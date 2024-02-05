@@ -304,9 +304,17 @@ source_set("${loopback_isolated_test_label}_socket_tests") {
 #   with_distinct_fast_udp_expectations (optional)
 #     If this is true, then we'll look for expectation files with _syncudp and
 #     _fastudp suffixes.
+#
+#   num_shards (optional)
+#     If set, this will override the number of shards the suite is sharded into.
 template("syscall_test_suite") {
   not_needed([ "invoker" ])
   suite_label = target_name
+
+  _num_shards = 5
+  if (defined(invoker.num_shards)) {
+    _num_shards = invoker.num_shards
+  }
 
   netstack3_expectations_target = "${suite_label}_netstack3_expectations"
   netstack2_expectations_target = "${suite_label}_netstack2_expectations"
@@ -402,7 +410,7 @@ template("syscall_test_suite") {
               expectations = "$_netstack2_expects_dir/${suite_label}.json5"
             }
           }
-          num_shards = 5
+          num_shards = _num_shards
 
           # Matches the first two slash delimited parts of the test name, or
           # just the whole name if there are no slashes. For example, from
@@ -434,6 +442,10 @@ template("syscall_test_suite") {
 syscall_test_suite(generic_test_label) {
 }
 syscall_test_suite(loopback_test_label) {
+  # The loopback suite was previously manually sharded into multiple different
+  # suites because it is longer-running and has more cases than many of the
+  # other suites. To compensate for this, use additional shards.
+  num_shards = 10
 }
 syscall_test_suite(loopback_isolated_test_label) {
 }
@@ -445,34 +457,6 @@ syscall_test_suite(udp_test_label) {
 syscall_test_suite(udp_raw_test_label) {
 }
 syscall_test_suite(udp_unbound_test_label) {
-}
-syscall_test_suite(loopback_tcp_accept_backlog_listen_v4_test_label) {
-  run_with_fast_udp = false
-  test_srcs_target = ":${loopback_test_label}_socket_tests"
-}
-syscall_test_suite(loopback_tcp_accept_backlog_listen_v4_mapped_test_label) {
-  run_with_fast_udp = false
-  test_srcs_target = ":${loopback_test_label}_socket_tests"
-}
-syscall_test_suite(loopback_tcp_accept_backlog_listen_v6_test_label) {
-  run_with_fast_udp = false
-  test_srcs_target = ":${loopback_test_label}_socket_tests"
-}
-syscall_test_suite(loopback_tcp_accept_test_label) {
-  run_with_fast_udp = false
-  test_srcs_target = ":${loopback_test_label}_socket_tests"
-}
-syscall_test_suite(loopback_tcp_backlog_test_label) {
-  run_with_fast_udp = false
-  test_srcs_target = ":${loopback_test_label}_socket_tests"
-
-  # TODO(https://fxbug.dev/42144060): Figure out how to allow high-severity logs
-  # in expected-to-fail tests.
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
 }
 syscall_test_suite(tcp_blocking_test_label) {
   run_with_fast_udp = false
@@ -494,11 +478,6 @@ suite_labels = [
   loopback_isolated_tcp_fin_wait_test_label,
   loopback_isolated_tcp_linger_timeout_test_label,
   loopback_isolated_test_label,
-  loopback_tcp_accept_backlog_listen_v4_mapped_test_label,
-  loopback_tcp_accept_backlog_listen_v4_test_label,
-  loopback_tcp_accept_backlog_listen_v6_test_label,
-  loopback_tcp_accept_test_label,
-  loopback_tcp_backlog_test_label,
   loopback_test_label,
   raw_packet_test_label,
   tcp_blocking_test_label,

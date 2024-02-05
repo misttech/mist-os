@@ -12,48 +12,88 @@
         {
             type: "expect_failure",
             matchers: [
-                // https://fxbug.dev/42111027
-                "BadSocketPairArgs.ValidateErrForBadCallsToSocketPair",
-
                 // https://fxbug.dev/42120534
-                "All/DualStackSocketTest.AddressOperations/V4Any*",
+                "All/DualStackSocketTest.AddressOperations/V4AnyBindConnectSendTo",
+                "All/DualStackSocketTest.AddressOperations/V4AnyBindSendToConnect",
+                "All/DualStackSocketTest.AddressOperations/V4AnyConnectBindSendTo",
+                "All/DualStackSocketTest.AddressOperations/V4AnyConnectSendToBind",
+                "All/DualStackSocketTest.AddressOperations/V4AnySendToBindConnect",
+                "All/DualStackSocketTest.AddressOperations/V4AnySendToConnectBind",
                 "All/DualStackSocketTest.AddressOperations/V4LoopbackBindConnectSendTo",
                 "All/DualStackSocketTest.AddressOperations/V4LoopbackBindSendToConnect",
 
                 // https://fxbug.dev/42085074
-                "All/SocketInetLoopbackTest.UdpIPV6Only/*",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV4Any_ConnectV4Any",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV4Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV4Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV4Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV4Loopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV4Loopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV4MappedAny_ConnectV4Any",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV4MappedAny_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV4MappedAny_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV4MappedAny_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV4MappedLoopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV4MappedLoopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV6Any_ConnectV4Any",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV6Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV6Any_ConnectV6Any",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV6Any_ConnectV6Loopback",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV6Loopback_ConnectV6Any",
+                "All/SocketInetLoopbackTest.UdpIPV6Only/ListenV6Loopback_ConnectV6Loopback",
+
+                // https://fxbug.dev/42111027
+                "BadSocketPairArgs.ValidateErrForBadCallsToSocketPair",
             ],
         },
         {
             type: "skip",
             matchers: [
-                // Skip tests run by loopback_tcp_accept_backlog_listen_* targets.
-                "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/Listen*",
-
-                // Skip tests run by loopback_tcp_accept_backlog target.
-                "All/SocketInetLoopbackTest.TCPBacklog/*",
-                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/*",
-
-                // Skip tests run by loopback_tcp_accept target.
-                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/*",
-                "All/SocketInetLoopbackTest.TCPAcceptAfterReset/*",
-                "All/SocketInetLoopbackTest.TCPDeferAccept/*",
-                "All/SocketInetLoopbackTest.TCPDeferAcceptTimeout/*",
-
                 // https://fxbug.dev/42063908
-                "All/SocketInetLoopbackTest.TCPListenShutdownListen/*",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV4Any_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV4Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV4Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV4Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV4Loopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV4Loopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV4MappedAny_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV4MappedAny_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV4MappedAny_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV4MappedAny_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV4MappedLoopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV4MappedLoopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV6Any_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV6Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV6Any_ConnectV6Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV6Any_ConnectV6Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV6Loopback_ConnectV6Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdownListen/ListenV6Loopback_ConnectV6Loopback",
 
                 // https://fxbug.dev/42111030
                 // Deadlock? Test makes no progress even when run in isolation.
-                "All/SocketInetReusePortTest.TcpPortReuseMultiThread/*",
-
-                // https://fxbug.dev/42111030
-                // Deadlock? Test makes no progress even when run in isolation.
-                "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/*",
-
-                // https://fxbug.dev/42111030
-                // Deadlock? Test makes no progress even when run in isolation.
-                "All/SocketInetReusePortTest.UdpPortReuseMultiThread/*",
+                "All/SocketInetReusePortTest.TcpPortReuseMultiThread/ListenV4Any_ConnectV4Loopback",
+                "All/SocketInetReusePortTest.TcpPortReuseMultiThread/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetReusePortTest.TcpPortReuseMultiThread/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetReusePortTest.TcpPortReuseMultiThread/ListenV6Any_ConnectV6Loopback",
+                "All/SocketInetReusePortTest.TcpPortReuseMultiThread/ListenV6Loopback_ConnectV6Loopback",
+                "All/SocketInetReusePortTest.UdpPortReuseMultiThread/ListenV4Any_ConnectV4Loopback",
+                "All/SocketInetReusePortTest.UdpPortReuseMultiThread/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetReusePortTest.UdpPortReuseMultiThread/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetReusePortTest.UdpPortReuseMultiThread/ListenV6Any_ConnectV6Loopback",
+                "All/SocketInetReusePortTest.UdpPortReuseMultiThread/ListenV6Loopback_ConnectV6Loopback",
+                "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/ListenV4Any_ConnectV4Loopback",
+                "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/ListenV6Any_ConnectV6Loopback",
+                "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/ListenV6Loopback_ConnectV6Loopback",
             ],
         },
     ],
