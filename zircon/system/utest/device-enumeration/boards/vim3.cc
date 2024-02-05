@@ -50,6 +50,23 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
 
       // EMMC
       "sys/platform/05:00:8/aml_emmc/aml-sd-emmc",
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/boot1/block",
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/boot2/block",
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/rpmb",
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-000/block",
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-001/block",
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-002/block",
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-003/block",
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-004/block",
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-005/block",
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-006/block",
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-007/block",
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-008/block",
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-009/block",
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-010/block",
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-011/block",
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-012/block",
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-013/block",
 
       // CPU devices.
       "sys/platform/05:06:1e",
