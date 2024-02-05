@@ -484,7 +484,20 @@ pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledCh
                     .map(|id| match make_sender_socket(id, addr, ttl) {
                         Ok(sock) => Some(sock),
                         Err(err) => {
-                            tracing::error!("mdns: failed to bind {}: {}", &addr, err);
+                            // Moving this to debug from error because there is nothing actionable
+                            // for the user.
+                            //
+                            // On Linux, we see this error most prominently during suspend/resume
+                            // cycle of the host. Looking at `journalctl -u avahi-service`, we see
+                            // the daemon withdrawing the address, registering a new one, and
+                            // invalidating the old address. These messages are classified as info
+                            // in the system journal and thus is a normal part of the operation.
+                            //
+                            // In rust, we get this error when we try to bind the UDP socket.
+                            // Because this function is a discovery loop, we retry automatically
+                            // and we eventually bind once the avahi service successfully registers
+                            // the address.
+                            tracing::debug!("mdns: failed to bind {}: {}", &addr, err);
                             None
                         }
                     })
@@ -741,7 +754,13 @@ async fn query_loop(sock: Rc<UdpSocket>, interval: Duration, mdns_port: u16) {
     loop {
         for query_buf in QUERY_BUF.iter() {
             if let Err(err) = sock.send_to(query_buf, to_addr).await {
-                tracing::error!(
+                // Moving this to debug from error as there is nothing actionable for the user.
+                // See the corresponding explanation in discovery_loop fn above.
+                //
+                // But the premise is that we see this during suspend / resume cycle of the host
+                // because the mDNS services for the relevant address and interface are not ready
+                // yet.
+                tracing::debug!(
                     "mdns query failed from {}: {}",
                     sock.local_addr()
                         .map(|a| a.to_string())
