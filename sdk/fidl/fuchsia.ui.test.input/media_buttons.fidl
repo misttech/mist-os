@@ -16,4 +16,13 @@ closed protocol MediaButtonsDevice {
         /// The button receiving the button press.
         1: button fuchsia.input.report.ConsumerControlButton;
     }) -> ();
+
+    /// Send a vector of pressing button on the requested button on the
+    /// device. Passing empty vector will release all pressing buttons.
+    @available(added=19)
+    strict SendButtonsState(table {
+        /// The button receiving the button press.
+        1: buttons
+                vector<fuchsia.input.report.ConsumerControlButton>:fuchsia.input.report.CONSUMER_CONTROL_MAX_NUM_BUTTONS;
+    }) -> ();
 };

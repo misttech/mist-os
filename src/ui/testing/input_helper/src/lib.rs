@@ -494,6 +494,26 @@ async fn handle_media_buttons_device_request_stream(
                     warn!("SimulateButtonPress request missing button");
                 }
             }
+            Ok(MediaButtonsDeviceRequest::SendButtonsState { payload, responder }) => {
+                let buttons = match payload.buttons {
+                    Some(buttons) => buttons,
+                    None => vec![],
+                };
+                let input_report = InputReport {
+                    event_time: Some(fasync::Time::now().into_nanos()),
+                    consumer_control: Some(ConsumerControlInputReport {
+                        pressed_buttons: Some(buttons),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                };
+
+                media_buttons_device
+                    .send_input_report(input_report)
+                    .expect("Failed to send button press input report");
+
+                responder.send().expect("Failed to send SimulateButtonsPress response");
+            }
             Err(e) => {
                 error!("Error on media buttons device channel: {}", e);
                 return;
