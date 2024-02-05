@@ -23,6 +23,7 @@ fidl("fuchsia.kernel") {
     "kernel-stats.fidl",
     "mexec-resource.fidl",
     "mmio-resource.fidl",
+    "msi-resource.fidl",
     "overview.fidl",
     "power-resource.fidl",
     "profile-resource.fidl",

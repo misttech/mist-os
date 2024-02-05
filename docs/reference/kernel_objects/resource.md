@@ -8,8 +8,7 @@ resource - Address space rights and accounting
 
 A resource is an immutable object that is used to validate access to syscalls
 that create objects backed by address space, or permit access to address space.
-These include [vm objects](vm_object.md), [interrupts](interrupts.md), and x86
-ioports.
+These include [vm objects](vm_object.md), [interrupts](interrupts.md), and x86 ioports.
 
 ## DESCRIPTION
 
@@ -19,17 +18,18 @@ required to create VMOs and IRQs, as well as accessing x86 ioports.
 A resource object consists of a single resource *kind*, with *base* address and
 *len* parameters that define a range of address space the holder of the resource
 is granted access to. The range covers *base* up to but not including *base* +
-*len*.  These objects are immutable after creation. Valid *kind*  values are
+*len*.  These objects are immutable after creation. Valid *kind* values are
 **ZX_RSRC_KIND_ROOT**, **ZX_RSRC_KIND_MMIO**, **ZX_RSRC_KIND_IOPORT**,
 **ZX_RSRC_KIND_IRQ**, **ZX_RSRC_KIND_SMC**, and **ZX_RSRC_KIND_SYSTEM**.
 
 The system resource is a special case that contains other resources, all of which have *len*
 one. These resources each have their own base within the system resource. Valid *base*
 values for the system resource are **ZX_RSRC_SYSTEM_HYPERVISOR_BASE**,
-**ZX_RSRC_SYSTEM_VMEX_BASE**, **ZX_RSRC_SYSTEM_DEBUG_BASE**,**ZX_RSRC_SYSTEM_INFO_BASE**,
+**ZX_RSRC_SYSTEM_VMEX_BASE**, **ZX_RSRC_SYSTEM_DEBUG_BASE**, **ZX_RSRC_SYSTEM_INFO_BASE**,
 **ZX_RSRC_SYSTEM_CPU_BASE**, **ZX_RSRC_SYSTEM_POWER_BASE**, **ZX_RSRC_SYSTEM_MEXEC_BASE**,
-**ZX_RSRC_SYSTEM_ENERGY_INFO_BASE**, **ZX_RSRC_SYSTEM_IOMMU_BASE** and
-**ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE**.
+**ZX_RSRC_SYSTEM_ENERGY_INFO_BASE**, **ZX_RSRC_SYSTEM_IOMMU_BASE**,
+**ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE**, **ZX_RSRC_SYSTEM_PROFILE_BASE**,
+and **ZX_RSRC_SYSTEM_MSI_BASE**.
 
 New resources may be created with an appropriate parent resource by calling
 [`zx_resource_create()`]. An initial resource of each *kind* is created by the kernel

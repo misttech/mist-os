@@ -44,6 +44,7 @@ typedef uint64_t zx_rsrc_system_base_t;
 #define ZX_RSRC_SYSTEM_IOMMU_BASE ((zx_rsrc_system_base_t)8u)
 #define ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE ((zx_rsrc_system_base_t)9u)
 #define ZX_RSRC_SYSTEM_PROFILE_BASE ((zx_rsrc_system_base_t)10u)
-#define ZX_RSRC_SYSTEM_COUNT ((zx_rsrc_system_base_t)11u)
+#define ZX_RSRC_SYSTEM_MSI_BASE ((zx_rsrc_system_base_t)11u)
+#define ZX_RSRC_SYSTEM_COUNT ((zx_rsrc_system_base_t)12u)
 
 #endif  // ZIRCON_SYSCALLS_RESOURCE_H_
