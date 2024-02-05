@@ -47,10 +47,10 @@ class NavListener : public fuchsia::web::NavigationEventListener {
   void OnNavigationStateChanged(fuchsia::web::NavigationState nav_state,
                                 OnNavigationStateChangedCallback send_ack) override {
     if (nav_state.has_url()) {
-      FX_VLOGS(1) << "nav_state.url = " << nav_state.url();
+      FX_LOGS(DEBUG) << "nav_state.url = " << nav_state.url();
     }
     if (nav_state.has_page_type()) {
-      FX_VLOGS(1) << "nav_state.page_type = " << static_cast<size_t>(nav_state.page_type());
+      FX_LOGS(DEBUG) << "nav_state.page_type = " << static_cast<size_t>(nav_state.page_type());
     }
     if (nav_state.has_is_main_document_loaded()) {
       FX_LOGS(INFO) << "nav_state.is_main_document_loaded = "
