@@ -4,6 +4,9 @@
 
 #include "src/developer/debug/zxdb/symbols/mock_line_table.h"
 
+#include "src/developer/debug/zxdb/symbols/lazy_symbol.h"
+#include "src/developer/debug/zxdb/symbols/symbol.h"
+
 namespace zxdb {
 
 MockLineTable::MockLineTable(FileNameVector files, RowVector rows)
@@ -22,9 +25,9 @@ std::optional<std::string> MockLineTable::GetFileNameByIndex(uint64_t file_id) c
   return file_names_[file_id - 1];
 }
 
-uint64_t MockLineTable::GetFunctionDieOffsetForRow(const llvm::DWARFDebugLine::Row& row) const {
+LazySymbol MockLineTable::GetFunctionForRow(const llvm::DWARFDebugLine::Row& row) const {
   // For now, don't support subroutine lookup in the mock.
-  return 0;
+  return LazySymbol();
 }
 
 // static

@@ -16,9 +16,13 @@
 namespace zxdb {
 
 // For outputting error messages for LineMatch.
+std::ostream& operator<<(std::ostream& out, const LazySymbol& s) {
+  // This test only cares about the DIE offsets, the symbol factories are the same.
+  return out << to_hex_string(s.die_offset());
+}
 std::ostream& operator<<(std::ostream& out, const LineMatch& m) {
-  return out << "LineMatch(" << to_hex_string(m.address) << ", " << m.line << ", "
-             << to_hex_string(m.function_die_offset) << ")";
+  return out << "LineMatch(" << to_hex_string(m.address) << ", " << m.line << ", " << m.function
+             << ")";
 }
 
 TEST(FindLine, GetAllLineTableMatchesInUnit) {
@@ -140,21 +144,20 @@ TEST(FindLine, AppendLineMatchesForInlineCalls) {
   outer_fn->set_inner_blocks({LazySymbol(outer_block)});
 
   std::vector<LineMatch> result;
-  AppendLineMatchesForInlineCalls(outer_fn.get(), kFilename, kLine, outer_fn->GetDieOffset(),
-                                  &result);
+  AppendLineMatchesForInlineCalls(outer_fn.get(), kFilename, kLine, outer_fn.get(), &result);
 
   // We should get only the exact match.
   ASSERT_EQ(1u, result.size());
-  EXPECT_EQ(result[0], LineMatch(kInlineCall2Begin, kLine, outer_fn->GetDieOffset())) << result[0];
+  EXPECT_EQ(result[0], LineMatch(kInlineCall2Begin, kLine, outer_fn->GetLazySymbol())) << result[0];
 
   // Let's pretend the line table found another match after the line in question (this would
   // normally be the case).
-  result.emplace_back(kInlineCall2Begin + 10, kLine + 1, outer_fn->GetDieOffset());
+  result.emplace_back(kInlineCall2Begin + 10, kLine + 1, outer_fn->GetLazySymbol());
 
   // GetBestLineMatches() should return only the inline match because it's an exact match.
   std::vector<LineMatch> best = GetBestLineMatches(result);
   ASSERT_EQ(1u, best.size());
-  EXPECT_EQ(best[0], LineMatch(kInlineCall2Begin, kLine, outer_fn->GetDieOffset())) << best[0];
+  EXPECT_EQ(best[0], LineMatch(kInlineCall2Begin, kLine, outer_fn->GetLazySymbol())) << best[0];
 }
 
 // Nested inline calls can mean there is more than one match for a line in a given physical
@@ -223,15 +226,14 @@ TEST(FindLine, AppendLineMatchesForInlineCalls_Multiple) {
   inline1_call2->set_inner_blocks({LazySymbol(inline2_call2)});
 
   std::vector<LineMatch> result;
-  AppendLineMatchesForInlineCalls(outer_fn.get(), kFilename, kLine, outer_fn->GetDieOffset(),
-                                  &result);
+  AppendLineMatchesForInlineCalls(outer_fn.get(), kFilename, kLine, outer_fn.get(), &result);
 
   // This should return the two exact matches.
   ASSERT_EQ(2u, result.size());
-  EXPECT_EQ(result[0], LineMatch(kInline2Call1Begin, kLine, inline1_call1->GetDieOffset()))
-      << std::hex << result[0].function_die_offset << " " << inline1_call1->GetDieOffset();
-  EXPECT_EQ(result[1], LineMatch(kInline2Call2Begin, kLine, inline1_call2->GetDieOffset()))
-      << std::hex << result[1].function_die_offset << " " << inline1_call2->GetDieOffset();
+  EXPECT_EQ(result[0], LineMatch(kInline2Call1Begin, kLine, inline1_call1->GetLazySymbol()))
+      << std::hex << result[0].function << " " << inline1_call1->GetLazySymbol();
+  EXPECT_EQ(result[1], LineMatch(kInline2Call2Begin, kLine, inline1_call2->GetLazySymbol()))
+      << std::hex << result[1].function << " " << inline1_call2->GetLazySymbol();
 
   // Both matches should be kept when ranking. The order is not important.
   std::vector<LineMatch> best = GetBestLineMatches(result);
@@ -245,27 +247,38 @@ TEST(FindLine, GetBestLineMatches) {
   auto out = GetBestLineMatches({});
   EXPECT_TRUE(out.empty());
 
+  LazySymbol fn_null;
+
   // Should return the smallest line #.
-  out = GetBestLineMatches(
-      {LineMatch(0x1000, 10, 0), LineMatch(0x1001, 7, 0), LineMatch(0x1002, 100, 0)});
+  out = GetBestLineMatches({LineMatch(0x1000, 10, fn_null), LineMatch(0x1001, 7, fn_null),
+                            LineMatch(0x1002, 100, fn_null)});
   ASSERT_EQ(1u, out.size());
   EXPECT_EQ(LineMatch(0x1001, 7, 0), out[0]);
 
+  // Set up some functions for the lines below.
+  MockSymbolFactory symbol_factory;
+  auto fn1 = fxl::MakeRefCounted<Function>(DwarfTag::kSubprogram);
+  symbol_factory.SetMockSymbol(0x2000, fn1);
+  auto fn2 = fxl::MakeRefCounted<Function>(DwarfTag::kSubprogram);
+  symbol_factory.SetMockSymbol(0x3000, fn2);
+  auto fn3 = fxl::MakeRefCounted<Function>(DwarfTag::kSubprogram);
+  symbol_factory.SetMockSymbol(0x4000, fn3);
+
   // When the smallest match has dupes, all should be returned assuming the functions are different.
-  out = GetBestLineMatches({LineMatch(0x1000, 10, 0), LineMatch(0x1001, 20, 1),
-                            LineMatch(0x1002, 10, 2), LineMatch(0x1003, 30, 3)});
+  out = GetBestLineMatches({LineMatch(0x1000, 10, fn_null), LineMatch(0x1001, 20, fn1),
+                            LineMatch(0x1002, 10, fn2), LineMatch(0x1003, 30, fn3)});
   ASSERT_EQ(2u, out.size());
-  EXPECT_EQ(LineMatch(0x1000, 10, 0), out[0]);
-  EXPECT_EQ(LineMatch(0x1002, 10, 2), out[1]);
+  EXPECT_EQ(LineMatch(0x1000, 10, fn_null), out[0]);
+  EXPECT_EQ(LineMatch(0x1002, 10, fn2), out[1]);
 
   // Dupes in the same function should return the smallest match.
-  out = GetBestLineMatches({LineMatch(0x1002, 10, 0),    // Match, discarded due to higher addr.
-                            LineMatch(0x1001, 20, 0),    // No line match.
-                            LineMatch(0x1000, 10, 0),    // Match, this one last lowest addr.
-                            LineMatch(0x1003, 10, 1)});  // Same line, different function.
+  out = GetBestLineMatches({LineMatch(0x1002, 10, fn_null),  // Match, discarded due to higher addr.
+                            LineMatch(0x1001, 20, fn_null),  // No line match.
+                            LineMatch(0x1000, 10, fn_null),  // Match, this one last lowest addr.
+                            LineMatch(0x1003, 10, fn1)});    // Same line, different function.
   ASSERT_EQ(2u, out.size());
-  EXPECT_EQ(LineMatch(0x1000, 10, 0), out[0]);
-  EXPECT_EQ(LineMatch(0x1003, 10, 1), out[1]);
+  EXPECT_EQ(LineMatch(0x1000, 10, fn_null), out[0]);
+  EXPECT_EQ(LineMatch(0x1003, 10, fn1), out[1]);
 }
 
 // Tests looking for a prologue end marker that's not present.

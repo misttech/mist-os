@@ -591,10 +591,9 @@ std::optional<Location> ModuleSymbolsImpl::DwarfLocationForAddress(
     lazy_function = LazySymbol(optional_func);
   } else {
     // Resolve the function for this address.
-    if (uint64_t fn_die_offset = unit->FunctionDieOffsetForRelativeAddress(relative_address)) {
+    if ((lazy_function = unit->FunctionForRelativeAddress(relative_address))) {
       // FunctionForRelativeAddress() will return the most specific inlined function for the
       // address.
-      lazy_function = GetSymbolFactory()->MakeLazy(fn_die_offset);
       function = RefPtrTo(lazy_function.Get()->As<Function>());
 
       // The is_inline() check is strictly unnecessary since ambiguous inline computations will
@@ -843,17 +842,16 @@ void ModuleSymbolsImpl::ResolveLineInputLocationForFile(const SymbolContext& sym
   // locations into account when looking for code line transitions. Then if you request a breakpoint
   // for an optimized-out line *before* the inline call, it can "slide" down to the inline call
   // even if there was no line table entry for it.
-  std::set<uint64_t> checked_functions;          // LineMatch.function_die_offsets we've checked.
+  std::set<LazySymbol> checked_functions;        // LineMatch.functions we've checked.
   size_t original_match_count = matches.size();  // Don't check anything the loop appends.
   for (size_t i = 0; i < original_match_count; i++) {
     const LineMatch& match = matches[i];
 
-    if (checked_functions.find(match.function_die_offset) != checked_functions.end())
+    if (checked_functions.find(match.function) != checked_functions.end())
       continue;  // Already checked this function.
-    checked_functions.insert(match.function_die_offset);
+    checked_functions.insert(match.function);
 
-    if (auto fn =
-            RefPtrTo(GetSymbolFactory()->CreateSymbol(match.function_die_offset)->As<Function>())) {
+    if (auto fn = match.function.Get()->As<Function>()) {
       // Make sure we have the outermost function and not some random code block inside it.
       //
       // If GetContainingFunction() returns a different function that we put in (i.e. we put in
@@ -862,12 +860,12 @@ void ModuleSymbolsImpl::ResolveLineInputLocationForFile(const SymbolContext& sym
       // not checked it yet.
       auto containing_fn = fn->GetContainingFunction(Function::kPhysicalOnly);
       if (fn->GetDieOffset() != containing_fn->GetDieOffset() &&
-          checked_functions.find(fn->GetDieOffset()) != checked_functions.end())
+          checked_functions.find(fn->GetLazySymbol()) != checked_functions.end())
         continue;  // Already checked this toplevel function.
 
       // Append any new matches.
       AppendLineMatchesForInlineCalls(containing_fn.get(), canonical_file, line_number,
-                                      containing_fn->GetDieOffset(), &matches);
+                                      containing_fn.get(), &matches);
     }
   }
 

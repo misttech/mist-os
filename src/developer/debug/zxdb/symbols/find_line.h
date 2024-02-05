@@ -11,6 +11,8 @@
 #include <tuple>
 #include <vector>
 
+#include "src/developer/debug/zxdb/symbols/lazy_symbol.h"
+
 namespace zxdb {
 
 class CodeBlock;
@@ -22,21 +24,20 @@ class SymbolContext;
 
 struct LineMatch {
   LineMatch() = default;
-  LineMatch(uint64_t addr, int ln, uint64_t func)
-      : address(addr), line(ln), function_die_offset(func) {}
+  LineMatch(uint64_t addr, int ln, LazySymbol func)
+      : address(addr), line(ln), function(std::move(func)) {}
 
   bool operator==(const LineMatch& other) const {
-    return std::tie(address, line, function_die_offset) ==
-           std::tie(other.address, other.line, other.function_die_offset);
+    return std::tie(address, line, function) == std::tie(other.address, other.line, other.function);
   }
 
   uint64_t address = 0;
   int line = 0;
 
-  // Absolute offset of the DIE containing the most specified inlined subroutine for this address or
-  // 0 if there is no function for it. This is used so we don't accidentally treat duplicate line
-  // entries in different functions as the same.
-  uint64_t function_die_offset = 0;
+  // Symbol of the most specific inlined for this address or an !is_valid() symbol if there is no
+  // function for it. This is used so we don't accidentally treat duplicate line entries in
+  // different functions as the same.
+  LazySymbol function;
 };
 
 // Searches the given line table for the given file/line. Finds the smallest line greater than or
@@ -58,8 +59,7 @@ std::vector<LineMatch> GetAllLineTableMatchesInUnit(const LineTable& line_table,
 // for recursive calls, some blocks will be lexical scopes and we want to maintain the DIE offset
 // of the parent *function* containing it.
 void AppendLineMatchesForInlineCalls(const CodeBlock* block, const std::string& full_path, int line,
-                                     uint64_t block_fn_die_offset,
-                                     std::vector<LineMatch>* accumulator);
+                                     const Function* block_fn, std::vector<LineMatch>* accumulator);
 
 // Filters the set of matches to get all instances of the closest match for the line, with a maximum
 // of one per function. It's assumed that the LineMatches are all for the same file.

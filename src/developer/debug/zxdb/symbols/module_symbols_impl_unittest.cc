@@ -649,19 +649,22 @@ TEST(ModuleSymbols, FissionAddress) {
   ASSERT_TRUE(result[0].has_symbols());
 
 // TODO finish implemeting debug fission support so this works.
+//
+// I believe the problem is that the line table is stored in the main binary, but
+// ModuleSymbolsImpl::DwarfLocationForAddress uses the DWO unit's line table.
 #if 0
-  EXPECT_EQ(result[0].file_line().file(), "foo");
-  EXPECT_EQ(result[0].file_line().line(), 999999);
+  EXPECT_EQ(result[0].file_line().file(), "other.cc");
+  EXPECT_EQ(result[0].file_line().line(), 9);
+#endif
 
   const Symbol* symbol = result[0].symbol().Get();
   ASSERT_TRUE(symbol);
-  EXPECT_EQ("CallOther()", symbol->GetFullName());
+  EXPECT_EQ("CallOther", symbol->GetFullName());
 
   // This should resolve to a real DWARF symbol. If the name matches above but it doesn't appear as
   // a function here, that means it matched the ELF symbol which bypasses all of the debug fission
   // stuff. That means the Fission address lookup failed.
   ASSERT_TRUE(symbol->As<Function>());
-#endif
 }
 
 }  // namespace zxdb

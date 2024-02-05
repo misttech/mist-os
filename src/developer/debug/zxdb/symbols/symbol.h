@@ -252,6 +252,7 @@ class Symbol : public fxl::RefCountedThreadSafe<Symbol> {
 #undef IMPLEMENT_TEMPLATIZED_AS
 
  protected:
+  friend LazySymbol;  // For constructing a LazySymbol from us.
   FRIEND_REF_COUNTED_THREAD_SAFE(Symbol);
   FRIEND_MAKE_REF_COUNTED(Symbol);
 

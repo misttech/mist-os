@@ -78,8 +78,7 @@ std::vector<LineMatch> GetAllLineTableMatchesInUnit(const LineTable& line_table,
           }
           if (row_line == best_line) {
             // Accumulate all matching results.
-            result.emplace_back(row.Address.Address, row_line,
-                                line_table.GetFunctionDieOffsetForRow(row));
+            result.emplace_back(row.Address.Address, row_line, line_table.GetFunctionForRow(row));
           }
         }
       }
@@ -90,7 +89,7 @@ std::vector<LineMatch> GetAllLineTableMatchesInUnit(const LineTable& line_table,
 }
 
 void AppendLineMatchesForInlineCalls(const CodeBlock* block, const std::string& full_path, int line,
-                                     uint64_t block_fn_die_offset,
+                                     const Function* block_fn,
                                      std::vector<LineMatch>* accumulator) {
   std::vector<LineMatch> result;
 
@@ -99,9 +98,9 @@ void AppendLineMatchesForInlineCalls(const CodeBlock* block, const std::string& 
     if (!child_block)
       continue;  // Shouldn't happen, maybe corrupt?
 
-    // This offset will be used for the recursive call and will depend on the type of item
-    // we're recursing into.
-    uint64_t containing_die_offset = block_fn_die_offset;
+    // This will be used for the recursive call and will depend on the type of item we're recursing
+    // into.
+    const Function* containing_fn = block_fn;
 
     if (const Function* child_fn = child_block->As<Function>()) {
       // Checks that the call line is an exact match. Unlike the line table code, we don't want
@@ -114,22 +113,20 @@ void AppendLineMatchesForInlineCalls(const CodeBlock* block, const std::string& 
         if (addr_range.size() > 0) {
           // Some inlined functions may be optimized away, only add those with code.
           //
-          // Note that the DIE offset we use here is that of the caller function. This is because
-          // the caller is the one where the call file/line matches, and which should be used to
-          // pick the best one in GetBestLineMatches() below.
-          accumulator->emplace_back(addr_range.begin(), child_fn->call_line().line(),
-                                    block_fn_die_offset);
+          // Note that the function we use here is that of the caller function. This is because the
+          // caller is the one where the call file/line matches, and which should be used to pick
+          // the best one in GetBestLineMatches() below.
+          accumulator->emplace_back(addr_range.begin(), child_fn->call_line().line(), block_fn);
         }
       }
 
-      // When recursing into a function, we want to use the function's DIE offset, otherwise
-      // inherit the caller's DIE offset (the default value of containing_die_offset above).
-      containing_die_offset = child_fn->GetDieOffset();
+      // When recursing into a function, we want to use that function, otherwise inherit the
+      // caller's DIE offset (the default value of containing_die_offset above).
+      containing_fn = child_fn;
     }
 
     // Recurse into all child code blocks including inlines.
-    AppendLineMatchesForInlineCalls(child_block, full_path, line, containing_die_offset,
-                                    accumulator);
+    AppendLineMatchesForInlineCalls(child_block, full_path, line, containing_fn, accumulator);
   }
 }
 
@@ -149,30 +146,31 @@ std::vector<LineMatch> GetBestLineMatches(const std::vector<LineMatch>& matches)
   // But if the same helper is inlined into many places (or even twice into the same function), we
   // want to catch all of those places.
   //
-  // By indexing by the [inlined] subroutine DIE offset, we can ensure there is only one match per
-  // subroutine, and resolve collisions by address.
-  std::map<uint64_t, size_t> die_to_match_index;
+  // By indexing by the [inlined] subroutine, we can ensure there is only one match per subroutine,
+  // and resolve collisions by address.
+  std::map<LazySymbol, size_t> fn_to_match_index;
   for (size_t i = 0; i < matches.size(); i++) {
     const LineMatch& match = matches[i];
-    if (match.line != min_elt_iter->line)
+    if (match.line != min_elt_iter->line) {
       continue;  // Not a match.
+    }
 
-    auto existing = die_to_match_index.find(match.function_die_offset);
-    if (existing == die_to_match_index.end()) {
+    auto existing = fn_to_match_index.find(match.function);
+    if (existing == fn_to_match_index.end()) {
       // New entry for this function.
-      die_to_match_index[match.function_die_offset] = i;
+      fn_to_match_index[match.function] = i;
     } else {
       // Duplicate in the same function, pick the lowest address.
       const LineMatch& existing_match = matches[existing->second];
       if (match.address < existing_match.address)
-        die_to_match_index[match.function_die_offset] = i;  // New one better.
+        fn_to_match_index[match.function] = i;  // New one better.
     }
   }
 
   // Convert back to a result vector.
   std::vector<LineMatch> result;
-  result.reserve(die_to_match_index.size());
-  for (const auto& [die, match_index] : die_to_match_index)
+  result.reserve(fn_to_match_index.size());
+  for (const auto& [die, match_index] : fn_to_match_index)
     result.push_back(matches[match_index]);
   return result;
 }

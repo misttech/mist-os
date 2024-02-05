@@ -29,9 +29,17 @@ int DwarfUnitImpl::GetDwarfVersion() const { return unit_->getVersion(); }
 
 llvm::DWARFDie DwarfUnitImpl::GetUnitDie() const { return unit_->getUnitDIE(true); }
 
-uint64_t DwarfUnitImpl::FunctionDieOffsetForRelativeAddress(uint64_t relative_address) const {
+LazySymbol DwarfUnitImpl::FunctionForRelativeAddress(uint64_t relative_address) const {
+  if (!binary_) {
+    return LazySymbol();
+  }
+
   EnsureFuncAddrMap();
-  return func_addr_to_die_offset_.Lookup(relative_address);
+  uint64_t offset = func_addr_to_die_offset_.Lookup(relative_address);
+  if (offset) {
+    return binary_->GetSymbolFactory()->MakeLazy(offset);
+  }
+  return LazySymbol();
 }
 
 uint64_t DwarfUnitImpl::GetOffset() const {

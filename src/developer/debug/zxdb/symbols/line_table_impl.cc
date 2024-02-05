@@ -8,6 +8,8 @@
 
 #include "llvm/DebugInfo/DWARF/DWARFContext.h"
 #include "src/developer/debug/zxdb/common/file_util.h"
+#include "src/developer/debug/zxdb/symbols/lazy_symbol.h"
+#include "src/developer/debug/zxdb/symbols/symbol.h"
 
 namespace zxdb {
 
@@ -47,10 +49,10 @@ std::optional<std::string> LineTableImpl::GetFileNameByIndex(uint64_t file_id) c
   return std::nullopt;
 }
 
-uint64_t LineTableImpl::GetFunctionDieOffsetForRow(const llvm::DWARFDebugLine::Row& row) const {
+LazySymbol LineTableImpl::GetFunctionForRow(const llvm::DWARFDebugLine::Row& row) const {
   if (!unit_)
     return 0;
-  return unit_->FunctionDieOffsetForRelativeAddress(row.Address.Address);
+  return unit_->FunctionForRelativeAddress(row.Address.Address);
 }
 
 }  // namespace zxdb

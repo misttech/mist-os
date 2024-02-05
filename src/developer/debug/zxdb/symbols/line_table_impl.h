@@ -23,7 +23,7 @@ class LineTableImpl : public LineTable {
   // LineTable public implementation.
   size_t GetNumFileNames() const override;
   std::optional<std::string> GetFileNameByIndex(uint64_t file_id) const override;
-  uint64_t GetFunctionDieOffsetForRow(const llvm::DWARFDebugLine::Row& row) const override;
+  LazySymbol GetFunctionForRow(const Row& row) const override;
 
  protected:
   // LineTable protected implementation.

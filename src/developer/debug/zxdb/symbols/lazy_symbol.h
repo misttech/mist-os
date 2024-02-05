@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #include <memory>
+#include <tuple>
 
 #include "src/developer/debug/zxdb/symbols/symbol_factory.h"
 #include "src/lib/fxl/memory/ref_ptr.h"
@@ -35,6 +36,17 @@ class LazySymbolBase {
 
   LazySymbolBase& operator=(const LazySymbolBase& other);
   LazySymbolBase& operator=(LazySymbolBase&& other);
+
+  // LazySymbols have an identity and can be compared for insertion into e.g. sets. These comparison
+  // operations assume that the factory pointer is unique for the module.
+  bool operator==(const LazySymbolBase& other) const {
+    return factory_.get() == other.factory_.get() && die_offset_ == other.die_offset_;
+  }
+  bool operator!=(const LazySymbolBase& other) const { return !operator==(other); }
+  bool operator<(const LazySymbolBase& other) const {
+    return std::make_tuple(factory_.get(), die_offset_) <
+           std::make_tuple(other.factory_.get(), other.die_offset_);
+  }
 
   // Returns the DIE offset of the symbol that will be created. This will be 0 for invalid or
   // uninitialized LazySymbols, as well as most synthetic symbols (like built-in types and
@@ -81,8 +93,13 @@ class LazySymbol : public LazySymbolBase {
              fxl::RefPtr<Symbol> pre_cached = {});
 
   // Implicitly creates a non-lazy one with a pre-cooked object, mostly for tests.
+  //
+  // Take the symbol factory and DIE offset from the Symbol. This is used for some comparison
+  // operations so must be set even when we have a symbol object already.
   template <class SymbolType>
-  LazySymbol(fxl::RefPtr<SymbolType> symbol) : LazySymbolBase(), symbol_(std::move(symbol)) {}
+  LazySymbol(fxl::RefPtr<SymbolType> symbol) : LazySymbolBase(), symbol_(std::move(symbol)) {
+    AssignFactoryAndDieFromSymbol();
+  }
   LazySymbol(const Symbol* symbol);
 
   bool is_valid() const { return LazySymbolBase::is_valid() || symbol_.get(); }
@@ -96,6 +113,13 @@ class LazySymbol : public LazySymbolBase {
   const Symbol* Get() const;
 
  private:
+  // This is an annoying function used as a helper for the template constructor above that extracts
+  // the factory and DIE offset from the current symbol_ and sets it as the source for this class.
+  //
+  // This is needed to extract the uses of the Symbol object to the .cc file to avoid circular
+  // dependencies.
+  void AssignFactoryAndDieFromSymbol();
+
   mutable fxl::RefPtr<Symbol> symbol_;
 };
 

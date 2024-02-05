@@ -18,6 +18,7 @@
 
 namespace zxdb {
 
+class LazySymbol;
 class SymbolContext;
 
 // This virtual interface wraps the line information for a single DWARFUnit. This indirection allows
@@ -76,10 +77,10 @@ class LineTable {
     return GetFileNameByIndex(row.File);
   }
 
-  // Returns the DIE associated with the most specific inlined subroutine (or subprogram) for the
-  // given row. This may be an invalid DIE if there is no subroutine for this code (could be
+  // Returns the function associated with the most specific inlined subroutine (or subprogram) for
+  // the given row. This may be invalid if there is no subroutine for this code (could be
   // compiler-generated).
-  virtual uint64_t GetFunctionDieOffsetForRow(const Row& row) const = 0;
+  virtual LazySymbol GetFunctionForRow(const Row& row) const = 0;
 
   // Query for sequences. This is used for iterating through the entire line table.
   //

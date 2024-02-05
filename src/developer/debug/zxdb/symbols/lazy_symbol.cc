@@ -19,7 +19,9 @@ fxl::RefPtr<Symbol> null_symbol;
 LazySymbolBase& LazySymbolBase::operator=(const LazySymbolBase& other) = default;
 LazySymbolBase& LazySymbolBase::operator=(LazySymbolBase&& other) = default;
 
-LazySymbol::LazySymbol(const Symbol* symbol) : symbol_(RefPtrTo(symbol)) {}
+LazySymbol::LazySymbol(const Symbol* symbol) : symbol_(RefPtrTo(symbol)) {
+  AssignFactoryAndDieFromSymbol();
+}
 
 fxl::RefPtr<Symbol> LazySymbolBase::Construct() const {
   if (is_valid())
@@ -52,6 +54,11 @@ const Symbol* LazySymbol::Get() const {
     }
   }
   return symbol_.get();
+}
+
+void LazySymbol::AssignFactoryAndDieFromSymbol() {
+  if (symbol_)
+    LazySymbolBase::operator=(symbol_->lazy_this_);
 }
 
 UncachedLazySymbol::UncachedLazySymbol(fxl::RefPtr<const SymbolFactory> factory,

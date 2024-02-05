@@ -35,7 +35,7 @@ class DwarfUnitImpl : public DwarfUnit {
   int GetDwarfVersion() const override;
   llvm::DWARFDie GetUnitDie() const override;
   uint64_t GetOffset() const override;
-  uint64_t FunctionDieOffsetForRelativeAddress(uint64_t relative_address) const override;
+  LazySymbol FunctionForRelativeAddress(uint64_t relative_address) const override;
   std::string GetCompilationDir() const override;
   const LineTable& GetLineTable() const override;
   const llvm::DWARFDebugLine::LineTable* GetLLVMLineTable() const override;

@@ -20,6 +20,7 @@ class DWARFDie;
 namespace zxdb {
 
 class DwarfBinary;
+class LazySymbol;
 class LineTable;
 
 // Represents a DWARF unit in the binary file. The primary purpose of this class is to allow
@@ -54,13 +55,9 @@ class DwarfUnit : public fxl::RefCountedThreadSafe<DwarfUnit> {
   // Returns the DWARFDie corresponding to this unit.
   virtual llvm::DWARFDie GetUnitDie() const = 0;
 
-  // Returns the DIE offset, if possible, for the function covering the given absolute/relative
-  // address. This will the most specific inlined subroutine if there are any. Returns 0 on failure.
-  uint64_t FunctionDieOffsetForAddress(const SymbolContext& symbol_context,
-                                       TargetPointer absolute_address) const {
-    return FunctionDieOffsetForRelativeAddress(symbol_context.AbsoluteToRelative(absolute_address));
-  }
-  virtual uint64_t FunctionDieOffsetForRelativeAddress(uint64_t relative_address) const = 0;
+  // Returns function covering the given absolute/relative address. This will the most specific
+  // inlined subroutine if there are any. Returns an !is_valid() LazySymbol on failure.
+  virtual LazySymbol FunctionForRelativeAddress(uint64_t relative_address) const = 0;
 
   // Returns the offset of the beginning of this unit within the symbol file. Returns 0 on failure.
   // The only failure case is that the symbols were unloaded.
