@@ -252,8 +252,6 @@ exit_loop:
   EXPECT_EQ(ptrace(PTRACE_CONT, child_pid, 0, 0), 0);
 }
 
-#ifdef __x86_64__
-
 namespace {
 
 // Loop until the target process indicates a sleeping state in /proc/pid/stat.
@@ -275,7 +273,11 @@ std::optional<std::string> WaitUntilBlocked(pid_t target) {
   return std::nullopt;
 }
 
-constexpr int kUnmaskedSignal = SIGUSR1;
+}  // namespace
+
+#ifdef __x86_64__
+
+static constexpr int kUnmaskedSignal = SIGUSR1;
 
 // Linux has internal errnos that capture the circumstances when an interrupted
 // syscall should restart rather than return.  These are ordinarily invisible to
@@ -342,10 +344,9 @@ void TraceSyscallWithRestartWithCall(int call, long arg0, long arg1, long arg2, 
   kill(child_pid, SIGKILL);
   ptrace(PTRACE_DETACH, child_pid, 0, 0);
 }
-}  // namespace
 
-constexpr int ERESTARTNOHAND = 514;
-constexpr int ERESTART_RESTARTBLOCK = 516;
+static constexpr int ERESTARTNOHAND = 514;
+static constexpr int ERESTART_RESTARTBLOCK = 516;
 
 TEST(PtraceTest, TraceSyscallWithRestart_pause) {
   ASSERT_NO_FATAL_FAILURE(TraceSyscallWithRestartWithCall(SYS_pause, 0, 0, 0, 0, ERESTARTNOHAND));
@@ -774,4 +775,53 @@ TEST(PtraceTest, PtraceEventStopWithSignalExit) {
   ASSERT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGTERM)
       << "WIFSIGNALED(status) == " << WIFEXITED(status)
       << " WTERMSIG(status) == " << WTERMSIG(status);
+}
+
+namespace {
+void GrandchildWithSigsuspendSigaction(int, siginfo_t *, void *) {
+  // NOP
+}
+}  // namespace
+
+// Test that traced child correctly resumes when signal needs to be delivered
+// because of a temporary mask.
+TEST(PtraceTest, GrandchildWithSigsuspend) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  pid_t child_pid = helper.RunInForkedProcess([] {
+    EXPECT_EQ(0, ptrace(PTRACE_TRACEME, 0, 0, 0));
+    EXPECT_EQ(0, raise(SIGSTOP));
+    sigset_t child_mask, old_mask;
+    EXPECT_EQ(0, sigemptyset(&child_mask));
+    EXPECT_EQ(0, sigaddset(&child_mask, SIGCHLD));
+
+    sigset_t empty_mask;
+    EXPECT_EQ(0, sigemptyset(&empty_mask));
+    struct sigaction sa, oldact;
+    sa.sa_sigaction = GrandchildWithSigsuspendSigaction;
+    sa.sa_mask = empty_mask;
+    EXPECT_EQ(0, sigaction(SIGCHLD, &sa, &oldact));
+    pid_t my_pid = getpid();
+    EXPECT_EQ(0, sigprocmask(SIG_BLOCK, &child_mask, &old_mask));
+    pid_t gc_pid = fork();
+    if (gc_pid == 0) {
+      WaitUntilBlocked(my_pid);
+      exit(0);
+    }
+    EXPECT_EQ(-1, sigsuspend(&old_mask));
+    int status;
+    EXPECT_EQ(gc_pid, waitpid(gc_pid, &status, 0));
+    EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0)
+        << "WIFEXITED(status) == " << WIFEXITED(status)
+        << " WEXITSTATUS(status) == " << WEXITSTATUS(status);
+  });
+  int status;
+  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
+      << WIFSTOPPED(status) << " " << WSTOPSIG(status);
+  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
+  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGCHLD)
+      << WIFSTOPPED(status) << " " << WSTOPSIG(status);
+  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, SIGCHLD));
 }

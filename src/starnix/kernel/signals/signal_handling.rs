@@ -184,18 +184,6 @@ pub fn dequeue_signal(current_task: &mut CurrentTask) {
         siginfo.as_ref().map(|siginfo| task.thread_group.signal_actions.get(siginfo.signal)),
     );
 
-    // A syscall may have been waiting with a temporary mask which should be used to dequeue the
-    // signal, but after the signal has been dequeued the old mask should be restored.
-    task_state.signals.restore_mask();
-    {
-        let (clear, set) = if task_state.signals.is_empty() {
-            (TaskFlags::SIGNALS_AVAILABLE, TaskFlags::empty())
-        } else {
-            (TaskFlags::empty(), TaskFlags::SIGNALS_AVAILABLE)
-        };
-        task_state.update_flags(clear | TaskFlags::TEMPORARY_SIGNAL_MASK, set);
-    };
-
     if let Some(ref siginfo) = siginfo {
         if task_state.ptrace_on_signal_consume() && siginfo.signal != SIGKILL {
             // Indicate we will be stopping for ptrace at the next opportunity.
@@ -210,6 +198,18 @@ pub fn dequeue_signal(current_task: &mut CurrentTask) {
             return;
         }
     }
+
+    // A syscall may have been waiting with a temporary mask which should be used to dequeue the
+    // signal, but after the signal has been dequeued the old mask should be restored.
+    task_state.signals.restore_mask();
+    {
+        let (clear, set) = if task_state.signals.is_empty() {
+            (TaskFlags::SIGNALS_AVAILABLE, TaskFlags::empty())
+        } else {
+            (TaskFlags::empty(), TaskFlags::SIGNALS_AVAILABLE)
+        };
+        task_state.update_flags(clear | TaskFlags::TEMPORARY_SIGNAL_MASK, set);
+    };
 
     if let Some(siginfo) = siginfo {
         if let SignalDetail::Timer { timer } = &siginfo.detail {

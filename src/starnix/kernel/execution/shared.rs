@@ -159,15 +159,15 @@ pub fn process_completed_restricted_exit(
             // Block a stopped process after it's had a chance to handle signals, since a signal might
             // cause it to stop.
             current_task.block_while_stopped();
-            let flags = current_task.flags();
             // If ptrace_cont has sent a signal, process it immediately.  This
             // seems to match Linux behavior.
-            if current_task
-                .read()
+
+            let task_state = current_task.read();
+            if task_state
                 .ptrace
                 .as_ref()
                 .is_some_and(|ptrace| ptrace.stop_status == crate::task::PtraceStatus::Continuing)
-                && flags.contains(TaskFlags::SIGNALS_AVAILABLE)
+                && task_state.signals.is_any_pending()
                 && !current_task.is_exitted()
             {
                 continue;
