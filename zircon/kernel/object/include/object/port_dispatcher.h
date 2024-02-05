@@ -23,15 +23,19 @@
 #include <object/handle.h>
 #include <object/signal_observer.h>
 
-// Important pointers diagram for PortObserver
-//
-// The diagrams below show the *relevant* pointers on different
-// states of the system. The pure header view is really the
-// union of all these pointer which can be confusing.
+// PortObserver lifetime and locking notes.
 //
 // PortDispatcher is responsible for destroying PortObservers (MaybeReap
 // or on_zero_handles), however, their destruction may be initiated by
 // either Dispatcher or PortDispatcher.
+//
+// PortObservers can exist on up to two doubly linked lists:
+// - PortObserver::List on PortDispatcher
+// - DoublyLinkedList<SignalObserver*> on Dispatcher
+//
+// The diagrams below show the *relevant* pointers on different
+// states of the system. The pure header view is really the
+// union of all these pointer which can be confusing.
 //
 // rc = ref counted
 // p  = raw pointer
@@ -78,6 +82,18 @@
 //   The |o| pointer is used to destroy the port observer only
 //   when cancellation happens and the port still owns the packet.
 //
+// Locking
+//
+// The PortDispatcher's lock guards PortDispatcher's list of observers
+// and the PortObserver's reference to its Dispatcher. The PortDispatcher
+// lock can be acquired while holding the Dispatcher's lock.
+//
+// The Dispatcher's lock guards the Dispatcher's list of observers and the
+// other fields on PortObserver, most notably the packet itself. The
+// dispatcher lock cannot be acquired while holding the PortDispatcher lock.
+//
+// Both the PortDispatcher and Dispatcher locks are held when delivering a
+// packet and when deciding whether to destroy it in MaybeReap.
 
 class PortDispatcher;
 class PortObserver;
@@ -110,8 +126,7 @@ struct PortInterruptPacket final : public fbl::DoublyLinkedListable<PortInterrup
   uint64_t key;
 };
 
-// Observers are weakly contained in Dispatchers until their OnInitialize(), OnStateChange() or
-// OnCancel() callbacks return StateObserver::kNeedRemoval.
+// Observers are weakly contained in Dispatchers.
 class PortObserver final : public SignalObserver {
  public:
   using ListNodeState = fbl::DoublyLinkedListNodeState<PortObserver*>;
