@@ -37,7 +37,7 @@ bool ParentDeviceDFv2::SetThreadRole(const char* role_name) {
 }
 
 zx::bti ParentDeviceDFv2::GetBusTransactionInitiator() {
-  auto res = pdev_->GetBti(0);
+  auto res = pdev_->GetBtiById(0);
   if (!res.ok()) {
     DMESSAGE("failed to get bus transaction initiator: %s", res.status_string());
     return zx::bti();
@@ -51,7 +51,7 @@ zx::bti ParentDeviceDFv2::GetBusTransactionInitiator() {
 
 std::unique_ptr<magma::PlatformMmio> ParentDeviceDFv2::CpuMapMmio(
     unsigned int index, magma::PlatformMmio::CachePolicy cache_policy) {
-  auto res = pdev_->GetMmio(index);
+  auto res = pdev_->GetMmioById(index);
   if (!res.ok()) {
     DMESSAGE("failed to get mmio: %s", res.status_string());
     return nullptr;
@@ -87,7 +87,7 @@ std::unique_ptr<magma::PlatformMmio> ParentDeviceDFv2::CpuMapMmio(
 }
 
 std::unique_ptr<magma::PlatformInterrupt> ParentDeviceDFv2::RegisterInterrupt(unsigned int index) {
-  auto res = pdev_->GetInterrupt(index, 0);
+  auto res = pdev_->GetInterruptById(index, 0);
   if (!res.ok()) {
     DMESSAGE("failed to register interrupt: %s", res.status_string());
     return nullptr;

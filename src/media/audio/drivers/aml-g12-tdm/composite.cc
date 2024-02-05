@@ -66,7 +66,7 @@ zx::result<> Driver::Start() {
   std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios;
   for (size_t i = 0; i < kNumberOfTdmEngines; ++i) {
     // There is one MMIO region with index 0 used by this driver.
-    auto get_mmio_result = pdev_->GetMmio(0);
+    auto get_mmio_result = pdev_->GetMmioById(0);
     if (!get_mmio_result.ok()) {
       FDF_LOG(ERROR, "Call to get MMIO failed: %s", get_mmio_result.status_string());
       return zx::error(get_mmio_result.status());
@@ -94,7 +94,7 @@ zx::result<> Driver::Start() {
   }
 
   // There is one BTI with index 0 used by this driver.
-  auto get_bti_result = pdev_->GetBti(0);
+  auto get_bti_result = pdev_->GetBtiById(0);
   if (!get_bti_result.ok()) {
     FDF_LOG(ERROR, "Call to get BTI failed: %s", get_bti_result.status_string());
     return zx::error(get_bti_result.status());

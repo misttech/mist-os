@@ -246,7 +246,7 @@ zx::result<> AmlSdmmc::InitResources(
   fidl::WireSyncClient pdev(std::move(pdev_client));
 
   {
-    const auto result = pdev->GetMmio(0);
+    const auto result = pdev->GetMmioById(0);
     if (!result.ok()) {
       FDF_LOGL(ERROR, logger(), "Call to get MMIO failed: %s", result.status_string());
       return zx::error(result.status());
@@ -275,7 +275,7 @@ zx::result<> AmlSdmmc::InitResources(
   }
 
   {
-    const auto result = pdev->GetInterrupt(0, 0);
+    const auto result = pdev->GetInterruptById(0, 0);
     if (!result.ok()) {
       FDF_LOGL(ERROR, logger(), "Call to get interrupt failed: %s", result.status_string());
       return zx::error(result.status());
@@ -289,7 +289,7 @@ zx::result<> AmlSdmmc::InitResources(
   }
 
   {
-    const auto result = pdev->GetBti(0);
+    const auto result = pdev->GetBtiById(0);
     if (!result.ok()) {
       FDF_LOGL(ERROR, logger(), "Call to get BTI failed: %s", result.status_string());
       return zx::error(result.status());

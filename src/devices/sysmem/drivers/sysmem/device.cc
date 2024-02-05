@@ -598,14 +598,15 @@ zx_status_t Device::Bind() {
   allocators_[fuchsia_sysmem2::HeapType::kSystemRam] =
       std::make_unique<SystemRamMemoryAllocator>(this);
 
-  auto result = pdev_.wire()->GetBti(0);
+  auto result = pdev_.wire()->GetBtiById(0);
   if (!result.ok()) {
-    DRIVER_ERROR("Transport error for PDev::GetBti() - status: %s", result.status_string());
+    DRIVER_ERROR("Transport error for PDev::GetBtiById() - status: %s", result.status_string());
     return result.status();
   }
 
   if (result->is_error()) {
-    DRIVER_ERROR("Failed PDev::GetBti() - status: %s", zx_status_get_string(result->error_value()));
+    DRIVER_ERROR("Failed PDev::GetBtiById() - status: %s",
+                 zx_status_get_string(result->error_value()));
     return result->error_value();
   }
 

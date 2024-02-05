@@ -83,7 +83,7 @@ zx_status_t PDevFidl::MapMmio(uint32_t index, std::optional<fdf::MmioBuffer>* mm
 }
 
 zx_status_t PDevFidl::GetMmio(uint32_t index, pdev_mmio_t* out_mmio) const {
-  fidl::WireResult result = pdev_->GetMmio(index);
+  fidl::WireResult result = pdev_->GetMmioById(index);
   if (result.status() != ZX_OK) {
     return result.status();
   }
@@ -103,7 +103,7 @@ zx_status_t PDevFidl::GetMmio(uint32_t index, pdev_mmio_t* out_mmio) const {
 }
 
 zx_status_t PDevFidl::GetInterrupt(uint32_t index, uint32_t flags, zx::interrupt* out_irq) {
-  fidl::WireResult result = pdev_->GetInterrupt(index, flags);
+  fidl::WireResult result = pdev_->GetInterruptById(index, flags);
   if (result.status() != ZX_OK) {
     return result.status();
   }
@@ -115,7 +115,7 @@ zx_status_t PDevFidl::GetInterrupt(uint32_t index, uint32_t flags, zx::interrupt
 }
 
 zx_status_t PDevFidl::GetBti(uint32_t index, zx::bti* out_bti) {
-  fidl::WireResult result = pdev_->GetBti(index);
+  fidl::WireResult result = pdev_->GetBtiById(index);
   if (result.status() != ZX_OK) {
     return result.status();
   }
@@ -127,7 +127,7 @@ zx_status_t PDevFidl::GetBti(uint32_t index, zx::bti* out_bti) {
 }
 
 zx_status_t PDevFidl::GetSmc(uint32_t index, zx::resource* out_smc) const {
-  fidl::WireResult result = pdev_->GetSmc(index);
+  fidl::WireResult result = pdev_->GetSmcById(index);
   if (result.status() != ZX_OK) {
     return result.status();
   }
