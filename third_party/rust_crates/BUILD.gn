@@ -530,6 +530,10 @@ group("netlink-packet-route") {
   public_deps = [ ":netlink-packet-route-v0_17_0" ]
 }
 
+group("netlink-packet-sock-diag") {
+  public_deps = [ ":netlink-packet-sock-diag-v0_4_2" ]
+}
+
 group("netlink-packet-utils") {
   public_deps = [ ":netlink-packet-utils-v0_5_2" ]
 }
@@ -8578,6 +8582,40 @@ rust_library("netlink-packet-route-v0_17_0") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":netlink-packet-route-v0_17_0.license" ]
+}
+
+license("netlink-packet-sock-diag-v0_4_2.license") {
+  public_package_name = "netlink_packet_sock_diag"
+  license_files = [ "//third_party/rust_crates/vendor/netlink-packet-sock-diag-0.4.2/LICENSE-MIT" ]
+}
+
+rust_library("netlink-packet-sock-diag-v0_4_2") {
+  crate_name = "netlink_packet_sock_diag"
+  crate_root = "//third_party/rust_crates/vendor/netlink-packet-sock-diag-0.4.2/src/lib.rs"
+  output_name = "netlink_packet_sock_diag-946f7e102ee3e5f0"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":byteorder-v1_4_3" ]
+  deps += [ ":anyhow-v1_0_75" ]
+  deps += [ ":bitflags-v1_3_2" ]
+  deps += [ ":libc-v0_2_149" ]
+  deps += [ ":netlink-packet-core-v0_7_0" ]
+  deps += [ ":netlink-packet-utils-v0_5_2" ]
+  deps += [ ":smallvec-v1_8_0" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=946f7e102ee3e5f0",
+    "-Cextra-filename=-946f7e102ee3e5f0",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":netlink-packet-sock-diag-v0_4_2.license" ]
 }
 
 license("netlink-packet-utils-v0_5_2.license") {
