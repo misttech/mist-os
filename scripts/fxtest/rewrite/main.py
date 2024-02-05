@@ -933,16 +933,14 @@ async def run_all_tests(
     await asyncio.wait(tasks)
 
     if maybe_debugger is not None:
-        # Reset stdout to /dev/null before terminating the debugger so termout doesn't fail its
-        # cleanup.
+        # Close the fifo to signal zxdb to close and reset stdout to /dev/null so termout doesn't fail its cleanup.
+        sys.stdout.close()
         sys.stdout = open(os.devnull, "w")
 
-        # TODO(https://fxbug.dev/322418013): zxdb doesn't handle signals sent to it like SIGQUIT, it
-        # handles terminal control codes itself, which prevents us from exiting nicely and putting
-        # the terminal back into a good state. We should implement a SIGQUIT handler so we can
-        # signal zxdb from here to cleanup the terminal and exit.
-        pg = os.getpgid(maybe_debugger.pid)
-        os.killpg(pg, signal.SIGTERM)
+        # This is a synchronous wait and we don't want to block the event loop, so run it in the
+        # default thread executor.
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, maybe_debugger.wait)
 
     recorder.emit_end(id=test_group)
 

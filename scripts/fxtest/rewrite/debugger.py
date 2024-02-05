@@ -90,17 +90,36 @@ def spawn(
     )
 
     def _cleanup():
+        # Close stdout. This may have already been done at the end of all the tests in main.py, but
+        # we do it again here to catch the ctrl+c case and still try to cleanly restore the terminal
+        # and clean up the socket to DebugAgent.
+        sys.stdout.close()
+        sys.stdout = open(os.devnull, "w")
+
         os.remove(fifo)
-        # The debugger should be terminated when all of the test suites have run. If not, forcefully
-        # kill it now.
-        if debugger_process.returncode is None:
-            pg = os.getpgid(debugger_process.pid)
-            os.killpg(pg, signal.SIGKILL)
+
+        try:
+            # Give zxdb a chance to gracefully shutdown, in the normal case this should return
+            # immediately, but when handling ctrl+c in embedded mode we wait some time to run
+            # cleanup routines.
+            debugger_process.wait(5)
+        except subprocess.TimeoutExpired as e:
+            sys.stderr.write(f"{e}\n")
+            sys.stderr.flush()
+        finally:
+            # zxdb should have gracefully exited by now, if it hasn't forcefully terminate and
+            # inform the user that they may need to reset their terminal.
+            if debugger_process.poll() is None:
+                sys.stderr.write(
+                    "⚠️  Warning: zxdb did not exit normally. `reset` will fix your terminal ⚠️\n"
+                )
+                sys.stderr.flush()
+                debugger_process.terminate()
 
     atexit.register(_cleanup)
 
     # Replace stdout with the named pipe we created and enable line buffering.
     # Note: 1 == line buffered. See https://docs.python.org/3/library/functions.html#open.
-    sys.stdout = open(fifo, "w", 1)
+    sys.stdout = open(fifo, "w", buffering=1)
 
     return debugger_process
