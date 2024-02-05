@@ -8,7 +8,7 @@
 use crate::{
     bpf::{
         fs::{get_bpf_object, get_selinux_context, BpfFsDir, BpfFsObject, BpfHandle, BpfObject},
-        map::{Map, MapStore},
+        map::Map,
         program::Program,
     },
     mm::{MemoryAccessor, MemoryAccessorExt},
@@ -16,7 +16,7 @@ use crate::{
     vfs::{Anon, FdFlags, FdNumber, LookupContext},
 };
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{Locked, OrderedMutex, Unlocked};
+use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::{SyscallResult, SUCCESS};
 use starnix_uapi::{
     bpf_attr__bindgen_ty_1, bpf_attr__bindgen_ty_10, bpf_attr__bindgen_ty_12,
@@ -110,11 +110,7 @@ pub fn sys_bpf(
                 value_size: map_attr.value_size,
                 max_entries: map_attr.max_entries,
             };
-            let mut map = Map {
-                schema,
-                flags: map_attr.map_flags,
-                entries: OrderedMutex::new(MapStore::new(&schema)?),
-            };
+            let mut map = Map::new(schema, map_attr.map_flags)?;
 
             // To quote
             // https://cs.android.com/android/platform/superproject/+/master:system/bpf/libbpf_android/Loader.cpp;l=670;drc=28e295395471b33e662b7116378d15f1e88f0864

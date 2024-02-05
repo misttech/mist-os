@@ -12,14 +12,14 @@ use starnix_uapi::{
 };
 use std::{
     collections::{btree_map::Entry, BTreeMap},
-    ops::{Bound, Deref, DerefMut},
+    ops::{Bound, Deref, DerefMut, Range},
 };
 use ubpf::MapSchema;
 
 /// The underlying storage for a BPF map.
 ///
 /// We will eventually need to implement a wide variety of backing stores.
-pub enum MapStore {
+enum MapStore {
     Hash(BTreeMap<Vec<u8>, Vec<u8>>),
     Array(Vec<u8>),
 }
@@ -30,7 +30,7 @@ pub struct Map {
     pub flags: u32,
 
     // This field should be private to this module.
-    pub entries: OrderedMutex<MapStore, BpfMapEntries>,
+    entries: OrderedMutex<MapStore, BpfMapEntries>,
 }
 impl BpfObject for Map {}
 
@@ -55,6 +55,11 @@ fn key_to_index(key: &[u8]) -> u32 {
 }
 
 impl Map {
+    pub fn new(schema: MapSchema, flags: u32) -> Result<Self, Errno> {
+        let store = MapStore::new(&schema)?;
+        Ok(Self { schema, flags, entries: OrderedMutex::new(store) })
+    }
+
     pub fn lookup(
         &self,
         locked: &mut Locked<'_, Unlocked>,
@@ -75,7 +80,7 @@ impl Map {
                 if index >= self.schema.max_entries {
                     return error!(ENOENT);
                 }
-                let value = &entries[self.schema.array_range_for_index(index)];
+                let value = &entries[array_range_for_index(self.schema.value_size, index)];
                 current_task.write_memory(user_value, value)?;
             }
         }
@@ -119,7 +124,8 @@ impl Map {
                 if flags == BPF_NOEXIST as u64 {
                     return error!(EEXIST);
                 }
-                entries[self.schema.array_range_for_index(index)].copy_from_slice(&value);
+                entries[array_range_for_index(self.schema.value_size, index)]
+                    .copy_from_slice(&value);
             }
         }
         Ok(())
@@ -173,4 +179,10 @@ impl Map {
         }
         Ok(())
     }
+}
+
+fn array_range_for_index(value_size: u32, index: u32) -> Range<usize> {
+    let base = index * value_size;
+    let limit = base + value_size;
+    (base as usize)..(limit as usize)
 }
