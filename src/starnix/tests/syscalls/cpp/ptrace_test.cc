@@ -786,6 +786,9 @@ void GrandchildWithSigsuspendSigaction(int, siginfo_t *, void *) {
 // Test that traced child correctly resumes when signal needs to be delivered
 // because of a temporary mask.
 TEST(PtraceTest, GrandchildWithSigsuspend) {
+  if (!test_helper::IsStarnix()) {
+    GTEST_SKIP() << "This test does not work on Linux in CQ";
+  }
   test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
   pid_t child_pid = helper.RunInForkedProcess([] {
