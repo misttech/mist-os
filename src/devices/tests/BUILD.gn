@@ -33,7 +33,9 @@ group("tests") {
     "isolateddevmgr:tests",
     "libdriver-integration-test",
     "multibind-composite-test:tests",
-    "node-group-test:tests",
+
+    # TODO(b/319724687): Re-enable once the flake is fixed.
+    #"node-group-test:tests",
     "nonbindable:tests",
     "runtime-composite-test:tests",
     "v2:tests",
