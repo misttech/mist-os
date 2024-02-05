@@ -77,12 +77,12 @@ main() {
 
     fx-info "Result:"
     echo
-    echo "    Core:"
+    echo "    Partner (Including //sdk:core and //sdk:driver):"
     for dep in "${core_deps[@]}"; do
         echo "      ${dep}"
     done
 
-    echo "    Platform:"
+    echo "    Internal (Including //sdk:platform):"
     for dep in "${platform_deps[@]}"; do
         echo "      ${dep}"
     done
