@@ -556,9 +556,9 @@ void Mdns::Renew(const DnsResource& resource, Media media, IpVersions ip_version
 
 void Mdns::Query(DnsType type, const std::string& name, Media media, IpVersions ip_versions,
                  zx::time initial_query_time, zx::duration interval, uint32_t interval_multiplier,
-                 uint32_t max_queries) {
+                 uint32_t max_queries, bool request_unicast_response) {
   resource_renewer_->Query(type, name, media, ip_versions, initial_query_time, interval,
-                           interval_multiplier, max_queries);
+                           interval_multiplier, max_queries, request_unicast_response);
 }
 
 void Mdns::RemoveAgent(std::shared_ptr<MdnsAgent> agent) {

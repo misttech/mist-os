@@ -39,7 +39,8 @@ TEST(DnsWritingTest, Regression102543) {
   EXPECT_EQ(expected_message_as_written, message_as_written);
 }
 
-// Tests writing of TXT records with no text strings (regression test for https://fxbug.dev/42053491).
+// Tests writing of TXT records with no text strings (regression test for
+// https://fxbug.dev/42053491).
 TEST(DnsWritingTest, Regression102543NoStrings) {
   std::vector<uint8_t> expected_message_as_written{
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x0c,

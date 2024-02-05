@@ -82,7 +82,8 @@ void AgentTest::Renew(const DnsResource& resource, Media media, IpVersions ip_ve
 
 void AgentTest::Query(DnsType type, const std::string& name, Media media, IpVersions ip_versions,
                       zx::time initial_query_time, zx::duration interval,
-                      uint32_t interval_multiplier, uint32_t max_queries) {
+                      uint32_t interval_multiplier, uint32_t max_queries,
+                      bool request_unicast_response) {
   query_calls_.push_back(QueryCall{
       .type_ = type,
       .name_ = name,
@@ -92,6 +93,7 @@ void AgentTest::Query(DnsType type, const std::string& name, Media media, IpVers
       .interval_ = interval,
       .interval_multiplier_ = interval_multiplier,
       .max_queries_ = max_queries,
+      .request_unicast_response_ = request_unicast_response,
   });
 }
 
@@ -112,7 +114,7 @@ void AgentTest::ExpectRenewCall(DnsResource resource) {
 void AgentTest::ExpectQueryCall(DnsType type, const std::string& name, Media media,
                                 IpVersions ip_versions, zx::time initial_query_time,
                                 zx::duration interval, uint32_t interval_multiplier,
-                                uint32_t max_queries) {
+                                uint32_t max_queries, bool request_unicast_response) {
   for (auto iter = query_calls_.begin(); iter != query_calls_.end(); ++iter) {
     if (iter->type_ == type && iter->name_ == name && iter->media_ == media &&
         iter->ip_versions_ == ip_versions) {
@@ -120,6 +122,7 @@ void AgentTest::ExpectQueryCall(DnsType type, const std::string& name, Media med
       EXPECT_EQ(interval, iter->interval_);
       EXPECT_EQ(interval_multiplier, iter->interval_multiplier_);
       EXPECT_EQ(max_queries, iter->max_queries_);
+      EXPECT_EQ(request_unicast_response, iter->request_unicast_response_);
       query_calls_.erase(iter);
       return;
     }

@@ -50,7 +50,7 @@ class ResourceRenewer : public MdnsAgent {
   // Queries for the indicated resource with the specified schedule.
   void Query(DnsType type, const std::string& name, Media media, IpVersions ip_versions,
              zx::time initial_query_time, zx::duration interval, uint32_t interval_multiplier,
-             uint32_t max_queries);
+             uint32_t max_queries, bool request_unicast_response = false);
 
   // MdnsAgent overrides.
   void ReceiveResource(const DnsResource& resource, MdnsResourceSection section,
@@ -68,8 +68,13 @@ class ResourceRenewer : public MdnsAgent {
   // using raw pointers, so the destructor must delete all Entry objects
   // explicitly.
   struct Entry {
-    Entry(std::string name, DnsType type, Media media, IpVersions ip_versions)
-        : name_(std::move(name)), type_(type), media_(media), ip_versions_(ip_versions) {}
+    Entry(std::string name, DnsType type, Media media, IpVersions ip_versions,
+          bool request_unicast_response)
+        : name_(std::move(name)),
+          type_(type),
+          media_(media),
+          ip_versions_(ip_versions),
+          request_unicast_response_(request_unicast_response) {}
 
     std::string name_;
     DnsType type_;
@@ -80,6 +85,7 @@ class ResourceRenewer : public MdnsAgent {
     zx::duration interval_;
     uint32_t interval_multiplier_;
     uint32_t queries_remaining_;
+    bool request_unicast_response_ = false;
 
     // Time value used for |schedule|. In some cases, we want to postpone a
     // query or expiration that was previously scheduled. In this case, |time_|

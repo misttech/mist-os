@@ -69,7 +69,8 @@ class AgentTest : public ::testing::Test, public MdnsAgent::Owner {
   // Expects that the agent has called |Query|.
   void ExpectQueryCall(DnsType type, const std::string& name, Media media, IpVersions ip_versions,
                        zx::time initial_query_time, zx::duration interval,
-                       uint32_t interval_multiplier, uint32_t max_queries);
+                       uint32_t interval_multiplier, uint32_t max_queries,
+                       bool request_unicast_response);
 
   // Expects that the agent has not asked for any resources to be expired.
   void ExpectNoExpirations() { EXPECT_TRUE(expirations_.empty()); }
@@ -184,6 +185,7 @@ class AgentTest : public ::testing::Test, public MdnsAgent::Owner {
     zx::duration interval_;
     uint32_t interval_multiplier_;
     uint32_t max_queries_;
+    bool request_unicast_response_;
   };
 
   struct ReplyAddressHash {
@@ -214,7 +216,7 @@ class AgentTest : public ::testing::Test, public MdnsAgent::Owner {
 
   void Query(DnsType type, const std::string& name, Media media, IpVersions ip_versions,
              zx::time initial_query_time, zx::duration interval, uint32_t interval_multiplier,
-             uint32_t max_queries) override;
+             uint32_t max_queries, bool request_unicast_response) override;
 
   void RemoveAgent(std::shared_ptr<MdnsAgent> agent) override;
 

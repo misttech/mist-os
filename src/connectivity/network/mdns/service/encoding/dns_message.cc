@@ -61,6 +61,9 @@ DnsQuestion::DnsQuestion() {}
 DnsQuestion::DnsQuestion(const std::string& name, DnsType type)
     : name_(DnsName(name)), type_(type) {}
 
+DnsQuestion::DnsQuestion(const std::string& name, DnsType type, bool request_unicast_response)
+    : name_(DnsName(name)), type_(type), unicast_response_(request_unicast_response) {}
+
 DnsResource::DnsResource() {}
 
 DnsResource::DnsResource(const std::string& name, DnsType type)

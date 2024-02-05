@@ -492,7 +492,7 @@ class Mdns : public MdnsAgent::Owner {
 
   void Query(DnsType type, const std::string& name, Media media, IpVersions ip_versions,
              zx::time initial_query_time, zx::duration interval, uint32_t interval_multiplier,
-             uint32_t max_queries) override;
+             uint32_t max_queries, bool request_unicast_response) override;
 
   void RemoveAgent(std::shared_ptr<MdnsAgent> agent) override;
 

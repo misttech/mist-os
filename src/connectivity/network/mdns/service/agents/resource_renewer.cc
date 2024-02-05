@@ -43,8 +43,8 @@ void ResourceRenewer::Renew(const DnsResource& resource, Media media, IpVersions
 void ResourceRenewer::Query(DnsType type, const std::string& name, Media media,
                             IpVersions ip_versions, zx::time initial_query_time,
                             zx::duration interval, uint32_t interval_multiplier,
-                            uint32_t max_queries) {
-  auto entry = std::make_unique<Entry>(name, type, media, ip_versions);
+                            uint32_t max_queries, bool request_unicast_response) {
+  auto entry = std::make_unique<Entry>(name, type, media, ip_versions, request_unicast_response);
   auto iter = entries_.find(entry);
 
   if (iter == entries_.end()) {
@@ -71,7 +71,7 @@ void ResourceRenewer::ReceiveResource(const DnsResource& resource, MdnsResourceS
 
   // |key| is just used as a key, so media and ip_versions are irrelevant.
   auto key = std::make_unique<Entry>(resource.name_.dotted_string_, resource.type_, Media::kBoth,
-                                     IpVersions::kBoth);
+                                     IpVersions::kBoth, false);
   auto iter = entries_.find(key);
   if (iter != entries_.end()) {
     if (sender_address.Matches((*iter)->media_) && sender_address.Matches((*iter)->ip_versions_)) {
@@ -109,8 +109,11 @@ void ResourceRenewer::SendRenewals() {
       EraseEntry(entry);
     } else {
       // Need to query.
-      SendQuestion(std::make_shared<DnsQuestion>(entry->name_, entry->type_),
+      SendQuestion(std::make_shared<DnsQuestion>(entry->name_, entry->type_,
+                                                 entry->request_unicast_response_),
                    ReplyAddress::Multicast(entry->media_, entry->ip_versions_));
+      // unicast response bit should be set only for the 1st query.
+      entry->request_unicast_response_ = false;
       entry->SetNextQueryOrExpiration();
       Schedule(entry);
     }

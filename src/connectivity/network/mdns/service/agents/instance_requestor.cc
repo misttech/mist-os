@@ -115,7 +115,7 @@ void InstanceRequestor::EndOfMessage() {
         // We have not received an SRV resource, and we haven't asked for one explicitly. Ask for
         // one now.
         Query(DnsType::kSrv, instance_full_name, media_, ip_versions_, now(), kAdditionalInterval,
-              kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+              kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
         instance_info.srv_queried_ = true;
       }
 
@@ -147,7 +147,7 @@ void InstanceRequestor::EndOfMessage() {
       // now. We proceed anyway, which means the client may first get the instance without text
       // and later get an |InstanceChanged| with text.
       Query(DnsType::kTxt, instance_full_name, media_, ip_versions_, now(), kAdditionalInterval,
-            kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+            kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
       instance_info.txt_queried_ = true;
     }
 
@@ -163,9 +163,9 @@ void InstanceRequestor::EndOfMessage() {
         // schedule.
         auto when = now();
         Query(DnsType::kA, target_full_name, media_, ip_versions_, when, kAdditionalInterval,
-              kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+              kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
         Query(DnsType::kAaaa, target_full_name, media_, ip_versions_, when, kAdditionalInterval,
-              kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+              kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
         target_info.addresses_queried_ = true;
       }
 

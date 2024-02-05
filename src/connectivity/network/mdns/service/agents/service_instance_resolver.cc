@@ -60,7 +60,7 @@ void ServiceInstanceResolver::EndOfMessage() {
   // ServiceInstanceResolver supports only v6 addresses.
   if (!aaaa_queried_ && instance_.has_service() && !instance_.has_ipv6_endpoint()) {
     Query(DnsType::kAaaa, target_full_name_, media_, ip_versions_, now(), kAdditionalInterval,
-          kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+          kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
     aaaa_queried_ = true;
     return;
   }
@@ -78,9 +78,9 @@ void ServiceInstanceResolver::Start(const std::string& service_instance) {
   // Increase the chance of coalescing the queries together in one message.
   auto ts = now();
   Query(DnsType::kSrv, service_instance_, media_, ip_versions_, ts, kAdditionalInterval,
-        kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+        kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
   Query(DnsType::kTxt, service_instance_, media_, ip_versions_, ts, kAdditionalInterval,
-        kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+        kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
 
   PostTaskForTime(
       [this]() {

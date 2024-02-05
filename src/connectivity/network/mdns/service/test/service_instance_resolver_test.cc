@@ -119,10 +119,10 @@ TEST_F(InstanceResolverTest, LocalInstance) {
   // Expect a SRV and TXT questions on start.
   ExpectQueryCall(DnsType::kSrv, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
                   Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
-                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
   ExpectQueryCall(DnsType::kTxt, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
                   Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
-                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
   ExpectPostTaskForTime(zx::sec(0), zx::sec(0));
   ExpectNoOther();
 
@@ -161,10 +161,10 @@ TEST_F(InstanceResolverTest, LocalProxyInstance) {
   // Expect a SRV and TXT questions on start.
   ExpectQueryCall(DnsType::kSrv, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
                   Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
-                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
   ExpectQueryCall(DnsType::kTxt, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
                   Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
-                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
   ExpectPostTaskForTime(zx::sec(0), zx::sec(0));
   ExpectNoOther();
 
@@ -205,10 +205,10 @@ TEST_F(InstanceResolverTest, LocalProxyInstanceFail) {
   // Expect a SRV and TXT questions on start.
   ExpectQueryCall(DnsType::kSrv, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
                   Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
-                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
   ExpectQueryCall(DnsType::kTxt, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
                   Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
-                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
   ExpectPostTaskForTime(zx::sec(0), zx::sec(0));
   ExpectNoOther();
 
@@ -241,10 +241,10 @@ TEST_F(InstanceResolverTest, ResponseWithoutAaaa) {
   // Expect a SRV & TXT questions on start.
   ExpectQueryCall(DnsType::kSrv, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
                   Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
-                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
   ExpectQueryCall(DnsType::kTxt, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
                   Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
-                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
   ExpectPostTaskForTime(zx::sec(0), zx::sec(0));
   ExpectNoOther();
 
@@ -256,7 +256,7 @@ TEST_F(InstanceResolverTest, ResponseWithoutAaaa) {
 
   // Expect a aaaa query call.
   ExpectQueryCall(DnsType::kAaaa, kHostFullName, Media::kBoth, IpVersions::kBoth, now(),
-                  kAdditionalInterval, kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalInterval, kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
 
   // Receive a response with only an aaaa record.
   ReceiveAddress(under_test, kHostFullName, sender_address);

@@ -920,7 +920,8 @@ TEST_F(MdnsUnitTests, PublishProxyHostAlreadyPublishedLocally) {
   // We don't expect the callback, because the probe has not completed.
   EXPECT_FALSE(callback1_called);
 
-  // Publish a proxy host of the same name. This call caused a crash before https://fxbug.dev/42075480 was fixed.
+  // Publish a proxy host of the same name. This call caused a crash before
+  // https://fxbug.dev/42075480 was fixed.
   fuchsia::net::mdns::ServiceInstancePublisherPtr publisher2_ptr;
   bool callback2_called = false;
   service_impl.PublishProxyHost(

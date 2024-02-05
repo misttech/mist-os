@@ -195,6 +195,7 @@ struct DnsHeader {
 struct DnsQuestion {
   DnsQuestion();
   DnsQuestion(const std::string& name, DnsType type);
+  DnsQuestion(const std::string& name, DnsType type, bool request_unicast_response);
 
   DnsName name_;
   DnsType type_;

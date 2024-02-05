@@ -848,9 +848,9 @@ TEST_F(InstanceRequestorTest, ResponseSansAddresses) {
 
   // Expect a A/AAAA queries.
   ExpectQueryCall(DnsType::kA, kHostFullName, Media::kBoth, IpVersions::kBoth, now(),
-                  kAdditionalInterval, kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalInterval, kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
   ExpectQueryCall(DnsType::kAaaa, kHostFullName, Media::kBoth, IpVersions::kBoth, now(),
-                  kAdditionalInterval, kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalInterval, kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
 
   // Receive a response with only an address record.
   ReceiveAddress(under_test, kHostFullName, sender_address);
@@ -903,7 +903,7 @@ TEST_F(InstanceRequestorTest, ResponseSansTxt) {
   // Expect a TXT query call.
   ExpectQueryCall(DnsType::kTxt, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
                   Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
-                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
 
   // Receive a response with only a TXT record.
   ReceiveTxt(under_test, kServiceName, kInstanceName, kText, sender_address);
@@ -950,7 +950,7 @@ TEST_F(InstanceRequestorTest, ResponsePtrOnly) {
   // Expect an SRV query calls.
   ExpectQueryCall(DnsType::kSrv, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
                   Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
-                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
 
   // Receive a response with only an SRV record.
   ReceiveSrv(under_test, kHostFullName, kServiceName, kInstanceName, kPort, sender_address);
@@ -959,12 +959,12 @@ TEST_F(InstanceRequestorTest, ResponsePtrOnly) {
 
   // Expect a A, AAAA and TXT query calls.
   ExpectQueryCall(DnsType::kA, kHostFullName, Media::kBoth, IpVersions::kBoth, now(),
-                  kAdditionalInterval, kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalInterval, kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
   ExpectQueryCall(DnsType::kAaaa, kHostFullName, Media::kBoth, IpVersions::kBoth, now(),
-                  kAdditionalInterval, kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalInterval, kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
   ExpectQueryCall(DnsType::kTxt, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
                   Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
-                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
 
   // Receive a response with only an address record.
   ReceiveAddress(under_test, kHostFullName, sender_address);
@@ -1022,9 +1022,9 @@ TEST_F(InstanceRequestorTest, ResponseSansAddressesV6) {
 
   // Expect a A/AAAA queries.
   ExpectQueryCall(DnsType::kA, kHostFullName, Media::kBoth, IpVersions::kBoth, now(),
-                  kAdditionalInterval, kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalInterval, kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
   ExpectQueryCall(DnsType::kAaaa, kHostFullName, Media::kBoth, IpVersions::kBoth, now(),
-                  kAdditionalInterval, kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+                  kAdditionalInterval, kAdditionalIntervalMultiplier, kAdditionalMaxQueries, true);
 
   // Receive a response with only an address record.
   ReceiveAddress(under_test, kHostFullName, sender_address);

@@ -73,7 +73,8 @@ class MdnsAgent : public std::enable_shared_from_this<MdnsAgent> {
     // Registers the resource for repeated queries. See |MdnsAgent::Request| below.
     virtual void Query(DnsType type, const std::string& name, Media media, IpVersions ip_versions,
                        zx::time initial_query_time, zx::duration interval,
-                       uint32_t interval_multiplier, uint32_t max_queries) = 0;
+                       uint32_t interval_multiplier, uint32_t max_queries,
+                       bool request_unicast_response) = 0;
 
     // Removes the specified agent.
     virtual void RemoveAgent(std::shared_ptr<MdnsAgent> agent) = 0;
@@ -238,9 +239,9 @@ class MdnsAgent : public std::enable_shared_from_this<MdnsAgent> {
   // (without yielding the thread), the queries will be sent in the same message.
   void Query(DnsType type, const std::string& name, Media media, IpVersions ip_versions,
              zx::time initial_query_time, zx::duration interval, uint32_t interval_multiplier,
-             uint32_t max_queries) {
+             uint32_t max_queries, bool request_unicast_response = false) {
     owner_->Query(type, name, media, ip_versions, initial_query_time, interval, interval_multiplier,
-                  max_queries);
+                  max_queries, request_unicast_response);
   }
 
   // Removes this agent.
