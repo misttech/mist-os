@@ -28,7 +28,6 @@ from assembly.assembly_input_bundle import (
     CompiledPackageAdditionalShards,
     DuplicatePackageException,
     PackageManifestParsingException,
-    CompiledPackageMainDefinition,
 )
 from depfile import DepFile
 from serialization import json_load
@@ -59,7 +58,6 @@ def copy_to_assembly_input_bundle(
     boot_driver_components_files_list: List[dict],
     shell_commands: Dict[str, List],
     core_realm_shards: List[FilePath],
-    core_realm_includes: FileEntryList,
     bootfs_files_package: Optional[FilePath],
 ) -> Tuple[AssemblyInputBundle, FilePath, DepSet]:
     """
@@ -111,28 +109,11 @@ def copy_to_assembly_input_bundle(
     aib_creator.shell_commands = shell_commands
 
     if core_realm_shards:
-        # Assume that the main cml for core is first (due to careful GN deps ordering)
-        if os.path.basename(core_realm_shards[0]) != "core.cml":
-            raise ValueError(
-                f"The first shard listed must be the main 'core.cml' file: {core_realm_shards}"
-            )
-
-        core_package_definition = CompiledPackageMainDefinition("core")
-        core_package_definition.components["core"] = core_realm_shards[0]
-
-        # This is passing a Set[FileEntry] to what _should_ be a Set[FilePath],
-        # but the aib_creator assumes that it's a set of FileEntry items in this
-        # field as it does all the copies.  Not ideal, but it works for now.
-        core_package_definition.includes = set(core_realm_includes)
-
-        aib_creator.compiled_packages.append(core_package_definition)
-
-        # Pass the rest as compiled_package_shards
-        if len(core_realm_shards) > 1:
-            additional_shards = CompiledPackageAdditionalShards(
-                "core", {"core": set(core_realm_shards[1:])}
-            )
-            aib_creator.compiled_package_shards.append(additional_shards)
+        # Pass the compiled_package_shards
+        additional_shards = CompiledPackageAdditionalShards(
+            "core", {"core": set(core_realm_shards)}
+        )
+        aib_creator.compiled_package_shards.append(additional_shards)
 
     return aib_creator.build()
 
@@ -176,10 +157,6 @@ def main():
         "--shell-commands-packages-list", type=argparse.FileType("r")
     )
     parser.add_argument("--core-realm-shards-list", type=argparse.FileType("r"))
-    parser.add_argument(
-        "--core-realm-includes-list", type=argparse.FileType("r")
-    )
-    parser.add_argument("--core-package-name", default="core")
     parser.add_argument("--bootfs-files-package", required=True)
     args = parser.parse_args()
 
@@ -227,18 +204,9 @@ def main():
                 )
 
     core_realm_shards: List[FilePath] = []
-    core_realm_includes: FileEntryList = []
     if args.core_realm_shards_list:
         for shard in json.load(args.core_realm_shards_list):
             core_realm_shards.append(shard)
-
-        # The source of a core realm include file is its location
-        # relative to the root_build_dir, while the destination
-        # is its location relative to the fuchsia root.
-        for include in json.load(args.core_realm_includes_list):
-            core_realm_includes.append(
-                FileEntry(include["source"], include["destination"])
-            )
 
     base = []
     if args.base_packages_list is not None:
@@ -304,7 +272,6 @@ def main():
             for (package, components) in shell_commands.items()
         },
         core_realm_shards,
-        core_realm_includes,
         args.bootfs_files_package,
     )
 

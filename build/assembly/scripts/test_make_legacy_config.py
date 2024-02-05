@@ -222,15 +222,8 @@ class MakeLegacyConfig(unittest.TestCase):
                 boot_driver_components_files_list=[],
                 shell_commands=shell_commands_file,
                 core_realm_shards=[
-                    os.path.join(SOURCE_DIR, "core/core.cml"),
                     os.path.join(SOURCE_DIR, "core/realm/shard1.cml"),
                     os.path.join(SOURCE_DIR, "core/realm/shard2.cml"),
-                ],
-                core_realm_includes=[
-                    FileEntry(
-                        os.path.join(SOURCE_DIR, "src/include.cml"),
-                        "src/include.cml",
-                    )
                 ],
                 bootfs_files_package=bootfs,
             )
@@ -275,16 +268,6 @@ class MakeLegacyConfig(unittest.TestCase):
             self.assertEqual(
                 aib.packages_to_compile,
                 [
-                    CompiledPackageMainDefinition(
-                        name="core",
-                        components={
-                            "core": "compiled_packages/core/core/core.cml"
-                        },
-                        contents=set(),
-                        includes=set(
-                            ["compiled_packages/include/src/include.cml"]
-                        ),
-                    ),
                     CompiledPackageAdditionalShards(
                         name="core",
                         component_shards={
@@ -393,10 +376,8 @@ class MakeLegacyConfig(unittest.TestCase):
                         "source/bootfs_files_package.json",
                         "source/bootfs_files_package/some/file",
                         "source/bootfs_files_package/another/file",
-                        "source/core/core.cml",
                         "source/core/realm/shard1.cml",
                         "source/core/realm/shard2.cml",
-                        "source/src/include.cml",
                         "source/bootfs/some/file",
                         "source/bootfs.json",
                         "source/bootfs/another/file",
@@ -491,14 +472,6 @@ class MakeLegacyConfig(unittest.TestCase):
                             destination="outdir/blobs/0cdbf3e4f1246ce7522e78c21bcf1c3aef2d41ac2b4de3f0ee98fc6273f62eb9",
                         ),
                         FileEntry(
-                            source="source/src/include.cml",
-                            destination="outdir/compiled_packages/include/src/include.cml",
-                        ),
-                        FileEntry(
-                            source="source/core/core.cml",
-                            destination="outdir/compiled_packages/core/core/core.cml",
-                        ),
-                        FileEntry(
                             source="source/core/realm/shard1.cml",
                             destination="outdir/compiled_packages/core/core/shard1.cml",
                         ),
@@ -557,10 +530,8 @@ class MakeLegacyConfig(unittest.TestCase):
                     "blobs/efac096092f7cf879c72ac51d23d9f142e97405dec7dd9c69aeee81de083f794",
                     "blobs/f0601d51be1ec8c11d825b756841937706eb2805ce9b924b67b4b0dc14caba29",
                     "blobs/fd0891d15ce65d7682f7437e441e917b8ed4bde4db07a11dc100104f25056051",
-                    "compiled_packages/core/core/core.cml",
                     "compiled_packages/core/core/shard1.cml",
                     "compiled_packages/core/core/shard2.cml",
-                    "compiled_packages/include/src/include.cml",
                     "kernel/kernel.bin",
                     "packages/base/base_a",
                     "packages/base/base_b",
@@ -602,7 +573,6 @@ class MakeLegacyConfig(unittest.TestCase):
                 [],
                 dict(),
                 set(),
-                [],
                 None,
             )
 
@@ -660,7 +630,6 @@ class MakeLegacyConfig(unittest.TestCase):
                     [],
                     dict(),
                     set(),
-                    [],
                     None,
                 )
 
@@ -716,7 +685,6 @@ class MakeLegacyConfig(unittest.TestCase):
                     [],
                     dict(),
                     set(),
-                    [],
                     None,
                 ),
             )

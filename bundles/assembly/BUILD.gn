@@ -548,17 +548,63 @@ assembly_input_bundle("core_realm") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           # All paths must be rebased since this is passed directly to the AIB
           # config.
 
-          # TODO:  These shards should be folded into the `core.cml` file itself
-          # as they are never omitted from that file.
+          component_name = "core"
+          shards = rebase_path("//src/sys/core/meta/core.cml", root_build_dir)
+        },
+      ]
 
+      # These are not included into the core.cml directly, but may be included
+      # via other shards.
+      component_includes = [
+        {
+          source =
+              rebase_path("//sdk/lib/inspect/offer.shard.cml", root_build_dir)
+          destination = "inspect/offer.shard.cml"
+        },
+        {
+          source =
+              rebase_path("//sdk/lib/syslog/offer.shard.cml", root_build_dir)
+          destination = "syslog/offer.shard.cml"
+        },
+      ]
+      foreach(
+          include,
+          [
+            "//src/connectivity/bluetooth/profiles/bt-a2dp/meta/bt-a2dp-common.core_shard.cml",
+            "//src/intl/intl_services/meta/intl.core_shard.base.cml",
+            "//src/media/audio/audio_core/meta/audio_core.core_shard.base.cml",
+            "//src/recovery/system/meta/core_shards/base.shard.cml",
+            "//src/recovery/system/meta/core_shards/ui.shard.cml",
+            "//src/session/bin/session_manager/meta/all_products_capabilities.core_shard.cml",
+            "//src/session/bin/session_manager/meta/session.smart.from_platform.core_shard.cml",
+            "//src/session/bin/session_manager/meta/some_products_capabilities.core_shard.cml",
+            "//src/session/bin/session_manager/meta/terminal_capabilities.core_shard.cml",
+            "//src/settings/service/meta/setui_service_base.core_shard.cml",
+            "//src/testing/sl4f/meta/sl4f_base.core_shard.cml",
+            "//src/ui/meta/ui_routes_base.shard.cml",
+          ]) {
+        component_includes += [
+          {
+            source = rebase_path(include, root_build_dir)
+            destination = rebase_path(include, "//")
+          },
+        ]
+      }
+    },
+    {
+      name = "core"
+      component_shards = [
+        {
           component_name = "core"
           shards = rebase_path(
                   [
+                    # TODO:  These shards should be folded into the above
+                    # `core.cml` file itself as they are never omitted from it.
                     "//src/developer/build_info/meta/build_info.core_shard.cml",
                     "//src/developer/forensics/forensics.core_shard.cml",
                     "//sdk/lib/inspect/offer.shard.cml",
