@@ -520,7 +520,7 @@ def union_type(ir, root_ir, recurse_guard=None) -> type:
     for member in ir["members"]:
         if member["reserved"]:
             continue
-        member_name = member["name"]
+        member_name = normalize_member_name(member["name"])
         member_type_name = member_name + "_type"
         member_constructor_name = member_name + "_variant"
 
@@ -543,6 +543,7 @@ def union_type(ir, root_ir, recurse_guard=None) -> type:
 
 def normalize_member_name(name) -> str:
     """Prevents use of names for struct or table members that are already keywords"""
+    name = camel_case_to_snake_case(name)
     if name in keyword.kwlist:
         return name + "_"
     return name

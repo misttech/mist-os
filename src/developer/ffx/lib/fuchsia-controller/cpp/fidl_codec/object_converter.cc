@@ -7,6 +7,8 @@
 #include <zircon/types.h>
 
 #include <cinttypes>
+#include <locale>
+#include <unordered_set>
 
 #include "object.h"
 #include "src/developer/ffx/lib/fuchsia-controller/cpp/abi/convert.h"
@@ -14,6 +16,43 @@
 #include "src/lib/fidl_codec/wire_object.h"
 
 namespace converter {
+
+namespace {
+
+// Converts camel case to lower snake case. Does not handle acronyms.
+std::string ToLowerSnake(std::string_view s) {
+  std::stringstream ss;
+  auto iter = s.cbegin();
+  ss.put(std::tolower(*iter, std::locale()));
+  iter++;
+  for (; iter != s.cend(); ++iter) {
+    auto c = *iter;
+    if (std::isupper(c)) {
+      ss.put('_');
+    }
+    ss.put(std::tolower(c, std::locale()));
+  }
+  return ss.str();
+}
+
+// This is a recreation of the "normalize_member_name" function from Python.
+inline std::string NormalizeMemberName(std::string_view s) {
+  // These keywords are taken from the Python docs:
+  // https://docs.python.org/3/reference/lexical_analysis.html#keywords
+  // Uppercase keywords have been ommitted.
+  static std::unordered_set<std::string> python_keywords = {
+      "await",  "else",    "import", "pass",   "break",    "except",   "in",     "raise",
+      "class",  "finally", "is",     "return", "and",      "continue", "for",    "lambda",
+      "try",    "as",      "def",    "from",   "nonlocal", "while",    "assert", "del",
+      "global", "not",     "with",   "async",  "elif",     "if",       "or",     "yield"};
+  auto lower_snake = ToLowerSnake(s);
+  if (python_keywords.count(lower_snake) > 0) {
+    lower_snake.append("_");
+  }
+  return lower_snake;
+}
+
+}  // namespace
 
 // Helper func. This attempts to lookup an attribute on an object while not setting an error if the
 // attribute does not exist. Can still return an error generally, and is indicated by returning
@@ -91,7 +130,7 @@ void ObjectConverter::VisitInteger(bool is_signed) {
     if (repr == convert::MINUS_ONE_U64 && PyErr_Occurred()) {
       return;
     }
-    result_ = std::make_unique<fidl_codec::IntegerValue>(static_cast<uint64_t>(repr), false);
+    result_ = std::make_unique<fidl_codec::IntegerValue>(repr, false);
   }
 }
 
@@ -132,7 +171,7 @@ void ObjectConverter::VisitStructType(const fidl_codec::StructType* type) {
     if (!member) {
       continue;
     }
-    auto child_item = py::Object(get_item(member->name()));
+    auto child_item = py::Object(get_item(NormalizeMemberName(member->name())));
     if (child_item == nullptr) {
       return;
     }
@@ -151,7 +190,7 @@ void ObjectConverter::VisitTableType(const fidl_codec::TableType* type) {
     if (!member) {
       continue;
     }
-    auto child_value = py::Object(GetAttr(obj_, member->name()));
+    auto child_value = py::Object(GetAttr(obj_, NormalizeMemberName(member->name())));
     if (child_value == nullptr) {
       return;
     }
@@ -175,7 +214,7 @@ void ObjectConverter::VisitUnionType(const fidl_codec::UnionType* type) {
     if (!member || member->reserved()) {
       continue;
     }
-    auto child_value = py::Object(GetAttr(obj_, member->name()));
+    auto child_value = py::Object(GetAttr(obj_, NormalizeMemberName(member->name())));
     if (child_value == nullptr) {
       return;
     }
@@ -188,8 +227,8 @@ void ObjectConverter::VisitUnionType(const fidl_codec::UnionType* type) {
     }
     return;
   }
-  PyErr_Format(PyExc_TypeError, "Unknown union variant '%s': %s", type->Name().c_str(),
-               type->ToString().c_str());
+  PyErr_Format(PyExc_TypeError, "No known union variants found set for '%s' of type: %s",
+               type->Name().c_str(), type->ToString().c_str());
 }
 
 void ObjectConverter::VisitType(const fidl_codec::Type* type) {
