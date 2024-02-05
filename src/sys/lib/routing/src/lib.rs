@@ -162,10 +162,9 @@ impl From<Vec<&ExposeDecl>> for RouteRequest {
 }
 
 impl RouteRequest {
-    /// Return `true` if the RouteRequest is a `use` capability declaration, and
-    /// the `availability` is `optional` (the target declares that it does not
-    /// require the capability).
-    pub fn target_use_optional(&self) -> bool {
+    /// Returns the availability of the RouteRequest if it is a `use` capability declaration
+    /// and supports availability.
+    pub fn target_use_availability(&self) -> Option<Availability> {
         use crate::RouteRequest::*;
         match self {
             UseDirectory(UseDirectoryDecl { availability, .. })
@@ -173,9 +172,7 @@ impl RouteRequest {
             | UseProtocol(UseProtocolDecl { availability, .. })
             | UseService(UseServiceDecl { availability, .. })
             | UseConfig(UseConfigurationDecl { availability, .. })
-            | UseStorage(UseStorageDecl { availability, .. }) => {
-                *availability == Availability::Optional
-            }
+            | UseStorage(UseStorageDecl { availability, .. }) => Some(*availability),
 
             OfferRunner(_)
             | OfferResolver(_)
@@ -187,17 +184,13 @@ impl RouteRequest {
             | ExposeConfig(_)
             | Resolver(_)
             | StorageBackingDirectory(_)
-            | UseRunner(_) => false,
-
-            OfferDirectory(OfferDirectoryDecl { availability, .. })
-            | OfferEventStream(OfferEventStreamDecl { availability, .. })
-            | OfferProtocol(OfferProtocolDecl { availability, .. })
-            | OfferConfig(OfferConfigurationDecl { availability, .. })
-            | OfferStorage(OfferStorageDecl { availability, .. }) => {
-                *availability == Availability::Optional
-            }
-
-            OfferService(bundle) => bundle.iter().all(|o| o.availability == Availability::Optional),
+            | UseRunner(_)
+            | OfferDirectory(_)
+            | OfferEventStream(_)
+            | OfferProtocol(_)
+            | OfferConfig(_)
+            | OfferStorage(_)
+            | OfferService(_) => None,
         }
     }
 }

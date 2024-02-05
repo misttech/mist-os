@@ -14,7 +14,13 @@ use {
     serde::{de, ser},
     serde::{Deserialize, Serialize},
     std::{
-        cmp, default::Default, fmt, iter, iter::DoubleEndedIterator, path::PathBuf, str::FromStr,
+        cmp,
+        default::Default,
+        fmt::{self, Display},
+        iter,
+        iter::DoubleEndedIterator,
+        path::PathBuf,
+        str::FromStr,
     },
     thiserror::Error,
     url,
@@ -933,6 +939,17 @@ symmetrical_enums!(
     SameAsTarget,
     Transitional
 );
+
+impl Display for Availability {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Availability::Required => write!(f, "Required"),
+            Availability::Optional => write!(f, "Optional"),
+            Availability::SameAsTarget => write!(f, "SameAsTarget"),
+            Availability::Transitional => write!(f, "Transitional"),
+        }
+    }
+}
 
 // TODO(cgonyeo): remove this once we've soft migrated to the availability field being required.
 impl Default for Availability {

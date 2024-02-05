@@ -33,7 +33,6 @@ async fn main() {
             "protocol `fidl.test.components.Trigger`",
             "not available for target component \
             `root/routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-parent`",
-            "Target optionally uses capability that was not available",
             "`fidl.test.components.Trigger` was not offered to",
             "`root/routing-tests/offers-to-children-unavailable-but-optional` by parent",
         ]],
@@ -56,7 +55,6 @@ async fn main() {
             "protocol `fidl.test.components.Trigger`",
             "not available for target component \
             `root/routing-tests/child-with-optional-use`",
-            "Target optionally uses capability that was not available",
             "`fidl.test.components.Trigger` was not offered to",
             "`root/routing-tests/child-with-optional-use` by parent",
         ]],
@@ -79,7 +77,6 @@ async fn main() {
             "protocol `fidl.test.components.Trigger`",
             "not available for target component \
             `root/routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-sibling`",
-            "Target optionally uses capability that was not available",
             "`fidl.test.components.Trigger` was not exposed to `root/routing-tests/offers-to-children-unavailable-but-optional`",
             "from child `#child-that-doesnt-expose`"
         ]],

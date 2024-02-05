@@ -18,12 +18,10 @@ use {
             storage,
         },
     },
-    ::routing::{
-        self, component_instance::ComponentInstanceInterface, error::AvailabilityRoutingError,
-        mapper::NoopRouteMapper,
-    },
+    ::routing::{self, component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper},
     async_trait::async_trait,
     cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl},
+    cm_types::Availability,
     fidl::epitaph::ChannelEpitaphExt,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     moniker::MonikerBase,
@@ -49,30 +47,7 @@ pub trait Route {
 #[async_trait]
 impl Route for RouteRequest {
     async fn route(self, target: &Arc<ComponentInstance>) -> Result<RouteSource, RoutingError> {
-        let optional_use = self.target_use_optional();
-        routing::route_capability(self, target, &mut NoopRouteMapper).await.map_err(|err| {
-            if optional_use {
-                match err {
-                    RoutingError::AvailabilityRoutingError(_) => {
-                        // `err` is already an AvailabilityRoutingError.
-                        // Return it as-is.
-                        err
-                    }
-                    _ => {
-                        // Wrap the error, to surface the target's
-                        // optional usage.
-                        RoutingError::AvailabilityRoutingError(
-                            AvailabilityRoutingError::FailedToRouteToOptionalTarget {
-                                reason: err.to_string(),
-                            },
-                        )
-                    }
-                }
-            } else {
-                // Not an optional `use` so return the error as-is.
-                err
-            }
-        })
+        routing::route_capability(self, target, &mut NoopRouteMapper).await
     }
 }
 
@@ -206,16 +181,18 @@ pub async fn report_routing_failure(
         .unwrap_or_else(|error| debug!(%error, "failed to send epitaph"));
     target
         .with_logger_as_default(|| {
-            match err {
-                ModelError::RouteOrOpenError {
-                    err:
-                        RouteOrOpenError::RoutingError(RoutingError::AvailabilityRoutingError(
-                            AvailabilityRoutingError::FailedToRouteToOptionalTarget { .. },
-                        )),
+            let availability = request.target_use_availability().unwrap_or(Availability::Required);
+            match availability {
+                Availability::Required => {
+                    // TODO(https://fxbug.dev/42060474): consider changing this to `error!()`
+                    warn!(
+                        "{availability} {request} was not available for target component `{}`: {}\n{}",
+                        &target.moniker, &err, ROUTE_ERROR_HELP
+                    );
                 }
-                | ModelError::RouteOrOpenError {
-                    err: RouteOrOpenError::RoutingError(RoutingError::SourceCapabilityIsVoid),
-                } => {
+                Availability::Optional
+                | Availability::SameAsTarget
+                | Availability::Transitional => {
                     // If the target declared the capability as optional, but
                     // the capability could not be routed (such as if the source
                     // component is not available) the component _should_
@@ -228,14 +205,7 @@ pub async fn report_routing_failure(
                     // `Required` capabilities to `error!()`, consider also
                     // changing this log for `Optional` to `warn!()`.
                     info!(
-                        "Optional {request} was not available for target component `{}`: {}\n{}",
-                        &target.moniker, &err, ROUTE_ERROR_HELP
-                    );
-                }
-                _ => {
-                    // TODO(https://fxbug.dev/42060474): consider changing this to `error!()`
-                    warn!(
-                        "Required {request} was not available for target component `{}`: {}\n{}",
+                        "{availability} {request} was not available for target component `{}`: {}\n{}",
                         &target.moniker, &err, ROUTE_ERROR_HELP
                     );
                 }

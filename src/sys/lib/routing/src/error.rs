@@ -556,7 +556,4 @@ pub enum AvailabilityRoutingError {
 
     #[error("Expose uses void source, but target requires the capability")]
     ExposeFromVoidToRequiredTarget,
-
-    #[error("Target optionally uses capability that was not available: {reason}")]
-    FailedToRouteToOptionalTarget { reason: String },
 }
