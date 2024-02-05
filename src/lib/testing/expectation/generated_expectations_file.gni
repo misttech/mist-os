@@ -2,6 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# Generates an expectations JSON5 file from a list of expectation files to
+# include. All test cases without matching expectations will be expected to
+# pass by default.
+#
+# Parameters
+#   includes (required)
+#     A list of expectation files to include.
+#     Type: list of paths
 template("generated_expectations_file") {
   generated_file(target_name) {
     output_file = "${target_gen_dir}/${target_name}.json5"

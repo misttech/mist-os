@@ -4,12 +4,6 @@
 {
     actions: [
         {
-            type: "expect_pass",
-            matchers: [
-                "*",
-            ],
-        },
-        {
             type: "expect_failure",
             matchers: [
                 "All/SocketInetLoopbackTest.TCPAcceptAfterReset/ListenV4Any_ConnectV4Any",

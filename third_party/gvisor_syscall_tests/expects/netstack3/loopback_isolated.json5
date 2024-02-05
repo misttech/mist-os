@@ -4,12 +4,6 @@
 {
     actions: [
         {
-            type: "expect_pass",
-            matchers: [
-                "*",
-            ],
-        },
-        {
             type: "skip",
             matchers: [
                 // TODO(https://fxbug.dev/42082655): Deflake and unskip.

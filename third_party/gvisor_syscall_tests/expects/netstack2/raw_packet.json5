@@ -4,12 +4,6 @@
 {
     actions: [
         {
-            type: "expect_pass",
-            matchers: [
-                "*",
-            ],
-        },
-        {
             type: "expect_failure",
             matchers: [
                 // https://fxbug.dev/42163179

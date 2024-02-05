@@ -4,12 +4,6 @@
 {
     actions: [
         {
-            type: "expect_pass",
-            matchers: [
-                "*",
-            ],
-        },
-        {
             type: "expect_failure",
             matchers: [
                 // Fuchsia does not support Unix sockets.

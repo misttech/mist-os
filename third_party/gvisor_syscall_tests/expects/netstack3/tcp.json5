@@ -5,12 +5,6 @@
     actions: [
         // Netstack3 does not support TCP (yet).
         {
-            type: "expect_pass",
-            matchers: [
-                "*",
-            ],
-        },
-        {
             type: "skip",
             matchers: [
                 // Skip tests that will otherwise hang forever.

@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/test.gni")
 import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
+import("//src/lib/testing/expectation/generated_expectations_file.gni")
 import("//src/lib/testing/sharding/fuchsia_sharded_test_package.gni")
 
 config("gvisor_test_util_config") {
@@ -316,9 +317,6 @@ template("syscall_test_suite") {
     _num_shards = invoker.num_shards
   }
 
-  netstack3_expectations_target = "${suite_label}_netstack3_expectations"
-  netstack2_expectations_target = "${suite_label}_netstack2_expectations"
-
   ns3_label = "netstack3"
 
   stacks = [
@@ -326,13 +324,11 @@ template("syscall_test_suite") {
       label = "netstack2_syncudp"
       component =
           "//src/connectivity/network/netstack:component-with-sync-udp-debug"
-      expectations = ":${netstack2_expectations_target}"
       manifest = "meta/netstack2/syncudp/${suite_label}_syscall_tests.cml"
     },
     {
       label = ns3_label
       component = "//src/connectivity/network/netstack3:component-debug"
-      expectations = ":${netstack3_expectations_target}"
       manifest = "meta/netstack3/${suite_label}_syscall_tests.cml"
     },
   ]
@@ -350,7 +346,6 @@ template("syscall_test_suite") {
         label = ns2_fastudp_label
         component =
             "//src/connectivity/network/netstack:component-with-fast-udp-debug"
-        expectations = ":${netstack2_expectations_target}"
         manifest = "meta/netstack2/fastudp/${suite_label}_syscall_tests.cml"
       },
     ]
@@ -384,6 +379,27 @@ template("syscall_test_suite") {
           invoker.with_distinct_fast_udp_expectations
     }
 
+    expectations_target_name = "${component_label}_expectations"
+    generated_expectations_file(expectations_target_name) {
+      includes = []
+      if (stack.label == ns3_label) {
+        includes = [ "expects/netstack3/${suite_label}.json5" ]
+      } else {
+        _netstack2_expects_dir = "expects/netstack2"
+        if (with_distinct_fast_udp_expectations) {
+          if (stack.label == ns2_fastudp_label) {
+            includes =
+                [ "$_netstack2_expects_dir/${suite_label}_fastudp.json5" ]
+          } else {
+            includes =
+                [ "$_netstack2_expects_dir/${suite_label}_syncudp.json5" ]
+          }
+        } else {
+          includes = [ "$_netstack2_expects_dir/${suite_label}.json5" ]
+        }
+      }
+    }
+
     fuchsia_sharded_test_package(test_package_label) {
       forward_variables_from(invoker, [ "test_specs" ])
       test_components = [
@@ -394,22 +410,7 @@ template("syscall_test_suite") {
             stack.component,
           ]
           manifest = stack.manifest
-          if (stack.label == ns3_label) {
-            expectations = "expects/netstack3/${suite_label}.json5"
-          } else {
-            _netstack2_expects_dir = "expects/netstack2"
-            if (with_distinct_fast_udp_expectations) {
-              if (stack.label == ns2_fastudp_label) {
-                expectations =
-                    "$_netstack2_expects_dir/${suite_label}_fastudp.json5"
-              } else {
-                expectations =
-                    "$_netstack2_expects_dir/${suite_label}_syncudp.json5"
-              }
-            } else {
-              expectations = "$_netstack2_expects_dir/${suite_label}.json5"
-            }
-          }
+          generated_expectations = ":${expectations_target_name}"
           num_shards = _num_shards
 
           # Matches the first two slash delimited parts of the test name, or

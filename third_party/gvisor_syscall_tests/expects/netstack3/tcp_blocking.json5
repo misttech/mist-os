@@ -4,12 +4,6 @@
 {
     actions: [
         {
-            type: "expect_pass",
-            matchers: [
-                "*",
-            ],
-        },
-        {
             type: "skip",
             matchers: [
                 // Skip tests that will otherwise hang forever.
