@@ -340,6 +340,7 @@ termcolor = { path = "ask2patch/termcolor" }
 walkdir = { path = "ask2patch/walkdir" }
 
 ### Empty Forks: empty forks kept only for satisfying cargo's resolution
+cc = { path = "empty/cc" }
 crossterm_winapi = { path = "empty/crossterm_winapi" }
 ctor = { path = "empty/ctor" }
 miow = { path = "empty/miow" }
