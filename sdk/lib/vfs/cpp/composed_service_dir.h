@@ -34,6 +34,7 @@ class ComposedServiceDir : public vfs::internal::Directory {
 
   void AddService(const std::string& service_name, std::unique_ptr<vfs::Service> service);
 
+ protected:
   //
   // |vfs::internal::Node| Implementations:
   //

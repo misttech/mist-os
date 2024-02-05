@@ -95,7 +95,6 @@ class FakeBootItemsFixture : public testing::Test {
     }
 
     ASSERT_NE(existing_entry, nullptr);
-    ASSERT_TRUE(existing_entry->IsDirectory());
     BindHierarchy(*reinterpret_cast<vfs::PseudoDir*>(existing_entry), path);
   }
 
@@ -220,14 +219,13 @@ void ValidatePublishedRequests(uint32_t svc_index, cpp20::span<PublishRequest> r
 
     vfs::internal::Node* lookup_node = nullptr;
     ASSERT_EQ(sink_root.Lookup(path, &lookup_node), ZX_OK);
-    ASSERT_TRUE(lookup_node->IsDirectory());
 
     auto* typed_dir = reinterpret_cast<vfs::PseudoDir*>(lookup_node);
     ASSERT_EQ(typed_dir->Lookup(name, &lookup_node), ZX_OK) << name;
 
     auto* vmo_file = reinterpret_cast<vfs::VmoFile*>(lookup_node);
-    std::vector<uint8_t> actual_data;
-    ASSERT_EQ(vmo_file->ReadAt(kData.size(), kDataOffset + i, &actual_data), ZX_OK);
+    std::vector<uint8_t> actual_data(kData.size());
+    ASSERT_EQ(vmo_file->vmo()->read(actual_data.data(), kDataOffset + i, kData.size()), ZX_OK);
 
     EXPECT_TRUE(memcmp(kData.data(), actual_data.data(), kData.size()) == 0);
   }

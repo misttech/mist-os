@@ -45,6 +45,7 @@ class Service : public vfs::internal::Node {
   // Destroys the services and releases its connector.
   ~Service() override;
 
+ protected:
   // |Node| implementation:
   zx_status_t GetAttr(fuchsia::io::NodeAttributes* out_attributes) const final;
 
@@ -52,7 +53,6 @@ class Service : public vfs::internal::Node {
 
   const Connector& connector() const { return connector_; }
 
- protected:
   fuchsia::io::OpenFlags GetAllowedFlags() const override;
   fuchsia::io::OpenFlags GetProhibitiveFlags() const override;
 

@@ -69,9 +69,9 @@ class PseudoDir final : public internal::Node {
     return node_map_.empty();
   }
 
-  // |vfs::internal::Node| implementation
-
-  zx_status_t Lookup(std::string_view name, Node** out_node) const override {
+  // Find and returns a node matching |name| in this directory. This directory maintains ownership
+  // of |out_node|. Returns |ZX_ERR_NOT_FOUND| if no node matching |name| was found.
+  zx_status_t Lookup(std::string_view name, Node** out_node) const {
     std::lock_guard guard(mutex_);
     if (auto node_it = node_map_.find(name); node_it != node_map_.cend()) {
       *out_node = node_it->second.get();
@@ -80,10 +80,8 @@ class PseudoDir final : public internal::Node {
     return ZX_ERR_NOT_FOUND;
   }
 
-  bool IsDirectory() const override { return true; }
-
  private:
-  static inline vfs_internal_node_t* CreateDirectory() {
+  static vfs_internal_node_t* CreateDirectory() {
     vfs_internal_node_t* dir;
     ZX_ASSERT(vfs_internal_directory_create(&dir) == ZX_OK);
     return dir;
@@ -108,17 +106,11 @@ class PseudoDir final : public internal::Node {
   mutable std::mutex mutex_;
 
   // *NOTE*: Due to the SDK VFS `Lookup()` semantics, we need to maintain a strong reference to the
-  // nodes added to this directory. `Lookup()` returns a `Node*` which callers then downcast to the
-  // concrete node type. The underlying implementation of the pseudo-directory has no concept of
-  // the C++ types specified here, so we must store them here to allow safe downcasting.
-  //
-  // TODO(https://fxbug.dev/311176363): `Lookup()` *should* be handled by the in-tree VFS code, but
-  // this requires changing `Lookup()` to return a concrete type of node specified by the caller.
-  // This implies that the C++ types defined here should act more as handle-based types that can be
-  // copied/moved. We might also consider removing `Lookup()` and require callers maintain
-  // references/pointers for the nodes they wish to keep track of.
-  std::map<std::string, std::shared_ptr<internal::Node>, std::less<>> node_map_ __TA_GUARDED(
-      mutex_);
+  // nodes added to this directory. `Lookup()` returns a `vfs::Node*` which callers downcast to the
+  // concrete node type. The underlying `vfs_internal_node_t` type has no concept of the `vfs::Node`
+  // type, so we must store them here to allow safe downcasting.
+  std::map<std::string, std::shared_ptr<internal::Node>, std::less<>> node_map_
+      __TA_GUARDED(mutex_);
 };
 }  // namespace vfs
 

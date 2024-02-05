@@ -30,12 +30,12 @@ class RemoteDir final : public vfs::internal::Directory {
 
   ~RemoteDir() override;
 
+ protected:
   void OpenRemote(fuchsia::io::OpenFlags flags, fuchsia::io::ModeType mode, std::string_view,
                   fidl::InterfaceRequest<fuchsia::io::Node> request) override;
 
   bool IsRemote() const override;
 
- protected:
   // |Node| implementation
   zx_status_t Connect(fuchsia::io::OpenFlags flags, zx::channel request,
                       async_dispatcher_t* dispatcher) final;

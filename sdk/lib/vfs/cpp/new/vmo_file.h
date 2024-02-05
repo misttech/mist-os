@@ -75,32 +75,18 @@ class VmoFile final : public internal::Node {
 
   ~VmoFile() override = default;
 
-  // TODO(https://fxbug.dev/293936429): Deprecate this method and share the VMO handle instead.
-  zx_status_t ReadAt(uint64_t count, uint64_t offset, std::vector<uint8_t>* out_data) {
-    if (count == 0u || offset >= length_) {
-      return ZX_OK;
-    }
-
-    size_t remaining_length = length_ - offset;
-    if (count > remaining_length) {
-      count = remaining_length;
-    }
-
-    out_data->resize(count);
-    return vmo_->read(out_data->data(), offset, count);
-  }
+  zx::unowned_vmo vmo() const { return vmo_->borrow(); }
 
  private:
   VmoFile(zx_handle_t vmo_handle, size_t length, WriteMode write_option,
           DefaultSharingMode vmo_sharing)
       : internal::Node(CreateVmoFile(vmo_handle, length, write_option, vmo_sharing)),
-        vmo_(zx::unowned_vmo{vmo_handle}),
-        length_(length) {}
+        vmo_(zx::unowned_vmo{vmo_handle}) {}
 
   // The underlying node is responsible for closing `vmo_handle` when the node is destroyed.
-  static inline vfs_internal_node_t* CreateVmoFile(zx_handle_t vmo_handle, size_t length,
-                                                   WriteMode write_option,
-                                                   DefaultSharingMode vmo_sharing) {
+  static vfs_internal_node_t* CreateVmoFile(zx_handle_t vmo_handle, size_t length,
+                                            WriteMode write_option,
+                                            DefaultSharingMode vmo_sharing) {
     vfs_internal_node_t* vmo_file;
     ZX_ASSERT(vfs_internal_vmo_file_create(vmo_handle, static_cast<uint64_t>(length),
                                            static_cast<vfs_internal_write_mode_t>(write_option),
@@ -110,7 +96,6 @@ class VmoFile final : public internal::Node {
   }
 
   zx::unowned_vmo vmo_;  // Cannot outlive underlying node.
-  size_t length_;        // Required for `ReadAt()`.
 };
 
 }  // namespace vfs

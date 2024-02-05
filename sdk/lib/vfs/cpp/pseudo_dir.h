@@ -17,6 +17,8 @@
 
 namespace vfs {
 
+class ComposedServiceDir;
+
 // A pseudo-directory is a directory-like object whose entries are constructed
 // by a program at runtime.  The client can lookup, enumerate, and watch(not yet
 // implemented) these directory entries but it cannot create, remove, or rename
@@ -78,13 +80,16 @@ class PseudoDir : public vfs::internal::Directory {
   // threads.
   bool IsEmpty() const;
 
-  // |Directory| implementation:
+  // |Node| implementation:
   zx_status_t Lookup(std::string_view name, vfs::internal::Node** out_node) const final;
 
+ private:
+  friend class ComposedServiceDir;
+
+  // |Directory| implementation:
   zx_status_t Readdir(uint64_t offset, void* data, uint64_t len, uint64_t* out_offset,
                       uint64_t* out_actual) override;
 
- private:
   class Entry {
    public:
     Entry(uint64_t id, std::string name);

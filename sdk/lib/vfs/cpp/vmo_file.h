@@ -65,6 +65,10 @@ class VmoFile final : public vfs::internal::File {
 
   ~VmoFile() override;
 
+  // Borrowed handle to the VMO backing this file.
+  zx::unowned_vmo vmo() const { return vmo_.borrow(); }
+
+ protected:
   // Create |count| bytes of data from the file at the given |offset|.
   //
   // The data read should be copied to |out_data|, which should be empty when
@@ -99,7 +103,6 @@ class VmoFile final : public vfs::internal::File {
   // Returns the node attributes for this VmoFile.
   zx_status_t GetAttr(fuchsia::io::NodeAttributes* out_attributes) const override;
 
- protected:
   fuchsia::io::OpenFlags GetAllowedFlags() const override;
 
  private:

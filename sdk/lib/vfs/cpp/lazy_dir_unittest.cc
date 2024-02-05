@@ -52,6 +52,9 @@ class TestLazyDir : public vfs::LazyDir {
 
   async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
 
+  // Lookup() will be removed from vfs::LazyDir when the new SDK VFS library ships.
+  using vfs::LazyDir::Lookup;
+
  protected:
   void GetContents(LazyEntryVector* out_vector) const override {
     out_vector->reserve(contents_.size());

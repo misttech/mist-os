@@ -55,10 +55,10 @@ class PseudoFile final : public vfs::internal::File {
 
   ~PseudoFile() override;
 
+ protected:
   // |Node| implementations:
   zx_status_t GetAttr(fuchsia::io::NodeAttributes* out_attributes) const override;
 
- protected:
   zx_status_t CreateConnection(fuchsia::io::OpenFlags flags,
                                std::unique_ptr<vfs::internal::Connection>* connection) override;
 

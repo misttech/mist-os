@@ -52,6 +52,7 @@ class LazyDir : public vfs::internal::Directory {
   LazyDir();
   ~LazyDir() override;
 
+ protected:
   // |Directory| implementation:
   zx_status_t Readdir(uint64_t offset, void* data, uint64_t len, uint64_t* out_offset,
                       uint64_t* out_actual) override;
@@ -61,7 +62,6 @@ class LazyDir : public vfs::internal::Directory {
 
   zx_status_t Lookup(std::string_view name, Node** out_node) const final;
 
- protected:
   // Get the contents of the directory in an output vector.
   virtual void GetContents(LazyEntryVector* out_vector) const = 0;
 

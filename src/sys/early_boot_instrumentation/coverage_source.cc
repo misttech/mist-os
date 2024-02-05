@@ -112,7 +112,6 @@ vfs::PseudoDir& GetOrCreate(std::string_view sink_name, DataType type, SinkDirMa
   vfs::internal::Node* node = nullptr;
   // Both subdirs should always be available.
   ZX_ASSERT(root_dir.Lookup(path, &node) == ZX_OK);
-  ZX_ASSERT(node->IsDirectory());
   return *reinterpret_cast<vfs::PseudoDir*>(node);
 }
 

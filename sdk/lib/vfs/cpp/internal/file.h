@@ -14,6 +14,8 @@
 namespace vfs {
 namespace internal {
 
+class FileConnection;
+
 // A file object in a file system.
 //
 // Implements the |fuchsia.io.File| interface. Incoming connections are
@@ -28,6 +30,9 @@ class File : public Node {
  public:
   File();
   ~File() override;
+
+ protected:
+  friend class FileConnection;
 
   // Create |count| bytes of data from the file at the given |offset|.
   //
@@ -65,7 +70,6 @@ class File : public Node {
   // backing memory, in accordance with properties requested by |flags|.
   virtual zx_status_t GetBackingMemory(fuchsia::io::VmoFlags flags, zx::vmo* out_vmo);
 
- protected:
   fuchsia::io::OpenFlags GetAllowedFlags() const override;
   fuchsia::io::OpenFlags GetProhibitiveFlags() const override;
 

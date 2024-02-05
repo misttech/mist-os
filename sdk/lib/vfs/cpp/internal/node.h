@@ -16,11 +16,16 @@
 #include <vector>
 
 namespace vfs {
+class PseudoDir;
+
 namespace internal {
 
 bool IsValidName(std::string_view name);
 
 class Connection;
+class Directory;
+class File;
+class NodeConnection;
 
 // An object in a file system.
 //
@@ -40,6 +45,35 @@ class Node {
 
   Node(const Node&) = delete;
   Node& operator=(const Node&) = delete;
+  // Establishes a connection for |request| using the given |flags|.
+  //
+  // Waits for messages asynchronously on the |request| channel using
+  // |dispatcher|. If |dispatcher| is |nullptr|, the implementation will call
+  // |async_get_default_dispatcher| to obtain the default dispatcher for the
+  // current thread.
+  //
+  // Calls |Connect| after validating flags and modes.
+  zx_status_t Serve(fuchsia::io::OpenFlags flags, zx::channel request,
+                    async_dispatcher_t* dispatcher = nullptr);
+
+ protected:
+  friend class Directory;
+  friend class File;
+  friend class Connection;
+  friend class NodeConnection;
+  friend class vfs::PseudoDir;
+
+  // Find an entry in this directory with the given |name|.
+  //
+  // The entry is returned via |out_node|. The returned entry is owned by this
+  // directory.
+  //
+  // Returns |ZX_ERR_NOT_FOUND| if no entry exists.
+  // Default implementation in this class return |ZX_ERR_NOT_DIR| if
+  // |IsDirectory| is false, else throws error with |ZX_ASSERT|.
+  //
+  // All directory types which are not remote should implement this method.
+  virtual zx_status_t Lookup(std::string_view name, Node** out_node) const;
 
   // Notifies |Node| that it should remove and return
   // |connection| from its list as it is getting closed.
@@ -71,29 +105,6 @@ class Node {
   virtual void Clone(fuchsia::io::OpenFlags flags, fuchsia::io::OpenFlags parent_flags,
                      zx::channel request, async_dispatcher_t* dispatcher);
 
-  // Establishes a connection for |request| using the given |flags|.
-  //
-  // Waits for messages asynchronously on the |request| channel using
-  // |dispatcher|. If |dispatcher| is |nullptr|, the implementation will call
-  // |async_get_default_dispatcher| to obtain the default dispatcher for the
-  // current thread.
-  //
-  // Calls |Connect| after validating flags and modes.
-  zx_status_t Serve(fuchsia::io::OpenFlags flags, zx::channel request,
-                    async_dispatcher_t* dispatcher = nullptr);
-
-  // Find an entry in this directory with the given |name|.
-  //
-  // The entry is returned via |out_node|. The returned entry is owned by this
-  // directory.
-  //
-  // Returns |ZX_ERR_NOT_FOUND| if no entry exists.
-  // Default implementation in this class return |ZX_ERR_NOT_DIR| if
-  // |IsDirectory| is false, else throws error with |ZX_ASSERT|.
-  //
-  // All directory types which are not remote should implement this method.
-  virtual zx_status_t Lookup(std::string_view name, Node** out_node) const;
-
   // Return true if |Node| is a remote node.
   virtual bool IsRemote() const { return false; }
 
@@ -108,7 +119,6 @@ class Node {
     ZX_PANIC("Unimplemented");
   }
 
- protected:
   // Returns total number of active connections
   uint64_t GetConnectionCount() const;
 

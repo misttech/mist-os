@@ -18,8 +18,9 @@
 #include <string_view>
 
 namespace vfs {
-
 namespace internal {
+
+class DirectoryConnection;
 
 // A directory object in a file system.
 //
@@ -35,6 +36,9 @@ class Directory : public Node {
  public:
   Directory();
   ~Directory() override;
+
+ protected:
+  friend class DirectoryConnection;
 
   // |Node| implementation
   zx_status_t Lookup(std::string_view name, Node** out_node) const override;
@@ -91,7 +95,6 @@ class Directory : public Node {
 
   bool IsDirectory() const override;
 
- protected:
   // |Node| implementations
   zx_status_t CreateConnection(fuchsia::io::OpenFlags flags,
                                std::unique_ptr<Connection>* connection) override;

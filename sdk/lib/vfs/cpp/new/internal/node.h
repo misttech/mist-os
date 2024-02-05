@@ -63,33 +63,6 @@ class Node {
                               static_cast<uint32_t>(flags));
   }
 
-  // Find an entry in this directory with the given |name|.
-  //
-  // The entry is returned via |out_node|. The returned entry is owned by this
-  // directory.
-  //
-  // Returns |ZX_ERR_NOT_FOUND| if no entry exists.
-  // Default implementation in this class return |ZX_ERR_NOT_DIR| if
-  // |IsDirectory| is false, else throws error with |ZX_ASSERT|.
-  //
-  // All directory types which are not remote should implement this method.
-  //
-  // TODO(https://fxbug.dev/293936429): Make Lookup a non-virtual method of PseudoDir once LazyDir
-  // is removed, or move it to a separate Directory interface.
-  virtual zx_status_t Lookup(std::string_view name, Node** out_node) const {
-    return ZX_ERR_NOT_DIR;
-  }
-
-  // Return true if |Node| is a remote node.
-  // TODO(https://fxbug.dev/293936429): Deprecate this method, it should not be required for
-  // protocol resolution.
-  virtual bool IsRemote() const { return false; }
-
-  // Return true if |Node| is a directory.
-  // TODO(https://fxbug.dev/293936429): Deprecate this method, it should not be required for
-  // protocol resolution.
-  virtual bool IsDirectory() const { return false; }
-
  protected:
   explicit Node(vfs_internal_node_t* handle) : handle_(handle) {}
 

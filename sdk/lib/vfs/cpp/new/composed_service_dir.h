@@ -34,13 +34,8 @@ class ComposedServiceDir final : public internal::Node {
               ZX_OK);
   }
 
-  zx_status_t Lookup(std::string_view name, vfs::internal::Node** out_node) const override {
-    // No existing callers require Lookup functionality for this node type.
-    ZX_PANIC("TODO(https://fxbug.dev/309685624)");
-  }
-
  private:
-  static inline vfs_internal_node_t* MakeComposedServiceDir() {
+  static vfs_internal_node_t* MakeComposedServiceDir() {
     vfs_internal_node_t* dir;
     ZX_ASSERT(vfs_internal_composed_svc_dir_create(&dir) == ZX_OK);
     return dir;

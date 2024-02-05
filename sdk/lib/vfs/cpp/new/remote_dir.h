@@ -33,10 +33,8 @@ class RemoteDir final : public internal::Node {
   explicit RemoteDir(fidl::InterfaceHandle<fuchsia::io::Directory> dir)
       : RemoteDir(dir.TakeChannel()) {}
 
-  bool IsRemote() const override { return true; }
-
  private:
-  static inline vfs_internal_node_t* CreateRemoteDir(zx::channel dir) {
+  static vfs_internal_node_t* CreateRemoteDir(zx::channel dir) {
     vfs_internal_node_t* remote;
     ZX_ASSERT(vfs_internal_remote_directory_create(dir.release(), &remote) == ZX_OK);
     return remote;

@@ -61,8 +61,8 @@ std::vector<uint8_t> ReadVmo(const zx::vmo& vmo, size_t offset, size_t length) {
 
 TEST(VmoFile, ConstructTransferOwnership) {
   vfs::VmoFile file(MakeTestVmo(), 1000);
-  std::vector<uint8_t> output;
-  EXPECT_EQ(ZX_OK, file.ReadAt(1000, 0, &output));
+  std::vector<uint8_t> output(1000);
+  EXPECT_EQ(ZX_OK, file.vmo()->read(output.data(), 0, 1000));
   EXPECT_EQ(1000u, output.size());
 }
 
