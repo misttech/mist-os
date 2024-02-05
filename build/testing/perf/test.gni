@@ -48,6 +48,9 @@ performance_testing_environments = [
 #
 #   timeout_secs (optional)
 #     See test_spec in build/testing/test_spec.gni
+#
+#   local_config_source (optional)
+#     See python_mobly_test in build/python/python_mobly_test.gni
 template("python_perf_test") {
   if (is_host) {
     assert(defined(invoker.main_source), "main_source is required")
@@ -97,6 +100,7 @@ template("python_perf_test") {
       test_name = "${target_name}"
       forward_variables_from(invoker,
                              [
+                               "local_config_source",
                                "main_source",
                                "params",
                                "params_source",

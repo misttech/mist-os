@@ -4,7 +4,10 @@
 # found in the LICENSE file.
 """Unit tests for trace metrics processors."""
 
+import json
 import os
+import pathlib
+import tempfile
 from typing import Any, Dict, List
 import unittest
 
@@ -16,8 +19,64 @@ import trace_processing.trace_metrics as trace_metrics
 import trace_processing.trace_model as trace_model
 
 
-class TraceMetricsTest(unittest.TestCase):
-    """Trace metrics tests."""
+class TestCaseResultTest(unittest.TestCase):
+    """Tests TestCaseResult"""
+
+    def test_to_json(self) -> None:
+        label = "L1"
+        test_suite = "bar"
+
+        result = trace_metrics.TestCaseResult(
+            label=label,
+            unit=trace_metrics.Unit.bytesPerSecond,
+            values=[0, 0.1, 23.45, 6],
+        )
+
+        self.assertEqual(result.label, label)
+        self.assertEqual(
+            result.to_json(test_suite=test_suite),
+            {
+                "label": label,
+                "test_suite": test_suite,
+                "unit": "bytes/second",
+                "values": [0, 0.1, 23.45, 6],
+            },
+        )
+
+    def test_write_fuchsia_perf_json(self) -> None:
+        test_suite = "ts"
+        results = [
+            trace_metrics.TestCaseResult(
+                label="l1",
+                unit=trace_metrics.Unit.percent,
+                values=[1],
+            ),
+            trace_metrics.TestCaseResult(
+                label="l2",
+                unit=trace_metrics.Unit.framesPerSecond,
+                values=[2],
+            ),
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            actual_output_path = (
+                pathlib.Path(tmpdir) / "actual_output.fuchsiaperf.json"
+            )
+
+            trace_metrics.TestCaseResult.write_fuchsiaperf_json(
+                results,
+                test_suite=test_suite,
+                output_path=actual_output_path,
+            )
+
+            actual_output = json.loads(actual_output_path.read_text())
+            self.assertEqual(
+                actual_output, [r.to_json(test_suite) for r in results]
+            )
+
+
+class MetricProcessorsTest(unittest.TestCase):
+    """Tests for the various MetricProcessors."""
 
     def setUp(self):
         # A second dirname is required to account for the .pyz archive which

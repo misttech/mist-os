@@ -10,11 +10,13 @@ See https://fuchsia.dev/fuchsia-src/development/performance/fuchsiaperf_format
 for more details.
 """
 
-from enum import Enum
+import dataclasses
+import enum
 import json
 import logging
 import os
-from typing import Any, Callable, Dict, List, Optional, TextIO, Union
+import pathlib
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import trace_processing.trace_model as trace_model
 
@@ -22,11 +24,12 @@ import trace_processing.trace_model as trace_model
 _LOGGER: logging.Logger = logging.getLogger("Performance")
 
 
-class Unit(Enum):
+class Unit(enum.StrEnum):
     """The set of valid Unit constants.
 
     This should be kept in sync with the list of supported units in the results
-    schema docs linked at the top of this file.
+    schema docs linked at the top of this file. These are the unit strings
+    accepted by catapult_converter.
     """
 
     # Time-based units.
@@ -46,51 +49,48 @@ class Unit(Enum):
     watts = "Watts"
 
 
+@dataclasses.dataclass(frozen=True)
 class TestCaseResult:
     """The results for a single test case.
 
     See the link at the top of this file for documentation.
     """
 
-    # Maps a [Unit] to the equivalent string expected in catapult converter.
-    _UNIT_TO_CONVERT_STRING: Dict[Unit, str] = {
-        Unit.nanoseconds: "nanoseconds",
-        Unit.milliseconds: "milliseconds",
-        Unit.bytes: "bytes",
-        Unit.bytesPerSecond: "bytes/second",
-        Unit.framesPerSecond: "frames/second",
-        Unit.percent: "percent",
-        Unit.countSmallerIsBetter: "count_smallerIsBetter",
-        Unit.countBiggerIsBetter: "count_biggerIsBetter",
-        Unit.watts: "Watts",
-    }
-
-    def __init__(self, metric: str, unit: Unit, values: List[float]) -> None:
-        self.metric: str = metric
-        # This field below is being renamed from "label" to "metric".
-        # It is duplicated as a transitional measure so that it can be accessed
-        # via either name.  TODO(https://fxbug.dev/42137976): Remove the "label" field."
-        self.label: str = metric
-        self.unit: Unit = unit
-        self.values: List[float] = values
-
-        # TODO(https://fxbug.dev/42137976): Remove the statement below when "label" is removed.
-        self.label = metric
+    label: str
+    unit: Unit
+    values: List[float]
 
     def to_json(self, test_suite: str) -> Dict[str, Any]:
-        convert_string: Optional[str] = self._UNIT_TO_CONVERT_STRING.get(
-            self.unit
-        )
-        if convert_string is None:
-            raise ValueError(
-                f"Failed to map {self.unit} to catapult converter string"
-            )
         return {
             "label": self.label,
             "test_suite": test_suite,
-            "unit": convert_string,
+            "unit": str(self.unit),
             "values": self.values,
         }
+
+    @staticmethod
+    def write_fuchsiaperf_json(
+        results: list["TestCaseResult"],
+        test_suite: str,
+        output_path: Union[str, os.PathLike],
+    ) -> None:
+        """Writes the given TestCaseResults into a fuchsiaperf json file.
+
+        Args:
+            results: The results to write.
+            test_suite: A test suite name to embed in the json.
+                E.g. "fuchsia.uiperf.my_metric".
+            output_path: Output file path, must end with ".fuchsiaperf.json".
+        """
+        if isinstance(output_path, str):
+            output_path = pathlib.Path(output_path)
+        assert output_path.name.endswith(
+            ".fuchsiaperf.json"
+        ), f"Expecting path that ends with '.fuchsiaperf.json' but got {output_path}"
+        results_json = [r.to_json(test_suite) for r in results]
+        with open(output_path, "w") as outfile:
+            json.dump(results_json, outfile, indent=4)
+        _LOGGER.info(f"Wrote {len(results)} results into {output_path}")
 
 
 # A callable object which can extract a set of metrics from a trace [Model],
@@ -166,19 +166,16 @@ class MetricsSpecSet:
             f"{self.test_name}-benchmark.fuchsiaperf.json",
         )
 
-        results: List[Dict[str, Any]] = []
+        results: List[TestCaseResult] = []
         for metrics_spec in self.metrics_specs:
             _LOGGER.info(f"Applying metrics spec {metrics_spec.name} to model")
-            test_case_results: List[
-                TestCaseResult
-            ] = metrics_spec.process_metrics(model)
-            for test_case_result in test_case_results:
-                results.append(
-                    test_case_result.to_json(test_suite=self.test_name)
-                )
+            results.extend(metrics_spec.process_metrics(model))
 
-        with open(output_file_name, "w") as output_file:
-            json.dumps(results, output_file)
+        TestCaseResult.write_fuchsiaperf_json(
+            results=results,
+            test_suite=self.test_name,
+            output_path=output_file_name,
+        )
         _LOGGER.info(
             f"Processing trace completed; written to " f"{output_file_name}."
         )
