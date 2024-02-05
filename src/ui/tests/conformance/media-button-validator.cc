@@ -120,6 +120,12 @@ class MediaButtonConformanceTest : public ui_conformance_test_base::ConformanceT
     ASSERT_EQ(media_buttons_->SimulateButtonPress(std::move(request)), ZX_OK);
   }
 
+  void SimulatePress(std::vector<fir::ConsumerControlButton> buttons) {
+    futi::MediaButtonsDeviceSendButtonsStateRequest request;
+    request.set_buttons(std::move(buttons));
+    ASSERT_EQ(media_buttons_->SendButtonsState(std::move(request)), ZX_OK);
+  }
+
  private:
   futi::MediaButtonsDeviceSyncPtr media_buttons_;
   futc::PuppetSyncPtr puppet_ptr_;
@@ -265,6 +271,112 @@ TEST_F(MediaButtonConformanceTest, SimplePress) {
     EXPECT_EQ(ToString(listener.events_received()[0]), ToString(MakeEmptyEvent()));
     EXPECT_EQ(ToString(listener.events_received()[1]), ToString(MakeEmptyEvent()));
     listener.clear_events();
+  }
+}
+
+TEST_F(MediaButtonConformanceTest, MultiPress) {
+  auto device_listener_registry = ConnectSyncIntoRealm<fup::DeviceListenerRegistry>();
+
+  ButtonsListener listener;
+  ASSERT_EQ(device_listener_registry->RegisterListener(listener.NewBinding()), ZX_OK);
+
+  // press multi buttons.
+  {
+    auto buttons = std::vector<fir::ConsumerControlButton>{
+        fuchsia::input::report::ConsumerControlButton::CAMERA_DISABLE,
+        fuchsia::input::report::ConsumerControlButton::MIC_MUTE,
+        fuchsia::input::report::ConsumerControlButton::PAUSE,
+        fuchsia::input::report::ConsumerControlButton::VOLUME_UP,
+    };
+    SimulatePress(std::move(buttons));
+    RunLoopUntil([&listener]() { return listener.events_received().size() > 0; });
+    EXPECT_EQ(listener.events_received().size(), 1u);
+    EXPECT_EQ(ToString(listener.events_received()[0]),
+              ToString(MakeMediaButtonsEvent(1, true, true, true, false)));
+    listener.clear_events();
+  }
+
+  // release multi buttons.
+  {
+    SimulatePress(std::vector<fir::ConsumerControlButton>());
+    RunLoopUntil([&listener]() { return listener.events_received().size() > 0; });
+    EXPECT_EQ(listener.events_received().size(), 1u);
+    EXPECT_EQ(ToString(listener.events_received()[0]), ToString(MakeEmptyEvent()));
+    listener.clear_events();
+  }
+}
+
+TEST_F(MediaButtonConformanceTest, MultiListener) {
+  auto device_listener_registry = ConnectSyncIntoRealm<fup::DeviceListenerRegistry>();
+
+  ButtonsListener listener1;
+  auto listener2 = std::make_unique<ButtonsListener>();
+  ASSERT_EQ(device_listener_registry->RegisterListener(listener1.NewBinding()), ZX_OK);
+  ASSERT_EQ(device_listener_registry->RegisterListener(listener2->NewBinding()), ZX_OK);
+
+  // Both listener received events.
+  {
+    SimulatePress(fir::ConsumerControlButton::VOLUME_UP);
+    FX_LOGS(INFO) << "wait for button VOLUME_UP";
+    RunLoopUntil([&listener1]() { return listener1.events_received().size() > 1; });
+    RunLoopUntil([&listener2]() { return listener2->events_received().size() > 1; });
+    EXPECT_EQ(listener1.events_received().size(), 2u);
+    EXPECT_EQ(listener2->events_received().size(), 2u);
+    EXPECT_EQ(ToString(listener1.events_received()[0]), ToString(MakeVolumeUpEvent()));
+    EXPECT_EQ(ToString(listener1.events_received()[1]), ToString(MakeEmptyEvent()));
+    EXPECT_EQ(ToString(listener2->events_received()[0]), ToString(MakeVolumeUpEvent()));
+    EXPECT_EQ(ToString(listener2->events_received()[1]), ToString(MakeEmptyEvent()));
+    listener1.clear_events();
+    listener2->clear_events();
+  }
+
+  ButtonsListener listener3;
+  ASSERT_EQ(device_listener_registry->RegisterListener(listener3.NewBinding()), ZX_OK);
+
+  // new listener receives the last event.
+  {
+    FX_LOGS(INFO) << "listener wait for the last button";
+    RunLoopUntil([&listener3]() { return listener3.events_received().size() > 0; });
+    EXPECT_EQ(ToString(listener3.events_received()[0]), ToString(MakeEmptyEvent()));
+    listener3.clear_events();
+  }
+
+  // then new listener receive only new events.
+  {
+    SimulatePress(fir::ConsumerControlButton::VOLUME_DOWN);
+    FX_LOGS(INFO) << "wait for button VOLUME_DOWN";
+    RunLoopUntil([&listener1]() { return listener1.events_received().size() > 1; });
+    RunLoopUntil([&listener2]() { return listener2->events_received().size() > 1; });
+    RunLoopUntil([&listener3]() { return listener3.events_received().size() > 1; });
+    EXPECT_EQ(listener1.events_received().size(), 2u);
+    EXPECT_EQ(listener2->events_received().size(), 2u);
+    EXPECT_EQ(listener3.events_received().size(), 2u);
+    EXPECT_EQ(ToString(listener1.events_received()[0]), ToString(MakeVolumeDownEvent()));
+    EXPECT_EQ(ToString(listener1.events_received()[1]), ToString(MakeEmptyEvent()));
+    EXPECT_EQ(ToString(listener2->events_received()[0]), ToString(MakeVolumeDownEvent()));
+    EXPECT_EQ(ToString(listener2->events_received()[1]), ToString(MakeEmptyEvent()));
+    EXPECT_EQ(ToString(listener3.events_received()[0]), ToString(MakeVolumeDownEvent()));
+    EXPECT_EQ(ToString(listener3.events_received()[1]), ToString(MakeEmptyEvent()));
+    listener1.clear_events();
+    listener2->clear_events();
+    listener3.clear_events();
+  }
+
+  // drop listener2, and verify other listeners still working.
+  listener2 = {};
+  {
+    SimulatePress(fir::ConsumerControlButton::PAUSE);
+    FX_LOGS(INFO) << "wait for button PAUSE";
+    RunLoopUntil([&listener1]() { return listener1.events_received().size() > 1; });
+    RunLoopUntil([&listener3]() { return listener3.events_received().size() > 1; });
+    EXPECT_EQ(listener1.events_received().size(), 2u);
+    EXPECT_EQ(listener3.events_received().size(), 2u);
+    EXPECT_EQ(ToString(listener1.events_received()[0]), ToString(MakePauseEvent()));
+    EXPECT_EQ(ToString(listener1.events_received()[1]), ToString(MakeEmptyEvent()));
+    EXPECT_EQ(ToString(listener3.events_received()[0]), ToString(MakePauseEvent()));
+    EXPECT_EQ(ToString(listener3.events_received()[1]), ToString(MakeEmptyEvent()));
+    listener1.clear_events();
+    listener3.clear_events();
   }
 }
 
