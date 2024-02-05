@@ -401,6 +401,13 @@ _CC_LIBRARY_COPTS_OVERRIDES = {
     ],
 }
 
+# alwayslink attr provide to an individual library. This should mostly be
+# used in tests when we don't care about unused symbol getting linked.
+# This is a workaround for driver testing before Bazel 7 is used in-tree.
+_ALWAYSLINK_LIBS = [
+    "driver_testing_cpp",
+]
+
 # buildifier: disable=unused-variable
 def _generate_cc_source_library_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     lib_base_path = meta["root"] + "/"
@@ -426,6 +433,7 @@ def _generate_cc_source_library_build_rules(ctx, meta, relative_dir, build_file,
     deps = _find_dep_paths(meta["deps"], "pkg/", ctx.attr.parent_sdk, parent_sdk_contents)
     target_name = _get_target_name(meta["name"])
     copts = _CC_LIBRARY_COPTS_OVERRIDES.get(target_name, [])
+    alwayslink = target_name in _ALWAYSLINK_LIBS
 
     _merge_template(
         ctx,
@@ -440,6 +448,7 @@ def _generate_cc_source_library_build_rules(ctx, meta, relative_dir, build_file,
             "{{headers}}": _get_starlark_list(meta["headers"], remove_prefix = lib_base_path),
             "{{relative_include_dir}}": meta["include_dir"][len(lib_base_path):],
             "{{copts}}": _get_starlark_list(copts),
+            "{{alwayslink}}": str(alwayslink),
         },
     )
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(meta["sources"])
