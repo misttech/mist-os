@@ -488,6 +488,7 @@ sdk_molecule("core_cc_prebuilt_libraries") {
     "//sdk/lib/fdio:fdio_sdk",
     "//sdk/lib/magma_client:magma_client_sdk",
     "//sdk/lib/svc:svc_sdk",
+    "//sdk/lib/vfs/internal:vfs_internal_sdk",
     "//sdk/lib/virtgralloc:virtgralloc_headers_sdk",
     "//src/devices/bin/driver_runtime:driver_runtime_sdk",
     "//src/performance/memory/heapdump/instrumentation:instrumentation_sdk",

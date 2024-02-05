@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/vfs/cpp/new/internal/libvfs_private.h>
+#include <lib/vfs/internal/libvfs_private.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>

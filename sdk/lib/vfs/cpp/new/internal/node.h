@@ -9,7 +9,7 @@
 #include <lib/async/default.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/interface_request.h>
-#include <lib/vfs/cpp/new/internal/libvfs_private.h>
+#include <lib/vfs/internal/libvfs_private.h>
 
 namespace vfs {
 // Types that require access to the `handle()` of child entries.

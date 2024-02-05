@@ -16,6 +16,7 @@ cc_prebuilt_library://pkg/syslog
 cc_prebuilt_library://pkg/trace-engine
 cc_prebuilt_library://pkg/trace-provider-so
 cc_prebuilt_library://pkg/trace-vthread
+cc_prebuilt_library://pkg/vfs_internal
 cc_prebuilt_library://pkg/vulkan
 cc_source_library://pkg/async
 cc_source_library://pkg/async-cpp

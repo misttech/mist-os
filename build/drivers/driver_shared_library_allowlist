@@ -1,4 +1,5 @@
 libasync-default.so
+libbackend_fuchsia_globals.so
 libclang_rt.asan.so
 libcrypto.so
 libc.so
@@ -8,7 +9,7 @@ libfdio.so
 libssl.so
 libsvc.so
 libsyslog.so
-libtrace-engine.so
-libbackend_fuchsia_globals.so
-libzircon.so
 libtee-client-api.so
+libtrace-engine.so
+libvfs_internal.so
+libzircon.so

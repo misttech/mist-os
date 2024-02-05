@@ -3,8 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/cpp/sdk_shared_library.gni")
 import("//build/cpp/sdk_source_set.gni")
-import("//build/cpp/sdk_static_library.gni")
 import("//build/test.gni")
 
 # A replacement version of this library is undergoing active development but is not available yet.
@@ -149,58 +149,6 @@ fuchsia_unittest_package("vfs_cpp_tests") {
   deps = [ ":vfs_cpp_unittests" ]
 }
 
-# *WARNING*: This is an internal static library used to provide a stable ABI to the in-tree C++ VFS
-# library in `//src/storage/lib/vfs/cpp`. It is only intended for use by the SDK VFS source_set
-# above, and must not be included as a direct dependency of any other targets.
-#
-# All code that requires VFS functionality *must* use the source_set or the in-tree VFS library.
-sdk_static_library("internal") {
-  # TODO(https://fxbug.dev/293936429): Change to partner when this library is complete, and add to:
-  #  - sdk/BUILD.gn
-  #  - sdk/manifests/fuchsia_idk.manifest
-  category = "internal"
-
-  sdk_name = "vfs_cpp_internal"
-  include_base = "//sdk"
-
-  # Headers are distributed with the source set below.
-  no_headers = true
-  sources = [
-    "new/internal/libvfs.cc",
-    "new/internal/libvfs_private.h",
-  ]
-
-  public_deps = [ "//zircon/system/ulib/async" ]
-
-  deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
-    "//src/storage/lib/vfs/cpp",
-    "//zircon/system/ulib/fbl",
-  ]
-
-  public_configs = [ "//sdk/config" ]
-
-  include_base = "//sdk"
-
-  complete_static_lib = true
-
-  #  ________  _________  ________  ________
-  # |\   ____\|\___   ___\\   __  \|\   __  \
-  # \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
-  #  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
-  #   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
-  #     ____\_\  \   \ \__\ \ \_______\ \__\
-  #    |\_________\   \|__|  \|_______|\|__|
-  #    \|_________|
-  #
-  # This is an internal-only library for use by //sdk/lib/vfs:cpp. Targets should depend on the
-  # C++ source_set declared above.
-  visibility = [
-    ":*",
-    "//build/sdk:*",
-  ]
-}
-
 # **WARNING**: This target is under development and is not intended for non-storage use.
 #
 # This is being developed as a drop-in replacement for the existing SDK VFS which uses the in-tree
@@ -215,16 +163,14 @@ sdk_source_set("cpp_new") {
 
   sources = [
     "new/composed_service_dir.h",
-    "new/internal/libvfs_private.h",
     "new/internal/node.h",
+    "new/lazy_dir.h",
     "new/pseudo_dir.h",
     "new/pseudo_file.h",
     "new/remote_dir.h",
     "new/service.h",
     "new/vmo_file.h",
   ]
-
-  sdk_headers_for_internal_use = [ "new/internal/libvfs_private.h" ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
@@ -234,7 +180,7 @@ sdk_source_set("cpp_new") {
     "//zircon/system/ulib/zx",
   ]
 
-  deps = [ ":internal" ]
+  deps = [ "//sdk/lib/vfs/internal:vfs_internal" ]
 
   public_configs = [ "//sdk/config" ]
 

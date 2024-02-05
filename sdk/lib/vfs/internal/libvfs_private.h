@@ -11,8 +11,8 @@
 // making changes to ensure binary compatibility. Some changes may require a soft transition:
 // https://fuchsia.dev/fuchsia-src/development/source_code/working_across_petals#soft-transitions
 
-#ifndef LIB_VFS_CPP_NEW_INTERNAL_LIBVFS_PRIVATE_H_
-#define LIB_VFS_CPP_NEW_INTERNAL_LIBVFS_PRIVATE_H_
+#ifndef LIB_VFS_INTERNAL_LIBVFS_PRIVATE_H_
+#define LIB_VFS_INTERNAL_LIBVFS_PRIVATE_H_
 
 #include <lib/async/dispatcher.h>
 #include <stdint.h>
@@ -169,4 +169,4 @@ zx_status_t vfs_internal_lazy_dir_create(const vfs_internal_lazy_dir_context* co
 
 __END_CDECLS
 
-#endif  // LIB_VFS_CPP_NEW_INTERNAL_LIBVFS_PRIVATE_H_
+#endif  // LIB_VFS_INTERNAL_LIBVFS_PRIVATE_H_

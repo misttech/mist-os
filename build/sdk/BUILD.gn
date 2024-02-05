@@ -111,8 +111,12 @@ group("sdk_versioned_source_sets_allowlist") {
 # Contains all the shared libraries redistributed with the partner or public
 # SDK that should be compatible with all the currently supported API levels.
 _sdk_versioned_shared_libraries_list = [
+  # sdk_shared_library() targets:
+  # keep-sorted: begin
   "//sdk/lib/fdio:fdio",
+  "//sdk/lib/syslog/cpp:backend_fuchsia_globals",
   "//sdk/lib/svc:svc",
+  "//sdk/lib/vfs/internal:vfs_internal",
   "//src/devices/bin/driver_runtime:driver_runtime",
   "//src/performance/memory/heapdump/instrumentation:instrumentation",
   "//third_party/Vulkan-Loader:libvulkan",
@@ -120,7 +124,8 @@ _sdk_versioned_shared_libraries_list = [
   "//zircon/system/ulib/syslog:syslog",
   "//zircon/system/ulib/trace-engine:trace-engine",
   "//zircon/system/ulib/trace-provider:trace-provider-so",
-  "//sdk/lib/syslog/cpp:backend_fuchsia_globals",
+
+  # keep-sorted: end
 ]
 
 group("sdk_versioned_shared_libraries") {
