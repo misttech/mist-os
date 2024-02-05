@@ -5,6 +5,7 @@
 use crate::{
     bpf::{
         fs::{get_bpf_object, BpfHandle, BpfObject},
+        helpers::BPF_HELPERS,
         map::Map,
     },
     task::CurrentTask,
@@ -18,15 +19,6 @@ use ubpf::{
     program::{UbpfVm, UbpfVmBuilder},
     ubpf::EBPF_OP_LDDW,
 };
-
-const MAP_LOOKUP_ELEM_INDEX: u32 = 1;
-const MAP_LOOKUP_ELEM_NAME: &'static str = "map_lookup_elem";
-
-const MAP_UPDATE_ELEM_INDEX: u32 = 2;
-const MAP_UPDATE_ELEM_NAME: &'static str = "map_update_elem";
-
-const MAP_DELETE_ELEM_INDEX: u32 = 3;
-const MAP_DELETE_ELEM_NAME: &'static str = "map_delete_elem";
 
 pub struct Program {
     _vm: Option<UbpfVm>,
@@ -46,9 +38,11 @@ impl Program {
         let objects = link(current_task, &mut code, &mut builder)?;
 
         let vm = (|| {
-            builder.register(MAP_LOOKUP_ELEM_INDEX, MAP_LOOKUP_ELEM_NAME)?;
-            builder.register(MAP_UPDATE_ELEM_INDEX, MAP_UPDATE_ELEM_NAME)?;
-            builder.register(MAP_DELETE_ELEM_INDEX, MAP_DELETE_ELEM_NAME)?;
+            // TODO(https://fxbug.dev/323503929): Only register helper function associated with the
+            // type of the bpf program.
+            for helper in BPF_HELPERS {
+                builder.register(helper)?;
+            }
             builder.load(code)
         })()
         .map_err(map_ubpf_error)?;

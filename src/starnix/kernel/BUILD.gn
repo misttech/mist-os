@@ -98,6 +98,7 @@ rustc_library("starnix_core") {
     "arch/${current_cpu}/vdso.rs",
     "arch/mod.rs",
     "bpf/fs.rs",
+    "bpf/helpers.rs",
     "bpf/map.rs",
     "bpf/mod.rs",
     "bpf/program.rs",

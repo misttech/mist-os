@@ -6,7 +6,7 @@ use crate::{
     converter::cbpf_to_ebpf,
     ubpf::{ubpf_create, ubpf_destroy, ubpf_exec, ubpf_load, ubpf_register, ubpf_vm},
     verifier::verify,
-    CallingContext, MapSchema, UbpfError,
+    CallingContext, FunctionSignature, MapSchema, UbpfError,
     UbpfError::*,
 };
 use linux_uapi::{bpf_insn, c_void, sock_filter};
@@ -20,9 +20,18 @@ pub struct UbpfVmBuilder {
     calling_context: CallingContext,
 }
 
-extern "C" fn ubpf_stub_callback() {
-    panic!("BPF program called a stub callback.");
+pub struct BpfHelper {
+    pub index: u32,
+    pub name: &'static str,
+    pub function_pointer: *mut std::os::raw::c_void,
+    pub signature: FunctionSignature,
 }
+
+// SAFETY
+//
+// The helper pointer is a constant function pointer so is safe to use across thread.
+unsafe impl Send for BpfHelper {}
+unsafe impl Sync for BpfHelper {}
 
 impl UbpfVmBuilder {
     pub fn new() -> Result<Self, UbpfError> {
@@ -40,21 +49,25 @@ impl UbpfVmBuilder {
     // This function signature will need more parameters eventually. The client needs to be able to
     // supply a real callback and it's type. The callback will be needed to actually call the
     // callback. The type will be needed for the verifier.
-    pub fn register(&self, index: u32, name: &'static str) -> Result<(), UbpfError> {
+    pub fn register(&mut self, helper: &BpfHelper) -> Result<(), UbpfError> {
         let success = unsafe {
             ubpf_register(
                 self.vm,
-                index,
-                name.as_ptr() as *const std::os::raw::c_char,
-                ubpf_stub_callback as *mut std::os::raw::c_void,
+                helper.index,
+                helper.name.as_ptr() as *const std::os::raw::c_char,
+                helper.function_pointer,
             )
         };
         if success != 0 {
             return Err(VmRegisterError(
-                format!("Unable to register callback {} ({}) with error {}", index, name, success)
-                    .to_string(),
+                format!(
+                    "Unable to register callback {} ({}) with error {}",
+                    helper.index, helper.name, success
+                )
+                .to_string(),
             ));
         }
+        self.calling_context.register_function(helper.index, helper.signature.clone());
         Ok(())
     }
 
