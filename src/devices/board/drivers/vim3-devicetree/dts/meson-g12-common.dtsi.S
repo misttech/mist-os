@@ -32,6 +32,16 @@
 			#gpio-cells = <2>;
 		};
 
+		audio: audio-controller@ff642000 {
+			compatible = "amlogic,audio-controller";
+			reg = <0x0 0xff642000 0x0 0x2000>;
+			iommus = <&dummy_iommu 4>;
+			clocks = <&clock 0x1000b &clock 0x20002>;
+			clock-names = "AUDIO_GATE", "AUDIO_PLL" ;
+			assigned-clocks = <&clock 0x20002>;
+			assigned-clock-rates = <768000000>;
+		};
+
 		aobus: bus@ff800000 {
 			reg = <0x0 0xff800000 0x0 0x100000>;
 			#address-cells = <2>;
@@ -122,7 +132,7 @@
 				<0x0 A311D_MEMORY_PD_BASE 0x0 A311D_MEMORY_PD_LENGTH>,
 				<0x0 A311D_NNA_SRAM_BASE  0x0 A311D_NNA_SRAM_LENGTH>;
 		interrupts = <GIC_SPI 147 GIC_IRQ_MODE_LEVEL_HIGH>;
-		iommus = <&dummy_iommu 2>;
+		iommus = <&dummy_iommu 3>;
 		registers = <&reset A311D_RESET2_LEVEL 4 0x0 0x1000>;
 	};
 };

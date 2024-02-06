@@ -785,7 +785,7 @@ zx_status_t AmlClock::Create(zx_device_t* parent) {
     return status;
   }
 
-  if (info.did == PDEV_VID_GENERIC && info.pid == PDEV_PID_GENERIC &&
+  if (info.vid == PDEV_VID_GENERIC && info.pid == PDEV_PID_GENERIC &&
       info.did == PDEV_DID_DEVICETREE_NODE) {
     // TODO(https://fxbug.dev/318736574) : Remove and rely only on GetDeviceInfo.
     pdev_board_info_t board_info;

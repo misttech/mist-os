@@ -157,6 +157,33 @@ zx::result<> Driver::Start() {
     return zx::error(device_info_result->error_value());
   }
 
+  if ((*device_info_result)->vid() == PDEV_VID_GENERIC &&
+      (*device_info_result)->pid() == PDEV_PID_GENERIC &&
+      (*device_info_result)->did() == PDEV_DID_DEVICETREE_NODE) {
+    // TODO(https://fxbug.dev/318736574) : Remove and rely only on GetDeviceInfo.
+    auto board_info_result = pdev_->GetBoardInfo();
+    if (!board_info_result.ok()) {
+      FDF_LOG(ERROR, "GetBoardInfo failed: %s",
+              zx_status_get_string(board_info_result->error_value()));
+      return zx::error(board_info_result->error_value());
+    }
+
+    if ((*board_info_result)->vid() == PDEV_VID_KHADAS) {
+      switch ((*board_info_result)->pid()) {
+        case PDEV_PID_VIM3:
+          (*device_info_result)->pid() = PDEV_PID_AMLOGIC_A311D;
+          break;
+        default:
+          FDF_LOG(ERROR, "Unsupported PID 0x%x for VID 0x%x", (*board_info_result)->pid(),
+                  (*board_info_result)->vid());
+          return zx::error(ZX_ERR_NOT_SUPPORTED);
+      }
+    } else {
+      FDF_LOG(ERROR, "Unsupported VID 0x%x", (*board_info_result)->vid());
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+    }
+  }
+
   metadata::AmlVersion aml_version = {};
   switch ((*device_info_result)->pid()) {
     case PDEV_PID_AMLOGIC_A311D:

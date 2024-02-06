@@ -16,16 +16,18 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/interrupt-controller-ffc01000",
       "sys/platform/i2c-5000",
       "sys/platform/i2c-1c000",
-      "sys/platform/clock-controller-ff63c000",
+      "sys/platform/clock-controller-ff63c000/clocks",
+      "sys/platform/clock-controller-ff63c000/clocks/clock-init",
       "sys/platform/fuchsia-contiguous/sysmem",
       "sys/platform/register-controller-1000/registers-device",
       "sys/platform/nna-ff100000",
       "sys/platform/dsi-7000/dw-dsi",
       "sys/platform/canvas-ff638000/aml-canvas",
       "sys/platform/adc-9000",
-      //"sys/platform/gpio-controller-ff634400", - Uncomment when gpio node is getting used.
+      "sys/platform/gpio-controller-ff634400",
       "sys/platform/gpu-ffe40000/gpu-ffe40000_group/aml-gpu",
       "sys/platform/arm-mali-ffe40000",
+      "sys/platform/audio-controller-ff642000/audio-controller-ff642000_group/aml-g12-audio-composite",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
