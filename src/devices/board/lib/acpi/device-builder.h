@@ -159,19 +159,14 @@ class DeviceBuilder {
   constexpr static const char* kDeviceTreeLinkID = "PRP0001";
   // Encode this bus's child metadata for consumption by the bus driver.
   zx::result<std::vector<uint8_t>> FidlEncodeMetadata();
-  // Build a composite for this device that binds to all of its parents.
-  // For instance, if a device had an i2c and spi resource, this would generate a composite device
-  // that binds to the i2c device, the spi device, and the acpi device.
+  // Build a composite node spec for this device that binds to all of its parents. For instance, if
+  // a device had an i2c and spi resource, this would generate a composite node spec that binds to
+  // the i2c device, the spi device, and the acpi device.
   zx::result<> BuildComposite(acpi::Manager* acpi, std::vector<zx_device_str_prop_t>& str_props,
                               async_dispatcher_t* device_dispatcher);
-  // Get bind instructions for the |child_index|th child of this bus.
-  // Used by |BuildComposite| to generate the bus bind rules.
-  std::vector<zx_bind_inst_t> GetFragmentBindInsnsForChild(size_t child_index);
   // Get bind rules and node properties for the |child_index|th child of this bus.
   std::pair<std::vector<ddk::BindRule>, std::vector<device_bind_prop_t>>
   GetFragmentBindRulesAndPropertiesForChild(size_t child_index);
-  // Get bind instructions for this device, used for generating the ACPI bind rules.
-  std::vector<zx_bind_inst_t> GetFragmentBindInsnsForSelf();
   // Get bind rules and node properties for this device.
   std::pair<std::vector<ddk::BindRule>, std::vector<device_bind_prop_t>>
   GetFragmentBindRulesAndPropertiesForSelf();
@@ -209,8 +204,8 @@ class DeviceBuilder {
   // ACPI_STA_* flags for this device.
   uint64_t state_;
 
-  // TODO(https://fxbug.dev/42173082): remove device_id and use dynamic binding to bind against string
-  // props once that is supported.
+  // TODO(https://fxbug.dev/42173082): remove device_id and use dynamic binding to bind against
+  // string props once that is supported.
   uint32_t device_id_;
 
   // Number of IRQs this device has, used to generate the interrupt fragments.

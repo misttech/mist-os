@@ -28,10 +28,6 @@
 
 namespace acpi {
 namespace {
-static const zx_bind_inst_t kSysmemFragment[] = {
-    BI_MATCH_IF(EQ, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_SYSMEM),
-};
-
 const std::vector<ddk::BindRule> kSysmemBindRules = {ddk::MakeAcceptBindRule(
     bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE)};
 
@@ -296,18 +292,6 @@ zx::result<> DeviceBuilder::BuildComposite(acpi::Manager* manager,
     return zx::ok();
   }
 
-  size_t fragment_count = buses_.size() + irq_count_ + 2;
-  // Bookkeeping.
-  // We use fixed-size arrays here rather than std::vector because we don't want
-  // pointers to array members to become invalidated when the vector resizes.
-  // While we could use vector.reserve(), there's no way to guarantee that future bugs won't be
-  // caused by someone adding an extra fragment without first updating the reserve() call.
-  auto bind_insns = std::make_unique<std::vector<zx_bind_inst_t>[]>(fragment_count);
-  auto fragment_names = std::make_unique<fbl::String[]>(fragment_count);
-  auto fragment_parts = std::make_unique<device_fragment_part_t[]>(fragment_count);
-  auto fragments = std::make_unique<device_fragment_t[]>(fragment_count);
-  std::unordered_map<BusType, uint32_t> parent_types;
-
   auto [acpi_bind_rules, acpi_properties] = GetFragmentBindRulesAndPropertiesForSelf();
   for (const auto& str_prop : str_props) {
     switch (str_prop.property_value.data_type) {
@@ -334,61 +318,17 @@ zx::result<> DeviceBuilder::BuildComposite(acpi::Manager* manager,
   auto composite_node_spec = ddk::CompositeNodeSpec(acpi_bind_rules, acpi_properties)
                                  .AddParentSpec(kSysmemBindRules, kSysmemProperties);
 
-  size_t bus_index = 0;
-  // Generate fragments for every device we use.
+  // Generate composite node spec parent for every device we use.
   for (auto& pair : buses_) {
     DeviceBuilder* parent = pair.first;
     size_t child_index = pair.second;
-    BusType type = parent->GetBusType();
-    // Fragments are named <protocol>NNN, e.g. "i2c000", "i2c001".
-    fragment_names[bus_index] = fbl::StringPrintf("%s%03u", BusTypeToString(type),
-                                                  parent_types.emplace(type, 0).first->second++);
-
-    std::vector<zx_bind_inst_t> insns = parent->GetFragmentBindInsnsForChild(child_index);
-    bind_insns[bus_index] = std::move(insns);
-    fragment_parts[bus_index] = device_fragment_part_t{
-        .instruction_count = static_cast<uint32_t>(bind_insns[bus_index].size()),
-        .match_program = bind_insns[bus_index].data(),
-    };
-    fragments[bus_index] = device_fragment_t{
-        .name = fragment_names[bus_index].data(),
-        .parts_count = 1,
-        .parts = &fragment_parts[bus_index],
-    };
-
-    bus_index++;
 
     auto [bind_rules, properties] = parent->GetFragmentBindRulesAndPropertiesForChild(child_index);
     composite_node_spec.AddParentSpec(bind_rules, properties);
   }
 
   for (uint32_t i = 0; i < irq_count_; i++) {
-    fragment_names[bus_index] = fbl::StringPrintf("irq%03u", i);
     auto bind_platform_dev_interrupt_id = i + 1;
-
-    // Make sure that the bind rules here stay in sync
-    // with the properties in irq-fragment.cc
-    // LINT.IfChange
-    std::vector<zx_bind_inst_t> insns{
-        BI_ABORT_IF(NE, BIND_ACPI_ID, device_id_),
-        BI_ABORT_IF(NE, BIND_PLATFORM_DEV_INTERRUPT_ID, bind_platform_dev_interrupt_id),
-        BI_MATCH(),
-    };
-    // LINT.ThenChange(irq-fragment.cc)
-    bind_insns[bus_index] = std::move(insns);
-
-    fragment_parts[bus_index] = device_fragment_part_t{
-        .instruction_count = static_cast<uint32_t>(bind_insns[bus_index].size()),
-        .match_program = bind_insns[bus_index].data(),
-    };
-    fragments[bus_index] = device_fragment_t{
-        .name = fragment_names[bus_index].data(),
-        .parts_count = 1,
-        .parts = &fragment_parts[bus_index],
-    };
-
-    bus_index++;
-
     composite_node_spec.AddParentSpec(
         std::vector<ddk::BindRule>{
             ddk::MakeAcceptBindRule(bind_fuchsia::ACPI_ID, device_id_),
@@ -404,67 +344,13 @@ zx::result<> DeviceBuilder::BuildComposite(acpi::Manager* manager,
                               bind_fuchsia_hardware_interrupt::SERVICE_ZIRCONTRANSPORT)});
   }
 
-  // Generate the ACPI fragment.
-  std::vector<zx_bind_inst_t> insns = GetFragmentBindInsnsForSelf();
-  bind_insns[bus_index] = std::move(insns);
-  fragment_parts[bus_index] = device_fragment_part_t{
-      .instruction_count = static_cast<uint32_t>(bind_insns[bus_index].size()),
-      .match_program = bind_insns[bus_index].data(),
-  };
-  fragments[bus_index] = device_fragment_t{
-      .name = "acpi",
-      .parts_count = 1,
-      .parts = &fragment_parts[bus_index],
-  };
-  bus_index++;
-
-  // Generate the sysmem fragment.
-  fragment_parts[bus_index] = device_fragment_part_t{
-      .instruction_count = sizeof(kSysmemFragment) / sizeof(kSysmemFragment[0]),
-      .match_program = kSysmemFragment,
-  };
-  fragments[bus_index] = device_fragment_t{
-      .name = "sysmem",
-      .parts_count = 1,
-      .parts = &fragment_parts[bus_index],
-  };
-  bus_index++;
-
-  [[maybe_unused]] composite_device_desc_t composite_desc = {
-      .props = dev_props_.data(),
-      .props_count = dev_props_.size(),
-      .str_props = str_props.data(),
-      .str_props_count = str_props.size(),
-      .fragments = fragments.get(),
-      .fragments_count = fragment_count,
-      .primary_fragment = "acpi",
-      .spawn_colocated = true,
-  };
-
 #if !defined(IS_TEST)
   // TODO(https://fxbug.dev/42160209): re-enable this in tests once mock_ddk supports composites.
-  auto composite_name = fbl::StringPrintf("%s-composite", name());
-  // Don't worry about any metadata, since it's present in the "acpi" parent.
-  DeviceArgs args(parent_->zx_device_, manager, device_dispatcher, handle_);
-  auto composite_device = std::make_unique<Device>(args);
-  zx_status_t status = composite_device->DdkAddComposite(composite_name.data(), &composite_desc);
-
-  if (status != ZX_OK) {
-#ifdef __Fuchsia__
-    zxlogf(ERROR, "Failed to add composite: %s", zx_status_get_string(status));
-#else
-    zxlogf(ERROR, "Failed to add composite");
-#endif
-    return zx::error(status);
-  }
-  // The DDK takes ownership of the device.
-  [[maybe_unused]] auto unused = composite_device.release();
-
   auto composite_node_spec_name = fbl::StringPrintf("%s-composite-spec", name());
   DeviceArgs composite_node_spec_args(parent_->zx_device_, manager, device_dispatcher, handle_);
   auto composite_node_spec_device = std::make_unique<Device>(composite_node_spec_args);
-  status = composite_node_spec_device->DdkAddCompositeNodeSpec(composite_node_spec_name.data(),
-                                                               composite_node_spec);
+  zx_status_t status = composite_node_spec_device->DdkAddCompositeNodeSpec(
+      composite_node_spec_name.data(), composite_node_spec);
   if (status != ZX_OK) {
 #ifdef __Fuchsia__
     zxlogf(ERROR, "Failed to add composite node spec: %s", zx_status_get_string(status));
@@ -475,53 +361,10 @@ zx::result<> DeviceBuilder::BuildComposite(acpi::Manager* manager,
   }
 
   // The DDK takes ownership of the device.
-  unused = composite_node_spec_device.release();
+  [[maybe_unused]] auto* unused = composite_node_spec_device.release();
 #endif
 
   return zx::ok();
-}
-
-std::vector<zx_bind_inst_t> DeviceBuilder::GetFragmentBindInsnsForChild(size_t child_index) {
-  std::vector<zx_bind_inst_t> ret;
-  switch (bus_type_) {
-    case BusType::kPci:
-      ret.push_back(BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_PCI));
-      break;
-    case BusType::kI2c:
-      // No Banjo protocol needed for I2C.
-      break;
-    case BusType::kSpi:
-      ret.push_back(BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_SPI));
-      break;
-    case BusType::kUnknown:
-      ZX_PANIC("Bus type is unknown");
-  }
-
-  std::visit(
-      [&ret, child_index, bus_id = GetBusId()](auto&& arg) {
-        using T = std::decay_t<decltype(arg)>;
-        using SpiChannel = fuchsia_hardware_spi_businfo::wire::SpiChannel;
-        using I2CChannel = fuchsia_hardware_i2c_businfo::wire::I2CChannel;
-        if constexpr (std::is_same_v<T, std::monostate>) {
-          ZX_ASSERT_MSG(false, "bus should have children");
-        } else if constexpr (std::is_same_v<T, std::vector<SpiChannel>>) {
-          SpiChannel& chan = arg[child_index];
-          ret.push_back(BI_ABORT_IF(NE, BIND_SPI_BUS_ID, bus_id));
-          ret.push_back(BI_ABORT_IF(NE, BIND_SPI_CHIP_SELECT, chan.cs()));
-        } else if constexpr (std::is_same_v<T, std::vector<I2CChannel>>) {
-          I2CChannel& chan = arg[child_index];
-          ret.push_back(BI_ABORT_IF(NE, BIND_I2C_BUS_ID, bus_id));
-          ret.push_back(BI_ABORT_IF(NE, BIND_I2C_ADDRESS, chan.address()));
-          ret.push_back(BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_I2C));
-        }
-      },
-      bus_children_);
-
-  // Only bind to the non-composite device.
-  ret.push_back(BI_ABORT_IF(NE, BIND_COMPOSITE, 0));
-  ret.push_back(BI_MATCH());
-
-  return ret;
 }
 
 std::pair<std::vector<ddk::BindRule>, std::vector<device_bind_prop_t>>
@@ -579,18 +422,6 @@ DeviceBuilder::GetFragmentBindRulesAndPropertiesForChild(size_t child_index) {
       bus_children_);
 
   return {bind_rules, properties};
-}
-
-std::vector<zx_bind_inst_t> DeviceBuilder::GetFragmentBindInsnsForSelf() {
-  std::vector<zx_bind_inst_t> ret;
-  ret.push_back(BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_ACPI));
-  for (auto& prop : dev_props_) {
-    ret.push_back(BI_ABORT_IF(NE, static_cast<uint32_t>(prop.id), prop.value));
-  }
-  // Only bind to the non-composite device.
-  ret.push_back(BI_ABORT_IF(NE, BIND_COMPOSITE, 0));
-  ret.push_back(BI_MATCH());
-  return ret;
 }
 
 std::pair<std::vector<ddk::BindRule>, std::vector<device_bind_prop_t>>
