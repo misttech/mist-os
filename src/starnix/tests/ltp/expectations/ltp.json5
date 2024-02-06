@@ -238,7 +238,6 @@
                 "vmsplice02",
                 "vmsplice03",
                 "vmsplice04",
-                "waitid10",
                 "writetest01",
 
                 // Not supported for our architectures.

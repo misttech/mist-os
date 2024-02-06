@@ -38,14 +38,14 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         );
     });
     dir.subdir(current_task, "kernel", 0o555, |dir| {
-        dir.entry(
-            current_task,
+        dir.node(
             "core_pattern",
-            StubSysctl::new_node(
-                "/proc/sys/kernel/core_pattern",
-                bug_ref!("https://fxbug.dev/322873960"),
+            fs.create_node(
+                current_task,
+                // TODO(https://fxbug.dev/322873960): Use the core pattern when generating a core dump.
+                BytesFile::new_node(b"core".to_vec()),
+                FsNodeInfo::new_factory(mode, FsCred::root()),
             ),
-            mode,
         );
         dir.entry(
             current_task,
@@ -284,7 +284,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             fs.create_node(
                 current_task,
                 BytesFile::new_node(b"65534".to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                FsNodeInfo::new_factory(mode, FsCred::root()),
             ),
         );
         dir.node(
@@ -292,7 +292,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             fs.create_node(
                 current_task,
                 BytesFile::new_node(b"65534".to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                FsNodeInfo::new_factory(mode, FsCred::root()),
             ),
         );
         dir.node(
@@ -300,7 +300,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             fs.create_node(
                 current_task,
                 BytesFile::new_node(b"4194304".to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                FsNodeInfo::new_factory(mode, FsCred::root()),
             ),
         );
         dir.subdir(current_task, "random", 0o555, |dir| {
