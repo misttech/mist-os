@@ -41,9 +41,12 @@ required if you wish to use Honeydew's SL4F-based affordances.
 
 # Setup Honeydew to run using isolated FFX and collect the logs
 # Call this first prior to calling any other Honeydew API
+>>> import os
+>>> FUCHSIA_ROOT = os.environ.get("FUCHSIA_DIR")
+>>> FFX_BIN = f"{FUCHSIA_ROOT}/.jiri_root/bin/ffx"
 >>> from honeydew.transports import ffx
 >>> ffx_config = ffx.FfxConfig()
->>> ffx_config.setup(binary_path="/usr/local/google/home/jpavankumar/fuchsia/.jiri_root/bin/ffx", isolate_dir=None, logs_dir="/tmp/logs/honeydew/", logs_level="debug", enable_mdns=True)
+>>> ffx_config.setup(binary_path=FFX_BIN, isolate_dir=None, logs_dir="/tmp/logs/honeydew/", logs_level="debug", enable_mdns=True)
 
 # Create Honeydew device object for a local device
 >>> import honeydew
