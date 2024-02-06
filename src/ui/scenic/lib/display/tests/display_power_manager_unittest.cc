@@ -17,7 +17,7 @@
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/scenic/lib/display/display_manager.h"
-#include "src/ui/scenic/lib/display/tests/mock_display_controller.h"
+#include "src/ui/scenic/lib/display/tests/mock_display_coordinator.h"
 
 namespace scenic_impl {
 namespace gfx {

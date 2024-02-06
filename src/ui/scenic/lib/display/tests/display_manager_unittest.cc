@@ -15,7 +15,7 @@
 #include <gtest/gtest.h>
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
-#include "src/ui/scenic/lib/display/tests/mock_display_controller.h"
+#include "src/ui/scenic/lib/display/tests/mock_display_coordinator.h"
 
 namespace scenic_impl {
 namespace gfx {

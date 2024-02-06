@@ -13,10 +13,10 @@
 #include "src/lib/fxl/strings/join_strings.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/allocation/id.h"
-#include "src/ui/scenic/lib/display/tests/mock_display_controller.h"
+#include "src/ui/scenic/lib/display/tests/mock_display_coordinator.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/flatland/engine/tests/common.h"
-#include "src/ui/scenic/lib/flatland/engine/tests/mock_display_controller.h"
+#include "src/ui/scenic/lib/flatland/engine/tests/mock_display_coordinator.h"
 #include "src/ui/scenic/lib/flatland/renderer/mock_renderer.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 
@@ -84,8 +84,8 @@ void SetConstraintsAndClose(fuchsia::sysmem::AllocatorSyncPtr& sysmem_allocator,
 
 // Creates a thread that waits until |num_messages| have been received by |mock|, then calls join()
 // on destruction. Returns a unique_ptr<> with a custom deleter.
-// TODO(https://fxbug.dev/42150597): Use function call counters from MockDisplayCoordinator instead of counting
-// them manually.
+// TODO(https://fxbug.dev/42150597): Use function call counters from MockDisplayCoordinator instead
+// of counting them manually.
 auto CreateServerWaitingForMessages(flatland::MockDisplayCoordinator& mock,
                                     const uint32_t num_messages) {
   return std::unique_ptr<std::thread, std::function<void(std::thread*)>>(

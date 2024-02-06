@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/scenic/lib/display/display_controller.h"
+#include "src/ui/scenic/lib/display/display_coordinator.h"
 
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/hardware/display/types/cpp/fidl.h>
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
-#include "src/ui/scenic/lib/display/tests/mock_display_controller.h"
+#include "src/ui/scenic/lib/display/tests/mock_display_coordinator.h"
 
 namespace scenic_impl {
 namespace display {
@@ -42,7 +42,7 @@ TEST_F(DisplayCoordinatorTest, Display2Test) {
 }
 
 TEST_F(DisplayCoordinatorTest, DisplayCoordinatorTest) {
-  DisplayCoordinatorObjects display_controller_objs = CreateMockDisplayCoordinator();
+  DisplayCoordinatorObjects display_coordinator_objs = CreateMockDisplayCoordinator();
 
   constexpr fuchsia::hardware::display::types::DisplayId kDisplayId1 = {.value = 1};
   constexpr fuchsia::hardware::display::types::DisplayId kDisplayId2 = {.value = 2};
@@ -55,9 +55,9 @@ TEST_F(DisplayCoordinatorTest, DisplayCoordinatorTest) {
 
   std::vector<Display2> displays;
   displays.push_back(std::move(display1));
-  DisplayCoordinator dc(std::move(displays), display_controller_objs.interface_ptr);
+  DisplayCoordinator dc(std::move(displays), display_coordinator_objs.interface_ptr);
 
-  EXPECT_EQ(display_controller_objs.interface_ptr.get(), dc.coordinator().get());
+  EXPECT_EQ(display_coordinator_objs.interface_ptr.get(), dc.coordinator().get());
 
   EXPECT_EQ(1u, dc.displays()->size());
   EXPECT_EQ(kDisplayId1.value, dc.displays()->at(0).display_id().value);

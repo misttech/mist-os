@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/scenic/lib/display/display_controller.h"
+#include "src/ui/scenic/lib/display/display_coordinator.h"
 
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fuchsia/hardware/display/types/cpp/fidl.h>

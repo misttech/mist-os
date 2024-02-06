@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/scenic/lib/display/display_controller_listener.h"
+#include "src/ui/scenic/lib/display/display_coordinator_listener.h"
 
 #include <lib/async/default.h>
 #include <lib/syslog/cpp/macros.h>
@@ -23,7 +23,8 @@ DisplayCoordinatorListener::DisplayCoordinatorListener(
     wait_coordinator_closed_.Begin(async_get_default_dispatcher());
 
     // Listen for events
-    // TODO(https://fxbug.dev/42154967): Resolve this hack when synchronous interfaces support events.
+    // TODO(https://fxbug.dev/42154967): Resolve this hack when synchronous interfaces support
+    // events.
     wait_event_msg_.set_object(coordinator_channel_handle_);
     wait_event_msg_.set_trigger(ZX_CHANNEL_READABLE);
     wait_event_msg_.Begin(async_get_default_dispatcher());

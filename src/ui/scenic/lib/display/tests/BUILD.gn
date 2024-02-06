@@ -12,8 +12,8 @@ executable("unittests") {
   output_name = "display_unittests"
   testonly = true
   sources = [
-    "display_controller_listener_unittest.cc",
-    "display_controller_unittest.cc",
+    "display_coordinator_listener_unittest.cc",
+    "display_coordinator_unittest.cc",
     "display_manager_unittest.cc",
     "display_power_manager_unittest.cc",
     "singleton_display_service_unittest.cc",
@@ -32,8 +32,8 @@ executable("unittests") {
 source_set("mocks") {
   testonly = true
   sources = [
-    "mock_display_controller.cc",
-    "mock_display_controller.h",
+    "mock_display_coordinator.cc",
+    "mock_display_coordinator.h",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_hlcpp",

@@ -14,7 +14,7 @@
 
 #include "src/lib/fxl/macros.h"
 #include "src/ui/scenic/lib/display/display.h"
-#include "src/ui/scenic/lib/display/display_controller_listener.h"
+#include "src/ui/scenic/lib/display/display_coordinator_listener.h"
 
 namespace scenic_impl {
 namespace display {
@@ -53,8 +53,8 @@ class DisplayManager {
     default_display_ = std::move(display);
   }
 
-  // TODO(https://fxbug.dev/42156567): we may want to have multiple clients of this, so a single setter that
-  // stomps previous callbacks may not be what we want.
+  // TODO(https://fxbug.dev/42156567): we may want to have multiple clients of this, so a single
+  // setter that stomps previous callbacks may not be what we want.
   using VsyncCallback = fit::function<void(
       fuchsia::hardware::display::types::DisplayId display_id, zx::time timestamp,
       fuchsia::hardware::display::types::ConfigStamp applied_config_stamp)>;

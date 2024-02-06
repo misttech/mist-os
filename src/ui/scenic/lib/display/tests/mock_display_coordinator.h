@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_UI_SCENIC_LIB_DISPLAY_TESTS_MOCK_DISPLAY_CONTROLLER_H_
-#define SRC_UI_SCENIC_LIB_DISPLAY_TESTS_MOCK_DISPLAY_CONTROLLER_H_
+#ifndef SRC_UI_SCENIC_LIB_DISPLAY_TESTS_MOCK_DISPLAY_COORDINATOR_H_
+#define SRC_UI_SCENIC_LIB_DISPLAY_TESTS_MOCK_DISPLAY_COORDINATOR_H_
 
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl_test_base.h>
@@ -12,7 +12,7 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/lib/fsl/handles/object_info.h"
-#include "src/ui/scenic/lib/display/display_controller_listener.h"
+#include "src/ui/scenic/lib/display/display_coordinator_listener.h"
 
 namespace scenic_impl {
 namespace display {
@@ -215,4 +215,4 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
 }  // namespace display
 }  // namespace scenic_impl
 
-#endif  // SRC_UI_SCENIC_LIB_DISPLAY_TESTS_MOCK_DISPLAY_CONTROLLER_H_
+#endif  // SRC_UI_SCENIC_LIB_DISPLAY_TESTS_MOCK_DISPLAY_COORDINATOR_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_CONTROLLER_LISTENER_H_
-#define SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_CONTROLLER_LISTENER_H_
+#ifndef SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_COORDINATOR_LISTENER_H_
+#define SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_COORDINATOR_LISTENER_H_
 
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/hardware/display/types/cpp/fidl.h>
@@ -89,4 +89,4 @@ class DisplayCoordinatorListener {
 }  // namespace display
 }  // namespace scenic_impl
 
-#endif  // SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_CONTROLLER_LISTENER_H_
+#endif  // SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_COORDINATOR_LISTENER_H_

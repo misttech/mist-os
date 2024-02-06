@@ -16,7 +16,7 @@ executable("unittests") {
     "common.cc",
     "common.h",
     "display_compositor_unittest.cc",
-    "mock_display_controller.h",
+    "mock_display_coordinator.h",
     "release_fence_manager_unittest.cc",
   ]
 

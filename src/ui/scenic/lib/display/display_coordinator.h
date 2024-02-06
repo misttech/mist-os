@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_CONTROLLER_H_
-#define SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_CONTROLLER_H_
+#ifndef SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_COORDINATOR_H_
+#define SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_COORDINATOR_H_
 
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
@@ -106,4 +106,4 @@ class DisplayCoordinator {
 }  // namespace display
 }  // namespace scenic_impl
 
-#endif  // SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_CONTROLLER_H_
+#endif  // SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_COORDINATOR_H_
