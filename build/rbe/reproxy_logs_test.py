@@ -9,6 +9,7 @@ import io
 import shutil
 import subprocess
 import tempfile
+import textwrap
 import unittest
 
 from unittest import mock
@@ -358,6 +359,79 @@ class DiffLogsTests(unittest.TestCase):
         ) as mock_multi_parse:
             status = reproxy_logs.diff_logs(args)
         self.assertEqual(status, 0)
+
+
+class WarmthLogsTests(unittest.TestCase):
+    def test_logs_comparison(self):
+        record1 = log_pb2.LogRecord()
+        record1.remote_metadata.action_digest = "aaaa/44"
+        record1.remote_metadata.result.status = (
+            command_pb2.CommandResultStatus.SUCCESS
+        )
+
+        record2 = log_pb2.LogRecord()
+        record2.remote_metadata.action_digest = (
+            record1.remote_metadata.action_digest
+        )
+        record2.remote_metadata.result.status = (
+            command_pb2.CommandResultStatus.CACHE_HIT
+        )
+
+        record3 = log_pb2.LogRecord()
+        record3.remote_metadata.action_digest = "bbbb/55"
+        record3.remote_metadata.result.status = (
+            command_pb2.CommandResultStatus.CACHE_HIT
+        )
+
+        record4 = log_pb2.LogRecord()
+        record4.remote_metadata.action_digest = "cccc/66"
+        record4.remote_metadata.result.status = (
+            command_pb2.CommandResultStatus.CACHE_HIT
+        )
+
+        record5 = log_pb2.LogRecord()
+        record5.remote_metadata.action_digest = "dddd/77"
+        record5.remote_metadata.result.status = (
+            command_pb2.CommandResultStatus.CACHE_HIT
+        )
+
+        ref_actions = reproxy_logs.ReproxyLog(
+            log_pb2.LogDump(records=[record1, record3, record4])
+        )
+        test_actions = reproxy_logs.ReproxyLog(
+            log_pb2.LogDump(
+                records=[
+                    record2,
+                    record3,
+                    record5,
+                ]
+            )
+        )
+        with mock.patch.object(
+            reproxy_logs, "parse_logs", return_value=(ref_actions, test_actions)
+        ) as mock_parse:
+            result = io.StringIO()
+            with contextlib.redirect_stdout(result):
+                status = reproxy_logs.warmth_logs(
+                    args=argparse.Namespace(
+                        reference_log=Path("first.rrpl"),
+                        test_log=Path("second.rrpl"),
+                    )
+                )
+                self.assertEqual(status, 0)
+                self.assertEqual(
+                    result.getvalue(),
+                    textwrap.dedent(
+                        """\
+The first build had 3 actions.
+The second build had 3 actions.
+There are 2 actions in common with the first build.
+Among those common actions, 2 were cache hits.
+Cache hits warmed up directly by the first build: 1
+Cache hits warmed up before the first build: 1
+                                                                  """
+                    ),
+                )
 
 
 class LookupOutputFileDigestTests(unittest.TestCase):

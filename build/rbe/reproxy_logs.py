@@ -18,6 +18,7 @@ import subprocess
 import sys
 
 from api.log import log_pb2
+from go.api.command import command_pb2
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Optional, Sequence, Tuple
 
@@ -431,6 +432,46 @@ def diff_logs(args: argparse.Namespace) -> int:
     return 0
 
 
+def warmth_logs(args: argparse.Namespace) -> int:
+    ref_log, test_log = parse_logs([args.reference_log, args.test_log])
+
+    ref_actions = ref_log.records_by_action_digest
+    test_actions = test_log.records_by_action_digest
+    ref_digests = set(ref_actions.keys())
+    print(f"The first build had {len(ref_digests)} actions.")
+    test_digests = set(test_actions.keys())
+    print(f"The second build had {len(test_digests)} actions.")
+    # Focus on common action digests.
+    common_digests = ref_digests & test_digests
+    print(
+        f"There are {len(common_digests)} actions in common with the first build."
+    )
+    newly_warmed = set()
+    already_warmed = set()
+    for digest in common_digests:
+        ref_action = ref_actions[digest]
+        test_action = test_actions[digest]
+        if (
+            test_action.remote_metadata.result.status
+            == command_pb2.CommandResultStatus.CACHE_HIT
+        ):
+            if (
+                ref_action.remote_metadata.result.status
+                == command_pb2.CommandResultStatus.SUCCESS
+            ):
+                newly_warmed.add(digest)
+            else:
+                already_warmed.add(digest)
+
+    total_cache_hits = len(newly_warmed) + len(already_warmed)
+    print(f"Among those common actions, {total_cache_hits} were cache hits.")
+    print(
+        f"Cache hits warmed up directly by the first build: {len(newly_warmed)}"
+    )
+    print(f"Cache hits warmed up before the first build: {len(already_warmed)}")
+    return 0
+
+
 def lookup_output_file_digest(log: Path, path: Path) -> Optional[str]:
     """Lookup the digest of an output file in the reproxy log.
 
@@ -550,6 +591,25 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         help="reproxy logs (.rrpl or .rpl) or the directories containing them",
         metavar="PATH",
         nargs=2,
+    )
+
+    # command: warmth
+    warmth_parser = subparsers.add_parser(
+        "warmth",
+        help="warmth reports the cache-warming effect between two builds",
+    )
+    warmth_parser.set_defaults(func=warmth_logs)
+    warmth_parser.add_argument(
+        "reference_log",
+        type=Path,
+        help="reproxy log from an earlier build expected to warm the cache",
+        metavar="PATH",
+    )
+    warmth_parser.add_argument(
+        "test_log",
+        type=Path,
+        help="reproxy log from a later build, for measure warming effect",
+        metavar="PATH",
     )
 
     # command: output_file_digest
