@@ -11,6 +11,7 @@
                 "fuchsia.ui.input3.Keyboard",
                 "fuchsia.ui.policy.DeviceListenerRegistry",
                 "fuchsia.ui.scenic.Scenic",
+                "fuchsia.ui.test.input.Registry",
             ],
             from: "#ui",
             to: "#starnix_runner",

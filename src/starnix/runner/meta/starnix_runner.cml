@@ -81,6 +81,7 @@
                 "fuchsia.ui.input3.Keyboard",
                 "fuchsia.ui.policy.DeviceListenerRegistry",
                 "fuchsia.ui.scenic.Scenic",
+                "fuchsia.ui.test.input.Registry",
                 "fuchsia.wlan.wlanix.Wlanix",
             ],
             from: "parent",
