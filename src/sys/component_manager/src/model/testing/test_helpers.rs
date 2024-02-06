@@ -331,6 +331,7 @@ impl TestEnvironmentBuilder {
                 endpoints::create_proxy_and_stream::<fcomponent::RealmMarker>().unwrap();
             let component = WeakComponentInstance::from(
                 &model
+                    .root()
                     .find_and_maybe_resolve(&moniker)
                     .await
                     .unwrap_or_else(|e| panic!("could not look up {}: {:?}", moniker, e)),
@@ -404,6 +405,7 @@ impl ActionsTest {
 
     pub async fn look_up(&self, moniker: Moniker) -> Arc<ComponentInstance> {
         self.model
+            .root()
             .find_and_maybe_resolve(&moniker)
             .await
             .unwrap_or_else(|e| panic!("could not look up {}: {:?}", moniker, e))
@@ -411,6 +413,7 @@ impl ActionsTest {
 
     pub async fn start(&self, moniker: Moniker) -> Arc<ComponentInstance> {
         self.model
+            .root()
             .start_instance(&moniker, &StartReason::Eager)
             .await
             .unwrap_or_else(|e| panic!("could not start {}: {:?}", moniker, e))

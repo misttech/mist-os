@@ -1227,8 +1227,7 @@ async fn destroying_instance_kills_framework_service_task() {
     .await;
 
     // Destroy `b`. This should cause the task hosted for `Realm` to be cancelled.
-    let root = test.model.find_and_maybe_resolve(&Moniker::root()).await.unwrap();
-    root.destroy_child("b".try_into().unwrap(), 0).await.expect("destroy failed");
+    test.model.root().destroy_child("b".try_into().unwrap(), 0).await.expect("destroy failed");
     let mut event_stream = proxy.take_event_stream();
     assert_matches!(event_stream.next().await, None);
 }
@@ -1344,7 +1343,7 @@ async fn destroying_instance_blocks_on_routing() {
     capability_util::add_dir_to_namespace(&namespace, "/data", dir_proxy).await;
 
     // Destroy `b`.
-    let root = test.model.find_and_maybe_resolve(&Moniker::root()).await.unwrap();
+    let root = test.model.root().find_and_maybe_resolve(&Moniker::root()).await.unwrap();
     let root_clone = root.clone();
     let destroy_nf =
         fasync::Task::spawn(
@@ -1985,8 +1984,12 @@ async fn use_with_destroyed_parent() {
 
     // Destroy "b", but preserve a reference to "c" so we can route from it below.
     let moniker = vec!["coll:b", "c"].try_into().unwrap();
-    let realm_c =
-        test.model.find_and_maybe_resolve(&moniker).await.expect("failed to look up realm b");
+    let realm_c = test
+        .model
+        .root()
+        .find_and_maybe_resolve(&moniker)
+        .await
+        .expect("failed to look up realm b");
     test.destroy_dynamic_child(Moniker::root(), "coll", "b").await;
 
     // Now attempt to route the service from "c". Should fail because "b" does not exist so we
@@ -2062,6 +2065,7 @@ async fn use_from_destroyed_but_not_removed() {
     let test = RoutingTest::new("a", components).await;
     let component_b = test
         .model
+        .root()
         .find_and_maybe_resolve(&vec!["b"].try_into().unwrap())
         .await
         .expect("failed to look up realm b");
@@ -2537,8 +2541,9 @@ async fn verify_service_route(
         child_monikers.into_iter().map(|m| ChildName::parse(m).unwrap()).collect();
 
     // Test routing directly.
-    let target_component = test.model.find_and_maybe_resolve(&target_moniker).await.unwrap();
-    let agg_component = test.model.find_and_maybe_resolve(&agg_moniker).await.unwrap();
+    let root = test.model.root();
+    let target_component = root.find_and_maybe_resolve(&target_moniker).await.unwrap();
+    let agg_component = root.find_and_maybe_resolve(&agg_moniker).await.unwrap();
     let source = RouteRequest::UseService(use_decl).route(&target_component).await.unwrap();
     match source {
         RouteSource {
@@ -3187,6 +3192,7 @@ async fn list_service_instances_from_collections() {
 
     let client_component = test
         .model
+        .root()
         .find_and_maybe_resolve(&vec!["client"].try_into().unwrap())
         .await
         .expect("client instance");

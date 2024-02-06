@@ -320,8 +320,10 @@ mod tests {
         .await
         .unwrap();
         model.discover_root_component(ComponentInput::empty()).await;
-        let component =
-            model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await?;
+        let component = model
+            .root()
+            .start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager)
+            .await?;
         assert_eq!(component.component_url, "test:///b");
 
         let registered_runner =
@@ -420,8 +422,10 @@ mod tests {
         )
         .await?;
         model.discover_root_component(ComponentInput::empty()).await;
-        let component =
-            model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await?;
+        let component = model
+            .root()
+            .start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager)
+            .await?;
         assert_eq!(component.component_url, "test:///b");
 
         let registered_runner =
@@ -526,8 +530,10 @@ mod tests {
         model.discover_root_component(ComponentInput::empty()).await;
         // Add instance to collection.
         {
-            let parent =
-                model.start_instance(&vec!["a"].try_into().unwrap(), &StartReason::Eager).await?;
+            let parent = model
+                .root()
+                .start_instance(&vec!["a"].try_into().unwrap(), &StartReason::Eager)
+                .await?;
             let child_decl = ChildDeclBuilder::new_lazy_child("b").build();
             parent
                 .add_dynamic_child(
@@ -539,6 +545,7 @@ mod tests {
                 .expect("failed to add child");
         }
         let component = model
+            .root()
             .start_instance(&vec!["a", "coll:b"].try_into().unwrap(), &StartReason::Eager)
             .await?;
         assert_eq!(component.component_url, "test:///b");
@@ -632,8 +639,10 @@ mod tests {
         .unwrap();
         model.discover_root_component(ComponentInput::empty()).await;
 
-        let component =
-            model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await?;
+        let component = model
+            .root()
+            .start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager)
+            .await?;
         assert_eq!(component.component_url, "test:///b");
 
         let registered_runner =
@@ -707,7 +716,10 @@ mod tests {
         .await?;
         model.discover_root_component(ComponentInput::empty()).await;
         assert_matches!(
-            model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await,
+            model
+                .root()
+                .start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager)
+                .await,
             Err(ModelError::ActionError { err: ActionError::ResolveError { .. } })
         );
         Ok(())

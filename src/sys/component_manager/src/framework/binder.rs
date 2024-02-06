@@ -162,11 +162,13 @@ mod tests {
             let builtin_environment = self.builtin_environment.lock().await;
             let source = builtin_environment
                 .model
+                .root()
                 .find_and_maybe_resolve(&source)
                 .await
                 .expect("failed to look up source moniker");
             let target = builtin_environment
                 .model
+                .root()
                 .find_and_maybe_resolve(&target)
                 .await
                 .expect("failed to look up target moniker");

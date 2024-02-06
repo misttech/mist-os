@@ -181,7 +181,7 @@ impl SynthesisTask {
                 }
                 ExtendedMoniker::ComponentInstance(ref scope_moniker) => scope_moniker.clone(),
             };
-            let root = model.find_and_maybe_resolve(&scope_moniker).await?;
+            let root = model.root().find_and_maybe_resolve(&scope_moniker).await?;
             let mut component_stream = get_subcomponents(root, visited_components.clone());
             let mut tasks = vec![];
             while let Some(component) = component_stream.next().await {

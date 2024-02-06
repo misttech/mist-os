@@ -55,7 +55,8 @@ impl RouteValidator {
             Moniker::try_from(moniker_str).map_err(|_| fcomponent::Error::InvalidArguments)?;
         let moniker = scope_moniker.concat(&moniker);
 
-        let instance = model.find(&moniker).await.ok_or(fcomponent::Error::InstanceNotFound)?;
+        let instance =
+            model.root().find(&moniker).await.ok_or(fcomponent::Error::InstanceNotFound)?;
 
         // Get all use and expose declarations for this component
         let (uses, exposes) = {
@@ -94,6 +95,7 @@ impl RouteValidator {
         let moniker = scope_moniker.concat(&moniker);
 
         let instance = model
+            .root()
             .find_and_maybe_resolve(&moniker)
             .await
             .map_err(|_| fsys::RouteValidatorError::InstanceNotFound)?;
@@ -514,7 +516,7 @@ mod tests {
         model.start(ComponentInput::empty()).await;
 
         // `my_child` should not be resolved right now
-        let instance = model.find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
         assert!(instance.is_none());
 
         // Validate the root
@@ -564,7 +566,7 @@ mod tests {
         );
 
         // This validation should have caused `my_child` to be resolved
-        let instance = model.find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
         assert!(instance.is_some());
 
         // Validate `my_child`
@@ -650,7 +652,7 @@ mod tests {
         model.start(ComponentInput::empty()).await;
 
         // `my_child` should not be resolved right now
-        let instance = model.find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
         assert!(instance.is_none());
 
         // Validate the root
@@ -711,7 +713,7 @@ mod tests {
         );
 
         // This validation should have caused `my_child` to be resolved
-        let instance = model.find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
         assert!(instance.is_some());
     }
 
@@ -1203,6 +1205,7 @@ mod tests {
             mock_runner.add_host_fn(&format!("test:///{}_resolved", name), out_dir.host_fn());
 
             let child = model
+                .root()
                 .find_and_maybe_resolve(&format!("coll:{}", name).as_str().try_into().unwrap())
                 .await
                 .unwrap();
@@ -1211,7 +1214,8 @@ mod tests {
 
         // Open the service directory from `target` so that it gets instantiated.
         {
-            let target = model.find_and_maybe_resolve(&"target".try_into().unwrap()).await.unwrap();
+            let target =
+                model.root().find_and_maybe_resolve(&"target".try_into().unwrap()).await.unwrap();
             target.start(&StartReason::Debug, None, IncomingCapabilities::default()).await.unwrap();
             let ns = mock_runner.get_namespace("test:///target_resolved").unwrap();
             let ns = ns.lock().await;
@@ -1341,7 +1345,7 @@ mod tests {
         model.start(ComponentInput::empty()).await;
 
         // `my_child` should not be resolved right now
-        let instance = model.find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
         assert!(instance.is_none());
 
         let targets = &[

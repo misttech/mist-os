@@ -223,7 +223,8 @@ pub async fn get_instance(
     let moniker = scope_moniker.concat(&moniker);
 
     // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
-    let instance = model.find(&moniker).await.ok_or(fsys::GetInstanceError::InstanceNotFound)?;
+    let instance =
+        model.root().find(&moniker).await.ok_or(fsys::GetInstanceError::InstanceNotFound)?;
     let instance_id = model.component_id_index().id_for_moniker(&instance.moniker).cloned();
 
     let resolved_info = {
@@ -279,7 +280,8 @@ pub async fn get_resolved_declaration(
     let moniker = scope_moniker.concat(&moniker);
 
     // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
-    let instance = model.find(&moniker).await.ok_or(fsys::GetDeclarationError::InstanceNotFound)?;
+    let instance =
+        model.root().find(&moniker).await.ok_or(fsys::GetDeclarationError::InstanceNotFound)?;
 
     let state = instance.lock_state().await;
 
@@ -294,8 +296,11 @@ pub async fn get_resolved_declaration(
     })?;
 
     // Attach the iterator task to the scope root.
-    let scope_root =
-        model.find(scope_moniker).await.ok_or(fsys::GetDeclarationError::InstanceNotFound)?;
+    let scope_root = model
+        .root()
+        .find(scope_moniker)
+        .await
+        .ok_or(fsys::GetDeclarationError::InstanceNotFound)?;
 
     let (client_end, server_end) =
         fidl::endpoints::create_endpoints::<fsys::ManifestBytesIteratorMarker>();
@@ -328,8 +333,11 @@ async fn resolve_declaration(
     trace!(parent=%parent_moniker, %collection, %url, "getting manifest for url in collection");
 
     // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
-    let instance =
-        model.find(&parent_moniker).await.ok_or(fsys::GetDeclarationError::InstanceNotFound)?;
+    let instance = model
+        .root()
+        .find(&parent_moniker)
+        .await
+        .ok_or(fsys::GetDeclarationError::InstanceNotFound)?;
 
     let (address, environment) = {
         // this lock needs to be dropped before we try to call resolve, since routing the resolver
@@ -373,8 +381,11 @@ async fn resolve_declaration(
     })?;
 
     // Attach the iterator task to the scope root.
-    let scope_root =
-        model.find(scope_moniker).await.ok_or(fsys::GetDeclarationError::InstanceNotFound)?;
+    let scope_root = model
+        .root()
+        .find(scope_moniker)
+        .await
+        .ok_or(fsys::GetDeclarationError::InstanceNotFound)?;
 
     let (client_end, server_end) =
         fidl::endpoints::create_endpoints::<fsys::ManifestBytesIteratorMarker>();
@@ -398,8 +409,11 @@ pub async fn get_structured_config(
     let moniker = scope_moniker.concat(&moniker);
 
     // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
-    let instance =
-        model.find(&moniker).await.ok_or(fsys::GetStructuredConfigError::InstanceNotFound)?;
+    let instance = model
+        .root()
+        .find(&moniker)
+        .await
+        .ok_or(fsys::GetStructuredConfigError::InstanceNotFound)?;
 
     let state = instance.lock_state().await;
 
@@ -425,7 +439,7 @@ async fn construct_namespace(
 
     // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
     let instance =
-        model.find(&moniker).await.ok_or(fsys::ConstructNamespaceError::InstanceNotFound)?;
+        model.root().find(&moniker).await.ok_or(fsys::ConstructNamespaceError::InstanceNotFound)?;
     let mut state = instance.lock_state().await;
     match &mut *state {
         InstanceState::Resolved(r) => {
@@ -455,7 +469,7 @@ async fn open(
     let moniker = scope_moniker.concat(&moniker);
 
     // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
-    let instance = model.find(&moniker).await.ok_or(fsys::OpenError::InstanceNotFound)?;
+    let instance = model.root().find(&moniker).await.ok_or(fsys::OpenError::InstanceNotFound)?;
 
     match dir_type {
         fsys::OpenDirType::OutgoingDir => {
@@ -539,8 +553,11 @@ async fn connect_to_storage_admin(
     let moniker = scope_moniker.concat(&moniker);
 
     // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
-    let instance =
-        model.find(&moniker).await.ok_or(fsys::ConnectToStorageAdminError::InstanceNotFound)?;
+    let instance = model
+        .root()
+        .find(&moniker)
+        .await
+        .ok_or(fsys::ConnectToStorageAdminError::InstanceNotFound)?;
 
     let storage_admin = StorageAdmin::new(Arc::downgrade(model));
     let task_group = instance.nonblocking_task_group();
@@ -583,8 +600,11 @@ async fn get_all_instances(
     let mut instances = vec![];
 
     // Only take instances contained within the scope realm
-    let scope_root =
-        model.find(scope_moniker).await.ok_or(fsys::GetAllInstancesError::InstanceNotFound)?;
+    let scope_root = model
+        .root()
+        .find(scope_moniker)
+        .await
+        .ok_or(fsys::GetAllInstancesError::InstanceNotFound)?;
 
     let mut queue = vec![scope_root.clone()];
 

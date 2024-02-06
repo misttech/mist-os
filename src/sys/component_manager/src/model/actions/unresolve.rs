@@ -299,6 +299,7 @@ pub mod tests {
         ];
         let test =
             ActionsTest::new("root", components, Some(vec!["container"].try_into().unwrap())).await;
+        let root = test.model.root();
 
         // Create dynamic instances in "coll".
         test.create_dynamic_child("coll", "a").await;
@@ -308,16 +309,13 @@ pub mod tests {
         let component_container = test.look_up(vec!["container"].try_into().unwrap()).await;
         let component_a = test.look_up(vec!["container", "coll:a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["container", "coll:b"].try_into().unwrap()).await;
-        test.model
-            .start_instance(&component_container.moniker, &StartReason::Eager)
+        root.start_instance(&component_container.moniker, &StartReason::Eager)
             .await
             .expect("could not start container");
-        test.model
-            .start_instance(&component_a.moniker, &StartReason::Eager)
+        root.start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:a");
-        test.model
-            .start_instance(&component_b.moniker, &StartReason::Eager)
+        root.start_instance(&component_b.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:b");
         assert!(component_container.is_started().await);

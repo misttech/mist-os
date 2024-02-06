@@ -53,7 +53,7 @@ impl InternalCapabilityProvider for RealmCapabilityProvider {
         // We only need to look up the component matching this scope.
         // These operations should all work, even if the component is not running.
         if let Some(model) = self.host.model.upgrade() {
-            if let Ok(component) = model.find_and_maybe_resolve(&self.scope_moniker).await {
+            if let Ok(component) = model.root().find_and_maybe_resolve(&self.scope_moniker).await {
                 let weak = WeakComponentInstance::new(&component);
                 drop(component);
                 let serve_result = self.host.serve(weak, server_end.into_stream().unwrap()).await;
@@ -368,6 +368,7 @@ mod tests {
 
             // Look up and start component.
             let component = model
+                .root()
                 .start_instance(&component_moniker, &StartReason::Eager)
                 .await
                 .expect("failed to start component");

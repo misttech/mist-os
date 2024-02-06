@@ -1195,6 +1195,94 @@ impl ComponentInstance {
             default_persistent_storage
         }
     }
+
+    /// Looks up a component by moniker.
+    ///
+    /// The component instance in the component will be resolved if that has not already happened.
+    pub async fn find_and_maybe_resolve(
+        self: &Arc<Self>,
+        look_up_moniker: &Moniker,
+    ) -> Result<Arc<ComponentInstance>, ModelError> {
+        let mut cur = self.clone();
+        for moniker in look_up_moniker.path().iter() {
+            cur = {
+                let cur_state = cur.lock_resolved_state().await?;
+                if let Some(c) = cur_state.get_child(moniker) {
+                    c.clone()
+                } else {
+                    return Err(ModelError::instance_not_found(look_up_moniker.clone()));
+                }
+            };
+        }
+        cur.lock_resolved_state().await?;
+        Ok(cur)
+    }
+
+    /// Finds a component matching the moniker, if such a component exists.
+    /// This function has no side-effects.
+    pub async fn find(
+        self: &Arc<Self>,
+        look_up_moniker: &Moniker,
+    ) -> Option<Arc<ComponentInstance>> {
+        let mut cur = self.clone();
+        for moniker in look_up_moniker.path().iter() {
+            cur = {
+                let state = cur.lock_state().await;
+                match &*state {
+                    InstanceState::Resolved(r) => {
+                        if let Some(c) = r.get_child(moniker) {
+                            c.clone()
+                        } else {
+                            return None;
+                        }
+                    }
+                    _ => return None,
+                }
+            };
+        }
+        Some(cur)
+    }
+
+    /// Finds a resolved component matching the moniker, if such a component exists.
+    /// This function has no side-effects.
+    #[cfg(test)]
+    pub async fn find_resolved(
+        self: &Arc<Self>,
+        find_moniker: &Moniker,
+    ) -> Option<Arc<ComponentInstance>> {
+        let mut cur = self.clone();
+        for moniker in find_moniker.path().iter() {
+            cur = {
+                let state = cur.lock_state().await;
+                match &*state {
+                    InstanceState::Resolved(r) => match r.get_child(moniker) {
+                        Some(c) => c.clone(),
+                        _ => return None,
+                    },
+                    _ => return None,
+                }
+            };
+        }
+        // Found the moniker, the last child in the chain of resolved parents. Is it resolved?
+        let state = cur.lock_state().await;
+        match &*state {
+            InstanceState::Resolved(_) => Some(cur.clone()),
+            _ => None,
+        }
+    }
+
+    /// Starts the component instance in the given component if it's not already running.
+    /// Returns the component that was bound to.
+    #[cfg(test)]
+    pub async fn start_instance<'a>(
+        self: &Arc<Self>,
+        moniker: &'a Moniker,
+        reason: &StartReason,
+    ) -> Result<Arc<ComponentInstance>, ModelError> {
+        let component = self.find_and_maybe_resolve(moniker).await?;
+        component.start(reason, None, IncomingCapabilities::default()).await?;
+        Ok(component)
+    }
 }
 
 /// Extracts a mutable reference to the `target` field of an `OfferDecl`, or
@@ -2563,12 +2651,9 @@ pub mod tests {
             .await
             .expect("subscribe to event stream");
 
-        let model = test.model.clone();
+        let root = test.model.root().clone();
         let (f, bind_handle) = async move {
-            model
-                .start_instance(&Moniker::root(), &StartReason::Root)
-                .await
-                .expect("failed to bind")
+            root.start_instance(&Moniker::root(), &StartReason::Root).await.expect("failed to bind")
         }
         .remote_handle();
         fasync::Task::spawn(f).detach();
@@ -2624,6 +2709,7 @@ pub mod tests {
         // Start the root so it and its eager children start.
         let _root = test
             .model
+            .root()
             .start_instance(&Moniker::root(), &StartReason::Root)
             .await
             .expect("failed to start root");
@@ -2718,12 +2804,11 @@ pub mod tests {
             .build()
             .await;
 
-        let root_realm =
-            test.model.start_instance(&Moniker::root(), &StartReason::Root).await.unwrap();
+        let root = test.model.root();
+        let root_realm = root.start_instance(&Moniker::root(), &StartReason::Root).await.unwrap();
         assert_eq!(instance_id, *root_realm.instance_id().unwrap());
 
-        let a_realm = test
-            .model
+        let a_realm = root
             .start_instance(&Moniker::try_from(vec!["a"]).unwrap(), &StartReason::Root)
             .await
             .unwrap();
@@ -2802,7 +2887,7 @@ pub mod tests {
         let test = RoutingTestBuilder::new("root", components).build().await;
 
         let root_component =
-            test.model.start_instance(&Moniker::root(), &StartReason::Root).await.unwrap();
+            test.model.root().start_instance(&Moniker::root(), &StartReason::Root).await.unwrap();
 
         let root_resolved = root_component.lock_resolved_state().await.expect("resolve failed");
 
@@ -3391,16 +3476,15 @@ pub mod tests {
                 .build(),
         )];
         let test = ActionsTest::new("root", components, None).await;
-        let _root = test
-            .model
+        let root = test.model.root();
+
+        let _root = root
             .start_instance(&Moniker::root(), &StartReason::Root)
             .await
             .expect("failed to start root");
         test.runner.wait_for_urls(&["test:///root_resolved"]).await;
 
-        let root_component = test.look_up(Moniker::root()).await;
-
-        let collection_decl = root_component
+        let collection_decl = root
             .lock_resolved_state()
             .await
             .expect("failed to get resolved state")
@@ -3413,8 +3497,7 @@ pub mod tests {
             .clone();
 
         let validate_and_convert = |offers: Vec<fdecl::Offer>| async {
-            root_component
-                .lock_resolved_state()
+            root.lock_resolved_state()
                 .await
                 .expect("failed to get resolved state")
                 .validate_and_convert_dynamic_component(
@@ -3549,18 +3632,16 @@ pub mod tests {
                 .build(),
         )];
         let test = ActionsTest::new("root", components, None).await;
-        let _root = test
-            .model
+        let root = test.model.root();
+
+        let _root = root
             .start_instance(&Moniker::root(), &StartReason::Root)
             .await
             .expect("failed to start root");
         test.runner.wait_for_urls(&["test:///root_resolved"]).await;
 
-        let root_component = test.look_up(Moniker::root()).await;
-
         let validate_and_convert = |capabilities: Vec<fdecl::Capability>| async {
-            root_component
-                .lock_resolved_state()
+            root.lock_resolved_state()
                 .await
                 .expect("failed to get resolved state")
                 .validate_and_convert_dynamic_component(
@@ -3703,5 +3784,67 @@ pub mod tests {
 
         // Wait for the logger to connect to LogSink.
         connect_rx.next().await.unwrap();
+    }
+
+    #[fuchsia::test]
+    async fn find_resolved_test() {
+        let components = vec![
+            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
+            ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
+            ("b", ComponentDeclBuilder::new().add_eager_child("c").add_eager_child("d").build()),
+            ("c", component_decl_with_test_runner()),
+            ("d", component_decl_with_test_runner()),
+        ];
+        let test = ActionsTest::new("root", components, None).await;
+        let root = test.model.root();
+
+        // Not resolved, so not found.
+        assert_matches!(root.find_resolved(&vec!["a"].try_into().unwrap()).await, None);
+        assert_matches!(root.find_resolved(&vec!["a", "b"].try_into().unwrap()).await, None);
+        assert_matches!(root.find_resolved(&vec!["a", "b", "c"].try_into().unwrap()).await, None);
+        assert_matches!(root.find_resolved(&vec!["a", "b", "d"].try_into().unwrap()).await, None);
+
+        // Resolve each component.
+        test.look_up(Moniker::root()).await;
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
+        let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
+
+        // Now they can all be found.
+        assert_matches!(root.find_resolved(&vec!["a"].try_into().unwrap()).await, Some(_));
+        assert_eq!(
+            root.find_resolved(&vec!["a"].try_into().unwrap()).await.unwrap().component_url,
+            "test:///a",
+        );
+        assert_matches!(root.find_resolved(&vec!["a", "b"].try_into().unwrap()).await, Some(_));
+        assert_matches!(
+            root.find_resolved(&vec!["a", "b", "c"].try_into().unwrap()).await,
+            Some(_)
+        );
+        assert_matches!(
+            root.find_resolved(&vec!["a", "b", "d"].try_into().unwrap()).await,
+            Some(_)
+        );
+        assert_matches!(
+            root.find_resolved(&vec!["a", "b", "nonesuch"].try_into().unwrap()).await,
+            None
+        );
+
+        // Unresolve, recursively.
+        ActionSet::register(component_a.clone(), UnresolveAction::new())
+            .await
+            .expect("unresolve failed");
+
+        // Unresolved recursively, so children in Discovered state.
+        assert!(is_discovered(&component_a).await);
+        assert!(is_discovered(&component_b).await);
+        assert!(is_discovered(&component_c).await);
+        assert!(is_discovered(&component_d).await);
+
+        assert_matches!(root.find_resolved(&vec!["a"].try_into().unwrap()).await, None);
+        assert_matches!(root.find_resolved(&vec!["a", "b"].try_into().unwrap()).await, None);
+        assert_matches!(root.find_resolved(&vec!["a", "b", "c"].try_into().unwrap()).await, None);
+        assert_matches!(root.find_resolved(&vec!["a", "b", "d"].try_into().unwrap()).await, None);
     }
 }

@@ -582,6 +582,7 @@ mod tests {
         let test = RoutingTest::new("a", components).await;
         let b_component = test
             .model
+            .root()
             .find_and_maybe_resolve(&vec!["b"].try_into().unwrap())
             .await
             .expect("failed to find component for b:0");
@@ -673,6 +674,7 @@ mod tests {
         let test = RoutingTest::new("a", components).await;
         let b_component = test
             .model
+            .root()
             .find_and_maybe_resolve(&vec!["b"].try_into().unwrap())
             .await
             .expect("failed to find component for b:0");
@@ -795,6 +797,7 @@ mod tests {
         let test = RoutingTest::new("a", components).await;
         let b_component = test
             .model
+            .root()
             .find_and_maybe_resolve(&vec!["b"].try_into().unwrap())
             .await
             .expect("failed to find component for b:0");
@@ -931,6 +934,7 @@ mod tests {
         let test = RoutingTest::new("a", components).await;
         let b_component = test
             .model
+            .root()
             .find_and_maybe_resolve(&vec!["b"].try_into().unwrap())
             .await
             .expect("failed to find component for b:0");

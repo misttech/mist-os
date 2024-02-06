@@ -80,8 +80,7 @@ impl Hook for ComponentEarlyStartupTimeStats {
 mod tests {
     use super::*;
     use crate::model::{
-        component::StartReason,
-        model::Model,
+        component::{ComponentInstance, StartReason},
         testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
     };
     use cm_rust_testing::ComponentDeclBuilder;
@@ -97,23 +96,19 @@ mod tests {
             ("b", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
+        let root = test.model.root();
 
         let inspector = inspect::Inspector::default();
         let stats = Arc::new(ComponentEarlyStartupTimeStats::new(
             inspector.root().create_child("start_times"),
         ));
-        test.model.root().hooks.install(stats.hooks()).await;
+        root.hooks.install(stats.hooks()).await;
 
-        let root_timestamp =
-            start_and_get_timestamp(test.model.clone(), Moniker::root()).await.into_nanos();
+        let root_timestamp = start_and_get_timestamp(root, Moniker::root()).await.into_nanos();
         let a_timestamp =
-            start_and_get_timestamp(test.model.clone(), vec!["a"].try_into().unwrap())
-                .await
-                .into_nanos();
+            start_and_get_timestamp(root, vec!["a"].try_into().unwrap()).await.into_nanos();
         let b_timestamp =
-            start_and_get_timestamp(test.model.clone(), vec!["a", "b"].try_into().unwrap())
-                .await
-                .into_nanos();
+            start_and_get_timestamp(root, vec!["a", "b"].try_into().unwrap()).await.into_nanos();
 
         assert_data_tree!(inspector, root: {
             start_times: {
@@ -154,9 +149,14 @@ mod tests {
         assert_eq!(child_count, MAX_NUMBER_OF_STARTUP_TIME_TRACKED_COMPONENTS);
     }
 
-    async fn start_and_get_timestamp(model: Arc<Model>, moniker: Moniker) -> zx::Time {
-        let component =
-            model.start_instance(&moniker, &StartReason::Root).await.expect("failed to bind");
+    async fn start_and_get_timestamp(
+        root_component: &Arc<ComponentInstance>,
+        moniker: Moniker,
+    ) -> zx::Time {
+        let component = root_component
+            .start_instance(&moniker, &StartReason::Root)
+            .await
+            .expect("failed to bind");
         let exec = component.lock_execution().await;
         exec.runtime.as_ref().unwrap().timestamp
     }

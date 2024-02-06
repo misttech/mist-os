@@ -2883,10 +2883,11 @@ mod tests {
             ("a", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
+        let root = test.model.root();
+
         // Start the component. This should cause the component to have an `Execution`.
         let component = test.look_up(vec!["a"].try_into().unwrap()).await;
-        test.model
-            .start_instance(&component.moniker, &StartReason::Eager)
+        root.start_instance(&component.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
         assert!(component.is_started().await);
@@ -2900,8 +2901,7 @@ mod tests {
         a_info.check_is_shut_down(&test.runner).await;
 
         // Trying to start the component should fail because it's shut down.
-        test.model
-            .start_instance(&a_info.component.moniker, &StartReason::Eager)
+        root.start_instance(&a_info.component.moniker, &StartReason::Eager)
             .await
             .expect_err("successfully bound to a after shutdown");
 
@@ -2929,6 +2929,7 @@ mod tests {
         ];
         let test =
             ActionsTest::new("root", components, Some(vec!["container"].try_into().unwrap())).await;
+        let root = test.model.root();
 
         // Create dynamic instances in "coll".
         test.create_dynamic_child("coll", "a").await;
@@ -2939,20 +2940,16 @@ mod tests {
         let component_a = test.look_up(vec!["container", "coll:a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["container", "coll:b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["container", "c"].try_into().unwrap()).await;
-        test.model
-            .start_instance(&component_container.moniker, &StartReason::Eager)
+        root.start_instance(&component_container.moniker, &StartReason::Eager)
             .await
             .expect("could not start container");
-        test.model
-            .start_instance(&component_a.moniker, &StartReason::Eager)
+        root.start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:a");
-        test.model
-            .start_instance(&component_b.moniker, &StartReason::Eager)
+        root.start_instance(&component_b.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:b");
-        test.model
-            .start_instance(&component_c.moniker, &StartReason::Eager)
+        root.start_instance(&component_c.moniker, &StartReason::Eager)
             .await
             .expect("could not start c");
         assert!(component_container.is_started().await);
@@ -3044,6 +3041,7 @@ mod tests {
         ];
         let test =
             ActionsTest::new("root", components, Some(vec!["container"].try_into().unwrap())).await;
+        let root = test.model.root();
 
         // Create dynamic instances in "coll".
         test.create_dynamic_child("coll", "a").await;
@@ -3072,20 +3070,16 @@ mod tests {
         let component_a = test.look_up(vec!["container", "coll:a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["container", "coll:b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["container", "c"].try_into().unwrap()).await;
-        test.model
-            .start_instance(&component_container.moniker, &StartReason::Eager)
+        root.start_instance(&component_container.moniker, &StartReason::Eager)
             .await
             .expect("could not start container");
-        test.model
-            .start_instance(&component_a.moniker, &StartReason::Eager)
+        root.start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:a");
-        test.model
-            .start_instance(&component_b.moniker, &StartReason::Eager)
+        root.start_instance(&component_b.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:b");
-        test.model
-            .start_instance(&component_c.moniker, &StartReason::Eager)
+        root.start_instance(&component_c.moniker, &StartReason::Eager)
             .await
             .expect("could not start c");
         assert!(component_container.is_started().await);
@@ -3201,9 +3195,9 @@ mod tests {
             ("c", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
+        let root = test.model.root();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        test.model
-            .start_instance(&component_a.moniker, &StartReason::Eager)
+        root.start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
         assert!(component_a.is_started().await);
@@ -3258,14 +3252,14 @@ mod tests {
             ("d", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
+        let root = test.model.root();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
         let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
-        test.model
-            .start_instance(&component_a.moniker, &StartReason::Eager)
+        root.start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
         assert!(component_a.is_started().await);
@@ -3400,6 +3394,7 @@ mod tests {
             ),
         ];
         let test = ActionsTest::new("root", components, None).await;
+        let root = test.model.root();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
@@ -3407,8 +3402,7 @@ mod tests {
         let component_e = test.look_up(vec!["a", "b", "e"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
-        test.model
-            .start_instance(&component_a.moniker, &StartReason::Eager)
+        root.start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
         assert!(component_a.is_started().await);
@@ -3597,6 +3591,7 @@ mod tests {
         let moniker_e: Moniker = vec!["a", "b", "e"].try_into().unwrap();
         let moniker_f: Moniker = vec!["a", "b", "f"].try_into().unwrap();
         let test = ActionsTest::new("root", components, None).await;
+        let root = test.model.root();
         let component_a = test.look_up(moniker_a.clone()).await;
         let component_b = test.look_up(moniker_b.clone()).await;
         let component_c = test.look_up(moniker_c.clone()).await;
@@ -3605,8 +3600,7 @@ mod tests {
         let component_f = test.look_up(moniker_f.clone()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
-        test.model
-            .start_instance(&component_a.moniker, &StartReason::Eager)
+        root.start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
         assert!(component_a.is_started().await);
@@ -3834,6 +3828,7 @@ mod tests {
         let moniker_e: Moniker = vec!["a", "b", "e"].try_into().unwrap();
         let moniker_f: Moniker = vec!["a", "b", "f"].try_into().unwrap();
         let test = ActionsTest::new("root", components, None).await;
+        let root = test.model.root();
         let component_a = test.look_up(moniker_a.clone()).await;
         let component_b = test.look_up(moniker_b.clone()).await;
         let component_c = test.look_up(moniker_c.clone()).await;
@@ -3842,8 +3837,7 @@ mod tests {
         let component_f = test.look_up(moniker_f.clone()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
-        test.model
-            .start_instance(&component_a.moniker, &StartReason::Eager)
+        root.start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
         assert!(component_a.is_started().await);
@@ -3982,14 +3976,14 @@ mod tests {
             ),
         ];
         let test = ActionsTest::new("root", components, None).await;
+        let root = test.model.root();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
         let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
-        test.model
-            .start_instance(&component_a.moniker, &StartReason::Eager)
+        root.start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
 
@@ -4075,13 +4069,13 @@ mod tests {
             ("c", ComponentDeclBuilder::new().build()),
         ];
         let test = ActionsTest::new("root", components, None).await;
+        let root = test.model.root();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["a", "c"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
-        test.model
-            .start_instance(&component_a.moniker, &StartReason::Eager)
+        root.start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
 
@@ -4156,13 +4150,13 @@ mod tests {
             ("c", ComponentDeclBuilder::new().build()),
         ];
         let test = ActionsTest::new("root", components, None).await;
+        let root = test.model.root();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["a", "c"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
-        test.model
-            .start_instance(&component_a.moniker, &StartReason::Eager)
+        root.start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
 
@@ -4278,13 +4272,13 @@ mod tests {
             ),
         ];
         let test = ActionsTest::new("root", components, None).await;
+        let root = test.model.root();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["a", "c"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
-        test.model
-            .start_instance(&component_a.moniker, &StartReason::Eager)
+        root.start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
 
@@ -4367,13 +4361,13 @@ mod tests {
             ("c", ComponentDeclBuilder::new().build()),
         ];
         let test = ActionsTest::new("root", components, None).await;
+        let root = test.model.root();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["a", "c"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
-        test.model
-            .start_instance(&component_a.moniker, &StartReason::Eager)
+        root.start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
 
@@ -4435,21 +4429,19 @@ mod tests {
             ("b", ComponentDeclBuilder::new().add_lazy_child("b").build()),
         ];
         let test = ActionsTest::new("root", components, None).await;
+        let root = test.model.root();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_b2 = test.look_up(vec!["a", "b", "b"].try_into().unwrap()).await;
 
         // Start second `b`.
-        test.model
-            .start_instance(&component_a.moniker, &StartReason::Eager)
+        root.start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start b2");
-        test.model
-            .start_instance(&component_b.moniker, &StartReason::Eager)
+        root.start_instance(&component_b.moniker, &StartReason::Eager)
             .await
             .expect("could not start b2");
-        test.model
-            .start_instance(&component_b2.moniker, &StartReason::Eager)
+        root.start_instance(&component_b2.moniker, &StartReason::Eager)
             .await
             .expect("could not start b2");
         assert!(component_a.is_started().await);
@@ -4510,14 +4502,14 @@ mod tests {
             ("d", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
+        let root = test.model.root();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
         let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
-        test.model
-            .start_instance(&component_a.moniker, &StartReason::Eager)
+        root.start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
         assert!(component_a.is_started().await);

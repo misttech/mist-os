@@ -388,10 +388,10 @@ impl RoutingTest {
         collection: &'a str,
         name: &'a str,
     ) {
+        let root = self.model.root();
         let component =
-            self.model.find_and_maybe_resolve(&moniker).await.expect("failed to look up component");
-        self.model
-            .start_instance(&component.moniker, &StartReason::Eager)
+            root.find_and_maybe_resolve(&moniker).await.expect("failed to look up component");
+        root.start_instance(&component.moniker, &StartReason::Eager)
             .await
             .expect("start instance failed");
         let child_moniker = ChildName::try_new(name, Some(collection)).expect("invalid moniker");
@@ -580,7 +580,7 @@ impl RoutingTest {
         reason: StartReason,
         wait_for_start: bool,
     ) -> Result<String, ModelError> {
-        self.model.start_instance(moniker, &reason).await?;
+        self.model.root().start_instance(moniker, &reason).await?;
         let component_name = match moniker.path().last() {
             Some(part) => part.name().to_string(),
             None => self.root_component_name.to_string(),
@@ -598,7 +598,7 @@ impl RoutingTest {
         reason: StartReason,
         wait_for_start: bool,
     ) -> Result<(Arc<ComponentInstance>, String), ModelError> {
-        let instance = self.model.start_instance(moniker, &reason).await?;
+        let instance = self.model.root().start_instance(moniker, &reason).await?;
         let component_name = match moniker.path().last() {
             Some(part) => part.name().to_string(),
             None => self.root_component_name.to_string(),
@@ -892,7 +892,7 @@ impl RoutingTestModel for RoutingTest {
         &self,
         moniker: &Moniker,
     ) -> Result<Arc<ComponentInstance>, anyhow::Error> {
-        self.model.find_and_maybe_resolve(&moniker).await.map_err(|err| anyhow!(err))
+        self.model.root().find_and_maybe_resolve(&moniker).await.map_err(|err| anyhow!(err))
     }
 
     async fn check_open_file(&self, moniker: Moniker, path: cm_types::Path) {
@@ -1468,11 +1468,12 @@ pub mod capability_util {
         directory: bool,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        let component = model
+        let root = model.root();
+        let component = root
             .find_and_maybe_resolve(moniker)
             .await
             .unwrap_or_else(|e| panic!("component not found {}: {}", moniker, e));
-        model.start_instance(moniker, &StartReason::Eager).await.expect("failed to start instance");
+        root.start_instance(moniker, &StartReason::Eager).await.expect("failed to start instance");
         let state = component.lock_state().await;
         match &*state {
             InstanceState::Resolved(resolved_instance_state) => {

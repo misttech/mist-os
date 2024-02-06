@@ -171,9 +171,9 @@ pub mod tests {
         ];
         let test = ActionsTest::new("root", components, None).await;
         // Start the component. This should cause the component to have an `Execution`.
-        let component_root = test.look_up(Moniker::root()).await;
+        let component_root = test.model.root();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        test.model
+        component_root
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
@@ -206,7 +206,7 @@ pub mod tests {
         }
 
         // Trying to start the component should fail because it's shut down.
-        test.model
+        component_root
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect_err("successfully bound to a after shutdown");
@@ -232,19 +232,19 @@ pub mod tests {
         test.create_dynamic_child("coll", "b").await;
 
         // Start the components. This should cause them to have an `Execution`.
-        let component_root = test.look_up(Moniker::root()).await;
+        let component_root = test.model.root();
         let component_container = test.look_up(vec!["container"].try_into().unwrap()).await;
         let component_a = test.look_up(vec!["container", "coll:a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["container", "coll:b"].try_into().unwrap()).await;
-        test.model
+        component_root
             .start_instance(&component_container.moniker, &StartReason::Eager)
             .await
             .expect("could not start container");
-        test.model
+        component_root
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:a");
-        test.model
+        component_root
             .start_instance(&component_b.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:b");
@@ -272,7 +272,7 @@ pub mod tests {
             ("b", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(Moniker::root()).await;
+        let component_root = test.model.root();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
 
@@ -546,7 +546,7 @@ pub mod tests {
     async fn destroy_registers_discover() {
         let components = vec![("root", ComponentDeclBuilder::new().build())];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(Moniker::root()).await;
+        let component_root = test.model.root();
         // This setup circumvents the registration of the Discover action on component_a.
         {
             let mut resolved_state = component_root.lock_resolved_state().await.unwrap();
@@ -570,7 +570,6 @@ pub mod tests {
         .await;
 
         // Shut down component so we can destroy it.
-        let component_root = test.look_up(Moniker::root()).await;
         let component_a = match *component_root.lock_state().await {
             InstanceState::Resolved(ref s) => {
                 s.get_child(&ChildName::try_from("a").unwrap()).expect("child a not found").clone()
@@ -613,9 +612,9 @@ pub mod tests {
             ("c", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(Moniker::root()).await;
+        let component_root = test.model.root();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        test.model
+        component_root
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
@@ -677,7 +676,7 @@ pub mod tests {
             ("x", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(Moniker::root()).await;
+        let component_root = test.model.root();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
@@ -685,11 +684,11 @@ pub mod tests {
         let component_x = test.look_up(vec!["x"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
-        test.model
+        component_root
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
-        test.model
+        component_root
             .start_instance(&component_x.moniker, &StartReason::Eager)
             .await
             .expect("could not start x");
@@ -794,21 +793,21 @@ pub mod tests {
             ("b", ComponentDeclBuilder::new().add_lazy_child("b").build()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(Moniker::root()).await;
+        let component_root = test.model.root();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_b2 = test.look_up(vec!["a", "b", "b"].try_into().unwrap()).await;
 
         // Start the second `b`.
-        test.model
+        component_root
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start b2");
-        test.model
+        component_root
             .start_instance(&component_b.moniker, &StartReason::Eager)
             .await
             .expect("could not start b2");
-        test.model
+        component_root
             .start_instance(&component_b2.moniker, &StartReason::Eager)
             .await
             .expect("could not start b2");
@@ -883,14 +882,14 @@ pub mod tests {
             ("d", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(Moniker::root()).await;
+        let component_root = test.model.root();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
         let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
         let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
 
         // Component startup was eager, so they should all have an `Execution`.
-        test.model
+        component_root
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");

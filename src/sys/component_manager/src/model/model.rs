@@ -6,8 +6,7 @@ use {
     crate::model::{
         actions::{resolve::sandbox_construction::ComponentInput, ActionKey, DiscoverAction},
         component::{
-            ComponentInstance, ComponentManagerInstance, IncomingCapabilities, InstanceState,
-            StartReason,
+            ComponentInstance, ComponentManagerInstance, IncomingCapabilities, StartReason,
         },
         context::ModelContext,
         environment::Environment,
@@ -15,7 +14,6 @@ use {
         token::InstanceRegistry,
     },
     cm_config::RuntimeConfig,
-    moniker::{Moniker, MonikerBase},
     std::sync::Arc,
     tracing::warn,
 };
@@ -87,74 +85,6 @@ impl Model {
         self.context.component_id_index()
     }
 
-    /// Looks up a component by moniker. The component instance in the component will be
-    /// resolved if that has not already happened.
-    pub async fn find_and_maybe_resolve(
-        &self,
-        look_up_moniker: &Moniker,
-    ) -> Result<Arc<ComponentInstance>, ModelError> {
-        let mut cur = self.root.clone();
-        for moniker in look_up_moniker.path().iter() {
-            cur = {
-                let cur_state = cur.lock_resolved_state().await?;
-                if let Some(c) = cur_state.get_child(moniker) {
-                    c.clone()
-                } else {
-                    return Err(ModelError::instance_not_found(look_up_moniker.clone()));
-                }
-            };
-        }
-        cur.lock_resolved_state().await?;
-        Ok(cur)
-    }
-
-    /// Finds a component matching the moniker, if such a component exists.
-    /// This function has no side-effects.
-    pub async fn find(&self, look_up_moniker: &Moniker) -> Option<Arc<ComponentInstance>> {
-        let mut cur = self.root.clone();
-        for moniker in look_up_moniker.path().iter() {
-            cur = {
-                let state = cur.lock_state().await;
-                match &*state {
-                    InstanceState::Resolved(r) => {
-                        if let Some(c) = r.get_child(moniker) {
-                            c.clone()
-                        } else {
-                            return None;
-                        }
-                    }
-                    _ => return None,
-                }
-            };
-        }
-        Some(cur)
-    }
-
-    /// Finds a resolved component matching the moniker, if such a component exists.
-    /// This function has no side-effects.
-    #[cfg(test)]
-    pub async fn find_resolved(&self, find_moniker: &Moniker) -> Option<Arc<ComponentInstance>> {
-        let mut cur = self.root.clone();
-        for moniker in find_moniker.path().iter() {
-            cur = {
-                let state = cur.lock_state().await;
-                match &*state {
-                    InstanceState::Resolved(r) => match r.get_child(moniker) {
-                        Some(c) => c.clone(),
-                        _ => return None,
-                    },
-                    _ => return None,
-                }
-            };
-        }
-        // Found the moniker, the last child in the chain of resolved parents. Is it resolved?
-        let state = cur.lock_state().await;
-        match &*state {
-            crate::model::component::InstanceState::Resolved(_) => Some(cur.clone()),
-            _ => None,
-        }
-    }
-
     /// Discovers the root component, providing it with `dict_for_root`.
     pub async fn discover_root_component(self: &Arc<Model>, input_for_root: ComponentInput) {
         let mut actions = self.root.lock_actions().await;
@@ -162,8 +92,9 @@ impl Model {
         let _ = actions.register_no_wait(&self.root, DiscoverAction::new(input_for_root));
     }
 
-    /// Starts root, starting the component tree. If `discover_root_component` has already been
-    /// called, then `dict_for_root` is unused.
+    /// Starts root, starting the component tree.
+    ///
+    /// If `discover_root_component` has already been called, then `input_for_root` is unused.
     pub async fn start(self: &Arc<Model>, input_for_root: ComponentInput) {
         // Normally the Discovered event is dispatched when an instance is added as a child, but
         // since the root isn't anyone's child we need to dispatch it here.
@@ -199,43 +130,25 @@ impl Model {
             }
         }
     }
-
-    /// Starts the component instance in the given component if it's not already running.
-    /// Returns the component that was bound to.
-    #[cfg(test)]
-    pub async fn start_instance<'a>(
-        self: &Arc<Model>,
-        moniker: &'a Moniker,
-        reason: &StartReason,
-    ) -> Result<Arc<ComponentInstance>, ModelError> {
-        let component = self.find_and_maybe_resolve(moniker).await?;
-        component.start(reason, None, IncomingCapabilities::default()).await?;
-        Ok(component)
-    }
 }
 
 #[cfg(test)]
 pub mod tests {
     use {
         crate::model::{
-            actions::test_utils::is_discovered,
             actions::{
                 resolve::sandbox_construction::ComponentInput, ActionSet, ShutdownAction,
-                ShutdownType, UnresolveAction,
+                ShutdownType,
             },
             error::ModelError,
             hooks::{Event, EventType, Hook, HooksRegistration},
             model::Model,
-            testing::test_helpers::{
-                component_decl_with_test_runner, ActionsTest, TestEnvironmentBuilder,
-                TestModelResult,
-            },
+            testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
         },
-        assert_matches::assert_matches,
         async_trait::async_trait,
         cm_rust_testing::ComponentDeclBuilder,
         fidl_fuchsia_component_decl as fdecl,
-        moniker::{Moniker, MonikerBase},
+        moniker::Moniker,
         std::sync::{Arc, Weak},
     };
 
@@ -308,9 +221,10 @@ pub mod tests {
             }
         }
 
-        let root = model.find(&Moniker::default()).await.unwrap();
         let hook = Arc::new(RegisterShutdown { model: model.clone() });
-        root.hooks
+        model
+            .root()
+            .hooks
             .install(vec![HooksRegistration::new(
                 "shutdown_root_on_child_discover",
                 vec![EventType::Discovered],
@@ -342,81 +256,5 @@ pub mod tests {
             TestEnvironmentBuilder::new().set_components(components).build().await;
 
         model.start(ComponentInput::empty()).await;
-    }
-
-    #[fuchsia::test]
-    async fn find_resolved_test() {
-        let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
-            ("b", ComponentDeclBuilder::new().add_eager_child("c").add_eager_child("d").build()),
-            ("c", component_decl_with_test_runner()),
-            ("d", component_decl_with_test_runner()),
-        ];
-        let test = ActionsTest::new("root", components, None).await;
-
-        // Not resolved, so not found.
-        assert_matches!(test.model.find_resolved(&vec!["a"].try_into().unwrap()).await, None);
-        assert_matches!(test.model.find_resolved(&vec!["a", "b"].try_into().unwrap()).await, None);
-        assert_matches!(
-            test.model.find_resolved(&vec!["a", "b", "c"].try_into().unwrap()).await,
-            None
-        );
-        assert_matches!(
-            test.model.find_resolved(&vec!["a", "b", "d"].try_into().unwrap()).await,
-            None
-        );
-
-        // Resolve each component.
-        test.look_up(Moniker::root()).await;
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
-        let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
-
-        // Now they can all be found.
-        assert_matches!(test.model.find_resolved(&vec!["a"].try_into().unwrap()).await, Some(_));
-        assert_eq!(
-            test.model.find_resolved(&vec!["a"].try_into().unwrap()).await.unwrap().component_url,
-            "test:///a",
-        );
-        assert_matches!(
-            test.model.find_resolved(&vec!["a", "b"].try_into().unwrap()).await,
-            Some(_)
-        );
-        assert_matches!(
-            test.model.find_resolved(&vec!["a", "b", "c"].try_into().unwrap()).await,
-            Some(_)
-        );
-        assert_matches!(
-            test.model.find_resolved(&vec!["a", "b", "d"].try_into().unwrap()).await,
-            Some(_)
-        );
-        assert_matches!(
-            test.model.find_resolved(&vec!["a", "b", "nonesuch"].try_into().unwrap()).await,
-            None
-        );
-
-        // Unresolve, recursively.
-        ActionSet::register(component_a.clone(), UnresolveAction::new())
-            .await
-            .expect("unresolve failed");
-
-        // Unresolved recursively, so children in Discovered state.
-        assert!(is_discovered(&component_a).await);
-        assert!(is_discovered(&component_b).await);
-        assert!(is_discovered(&component_c).await);
-        assert!(is_discovered(&component_d).await);
-
-        assert_matches!(test.model.find_resolved(&vec!["a"].try_into().unwrap()).await, None);
-        assert_matches!(test.model.find_resolved(&vec!["a", "b"].try_into().unwrap()).await, None);
-        assert_matches!(
-            test.model.find_resolved(&vec!["a", "b", "c"].try_into().unwrap()).await,
-            None
-        );
-        assert_matches!(
-            test.model.find_resolved(&vec!["a", "b", "d"].try_into().unwrap()).await,
-            None
-        );
     }
 }

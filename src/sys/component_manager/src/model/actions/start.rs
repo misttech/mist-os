@@ -757,8 +757,10 @@ mod tests {
         let test_topology =
             builder.add_blocker(TEST_CHILD_NAME, resolved_tx, continue_rx).build().await;
 
-        let _root = test_topology.model.find_and_maybe_resolve(&Moniker::default()).await.unwrap();
-        let child = test_topology.model.find(&TEST_CHILD_NAME.try_into().unwrap()).await.unwrap();
+        let _root =
+            test_topology.model.root().find_and_maybe_resolve(&Moniker::default()).await.unwrap();
+        let child =
+            test_topology.model.root().find(&TEST_CHILD_NAME.try_into().unwrap()).await.unwrap();
 
         let start_fut = child.lock_actions().await.register_no_wait(
             &child,

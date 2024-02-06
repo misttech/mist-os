@@ -46,7 +46,8 @@ impl LifecycleController {
     ) -> Result<(), fsys::ResolveError> {
         let moniker =
             join_monikers(scope_moniker, &moniker).map_err(|_| fsys::ResolveError::BadMoniker)?;
-        let instance = model.find(&moniker).await.ok_or(fsys::ResolveError::InstanceNotFound)?;
+        let instance =
+            model.root().find(&moniker).await.ok_or(fsys::ResolveError::InstanceNotFound)?;
         instance.resolve().await.map(|_| ()).map_err(|error| {
             warn!(%moniker, %error, "failed to resolve instance");
             error.into()
@@ -61,7 +62,8 @@ impl LifecycleController {
     ) -> Result<(), fsys::StartError> {
         let moniker =
             join_monikers(scope_moniker, &moniker).map_err(|_| fsys::StartError::BadMoniker)?;
-        let instance = model.find(&moniker).await.ok_or(fsys::StartError::InstanceNotFound)?;
+        let instance =
+            model.root().find(&moniker).await.ok_or(fsys::StartError::InstanceNotFound)?;
         instance
             .start(&StartReason::Debug, None, IncomingCapabilities::default())
             .await
@@ -81,7 +83,8 @@ impl LifecycleController {
     ) -> Result<(), fsys::StopError> {
         let moniker =
             join_monikers(scope_moniker, &moniker).map_err(|_| fsys::StopError::BadMoniker)?;
-        let instance = model.find(&moniker).await.ok_or(fsys::StopError::InstanceNotFound)?;
+        let instance =
+            model.root().find(&moniker).await.ok_or(fsys::StopError::InstanceNotFound)?;
         ActionSet::register(instance.clone(), StopAction::new(false)).await.map_err(|error| {
             warn!(%moniker, %error, "failed to stop instance");
             error
@@ -96,7 +99,8 @@ impl LifecycleController {
     ) -> Result<(), fsys::UnresolveError> {
         let moniker =
             join_monikers(scope_moniker, &moniker).map_err(|_| fsys::UnresolveError::BadMoniker)?;
-        let component = model.find(&moniker).await.ok_or(fsys::UnresolveError::InstanceNotFound)?;
+        let component =
+            model.root().find(&moniker).await.ok_or(fsys::UnresolveError::InstanceNotFound)?;
         component.unresolve().await.map_err(|error| {
             warn!(%moniker, %error, "failed to unresolve instance");
             error
@@ -115,7 +119,7 @@ impl LifecycleController {
         let parent_moniker = join_monikers(scope_moniker, &parent_moniker)
             .map_err(|_| fsys::CreateError::BadMoniker)?;
         let parent_component =
-            model.find_and_maybe_resolve(&parent_moniker).await.map_err(|e| match e {
+            model.root().find_and_maybe_resolve(&parent_moniker).await.map_err(|e| match e {
                 ModelError::PathIsNotUtf8 { path: _ }
                 | ModelError::UnexpectedComponentManagerMoniker
                 | ModelError::ComponentInstanceError { err: _ } => {
@@ -149,7 +153,7 @@ impl LifecycleController {
         let parent_moniker = join_monikers(scope_moniker, &parent_moniker)
             .map_err(|_| fsys::DestroyError::BadMoniker)?;
         let parent_component =
-            model.find(&parent_moniker).await.ok_or(fsys::DestroyError::InstanceNotFound)?;
+            model.root().find(&parent_moniker).await.ok_or(fsys::DestroyError::InstanceNotFound)?;
 
         child.collection.as_ref().ok_or(fsys::DestroyError::BadChildRef)?;
         let child_moniker = ChildName::try_new(&child.name, child.collection.as_ref())
@@ -409,6 +413,7 @@ mod tests {
 
         let test_model_result =
             TestEnvironmentBuilder::new().set_components(components).build().await;
+        let root = test_model_result.model.root();
 
         let lifecycle_controller = {
             let env = test_model_result.builtin_environment.lock().await;
@@ -424,16 +429,10 @@ mod tests {
         });
 
         lifecycle_proxy.resolve_instance(".").await.unwrap().unwrap();
-        let component_a = test_model_result
-            .model
-            .find_and_maybe_resolve(&vec!["a"].try_into().unwrap())
-            .await
-            .unwrap();
-        let component_b = test_model_result
-            .model
-            .find_and_maybe_resolve(&vec!["a", "b"].try_into().unwrap())
-            .await
-            .unwrap();
+        let component_a =
+            root.find_and_maybe_resolve(&vec!["a"].try_into().unwrap()).await.unwrap();
+        let component_b =
+            root.find_and_maybe_resolve(&vec!["a", "b"].try_into().unwrap()).await.unwrap();
         assert!(is_resolved(&component_a).await);
         assert!(is_resolved(&component_b).await);
 

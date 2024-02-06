@@ -909,16 +909,17 @@ mod tests {
             ChildDeclBuilder::new_lazy_child("baz"),
         )
         .await;
+        let root = test.model.root();
         let foo_component =
-            test.model.find_and_maybe_resolve(&"coll1:foo".parse().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&"coll1:foo".parse().unwrap()).await.unwrap();
         let bar_component =
-            test.model.find_and_maybe_resolve(&"coll1:bar".parse().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&"coll1:bar".parse().unwrap()).await.unwrap();
         let baz_component =
-            test.model.find_and_maybe_resolve(&"coll2:baz".parse().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&"coll2:baz".parse().unwrap()).await.unwrap();
         let static_a_component =
-            test.model.find_and_maybe_resolve(&"static_a".parse().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&"static_a".parse().unwrap()).await.unwrap();
         let static_b_component =
-            test.model.find_and_maybe_resolve(&"static_b".parse().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&"static_b".parse().unwrap()).await.unwrap();
 
         let provider = MockAnonymizedCapabilityProvider {
             instances: hashmap! {
@@ -941,18 +942,14 @@ mod tests {
             service_name: "my.service.Service".parse().unwrap(),
         };
 
-        let dir = AnonymizedAggregateServiceDir::new(
-            test.model.root().as_weak(),
-            route,
-            Box::new(provider),
-        );
+        let dir = AnonymizedAggregateServiceDir::new(root.as_weak(), route, Box::new(provider));
 
         if init_service_dir {
             dir.add_entries_from_children().await.expect("failed to add entries");
         }
 
         let dir_arc = Arc::new(dir);
-        test.model.root().hooks.install(dir_arc.hooks()).await;
+        root.hooks.install(dir_arc.hooks()).await;
         (test, dir_arc)
     }
 
@@ -993,13 +990,11 @@ mod tests {
             assert!(instance_dir_contents.iter().find(|d| d.name == "member").is_some());
         }
 
-        let baz_component = test
-            .model
-            .find_and_maybe_resolve(&vec!["coll2:baz"].try_into().unwrap())
-            .await
-            .unwrap();
+        let root = test.model.root();
+        let baz_component =
+            root.find_and_maybe_resolve(&vec!["coll2:baz"].try_into().unwrap()).await.unwrap();
         let static_a_component =
-            test.model.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
 
         // Add entries from the children again. This should be a no-op since all of them are
         // already there and we prevent duplicates.
@@ -1185,23 +1180,17 @@ mod tests {
         )
         .await;
 
-        let root_component = test.model.root();
+        let root = test.model.root();
         let container_component =
-            test.model.find_and_maybe_resolve(&"container".parse().unwrap()).await.unwrap();
-        let foo_component = test
-            .model
-            .find_and_maybe_resolve(&"container/coll:foo".parse().unwrap())
-            .await
-            .unwrap();
-        let bar_component = test
-            .model
-            .find_and_maybe_resolve(&"container/coll:bar".parse().unwrap())
-            .await
-            .unwrap();
+            root.find_and_maybe_resolve(&"container".parse().unwrap()).await.unwrap();
+        let foo_component =
+            root.find_and_maybe_resolve(&"container/coll:foo".parse().unwrap()).await.unwrap();
+        let bar_component =
+            root.find_and_maybe_resolve(&"container/coll:bar".parse().unwrap()).await.unwrap();
 
         let provider = MockAnonymizedCapabilityProvider {
             instances: hashmap! {
-                AggregateInstance::Parent => root_component.as_weak(),
+                AggregateInstance::Parent => root.as_weak(),
                 AggregateInstance::Self_ => container_component.as_weak(),
                 AggregateInstance::Child("coll:foo".try_into().unwrap()) => foo_component.as_weak(),
                 AggregateInstance::Child("coll:bar".try_into().unwrap()) => bar_component.as_weak(),
@@ -1218,15 +1207,11 @@ mod tests {
             service_name: "my.service.Service".parse().unwrap(),
         };
 
-        let dir = AnonymizedAggregateServiceDir::new(
-            test.model.root().as_weak(),
-            route,
-            Box::new(provider),
-        );
+        let dir = AnonymizedAggregateServiceDir::new(root.as_weak(), route, Box::new(provider));
         dir.add_entries_from_children().await.unwrap();
 
         let dir_arc = Arc::new(dir);
-        test.model.root().hooks.install(dir_arc.hooks()).await;
+        root.hooks.install(dir_arc.hooks()).await;
 
         let execution_scope = ExecutionScope::new();
         let dir_proxy = open_dir(execution_scope.clone(), dir_arc.dir_entry().await);
@@ -1307,11 +1292,9 @@ mod tests {
         // should be no entries in a non initialized collection service dir.
         assert_eq!(instance_names.len(), 0);
 
-        let foo_component = test
-            .model
-            .find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap())
-            .await
-            .unwrap();
+        let root = test.model.root();
+        let foo_component =
+            root.find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
 
         // Test that starting an instance results in the collection service directory adding the
         // relevant instances.
@@ -1322,11 +1305,8 @@ mod tests {
         let entries = wait_for_dir_content_change(&dir_proxy, entries).await;
         assert_eq!(entries.len(), 1);
 
-        let baz_component = test
-            .model
-            .find_and_maybe_resolve(&vec!["coll2:baz"].try_into().unwrap())
-            .await
-            .unwrap();
+        let baz_component =
+            root.find_and_maybe_resolve(&vec!["coll2:baz"].try_into().unwrap()).await.unwrap();
 
         // Test with second collection
         baz_component
@@ -1337,7 +1317,7 @@ mod tests {
         assert_eq!(entries.len(), 3);
 
         let static_a_component =
-            test.model.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
 
         // Test with static child
         static_a_component
@@ -1360,22 +1340,17 @@ mod tests {
         let instance_names: HashSet<String> = entries.iter().map(|d| d.name.clone()).collect();
         assert_eq!(instance_names.len(), 6);
 
-        let foo_component = test
-            .model
-            .find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap())
-            .await
-            .unwrap();
+        let root = test.model.root();
+        let foo_component =
+            root.find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
 
         // Test that removal of instances works
         foo_component.stop().await.unwrap();
         let entries = wait_for_dir_content_change(&dir_proxy, entries).await;
         assert_eq!(entries.len(), 5);
 
-        let baz_component = test
-            .model
-            .find_and_maybe_resolve(&vec!["coll2:baz"].try_into().unwrap())
-            .await
-            .unwrap();
+        let baz_component =
+            root.find_and_maybe_resolve(&vec!["coll2:baz"].try_into().unwrap()).await.unwrap();
 
         // Test with second collection
         baz_component.stop().await.unwrap();
@@ -1383,7 +1358,7 @@ mod tests {
         assert_eq!(entries.len(), 3);
 
         let static_a_component =
-            test.model.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
 
         // Test with static child
         static_a_component.stop().await.unwrap();
@@ -1415,6 +1390,7 @@ mod tests {
             .build()
             .await;
 
+        let root = test.model.root();
         test.create_dynamic_child(
             &Moniker::root(),
             "coll1",
@@ -1427,11 +1403,8 @@ mod tests {
             ChildDeclBuilder::new_lazy_child("bar"),
         )
         .await;
-        let foo_component = test
-            .model
-            .find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap())
-            .await
-            .unwrap();
+        let foo_component =
+            root.find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
 
         let provider = MockAnonymizedCapabilityProvider {
             instances: hashmap! {
@@ -1446,11 +1419,7 @@ mod tests {
             service_name: "my.service.Service".parse().unwrap(),
         };
 
-        let dir = AnonymizedAggregateServiceDir::new(
-            test.model.root().as_weak(),
-            route,
-            Box::new(provider),
-        );
+        let dir = AnonymizedAggregateServiceDir::new(root.as_weak(), route, Box::new(provider));
 
         dir.add_entries_from_children().await.unwrap();
         // Entries from foo should be available even though we can't route to bar
@@ -1494,6 +1463,7 @@ mod tests {
             .build()
             .await;
 
+        let root = test.model.root();
         test.create_dynamic_child(
             &Moniker::root(),
             "coll1",
@@ -1506,18 +1476,12 @@ mod tests {
             ChildDeclBuilder::new_lazy_child("bar"),
         )
         .await;
-        let foo_component = test
-            .model
-            .find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap())
-            .await
-            .unwrap();
-        let bar_component = test
-            .model
-            .find_and_maybe_resolve(&vec!["coll2:bar"].try_into().unwrap())
-            .await
-            .unwrap();
+        let foo_component =
+            root.find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
+        let bar_component =
+            root.find_and_maybe_resolve(&vec!["coll2:bar"].try_into().unwrap()).await.unwrap();
         let static_a_component =
-            test.model.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
 
         let provider = MockAnonymizedCapabilityProvider {
             instances: hashmap! {
@@ -1536,11 +1500,7 @@ mod tests {
             service_name: "my.service.Service".parse().unwrap(),
         };
 
-        let dir = AnonymizedAggregateServiceDir::new(
-            test.model.root().as_weak(),
-            route,
-            Box::new(provider),
-        );
+        let dir = AnonymizedAggregateServiceDir::new(root.as_weak(), route, Box::new(provider));
 
         dir.add_entries_from_children().await.unwrap();
 
@@ -1593,14 +1553,14 @@ mod tests {
             .build()
             .await;
 
+        let root = test.model.root();
         test.create_dynamic_child(
             &Moniker::root(),
             "coll1",
             ChildDeclBuilder::new_lazy_child("foo"),
         )
         .await;
-        let foo_component = test
-            .model
+        let foo_component = root
             .find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap())
             .await
             .expect("failed to find foo instance");
@@ -1614,7 +1574,7 @@ mod tests {
         };
 
         let dir = FilteredAggregateServiceDir::new(
-            test.model.root().as_weak(),
+            root.as_weak(),
             foo_component.as_weak(),
             Box::new(provider),
         )

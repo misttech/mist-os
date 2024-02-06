@@ -69,7 +69,9 @@ impl DirectoryReadyNotifier {
             // destroyed in the intervening time, so we just exit early.
             let target = match this.model.upgrade() {
                 Some(model) => {
-                    if let Ok(component) = model.find_and_maybe_resolve(&target_moniker).await {
+                    if let Ok(component) =
+                        model.root().find_and_maybe_resolve(&target_moniker).await
+                    {
                         component
                     } else {
                         return;
