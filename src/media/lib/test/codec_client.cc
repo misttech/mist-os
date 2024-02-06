@@ -131,11 +131,11 @@ void CodecClient::Start() {
   // debugging if just starting the Codec server fails instead.  Actual clients
   // don't need to use Sync() here.
   CallSyncAndWaitForResponse();
-  FX_VLOGS(3) << "Sync() completed, which means the Codec server exists.";
+  FX_LOGS(DEBUG) << "Sync() completed, which means the Codec server exists.";
   if (connection_lost_)
     return;
 
-  FX_VLOGS(3) << "Waiting for OnInputConstraints() from the Codec server...";
+  FX_LOGS(DEBUG) << "Waiting for OnInputConstraints() from the Codec server...";
   // The Codec client can rely on an OnInputConstraints() arriving shortly,
   // without any message required from the client first.  The
   // OnInputConstraints() may in future actually be sent by the CodecFactory,
@@ -149,7 +149,7 @@ void CodecClient::Start() {
     }
   }  // ~lock
   ZX_ASSERT(input_constraints_);
-  FX_VLOGS(3) << "Got OnInputConstraints() from the Codec server.";
+  FX_LOGS(DEBUG) << "Got OnInputConstraints() from the Codec server.";
 
   // We know input_constraints_ won't change outside the lock because we prevent
   // that in OnInputConstraints() by only accepting input constraints if there
@@ -360,9 +360,9 @@ void CodecClient::CallSyncAndWaitForResponse() {
   // method is called from the main thread not the FIDL thread, so we have to
   // switch threads to send a FIDL message.  The inner lambda is the completion
   // callback.
-  FX_VLOGS(3) << "before calling Sync() (main thread)...";
+  FX_LOGS(DEBUG) << "before calling Sync() (main thread)...";
   async::PostTask(dispatcher_, [&] {
-    FX_VLOGS(3) << "before calling Sync() (fidl thread)...";
+    FX_LOGS(DEBUG) << "before calling Sync() (fidl thread)...";
     codec_->Sync([&]() {
       {  // scope lock
         std::unique_lock<std::mutex> lock(is_sync_complete_lock_);
@@ -371,7 +371,7 @@ void CodecClient::CallSyncAndWaitForResponse() {
       is_sync_complete_condition_.notify_all();
     });
   });
-  FX_VLOGS(3) << "after calling Sync() - waiting...\n";
+  FX_LOGS(DEBUG) << "after calling Sync() - waiting...\n";
   {  // scope lock
     std::unique_lock<std::mutex> lock(is_sync_complete_lock_);
     // We rely on the channel error handler to be doing an exit() for this loop
@@ -380,7 +380,7 @@ void CodecClient::CallSyncAndWaitForResponse() {
       is_sync_complete_condition_.wait(lock);
     }
   }
-  FX_VLOGS(3) << "after calling Sync() - done waiting\n";
+  FX_LOGS(DEBUG) << "after calling Sync() - done waiting\n";
   ZX_ASSERT(is_sync_complete || connection_lost_);
 }
 
@@ -738,8 +738,8 @@ std::unique_ptr<CodecOutput> CodecClient::BlockingGetEmittedOutput() {
         // all along during most of this whole method.  If we had set to false
         // up there, it would probably be less obvious why it works vs. here,
         // but either can work.
-        FX_VLOGS(3) << "output_config_action_pending_ = false, because client "
-                       "caught up";
+        FX_LOGS(DEBUG) << "output_config_action_pending_ = false, because client "
+                          "caught up";
         output_constraints_action_pending_ = false;
         // Because this was true for at least pending config reason which we
         // are only just clearing immediately above.
@@ -755,8 +755,8 @@ std::unique_ptr<CodecOutput> CodecClient::BlockingGetEmittedOutput() {
         // output_constraints_action_pending_ or output_pending_. Both remain
         // true until we've caught up to a config that's at least as new as the
         // last_required_output_constraints_.
-        FX_VLOGS(3) << "output_constraints_action_pending_ remains true because server "
-                       "has sent yet another action-required output constraints";
+        FX_LOGS(DEBUG) << "output_constraints_action_pending_ remains true because server "
+                          "has sent yet another action-required output constraints";
         ZX_ASSERT(output_constraints_action_pending_);
         ZX_ASSERT(output_pending_);
       }
@@ -962,17 +962,17 @@ void CodecClient::OnOutputConstraints(fuchsia::media::StreamOutputConstraints ou
                         "increasingbuffer_constraints_version_ordinal";
     }
     last_output_constraints_ = shared_constraints;
-    FX_VLOGS(3) << "OnOutputConstraints buffer_constraints_version_ordinal: "
-                << shared_constraints->buffer_constraints().buffer_constraints_version_ordinal()
-                << "buffer_constraints_action_required: "
-                << shared_constraints->buffer_constraints_action_required();
+    FX_LOGS(DEBUG) << "OnOutputConstraints buffer_constraints_version_ordinal: "
+                   << shared_constraints->buffer_constraints().buffer_constraints_version_ordinal()
+                   << "buffer_constraints_action_required: "
+                   << shared_constraints->buffer_constraints_action_required();
     if (shared_constraints->buffer_constraints_action_required()) {
       last_required_output_constraints_ = shared_constraints;
       // A client is allowed to forget the output format on any action required
       // buffer constraints, so forget here.
       last_output_format_ = nullptr;
-      FX_VLOGS(3) << "output_config_action_pending_ = true, because received a "
-                     "buffer_constraints_action_required constraints\n";
+      FX_LOGS(DEBUG) << "output_config_action_pending_ = true, because received a "
+                        "buffer_constraints_action_required constraints\n";
       output_constraints_action_pending_ = true;
       if (!output_pending_) {
         output_pending_ = true;
