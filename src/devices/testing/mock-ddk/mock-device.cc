@@ -339,6 +339,13 @@ size_t MockDevice::descendant_count() const {
 namespace {
 
 zx_status_t ProcessDeviceRemoval(MockDevice* device, async_dispatcher_t* dispatcher) {
+  // deleting children, so use a while loop:
+  while (!device->children().empty()) {
+    auto status = ProcessDeviceRemoval(device->children().back().get(), dispatcher);
+    if (status != ZX_OK) {
+      return status;
+    }
+  }
   if (dispatcher != nullptr) {
     std::latch done(1);
     async::PostTask(dispatcher, [&]() {
@@ -348,13 +355,6 @@ zx_status_t ProcessDeviceRemoval(MockDevice* device, async_dispatcher_t* dispatc
     done.wait();
   } else {
     device->UnbindOp();
-  }
-  // deleting children, so use a while loop:
-  while (!device->children().empty()) {
-    auto status = ProcessDeviceRemoval(device->children().back().get(), dispatcher);
-    if (status != ZX_OK) {
-      return status;
-    }
   }
   if (device->HasUnbindOp()) {
     zx_status_t status = device->WaitUntilUnbindReplyCalled();
