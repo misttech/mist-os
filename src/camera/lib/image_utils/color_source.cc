@@ -42,8 +42,8 @@ void ColorSource::FillARGB(void* start, size_t buffer_size) {
   }
   uint8_t r, g, b;
   hsv_color(frame_color_, &r, &g, &b);
-  FX_VLOGS(4) << "Filling with " << static_cast<int>(r) << " " << static_cast<int>(g) << " "
-              << static_cast<int>(b);
+  FX_LOGS(DEBUG) << "Filling with " << static_cast<int>(r) << " " << static_cast<int>(g) << " "
+                 << static_cast<int>(b);
   uint32_t color = kAlphaValue << kAlphaShift | r << kRedShift | g << kGreenShift | b;
   ZX_DEBUG_ASSERT(buffer_size % 4 == 0);
   size_t num_pixels = buffer_size / 4;
