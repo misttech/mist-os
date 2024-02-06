@@ -304,9 +304,17 @@ fxl::RefPtr<AsyncOutputBuffer> FormatRemote(const ExprValue& remote,
 
 fxl::RefPtr<AsyncOutputBuffer> FormatPin(const ExprValue& pin, const FormatFutureOptions& options,
                                          const fxl::RefPtr<EvalContext>& context, int indent) {
-  ErrOrValue pointer = ResolveNonstaticMember(context, pin, {"pointer"});
-  if (pointer.has_error())
-    return FormatError("Invalid Pin", pointer.err());
+  // Pin changed the member variable name to "__pointer" in
+  // https://fuchsia.googlesource.com/third_party/rust/+/346397d081d289db20bc5cbdc23c96e00e60825f
+  // So if this fails we should try the old variable.
+  ErrOrValue pointer = ResolveNonstaticMember(context, pin, {"__pointer"});
+  if (pointer.has_error()) {
+    pointer = ResolveNonstaticMember(context, pin, {"pointer"});
+
+    if (pointer.has_error())
+      return FormatError("Invalid Pin", pointer.err());
+  }
+
   // Let FormatFuture to resolve pointer.
   return FormatFuture(pointer.value(), options, context, indent);
 }
