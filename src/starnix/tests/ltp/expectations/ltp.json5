@@ -234,8 +234,6 @@
                 "umount2_02",
                 "unshare01",
                 "utsname03_clone",
-                "vhangup01",
-                "vhangup02",
                 "vmsplice01",
                 "vmsplice02",
                 "vmsplice03",

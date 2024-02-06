@@ -83,7 +83,7 @@ pub fn dispatch_syscall(
             sys_sched_setscheduler, sys_seccomp, sys_set_tid_address, sys_setfsgid, sys_setfsuid,
             sys_setgid, sys_setgroups, sys_setns, sys_setpgid, sys_setpriority, sys_setregid,
             sys_setresgid, sys_setresuid, sys_setreuid, sys_setrlimit, sys_setsid, sys_setuid,
-            sys_swapoff, sys_swapon, sys_syslog, sys_unshare,
+            sys_swapoff, sys_swapon, sys_syslog, sys_unshare, sys_vhangup,
         },
         vfs::{
             socket::syscalls::{
@@ -438,6 +438,7 @@ pub fn dispatch_syscall(
         unlinkat[3],
         unshare[1],
         utimensat[4],
+        vhangup[0],
         #[cfg(target_arch = "x86_64")] vfork[0],
         wait4[4],
         waitid[5],

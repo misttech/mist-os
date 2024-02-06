@@ -31,7 +31,7 @@ use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct,
     auth::{
         Capabilities, Credentials, SecureBits, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN,
-        CAP_SYS_NICE, CAP_SYS_PTRACE,
+        CAP_SYS_NICE, CAP_SYS_PTRACE, CAP_SYS_TTY_CONFIG,
     },
     c_char, c_int, clone_args, errno, error,
     errors::Errno,
@@ -1798,6 +1798,17 @@ pub fn sys_syslog(
             Ok(0)
         }
     }
+}
+
+pub fn sys_vhangup(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+) -> Result<(), Errno> {
+    if !current_task.creds().has_capability(CAP_SYS_TTY_CONFIG) {
+        return error!(EPERM);
+    }
+    track_stub!(TODO("https://fxbug.dev/324079257"), "vhangup");
+    Ok(())
 }
 
 #[cfg(test)]
