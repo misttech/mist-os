@@ -48,8 +48,8 @@ func (oc *OrchestrateConfig) ReadDeviceConfig(path string) (*DeviceConfig, error
 	return &data[0], nil
 }
 
-// HardwareRunInput is the struct that defines how to run a test in a hw target.
-type HardwareRunInput struct {
+// TargetRunInput is the struct that defines how to run a test in a hw or emulator target.
+type TargetRunInput struct {
 	// Product bundle URL to download with "ffx product download".
 	TransferURL string `json:"transfer_url"`
 	// Fuchsia packages archives to publish with "ffx repository publish".
@@ -64,12 +64,60 @@ type HardwareRunInput struct {
 	FfxluciauthPath string `json:"ffxluciauth_path"`
 }
 
+// HostRunInput is the struct that defines how to run a test without device provisioning.
+type HostRunInput struct {
+	// Map of CIPD destination to CIPD package path:version.
+	Cipd map[string]string `json:"cipd"`
+}
+
 // RunInput is the struct that defines how to run a test.
 type RunInput struct {
 	// Global experiments enabled for this run.
 	ExperimentSlice []string `json:"experiments"`
 	// Configs specific for hardware.
-	Hardware HardwareRunInput `json:"hardware"`
+	Hardware TargetRunInput `json:"hardware"`
+	// Configs specific for emulator.
+	Emulator TargetRunInput `json:"emulator"`
+	// Configs specific for host.
+	Host HostRunInput `json:"host"`
+}
+
+// Returns whether RunInput.Hardware was specified.
+func (ri *RunInput) IsHardware() bool {
+	return ri.Hardware.FfxPath != ""
+}
+
+// Returns whether RunInput.Emulator was specified.
+func (ri *RunInput) IsEmulator() bool {
+	return ri.Emulator.FfxPath != ""
+}
+
+// Returns whether RunInput.Hardware or RunInput.Emulator was specified.
+func (ri *RunInput) IsTarget() bool {
+	return ri.IsHardware() || ri.IsEmulator()
+}
+
+// Returns whether RunInput.Host was specified.
+func (ri *RunInput) IsHost() bool {
+	return !ri.IsTarget()
+}
+
+// Returns RunInput.Hardware if RunInput.IsHardware, otherwise RunInput.Emulator.
+func (ri *RunInput) Target() TargetRunInput {
+	if ri.IsHardware() {
+		return ri.Hardware
+	} else {
+		return ri.Emulator
+	}
+}
+
+// Returns Cipd from either Hardware, Emulator, or Host; whichever is specified.
+func (ri *RunInput) Cipd() map[string]string {
+	if ri.IsTarget() {
+		return ri.Target().Cipd
+	} else {
+		return ri.Host.Cipd
+	}
 }
 
 func (ri *RunInput) HasExperiment(experiment string) bool {

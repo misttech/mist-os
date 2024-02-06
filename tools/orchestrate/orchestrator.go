@@ -50,7 +50,7 @@ func (r *TestOrchestrator) instantiateFfx(in *RunInput) error {
 		return fmt.Errorf("os.Getwd: %w", err)
 	}
 	ffxOpt := &ffx.Option{
-		ExePath: filepath.Join(wd, in.Hardware.FfxPath),
+		ExePath: filepath.Join(wd, in.Target().FfxPath),
 		LogDir:  os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR"),
 	}
 	f, err := ffx.New(ffxOpt)
@@ -63,44 +63,56 @@ func (r *TestOrchestrator) instantiateFfx(in *RunInput) error {
 
 // Run executes tests.
 func (r *TestOrchestrator) Run(in *RunInput, testCmd []string) error {
-	if len(in.Hardware.Cipd) > 0 {
+	if len(in.Cipd()) > 0 {
 		fmt.Println("=== orchestrate - Downloading CIPD packages (0/6) ===")
 		if err := r.cipdEnsure(in); err != nil {
 			return fmt.Errorf("cipdEnsure: %w", err)
 		}
 	}
-	fmt.Println("=== orchestrate - Setting up ffx (1/6) ===")
-	if err := r.instantiateFfx(in); err != nil {
-		return fmt.Errorf("instantiateFfx: %w", err)
-	}
-	defer func() {
-		if err := r.ffx.Close(); err != nil {
-			fmt.Printf("ffx.Close: %v\n", err)
+	if in.IsTarget() {
+		fmt.Println("=== orchestrate - Setting up ffx (1/6) ===")
+		if err := r.instantiateFfx(in); err != nil {
+			return fmt.Errorf("instantiateFfx: %w", err)
 		}
-	}()
-	if err := r.setupFfx(); err != nil {
-		return fmt.Errorf("setupFfx: %w", err)
+		defer func() {
+			if err := r.ffx.Close(); err != nil {
+				fmt.Printf("ffx.Close: %v\n", err)
+			}
+		}()
+		if err := r.setupFfx(); err != nil {
+			return fmt.Errorf("setupFfx: %w", err)
+		}
+		defer r.stopDaemon()
+		fmt.Println("=== orchestrate - Downloading Product Bundle (2/6) ===")
+		productDir, err := r.downloadProductBundle(in)
+		if err != nil {
+			return fmt.Errorf("downloadProductBundle: %w", err)
+		}
+		if in.IsHardware() {
+			fmt.Println("=== orchestrate - Flashing Device (3/6) ===")
+			if err := r.flashDevice(productDir); err != nil {
+				return fmt.Errorf("flashDevice: %w", err)
+			}
+		} else if in.IsEmulator() {
+			fmt.Println("=== orchestrate - Starting Emulator (3/6) ===")
+			if err := r.startEmulator(productDir); err != nil {
+				return fmt.Errorf("startEmulator: %w", err)
+			}
+			defer r.stopEmulator()
+		}
+		fmt.Println("=== orchestrate - Serving Packages (4/6) ===")
+		if err := r.servePackages(in, productDir); err != nil {
+			return fmt.Errorf("servePackages: %w", err)
+		}
+		defer r.stopPackageServer()
+		fmt.Println("=== orchestrate - Reach Device (5/6) ===")
+		if err := r.reachDevice(); err != nil {
+			return fmt.Errorf("reachDevice: %w", err)
+		}
+		defer r.stopFfxLog()
+	} else {
+		fmt.Println("=== orchestrate - Skipped Target Provisioning (1-5/6) ===")
 	}
-	defer r.stopDaemon()
-	fmt.Println("=== orchestrate - Downloading Product Bundle (2/6) ===")
-	productDir, err := r.downloadProductBundle(in)
-	if err != nil {
-		return fmt.Errorf("downloadProductBundle: %w", err)
-	}
-	fmt.Println("=== orchestrate - Flashing Device (3/6) ===")
-	if err := r.flashDevice(productDir); err != nil {
-		return fmt.Errorf("flashDevice: %w", err)
-	}
-	fmt.Println("=== orchestrate - Serving Packages (4/6) ===")
-	if err := r.servePackages(in, productDir); err != nil {
-		return fmt.Errorf("servePackages: %w", err)
-	}
-	defer r.stopPackageServer()
-	fmt.Println("=== orchestrate - Reach Device (5/6) ===")
-	if err := r.reachDevice(); err != nil {
-		return fmt.Errorf("reachDevice: %w", err)
-	}
-	defer r.stopFfxLog()
 	fmt.Println("=== orchestrate - Test (6/6) ===")
 	if err := r.test(testCmd, in); err != nil {
 		return fmt.Errorf("test: %w", err)
@@ -114,7 +126,7 @@ func (r *TestOrchestrator) cipdEnsure(in *RunInput) error {
 	if err != nil {
 		return fmt.Errorf("os.Getwd: %w", err)
 	}
-	for destPath, cipdSpec := range in.Hardware.Cipd {
+	for destPath, cipdSpec := range in.Cipd() {
 		split := strings.SplitN(cipdSpec, ":", 2)
 		ensureLine := fmt.Sprintf("%s\t%s\n", split[0], split[1])
 		cipdCmd := []string{
@@ -225,11 +237,11 @@ func (r *TestOrchestrator) downloadProductBundle(in *RunInput) (string, error) {
 	ffxArgs := []string{
 		"product",
 		"download",
-		in.Hardware.TransferURL,
+		in.Target().TransferURL,
 		dir,
 	}
-	if in.Hardware.FfxluciauthPath != "" {
-		ffxArgs = append(ffxArgs, "--auth", in.Hardware.FfxluciauthPath)
+	if in.Target().FfxluciauthPath != "" {
+		ffxArgs = append(ffxArgs, "--auth", in.Target().FfxluciauthPath)
 	}
 	_, err = r.ffx.RunCmdSync(ffxArgs...)
 	if err != nil {
@@ -238,10 +250,17 @@ func (r *TestOrchestrator) downloadProductBundle(in *RunInput) (string, error) {
 	return dir, nil
 }
 
-/* Step 3 - Flashing device. */
+/* Step 3 - Flashing device OR Starting emulator. */
 func (r *TestOrchestrator) flashDevice(productDir string) error {
 	if err := r.ffx.Flash(r.deviceConfig.FastbootSerial, productDir, ""); err != nil {
 		return fmt.Errorf("ffx flash: %w", err)
+	}
+	return nil
+}
+
+func (r *TestOrchestrator) startEmulator(productDir string) error {
+	if _, err := r.ffx.RunCmdSync("emu", "start", productDir, "--net", "user", "--headless"); err != nil {
+		return fmt.Errorf("ffx emu start: %w", err)
 	}
 	return nil
 }
@@ -252,16 +271,16 @@ func (r *TestOrchestrator) servePackages(in *RunInput, productDir string) error 
 		return fmt.Errorf("ffx repository add-from-pm: %w out: %s", err, out)
 	}
 	// It is important to always publish, even if there is nothing in
-	// in.Hardware.PackageArchives, because it will force the package metadata
+	// in.Target().PackageArchives, because it will force the package metadata
 	// to be refreshed (see b/309847820).
 	publishArgs := []string{"repository", "publish", productDir}
-	for _, far := range in.Hardware.PackageArchives {
+	for _, far := range in.Target().PackageArchives {
 		publishArgs = append(publishArgs, "--package-archive", far)
 	}
 	if out, err := r.ffx.RunCmdSync(publishArgs...); err != nil {
 		return fmt.Errorf("ffx %v: %w out: %v", publishArgs, err, out)
 	}
-	for _, buildID := range in.Hardware.BuildIds {
+	for _, buildID := range in.Target().BuildIds {
 		if out, err := r.ffx.RunCmdSync("debug", "symbol-index", "add", buildID); err != nil {
 			return fmt.Errorf("ffx debug symbol-index add %s: %w out: %s", buildID, err, out)
 		}
@@ -303,9 +322,11 @@ func (r *TestOrchestrator) serveAndWait() error {
 
 /* Step 5 - Reach Device */
 func (r *TestOrchestrator) reachDevice() error {
-	addr := r.deviceConfig.Network.IPv4
-	if _, err := r.ffx.RunCmdSync("target", "add", addr, "--nowait"); err != nil {
-		return fmt.Errorf("ffx target add: %w", err)
+	if r.deviceConfig != nil {
+		addr := r.deviceConfig.Network.IPv4
+		if _, err := r.ffx.RunCmdSync("target", "add", addr, "--nowait"); err != nil {
+			return fmt.Errorf("ffx target add: %w", err)
+		}
 	}
 	if _, err := r.ffx.RunCmdSync("target", "wait"); err != nil {
 		return fmt.Errorf("ffx target wait: %w", err)
@@ -368,38 +389,37 @@ func (r *TestOrchestrator) test(testCmd []string, in *RunInput) error {
 		}
 	}()
 
-	// Use ffx.Cmd to effectively construct `testCmd` with the same execution
-	// environment/constraint as any other ffx command (eg: setting
-	// FFX_ISOLATE_DIR). Note that immediately replace the executable specified
-	// in `cmd` with `testCmd`'s executable, so the test step isn't actually
-	// running an ffx command/subcommand.
-	cmd := r.ffx.Cmd(testCmd[1:]...)
-	cmd.Path, err = exec.LookPath(testCmd[0])
-	if err != nil {
-		return fmt.Errorf("exec.LookPath: %w", err)
+	cmd := exec.Command(testCmd[0], testCmd[1:]...)
+
+	// Prepare the `cmd` env for target tests:
+	//  1. Applies default ffx cmd environment variables
+	//     (eg: isolation, disabling analytics).
+	//  2. Adds ffx so that downstream can call "ffx" without having to leak its
+	//     full path.
+	//  3. Add openssh to PATH.
+	if in.IsTarget() {
+		r.ffx.ApplyEnv(cmd)
+		ffxDir := filepath.Dir(filepath.Join(wd, in.Target().FfxPath))
+		if err := os.Setenv("PATH", fmt.Sprintf("%s:%s", ffxDir, os.Getenv("PATH"))); err != nil {
+			return fmt.Errorf("os.Setenv: %w", err)
+		}
+		sshDir := filepath.Join(wd, "openssh-portable", "bin")
+		cmd.Env = appendPath(cmd.Env, sshDir, ffxDir)
 	}
-	cmd.Args[0] = cmd.Path
 
 	// Setup pipes to forward subcmd stdout and stderr to logFile and os.Stdout.
 	pipeOut := io.MultiWriter(logFile, os.Stdout)
 	cmd.Stdout = pipeOut
 	cmd.Stderr = pipeOut
 
-	// Finds ffx in PATH to allow downstream calls to "ffx" without having to
-	// leak the full path. Also adds ssh to PATH.
-	ffxDir := filepath.Dir(filepath.Join(wd, in.Hardware.FfxPath))
-	if err := os.Setenv("PATH", fmt.Sprintf("%s:%s", ffxDir, os.Getenv("PATH"))); err != nil {
-		return fmt.Errorf("os.Setenv: %w", err)
-	}
-	sshDir := filepath.Join(wd, "openssh-portable", "bin")
-	cmd.Env = appendPath(cmd.Env, sshDir, ffxDir)
-
 	fmt.Printf("Running test: %+v\n", cmd.Args)
 	testErr := cmd.Run()
 	fmt.Printf("Pausing 10 seconds for log flush...\n")
 	time.Sleep(10 * time.Second)
-	if _, err := r.ffx.RunCmdSync("target", "snapshot", "-d", os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR")); err != nil {
-		fmt.Printf("target snapshot: %v\n", err)
+	if in.IsTarget() {
+		if _, err := r.ffx.RunCmdSync("target", "snapshot", "-d", os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR")); err != nil {
+			fmt.Printf("target snapshot: %v\n", err)
+		}
 	}
 	if err := r.writeTestSummary(testErr); err != nil {
 		return fmt.Errorf("writeTestSummary: %w", err)
@@ -446,9 +466,14 @@ func writeJSON(filename string, data any) error {
 
 /* Cleanup */
 func (r *TestOrchestrator) stopPackageServer() {
-	_, err := r.ffx.RunCmdSync("repository", "server", "stop")
-	if err != nil {
+	if _, err := r.ffx.RunCmdSync("repository", "server", "stop"); err != nil {
 		fmt.Printf("ffx repository server stop: %v", err)
+	}
+}
+
+func (r *TestOrchestrator) stopEmulator() {
+	if _, err := r.ffx.RunCmdSync("emu", "stop", "--all"); err != nil {
+		fmt.Printf("ffx emu stop: %v", err)
 	}
 }
 

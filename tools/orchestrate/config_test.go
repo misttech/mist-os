@@ -85,7 +85,7 @@ func TestReadRunInput(t *testing.T) {
 			name:     "Success",
 			jsonData: "{\"hardware\": {\"ffx_path\":\"foo\"}}",
 			wantResult: &RunInput{
-				Hardware: HardwareRunInput{
+				Hardware: TargetRunInput{
 					FfxPath: "foo",
 				},
 			},

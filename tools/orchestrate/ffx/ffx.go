@@ -21,6 +21,16 @@ import (
 	utils "go.fuchsia.dev/fuchsia/tools/orchestrate/utils"
 )
 
+// XDG_ENV_VARS are leaky environment variables to override. See ApplyEnv.
+var XDG_ENV_VARS = [...]string{
+	"HOME",
+	"XDG_CACHE_HOME",
+	"XDG_CONFIG_HOME",
+	"XDG_DATA_HOME",
+	"XDG_HOME",
+	"XDG_STATE_HOME",
+}
+
 // Ffx defines settings for ffx commands.
 type Ffx struct {
 	// Dir is the working directory for ffx, and where it writes files.
@@ -135,11 +145,24 @@ func (f *Ffx) setupDefaultConfig(configPath string, opt Option) error {
 // Cmd returns a generic exec.Cmd configured to execute ffx.
 func (f *Ffx) Cmd(args ...string) *exec.Cmd {
 	cmd := exec.Command(f.bin, args...)
+	f.ApplyEnv(cmd)
+	return cmd
+}
+
+// ApplyEnv applies the relevant ffx environment variables onto an `exec.Cmd`,
+// needed for the safe execution of ffx.
+func (f *Ffx) ApplyEnv(cmd *exec.Cmd) {
 	cmd.Env = append(os.Environ(), "FFX_ISOLATE_DIR="+f.Dir, "FUCHSIA_ANALYTICS_DISABLED=1")
 	if f.sslCertPath != "" {
 		cmd.Env = append(cmd.Env, "SSL_CERT_FILE="+f.sslCertPath)
 	}
-	return cmd
+	// Override HOME and other HOME-related environment variables, since ffx and
+	// tests shouldn't assume anything about those.
+	// This prevents ffx from creating and using default ssh keys from the real
+	// home directory.
+	for _, xdg_env_var := range XDG_ENV_VARS {
+		cmd.Env = append(cmd.Env, xdg_env_var+"="+f.Dir)
+	}
 }
 
 // RunCmdSync starts a command and waits for the command to complete.
