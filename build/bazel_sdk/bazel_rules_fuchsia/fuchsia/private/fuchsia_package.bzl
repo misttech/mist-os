@@ -307,7 +307,7 @@ def _build_fuchsia_package_impl(ctx):
 
     # This build-id directory is used for the in-tree build
     # LINT.IfChange
-    build_id_path = ctx.attr.package_name + "/.build-id"
+    build_id_path = ctx.label.name + "_build_id_dir"
     # LINT.ThenChange(//build/bazel/bazel_fuchsia_package.gni)
 
     # Grab all of our stripped resources

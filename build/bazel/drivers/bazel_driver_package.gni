@@ -71,7 +71,13 @@ template("bazel_driver_package") {
         ninja = "$package_name.far"
       },
     ]
-    build_id_directories = [ "${package_name}/.build-id" ]
+
+    build_id_directories = [
+      {
+        bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_build_id_dir"
+        ninja = "${bazel_build_target}_build_id_dir"
+      },
+    ]
   }
 
   if (defined(invoker.gn_driver_package_for_verification)) {

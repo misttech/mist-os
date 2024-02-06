@@ -126,8 +126,8 @@ declare_args() {
 #     When build_id_directories is set the action will copy all of the debug
 #     symbols in the build-id into the root .build-id directory.
 #
-#     The directories should be relative to teh BAZEL_TARGET_OUT_DIR and will be
-#     copied into ninja at the same path.
+#     The arguments use the same scopes as those used in copy_outputs which
+#     means they can use the same string templates.
 #
 #     The tool will look for build directories that have a 2 character name and
 #     then copy all of the contents. Thus the structure of the directory should
@@ -146,10 +146,13 @@ declare_args() {
 #
 #       # Specify where the build ids are
 #       build_id_directories = [
-#         "${package_name}/.build-id"
+#         {
+#           bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_build_id_dir"
+#           ninja = "${bazel_build_target}_build_id_dir"
+#         }
 #       ]
 #
-#     Type: list of strings.
+#     Type: list of scopes.
 #     Default: empty
 #
 #   build_id_stamp_name: (optional)
@@ -271,16 +274,20 @@ template("bazel_action") {
 
   if (defined(invoker.build_id_directories)) {
     _needs_dir_copy = true
-    foreach(build_id_dir, invoker.build_id_directories) {
-      _build_id_dirs += [ "${target_out_dir}/${build_id_dir}" ]
-      _copy_ouputs += [
-        {
-          bazel = "{{BAZEL_TARGET_OUT_DIR}}/${build_id_dir}"
-          ninja = build_id_dir
-        },
-      ]
+    foreach(entry, invoker.build_id_directories) {
+      assert(
+          "$entry" != entry,
+          "`build_id_directories` items must be scopes, string found: \"$entry\"")
+
+      assert(defined(entry.bazel),
+             "`build_id_directories` scope requires bazel key: $entry")
+      assert(defined(entry.ninja),
+             "`build_id_directories` scope requires ninja key: $entry")
+
+      _build_id_dirs += [ "${target_out_dir}/${entry.ninja}" ]
+      _copy_ouputs += [ entry ]
       _directory_timestamp_outputs +=
-          [ "${build_id_dir}/${_build_id_stamp_name}" ]
+          [ "${entry.ninja}/${_build_id_stamp_name}" ]
     }
   } else {
     not_needed([ "_build_id_stamp_name" ])
