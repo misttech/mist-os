@@ -12,7 +12,7 @@
 
 use anyhow::{Context, Error};
 use diagnostics_hierarchy::Property;
-use diagnostics_log::{OnInterestChanged, PublishOptions, Publisher};
+use diagnostics_log::{OnInterestChanged, Publisher, PublisherOptions};
 use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_archivist_test as fpuppet;
 use fidl_fuchsia_diagnostics::Severity;
@@ -55,16 +55,17 @@ async fn main() -> Result<(), Error> {
 }
 
 fn subscribe_to_log_interest_changes(notifier: InterestChangedNotifier) -> Result<(), Error> {
-    // It's unfortunate we can't just create the publisher directly and register
-    // the interest listener without the roundtrip through tracing::dispatcher.
-    // We must call diagnostics_log::initialize because it initializes global
-    // state through private function calls.
-    diagnostics_log::initialize(PublishOptions::default().wait_for_initial_interest(false))
-        .expect("initialized tracing");
-    tracing::dispatcher::get_default(|dispatcher| {
-        let publisher: &Publisher = dispatcher.downcast_ref().unwrap();
-        publisher.set_interest_listener(notifier.clone());
-    });
+    // Don't wait for initial interest. Many times the test cases rely on knowing when the
+    // component received its initial interest to know that it's running and already serving FIDL
+    // requests.
+    let publisher = Publisher::new(PublisherOptions::default().wait_for_initial_interest(false))?;
+    publisher.set_interest_listener(notifier);
+    let previous_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        tracing::error!(%info, "PANIC");
+        previous_hook(info);
+    }));
+    tracing::subscriber::set_global_default(publisher)?;
     Ok(())
 }
 
