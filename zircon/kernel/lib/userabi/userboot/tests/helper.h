@@ -7,6 +7,7 @@
 
 #include <lib/zx/channel.h>
 #include <lib/zx/eventpair.h>
+#include <lib/zx/object.h>
 #include <lib/zx/vmo.h>
 #include <zircon/types.h>
 
@@ -16,6 +17,7 @@
 
 struct Message {
   ~Message();
+
   std::vector<uint8_t> msg;
   std::vector<zx_handle_t> handles;
 };
@@ -42,6 +44,24 @@ void GetStashedSvc(zx::unowned_channel svc_stash, zx::channel& svc);
 
 // Will sec |svc_stash| to the equivalent startup SvcStash handle.
 zx::channel GetSvcStash();
+
+// `T` is a callable that is given a readable channel and a token to determine whether the loop
+// should continue or not. It is important to leave the signature as non returning, such that
+// tests may assert in the body.
+template <typename T>
+void OnEachMessage(zx::unowned_channel svc_stash, T&& callable) {
+  zx_signals_t observed = 0;
+  while (svc_stash->wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), &observed) !=
+         ZX_ERR_TIMED_OUT) {
+    if ((observed & ZX_CHANNEL_READABLE) == 0) {
+      return;
+    }
+    bool cont = false;
+    if (callable(svc_stash->borrow(), cont); !cont) {
+      return;
+    }
+  }
+}
 
 // Returns the kernel object ID of the object and peer object respectively.
 zx_koid_t GetKoid(zx_handle_t handle);

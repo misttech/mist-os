@@ -49,6 +49,7 @@ if (is_fuchsia) {
     sources = [ "multiple-svc-test.cc" ]
     deps = [
       ":helper",
+      "data-publisher:published-data",
       "//src/zircon/testing/standalone-test",
       "//zircon/system/ulib/zx",
       "//zircon/system/ulib/zxtest",

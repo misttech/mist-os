@@ -11,6 +11,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "data-publisher/published-data.h"
 #include "helper.h"
 
 namespace {
@@ -56,24 +57,30 @@ class MultipleProcessSvcTest : public zxtest::Test {
   zx::unowned_channel provider_svc_;
 };
 
-// The provided data is in 'data-publisher/main.cc'.
 TEST_F(MultipleProcessSvcTest, ProviderDataMatchesExpectations) {
-  Message debug_msg;
-  ASSERT_NO_FAILURES(GetDebugDataMessage(provider_svc(), debug_msg));
-  DebugDataMessageView view(debug_msg);
+  bool found = false;
+  OnEachMessage(provider_svc(), [&](zx::unowned_channel stashed_svc, bool& keep_going) {
+    keep_going = false;
+    Message debug_msg;
+    ASSERT_NO_FAILURES(GetDebugDataMessage(std::move(stashed_svc), debug_msg));
+    DebugDataMessageView view(debug_msg);
+    if (view.sink() != kPublisherSinkName) {
+      keep_going = true;
+      return;
+    }
+    found = true;
+    // Token must be signaled with peer closed.
+    zx_signals_t observed = 0;
+    view.token()->wait_one(ZX_EVENTPAIR_PEER_CLOSED, zx::time::infinite_past(), &observed);
+    EXPECT_TRUE((observed & ZX_EVENTPAIR_PEER_CLOSED) != 0);
 
-  ASSERT_EQ(view.sink(), "data-provider");
+    // Check vmo contents.
+    std::array<char, 12> actual_contents = {};
+    ASSERT_OK(view.vmo()->read(actual_contents.data(), 0, actual_contents.size()));
 
-  // Token must be signaled with peer closed.
-  zx_signals_t observed = 0;
-  view.token()->wait_one(ZX_EVENTPAIR_PEER_CLOSED, zx::time::infinite_past(), &observed);
-  EXPECT_TRUE((observed & ZX_EVENTPAIR_PEER_CLOSED) != 0);
-
-  // Check vmo contents.
-  std::array<char, 12> actual_contents = {};
-  ASSERT_OK(view.vmo()->read(actual_contents.data(), 0, actual_contents.size()));
-
-  ASSERT_EQ(std::string(actual_contents.data(), actual_contents.size()), "Hello World!");
+    ASSERT_EQ(std::string(actual_contents.data(), actual_contents.size()), "Hello World!");
+  });
+  ASSERT_TRUE(found);
 }
 
 TEST_F(MultipleProcessSvcTest, SanitizerPublishDataShowsUpInStashedHandle) {
@@ -82,11 +89,6 @@ TEST_F(MultipleProcessSvcTest, SanitizerPublishDataShowsUpInStashedHandle) {
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(124, 0, &vmo));
-
-  // Channel transitions from not readable to readable.
-  zx_signals_t observed = 0;
-  ASSERT_STATUS(stashed_svc()->wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), &observed),
-                ZX_ERR_TIMED_OUT);
 
   constexpr const char* kDataSink = "some_sink_name";
   zx_koid_t vmo_koid = GetKoid(vmo.get());
@@ -97,16 +99,22 @@ TEST_F(MultipleProcessSvcTest, SanitizerPublishDataShowsUpInStashedHandle) {
   ASSERT_NE(token_koid, ZX_KOID_INVALID);
   ASSERT_NE(vmo_koid, ZX_KOID_INVALID);
 
-  observed = 0;
-  ASSERT_OK(stashed_svc()->wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), &observed));
-  ASSERT_TRUE((observed & ZX_CHANNEL_READABLE) != 0);
+  bool found = false;
+  OnEachMessage(stashed_svc(), [&](zx::unowned_channel stashed_svc, bool& keep_going) {
+    keep_going = false;
+    Message debug_msg;
+    ASSERT_NO_FAILURES(GetDebugDataMessage(std::move(stashed_svc), debug_msg));
+    DebugDataMessageView view(debug_msg);
+    if (view.sink() != kDataSink) {
+      keep_going = true;
+      return;
+    }
+    found = true;
 
-  // There should be an open request after this.
-  Message debug_msg;
-  ASSERT_NO_FAILURES(GetDebugDataMessage(stashed_svc(), debug_msg));
-  DebugDataMessageView view(debug_msg);
-  ASSERT_EQ(view.sink(), kDataSink);
-  ASSERT_EQ(GetKoid(view.vmo()->get()), vmo_koid);
-  ASSERT_EQ(GetKoid(view.token()->get()), token_koid);
+    ASSERT_EQ(view.sink(), kDataSink);
+    ASSERT_EQ(GetKoid(view.vmo()->get()), vmo_koid);
+    ASSERT_EQ(GetKoid(view.token()->get()), token_koid);
+  });
+  ASSERT_TRUE(found);
 }
 }  // namespace

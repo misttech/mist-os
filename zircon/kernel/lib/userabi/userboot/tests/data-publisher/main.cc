@@ -9,14 +9,17 @@
 #include <stdio.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/limits.h>
 #include <zircon/sanitizer.h>
+
+#include "published-data.h"
 
 int main(int argc, const char**) {
   zx::vmo data;
 
-  ZX_ASSERT(zx::vmo::create(4096, 0, &data) == ZX_OK);
-  ZX_ASSERT(data.write("Hello World!", 0, 12) == ZX_OK);
+  ZX_ASSERT(zx::vmo::create(ZX_PAGE_SIZE, 0, &data) == ZX_OK);
+  ZX_ASSERT(data.write(kVmoContents.data(), 0, kVmoContents.size()) == ZX_OK);
 
-  __sanitizer_publish_data("data-provider", data.release());
+  __sanitizer_publish_data(kPublisherSinkName.data(), data.release());
   return 0;
 }
