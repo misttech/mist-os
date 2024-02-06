@@ -15,7 +15,7 @@ using base::BigEndianReader;
   do {                                                                     \
     uint8_t _out;                                                          \
     if (!reader.ReadU8(&_out)) {                                           \
-      DVLOG(1)                                                             \
+      FX_LOGS(DEBUG)                                                       \
           << "Error in stream: unexpected EOS while trying to read " #out; \
       return false;                                                        \
     }                                                                      \
@@ -26,7 +26,7 @@ using base::BigEndianReader;
   do {                                                                     \
     uint16_t _out;                                                         \
     if (!reader.ReadU16(&_out)) {                                          \
-      DVLOG(1)                                                             \
+      FX_LOGS(DEBUG)                                                       \
           << "Error in stream: unexpected EOS while trying to read " #out; \
       return false;                                                        \
     }                                                                      \
@@ -188,13 +188,13 @@ static bool ParseSOF(const uint8_t* buffer,
     if (component.vertical_sampling_factor > max_v_factor)
       max_v_factor = component.vertical_sampling_factor;
     if (!InRange(component.horizontal_sampling_factor, 1, 4)) {
-      DVLOG(1) << "Invalid horizontal sampling factor "
-               << static_cast<int>(component.horizontal_sampling_factor);
+      FX_LOGS(DEBUG) << "Invalid horizontal sampling factor "
+                     << static_cast<int>(component.horizontal_sampling_factor);
       return false;
     }
     if (!InRange(component.vertical_sampling_factor, 1, 4)) {
-      DVLOG(1) << "Invalid vertical sampling factor "
-               << static_cast<int>(component.horizontal_sampling_factor);
+      FX_LOGS(DEBUG) << "Invalid vertical sampling factor "
+                     << static_cast<int>(component.horizontal_sampling_factor);
       return false;
     }
     READ_U8_OR_RETURN_FALSE(&component.quantization_table_selector);
@@ -227,7 +227,7 @@ static bool ParseDQT(const uint8_t* buffer,
     uint8_t precision = precision_and_table_id / 16;
     uint8_t table_id = precision_and_table_id % 16;
     if (!InRange(precision, 0, 1)) {
-      DVLOG(1) << "Invalid precision " << static_cast<int>(precision);
+      FX_LOGS(DEBUG) << "Invalid precision " << static_cast<int>(precision);
       return false;
     }
     if (precision == 1) {  // 1 means 16-bit precision
@@ -265,7 +265,7 @@ static bool ParseDHT(const uint8_t* buffer,
     int table_class = table_class_and_id / 16;
     int table_id = table_class_and_id % 16;
     if (!InRange(table_class, 0, 1)) {
-      DVLOG(1) << "Invalid table class " << table_class;
+      FX_LOGS(DEBUG) << "Invalid table class " << table_class;
       return false;
     }
     if (table_id >= 2) {
@@ -289,7 +289,7 @@ static bool ParseDHT(const uint8_t* buffer,
     // Fuchsia change: Fix implicit conversion
     if (!InRange(base::checked_cast<int>(count), 0,
                  sizeof(table->code_value))) {
-      DVLOG(1) << "Invalid code count " << count;
+      FX_LOGS(DEBUG) << "Invalid code count " << count;
       return false;
     }
     if (!reader.ReadBytes(&table->code_value, count))
@@ -525,7 +525,7 @@ static bool ParseSOI(const uint8_t* buffer,
         has_marker_sos = true;
         break;
       default:
-        DVLOG(4) << "unknown marker " << static_cast<int>(marker2);
+        FX_LOGS(DEBUG) << "unknown marker " << static_cast<int>(marker2);
         break;
     }
     reader.Skip(size);

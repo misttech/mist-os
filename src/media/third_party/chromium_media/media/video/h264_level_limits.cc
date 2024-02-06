@@ -66,7 +66,8 @@ LevelLimits LevelToLevelLimits(uint8_t level) {
     case H264SPS::kLevelIDC6p2:
       return {16711680, 139264, 696320, 800000};  // Level 6.2
     default:
-      DVLOG(1) << "Invalid codec level (" << static_cast<int>(level) << ")";
+      FX_LOGS(DEBUG) << "Invalid codec level (" << static_cast<int>(level)
+                     << ")";
       return {0, 0, 0, 0};
   }
 }
@@ -104,7 +105,7 @@ uint32_t H264ProfileLevelToMaxBR(VideoCodecProfile profile, uint8_t level) {
     case H264PROFILE_HIGH444PREDICTIVEPROFILE:
       return max_main_br * 4;
     default:
-      DVLOG(1) << "Failed to query MaxBR for profile: " << profile;
+      FX_LOGS(DEBUG) << "Failed to query MaxBR for profile: " << profile;
       //<< GetProfileName(profile);
       return 0;
   }
@@ -120,21 +121,23 @@ bool CheckH264LevelLimits(VideoCodecProfile profile,
 
   uint32_t max_bitrate = max_bitrate_kbs * 1000;
   if (bitrate > max_bitrate) {
-    DVLOG(1) << "Target bitrate: " << bitrate << " exceeds Max: " << max_bitrate
-             << " bit/s";
+    FX_LOGS(DEBUG) << "Target bitrate: " << bitrate
+                   << " exceeds Max: " << max_bitrate << " bit/s";
     return false;
   }
 
   if (framesize_in_mbs > H264LevelToMaxFS(level)) {
-    DVLOG(1) << "Target frame size: " << framesize_in_mbs
-             << " exceeds Max: " << H264LevelToMaxFS(level) << " Macroblocks";
+    FX_LOGS(DEBUG) << "Target frame size: " << framesize_in_mbs
+                   << " exceeds Max: " << H264LevelToMaxFS(level)
+                   << " Macroblocks";
     return false;
   }
 
   uint32_t mbps = framesize_in_mbs * framerate;
   if (mbps > H264LevelToMaxMBPS(level)) {
-    DVLOG(1) << "Target macroblock processing rate: " << mbps
-             << " exceeds Max: " << H264LevelToMaxMBPS(level) << "Macroblock/s";
+    FX_LOGS(DEBUG) << "Target macroblock processing rate: " << mbps
+                   << " exceeds Max: " << H264LevelToMaxMBPS(level)
+                   << "Macroblock/s";
     return false;
   }
 

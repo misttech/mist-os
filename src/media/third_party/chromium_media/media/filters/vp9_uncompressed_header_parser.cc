@@ -645,7 +645,7 @@ uint8_t Vp9UncompressedHeaderParser::ReadProfile() {
 bool Vp9UncompressedHeaderParser::VerifySyncCode() {
   const int kSyncCode = 0x498342;
   if (reader_.ReadLiteral(8 * 3) != kSyncCode) {
-    DVLOG(1) << "Invalid frame sync code";
+    FX_LOGS(DEBUG) << "Invalid frame sync code";
     return false;
   }
   return true;
@@ -666,12 +666,12 @@ bool Vp9UncompressedHeaderParser::ReadColorConfig(Vp9FrameHeader* fhdr) {
       fhdr->subsampling_x = reader_.ReadBool() ? 1 : 0;
       fhdr->subsampling_y = reader_.ReadBool() ? 1 : 0;
       if (fhdr->subsampling_x == 1 && fhdr->subsampling_y == 1) {
-        DVLOG(1) << "4:2:0 color not supported in profile 1 or 3";
+        FX_LOGS(DEBUG) << "4:2:0 color not supported in profile 1 or 3";
         return false;
       }
       bool reserved = reader_.ReadBool();
       if (reserved) {
-        DVLOG(1) << "reserved bit set";
+        FX_LOGS(DEBUG) << "reserved bit set";
         return false;
       }
     } else {
@@ -684,11 +684,11 @@ bool Vp9UncompressedHeaderParser::ReadColorConfig(Vp9FrameHeader* fhdr) {
 
       bool reserved = reader_.ReadBool();
       if (reserved) {
-        DVLOG(1) << "reserved bit set";
+        FX_LOGS(DEBUG) << "reserved bit set";
         return false;
       }
     } else {
-      DVLOG(1) << "4:4:4 color not supported in profile 0 or 2";
+      FX_LOGS(DEBUG) << "4:4:4 color not supported in profile 0 or 2";
       return false;
     }
   }
@@ -747,8 +747,8 @@ bool Vp9UncompressedHeaderParser::ReadFrameSizeFromRefs(Vp9FrameHeader* fhdr) {
     }
   }
   if (!has_valid_ref_frame) {
-    DVLOG(1) << "There should be at least one reference frame meeting "
-             << "size conditions.";
+    FX_LOGS(DEBUG) << "There should be at least one reference frame meeting "
+                   << "size conditions.";
     return false;
   }
 
@@ -871,8 +871,8 @@ bool Vp9UncompressedHeaderParser::ReadSegmentationParams() {
             if (reader_.ReadBool()) {
               // 7.2.9
               if (segmentation.abs_or_delta_update) {
-                DVLOG(1) << "feature_sign should be 0"
-                         << " if abs_or_delta_update is 1";
+                FX_LOGS(DEBUG) << "feature_sign should be 0"
+                               << " if abs_or_delta_update is 1";
                 return false;
               }
               data = -data;
@@ -911,7 +911,7 @@ bool Vp9UncompressedHeaderParser::ReadTileInfo(Vp9FrameHeader* fhdr) {
 
   // 7.2.11 Tile info semantics
   if (fhdr->tile_cols_log2 > 6) {
-    DVLOG(1) << "tile_cols_log2 should be <= 6";
+    FX_LOGS(DEBUG) << "tile_cols_log2 should be <= 6";
     return false;
   }
 
@@ -936,7 +936,7 @@ void Vp9UncompressedHeaderParser::ResetLoopfilter() {
 bool Vp9UncompressedHeaderParser::Parse(const uint8_t* stream,
                                         off_t frame_size,
                                         Vp9FrameHeader* fhdr) {
-  DVLOG(2) << "Vp9UncompressedHeaderParser::Parse";
+  FX_LOGS(DEBUG) << "Vp9UncompressedHeaderParser::Parse";
   reader_.Initialize(stream, frame_size);
 
   fhdr->data = stream;
@@ -944,13 +944,13 @@ bool Vp9UncompressedHeaderParser::Parse(const uint8_t* stream,
 
   // frame marker
   if (reader_.ReadLiteral(2) != 0x2) {
-    DVLOG(1) << "frame marker shall be equal to 2";
+    FX_LOGS(DEBUG) << "frame marker shall be equal to 2";
     return false;
   }
 
   fhdr->profile = ReadProfile();
   if (fhdr->profile >= kVp9MaxProfile) {
-    DVLOG(1) << "Unsupported bitstream profile";
+    FX_LOGS(DEBUG) << "Unsupported bitstream profile";
     return false;
   }
 
@@ -961,11 +961,11 @@ bool Vp9UncompressedHeaderParser::Parse(const uint8_t* stream,
     fhdr->show_frame = true;
 
     if (!reader_.ConsumeTrailingBits()) {
-      DVLOG(1) << "trailing bits are not zero";
+      FX_LOGS(DEBUG) << "trailing bits are not zero";
       return false;
     }
     if (!reader_.IsValid()) {
-      DVLOG(1) << "parser reads beyond the end of buffer";
+      FX_LOGS(DEBUG) << "parser reads beyond the end of buffer";
       return false;
     }
     fhdr->uncompressed_header_size = reader_.GetBytesRead();
@@ -1032,9 +1032,9 @@ bool Vp9UncompressedHeaderParser::Parse(const uint8_t* stream,
         const Vp9Parser::ReferenceSlot& ref =
             context_->GetRefSlot(fhdr->ref_frame_idx[i]);
         if (!ref.initialized) {
-          DVLOG(1) << "ref_frame_idx[" << i
-                   << "]=" << static_cast<int>(fhdr->ref_frame_idx[i])
-                   << " refers to unused frame";
+          FX_LOGS(DEBUG) << "ref_frame_idx[" << i
+                         << "]=" << static_cast<int>(fhdr->ref_frame_idx[i])
+                         << " refers to unused frame";
           return false;
         }
 
@@ -1042,7 +1042,7 @@ bool Vp9UncompressedHeaderParser::Parse(const uint8_t* stream,
         // the selected reference frames match the current frame in bit depth,
         // profile, chroma subsampling, and color space.
         if (ref.profile != fhdr->profile) {
-          DVLOG(1) << "profile of referenced frame mismatch";
+          FX_LOGS(DEBUG) << "profile of referenced frame mismatch";
           return false;
         }
         if (i == 0) {
@@ -1054,7 +1054,7 @@ bool Vp9UncompressedHeaderParser::Parse(const uint8_t* stream,
           fhdr->subsampling_y = ref.subsampling_y;
         } else {
           if (fhdr->bit_depth != ref.bit_depth) {
-            DVLOG(1) << "bit_depth of referenced frame mismatch";
+            FX_LOGS(DEBUG) << "bit_depth of referenced frame mismatch";
             return false;
           }
           // There are encoded streams with no color_space information
@@ -1066,12 +1066,12 @@ bool Vp9UncompressedHeaderParser::Parse(const uint8_t* stream,
           if (fhdr->color_space != ref.color_space &&
               fhdr->color_space != Vp9ColorSpace::UNKNOWN &&
               ref.color_space != Vp9ColorSpace::UNKNOWN) {
-            DVLOG(1) << "color_space of referenced frame mismatch";
+            FX_LOGS(DEBUG) << "color_space of referenced frame mismatch";
             return false;
           }
           if (fhdr->subsampling_x != ref.subsampling_x ||
               fhdr->subsampling_y != ref.subsampling_y) {
-            DVLOG(1) << "chroma subsampling of referenced frame mismatch";
+            FX_LOGS(DEBUG) << "chroma subsampling of referenced frame mismatch";
             return false;
           }
         }
@@ -1123,16 +1123,16 @@ bool Vp9UncompressedHeaderParser::Parse(const uint8_t* stream,
 
   fhdr->header_size_in_bytes = reader_.ReadLiteral(16);
   if (fhdr->header_size_in_bytes == 0) {
-    DVLOG(1) << "invalid header size";
+    FX_LOGS(DEBUG) << "invalid header size";
     return false;
   }
 
   if (!reader_.ConsumeTrailingBits()) {
-    DVLOG(1) << "trailing bits are not zero";
+    FX_LOGS(DEBUG) << "trailing bits are not zero";
     return false;
   }
   if (!reader_.IsValid()) {
-    DVLOG(1) << "parser reads beyond the end of buffer";
+    FX_LOGS(DEBUG) << "parser reads beyond the end of buffer";
     return false;
   }
   fhdr->uncompressed_header_size = reader_.GetBytesRead();

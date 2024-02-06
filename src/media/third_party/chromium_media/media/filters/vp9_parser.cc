@@ -14,13 +14,13 @@
 #include <algorithm>
 
 // Fuchsia change: Remove libraries in favor of "chromium_utils.h"
-//#include "base/bind.h"
-//#include "base/callback_helpers.h"
-//#include "base/containers/circular_deque.h"
-//#include "base/cxx17_backports.h"
-//#include "base/logging.h"
-//#include "base/numerics/safe_conversions.h"
-//#include "base/sys_byteorder.h"
+// #include "base/bind.h"
+// #include "base/callback_helpers.h"
+// #include "base/containers/circular_deque.h"
+// #include "base/cxx17_backports.h"
+// #include "base/logging.h"
+// #include "base/numerics/safe_conversions.h"
+// #include "base/sys_byteorder.h"
 #include "chromium_utils.h"
 
 // Fuchsia change: Don't support compressed headers
@@ -204,7 +204,8 @@ std::unique_ptr<DecryptConfig> SplitSubsamples(
   std::vector<SubsampleEntry> frame_dc_subsamples;
   do {
     if (*current_subsample_index >= subsamples.size()) {
-      DVLOG(1) << "Not enough subsamples in the superframe decrypt config";
+      FX_LOGS(DEBUG)
+          << "Not enough subsamples in the superframe decrypt config";
       return nullptr;
     }
 
@@ -215,7 +216,7 @@ std::unique_ptr<DecryptConfig> SplitSubsamples(
     // if clear+cipher bytes would be over the max of uint32_t, we need to
     // quit immediatly, to prevent malicious overflowing.
     if (0xFFFFFFFF - subsample_clear < subsample_cipher) {
-      DVLOG(1) << "Invalid subsample alignment";
+      FX_LOGS(DEBUG) << "Invalid subsample alignment";
       return nullptr;
     }
 
@@ -238,7 +239,7 @@ std::unique_ptr<DecryptConfig> SplitSubsamples(
       // Only a clear section can cross over a frame boundary, otherwise
       // the frame header for the next frame would be encrypted, which is not
       // spec compliant.
-      DVLOG(1) << "Invalid subsample alignment";
+      FX_LOGS(DEBUG) << "Invalid subsample alignment";
       return nullptr;
     } else if (subsample_clear + subsample_cipher <= frame_size) {
       // In this case a subsample is less than or equal to a whole frame
@@ -283,7 +284,8 @@ bool IsByteNEncrypted(off_t byte,
     }
     byte -= subsample.cypher_bytes;
   }
-  DVLOG(3) << "Subsamples do not extend to cover offset " << original_byte;
+  FX_LOGS(DEBUG) << "Subsamples do not extend to cover offset "
+                 << original_byte;
   return false;
 }
 
@@ -509,7 +511,7 @@ void Vp9Parser::Context::Vp9FrameContextManager::Update(
 
 void Vp9Parser::Context::Vp9FrameContextManager::UpdateFromClient(
     const Vp9FrameContext& frame_context) {
-  DVLOG(2) << "Got external frame_context update";
+  FX_LOGS(DEBUG) << "Got external frame_context update";
   DCHECK(needs_client_update_);
   if (!frame_context.IsValid()) {
     DLOG(ERROR) << "Invalid prob value in frame_context";
@@ -613,7 +615,7 @@ bool Vp9Parser::ParseUncompressedHeader(const FrameInfo& frame_info,
     for (off_t i = curr_frame_header_.uncompressed_header_size;
          i < frame_info.size; i++) {
       if (frame_info.ptr[i] != 0) {
-        DVLOG(1) << "Padding bits are not zeros.";
+        FX_LOGS(DEBUG) << "Padding bits are not zeros.";
         *result = kInvalidStream;
         return true;
       }
@@ -625,10 +627,11 @@ bool Vp9Parser::ParseUncompressedHeader(const FrameInfo& frame_info,
   if (curr_frame_header_.uncompressed_header_size +
           curr_frame_header_.header_size_in_bytes >
       base::checked_cast<size_t>(frame_info.size)) {
-    DVLOG(1) << "header_size_in_bytes="
-             << curr_frame_header_.header_size_in_bytes
-             << " is larger than bytes left in buffer: "
-             << frame_info.size - curr_frame_header_.uncompressed_header_size;
+    FX_LOGS(DEBUG) << "header_size_in_bytes="
+                   << curr_frame_header_.header_size_in_bytes
+                   << " is larger than bytes left in buffer: "
+                   << frame_info.size -
+                          curr_frame_header_.uncompressed_header_size;
     *result = kInvalidStream;
     return true;
   }
@@ -647,13 +650,13 @@ bool Vp9Parser::ParseCompressedHeader(const FrameInfo& frame_info,
   if (!context_to_load.initialized()) {
     // 8.2 Frame order constraints
     // must load an initialized set of probabilities.
-    DVLOG(1) << "loading uninitialized frame context, index="
+    FX_LOGS(DEBUG) << "loading uninitialized frame context, index="
              << frame_context_idx;
     *result = kInvalidStream;
     return true;
   }
   if (context_to_load.needs_client_update()) {
-    DVLOG(3) << "waiting frame_context_idx=" << frame_context_idx
+    FX_LOGS(DEBUG) << "waiting frame_context_idx=" << frame_context_idx
              << " to update";
     curr_frame_info_ = frame_info;
     *result = kAwaitingRefresh;
@@ -699,7 +702,7 @@ Vp9Parser::Result Vp9Parser::ParseNextFrame(
     std::unique_ptr<DecryptConfig>* frame_decrypt_config) {
   DCHECK(fhdr);
   DCHECK(allocate_size);
-  DVLOG(2) << "ParseNextFrame";
+  FX_LOGS(DEBUG) << "ParseNextFrame";
   FrameInfo frame_info;
   Result result;
 
@@ -727,7 +730,7 @@ Vp9Parser::Result Vp9Parser::ParseNextFrame(
       }
 
       if (frames_.empty()) {
-        DVLOG(1) << "Failed parsing superframes/SVC frame";
+        FX_LOGS(DEBUG) << "Failed parsing superframes/SVC frame";
         return kInvalidStream;
       }
     }
@@ -844,7 +847,7 @@ base::circular_deque<Vp9Parser::FrameInfo> Vp9Parser::ParseSuperframe() {
     return frames;
   }
 
-  DVLOG(1) << "Parsing a superframe";
+  FX_LOGS(DEBUG) << "Parsing a superframe";
 
   // The bytes immediately before the superframe marker constitute superframe
   // index, which stores information about sizes of each frame in it.
@@ -887,7 +890,7 @@ base::circular_deque<Vp9Parser::FrameInfo> Vp9Parser::ParseSuperframe() {
 
     if (!base::IsValueInRangeForNumericType<off_t>(size) ||
         static_cast<off_t>(size) > bytes_left) {
-      DVLOG(1) << "Not enough data in the buffer for frame " << i;
+      FX_LOGS(DEBUG) << "Not enough data in the buffer for frame " << i;
       frames.clear();
       return frames;
     }
@@ -898,7 +901,7 @@ base::circular_deque<Vp9Parser::FrameInfo> Vp9Parser::ParseSuperframe() {
           size, &current_subsample, &extra_clear_subsample_bytes,
           stream_decrypt_config_.get(), subsamples, &iv);
       if (!frame_dc) {
-        DVLOG(1) << "Failed to calculate decrypt config for frame " << i;
+        FX_LOGS(DEBUG) << "Failed to calculate decrypt config for frame " << i;
         frames.clear();
         return frames;
       }
@@ -910,7 +913,7 @@ base::circular_deque<Vp9Parser::FrameInfo> Vp9Parser::ParseSuperframe() {
     stream += size;
     bytes_left -= size;
 
-    DVLOG(1) << "Frame " << i << ", size: " << size;
+    FX_LOGS(DEBUG) << "Frame " << i << ", size: " << size;
   }
 
   return frames;
@@ -940,14 +943,14 @@ base::circular_deque<Vp9Parser::FrameInfo> Vp9Parser::ParseSVCFrame() {
     const uint32_t size = spatial_layer_frame_size_[i];
     if (!base::IsValueInRangeForNumericType<off_t>(size) ||
         static_cast<off_t>(size) > bytes_left) {
-      DVLOG(1) << "Not enough data in the buffer for frame " << i;
+      FX_LOGS(DEBUG) << "Not enough data in the buffer for frame " << i;
       return {};
     }
 
     frames.emplace_back(stream, size);
     stream += size;
     bytes_left -= size;
-    DVLOG(1) << "Frame " << i << ", size: " << size;
+    FX_LOGS(DEBUG) << "Frame " << i << ", size: " << size;
   }
 
   DCHECK(!frames.empty());

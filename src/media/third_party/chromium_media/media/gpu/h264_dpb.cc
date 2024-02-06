@@ -105,8 +105,9 @@ void H264DPB::DeleteUnused() {
 
 void H264DPB::StorePic(scoped_refptr<H264Picture> pic) {
   DCHECK_LT(pics_.size(), max_num_pics_);
-  DVLOG(3) << "Adding PicNum: " << pic->pic_num << " ref: " << (int)pic->ref
-           << " longterm: " << (int)pic->long_term << " to DPB";
+  FX_LOGS(DEBUG) << "Adding PicNum: " << pic->pic_num
+                 << " ref: " << (int)pic->ref
+                 << " longterm: " << (int)pic->long_term << " to DPB";
   pic->dpb_position = static_cast<int>(pics_.size());
   pics_.push_back(std::move(pic));
 }
@@ -131,7 +132,7 @@ scoped_refptr<H264Picture> H264DPB::GetShortRefPicByPicNum(int pic_num) {
       return pic;
   }
 
-  DVLOG(1) << "Missing short ref pic num: " << pic_num;
+  FX_LOGS(DEBUG) << "Missing short ref pic num: " << pic_num;
   return nullptr;
 }
 
@@ -141,7 +142,7 @@ scoped_refptr<H264Picture> H264DPB::GetLongRefPicByLongTermPicNum(int pic_num) {
       return pic;
   }
 
-  DVLOG(1) << "Missing long term pic num: " << pic_num;
+  FX_LOGS(DEBUG) << "Missing long term pic num: " << pic_num;
   return nullptr;
 }
 

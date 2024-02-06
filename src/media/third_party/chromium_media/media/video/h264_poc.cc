@@ -21,26 +21,26 @@ bool HasMMCO5(const media::H264SliceHeader& slice_hdr) {
   // Require that the frame actually has memory management control operations.
   if (slice_hdr.nal_ref_idc == 0 || slice_hdr.idr_pic_flag ||
       !slice_hdr.adaptive_ref_pic_marking_mode_flag) {
-    DVLOG(1) << "return false (1)";
+    FX_LOGS(DEBUG) << "return false (1)";
     return false;
   }
 
   for (size_t i = 0; i < std::size(slice_hdr.ref_pic_marking); i++) {
     int32_t op = slice_hdr.ref_pic_marking[i].memory_mgmnt_control_operation;
     if (op == 5) {
-      DVLOG(1) << "op == 5 - return true";
+      FX_LOGS(DEBUG) << "op == 5 - return true";
       return true;
     }
 
     // Stop at the end of the list.
     if (op == 0) {
-      DVLOG(1) << "return false (2)";
+      FX_LOGS(DEBUG) << "return false (2)";
       return false;
     }
   }
 
   // Should not get here, the list is always zero terminated.
-  DVLOG(1) << "return false (3)";
+  FX_LOGS(DEBUG) << "return false (3)";
   return false;
 }
 
@@ -65,7 +65,7 @@ void H264POC::Reset() {
 std::optional<int32_t> H264POC::ComputePicOrderCnt(
     const H264SPS* sps,
     const H264SliceHeader& slice_hdr) {
-  DVLOG(1) << "ComputePicOrderCnt";
+  FX_LOGS(DEBUG) << "ComputePicOrderCnt";
   if (slice_hdr.field_pic_flag) {
     DLOG(ERROR) << "Interlaced frames are not supported";
     return std::nullopt;
@@ -76,8 +76,8 @@ std::optional<int32_t> H264POC::ComputePicOrderCnt(
   int32_t max_frame_num = 1 << (sps->log2_max_frame_num_minus4 + 4);
   int32_t max_pic_order_cnt_lsb =
       1 << (sps->log2_max_pic_order_cnt_lsb_minus4 + 4);
-  DVLOG(1) << "mmco5: " << mmco5 << " max_frame_num: " << max_frame_num
-           << " max_pic_order_cnt_lsb: " << max_pic_order_cnt_lsb;
+  FX_LOGS(DEBUG) << "mmco5: " << mmco5 << " max_frame_num: " << max_frame_num
+                 << " max_pic_order_cnt_lsb: " << max_pic_order_cnt_lsb;
 
   // Based on T-REC-H.264 8.2.1, "Decoding process for picture order
   // count", available from http://www.itu.int/rec/T-REC-H.264.
@@ -91,20 +91,20 @@ std::optional<int32_t> H264POC::ComputePicOrderCnt(
     case 0: {
       int32_t prev_pic_order_cnt_msb = ref_pic_order_cnt_msb_;
       int32_t prev_pic_order_cnt_lsb = ref_pic_order_cnt_lsb_;
-      DVLOG(1) << "prev_pic_order_cnt_msb: " << prev_pic_order_cnt_msb
-               << " prev_pic_order_cnt_lsb: " << prev_pic_order_cnt_lsb;
+      FX_LOGS(DEBUG) << "prev_pic_order_cnt_msb: " << prev_pic_order_cnt_msb
+                     << " prev_pic_order_cnt_lsb: " << prev_pic_order_cnt_lsb;
 
       // For an IDR picture, clear the state.
       if (slice_hdr.idr_pic_flag) {
         prev_pic_order_cnt_msb = 0;
         prev_pic_order_cnt_lsb = 0;
-        DVLOG(1) << "prev_pic_order_cnt_msb / lsb = 0";
+        FX_LOGS(DEBUG) << "prev_pic_order_cnt_msb / lsb = 0";
       }
       // 8-3. Derive |pic_order_cnt_msb|, accounting for wrapping which is
       //      detected when |pic_order_cnt_lsb| increases or decreases by at
       //      least half of its maximum.
-      DVLOG(1) << "slice_hdr.pic_order_cnt_lsb: "
-               << slice_hdr.pic_order_cnt_lsb;
+      FX_LOGS(DEBUG) << "slice_hdr.pic_order_cnt_lsb: "
+                     << slice_hdr.pic_order_cnt_lsb;
       int32_t pic_order_cnt_msb;
       if ((slice_hdr.pic_order_cnt_lsb < prev_pic_order_cnt_lsb) &&
           (prev_pic_order_cnt_lsb - slice_hdr.pic_order_cnt_lsb >=
@@ -117,13 +117,13 @@ std::optional<int32_t> H264POC::ComputePicOrderCnt(
       } else {
         pic_order_cnt_msb = prev_pic_order_cnt_msb;
       }
-      DVLOG(1) << "pic_order_cnt_msb: " << pic_order_cnt_msb;
+      FX_LOGS(DEBUG) << "pic_order_cnt_msb: " << pic_order_cnt_msb;
 
       // 8-4, 8-5. Derive |top_field_order_count| and |bottom_field_order_cnt|
       //           (assuming no interlacing).
       int32_t top_foc = pic_order_cnt_msb + slice_hdr.pic_order_cnt_lsb;
       int32_t bottom_foc = top_foc + slice_hdr.delta_pic_order_cnt_bottom;
-      DVLOG(1) << "top_foc: " << top_foc << " bottom_foc: " << bottom_foc;
+      FX_LOGS(DEBUG) << "top_foc: " << top_foc << " bottom_foc: " << bottom_foc;
 
       // Compute POC.
       //
@@ -134,7 +134,7 @@ std::optional<int32_t> H264POC::ComputePicOrderCnt(
         pic_order_cnt = 0;
       else
         pic_order_cnt = std::min(top_foc, bottom_foc);
-      DVLOG(1) << "pic_order_cnt: " << pic_order_cnt;
+      FX_LOGS(DEBUG) << "pic_order_cnt: " << pic_order_cnt;
 
       // Store state.
       pending_mmco5_ = mmco5;
@@ -264,7 +264,7 @@ std::optional<int32_t> H264POC::ComputePicOrderCnt(
       return std::nullopt;
   }
 
-  DVLOG(1) << "pic_order_cnt: " << pic_order_cnt;
+  FX_LOGS(DEBUG) << "pic_order_cnt: " << pic_order_cnt;
   return pic_order_cnt;
 }
 

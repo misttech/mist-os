@@ -118,8 +118,8 @@ void VP9Decoder::SetStream(int32_t id, const DecoderBuffer& decoder_buffer) {
 
   DCHECK(ptr);
   DCHECK(size);
-  DVLOG(4) << "New input stream id: " << id << " at: " << (void*)ptr
-           << " size: " << size;
+  FX_LOGS(DEBUG) << "New input stream id: " << id << " at: " << (void*)ptr
+                 << " size: " << size;
   stream_id_ = id;
   std::vector<uint32_t> frame_sizes;
   if (!GetSpatialLayerFrameSize(decoder_buffer, frame_sizes)) {
@@ -132,7 +132,7 @@ void VP9Decoder::SetStream(int32_t id, const DecoderBuffer& decoder_buffer) {
 }
 
 bool VP9Decoder::Flush() {
-  DVLOG(2) << "Decoder flush";
+  FX_LOGS(DEBUG) << "Decoder flush";
   Reset();
   return true;
 }
@@ -184,12 +184,12 @@ VP9Decoder::DecodeResult VP9Decoder::Decode() {
           return kRanOutOfStreamData;
 
         case Vp9Parser::kInvalidStream:
-          DVLOG(1) << "Error parsing stream";
+          FX_LOGS(DEBUG) << "Error parsing stream";
           SetError();
           return kDecodeError;
 
         case Vp9Parser::kAwaitingRefresh:
-          DVLOG(4) << "Awaiting context update";
+          FX_LOGS(DEBUG) << "Awaiting context update";
           return kNeedContextUpdate;
       }
     }
@@ -217,7 +217,7 @@ VP9Decoder::DecodeResult VP9Decoder::Decode() {
       size_t frame_to_show = curr_frame_hdr_->frame_to_show_map_idx;
       if (frame_to_show >= kVp9NumRefFrames ||
           !ref_frames_.GetFrame(frame_to_show)) {
-        DVLOG(1) << "Request to show an invalid frame";
+        FX_LOGS(DEBUG) << "Request to show an invalid frame";
         SetError();
         return kDecodeError;
       }
@@ -227,7 +227,7 @@ VP9Decoder::DecodeResult VP9Decoder::Decode() {
       scoped_refptr<VP9Picture> pic =
           ref_frames_.GetFrame(frame_to_show)->Duplicate();
       if (pic == nullptr) {
-        DVLOG(1) << "Failed to duplicate the VP9Picture.";
+        FX_LOGS(DEBUG) << "Failed to duplicate the VP9Picture.";
         SetError();
         return kDecodeError;
       }
@@ -247,35 +247,35 @@ VP9Decoder::DecodeResult VP9Decoder::Decode() {
                               curr_frame_hdr_->render_height);
     // For safety, check the validity of render size or leave it as pic size.
     if (!gfx::Rect(new_pic_size).Contains(new_render_rect)) {
-      DVLOG(1) << "Render size exceeds picture size. render size: "
-               << new_render_rect.ToString()
-               << ", picture size: " << new_pic_size.ToString();
+      FX_LOGS(DEBUG) << "Render size exceeds picture size. render size: "
+                     << new_render_rect.ToString()
+                     << ", picture size: " << new_pic_size.ToString();
       new_render_rect = gfx::Rect(new_pic_size);
     }
     VideoCodecProfile new_profile =
         VP9ProfileToVideoCodecProfile(curr_frame_hdr_->profile);
     if (new_profile == VIDEO_CODEC_PROFILE_UNKNOWN) {
-      VLOG(1) << "Invalid profile: " << curr_frame_hdr_->profile;
+      FX_LOGS(DEBUG) << "Invalid profile: " << curr_frame_hdr_->profile;
       return kDecodeError;
     }
     if (!IsValidBitDepth(curr_frame_hdr_->bit_depth, new_profile)) {
-      DVLOG(1) << "Invalid bit depth="
-               << base::strict_cast<int>(curr_frame_hdr_->bit_depth)
-               << ", profile=" << GetProfileName(new_profile);
+      FX_LOGS(DEBUG) << "Invalid bit depth="
+                     << base::strict_cast<int>(curr_frame_hdr_->bit_depth)
+                     << ", profile=" << GetProfileName(new_profile);
       return kDecodeError;
     }
     if (!IsYUV420Sequence(*curr_frame_hdr_)) {
-      DVLOG(1) << "Only YUV 4:2:0 is supported";
+      FX_LOGS(DEBUG) << "Only YUV 4:2:0 is supported";
       return kDecodeError;
     }
 
     DCHECK(!new_pic_size.IsEmpty());
     if (new_pic_size != pic_size_ || new_profile != profile_ ||
         curr_frame_hdr_->bit_depth != bit_depth_) {
-      DVLOG(1) << "New profile: " << GetProfileName(new_profile)
-               << ", New resolution: " << new_pic_size.ToString()
-               << ", New bit depth: "
-               << base::strict_cast<int>(curr_frame_hdr_->bit_depth);
+      FX_LOGS(DEBUG) << "New profile: " << GetProfileName(new_profile)
+                     << ", New resolution: " << new_pic_size.ToString()
+                     << ", New bit depth: "
+                     << base::strict_cast<int>(curr_frame_hdr_->bit_depth);
 
       // If frame is a keyframe, reset the decoding process by releasing all the
       // reference frames
@@ -295,7 +295,7 @@ VP9Decoder::DecodeResult VP9Decoder::Decode() {
     if (!pic) {
       return kRanOutOfSurfaces;
     }
-    DVLOG(2) << "Render resolution: " << new_render_rect.ToString();
+    FX_LOGS(DEBUG) << "Render resolution: " << new_render_rect.ToString();
 
     pic->set_visible_rect(new_render_rect);
     pic->set_bitstream_id(stream_id_);

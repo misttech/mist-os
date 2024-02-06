@@ -17,7 +17,7 @@ bool VerifySubsamplesMatchSize(const std::vector<SubsampleEntry>& subsamples,
   }
 
   if (!total_size.IsValid() || total_size.ValueOrDie() != input_size) {
-    DVLOG(1) << "Subsample sizes do not equal input size";
+    FX_LOGS(DEBUG) << "Subsample sizes do not equal input size";
     return false;
   }
 

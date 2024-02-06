@@ -120,7 +120,7 @@ std::optional<gfx::Size> H264SPS::GetCodedSize() const {
   int max_map_units_minus1 = std::numeric_limits<int>::max() / map_unit - 1;
   if (pic_width_in_mbs_minus1 > max_mb_minus1 ||
       pic_height_in_map_units_minus1 > max_map_units_minus1) {
-    DVLOG(1) << "Coded size is too large.";
+    FX_LOGS(DEBUG) << "Coded size is too large.";
     return std::nullopt;
   }
 
@@ -160,7 +160,7 @@ std::optional<gfx::Rect> H264SPS::GetVisibleRect() const {
       coded_size->width() / crop_unit_x < frame_crop_right_offset ||
       coded_size->height() / crop_unit_y < frame_crop_top_offset ||
       coded_size->height() / crop_unit_y < frame_crop_bottom_offset) {
-    DVLOG(1) << "Frame cropping exceeds coded size.";
+    FX_LOGS(DEBUG) << "Frame cropping exceeds coded size.";
     return std::nullopt;
   }
   int crop_left = crop_unit_x * frame_crop_left_offset;
@@ -173,7 +173,7 @@ std::optional<gfx::Rect> H264SPS::GetVisibleRect() const {
   // at least one corner of the coded frame.
   if (coded_size->width() - crop_left <= crop_right ||
       coded_size->height() - crop_top <= crop_bottom) {
-    DVLOG(1) << "Frame cropping excludes entire frame.";
+    FX_LOGS(DEBUG) << "Frame cropping excludes entire frame.";
     return std::nullopt;
   }
 
@@ -238,7 +238,7 @@ H264SEIMessage::H264SEIMessage() {
   do {                                                                     \
     int _out;                                                              \
     if (!br_.ReadBits(num_bits, &_out)) {                                  \
-      DVLOG(1)                                                             \
+      FX_LOGS(DEBUG)                                                       \
           << "Error in stream: unexpected EOS while trying to read " #out; \
       return kInvalidStream;                                               \
     }                                                                      \
@@ -249,45 +249,48 @@ H264SEIMessage::H264SEIMessage() {
   do {                                                                     \
     int _out;                                                              \
     if (!br_.ReadBits(1, &_out)) {                                         \
-      DVLOG(1)                                                             \
+      FX_LOGS(DEBUG)                                                       \
           << "Error in stream: unexpected EOS while trying to read " #out; \
       return kInvalidStream;                                               \
     }                                                                      \
     *out = _out != 0;                                                      \
   } while (0)
 
-#define READ_UE_OR_RETURN(out)                                                 \
-  do {                                                                         \
-    if (ReadUE(out) != kOk) {                                                  \
-      DVLOG(1) << "Error in stream: invalid value while trying to read " #out; \
-      return kInvalidStream;                                                   \
-    }                                                                          \
+#define READ_UE_OR_RETURN(out)                                            \
+  do {                                                                    \
+    if (ReadUE(out) != kOk) {                                             \
+      FX_LOGS(DEBUG)                                                      \
+          << "Error in stream: invalid value while trying to read " #out; \
+      return kInvalidStream;                                              \
+    }                                                                     \
   } while (0)
 
-#define READ_SE_OR_RETURN(out)                                                 \
-  do {                                                                         \
-    if (ReadSE(out) != kOk) {                                                  \
-      DVLOG(1) << "Error in stream: invalid value while trying to read " #out; \
-      return kInvalidStream;                                                   \
-    }                                                                          \
+#define READ_SE_OR_RETURN(out)                                            \
+  do {                                                                    \
+    if (ReadSE(out) != kOk) {                                             \
+      FX_LOGS(DEBUG)                                                      \
+          << "Error in stream: invalid value while trying to read " #out; \
+      return kInvalidStream;                                              \
+    }                                                                     \
   } while (0)
 
-#define IN_RANGE_OR_RETURN(val, min, max)                                   \
-  do {                                                                      \
-    if ((val) < (min) || (val) > (max)) {                                   \
-      DVLOG(1) << "Error in stream: invalid value, expected " #val " to be" \
-               << " in range [" << (min) << ":" << (max) << "]"             \
-               << " found " << (val) << " instead";                         \
-      return kInvalidStream;                                                \
-    }                                                                       \
+#define IN_RANGE_OR_RETURN(val, min, max)                                \
+  do {                                                                   \
+    if ((val) < (min) || (val) > (max)) {                                \
+      FX_LOGS(DEBUG) << "Error in stream: invalid value, expected " #val \
+                        " to be"                                         \
+                     << " in range [" << (min) << ":" << (max) << "]"    \
+                     << " found " << (val) << " instead";                \
+      return kInvalidStream;                                             \
+    }                                                                    \
   } while (0)
 
-#define TRUE_OR_RETURN(a)                                            \
-  do {                                                               \
-    if (!(a)) {                                                      \
-      DVLOG(1) << "Error in stream: invalid value, expected " << #a; \
-      return kInvalidStream;                                         \
-    }                                                                \
+#define TRUE_OR_RETURN(a)                                                  \
+  do {                                                                     \
+    if (!(a)) {                                                            \
+      FX_LOGS(DEBUG) << "Error in stream: invalid value, expected " << #a; \
+      return kInvalidStream;                                               \
+    }                                                                      \
   } while (0)
 
 // ISO 14496 part 10
@@ -344,7 +347,7 @@ void H264Parser::SetEncryptedStream(
 const H264PPS* H264Parser::GetPPS(int pps_id) const {
   auto it = active_PPSes_.find(pps_id);
   if (it == active_PPSes_.end()) {
-    DVLOG(1) << "Requested a nonexistent PPS id " << pps_id;
+    FX_LOGS(DEBUG) << "Requested a nonexistent PPS id " << pps_id;
     return nullptr;
   }
 
@@ -354,7 +357,7 @@ const H264PPS* H264Parser::GetPPS(int pps_id) const {
 const H264SPS* H264Parser::GetSPS(int sps_id) const {
   auto it = active_SPSes_.find(sps_id);
   if (it == active_SPSes_.end()) {
-    DVLOG(1) << "Requested a nonexistent SPS id " << sps_id;
+    FX_LOGS(DEBUG) << "Requested a nonexistent SPS id " << sps_id;
     return nullptr;
   }
 
@@ -423,7 +426,7 @@ bool H264Parser::LocateNALU(off_t* nalu_size, off_t* start_code_size) {
 
   if (!FindStartCodeInClearRanges(stream_, bytes_left_, encrypted_ranges_,
                                   &nalu_start_off, &annexb_start_code_size)) {
-    DVLOG(4) << "Could not find start code, end of stream?";
+    FX_LOGS(DEBUG) << "Could not find start code, end of stream?";
     return false;
   }
 
@@ -434,7 +437,7 @@ bool H264Parser::LocateNALU(off_t* nalu_size, off_t* start_code_size) {
   const uint8_t* nalu_data = stream_ + annexb_start_code_size;
   off_t max_nalu_data_size = bytes_left_ - annexb_start_code_size;
   if (max_nalu_data_size <= 0) {
-    DVLOG(3) << "End of stream";
+    FX_LOGS(DEBUG) << "End of stream";
     return false;
   }
 
@@ -518,7 +521,7 @@ VideoCodecProfile H264Parser::ProfileIDCToVideoCodecProfile(int profile_idc) {
     case H264SPS::kProfileIDSMultiviewHigh:
       return H264PROFILE_MULTIVIEWHIGH;
   }
-  DVLOG(1) << "unknown video profile: " << profile_idc;
+  FX_LOGS(DEBUG) << "unknown video profile: " << profile_idc;
   return VIDEO_CODEC_PROFILE_UNKNOWN;
 }
 
@@ -600,8 +603,8 @@ H264Parser::Result H264Parser::AdvanceToNextNALU(H264NALU* nalu) {
   off_t start_code_size;
   off_t nalu_size_with_start_code;
   if (!LocateNALU(&nalu_size_with_start_code, &start_code_size)) {
-    DVLOG(4) << "Could not find next NALU, bytes left in stream: "
-             << bytes_left_;
+    FX_LOGS(DEBUG) << "Could not find next NALU, bytes left in stream: "
+                   << bytes_left_;
     stream_ = nullptr;
     bytes_left_ = 0;
     return kEOStream;
@@ -609,7 +612,7 @@ H264Parser::Result H264Parser::AdvanceToNextNALU(H264NALU* nalu) {
 
   nalu->data = stream_ + start_code_size;
   nalu->size = nalu_size_with_start_code - start_code_size;
-  DVLOG(4) << "NALU found: size=" << nalu_size_with_start_code;
+  FX_LOGS(DEBUG) << "NALU found: size=" << nalu_size_with_start_code;
 
   // Initialize bit reader at the start of found NALU.
   if (!br_.Initialize(nalu->data, nalu->size)) {
@@ -633,10 +636,10 @@ H264Parser::Result H264Parser::AdvanceToNextNALU(H264NALU* nalu) {
   READ_BITS_OR_RETURN(2, &nalu->nal_ref_idc);
   READ_BITS_OR_RETURN(5, &nalu->nal_unit_type);
 
-  DVLOG(4) << "NALU type: " << static_cast<int>(nalu->nal_unit_type)
-           << " at: " << reinterpret_cast<const void*>(nalu->data)
-           << " size: " << nalu->size
-           << " ref: " << static_cast<int>(nalu->nal_ref_idc);
+  FX_LOGS(DEBUG) << "NALU type: " << static_cast<int>(nalu->nal_unit_type)
+                 << " at: " << reinterpret_cast<const void*>(nalu->data)
+                 << " size: " << nalu->size
+                 << " ref: " << static_cast<int>(nalu->nal_ref_idc);
 
   previous_nalu_range_.clear();
   previous_nalu_range_.Add(nalu->data, nalu->data + nalu->size);
@@ -1070,7 +1073,7 @@ H264Parser::Result H264Parser::ParseSPS(int* sps_id) {
     READ_BOOL_OR_RETURN(&sps->seq_scaling_matrix_present_flag);
 
     if (sps->seq_scaling_matrix_present_flag) {
-      DVLOG(4) << "Scaling matrix present";
+      FX_LOGS(DEBUG) << "Scaling matrix present";
       res = ParseSPSScalingLists(sps.get());
       if (res != kOk)
         return res;
@@ -1136,7 +1139,7 @@ H264Parser::Result H264Parser::ParseSPS(int* sps_id) {
 
   READ_BOOL_OR_RETURN(&sps->vui_parameters_present_flag);
   if (sps->vui_parameters_present_flag) {
-    DVLOG(4) << "VUI parameters present";
+    FX_LOGS(DEBUG) << "VUI parameters present";
     res = ParseVUIParameters(sps.get());
     if (res != kOk)
       return res;
@@ -1191,11 +1194,12 @@ H264Parser::Result H264Parser::ParsePPS(int* pps_id) {
   TRUE_OR_RETURN(pps->seq_parameter_set_id < 32);
 
   if (active_SPSes_.find(pps->seq_parameter_set_id) == active_SPSes_.end()) {
-    DVLOG(1) << "Invalid stream, no SPS id: " << pps->seq_parameter_set_id;
+    FX_LOGS(DEBUG) << "Invalid stream, no SPS id: "
+                   << pps->seq_parameter_set_id;
     return kInvalidStream;
   }
 
-  DVLOG(4) << "pps->seq_parameter_set_id: " << pps->seq_parameter_set_id;
+  FX_LOGS(DEBUG) << "pps->seq_parameter_set_id: " << pps->seq_parameter_set_id;
   sps = GetSPS(pps->seq_parameter_set_id);
   TRUE_OR_RETURN(sps);
 
@@ -1204,7 +1208,7 @@ H264Parser::Result H264Parser::ParsePPS(int* pps_id) {
 
   READ_UE_OR_RETURN(&pps->num_slice_groups_minus1);
   if (pps->num_slice_groups_minus1 > 1) {
-    DVLOG(1) << "Slice groups not supported";
+    FX_LOGS(DEBUG) << "Slice groups not supported";
     return kUnsupportedStream;
   }
 
@@ -1247,7 +1251,7 @@ H264Parser::Result H264Parser::ParsePPS(int* pps_id) {
     READ_BOOL_OR_RETURN(&pps->pic_scaling_matrix_present_flag);
 
     if (pps->pic_scaling_matrix_present_flag) {
-      DVLOG(4) << "Picture scaling matrix present";
+      FX_LOGS(DEBUG) << "Picture scaling matrix present";
       res = ParsePPSScalingLists(*sps, pps.get());
       if (res != kOk)
         return res;
@@ -1273,11 +1277,12 @@ H264Parser::Result H264Parser::AcceptPreparsedPPS(std::unique_ptr<H264PPS> pps,
   *pps_id = -1;
 
   if (active_SPSes_.find(pps->seq_parameter_set_id) == active_SPSes_.end()) {
-    DVLOG(1) << "Invalid stream, no SPS id: " << pps->seq_parameter_set_id;
+    FX_LOGS(DEBUG) << "Invalid stream, no SPS id: "
+                   << pps->seq_parameter_set_id;
     return kInvalidStream;
   }
 
-  DVLOG(4) << "pps->seq_parameter_set_id: " << pps->seq_parameter_set_id;
+  FX_LOGS(DEBUG) << "pps->seq_parameter_set_id: " << pps->seq_parameter_set_id;
   sps = GetSPS(pps->seq_parameter_set_id);
   TRUE_OR_RETURN(sps);
 
@@ -1481,7 +1486,7 @@ H264Parser::Result H264Parser::ParseDecRefPicMarking(H264SliceHeader* shdr) {
       }
 
       if (i == std::size(shdr->ref_pic_marking)) {
-        DVLOG(1) << "Ran out of dec ref pic marking fields";
+        FX_LOGS(DEBUG) << "Ran out of dec ref pic marking fields";
         return kUnsupportedStream;
       }
     }
@@ -1505,14 +1510,14 @@ H264Parser::Result H264Parser::ParseSliceHeader(const H264NALU& nalu,
   shdr->nalu_data = nalu.data;
   shdr->nalu_size = nalu.size;
 
-  DVLOG(1) << "nbl: " << br_.NumBitsLeft() << " size: " << nalu.size;
+  FX_LOGS(DEBUG) << "nbl: " << br_.NumBitsLeft() << " size: " << nalu.size;
 
   READ_UE_OR_RETURN(&shdr->first_mb_in_slice);
   READ_UE_OR_RETURN(&shdr->slice_type);
   if (shdr->slice_type >= 10) {
     for (uint32_t i = 0; i < std::min(128LL, nalu.size); ++i) {
-      DVLOG(1) << "nalu[" << i << "] == 0x" << std::setw(2) << std::hex
-               << (int)(nalu.data[i]);
+      FX_LOGS(DEBUG) << "nalu[" << i << "] == 0x" << std::setw(2) << std::hex
+                     << (int)(nalu.data[i]);
     }
   }
   TRUE_OR_RETURN(shdr->slice_type < 10);
@@ -1522,12 +1527,12 @@ H264Parser::Result H264Parser::ParseSliceHeader(const H264NALU& nalu,
   pps = GetPPS(shdr->pic_parameter_set_id);
   TRUE_OR_RETURN(pps);
 
-  DVLOG(4) << "pps->seq_parameter_set_id: " << pps->seq_parameter_set_id;
+  FX_LOGS(DEBUG) << "pps->seq_parameter_set_id: " << pps->seq_parameter_set_id;
   sps = GetSPS(pps->seq_parameter_set_id);
   TRUE_OR_RETURN(sps);
 
   if (sps->separate_colour_plane_flag) {
-    DVLOG(1) << "Interlaced streams not supported";
+    FX_LOGS(DEBUG) << "Interlaced streams not supported";
     return kUnsupportedStream;
   }
 
@@ -1535,7 +1540,7 @@ H264Parser::Result H264Parser::ParseSliceHeader(const H264NALU& nalu,
   if (!sps->frame_mbs_only_flag) {
     READ_BOOL_OR_RETURN(&shdr->field_pic_flag);
     if (shdr->field_pic_flag) {
-      DVLOG(1) << "Interlaced streams not supported";
+      FX_LOGS(DEBUG) << "Interlaced streams not supported";
       return kUnsupportedStream;
     }
   }
@@ -1598,11 +1603,11 @@ H264Parser::Result H264Parser::ParseSliceHeader(const H264NALU& nalu,
   } else {
     res = ParseRefPicListModifications(shdr);
     if (res != kOk) {
-      DVLOG(1) << "br_.NumBitsLeft(): " << br_.NumBitsLeft()
-               << " nalu.size: " << nalu.size;
+      FX_LOGS(DEBUG) << "br_.NumBitsLeft(): " << br_.NumBitsLeft()
+                     << " nalu.size: " << nalu.size;
       for (uint32_t i = 0; i < std::min(128LL, nalu.size); ++i) {
-        DVLOG(1) << "nalu[" << i << "] == 0x" << std::setw(2) << std::hex
-                 << (int)(nalu.data[i]);
+        FX_LOGS(DEBUG) << "nalu[" << i << "] == 0x" << std::setw(2) << std::hex
+                       << (int)(nalu.data[i]);
       }
       return res;
     }
@@ -1649,7 +1654,7 @@ H264Parser::Result H264Parser::ParseSliceHeader(const H264NALU& nalu,
   }
 
   if (pps->num_slice_groups_minus1 > 0) {
-    DVLOG(1) << "Slice groups not supported";
+    FX_LOGS(DEBUG) << "Slice groups not supported";
     return kUnsupportedStream;
   }
 
@@ -1678,8 +1683,8 @@ H264Parser::Result H264Parser::ParseSEI(H264SEIMessage* sei_msg) {
   }
   sei_msg->payload_size += byte;
 
-  DVLOG(4) << "Found SEI message type: " << sei_msg->type
-           << " payload size: " << sei_msg->payload_size;
+  FX_LOGS(DEBUG) << "Found SEI message type: " << sei_msg->type
+                 << " payload size: " << sei_msg->payload_size;
 
   switch (sei_msg->type) {
     case H264SEIMessage::kSEIRecoveryPoint:
@@ -1690,7 +1695,7 @@ H264Parser::Result H264Parser::ParseSEI(H264SEIMessage* sei_msg) {
       break;
 
     default:
-      DVLOG(4) << "Unsupported SEI message";
+      FX_LOGS(DEBUG) << "Unsupported SEI message";
       break;
   }
 
