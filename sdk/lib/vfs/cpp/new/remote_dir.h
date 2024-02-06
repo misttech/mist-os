@@ -12,26 +12,28 @@
 
 namespace vfs {
 
-// A remote directory holds a channel to a remotely hosted directory to
-// which requests are delegated when opened.
+// A remote directory holds a channel to a remotely hosted directory to which requests are delegated
+// when opened.
 //
-// This class is designed to allow programs to publish remote filesystems
-// as directories without requiring a separate "mount" step.  In effect,
-// a remote directory is "mounted" at creation time.
+// This class is designed to allow programs to publish remote filesystems as directories without
+// requiring a separate "mount" step.  In effect, a remote directory is "mounted" at creation time.
 //
-// It is not possible for the client to detach the remote directory or
-// to mount a new one in its place.
+// It is not possible for the client to detach the remote directory or to mount a new one in its
+// place.
+//
+// This class is thread-safe.
 class RemoteDir final : public internal::Node {
  public:
-  // Binds to a remotely hosted directory using the specified
-  // |fuchsia.io.Directory| client channel endpoint.The channel must be valid.
+  // Binds to a remotely hosted directory channel via `remote_dir`. The channel must be valid and
+  // must be compatible with the `fuchsia.io.Directory` protocol.
   explicit RemoteDir(zx::channel remote_dir)
       : internal::Node(CreateRemoteDir(std::move(remote_dir))) {}
 
-  // Binds to a remotely hosted directory using the specified
-  // InterfaceHandle. Handle must be valid.
+  // Binds to a remotely hosted directory using the specified `dir`. The `dir` handle must be valid.
   explicit RemoteDir(fidl::InterfaceHandle<fuchsia::io::Directory> dir)
       : RemoteDir(dir.TakeChannel()) {}
+
+  using internal::Node::Serve;
 
  private:
   static vfs_internal_node_t* CreateRemoteDir(zx::channel dir) {

@@ -20,21 +20,12 @@ class PseudoDir;
 
 namespace vfs::internal {
 
-// An object in a file system.
-//
-// Implements the |fuchsia.io.Node| interface. Incoming connections are owned by
-// this object and will be destroyed when this object is destroyed.
-//
-// Subclass to implement a particular kind of file system object.
+// Represents an object in a file system that communicates via the `fuchsia.io.Node` protocol, and
+// potentially supports the composed protocols `fuchsia.io.Directory` and `fuchsia.io.File`.
 class Node {
  public:
   virtual ~Node() {
-    if (handle_) {
-      vfs_internal_node_destroy(handle_);
-    }
-    if (vfs_handle_) {
-      vfs_internal_destroy(vfs_handle_);
-    }
+    vfs_internal_node_destroy(handle_);  // Close all connections to this node and destroy it.
   }
 
   Node(const Node& node) = delete;
@@ -42,31 +33,27 @@ class Node {
   Node(Node&& node) = delete;
   Node& operator=(Node&& node) = delete;
 
-  // Establishes a connection for |request| using the given |flags|.
+ protected:
+  explicit Node(vfs_internal_node_t* handle) : handle_(handle) { ZX_DEBUG_ASSERT(handle); }
+
+  // Establishes a connection for `request` using the given `flags`. This method must only be used
+  // with a single-threaded asynchronous dispatcher. If `dispatcher` is `nullptr`, the current
+  // thread's default dispatcher will be used via `async_get_default_dispatcher`.
   //
-  // Waits for messages asynchronously on the |request| channel using
-  // |dispatcher|. If |dispatcher| is |nullptr|, the implementation will call
-  // |async_get_default_dispatcher| to obtain the default dispatcher for the
-  // current thread.
+  // The same `dispatcher` must be used if multiple connections are served for the same node,
+  // otherwise `ZX_ERR_INVALID_ARGS` will be returned.
   //
-  // This method is NOT thread-safe and must be used with a single-threaded asynchronous dispatcher.
+  // Not all node types support `Serve()` due to lifetime restrictions.
   zx_status_t Serve(fuchsia::io::OpenFlags flags, zx::channel request,
                     async_dispatcher_t* dispatcher = nullptr) {
-    if (!vfs_handle_) {
-      if (zx_status_t status = vfs_internal_create(
-              dispatcher ? dispatcher : async_get_default_dispatcher(), &vfs_handle_);
-          status != ZX_OK) {
-        return status;
-      }
+    if (!dispatcher) {
+      dispatcher = async_get_default_dispatcher();
     }
-    return vfs_internal_serve(vfs_handle_, handle_, request.release(),
-                              static_cast<uint32_t>(flags));
+    return vfs_internal_node_serve(handle_, dispatcher, request.release(),
+                                   static_cast<uint32_t>(flags));
   }
 
- protected:
-  explicit Node(vfs_internal_node_t* handle) : handle_(handle) {}
-
-  // Types that require access to the `handle()` for child entries.
+  // Types that require access to `handle()` for operating on child entries.
   friend class vfs::ComposedServiceDir;
   friend class vfs::LazyDir;
   friend class vfs::PseudoDir;
@@ -75,8 +62,7 @@ class Node {
   vfs_internal_node_t* handle() { return handle_; }
 
  private:
-  vfs_internal_node_t* handle_;
-  vfs_internal_vfs_t* vfs_handle_ = nullptr;
+  vfs_internal_node_t* const handle_;
 };
 
 }  // namespace vfs::internal

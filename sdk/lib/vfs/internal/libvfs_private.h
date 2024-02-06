@@ -34,9 +34,6 @@ typedef uint8_t vfs_internal_sharing_mode_t;
 #define VFS_INTERNAL_SHARING_MODE_DUPLICATE ((vfs_internal_sharing_mode_t)1)
 #define VFS_INTERNAL_SHARING_MODE_COW ((vfs_internal_sharing_mode_t)2)
 
-// Handle to a VFS object capable of serving nodes.
-typedef struct vfs_internal_vfs vfs_internal_vfs_t;
-
 // Handle to a node/directory entry.
 typedef struct vfs_internal_node vfs_internal_node_t;
 
@@ -57,36 +54,41 @@ typedef void (*vfs_internal_release_buffer_t)(void* cookie);
 typedef zx_status_t (*vfs_internal_write_handler_t)(const void* cookie, const char* data,
                                                     size_t len);
 
-// Create a VFS object capable of serving node connections using `dispatcher`. The object is NOT
-// thread-safe and must be used with a single-threaded dispatcher.
-zx_status_t vfs_internal_create(async_dispatcher_t* dispatcher, vfs_internal_vfs_t** out_vfs);
-
-// Destroy a VFS created by `vfs_create`. `vfs` should not be used after this is called. Any active
-// connections will be unbound before `vfs` is destroyed.
-zx_status_t vfs_internal_destroy(vfs_internal_vfs_t* vfs);
-
-// Use `vfs` to serve the given `vnode` over `channel` with specified `rights. `channel` must be
+// Serve `vnode` using `dispatcher` over `channel` with specified `rights. `channel` must be
 // be protocol compatible with the type of node being served. Takes ownership of `channel` and
-// closes the handle on failure or when `vfs` is destroyed.
-zx_status_t vfs_internal_serve(vfs_internal_vfs_t* vfs, const vfs_internal_node_t* vnode,
-                               zx_handle_t channel, uint32_t rights);
+// closes the handle on failure or when `vfs` is destroyed. The same `dispatcher` must be used
+// on subsequent calls to this method for a given `vnode` otherwise returns `ZX_ERR_INVALID_ARGS`.
+// This function is thread-safe.
+zx_status_t vfs_internal_node_serve(vfs_internal_node_t* vnode, async_dispatcher_t* dispatcher,
+                                    zx_handle_t channel, uint32_t rights);
 
-// Destroy the specified `vnode` handle. The underlying node will remain alive so long as there are
-// active connections or other vnodes that hold a reference to it.
+// Shuts down all active connections being served by `vnode`. This function is thread-safe.
+zx_status_t vfs_internal_node_shutdown(vfs_internal_node_t* vnode);
+
+// Destroy the specified `vnode` handle and close any open connections.
+//
+// This function is *NOT* thread-safe.
 zx_status_t vfs_internal_node_destroy(vfs_internal_node_t* vnode);
 
 // Create a pseudo directory capable of server-side modification. Directory entries can be added or
 // removed at runtime, but cannot be modified by clients.
-zx_status_t vfs_internal_directory_create(vfs_internal_node_t** out_vnode);
+//
+// This function is *NOT* thread-safe.
+zx_status_t vfs_internal_directory_create(vfs_internal_node_t** out_dir);
 
-// Add a directory entry to `dir`. `dir` must be a directory node created by `vfs_directory_create`.
+// Add a directory entry to `dir`. This function asserts that `dir` is a directory created by
+// `vfs_internal_directory_create()`. This function is thread-safe.
 zx_status_t vfs_internal_directory_add(vfs_internal_node_t* dir, const vfs_internal_node_t* vnode,
                                        const char* name);
 
-// Remove an existing directory entry from `dir`.
+// Remove an existing directory entry from `dir`. Any open connections to the entry will be closed.
+// This function asserts that `dir` is a directory created by `vfs_internal_directory_create()`.
+// This function is thread-safe.
 zx_status_t vfs_internal_directory_remove(vfs_internal_node_t* dir, const char* name);
 
 // Create a remote directory node. Open requests to this node will be forwarded to `remote`.
+//
+// This function is *NOT* thread-safe.
 zx_status_t vfs_internal_remote_directory_create(zx_handle_t remote,
                                                  vfs_internal_node_t** out_vnode);
 
@@ -100,18 +102,23 @@ typedef struct vfs_internal_svc_context {
 
 // Create a service connector node. The `cookie` passed in `context` will be destroyed on failure,
 // or when the node is destroyed.
+//
+// This function is *NOT* thread-safe.
 zx_status_t vfs_internal_service_create(const vfs_internal_svc_context_t* context,
                                         vfs_internal_node_t** out_vnode);
 
 // Create a file-like object backed by a VMO. Takes ownership of `vmo_handle` and destroys it on
 // failure, or when the node is destroyed.
+//
+// This function is *NOT* thread-safe.
 zx_status_t vfs_internal_vmo_file_create(zx_handle_t vmo_handle, uint64_t length,
                                          vfs_internal_write_mode_t writable,
                                          vfs_internal_sharing_mode_t sharing_mode,
                                          vfs_internal_node_t** out_vnode);
 
 // Context associated with a pseudo-file node. Note that `cookie` is shared across the various
-// callbacks, so they are grouped together here.
+// callbacks, so they are grouped together here. The implementation guarantees invocations of
+// read/release are done under a lock.
 typedef struct vfs_internal_file_context {
   void* cookie;
   vfs_internal_read_handler_t read;
@@ -122,20 +129,24 @@ typedef struct vfs_internal_file_context {
 
 // Create a buffered file-like object backed by callbacks. The `cookie` passed in `context` will be
 // destroyed on failure, or when the node is destroyed.
+//
+// This function is *NOT* thread-safe.
 zx_status_t vfs_internal_pseudo_file_create(size_t max_bytes,
                                             const vfs_internal_file_context_t* context,
                                             vfs_internal_node_t** out_vnode);
 
 // Create a composed service directory which allows dynamic fallback services.
+//
+// This function is *NOT* thread-safe.
 zx_status_t vfs_internal_composed_svc_dir_create(vfs_internal_node_t** out_vnode);
 
-// Adds a service instance to this composed service directory.
+// Adds a service instance to this composed service directory. This function is thread-safe.
 zx_status_t vfs_internal_composed_svc_dir_add(vfs_internal_node_t* dir,
                                               const vfs_internal_node_t* service_node,
                                               const char* name);
 
 // Sets the fallback directory for a composed service directory. `fallback_channel` must be
-// compatible with the fuchsia.io protocol.
+// compatible with the fuchsia.io protocol. This function is thread-safe.
 zx_status_t vfs_internal_composed_svc_dir_set_fallback(vfs_internal_node_t* dir,
                                                        zx_handle_t fallback_channel);
 
@@ -161,7 +172,9 @@ typedef struct vfs_internal_lazy_dir_context {
   vfs_internal_get_entry_t get_entry;
 } vfs_internal_lazy_dir_context_t;
 
-// Create a new lazy directory node. The state of `context` must outlive the directory entry.
+// Create a new lazy directory node. The state of `context` *must* outlive `out_vnode`.
+//
+// This function is *NOT* thread-safe.
 zx_status_t vfs_internal_lazy_dir_create(const vfs_internal_lazy_dir_context* context,
                                          vfs_internal_node_t** out_vnode);
 

@@ -11,10 +11,13 @@
 #include <lib/vfs/cpp/new/internal/node.h>
 
 namespace vfs {
+
+// A node which binds a channel to a service implementation when opened.
+//
+// This class is thread-safe.
 class Service final : public internal::Node {
  public:
-  // Handler called to bind the provided channel to an implementation
-  // of the service.
+  // Handler callback which binds `channel` to a service instance.
   using Connector = fit::function<void(zx::channel channel, async_dispatcher_t* dispatcher)>;
   explicit Service(Connector connector) : internal::Node(MakeService(std::move(connector))) {}
 
@@ -25,8 +28,10 @@ class Service final : public internal::Node {
               handler(fidl::InterfaceRequest<Interface>(std::move(channel)));
             }) {}
 
+  using internal::Node::Serve;
+
  private:
-  static inline vfs_internal_node_t* MakeService(Connector connector) {
+  static vfs_internal_node_t* MakeService(Connector connector) {
     vfs_internal_node_t* svc;
     vfs_internal_svc_context_t context{
         .cookie = new Connector(std::move(connector)),

@@ -83,10 +83,12 @@ class TestLazyDir : public vfs::LazyDir {
 class LazyDirTest : public ::gtest::RealLoopFixture {
  protected:
   void SetUp() override {
-    test_dir_ = std::make_unique<TestLazyDir>();
+    root_dir_ = std::make_unique<vfs::PseudoDir>();
+    test_dir_ = std::make_shared<TestLazyDir>();
+    root_dir_->AddSharedEntry("test_lazy_dir", test_dir_);
     zx::channel server;
-    ASSERT_EQ(zx::channel::create(0, &test_dir_client_, &server), ZX_OK);
-    ASSERT_EQ(test_dir_->Serve(
+    ASSERT_EQ(zx::channel::create(0, &root_client_, &server), ZX_OK);
+    ASSERT_EQ(root_dir_->Serve(
                   fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE,
                   std::move(server)),
               ZX_OK);
@@ -97,16 +99,20 @@ class LazyDirTest : public ::gtest::RealLoopFixture {
   // Consumes and opens the test directory as a file descriptor. This must be called from a
   // different thread than the one serving the connection and can only be called once.
   fbl::unique_fd open_test_dir_fd() {
-    ZX_ASSERT_MSG(test_dir_client_.is_valid(), "open_root_fd() can only be called once per test!");
-    fbl::unique_fd fd;
-    zx_status_t status = fdio_fd_create(test_dir_client_.release(), fd.reset_and_get_address());
+    ZX_ASSERT_MSG(root_client_.is_valid(), "open_test_dir_fd() can only be called once per test!");
+    fbl::unique_fd root_fd;
+    zx_status_t status = fdio_fd_create(root_client_.release(), root_fd.reset_and_get_address());
     ZX_ASSERT_MSG(status == ZX_OK, "Failed to create fd: %s", zx_status_get_string(status));
+
+    fbl::unique_fd fd(openat(root_fd.get(), "test_lazy_dir", O_DIRECTORY));
+    ZX_ASSERT_MSG(fd, "Failed to open entry: %s", strerror(errno));
     return fd;
   }
 
  private:
-  std::unique_ptr<TestLazyDir> test_dir_;
-  zx::channel test_dir_client_;
+  std::unique_ptr<vfs::PseudoDir> root_dir_;
+  std::shared_ptr<TestLazyDir> test_dir_;
+  zx::channel root_client_;
 };
 
 #pragma clang diagnostic pop

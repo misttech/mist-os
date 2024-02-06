@@ -11,6 +11,7 @@
 #include <zircon/errors.h>
 
 #include <memory>
+#include <mutex>
 #include <type_traits>
 #include <variant>
 
@@ -67,6 +68,7 @@ class LibvfsComposedServiceDir final : public intree_vfs::PseudoDir {
     if (status == ZX_OK) {
       return status;
     }
+    std::lock_guard guard(mutex_);
     if (fallback_dir_) {
       auto entry = fallback_services_.find(name);
       if (entry != fallback_services_.end()) {
@@ -92,7 +94,14 @@ class LibvfsComposedServiceDir final : public intree_vfs::PseudoDir {
     return ZX_ERR_NOT_FOUND;
   }
 
-  void SetFallback(fidl::ClientEnd<fuchsia_io::Directory> dir) { fallback_dir_ = std::move(dir); }
+  zx_status_t SetFallback(fidl::ClientEnd<fuchsia_io::Directory> dir) {
+    std::lock_guard guard(mutex_);
+    if (fallback_dir_) {
+      return ZX_ERR_BAD_STATE;
+    }
+    fallback_dir_ = std::move(dir);
+    return ZX_OK;
+  }
 
   zx_status_t AddService(std::string_view name, fbl::RefPtr<intree_vfs::Service> service) {
     return this->AddEntry(name, std::move(service));
@@ -102,11 +111,13 @@ class LibvfsComposedServiceDir final : public intree_vfs::PseudoDir {
   friend fbl::internal::MakeRefCountedHelper<LibvfsComposedServiceDir>;
   friend fbl::RefPtr<LibvfsComposedServiceDir>;
 
-  fidl::ClientEnd<fuchsia_io::Directory> fallback_dir_;
+  std::mutex mutex_;
+  fidl::ClientEnd<fuchsia_io::Directory> fallback_dir_ __TA_GUARDED(mutex_);
 
   // The collection of services that have been looked up on the fallback directory. These services
   // just forward connection requests to the fallback directory.
-  mutable std::map<std::string, fbl::RefPtr<intree_vfs::Service>, std::less<>> fallback_services_;
+  mutable std::map<std::string, fbl::RefPtr<intree_vfs::Service>, std::less<>> fallback_services_
+      __TA_GUARDED(mutex_);
 };
 
 // Implements in-tree `fs::LazyDir` using C callbacks defined in `vfs_internal_lazy_dir_context_t`.
@@ -128,10 +139,6 @@ class LibvfsLazyDir final : public intree_vfs::LazyDir {
 
 }  // namespace
 
-typedef struct vfs_internal_vfs {
-  std::unique_ptr<intree_vfs::FuchsiaVfs> vfs;
-} vfs_internal_vfs_t;
-
 typedef struct vfs_internal_node {
   using NodeVariant = std::variant<
       /* in-tree VFS types */
@@ -142,6 +149,11 @@ typedef struct vfs_internal_node {
       fbl::RefPtr<LibvfsComposedServiceDir>, fbl::RefPtr<LibvfsLazyDir>>;
 
   NodeVariant node;
+  std::mutex mutex;
+  // `intree_vfs::SynchronousVfs` will synchronously close all active connections on destruction.
+  // If we need to support `intree_vfs::ManagedVfs`, this will need to be revisited to ensure node
+  // lifetimes during asynchronous teardown.
+  std::unique_ptr<intree_vfs::SynchronousVfs> vfs __TA_GUARDED(mutex);
 
   template <typename T>
   T* Downcast() {
@@ -156,28 +168,11 @@ typedef struct vfs_internal_node {
   }
 } vfs_internal_node_t;
 
-__EXPORT zx_status_t vfs_internal_create(async_dispatcher_t* dispatcher,
-                                         vfs_internal_vfs_t** out_vfs) {
-  if (!out_vfs || !dispatcher) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  *out_vfs =
-      new vfs_internal_vfs_t{.vfs = std::make_unique<intree_vfs::SynchronousVfs>(dispatcher)};
-  return ZX_OK;
-}
-
-__EXPORT zx_status_t vfs_internal_destroy(vfs_internal_vfs_t* vfs) {
-  if (!vfs) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  delete vfs;
-  return ZX_OK;
-}
-
-__EXPORT zx_status_t vfs_internal_serve(vfs_internal_vfs_t* vfs, const vfs_internal_node_t* vnode,
-                                        zx_handle_t channel, uint32_t rights) {
+__EXPORT zx_status_t vfs_internal_node_serve(vfs_internal_node_t* vnode,
+                                             async_dispatcher_t* dispatcher, zx_handle_t channel,
+                                             uint32_t rights) {
   zx::channel chan(channel);
-  if (!vfs || !vnode) {
+  if (!vnode || !dispatcher) {
     return ZX_ERR_INVALID_ARGS;
   }
   if (!chan) {
@@ -188,8 +183,23 @@ __EXPORT zx_status_t vfs_internal_serve(vfs_internal_vfs_t* vfs, const vfs_inter
   if (!fidl_rights) {
     return ZX_ERR_INVALID_ARGS;
   }
-  return vfs->vfs->Serve(vnode->AsNode(), std::move(chan),
-                         intree_vfs::VnodeConnectionOptions::FromIoV1Flags(*fidl_rights));
+  std::lock_guard guard(vnode->mutex);
+  if (!vnode->vfs) {
+    vnode->vfs = std::make_unique<intree_vfs::SynchronousVfs>(dispatcher);
+  } else if (dispatcher != vnode->vfs->dispatcher()) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  return vnode->vfs->Serve(vnode->AsNode(), std::move(chan),
+                           intree_vfs::VnodeConnectionOptions::FromIoV1Flags(*fidl_rights));
+}
+
+__EXPORT zx_status_t vfs_internal_node_shutdown(vfs_internal_node_t* vnode) {
+  if (!vnode) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  std::lock_guard guard(vnode->mutex);
+  vnode->vfs = nullptr;
+  return ZX_OK;
 }
 
 __EXPORT zx_status_t vfs_internal_node_destroy(vfs_internal_node_t* vnode) {
@@ -200,11 +210,11 @@ __EXPORT zx_status_t vfs_internal_node_destroy(vfs_internal_node_t* vnode) {
   return ZX_OK;
 }
 
-__EXPORT zx_status_t vfs_internal_directory_create(vfs_internal_node_t** out_vnode) {
-  if (!out_vnode) {
+__EXPORT zx_status_t vfs_internal_directory_create(vfs_internal_node_t** out_dir) {
+  if (!out_dir) {
     return ZX_ERR_INVALID_ARGS;
   }
-  *out_vnode = new vfs_internal_node_t{.node = fbl::MakeRefCounted<intree_vfs::PseudoDir>()};
+  *out_dir = new vfs_internal_node_t{.node = fbl::MakeRefCounted<intree_vfs::PseudoDir>()};
   return ZX_OK;
 }
 
@@ -225,11 +235,19 @@ __EXPORT zx_status_t vfs_internal_directory_remove(vfs_internal_node_t* dir, con
   if (!dir || !name) {
     return ZX_ERR_INVALID_ARGS;
   }
-  intree_vfs::PseudoDir* downcasted = dir->Downcast<intree_vfs::PseudoDir>();
-  if (!downcasted) {
-    return ZX_ERR_WRONG_TYPE;
+  intree_vfs::PseudoDir* pseudo_dir = dir->Downcast<intree_vfs::PseudoDir>();
+  ZX_ASSERT(pseudo_dir);  // Callers should ensure `dir` is the correct type.
+  std::lock_guard guard(dir->mutex);
+  fbl::RefPtr<fs::Vnode> node;
+  if (zx_status_t status = pseudo_dir->Lookup(name, &node); status != ZX_OK) {
+    return status;
   }
-  return downcasted->RemoveEntry(name);
+  if (dir->vfs) {
+    dir->vfs->CloseAllConnectionsForVnode(*node, nullptr);
+  }
+  // We should never fail to remove the entry as we just looked it up under lock.
+  ZX_ASSERT(pseudo_dir->RemoveEntry(name, node.get()) == ZX_OK);
+  return ZX_OK;
 }
 
 __EXPORT zx_status_t vfs_internal_remote_directory_create(zx_handle_t remote,
@@ -302,7 +320,9 @@ __EXPORT zx_status_t vfs_internal_pseudo_file_create(size_t max_bytes,
     return ZX_ERR_INVALID_ARGS;
   }
   intree_vfs::BufferedPseudoFile::ReadHandler read_handler =
-      [context = *context, destroyer = std::move(destroyer)](fbl::String* output) -> zx_status_t {
+      [context = *context, destroyer = std::move(destroyer),
+       mutex = std::make_unique<std::mutex>()](fbl::String* output) -> zx_status_t {
+    std::lock_guard guard(*mutex);  // Have to ensure read/release are called under lock together.
     const char* data;
     size_t len;
     if (zx_status_t status = context.read(context.cookie, &data, &len); status != ZX_OK) {
@@ -360,8 +380,8 @@ __EXPORT zx_status_t vfs_internal_composed_svc_dir_set_fallback(vfs_internal_nod
   if (fallback_channel == ZX_HANDLE_INVALID) {
     return ZX_ERR_BAD_HANDLE;
   }
-  downcasted->SetFallback(fidl::ClientEnd<fuchsia_io::Directory>{zx::channel(fallback_channel)});
-  return ZX_OK;
+  return downcasted->SetFallback(
+      fidl::ClientEnd<fuchsia_io::Directory>{zx::channel(fallback_channel)});
 }
 
 namespace {

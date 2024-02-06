@@ -118,4 +118,20 @@ TEST_F(PseudoDirTest, Serve) {
   });
 }
 
+TEST_F(PseudoDirTest, ServeFailWithDifferentDispatcher) {
+  zx::channel root_client, root_server;
+  // We should be able to serve the same node multiple times so long as we use the same dispatcher.
+  ASSERT_EQ(zx::channel::create(0, &root_client, &root_server), ZX_OK);
+  ASSERT_EQ(root()->Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, std::move(root_server)), ZX_OK);
+  ASSERT_EQ(zx::channel::create(0, &root_client, &root_server), ZX_OK);
+  ASSERT_EQ(root()->Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, std::move(root_server)), ZX_OK);
+  // Serve should fail with a different dispatcher. Only one dispatcher may be registered to serve
+  // a given node.
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  ASSERT_EQ(zx::channel::create(0, &root_client, &root_server), ZX_OK);
+  ASSERT_EQ(root()->Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, std::move(root_server),
+                          loop.dispatcher()),
+            ZX_ERR_INVALID_ARGS);
+}
+
 }  // namespace

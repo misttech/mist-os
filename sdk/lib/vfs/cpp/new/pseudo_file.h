@@ -14,30 +14,22 @@ namespace vfs {
 
 // Buffered pseudo-file.
 //
-// This variant is optimized for incrementally reading and writing properties
-// which are larger than can typically be read or written by the client in
-// a single I/O transaction.
+// This variant is optimized for incrementally reading and writing properties which are larger than
+// can typically be read or written by the client in a single I/O transaction.
 //
-// In read mode, the pseudo-file invokes its read handler when the file is
-// opened and retains the content in a buffer which the client incrementally
-// reads from and can seek within.
+// In read mode, the pseudo-file invokes its read handler when the file is opened and retains the
+// content in an output buffer which the client incrementally reads from and can seek within.
 //
-// In write mode, the client incrementally writes into and seeks within the
-// buffer which the pseudo-file delivers as a whole to the write handler when
-// the file is closed (if there were any writes). Truncation is also supported.
+// In write mode, the client incrementally writes into and seeks within an input buffer which the
+// pseudo-file delivers as a whole to the write handler when the file is closed.  Truncation is also
+// supported.
 //
-// This class is thread-hostile.
+// Each client has its own separate output and input buffers.  Writing into the output buffer does
+// not affect the contents of the client's input buffer or that of any other client.  Changes to the
+// underlying state of the pseudo-file are not observed by the client until it closes and re-opens
+// the file.
 //
-//  # Simple usage
-//
-// Instances of this class should be owned and managed on the same thread
-// that services their connections.
-//
-// # Advanced usage
-//
-// You can use a background thread to service connections provided:
-// async_dispatcher_t for the background thread is stopped or suspended
-// prior to destroying the file.
+// This class is thread-safe.
 class PseudoFile final : public internal::Node {
  public:
   // Handler called to read from the pseudo-file.
@@ -48,15 +40,14 @@ class PseudoFile final : public internal::Node {
 
   // Creates a buffered pseudo-file.
   //
-  // |read_handler| cannot be null. If the |write_handler| is null, then the
-  // pseudo-file is considered not writable. The |max_file_size|
-  // determines the maximum number of bytes which can be written to and read from
-  // the pseudo-file's input buffer when it it opened for writing/reading.
-  PseudoFile(size_t max_file_size, ReadHandler read_handler = ReadHandler(),
-             WriteHandler write_handler = WriteHandler())
+  // `read_handler` cannot be null. If the `write_handler` is null, then the pseudo-file is
+  // considered not writable. `max_file_size` determines the maximum number of bytes which can be
+  // written to and read from the pseudo-file's input buffer when it it opened for writing/reading.
+  explicit PseudoFile(size_t max_file_size, ReadHandler read_handler = ReadHandler(),
+                      WriteHandler write_handler = WriteHandler())
       : Node(MakePseudoFile(max_file_size, std::move(read_handler), std::move(write_handler))) {}
 
-  ~PseudoFile() override = default;
+  using internal::Node::Serve;
 
  private:
   struct PseudoFileState {
@@ -66,8 +57,8 @@ class PseudoFile final : public internal::Node {
     std::vector<uint8_t> buffer;  // Temporary buffer used to store owned data until it's copied.
   };
 
-  static inline vfs_internal_node_t* MakePseudoFile(size_t max_file_size, ReadHandler read_handler,
-                                                    WriteHandler write_handler) {
+  static vfs_internal_node_t* MakePseudoFile(size_t max_file_size, ReadHandler read_handler,
+                                             WriteHandler write_handler) {
     ZX_ASSERT(read_handler);
     vfs_internal_node_t* file;
     PseudoFileState* cookie = new PseudoFileState{

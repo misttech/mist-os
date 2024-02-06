@@ -73,8 +73,9 @@ class VmoFile final : public internal::Node {
           DefaultSharingMode vmo_sharing = DefaultSharingMode::DUPLICATE)
       : VmoFile(vmo.release(), length, write_option, vmo_sharing) {}
 
-  ~VmoFile() override = default;
+  using internal::Node::Serve;
 
+  // Returns a borrowed handle to the VMO backing this file.
   zx::unowned_vmo vmo() const { return vmo_->borrow(); }
 
  private:
