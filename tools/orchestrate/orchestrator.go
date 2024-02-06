@@ -251,10 +251,15 @@ func (r *TestOrchestrator) servePackages(in *RunInput, productDir string) error 
 	if out, err := r.ffx.RunCmdSync("repository", "add-from-pm", productDir); err != nil {
 		return fmt.Errorf("ffx repository add-from-pm: %w out: %s", err, out)
 	}
+	// It is important to always publish, even if there is nothing in
+	// in.Hardware.PackageArchives, because it will force the package metadata
+	// to be refreshed (see b/309847820).
+	publishArgs := []string{"repository", "publish", productDir}
 	for _, far := range in.Hardware.PackageArchives {
-		if out, err := r.ffx.RunCmdSync("repository", "publish", productDir, "--package-archive", far); err != nil {
-			return fmt.Errorf("ffx repository publish %s: %w out: %s", far, err, out)
-		}
+		publishArgs = append(publishArgs, "--package-archive", far)
+	}
+	if out, err := r.ffx.RunCmdSync(publishArgs...); err != nil {
+		return fmt.Errorf("ffx %v: %w out: %v", publishArgs, err, out)
 	}
 	for _, buildID := range in.Hardware.BuildIds {
 		if out, err := r.ffx.RunCmdSync("debug", "symbol-index", "add", buildID); err != nil {
