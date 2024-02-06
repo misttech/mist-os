@@ -25,10 +25,7 @@ group("tests") {
 
   if (target_cpu == "riscv64") {
     # TODO(b/297312145): Enable all tests on RISC-V.
-    deps -= [
-      "android:tests",
-      "gvisor:tests",
-    ]
+    deps -= [ "gvisor:tests" ]
   }
 
   # TODO(https://fxbug.dev/42067974): Remove !is_asan check when Starnix can run binaries built for
