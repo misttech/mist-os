@@ -22,7 +22,6 @@ use crate::{
 
 use {
     anyhow::Error,
-    async_trait::async_trait,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon_status::Status,
@@ -522,7 +521,6 @@ where
     }
 }
 
-#[async_trait]
 impl<T: DerivedConnection + 'static> Representation for BaseConnection<T> {
     type Protocol = fio::DirectoryMarker;
 

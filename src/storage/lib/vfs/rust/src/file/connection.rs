@@ -21,7 +21,6 @@ use {
         ObjectRequestRef, ProtocolsExt,
     },
     anyhow::Error,
-    async_trait::async_trait,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon_status::Status,
@@ -79,25 +78,36 @@ fn create_connection<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMu
 }
 
 /// Trait for dispatching read, write, and seek FIDL requests.
-#[async_trait]
 trait IoOpHandler: Send + Sync {
     /// Reads at most `count` bytes from the file starting at the connection's seek offset and
     /// advances the seek offset.
-    async fn read(&mut self, count: u64) -> Result<Vec<u8>, Status>;
+    fn read(&mut self, count: u64) -> impl Future<Output = Result<Vec<u8>, Status>> + Send;
 
     /// Reads `count` bytes from the file starting at `offset`.
-    async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, Status>;
+    fn read_at(
+        &self,
+        offset: u64,
+        count: u64,
+    ) -> impl Future<Output = Result<Vec<u8>, Status>> + Send;
 
     /// Writes `data` to the file starting at the connect's seek offset and advances the seek
     /// offset. If the connection is in append mode then the seek offset is moved to the end of the
     /// file before writing. Returns the number of bytes written.
-    async fn write(&mut self, data: Vec<u8>) -> Result<u64, Status>;
+    fn write(&mut self, data: Vec<u8>) -> impl Future<Output = Result<u64, Status>> + Send;
 
     /// Writes `data` to the file starting at `offset`. Returns the number of bytes written.
-    async fn write_at(&self, offset: u64, data: Vec<u8>) -> Result<u64, Status>;
+    fn write_at(
+        &self,
+        offset: u64,
+        data: Vec<u8>,
+    ) -> impl Future<Output = Result<u64, Status>> + Send;
 
     /// Modifies the connection's seek offset. Returns the connections new seek offset.
-    async fn seek(&mut self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, Status>;
+    fn seek(
+        &mut self,
+        offset: i64,
+        origin: fio::SeekOrigin,
+    ) -> impl Future<Output = Result<u64, Status>> + Send;
 
     /// Notifies the `IoOpHandler` that the flags of the connection have changed.
     fn update_flags(&mut self, flags: fio::OpenFlags) -> Status;
@@ -164,7 +174,6 @@ impl<T: 'static + DirectoryEntry + File + FileIo> FidlIoConnection<T> {
     }
 }
 
-#[async_trait]
 impl<T: 'static + File + FileIo> IoOpHandler for FidlIoConnection<T> {
     async fn read(&mut self, count: u64) -> Result<Vec<u8>, Status> {
         let buffer = self.read_at(self.seek, count).await?;
@@ -268,7 +277,6 @@ impl<T: 'static + File> DerefMut for RawIoConnection<T> {
     }
 }
 
-#[async_trait]
 impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> IoOpHandler for RawIoConnection<T> {
     async fn read(&mut self, count: u64) -> Result<Vec<u8>, Status> {
         self.file.read(count).await
@@ -357,7 +365,6 @@ mod stream_io {
         }
     }
 
-    #[async_trait]
     impl<T: 'static + File> IoOpHandler for StreamIoConnection<T> {
         async fn read(&mut self, count: u64) -> Result<Vec<u8>, Status> {
             let stream = self.stream.temp_clone();
@@ -977,7 +984,6 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
     }
 }
 
-#[async_trait]
 impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + IoOpHandler> Representation
     for FileConnection<U>
 {
@@ -1175,7 +1181,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl File for MockFile {
         fn writable(&self) -> bool {
             true
@@ -1220,7 +1225,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl FileIo for MockFile {
         async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, Status> {
             let count = buffer.len() as u64;

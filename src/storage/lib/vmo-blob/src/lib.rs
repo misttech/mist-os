@@ -113,7 +113,6 @@ impl vfs::node::Node for VmoBlob {
 }
 
 /// Implement VFS trait so blobs can be accessed as files.
-#[async_trait]
 impl File for VmoBlob {
     fn executable(&self) -> bool {
         true

@@ -166,7 +166,6 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for MetaFile<S> {
     }
 }
 
-#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::file::File for MetaFile<S> {
     async fn open_file(&self, _options: &vfs::file::FileOptions) -> Result<(), zx::Status> {
         Ok(())
@@ -241,7 +240,6 @@ impl<S: crate::NonMetaStorage> vfs::file::File for MetaFile<S> {
     }
 }
 
-#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::file::FileIo for MetaFile<S> {
     async fn read_at(&self, offset_chunk: u64, buffer: &mut [u8]) -> Result<u64, zx::Status> {
         let offset_chunk = std::cmp::min(offset_chunk, self.location.length);

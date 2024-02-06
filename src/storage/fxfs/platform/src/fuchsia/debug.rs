@@ -124,7 +124,6 @@ impl vfs::node::Node for InternalFile {
     }
 }
 
-#[async_trait]
 impl File for InternalFile {
     async fn open_file(&self, _options: &FileOptions) -> Result<(), Status> {
         Ok(())
@@ -163,7 +162,6 @@ impl File for InternalFile {
     }
 }
 
-#[async_trait]
 impl FileIo for InternalFile {
     async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, Status> {
         // Deal with alignment. Handle requires aligned reads.

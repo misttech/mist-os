@@ -134,7 +134,6 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for MetaAsFile<S> {
     }
 }
 
-#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::file::File for MetaAsFile<S> {
     async fn open_file(&self, _options: &vfs::file::FileOptions) -> Result<(), zx::Status> {
         Ok(())
@@ -172,7 +171,6 @@ impl<S: crate::NonMetaStorage> vfs::file::File for MetaAsFile<S> {
     }
 }
 
-#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::file::FileIo for MetaAsFile<S> {
     async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, zx::Status> {
         let contents = self.root_dir.hash.to_string();

@@ -294,7 +294,6 @@ impl Debug for FatFile {
     }
 }
 
-#[async_trait]
 impl VfsFile for FatFile {
     fn writable(&self) -> bool {
         return true;
@@ -369,7 +368,6 @@ impl VfsFile for FatFile {
     }
 }
 
-#[async_trait]
 impl VfsFileIo for FatFile {
     async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, Status> {
         let fs_lock = self.filesystem.lock().unwrap();

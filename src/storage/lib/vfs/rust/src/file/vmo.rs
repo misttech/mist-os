@@ -311,7 +311,6 @@ impl Node for VmoFile {
     }
 }
 
-#[async_trait]
 impl FileIo for VmoFile {
     async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, Status> {
         let vmo = self.vmo().await;
@@ -349,7 +348,6 @@ impl FileIo for VmoFile {
     }
 }
 
-#[async_trait]
 impl File for VmoFile {
     fn readable(&self) -> bool {
         self.readable

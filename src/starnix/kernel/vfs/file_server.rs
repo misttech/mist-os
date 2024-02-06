@@ -495,7 +495,6 @@ impl directory::entry_container::MutableDirectory for StarnixNodeConnection {
     }
 }
 
-#[async_trait]
 impl file::File for StarnixNodeConnection {
     fn writable(&self) -> bool {
         true
@@ -550,7 +549,6 @@ impl file::File for StarnixNodeConnection {
     }
 }
 
-#[async_trait]
 impl file::RawFileIoConnection for StarnixNodeConnection {
     async fn read(&self, count: u64) -> Result<Vec<u8>, zx::Status> {
         let file = self.file.clone();

@@ -5,8 +5,10 @@
 //! Module holding different kinds of files and their building blocks.
 
 use {
-    crate::node::Node, async_trait::async_trait, fidl_fuchsia_io as fio,
+    crate::node::Node,
+    fidl_fuchsia_io as fio,
     fuchsia_zircon_status::Status,
+    std::future::{ready, Future},
 };
 
 #[cfg(target_os = "fuchsia")]
@@ -90,7 +92,6 @@ pub enum SyncMode {
 }
 
 /// Trait used for all files.
-#[async_trait]
 pub trait File: Node {
     /// Capabilities:
     fn readable(&self) -> bool {
@@ -110,78 +111,94 @@ pub trait File: Node {
     /// * OPEN_FLAG_TRUNCATE - A call to truncate() will be made immediately after open().
     /// * OPEN_FLAG_DESCRIBE - The OnOpen event is sent before any other requests are received from
     /// the file's client.
-    async fn open_file(&self, options: &FileOptions) -> Result<(), Status>;
+    fn open_file(&self, options: &FileOptions) -> impl Future<Output = Result<(), Status>> + Send;
 
     /// Truncate the file to |length|.
     /// If there are pending attributes to update (see set_attrs), they should also be flushed at
     /// this time.  Otherwise, no attributes should be updated, other than size as needed.
-    async fn truncate(&self, length: u64) -> Result<(), Status>;
+    fn truncate(&self, length: u64) -> impl Future<Output = Result<(), Status>> + Send;
 
     /// Get a VMO representing this file.
     /// If not supported by the underlying filesystem, should return Err(NOT_SUPPORTED).
     #[cfg(target_os = "fuchsia")]
-    async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<zx::Vmo, Status>;
+    fn get_backing_memory(
+        &self,
+        flags: fio::VmoFlags,
+    ) -> impl Future<Output = Result<zx::Vmo, Status>> + Send;
 
     /// Get the size of this file.
     /// This is used to calculate seek offset relative to the end.
-    async fn get_size(&self) -> Result<u64, Status>;
+    fn get_size(&self) -> impl Future<Output = Result<u64, Status>> + Send;
 
     /// Set the attributes of this file based on the values in `attrs`.
-    async fn set_attrs(
+    fn set_attrs(
         &self,
         flags: fio::NodeAttributeFlags,
         attrs: fio::NodeAttributes,
-    ) -> Result<(), Status>;
+    ) -> impl Future<Output = Result<(), Status>> + Send;
 
     /// Set the attributes of this file based on the values in `attributes`.
-    async fn update_attributes(&self, attributes: fio::MutableNodeAttributes)
-        -> Result<(), Status>;
+    fn update_attributes(
+        &self,
+        attributes: fio::MutableNodeAttributes,
+    ) -> impl Future<Output = Result<(), Status>> + Send;
 
     /// List this files extended attributes.
-    async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Status> {
-        Err(Status::NOT_SUPPORTED)
+    fn list_extended_attributes(
+        &self,
+    ) -> impl Future<Output = Result<Vec<Vec<u8>>, Status>> + Send {
+        ready(Err(Status::NOT_SUPPORTED))
     }
 
     /// Get the value for an extended attribute.
-    async fn get_extended_attribute(&self, _name: Vec<u8>) -> Result<Vec<u8>, Status> {
-        Err(Status::NOT_SUPPORTED)
+    fn get_extended_attribute(
+        &self,
+        _name: Vec<u8>,
+    ) -> impl Future<Output = Result<Vec<u8>, Status>> + Send {
+        ready(Err(Status::NOT_SUPPORTED))
     }
 
     /// Set the value for an extended attribute.
-    async fn set_extended_attribute(
+    fn set_extended_attribute(
         &self,
         _name: Vec<u8>,
         _value: Vec<u8>,
         _mode: fio::SetExtendedAttributeMode,
-    ) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
+    ) -> impl Future<Output = Result<(), Status>> + Send {
+        ready(Err(Status::NOT_SUPPORTED))
     }
 
     /// Remove the value for an extended attribute.
-    async fn remove_extended_attribute(&self, _name: Vec<u8>) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
+    fn remove_extended_attribute(
+        &self,
+        _name: Vec<u8>,
+    ) -> impl Future<Output = Result<(), Status>> + Send {
+        ready(Err(Status::NOT_SUPPORTED))
     }
 
     /// Preallocate disk space for this range.
-    async fn allocate(
+    fn allocate(
         &self,
         _offset: u64,
         _length: u64,
         _mode: fio::AllocateMode,
-    ) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
+    ) -> impl Future<Output = Result<(), Status>> + Send {
+        ready(Err(Status::NOT_SUPPORTED))
     }
 
     /// Set the merkle tree and the descriptor for this file and mark the file as fsverity-enabled.
-    async fn enable_verity(&self, _options: fio::VerificationOptions) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
+    fn enable_verity(
+        &self,
+        _options: fio::VerificationOptions,
+    ) -> impl Future<Output = Result<(), Status>> + Send {
+        ready(Err(Status::NOT_SUPPORTED))
     }
 
     /// Sync this file's contents to the storage medium (probably disk).
     /// This does not necessarily guarantee that the file will be completely written to disk once
     /// the call returns. It merely guarantees that any changes to the file have been propagated
     /// to the next layer in the storage stack.
-    async fn sync(&self, mode: SyncMode) -> Result<(), Status>;
+    fn sync(&self, mode: SyncMode) -> impl Future<Output = Result<(), Status>> + Send;
 
     /// Returns an optional event for the file which signals `fuchsia.io2.FileSignal` events to
     /// clients (e.g. when a file becomes readable).  See `fuchsia.io2.File.Describe`.
@@ -192,18 +209,25 @@ pub trait File: Node {
 
 // Trait for handling reads and writes to a file. Files that support Streams should handle reads and
 // writes via a Pager instead of implementing this trait.
-#[async_trait]
 pub trait FileIo: Send + Sync {
     /// Read at most |buffer.len()| bytes starting at |offset| into |buffer|. The function may read
     /// less than |count| bytes and still return success, in which case read_at returns the number
     /// of bytes read into |buffer|.
-    async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, Status>;
+    fn read_at(
+        &self,
+        offset: u64,
+        buffer: &mut [u8],
+    ) -> impl Future<Output = Result<u64, Status>> + Send;
 
     /// Write |content| starting at |offset|, returning the number of bytes that were successfully
     /// written.
     /// If there are pending attributes to update (see set_attrs), they should also be flushed at
     /// this time.  Otherwise, no attributes should be updated, other than size as needed.
-    async fn write_at(&self, offset: u64, content: &[u8]) -> Result<u64, Status>;
+    fn write_at(
+        &self,
+        offset: u64,
+        content: &[u8],
+    ) -> impl Future<Output = Result<u64, Status>> + Send;
 
     /// Appends |content| returning, if successful, the number of bytes written, and the file offset
     /// after writing.  Implementations should make the writes atomic, so in the event that multiple
@@ -211,7 +235,7 @@ pub trait FileIo: Send + Sync {
     /// sequence.
     /// If there are pending attributes to update (see set_attrs), they should also be flushed at
     /// this time.  Otherwise, no attributes should be updated, other than size as needed.
-    async fn append(&self, content: &[u8]) -> Result<(u64, u64), Status>;
+    fn append(&self, content: &[u8]) -> impl Future<Output = Result<(u64, u64), Status>> + Send;
 }
 
 /// Trait for dispatching read, write, and seek FIDL requests for a given connection. The
@@ -219,25 +243,36 @@ pub trait FileIo: Send + Sync {
 ///
 /// Files that support Streams should handle reads and writes via a Pager instead of implementing
 /// this trait.
-#[async_trait]
 pub trait RawFileIoConnection: Send + Sync {
     /// Reads at most `count` bytes from the file starting at the connection's seek offset and
     /// advances the seek offset.
-    async fn read(&self, count: u64) -> Result<Vec<u8>, Status>;
+    fn read(&self, count: u64) -> impl Future<Output = Result<Vec<u8>, Status>> + Send;
 
     /// Reads `count` bytes from the file starting at `offset`.
-    async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, Status>;
+    fn read_at(
+        &self,
+        offset: u64,
+        count: u64,
+    ) -> impl Future<Output = Result<Vec<u8>, Status>> + Send;
 
     /// Writes `data` to the file starting at the connect's seek offset and advances the seek
     /// offset. If the connection is in append mode then the seek offset is moved to the end of the
     /// file before writing. Returns the number of bytes written.
-    async fn write(&self, data: &[u8]) -> Result<u64, Status>;
+    fn write(&self, data: &[u8]) -> impl Future<Output = Result<u64, Status>> + Send;
 
     /// Writes `data` to the file starting at `offset`. Returns the number of bytes written.
-    async fn write_at(&self, offset: u64, data: &[u8]) -> Result<u64, Status>;
+    fn write_at(
+        &self,
+        offset: u64,
+        data: &[u8],
+    ) -> impl Future<Output = Result<u64, Status>> + Send;
 
     /// Modifies the connection's seek offset. Returns the connections new seek offset.
-    async fn seek(&self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, Status>;
+    fn seek(
+        &self,
+        offset: i64,
+        origin: fio::SeekOrigin,
+    ) -> impl Future<Output = Result<u64, Status>> + Send;
 
     /// Notifies the `IoOpHandler` that the flags of the connection have changed.
     fn update_flags(&self, flags: fio::OpenFlags) -> Status;

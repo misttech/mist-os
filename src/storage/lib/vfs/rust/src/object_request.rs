@@ -8,7 +8,6 @@ use {
         node::{self, Node},
         ProtocolsExt,
     },
-    async_trait::async_trait,
     fidl::{
         endpoints::{ControlHandle, ProtocolMarker, RequestStream, ServerEnd},
         epitaph::ChannelEpitaphExt,
@@ -258,7 +257,6 @@ pub(crate) enum ObjectRequestSend {
     Nothing,
 }
 
-#[async_trait]
 /// Trait to get either fio::Representation or fio::NodeInfoDeprecated.  Connection types
 /// should implement this.
 pub trait Representation {
@@ -266,13 +264,13 @@ pub trait Representation {
     type Protocol: ProtocolMarker;
 
     /// Returns io2's Representation for the object.
-    async fn get_representation(
+    fn get_representation(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::Representation, Status>;
+    ) -> impl Future<Output = Result<fio::Representation, Status>> + Send;
 
     /// Returns io1's NodeInfoDeprecated.
-    async fn node_info(&self) -> Result<fio::NodeInfoDeprecated, Status>;
+    fn node_info(&self) -> impl Future<Output = Result<fio::NodeInfoDeprecated, Status>> + Send;
 }
 
 /// Trait for converting fio::ConnectionProtocols and fio::OpenFlags into ObjectRequest.

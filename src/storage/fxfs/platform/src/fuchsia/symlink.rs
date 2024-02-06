@@ -86,7 +86,6 @@ impl FxSymlink {
     }
 }
 
-#[async_trait]
 impl Symlink for FxSymlink {
     async fn read_target(&self) -> Result<Vec<u8>, zx::Status> {
         self.handle.store().read_symlink(self.object_id()).await.map_err(map_to_status)

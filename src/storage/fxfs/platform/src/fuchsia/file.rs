@@ -392,7 +392,6 @@ impl vfs::node::Node for FxFile {
     }
 }
 
-#[async_trait]
 impl File for FxFile {
     fn writable(&self) -> bool {
         true

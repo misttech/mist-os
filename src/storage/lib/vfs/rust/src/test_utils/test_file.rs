@@ -136,7 +136,6 @@ impl Node for TestFile {
     }
 }
 
-#[async_trait]
 impl FileIo for TestFile {
     async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, Status> {
         let content_size = self.data.lock().unwrap().len().try_into().unwrap();
@@ -169,7 +168,6 @@ impl FileIo for TestFile {
     }
 }
 
-#[async_trait]
 impl File for TestFile {
     fn readable(&self) -> bool {
         true

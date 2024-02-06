@@ -238,7 +238,6 @@ impl<N: Node> Connection<N> {
     }
 }
 
-#[async_trait]
 impl<N: Node> Representation for Connection<N> {
     type Protocol = fio::NodeMarker;
 

@@ -222,7 +222,6 @@ async fn test_not_fsverity_enabled() {
 async fn test_read_link_error() {
     struct ErrorSymlink;
 
-    #[async_trait]
     impl Symlink for ErrorSymlink {
         async fn read_target(&self) -> Result<Vec<u8>, zx::Status> {
             Err(zx::Status::IO)
@@ -746,7 +745,6 @@ impl DirectoryEntry for AllocateFile {
     }
 }
 
-#[async_trait]
 impl FileIo for AllocateFile {
     async fn read_at(&self, _offset: u64, _buffer: &mut [u8]) -> Result<u64, Status> {
         unimplemented!()
@@ -772,7 +770,6 @@ impl vfs::node::Node for AllocateFile {
     }
 }
 
-#[async_trait]
 impl File for AllocateFile {
     fn writable(&self) -> bool {
         true

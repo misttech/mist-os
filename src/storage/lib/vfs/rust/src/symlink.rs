@@ -18,35 +18,44 @@ use {
         path::Path,
         ObjectRequest, ObjectRequestRef, ProtocolsExt, ToObjectRequest,
     },
-    async_trait::async_trait,
     fidl::endpoints::{ControlHandle as _, Responder, ServerEnd},
     fidl_fuchsia_io as fio,
     fuchsia_zircon_status::Status,
     futures::StreamExt,
-    std::{future::Future, sync::Arc},
+    std::{
+        future::{ready, Future},
+        sync::Arc,
+    },
 };
 
-#[async_trait]
 pub trait Symlink: Node {
-    async fn read_target(&self) -> Result<Vec<u8>, Status>;
+    fn read_target(&self) -> impl Future<Output = Result<Vec<u8>, Status>> + Send;
 
     // Extended attributes for symlinks.
-    async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Status> {
-        Err(Status::NOT_SUPPORTED)
+    fn list_extended_attributes(
+        &self,
+    ) -> impl Future<Output = Result<Vec<Vec<u8>>, Status>> + Send {
+        ready(Err(Status::NOT_SUPPORTED))
     }
-    async fn get_extended_attribute(&self, _name: Vec<u8>) -> Result<Vec<u8>, Status> {
-        Err(Status::NOT_SUPPORTED)
+    fn get_extended_attribute(
+        &self,
+        _name: Vec<u8>,
+    ) -> impl Future<Output = Result<Vec<u8>, Status>> + Send {
+        ready(Err(Status::NOT_SUPPORTED))
     }
-    async fn set_extended_attribute(
+    fn set_extended_attribute(
         &self,
         _name: Vec<u8>,
         _value: Vec<u8>,
         _mode: fio::SetExtendedAttributeMode,
-    ) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
+    ) -> impl Future<Output = Result<(), Status>> + Send {
+        ready(Err(Status::NOT_SUPPORTED))
     }
-    async fn remove_extended_attribute(&self, _name: Vec<u8>) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
+    fn remove_extended_attribute(
+        &self,
+        _name: Vec<u8>,
+    ) -> impl Future<Output = Result<(), Status>> + Send {
+        ready(Err(Status::NOT_SUPPORTED))
     }
 }
 
@@ -297,7 +306,6 @@ impl<T: IntoAny + Symlink + Send + Sync> DirectoryEntry for T {
     }
 }
 
-#[async_trait]
 impl<T: Symlink> Representation for Connection<T> {
     type Protocol = fio::SymlinkMarker;
 
@@ -351,7 +359,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl Symlink for TestSymlink {
         async fn read_target(&self) -> Result<Vec<u8>, Status> {
             Ok(TARGET.to_vec())

@@ -106,7 +106,6 @@ impl Node for BlockFile {
     }
 }
 
-#[async_trait]
 impl File for BlockFile {
     fn writable(&self) -> bool {
         true
@@ -150,7 +149,6 @@ impl File for BlockFile {
     }
 }
 
-#[async_trait]
 impl FileIo for BlockFile {
     async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, zx::Status> {
         let () = self
