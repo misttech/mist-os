@@ -231,7 +231,7 @@ int ConsoleMain(int argc, const char* argv[]) {
       debug_adapter = std::make_unique<DebugAdapterServer>(console->get(), port);
       err = debug_adapter->Init();
       if (err.has_error()) {
-        LOGS(Error) << "Failed to initialize debug adapter: " << err.msg();
+        fprintf(stderr, "Failed to initialize debug adapter: %s\n", err.msg().c_str());
         loop.Cleanup();
         return EXIT_FAILURE;
       }
@@ -242,6 +242,8 @@ int ConsoleMain(int argc, const char* argv[]) {
     // Suppress input during startup.
     // Balanced in InitConsole.
     console->DisableInput();
+    // This will enable output from the console if we're not in embedded mode, so we can reliably
+    // use the logging macros now.
     console->context().InitConsoleMode();
 
     std::vector<std::unique_ptr<debug::BufferedFD>> file_streamers;

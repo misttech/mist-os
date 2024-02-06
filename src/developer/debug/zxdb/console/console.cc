@@ -89,7 +89,7 @@ void Console::WriteLog(debug::LogSeverity severity, const debug::FileLineFunctio
       syntax = Syntax::kError;
       break;
   }
-  Write(OutputBuffer(syntax, std::move(log)));
+  Output(OutputBuffer(syntax, std::move(log)));
 }
 
 }  // namespace zxdb
