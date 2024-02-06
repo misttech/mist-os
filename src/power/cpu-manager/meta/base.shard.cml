@@ -34,6 +34,12 @@
             availability: "optional",
         },
     ],
+    expose: [
+        {
+            protocol: "fuchsia.component.Binder",
+            from: "framework",
+        },
+    ],
     config: {
         // Path to a node config file for the CPU Manager to use. Typically set as a default
         // value, but can be overridden for integration tests.

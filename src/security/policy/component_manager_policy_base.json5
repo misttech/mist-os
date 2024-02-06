@@ -7,7 +7,6 @@
                 "/bootstrap/devfs-with-pkg",
                 "/bootstrap/driver_manager",
                 "/bootstrap/power_manager",
-                "/bootstrap/cpu_manager",
                 "/bootstrap/shutdown_shim",
             ],
         },
@@ -314,6 +313,7 @@
         ],
         child_policy: {
             reboot_on_terminate: [
+                "/bootstrap/cpu_manager",
                 "/bootstrap/driver_index",
                 "/bootstrap/fshost",
                 "/bootstrap/pkg-cache",

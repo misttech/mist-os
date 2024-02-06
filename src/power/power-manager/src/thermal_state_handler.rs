@@ -15,6 +15,7 @@ use async_trait::async_trait;
 use async_utils::hanging_get::server as hanging_get;
 use fidl_fuchsia_thermal as fthermal;
 use fuchsia_async as fasync;
+use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObjLocal};
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use futures::prelude::*;
@@ -151,6 +152,10 @@ impl<'a, 'b> ThermalStateHandlerBuilder<'a, 'b> {
             _inspect: inspect,
         });
 
+        if self.enable_cpu_thermal_state_connector {
+            let _connector = connect_to_protocol::<fidl_fuchsia_component::BinderMarker>()?;
+        }
+
         // Publish the Controller service only if both enable_client_state_connector = true
         // and we were provided with a ServiceFs
         if self.enable_client_state_connector {
@@ -234,10 +239,11 @@ impl ClientStates {
             "sensor" => sensor
         );
 
-        self.0
-            .borrow_mut()
-            .values_mut()
-            .for_each(|client_state| client_state.process_new_thermal_load(thermal_load, sensor));
+        for (client, client_state) in self.0.borrow_mut().iter_mut() {
+            if client != Self::CPU_CLIENT_TYPE {
+                client_state.process_new_thermal_load(thermal_load, sensor);
+            }
+        }
     }
 
     /// Processes a new CPU thermal load.
@@ -1222,6 +1228,56 @@ mod tests {
 
         // When the client first connects, verify they get the latest thermal state
         assert_matches!(client.get_thermal_state(&mut executor), Ok(Some(ThermalState(1))));
+    }
+
+    /// Tests that both CPU and regular clients simultaneously receive their appropriate thermal
+    /// state updates.
+    #[test]
+    fn test_mixed_client_types() {
+        let mut executor = fasync::TestExecutor::new();
+        let mut service_fs = ServiceFs::new_local();
+
+        let thermal_config = ThermalConfig::new().add_client_config(
+            "client1",
+            ClientConfig::new()
+                .add_thermal_state(vec![TripPoint::new("sensor1", 1, 9)])
+                .add_thermal_state(vec![TripPoint::new("sensor1", 10, 19)]),
+        );
+
+        let node = ThermalStateHandlerBuilder {
+            node_name: "thermal_state_handler".to_string(),
+            inspect_root: None,
+            thermal_config: Some(thermal_config),
+            outgoing_svc_dir: Some(service_fs.root_dir()),
+            platform_metrics: None,
+            enable_cpu_thermal_state_connector: true,
+            enable_client_state_connector: true,
+        }
+        .build()
+        .unwrap();
+
+        let test_env = TestEnv::new(service_fs);
+        let client1 = test_env.connect_client("client1");
+        let client2 = test_env.connect_client("CPU");
+
+        // First request gives initial thermal state for both clients
+        assert_matches!(client1.get_thermal_state(&mut executor), Ok(Some(ThermalState(0))));
+        assert_matches!(client2.get_thermal_state(&mut executor), Ok(Some(ThermalState(0))));
+
+        // Update the thermal load for "sensor1" and verify client1 gets updated thermal state while
+        // client2 remains unchanged
+        executor
+            .run_singlethreaded(node.handle_update_thermal_load(ThermalLoad(19), "sensor1"))
+            .unwrap();
+        assert_matches!(client1.get_thermal_state(&mut executor), Ok(Some(ThermalState(2))));
+        assert_matches!(client2.get_thermal_state(&mut executor), Ok(None));
+
+        // Update cpu thermal load
+        executor.run_singlethreaded(node.handle_update_cpu_thermal_load(ThermalLoad(29))).unwrap();
+
+        // client1 state is unchanged, but client2 moves to state 29
+        assert_matches!(client1.get_thermal_state(&mut executor), Ok(None));
+        assert_matches!(client2.get_thermal_state(&mut executor), Ok(Some(ThermalState(29))));
     }
 
     /// Tests that multiple clients connected simultaneously receive their appropriate thermal state

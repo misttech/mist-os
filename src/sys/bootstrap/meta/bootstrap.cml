@@ -122,6 +122,7 @@
         {
             name: "cpu_manager",
             url: "fuchsia-boot:///cpu-manager#meta/cpu-manager.cm",
+            on_terminate: "reboot",
         },
         {
             name: "virtual_console",
@@ -610,6 +611,15 @@
             ],
             from: "parent",
             to: "#power_manager",
+        },
+        {
+            protocol: [ "fuchsia.component.Binder" ],
+            from: "#cpu_manager",
+            to: "#power_manager",
+
+            // cpu_manager uses fuchsia.thermal.ClientStateConnector from power_manage
+            // Weak to resolve dependency cycles
+            dependency: "weak",
         },
         {
             protocol: [

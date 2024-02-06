@@ -6,6 +6,5 @@
     program: {
         runner: "elf",
         binary: "bin/cpu_manager",
-        main_process_critical: "true",
     },
 }
