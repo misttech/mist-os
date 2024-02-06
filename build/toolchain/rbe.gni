@@ -120,6 +120,11 @@ declare_args() {
   # and not restricted environments that lack direct network access.
   rust_rbe_download_unstripped_binaries = true
 
+  # Set to true to emit additional .rmeta files when compiling Rust rlibs.
+  # The .rmeta metadata files can be used by downstream build actions
+  # to quickly evaluate transitive dependencies (and remote inputs).
+  rust_emit_rmeta = false
+
   ########################
   ### C++ RBE controls ###
   ########################

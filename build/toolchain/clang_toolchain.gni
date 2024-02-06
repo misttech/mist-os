@@ -646,7 +646,7 @@ template("clang_toolchain") {
 
         # TODO(https://fxbug.dev/42124325): Replacement for rustenv
         command += "{{rustenv}}${ld_location_env} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}}"
-        command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target $link_map_args {{rustflags}}"
+        command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link{{EMIT_RMETA}} -Zdep-info-omit-d-target $link_map_args {{rustflags}}"
         command += " -o \"{{UNSTRIPPED_OUTFILE}}\""
         if (rustc_use_response_files) {
           rspfile = outfile + ".rsp"
@@ -730,6 +730,7 @@ template("clang_toolchain") {
         command = string_replace(command,
                                  "{{UNSTRIPPED_OUTFILE}}",
                                  unstripped_outfile)
+        command = string_replace(command, "{{EMIT_RMETA}}", "")
 
         # Expand UNSTRIPPED_DIR
         _unstripped_dir = "exe.unstripped"
@@ -761,7 +762,9 @@ template("clang_toolchain") {
 
       tool("rust_rlib") {
         forward_variables_from(_rust_concurrent_jobs, "*")
-        depfile = "{{output}}.d"
+        rmeta = "{{output_dir}}/lib{{target_output_name}}.rmeta"
+        rlib = "{{output_dir}}/lib{{target_output_name}}{{output_extension}}"
+        depfile = "$rlib.d"
 
         # Overwrite an existing output file only if its contents have changed.
         command = string_replace(_restat_rustc_prefix, "{{DEPFILE}}", depfile)
@@ -772,8 +775,14 @@ template("clang_toolchain") {
 
         # TODO(https://fxbug.dev/42124325): Replacement for rustenv
         command += "{{rustenv}} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}}"
-        command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target {{rustflags}}"
-        command += " -o {{output}}"
+        extra_emit_opts = ""
+        if (rust_emit_rmeta) {
+          extra_emit_opts = ",metadata=$rmeta"
+        } else {
+          not_needed([ "rmeta" ])
+        }
+        command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link$extra_emit_opts -Zdep-info-omit-d-target {{rustflags}}"
+        command += " -o $rlib"
         if (rustc_use_response_files) {
           rspfile = "{{output}}.rsp"
           rspfile_content = "{{rustdeps}} {{externs}}"
@@ -785,8 +794,11 @@ template("clang_toolchain") {
             " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
 
         description = "RUST {{output}}"
-        outputs =
-            [ "{{output_dir}}/lib{{target_output_name}}{{output_extension}}" ]
+        outputs = [ rlib ]
+        if (rust_emit_rmeta) {
+          outputs += [ rmeta ]
+        }
+
         default_output_dir = "{{target_out_dir}}"
         default_output_extension = ".rlib"
         rust_sysroot = "$rebased_rustc_prefix"
@@ -833,6 +845,7 @@ template("clang_toolchain") {
         description = "RUST {{output}}"
         default_output_dir = "{{target_out_dir}}"
         output_prefix = "lib"
+        command = string_replace(command, "{{EMIT_RMETA}}", "")
       }
 
       tool("rust_dylib") {
@@ -841,6 +854,14 @@ template("clang_toolchain") {
         description = "RUST {{output}}"
         default_output_dir = "{{root_out_dir}}/rust-shared"
         output_prefix = "lib"
+        if (rust_emit_rmeta) {
+          rmeta = "{{output_dir}}/{{target_output_name}}.rmeta"
+          command =
+              string_replace(command, "{{EMIT_RMETA}}", ",metadata=$rmeta")
+          outputs += [ rmeta ]
+        } else {
+          command = string_replace(command, "{{EMIT_RMETA}}", "")
+        }
       }
 
       tool("rust_macro") {
@@ -871,6 +892,7 @@ template("clang_toolchain") {
         description = "RUST {{output}}"
         outputs =
             [ "{{output_dir}}/{{target_output_name}}{{output_extension}}" ]
+
         default_output_dir = "{{root_out_dir}}"
         default_output_extension = _dylib_extension
         output_prefix = "lib"
