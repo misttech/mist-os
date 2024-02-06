@@ -782,6 +782,9 @@ template("clang_toolchain") {
           not_needed([ "rmeta" ])
         }
         command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link$extra_emit_opts -Zdep-info-omit-d-target {{rustflags}}"
+        if (!rust_rbe_download_rlibs) {
+          command += " --remote-flag=--download_outputs=false"
+        }
         command += " -o $rlib"
         if (rustc_use_response_files) {
           rspfile = "{{output}}.rsp"

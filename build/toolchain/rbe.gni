@@ -125,6 +125,10 @@ declare_args() {
   # to quickly evaluate transitive dependencies (and remote inputs).
   rust_emit_rmeta = false
 
+  # TODO(b/42084033): Controls whether or not to download (intermediate)
+  # rlibs from remote Rust build actions.
+  rust_rbe_download_rlibs = true
+
   ########################
   ### C++ RBE controls ###
   ########################
@@ -267,6 +271,9 @@ assert(
     rust_rbe_check == "none" || rust_rbe_check == "consistency" ||
         rust_rbe_check == "determinism",
     "rust_rbe_check must be one of {none,consistency,determinism}, but got: ${rust_rbe_check}.")
+
+assert(rust_rbe_download_rlibs || rust_emit_rmeta,
+       "rust_rbe_download_rlibs=false requires rust_emit_rmeta=true")
 
 assert(cxx_rbe_exec_strategy == "remote" || cxx_rbe_exec_strategy == "local" ||
            cxx_rbe_exec_strategy == "remote_local_fallback" ||
