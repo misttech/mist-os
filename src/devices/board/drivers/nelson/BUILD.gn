@@ -207,7 +207,10 @@ fuchsia_driver_component("nelson-module") {
 
 fuchsia_driver_package("package") {
   package_name = "nelson-module"
-  driver_components = [ ":nelson-module" ]
+  driver_components = [
+    ":nelson-module",
+    "post-init",
+  ]
 }
 
 group("tests") {
