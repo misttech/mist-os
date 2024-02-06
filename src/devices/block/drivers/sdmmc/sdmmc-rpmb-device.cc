@@ -14,26 +14,19 @@
 
 namespace sdmmc {
 
-RpmbDevice::RpmbDevice(SdmmcBlockDevice* sdmmc_parent,
-                       const std::array<uint8_t, SDMMC_CID_SIZE>& cid,
-                       const std::array<uint8_t, MMC_EXT_CSD_SIZE>& ext_csd)
-    : sdmmc_parent_(sdmmc_parent),
-      cid_(cid),
-      rpmb_size_(ext_csd[MMC_EXT_CSD_RPMB_SIZE_MULT]),
-      reliable_write_sector_count_(ext_csd[MMC_EXT_CSD_REL_WR_SEC_C]) {
-  const std::string path_from_parent = std::string(sdmmc_parent_->parent()->driver_name()) + "/" +
-                                       std::string(sdmmc_parent_->block_name()) + "/";
-
-  // TODO(hanbinyoon): Move this initialization so that any error status can be returned.
-  ZX_ASSERT(compat_server_
-                .Initialize(sdmmc_parent_->parent()->driver_incoming(),
-                            sdmmc_parent_->parent()->driver_outgoing(),
-                            sdmmc_parent_->parent()->driver_node_name(), kDeviceName,
-                            compat::ForwardMetadata::None(), std::nullopt, path_from_parent)
-                .is_ok());
-}
-
 zx_status_t RpmbDevice::AddDevice() {
+  {
+    const std::string path_from_parent = std::string(sdmmc_parent_->parent()->driver_name()) + "/" +
+                                         std::string(sdmmc_parent_->block_name()) + "/";
+    auto result = compat_server_.Initialize(
+        sdmmc_parent_->parent()->driver_incoming(), sdmmc_parent_->parent()->driver_outgoing(),
+        sdmmc_parent_->parent()->driver_node_name(), kDeviceName, compat::ForwardMetadata::None(),
+        std::nullopt, path_from_parent);
+    if (result.is_error()) {
+      return result.status_value();
+    }
+  }
+
   {
     fuchsia_hardware_rpmb::Service::InstanceHandler handler({
         .device = fit::bind_member<&RpmbDevice::Serve>(this),

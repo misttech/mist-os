@@ -28,7 +28,11 @@ class RpmbDevice : public fidl::WireServer<fuchsia_hardware_rpmb::Rpmb> {
   // is transferred to devmgr shortly after, meaning it will outlive this object due to the
   // parent/child device relationship.
   RpmbDevice(SdmmcBlockDevice* sdmmc_parent, const std::array<uint8_t, SDMMC_CID_SIZE>& cid,
-             const std::array<uint8_t, MMC_EXT_CSD_SIZE>& ext_csd);
+             const std::array<uint8_t, MMC_EXT_CSD_SIZE>& ext_csd)
+      : sdmmc_parent_(sdmmc_parent),
+        cid_(cid),
+        rpmb_size_(ext_csd[MMC_EXT_CSD_RPMB_SIZE_MULT]),
+        reliable_write_sector_count_(ext_csd[MMC_EXT_CSD_REL_WR_SEC_C]) {}
 
   zx_status_t AddDevice();
 

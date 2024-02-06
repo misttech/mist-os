@@ -17,25 +17,6 @@ namespace sdmmc {
 
 using fuchsia_hardware_sdio::wire::SdioHwInfo;
 
-SdioFunctionDevice::SdioFunctionDevice(SdioControllerDevice* sdio_parent, uint32_t func)
-    : function_(static_cast<uint8_t>(func)), sdio_parent_(sdio_parent) {
-  sdio_function_name_ = "sdmmc-sdio-" + std::to_string(func);
-
-  const std::string path_from_parent = std::string(sdio_parent_->parent()->driver_name()) + "/" +
-                                       std::string(sdio_parent_->kDeviceName) + "/";
-  compat::DeviceServer::BanjoConfig banjo_config;
-  banjo_config.callbacks[ZX_PROTOCOL_SDIO] = sdio_server_.callback();
-
-  // TODO(hanbinyoon): Move this initialization so that any error status can be returned.
-  ZX_ASSERT(compat_server_
-                .Initialize(sdio_parent_->parent()->driver_incoming(),
-                            sdio_parent_->parent()->driver_outgoing(),
-                            sdio_parent_->parent()->driver_node_name(), sdio_function_name_,
-                            compat::ForwardMetadata::None(), std::move(banjo_config),
-                            path_from_parent)
-                .is_ok());
-}
-
 zx_status_t SdioFunctionDevice::Create(SdioControllerDevice* sdio_parent, uint32_t func,
                                        std::unique_ptr<SdioFunctionDevice>* out_dev) {
   fbl::AllocChecker ac;
@@ -49,6 +30,21 @@ zx_status_t SdioFunctionDevice::Create(SdioControllerDevice* sdio_parent, uint32
 }
 
 zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info) {
+  {
+    const std::string path_from_parent = std::string(sdio_parent_->parent()->driver_name()) + "/" +
+                                         std::string(sdio_parent_->kDeviceName) + "/";
+    compat::DeviceServer::BanjoConfig banjo_config;
+    banjo_config.callbacks[ZX_PROTOCOL_SDIO] = sdio_server_.callback();
+
+    auto result = compat_server_.Initialize(
+        sdio_parent_->parent()->driver_incoming(), sdio_parent_->parent()->driver_outgoing(),
+        sdio_parent_->parent()->driver_node_name(), sdio_function_name_,
+        compat::ForwardMetadata::None(), std::move(banjo_config), path_from_parent);
+    if (result.is_error()) {
+      return result.status_value();
+    }
+  }
+
   {
     fuchsia_hardware_sdio::Service::InstanceHandler handler({
         .device = fit::bind_member<&SdioFunctionDevice::Serve>(this),

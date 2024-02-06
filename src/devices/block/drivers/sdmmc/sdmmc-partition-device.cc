@@ -33,28 +33,30 @@ PartitionDevice::PartitionDevice(SdmmcBlockDevice* sdmmc_parent, const block_inf
       // error.
       break;
   }
-
-  const std::string path_from_parent = std::string(sdmmc_parent_->parent()->driver_name()) + "/" +
-                                       std::string(sdmmc_parent_->block_name()) + "/";
-  compat::DeviceServer::BanjoConfig banjo_config;
-  banjo_config.callbacks[ZX_PROTOCOL_BLOCK_IMPL] = block_impl_server_.callback();
-  if (partition_ != USER_DATA_PARTITION) {
-    block_partition_server_.emplace(ZX_PROTOCOL_BLOCK_PARTITION, this,
-                                    &block_partition_protocol_ops_);
-    banjo_config.callbacks[ZX_PROTOCOL_BLOCK_PARTITION] = block_partition_server_->callback();
-  }
-
-  // TODO(hanbinyoon): Move this initialization so that any error status can be returned.
-  ZX_ASSERT(compat_server_
-                .Initialize(sdmmc_parent_->parent()->driver_incoming(),
-                            sdmmc_parent_->parent()->driver_outgoing(),
-                            sdmmc_parent_->parent()->driver_node_name(), partition_name_,
-                            compat::ForwardMetadata::Some({DEVICE_METADATA_GPT_INFO}),
-                            std::move(banjo_config), path_from_parent)
-                .is_ok());
 }
 
 zx_status_t PartitionDevice::AddDevice() {
+  {
+    const std::string path_from_parent = std::string(sdmmc_parent_->parent()->driver_name()) + "/" +
+                                         std::string(sdmmc_parent_->block_name()) + "/";
+    compat::DeviceServer::BanjoConfig banjo_config;
+    banjo_config.callbacks[ZX_PROTOCOL_BLOCK_IMPL] = block_impl_server_.callback();
+    if (partition_ != USER_DATA_PARTITION) {
+      block_partition_server_.emplace(ZX_PROTOCOL_BLOCK_PARTITION, this,
+                                      &block_partition_protocol_ops_);
+      banjo_config.callbacks[ZX_PROTOCOL_BLOCK_PARTITION] = block_partition_server_->callback();
+    }
+
+    auto result = compat_server_.Initialize(
+        sdmmc_parent_->parent()->driver_incoming(), sdmmc_parent_->parent()->driver_outgoing(),
+        sdmmc_parent_->parent()->driver_node_name(), partition_name_,
+        compat::ForwardMetadata::Some({DEVICE_METADATA_GPT_INFO}), std::move(banjo_config),
+        path_from_parent);
+    if (result.is_error()) {
+      return result.status_value();
+    }
+  }
+
   if (partition_name_.empty()) {
     return ZX_ERR_NOT_SUPPORTED;
   }

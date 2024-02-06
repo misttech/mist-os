@@ -22,8 +22,6 @@ class SdioControllerDevice;
 class SdioFunctionDevice : public fidl::WireServer<fuchsia_hardware_sdio::Device>,
                            public ddk::SdioProtocol<SdioFunctionDevice> {
  public:
-  SdioFunctionDevice(SdioControllerDevice* sdio_parent, uint32_t func);
-
   static zx_status_t Create(SdioControllerDevice* sdio_parent, uint32_t func,
                             std::unique_ptr<SdioFunctionDevice>* out_dev);
 
@@ -76,6 +74,11 @@ class SdioFunctionDevice : public fidl::WireServer<fuchsia_hardware_sdio::Device
   fdf::Logger& logger();
 
  private:
+  SdioFunctionDevice(SdioControllerDevice* sdio_parent, uint32_t func)
+      : function_(static_cast<uint8_t>(func)), sdio_parent_(sdio_parent) {
+    sdio_function_name_ = "sdmmc-sdio-" + std::to_string(func);
+  }
+
   void Serve(fidl::ServerEnd<fuchsia_hardware_sdio::Device> request);
 
   uint8_t function_ = SDIO_MAX_FUNCS;
