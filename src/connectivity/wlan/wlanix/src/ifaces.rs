@@ -24,11 +24,8 @@ use {
 pub(crate) trait IfaceManager: Send + Sync {
     type Client: ClientIface;
 
-    async fn list_phys(&self) -> Result<Vec<u16>, Error>;
     async fn list_interfaces(&self) -> Result<Vec<fidl_device_service::QueryIfaceResponse>, Error>;
-    async fn create_client_iface(&self, phy_id: u16) -> Result<u16, Error>;
     async fn get_client_iface(&self, iface_id: u16) -> Result<Arc<Self::Client>, Error>;
-    async fn destroy_iface(&self, iface_id: u16) -> Result<(), Error>;
 }
 
 pub struct DeviceMonitorIfaceManager {
@@ -50,10 +47,6 @@ impl DeviceMonitorIfaceManager {
 impl IfaceManager for DeviceMonitorIfaceManager {
     type Client = SmeClientIface;
 
-    async fn list_phys(&self) -> Result<Vec<u16>, Error> {
-        self.monitor_svc.list_phys().await.map_err(Into::into)
-    }
-
     async fn list_interfaces(&self) -> Result<Vec<fidl_device_service::QueryIfaceResponse>, Error> {
         let ifaces = self.monitor_svc.list_ifaces().await?;
         let mut result = Vec::with_capacity(ifaces.len());
@@ -69,71 +62,19 @@ impl IfaceManager for DeviceMonitorIfaceManager {
         Ok(result)
     }
 
-    async fn create_client_iface(&self, phy_id: u16) -> Result<u16, Error> {
-        // TODO(b/298030838): Remove unmanaged iface support when wlanix is the sole config path.
-        let existing_ifaces = self.list_interfaces().await?;
-        let mut unmanaged_iface_id = None;
-        for iface in existing_ifaces {
-            if !self.ifaces.lock().contains_key(&iface.id)
-                && iface.role == fidl_common::WlanMacRole::Client
-            {
-                info!("Found existing client iface -- skipping iface creation");
-                unmanaged_iface_id = Some(iface.id);
-                break;
-            }
+    async fn get_client_iface(&self, iface_id: u16) -> Result<Arc<SmeClientIface>, Error> {
+        if let Some(iface) = self.ifaces.lock().get(&iface_id) {
+            return Ok(iface.clone());
         }
-        let (iface_id, wlanix_provisioned) = match unmanaged_iface_id {
-            Some(id) => (id, false),
-            None => {
-                let (status, response) = self
-                    .monitor_svc
-                    .create_iface(&fidl_device_service::CreateIfaceRequest {
-                        phy_id,
-                        role: fidl_fuchsia_wlan_common::WlanMacRole::Client,
-                        // TODO(b/322060085): Determine if we need to populate this and how.
-                        sta_addr: [0u8; 6],
-                    })
-                    .await?;
-                zx::Status::ok(status)?;
-                (
-                    response
-                        .ok_or_else(|| format_err!("Did not receieve a CreateIfaceResponse"))?
-                        .iface_id,
-                    true,
-                )
-            }
-        };
-
         let (sme_proxy, server) = create_proxy::<fidl_sme::ClientSmeMarker>()?;
         self.monitor_svc.get_client_sme(iface_id, server).await?.map_err(zx::Status::from_raw)?;
-        let mut iface = SmeClientIface::new(sme_proxy);
-        iface.wlanix_provisioned = wlanix_provisioned;
-        let _ = self.ifaces.lock().insert(iface_id, Arc::new(iface));
-        Ok(iface_id)
-    }
-
-    async fn get_client_iface(&self, iface_id: u16) -> Result<Arc<SmeClientIface>, Error> {
-        match self.ifaces.lock().get(&iface_id) {
-            Some(iface) => Ok(iface.clone()),
-            None => Err(format_err!("Requested unknown iface {}", iface_id)),
-        }
-    }
-
-    async fn destroy_iface(&self, iface_id: u16) -> Result<(), Error> {
-        // TODO(b/298030838): Remove unmanaged iface support when wlanix is the sole config path.
-        if let Some(iface) = self.ifaces.lock().remove(&iface_id) {
-            if iface.wlanix_provisioned {
-                let status = self
-                    .monitor_svc
-                    .destroy_iface(&fidl_device_service::DestroyIfaceRequest { iface_id })
-                    .await?;
-                zx::Status::ok(status).map_err(|e| e.into())
-            } else {
-                info!("Iface {} was not provisioned by wlanix. Skipping destruction.", iface_id);
-                Ok(())
-            }
+        let mut ifaces = self.ifaces.lock();
+        if let Some(iface) = ifaces.get(&iface_id) {
+            Ok(iface.clone())
         } else {
-            Ok(())
+            let iface = Arc::new(SmeClientIface::new(sme_proxy));
+            ifaces.insert(iface_id, iface.clone());
+            Ok(iface)
         }
     }
 }
@@ -175,8 +116,6 @@ pub(crate) struct SmeClientIface {
     sme_proxy: fidl_sme::ClientSmeProxy,
     last_scan_results: Arc<Mutex<Vec<fidl_sme::ScanResult>>>,
     scan_abort_signal: Arc<Mutex<Option<oneshot::Sender<()>>>>,
-    // TODO(b/298030838): Remove unmanaged iface support when wlanix is the sole config path.
-    wlanix_provisioned: bool,
 }
 
 impl SmeClientIface {
@@ -185,7 +124,6 @@ impl SmeClientIface {
             sme_proxy,
             last_scan_results: Arc::new(Mutex::new(vec![])),
             scan_abort_signal: Arc::new(Mutex::new(None)),
-            wlanix_provisioned: true,
         }
     }
 }
@@ -495,18 +433,10 @@ pub mod test_utils {
     impl IfaceManager for TestIfaceManager {
         type Client = TestClientIface;
 
-        async fn list_phys(&self) -> Result<Vec<u16>, Error> {
-            Ok(vec![1])
-        }
-
         async fn list_interfaces(
             &self,
         ) -> Result<Vec<fidl_device_service::QueryIfaceResponse>, Error> {
             Ok(vec![FAKE_IFACE_RESPONSE.clone()])
-        }
-
-        async fn create_client_iface(&self, _phy_id: u16) -> Result<u16, Error> {
-            Ok(FAKE_IFACE_RESPONSE.id)
         }
 
         async fn get_client_iface(&self, _iface_id: u16) -> Result<Arc<TestClientIface>, Error> {
@@ -514,10 +444,6 @@ pub mod test_utils {
                 Some(iface) => Ok(Arc::clone(iface)),
                 None => panic!("Requested client iface but none configured"),
             }
-        }
-
-        async fn destroy_iface(&self, _iface_id: u16) -> Result<(), Error> {
-            Ok(())
         }
     }
 }
@@ -539,8 +465,6 @@ mod tests {
             test_utils::fake_stas::FakeProtectionCfg,
         },
     };
-
-    const TEST_IFACE_ID: u16 = 123;
 
     fn setup_test() -> (
         fasync::TestExecutor,
@@ -588,129 +512,19 @@ mod tests {
     }
 
     #[test]
-    fn test_create_and_get_client_iface() {
+    fn test_get_client_iface() {
         let (mut exec, mut monitor_stream, manager) = setup_test();
-        let mut fut = manager.create_client_iface(0);
-
-        // Indicate that there are no existing ifaces.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let responder = assert_variant!(
-            exec.run_until_stalled(&mut monitor_stream.select_next_some()),
-            Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::ListIfaces { responder })) => responder);
-        responder.send(&[]).expect("Failed to respond to ListIfaces");
-
-        // Create a new iface.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let responder = assert_variant!(
-            exec.run_until_stalled(&mut monitor_stream.select_next_some()),
-            Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::CreateIface { responder, .. })) => responder);
-        responder
-            .send(0, Some(&fidl_device_service::CreateIfaceResponse { iface_id: TEST_IFACE_ID }))
-            .expect("Failed to send CreateIface response");
-
-        // Establish a connection to the new iface.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let responder = assert_variant!(
-            exec.run_until_stalled(&mut monitor_stream.select_next_some()),
-            Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::GetClientSme { responder, .. })) => responder);
-        responder.send(Ok(())).expect("Failed to send GetClientSme response");
-
-        // Creation complete!
-        let request_id =
-            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(id)) => id);
-        assert_eq!(request_id, TEST_IFACE_ID);
-
-        // The new iface is ready for use.
-        assert_variant!(
-            exec.run_until_stalled(&mut manager.get_client_iface(TEST_IFACE_ID)),
-            Poll::Ready(Ok(_))
-        );
-    }
-
-    #[test]
-    fn test_create_iface_fails() {
-        let (mut exec, mut monitor_stream, manager) = setup_test();
-        let mut fut = manager.create_client_iface(0);
-
-        // Indicate that there are no existing ifaces.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let responder = assert_variant!(
-            exec.run_until_stalled(&mut monitor_stream.select_next_some()),
-            Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::ListIfaces { responder })) => responder);
-        responder.send(&[]).expect("Failed to respond to ListIfaces");
-
-        // Return an error for CreateIface.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let responder = assert_variant!(
-            exec.run_until_stalled(&mut monitor_stream.select_next_some()),
-            Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::CreateIface { responder, .. })) => responder);
-        responder.send(1, None).expect("Failed to send CreateIface response");
-
-        assert_variant!(
-            exec.run_until_stalled(&mut manager.get_client_iface(TEST_IFACE_ID)),
-            Poll::Ready(Err(_))
-        );
-    }
-
-    #[test]
-    fn test_destroy_iface() {
-        let (mut exec, mut monitor_stream, manager) = setup_test();
-
-        let (proxy, _server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("Failed to create proxy");
-        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(proxy)));
-
-        let mut fut = manager.destroy_iface(1);
-
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        let responder = assert_variant!(
-            exec.run_until_stalled(&mut monitor_stream.select_next_some()),
-            Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::DestroyIface { responder, .. })) => responder);
-        responder.send(0).expect("Failed to send DestroyIface response");
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
-
-        assert!(manager.ifaces.lock().is_empty());
-    }
-
-    // TODO(b/298030838): Delete test when wlanix is the sole config path.
-    #[test]
-    fn test_destroy_iface_not_wlanix() {
-        let (mut exec, mut monitor_stream, manager) = setup_test();
-
-        let (proxy, _server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("Failed to create proxy");
-        let mut iface = SmeClientIface::new(proxy);
-        iface.wlanix_provisioned = false;
-        manager.ifaces.lock().insert(1, Arc::new(iface));
-
-        let mut fut = manager.destroy_iface(1);
-
-        // No destroy request is sent.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
-        assert_variant!(
-            exec.run_until_stalled(&mut monitor_stream.select_next_some()),
-            Poll::Pending
-        );
-
-        assert!(manager.ifaces.lock().is_empty());
-    }
-
-    #[test]
-    fn test_get_client_iface_fails_no_such_iface() {
-        let (mut exec, _monitor_stream, manager) = setup_test();
         let mut fut = manager.get_client_iface(1);
 
-        // No ifaces exist, so this should always error.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_e)));
-    }
+        // First query device monitor for the list of ifaces.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        let (_sme_server, responder) = assert_variant!(
+            exec.run_until_stalled(&mut monitor_stream.select_next_some()),
+            Poll::Ready(Ok(fidl_device_service::DeviceMonitorRequest::GetClientSme { iface_id: 1, sme_server, responder })) => (sme_server, responder));
+        responder.send(Ok(())).expect("Failed to respond to GetClientSme");
 
-    #[test]
-    fn test_destroy_iface_no_such_iface() {
-        let (mut exec, _monitor_stream, manager) = setup_test();
-        let mut fut = manager.destroy_iface(1);
-
-        // No ifaces exist, so this should always return immediately.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+        let _iface =
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(iface)) => iface);
     }
 
     #[test]
