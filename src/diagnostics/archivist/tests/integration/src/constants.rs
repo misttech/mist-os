@@ -16,6 +16,5 @@ pub const SOCKET_PUPPET_COMPONENT_URL: &str =
     "fuchsia-pkg://fuchsia.com/archivist-integration-tests#meta/socket-puppet.cm";
 pub const LOG_AND_EXIT_COMPONENT_URL: &str =
     "fuchsia-pkg://fuchsia.com/archivist-integration-tests#meta/log-and-exit.cm";
-pub const LOGGING_COMPONENT_URL: &str = "#meta/logging_component.cm";
 pub const STUB_INSPECT_COMPONENT_URL: &str =
     "fuchsia-pkg://fuchsia.com/archivist-integration-tests#meta/stub_inspect_component.cm";

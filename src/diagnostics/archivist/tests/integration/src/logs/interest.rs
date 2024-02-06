@@ -5,14 +5,9 @@
 use crate::assert::assert_logs_sequence;
 use crate::puppet::PuppetProxyExt;
 use crate::test_topology;
-use anyhow::{Context, Error};
-use diagnostics_reader::{ArchiveReader, Logs};
+use crate::utils::LogSettingsExt;
 use fidl_fuchsia_archivist_test as ftest;
-use fidl_fuchsia_diagnostics::{
-    ArchiveAccessorMarker, ComponentSelector, Interest, LogInterestSelector, LogSettingsMarker,
-    LogSettingsProxy, Severity,
-};
-use selectors::{self, parse_component_selector, VerboseError};
+use fidl_fuchsia_diagnostics::{LogSettingsMarker, Severity};
 
 // This test verifies that a component only emits messages at or above its
 // current interest severity level, even when the interest changes while the
@@ -31,26 +26,11 @@ async fn set_interest() {
     .await
     .expect("create test topology");
 
-    let accessor = realm_proxy
-        .connect_to_protocol::<ArchiveAccessorMarker>()
-        .await
-        .expect("connect to archive accessor");
-
-    let mut logs = ArchiveReader::new()
-        .with_archive(accessor)
-        .snapshot_then_subscribe::<Logs>()
-        .expect("subscribe to logs");
-
-    let log_settings = realm_proxy
-        .connect_to_protocol::<LogSettingsMarker>()
-        .await
-        .expect("connect to log settings");
+    let mut logs = crate::utils::snapshot_and_stream_logs(&realm_proxy).await;
 
     let puppet = test_topology::connect_to_puppet(&realm_proxy, PUPPET_NAME)
         .await
         .expect("connect to puppet");
-
-    let component_log_settings = ComponentLogSettings::new(PUPPET_NAME);
 
     // Use default severity INFO.
     // Wait for the initial interest to be observed.
@@ -81,8 +61,13 @@ async fn set_interest() {
     )
     .await;
 
+    let log_settings = realm_proxy
+        .connect_to_protocol::<LogSettingsMarker>()
+        .await
+        .expect("connect to log settings");
+
     // Severity: DEBUG
-    component_log_settings.set_interest(&log_settings, Severity::Debug).await.unwrap();
+    log_settings.set_component_interest(PUPPET_NAME, Severity::Debug).await.unwrap();
     response = puppet.wait_for_interest_change().await.unwrap();
     assert_eq!(response.severity, Some(Severity::Debug));
     puppet
@@ -107,7 +92,7 @@ async fn set_interest() {
     .await;
 
     // Severity: WARN
-    component_log_settings.set_interest(&log_settings, Severity::Warn).await.unwrap();
+    log_settings.set_component_interest(PUPPET_NAME, Severity::Warn).await.unwrap();
     response = puppet.wait_for_interest_change().await.unwrap();
     assert_eq!(response.severity, Some(Severity::Warn));
     puppet
@@ -127,7 +112,7 @@ async fn set_interest() {
     .await;
 
     // Severity: ERROR
-    component_log_settings.set_interest(&log_settings, Severity::Error).await.unwrap();
+    log_settings.set_component_interest(PUPPET_NAME, Severity::Error).await.unwrap();
     response = puppet.wait_for_interest_change().await.unwrap();
     assert_eq!(response.severity, Some(Severity::Error));
     puppet
@@ -196,14 +181,7 @@ async fn set_interest_before_startup() {
         .expect("connect to log settings");
 
     // Set the minimum severity to Severity::Debug.
-    let component_log_settings = ComponentLogSettings::new(PUPPET_NAME);
-    component_log_settings.set_interest(&log_settings, Severity::Debug).await.unwrap();
-
-    // Start listening for logs.
-    let accessor = realm_proxy
-        .connect_to_protocol::<ArchiveAccessorMarker>()
-        .await
-        .expect("connect to archive accessor");
+    log_settings.set_component_interest(PUPPET_NAME, Severity::Debug).await.unwrap();
 
     // Connect to the component under test to start it.
     let puppet = test_topology::connect_to_puppet(&realm_proxy, PUPPET_NAME)
@@ -216,45 +194,13 @@ async fn set_interest_before_startup() {
         .log_messages(vec![(Severity::Debug, "debugging world"), (Severity::Info, "Hello, world!")])
         .await;
 
-    let mut logs = ArchiveReader::new()
-        .with_archive(accessor)
-        .snapshot_then_subscribe::<Logs>()
-        .expect("subscribe to logs");
-
     // Assert logs include the Severity::Debug log.
+    let mut logs = crate::utils::snapshot_and_stream_logs(&realm_proxy).await;
+
     assert_logs_sequence(
         &mut logs,
         PUPPET_MONIKER,
         vec![(Severity::Debug, "debugging world"), (Severity::Info, "Hello, world!")],
     )
     .await;
-}
-
-// A helper struct that modifies log settings for a set of components matched by a given
-// component_selector.
-struct ComponentLogSettings {
-    component_selector: ComponentSelector,
-}
-
-impl ComponentLogSettings {
-    fn new(component_selector_str: &'static str) -> Self {
-        let component_selector = parse_component_selector::<VerboseError>(component_selector_str)
-            .expect("is valid component selector");
-        Self { component_selector }
-    }
-}
-
-impl ComponentLogSettings {
-    async fn set_interest(
-        &self,
-        log_settings: &LogSettingsProxy,
-        severity: Severity,
-    ) -> Result<(), Error> {
-        let interests = [LogInterestSelector {
-            selector: self.component_selector.clone(),
-            interest: Interest { min_severity: Some(severity), ..Default::default() },
-        }];
-        log_settings.set_interest(&interests).await.context("set interest")?;
-        Ok(())
-    }
 }

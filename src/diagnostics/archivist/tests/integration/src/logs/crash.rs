@@ -4,9 +4,8 @@
 
 use crate::puppet::PuppetProxyExt;
 use crate::test_topology;
-use diagnostics_reader::{ArchiveReader, Logs};
 use fidl_fuchsia_archivist_test as ftest;
-use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, Severity};
+use fidl_fuchsia_diagnostics::Severity;
 use futures::StreamExt;
 use tracing::warn;
 
@@ -42,8 +41,8 @@ async fn logs_from_crashing_component() -> Result<(), anyhow::Error> {
     let mut log_buf: Vec<String> = vec![];
     let mut found_log_message = false;
     let mut found_crash_message = false;
-    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await?;
-    let mut logs = ArchiveReader::new().with_archive(accessor).snapshot_then_subscribe::<Logs>()?;
+
+    let mut logs = crate::utils::snapshot_and_stream_logs(&realm_proxy).await;
 
     // Check for the log message.
     while let Some(Ok(logs_data)) = logs.next().await {
