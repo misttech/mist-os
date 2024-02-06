@@ -10,11 +10,6 @@
             "-ie",
             "-f",
             "/config/data/sshd_config",
-
-            // TODO: fxbug.dev/304565237 - delete the next two lines by
-            // 2024-02-06 at the latest.
-            "-o",
-            "LogLevel=DEBUG",
         ],
 
         // stdin and stdout are forwarded to the SSH connection fd.
