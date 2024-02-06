@@ -16,23 +16,21 @@ void TestErrorReporter::ReportError(fuchsia_logging::LogSeverity severity,
                                     std::string error_string) {
   // Typically, we don't want to log expected errors when running the tests.
   // However, it is useful to print these errors while writing the tests.
-#ifndef NDEBUG
+#if ENABLE_DLOG
   // Allow force printing of errors via --verbose=3 as a parameter.
-  if (FX_VLOG_IS_ON(3)) {
-    switch (severity) {
-      case ::fuchsia_logging::LOG_INFO:
-        FX_LOGS(INFO) << error_string;
-        break;
-      case ::fuchsia_logging::LOG_WARNING:
-        FX_LOGS(WARNING) << error_string;
-        break;
-      case ::fuchsia_logging::LOG_ERROR:
-        FX_LOGS(ERROR) << error_string;
-        break;
-      case ::fuchsia_logging::LOG_FATAL:
-        FX_LOGS(FATAL) << error_string;
-        break;
-    }
+  switch (severity) {
+    case ::fuchsia_logging::LOG_INFO:
+      FX_LOGS(INFO) << error_string;
+      break;
+    case ::fuchsia_logging::LOG_WARNING:
+      FX_LOGS(WARNING) << error_string;
+      break;
+    case ::fuchsia_logging::LOG_ERROR:
+      FX_LOGS(ERROR) << error_string;
+      break;
+    case ::fuchsia_logging::LOG_FATAL:
+      FX_LOGS(FATAL) << error_string;
+      break;
   }
 #endif
 
