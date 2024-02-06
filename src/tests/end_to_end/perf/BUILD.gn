@@ -69,59 +69,6 @@ dart_test("summarize_perf_results_test") {
 }
 test_list += [ "summarize_perf_results_test" ]
 
-# Split the following tests into shards so that each shard fits
-# within the default time limit.
-shards = [
-  "0",
-  "1",
-  "2",
-  "3",
-  "4",
-  "5",
-  "6",
-  "7",
-  "8",
-  "9",
-  "10",
-]
-total_shards = "11"
-shard_test_list = [ "netstack_iperf_test" ]
-
-foreach(test, shard_test_list) {
-  foreach(shard, shards) {
-    target_name = test + "_shard_" + shard
-    dart_test(target_name) {
-      sources = [
-        test + ".dart",
-        "helpers.dart",
-        "summarize.dart",
-      ]
-
-      args = [
-        "--total-shards=" + total_shards,
-        "--shard-index=" + shard,
-      ]
-
-      deps = [
-        "//sdk/testing/sl4f/client",
-        "//third_party/dart-pkg/pub/args",
-        "//third_party/dart-pkg/pub/logging",
-        "//third_party/dart-pkg/pub/meta",
-        "//third_party/dart-pkg/pub/test",
-        "//third_party/dart-pkg/pub/tuple",
-      ]
-
-      non_dart_deps = [ ":runtime_deps($host_toolchain)" ]
-
-      environments = [
-        nuc_env,
-        vim3_env,
-      ]
-    }
-    test_list += [ target_name ]
-  }
-}
-
 _tests = [
   {
     name = "flatland_benchmark"
@@ -194,12 +141,6 @@ if (is_host) {
     # keep-sorted start
     "fuchsia.flatland_latency.txt",
     "fuchsia.input_latency.simplest_app.txt",
-    "fuchsia.netstack.iperf_benchmarks.ethernet_tcp_recv.txt",
-    "fuchsia.netstack.iperf_benchmarks.ethernet_tcp_send.txt",
-    "fuchsia.netstack.iperf_benchmarks.ethernet_udp_recv.txt",
-    "fuchsia.netstack.iperf_benchmarks.ethernet_udp_send.txt",
-    "fuchsia.netstack.iperf_benchmarks.localhost_tcp.txt",
-    "fuchsia.netstack.iperf_benchmarks.localhost_udp.txt",
 
     # keep-sorted end
   ]
@@ -218,12 +159,6 @@ if (is_host) {
       "//src/performance/trace2json:bin",
       "//src/testing/catapult_converter:converter_bin",
     ]
-
-    # TODO(https://fxbug.dev/42125198): Enable host build for non-linux hosts as well.
-    if (host_os == "linux") {
-      sources += [ "$root_out_dir/iperf3" ]
-      deps += [ "//third_party/iperf:bin" ]
-    }
   }
 }
 
@@ -252,9 +187,6 @@ group("test") {
 
     # Many tests use sl4f to communicate with the target.
     "//src/testing/sl4f",
-
-    # These are used by netstack benchmarks.
-    "//third_party/iperf:iperf3_pkg",
 
     # These are used by flatland_benchmarks and input_latency_benchmarks
     "//src/ui/examples:flatland-examples",
