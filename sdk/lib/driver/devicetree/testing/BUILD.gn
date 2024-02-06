@@ -2,8 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-source_set("board-test-helper") {
-  deps = [
+import("//build/cpp/sdk_source_set.gni")
+
+sdk_source_set("board-test-helper") {
+  sdk_name = "board-test-helper"
+  category = "internal"
+  non_sdk_local_deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/lib/device-watcher/cpp",
@@ -15,7 +19,7 @@ source_set("board-test-helper") {
     "//zircon/system/ulib/sync:sync-cpp",
   ]
 
-  public_deps = [
+  non_sdk_public_deps = [
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/zbi-format",
     "//src/devices/bus/drivers/platform",
@@ -26,8 +30,6 @@ source_set("board-test-helper") {
     "board-test-helper.cc",
     "board-test-helper.h",
   ]
-
-  testonly = true
 }
 
 source_set("visitor-test-helper") {

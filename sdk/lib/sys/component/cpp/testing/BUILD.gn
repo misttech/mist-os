@@ -5,8 +5,6 @@
 import("//build/cpp/sdk_source_set.gni")
 
 group("cpp") {
-  testonly = true
-
   public_deps = [
     ":cpp_library",
     "//src/lib/fuchsia-component-test:includes",

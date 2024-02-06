@@ -25,7 +25,6 @@ group("driver_test_realm") {
 }
 
 group("realm_builder_version") {
-  testonly = true
   deps = [
     ":driver_manager_test",
     ":driver_test_realm_component",
@@ -53,7 +52,6 @@ group("tests") {
 
 executable("bin") {
   output_name = "driver_test_realm"
-  testonly = true
   sources = [ "driver_test_realm.cc" ]
   deps = [
     ":driver_test_realm_config",
@@ -100,7 +98,6 @@ fuchsia_structured_config_values("driver_test_realm_config_default") {
 }
 
 fuchsia_component("driver_test_realm_component") {
-  testonly = true
   cm_label = ":manifest"
   deps = [
     ":bin",
@@ -110,7 +107,6 @@ fuchsia_component("driver_test_realm_component") {
 
 executable("fake_resolver_bin") {
   output_name = "fake_resolver"
-  testonly = true
   sources = [ "fake_resolver.cc" ]
   data_deps = [ "fake_driver:driver_package" ]
   deps = [
@@ -125,19 +121,16 @@ executable("fake_resolver_bin") {
 }
 
 fuchsia_component("fake_resolver") {
-  testonly = true
   manifest = "meta/fake_resolver.cml"
   deps = [ ":fake_resolver_bin" ]
 }
 
 fuchsia_component_manifest("driver_manager_manifest") {
-  testonly = true
   component_name = "driver_manager_test"
   manifest = "meta/driver_manager_test.cml"
 }
 
 fuchsia_structured_config_values("test_config") {
-  testonly = true
   cm_label = ":driver_manager_manifest"
   values = {
     set_root_driver_host_critical = false
@@ -152,7 +145,6 @@ fuchsia_structured_config_values("test_config") {
 }
 
 fuchsia_component("driver_manager_test") {
-  testonly = true
   cm_label = ":driver_manager_manifest"
   deps = [
     ":test_config",
@@ -161,7 +153,6 @@ fuchsia_component("driver_manager_test") {
 }
 
 fuchsia_component_manifest("test_realm_manifest") {
-  testonly = true
   component_name = "test_realm"
   manifest = "meta/test_realm.cml"
   restricted_features = [

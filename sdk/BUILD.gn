@@ -586,6 +586,7 @@ sdk_molecule("platform_libs") {
     ":version_history",
     "//sdk/lib/driver/compat/cpp:cpp_sdk",
     "//sdk/lib/driver/devicetree/manager:manager_sdk",
+    "//sdk/lib/driver/devicetree/testing:board-test-helper_sdk",
     "//sdk/lib/driver/devicetree/visitors:load-visitors_sdk",
     "//sdk/lib/driver/devicetree/visitors/default:default_sdk",
     "//src/developer/debug/ipc:ipc_sdk",
