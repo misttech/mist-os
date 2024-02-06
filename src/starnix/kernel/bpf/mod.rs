@@ -11,7 +11,7 @@
 
 mod helpers;
 mod map;
-mod program;
 
 pub mod fs;
+pub mod program;
 pub mod syscalls;

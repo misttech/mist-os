@@ -9,7 +9,7 @@ use crate::{
     bpf::{
         fs::{get_bpf_object, get_selinux_context, BpfFsDir, BpfFsObject, BpfHandle, BpfObject},
         map::Map,
-        program::Program,
+        program::{Program, ProgramInfo},
     },
     mm::{MemoryAccessor, MemoryAccessorExt},
     task::CurrentTask,
@@ -212,16 +212,17 @@ pub fn sys_bpf(
             let prog_attr: bpf_attr__bindgen_ty_4 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_PROG_LOAD");
 
+            let info = ProgramInfo::from(&prog_attr);
             let user_code = UserRef::<bpf_insn>::new(UserAddress::from(prog_attr.insns));
             let code = current_task.read_objects_to_vec(user_code, prog_attr.insn_cnt as usize)?;
 
             let program = if current_task.kernel().features.bpf_v2 {
-                Program::new(current_task, code)?
+                Program::new(current_task, info, code)?
             } else {
                 // We pretend to succeed at loading the program in the basic version of bpf.
                 // Eventually we'll be able to remove this stub when we can load bpf programs
                 // accurately.
-                Program::new_stub()
+                Program::new_stub(info)
             };
 
             install_bpf_fd(current_task, program)

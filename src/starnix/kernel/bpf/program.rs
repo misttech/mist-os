@@ -11,16 +11,57 @@ use crate::{
     task::CurrentTask,
     vfs::FdNumber,
 };
+use starnix_logging::track_stub;
+use starnix_uapi::bpf_attr__bindgen_ty_4;
 
 use starnix_logging::log_error;
-use starnix_uapi::{bpf_insn, errno, error, errors::Errno};
+use starnix_uapi::{
+    bpf_insn, bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER, errno, error, errors::Errno,
+};
 use ubpf::{
     error::UbpfError,
     program::{UbpfVm, UbpfVmBuilder},
     ubpf::EBPF_OP_LDDW,
 };
 
+/// The different type of BPF programs.
+#[derive(Debug, Eq, PartialEq)]
+pub enum ProgramType {
+    SocketFilter,
+    /// Unhandled program type.
+    Unknown(u32),
+}
+
+impl From<u32> for ProgramType {
+    fn from(program_type: u32) -> Self {
+        match program_type {
+            #![allow(non_upper_case_globals)]
+            bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER => Self::SocketFilter,
+            program_type @ _ => {
+                track_stub!(
+                    TODO("https://fxbug.dev/324043750"),
+                    "Unknown BPF program type",
+                    program_type
+                );
+                Self::Unknown(program_type)
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ProgramInfo {
+    pub program_type: ProgramType,
+}
+
+impl From<&bpf_attr__bindgen_ty_4> for ProgramInfo {
+    fn from(info: &bpf_attr__bindgen_ty_4) -> Self {
+        Self { program_type: info.prog_type.into() }
+    }
+}
+
 pub struct Program {
+    pub info: ProgramInfo,
     _vm: Option<UbpfVm>,
     _objects: Vec<BpfHandle>,
 }
@@ -33,7 +74,11 @@ fn map_ubpf_error(e: UbpfError) -> Errno {
 }
 
 impl Program {
-    pub fn new(current_task: &CurrentTask, mut code: Vec<bpf_insn>) -> Result<Program, Errno> {
+    pub fn new(
+        current_task: &CurrentTask,
+        info: ProgramInfo,
+        mut code: Vec<bpf_insn>,
+    ) -> Result<Program, Errno> {
         let mut builder = UbpfVmBuilder::new().map_err(map_ubpf_error)?;
         let objects = link(current_task, &mut code, &mut builder)?;
 
@@ -46,11 +91,11 @@ impl Program {
             builder.load(code)
         })()
         .map_err(map_ubpf_error)?;
-        Ok(Program { _vm: Some(vm), _objects: objects })
+        Ok(Program { info, _vm: Some(vm), _objects: objects })
     }
 
-    pub fn new_stub() -> Program {
-        Program { _vm: None, _objects: vec![] }
+    pub fn new_stub(info: ProgramInfo) -> Program {
+        Program { info, _vm: None, _objects: vec![] }
     }
 }
 

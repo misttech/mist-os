@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use crate::{
-    bpf::fs::{get_bpf_object, BpfHandle},
+    bpf::{
+        fs::{get_bpf_object, BpfHandle},
+        program::{Program, ProgramType},
+    },
     mm::MemoryAccessorExt,
     task::{CurrentTask, EventHandler, Task, WaitCanceler, WaitQueue, Waiter},
     vfs::{
@@ -381,9 +384,16 @@ impl UnixSocket {
         inner.keepalive = keepalive;
     }
 
-    fn set_bpf_program(&self, bpf_program: Option<BpfHandle>) {
+    fn set_bpf_program(&self, bpf_program: Option<BpfHandle>) -> Result<(), Errno> {
+        if let Some(program) = bpf_program.as_ref() {
+            let program = program.downcast::<Program>().ok_or_else(|| errno!(EINVAL))?;
+            if program.info.program_type != ProgramType::SocketFilter {
+                return error!(EINVAL);
+            }
+        }
         let mut inner = self.lock();
         inner.bpf_program = bpf_program;
+        Ok(())
     }
 
     fn peer_cred(&self) -> Option<ucred> {
@@ -727,7 +737,7 @@ impl SocketOps for UnixSocket {
                 SO_ATTACH_BPF => {
                     let fd: FdNumber = task.read_object(user_opt.try_into()?)?;
                     let object = get_bpf_object(task, fd)?;
-                    self.set_bpf_program(Some(object));
+                    self.set_bpf_program(Some(object))?;
                 }
                 _ => return error!(ENOPROTOOPT),
             },
