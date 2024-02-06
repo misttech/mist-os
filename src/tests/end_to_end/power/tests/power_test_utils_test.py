@@ -82,7 +82,7 @@ class PowerSamplerTest(unittest.TestCase):
 
         mock_popen.assert_called()
         self.assertEqual(
-            mock_popen.call_args[1]["cmd"],
+            mock_popen.call_args.args[0],
             [
                 _MEASUREPOWER_PATH,
                 "-format",

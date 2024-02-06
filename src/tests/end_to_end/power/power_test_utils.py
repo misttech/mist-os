@@ -344,7 +344,7 @@ class _RealPowerSampler(PowerSampler):
         ]
         _LOGGER.debug(f"Power measurement cmd: {cmd}")
         self._measurepower_proc = subprocess.Popen(
-            cmd=cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
 
     def _await_first_sample(self, timeout_sec: float = 60):
