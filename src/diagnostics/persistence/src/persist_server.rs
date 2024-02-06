@@ -12,7 +12,7 @@ use {
     fuchsia_sync::Mutex,
     futures::StreamExt,
     persistence_config::{ServiceName, Tag},
-    std::{collections::HashSet, iter::Iterator, sync::Arc},
+    std::{collections::HashSet, sync::Arc},
     tracing::*,
 };
 
