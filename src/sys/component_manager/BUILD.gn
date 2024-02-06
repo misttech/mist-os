@@ -159,6 +159,7 @@ rustc_binary("bin") {
     "src/builtin/mexec_resource.rs",
     "src/builtin/mmio_resource.rs",
     "src/builtin/mod.rs",
+    "src/builtin/msi_resource.rs",
     "src/builtin/power_resource.rs",
     "src/builtin/profile_resource.rs",
     "src/builtin/realm_builder.rs",

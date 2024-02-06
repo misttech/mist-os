@@ -30,6 +30,7 @@ use {
             log::{ReadOnlyLog, WriteOnlyLog},
             mexec_resource::MexecResource,
             mmio_resource::MmioResource,
+            msi_resource::MsiResource,
             power_resource::PowerResource,
             profile_resource::ProfileResource,
             realm_builder::{
@@ -852,6 +853,28 @@ impl BuiltinEnvironment {
         if let Some(mexec_resource) = mexec_resource {
             root_input_builder.add_protocol_if_enabled::<fkernel::MexecResourceMarker>(
                 move |stream| mexec_resource.clone().serve(stream).boxed(),
+            );
+        }
+
+        // Set up the MsiResource service.
+        let msi_resource = system_resource_handle
+            .as_ref()
+            .and_then(|handle| {
+                handle
+                    .create_child(
+                        zx::ResourceKind::SYSTEM,
+                        None,
+                        zx::sys::ZX_RSRC_SYSTEM_MSI_BASE,
+                        1,
+                        b"msi",
+                    )
+                    .ok()
+            })
+            .map(MsiResource::new)
+            .and_then(Result::ok);
+        if let Some(msi_resource) = msi_resource {
+            root_input_builder.add_protocol_if_enabled::<fkernel::MsiResourceMarker>(
+                move |stream| msi_resource.clone().serve(stream).boxed(),
             );
         }
 

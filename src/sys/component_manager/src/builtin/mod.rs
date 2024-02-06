@@ -24,6 +24,7 @@ pub mod kernel_stats;
 pub mod log;
 pub mod mexec_resource;
 pub mod mmio_resource;
+pub mod msi_resource;
 pub mod power_resource;
 pub mod profile_resource;
 pub mod realm_builder;

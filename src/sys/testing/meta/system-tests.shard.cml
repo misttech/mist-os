@@ -68,6 +68,7 @@
                 "fuchsia.kernel.IrqResource",
                 "fuchsia.kernel.MexecResource",
                 "fuchsia.kernel.MmioResource",
+                "fuchsia.kernel.MsiResource",
                 "fuchsia.kernel.PowerResource",
                 "fuchsia.kernel.ProfileResource",
                 "fuchsia.kernel.RootJob",
