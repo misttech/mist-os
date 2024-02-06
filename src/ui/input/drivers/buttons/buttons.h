@@ -98,9 +98,9 @@ class ButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_I
   static constexpr size_t kFeatureAndDescriptorBufferSize = 512;
 
   int Thread();
-  uint8_t ReconfigurePolarity(uint32_t idx, uint64_t int_port);
+  zx::result<uint8_t> ReconfigurePolarity(uint32_t idx, uint64_t int_port);
   zx_status_t ConfigureInterrupt(uint32_t idx, uint64_t int_port);
-  bool MatrixScan(uint32_t row, uint32_t col, zx_duration_t delay);
+  zx::result<bool> MatrixScan(uint32_t row, uint32_t col, zx_duration_t delay);
 
   struct ButtonsInputReport {
     zx::time event_time = zx::time(ZX_TIME_INFINITE_PAST);

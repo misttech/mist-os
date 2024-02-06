@@ -156,7 +156,11 @@ int ButtonsDevice::Thread() {
       uint32_t type = static_cast<uint32_t>(packet.key - kPortKeyInterruptStart);
       if (gpios_[type].config.type == BUTTONS_GPIO_TYPE_INTERRUPT) {
         // We need to reconfigure the GPIO to catch the opposite polarity.
-        debounce_states_[type].value = ReconfigurePolarity(type, packet.key);
+        auto reconfig_result = ReconfigurePolarity(type, packet.key);
+        if (!reconfig_result.is_ok()) {
+          return reconfig_result.error_value();
+        }
+        debounce_states_[type].value = *reconfig_result;
 
         // Notify
         debounce_states_[type].timer.set(zx::deadline_after(zx::duration(kDebounceThresholdNs)),
@@ -252,19 +256,19 @@ void ButtonsDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
 }
 
 // Requires interrupts to be disabled for all rows/cols.
-bool ButtonsDevice::MatrixScan(uint32_t row, uint32_t col, zx_duration_t delay) {
+zx::result<bool> ButtonsDevice::MatrixScan(uint32_t row, uint32_t col, zx_duration_t delay) {
   auto& gpio_col = gpios_[col];
   {
     fidl::WireResult result = gpio_col.client->ConfigIn(
         fuchsia_hardware_gpio::GpioFlags::kNoPull);  // Float column to find row in use.
     if (!result.ok()) {
       zxlogf(ERROR, "Failed to send ConfigIn request to gpio %u: %s", col, result.status_string());
-      return result.status();
+      return zx::error(result.status());
     }
     if (result->is_error()) {
       zxlogf(ERROR, "Failed to configuire gpio %u to input: %s", col,
              zx_status_get_string(result->error_value()));
-      return result->error_value();
+      return zx::error(result->error_value());
     }
   }
   zx::nanosleep(zx::deadline_after(zx::duration(delay)));
@@ -272,28 +276,28 @@ bool ButtonsDevice::MatrixScan(uint32_t row, uint32_t col, zx_duration_t delay) 
   fidl::WireResult read_result = gpios_[row].client->Read();
   if (!read_result.ok()) {
     zxlogf(ERROR, "Failed to send Read request to gpio %u: %s", row, read_result.status_string());
-    return read_result.status();
+    return zx::error(read_result.status());
   }
   if (read_result->is_error()) {
     zxlogf(ERROR, "Failed to read gpio %u: %s", row,
            zx_status_get_string(read_result->error_value()));
-    return read_result->error_value();
+    return zx::error(read_result->error_value());
   }
 
   {
     fidl::WireResult result = gpio_col.client->ConfigOut(gpio_col.config.matrix.output_value);
     if (!result.ok()) {
       zxlogf(ERROR, "Failed to send ConfigOut request to gpio %u: %s", col, result.status_string());
-      return result.status();
+      return zx::error(result.status());
     }
     if (result->is_error()) {
       zxlogf(ERROR, "Failed to configuire gpio %u to output: %s", col,
              zx_status_get_string(result->error_value()));
-      return result->error_value();
+      return zx::error(result->error_value());
     }
   }
   zxlogf(DEBUG, "row %u col %u val %u", row, col, read_result.value()->value);
-  return static_cast<bool>(read_result.value()->value);
+  return zx::ok(static_cast<bool>(read_result.value()->value));
 }
 
 zx::result<ButtonsDevice::ButtonsInputReport> ButtonsDevice::GetInputReport() {
@@ -302,7 +306,12 @@ zx::result<ButtonsDevice::ButtonsInputReport> ButtonsDevice::GetInputReport() {
   for (size_t i = 0; i < buttons_.size(); ++i) {
     bool new_value = false;  // A value true means a button is pressed.
     if (buttons_[i].type == BUTTONS_TYPE_MATRIX) {
-      new_value = MatrixScan(buttons_[i].gpioA_idx, buttons_[i].gpioB_idx, buttons_[i].gpio_delay);
+      auto scan_result =
+          MatrixScan(buttons_[i].gpioA_idx, buttons_[i].gpioB_idx, buttons_[i].gpio_delay);
+      if (!scan_result.is_ok()) {
+        return zx::error(scan_result.error_value());
+      }
+      new_value = *scan_result;
     } else if (buttons_[i].type == BUTTONS_TYPE_DIRECT) {
       auto gpio_index = buttons_[i].gpioA_idx;
       fidl::WireResult read_result = gpios_[gpio_index].client->Read();
@@ -354,7 +363,7 @@ void ButtonsDevice::GetInputReport(GetInputReportRequestView request,
   completer.ReplySuccess(input_report.Build());
 }
 
-uint8_t ButtonsDevice::ReconfigurePolarity(uint32_t idx, uint64_t int_port) {
+zx::result<uint8_t> ButtonsDevice::ReconfigurePolarity(uint32_t idx, uint64_t int_port) {
   zxlogf(DEBUG, "gpio %u port %lu", idx, int_port);
   uint8_t current = 0, old;
   auto& gpio = gpios_[idx];
@@ -362,12 +371,12 @@ uint8_t ButtonsDevice::ReconfigurePolarity(uint32_t idx, uint64_t int_port) {
   fidl::WireResult read_result1 = gpio.client->Read();
   if (!read_result1.ok()) {
     zxlogf(ERROR, "Failed to send Read request to gpio %u: %s", idx, read_result1.status_string());
-    return read_result1.status();
+    return zx::error(read_result1.status());
   }
   if (read_result1->is_error()) {
     zxlogf(ERROR, "Failed to read gpio %u: %s", idx,
            zx_status_get_string(read_result1->error_value()));
-    return read_result1->error_value();
+    return zx::error(read_result1->error_value());
   }
   current = read_result1.value()->value;
 
@@ -379,12 +388,12 @@ uint8_t ButtonsDevice::ReconfigurePolarity(uint32_t idx, uint64_t int_port) {
       if (!result.ok()) {
         zxlogf(ERROR, "Failed to send SetPolarity request to gpio %u: %s", idx,
                result.status_string());
-        return result.status();
+        return zx::error(result.status());
       }
       if (result->is_error()) {
         zxlogf(ERROR, "Failed to set polarity of gpio %u: %s", idx,
                zx_status_get_string(result->error_value()));
-        return result->error_value();
+        return zx::error(result->error_value());
       }
     }
 
@@ -393,18 +402,18 @@ uint8_t ButtonsDevice::ReconfigurePolarity(uint32_t idx, uint64_t int_port) {
     if (!read_result2.ok()) {
       zxlogf(ERROR, "Failed to send Read request to gpio %u: %s", idx,
              read_result2.status_string());
-      return read_result2.status();
+      return zx::error(read_result2.status());
     }
     if (read_result2->is_error()) {
       zxlogf(ERROR, "Failed to read gpio %u: %s", idx,
              zx_status_get_string(read_result2->error_value()));
-      return read_result2->error_value();
+      return zx::error(read_result2->error_value());
     }
     current = read_result2.value()->value;
     zxlogf(TRACE, "old gpio %u new gpio %u", old, current);
     // If current switches after setup, we setup a new trigger for it (opposite edge).
   } while (current != old);
-  return current;
+  return zx::ok(current);
 }
 
 zx_status_t ButtonsDevice::ConfigureInterrupt(uint32_t idx, uint64_t int_port) {
@@ -460,7 +469,10 @@ zx_status_t ButtonsDevice::ConfigureInterrupt(uint32_t idx, uint64_t int_port) {
     return status;
   }
   // To make sure polarity is correct in case it changed during configuration.
-  ReconfigurePolarity(idx, int_port);
+  auto reconfig_result = ReconfigurePolarity(idx, int_port);
+  if (!reconfig_result.is_ok()) {
+    return reconfig_result.error_value();
+  }
   return ZX_OK;
 }
 
