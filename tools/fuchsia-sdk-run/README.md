@@ -49,3 +49,22 @@ ffx --help
 This will make it so that you can run `ffx` (including `ffx sdk run`) through
 the "ffx" mode and `zxdb` and `far` through the "default sdk" search method,
 finding them in the SDK and running them that way.
+
+### Alias based Setup
+
+Common shells (e.g. bash, zsh, fish) support aliasing one command to another.
+
+Instead of hardlinking the `fuchsia-sdk-run` binary to `ffx` you could Instead
+add `fuchsia-sdk-run` to your path, then put the following in your shell 
+setup files (e.g. `.bashrc` or `.zshrc`):
+
+```bash
+alias ffx='fuchsia-sdk-run ffx'
+```
+
+This will allow you to run `ffx target list` from your prompt, and the actual
+command which will be run is:
+
+```bash
+fuchsia-sdk-run ffx target list
+```
