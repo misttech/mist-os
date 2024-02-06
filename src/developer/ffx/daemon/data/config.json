@@ -16,17 +16,6 @@
             "timeout_rate": 5
         }
     },
-    "proactive_log": {
-        "cache_directory": "$DATA/target_logs",
-        "enabled": false,
-        "max_log_size_bytes": 10485760,
-        "max_session_size_bytes": 104857600,
-        "max_sessions_per_target": 5,
-        "symbolize": {
-            "enabled": true,
-            "extra_args": []
-        }
-    },
     "ssh": {
         "auth-sock": [
             "$SSH_AUTH_SOCK"
