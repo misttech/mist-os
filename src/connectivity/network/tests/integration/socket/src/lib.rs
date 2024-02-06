@@ -2791,6 +2791,7 @@ async fn test_udp_source_address_has_zone<N: Netstack>(name: &str) {
         .await
         .expect("client failed to join network");
     client_ep.add_address_and_subnet_route(Ipv6::CLIENT_SUBNET).await.expect("configure address");
+    client_ep.apply_nud_flake_workaround().await.expect("apply NUD flake workaround");
     let server_ep = server
         .join_network_with(
             &net,
@@ -2801,19 +2802,7 @@ async fn test_udp_source_address_has_zone<N: Netstack>(name: &str) {
         .await
         .expect("server failed to join network");
     server_ep.add_address_and_subnet_route(Ipv6::SERVER_SUBNET).await.expect("configure address");
-
-    if let NetstackVersion::Netstack2 { .. } = N::VERSION {
-        // Add static ARP entries as we've observed flakes in CQ due to ARP timeouts
-        // and ARP resolution is immaterial to this test.
-        futures::stream::iter([
-            (&server, &server_ep, Ipv6::CLIENT_SUBNET.addr, CLIENT_MAC),
-            (&client, &client_ep, Ipv6::SERVER_SUBNET.addr, SERVER_MAC),
-        ])
-        .for_each_concurrent(None, |(realm, ep, addr, mac)| {
-            realm.add_neighbor_entry(ep.id(), addr, mac).map(|r| r.expect("add_neighbor_entry"))
-        })
-        .await;
-    }
+    server_ep.apply_nud_flake_workaround().await.expect("apply NUD flake workaround");
 
     // Get the link local address for the client.
     let link_local_addr = std::pin::pin!(client_ep
