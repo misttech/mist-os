@@ -14,7 +14,7 @@ import signal
 import subprocess
 import time
 
-from trace_processing import trace_metrics
+from trace_processing import trace_metrics, trace_model
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ class AggregatePowerMetrics:
         Returns:
           List of JSON object.
         """
-        results: List[trace_metrics.TestCaseResult] = [
+        results: list[trace_metrics.TestCaseResult] = [
             trace_metrics.TestCaseResult(
                 label="MinPower",
                 unit=trace_metrics.Unit.watts,
@@ -116,7 +116,9 @@ class _PowerCsvHeaders(enum.StrEnum):
         return list(_PowerCsvHeaders)
 
 
-class PowerMetricsProcessor:
+# TODO(b/320778225): Make this class private and stateless by changing all callers to use
+# MetricsSampler directly.
+class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
     """Power metric processor to extract performance data from raw samples.
 
     Args:
@@ -127,7 +129,11 @@ class PowerMetricsProcessor:
         self._power_samples_path: str = power_samples_path
         self._power_metrics: AggregatePowerMetrics = AggregatePowerMetrics()
 
-    def process_metrics(self):
+    # Implements MetricsProcessor.process_metrics. Model is unused and is None
+    # to support legacy users.
+    def process_metrics(
+        self, model: trace_model.Model = None
+    ) -> list[trace_metrics.TestCaseResult]:
         """Coverts CSV samples into aggregate metrics."""
         with open(self._power_samples_path, "r") as f:
             reader = csv.reader(f)
@@ -140,11 +146,16 @@ class PowerMetricsProcessor:
                     current=float(row[2]),
                 )
                 self._power_metrics.process_sample(sample)
+        return self._power_metrics.to_fuchsiaperf_results()
 
+    # DEPRECATED: Use process_metrics return value.
+    # TODO(b/320778225): Remove once downstream users are refactored.
     def to_fuchsiaperf_results(self) -> list[trace_metrics.TestCaseResult]:
         """Returns the processed TestCaseResults"""
         return self._power_metrics.to_fuchsiaperf_results()
 
+    # DEPRECATED: Use process_metrics + trace_metrics.TestCaseResult.write_fuchsiaperf_json.
+    # TODO(b/320778225): Remove once downstream users are refactored.
     def write_fuchsiaperf_json(
         self,
         output_dir: str,
@@ -193,19 +204,34 @@ class _PowerSamplerState(enum.Enum):
     STOPPED = 3
 
 
-class PowerSampler(abc.ABC):
+class PowerSampler:
     """Power sampling base class.
 
     Usage:
     ```
     sampler:PowerSampler = create_power_sampler(...)
     sampler.start()
-    ... interact with the device ...
+    ... interact with the device, also gather traces ...
     sampler.stop()
-    results = sampler.to_fuchsiaperf_results()
+
+    sampler.metrics_processor().process_and_save(model, output_path="my_test.fuchsiaperf.json")
     ```
-    The results can be combined with the results of other metric processors
-    and then saved via `TestCaseResult.
+
+    Alternatively, the sampler can be combined with the results of other metric processors like this:
+    ```
+    power_sampler = PowerSampler(...)
+
+    processor = MetricsProcessorSet([
+      CpuMetricsProcessor(aggregates_only=True),
+      FpsMetricsProcessor(aggregates_only=False),
+      MyCustomProcessor(...),
+      power_sampler.metrics_processor(),
+    ])
+
+    ... gather traces, start and stop the power sampler, create the model ...
+
+    processor.process_and_save(model, output_path="my_test.fuchsiaperf.json")
+    ```
     """
 
     def __init__(self, config: PowerSamplerConfig):
@@ -229,10 +255,20 @@ class PowerSampler(abc.ABC):
             self._state = _PowerSamplerState.STOPPED
             self._stop_impl()
 
+    # DEPRECATED: Use .metric_processor().process_metrics() instead.
+    # TODO(b/320778225): Remove once downstream users are refactored.
     def to_fuchsiaperf_results(self) -> list[trace_metrics.TestCaseResult]:
         """Returns power metrics TestCaseResults"""
         assert self._state == _PowerSamplerState.STOPPED
-        return self._to_fuchsiaperf_results_impl()
+        return self.metrics_processor().process_metrics(
+            model=trace_model.Model()
+        )
+
+    # Implements MetricsProcessor.process_metrics. Model is unused.
+
+    def metrics_processor(self) -> trace_metrics.MetricsProcessor:
+        """Returns a MetricsProcessor instance associated with the sampler."""
+        return self._metrics_processor_impl()
 
     @abc.abstractmethod
     def _stop_impl(self) -> None:
@@ -243,9 +279,7 @@ class PowerSampler(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _to_fuchsiaperf_results_impl(
-        self,
-    ) -> list[trace_metrics.TestCaseResult]:
+    def _metrics_processor_impl(self) -> trace_metrics.MetricsProcessor:
         pass
 
 
@@ -266,10 +300,8 @@ class _NoopPowerSampler(PowerSampler):
     def _stop_impl(self) -> None:
         pass
 
-    def _to_fuchsiaperf_results_impl(
-        self,
-    ) -> list[trace_metrics.TestCaseResult]:
-        return []
+    def _metrics_processor_impl(self) -> trace_metrics.MetricsProcessor:
+        return trace_metrics.ConstantMetricsProcessor(results=[])
 
 
 class _RealPowerSampler(PowerSampler):
@@ -299,14 +331,8 @@ class _RealPowerSampler(PowerSampler):
         self._stop_power_measurement()
         _LOGGER.info("Power sampling stopped")
 
-    def _to_fuchsiaperf_results_impl(
-        self,
-    ) -> list[trace_metrics.TestCaseResult]:
-        metrics_processor = PowerMetricsProcessor(
-            power_samples_path=self._csv_output_path
-        )
-        metrics_processor.process_metrics()
-        return metrics_processor.to_fuchsiaperf_results()
+    def _metrics_processor_impl(self) -> trace_metrics.MetricsProcessor:
+        return PowerMetricsProcessor(power_samples_path=self._csv_output_path)
 
     def _start_power_measurement(self):
         cmd = [

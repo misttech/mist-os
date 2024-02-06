@@ -6,8 +6,7 @@
 import math
 from typing import Any, Iterable, List, Optional, Set, Tuple, Type
 
-import trace_processing.trace_model as trace_model
-import trace_processing.trace_time as trace_time
+from trace_processing import trace_model, trace_metrics, trace_time
 
 
 # Compute the mean (https://en.wikipedia.org/wiki/Arithmetic_mean#Definition)
@@ -230,3 +229,42 @@ def find_valid_vsync_start_index(vsyncs: List[trace_model.Event]) -> int:
             i += 1
         return i
     return 0
+
+
+def standard_metrics_set(
+    values: List[float],
+    label_prefix: str,
+    unit: trace_metrics.Unit,
+    percentiles: tuple[int] = (5, 25, 50, 75, 95),
+) -> list[trace_metrics.TestCaseResult]:
+    """Generates min, max, average and percentiles metrics for the given values.
+
+    Args:
+        values: Input to create the metrics from.
+        label_prefix: metric labels will be '{label_prefix}Min', '{label_prefix}Max',
+            '{label_prefix}Average' and '{label_prefix}P*' (percentiles).
+        unit: The metrics unit.
+        percentiles: Percentiles to output.
+
+    Returns:
+        A list of TestCaseResults representing each of the generated metrics.
+    """
+
+    results = [
+        trace_metrics.TestCaseResult(
+            f"{label_prefix}P{p}",
+            unit,
+            [percentile(values, p)],
+        )
+        for p in percentiles
+    ]
+
+    results += [
+        trace_metrics.TestCaseResult(f"{label_prefix}Min", unit, [min(values)]),
+        trace_metrics.TestCaseResult(f"{label_prefix}Max", unit, [max(values)]),
+        trace_metrics.TestCaseResult(
+            f"{label_prefix}Average", unit, [mean(values)]
+        ),
+    ]
+
+    return results

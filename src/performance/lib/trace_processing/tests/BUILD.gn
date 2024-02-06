@@ -40,7 +40,10 @@ if (is_host) {
   python_host_test("trace_metrics_test") {
     main_source = "trace_metrics_test.py"
     sources = [ "test_utils.py" ]
-    libraries = [ "//src/performance/lib/trace_processing" ]
+    libraries = [
+      "//src/performance/lib/trace_processing",
+      "//third_party/parameterized",
+    ]
     deps = [ ":trace_metrics_test_data" ]
   }
 

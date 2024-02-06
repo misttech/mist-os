@@ -7,9 +7,7 @@
 from typing import Any, Dict, List
 import unittest
 
-import trace_processing.trace_model as trace_model
-import trace_processing.trace_time as trace_time
-import trace_processing.trace_utils as trace_utils
+from trace_processing import trace_model, trace_time, trace_utils, trace_metrics
 import test_utils
 
 
@@ -195,4 +193,26 @@ class TraceUtilsTest(unittest.TestCase):
         )
         self.assertEqual(
             trace_utils.total_event_duration(model.all_events()), mode_duration
+        )
+
+    def test_standard_metrics_set(self) -> None:
+        values = [0, 10]
+        unit = trace_metrics.Unit.milliseconds
+
+        results = trace_utils.standard_metrics_set(
+            values=values, label_prefix="Foo", unit=unit
+        )
+        self.maxDiff = None
+        self.assertEqual(
+            results,
+            [
+                trace_metrics.TestCaseResult("FooP5", unit, [0.5]),
+                trace_metrics.TestCaseResult("FooP25", unit, [2.5]),
+                trace_metrics.TestCaseResult("FooP50", unit, [5.0]),
+                trace_metrics.TestCaseResult("FooP75", unit, [7.5]),
+                trace_metrics.TestCaseResult("FooP95", unit, [9.5]),
+                trace_metrics.TestCaseResult("FooMin", unit, [0.0]),
+                trace_metrics.TestCaseResult("FooMax", unit, [10.0]),
+                trace_metrics.TestCaseResult("FooAverage", unit, [5.0]),
+            ],
         )

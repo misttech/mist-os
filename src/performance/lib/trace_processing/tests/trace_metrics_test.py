@@ -7,8 +7,8 @@
 import json
 import os
 import pathlib
+from parameterized import parameterized, param
 import tempfile
-from typing import Any, Dict, List
 import unittest
 
 import trace_processing.metrics.cpu as cpu_metrics
@@ -19,6 +19,13 @@ import trace_processing.trace_metrics as trace_metrics
 import trace_processing.trace_model as trace_model
 
 
+# Boilerplate-busting constants:
+U = trace_metrics.Unit
+TCR = trace_metrics.TestCaseResult
+
+_EMPTY_MODEL = trace_model.Model()
+
+
 class TestCaseResultTest(unittest.TestCase):
     """Tests TestCaseResult"""
 
@@ -26,10 +33,8 @@ class TestCaseResultTest(unittest.TestCase):
         label = "L1"
         test_suite = "bar"
 
-        result = trace_metrics.TestCaseResult(
-            label=label,
-            unit=trace_metrics.Unit.bytesPerSecond,
-            values=[0, 0.1, 23.45, 6],
+        result = TCR(
+            label=label, unit=U.bytesPerSecond, values=[0, 0.1, 23.45, 6]
         )
 
         self.assertEqual(result.label, label)
@@ -46,16 +51,8 @@ class TestCaseResultTest(unittest.TestCase):
     def test_write_fuchsia_perf_json(self) -> None:
         test_suite = "ts"
         results = [
-            trace_metrics.TestCaseResult(
-                label="l1",
-                unit=trace_metrics.Unit.percent,
-                values=[1],
-            ),
-            trace_metrics.TestCaseResult(
-                label="l2",
-                unit=trace_metrics.Unit.framesPerSecond,
-                values=[2],
-            ),
+            TCR(label="l1", unit=U.percent, values=[1]),
+            TCR(label="l2", unit=U.framesPerSecond, values=[2]),
         ]
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -78,174 +75,296 @@ class TestCaseResultTest(unittest.TestCase):
 class MetricProcessorsTest(unittest.TestCase):
     """Tests for the various MetricProcessors."""
 
-    def setUp(self):
+    def _load_model(self, model_file_name) -> trace_model.Model:
         # A second dirname is required to account for the .pyz archive which
         # contains the test and a third one since data is a sibling of the test.
-        self._runtime_deps_path: str = os.path.join(
+        runtime_deps_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
             "runtime_deps",
         )
-
-    def test_custom_processor(self) -> None:
-        def test_processor(
-            model: trace_model.Model, extra_args: Dict[str, Any]
-        ) -> List[trace_metrics.TestCaseResult]:
-            return [
-                trace_metrics.TestCaseResult(
-                    "test", trace_metrics.Unit.countBiggerIsBetter, [1234, 5678]
-                )
-            ]
-
-        model: trace_model.Model = trace_model.Model()
-        metrics_spec: trace_metrics.MetricsSpec = trace_metrics.MetricsSpec(
-            name="test",
-            processor=test_processor,
+        return trace_importing.create_model_from_file_path(
+            os.path.join(runtime_deps_path, model_file_name)
         )
-        results: List[
-            trace_metrics.TestCaseResult
-        ] = metrics_spec.process_metrics(model)
-        self.assertAlmostEqual(results[0].values[0], 1234.0)
-        self.assertAlmostEqual(results[0].values[1], 5678.0)
 
-    def test_cpu_metric(self) -> None:
-        model: trace_model.Model = trace_importing.create_model_from_file_path(
-            os.path.join(self._runtime_deps_path, "cpu_metric.json")
+    def test_process_and_save(self) -> None:
+        test_suite = "ts"
+        expected_results = [
+            TCR(label="test", unit=U.countBiggerIsBetter, values=[1234, 5678])
+        ]
+        processor = trace_metrics.ConstantMetricsProcessor(
+            results=expected_results
         )
-        results: List[
-            trace_metrics.TestCaseResult
-        ] = cpu_metrics.metrics_processor(model, {})
-        self.assertAlmostEqual(results[0].values[0], 43.0)
-        self.assertAlmostEqual(results[0].values[1], 20.0)
-        aggregated_results: List[
-            trace_metrics.TestCaseResult
-        ] = cpu_metrics.metrics_processor(model, {"aggregateMetricsOnly": True})
-        self.assertEqual(len(aggregated_results), 8)
-        self.assertEqual(aggregated_results[0].label, "CpuP5")
-        self.assertAlmostEqual(aggregated_results[0].values[0], 21.15)
-        self.assertEqual(aggregated_results[1].label, "CpuP25")
-        self.assertAlmostEqual(aggregated_results[1].values[0], 25.75)
-        self.assertEqual(aggregated_results[2].label, "CpuP50")
-        self.assertAlmostEqual(aggregated_results[2].values[0], 31.5)
-        self.assertEqual(aggregated_results[3].label, "CpuP75")
-        self.assertAlmostEqual(aggregated_results[3].values[0], 37.25)
-        self.assertEqual(aggregated_results[4].label, "CpuP95")
-        self.assertAlmostEqual(aggregated_results[4].values[0], 41.85)
-        self.assertEqual(aggregated_results[5].label, "CpuMin")
-        self.assertAlmostEqual(aggregated_results[5].values[0], 20.0)
-        self.assertEqual(aggregated_results[6].label, "CpuMax")
-        self.assertAlmostEqual(aggregated_results[6].values[0], 43.0)
-        self.assertEqual(aggregated_results[7].label, "CpuAverage")
-        self.assertAlmostEqual(aggregated_results[7].values[0], 31.5)
 
-    def test_cpu_metric_after_system_metrics_logger_migration(self) -> None:
-        model: trace_model.Model = trace_importing.create_model_from_file_path(
-            os.path.join(
-                self._runtime_deps_path, "cpu_metric_system_metrics_logger.json"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = (
+                pathlib.Path(tmpdir) / "actual_output.fuchsiaperf.json"
             )
-        )
-        results: List[
-            trace_metrics.TestCaseResult
-        ] = cpu_metrics.metrics_processor(model, {})
-        self.assertAlmostEqual(results[0].values[0], 43.0)
-        self.assertAlmostEqual(results[0].values[1], 20.0)
-        aggregated_results: List[
-            trace_metrics.TestCaseResult
-        ] = cpu_metrics.metrics_processor(model, {"aggregateMetricsOnly": True})
-        self.assertEqual(len(aggregated_results), 8)
-        self.assertEqual(aggregated_results[0].label, "CpuP5")
-        self.assertAlmostEqual(aggregated_results[0].values[0], 21.15)
-        self.assertEqual(aggregated_results[1].label, "CpuP25")
-        self.assertAlmostEqual(aggregated_results[1].values[0], 25.75)
-        self.assertEqual(aggregated_results[2].label, "CpuP50")
-        self.assertAlmostEqual(aggregated_results[2].values[0], 31.5)
-        self.assertEqual(aggregated_results[3].label, "CpuP75")
-        self.assertAlmostEqual(aggregated_results[3].values[0], 37.25)
-        self.assertEqual(aggregated_results[4].label, "CpuP95")
-        self.assertAlmostEqual(aggregated_results[4].values[0], 41.85)
-        self.assertEqual(aggregated_results[5].label, "CpuMin")
-        self.assertAlmostEqual(aggregated_results[5].values[0], 20.0)
-        self.assertEqual(aggregated_results[6].label, "CpuMax")
-        self.assertAlmostEqual(aggregated_results[6].values[0], 43.0)
-        self.assertEqual(aggregated_results[7].label, "CpuAverage")
-        self.assertAlmostEqual(aggregated_results[7].values[0], 31.5)
+            processor.process_and_save_metrics(
+                _EMPTY_MODEL, test_suite, output_path
+            )
+            actual_output = json.loads(output_path.read_text())
+            self.assertEqual(
+                actual_output, [r.to_json(test_suite) for r in expected_results]
+            )
 
-    def test_fps_metric(self) -> None:
-        model: trace_model.Model = trace_importing.create_model_from_file_path(
-            os.path.join(self._runtime_deps_path, "fps_metric.json")
+    def test_constant_processor(self) -> None:
+        expected_results = [
+            TCR(label="test", unit=U.countBiggerIsBetter, values=[1234, 5678])
+        ]
+        processor = trace_metrics.ConstantMetricsProcessor(
+            results=expected_results
         )
-        results: List[
-            trace_metrics.TestCaseResult
-        ] = fps_metrics.metrics_processor(model, {})
-        self.assertAlmostEqual(results[0].values[0], 10000000.0)
-        self.assertAlmostEqual(results[0].values[1], 5000000.0)
-        aggregated_results: List[
-            trace_metrics.TestCaseResult
-        ] = fps_metrics.metrics_processor(model, {"aggregateMetricsOnly": True})
-        self.assertEqual(len(aggregated_results), 8)
-        self.assertEqual(aggregated_results[0].label, "FpsP5")
-        self.assertAlmostEqual(aggregated_results[0].values[0], 5250000.0)
-        self.assertEqual(aggregated_results[1].label, "FpsP25")
-        self.assertAlmostEqual(aggregated_results[1].values[0], 6250000.0)
-        self.assertEqual(aggregated_results[2].label, "FpsP50")
-        self.assertAlmostEqual(aggregated_results[2].values[0], 7500000.0)
-        self.assertEqual(aggregated_results[3].label, "FpsP75")
-        self.assertAlmostEqual(aggregated_results[3].values[0], 8750000.0)
-        self.assertEqual(aggregated_results[4].label, "FpsP95")
-        self.assertAlmostEqual(aggregated_results[4].values[0], 9750000.0)
-        self.assertEqual(aggregated_results[5].label, "FpsMin")
-        self.assertAlmostEqual(aggregated_results[5].values[0], 5000000.0)
-        self.assertEqual(aggregated_results[6].label, "FpsMax")
-        self.assertAlmostEqual(aggregated_results[6].values[0], 10000000.0)
-        self.assertEqual(aggregated_results[7].label, "FpsAverage")
-        self.assertAlmostEqual(aggregated_results[7].values[0], 7500000.0)
+        actual_results = processor.process_metrics(_EMPTY_MODEL)
 
-    def test_scenic_metrics(self) -> None:
-        model: trace_model.Model = trace_importing.create_model_from_file_path(
-            os.path.join(self._runtime_deps_path, "scenic_metric.json")
+        self.assertEqual(actual_results, expected_results)
+
+    def test_processors_set(self) -> None:
+        expected_results1 = [
+            TCR(label="l1", unit=U.countBiggerIsBetter, values=[1234, 5678])
+        ]
+        expected_results2 = [
+            TCR(label="l2", unit=U.framesPerSecond, values=[29.9])
+        ]
+
+        processor = trace_metrics.MetricsProcessorsSet(
+            sub_processors=[
+                trace_metrics.ConstantMetricsProcessor(
+                    results=expected_results1
+                ),
+                trace_metrics.ConstantMetricsProcessor(
+                    results=expected_results2
+                ),
+            ]
         )
-        results: List[
-            trace_metrics.TestCaseResult
-        ] = scenic_metrics.metrics_processor(model, {})
-        self.assertAlmostEqual(results[0].values[0], 0.09)
-        self.assertAlmostEqual(results[0].values[1], 0.08)
-        self.assertAlmostEqual(results[0].values[2], 0.1)
-        self.assertAlmostEqual(results[1].values[0], 0.11)
-        self.assertAlmostEqual(results[1].values[1], 0.112)
-        aggregated_results: List[
-            trace_metrics.TestCaseResult
-        ] = scenic_metrics.metrics_processor(
-            model, {"aggregateMetricsOnly": True}
-        )
-        self.assertEqual(len(aggregated_results), 16)
-        self.assertEqual(aggregated_results[0].label, "RenderCpuP5")
-        self.assertAlmostEqual(aggregated_results[0].values[0], 0.081)
-        self.assertEqual(aggregated_results[1].label, "RenderCpuP25")
-        self.assertAlmostEqual(aggregated_results[1].values[0], 0.085)
-        self.assertEqual(aggregated_results[2].label, "RenderCpuP50")
-        self.assertAlmostEqual(aggregated_results[2].values[0], 0.09)
-        self.assertEqual(aggregated_results[3].label, "RenderCpuP75")
-        self.assertAlmostEqual(aggregated_results[3].values[0], 0.095)
-        self.assertEqual(aggregated_results[4].label, "RenderCpuP95")
-        self.assertAlmostEqual(aggregated_results[4].values[0], 0.099)
-        self.assertEqual(aggregated_results[5].label, "RenderCpuMin")
-        self.assertAlmostEqual(aggregated_results[5].values[0], 0.08)
-        self.assertEqual(aggregated_results[6].label, "RenderCpuMax")
-        self.assertAlmostEqual(aggregated_results[6].values[0], 0.1)
-        self.assertEqual(aggregated_results[7].label, "RenderCpuAverage")
-        self.assertAlmostEqual(aggregated_results[7].values[0], 0.09)
-        self.assertEqual(aggregated_results[8].label, "RenderTotalP5")
-        self.assertAlmostEqual(aggregated_results[8].values[0], 0.1101)
-        self.assertEqual(aggregated_results[9].label, "RenderTotalP25")
-        self.assertAlmostEqual(aggregated_results[9].values[0], 0.1105)
-        self.assertEqual(aggregated_results[10].label, "RenderTotalP50")
-        self.assertAlmostEqual(aggregated_results[10].values[0], 0.111)
-        self.assertEqual(aggregated_results[11].label, "RenderTotalP75")
-        self.assertAlmostEqual(aggregated_results[11].values[0], 0.1115)
-        self.assertEqual(aggregated_results[12].label, "RenderTotalP95")
-        self.assertAlmostEqual(aggregated_results[12].values[0], 0.1119)
-        self.assertEqual(aggregated_results[13].label, "RenderTotalMin")
-        self.assertAlmostEqual(aggregated_results[13].values[0], 0.11)
-        self.assertEqual(aggregated_results[14].label, "RenderTotalMax")
-        self.assertAlmostEqual(aggregated_results[14].values[0], 0.112)
-        self.assertEqual(aggregated_results[15].label, "RenderTotalAverage")
-        self.assertAlmostEqual(aggregated_results[15].values[0], 0.111)
+        actual_results = processor.process_metrics(_EMPTY_MODEL)
+        self.assertEqual(actual_results, expected_results1 + expected_results2)
+
+    @parameterized.expand(
+        [
+            param(
+                "cpu",
+                processor=cpu_metrics.CpuMetricsProcessor(
+                    aggregates_only=False
+                ),
+                model_file="cpu_metric.json",
+                expected_results=[
+                    TCR(label="CpuLoad", unit=U.percent, values=[43, 20]),
+                ],
+            ),
+            param(
+                "cpu_from_system_metrics_logger",
+                processor=cpu_metrics.CpuMetricsProcessor(
+                    aggregates_only=False
+                ),
+                model_file="cpu_metric_system_metrics_logger.json",
+                expected_results=[
+                    TCR(label="CpuLoad", unit=U.percent, values=[43, 20]),
+                ],
+            ),
+            param(
+                "cpu_aggregates",
+                processor=cpu_metrics.CpuMetricsProcessor(aggregates_only=True),
+                model_file="cpu_metric.json",
+                expected_results=[
+                    TCR(label="CpuP5", unit=U.percent, values=[21.15]),
+                    TCR(label="CpuP25", unit=U.percent, values=[25.75]),
+                    TCR(label="CpuP50", unit=U.percent, values=[31.5]),
+                    TCR(label="CpuP75", unit=U.percent, values=[37.25]),
+                    TCR(label="CpuP95", unit=U.percent, values=[41.85]),
+                    TCR(label="CpuMin", unit=U.percent, values=[20]),
+                    TCR(label="CpuMax", unit=U.percent, values=[43]),
+                    TCR(label="CpuAverage", unit=U.percent, values=[31.5]),
+                ],
+            ),
+            param(
+                "cpu_aggregates_from_system_metrics_logger",
+                processor=cpu_metrics.CpuMetricsProcessor(aggregates_only=True),
+                model_file="cpu_metric_system_metrics_logger.json",
+                expected_results=[
+                    TCR(label="CpuP5", unit=U.percent, values=[21.15]),
+                    TCR(label="CpuP25", unit=U.percent, values=[25.75]),
+                    TCR(label="CpuP50", unit=U.percent, values=[31.5]),
+                    TCR(label="CpuP75", unit=U.percent, values=[37.25]),
+                    TCR(label="CpuP95", unit=U.percent, values=[41.85]),
+                    TCR(label="CpuMin", unit=U.percent, values=[20]),
+                    TCR(label="CpuMax", unit=U.percent, values=[43]),
+                    TCR(label="CpuAverage", unit=U.percent, values=[31.5]),
+                ],
+            ),
+            param(
+                "fps",
+                processor=fps_metrics.FpsMetricsProcessor(
+                    aggregates_only=False
+                ),
+                model_file="fps_metric.json",
+                expected_results=[
+                    TCR(
+                        label="Fps",
+                        unit=U.framesPerSecond,
+                        values=[10000000.0, 5000000.0],
+                    )
+                ],
+            ),
+            param(
+                "fps_aggregates",
+                processor=fps_metrics.FpsMetricsProcessor(aggregates_only=True),
+                model_file="fps_metric.json",
+                expected_results=[
+                    TCR(
+                        label="FpsP5",
+                        unit=U.framesPerSecond,
+                        values=[5250000.0],
+                    ),
+                    TCR(
+                        label="FpsP25",
+                        unit=U.framesPerSecond,
+                        values=[6250000.0],
+                    ),
+                    TCR(
+                        label="FpsP50",
+                        unit=U.framesPerSecond,
+                        values=[7500000.0],
+                    ),
+                    TCR(
+                        label="FpsP75",
+                        unit=U.framesPerSecond,
+                        values=[8750000.0],
+                    ),
+                    TCR(
+                        label="FpsP95",
+                        unit=U.framesPerSecond,
+                        values=[9750000.0],
+                    ),
+                    TCR(
+                        label="FpsMin",
+                        unit=U.framesPerSecond,
+                        values=[5000000.0],
+                    ),
+                    TCR(
+                        label="FpsMax",
+                        unit=U.framesPerSecond,
+                        values=[10000000.0],
+                    ),
+                    TCR(
+                        label="FpsAverage",
+                        unit=U.framesPerSecond,
+                        values=[7500000.0],
+                    ),
+                ],
+            ),
+            param(
+                "scenic",
+                processor=scenic_metrics.ScenicMetricsProcessor(
+                    aggregates_only=False
+                ),
+                model_file="scenic_metric.json",
+                expected_results=[
+                    TCR(
+                        label="RenderCpu",
+                        unit=U.milliseconds,
+                        values=[0.09, 0.08, 0.1],
+                    ),
+                    TCR(
+                        label="RenderTotal",
+                        unit=U.milliseconds,
+                        values=[0.11, 0.112],
+                    ),
+                ],
+            ),
+            param(
+                "scenic_aggregates",
+                processor=scenic_metrics.ScenicMetricsProcessor(
+                    aggregates_only=True
+                ),
+                model_file="scenic_metric.json",
+                expected_results=[
+                    TCR(
+                        label="RenderCpuP5", unit=U.milliseconds, values=[0.081]
+                    ),
+                    TCR(
+                        label="RenderCpuP25",
+                        unit=U.milliseconds,
+                        values=[0.08499999999999999],
+                    ),
+                    TCR(
+                        label="RenderCpuP50", unit=U.milliseconds, values=[0.09]
+                    ),
+                    TCR(
+                        label="RenderCpuP75",
+                        unit=U.milliseconds,
+                        values=[0.095],
+                    ),
+                    TCR(
+                        label="RenderCpuP95",
+                        unit=U.milliseconds,
+                        values=[0.099],
+                    ),
+                    TCR(
+                        label="RenderCpuMin", unit=U.milliseconds, values=[0.08]
+                    ),
+                    TCR(
+                        label="RenderCpuMax", unit=U.milliseconds, values=[0.1]
+                    ),
+                    TCR(
+                        label="RenderCpuAverage",
+                        unit=U.milliseconds,
+                        values=[0.09000000000000001],
+                    ),
+                    TCR(
+                        label="RenderTotalP5",
+                        unit=U.milliseconds,
+                        values=[0.1101],
+                    ),
+                    TCR(
+                        label="RenderTotalP25",
+                        unit=U.milliseconds,
+                        values=[0.1105],
+                    ),
+                    TCR(
+                        label="RenderTotalP50",
+                        unit=U.milliseconds,
+                        values=[0.111],
+                    ),
+                    TCR(
+                        label="RenderTotalP75",
+                        unit=U.milliseconds,
+                        values=[0.1115],
+                    ),
+                    TCR(
+                        label="RenderTotalP95",
+                        unit=U.milliseconds,
+                        values=[0.1119],
+                    ),
+                    TCR(
+                        label="RenderTotalMin",
+                        unit=U.milliseconds,
+                        values=[0.11],
+                    ),
+                    TCR(
+                        label="RenderTotalMax",
+                        unit=U.milliseconds,
+                        values=[0.112],
+                    ),
+                    TCR(
+                        label="RenderTotalAverage",
+                        unit=U.milliseconds,
+                        values=[0.111],
+                    ),
+                ],
+            ),
+        ]
+    )
+    def test_processor(
+        self,
+        _: str,
+        processor: trace_metrics.MetricsProcessor,
+        model_file: str,
+        expected_results: list[TCR],
+    ) -> None:
+        """Tests a processor's outputs with a given input model loaded from a json file"""
+        model = self._load_model(model_file)
+        actual_results = processor.process_metrics(model)
+
+        # Improves assertEqual output when comparing lists.
+        self.maxDiff = 10000
+        self.assertEquals(actual_results, expected_results)
