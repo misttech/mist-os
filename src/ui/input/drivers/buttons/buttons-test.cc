@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "buttons.h"
-
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
@@ -18,6 +16,7 @@
 #include <ddk/metadata/buttons.h>
 #include <zxtest/zxtest.h>
 
+#include "buttons-device.h"
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 

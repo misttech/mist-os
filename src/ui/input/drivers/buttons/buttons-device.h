@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_UI_INPUT_DRIVERS_BUTTONS_BUTTONS_H_
-#define SRC_UI_INPUT_DRIVERS_BUTTONS_BUTTONS_H_
+#ifndef SRC_UI_INPUT_DRIVERS_BUTTONS_BUTTONS_DEVICE_H_
+#define SRC_UI_INPUT_DRIVERS_BUTTONS_BUTTONS_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
@@ -164,4 +164,4 @@ class ButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_I
 
 }  // namespace buttons
 
-#endif  // SRC_UI_INPUT_DRIVERS_BUTTONS_BUTTONS_H_
+#endif  // SRC_UI_INPUT_DRIVERS_BUTTONS_BUTTONS_DEVICE_H_

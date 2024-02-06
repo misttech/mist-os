@@ -43,7 +43,10 @@ fuchsia_driver_package("package") {
 
 source_set("common") {
   configs += [ "//build/config:all_source" ]
-  sources = [ "buttons.cc" ]
+  sources = [
+    "buttons-device.cc",
+    "buttons.cc",
+  ]
 
   public_deps = [
     ":buttons-bind",
