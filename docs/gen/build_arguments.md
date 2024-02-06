@@ -1128,7 +1128,7 @@ from infra builds, and later inspection.
 
 **Current value (from the default):** `"//out/not-default/comparison-reports"`
 
-From //build/toolchain/rbe.gni:181
+From //build/toolchain/rbe.gni:190
 
 ### compress_debuginfo
 
@@ -1293,7 +1293,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:176
+From //build/toolchain/rbe.gni:185
 
 ### cxx_rbe_download_obj_files
 
@@ -1305,7 +1305,7 @@ and not restricted environments that lack direct network access.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:188
+From //build/toolchain/rbe.gni:197
 
 ### cxx_rbe_enable
 
@@ -1318,7 +1318,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:129
+From //build/toolchain/rbe.gni:138
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -1326,7 +1326,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:129
+From //build/toolchain/rbe.gni:138
 
 ### cxx_rbe_exec_strategy
 
@@ -1349,7 +1349,7 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:152
+From //build/toolchain/rbe.gni:161
 
 ### cxx_rbe_minimalist_wrapper
 
@@ -1359,7 +1359,7 @@ This flag is only meaningful when `cxx_rbe_enable` is true.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:134
+From //build/toolchain/rbe.gni:143
 
 ### data_filesystem_format
 
@@ -4305,7 +4305,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:235
+From //build/toolchain/rbe.gni:244
 
 ### link_rbe_enable
 
@@ -4319,7 +4319,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:197
+From //build/toolchain/rbe.gni:206
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -4327,7 +4327,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:197
+From //build/toolchain/rbe.gni:206
 
 ### link_rbe_exec_strategy
 
@@ -4350,7 +4350,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:215
+From //build/toolchain/rbe.gni:224
 
 ### llvm_prefix
 
@@ -6930,6 +6930,16 @@ Enable debug assertions, e.g. for overflow checking.
 
 From //build/config/rust/BUILD.gn:32
 
+### rust_emit_rmeta
+
+Set to true to emit additional .rmeta files when compiling Rust rlibs.
+The .rmeta metadata files can be used by downstream build actions
+to quickly evaluate transitive dependencies (and remote inputs).
+
+**Current value (from the default):** `false`
+
+From //build/toolchain/rbe.gni:126
+
 ### rust_incremental
 
 Enable incremental rust compilation. Takes a path to the directory to use
@@ -6990,6 +7000,15 @@ One of:
 **Current value (from the default):** `"none"`
 
 From //build/toolchain/rbe.gni:114
+
+### rust_rbe_download_rlibs
+
+TODO(b/42084033): Controls whether or not to download (intermediate)
+rlibs from remote Rust build actions.
+
+**Current value (from the default):** `true`
+
+From //build/toolchain/rbe.gni:130
 
 ### rust_rbe_download_unstripped_binaries
 
