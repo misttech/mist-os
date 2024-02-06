@@ -10,10 +10,13 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/pwm/cpp/bind.h>
 #include <ddk/metadata/pwm.h>
 #include <soc/aml-a311d/a311d-pwm.h>
 
-#include "src/devices/board/drivers/vim3/vim3-pwm-bind.h"
 #include "vim3-gpios.h"
 #include "vim3.h"
 
@@ -59,13 +62,45 @@ static const std::vector<fpbus::Metadata> pwm_metadata{
 static const fpbus::Node pwm_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "pwm";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_A311D;
-  dev.did() = PDEV_DID_AMLOGIC_PWM;
+  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_A311D;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_PWM;
   dev.mmio() = pwm_mmios;
   dev.metadata() = pwm_metadata;
   return dev;
 }();
+
+const ddk::BindRule kPwmRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::PWM_ID, static_cast<uint32_t>(A311D_PWM_E)),
+};
+
+const device_bind_prop_t kPwmProperties[] = {
+    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+};
+
+const ddk::BindRule kGpioWifiRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_WIFI_32K)),
+};
+
+const device_bind_prop_t kGpioWifiProperties[] = {
+    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_WIFI_LPO),
+};
+
+const ddk::BindRule kGpioBtRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_BT_EN)),
+};
+
+const device_bind_prop_t kGpioBtProperties[] = {
+    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_BT_REG_ON),
+};
 
 zx_status_t Vim3::PwmInit() {
   fidl::Arena<> fidl_arena;
@@ -82,27 +117,12 @@ zx_status_t Vim3::PwmInit() {
     return result->error_value();
   }
 
-  // Add a composite device for pwm init driver.
-  const zx_device_prop_t props[] = {
-      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_AMLOGIC},
-      {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_AMLOGIC_A311D},
-      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_AMLOGIC_PWM_INIT},
-  };
-
-  const composite_device_desc_t comp_desc = {
-      .props = props,
-      .props_count = std::size(props),
-      .fragments = pwm_init_fragments,
-      .fragments_count = std::size(pwm_init_fragments),
-      .primary_fragment = "pwm",
-      .spawn_colocated = true,
-      .metadata_list = nullptr,
-      .metadata_count = 0,
-  };
-
-  zx_status_t status = DdkAddComposite("pwm-init", &comp_desc);
+  zx_status_t status =
+      DdkAddCompositeNodeSpec("pwm_init", ddk::CompositeNodeSpec(kPwmRules, kPwmProperties)
+                                              .AddParentSpec(kGpioWifiRules, kGpioWifiProperties)
+                                              .AddParentSpec(kGpioBtRules, kGpioBtProperties));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: DdkAddComposite failed: %d", __func__, status);
+    zxlogf(ERROR, "DdkAddCompositeNodeSpec failed: %s", zx_status_get_string(status));
     return status;
   }
 

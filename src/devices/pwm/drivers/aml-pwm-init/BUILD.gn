@@ -11,7 +11,10 @@ driver_bind_rules("aml-pwm-init-bind") {
   rules = "aml-pwm-init.bind"
   bind_output = "aml-pwm-init.bindbc"
   tests = "bind-tests.json"
-  deps = [ "//src/devices/bind/fuchsia.amlogic.platform" ]
+  deps = [
+    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.pwm",
+  ]
 }
 
 fuchsia_driver("aml-pwm-init-driver") {

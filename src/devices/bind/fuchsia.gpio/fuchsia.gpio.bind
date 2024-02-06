@@ -44,6 +44,8 @@ enum FUNCTION {
    VDIG_ENABLE,
    POWER,
    SDMMC_RESET,
+   WIFI_LPO,
+   BT_REG_ON,
 
    // Audio TDM GPIOs.
    TDM_A_SCLK,

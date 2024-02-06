@@ -25,18 +25,6 @@ driver_bind_rules("astro-bind") {
   ]
 }
 
-driver_bind_rules("astro-pwm-bind") {
-  rules = "bind/astro-pwm.bind"
-  header_output = "astro-pwm-bind.h"
-  bind_output = "astro-pwm-bind.bc"
-  tests = "bind-tests/astro-pwm-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.s905d2",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.pwm",
-  ]
-}
-
 driver_bind_rules("pwm-ao-d-bind") {
   rules = "bind/pwm-ao-d.bind"
   header_output = "pwm-ao-d-bind.h"
@@ -102,7 +90,6 @@ fuchsia_driver("astro-driver") {
   ]
   deps = [
     ":astro-bind",
-    ":astro-pwm-bind_header",
     ":astro-wifi-bind_header",
     ":pwm-ao-d-bind_header",
     "//sdk/banjo/fuchsia.hardware.iommu:fuchsia.hardware.iommu_banjo_cpp",
@@ -204,7 +191,6 @@ group("tests") {
   testonly = true
   deps = [
     ":astro-bind_test",
-    ":astro-pwm-bind_test",
     ":astro-wifi-bind_test",
     ":pwm-ao-d-bind_test",
     "post-init:tests",

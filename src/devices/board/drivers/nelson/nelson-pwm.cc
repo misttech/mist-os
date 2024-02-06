@@ -10,12 +10,15 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/pwm/cpp/bind.h>
 #include <ddk/metadata/pwm.h>
 #include <soc/aml-s905d3/s905d3-pwm.h>
 
 #include "nelson-gpios.h"
 #include "nelson.h"
-#include "src/devices/board/drivers/nelson/pwm_init_bind.h"
 
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -62,15 +65,46 @@ static const std::vector<fpbus::Metadata> pwm_metadata{
 static const fpbus::Node pwm_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "pwm";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_S905D3;
-  dev.did() = PDEV_DID_AMLOGIC_PWM;
+  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D3;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_PWM;
   dev.mmio() = pwm_mmios;
   dev.metadata() = pwm_metadata;
   return dev;
 }();
 
-// Composite binding rules for wifi driver.
+const ddk::BindRule kPwmRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::PWM_ID, static_cast<uint32_t>(S905D3_PWM_E)),
+};
+
+const device_bind_prop_t kPwmProperties[] = {
+    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+};
+
+const ddk::BindRule kGpioWifiRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                            static_cast<uint32_t>(GPIO_SOC_WIFI_LPO_32K768)),
+};
+
+const device_bind_prop_t kGpioWifiProperties[] = {
+    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_WIFI_LPO),
+};
+
+const ddk::BindRule kGpioBtRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_SOC_BT_REG_ON)),
+};
+
+const device_bind_prop_t kGpioBtProperties[] = {
+    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_BT_REG_ON),
+};
 
 zx_status_t Nelson::PwmInit() {
   fidl::Arena<> fidl_arena;
@@ -87,27 +121,12 @@ zx_status_t Nelson::PwmInit() {
     return result->error_value();
   }
 
-  // Add a composite device for pwm init driver.
-  const zx_device_prop_t props[] = {
-      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_AMLOGIC},
-      {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_AMLOGIC_S905D3},
-      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_AMLOGIC_PWM_INIT},
-  };
-
-  const composite_device_desc_t comp_desc = {
-      .props = props,
-      .props_count = std::size(props),
-      .fragments = pwm_init_fragments,
-      .fragments_count = std::size(pwm_init_fragments),
-      .primary_fragment = "pwm",
-      .spawn_colocated = false,
-      .metadata_list = nullptr,
-      .metadata_count = 0,
-  };
-
-  zx_status_t status = DdkAddComposite("pwm-init", &comp_desc);
+  zx_status_t status =
+      DdkAddCompositeNodeSpec("pwm_init", ddk::CompositeNodeSpec(kPwmRules, kPwmProperties)
+                                              .AddParentSpec(kGpioWifiRules, kGpioWifiProperties)
+                                              .AddParentSpec(kGpioBtRules, kGpioBtProperties));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: DdkAddComposite failed: %d", __func__, status);
+    zxlogf(ERROR, "DdkAddCompositeNodeSpec failed: %s", zx_status_get_string(status));
     return status;
   }
 

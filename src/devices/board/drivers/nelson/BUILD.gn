@@ -40,18 +40,6 @@ driver_bind_rules("nelson-bind") {
   ]
 }
 
-driver_bind_rules("pwm_init_bind") {
-  rules = "bind/pwm_init.bind"
-  header_output = "pwm_init_bind.h"
-  bind_output = "pwm_init_bind.bc"
-  tests = "bind-tests/pwm_init-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.pwm",
-  ]
-}
-
 driver_bind_rules("nelson_wifi_bind") {
   rules = "bind/nelson_wifi.bind"
   header_output = "nelson_wifi_bind.h"
@@ -125,7 +113,6 @@ fuchsia_driver("nelson-module-driver") {
   deps = [
     ":nelson-bind",
     ":nelson_wifi_bind_header",
-    ":pwm_init_bind_header",
     "//sdk/banjo/fuchsia.hardware.iommu:fuchsia.hardware.iommu_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
