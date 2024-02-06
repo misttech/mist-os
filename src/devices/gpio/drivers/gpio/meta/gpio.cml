@@ -19,6 +19,7 @@
         { service: "fuchsia.hardware.gpio.Service" },
     ],
     use: [
+        { protocol: "fuchsia.scheduler.ProfileProvider" },
         { service: 'fuchsia.hardware.gpioimpl.Service' },
     ],
     expose: [

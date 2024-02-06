@@ -172,10 +172,12 @@ zx_status_t AmlGpio::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  if (auto status = device->DdkAdd(ddk::DeviceAddArgs("aml-gpio")
-                                       .set_proto_id(ZX_PROTOCOL_GPIO_IMPL)
-                                       .forward_metadata(parent, DEVICE_METADATA_GPIO_PINS)
-                                       .forward_metadata(parent, DEVICE_METADATA_GPIO_INIT));
+  if (auto status =
+          device->DdkAdd(ddk::DeviceAddArgs("aml-gpio")
+                             .set_proto_id(ZX_PROTOCOL_GPIO_IMPL)
+                             .forward_metadata(parent, DEVICE_METADATA_GPIO_PINS)
+                             .forward_metadata(parent, DEVICE_METADATA_GPIO_INIT)
+                             .forward_metadata(parent, DEVICE_METADATA_SCHEDULER_ROLE_NAME));
       status != ZX_OK) {
     zxlogf(ERROR, "AmlGpio::Create: DdkAdd failed");
     return status;

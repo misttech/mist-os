@@ -13,8 +13,10 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/zircon-internal/thread_annotations.h>
 
+#include <optional>
 #include <string_view>
 
+#include <ddk/metadata/gpio.h>
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
 #include <fbl/mutex.h>
@@ -58,18 +60,25 @@ class GpioImplProxy {
 };
 
 class GpioRootDevice;
-using GpioRootDeviceType = ddk::Device<GpioRootDevice>;
+using GpioRootDeviceType = ddk::Device<GpioRootDevice, ddk::Unbindable>;
 
 class GpioRootDevice : public GpioRootDeviceType {
  public:
   static zx_status_t Create(void* ctx, zx_device_t* parent);
-
+  void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
 
  private:
-  explicit GpioRootDevice(zx_device_t* parent) : GpioRootDeviceType(parent) {}
+  explicit GpioRootDevice(zx_device_t* parent)
+      : GpioRootDeviceType(parent), driver_dispatcher_(fdf::Dispatcher::GetCurrent()) {}
 
-  zx_status_t AddPinDevices(uint32_t controller_id, const ddk::GpioImplProtocolClient& gpio_banjo);
+  zx_status_t AddPinDevices(uint32_t controller_id, const ddk::GpioImplProtocolClient& gpio_banjo,
+                            const std::vector<gpio_pin_t>& pins);
+  void DispatcherShutdownHandler(fdf_dispatcher_t* dispatcher);
+
+  const fdf::UnownedDispatcher driver_dispatcher_;
+  std::optional<fdf::SynchronizedDispatcher> fidl_dispatcher_;
+  std::optional<ddk::UnbindTxn> unbind_txn_;
 };
 
 // GpioDevice currently implements both the Banjo and FIDL versions of the GPIO protocol, although
@@ -84,18 +93,32 @@ class GpioRootDevice : public GpioRootDeviceType {
 // ----------------|---------------|-----------|
 //           Banjo |   supported   | supported |
 //           FIDL  | not supported | supported |
+//
+// GpioDevice instances live on fidl_dispatcher_, which is either a dispatcher owned by the
+// GpioRootDevice, or the default driver dispatcher. Driver hooks (DdkUnbind and DdkRelease) always
+// run on the default driver dispatcher.
 class GpioDevice : public GpioDeviceType, public ddk::GpioProtocol<GpioDevice, ddk::base_protocol> {
  public:
-  GpioDevice(zx_device_t* parent, const ddk::GpioImplProtocolClient& gpio_banjo, uint32_t pin,
-             std::string_view name)
-      : GpioDeviceType(parent), gpio_banjo_(gpio_banjo), pin_(pin), name_(name) {}
-
-  GpioDevice(zx_device_t* parent, fdf::ClientEnd<fuchsia_hardware_gpioimpl::GpioImpl> gpio,
-             uint32_t pin, std::string_view name)
+  GpioDevice(zx_device_t* parent, fdf::UnownedDispatcher fidl_dispatcher,
+             const ddk::GpioImplProtocolClient& gpio_banjo, uint32_t pin, std::string_view name)
       : GpioDeviceType(parent),
-        gpio_(std::move(gpio), fdf::Dispatcher::GetCurrent()->get()),
+        fidl_dispatcher_(std::move(fidl_dispatcher)),
+        gpio_banjo_(gpio_banjo),
         pin_(pin),
-        name_(name) {}
+        name_(name),
+        bindings_(std::in_place),
+        outgoing_(std::in_place, fidl_dispatcher_->async_dispatcher()) {}
+
+  GpioDevice(zx_device_t* parent, fdf::UnownedDispatcher fidl_dispatcher,
+             fdf::ClientEnd<fuchsia_hardware_gpioimpl::GpioImpl> gpio, uint32_t pin,
+             std::string_view name)
+      : GpioDeviceType(parent),
+        fidl_dispatcher_(std::move(fidl_dispatcher)),
+        pin_(pin),
+        name_(name),
+        gpio_(std::in_place, std::move(gpio), fidl_dispatcher_->get()),
+        bindings_(std::in_place),
+        outgoing_(std::in_place, fidl_dispatcher_->async_dispatcher()) {}
 
   zx_status_t InitAddDevice(uint32_t controller_id);
 
@@ -134,20 +157,18 @@ class GpioDevice : public GpioDeviceType, public ddk::GpioProtocol<GpioDevice, d
   void SetPolarity(SetPolarityRequestView request, SetPolarityCompleter::Sync& completer) override;
 
  private:
+  const fdf::UnownedDispatcher fidl_dispatcher_;
   ddk::GpioImplProtocolClient gpio_banjo_ TA_GUARDED(lock_);
-  fdf::WireClient<fuchsia_hardware_gpioimpl::GpioImpl> gpio_ TA_GUARDED(lock_);
   const uint32_t pin_;
   const std::string name_;
-  using Binding = struct {
-    fidl::ServerBindingRef<fuchsia_hardware_gpio::Gpio> binding;
-    std::optional<ddk::UnbindTxn> unbind_txn;
-  };
 
-  std::optional<component::OutgoingDirectory> outgoing_;
-  fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio> bindings_;
-
-  std::optional<Binding> binding_;
   fbl::Mutex lock_;
+
+  // These objects can only be accessed on the FIDL dispatcher. Making them optional allows them to
+  // be destroyed manually in our unbind hook.
+  std::optional<fdf::WireClient<fuchsia_hardware_gpioimpl::GpioImpl>> gpio_ TA_GUARDED(lock_);
+  std::optional<fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio>> bindings_;
+  std::optional<component::OutgoingDirectory> outgoing_;
 };
 
 class GpioInitDevice;

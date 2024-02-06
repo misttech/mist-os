@@ -4,6 +4,7 @@
 
 #include "gpio.h"
 
+#include <fidl/fuchsia.scheduler/cpp/wire.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -13,7 +14,6 @@
 #include <memory>
 
 #include <bind/fuchsia/gpio/cpp/bind.h>
-#include <ddk/metadata/gpio.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
@@ -110,7 +110,7 @@ void GpioDevice::ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& 
   }
 
   fdf::Arena arena('GPIO');
-  gpio_.buffer(arena)
+  gpio_->buffer(arena)
       ->ConfigIn(pin_, request->flags)
       .ThenExactlyOnce(fit::inline_callback<
                        void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::ConfigIn>&),
@@ -133,7 +133,7 @@ void GpioDevice::ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Syn
   }
 
   fdf::Arena arena('GPIO');
-  gpio_.buffer(arena)
+  gpio_->buffer(arena)
       ->ConfigOut(pin_, request->initial_value)
       .ThenExactlyOnce(
           fit::inline_callback<
@@ -163,7 +163,7 @@ void GpioDevice::Read(ReadCompleter::Sync& completer) {
   }
 
   fdf::Arena arena('GPIO');
-  gpio_.buffer(arena)->Read(pin_).ThenExactlyOnce(
+  gpio_->buffer(arena)->Read(pin_).ThenExactlyOnce(
       fit::inline_callback<void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::Read>&),
                            sizeof(ReadCompleter::Async)>(
           [completer = completer.ToAsync()](auto& result) mutable {
@@ -184,7 +184,7 @@ void GpioDevice::Write(WriteRequestView request, WriteCompleter::Sync& completer
   }
 
   fdf::Arena arena('GPIO');
-  gpio_.buffer(arena)
+  gpio_->buffer(arena)
       ->Write(pin_, request->value)
       .ThenExactlyOnce(fit::inline_callback<
                        void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::Write>&),
@@ -215,7 +215,7 @@ void GpioDevice::SetDriveStrength(SetDriveStrengthRequestView request,
   }
 
   fdf::Arena arena('GPIO');
-  gpio_.buffer(arena)
+  gpio_->buffer(arena)
       ->SetDriveStrength(pin_, request->ds_ua)
       .ThenExactlyOnce(
           fit::inline_callback<
@@ -245,7 +245,7 @@ void GpioDevice::GetDriveStrength(GetDriveStrengthCompleter::Sync& completer) {
   }
 
   fdf::Arena arena('GPIO');
-  gpio_.buffer(arena)->GetDriveStrength(pin_).ThenExactlyOnce(
+  gpio_->buffer(arena)->GetDriveStrength(pin_).ThenExactlyOnce(
       fit::inline_callback<
           void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::GetDriveStrength>&),
           sizeof(GetDriveStrengthCompleter::Async)>(
@@ -275,7 +275,7 @@ void GpioDevice::GetInterrupt(GetInterruptRequestView request,
   }
 
   fdf::Arena arena('GPIO');
-  gpio_.buffer(arena)
+  gpio_->buffer(arena)
       ->GetInterrupt(pin_, request->flags)
       .ThenExactlyOnce(
           fit::inline_callback<
@@ -299,7 +299,7 @@ void GpioDevice::ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) {
   }
 
   fdf::Arena arena('GPIO');
-  gpio_.buffer(arena)->ReleaseInterrupt(pin_).ThenExactlyOnce(
+  gpio_->buffer(arena)->ReleaseInterrupt(pin_).ThenExactlyOnce(
       fit::inline_callback<
           void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::ReleaseInterrupt>&),
           sizeof(ReleaseInterruptCompleter::Async)>(
@@ -322,7 +322,7 @@ void GpioDevice::SetAltFunction(SetAltFunctionRequestView request,
   }
 
   fdf::Arena arena('GPIO');
-  gpio_.buffer(arena)
+  gpio_->buffer(arena)
       ->SetAltFunction(pin_, request->function)
       .ThenExactlyOnce(
           fit::inline_callback<
@@ -348,7 +348,7 @@ void GpioDevice::SetPolarity(SetPolarityRequestView request,
   }
 
   fdf::Arena arena('GPIO');
-  gpio_.buffer(arena)
+  gpio_->buffer(arena)
       ->SetPolarity(pin_, request->polarity)
       .ThenExactlyOnce(
           fit::inline_callback<
@@ -374,16 +374,14 @@ zx_status_t GpioDevice::InitAddDevice(const uint32_t controller_id) {
       {BIND_GPIO_CONTROLLER, 0, controller_id},
   };
 
-  async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-  outgoing_ = component::OutgoingDirectory(dispatcher);
-
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
     return endpoints.status_value();
   }
 
   fuchsia_hardware_gpio::Service::InstanceHandler handler({
-      .device = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
+      .device = bindings_->CreateHandler(this, fidl_dispatcher_->async_dispatcher(),
+                                         fidl::kIgnoreBindingClosure),
   });
   auto result = outgoing_->AddService<fuchsia_hardware_gpio::Service>(std::move(handler));
   if (result.is_error()) {
@@ -407,14 +405,20 @@ zx_status_t GpioDevice::InitAddDevice(const uint32_t controller_id) {
 }
 
 void GpioDevice::DdkUnbind(ddk::UnbindTxn txn) {
-  if (binding_.has_value()) {
-    Binding& binding = binding_.value();
-    ZX_ASSERT(!binding.unbind_txn.has_value());
-    binding.unbind_txn.emplace(std::move(txn));
-    binding.binding.Unbind();
-  } else {
+  async::PostTask(fidl_dispatcher_->async_dispatcher(), [this, txn = std::move(txn)]() mutable {
+    {
+      fbl::AutoLock lock(&lock_);
+
+      // The release hook must run synchronously on the main driver dispatcher, so destroy any
+      // objects that live on the FIDL dispatcher during unbind instead.
+
+      outgoing_.reset();
+      bindings_.reset();
+      gpio_.reset();
+    }
+
     txn.Reply();
-  }
+  });
 }
 
 void GpioDevice::DdkRelease() { delete this; }
@@ -423,6 +427,22 @@ zx_status_t GpioRootDevice::Create(void* ctx, zx_device_t* parent) {
   const ddk::GpioImplProtocolClient gpio_banjo(parent);
   if (gpio_banjo.is_valid()) {
     zxlogf(INFO, "Using Banjo gpioimpl protocol");
+  }
+
+  auto pins = ddk::GetMetadataArray<gpio_pin_t>(parent, DEVICE_METADATA_GPIO_PINS);
+  if (!pins.is_ok()) {
+    zxlogf(ERROR, "Failed to get metadata array: %s", pins.status_string());
+    return pins.error_value();
+  }
+
+  // Make sure that the list of GPIO pins has no duplicates.
+  auto gpio_cmp_lt = [](gpio_pin_t& lhs, gpio_pin_t& rhs) { return lhs.pin < rhs.pin; };
+  auto gpio_cmp_eq = [](gpio_pin_t& lhs, gpio_pin_t& rhs) { return lhs.pin == rhs.pin; };
+  std::sort(pins.value().begin(), pins.value().end(), gpio_cmp_lt);
+  auto result = std::adjacent_find(pins.value().begin(), pins.value().end(), gpio_cmp_eq);
+  if (result != pins.value().end()) {
+    zxlogf(ERROR, "gpio pin '%d' was published more than once", result->pin);
+    return ZX_ERR_INVALID_ARGS;
   }
 
   uint32_t controller_id = 0;
@@ -458,50 +478,93 @@ zx_status_t GpioRootDevice::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_MEMORY;
   }
 
+  auto scheduler_role = ddk::GetEncodedMetadata<fuchsia_scheduler::wire::RoleName>(
+      parent, DEVICE_METADATA_SCHEDULER_ROLE_NAME);
+  if (scheduler_role.is_ok()) {
+    const std::string role_name(scheduler_role->role.get());
+
+    zx::result result = fdf::SynchronizedDispatcher::Create(
+        {}, "GPIO", fit::bind_member<&GpioRootDevice::DispatcherShutdownHandler>(root.get()),
+        role_name);
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to create SynchronizedDispatcher: %s", result.status_string());
+      return result.error_value();
+    }
+
+    // If scheduler role metadata was provided, create a new dispatcher using the role, and use
+    // that dispatcher instead of the default dispatcher passed to this method.
+    root->fidl_dispatcher_.emplace(*std::move(result));
+
+    zxlogf(DEBUG, "Using dispatcher with role \"%s\"", role_name.c_str());
+  }
+
   zx_status_t status = root->DdkAdd(ddk::DeviceAddArgs("gpio").set_flags(DEVICE_ADD_NON_BINDABLE));
   if (status != ZX_OK) {
     zxlogf(ERROR, "DdkAdd failed: %s", zx_status_get_string(status));
     return status;
   }
 
-  status = root->AddPinDevices(controller_id, gpio_banjo);
+  if (root->fidl_dispatcher_) {
+    // Pin devices must be created on the FIDL dispatcher if it exists.
+    async::PostTask(root->fidl_dispatcher_->async_dispatcher(),
+                    [=, root = root.get(), pins = *std::move(pins)]() {
+                      root->AddPinDevices(controller_id, gpio_banjo, pins);
+                    });
+    status = ZX_OK;
+  } else {
+    status = root->AddPinDevices(controller_id, gpio_banjo, *pins);
+  }
 
   [[maybe_unused]] auto ptr = root.release();
 
   return status;
 }
 
+void GpioRootDevice::DdkUnbind(ddk::UnbindTxn txn) {
+  ZX_ASSERT_MSG(!unbind_txn_, "unbind_txn_ already set");
+  if (fidl_dispatcher_) {
+    unbind_txn_.emplace(std::move(txn));
+
+    // Post a task to the FIDL dispatcher to start shutting itself down. If run on this thread
+    // instead, the dispatcher could change states while a task on it is running, potentially
+    // causing an assert failure if that task was trying to bind a FIDL server.
+    async::PostTask(fidl_dispatcher_->async_dispatcher(),
+                    [&]() { fidl_dispatcher_->ShutdownAsync(); });
+  } else {
+    txn.Reply();
+  }
+}
+
 void GpioRootDevice::DdkRelease() { delete this; }
 
+void GpioRootDevice::DispatcherShutdownHandler(fdf_dispatcher_t* dispatcher) {
+  async::PostTask(driver_dispatcher_->async_dispatcher(), [this]() {
+    ZX_DEBUG_ASSERT_MSG(unbind_txn_,
+                        "unbind_txn_ was not set before the FIDL dispatcher shut down");
+    unbind_txn_->Reply();
+  });
+}
+
 zx_status_t GpioRootDevice::AddPinDevices(const uint32_t controller_id,
-                                          const ddk::GpioImplProtocolClient& gpio_banjo) {
-  auto pins = ddk::GetMetadataArray<gpio_pin_t>(parent(), DEVICE_METADATA_GPIO_PINS);
-  if (!pins.is_ok()) {
-    zxlogf(ERROR, "Failed to get metadata array: %s", pins.status_string());
-    return pins.error_value();
-  }
+                                          const ddk::GpioImplProtocolClient& gpio_banjo,
+                                          const std::vector<gpio_pin_t>& pins) {
+  const fdf::UnownedDispatcher fidl_dispatcher =
+      fidl_dispatcher_ ? fdf::UnownedDispatcher(fidl_dispatcher_->get())
+                       : fdf::Dispatcher::GetCurrent();
 
-  // Make sure that the list of GPIO pins has no duplicates.
-  auto gpio_cmp_lt = [](gpio_pin_t& lhs, gpio_pin_t& rhs) { return lhs.pin < rhs.pin; };
-  auto gpio_cmp_eq = [](gpio_pin_t& lhs, gpio_pin_t& rhs) { return lhs.pin == rhs.pin; };
-  std::sort(pins.value().begin(), pins.value().end(), gpio_cmp_lt);
-  auto result = std::adjacent_find(pins.value().begin(), pins.value().end(), gpio_cmp_eq);
-  if (result != pins.value().end()) {
-    zxlogf(ERROR, "gpio pin '%d' was published more than once", result->pin);
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  for (auto pin : *pins) {
+  for (const auto& pin : pins) {
     fbl::AllocChecker ac;
     std::unique_ptr<GpioDevice> dev;
 
     if (gpio_banjo.is_valid()) {
-      dev.reset(new (&ac) GpioDevice(zxdev(), gpio_banjo, pin.pin, pin.name));
+      dev.reset(new (&ac)
+                    GpioDevice(zxdev(), fidl_dispatcher->borrow(), gpio_banjo, pin.pin, pin.name));
     } else {
       zx::result gpio =
           DdkConnectRuntimeProtocol<fuchsia_hardware_gpioimpl::Service::Device>(parent());
       ZX_ASSERT_MSG(gpio.is_ok(), "Failed to get additional FIDL client: %s", gpio.status_string());
-      dev.reset(new (&ac) GpioDevice(zxdev(), *std::move(gpio), pin.pin, pin.name));
+      dev.reset(new (&ac) GpioDevice(zxdev(), fidl_dispatcher->borrow(), *std::move(gpio), pin.pin,
+                                     pin.name));
     }
 
     if (!ac.check()) {

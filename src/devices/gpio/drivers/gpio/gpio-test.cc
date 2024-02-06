@@ -4,6 +4,7 @@
 
 #include "gpio.h"
 
+#include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <fuchsia/hardware/gpioimpl/cpp/banjo-mock.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/ddk/debug.h>
@@ -35,7 +36,8 @@ class GpioDeviceWrapper {
   }
 
   explicit GpioDeviceWrapper()
-      : device_(nullptr, ddk::GpioImplProtocolClient(gpio_impl_.GetProto()), 0, "GPIO_0") {}
+      : device_(nullptr, fdf::Dispatcher::GetCurrent(),
+                ddk::GpioImplProtocolClient(gpio_impl_.GetProto()), 0, "GPIO_0") {}
 
   ddk::MockGpioImpl gpio_impl_;
   GpioDevice device_;
@@ -299,6 +301,7 @@ TEST(GpioTest, Init) {
   };
 
   std::shared_ptr<zx_device> fake_root = MockDevice::FakeRootParent();
+  std::shared_ptr<fdf_testing::DriverRuntime> runtime = mock_ddk::GetDriverRuntime();
 
   ddk::MockGpioImpl gpio;
 
@@ -398,7 +401,14 @@ TEST(GpioTest, Init) {
   for (auto& child : fake_root->children()) {
     device_async_remove(child.get());
   }
-  mock_ddk::ReleaseFlaggedDevices(fake_root.get());
+
+  // ReleaseFlaggedDevices blocks, so it must be run on another thread while the foreground
+  // dispatcher runs on this one. Pass the foreground dispatcher to it so that the unbind hooks run
+  // on a foreground dispatcher thread as the driver expects.
+  runtime->PerformBlockingWork(
+      [&, dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher()]() {
+        EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(fake_root.get(), dispatcher));
+      });
 
   EXPECT_NO_FAILURES(gpio.VerifyAndClear());
 }
@@ -414,6 +424,7 @@ TEST(GpioTest, InitErrorHandling) {
   };
 
   std::shared_ptr<zx_device> fake_root = MockDevice::FakeRootParent();
+  std::shared_ptr<fdf_testing::DriverRuntime> runtime = mock_ddk::GetDriverRuntime();
 
   ddk::MockGpioImpl gpio;
 
@@ -474,7 +485,10 @@ TEST(GpioTest, InitErrorHandling) {
   // GPIO root device (init device should not be added due to errors).
   EXPECT_EQ(fake_root->child_count(), 1);
   device_async_remove(fake_root->GetLatestChild());
-  mock_ddk::ReleaseFlaggedDevices(fake_root.get());
+  runtime->PerformBlockingWork(
+      [&, dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher()]() {
+        EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(fake_root.get(), dispatcher));
+      });
 
   EXPECT_NO_FAILURES(gpio.VerifyAndClear());
 }
@@ -573,6 +587,14 @@ TEST(GpioTest, FallBackToFidl) {
   runtime->Run();
 
   EXPECT_NO_FAILURES(gpioimpl_fidl.SyncCall(&MockGpioImplFidl::VerifyAndClear));
+
+  // Unbind and release the root device and its children so that the driver hooks run and safely
+  // tear down the FIDL clients.
+  device_async_remove(root_device);
+  runtime->PerformBlockingWork(
+      [&, dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher()]() {
+        EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(root_device, dispatcher));
+      });
 }
 
 TEST(GpioTest, ControllerId) {
@@ -642,6 +664,90 @@ TEST(GpioTest, ControllerId) {
     runtime->Run();
     runtime->ResetQuit();
   }
+
+  async_dispatcher_t* const driver_dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+
+  device_async_remove(root_device);
+  runtime->PerformBlockingWork(
+      [&]() { EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(root_device, driver_dispatcher)); });
+}
+
+TEST(GpioTest, SchedulerRole) {
+  constexpr gpio_pin_t pins[] = {
+      DECL_GPIO_PIN(0),
+      DECL_GPIO_PIN(1),
+      DECL_GPIO_PIN(2),
+  };
+
+  std::shared_ptr runtime = mock_ddk::GetDriverRuntime();
+  async_dispatcher_t* const driver_dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  async_dispatcher_t* const background_dispatcher =
+      runtime->StartBackgroundDispatcher()->async_dispatcher();
+
+  auto parent = MockDevice::FakeRootParent();
+  parent->SetMetadata(DEVICE_METADATA_GPIO_PINS, pins, std::size(pins) * sizeof(gpio_pin_t));
+
+  {
+    // Add scheduler role metadata that will cause the core driver to create a new driver
+    // dispatcher. Verify that FIDL calls can still be made, and that dispatcher shutdown using the
+    // unbind hook works.
+    fuchsia_scheduler::RoleName role("no.such.scheduler.role");
+    const auto result = fidl::Persist(role);
+    ASSERT_TRUE(result.is_ok());
+    parent->SetMetadata(DEVICE_METADATA_SCHEDULER_ROLE_NAME, result->data(), result->size());
+  }
+
+  async_patterns::TestDispatcherBound<MockGpioImplFidl> gpioimpl_fidl(background_dispatcher,
+                                                                      std::in_place, 0);
+
+  {
+    auto outgoing_client = gpioimpl_fidl.SyncCall(&MockGpioImplFidl::CreateOutgoingAndServe);
+    ASSERT_TRUE(outgoing_client.is_ok());
+
+    parent->AddFidlService(fuchsia_hardware_gpioimpl::Service::Name, std::move(*outgoing_client));
+  }
+
+  ASSERT_OK(GpioRootDevice::Create(nullptr, parent.get()));
+
+  runtime->RunUntil([&]() -> bool {
+    return parent->child_count() == 1 && parent->GetLatestChild()->child_count() == 3;
+  });
+
+  ASSERT_EQ(parent->child_count(), 1);
+
+  auto* const root_device = parent->GetLatestChild();
+  EXPECT_EQ(root_device->child_count(), 3);
+
+  const auto path =
+      std::string("svc/") +
+      component::MakeServiceMemberPath<fuchsia_hardware_gpio::Service::Device>("default");
+
+  gpioimpl_fidl.SyncCall([&](MockGpioImplFidl* gpioimpl) {
+    gpioimpl->ExpectWrite(ZX_OK, 0, static_cast<uint8_t>(1));
+    gpioimpl->ExpectWrite(ZX_OK, 1, static_cast<uint8_t>(1));
+    gpioimpl->ExpectWrite(ZX_OK, 2, static_cast<uint8_t>(1));
+  });
+
+  for (auto& child : root_device->children()) {
+    auto client_end = component::ConnectAt<fuchsia_hardware_gpio::Gpio>(child->outgoing(), path);
+    ASSERT_TRUE(client_end.is_ok());
+
+    fidl::WireClient<fuchsia_hardware_gpio::Gpio> gpio_client(*std::move(client_end),
+                                                              driver_dispatcher);
+    gpio_client->Write(1).Then(
+        [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::Write>& result) {
+          ASSERT_TRUE(result.ok());
+          EXPECT_TRUE(result->is_ok());
+          runtime->Quit();
+        });
+
+    runtime->Run();
+    runtime->ResetQuit();
+  }
+
+  device_async_remove(root_device);
+  runtime->PerformBlockingWork(
+      [&]() { EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(root_device, driver_dispatcher)); });
 }
 
 }  // namespace
