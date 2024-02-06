@@ -270,22 +270,27 @@ std::vector<Location> ModuleSymbolsImpl::ResolveInputLocation(const SymbolContex
   }
 }
 
-fxl::RefPtr<DwarfUnit> ModuleSymbolsImpl::GetDwarfUnitForAddress(
+ModuleSymbols::FoundUnit ModuleSymbolsImpl::GetDwarfUnitForAddress(
     const SymbolContext& symbol_context, uint64_t absolute_address) const {
-  fxl::RefPtr<DwarfUnit> main_unit =
+  FoundUnit result;
+
+  result.main_binary_unit =
       binary_->UnitForRelativeAddress(symbol_context.AbsoluteToRelative(absolute_address));
   // The dwos_.empty() check is an optimization to avoid checking the skeleton units when we know
   // there are none.
-  if (!main_unit || dwos_.empty()) {
-    return main_unit;
+  if (!result.main_binary_unit || dwos_.empty()) {
+    // The result should either be both null pointers, or both the valid non-DWO unit.
+    result.details_unit = result.main_binary_unit;
+    return result;
   }
 
   // In the case of debug fission, we want to return the full unit in the .dwo file. This needs to
   // be looked up if the unit that was matched was a skeleton.
-  llvm::DWARFDie llvm_die = main_unit->GetUnitDie();
+  llvm::DWARFDie llvm_die = result.main_binary_unit->GetUnitDie();
   if (static_cast<int>(llvm_die.getTag()) != static_cast<int>(DwarfTag::kSkeletonUnit)) {
     // Not a skeleton unit.
-    return main_unit;
+    result.details_unit = result.main_binary_unit;
+    return result;
   }
 
   // Look up the DWO for this skeleton.
@@ -293,21 +298,24 @@ fxl::RefPtr<DwarfUnit> ModuleSymbolsImpl::GetDwarfUnitForAddress(
   auto found_skeleton_index = dwo_skeleton_offset_to_index_.find(skeleton_offset);
   if (found_skeleton_index == dwo_skeleton_offset_to_index_.end()) {
     // Some invalid DWO reference, give up and return the skeleton one.
-    return main_unit;
+    result.details_unit = result.main_binary_unit;
+    return result;
   }
 
   FX_CHECK(found_skeleton_index->second < dwos_.size());
-  return dwos_[found_skeleton_index->second]->binary()->GetDwoUnit();
+  result.details_unit = dwos_[found_skeleton_index->second]->binary()->GetDwoUnit();
+  return result;
 }
 
 LineDetails ModuleSymbolsImpl::LineDetailsForAddress(const SymbolContext& symbol_context,
                                                      uint64_t absolute_address, bool greedy) const {
-  fxl::RefPtr<DwarfUnit> unit = GetDwarfUnitForAddress(symbol_context, absolute_address);
-  if (!unit)
+  FoundUnit found_unit = GetDwarfUnitForAddress(symbol_context, absolute_address);
+  if (!found_unit)
     return LineDetails();
 
   // TODO(brettw) this should use our LineTable wrapper instead of LLVM's so it can be mocked.
-  const llvm::DWARFDebugLine::LineTable* line_table = unit->GetLLVMLineTable();
+  const llvm::DWARFDebugLine::LineTable* line_table =
+      found_unit.main_binary_unit->GetLLVMLineTable();
   if (!line_table || line_table->Rows.empty())
     return LineDetails();
 
@@ -354,7 +362,7 @@ LineDetails ModuleSymbolsImpl::LineDetailsForAddress(const SymbolContext& symbol
     if (!build_dir_.empty()) {
       compilation_dir = build_dir_;
     } else {
-      compilation_dir = unit->GetCompilationDir();
+      compilation_dir = found_unit.details_unit->GetCompilationDir();
     }
   }
 
@@ -570,8 +578,8 @@ std::optional<Location> ModuleSymbolsImpl::DwarfLocationForAddress(
     const SymbolContext& symbol_context, uint64_t absolute_address, const ResolveOptions& options,
     const Function* optional_func) const {
   // TODO(bug 5544) handle addresses that aren't code like global variables.
-  fxl::RefPtr<DwarfUnit> unit = GetDwarfUnitForAddress(symbol_context, absolute_address);
-  if (!unit)  // No DWARF symbol.
+  FoundUnit found_unit = GetDwarfUnitForAddress(symbol_context, absolute_address);
+  if (!found_unit)  // No DWARF symbol.
     return std::nullopt;
 
   uint64_t relative_address = symbol_context.AbsoluteToRelative(absolute_address);
@@ -591,7 +599,7 @@ std::optional<Location> ModuleSymbolsImpl::DwarfLocationForAddress(
     lazy_function = LazySymbol(optional_func);
   } else {
     // Resolve the function for this address.
-    if ((lazy_function = unit->FunctionForRelativeAddress(relative_address))) {
+    if ((lazy_function = found_unit.details_unit->FunctionForRelativeAddress(relative_address))) {
       // FunctionForRelativeAddress() will return the most specific inlined function for the
       // address.
       function = RefPtrTo(lazy_function.Get()->As<Function>());
@@ -621,7 +629,7 @@ std::optional<Location> ModuleSymbolsImpl::DwarfLocationForAddress(
   // Get the file/line location (may fail). Don't overwrite one computed above if already set above
   // using the ambigous inline call site.
   if (!file_line.is_valid()) {
-    const LineTable& line_table = unit->GetLineTable();
+    const LineTable& line_table = found_unit.main_binary_unit->GetLineTable();
 
     // Use the line table to move the address to after the function prologue. Assume if the function
     // is inline there's no prologue. Inlines themselves will have no prologues, and we assume
@@ -660,10 +668,12 @@ std::optional<Location> ModuleSymbolsImpl::DwarfLocationForAddress(
         // if a file name or build directory is given to ensure that all "no code" locations compare
         // identically. This is guaranteed here because file_name will only be set when the line is
         // nonzero.
-        if (build_dir_.empty())
-          file_line = FileLine(std::move(*file_name), unit->GetCompilationDir(), row.Line);
-        else
+        if (build_dir_.empty()) {
+          file_line = FileLine(std::move(*file_name), found_unit.details_unit->GetCompilationDir(),
+                               row.Line);
+        } else {
           file_line = FileLine(std::move(*file_name), build_dir_, row.Line);
+        }
       }
       column = row.Column;
     }

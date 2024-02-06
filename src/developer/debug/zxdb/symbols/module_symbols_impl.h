@@ -65,8 +65,8 @@ class ModuleSymbolsImpl final : public ModuleSymbols, public DwarfSymbolFactory:
   std::vector<Location> ResolveInputLocation(
       const SymbolContext& symbol_context, const InputLocation& input_location,
       const ResolveOptions& options = ResolveOptions()) const override;
-  fxl::RefPtr<DwarfUnit> GetDwarfUnitForAddress(const SymbolContext& symbol_context,
-                                                uint64_t absolute_address) const override;
+  FoundUnit GetDwarfUnitForAddress(const SymbolContext& symbol_context,
+                                   uint64_t absolute_address) const override;
   LineDetails LineDetailsForAddress(const SymbolContext& symbol_context, uint64_t absolute_address,
                                     bool greedy) const override;
   std::vector<std::string> FindFileMatches(std::string_view name) const override;

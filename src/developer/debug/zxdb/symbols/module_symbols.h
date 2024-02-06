@@ -45,6 +45,29 @@ class SymbolContext;
 // via the CompileUnit.
 class ModuleSymbols : public fxl::RefCountedThreadSafe<ModuleSymbols> {
  public:
+  // Encapsulates a requested unit.
+  //
+  // In the case of debug fission, the detailed symbols for each object file are split out, but the
+  // line information and the address tables are kept in the main binary.
+  //
+  // This structure encapsulates this information. When a unit is found in a non-debug-fission
+  // binary, everything is in the same place and the two pointers will be the same. In the case of a
+  // debug fission binary, the main_binary_unit will be the "skeleton unit" in the main binary,
+  // while the details_unit will refer to the full symbols in the .dwo file.
+  //
+  // This scheme allows calling code to lookup based on what it's used for rather than encoding
+  // debug-fission-specific logic at each site.
+  //
+  // The pointers will be invalid if there is no unit found. They should both either be valid or
+  // null, but not a combination.
+  struct FoundUnit {
+    // Returns true if the pointers are valid.
+    operator bool() const { return main_binary_unit && details_unit; }
+
+    fxl::RefPtr<DwarfUnit> main_binary_unit;  // Use for line table and address table information.
+    fxl::RefPtr<DwarfUnit> details_unit;      // Use for detailed symbols (functions, types).
+  };
+
   fxl::WeakPtr<ModuleSymbols> GetWeakPtr();
 
   // Returns information about this module. This is relatively slow because it needs to count the
@@ -76,9 +99,10 @@ class ModuleSymbols : public fxl::RefCountedThreadSafe<ModuleSymbols> {
       const SymbolContext& symbol_context, const InputLocation& input_location,
       const ResolveOptions& options = ResolveOptions()) const = 0;
 
-  // Returns the low-level DwarfUnit that covers the given address, or null if no match.
-  virtual fxl::RefPtr<DwarfUnit> GetDwarfUnitForAddress(const SymbolContext& symbol_context,
-                                                        uint64_t absolute_address) const = 0;
+  // Returns the low-level DwarfUnit(s) that covers the given address, or null if no match. The
+  // pointers in the structure will be null if not found.
+  virtual FoundUnit GetDwarfUnitForAddress(const SymbolContext& symbol_context,
+                                           uint64_t absolute_address) const = 0;
 
   // Computes the line that corresponds to the given address. Unlike ResolveInputLocation (which
   // just returns the current source line), this returns the entire set of contiguous line table

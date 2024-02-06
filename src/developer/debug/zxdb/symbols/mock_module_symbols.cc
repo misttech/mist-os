@@ -95,9 +95,9 @@ std::vector<Location> MockModuleSymbols::ResolveInputLocation(const SymbolContex
   return result;
 }
 
-fxl::RefPtr<DwarfUnit> MockModuleSymbols::GetDwarfUnitForAddress(
+ModuleSymbols::FoundUnit MockModuleSymbols::GetDwarfUnitForAddress(
     const SymbolContext& symbol_context, uint64_t absolute_address) const {
-  return nullptr;
+  return FoundUnit{nullptr, nullptr};
 }
 
 LineDetails MockModuleSymbols::LineDetailsForAddress(const SymbolContext& symbol_context,

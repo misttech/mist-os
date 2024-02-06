@@ -234,14 +234,14 @@ OutputBuffer DumpLineTable(ProcessSymbols* process_symbols, uint64_t address,
     return OutputBuffer("The address " + to_hex_string(address) + " is not covered by a module.\n");
   SymbolContext symbol_context = loaded_module->symbol_context();
 
-  fxl::RefPtr<DwarfUnit> unit =
+  ModuleSymbols::FoundUnit found_unit =
       loaded_module->module_symbols()->GetDwarfUnitForAddress(symbol_context, address);
-  if (!unit) {
+  if (!found_unit) {
     return OutputBuffer("This address " + to_hex_string(address) +
                         " is not covered by a compilation unit.\n");
   }
 
-  const LineTable& line_table = unit->GetLineTable();
+  const LineTable& line_table = found_unit.main_binary_unit->GetLineTable();
   cpp20::span<const LineTable::Row> sequence =
       line_table.GetRowSequenceForAddress(symbol_context, address);
   if (sequence.empty())

@@ -648,14 +648,8 @@ TEST(ModuleSymbols, FissionAddress) {
   ASSERT_TRUE(result[0].is_valid());
   ASSERT_TRUE(result[0].has_symbols());
 
-// TODO finish implemeting debug fission support so this works.
-//
-// I believe the problem is that the line table is stored in the main binary, but
-// ModuleSymbolsImpl::DwarfLocationForAddress uses the DWO unit's line table.
-#if 0
   EXPECT_EQ(result[0].file_line().file(), "other.cc");
   EXPECT_EQ(result[0].file_line().line(), 9);
-#endif
 
   const Symbol* symbol = result[0].symbol().Get();
   ASSERT_TRUE(symbol);
