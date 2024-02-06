@@ -3071,7 +3071,7 @@
   area: ['Component Framework']
   issue: ['298246710']
   gerrit_change_id: ['910123']
-  status: 'Pending'
+  status: 'Accepted'
   reviewers: ['abarth@google.com', 'crjohns@google.com', 'markdittmer@google.com', 'miguelfrde@google.com', 'phosek@google.com', 'surajmalhotra@google.com', 'ypomortsev@google.com']
   submitted: '2023-10-16'
   reviewed: ''
