@@ -3,6 +3,82 @@
     "traceEvents": [
         {
             "cat": "gfx",
+            "name": "RenderFrame",
+            "ts": 5,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "X",
+            "dur": 5,
+            "args": {
+                "frame_number": 13,
+                "time": 0.4
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 8,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "s",
+            "id": "234"
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 33,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "f",
+            "bp": "e",
+            "id": "234"
+        },
+        {
+            "cat": "gfx",
+            "name": "Display::Fence::OnReady",
+            "ts": 30,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "X",
+            "dur": 10,
+            "args": {
+                "display_id": 1
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "RenderFrame",
+            "ts": 15,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "X",
+            "dur": 5,
+            "args": {
+                "frame_number": 14,
+                "time": 0.4
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 18,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "s",
+            "id": "235"
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 23,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "f",
+            "bp": "e",
+            "id": "235"
+        },
+        {
+            "cat": "gfx",
             "name": "Display::Controller::OnDisplayVsync",
             "ts": 0.1,
             "pid": 5693,
@@ -169,6 +245,38 @@
             "ph": "f",
             "bp": "e",
             "id": "103"
+        },
+        {
+            "cat": "gfx",
+            "name": "RenderFrame",
+            "ts": 0.61,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "X",
+            "dur": 0.08,
+            "args": {
+                "frame_number": 5,
+                "time": 0.4
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 0.65,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "s",
+            "id": "104"
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 0.705,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "f",
+            "bp": "e",
+            "id": "104"
         },
         {
             "cat": "gfx",

@@ -56,6 +56,13 @@ def metrics_processor(
         for e in scenic_start_events
     ]
 
+    valid_vsync_start_index = trace_utils.find_valid_vsync_start_index(
+        vsync_ready_events
+    )
+    scenic_start_events = scenic_start_events[valid_vsync_start_index:]
+    scenic_render_events = scenic_render_events[valid_vsync_start_index:]
+    vsync_ready_events = vsync_ready_events[valid_vsync_start_index:]
+
     if len(scenic_render_events) < 1 or len(vsync_ready_events) < 1:
         _LOGGER.info(
             f"No render or vsync events are present. Perhaps the trace duration"

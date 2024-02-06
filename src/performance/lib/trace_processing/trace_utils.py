@@ -211,3 +211,22 @@ def get_nearest_following_event(
         type=trace_model.DurationEvent,
     )
     return next(filtered_following_events, None)
+
+
+# This method looks for a possible race between trace event start in Scenic and magma.
+# We can safely skip these events. See https://fxbug.dev/322849857 for more details.
+def find_valid_vsync_start_index(vsyncs: List[trace_model.Event]) -> int:
+    """Find the index of the first valid vsync flow.
+
+    Args:
+      vsyncs: List of vsync events.
+
+    Returns:
+      The first index where vsyncs are chronologically ordered.
+    """
+    if len(vsyncs) > 1 and vsyncs[1].start < vsyncs[0].start:
+        i = 1
+        while i < len(vsyncs) and vsyncs[i].start < vsyncs[0].start:
+            i += 1
+        return i
+    return 0

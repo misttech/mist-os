@@ -42,7 +42,6 @@ def metrics_processor(
         name=_SCENIC_RENDER_EVENT_NAME,
         type=trace_model.DurationEvent,
     )
-
     vsync_events: List[trace_model.Event] = list(
         filter(
             lambda item: item is not None,
@@ -55,6 +54,11 @@ def metrics_processor(
         )
     )
 
+    # This method looks for a possible race between trace event start in Scenic and magma.
+    # We can safely skip these events. See https://fxbug.dev/322849857 for more details.
+    vsync_events = vsync_events[
+        trace_utils.find_valid_vsync_start_index(vsync_events) :
+    ]
     if len(vsync_events) < 2:
         _LOGGER.info(
             f"Less than two vsync events are present. Perhaps the trace duration"
@@ -64,10 +68,18 @@ def metrics_processor(
 
     fps_values: List[float] = []
     for i in range(len(vsync_events) - 1):
+        # Two renders may be squashed into one.
+        if vsync_events[i + 1].start == vsync_events[i].start:
+            i += 1
+            continue
         fps_values.append(
             trace_time.TimeDelta.from_seconds(1)
             / (vsync_events[i + 1].start - vsync_events[i].start)
         )
+
+    if len(fps_values) == 0:
+        _LOGGER.info(f"Not enough valid vsyncs")
+        return []
 
     fps_mean: float = trace_utils.mean(fps_values)
     _LOGGER.info(f"Average FPS: {fps_mean}")
