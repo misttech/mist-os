@@ -11,7 +11,6 @@ driver_bind_rules("buttons-bind") {
   rules = "buttons.bind"
   bind_output = "buttons.bindbc"
   tests = "bind-tests.json"
-  disable_fragment_gen = true
   deps = [
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
@@ -20,12 +19,10 @@ driver_bind_rules("buttons-bind") {
 
 fuchsia_driver("buttons-driver") {
   output_name = "buttons"
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
+  deps = [
+    ":buttons-bind",
+    ":common",
   ]
-  sources = []
-  deps = [ ":common" ]
 }
 
 fuchsia_driver_component("buttons") {
@@ -49,26 +46,19 @@ source_set("common") {
   ]
 
   public_deps = [
-    ":buttons-bind",
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
+    "//sdk/lib/driver/compat/cpp:cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/devfs/cpp",
+    "//src/devices/bin/driver_runtime",
+    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/lib/ddk:ddk-metadata-headers",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/sync:sync-cpp",
-    "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 test("buttons-test") {
@@ -78,10 +68,8 @@ test("buttons-test") {
   deps = [
     ":common",
     "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:cpp",
     "//src/devices/gpio/testing/fake-gpio",
-    "//src/devices/testing/mock-ddk",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/mock-function",
     "//zircon/system/ulib/zxtest",
   ]
 }

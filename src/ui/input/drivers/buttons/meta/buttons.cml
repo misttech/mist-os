@@ -3,19 +3,20 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/buttons.so",
         bind: "meta/bind/buttons.bindbc",
-        colocate: "false",
-        compat: "driver/buttons.so",
-        default_dispatcher_opts: [ "allow_sync_calls" ],
-        fallback: "false",
     },
     use: [
-        { service: "fuchsia.hardware.gpio.Service" },
+        {
+            service: [
+                "fuchsia.driver.compat.Service",
+                "fuchsia.hardware.gpio.Service",
+            ],
+        },
     ],
 }

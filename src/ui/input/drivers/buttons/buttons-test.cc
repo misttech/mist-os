@@ -2,23 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
+#include "buttons.h"
+
+#include <fidl/fuchsia.hardware.gpio/cpp/wire_test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <zircon/assert.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/testing/cpp/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/test_node.h>
 
-#include <cstddef>
 #include <set>
 
-#include <ddk/metadata/buttons.h>
 #include <zxtest/zxtest.h>
 
-#include "buttons-device.h"
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
 static const buttons_button_config_t buttons_direct[] = {
@@ -100,193 +99,197 @@ static const buttons_gpio_config_t gpios_duplicate[] = {
 
 namespace buttons {
 
-class ButtonsDeviceTest : public ButtonsDevice {
- public:
-  explicit ButtonsDeviceTest(zx_device_t* fake_parent, async_dispatcher_t* dispatcher)
-      : ButtonsDevice(fake_parent, dispatcher) {}
+static constexpr size_t kMaxGpioServers = 4;
 
-  void FakeInterrupt(uint32_t i = 0) {
-    // Issue the first interrupt.
-    zx_port_packet packet = {kPortKeyInterruptStart + i, ZX_PKT_TYPE_USER, ZX_OK, {}};
-    zx_status_t status = port_.queue(&packet);
-    ZX_ASSERT(status == ZX_OK);
-  }
+enum MetadataVersion : uint8_t {
+  kMetadataSingleButtonDirect = 0,
+  kMetadataMultiple,
+  kMetadataDuplicate,
+  kMetadataMatrix,
+  kMetadataPolled,
+};
 
-  void DebounceWait() {
-    sync_completion_wait(&debounce_threshold_passed_, ZX_TIME_INFINITE);
-    sync_completion_reset(&debounce_threshold_passed_);
-  }
-
-  void Notify(uint32_t type) override {
-    ButtonsDevice::Notify(type);
-    sync_completion_signal(&debounce_threshold_passed_);
-  }
-
- private:
-  sync_completion_t debounce_threshold_passed_;
+struct IncomingNamespace {
+  fdf_testing::TestNode node_{std::string("root")};
+  fdf_testing::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
+  compat::DeviceServer device_server_;
+  fake_gpio::FakeGpio fake_gpio_servers_[kMaxGpioServers];
 };
 
 class ButtonsTest : public zxtest::Test {
  public:
-  void SetUp() override { ASSERT_OK(gpio_loop_.StartThread("gpios")); }
+  void Init(MetadataVersion metadata_version) {
+    fuchsia_driver_framework::DriverStartArgs start_args;
+    incoming_.SyncCall([&](IncomingNamespace* incoming) {
+      auto start_args_result = incoming->node_.CreateStartArgsAndServe();
+      ASSERT_TRUE(start_args_result.is_ok());
+      start_args = std::move(start_args_result->start_args);
+
+      auto init_result =
+          incoming->env_.Initialize(std::move(start_args_result->incoming_directory_server));
+      ASSERT_TRUE(init_result.is_ok());
+      incoming->device_server_.Init(component::kDefaultInstance, "");
+
+      // Serve metadata.
+      std::vector<std::string> buttons_names;
+      cpp20::span<const buttons_button_config_t> buttons;
+      cpp20::span<const buttons_gpio_config_t> gpios;
+      switch (metadata_version) {
+        case kMetadataSingleButtonDirect: {
+          buttons_names = {"volume-up"};
+          buttons = {buttons_direct, std::size(buttons_direct)};
+          gpios = {gpios_direct, std::size(gpios_direct)};
+        } break;
+        case kMetadataMultiple: {
+          buttons_names = {"volume-up", "mic-privacy", "cam-mute"};
+          buttons = {buttons_multiple, std::size(buttons_multiple)};
+          gpios = {gpios_multiple, std::size(gpios_multiple)};
+        } break;
+        case kMetadataDuplicate: {
+          buttons_names = {"volume-up", "volume-down", "volume-both"};
+          buttons = {buttons_duplicate, std::size(buttons_duplicate)};
+          gpios = {gpios_duplicate, std::size(gpios_duplicate)};
+        } break;
+        case kMetadataMatrix: {
+          buttons_names = {"volume-up", "key-a", "key-m", "play-pause"};
+          buttons = {buttons_matrix, std::size(buttons_matrix)};
+          gpios = {gpios_matrix, std::size(gpios_matrix)};
+        } break;
+        case kMetadataPolled: {
+          buttons_names = {"volume-up", "mic-privacy", "cam-mute"};
+          buttons = {buttons_multiple, std::size(buttons_multiple)};
+          gpios = {gpios_multiple_one_polled, std::size(gpios_multiple_one_polled)};
+        } break;
+        default:
+          ASSERT_TRUE(0);
+      }
+      zx_status_t status;
+      status = incoming->device_server_.AddMetadata(DEVICE_METADATA_BUTTONS_GPIOS, &gpios[0],
+                                                    gpios.size_bytes());
+      ASSERT_OK(status);
+      status = incoming->device_server_.AddMetadata(DEVICE_METADATA_BUTTONS_BUTTONS, &buttons[0],
+                                                    buttons.size_bytes());
+      ASSERT_OK(status);
+      status = incoming->device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                              &incoming->env_.incoming_directory());
+      ASSERT_OK(status);
+
+      // Serve fake GPIO servers.
+      size_t n_gpios = gpios.size_bytes() / sizeof(buttons_gpio_config_t);
+      ASSERT_LE(n_gpios, kMaxGpioServers);
+      for (size_t i = 0; i < n_gpios; ++i) {
+        ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL,
+                                        &fake_gpio_interrupts_[i]));
+        zx::interrupt interrupt;
+        ASSERT_OK(fake_gpio_interrupts_[i].duplicate(ZX_RIGHT_SAME_RIGHTS, &interrupt));
+        incoming->fake_gpio_servers_[i].SetInterrupt(zx::ok(std::move(interrupt)));
+        auto gpio_handler = incoming->fake_gpio_servers_[i].CreateInstanceHandler();
+        auto result =
+            incoming->env_.incoming_directory().AddService<fuchsia_hardware_gpio::Service>(
+                std::move(gpio_handler), buttons_names[i].c_str());
+        ASSERT_TRUE(result.is_ok());
+
+        incoming->fake_gpio_servers_[i].SetDefaultReadResponse(zx::ok(uint8_t{0u}));
+      }
+    });
+
+    // Start dut_.
+    auto result = runtime_.RunToCompletion(dut_.SyncCall(
+        &fdf_testing::DriverUnderTest<buttons::Buttons>::Start, std::move(start_args)));
+    ASSERT_TRUE(result.is_ok());
+
+    // Connect to InputDevice.
+    zx::result connect_result = incoming_.SyncCall([](IncomingNamespace* incoming) {
+      return incoming->node_.children().at("buttons").ConnectToDevice();
+    });
+    ASSERT_OK(connect_result.status_value());
+    client_.Bind(
+        fidl::ClientEnd<fuchsia_input_report::InputDevice>(std::move(connect_result.value())));
+  }
 
   void TearDown() override {
-    // If your device has an unbind function:
-    device().zxdev()->UnbindOp();
-    EXPECT_TRUE(device().zxdev()->UnbindReplyCalled());
+    // Stop dut_.
+    auto result = runtime_.RunToCompletion(
+        dut_.SyncCall(&fdf_testing::DriverUnderTest<buttons::Buttons>::PrepareStop));
+    ASSERT_TRUE(result.is_ok());
   }
 
- protected:
-  void BindDevice(const buttons_gpio_config_t* gpios_config, size_t gpios_config_size,
-                  const buttons_button_config_t* buttons_config, size_t buttons_config_size) {
-    gpios_.clear();
-    for (size_t i = 0; i < gpios_config_size; i++) {
-      auto gpio = std::make_unique<async_patterns::TestDispatcherBound<fake_gpio::FakeGpio>>(
-          gpio_loop_.dispatcher(), std::in_place);
-      SetupGpio(*gpio, gpios_config[i]);
-      gpios_.emplace_back(std::move(gpio));
-    }
+  void DrainInitialReport(fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>& reader) {
+    auto result = reader->ReadInputReports();
+    ASSERT_OK(result.status());
+    ASSERT_FALSE(result.value().is_error());
+    auto& reports = result.value().value()->reports;
 
-    const size_t n_gpios = gpios_config_size;
-    auto gpios = fbl::Array(new ButtonsDevice::Gpio[n_gpios], n_gpios);
-    const size_t n_buttons = buttons_config_size;
-    auto buttons = fbl::Array(new buttons_button_config_t[n_buttons], n_buttons);
-    for (size_t i = 0; i < n_gpios; ++i) {
-      gpios[i].client.Bind(gpios_[i]->SyncCall(&fake_gpio::FakeGpio::Connect));
-      gpios[i].config = gpios_config[i];
-    }
+    ASSERT_EQ(1, reports.count());
+    auto report = reports[0];
 
-    for (size_t i = 0; i < n_buttons; ++i) {
-      buttons[i] = buttons_config[i];
-      switch (buttons_config[i].type)
-      case BUTTONS_TYPE_DIRECT:
-      case BUTTONS_TYPE_MATRIX: {
-        gpios_[buttons[i].gpioA_idx]->SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
-                                               zx::ok<uint8_t>(0));
-        break;
-        default:
-          FAIL();
-      }
-    }
+    ASSERT_TRUE(report.has_event_time());
+    ASSERT_TRUE(report.has_consumer_control());
+    auto& consumer_control = report.consumer_control();
 
-    auto device =
-        std::make_unique<ButtonsDeviceTest>(fake_parent_.get(), input_report_loop_.dispatcher());
-    ASSERT_OK(device->Bind(std::move(gpios), std::move(buttons)));
-    // devmgr is now in charge of the memory for dev.
-    device_ = device.release();
-    EXPECT_OK(input_report_loop_.RunUntilIdle());
+    ASSERT_TRUE(consumer_control.has_pressed_buttons());
   }
 
-  fidl::WireClient<fuchsia_input_report::InputReportsReader> GetReader() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
-    EXPECT_OK(endpoints);
-    fidl::BindServer(input_report_loop_.dispatcher(), std::move(endpoints->server), &device());
-    fidl::WireSyncClient<fuchsia_input_report::InputDevice> client(std::move(endpoints->client));
-
-    auto reader_endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-    EXPECT_OK(reader_endpoints.status_value());
-    auto result = client->GetInputReportsReader(std::move(reader_endpoints->server));
-    EXPECT_TRUE(result.ok());
-    auto reader = fidl::WireClient<fuchsia_input_report::InputReportsReader>(
-        std::move(reader_endpoints->client), input_report_loop_.dispatcher());
-
-    EXPECT_OK(input_report_loop_.RunUntilIdle());
+  fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> GetReader() {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
+    ZX_ASSERT(endpoints.is_ok());
+    auto result = client_->GetInputReportsReader(std::move(endpoints->server));
+    ZX_ASSERT(result.ok());
+    ZX_ASSERT(client_->GetDescriptor().ok());
+    auto reader = fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(
+        std::move(endpoints->client));
+    ZX_ASSERT(reader.is_valid());
 
     DrainInitialReport(reader);
 
     return reader;
   }
 
-  void ReconfigureGpioPolarity(size_t gpio_index, uint8_t read_value,
-                               fuchsia_hardware_gpio::GpioPolarity expected_polarity) {
-    GetGpio(gpio_index).SyncCall([read_value, expected_polarity](fake_gpio::FakeGpio* gpio) {
-      gpio->PushReadResponse(zx::ok(read_value));
-      gpio->PushReadCallback(
-          [read_value, expected_polarity](fake_gpio::FakeGpio& gpio) -> zx::result<uint8_t> {
-            EXPECT_EQ(gpio.GetPolarity(), expected_polarity);
-            return zx::ok(read_value);
-          });
+  void SetGpioReadResponse(size_t gpio_index, uint8_t read_data) {
+    incoming_.SyncCall([&](IncomingNamespace* incoming) {
+      incoming->fake_gpio_servers_[gpio_index].PushReadResponse(zx::ok(read_data));
     });
   }
 
-  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio>& GetGpio(size_t index) {
-    return *gpios_[index];
+  void SetDefaultGpioReadResponse(size_t gpio_index, uint8_t read_data) {
+    incoming_.SyncCall([&](IncomingNamespace* incoming) {
+      incoming->fake_gpio_servers_[gpio_index].SetDefaultReadResponse(zx::ok(read_data));
+    });
   }
-  ButtonsDeviceTest& device() { return *device_; }
-
-  async::Loop input_report_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 
  private:
-  static void SetupGpio(async_patterns::TestDispatcherBound<fake_gpio::FakeGpio>& gpio,
-                        const buttons_gpio_config_t& gpio_config) {
-    if (gpio_config.type == BUTTONS_GPIO_TYPE_INTERRUPT) {
-      gpio.SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
-                    zx::ok<uint8_t>(0));  // Not pushed, low.
-      gpio.SyncCall(&fake_gpio::FakeGpio::PushReadResponse, zx::ok<uint8_t>(0));  // Not pushed.
-      gpio.SyncCall(&fake_gpio::FakeGpio::PushReadCallback, [](fake_gpio::FakeGpio& gpio) {
-        ZX_ASSERT(gpio.GetPolarity() ==
-                  fuchsia_hardware_gpio::GpioPolarity::kHigh);  // Set correct polarity.
-        return zx::ok<uint8_t>(0);                              // Still not pushed.
-      });
-    } else if (gpio_config.type == BUTTONS_GPIO_TYPE_POLL) {
-      gpio.SyncCall(&fake_gpio::FakeGpio::SetDefaultReadResponse, zx::ok<uint8_t>(0));
-    }
-  }
+  fdf_testing::DriverRuntime runtime_;
+  fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
+  fdf::UnownedSynchronizedDispatcher driver_dispatcher_ = runtime_.StartBackgroundDispatcher();
 
-  void DrainInitialReport(fidl::WireClient<fuchsia_input_report::InputReportsReader>& reader) {
-    reader->ReadInputReports().Then([&](auto& result) {
-      ASSERT_TRUE(result.ok());
-      ASSERT_TRUE(result->is_ok());
-      auto& reports = result->value()->reports;
+ protected:
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{
+      env_dispatcher_->async_dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<buttons::Buttons>> dut_{
+      driver_dispatcher_->async_dispatcher(), std::in_place};
 
-      ASSERT_EQ(reports.count(), 1);
-      auto& report = reports[0];
-
-      ASSERT_TRUE(report.has_event_time());
-      ASSERT_TRUE(report.has_consumer_control());
-      auto& consumer_control = report.consumer_control();
-
-      ASSERT_TRUE(consumer_control.has_pressed_buttons());
-
-      input_report_loop_.Quit();
-    });
-    EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
-    EXPECT_OK(input_report_loop_.ResetQuit());
-  }
-
-  std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
-  async::Loop gpio_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
-  std::vector<std::unique_ptr<async_patterns::TestDispatcherBound<fake_gpio::FakeGpio>>> gpios_;
-  ButtonsDeviceTest* device_;
+  fidl::WireSyncClient<fuchsia_input_report::InputDevice> client_;
+  zx::interrupt fake_gpio_interrupts_[kMaxGpioServers];
 };
 
-TEST_F(ButtonsTest, DirectButtonBind) {
-  BindDevice(gpios_direct, std::size(gpios_direct), buttons_direct, std::size(buttons_direct));
-}
+TEST_F(ButtonsTest, DirectButtonInit) { Init(kMetadataSingleButtonDirect); }
 
 TEST_F(ButtonsTest, DirectButtonPush) {
-  BindDevice(gpios_direct, std::size(gpios_direct), buttons_direct, std::size(buttons_direct));
+  Init(kMetadataSingleButtonDirect);
 
-  // Reconfigure Polarity due to interrupt.
-  ReconfigureGpioPolarity(0, 1, fuchsia_hardware_gpio::GpioPolarity::kLow);
-  GetGpio(0).SyncCall(&fake_gpio::FakeGpio::PushReadResponse, zx::ok<uint8_t>(1));
-  device().FakeInterrupt();
-  device().DebounceWait();
+  fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
 }
 
-TEST_F(ButtonsTest, DirectButtonPushUnpushedReport) {
-  BindDevice(gpios_direct, std::size(gpios_direct), buttons_direct, std::size(buttons_direct));
-
+TEST_F(ButtonsTest, DirectButtonPushReleaseReport) {
+  Init(kMetadataSingleButtonDirect);
   auto reader = GetReader();
 
-  // Push (must push first before testing unpush because the default last_report_ is nothing pushed)
-  // Reconfigure Polarity due to interrupt.
-  ReconfigureGpioPolarity(0, 1, fuchsia_hardware_gpio::GpioPolarity::kLow);
-  GetGpio(0).SyncCall(&fake_gpio::FakeGpio::PushReadResponse, zx::ok<uint8_t>(1));
-  device().FakeInterrupt();
-  device().DebounceWait();
+  // Push.
+  SetDefaultGpioReadResponse(0, 1);
 
-  reader->ReadInputReports().Then([&](auto& result) {
+  fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+  {
+    auto result = reader->ReadInputReports();
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
@@ -302,20 +305,13 @@ TEST_F(ButtonsTest, DirectButtonPushUnpushedReport) {
     ASSERT_EQ(consumer_control.pressed_buttons().count(), 1);
     EXPECT_EQ(consumer_control.pressed_buttons()[0],
               fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
+  }
 
-    input_report_loop_.Quit();
-  });
-  EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
-  EXPECT_OK(input_report_loop_.ResetQuit());
-
-  // Unpush
-  // Reconfigure Polarity due to interrupt.
-  ReconfigureGpioPolarity(0, 0, fuchsia_hardware_gpio::GpioPolarity::kHigh);
-  GetGpio(0).SyncCall(&fake_gpio::FakeGpio::PushReadResponse, zx::ok<uint8_t>(0));
-  device().FakeInterrupt();
-  device().DebounceWait();
-
-  reader->ReadInputReports().Then([&](auto& result) {
+  // Release.
+  SetDefaultGpioReadResponse(0, 0);
+  fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+  {
+    auto result = reader->ReadInputReports();
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
@@ -329,224 +325,156 @@ TEST_F(ButtonsTest, DirectButtonPushUnpushedReport) {
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
     ASSERT_EQ(consumer_control.pressed_buttons().count(), 0);
-
-    input_report_loop_.Quit();
-  });
-  EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
+  }
 }
 
-TEST_F(ButtonsTest, DirectButtonPushedReport) {
-  BindDevice(gpios_direct, std::size(gpios_direct), buttons_direct, std::size(buttons_direct));
+TEST_F(ButtonsTest, DirectButtonPushReleasePush) {
+  Init(kMetadataSingleButtonDirect);
 
-  auto reader = GetReader();
+  SetGpioReadResponse(0, 0);
+  fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
 
-  // Reconfigure Polarity due to interrupt.
-  ReconfigureGpioPolarity(0, 1, fuchsia_hardware_gpio::GpioPolarity::kLow);
-  GetGpio(0).SyncCall(&fake_gpio::FakeGpio::PushReadResponse, zx::ok<uint8_t>(1));
-  device().FakeInterrupt();
-  device().DebounceWait();
+  SetGpioReadResponse(0, 1);
+  fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
 
-  reader->ReadInputReports().Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    ASSERT_TRUE(result->is_ok());
-    auto& reports = result->value()->reports;
-
-    ASSERT_EQ(reports.count(), 1);
-    auto& report = reports[0];
-
-    ASSERT_TRUE(report.has_event_time());
-    ASSERT_TRUE(report.has_consumer_control());
-    auto& consumer_control = report.consumer_control();
-
-    ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    ASSERT_EQ(consumer_control.pressed_buttons().count(), 1);
-    EXPECT_EQ(consumer_control.pressed_buttons()[0],
-              fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
-
-    input_report_loop_.Quit();
-  });
-  EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
-}
-
-TEST_F(ButtonsTest, DirectButtonPushUnpushPush) {
-  BindDevice(gpios_direct, std::size(gpios_direct), buttons_direct, std::size(buttons_direct));
-
-  // Reconfigure Polarity due to interrupt.
-  ReconfigureGpioPolarity(0, 1, fuchsia_hardware_gpio::GpioPolarity::kLow);
-  GetGpio(0).SyncCall(&fake_gpio::FakeGpio::PushReadResponse, zx::ok<uint8_t>(1));
-  device().FakeInterrupt();
-  device().DebounceWait();
-
-  // Reconfigure Polarity due to interrupt.
-  ReconfigureGpioPolarity(0, 0, fuchsia_hardware_gpio::GpioPolarity::kHigh);
-  GetGpio(0).SyncCall(&fake_gpio::FakeGpio::PushReadResponse, zx::ok<uint8_t>(0));
-  device().FakeInterrupt();
-  device().DebounceWait();
-
-  // Reconfigure Polarity due to interrupt.
-  ReconfigureGpioPolarity(0, 1, fuchsia_hardware_gpio::GpioPolarity::kLow);
-  GetGpio(0).SyncCall(&fake_gpio::FakeGpio::PushReadResponse, zx::ok<uint8_t>(1));
-  device().FakeInterrupt();
-  device().DebounceWait();
+  SetGpioReadResponse(0, 0);
+  fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
 }
 
 TEST_F(ButtonsTest, DirectButtonFlaky) {
-  BindDevice(gpios_direct, std::size(gpios_direct), buttons_direct, std::size(buttons_direct));
+  Init(kMetadataSingleButtonDirect);
 
-  // Reconfigure Polarity due to interrupt and keep checking until correct.
-  GetGpio(0).SyncCall([](fake_gpio::FakeGpio* gpio) {
-    gpio->PushReadResponse(zx::ok<uint8_t>(1));  // Pushed.
-    gpio->PushReadCallback([](fake_gpio::FakeGpio& gpio) -> zx::result<uint8_t> {
-      ZX_ASSERT(gpio.GetPolarity() ==
-                fuchsia_hardware_gpio::GpioPolarity::kLow);  // Turn the polarity.
-      return zx::ok<uint8_t>(0);                             // Oops now not pushed! not ok, retry.
-    });
-    gpio->PushReadCallback([](fake_gpio::FakeGpio& gpio) -> zx::result<uint8_t> {
-      ZX_ASSERT(gpio.GetPolarity() ==
-                fuchsia_hardware_gpio::GpioPolarity::kHigh);  // Turn the polarity.
-      return zx::ok<uint8_t>(1);                              // Oops pushed! not ok, retry.
-    });
-    gpio->PushReadCallback([](fake_gpio::FakeGpio& gpio) -> zx::result<uint8_t> {
-      ZX_ASSERT(gpio.GetPolarity() ==
-                fuchsia_hardware_gpio::GpioPolarity::kLow);  // Turn the polarity.
-      return zx::ok<uint8_t>(0);                             // Oops now not pushed! not ok, retry.
-    });
-    gpio->PushReadCallback([](fake_gpio::FakeGpio& gpio) -> zx::result<uint8_t> {
-      ZX_ASSERT(gpio.GetPolarity() ==
-                fuchsia_hardware_gpio::GpioPolarity::kHigh);  // Turn the polarity.
-      return zx::ok<uint8_t>(1);                              // Oops pushed again! not ok, retry.
-    });
-    gpio->PushReadCallback([](fake_gpio::FakeGpio& gpio) -> zx::result<uint8_t> {
-      ZX_ASSERT(gpio.GetPolarity() ==
-                fuchsia_hardware_gpio::GpioPolarity::kLow);  // Turn the polarity.
-      return zx::ok<uint8_t>(1);                             // Now pushed and polarity set low, ok.
-    });
-    gpio->PushReadResponse(zx::ok<uint8_t>(1));  // Pushed.
-  });
-  // Read value to generate report.
-  device().FakeInterrupt();
-  device().DebounceWait();
+  SetGpioReadResponse(0, 1);
+  SetGpioReadResponse(0, 0);
+  SetDefaultGpioReadResponse(0, 1);  // Stabilizes.
+
+  fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+
+  auto reader = GetReader();
+  auto result = reader->ReadInputReports();
+  ASSERT_TRUE(result.ok());
+  ASSERT_TRUE(result->is_ok());
+  auto& reports = result->value()->reports;
+
+  ASSERT_EQ(reports.count(), 1);
+  auto& report = reports[0];
+
+  ASSERT_TRUE(report.has_event_time());
+  ASSERT_TRUE(report.has_consumer_control());
+  auto& consumer_control = report.consumer_control();
+
+  ASSERT_TRUE(consumer_control.has_pressed_buttons());
+  ASSERT_EQ(consumer_control.pressed_buttons().count(), 1);
+  EXPECT_EQ(consumer_control.pressed_buttons()[0],
+            fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
 }
 
-TEST_F(ButtonsTest, MatrixButtonBind) {
-  BindDevice(gpios_matrix, std::size(gpios_matrix), buttons_matrix, std::size(buttons_matrix));
-}
+TEST_F(ButtonsTest, MatrixButtonInit) { Init(kMetadataMatrix); }
 
 TEST_F(ButtonsTest, MatrixButtonPush) {
-  BindDevice(gpios_matrix, std::size(gpios_matrix), buttons_matrix, std::size(buttons_matrix));
+  Init(kMetadataMatrix);
 
   auto reader = GetReader();
 
-  // Reconfigure Polarity due to interrupt.
-  ReconfigureGpioPolarity(0, 1, fuchsia_hardware_gpio::GpioPolarity::kLow);
+  // Initial reads.
+  SetGpioReadResponse(0, 0);
+  SetGpioReadResponse(0, 0);
+  SetGpioReadResponse(1, 0);
+  SetGpioReadResponse(1, 0);
 
-  GetGpio(0).SyncCall([](fake_gpio::FakeGpio* gpio) {
-    // Matrix Scan for 0.
-    gpio->PushReadResponse(zx::ok<uint8_t>(1));  // Read row.
+  SetGpioReadResponse(0, 1);  // Read row. Matrix Scan for 0.
+  SetGpioReadResponse(0, 0);  // Read row. Matrix Scan for 2.
+  SetGpioReadResponse(1, 0);  // Read row. Matrix Scan for 1.
+  SetGpioReadResponse(1, 0);  // Read row. Matrix Scan for 3.
 
-    // Matrix Scan for 2.
-    gpio->PushReadResponse(zx::ok<uint8_t>(0));  // Read row.
+  fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+
+  auto result = reader->ReadInputReports();
+  ASSERT_TRUE(result.ok());
+  ASSERT_TRUE(result->is_ok());
+  auto& reports = result->value()->reports;
+
+  ASSERT_EQ(reports.count(), 1);
+  auto& report = reports[0];
+
+  ASSERT_TRUE(report.has_event_time());
+  ASSERT_TRUE(report.has_consumer_control());
+  auto& consumer_control = report.consumer_control();
+
+  ASSERT_TRUE(consumer_control.has_pressed_buttons());
+  ASSERT_EQ(consumer_control.pressed_buttons().count(), 1);
+  EXPECT_EQ(consumer_control.pressed_buttons()[0],
+            fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
+
+  incoming_.SyncCall([&](IncomingNamespace* incoming) {
+    auto gpio_2_states = incoming->fake_gpio_servers_[2].GetStateLog();
+    ASSERT_GE(gpio_2_states.size(), 4);
+    ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
+              (gpio_2_states.end() - 4)->sub_state);  // Float column.
+    ASSERT_EQ(fake_gpio::WriteSubState{.value = gpios_matrix[2].matrix.output_value},
+              (gpio_2_states.end() - 3)->sub_state);  // Restore column.
+    ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
+              (gpio_2_states.end() - 2)->sub_state);  // Float column.
+    ASSERT_EQ(fake_gpio::WriteSubState{.value = gpios_matrix[2].matrix.output_value},
+              (gpio_2_states.end() - 1)->sub_state);  // Restore column.
+
+    auto gpio_3_states = incoming->fake_gpio_servers_[3].GetStateLog();
+    ASSERT_GE(gpio_3_states.size(), 4);
+    ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
+              (gpio_3_states.end() - 4)->sub_state);  // Float column.
+    ASSERT_EQ(fake_gpio::WriteSubState{.value = gpios_matrix[3].matrix.output_value},
+              (gpio_3_states.end() - 3)->sub_state);  // Restore column.
+    ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
+              (gpio_3_states.end() - 2)->sub_state);  // Float column.
+    ASSERT_EQ(fake_gpio::WriteSubState{.value = gpios_matrix[3].matrix.output_value},
+              (gpio_3_states.end() - 1)->sub_state);  // Restore column.
   });
+}
 
-  GetGpio(1).SyncCall([](fake_gpio::FakeGpio* gpio) {
-    // Matrix Scan for 1.
-    gpio->PushReadResponse(zx::ok<uint8_t>(0));  // Read row.
+TEST_F(ButtonsTest, DuplicateReports) {
+  Init(kMetadataDuplicate);
 
-    // Matrix Scan for 3.
-    gpio->PushReadResponse(zx::ok<uint8_t>(0));  // Read row.
-  });
+  auto reader = GetReader();
 
-  device().FakeInterrupt();
-  device().DebounceWait();
+  // Holding FDR (VOL_UP and VOL_DOWN), then release VOL_UP, should only get one report
+  // for the FDR and one report for the VOL_UP. When FDR is released, there is no
+  // new report generated since the reported values do not change.
 
-  reader->ReadInputReports().Then([&](auto& result) {
+  // Push FDR (both VOL_UP and VOL_DOWN).
+  SetGpioReadResponse(2, 1);
+  SetGpioReadResponse(2, 1);
+
+  // Report.
+  SetGpioReadResponse(0, 1);
+  SetGpioReadResponse(1, 1);
+  SetGpioReadResponse(2, 1);
+
+  // Release VOL_UP.
+  SetGpioReadResponse(0, 0);
+  SetGpioReadResponse(0, 0);
+
+  // Report.
+  SetGpioReadResponse(0, 0);
+  SetGpioReadResponse(1, 1);
+  SetGpioReadResponse(2, 0);
+
+  // Release FDR (both VOL_UP and VOL_DOWN).
+  SetGpioReadResponse(2, 0);
+  SetGpioReadResponse(2, 0);
+
+  // Report (same as before).
+  SetGpioReadResponse(0, 0);
+  SetGpioReadResponse(1, 1);
+  SetGpioReadResponse(2, 0);
+
+  fake_gpio_interrupts_[2].trigger(0, zx::clock::get_monotonic());
+  {
+    auto result = reader->ReadInputReports();
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
     ASSERT_EQ(reports.count(), 1);
-    auto& report = reports[0];
-
-    ASSERT_TRUE(report.has_event_time());
-    ASSERT_TRUE(report.has_consumer_control());
-    auto& consumer_control = report.consumer_control();
-
-    ASSERT_TRUE(consumer_control.has_pressed_buttons());
-    ASSERT_EQ(consumer_control.pressed_buttons().count(), 1);
-    EXPECT_EQ(consumer_control.pressed_buttons()[0],
-              fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
-
-    input_report_loop_.Quit();
-  });
-  EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
-
-  auto gpio_2_states = GetGpio(2).SyncCall(&fake_gpio::FakeGpio::GetStateLog);
-  ASSERT_GE(gpio_2_states.size(), 4);
-  ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
-            (gpio_2_states.end() - 4)->sub_state);  // Float column.
-  ASSERT_EQ(fake_gpio::WriteSubState{.value = gpios_matrix[2].matrix.output_value},
-            (gpio_2_states.end() - 3)->sub_state);  // Restore column.
-  ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
-            (gpio_2_states.end() - 2)->sub_state);  // Float column.
-  ASSERT_EQ(fake_gpio::WriteSubState{.value = gpios_matrix[2].matrix.output_value},
-            (gpio_2_states.end() - 1)->sub_state);  // Restore column.
-
-  auto gpio_3_states = GetGpio(3).SyncCall(&fake_gpio::FakeGpio::GetStateLog);
-  ASSERT_GE(gpio_3_states.size(), 4);
-  ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
-            (gpio_3_states.end() - 4)->sub_state);  // Float column.
-  ASSERT_EQ(fake_gpio::WriteSubState{.value = gpios_matrix[3].matrix.output_value},
-            (gpio_3_states.end() - 3)->sub_state);  // Restore column.
-  ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
-            (gpio_3_states.end() - 2)->sub_state);  // Float column.
-  ASSERT_EQ(fake_gpio::WriteSubState{.value = gpios_matrix[3].matrix.output_value},
-            (gpio_3_states.end() - 1)->sub_state);  // Restore column.
-}
-
-TEST_F(ButtonsTest, DuplicateReports) {
-  BindDevice(gpios_duplicate, std::size(gpios_duplicate), buttons_duplicate,
-             std::size(buttons_duplicate));
-
-  auto reader = GetReader();
-
-  // Holding FDR (VOL_UP and VOL_DOWN), then release VOL_UP, should only get one report.
-  // Reconfigure Polarity due to interrupt.
-  ReconfigureGpioPolarity(2, 1, fuchsia_hardware_gpio::GpioPolarity::kLow);
-  GetGpio(0).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
-                      zx::ok<uint8_t>(1));  // Read value to prepare report.
-  GetGpio(1).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
-                      zx::ok<uint8_t>(1));  // Read value to prepare report.
-  GetGpio(2).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
-                      zx::ok<uint8_t>(1));  // Read value to prepare report.
-  device().FakeInterrupt(2);
-  device().DebounceWait();
-
-  ReconfigureGpioPolarity(0, 0, fuchsia_hardware_gpio::GpioPolarity::kHigh);
-  GetGpio(0).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
-                      zx::ok<uint8_t>(0));  // Read value to prepare report.
-  GetGpio(1).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
-                      zx::ok<uint8_t>(1));  // Read value to prepare report.
-  GetGpio(2).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
-                      zx::ok<uint8_t>(0));  // Read value to prepare report.
-  device().FakeInterrupt(0);
-  device().DebounceWait();
-
-  ReconfigureGpioPolarity(2, 0, fuchsia_hardware_gpio::GpioPolarity::kHigh);
-  GetGpio(0).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
-                      zx::ok<uint8_t>(0));  // Read value to prepare report.
-  GetGpio(1).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
-                      zx::ok<uint8_t>(1));  // Read value to prepare report.
-  GetGpio(2).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
-                      zx::ok<uint8_t>(0));  // Read value to prepare report.
-  device().FakeInterrupt(2);
-  device().DebounceWait();
-
-  reader->ReadInputReports().Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    ASSERT_TRUE(result->is_ok());
-    auto& reports = result->value()->reports;
-
-    ASSERT_EQ(reports.count(), 2);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -564,40 +492,51 @@ TEST_F(ButtonsTest, DuplicateReports) {
         fuchsia_input_report::wire::ConsumerControlButton::kVolumeDown,
         fuchsia_input_report::wire::ConsumerControlButton::kFactoryReset};
     EXPECT_EQ(expected_buttons, pressed_buttons);
+  }
 
-    report = reports[1];
+  fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+
+  {
+    auto result = reader->ReadInputReports();
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    auto& reports = result->value()->reports;
+
+    ASSERT_EQ(reports.count(), 1);
+    auto& report = reports[0];
+    report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
     ASSERT_TRUE(report.has_consumer_control());
-    consumer_control = report.consumer_control();
+    auto& consumer_control = report.consumer_control();
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
     ASSERT_EQ(consumer_control.pressed_buttons().count(), 1);
     EXPECT_EQ(consumer_control.pressed_buttons()[0],
               fuchsia_input_report::ConsumerControlButton::kVolumeDown);
+  }
 
-    input_report_loop_.Quit();
-  });
-  EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
+  fake_gpio_interrupts_[2].trigger(0, zx::clock::get_monotonic());
 }
 
 TEST_F(ButtonsTest, CamMute) {
-  BindDevice(gpios_multiple, std::size(gpios_multiple), buttons_multiple,
-             std::size(buttons_multiple));
+  Init(kMetadataMultiple);
 
   auto reader = GetReader();
 
-  ReconfigureGpioPolarity(2, 1, fuchsia_hardware_gpio::GpioPolarity::kLow);
-  GetGpio(0).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
-                      zx::ok<uint8_t>(0));  // Read value to prepare report.
-  GetGpio(1).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
-                      zx::ok<uint8_t>(0));  // Read value to prepare report.
-  GetGpio(2).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
-                      zx::ok<uint8_t>(1));  // Read value to prepare report.
-  device().FakeInterrupt(2);
-  device().DebounceWait();
+  // Push camera mute.
+  SetGpioReadResponse(2, 1);
+  SetGpioReadResponse(2, 1);
 
-  reader->ReadInputReports().Then([&](auto& result) {
+  // Report.
+  SetGpioReadResponse(0, 0);
+  SetGpioReadResponse(1, 0);
+  SetGpioReadResponse(2, 1);
+
+  fake_gpio_interrupts_[2].trigger(0, zx::clock::get_monotonic());
+
+  {
+    auto result = reader->ReadInputReports();
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
@@ -613,23 +552,21 @@ TEST_F(ButtonsTest, CamMute) {
     ASSERT_EQ(consumer_control.pressed_buttons().count(), 1);
     EXPECT_EQ(consumer_control.pressed_buttons()[0],
               fuchsia_input_report::wire::ConsumerControlButton::kCameraDisable);
+  }
 
-    input_report_loop_.Quit();
-  });
-  EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
-  EXPECT_OK(input_report_loop_.ResetQuit());
+  // Release camera mute.
+  SetGpioReadResponse(2, 0);
+  SetGpioReadResponse(2, 0);
 
-  ReconfigureGpioPolarity(2, 0, fuchsia_hardware_gpio::GpioPolarity::kHigh);
-  GetGpio(0).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
-                      zx::ok<uint8_t>(0));  // Read value to prepare report.
-  GetGpio(1).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
-                      zx::ok<uint8_t>(0));  // Read value to prepare report.
-  GetGpio(2).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
-                      zx::ok<uint8_t>(0));  // Read value to prepare report.
-  device().FakeInterrupt(2);
-  device().DebounceWait();
+  // Report.
+  SetGpioReadResponse(0, 0);
+  SetGpioReadResponse(1, 0);
+  SetGpioReadResponse(2, 0);
 
-  reader->ReadInputReports().Then([&](auto& result) {
+  fake_gpio_interrupts_[2].trigger(0, zx::clock::get_monotonic());
+
+  {
+    auto result = reader->ReadInputReports();
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
@@ -643,26 +580,21 @@ TEST_F(ButtonsTest, CamMute) {
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
     ASSERT_EQ(consumer_control.pressed_buttons().count(), 0);
-    input_report_loop_.Quit();
-  });
-  EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
+  }
 }
 
 TEST_F(ButtonsTest, PollOneButton) {
-  BindDevice(gpios_multiple_one_polled, std::size(gpios_multiple_one_polled), buttons_multiple,
-             std::size(buttons_multiple));
+  Init(kMetadataPolled);
 
   auto reader = GetReader();
 
   // All GPIOs must have a default read value if polling is being used, as they are all ready
   // every poll period.
-  GetGpio(2).SyncCall(&fake_gpio::FakeGpio::SetDefaultReadResponse, zx::ok<uint8_t>(0));
+  SetDefaultGpioReadResponse(0, 1);
 
-  GetGpio(0).SyncCall(&fake_gpio::FakeGpio::SetDefaultReadResponse, zx::ok<uint8_t>(1));
-  device().FakeInterrupt();
-  device().DebounceWait();
-
-  reader->ReadInputReports().Then([&](auto& result) {
+  fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+  {
+    auto result = reader->ReadInputReports();
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
@@ -678,16 +610,14 @@ TEST_F(ButtonsTest, PollOneButton) {
     ASSERT_EQ(consumer_control.pressed_buttons().count(), 1);
     EXPECT_EQ(consumer_control.pressed_buttons()[0],
               fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
+  }
 
-    input_report_loop_.Quit();
-  });
-  EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
-  EXPECT_OK(input_report_loop_.ResetQuit());
+  SetDefaultGpioReadResponse(1, 1);
 
-  GetGpio(1).SyncCall(&fake_gpio::FakeGpio::SetDefaultReadResponse, zx::ok<uint8_t>(1));
-  device().DebounceWait();
-
-  reader->ReadInputReports().Then([&](auto& result) {
+  fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+  fake_gpio_interrupts_[1].trigger(0, zx::clock::get_monotonic());
+  {
+    auto result = reader->ReadInputReports();
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
@@ -709,17 +639,12 @@ TEST_F(ButtonsTest, PollOneButton) {
         fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp,
         fuchsia_input_report::wire::ConsumerControlButton::kMicMute};
     EXPECT_EQ(expected_buttons, pressed_buttons);
+  }
+  SetDefaultGpioReadResponse(0, 0);
 
-    input_report_loop_.Quit();
-  });
-  EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
-  EXPECT_OK(input_report_loop_.ResetQuit());
-
-  GetGpio(0).SyncCall(&fake_gpio::FakeGpio::SetDefaultReadResponse, zx::ok<uint8_t>(0));
-  device().FakeInterrupt();
-  device().DebounceWait();
-
-  reader->ReadInputReports().Then([&](auto& result) {
+  fake_gpio_interrupts_[1].trigger(0, zx::clock::get_monotonic());
+  {
+    auto result = reader->ReadInputReports();
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
@@ -735,16 +660,12 @@ TEST_F(ButtonsTest, PollOneButton) {
     ASSERT_EQ(consumer_control.pressed_buttons().count(), 1);
     EXPECT_EQ(consumer_control.pressed_buttons()[0],
               fuchsia_input_report::wire::ConsumerControlButton::kMicMute);
+  }
 
-    input_report_loop_.Quit();
-  });
-  EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
-  EXPECT_OK(input_report_loop_.ResetQuit());
+  SetDefaultGpioReadResponse(1, 0);
 
-  GetGpio(1).SyncCall(&fake_gpio::FakeGpio::SetDefaultReadResponse, zx::ok<uint8_t>(0));
-  device().DebounceWait();
-
-  reader->ReadInputReports().Then([&](auto& result) {
+  {
+    auto result = reader->ReadInputReports();
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
@@ -758,10 +679,7 @@ TEST_F(ButtonsTest, PollOneButton) {
 
     ASSERT_TRUE(consumer_control.has_pressed_buttons());
     ASSERT_EQ(consumer_control.pressed_buttons().count(), 0);
-
-    input_report_loop_.Quit();
-  });
-  EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
+  }
 }
 
 }  // namespace buttons

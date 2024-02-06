@@ -7,25 +7,17 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/input_report_reader/reader.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/sync/cpp/completion.h>
-#include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/port.h>
 #include <lib/zx/timer.h>
+#include <zircon/threads.h>
 
 #include <ddk/metadata/buttons.h>
-#include <ddktl/device.h>
-#include <ddktl/fidl.h>
-#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/array.h>
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
-#include <fbl/ref_counted.h>
 
 namespace buttons {
 
@@ -40,12 +32,7 @@ constexpr uint64_t kPortKeyPollTimer = 0x1000;
 // Debounce threshold.
 constexpr uint64_t kDebounceThresholdNs = 50'000'000;
 
-class ButtonsDevice;
-using DeviceType =
-    ddk::Device<ButtonsDevice, ddk::Messageable<fuchsia_input_report::InputDevice>::Mixin,
-                ddk::Unbindable>;
-
-class ButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTREPORT> {
+class ButtonsDevice : public fidl::WireServer<fuchsia_input_report::InputDevice> {
  public:
   struct Gpio {
     fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client;
@@ -53,15 +40,10 @@ class ButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_I
     buttons_gpio_config_t config;
   };
 
-  explicit ButtonsDevice(zx_device_t* device, async_dispatcher_t* dispatcher)
-      : DeviceType(device), dispatcher_(dispatcher) {
-    metrics_root_ = inspector_.GetRoot().CreateChild("hid-input-report-touch");
-    average_latency_usecs_ = metrics_root_.CreateUint("average_latency_usecs", 0);
-    max_latency_usecs_ = metrics_root_.CreateUint("max_latency_usecs", 0);
-    total_report_count_ = metrics_root_.CreateUint("total_report_count", 0);
-    last_event_timestamp_ = metrics_root_.CreateUint("last_event_timestamp", 0);
-  }
-  virtual ~ButtonsDevice() = default;
+  explicit ButtonsDevice(async_dispatcher_t* dispatcher,
+                         fbl::Array<buttons_button_config_t> buttons, fbl::Array<Gpio> gpios);
+  void Notify(size_t button_index);
+  void ShutDown();
 
   // fuchsia_input_report::InputDevice required methods
   void GetInputReportsReader(GetInputReportsReaderRequestView request,
@@ -81,23 +63,13 @@ class ButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_I
   void GetInputReport(GetInputReportRequestView request,
                       GetInputReportCompleter::Sync& completer) override;
 
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
-
-  zx_status_t Bind(fbl::Array<Gpio> gpios, fbl::Array<buttons_button_config_t> buttons);
-  virtual void Notify(uint32_t button_index);
-
- protected:
-  // Protected for unit testing.
-  void ShutDown();
-
-  zx::port port_;
-
  private:
+  zx::port port_;
   friend class ButtonsDeviceTest;
   static constexpr size_t kFeatureAndDescriptorBufferSize = 512;
 
   int Thread();
+  zx_status_t Init();
   zx::result<uint8_t> ReconfigurePolarity(uint32_t idx, uint64_t int_port);
   zx_status_t ConfigureInterrupt(uint32_t idx, uint64_t int_port);
   zx::result<bool> MatrixScan(uint32_t row, uint32_t col, zx_duration_t delay);
@@ -123,7 +95,7 @@ class ButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_I
       return std::all_of(buttons.cbegin(), buttons.cend(), [](bool i) { return !i; });
     }
   };
-  zx::result<ButtonsInputReport> GetInputReport();
+  zx::result<ButtonsInputReport> GetInputReportInternal();
 
   async_dispatcher_t* dispatcher_;
 
