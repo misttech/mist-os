@@ -28,7 +28,7 @@
                     {
                         "projects": [
                             "prebuilt/third_party/rust/linux-x64",
-                            "third_party/rust_crates/vendor/regex-syntax-0.6.26",
+                            "third_party/rust_crates/vendor/regex-syntax-0.6.29",
                             "third_party/rust_crates/vendor/bstr-1.5.0"
                         ],
                         "bug": "",
