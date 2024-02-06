@@ -15,7 +15,11 @@ group("tests") {
 driver_bind_rules("bind") {
   rules = "acpi_battery.bind"
   bind_output = "acpi_battery.bindbc"
-  deps = [ "//src/devices/bind/fuchsia.acpi" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
+    "//src/devices/bind/fuchsia.acpi",
+    "//src/devices/bind/fuchsia.sysmem",
+  ]
 }
 
 common_deps = [

@@ -12,8 +12,8 @@ TEST_F(DeviceEnumerationTest, QemuX64Test) {
 
       "sys/platform/pt/acpi", "sys/platform/pt/PCI0/bus/00:1f.2/00_1f_2/ahci",
       // TODO(https://fxbug.dev/42075162): Re-enable with new names after QEMU roll
-      //"sys/platform/pt/acpi/acpi-_SB_/acpi-PCI0/acpi-ISA_/acpi-KBD_/pt/acpi-KBD_-composite/i8042/i8042-keyboard",
-      //"sys/platform/pt/acpi/acpi-_SB_/acpi-PCI0/acpi-ISA_/acpi-KBD_/pt/acpi-KBD_-composite/i8042/i8042-mouse",
+      //"sys/platform/pt/acpi/acpi-_SB_/acpi-PCI0/acpi-ISA_/acpi-KBD_/pt/acpi-KBD_-composite-spec/i8042/i8042-keyboard",
+      //"sys/platform/pt/acpi/acpi-_SB_/acpi-PCI0/acpi-ISA_/acpi-KBD_/pt/acpi-KBD_-composite-spec/i8042/i8042-mouse",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));

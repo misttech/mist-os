@@ -73,7 +73,11 @@ define_common_lib("uart16550_lib_for_testing") {
 driver_bind_rules("uart16550_bind") {
   rules = "uart16550.bind"
   tests = "bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.acpi" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
+    "//src/devices/bind/fuchsia.acpi",
+    "//src/devices/bind/fuchsia.sysmem",
+  ]
 }
 
 fuchsia_driver("uart16550-driver") {

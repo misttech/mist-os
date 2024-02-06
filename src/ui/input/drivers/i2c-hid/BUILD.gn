@@ -15,8 +15,9 @@ driver_bind_rules("i2c_hid_bind") {
   rules = "i2c_hid.bind"
   tests = "tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
     "//src/devices/bind/fuchsia.acpi",
-    "//src/devices/bind/fuchsia.i2c",
+    "//src/devices/bind/fuchsia.sysmem",
   ]
 }
 

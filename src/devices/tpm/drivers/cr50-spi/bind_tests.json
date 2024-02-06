@@ -1,37 +1,40 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.I2C",
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.acpi.FIRST_CID": "\"google,cr50\""
-        },
-        "expected": "abort",
-        "name": "Wrong bus type"
+        "node": "acpi",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.acpi.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.SPI",
+                    "fuchsia.acpi.FIRST_CID": "\"google,cr50\""
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.SPI",
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.acpi.FIRST_CID": "\"google,not-cr50\""
-        },
-        "expected": "abort",
-        "name": "Wrong compatible"
+        "node": "irq000",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.hardware.interrupt.Service": "fuchsia.hardware.interrupt.Service.ZirconTransport"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.SPI",
-            "fuchsia.acpi.FIRST_CID": "\"google,cr50\""
-        },
-        "expected": "abort",
-        "name": "Not composite"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.SPI",
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.acpi.FIRST_CID": "\"google,cr50\""
-        },
-        "expected": "match",
-        "name": "SPI cr50"
+        "node": "sysmem",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     }
 ]

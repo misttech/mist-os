@@ -2,9 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.i2c;
-using fuchsia.acpi;
+composite i2c_hid;
 
-fuchsia.BIND_ACPI_BUS_TYPE == fuchsia.acpi.BIND_ACPI_BUS_TYPE.I2C;
-fuchsia.acpi.FIRST_CID == "PNP0C50";
-fuchsia.BIND_COMPOSITE == 1;
+using fuchsia.acpi;
+using fuchsia.hardware.interrupt;
+using fuchsia.sysmem;
+
+primary node "acpi" {
+  fuchsia.BIND_PROTOCOL == fuchsia.acpi.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_ACPI_BUS_TYPE == fuchsia.acpi.BIND_ACPI_BUS_TYPE.I2C;
+  fuchsia.acpi.FIRST_CID == "PNP0C50";
+}
+
+node "irq000" {
+  fuchsia.hardware.interrupt.Service == fuchsia.hardware.interrupt.Service.ZirconTransport;
+}
+
+node "sysmem" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
+}

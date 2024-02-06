@@ -1,25 +1,47 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.bluetooth.BIND_PROTOCOL.DEVICE"
-        },
-        "expected": "abort",
-        "name": "Incorrect_Protocol"
+        "node": "acpi",
+        "tests": [
+            {
+                "name": "Match HID",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.acpi.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.acpi.HID": "\"PNP0303\""
+                }
+            },
+            {
+                "name": "Match FIRST_CID",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.acpi.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.acpi.FIRST_CID": "\"PNP0303\""
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.acpi.HID": "\"PNP0303\"",
-            "fuchsia.BIND_COMPOSITE": "1"
-        },
-        "expected": "match",
-        "name": "HID"
+        "node": "irq000",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.hardware.interrupt.Service": "fuchsia.hardware.interrupt.Service.ZirconTransport"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.acpi.FIRST_CID": "\"PNP0303\"",
-            "fuchsia.BIND_COMPOSITE": "1"
-        },
-        "expected": "match",
-        "name": "CID"
+        "node": "sysmem",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     }
 ]

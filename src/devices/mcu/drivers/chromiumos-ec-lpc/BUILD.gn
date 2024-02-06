@@ -15,7 +15,11 @@ group("tests") {
 driver_bind_rules("bind") {
   rules = "chromiumos_ec_lpc.bind"
   bind_output = "chromiumos_ec_lpc.bindbc"
-  deps = [ "//src/devices/bind/fuchsia.acpi" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
+    "//src/devices/bind/fuchsia.acpi",
+    "//src/devices/bind/fuchsia.sysmem",
+  ]
 }
 
 common_deps = [
