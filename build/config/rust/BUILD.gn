@@ -73,6 +73,10 @@ config("incremental") {
   }
 }
 
+assert(
+    rust_incremental == "" || !rust_rbe_enabled,
+    "Rust-incremental compilation is non-hermetic and hence, incompatible with remote execution.")
+
 config("one_codegen_unit") {
   # Disable codegen parallelism.
   # Trades incremental rebuild speed for smaller code size.
