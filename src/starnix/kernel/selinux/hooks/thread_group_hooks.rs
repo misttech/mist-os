@@ -134,7 +134,7 @@ pub fn check_getsched_access(
 }
 
 /// The SELinux security structure for `ThreadGroup`.
-#[derive(Default, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SeLinuxThreadGroupState {
     /// Current SID for the task.
     pub current_sid: SecurityId,
@@ -166,13 +166,16 @@ impl SeLinuxThreadGroupState {
         SeLinuxThreadGroupState {
             current_sid: sid.clone(),
             previous_sid: sid,
-            ..Default::default()
+            exec_sid: None,
+            fscreate_sid: None,
+            keycreate_sid: None,
+            sockcreate_sid: None,
         }
     }
 }
 
 /// The SELinux security structure for `ResolvedElf`.
-#[derive(Default, Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct SeLinuxResolvedElfState {
     /// Security ID for the transformed process.
     pub sid: SecurityId,

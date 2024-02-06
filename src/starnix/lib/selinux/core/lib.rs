@@ -8,7 +8,7 @@ pub mod security_server;
 pub mod seq_lock;
 
 /// The Security ID (SID) used internally to refer to a security context.
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SecurityId(u64);
 
 impl From<u64> for SecurityId {

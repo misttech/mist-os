@@ -97,7 +97,7 @@ impl Reset for DenyAll {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 struct QueryAndResult {
     source_sid: SecurityId,
     target_sid: SecurityId,
@@ -147,7 +147,7 @@ pub(crate) const DEFAULT_FIXED_SIZE: usize = 10;
 /// This implementation is thread-hostile; it expects all operations to be executed on the same
 /// thread.
 pub struct Fixed<D = DenyAll, const SIZE: usize = DEFAULT_FIXED_SIZE> {
-    cache: [QueryAndResult; SIZE],
+    cache: [Option<QueryAndResult>; SIZE],
     next_index: usize,
     is_full: bool,
     delegate: D,
@@ -166,12 +166,7 @@ impl<D, const SIZE: usize> Fixed<D, SIZE> {
         if SIZE == 0 {
             panic!("cannot instantiate fixed access vector cache of size 0");
         }
-        Self {
-            cache: std::array::from_fn(|_| QueryAndResult::default()),
-            next_index: 0,
-            is_full: false,
-            delegate,
-        }
+        Self { cache: std::array::from_fn(|_| None), next_index: 0, is_full: false, delegate }
     }
 
     /// Returns a boolean indicating whether the local cache is empty.
@@ -183,7 +178,7 @@ impl<D, const SIZE: usize> Fixed<D, SIZE> {
     /// Inserts `query_and_result` into the cache.
     #[inline]
     fn insert(&mut self, query_and_result: QueryAndResult) {
-        self.cache[self.next_index] = query_and_result;
+        self.cache[self.next_index] = Some(query_and_result);
         self.next_index = (self.next_index + 1) % SIZE;
         if self.next_index == 0 {
             self.is_full = true;
@@ -201,7 +196,10 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
         if !self.is_empty() {
             let mut index = if self.next_index == 0 { SIZE - 1 } else { self.next_index - 1 };
             loop {
-                let query_and_result = &self.cache[index];
+                // This loop will only visit entries that have been set, so
+                // each visited cache entry must already be `Some()`.
+                let query_and_result = self.cache[index].as_ref().unwrap();
+
                 if &source_sid == &query_and_result.source_sid
                     && &target_sid == &query_and_result.target_sid
                     && &target_class == &query_and_result.target_class
@@ -801,7 +799,7 @@ mod tests {
             //
 
             for item in avc_for_query_1.delegate.lock().cache.iter() {
-                assert_eq!(ACCESS_VECTOR_WRITE, item.access_vector);
+                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_vector);
             }
         });
         let (tx2, rx2) = futures::channel::oneshot::channel();
@@ -834,7 +832,7 @@ mod tests {
             //
 
             for item in avc_for_query_2.delegate.lock().cache.iter() {
-                assert_eq!(ACCESS_VECTOR_WRITE, item.access_vector);
+                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_vector);
             }
         });
 
@@ -1041,7 +1039,7 @@ mod tests {
             //
 
             for item in avc_for_query_1.delegate.cache.iter() {
-                assert_eq!(ACCESS_VECTOR_WRITE, item.access_vector);
+                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_vector);
             }
         });
         let (tx2, rx2) = futures::channel::oneshot::channel();
@@ -1074,7 +1072,7 @@ mod tests {
             //
 
             for item in avc_for_query_2.delegate.cache.iter() {
-                assert_eq!(ACCESS_VECTOR_WRITE, item.access_vector);
+                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_vector);
             }
         });
 
@@ -1160,11 +1158,14 @@ mod tests {
         let shared_cache = security_server.manager().shared_cache.delegate.lock();
         if shared_cache.is_full {
             for item in shared_cache.cache.iter() {
-                assert_eq!(ACCESS_VECTOR_WRITE, item.access_vector);
+                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_vector);
             }
         } else {
             for i in 0..shared_cache.next_index {
-                assert_eq!(ACCESS_VECTOR_WRITE, shared_cache.cache[i].access_vector);
+                assert_eq!(
+                    ACCESS_VECTOR_WRITE,
+                    shared_cache.cache[i].as_ref().unwrap().access_vector
+                );
             }
         }
     }
