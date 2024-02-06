@@ -261,7 +261,7 @@ use fuchsia_wayland_core::{{ArgKind, Arg, Array, Enum, Fixed, FromArgs, IntoMess
             for message in messages.iter() {
                 writeln!(
                     self.w,
-                    "            {}::{} {{ .. }} => fuchsia_trace::cstr!(\"{}::{}\"),",
+                    "            {}::{} {{ .. }} => c\"{}::{}\",",
                     name,
                     message.rust_name(),
                     interface.name,
