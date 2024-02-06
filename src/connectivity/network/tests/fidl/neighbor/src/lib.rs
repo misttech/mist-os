@@ -630,6 +630,10 @@ async fn neigh_clear_entries<N: Netstack>(name: &str) {
     let mut solicit_stream = netstack_testing_common::nud::create_metadata_stream(&fake_ep);
 
     let (alice, bob) = create_neighbor_realms::<N>(&sandbox, &network, name).await;
+    // Apply the NUD flake workaround, since we expect all neighbor resolution
+    // to succeed in this test case.
+    alice.ep.apply_nud_flake_workaround().await.expect("nud flake workaround");
+    bob.ep.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     let controller = alice
         .realm
