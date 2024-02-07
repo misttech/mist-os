@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
@@ -38,6 +39,12 @@
 #define spicc1_clk_sel_fclk_div3 (3 << 23)
 #define spicc1_clk_en (1 << 22)
 #define spicc1_clk_div(x) (((x)-1) << 16)
+
+namespace {
+
+constexpr char kSpi1SchedulerRole[] = "fuchsia.devices.spi.drivers.aml-spi.spi1";
+
+}  // namespace
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
@@ -304,6 +311,20 @@ zx_status_t Nelson::Spi1Init() {
         reinterpret_cast<const uint8_t*>(&spi_1_config) + sizeof(spi_1_config));
     return ret;
   }());
+
+  {
+    const fuchsia_scheduler::RoleName role(kSpi1SchedulerRole);
+
+    fit::result result = fidl::Persist(role);
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to persist scheduler role: %s",
+             result.error_value().FormatDescription().c_str());
+      return result.error_value().status();
+    }
+
+    spi_1_metadata.emplace_back(
+        fpbus::Metadata{{DEVICE_METADATA_SCHEDULER_ROLE_NAME, *std::move(result)}});
+  }
 
   auto spi_status = fidl_metadata::spi::SpiChannelsToFidl(NELSON_SPICC1, spi_1_channels);
   if (spi_status.is_error()) {

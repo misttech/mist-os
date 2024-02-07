@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
@@ -18,6 +19,12 @@
 
 // uncomment to disable LED blinky test
 // #define GPIO_TEST
+
+namespace {
+
+constexpr char kGpioHSchedulerRole[] = "fuchsia.devices.gpio.drivers.aml-gpio.gpioh";
+
+}  // namespace
 
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -173,27 +180,6 @@ static const gpio_pin_t gpio_h_pins[] = {
     DECL_GPIO_PIN(GPIO_SOC_SPI_B_MISO),   DECL_GPIO_PIN(GPIO_SOC_SPI_B_SS0),
     DECL_GPIO_PIN(GPIO_SOC_SPI_B_SCLK),   DECL_GPIO_PIN(GPIO_SOC_SELINA_OSC_EN)};
 
-static const std::vector<fpbus::Metadata> gpio_h_metadata{
-    {{
-        .type = DEVICE_METADATA_GPIO_PINS,
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&gpio_h_pins),
-            reinterpret_cast<const uint8_t*>(&gpio_h_pins) + sizeof(gpio_h_pins)),
-    }},
-};
-
-static const fpbus::Node gpio_h_dev = []() {
-  fpbus::Node dev = {};
-  dev.name() = "gpio-h";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_S905D3;
-  dev.did() = PDEV_DID_AMLOGIC_GPIO;
-  dev.instance_id() = 1;
-  dev.mmio() = gpio_mmios;
-  dev.metadata() = gpio_h_metadata;
-  return dev;
-}();
-
 static const gpio_pin_t gpio_c_pins[] = {
     DECL_GPIO_PIN(GPIO_SOC_SPI_A_MISO),
     DECL_GPIO_PIN(GPIO_SOC_SPI_A_MOSI),
@@ -272,6 +258,40 @@ zx_status_t Nelson::GpioInit() {
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
+
+  const fuchsia_scheduler::RoleName role(kGpioHSchedulerRole);
+
+  fit::result role_metadata = fidl::Persist(role);
+  if (role_metadata.is_error()) {
+    zxlogf(ERROR, "Failed to persist scheduler role: %s",
+           role_metadata.error_value().FormatDescription().c_str());
+    return role_metadata.error_value().status();
+  }
+
+  const std::vector<fpbus::Metadata> gpio_h_metadata{
+      {{
+          .type = DEVICE_METADATA_GPIO_PINS,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&gpio_h_pins),
+              reinterpret_cast<const uint8_t*>(&gpio_h_pins) + sizeof(gpio_h_pins)),
+      }},
+      {{
+          .type = DEVICE_METADATA_SCHEDULER_ROLE_NAME,
+          .data = role_metadata.value(),
+      }},
+  };
+
+  const fpbus::Node gpio_h_dev = [&gpio_h_metadata]() {
+    fpbus::Node dev = {};
+    dev.name() = "gpio-h";
+    dev.vid() = PDEV_VID_AMLOGIC;
+    dev.pid() = PDEV_PID_AMLOGIC_S905D3;
+    dev.did() = PDEV_DID_AMLOGIC_GPIO;
+    dev.instance_id() = 1;
+    dev.mmio() = gpio_mmios;
+    dev.metadata() = gpio_h_metadata;
+    return dev;
+  }();
 
   {
     auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, gpio_h_dev));
