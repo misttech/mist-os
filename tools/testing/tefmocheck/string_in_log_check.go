@@ -537,6 +537,12 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: "Timed out waiting for the ffx daemon on the Overnet mesh over socket",
 			Type:   swarmingOutputType,
 		},
+		// For https://fxbug.dev/317290699.
+		&stringInLogCheck{
+			String:             "process terminated with abnormal return code url=fuchsia-pkg://fuchsia.com/sshd-host#meta/sshd.cm",
+			Type:               swarmingOutputType,
+			SkipAllPassedTests: true,
+		},
 		// This error happens when `botanist run` exceeds its timeout, e.g.
 		// because many tests are taking too long. If botanist exceeds its timeout,
 		// it will terminate subprocesses which can lead to the errors below.
