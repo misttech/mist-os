@@ -104,7 +104,84 @@
         pointer_auto_focus: { type: "bool" },
         display_composition: { type: "bool" },
         i_can_haz_display_id: { type: "int64" },
+
+        // The index to the display mode selected by Scenic if not -1. It
+        // overrides all the other display mode constraints.
+        //
+        // If -1, Scenic ignores this field and selects the display mode using
+        // other constraints.
+        //
+        // TODO(https://fxbug.dev/42156949): Replace it with fields that support
+        // multiple displays.
         i_can_haz_display_mode: { type: "int64" },
         display_rotation: { type: "uint64" },
+
+        // The following fields specify the constraints of the display modes
+        // allowed by Scenic. Scenic will exit if none of the display modes
+        // provided by the display device satisfy all the constraints.
+
+        // The minimum allowed display horizontal resolution (width) in pixels,
+        // if not -1.
+        // Otherwise there's no minimum limit on the display horizontal
+        // resolution.
+        //
+        // Must be non-negative or -1.
+        //
+        // Must be <= `max_display_horizontal_resolution_px` if both fields are
+        // non-negative.
+        min_display_horizontal_resolution_px: { type: "int32" },
+
+        // The maximum allowed display horizontal resolution (width) in pixels,
+        // if not -1.
+        // Otherwise there's no maximum limit on the display horizontal
+        // resolution.
+        //
+        // Must be non-negative or -1.
+        //
+        // Must be >= `min_display_horizontal_resolution_px` if both fields are
+        // non-negative.
+        max_display_horizontal_resolution_px: { type: "int32" },
+
+        // The minimum allowed display vertical resolution (height) in pixels,
+        // if not -1.
+        // Otherwise there's no minimum limit on the display vertical
+        // resolution.
+        //
+        // Must be non-negative or -1.
+        //
+        // Must be <= `max_display_vertical_resolution_px` if both fields are
+        // non-negative.
+        min_display_vertical_resolution_px: { type: "int32" },
+
+        // The maximum allowed display vertical resolution (height) in pixels,
+        // if not -1.
+        // Otherwise there's no maximum limit on the display vertical
+        // resolution.
+        //
+        // Must be non-negative or -1.
+        //
+        // Must be >= `min_display_vertical_resolution_px` if both fields are
+        // non-negative.
+        max_display_vertical_resolution_px: { type: "int32" },
+
+        // The minimum allowed display refresh rate in millihertz (10^-3 hertz),
+        // if not -1.
+        // Otherwise there's no minimum limit on the display refresh rate.
+        //
+        // Must be non-negative or -1.
+        //
+        // Must be <= `max_display_refresh_rate_millihertz` if both fields are
+        // non-negative.
+        min_display_refresh_rate_millihertz: { type: "int32" },
+
+        // The maximum allowed display refresh rate in millihertz (10^-3 hertz),
+        // if not -1.
+        // Otherwise there's no maximum limit on the display refresh rate.
+        //
+        // Must be non-negative or -1.
+        //
+        // Must be >= `min_display_refresh_rate_millihertz` if both fields are
+        // non-negative.
+        max_display_refresh_rate_millihertz: { type: "int32" },
     },
 }

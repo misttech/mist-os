@@ -6,4 +6,10 @@
     i_can_haz_display_id: -1,
     i_can_haz_display_mode: -1,
     display_rotation: 270,
+    min_display_horizontal_resolution_px: -1,
+    max_display_horizontal_resolution_px: -1,
+    min_display_vertical_resolution_px: -1,
+    max_display_vertical_resolution_px: -1,
+    min_display_refresh_rate_millihertz: -1,
+    max_display_refresh_rate_millihertz: -1,
 }
