@@ -21,6 +21,7 @@ namespace audio {
 
 // TODO(https://fxbug.dev/42055135): Add handling for the other formats supported by this hardware.
 static const std::vector<uint32_t> kSupportedNumberOfChannels = {2};
+static const uint64_t kMaxSupportedChannelsToUseBitmask = 2;
 static const std::vector<SampleFormat> kSupportedSampleFormats = {SampleFormat::PCM_SIGNED};
 static const std::vector<FrameFormat> kSupportedFrameFormats = {FrameFormat::I2S};
 static const std::vector<uint32_t> kSupportedRates = {48'000, 96'000};
@@ -229,11 +230,7 @@ void Tas27xx::SetGainStateInternal(GainState gain_state) {
 bool Tas27xx::ValidGain(float gain) { return (gain <= kMaxGain) && (gain >= kMinGain); }
 
 zx_status_t Tas27xx::SetRate(uint32_t rate) {
-  if (rate != 48000 && rate != 96000) {
-    zxlogf(ERROR, "tas27xx: rate not supported %u", rate);
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  // Note: autorate is enabled below, so changine the codec rate is not strictly required.
+  // Note: autorate is enabled below, so changing the codec rate is not strictly required.
   // bit[5]   - rate ramp, 0=48kHz, 1=44.1kHz
   // bit[4]   - auto rate, 0=enable
   // bit[3:1] - samp rate, 3=48kHz, 4=96kHz
@@ -244,13 +241,10 @@ zx_status_t Tas27xx::SetRate(uint32_t rate) {
 }
 
 zx_status_t Tas27xx::SetTdmSlots(uint64_t channels_to_use_bitmask) {
+  // kMaxSupportedChannelsToUseBitmask is 0x02: only 1 of the 2 available channels can be enabled.
   // bit[5:4] - RX_SCFG, 01b Mono, Right channel or 10b = Mono, Left channel.
   // bit[3:2] - RX_WLEN, 00b = 16-bits word length
   // bit[0:1] - RX_SLEN, 10b = 32-bit slot length
-  if (channels_to_use_bitmask != 1 && channels_to_use_bitmask != 2) {
-    zxlogf(ERROR, "tas27xx: channels to use not supported %lu", channels_to_use_bitmask);
-    return ZX_ERR_NOT_SUPPORTED;
-  }
   channels_to_use_bitmask_ = channels_to_use_bitmask;
   uint8_t rx_scfg = static_cast<uint8_t>(channels_to_use_bitmask_);
   return WriteReg(TDM_CFG2, (rx_scfg << 4) | (0x00 << 2) | 0x02);
@@ -412,12 +406,59 @@ zx_status_t Tas27xx::Shutdown() {
 DaiSupportedFormats Tas27xx::GetDaiFormats() { return kSupportedDaiFormats; }
 
 zx::result<CodecFormatInfo> Tas27xx::SetDaiFormat(const DaiFormat& format) {
-  format_.emplace(format);
-  return SetDaiFormatInternal(format);
+  auto result = SetDaiFormatInternal(format);
+  if (result.is_ok()) {
+    format_.emplace(format);
+  }
+  return result;
+}
+
+template <typename X>
+bool contains(std::vector<X> vec, X val) {
+  return std::any_of(vec.cbegin(), vec.cend(), [val](X v) { return (val == v); });
+}
+
+zx_status_t CheckFormatSupported(const DaiFormat& format) {
+  if (!contains(kSupportedNumberOfChannels, format.number_of_channels)) {
+    zxlogf(ERROR, "tas27xx: number of channels not supported %u", format.number_of_channels);
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  if (format.channels_to_use_bitmask > kMaxSupportedChannelsToUseBitmask) {
+    zxlogf(ERROR, "tas27xx: channels to use not supported %lu", format.channels_to_use_bitmask);
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  if (!contains(kSupportedSampleFormats, format.sample_format)) {
+    zxlogf(ERROR, "tas27xx: sample format not supported");
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  if (!contains(kSupportedFrameFormats, format.frame_format)) {
+    zxlogf(ERROR, "tas27xx: frame format not supported");
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  if (!contains(kSupportedRates, format.frame_rate)) {
+    zxlogf(ERROR, "tas27xx: rate not supported %u", format.frame_rate);
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  if (!contains(kSupportedBitsPerSlot, format.bits_per_slot)) {
+    zxlogf(ERROR, "tas27xx: bits per slot not supported %u",
+           static_cast<uint16_t>(format.bits_per_slot));
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  if (!contains(kSupportedBitsPerSample, format.bits_per_sample)) {
+    zxlogf(ERROR, "tas27xx: bits per sample not supported %u",
+           static_cast<uint16_t>(format.bits_per_sample));
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  return ZX_OK;
 }
 
 zx::result<CodecFormatInfo> Tas27xx::SetDaiFormatInternal(const DaiFormat& format) {
-  zx_status_t status = SetRate(format.frame_rate);
+  zx_status_t status = CheckFormatSupported(format);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  status = SetRate(format.frame_rate);
   if (status != ZX_OK) {
     return zx::error(status);
   }

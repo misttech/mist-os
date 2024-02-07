@@ -10,19 +10,17 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/i2c-channel.h>
+#include <lib/fidl/cpp/binding_set.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/simple-codec/simple-codec-server.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <threads.h>
 
-#include <memory>
-
 #include <ddktl/device.h>
+#include <ddktl/suspend-txn.h>
 #include <fbl/mutex.h>
 #include <ti/ti-audio.h>
 
-#include "ddktl/suspend-txn.h"
-#include "lib/fidl/cpp/binding_set.h"
 #include "tas58xx-inspect.h"
 
 namespace audio {
@@ -77,11 +75,11 @@ class Tas58xx : public SimpleCodecServer,
 
   // Protected for unit tests.
   zx_status_t SetBand(bool enabled, size_t index, uint32_t frequency, float Q, float gain_db);
-  uint64_t GetTopologyId() { return kTopologyId; }
-  uint64_t GetAglPeId() { return kAglPeId; }
-  uint64_t GetEqPeId() { return kEqPeId; }
-  uint64_t GetGainPeId() { return kGainPeId; }
-  uint64_t GetMutePeId() { return kMutePeId; }
+  static uint64_t GetTopologyId() { return kTopologyId; }
+  static uint64_t GetAglPeId() { return kAglPeId; }
+  static uint64_t GetEqPeId() { return kEqPeId; }
+  static uint64_t GetGainPeId() { return kGainPeId; }
+  static uint64_t GetMutePeId() { return kMutePeId; }
   virtual bool BackgroundFaultPollingIsEnabled() {
     return true;  // Unit test can override to disable.
   }

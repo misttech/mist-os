@@ -6,7 +6,7 @@
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
 #include <fidl/fuchsia.virtualaudio/cpp/wire.h>
 #include <lib/ddk/debug.h>
-#include <lib/fit/result.h>
+#include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
@@ -154,15 +154,76 @@ void VirtualAudioCodec::SetDaiFormat(SetDaiFormatRequest& request,
                                      SetDaiFormatCompleter::Sync& completer) {
   auto parent = parent_.lock();
   ZX_ASSERT(parent);
-  if (request.format().frame_rate() > 192000) {
-    completer.Close(ZX_ERR_INVALID_ARGS);
+  fuchsia_hardware_audio::DaiFormat format = request.format();
+  if (format.frame_rate() > 192000) {
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
   }
-  fuchsia_hardware_audio::CodecFormatInfo codec_info{{
-      .external_delay = 123,
-      .turn_on_delay = 234,
-      .turn_off_delay = 345,
-  }};
-  completer.Reply(fit::ok(codec_info));
+
+  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> supported_formats =
+      config_.device_specific()->codec()->dai_interconnect()->dai_supported_formats().value_or(
+          std::vector<fuchsia_hardware_audio::DaiSupportedFormats>{});
+
+  for (auto dai_format_set : supported_formats) {
+    std::optional<uint32_t> number_of_channels;
+    for (auto channel_count : dai_format_set.number_of_channels()) {
+      if (channel_count == format.number_of_channels()) {
+        number_of_channels = format.number_of_channels();
+        break;
+      }
+    }
+    std::optional<uint64_t> channels_to_use_bitmask;
+    if (format.channels_to_use_bitmask() <= (1u << format.number_of_channels()) - 1) {
+      channels_to_use_bitmask = format.channels_to_use_bitmask();
+    }
+    std::optional<fuchsia_hardware_audio::DaiSampleFormat> sample_format;
+    for (auto sample_fmt : dai_format_set.sample_formats()) {
+      if (sample_fmt == format.sample_format()) {
+        sample_format = format.sample_format();
+        break;
+      }
+    }
+    std::optional<fuchsia_hardware_audio::DaiFrameFormat> frame_format;
+    for (auto& frame_fmt : dai_format_set.frame_formats()) {
+      if (frame_fmt == format.frame_format()) {
+        frame_format = format.frame_format();
+        break;
+      }
+    }
+    std::optional<uint32_t> frame_rate;
+    for (auto rate : dai_format_set.frame_rates()) {
+      if (rate == format.frame_rate()) {
+        frame_rate = format.frame_rate();
+        break;
+      }
+    }
+    std::optional<uint8_t> bits_per_slot;
+    for (auto bits : dai_format_set.bits_per_slot()) {
+      if (bits == format.bits_per_slot()) {
+        bits_per_slot = format.bits_per_slot();
+        break;
+      }
+    }
+    std::optional<uint8_t> bits_per_sample;
+    for (auto bits : dai_format_set.bits_per_sample()) {
+      if (bits == format.bits_per_sample()) {
+        bits_per_sample = format.bits_per_sample();
+        break;
+      }
+    }
+    if (number_of_channels.has_value() && channels_to_use_bitmask.has_value() &&
+        sample_format.has_value() && frame_format.has_value() && frame_rate.has_value() &&
+        bits_per_slot.has_value() && bits_per_sample.has_value()) {
+      fuchsia_hardware_audio::CodecFormatInfo codec_info{{
+          .external_delay = 123,
+          .turn_on_delay = 234,
+          .turn_off_delay = 345,
+      }};
+      completer.Reply(zx::ok(codec_info));
+      return;
+    }
+  }
+  completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
 }
 
 void VirtualAudioCodec::Start(StartCompleter::Sync& completer) {

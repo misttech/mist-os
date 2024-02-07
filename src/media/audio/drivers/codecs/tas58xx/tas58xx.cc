@@ -797,21 +797,21 @@ zx::result<CodecFormatInfo> Tas58xx::SetDaiFormat(const DaiFormat& format) {
   // "the input signal to the PBTL amplifier is left frame of I2S or TDM data".
   if (metadata_.bridged &&
       (format.number_of_channels != 2 || (format.channels_to_use_bitmask != 1))) {
-    zxlogf(ERROR, "DAI format channels to use not supported in bridged mode %u 0x%lX",
+    zxlogf(ERROR, "DAI format channels not supported in bridged mode: %u-channel, mask 0x%lX",
            format.number_of_channels, format.channels_to_use_bitmask);
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   // Only the first 2 bits are ok.
   if (format.number_of_channels == 2 && (format.channels_to_use_bitmask & ~3)) {
-    zxlogf(ERROR, "DAI format channels to use not supported %u 0x%lX", format.number_of_channels,
-           format.channels_to_use_bitmask);
+    zxlogf(ERROR, "DAI format channels not supported: %u-channel, mask 0x%lX",
+           format.number_of_channels, format.channels_to_use_bitmask);
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
   if (format.number_of_channels == 4 && format.channels_to_use_bitmask != 3 &&
       format.channels_to_use_bitmask != 0xc) {
-    zxlogf(ERROR, "DAI format channels to use not supported %u 0x%lX", format.number_of_channels,
-           format.channels_to_use_bitmask);
+    zxlogf(ERROR, "DAI format channels not supported: %u-channel, mask 0x%lX",
+           format.number_of_channels, format.channels_to_use_bitmask);
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 

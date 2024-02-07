@@ -56,13 +56,6 @@ void AdminTest::RequestCodecStopAndExpectResponse() {
   }
 }
 
-// SetBridgedMode returns no response; WaitForError() afterward if this is the last FIDL command.
-void AdminTest::SetBridgedMode(bool bridged_mode) {
-  ASSERT_TRUE(device_entry().isCodec());
-
-  codec()->SetBridgedMode(bridged_mode);
-}
-
 // Request that the driver reset, expecting a response.
 // TODO(https://fxbug.dev/42075676): Test Reset for Composite and Dai (Reset closes any RingBuffer).
 // TODO(https://fxbug.dev/42077405): When SignalProcessing testing, Reset should change this state.
@@ -404,26 +397,6 @@ void AdminTest::DropRingBuffer() {
 // Verify that a Reset() returns a valid completion.
 DEFINE_ADMIN_TEST_CLASS(Reset, { ResetAndExpectResponse(); });
 
-DEFINE_ADMIN_TEST_CLASS(BridgedMode, {
-  ASSERT_TRUE(device_entry().isCodec());
-
-  ASSERT_NO_FAILURE_OR_SKIP(RetrieveIsBridgeable());
-  if (!CanBeBridged()) {
-    GTEST_SKIP() << "This codec does not support bridged mode";
-    __UNREACHABLE;
-  }
-
-  SetBridgedMode(true);
-  WaitForError();
-});
-
-DEFINE_ADMIN_TEST_CLASS(NonBridgedMode, {
-  ASSERT_TRUE(device_entry().isCodec());
-
-  SetBridgedMode(false);
-  WaitForError();
-});
-
 // Start-while-started should always succeed, so we test this twice.
 DEFINE_ADMIN_TEST_CLASS(CodecStart, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestCodecStartAndExpectResponse());
@@ -707,9 +680,6 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
 
   if (device_entry.isCodec()) {
     REGISTER_ADMIN_TEST(Reset, device_entry);
-
-    REGISTER_ADMIN_TEST(BridgedMode, device_entry);
-    REGISTER_ADMIN_TEST(NonBridgedMode, device_entry);
 
     REGISTER_ADMIN_TEST(CodecStop, device_entry);
     REGISTER_ADMIN_TEST(CodecStart, device_entry);

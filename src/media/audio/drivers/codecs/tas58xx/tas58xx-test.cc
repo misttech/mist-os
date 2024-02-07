@@ -1576,7 +1576,7 @@ TEST(Tas58xxTest, Bridged) {
     format.bits_per_slot = 32;
     format.bits_per_sample = 16;
     auto formats = client.GetDaiFormats();
-    // Which channel for birdged miode is not checked by IsDaiFormatSupported,
+    // Which channel for bridged mode is not checked by IsDaiFormatSupported,
     // so this still returns TRUE.
     ASSERT_TRUE(IsDaiFormatSupported(format, formats.value()));
     zx::result<CodecFormatInfo> format_info = client.SetDaiFormat(std::move(format));

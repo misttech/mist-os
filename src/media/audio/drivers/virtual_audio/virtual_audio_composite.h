@@ -55,12 +55,10 @@ class VirtualAudioComposite
   void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override;
 
   // FIDL natural C++ methods for fuchsia.hardware.audio.Composite.
-  void Reset(ResetCompleter::Sync& completer) override { completer.Reply(zx::ok()); }
+  void Reset(ResetCompleter::Sync& completer) override;
   void GetProperties(fidl::Server<fuchsia_hardware_audio::Composite>::GetPropertiesCompleter::Sync&
                          completer) override;
-  void GetHealthState(GetHealthStateCompleter::Sync& completer) override {
-    completer.Reply(fuchsia_hardware_audio::HealthState{}.healthy(true));
-  }
+  void GetHealthState(GetHealthStateCompleter::Sync& completer) override;
   void SignalProcessingConnect(SignalProcessingConnectRequest& request,
                                SignalProcessingConnectCompleter::Sync& completer) override;
   void GetRingBufferFormats(GetRingBufferFormatsRequest& request,
@@ -96,10 +94,10 @@ class VirtualAudioComposite
   void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) override;
 
  private:
+  static constexpr uint64_t kTopologyId = 789;
   static constexpr size_t kNumberOfElements = 2;
   static constexpr uint64_t kRingBufferId = 123;
   static constexpr uint64_t kDaiId = 456;
-  static constexpr uint64_t kTopologyId = 789;
 
   void ResetRingBuffer();
   void OnRingBufferClosed(fidl::UnbindInfo info);

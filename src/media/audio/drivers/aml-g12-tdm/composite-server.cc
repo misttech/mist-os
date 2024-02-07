@@ -403,6 +403,13 @@ void AudioCompositeServer::SetDaiFormat(SetDaiFormatRequest& request,
     return;
   }
 
+  if (request.format().channels_to_use_bitmask() >= (1u << request.format().number_of_channels())) {
+    FDF_LOG(ERROR, "DAI format channels-to-use 0x%zx out of range, for DAI id (%lu)",
+            request.format().channels_to_use_bitmask(), request.processing_element_id());
+    completer.Reply(zx::error(fuchsia_hardware_audio::DriverError::kInvalidArgs));
+    return;
+  }
+
   if (!contains(supported.sample_formats(), request.format().sample_format())) {
     FDF_LOG(ERROR, "DAI format sample format for DAI id (%lu) not supported",
             request.processing_element_id());
