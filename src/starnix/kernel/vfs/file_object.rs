@@ -1125,21 +1125,6 @@ impl FileObject {
         if !self.ops().is_seekable() {
             return error!(ESPIPE);
         }
-        self.read_raw(locked, current_task, offset, data)
-    }
-
-    /// Delegate the read operation to FileOps after executing the common permission check. This
-    /// calls does not handle any operation related to file offsets.
-    pub fn read_raw<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno>
-    where
-        L: LockEqualOrBefore<ReadOps>,
-    {
         if offset >= MAX_LFS_FILESIZE {
             return error!(EINVAL);
         }
@@ -1228,7 +1213,7 @@ impl FileObject {
         &self,
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
-        offset: usize,
+        mut offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>
     where
@@ -1237,21 +1222,6 @@ impl FileObject {
         if !self.ops().is_seekable() {
             return error!(ESPIPE);
         }
-        self.write_raw(locked, current_task, offset, data)
-    }
-
-    /// Delegate the write operation to FileOps after executing the common permission check. This
-    /// calls does not handle any operation related to file offsets.
-    pub fn write_raw<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
-        mut offset: usize,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno>
-    where
-        L: LockEqualOrBefore<WriteOps>,
-    {
         self.write_fn(locked, current_task, |locked| {
             let _guard = self.node().append_lock.read(current_task)?;
 

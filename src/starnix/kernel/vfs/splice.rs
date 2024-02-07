@@ -12,7 +12,7 @@ use crate::{
     },
 };
 use starnix_logging::track_stub;
-use starnix_sync::{ordered_lock, LockBefore, Locked, MutexGuard, ReadOps, WriteOps};
+use starnix_sync::{LockBefore, Locked, ReadOps, WriteOps};
 use starnix_uapi::{
     errno, error, errors::Errno, off_t, open_flags::OpenFlags, uapi, user_address::UserRef,
     user_buffer::MAX_RW_COUNT,
@@ -116,68 +116,49 @@ where
 }
 
 #[derive(Debug)]
-struct SplicedFile {
+struct SplicedOperand {
     file: FileHandle,
-    offset_ref: UserRef<off_t>,
-    offset: Option<usize>,
+    user_offset: UserRef<off_t>,
+    maybe_offset: Option<usize>,
 }
 
-impl SplicedFile {
+impl SplicedOperand {
     fn new(
         current_task: &CurrentTask,
         fd: FdNumber,
-        offset_ref: UserRef<off_t>,
+        user_offset: UserRef<off_t>,
     ) -> Result<Self, Errno> {
         let file = current_task.files.get(fd)?;
-        let offset = if offset_ref.is_null() {
+        let maybe_offset = if user_offset.is_null() {
             None
         } else {
             if !file.is_seekable() {
                 return error!(ESPIPE);
             }
-            let offset = current_task.read_object(offset_ref)?;
+            let offset = current_task.read_object(user_offset)?;
             if offset < 0 {
                 return error!(EINVAL);
             } else {
                 Some(offset as usize)
             }
         };
-        Ok(Self { file, offset_ref, offset })
+        Ok(Self { file, user_offset, maybe_offset })
     }
 
     fn maybe_as_pipe(&self) -> Option<&PipeFileObject> {
         self.file.downcast_file::<PipeFileObject>()
     }
 
-    /// Returns the effective offset at which to execute read/write
-    /// - Return None if the file has no persistent offsets, and all read/write must happen at 0.
-    /// - Returns Some(self.offset) if the offset has been specified by the user
-    /// - Returns Some(*file_offset) otherwise
-    fn effective_offset(&self, file_offset: &MutexGuard<'_, off_t>) -> Option<usize> {
-        self.file.has_persistent_offsets().then(|| self.offset.unwrap_or(**file_offset as usize))
-    }
-
-    fn update_offset(
+    fn maybe_write_result_offset(
         &self,
         current_task: &CurrentTask,
-        offset_guard: &mut MutexGuard<'_, off_t>,
         spliced: usize,
     ) -> Result<(), Errno> {
-        match &self.offset {
-            None if self.file.has_persistent_offsets() => {
-                // The file has persistent offsets, and the user didn't specify an offset. The
-                // internal file offset must be updated.
-                **offset_guard += spliced as off_t;
-                Ok(())
-            }
-            Some(v) => {
-                // The file is seekable and the user specified an offset. The new offset must be
-                // written back to userspace.
-                current_task.write_object(self.offset_ref, &((*v + spliced) as off_t)).map(|_| ())
-            }
-            // Nothing to be done.
-            _ => Ok(()),
+        if let Some(offset) = self.maybe_offset {
+            let new_offset = (offset + spliced) as off_t;
+            current_task.write_object(self.user_offset, &new_offset)?;
         }
+        Ok(())
     }
 }
 
@@ -204,57 +185,56 @@ where
 
     let non_blocking = flags & uapi::SPLICE_F_NONBLOCK != 0;
 
-    let file_in = SplicedFile::new(current_task, fd_in, off_in)?;
-    let file_out = SplicedFile::new(current_task, fd_out, off_out)?;
+    let operand_in = SplicedOperand::new(current_task, fd_in, off_in)?;
+    let operand_out = SplicedOperand::new(current_task, fd_out, off_out)?;
 
     // out_fd has the O_APPEND flag set. This is not supported by splice().
-    if file_out.file.flags().contains(OpenFlags::APPEND) {
+    if operand_out.file.flags().contains(OpenFlags::APPEND) {
         return error!(EINVAL);
     }
 
-    // Lock offsets.
-    let (mut file_in_offset_guard, mut file_out_offset_guard) =
-        ordered_lock(&file_in.file.offset, &file_out.file.offset);
-
-    let spliced = match (file_in.maybe_as_pipe(), file_out.maybe_as_pipe()) {
+    let spliced = match (operand_in.maybe_as_pipe(), operand_out.maybe_as_pipe()) {
         // Splice can only be used when one of the files is a pipe.
-        (None, None) => error!(EINVAL),
+        (None, None) => return error!(EINVAL),
         // If both ends are pipes, use the symmetric `Pipe::splice` function.
         (Some(_), Some(_)) => {
             let PipeOperands { mut read, mut write } = PipeFileObject::lock_pipes(
                 current_task,
-                &file_in.file,
-                &file_out.file,
+                &operand_in.file,
+                &operand_out.file,
                 len,
                 non_blocking,
             )?;
-            Pipe::splice(&mut read, &mut write, len)
+            Pipe::splice(&mut read, &mut write, len)?
         }
-        (None, Some(pipe_out)) => pipe_out.splice_from(
-            locked,
-            current_task,
-            &file_out.file,
-            &file_in.file,
-            file_in.effective_offset(&file_in_offset_guard),
-            len,
-            non_blocking,
-        ),
-        (Some(pipe_in), None) => pipe_in.splice_to(
-            locked,
-            current_task,
-            &file_in.file,
-            &file_out.file,
-            file_out.effective_offset(&file_out_offset_guard),
-            len,
-            non_blocking,
-        ),
-    }?;
+        (None, Some(pipe_out)) => {
+            let spliced = pipe_out.splice_from(
+                locked,
+                current_task,
+                &operand_out.file,
+                &operand_in.file,
+                operand_in.maybe_offset,
+                len,
+                non_blocking,
+            )?;
+            operand_in.maybe_write_result_offset(current_task, spliced)?;
+            spliced
+        }
+        (Some(pipe_in), None) => {
+            let spliced = pipe_in.splice_to(
+                locked,
+                current_task,
+                &operand_in.file,
+                &operand_out.file,
+                operand_out.maybe_offset,
+                len,
+                non_blocking,
+            )?;
+            operand_out.maybe_write_result_offset(current_task, spliced)?;
+            spliced
+        }
+    };
 
-    // Update both file offset before returning in case of error writing back to
-    // userspace.
-    let update_offset_in = file_in.update_offset(current_task, &mut file_in_offset_guard, spliced);
-    file_out.update_offset(current_task, &mut file_out_offset_guard, spliced)?;
-    update_offset_in?;
     Ok(spliced)
 }
 

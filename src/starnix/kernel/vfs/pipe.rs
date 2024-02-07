@@ -812,7 +812,7 @@ impl PipeFileObject {
         current_task: &CurrentTask,
         self_file: &FileHandle,
         from: &FileHandle,
-        offset: Option<usize>,
+        maybe_offset: Option<usize>,
         len: usize,
         non_blocking: bool,
     ) -> Result<usize, Errno>
@@ -825,7 +825,11 @@ impl PipeFileObject {
         let mut pipe = self.lock_pipe_for_writing(current_task, self_file, non_blocking, len)?;
         let len = std::cmp::min(len, pipe.messages.available_capacity());
         let mut buffer = SpliceOutputBuffer { pipe: &mut pipe, len, available: len };
-        from.read_raw(locked, current_task, offset.unwrap_or(0), &mut buffer)
+        if let Some(offset) = maybe_offset {
+            from.read_at(locked, current_task, offset, &mut buffer)
+        } else {
+            from.read(locked, current_task, &mut buffer)
+        }
     }
 
     /// Splice from this pipe to the given file handle.
@@ -838,7 +842,7 @@ impl PipeFileObject {
         current_task: &CurrentTask,
         self_file: &FileHandle,
         to: &FileHandle,
-        offset: Option<usize>,
+        maybe_offset: Option<usize>,
         len: usize,
         non_blocking: bool,
     ) -> Result<usize, Errno>
@@ -851,7 +855,11 @@ impl PipeFileObject {
         let mut pipe = self.lock_pipe_for_reading(current_task, self_file, non_blocking)?;
         let len = std::cmp::min(len, pipe.messages.len());
         let mut buffer = SpliceInputBuffer { pipe: &mut pipe, len, available: len };
-        to.write_raw(locked, current_task, offset.unwrap_or(0), &mut buffer)
+        if let Some(offset) = maybe_offset {
+            to.write_at(locked, current_task, offset, &mut buffer)
+        } else {
+            to.write(locked, current_task, &mut buffer)
+        }
     }
 
     /// Obtain the pipe objects from the given file handles, if they are both pipes.
