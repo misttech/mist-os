@@ -42,8 +42,7 @@ class ComponentInspector final {
 
   std::unique_ptr<::inspect::NodeHealth> component_health_;
   ::inspect::Inspector inspector_;
-} ZX_DEPRECATED_SINCE(1, 16,
-                      "Use inspect::ComponentInspector instead from sdk/lib/inspect/component.");
+};
 
 }  // namespace sys
 
