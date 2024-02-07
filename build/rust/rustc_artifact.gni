@@ -120,8 +120,18 @@ template("rustc_artifact") {
   }
   _local_inputs = _remote_inputs
 
+  # Compute the metadata used to uniquely identify this target within rustc.
+  # In particular, it is used as a key in the incremental cache to prevent
+  # builds of the same crate name from clobbering each others' cache entries.
+  # It is also used in symbol mangling.
+  #
+  # This is a space-separated list.
+  _codegen_metadata =
+      rebase_path(target_out_dir, root_build_dir) + " " + target_name
+  _rustflags = [ "-Cmetadata=${_codegen_metadata}" ]
+
   # TODO(https://fxbug.dev/42064463): Remove this cfg once soft transitions are done.
-  _rustflags =
+  _rustflags +=
       [ "--cfg=fidl_rust_transition_step=\"${fidl_rust_transition_step}\"" ]
   if (defined(invoker.features)) {
     foreach(i, invoker.features) {
@@ -168,6 +178,9 @@ template("rustc_artifact") {
       rustflags = _rustflags
       sources = invoker.sources
       quiet = _quiet_clippy
+
+      # Additional metadata to differentiate the clippy target from the actual target.
+      rustflags += [ "-Cmetadata=clippy" ]
     }
   } else {
     if (defined(invoker.clippy_crate_type)) {
