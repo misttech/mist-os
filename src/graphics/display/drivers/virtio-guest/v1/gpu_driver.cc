@@ -32,27 +32,12 @@ zx_status_t VirtioDisplayBind(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NOT_FOUND;
   }
 
-  zx::result<std::pair<zx::bti, std::unique_ptr<virtio::Backend>>> bti_and_backend_result =
-      virtio::GetBtiAndBackend(parent);
-  if (!bti_and_backend_result.is_ok()) {
-    zxlogf(ERROR, "GetBtiAndBackend failed: %s", bti_and_backend_result.status_string());
-    return bti_and_backend_result.error_value();
-  }
-  auto& [bti, backend] = bti_and_backend_result.value();
-
-  fbl::AllocChecker alloc_checker;
-  auto device = fbl::make_unique_checked<GpuDevice>(&alloc_checker, parent, std::move(bti),
-                                                    std::move(backend));
-  if (!alloc_checker.check()) {
-    zxlogf(ERROR, "Failed to allocate memory for GpuDevice");
+  // Create and initialize device.
+  zx::result<std::unique_ptr<GpuDevice>> result = GpuDevice::Create(parent);
+  if (result.is_error()) {
     return ZX_ERR_NO_MEMORY;
   }
-
-  status = device->Init();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to initialize device: %s", zx_status_get_string(status));
-    return status;
-  }
+  std::unique_ptr<GpuDevice> device = std::move(result).value();
 
   // devmgr now owns the memory for `device`.
   [[maybe_unused]] auto device_ptr = device.release();

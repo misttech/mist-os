@@ -13,8 +13,13 @@
 #include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fidl/cpp/wire/channel.h>
+#include <lib/zx/pmt.h>
+#include <lib/zx/vmo.h>
 #include <zircon/compiler.h>
 
+#include <virtio/virtio.h>
+
+#include "src/graphics/display/drivers/virtio-guest/v1/virtio-abi.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 
 #define USE_GTEST
@@ -157,26 +162,44 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
 class FakeGpuBackend : public virtio::FakeBackend {
  public:
   FakeGpuBackend() : FakeBackend({{0, 1024}}) {}
+
+  uint64_t ReadFeatures() override { return VIRTIO_F_VERSION_1; }
+
+  void SetDeviceConfig(const virtio_abi::GpuDeviceConfig& device_config) {
+    for (size_t i = 0; i < sizeof(device_config); ++i) {
+      WriteDeviceConfig(static_cast<uint16_t>(i),
+                        *(reinterpret_cast<const uint8_t*>(&device_config) + i));
+    }
+  }
 };
 
 class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
  public:
-  VirtioGpuTest() = default;
-  void SetUp() override {
-    fake_sysmem_ = std::make_unique<MockAllocator>(dispatcher());
+  VirtioGpuTest() : virtio_queue_buffer_pool_(zx_system_get_page_size()) {}
+  ~VirtioGpuTest() override = default;
 
+  void SetUp() override {
     zx::bti bti;
     fake_bti_create(bti.reset_and_get_address());
-    device_ = std::make_unique<virtio_display::GpuDevice>(nullptr, std::move(bti),
-                                                          std::make_unique<FakeGpuBackend>());
 
+    auto backend = std::make_unique<FakeGpuBackend>();
+    backend->SetDeviceConfig({
+        .pending_events = 0,
+        .clear_events = 0,
+        .scanout_limit = 1,
+        .capability_set_limit = 1,
+    });
+
+    fake_sysmem_ = std::make_unique<MockAllocator>(dispatcher());
     zx::result<fidl::Endpoints<fuchsia_sysmem::Allocator>> sysmem_endpoints =
         fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
     ASSERT_OK(sysmem_endpoints.status_value());
     auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
     fidl::BindServer(dispatcher(), std::move(sysmem_server), fake_sysmem_.get());
 
-    ASSERT_OK(device_->SetAndInitSysmemForTesting(fidl::WireSyncClient(std::move(sysmem_client))));
+    device_ = std::make_unique<virtio_display::GpuDevice>(
+        nullptr, std::move(bti), std::move(backend), std::move(sysmem_client), zx::vmo(), zx::pmt(),
+        zx_paddr_t{0}, cpp20::span(virtio_queue_buffer_pool_));
 
     RunLoopUntilIdle();
   }
@@ -195,6 +218,7 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
   }
 
  protected:
+  std::vector<uint8_t> virtio_queue_buffer_pool_;
   std::unique_ptr<MockAllocator> fake_sysmem_;
   std::unique_ptr<virtio_display::GpuDevice> device_;
 };

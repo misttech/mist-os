@@ -7,18 +7,26 @@
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
+#include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <lib/stdcompat/span.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
+#include <lib/zx/pmt.h>
 #include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
 #include <semaphore.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
+#include <zircon/types.h>
 
-#include <cstdlib>
+#include <cstdint>
 #include <memory>
+#include <optional>
 
 #include <ddktl/device.h>
+#include <fbl/condition_variable.h>
+#include <fbl/mutex.h>
 
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-abi.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
@@ -35,9 +43,28 @@ class GpuDevice : public virtio::Device,
                   public DeviceType,
                   public ddk::DisplayControllerImplProtocol<GpuDevice, ddk::base_protocol> {
  public:
-  // Constructor called by virtio::CreateAndBind().
-  GpuDevice(zx_device_t* device, zx::bti bti, std::unique_ptr<virtio::Backend> backend);
+  // Exposed for testing. Production code must use the Create() factory method.
+  //
+  // `bti` is used to obtain physical memory addresses given to the virtio
+  // device.
+  //
+  // `virtio_queue_buffer_pool` must be large enough to store requests and
+  // responses exchanged with the virtio device. The buffer must reside at
+  // `virtio_queue_buffer_pool_physical_address` in the virtio device's physical
+  // address space.
+  //
+  // The instance hangs onto `virtio_queue_buffer_pool_vmo` and
+  // `virtio_queue_buffer_pool_pin` for the duration of its lifetime. They are
+  // intended to keep the memory backing `virtio_queue_buffer_pool` alive and
+  // pinned to `virtio_queue_buffer_pool_physical_address`.
+  GpuDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<virtio::Backend> backend,
+            fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_client,
+            zx::vmo virtio_queue_buffer_pool_vmo, zx::pmt virtio_queue_buffer_pool_pin,
+            zx_paddr_t virtio_queue_buffer_pool_physical_address,
+            cpp20::span<uint8_t> virtio_queue_buffer_pool);
   ~GpuDevice() override;
+
+  static zx::result<std::unique_ptr<GpuDevice>> Create(zx_device_t* bus_device);
 
   zx_status_t Init() override;
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
@@ -115,15 +142,35 @@ class GpuDevice : public virtio::Device,
 
   bool DisplayControllerImplIsCaptureCompleted() { return false; }
 
-  zx_status_t SetAndInitSysmemForTesting(fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem) {
-    sysmem_ = std::move(sysmem);
-    return ZX_OK;
-  }
-
  private:
-  // Internal routines
-  template <typename RequestType, typename ResponseType>
-  void send_command_response(const RequestType* cmd, ResponseType** res);
+  // Synchronous request/response exchange on the main virtqueue.
+  //
+  // The returned reference points to data owned by the GpuDevice instance, and
+  // is only valid until the method is called again.
+  //
+  // Call sites are expected to rely on partial template type inference. The
+  // argument type should not be specified twice.
+  //
+  //     const virtio_abi::EmptyRequest request = {...};
+  //     const auto& response =
+  //         device->ExchangeRequestResponse<virtio_abi::EmptyResponse>(
+  //             request);
+  //
+  // The current implementation fully serializes request/response exchanges.
+  // More precisely, even if ExchangeRequestResponse() is called concurrently,
+  // the virtio device will never be given a request while another request is
+  // pending. While this behavior is observable, it is not part of the API. The
+  // implementation may be evolved to issue concurrent requests in the future.
+  template <typename ResponseType, typename RequestType>
+  const ResponseType& ExchangeRequestResponse(const RequestType& request);
+
+  // Called when the virtio device notifies the driver of having used a buffer.
+  //
+  // `used_descriptor_index` is the virtqueue descriptor table index pointing to
+  // the data that was consumed by the device. The indicated buffer, as well as
+  // all the linked buffers, are now owned by the driver.
+  void VirtioBufferUsedByDevice(uint32_t used_descriptor_index) __TA_REQUIRES(virtio_queue_mutex_);
+
   zx::result<display::DriverImageId> Import(zx::vmo vmo, const image_t* image, size_t offset,
                                             uint32_t pixel_size, uint32_t row_bytes,
                                             fuchsia_images2::wire::PixelFormat pixel_format);
@@ -148,8 +195,40 @@ class GpuDevice : public virtio::Device,
 
   std::thread start_thread_ = {};
 
-  // the main virtio ring
-  virtio::Ring vring_ = {this};
+  // Ensures that a single ExchangeRequestResponse() call is in progress.
+  fbl::Mutex exchange_request_response_mutex_;
+
+  // Protects data members modified by multiple threads.
+  fbl::Mutex virtio_queue_mutex_;
+
+  // Signaled when the virtio device consumes a designated virtio queue buffer.
+  //
+  // The buffer is identified by `virtio_queue_request_index_`.
+  fbl::ConditionVariable virtio_queue_buffer_used_signal_;
+
+  // Identifies the request buffer allocated in ExchangeRequestResponse().
+  //
+  // nullopt iff no ExchangeRequestResponse() is in progress.
+  std::optional<uint16_t> virtio_queue_request_index_ __TA_GUARDED(virtio_queue_mutex_);
+
+  // The GPU device's control virtqueue.
+  //
+  // Defined in the VIRTIO spec Section 5.7.2 "GPU Device" > "Virtqueues".
+  virtio::Ring virtio_queue_ __TA_GUARDED(virtio_queue_mutex_);
+
+  // Backs `virtio_queue_buffer_pool_`.
+  const zx::vmo virtio_queue_buffer_pool_vmo_;
+
+  // Pins `virtio_queue_buffer_pool_vmo_` at a known physical address.
+  const zx::pmt virtio_queue_buffer_pool_pin_;
+
+  // The starting address of `virtio_queue_buffer_pool_`.
+  const zx_paddr_t virtio_queue_buffer_pool_physical_address_;
+
+  // Memory pinned at a known physical address, used for virtqueue buffers.
+  //
+  // The span's data is modified by the driver and by the virtio device.
+  const cpp20::span<uint8_t> virtio_queue_buffer_pool_;
 
   // gpu op
   io_buffer_t gpu_req_ = {};
@@ -159,10 +238,6 @@ class GpuDevice : public virtio::Device,
   int pmode_id_ = -1;
 
   uint32_t next_resource_id_ = 1;
-
-  fbl::Mutex request_lock_;
-  sem_t request_sem_ = {};
-  sem_t response_sem_ = {};
 
   // Flush thread
   void virtio_gpu_flusher();

@@ -7,16 +7,25 @@
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/ddk/debug.h>
+#include <lib/ddk/device.h>
 #include <lib/fit/defer.h>
 #include <lib/image-format/image_format.h>
+#include <lib/stdcompat/span.h>
 #include <lib/sysmem-version/sysmem-version.h>
+#include <lib/virtio/driver_utils.h>
 #include <lib/zircon-internal/align.h>
+#include <lib/zx/bti.h>
+#include <lib/zx/pmt.h>
 #include <lib/zx/result.h>
+#include <lib/zx/vmar.h>
+#include <lib/zx/vmo.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 #include <zircon/time.h>
+#include <zircon/types.h>
 
+#include <algorithm>
 #include <cinttypes>
 #include <cstring>
 #include <memory>
@@ -443,61 +452,186 @@ zx_status_t GpuDevice::DisplayControllerImplSetDisplayPower(uint64_t display_id,
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-GpuDevice::GpuDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<virtio::Backend> backend)
-    : virtio::Device(std::move(bti), std::move(backend)), DeviceType(bus_device) {
-  sem_init(&request_sem_, 0, 1);
-  sem_init(&response_sem_, 0, 0);
-}
+GpuDevice::GpuDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<virtio::Backend> backend,
+                     fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_client,
+                     zx::vmo virtio_queue_buffer_pool_vmo, zx::pmt virtio_queue_buffer_pool_pin,
+                     zx_paddr_t virtio_queue_buffer_pool_physical_address,
+                     cpp20::span<uint8_t> virtio_queue_buffer_pool)
+    : virtio::Device(std::move(bti), std::move(backend)),
+      DeviceType(bus_device),
+      virtio_queue_(this),
+      virtio_queue_buffer_pool_vmo_(std::move(virtio_queue_buffer_pool_vmo)),
+      virtio_queue_buffer_pool_pin_(std::move(virtio_queue_buffer_pool_pin)),
+      virtio_queue_buffer_pool_physical_address_(virtio_queue_buffer_pool_physical_address),
+      virtio_queue_buffer_pool_(virtio_queue_buffer_pool),
+      sysmem_(std::move(sysmem_client)) {}
 
 GpuDevice::~GpuDevice() {
   io_buffer_release(&gpu_req_);
 
-  // TODO: clean up allocated physical memory
-  sem_destroy(&request_sem_);
-  sem_destroy(&response_sem_);
+  if (!virtio_queue_buffer_pool_.empty()) {
+    zx_vaddr_t virtio_queue_buffer_pool_begin =
+        reinterpret_cast<zx_vaddr_t>(virtio_queue_buffer_pool_.data());
+    zx::vmar::root_self()->unmap(virtio_queue_buffer_pool_begin, virtio_queue_buffer_pool_.size());
+  }
 }
 
-template <typename RequestType, typename ResponseType>
-void GpuDevice::send_command_response(const RequestType* cmd, ResponseType** res) {
-  size_t cmd_len = sizeof(RequestType);
-  size_t res_len = sizeof(ResponseType);
-  zxlogf(TRACE,
-         "Sending command (buffer at %p, length %zu), expecting reply (pointer at %p, length %zu)",
-         cmd, cmd_len, res, res_len);
+// static
+zx::result<std::unique_ptr<GpuDevice>> GpuDevice::Create(zx_device_t* bus_device) {
+  zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> sysmem_client_result =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1>(bus_device,
+                                                                                    "sysmem");
+  if (sysmem_client_result.is_error()) {
+    zxlogf(ERROR, "Failed to get sysmem client: %s", sysmem_client_result.status_string());
+    return sysmem_client_result.take_error();
+  }
 
-  // Keep this single message at a time
-  sem_wait(&request_sem_);
-  auto cleanup = fit::defer([this]() { sem_post(&request_sem_); });
+  zx::result<std::pair<zx::bti, std::unique_ptr<virtio::Backend>>> bti_and_backend_result =
+      virtio::GetBtiAndBackend(bus_device);
+  if (!bti_and_backend_result.is_ok()) {
+    zxlogf(ERROR, "GetBtiAndBackend failed: %s", bti_and_backend_result.status_string());
+    return bti_and_backend_result.take_error();
+  }
+  auto& [bti, backend] = bti_and_backend_result.value();
 
-  uint16_t i;
-  struct vring_desc* desc = vring_.AllocDescChain(2, &i);
-  ZX_ASSERT(desc);
+  zx::vmo virtio_queue_buffer_pool_vmo;
+  zx_status_t status =
+      zx::vmo::create(zx_system_get_page_size(), /*options=*/0, &virtio_queue_buffer_pool_vmo);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to allocate virtqueue buffers VMO: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
 
-  void* gpu_req_base = io_buffer_virt(&gpu_req_);
-  zx_paddr_t gpu_req_pa = io_buffer_phys(&gpu_req_);
+  uint64_t virtio_queue_buffer_pool_size;
+  status = virtio_queue_buffer_pool_vmo.get_size(&virtio_queue_buffer_pool_size);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to get virtqueue buffers VMO size: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
 
-  memcpy(gpu_req_base, cmd, cmd_len);
+  // Commit backing store and get the physical address.
+  zx_paddr_t virtio_queue_buffer_pool_physical_address;
+  zx::pmt virtio_queue_buffer_pool_pin;
+  status = bti.pin(ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE, virtio_queue_buffer_pool_vmo, /*offset=*/0,
+                   virtio_queue_buffer_pool_size, &virtio_queue_buffer_pool_physical_address, 1,
+                   &virtio_queue_buffer_pool_pin);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to pin virtqueue buffers VMO: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
 
-  desc->addr = gpu_req_pa;
-  desc->len = static_cast<uint32_t>(cmd_len);
-  desc->flags = VRING_DESC_F_NEXT;
+  zx_vaddr_t virtio_queue_buffer_pool_begin;
+  status = zx::vmar::root_self()->map(
+      ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, /*vmar_offset=*/0, virtio_queue_buffer_pool_vmo,
+      /*vmo_offset=*/0, virtio_queue_buffer_pool_size, &virtio_queue_buffer_pool_begin);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to map virtqueue buffers VMO: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
 
-  // Set the second descriptor to the response with the write bit set
-  desc = vring_.DescFromIndex(desc->next);
-  ZX_ASSERT(desc);
+  zxlogf(INFO,
+         "Allocated virtqueue buffers at virtual address 0x%016" PRIx64
+         ", physical address 0x%016" PRIx64,
+         virtio_queue_buffer_pool_begin, virtio_queue_buffer_pool_physical_address);
 
-  *res = reinterpret_cast<ResponseType*>(static_cast<uint8_t*>(gpu_req_base) + cmd_len);
-  zx_paddr_t res_phys = gpu_req_pa + cmd_len;
-  memset(*res, 0, res_len);
+  // NOLINTBEGIN(performance-no-int-to-ptr): Casting from zx_vaddr_t to a
+  // pointer is unavoidable due to the zx::vmar::map() API.
+  cpp20::span<uint8_t> virtio_queue_buffer_pool(
+      reinterpret_cast<uint8_t*>(virtio_queue_buffer_pool_begin), virtio_queue_buffer_pool_size);
+  // NOLINTEND(performance-no-int-to-ptr)
 
-  desc->addr = res_phys;
-  desc->len = static_cast<uint32_t>(res_len);
-  desc->flags = VRING_DESC_F_WRITE;
+  fbl::AllocChecker alloc_checker;
+  auto device = fbl::make_unique_checked<GpuDevice>(
+      &alloc_checker, bus_device, std::move(bti), std::move(backend),
+      std::move(sysmem_client_result).value(), std::move(virtio_queue_buffer_pool_vmo),
+      std::move(virtio_queue_buffer_pool_pin), virtio_queue_buffer_pool_physical_address,
+      virtio_queue_buffer_pool);
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "Failed to allocate memory for GpuDevice");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  status = device->Init();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to initialize device");
+    return zx::error(status);
+  }
+
+  return zx::ok(std::move(device));
+}
+
+template <typename ResponseType, typename RequestType>
+const ResponseType& GpuDevice::ExchangeRequestResponse(const RequestType& request) {
+  static constexpr size_t request_size = sizeof(RequestType);
+  static constexpr size_t response_size = sizeof(ResponseType);
+  zxlogf(TRACE, "Sending %zu-byte request, expecting %zu-byte response", request_size,
+         response_size);
+
+  // Request/response exchanges are fully serialized.
+  //
+  // Relaxing this implementation constraint would require the following:
+  // * An allocation scheme for `virtual_queue_buffer_pool`. An easy solution is
+  //   to sub-divide the area into equally-sized cells, where each cell can hold
+  //   the largest possible request + response.
+  // * A map of virtio queue descriptor index to condition variable, so multiple
+  //   threads can be waiting on the device notification interrupt.
+  // * Handling the case where `virtual_queue_buffer_pool` is full. Options are
+  //   waiting on a new condition variable signaled whenever a buffer is
+  //   released, and asserting that implies the buffer pool is statically sized
+  //   to handle the maximum possible concurrency.
+  //
+  // Optionally, the locking around `virtio_queue_mutex_` could be more
+  // fine-grained. Allocating the descriptors needs to be serialized, but
+  // populating them can be done concurrently. Last, submitting the descriptors
+  // to the virtio device must be serialized.
+  fbl::AutoLock exhange_request_response_lock(&exchange_request_response_mutex_);
+
+  fbl::AutoLock virtio_queue_lock(&virtio_queue_mutex_);
+
+  // Allocate two virtqueue descriptors. This is the minimum number of
+  // descriptors needed to represent a request / response exchange using the
+  // split virtqueue format described in the VIRTIO spec Section 2.7 "Split
+  // Virtqueues". This is because each descriptor can point to a read-only or a
+  // write-only memory buffer, and we need one of each.
+  //
+  // The first (returned) descriptor will point to the request buffer, and the
+  // second (chained) descriptor will point to the response buffer.
+
+  uint16_t request_descriptor_index;
+  vring_desc* const request_descriptor =
+      virtio_queue_.AllocDescChain(/*count=*/2, &request_descriptor_index);
+  ZX_ASSERT(request_descriptor);
+  virtio_queue_request_index_ = request_descriptor_index;
+
+  cpp20::span<uint8_t> request_span = virtio_queue_buffer_pool_.subspan(0, request_size);
+  std::memcpy(request_span.data(), &request, request_size);
+
+  const zx_paddr_t request_physical_address = virtio_queue_buffer_pool_physical_address_;
+  request_descriptor->addr = request_physical_address;
+  static_assert(request_size <= std::numeric_limits<uint32_t>::max());
+  request_descriptor->len = static_cast<uint32_t>(request_size);
+  request_descriptor->flags = VRING_DESC_F_NEXT;
+
+  vring_desc* const response_descriptor = virtio_queue_.DescFromIndex(request_descriptor->next);
+  ZX_ASSERT(response_descriptor);
+
+  cpp20::span<uint8_t> response_span =
+      virtio_queue_buffer_pool_.subspan(request_size, response_size);
+  std::fill(response_span.begin(), response_span.end(), 0);
+
+  const zx_paddr_t response_physical_address = request_physical_address + request_size;
+  response_descriptor->addr = response_physical_address;
+  static_assert(response_size <= std::numeric_limits<uint32_t>::max());
+  response_descriptor->len = static_cast<uint32_t>(response_size);
+  response_descriptor->flags = VRING_DESC_F_WRITE;
 
   // Submit the transfer & wait for the response
-  vring_.SubmitChain(i);
-  vring_.Kick();
-  sem_wait(&response_sem_);
+  virtio_queue_.SubmitChain(request_descriptor_index);
+  virtio_queue_.Kick();
+
+  virtio_queue_buffer_used_signal_.Wait(&virtio_queue_mutex_);
+
+  return *reinterpret_cast<ResponseType*>(response_span.data());
 }
 
 zx_status_t GpuDevice::get_display_info() {
@@ -505,17 +639,16 @@ zx_status_t GpuDevice::get_display_info() {
       .header = {.type = virtio_abi::ControlType::kGetDisplayInfoCommand},
   };
 
-  virtio_abi::DisplayInfoResponse* response;
-  send_command_response(&command, &response);
-  if (response->header.type != virtio_abi::ControlType::kDisplayInfoResponse) {
+  const auto& response = ExchangeRequestResponse<virtio_abi::DisplayInfoResponse>(command);
+  if (response.header.type != virtio_abi::ControlType::kDisplayInfoResponse) {
     zxlogf(ERROR, "Expected DisplayInfo response, got %s (0x%04x)",
-           ControlTypeToString(response->header.type),
-           static_cast<unsigned int>(response->header.type));
+           ControlTypeToString(response.header.type),
+           static_cast<unsigned int>(response.header.type));
     return ZX_ERR_NOT_FOUND;
   }
 
   for (int i = 0; i < virtio_abi::kMaxScanouts; i++) {
-    const virtio_abi::ScanoutInfo& scanout = response->scanouts[i];
+    const virtio_abi::ScanoutInfo& scanout = response.scanouts[i];
     if (!scanout.enabled) {
       continue;
     }
@@ -530,7 +663,7 @@ zx_status_t GpuDevice::get_display_info() {
     }
 
     // Save the first valid pmode we see
-    pmode_ = response->scanouts[i];
+    pmode_ = response.scanouts[i];
     pmode_id_ = i;
   }
   return ZX_OK;
@@ -572,9 +705,8 @@ zx_status_t GpuDevice::allocate_2d_resource(uint32_t* resource_id, uint32_t widt
   };
   *resource_id = command.resource_id;
 
-  virtio_abi::EmptyResponse* response;
-  send_command_response(&command, &response);
-  return ResponseTypeToZxStatus(response->header.type);
+  const auto& response = ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
+  return ResponseTypeToZxStatus(response.header.type);
 }
 
 zx_status_t GpuDevice::attach_backing(uint32_t resource_id, zx_paddr_t ptr, size_t buf_len) {
@@ -593,9 +725,8 @@ zx_status_t GpuDevice::attach_backing(uint32_t resource_id, zx_paddr_t ptr, size
           },
   };
 
-  virtio_abi::EmptyResponse* response;
-  send_command_response(&command, &response);
-  return ResponseTypeToZxStatus(response->header.type);
+  const auto& response = ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
+  return ResponseTypeToZxStatus(response.header.type);
 }
 
 zx_status_t GpuDevice::set_scanout(uint32_t scanout_id, uint32_t resource_id, uint32_t width,
@@ -617,9 +748,8 @@ zx_status_t GpuDevice::set_scanout(uint32_t scanout_id, uint32_t resource_id, ui
       .resource_id = resource_id,
   };
 
-  virtio_abi::EmptyResponse* response;
-  send_command_response(&command, &response);
-  return ResponseTypeToZxStatus(response->header.type);
+  const auto& response = ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
+  return ResponseTypeToZxStatus(response.header.type);
 }
 
 zx_status_t GpuDevice::flush_resource(uint32_t resource_id, uint32_t width, uint32_t height) {
@@ -632,9 +762,8 @@ zx_status_t GpuDevice::flush_resource(uint32_t resource_id, uint32_t width, uint
       .resource_id = resource_id,
   };
 
-  virtio_abi::EmptyResponse* response;
-  send_command_response(&command, &response);
-  return ResponseTypeToZxStatus(response->header.type);
+  const auto& response = ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
+  return ResponseTypeToZxStatus(response.header.type);
 }
 
 zx_status_t GpuDevice::transfer_to_host_2d(uint32_t resource_id, uint32_t width, uint32_t height) {
@@ -654,9 +783,8 @@ zx_status_t GpuDevice::transfer_to_host_2d(uint32_t resource_id, uint32_t width,
       .resource_id = resource_id,
   };
 
-  virtio_abi::EmptyResponse* response;
-  send_command_response(&command, &response);
-  return ResponseTypeToZxStatus(response->header.type);
+  const auto& response = ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
+  return ResponseTypeToZxStatus(response.header.type);
 }
 
 void GpuDevice::virtio_gpu_flusher() {
@@ -760,13 +888,6 @@ zx_koid_t GetKoid(zx_handle_t handle) {
 zx_status_t GpuDevice::Init() {
   zxlogf(TRACE, "Init()");
 
-  zx::result sysmem_result =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1>("sysmem");
-  if (sysmem_result.is_error()) {
-    zxlogf(ERROR, "Could not get Display SYSMEM protocol: %s", sysmem_result.status_string());
-    return sysmem_result.status_value();
-  }
-  sysmem_ = fidl::WireSyncClient(std::move(*sysmem_result));
   auto pid = GetKoid(zx_process_self());
   std::string debug_name = fxl::StringPrintf("virtio-gpu-display[%lu]", pid);
   auto set_debug_status =
@@ -792,14 +913,18 @@ zx_status_t GpuDevice::Init() {
     zxlogf(ERROR, "Legacy virtio interface is not supported by this driver");
     return ZX_ERR_NOT_SUPPORTED;
   }
+
   DriverFeaturesAck(VIRTIO_F_VERSION_1);
-  if (zx_status_t status = DeviceStatusFeaturesOk(); status != ZX_OK) {
+
+  zx_status_t status = DeviceStatusFeaturesOk();
+  if (status != ZX_OK) {
     zxlogf(ERROR, "Feature negotiation failed: %s", zx_status_get_string(status));
     return status;
   }
 
-  // Allocate the main vring
-  zx_status_t status = vring_.Init(0, 16);
+  // Allocate the control virtqueue.
+  fbl::AutoLock virtio_queue_lock(&virtio_queue_mutex_);
+  status = virtio_queue_.Init(0, 16);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to allocate vring: %s", zx_status_get_string(status));
     return status;
@@ -843,34 +968,67 @@ void GpuDevice::DdkRelease() {
 void GpuDevice::IrqRingUpdate() {
   zxlogf(TRACE, "IrqRingUpdate()");
 
-  // Parse our descriptor chain, add back to the free queue
-  auto free_chain = [this](vring_used_elem* used_elem) {
-    uint16_t i = static_cast<uint16_t>(used_elem->id);
-    struct vring_desc* desc = vring_.DescFromIndex(i);
-    for (;;) {
-      int next;
+  // The lambda passed to virtio::Ring::IrqRingUpdate() should be annotated
+  // __TA_REQUIRES(virtio_queue_mutex_). However, Clang's Thread Safety analysis
+  // cannot prove the correctness of this annotation.
+  //
+  // Clang's static analyzer does not do inter-procedural analysis such as
+  // inlining. Therefore, the analyzer does not know that IrqRingUpdate() only
+  // calls the lambda argument before returning. So, it does not know that the
+  // fbl::AutoLock is alive during the lambda calls, which would satisfy the
+  // __TA_REQUIRES() annotation on the lambda.
+  fbl::AutoLock virtio_queue_lock(&virtio_queue_mutex_);
+  virtio_queue_.IrqRingUpdate([&](vring_used_elem* used_buffer_info)
+                                  __TA_NO_THREAD_SAFETY_ANALYSIS {
+                                    const uint32_t used_descriptor_index = used_buffer_info->id;
+                                    VirtioBufferUsedByDevice(used_descriptor_index);
+                                  });
+}
 
-      if (desc->flags & VRING_DESC_F_NEXT) {
-        next = desc->next;
-      } else {
-        // End of chain
-        next = -1;
-      }
+void GpuDevice::VirtioBufferUsedByDevice(uint32_t used_descriptor_index) {
+  if (unlikely(used_descriptor_index > std::numeric_limits<uint16_t>::max())) {
+    zxlogf(WARNING, "GPU device reported invalid used descriptor index: %" PRIu32,
+           used_descriptor_index);
+    return;
+  }
+  // The check above ensures that the static_cast below does not lose any
+  // information.
+  uint16_t used_descriptor_index_u16 = static_cast<uint16_t>(used_descriptor_index);
 
-      vring_.FreeDesc(i);
+  while (true) {
+    struct vring_desc* buffer_descriptor = virtio_queue_.DescFromIndex(used_descriptor_index_u16);
 
-      if (next < 0) {
-        break;
-      }
-      i = static_cast<uint16_t>(next);
-      desc = vring_.DescFromIndex(i);
+    // Read information before the descriptor is freed.
+    const bool next_descriptor_index_is_valid = (buffer_descriptor->flags & VRING_DESC_F_NEXT) != 0;
+    const uint16_t next_descriptor_index = buffer_descriptor->next;
+    virtio_queue_.FreeDesc(used_descriptor_index_u16);
+
+    // VIRTIO spec Section 2.7.7.1 "Driver Requirements: Used Buffer
+    // Notification Suppression" requires that drivers handle spurious
+    // notifications. So, we only notify the request thread when the device
+    // reports having used the specific buffer that populated the request.
+    // buffer has been used by the device.
+    if (virtio_queue_request_index_.has_value() &&
+        virtio_queue_request_index_.value() == used_descriptor_index) {
+      virtio_queue_request_index_.reset();
+
+      // TODO(costan): Ideally, the variable would be signaled when
+      // `virtio_queue_mutex_` is not locked. This would avoid having the
+      // ExchangeRequestResponse() thread wake up, only to have to wait on the
+      // mutex. Some options are:
+      // * Plumb a (currently 1-element long) list of variables to be signaled
+      //   from VirtioBufferUsedByDevice() to IrqRingUpdate().
+      // * Replace virtio::Ring::IrqRingUpdate() with an iterator abstraction.
+      //   The list of variables to be signaled would not need to be plumbed
+      //   across methods.
+      virtio_queue_buffer_used_signal_.Signal();
     }
-    // Notify the request thread
-    sem_post(&response_sem_);
-  };
 
-  // Tell the ring to find free chains and hand it back to our lambda
-  vring_.IrqRingUpdate(free_chain);
+    if (!next_descriptor_index_is_valid) {
+      break;
+    }
+    used_descriptor_index_u16 = next_descriptor_index;
+  }
 }
 
 void GpuDevice::IrqConfigChange() { zxlogf(TRACE, "IrqConfigChange()"); }
