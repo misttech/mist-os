@@ -97,9 +97,10 @@ void ObjectConverter::VisitStringType(const fidl_codec::StringType* type) {
   if (HandleNone(type)) {
     return;
   }
-  const char* str = PyUnicode_AsUTF8AndSize(obj_, nullptr);
+  Py_ssize_t size;
+  const char* str = PyUnicode_AsUTF8AndSize(obj_, &size);
   if (str) {
-    result_ = std::make_unique<fidl_codec::StringValue>(std::string(str));
+    result_ = std::make_unique<fidl_codec::StringValue>(std::string(str, size));
   }
 }
 

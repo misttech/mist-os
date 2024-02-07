@@ -19,7 +19,7 @@ gidl("conformance_tests_py") {
   language = "fuchsia_controller"
 
   # Currently missing flexible enum tests, float tests, handle tests, protocol endpoint tests,
-  # recursive depth tests, strings_utf8.gen tests, and transformer1 tests.
+  # recursive depth tests, and transformer1 tests.
   #
   # All tests are currently running with encode-success targets only.
   inputs = [
@@ -43,6 +43,7 @@ gidl("conformance_tests_py") {
     "//src/tests/fidl/conformance_suite/transformer2.gidl",
     "//src/tests/fidl/conformance_suite/union.gidl",
     "//src/tests/fidl/conformance_suite/vectors.gidl",
+    "//src/tests/fidl/conformance_suite/strings_utf8.gen.gidl",
   ]
   fidl = conformance_suite_fidl_target
   output = conformance_test_source

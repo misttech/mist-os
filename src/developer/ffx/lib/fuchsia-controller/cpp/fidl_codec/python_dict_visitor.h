@@ -44,7 +44,8 @@ class PythonDictVisitor : public fidl_codec::Visitor {
 
   void VisitStringValue(const fidl_codec::StringValue* node,
                         const fidl_codec::Type* for_type) override {
-    result_ = PyUnicode_FromString(node->string().c_str());
+    result_ = PyUnicode_FromStringAndSize(node->string().data(),
+                                          static_cast<Py_ssize_t>(node->string().length()));
   }
 
   void VisitUnionValue(const fidl_codec::UnionValue* node, const fidl_codec::Type* type) override {
@@ -145,7 +146,6 @@ class PythonDictVisitor : public fidl_codec::Visitor {
     if (negative) {
       // Max possible absolute value for a signed integer (2^63 - 1).
       if (value > 0x7fffffffffffffff) {
-        std::stringstream ss;
         PyErr_SetString(PyExc_OverflowError, "Integer overflow");
         return;
       }

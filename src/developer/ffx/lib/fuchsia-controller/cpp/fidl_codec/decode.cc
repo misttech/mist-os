@@ -18,31 +18,22 @@ enum Direction : uint8_t { REQUEST, RESPONSE };
 
 PyObject *decode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds,  // NOLINT
                               Direction direction) {
-  PyObject *bytes = nullptr;
   PyObject *handles = nullptr;
+  Py_buffer bytes_raw;
   static const char *kwlist[] = {
       "bytes",
       "handles",
       nullptr,
   };
-  if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO", const_cast<char **>(kwlist), &bytes,
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "y*O", const_cast<char **>(kwlist), &bytes_raw,
                                    &handles)) {
     return nullptr;
   }
-  // NOLINTNEXTLINE: This macro upsets the linter for not using DeMorgan's.
-  if (!PyByteArray_Check(bytes)) {
-    PyErr_SetString(PyExc_TypeError, "Expected bytes to be bytearray");
-    return nullptr;
-  }
+  py::Buffer bytes(bytes_raw);
   if (!PyList_Check(handles)) {
     PyErr_SetString(PyExc_TypeError, "Expected handles to be a list");
     return nullptr;
   }
-  char *c_bytes = PyByteArray_AsString(bytes);
-  if (c_bytes == nullptr) {
-    return nullptr;
-  }
-  Py_ssize_t c_bytes_len = PyByteArray_Size(bytes);
   Py_ssize_t c_handles_len = PyList_Size(handles);
   std::unique_ptr<zx_handle_disposition_t[]> c_handles =
       std::make_unique<zx_handle_disposition_t[]>(c_handles_len);
@@ -59,7 +50,7 @@ PyObject *decode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds,  /
     // not just be integers.
     c_handles[i] = zx_handle_disposition_t{.handle = res};
   }
-  auto header = reinterpret_cast<const fidl_message_header_t *>(c_bytes);
+  auto header = reinterpret_cast<const fidl_message_header_t *>(bytes.buf());
   const std::vector<fidl_codec::ProtocolMethod *> *methods =
       mod::get_module_state()->loader->GetByOrdinal(header->ordinal);
   if (methods == nullptr || methods->empty()) {
@@ -74,13 +65,14 @@ PyObject *decode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds,  /
   bool successful;
   switch (direction) {
     case Direction::RESPONSE:
-      successful = fidl_codec::DecodeResponse(
-          method, reinterpret_cast<uint8_t *>(c_bytes), static_cast<uint64_t>(c_bytes_len),
-          c_handles.get(), static_cast<uint64_t>(c_handles_len), &object, errors);
+      successful =
+          fidl_codec::DecodeResponse(method, reinterpret_cast<const uint8_t *>(bytes.buf()),
+                                     static_cast<uint64_t>(bytes.len()), c_handles.get(),
+                                     static_cast<uint64_t>(c_handles_len), &object, errors);
       break;
     case Direction::REQUEST:
-      successful = fidl_codec::DecodeRequest(method, reinterpret_cast<uint8_t *>(c_bytes),
-                                             static_cast<uint64_t>(c_bytes_len), c_handles.get(),
+      successful = fidl_codec::DecodeRequest(method, reinterpret_cast<const uint8_t *>(bytes.buf()),
+                                             static_cast<uint64_t>(bytes.len()), c_handles.get(),
                                              static_cast<uint64_t>(c_handles_len), &object, errors);
       break;
   }

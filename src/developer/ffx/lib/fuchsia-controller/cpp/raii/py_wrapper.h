@@ -27,6 +27,22 @@ class Object {
   PyObject* ptr_;
 };
 
+class Buffer {
+ public:
+  explicit Buffer(Py_buffer buf) : buffer_(buf) {}
+  ~Buffer() { PyBuffer_Release(&buffer_); }
+  Py_ssize_t len() const { return buffer_.len; }
+  void* buf() const { return buffer_.buf; }
+
+  Buffer(const Buffer&) = delete;
+  Buffer& operator=(const Buffer&) = delete;
+  Buffer(Buffer&&) = delete;
+  Buffer& operator=(Buffer&&) = delete;
+
+ private:
+  Py_buffer buffer_;
+};
+
 }  // namespace py
 
 #endif  // SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_RAII_PY_WRAPPER_H_
