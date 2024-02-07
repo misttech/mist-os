@@ -65,6 +65,7 @@ void CheckCpuTopology(cpp20::span<const zbi_topology_node_t> actual_nodes,
             const auto& actual_riscv = actual_processor.architecture_info.riscv64;
             const auto& expected_riscv = expected_processor.architecture_info.riscv64;
             EXPECT_EQ(actual_riscv.hart_id, expected_riscv.hart_id);
+            EXPECT_EQ(actual_riscv.isa_strtab_index, expected_riscv.isa_strtab_index);
           } break;
           default:
             break;

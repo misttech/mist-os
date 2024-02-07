@@ -51,11 +51,22 @@ constexpr zbi_board_info_t kQemuBoardInfo = {
     .revision = 0x1,
 };
 
+struct BootHartIdGetter {
+  static uint64_t Get() {
+    ZX_DEBUG_ASSERT(gArchPhysInfo);
+    return gArchPhysInfo->boot_hart_id;
+  }
+};
+
 }  // namespace
 
 void PhysMain(void* fdt, arch::EarlyTicks ticks) {
   InitStdout();
   ApplyRelocations();
+
+  // Set up gArchPhysInfo as early as possible, as the boot hart ID needs to
+  // be supplied to the CPU topology devicetree matcher.
+  ArchSetUp(nullptr);
 
   AddressSpace aspace;
   InitMemory(fdt, &aspace);
@@ -63,10 +74,11 @@ void PhysMain(void* fdt, arch::EarlyTicks ticks) {
   MainSymbolize symbolize(kShimName);
 
   // Memory has been initialized, we can finish up parsing the rest of the items from the boot shim.
-  boot_shim::DevicetreeBootShim<
-      boot_shim::UartItem<>, boot_shim::PoolMemConfigItem, boot_shim::RiscvDevicetreePlicItem,
-      boot_shim::RiscvDevicetreeTimerItem, boot_shim::RiscvDevictreeCpuTopologyItem,
-      boot_shim::DevicetreeDtbItem, PlatformIdItem, BoardInfoItem>
+  boot_shim::DevicetreeBootShim<boot_shim::UartItem<>, boot_shim::PoolMemConfigItem,
+                                boot_shim::RiscvDevicetreePlicItem,
+                                boot_shim::RiscvDevicetreeTimerItem,
+                                boot_shim::RiscvDevictreeCpuTopologyItem<BootHartIdGetter>,
+                                boot_shim::DevicetreeDtbItem, PlatformIdItem, BoardInfoItem>
       shim(kShimName, gDevicetreeBoot.fdt);
   shim.set_allocator([](size_t size, size_t align, fbl::AllocChecker& ac) -> void* {
     return new (ktl::align_val_t{align}, gPhysNew<memalloc::Type::kPhysScratch>, ac) uint8_t[size];
@@ -81,13 +93,6 @@ void PhysMain(void* fdt, arch::EarlyTicks ticks) {
 
   // Fill DevicetreeItems.
   ZX_ASSERT(shim.Init());
-
-  // Use the generated zbi to do some setup.
-  ArchSetUp(nullptr);
-
-  // After gArchPhysinfo is set.
-  shim.Get<boot_shim::RiscvDevictreeCpuTopologyItem>().set_boot_hart_id(
-      gArchPhysInfo->boot_hart_id);
 
   // Finally we can boot into the kernel image.
   BootZbi::InputZbi zbi_view(gDevicetreeBoot.ramdisk);

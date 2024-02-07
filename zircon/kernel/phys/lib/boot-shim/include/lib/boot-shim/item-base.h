@@ -53,6 +53,8 @@ class SingleItem : public ItemBase {
  public:
   constexpr size_t size_bytes() const { return ItemSize(payload_.size_bytes()); }
 
+  constexpr ByteView payload() const { return payload_; }
+
   constexpr SingleItem& set_payload(ByteView payload) {
     payload_ = payload;
     return *this;

@@ -5,7 +5,9 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/boot-shim/devicetree.h>
+#include <lib/devicetree/devicetree.h>
 #include <lib/devicetree/matcher.h>
+#include <lib/fit/defer.h>
 #include <lib/stdcompat/algorithm.h>
 #include <lib/zbi-format/cpu.h>
 #include <zircon/assert.h>
@@ -16,8 +18,6 @@
 #include <optional>
 
 #include <fbl/alloc_checker.h>
-
-#include "lib/devicetree/devicetree.h"
 
 namespace boot_shim {
 
@@ -138,6 +138,27 @@ devicetree::ScanState DevictreeCpuTopologyItem::OnSubtree(const devicetree::Node
     }
   }
   return devicetree::ScanState::kActive;
+}
+
+void DevictreeCpuTopologyItem::OnDone() {
+  // cpu_entry_count_ may have been decremented in skipping CPU entries with
+  // malformed fields. Update the span to reflect the recorded entries.
+  cpu_entries_ = cpu_entries_.subspan(0, cpu_entry_count_);
+
+  std::sort(cpu_entries_.begin(), cpu_entries_.end(), [](const CpuEntry& a, const CpuEntry& b) {
+    ZX_DEBUG_ASSERT(b.reg);  // No "reg"-less CPU should have been recorded.
+    ZX_DEBUG_ASSERT(a.reg);
+    ZX_DEBUG_ASSERT(a.reg->size() == b.reg->size());
+    for (size_t i = 0; i < a.reg->size(); ++i) {
+      std::optional<uint64_t> addr_a = (*a.reg)[i].address();
+      std::optional<uint64_t> addr_b = (*b.reg)[i].address();
+      if (addr_a == addr_b) {
+        continue;
+      }
+      return !addr_a || (addr_b && *addr_a < *addr_b);
+    }
+    return false;
+  });
 }
 
 devicetree::ScanState DevictreeCpuTopologyItem::IncreaseEntryNodeCountFirstScan(
@@ -265,35 +286,41 @@ devicetree::ScanState DevictreeCpuTopologyItem::AddCpuNodeSecondScan(
     const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
   ZX_ASSERT(!cpu_entries_.empty() && (cpu_entry_index_ < cpu_entry_count_));
 
-  std::optional<uint32_t> phandle_val;
-  auto [phandle, reg] = decoder.FindProperties("phandle", "reg");
+  std::optional<uint32_t> phandle;
+  auto [phandle_prop, reg_prop] = decoder.FindProperties("phandle", "reg");
 
-  if (phandle) {
-    phandle_val = phandle->AsUint32();
+  if (phandle_prop) {
+    phandle = phandle_prop->AsUint32();
   }
 
   // We do not record any pathological CPUs with missing or malformed "reg"
-  // properties. Rather, we log an error and continue with recording other
-  // non-problematic CPUs in the hope that the kernel can still boot.
-  if (!reg) {
+  // properties. Rather, we log an error, decrease the expected entry count,
+  // and continue with recording other non-problematic CPUs in the hope that
+  // the kernel can still boot.
+  auto decrease_cpu_entry_count = fit::defer([this]() { --cpu_entry_count_; });
+
+  if (!reg_prop) {
     OnError("CPU node missing 'reg' property.");
     return devicetree::ScanState::kActive;
   }
-  if (!reg->AsReg(decoder)) {
-    OnError("Failed to decode CPU node 'reg' property.");
+  std::optional<devicetree::RegProperty> reg = reg_prop->AsReg(decoder);
+  if (!reg) {
+    OnError("Failed to decode CPU node 'reg' .");
     return devicetree::ScanState::kActive;
   }
 
   // Properties are not copy or move assignable, so we must initialize in place.
   new (&cpu_entries_[cpu_entry_index_]) CpuEntry{
-      .phandle = phandle_val,
+      .phandle = phandle,
+      .reg = reg,
       .properties = decoder.properties(),
   };
   // Committing the CPU entry is equivalent at this point to incrementing the
   // index. Gate that on checking the integrity of the architecture-specific
   // processor information.
   if (arch_info_checker_(cpu_entries_[cpu_entry_index_])) {
-    cpu_entry_index_++;
+    ++cpu_entry_index_;
+    decrease_cpu_entry_count.cancel();
   }
   return devicetree::ScanState::kActive;
 }

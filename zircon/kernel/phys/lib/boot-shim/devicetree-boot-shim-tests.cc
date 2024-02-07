@@ -229,8 +229,7 @@ TEST_F(DevicetreeBootShimTest, ItemsWithoutMatchingNodes) {
       DevicetreeItem1, DevicetreeItem2, NonDeviceTreeItem, boot_shim::UartItem<>,
       boot_shim::ArmDevicetreePsciItem, boot_shim::ArmDevicetreeGicItem,
       boot_shim::ArmDevictreeCpuTopologyItem, boot_shim::ArmDevicetreeTimerItem,
-      boot_shim::RiscvDevicetreePlicItem, boot_shim::RiscvDevicetreeTimerItem,
-      boot_shim::RiscvDevictreeCpuTopologyItem>
+      boot_shim::RiscvDevicetreePlicItem, boot_shim::RiscvDevicetreeTimerItem>
       shim("devicetree-boot-shim-test", fdt());
   shim.set_allocator([&allocs](size_t size, size_t alignment, fbl::AllocChecker& ac) -> void* {
     // Custom aligned_alloc since OS X doesnt support it in some versions.

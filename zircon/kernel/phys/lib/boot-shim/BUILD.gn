@@ -45,11 +45,13 @@ zx_library("boot-shim") {
     # <lib/boot-shim/efi.h> #include <efi/system-table.h>
     "//zircon/kernel/lib/efi",
 
-    # <lib/boot-shim/devicetree-boot-shim> has include <lib/devictree/matcher.h>
-    # <lib/devicetree/devicetree.h>
+    # <lib/boot-shim/devicetree-boot-shim> has #include <lib/devictree/matcher.h>
+    # <lib/boot-shim/devicetree-boot-shim> has #include <lib/devicetree/devicetree.h>
     "//zircon/kernel/lib/devicetree",
 
-    # <lib/boot-shim/devicetree-boot-shim> has include <fbl/macros.h>
+    # <lib/boot-shim/devicetree-boot-shim> has #include <fbl/macros.h>
+    # <lib/boot-shim/devicetree.h> has #include <fbl/intrusive_hash_table.h>
+    # <lib/boot-shim/devicetree.h> has #include <fbl/intrusive_single_list.h>
     "//zircon/system/ulib/fbl",
 
     # <lib/boot-shim/devicetree.h> exposes memalloc::Range.
@@ -68,6 +70,7 @@ zx_library("boot-shim") {
     "devicetree-cpu-topology-item.cc",
     "devicetree-irq-resolver.cc",
     "devicetree-memory-matcher.cc",
+    "devicetree-riscv-cpu-topology-item.cc",
     "devicetree-riscv-plic-item.cc",
     "devicetree-riscv-timer-item.cc",
     "efi-boot-shim.cc",
@@ -77,6 +80,7 @@ zx_library("boot-shim") {
   ]
 
   deps = [
+    "//sdk/lib/fit",
     "//zircon/kernel/lib/acpi_lite",
     "//zircon/kernel/lib/boot-options",
     "//zircon/system/ulib/fbl",

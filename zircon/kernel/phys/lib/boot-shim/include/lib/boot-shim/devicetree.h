@@ -27,6 +27,7 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <zircon/assert.h>
 
 #include <algorithm>
 #include <array>
@@ -37,6 +38,8 @@
 #include <type_traits>
 #include <variant>
 
+#include <fbl/intrusive_hash_table.h>
+#include <fbl/intrusive_single_list.h>
 #include <fbl/type_info.h>
 
 namespace boot_shim {
@@ -556,6 +559,11 @@ class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyI
     return found_cpus_ ? devicetree::ScanState::kActive : devicetree::ScanState::kDone;
   }
 
+  // Finalizes cpu_entries() (excluding skipped entries due to malformed
+  // fields) and sorts them by ID for normalization's sake, which
+  // is convenient at the very least for test purposes.
+  void OnDone();
+
   size_t size_bytes() const { return ItemSize(node_element_count() * sizeof(zbi_topology_node_t)); }
 
   fit::result<DataZbi::Error> AppendItems(DataZbi& zbi) const;
@@ -564,8 +572,11 @@ class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyI
   // Used for decoding CPU-related properties.
   struct CpuEntry {
     std::optional<uint32_t> phandle;
+    std::optional<devicetree::RegProperty> reg;
     devicetree::Properties properties;
   };
+
+  cpp20::span<const CpuEntry> cpu_entries() const { return cpu_entries_; }
 
   // Callback used during matching for checking architecture-specific processor
   // information. The returned boolean indicates whether matching should
@@ -586,6 +597,30 @@ class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyI
     allocator_ = &shim.allocator();
     arch_info_checker_ = std::move(arch_info_checker);
     arch_info_setter_ = std::move(arch_info_setter);
+  }
+
+  template <typename T>
+  cpp20::span<T> Allocate(
+      size_t count, fbl::AllocChecker& ac,
+      cpp20::source_location location = cpp20::source_location::current()) const {
+    size_t alloc_size = sizeof(T) * count;
+    auto* alloc = static_cast<T*>((*allocator_)(alloc_size, alignof(T), ac));
+    if (!alloc) {
+      // Log allocation failure. The effect is that the matcher will keep looking and will fail to
+      // make progress. But the error will be logged.
+      auto* self = const_cast<DevictreeCpuTopologyItem*>(this);
+      self->OnError("Allocation Failed.");
+      self->Log("at %s:%u\n", location.file_name(), static_cast<unsigned int>(location.line()));
+      count = 0;
+    }
+    memset(alloc, 0, alloc_size);
+    return cpp20::span<T>(alloc, count);
+  }
+
+  template <typename T>
+  T* Allocate(fbl::AllocChecker& ac,
+              cpp20::source_location location = cpp20::source_location::current()) const {
+    return Allocate<T>(1, ac, location).data();
   }
 
  private:
@@ -645,22 +680,6 @@ class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyI
   fit::result<ItemBase::DataZbi::Error> CalculateClusterPerformanceClass(
       cpp20::span<zbi_topology_node_t> nodes) const;
 
-  template <typename T>
-  cpp20::span<T> Allocate(
-      size_t count, fbl::AllocChecker& ac, 
-      cpp20::source_location location = cpp20::source_location::current()) const {
-    auto* alloc = static_cast<T*>((*allocator_)(sizeof(T) * count, alignof(T), ac));
-    if (!alloc) {
-      // Log allocation failure. The effect is that the matcher will keep looking and will fail to
-      // make progress. But the error will be logged.
-      auto* self = const_cast<DevictreeCpuTopologyItem*>(this);
-      self->OnError("Allocation Failed.");
-      self->Log("at %s:%u\n", location.file_name(), static_cast<unsigned int>(location.line()));
-      count = 0;
-    }
-    return cpp20::span<T>(alloc, count);
-  }
-
   // Flattened 'cpu-map'.
   cpp20::span<CpuMapEntry> map_entries_;
   uint32_t map_entry_index_ = 0;
@@ -687,35 +706,105 @@ class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyI
   bool found_cpus_ = false;
 };
 
-class RiscvDevictreeCpuTopologyItem : public DevictreeCpuTopologyItem {
+class RiscvDevictreeCpuTopologyItemBase : public DevictreeCpuTopologyItem,
+                                          public SingleItem<ZBI_TYPE_RISCV64_ISA_STRTAB> {
  public:
+  explicit RiscvDevictreeCpuTopologyItemBase(uint64_t boot_hart_id) : boot_hart_id_(boot_hart_id) {}
+
+  ~RiscvDevictreeCpuTopologyItemBase() { id_to_index_.clear_unsafe(); }
+
   template <typename Shim>
   void Init(Shim& shim) {
     DevictreeCpuTopologyItem::Init(
         shim,  //
-        [](const CpuEntry&) {
-          // TODO(https://fxbug.dev/42075221): Skip if "riscv,isa" is missing.
+        [this](const CpuEntry& cpu_entry) {
+          // The presence of "reg" should already have been validated.
+          std::optional<devicetree::RegProperty> reg = cpu_entry.reg;
+          ZX_DEBUG_ASSERT(reg);
+          if (reg->size() != 1) {
+            OnError("'reg' property in 'cpu' node contains an unexpected number of cells.");
+            return false;
+          }
+          if (!(*reg)[0].address()) {
+            OnError("Could not parse first cell of 'reg' property in 'cpu' node.");
+            return false;
+          }
+
+          // No "riscv,isa"-less CPU should be recorded.
+          devicetree::PropertyDecoder decoder(cpu_entry.properties);
+          auto isa_string =
+              decoder.FindAndDecodeProperty<&devicetree::PropertyValue::AsString>("riscv,isa");
+          if (!isa_string) {
+            OnError("Missing \"riscv,isa\" property");
+            return false;
+          }
           return true;
         },
         [this](zbi_topology_processor_t& node, const CpuEntry& cpu_entry) -> void {
           node.architecture_info.discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64;
-          devicetree::PropertyDecoder decoder(cpu_entry.properties);
-          auto reg = decoder.FindAndDecodeProperty<&devicetree::PropertyValue::AsUint32>("reg");
-          ZX_DEBUG_ASSERT(reg);  // Validated in the arch info checker.
-          node.architecture_info.riscv64.hart_id = *reg;
-          if (*reg == boot_hart_id_) {
+
+          auto reg = cpu_entry.reg;
+          ZX_DEBUG_ASSERT(reg);
+          std::optional<uint64_t> hart_id = (*reg)[0].address();
+          ZX_DEBUG_ASSERT(hart_id);
+          node.architecture_info.riscv64.hart_id = *hart_id;
+
+          if (*hart_id == boot_hart_id_) {
             node.flags |= ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY;
           } else {
             node.flags &= ~ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY;
           }
+          auto it = id_to_index_.find(*hart_id);
+          if (it != id_to_index_.end()) {
+            node.architecture_info.riscv64.isa_strtab_index =
+                static_cast<uint16_t>(it->strtab_index);
+          }
         });
   }
 
-  void set_boot_hart_id(uint64_t hart_id) { boot_hart_id_ = hart_id; }
+  size_t size_bytes() const {
+    return DevictreeCpuTopologyItem::size_bytes() + IsaStrtabItem::size_bytes();
+  }
+
+  // Finalizes the ISA string table.
+  void OnDone();
+
+  fit::result<DataZbi::Error> AppendItems(DataZbi& zbi) const {
+    if (auto result = DevictreeCpuTopologyItem::AppendItems(zbi); result.is_error()) {
+      return result;
+    }
+    return IsaStrtabItem::AppendItems(zbi);
+  }
 
  private:
-  std::optional<uint64_t> boot_hart_id_;
+  using IsaStrtabItem = SingleItem<ZBI_TYPE_RISCV64_ISA_STRTAB>;
+
+  struct IsaStrtabIndex
+      : public fbl::SinglyLinkedListable<IsaStrtabIndex*, fbl::NodeOptions::AllowClearUnsafe> {
+    // Required to instantiate fbl::DefaultKeyedObjectTraits.
+    uint64_t GetKey() const { return hart_id; }
+
+    // Required to instantiate fbl::DefaultHashTraits.
+    static size_t GetHash(uint64_t key) { return static_cast<size_t>(key); }
+
+    uint64_t hart_id = 0;
+    size_t strtab_index = 0;
+  };
+
+  uint64_t boot_hart_id_;
+  cpp20::span<char> isa_strtab_;
+  fbl::HashTable<uint64_t, IsaStrtabIndex*> id_to_index_;
 };
+
+// BootHartIdGetter provides a static means of accessing the boot hart ID, which
+// derives from outside of the devicetree: it must provide a method of the form
+// `static uint64_t Get()`.
+template <typename BootHartIdGetter>
+class RiscvDevictreeCpuTopologyItem : public RiscvDevictreeCpuTopologyItemBase {
+ public:
+  RiscvDevictreeCpuTopologyItem() : RiscvDevictreeCpuTopologyItemBase(BootHartIdGetter::Get()) {}
+};
+
 class ArmDevictreeCpuTopologyItem : public DevictreeCpuTopologyItem {
  public:
   template <typename Shim>
@@ -723,17 +812,9 @@ class ArmDevictreeCpuTopologyItem : public DevictreeCpuTopologyItem {
     DevictreeCpuTopologyItem::Init(
         shim,  //
         [this](const CpuEntry& cpu_entry) {
-          devicetree::PropertyDecoder decoder(cpu_entry.properties);
-          auto reg_prop = decoder.FindProperty("reg");
-          if (!reg_prop) {
-            OnError("Could not find 'reg' property in 'cpu' node.");
-            return false;
-          }
-          auto reg = devicetree::RegProperty::Create(1, 0, reg_prop->AsBytes());
-          if (!reg) {
-            OnError("Could not parse 'reg' property in 'cpu' node.");
-            return false;
-          }
+          // The presence of "reg" should already have been validated.
+          std::optional<devicetree::RegProperty> reg = cpu_entry.reg;
+          ZX_DEBUG_ASSERT(reg);
           if (reg->size() == 0 || reg->size() > 2) {
             OnError("'reg' property in 'cpu' node contains an unexpected number of cells.");
             return false;
@@ -748,10 +829,16 @@ class ArmDevictreeCpuTopologyItem : public DevictreeCpuTopologyItem {
           }
           return true;
         },
-        [](zbi_topology_processor_t& node, const CpuEntry& cpu_entry) -> void {
+        [](zbi_topology_processor_t& node, const CpuEntry& cpu_entry) {
           node.architecture_info.discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64;
           devicetree::PropertyDecoder decoder(cpu_entry.properties);
 
+          // Even though the decoded "reg" property is readily available as
+          // cpu_entry.reg, it's more convenient to normalize it as an array of
+          // with elements containing only a single address cell, rather than
+          // conditionally dealing with the case with elements with two address
+          // cells.
+          //
           // Validations of debug asserts below were made in the arch info
           // checker.
           auto reg_prop = decoder.FindProperty("reg");

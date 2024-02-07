@@ -60,6 +60,8 @@ inline ByteView AsBytes(const void* payload, size_t len) {
   return {reinterpret_cast<const std::byte*>(payload), len};
 }
 
+inline ByteView AsBytes(std::string_view sv) { return AsBytes(sv.data(), sv.size()); }
+
 template <typename T>
 inline ByteView AsBytes(const T& payload) {
   return AsSpan<const std::byte>(payload);
@@ -135,8 +137,8 @@ struct StorageTraits {
   /// empty (`length` == 0), there will always be a single callback made with
   /// an empty data argument.
   template <typename Callback>
-  static auto Read(Storage& zbi, payload_type payload, uint32_t length, Callback&& callback)
-      -> fit::result<error_type, decltype(callback(ByteView{}))> {
+  static auto Read(Storage& zbi, payload_type payload, uint32_t length,
+                   Callback&& callback) -> fit::result<error_type, decltype(callback(ByteView{}))> {
     return fit::error<error_type>{};
   }
 

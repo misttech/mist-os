@@ -9,11 +9,33 @@
 #include <lib/boot-shim/testing/devicetree-test-fixture.h>
 #include <lib/fit/defer.h>
 #include <lib/zbi-format/cpu.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/image.h>
+
+#include <cstdint>
+#include <initializer_list>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include <zxtest/zxtest.h>
 
 namespace {
 using boot_shim::testing::LoadDtb;
 using boot_shim::testing::LoadedDtb;
+
+template <uint64_t BootHartId>
+struct BootHartIdGetter {
+  static uint64_t Get() { return BootHartId; }
+};
+
+template <uint64_t BootHartId>
+using RiscvDevictreeCpuTopologyItem =
+    boot_shim::RiscvDevictreeCpuTopologyItem<BootHartIdGetter<BootHartId>>;
+
+// An ISA string common to multiple test devicetrees.
+constexpr std::string_view kCommonTestHartIsaString =
+    "rv64imafdch_zicsr_zifencei_zihintpause_zba_zbb_zbc_zbs_sstc";
 
 class TestAllocator {
  public:
@@ -40,6 +62,26 @@ class TestAllocator {
  private:
   std::vector<void*> allocs_;
 };
+
+// Initial NUL entry is automatically included.
+std::string BuildStringTable(std::initializer_list<std::string_view> strings) {
+  std::string table;
+  table += '\0';  // Initial NUL.
+  for (std::string_view sv : strings) {
+    table += sv;
+    table += '\0';
+  }
+  return table;
+}
+
+// Initial NUL entry among the expected strings is automatically assumed and
+// should not be provided.
+void ExpectStringTable(std::initializer_list<std::string_view> expected_strs,
+                       cpp20::span<const std::byte> actual) {
+  std::string expected = BuildStringTable(expected_strs);
+  ASSERT_EQ(expected.size(), actual.size());
+  EXPECT_BYTES_EQ(expected.data(), actual.data(), actual.size());
+}
 
 class RiscvDevictreeCpuTopologyItemTest
     : public boot_shim::testing::TestMixin<boot_shim::testing::RiscvDevicetreeTest,
@@ -90,9 +132,8 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, MissingNode) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = empty_fdt();
-  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevictreeCpuTopologyItem> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<RiscvDevictreeCpuTopologyItem<3>> shim("test", fdt);
   shim.set_allocator(TestAllocator());
-  shim.Get<boot_shim::RiscvDevictreeCpuTopologyItem>().set_boot_hart_id(3);
 
   ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
@@ -137,6 +178,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpusWithCpuMap) {
                                   .riscv64 =
                                       {
                                           .hart_id = 0,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
@@ -160,6 +202,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpusWithCpuMap) {
                                   .riscv64 =
                                       {
                                           .hart_id = 1,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
@@ -196,6 +239,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpusWithCpuMap) {
                                   .riscv64 =
                                       {
                                           .hart_id = 2,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
@@ -219,6 +263,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpusWithCpuMap) {
                                   .riscv64 =
                                       {
                                           .hart_id = 3,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
@@ -235,23 +280,27 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpusWithCpuMap) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = riscv_cpus();
-  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevictreeCpuTopologyItem> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<RiscvDevictreeCpuTopologyItem<3>> shim("test", fdt);
   shim.set_allocator(TestAllocator());
-  shim.Get<boot_shim::RiscvDevictreeCpuTopologyItem>().set_boot_hart_id(3);
 
   ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
-  bool present = false;
+  bool topology_present = false;
+  bool string_table_present = false;
   for (auto [header, payload] : image) {
     if (header->type == ZBI_TYPE_CPU_TOPOLOGY) {
-      present = true;
+      topology_present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
       boot_shim::testing::CheckCpuTopology(nodes, kExpectedTopology);
+    } else if (header->type == ZBI_TYPE_RISCV64_ISA_STRTAB) {
+      string_table_present = true;
+      ASSERT_NO_FATAL_FAILURE(ExpectStringTable({kCommonTestHartIsaString}, payload));
     }
   }
-  ASSERT_TRUE(present);
+  EXPECT_TRUE(topology_present);
+  EXPECT_TRUE(string_table_present);
 }
 
 TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithNestedClusters) {
@@ -315,6 +364,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithNestedClusters) {
                                   .riscv64 =
                                       {
                                           .hart_id = 0,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
@@ -338,6 +388,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithNestedClusters) {
                                   .riscv64 =
                                       {
                                           .hart_id = 1,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
@@ -400,6 +451,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithNestedClusters) {
                                   .riscv64 =
                                       {
                                           .hart_id = 2,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
@@ -423,6 +475,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithNestedClusters) {
                                   .riscv64 =
                                       {
                                           .hart_id = 3,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
@@ -439,23 +492,27 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithNestedClusters) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = riscv_cpus_nested_clusters();
-  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevictreeCpuTopologyItem> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<RiscvDevictreeCpuTopologyItem<3>> shim("test", fdt);
   shim.set_allocator(TestAllocator());
-  shim.Get<boot_shim::RiscvDevictreeCpuTopologyItem>().set_boot_hart_id(3);
 
   ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
-  bool present = false;
+  bool topology_present = false;
+  bool string_table_present = false;
   for (auto [header, payload] : image) {
     if (header->type == ZBI_TYPE_CPU_TOPOLOGY) {
-      present = true;
+      topology_present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
       boot_shim::testing::CheckCpuTopology(nodes, kExpectedTopology);
+    } else if (header->type == ZBI_TYPE_RISCV64_ISA_STRTAB) {
+      string_table_present = true;
+      ASSERT_NO_FATAL_FAILURE(ExpectStringTable({kCommonTestHartIsaString}, payload));
     }
   }
-  ASSERT_TRUE(present);
+  EXPECT_TRUE(topology_present);
+  EXPECT_TRUE(string_table_present);
 }
 
 TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithoutCpuMap) {
@@ -473,6 +530,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithoutCpuMap) {
                                   .riscv64 =
                                       {
                                           .hart_id = 0,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
@@ -496,6 +554,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithoutCpuMap) {
                                   .riscv64 =
                                       {
                                           .hart_id = 1,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
@@ -519,6 +578,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithoutCpuMap) {
                                   .riscv64 =
                                       {
                                           .hart_id = 2,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
@@ -542,6 +602,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithoutCpuMap) {
                                   .riscv64 =
                                       {
                                           .hart_id = 3,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
@@ -558,23 +619,27 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithoutCpuMap) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = riscv_cpus_no_cpu_map();
-  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevictreeCpuTopologyItem> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<RiscvDevictreeCpuTopologyItem<3>> shim("test", fdt);
   shim.set_allocator(TestAllocator());
-  shim.Get<boot_shim::RiscvDevictreeCpuTopologyItem>().set_boot_hart_id(3);
 
   ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
-  bool present = false;
+  bool topology_present = false;
+  bool string_table_present = false;
   for (auto [header, payload] : image) {
     if (header->type == ZBI_TYPE_CPU_TOPOLOGY) {
-      present = true;
+      topology_present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
       boot_shim::testing::CheckCpuTopology(nodes, kExpectedTopology);
+    } else if (header->type == ZBI_TYPE_RISCV64_ISA_STRTAB) {
+      string_table_present = true;
+      ASSERT_NO_FATAL_FAILURE(ExpectStringTable({kCommonTestHartIsaString}, payload));
     }
   }
-  ASSERT_TRUE(present);
+  EXPECT_TRUE(topology_present);
+  EXPECT_TRUE(string_table_present);
 }
 
 TEST_F(RiscvDevictreeCpuTopologyItemTest, Qemu) {
@@ -605,6 +670,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, Qemu) {
                                   .riscv64 =
                                       {
                                           .hart_id = 0,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
@@ -628,6 +694,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, Qemu) {
                                   .riscv64 =
                                       {
                                           .hart_id = 1,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
@@ -651,6 +718,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, Qemu) {
                                   .riscv64 =
                                       {
                                           .hart_id = 2,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
@@ -674,6 +742,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, Qemu) {
                                   .riscv64 =
                                       {
                                           .hart_id = 3,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
@@ -690,26 +759,32 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, Qemu) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = qemu_riscv();
-  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevictreeCpuTopologyItem> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<RiscvDevictreeCpuTopologyItem<3>> shim("test", fdt);
   shim.set_allocator(TestAllocator());
-  shim.Get<boot_shim::RiscvDevictreeCpuTopologyItem>().set_boot_hart_id(3);
 
   ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
-  bool present = false;
+  bool topology_present = false;
+  bool string_table_present = false;
   for (auto [header, payload] : image) {
     if (header->type == ZBI_TYPE_CPU_TOPOLOGY) {
-      present = true;
+      topology_present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
       boot_shim::testing::CheckCpuTopology(nodes, kExpectedTopology);
+    } else if (header->type == ZBI_TYPE_RISCV64_ISA_STRTAB) {
+      string_table_present = true;
+      ASSERT_NO_FATAL_FAILURE(ExpectStringTable({kCommonTestHartIsaString}, payload));
     }
   }
-  ASSERT_TRUE(present);
+  EXPECT_TRUE(topology_present);
+  EXPECT_TRUE(string_table_present);
 }
 
 TEST_F(RiscvDevictreeCpuTopologyItemTest, VisionFive2) {
+  constexpr std::string_view kHart0IsaString = "rv64imac";         // strtab index 1
+  constexpr std::string_view kCommonHartIsaString = "rv64imafdc";  // strtab index 10
   constexpr std::array kExpectedTopology = {
       // cpu@0
       zbi_topology_node_t{
@@ -724,6 +799,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, VisionFive2) {
                                   .riscv64 =
                                       {
                                           .hart_id = 0,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
@@ -747,6 +823,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, VisionFive2) {
                                   .riscv64 =
                                       {
                                           .hart_id = 1,
+                                          .isa_strtab_index = 10,
                                       },
                               },
                           .flags = 0,
@@ -770,6 +847,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, VisionFive2) {
                                   .riscv64 =
                                       {
                                           .hart_id = 2,
+                                          .isa_strtab_index = 10,
                                       },
                               },
                           .flags = 0,
@@ -793,6 +871,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, VisionFive2) {
                                   .riscv64 =
                                       {
                                           .hart_id = 3,
+                                          .isa_strtab_index = 10,
                                       },
                               },
                           .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
@@ -816,6 +895,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, VisionFive2) {
                                   .riscv64 =
                                       {
                                           .hart_id = 4,
+                                          .isa_strtab_index = 10,
                                       },
                               },
                           .flags = 0,
@@ -832,26 +912,32 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, VisionFive2) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = vision_five_2();
-  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevictreeCpuTopologyItem> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<RiscvDevictreeCpuTopologyItem<3>> shim("test", fdt);
   shim.set_allocator(TestAllocator());
-  shim.Get<boot_shim::RiscvDevictreeCpuTopologyItem>().set_boot_hart_id(3);
 
   ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
-  bool present = false;
+  bool topology_present = false;
+  bool string_table_present = false;
   for (auto [header, payload] : image) {
     if (header->type == ZBI_TYPE_CPU_TOPOLOGY) {
-      present = true;
+      topology_present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
       boot_shim::testing::CheckCpuTopology(nodes, kExpectedTopology);
+    } else if (header->type == ZBI_TYPE_RISCV64_ISA_STRTAB) {
+      string_table_present = true;
+      ASSERT_NO_FATAL_FAILURE(ExpectStringTable({kHart0IsaString, kCommonHartIsaString}, payload));
     }
   }
-  ASSERT_TRUE(present);
+  EXPECT_TRUE(topology_present);
+  EXPECT_TRUE(string_table_present);
 }
 
 TEST_F(RiscvDevictreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
+  constexpr std::string_view kHart0IsaString = "rv64imac";         // strtab index 1
+  constexpr std::string_view kCommonHartIsaString = "rv64imafdc";  // strtab index 10
   constexpr std::array kExpectedTopology = {
       // cluster0
       zbi_topology_node_t{
@@ -879,6 +965,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
                                   .riscv64 =
                                       {
                                           .hart_id = 3,
+                                          .isa_strtab_index = 10,
                                       },
                               },
                           .flags = 0,
@@ -902,6 +989,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
                                   .riscv64 =
                                       {
                                           .hart_id = 1,
+                                          .isa_strtab_index = 10,
                                       },
                               },
                           .flags = 0,
@@ -925,6 +1013,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
                                   .riscv64 =
                                       {
                                           .hart_id = 4,
+                                          .isa_strtab_index = 10,
                                       },
                               },
                           .flags = 0,
@@ -948,6 +1037,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
                                   .riscv64 =
                                       {
                                           .hart_id = 2,
+                                          .isa_strtab_index = 10,
                                       },
                               },
                           .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
@@ -971,6 +1061,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
                                   .riscv64 =
                                       {
                                           .hart_id = 0,
+                                          .isa_strtab_index = 1,
                                       },
                               },
                           .flags = 0,
@@ -987,23 +1078,27 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = sifive_hifive_unmatched();
-  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevictreeCpuTopologyItem> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<RiscvDevictreeCpuTopologyItem<2>> shim("test", fdt);
   shim.set_allocator(TestAllocator());
-  shim.Get<boot_shim::RiscvDevictreeCpuTopologyItem>().set_boot_hart_id(2);
 
   ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
-  bool present = false;
+  bool topology_present = false;
+  bool string_table_present = false;
   for (auto [header, payload] : image) {
     if (header->type == ZBI_TYPE_CPU_TOPOLOGY) {
-      present = true;
+      topology_present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
       boot_shim::testing::CheckCpuTopology(nodes, kExpectedTopology);
+    } else if (header->type == ZBI_TYPE_RISCV64_ISA_STRTAB) {
+      string_table_present = true;
+      ASSERT_NO_FATAL_FAILURE(ExpectStringTable({kHart0IsaString, kCommonHartIsaString}, payload));
     }
   }
-  ASSERT_TRUE(present);
+  EXPECT_TRUE(topology_present);
+  EXPECT_TRUE(string_table_present);
 }
 
 }  // namespace
