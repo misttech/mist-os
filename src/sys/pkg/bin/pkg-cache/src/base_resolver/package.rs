@@ -17,14 +17,21 @@ pub(crate) async fn serve_request_stream(
     base_packages: Arc<HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>>,
     authenticator: ContextAuthenticator,
     blobfs: blobfs::Client,
+    caching_package_server: caching_package_server::CachingPackageServer<blobfs::Client>,
 ) -> anyhow::Result<()> {
     while let Some(request) =
         stream.try_next().await.context("failed to read request from FIDL stream")?
     {
         match request {
             fpkg::PackageResolverRequest::Resolve { package_url, dir, responder } => {
-                match resolve(&package_url, dir, &base_packages, authenticator.clone(), &blobfs)
-                    .await
+                match resolve(
+                    &package_url,
+                    dir,
+                    &base_packages,
+                    authenticator.clone(),
+                    &caching_package_server,
+                )
+                .await
                 {
                     Ok(context) => responder.send(Ok(&context)),
                     Err(e) => {
@@ -52,6 +59,7 @@ pub(crate) async fn serve_request_stream(
                     &base_packages,
                     authenticator.clone(),
                     &blobfs,
+                    &caching_package_server,
                 )
                 .await
                 {
@@ -89,6 +97,7 @@ async fn resolve_with_context(
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
     authenticator: ContextAuthenticator,
     blobfs: &blobfs::Client,
+    caching_package_server: &caching_package_server::CachingPackageServer<blobfs::Client>,
 ) -> Result<fpkg::ResolutionContext, ResolverError> {
     resolve_with_context_impl(
         &fuchsia_url::PackageUrl::parse(package_url)?,
@@ -97,27 +106,30 @@ async fn resolve_with_context(
         base_packages,
         authenticator,
         blobfs,
+        caching_package_server,
     )
     .await
 }
 
-pub(crate) async fn resolve_with_context_impl(
+pub(super) async fn resolve_with_context_impl(
     package_url: &fuchsia_url::PackageUrl,
     context: fpkg::ResolutionContext,
     dir: ServerEnd<fio::DirectoryMarker>,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
     authenticator: ContextAuthenticator,
     blobfs: &blobfs::Client,
+    caching_package_server: &caching_package_server::CachingPackageServer<blobfs::Client>,
 ) -> Result<fpkg::ResolutionContext, ResolverError> {
     match package_url {
         fuchsia_url::PackageUrl::Absolute(url) => {
             if !context.bytes.is_empty() {
                 return Err(ResolverError::ContextWithAbsoluteUrl);
             }
-            resolve_impl(url, dir, base_packages, authenticator, blobfs).await
+            resolve_impl(url, dir, base_packages, authenticator, caching_package_server).await
         }
         fuchsia_url::PackageUrl::Relative(url) => {
-            resolve_subpackage(url, context, dir, authenticator, blobfs).await
+            resolve_subpackage(url, context, dir, authenticator, blobfs, caching_package_server)
+                .await
         }
     }
 }
@@ -127,17 +139,17 @@ async fn resolve(
     dir: ServerEnd<fio::DirectoryMarker>,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
     authenticator: ContextAuthenticator,
-    blobfs: &blobfs::Client,
+    caching_package_server: &caching_package_server::CachingPackageServer<blobfs::Client>,
 ) -> Result<fpkg::ResolutionContext, ResolverError> {
-    resolve_impl(&url.parse()?, dir, base_packages, authenticator, blobfs).await
+    resolve_impl(&url.parse()?, dir, base_packages, authenticator, caching_package_server).await
 }
 
-pub(crate) async fn resolve_impl(
+pub(super) async fn resolve_impl(
     url: &fuchsia_url::AbsolutePackageUrl,
     dir: ServerEnd<fio::DirectoryMarker>,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
     authenticator: ContextAuthenticator,
-    blobfs: &blobfs::Client,
+    caching_package_server: &caching_package_server::CachingPackageServer<blobfs::Client>,
 ) -> Result<fpkg::ResolutionContext, ResolverError> {
     let url_storage;
     let url = match url {
@@ -164,15 +176,10 @@ pub(crate) async fn resolve_impl(
     let hash = base_packages
         .get(url)
         .ok_or_else(|| ResolverError::PackageNotInBase(url.clone().into()))?;
-    let () = package_directory::serve(
-        package_directory::ExecutionScope::new(),
-        blobfs.clone(),
-        *hash,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        dir,
-    )
-    .await
-    .map_err(ResolverError::ServePackageDirectory)?;
+    let () = caching_package_server
+        .serve(*hash, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE, dir, None)
+        .await
+        .map_err(ResolverError::ServePackageDirectory)?;
     Ok(authenticator.create(hash))
 }
 
@@ -182,6 +189,7 @@ async fn resolve_subpackage(
     dir: ServerEnd<fio::DirectoryMarker>,
     authenticator: ContextAuthenticator,
     blobfs: &blobfs::Client,
+    caching_package_server: &caching_package_server::CachingPackageServer<blobfs::Client>,
 ) -> Result<fpkg::ResolutionContext, ResolverError> {
     let super_hash = authenticator.clone().authenticate(context)?;
     let super_package = package_directory::RootDir::new(blobfs.clone(), super_hash)
@@ -193,21 +201,21 @@ async fn resolve_subpackage(
         .subpackages()
         .get(package_url)
         .ok_or_else(|| ResolverError::SubpackageNotFound)?;
-    let () = package_directory::serve(
-        package_directory::ExecutionScope::new(),
-        blobfs.clone(),
-        subpackage,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        dir,
-    )
-    .await
-    .map_err(ResolverError::ServePackageDirectory)?;
+    let () = caching_package_server
+        .serve(
+            subpackage,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+            dir,
+            None,
+        )
+        .await
+        .map_err(ResolverError::ServePackageDirectory)?;
     Ok(authenticator.create(&subpackage))
 }
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use {super::*, assert_matches::assert_matches, fuchsia_async as fasync};
 
     #[fuchsia::test]
     async fn resolve_rejects_pinned_url() {
@@ -221,7 +229,7 @@ mod tests {
                     [0; 32].into()
                 )]),
                 ContextAuthenticator::new(),
-                &blobfs::Client::new_test().0
+                &caching_package_server::CachingPackageServer::new(blobfs::Client::new_test().0).0
             )
             .await,
             Err(ResolverError::PackageHashNotSupported)
@@ -241,7 +249,8 @@ mod tests {
                     [0; 32].into()
                 )]),
                 ContextAuthenticator::new(),
-                &blobfs::Client::new_test().0
+                &blobfs::Client::new_test().0,
+                &caching_package_server::CachingPackageServer::new(blobfs::Client::new_test().0).0,
             )
             .await,
             Err(ResolverError::PackageHashNotSupported)
@@ -252,8 +261,10 @@ mod tests {
     async fn resolve_clears_zero_variant() {
         let pkg = fuchsia_pkg_testing::PackageBuilder::new("name").build().await.unwrap();
         let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.unwrap();
-        let blobfs_client = blobfs.client();
         pkg.write_to_blobfs(&blobfs).await;
+        let (caching_package_server, caching_fut) =
+            caching_package_server::CachingPackageServer::new(blobfs.client());
+        let () = fasync::Task::spawn(caching_fut).detach();
         let (proxy, server) = fidl::endpoints::create_proxy().unwrap();
 
         let _: fpkg::ResolutionContext = resolve(
@@ -264,7 +275,7 @@ mod tests {
                 *pkg.hash(),
             )]),
             ContextAuthenticator::new(),
-            &blobfs_client,
+            &caching_package_server,
         )
         .await
         .unwrap();
@@ -286,7 +297,7 @@ mod tests {
                     [0u8; 32].into()
                 )]),
                 ContextAuthenticator::new(),
-                &blobfs::Client::new_test().0
+                &caching_package_server::CachingPackageServer::new(blobfs::Client::new_test().0).0,
             )
             .await,
             Err(ResolverError::PackageNotInBase(_))

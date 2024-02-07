@@ -20,6 +20,7 @@ pub(crate) async fn serve_request_stream(
     base_packages: Arc<HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>>,
     authenticator: ContextAuthenticator,
     blobfs: blobfs::Client,
+    caching_package_server: caching_package_server::CachingPackageServer<blobfs::Client>,
 ) -> anyhow::Result<()> {
     while let Some(request) =
         stream.try_next().await.context("failed to read request from FIDL stream")?
@@ -28,17 +29,22 @@ pub(crate) async fn serve_request_stream(
             fcomponent_resolution::ResolverRequest::Resolve { component_url, responder } => {
                 let () = responder
                     .send(
-                        resolve(&component_url, &base_packages, authenticator.clone(), &blobfs)
-                            .await
-                            .map_err(|e| {
-                                let fidl_err = (&e).into();
-                                error!(
-                                    "failed to resolve component {}: {:#}",
-                                    component_url,
-                                    anyhow::anyhow!(e)
-                                );
-                                fidl_err
-                            }),
+                        resolve(
+                            &component_url,
+                            &base_packages,
+                            authenticator.clone(),
+                            &caching_package_server,
+                        )
+                        .await
+                        .map_err(|e| {
+                            let fidl_err = (&e).into();
+                            error!(
+                                "failed to resolve component {}: {:#}",
+                                component_url,
+                                anyhow::anyhow!(e)
+                            );
+                            fidl_err
+                        }),
                     )
                     .context("sending fuchsia.component.resolution/Resolver.Resolve response")?;
             }
@@ -55,6 +61,7 @@ pub(crate) async fn serve_request_stream(
                             &base_packages,
                             authenticator.clone(),
                             &blobfs,
+                            &caching_package_server,
                         )
                         .await
                         .map_err(|e| {
@@ -80,7 +87,7 @@ async fn resolve(
     url: &str,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
     authenticator: ContextAuthenticator,
-    blobfs: &blobfs::Client,
+    caching_package_server: &caching_package_server::CachingPackageServer<blobfs::Client>,
 ) -> Result<fcomponent_resolution::Component, ResolverError> {
     let url = fuchsia_url::ComponentUrl::parse(url)?;
     let (package, server_end) =
@@ -93,7 +100,7 @@ async fn resolve(
         server_end,
         base_packages,
         authenticator,
-        blobfs,
+        caching_package_server,
     )
     .await?;
     resolve_from_package(&url, package, fcomponent_resolution::Context { bytes: context.bytes })
@@ -106,6 +113,7 @@ async fn resolve_with_context(
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
     authenticator: ContextAuthenticator,
     blobfs: &blobfs::Client,
+    caching_package_server: &caching_package_server::CachingPackageServer<blobfs::Client>,
 ) -> Result<fcomponent_resolution::Component, ResolverError> {
     let url = fuchsia_url::ComponentUrl::parse(url)?;
     let (package, server_end) =
@@ -117,6 +125,7 @@ async fn resolve_with_context(
         base_packages,
         authenticator,
         blobfs,
+        caching_package_server,
     )
     .await?;
     resolve_from_package(&url, package, fcomponent_resolution::Context { bytes: context.bytes })
@@ -186,7 +195,7 @@ mod tests {
                 "relative#meta/missing",
                 &HashMap::new(),
                 ContextAuthenticator::new(),
-                &blobfs::Client::new_test().0
+                &caching_package_server::CachingPackageServer::new(blobfs::Client::new_test().0).0
             )
             .await,
             Err(ResolverError::AbsoluteUrlRequired)

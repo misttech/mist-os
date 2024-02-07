@@ -188,6 +188,11 @@ async fn main_inner() -> Result<(), Error> {
     )
     .serve_and_log_errors();
     let cobalt_fut = Task::spawn(cobalt_fut);
+    let (caching_package_server, caching_package_server_cleanup) =
+        caching_package_server::CachingPackageServer::new(blobfs.clone());
+    inspector
+        .root()
+        .record_lazy_child("open-packages", caching_package_server.record_lazy_inspect());
 
     // Use VFS to serve the out dir because ServiceFs does not support OPEN_RIGHT_EXECUTABLE and
     // pkgfs/{packages|system} require it.
@@ -196,6 +201,7 @@ async fn main_inner() -> Result<(), Error> {
     {
         let package_index = Arc::clone(&package_index);
         let blobfs = blobfs.clone();
+        let caching_package_server = caching_package_server.clone();
         let base_packages = Arc::clone(&base_packages);
         let cache_packages = Arc::clone(&cache_packages);
         let scope = scope.clone();
@@ -214,6 +220,7 @@ async fn main_inner() -> Result<(), Error> {
                         Arc::clone(&cache_packages),
                         executability_restrictions,
                         scope.clone(),
+                        caching_package_server.clone(),
                         stream,
                         cobalt_sender.clone(),
                         Arc::clone(&cache_inspect_id),
@@ -284,6 +291,7 @@ async fn main_inner() -> Result<(), Error> {
         let base_resolver_base_packages = Arc::clone(&base_resolver_base_packages);
         let authenticator = authenticator.clone();
         let blobfs = blobfs.clone();
+        let caching_package_server = caching_package_server.clone();
         let () = svc_dir
             .add_entry(
                 fidl_fuchsia_pkg::PackageResolverMarker::PROTOCOL_NAME,
@@ -294,6 +302,7 @@ async fn main_inner() -> Result<(), Error> {
                             Arc::clone(&base_resolver_base_packages),
                             authenticator.clone(),
                             blobfs.clone(),
+                            caching_package_server.clone(),
                         )
                         .unwrap_or_else(|e| {
                             error!("failed to serve package resolver request: {:#}", e)
@@ -307,6 +316,7 @@ async fn main_inner() -> Result<(), Error> {
         let base_resolver_base_packages = Arc::clone(&base_resolver_base_packages);
         let authenticator = authenticator.clone();
         let blobfs = blobfs.clone();
+        let caching_package_server = caching_package_server.clone();
         let () = svc_dir
             .add_entry(
                 fidl_fuchsia_component_resolution::ResolverMarker::PROTOCOL_NAME,
@@ -317,6 +327,7 @@ async fn main_inner() -> Result<(), Error> {
                             Arc::clone(&base_resolver_base_packages),
                             authenticator.clone(),
                             blobfs.clone(),
+                            caching_package_server.clone(),
                         )
                         .unwrap_or_else(|e| {
                             error!("failed to serve component resolver request: {:#}", e)
@@ -354,6 +365,9 @@ async fn main_inner() -> Result<(), Error> {
             .context("taking startup handle")?
             .into(),
     );
+    // TODO(https://fxbug.dev/323972640) Test clean pkg-cache shutdown.
+    drop(caching_package_server);
+    let () = caching_package_server_cleanup.await;
     let () = scope.wait().await;
 
     cobalt_fut.await;

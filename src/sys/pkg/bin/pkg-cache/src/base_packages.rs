@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::anyhow,
-    anyhow::Context as _,
+    anyhow::{anyhow, Context as _},
     fuchsia_inspect as finspect,
     fuchsia_merkle::Hash,
     futures::{future::BoxFuture, FutureExt as _, StreamExt as _},
