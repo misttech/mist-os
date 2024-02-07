@@ -234,10 +234,6 @@
                 "umount2_02",
                 "unshare01",
                 "utsname03_clone",
-                "vmsplice01",
-                "vmsplice02",
-                "vmsplice03",
-                "vmsplice04",
                 "writetest01",
 
                 // Not supported for our architectures.
