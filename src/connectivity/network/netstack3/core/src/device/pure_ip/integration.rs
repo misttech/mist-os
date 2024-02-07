@@ -105,10 +105,8 @@ where
         metadata: PureIpDeviceFrameMetadata<CC::DeviceId>,
         buffer: B,
     ) {
-        // NB: A link layer device would need to dispatch the frame to the
-        // device socket handler; however pure IP devices operate above the link
-        // layer, and are not expected to deliver their packets to device
-        // sockets. This conforms to the behavior on Linux.
+        // TODO(https://fxbug.dev/42051633): Deliver the received frame to
+        // the device socket handler.
         let PureIpDeviceFrameMetadata { device_id, ip_version } = metadata;
         match ip_version {
             IpVersion::V4 => self.receive_frame(
