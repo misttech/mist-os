@@ -245,16 +245,10 @@ open protocol LeaseControl {
 /// ElementControl channel (and passed to other clients who need access
 /// to the element's current power level).
 open protocol Status {
-    /// Returns the current power level for this element, non-blocking.
-    flexible GetPowerLevel() -> (resource struct {
-        current_level PowerLevel;
-    }) error StatusError;
-
-    /// Returns the current power level for this element, blocking until
-    /// the current power level is different than last_level.
-    flexible WatchPowerLevel(resource struct {
-        last_level PowerLevel;
-    }) -> (resource struct {
+    /// Returns the current power level for this element. The first call on
+    /// this channel will return immediately. Subsequent calls will block until
+    /// the current power level has changed.
+    flexible WatchPowerLevel() -> (resource struct {
         current_level PowerLevel;
     }) error StatusError;
 };

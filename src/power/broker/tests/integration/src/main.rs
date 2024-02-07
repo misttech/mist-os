@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Error, Result};
-use fidl::endpoints::{create_endpoints, Proxy};
+use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
 use fidl_fuchsia_power_broker::{
     self as fpb, BinaryPowerLevel, DependencyType, LeaseStatus, LevelDependency, StatusMarker,
     TopologyMarker,
@@ -48,10 +48,11 @@ async fn test_direct() -> Result<()> {
         )
         .await?
         .expect("add_element failed");
+    let parent_element_control = parent_element_control.into_proxy()?;
     let parent_status = {
-        let (client, server) = create_endpoints::<StatusMarker>();
-        parent_element_control.into_proxy()?.open_status_channel(server)?;
-        client.into_proxy()?
+        let (client, server) = create_proxy::<StatusMarker>()?;
+        parent_element_control.open_status_channel(server)?;
+        client
     };
     let parent_level_control = parent_level_control.into_proxy()?;
     let (_, child_lessor, _) = topology
@@ -72,7 +73,7 @@ async fn test_direct() -> Result<()> {
         )
         .await?
         .expect("add_element failed");
-    let child_lessor = child_lessor.into_proxy()?;
+    let child_lessor: fpb::LessorProxy = child_lessor.into_proxy()?;
 
     // Initial required level for P should be OFF.
     // Update P's current level to OFF with PowerBroker.
@@ -83,7 +84,7 @@ async fn test_direct() -> Result<()> {
         .update_current_power_level(BinaryPowerLevel::Off.into_primitive())
         .await?
         .expect("update_current_power_level failed");
-    let power_level = parent_status.get_power_level().await?.expect("get_power_level failed");
+    let power_level = parent_status.watch_power_level().await?.expect("watch_power_level failed");
     assert_eq!(power_level, BinaryPowerLevel::Off.into_primitive());
 
     // Acquire lease for C, P should now have required level ON
@@ -104,6 +105,8 @@ async fn test_direct() -> Result<()> {
         .update_current_power_level(BinaryPowerLevel::On.into_primitive())
         .await?
         .expect("update_current_power_level failed");
+    let power_level = parent_status.watch_power_level().await?.expect("watch_power_level failed");
+    assert_eq!(power_level, BinaryPowerLevel::On.into_primitive());
     assert_eq!(lease.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Satisfied);
 
     // Drop lease, P should now have required level OFF
@@ -113,6 +116,19 @@ async fn test_direct() -> Result<()> {
         .await?
         .expect("watch_required_level failed");
     assert_eq!(parent_req_level, BinaryPowerLevel::Off.into_primitive());
+
+    // Update P's required level to OFF
+    parent_level_control
+        .update_current_power_level(BinaryPowerLevel::Off.into_primitive())
+        .await?
+        .expect("update_current_power_level failed");
+    let power_level = parent_status.watch_power_level().await?.expect("watch_power_level failed");
+    assert_eq!(power_level, BinaryPowerLevel::Off.into_primitive());
+
+    // Remove P's element. Status channel should be closed.
+    parent_element_control.remove_element().await?;
+    let status_after_remove = parent_status.watch_power_level().await;
+    assert!(matches!(status_after_remove, Err(fidl::Error::ClientChannelClosed { .. })));
 
     Ok(())
 }
@@ -220,7 +236,7 @@ async fn test_transitive() -> Result<()> {
             .update_current_power_level(BinaryPowerLevel::Off.into_primitive())
             .await?
             .expect("update_current_power_level failed");
-        let power_level = status.get_power_level().await?.expect("get_power_level failed");
+        let power_level = status.watch_power_level().await?.expect("watch_power_level failed");
         assert_eq!(power_level, BinaryPowerLevel::Off.into_primitive());
     }
 

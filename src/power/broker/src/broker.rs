@@ -144,6 +144,7 @@ impl Broker {
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn get_current_level(&mut self, element_id: &ElementID) -> Option<PowerLevel> {
         self.current.get(element_id)
     }
