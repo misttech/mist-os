@@ -71,7 +71,7 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   boot_shim::DevicetreeBootShim<
       boot_shim::UartItem<>, boot_shim::PoolMemConfigItem, boot_shim::ArmDevicetreePsciItem,
       boot_shim::ArmDevicetreeGicItem, boot_shim::DevicetreeDtbItem, PlatformIdItem, BoardInfoItem,
-      boot_shim::ArmDevictreeCpuTopologyItem, boot_shim::ArmDevicetreeTimerItem>
+      boot_shim::ArmDevicetreeCpuTopologyItem, boot_shim::ArmDevicetreeTimerItem>
       shim(kShimName, gDevicetreeBoot.fdt);
   shim.set_mmio_observer([&](boot_shim::DevicetreeMmioRange mmio_range) {
     // This attempts to generate a peripheral ramge the covers as much as possible from the

@@ -37,9 +37,9 @@ struct HashableIsaString
 
 }  // namespace
 
-void RiscvDevictreeCpuTopologyItemBase::OnDone() {
+void RiscvDevicetreeCpuTopologyItemBase::OnDone() {
   // Finalizes cpu_entries() and sorts it by hart ID.
-  DevictreeCpuTopologyItem::OnDone();
+  DevicetreeCpuTopologyItem::OnDone();
 
   fbl::HashTable<std::string_view, HashableIsaString*> isa_strings;
   auto cleanup = fit::defer([&isa_strings]() { isa_strings.clear_unsafe(); });

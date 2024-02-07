@@ -30,8 +30,8 @@ struct BootHartIdGetter {
 };
 
 template <uint64_t BootHartId>
-using RiscvDevictreeCpuTopologyItem =
-    boot_shim::RiscvDevictreeCpuTopologyItem<BootHartIdGetter<BootHartId>>;
+using RiscvDevicetreeCpuTopologyItem =
+    boot_shim::RiscvDevicetreeCpuTopologyItem<BootHartIdGetter<BootHartId>>;
 
 // An ISA string common to multiple test devicetrees.
 constexpr std::string_view kCommonTestHartIsaString =
@@ -83,7 +83,7 @@ void ExpectStringTable(std::initializer_list<std::string_view> expected_strs,
   EXPECT_BYTES_EQ(expected.data(), actual.data(), actual.size());
 }
 
-class RiscvDevictreeCpuTopologyItemTest
+class RiscvDevicetreeCpuTopologyItemTest
     : public boot_shim::testing::TestMixin<boot_shim::testing::RiscvDevicetreeTest,
                                            boot_shim::testing::SyntheticDevicetreeTest> {
  public:
@@ -120,19 +120,19 @@ class RiscvDevictreeCpuTopologyItemTest
   static std::optional<LoadedDtb> riscv_cpus_no_cpu_map_dtb_;
 };
 
-std::optional<LoadedDtb> RiscvDevictreeCpuTopologyItemTest::riscv_cpus_dtb_ = std::nullopt;
-std::optional<LoadedDtb> RiscvDevictreeCpuTopologyItemTest::riscv_cpus_nested_clusters_dtb_ =
+std::optional<LoadedDtb> RiscvDevicetreeCpuTopologyItemTest::riscv_cpus_dtb_ = std::nullopt;
+std::optional<LoadedDtb> RiscvDevicetreeCpuTopologyItemTest::riscv_cpus_nested_clusters_dtb_ =
     std::nullopt;
-std::optional<LoadedDtb> RiscvDevictreeCpuTopologyItemTest::riscv_cpus_no_cpu_map_dtb_ =
+std::optional<LoadedDtb> RiscvDevicetreeCpuTopologyItemTest::riscv_cpus_no_cpu_map_dtb_ =
     std::nullopt;
 
-TEST_F(RiscvDevictreeCpuTopologyItemTest, MissingNode) {
+TEST_F(RiscvDevicetreeCpuTopologyItemTest, MissingNode) {
   std::array<std::byte, 1024> image_buffer;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = empty_fdt();
-  boot_shim::DevicetreeBootShim<RiscvDevictreeCpuTopologyItem<3>> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<RiscvDevicetreeCpuTopologyItem<3>> shim("test", fdt);
   shim.set_allocator(TestAllocator());
 
   ASSERT_TRUE(shim.Init());
@@ -143,7 +143,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, MissingNode) {
   }
 }
 
-TEST_F(RiscvDevictreeCpuTopologyItemTest, CpusWithCpuMap) {
+TEST_F(RiscvDevicetreeCpuTopologyItemTest, CpusWithCpuMap) {
   constexpr std::array kExpectedTopology = {
 
       // socket0
@@ -280,7 +280,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpusWithCpuMap) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = riscv_cpus();
-  boot_shim::DevicetreeBootShim<RiscvDevictreeCpuTopologyItem<3>> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<RiscvDevicetreeCpuTopologyItem<3>> shim("test", fdt);
   shim.set_allocator(TestAllocator());
 
   ASSERT_TRUE(shim.Init());
@@ -303,7 +303,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpusWithCpuMap) {
   EXPECT_TRUE(string_table_present);
 }
 
-TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithNestedClusters) {
+TEST_F(RiscvDevicetreeCpuTopologyItemTest, CpuNodesWithNestedClusters) {
   constexpr std::array kExpectedTopology = {
 
       // socket0
@@ -492,7 +492,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithNestedClusters) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = riscv_cpus_nested_clusters();
-  boot_shim::DevicetreeBootShim<RiscvDevictreeCpuTopologyItem<3>> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<RiscvDevicetreeCpuTopologyItem<3>> shim("test", fdt);
   shim.set_allocator(TestAllocator());
 
   ASSERT_TRUE(shim.Init());
@@ -515,7 +515,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithNestedClusters) {
   EXPECT_TRUE(string_table_present);
 }
 
-TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithoutCpuMap) {
+TEST_F(RiscvDevicetreeCpuTopologyItemTest, CpuNodesWithoutCpuMap) {
   constexpr std::array kExpectedTopology = {
       // cpu@0
       zbi_topology_node_t{
@@ -619,7 +619,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithoutCpuMap) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = riscv_cpus_no_cpu_map();
-  boot_shim::DevicetreeBootShim<RiscvDevictreeCpuTopologyItem<3>> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<RiscvDevicetreeCpuTopologyItem<3>> shim("test", fdt);
   shim.set_allocator(TestAllocator());
 
   ASSERT_TRUE(shim.Init());
@@ -642,7 +642,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithoutCpuMap) {
   EXPECT_TRUE(string_table_present);
 }
 
-TEST_F(RiscvDevictreeCpuTopologyItemTest, Qemu) {
+TEST_F(RiscvDevicetreeCpuTopologyItemTest, Qemu) {
   constexpr std::array kExpectedTopology = {
       // cluster0
       zbi_topology_node_t{
@@ -759,7 +759,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, Qemu) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = qemu_riscv();
-  boot_shim::DevicetreeBootShim<RiscvDevictreeCpuTopologyItem<3>> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<RiscvDevicetreeCpuTopologyItem<3>> shim("test", fdt);
   shim.set_allocator(TestAllocator());
 
   ASSERT_TRUE(shim.Init());
@@ -782,7 +782,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, Qemu) {
   EXPECT_TRUE(string_table_present);
 }
 
-TEST_F(RiscvDevictreeCpuTopologyItemTest, VisionFive2) {
+TEST_F(RiscvDevicetreeCpuTopologyItemTest, VisionFive2) {
   constexpr std::string_view kHart0IsaString = "rv64imac";         // strtab index 1
   constexpr std::string_view kCommonHartIsaString = "rv64imafdc";  // strtab index 10
   constexpr std::array kExpectedTopology = {
@@ -912,7 +912,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, VisionFive2) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = vision_five_2();
-  boot_shim::DevicetreeBootShim<RiscvDevictreeCpuTopologyItem<3>> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<RiscvDevicetreeCpuTopologyItem<3>> shim("test", fdt);
   shim.set_allocator(TestAllocator());
 
   ASSERT_TRUE(shim.Init());
@@ -935,7 +935,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, VisionFive2) {
   EXPECT_TRUE(string_table_present);
 }
 
-TEST_F(RiscvDevictreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
+TEST_F(RiscvDevicetreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
   constexpr std::string_view kHart0IsaString = "rv64imac";         // strtab index 1
   constexpr std::string_view kCommonHartIsaString = "rv64imafdc";  // strtab index 10
   constexpr std::array kExpectedTopology = {
@@ -1078,7 +1078,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = sifive_hifive_unmatched();
-  boot_shim::DevicetreeBootShim<RiscvDevictreeCpuTopologyItem<2>> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<RiscvDevicetreeCpuTopologyItem<2>> shim("test", fdt);
   shim.set_allocator(TestAllocator());
 
   ASSERT_TRUE(shim.Init());

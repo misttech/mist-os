@@ -77,7 +77,7 @@ void PhysMain(void* fdt, arch::EarlyTicks ticks) {
   boot_shim::DevicetreeBootShim<boot_shim::UartItem<>, boot_shim::PoolMemConfigItem,
                                 boot_shim::RiscvDevicetreePlicItem,
                                 boot_shim::RiscvDevicetreeTimerItem,
-                                boot_shim::RiscvDevictreeCpuTopologyItem<BootHartIdGetter>,
+                                boot_shim::RiscvDevicetreeCpuTopologyItem<BootHartIdGetter>,
                                 boot_shim::DevicetreeDtbItem, PlatformIdItem, BoardInfoItem>
       shim(kShimName, gDevicetreeBoot.fdt);
   shim.set_allocator([](size_t size, size_t align, fbl::AllocChecker& ac) -> void* {

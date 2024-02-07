@@ -21,8 +21,8 @@
 
 namespace boot_shim {
 
-devicetree::ScanState DevictreeCpuTopologyItem::OnNode(const devicetree::NodePath& path,
-                                                       const devicetree::PropertyDecoder& decoder) {
+devicetree::ScanState DevicetreeCpuTopologyItem::OnNode(
+    const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
   if (path == "/") {
     return devicetree::ScanState::kActive;
   }
@@ -64,7 +64,7 @@ devicetree::ScanState DevictreeCpuTopologyItem::OnNode(const devicetree::NodePat
                                : IncreaseEntryNodeCountFirstScan(path, decoder);
 }
 
-devicetree::ScanState DevictreeCpuTopologyItem::OnSubtree(const devicetree::NodePath& path) {
+devicetree::ScanState DevicetreeCpuTopologyItem::OnSubtree(const devicetree::NodePath& path) {
   // Clusters can contain other clusters, when exiting a cluster, restore the containing cluster
   // to cluster containing the current cluster if any.
   if (current_cluster_) {
@@ -140,7 +140,7 @@ devicetree::ScanState DevictreeCpuTopologyItem::OnSubtree(const devicetree::Node
   return devicetree::ScanState::kActive;
 }
 
-void DevictreeCpuTopologyItem::OnDone() {
+void DevicetreeCpuTopologyItem::OnDone() {
   // cpu_entry_count_ may have been decremented in skipping CPU entries with
   // malformed fields. Update the span to reflect the recorded entries.
   cpu_entries_ = cpu_entries_.subspan(0, cpu_entry_count_);
@@ -161,7 +161,7 @@ void DevictreeCpuTopologyItem::OnDone() {
   });
 }
 
-devicetree::ScanState DevictreeCpuTopologyItem::IncreaseEntryNodeCountFirstScan(
+devicetree::ScanState DevicetreeCpuTopologyItem::IncreaseEntryNodeCountFirstScan(
     const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
   ZX_ASSERT(map_entries_.empty());
   std::string_view name = path.back();
@@ -201,7 +201,7 @@ devicetree::ScanState DevictreeCpuTopologyItem::IncreaseEntryNodeCountFirstScan(
   return devicetree::ScanState::kDoneWithSubtree;
 }
 
-devicetree::ScanState DevictreeCpuTopologyItem::AddEntryNodeSecondScan(
+devicetree::ScanState DevicetreeCpuTopologyItem::AddEntryNodeSecondScan(
     const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
   ZX_ASSERT(!map_entries_.empty());
   auto name = path.back().name();
@@ -275,14 +275,14 @@ devicetree::ScanState DevictreeCpuTopologyItem::AddEntryNodeSecondScan(
   return devicetree::ScanState::kDoneWithSubtree;
 }
 
-devicetree::ScanState DevictreeCpuTopologyItem::IncreaseCpuNodeCountFirstScan(
+devicetree::ScanState DevicetreeCpuTopologyItem::IncreaseCpuNodeCountFirstScan(
     const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
   ZX_ASSERT(cpu_entries_.empty());
   cpu_entry_count_++;
   return devicetree::ScanState::kActive;
 }
 
-devicetree::ScanState DevictreeCpuTopologyItem::AddCpuNodeSecondScan(
+devicetree::ScanState DevicetreeCpuTopologyItem::AddCpuNodeSecondScan(
     const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
   ZX_ASSERT(!cpu_entries_.empty() && (cpu_entry_index_ < cpu_entry_count_));
 
@@ -325,7 +325,7 @@ devicetree::ScanState DevictreeCpuTopologyItem::AddCpuNodeSecondScan(
   return devicetree::ScanState::kActive;
 }
 
-fit::result<ItemBase::DataZbi::Error> DevictreeCpuTopologyItem::UpdateEntryCpuLinks() const {
+fit::result<ItemBase::DataZbi::Error> DevicetreeCpuTopologyItem::UpdateEntryCpuLinks() const {
   ZX_ASSERT(!cpu_entries_.empty() && !map_entries_.empty());
 
   // Not every devicetree defines a CPU map. When this happens, the entry nodes have been
@@ -393,7 +393,7 @@ fit::result<ItemBase::DataZbi::Error> DevictreeCpuTopologyItem::UpdateEntryCpuLi
   return fit::ok();
 }
 
-fit::result<ItemBase::DataZbi::Error> DevictreeCpuTopologyItem::CalculateClusterPerformanceClass(
+fit::result<ItemBase::DataZbi::Error> DevicetreeCpuTopologyItem::CalculateClusterPerformanceClass(
     cpp20::span<zbi_topology_node_t> nodes) const {
   if (cluster_count_ <= 1) {
     return fit::ok();
@@ -489,7 +489,7 @@ fit::result<ItemBase::DataZbi::Error> DevictreeCpuTopologyItem::CalculateCluster
   return fit::ok();
 }
 
-fit::result<DevictreeCpuTopologyItem::DataZbi::Error> DevictreeCpuTopologyItem::AppendItems(
+fit::result<DevicetreeCpuTopologyItem::DataZbi::Error> DevicetreeCpuTopologyItem::AppendItems(
     DataZbi& zbi) const {
   if (size_bytes() == 0) {
     return fit::ok();
@@ -538,7 +538,7 @@ fit::result<DevictreeCpuTopologyItem::DataZbi::Error> DevictreeCpuTopologyItem::
           core_node.logical_ids[core_node.logical_id_count - 1] = 0;
         }
       } else {
-        const_cast<DevictreeCpuTopologyItem*>(this)->OnError(
+        const_cast<DevicetreeCpuTopologyItem*>(this)->OnError(
             "'thread' entry without an associated 'cpu' entry.");
       }
       continue;

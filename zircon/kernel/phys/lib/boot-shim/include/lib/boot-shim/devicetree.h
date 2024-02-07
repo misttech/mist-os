@@ -548,8 +548,8 @@ class RiscvDevicetreePlicItem
 // See:
 // https://www.kernel.org/doc/Documentation/devicetree/bindings/arm/cpu-capacity.txt
 // https://www.kernel.org/doc/Documentation/devicetree/bindings/cpu/cpu-topology.txt
-class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyItem, 2>,
-                                 public ItemBase {
+class DevicetreeCpuTopologyItem : public DevicetreeItemBase<DevicetreeCpuTopologyItem, 2>,
+                                  public ItemBase {
  public:
   // Matcher API.
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
@@ -593,7 +593,7 @@ class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyI
 
   template <typename Shim>
   void Init(const Shim& shim, CheckArchCpuInfo arch_info_checker, SetArchCpuInfo arch_info_setter) {
-    DevicetreeItemBase<DevictreeCpuTopologyItem, 2>::Init(shim);
+    DevicetreeItemBase<DevicetreeCpuTopologyItem, 2>::Init(shim);
     allocator_ = &shim.allocator();
     arch_info_checker_ = std::move(arch_info_checker);
     arch_info_setter_ = std::move(arch_info_setter);
@@ -608,7 +608,7 @@ class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyI
     if (!alloc) {
       // Log allocation failure. The effect is that the matcher will keep looking and will fail to
       // make progress. But the error will be logged.
-      auto* self = const_cast<DevictreeCpuTopologyItem*>(this);
+      auto* self = const_cast<DevicetreeCpuTopologyItem*>(this);
       self->OnError("Allocation Failed.");
       self->Log("at %s:%u\n", location.file_name(), static_cast<unsigned int>(location.line()));
       count = 0;
@@ -706,16 +706,17 @@ class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyI
   bool found_cpus_ = false;
 };
 
-class RiscvDevictreeCpuTopologyItemBase : public DevictreeCpuTopologyItem,
-                                          public SingleItem<ZBI_TYPE_RISCV64_ISA_STRTAB> {
+class RiscvDevicetreeCpuTopologyItemBase : public DevicetreeCpuTopologyItem,
+                                           public SingleItem<ZBI_TYPE_RISCV64_ISA_STRTAB> {
  public:
-  explicit RiscvDevictreeCpuTopologyItemBase(uint64_t boot_hart_id) : boot_hart_id_(boot_hart_id) {}
+  explicit RiscvDevicetreeCpuTopologyItemBase(uint64_t boot_hart_id)
+      : boot_hart_id_(boot_hart_id) {}
 
-  ~RiscvDevictreeCpuTopologyItemBase() { id_to_index_.clear_unsafe(); }
+  ~RiscvDevicetreeCpuTopologyItemBase() { id_to_index_.clear_unsafe(); }
 
   template <typename Shim>
   void Init(Shim& shim) {
-    DevictreeCpuTopologyItem::Init(
+    DevicetreeCpuTopologyItem::Init(
         shim,  //
         [this](const CpuEntry& cpu_entry) {
           // The presence of "reg" should already have been validated.
@@ -763,14 +764,14 @@ class RiscvDevictreeCpuTopologyItemBase : public DevictreeCpuTopologyItem,
   }
 
   size_t size_bytes() const {
-    return DevictreeCpuTopologyItem::size_bytes() + IsaStrtabItem::size_bytes();
+    return DevicetreeCpuTopologyItem::size_bytes() + IsaStrtabItem::size_bytes();
   }
 
   // Finalizes the ISA string table.
   void OnDone();
 
   fit::result<DataZbi::Error> AppendItems(DataZbi& zbi) const {
-    if (auto result = DevictreeCpuTopologyItem::AppendItems(zbi); result.is_error()) {
+    if (auto result = DevicetreeCpuTopologyItem::AppendItems(zbi); result.is_error()) {
       return result;
     }
     return IsaStrtabItem::AppendItems(zbi);
@@ -800,16 +801,16 @@ class RiscvDevictreeCpuTopologyItemBase : public DevictreeCpuTopologyItem,
 // derives from outside of the devicetree: it must provide a method of the form
 // `static uint64_t Get()`.
 template <typename BootHartIdGetter>
-class RiscvDevictreeCpuTopologyItem : public RiscvDevictreeCpuTopologyItemBase {
+class RiscvDevicetreeCpuTopologyItem : public RiscvDevicetreeCpuTopologyItemBase {
  public:
-  RiscvDevictreeCpuTopologyItem() : RiscvDevictreeCpuTopologyItemBase(BootHartIdGetter::Get()) {}
+  RiscvDevicetreeCpuTopologyItem() : RiscvDevicetreeCpuTopologyItemBase(BootHartIdGetter::Get()) {}
 };
 
-class ArmDevictreeCpuTopologyItem : public DevictreeCpuTopologyItem {
+class ArmDevicetreeCpuTopologyItem : public DevicetreeCpuTopologyItem {
  public:
   template <typename Shim>
   void Init(Shim& shim) {
-    DevictreeCpuTopologyItem::Init(
+    DevicetreeCpuTopologyItem::Init(
         shim,  //
         [this](const CpuEntry& cpu_entry) {
           // The presence of "reg" should already have been validated.

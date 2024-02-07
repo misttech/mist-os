@@ -232,7 +232,7 @@ TEST_F(ArmCpuTopologyItemTest, CpusMultipleCells) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = cpus();
-  boot_shim::DevicetreeBootShim<boot_shim::ArmDevictreeCpuTopologyItem> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeCpuTopologyItem> shim("test", fdt);
   shim.set_allocator(TestAllocator());
 
   shim.Init();
@@ -399,7 +399,7 @@ TEST_F(ArmCpuTopologyItemTest, CpusSingleCell) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = cpus_single_cell();
-  boot_shim::DevicetreeBootShim<boot_shim::ArmDevictreeCpuTopologyItem> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeCpuTopologyItem> shim("test", fdt);
   shim.set_allocator(TestAllocator());
   shim.Init();
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
@@ -533,7 +533,7 @@ TEST_F(ArmCpuTopologyItemTest, CpusNoCpuMap) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = cpus_no_cpu_map();
-  boot_shim::DevicetreeBootShim<boot_shim::ArmDevictreeCpuTopologyItem> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeCpuTopologyItem> shim("test", fdt);
   shim.set_allocator(TestAllocator());
 
   shim.Init();
@@ -668,7 +668,7 @@ TEST_F(ArmCpuTopologyItemTest, Qemu) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = qemu_arm_gic3();
-  boot_shim::DevicetreeBootShim<boot_shim::ArmDevictreeCpuTopologyItem> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeCpuTopologyItem> shim("test", fdt);
   shim.set_allocator(TestAllocator());
 
   shim.Init();
@@ -721,7 +721,7 @@ TEST_F(ArmCpuTopologyItemTest, Crosvm) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = crosvm_arm();
-  boot_shim::DevicetreeBootShim<boot_shim::ArmDevictreeCpuTopologyItem> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeCpuTopologyItem> shim("test", fdt);
   shim.set_allocator(TestAllocator());
   shim.Init();
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
@@ -937,7 +937,7 @@ TEST_F(ArmCpuTopologyItemTest, KhadasVim3) {
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = khadas_vim3();
-  boot_shim::DevicetreeBootShim<boot_shim::ArmDevictreeCpuTopologyItem> shim("test", fdt);
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeCpuTopologyItem> shim("test", fdt);
   shim.set_allocator(TestAllocator());
 
   shim.Init();
