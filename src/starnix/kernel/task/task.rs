@@ -21,6 +21,7 @@ use fuchsia_zircon::{
 };
 use macro_rules_attribute::apply;
 use once_cell::sync::OnceCell;
+use selinux::SecurityId;
 use starnix_logging::{
     log_debug, log_warn, set_zx_name, {self},
 };
@@ -1204,6 +1205,11 @@ impl Task {
             })
         });
         logging_span.clone()
+    }
+
+    /// Get the SELinux security ID of the current task, or `None` if not set.
+    pub fn get_current_sid(&self) -> Option<SecurityId> {
+        self.thread_group.read().selinux_state.as_ref().map(|state| state.current_sid.clone())
     }
 
     fn update_logging_span(&self, debug_info: &starnix_logging::TaskDebugInfo) {

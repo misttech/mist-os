@@ -37,8 +37,6 @@
                 "*selinux_task_setnice*",
                 "*selinux_task_setscheduler*",
                 "*selinux_task_getsid*",
-                "*selinux_task_getpgid*",
-                "*selinux_task_setpgid*",
                 "*selinux_file*",
                 "*selinux_ioctl*",
                 "*selinux_capable_file*",

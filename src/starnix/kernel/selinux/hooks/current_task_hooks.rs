@@ -12,11 +12,11 @@ pub fn check_task_create_access(current_task: &CurrentTask) -> Result<(), Errno>
     match &current_task.kernel().security_server {
         None => return Ok(()),
         Some(security_server) => {
-            let group_state = current_task.thread_group.read();
+            let sid = current_task.get_current_sid();
             thread_group_hooks::check_task_create_access(
                 security_server.as_ref(),
                 &security_server.as_permission_check(),
-                &group_state.selinux_state,
+                sid,
             )
         }
     }
@@ -64,14 +64,47 @@ pub fn check_getsched_access(source: &CurrentTask, target: &Task) -> Result<(), 
         Some(security_server) => {
             // TODO(b/323856891): Consider holding `source.thread_group` and `target.thread_group`
             // read locks for duration of access check.
-            let source_state = { source.thread_group.read().selinux_state.clone() };
-            let target_state = { target.thread_group.read().selinux_state.clone() };
-
+            let source_sid = source.get_current_sid();
+            let target_sid = target.get_current_sid();
             thread_group_hooks::check_getsched_access(
                 security_server.as_ref(),
                 &security_server.as_permission_check(),
-                &source_state,
-                &target_state,
+                source_sid,
+                target_sid,
+            )
+        }
+    }
+}
+
+/// Checks if getpgid is allowed, if SELinux is enabled. Access is allowed if SELinux is disabled.
+pub fn check_getpgid_access(source_task: &CurrentTask, target_task: &Task) -> Result<(), Errno> {
+    match &source_task.kernel().security_server {
+        None => return Ok(()),
+        Some(security_server) => {
+            let source_sid = source_task.get_current_sid();
+            let target_sid = target_task.get_current_sid();
+            thread_group_hooks::check_getpgid_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                source_sid,
+                target_sid,
+            )
+        }
+    }
+}
+
+/// Checks if setpgid is allowed, if SELinux is enabled. Access is allowed if SELinux is disabled.
+pub fn check_setpgid_access(source_task: &CurrentTask, target_task: &Task) -> Result<(), Errno> {
+    match &source_task.kernel().security_server {
+        None => return Ok(()),
+        Some(security_server) => {
+            let source_sid = source_task.get_current_sid();
+            let target_sid = target_task.get_current_sid();
+            thread_group_hooks::check_setpgid_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                source_sid,
+                target_sid,
             )
         }
     }

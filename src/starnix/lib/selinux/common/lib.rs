@@ -218,7 +218,11 @@ class_permission_enum! {
         /// Permission to transition to a different security domain.
         Transition,
         /// Permission to get scheduling policy currently applied to a process.
-        GetScheduler,
+        GetSched,
+        /// Permission to get the process group ID.
+        GetPgid,
+        /// Permission to set the process group ID.
+        SetPgid,
     }
 }
 
@@ -227,7 +231,9 @@ impl ProcessPermission {
         match self {
             ProcessPermission::Fork => "fork",
             ProcessPermission::Transition => "transition",
-            ProcessPermission::GetScheduler => "getsched",
+            ProcessPermission::GetSched => "getsched",
+            ProcessPermission::GetPgid => "getpgid",
+            ProcessPermission::SetPgid => "setpgid",
         }
     }
 }

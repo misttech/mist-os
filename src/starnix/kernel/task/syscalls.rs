@@ -361,6 +361,8 @@ pub fn sys_getpgid(
 ) -> Result<pid_t, Errno> {
     let weak = get_task_or_current(current_task, pid);
     let task = Task::from_weak(&weak)?;
+
+    selinux_hooks::check_getpgid_access(current_task, &task)?;
     let pgid = task.thread_group.read().process_group.leader;
     Ok(pgid)
 }
@@ -373,6 +375,8 @@ pub fn sys_setpgid(
 ) -> Result<(), Errno> {
     let weak = get_task_or_current(current_task, pid);
     let task = Task::from_weak(&weak)?;
+
+    selinux_hooks::check_setpgid_access(current_task, &task)?;
     current_task.thread_group.setpgid(locked, &task, pgid)?;
     Ok(())
 }
