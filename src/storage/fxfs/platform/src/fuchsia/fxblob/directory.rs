@@ -197,6 +197,15 @@ impl BlobDirectory {
         Ok(())
     }
 
+    pub async fn open_blob(self: &Arc<Self>, hash: Hash) -> Result<Arc<FxBlob>, Error> {
+        self.lookup(fio::OpenFlags::RIGHT_READABLE, Identifier::from_hash(hash))
+            .await?
+            .take()
+            .into_any()
+            .downcast::<FxBlob>()
+            .map_err(|_| FxfsError::Inconsistent.into())
+    }
+
     pub(crate) async fn lookup(
         self: &Arc<Self>,
         flags: fio::OpenFlags,

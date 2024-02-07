@@ -17,6 +17,7 @@ use {
         volume::FxVolume,
     },
     anyhow::{anyhow, ensure, Context, Error},
+    fuchsia_hash::Hash,
     fuchsia_merkle::{hash_block, MerkleTree},
     fuchsia_zircon::Status,
     fuchsia_zircon::{self as zx, AsHandleRef},
@@ -111,6 +112,10 @@ impl FxBlob {
             self.open_count_add_one();
         }
         Ok(child_vmo)
+    }
+
+    pub fn root(&self) -> Hash {
+        self.merkle_tree.root()
     }
 }
 

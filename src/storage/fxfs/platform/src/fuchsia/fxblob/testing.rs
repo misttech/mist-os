@@ -26,6 +26,14 @@ pub async fn new_blob_fixture() -> TestFixture {
     .await
 }
 
+pub async fn open_blob_fixture(device_holder: DeviceHolder) -> TestFixture {
+    TestFixture::open(
+        device_holder,
+        TestFixtureOptions { encrypted: false, as_blob: true, format: false, serve_volume: true },
+    )
+    .await
+}
+
 #[async_trait]
 pub trait BlobFixture {
     async fn write_blob(&self, data: &[u8], mode: CompressionMode) -> Hash;

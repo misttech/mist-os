@@ -15,6 +15,7 @@ mod memory_pressure;
 pub mod node;
 mod paged_object_handle;
 pub mod pager;
+pub mod profile;
 mod remote_crypt;
 mod symlink;
 pub mod volume;

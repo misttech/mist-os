@@ -10,6 +10,6 @@ pub mod reader;
 mod writer;
 
 #[cfg(test)]
-mod testing;
+pub mod testing;
 
 pub use crate::fxblob::directory::BlobDirectory;
