@@ -20,6 +20,7 @@
     use: [
         { service: "fuchsia.hardware.registers.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
+        { service: "fuchsia.hardware.clock.Service" },
         { service: "fuchsia.driver.compat.Service" },
         { protocol: "fuchsia.kernel.MmioResource" },
     ],

@@ -44,6 +44,9 @@ constexpr clock_id_t clock_ids[] = {
     // For video decoder
     {sm1_clk::CLK_DOS_GCLK_VDEC},
     {sm1_clk::CLK_DOS},
+
+    // For GPU
+    {sm1_clk::CLK_GP0_PLL},
 };
 
 zx_status_t Nelson::ClkInit() {

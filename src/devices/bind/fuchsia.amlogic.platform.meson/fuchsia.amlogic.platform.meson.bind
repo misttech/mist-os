@@ -12,6 +12,9 @@ uint G12A_CLK_ID {
   CLK_DOS_GCLK_VDEC = 65602,
   CLK_SYS_CPU_CLK_DIV16 = 65537,
 
+  // PLLs.
+  CLK_GP0_PLL = 0x20000,
+
   // CPU clocks
   CLK_SYS_CPU_CLK = 1048576,
 };
@@ -48,6 +51,7 @@ uint G12B_CLK_ID {
   CLK_EMMC_C = 0x1000c,
 
   // PLLs.
+  CLK_GP0_PLL = 0x20000,
   CLK_HIFI_PLL = 0x20002,
 
   // CPU Clocks
@@ -61,6 +65,7 @@ uint SM1_CLK_ID {
   CLK_SYS_CPU_CLK_DIV16 = 0x10001,
   CLK_DOS_GCLK_VDEC = 0x10049,
   CLK_DOS = 0x10003,
+  CLK_GP0_PLL = 0x20000,
 };
 
 // Values taken from <soc/aml-meson/axg-clk.h>

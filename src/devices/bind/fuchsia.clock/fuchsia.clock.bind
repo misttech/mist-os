@@ -29,4 +29,5 @@ enum FUNCTION {
   AUDIO_GATE,
   AUDIO_PLL,
   TSENSOR,
+  GP0_PLL,
 };

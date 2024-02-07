@@ -7,6 +7,7 @@ composite aml_gpu;
 using fuchsia.amlogic.platform;
 using fuchsia.register;
 using fuchsia.platform;
+using fuchsia.clock;
 using fuchsia.devicetree;
 
 primary node "pdev" {
@@ -28,4 +29,8 @@ primary node "pdev" {
 
 node "register-reset" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.register.BIND_FIDL_PROTOCOL.DEVICE;
+}
+
+optional node "clock-gp0-pll" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
 }

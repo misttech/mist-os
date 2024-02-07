@@ -16,6 +16,7 @@
 #include <lib/zx/vmo.h>
 
 #include <gtest/gtest.h>
+#include <soc/aml-common/aml-registers.h>
 
 #include "s905d2-gpu.h"
 #include "src/devices/registers/testing/mock-registers/mock-registers.h"

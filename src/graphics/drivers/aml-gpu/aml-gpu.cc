@@ -25,7 +25,7 @@
 #include <bind/fuchsia/arm/platform/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpu/mali/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
-#include <soc/aml-s905d2/s905d2-hiu.h>
+#include <soc/aml-common/aml-registers.h>
 
 #include "s905d2-gpu.h"
 #include "s912-gpu.h"
@@ -118,32 +118,38 @@ void AmlGpu::UpdateClockProperties() {
 }
 
 zx_status_t AmlGpu::Gp0Init() {
-  // hiu_dev_ is now initialized in |s905d2_hiu_init|.
-  gp0_pll_dev_ = std::make_unique<aml_pll_dev_t>();
-
-  // HIU Init.
-  zx_status_t status = s905d2_hiu_init_etc(&*hiu_dev_, hiu_buffer_->View(0));
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "aml_gp0_init: hiu_init failed: %d", status);
-    return status;
+  auto clock_client = incoming()->Connect<fuchsia_hardware_clock::Service::Clock>("clock-gp0-pll");
+  if (clock_client.is_error() || !clock_client.value().is_valid()) {
+    FDF_LOG(ERROR, "could not get clock fragment");
+    return ZX_ERR_NO_RESOURCES;
   }
 
-  status = s905d2_pll_init(&*hiu_dev_, gp0_pll_dev_.get(), GP0_PLL);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "aml_gp0_init: pll_init failed: %d", status);
-    return status;
+  gp0_clock_ = fidl::WireSyncClient(std::move(clock_client.value()));
+
+  // Errors setting the clock should be logged but ignored; initialization can continue either way.
+  auto set_result = gp0_clock_->SetRate(846000000);
+  if (set_result.status() != ZX_OK) {
+    FDF_LOG(ERROR, "Setting clock frequency failed, %s", set_result.FormatDescription().c_str());
+    return ZX_OK;
   }
 
-  status = s905d2_pll_set_rate(gp0_pll_dev_.get(), 846000000);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "aml_gp0_init: pll_set_rate failed: %d", status);
-    return status;
+  if (set_result->is_error()) {
+    FDF_LOG(ERROR, "Setting clock frequency failed, %s",
+            zx_status_get_string(set_result->error_value()));
+    return ZX_OK;
   }
-  status = s905d2_pll_ena(gp0_pll_dev_.get());
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "aml_gp0_init: pll_ena failed: %d", status);
-    return status;
+
+  auto enable_result = gp0_clock_->Enable();
+  if (enable_result.status() != ZX_OK) {
+    FDF_LOG(ERROR, "Enabling clock failed, %s", enable_result.FormatDescription().c_str());
+    return ZX_OK;
   }
+
+  if (enable_result->is_error()) {
+    FDF_LOG(ERROR, "Enabling clock failed, %s", zx_status_get_string(enable_result->error_value()));
+    return ZX_OK;
+  }
+
   gp0_init_succeeded_ = true;
   root_.RecordBool("gp0_init_succeeded", true);
   return ZX_OK;

@@ -13,11 +13,14 @@
 #include <zircon/syscalls/smc.h>
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/amlogic/platform/meson/cpp/bind.h>
 #include <bind/fuchsia/arm/platform/cpp/bind.h>
+#include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpu/mali/cpp/bind.h>
 #include <bind/fuchsia/register/cpp/bind.h>
 #include <soc/aml-common/aml-registers.h>
+#include <soc/aml-meson/sm1-clk.h>
 #include <soc/aml-s905d3/s905d3-hw.h>
 
 #include "nelson.h"
@@ -124,8 +127,26 @@ zx_status_t Nelson::MaliInit() {
                 fdf::MakeProperty(bind_fuchsia_register::NAME, aml_registers::REGISTER_MALI_RESET),
             },
     }};
+    auto aml_gpu_clock_node = fuchsia_driver_framework::ParentSpec{{
+        .bind_rules =
+            {
+                fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                        bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+                fdf::MakeAcceptBindRule(
+                    bind_fuchsia::CLOCK_ID,
+                    bind_fuchsia_amlogic_platform_meson::SM1_CLK_ID_CLK_GP0_PLL),
+            },
+        .properties =
+            {
+                fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                  bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+                fdf::MakeProperty(bind_fuchsia_clock::FUNCTION,
+                                  bind_fuchsia_clock::FUNCTION_GP0_PLL),
+            },
+    }};
 
-    auto parents = std::vector<fuchsia_driver_framework::ParentSpec>{aml_gpu_register_reset_node};
+    auto parents = std::vector<fuchsia_driver_framework::ParentSpec>{aml_gpu_register_reset_node,
+                                                                     aml_gpu_clock_node};
 
     auto composite_node_spec = fuchsia_driver_framework::CompositeNodeSpec(
         {.name = "aml-gpu-composite", .parents = parents});

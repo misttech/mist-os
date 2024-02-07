@@ -4,6 +4,7 @@
 #ifndef SRC_GRAPHICS_DRIVERS_AML_GPU_AML_GPU_H_
 #define SRC_GRAPHICS_DRIVERS_AML_GPU_AML_GPU_H_
 
+#include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
 #include <lib/device-protocol/pdev-fidl.h>
@@ -16,8 +17,6 @@
 
 #include <memory>
 #include <optional>
-
-#include <soc/aml-common/aml-registers.h>
 
 constexpr uint32_t kPwrKey = 0x14;
 constexpr uint32_t kPwrOverride1 = 0x16;
@@ -58,7 +57,6 @@ typedef struct {
   uint32_t input_freq_map[kClockInputs];
 } aml_gpu_block_t;
 
-typedef struct aml_pll_dev aml_pll_dev_t;
 namespace aml_gpu {
 class TestAmlGpu;
 
@@ -104,12 +102,12 @@ class AmlGpu final : public fdf::DriverBase,
   std::optional<fdf::MmioBuffer> gpu_buffer_;
 
   fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset_register_;
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> gp0_clock_;
   // Resource used to perform SMC calls. Only needed on SM1.
   zx::resource secure_monitor_;
 
   aml_gpu_block_t* gpu_block_;
   std::optional<fdf::MmioBuffer> hiu_dev_;
-  std::unique_ptr<aml_pll_dev_t> gp0_pll_dev_;
   int32_t current_clk_source_ = -1;
   inspect::Inspector inspector_;
   std::unique_ptr<inspect::ComponentInspector> component_inspector_;

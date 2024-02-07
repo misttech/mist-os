@@ -41,6 +41,9 @@ constexpr clock_id_t clock_ids[] = {
     // For video decoder
     {g12a_clk::CLK_DOS_GCLK_VDEC},
     {g12a_clk::CLK_DOS},
+
+    // For GPU
+    {g12a_clk::CLK_GP0_PLL},
 };
 
 zx_status_t Astro::ClkInit() {
