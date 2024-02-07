@@ -33,6 +33,7 @@
                 "*selinux_shm*",
                 "*selinux_stat*",
                 "*selinux_sysctl*",
+                "*selinux_sigkill*",
                 "*selinux_task_setnice*",
                 "*selinux_task_setscheduler*",
                 "*selinux_task_getsid*",
