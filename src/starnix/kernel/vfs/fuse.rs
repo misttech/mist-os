@@ -1482,11 +1482,10 @@ impl FuseMutableState {
             _ => {}
         }
         let header: uapi::fuse_out_header = data.read_to_object()?;
-
-        let remainder: usize = (header.len as usize) - std::mem::size_of::<uapi::fuse_out_header>();
-        if data.available() < remainder {
-            return error!(EINVAL);
-        }
+        let payload_size = std::cmp::min(
+            (header.len as usize) - std::mem::size_of::<uapi::fuse_out_header>(),
+            data.available(),
+        );
         self.waiters.notify_value(header.unique);
         let running_operation =
             self.operations.get_mut(&header.unique).ok_or_else(|| errno!(EINVAL))?;
@@ -1498,8 +1497,8 @@ impl FuseMutableState {
             running_operation.response =
                 Some(operation.handle_error(&mut self.operations_state, errno));
         } else {
-            let buffer = data.read_to_vec_limited(remainder)?;
-            if buffer.len() != remainder {
+            let buffer = data.read_to_vec_limited(payload_size)?;
+            if buffer.len() != payload_size {
                 return error!(EINVAL);
             }
             let response = operation.parse_response(buffer)?;
@@ -1513,7 +1512,7 @@ impl FuseMutableState {
         if operation.is_async() {
             self.operations.remove(&header.unique);
         }
-        Ok(header.len as usize)
+        Ok(payload_size)
     }
 
     fn handle_async(
