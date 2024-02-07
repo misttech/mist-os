@@ -21,3 +21,20 @@ exclude = '''
   )
 )
 '''
+
+[tool.mypy]
+strict = true
+pretty = true
+
+# We need to ignore missing imports since some of our source code dependencies
+# reside in the 'third_party' directory, which may not always be in python path.
+ignore_missing_imports = true
+
+# TODO(b/324270220): Temporarily disable this flag to ease the transition to
+# type checking. Re enable this flag for stricter checking in the future.
+warn_return_any = false
+
+# Due to direct file passing, the mypy --exclude flag is bypassed. Therefore, we
+# maintain an exclusion list within fuchsia/build/python/mypy_checker.py
+# and ignore files from the  mypy command.
+exclude = []

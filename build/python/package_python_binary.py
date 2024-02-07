@@ -1,9 +1,10 @@
 #!/usr/bin/env fuchsia-vendored-python
-"""Creats a Python zip archive for the input main source."""
-
 # Copyright 2021 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
+"""Creates a Python zip archive for the input main source and
+    optionally type check for all the sources."""
 
 import argparse
 import json
@@ -12,18 +13,18 @@ import shutil
 import sys
 import zipapp
 
+import mypy_checker
+
 
 def main():
     parser = argparse.ArgumentParser(
         "Creates a Python zip archive for the input main source"
     )
-
     parser.add_argument(
         "--target_name",
         help="Name of the build target",
         required=True,
     )
-
     parser.add_argument(
         "--main_source",
         help="Path to the source containing the main function",
@@ -34,14 +35,12 @@ def main():
         help="Name of the the main callable, that is the entry point of the generated archive",
         required=True,
     )
-
     parser.add_argument(
         "--gen_dir",
         help="Path to gen directory, used to stage temporary directories",
         required=True,
     )
     parser.add_argument("--output", help="Path to output", required=True)
-
     parser.add_argument(
         "--sources",
         help="Sources of this target, including main source",
@@ -59,10 +58,15 @@ def main():
         type=argparse.FileType("w"),
         required=True,
     )
-
+    parser.add_argument(
+        "--enable_pytype",
+        action="store_true",
+        help="Name of the build target",
+    )
     args = parser.parse_args()
 
     infos = json.load(args.library_infos)
+    type_check_files = []
 
     # Temporary directory to stage the source tree for this python binary,
     # including sources of itself and all the libraries it imports.
@@ -140,6 +144,11 @@ sys.exit({args.main_callable}())
         for dir in dirs:
             os.rmdir(os.path.join(root, dir))
     os.rmdir(app_dir)
+
+    if args.enable_pytype:
+        # Type check for Python binary sources and their library sources
+        type_check_files: list[str] = args.sources + files_to_copy
+        return mypy_checker.run_mypy_checks(type_check_files)
 
 
 if __name__ == "__main__":

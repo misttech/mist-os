@@ -14,6 +14,7 @@
 #     "foo.py",
 #     "bar.py",
 #   ]
+#   enable_pytype = true
 #   output_name = "main.pyz"
 #   deps = [ "//path/to/lib" ]
 # }
@@ -40,6 +41,11 @@
 #     Name of the output Python zip archive, must have .pyz as extension.
 #     Type: string
 #     Default: ${target_name}.pyz
+#
+#   enable_pytype(optional)
+#     If true, enable pytype checking on the target and respective deps.
+#     Type: boolean
+#     Default: False
 #
 #   sources
 #   deps
@@ -102,6 +108,10 @@ template("python_binary") {
       _main_callable = invoker.main_callable
     }
 
+    inputs += [
+      "//build/python/mypy_checker.py",
+      "//pyproject.toml",
+    ]
     script = "//build/python/package_python_binary.py"
     depfile = "${target_out_dir}/${target_name}.d"
     args = [ "--sources" ] + rebase_path(sources, root_build_dir) + [
@@ -120,5 +130,8 @@ template("python_binary") {
              "--output",
              rebase_path(_output, root_build_dir),
            ]
+    if (defined(invoker.enable_pytype) && invoker.enable_pytype) {
+      args += [ "--enable_pytype" ]
+    }
   }
 }

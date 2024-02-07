@@ -28,7 +28,7 @@ per-file go.mod,go.sum,fuchsia.code-workspace = file:/build/go/OWNERS
 per-file rustfmt.toml,fuchsia.code-workspace = file:/build/rust/OWNERS
 
 # Python-language support files
-per-file pyrightconfig.json,fuchsia.code-workspace = file:/build/python/OWNERS
+per-file pyproject.toml,pyrightconfig.json,fuchsia.code-workspace = file:/build/python/OWNERS
 
 # SHAC support files
 per-file shac.star,shac.textproto = file:/scripts/shac/OWNERS
