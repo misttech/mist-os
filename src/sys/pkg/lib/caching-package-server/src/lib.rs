@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    fidl_fuchsia_io as fio,
-    futures::{SinkExt as _, StreamExt as _},
+    fidl_fuchsia_io as fio, fuchsia_inspect as finspect,
+    futures::{future::BoxFuture, FutureExt as _, SinkExt as _, StreamExt as _},
     std::{
         collections::{HashMap, HashSet},
         sync::Arc,
@@ -82,11 +82,14 @@ impl<S: package_directory::NonMetaStorage + Clone> CachingPackageServer<S> {
     /// `hash` on `server_end`.
     /// The cleanup future returned by `Self::new` must be polled for this function to complete.
     /// Panics if the cleanup future returned by `Self::new` has been dropped.
+    /// If provided, `root_dir` must be backed by the same `NonMetaStorage` that `Self::new` was
+    /// called with.
     pub async fn serve(
         &self,
         hash: fuchsia_hash::Hash,
         flags: fio::OpenFlags,
         server_end: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
+        root_dir: Option<Arc<package_directory::RootDir<S>>>,
     ) -> Result<(), package_directory::Error> {
         {
             let packages = self.open_packages.lock().expect("poisoned mutex");
@@ -101,8 +104,10 @@ impl<S: package_directory::NonMetaStorage + Clone> CachingPackageServer<S> {
             }
         }
 
-        // Making a RootDir takes ~100,000 ns (it reads the meta.far), so do this without the lock.
-        let root_dir =
+        let root_dir = if let Some(root_dir) = root_dir {
+            root_dir
+        } else {
+            // Making a RootDir takes ~100 μs (reading the meta.far), so do this without the lock.
             match package_directory::RootDir::new(self.non_meta_storage.clone(), hash).await {
                 Ok(root_dir) => root_dir,
                 Err(e) => {
@@ -113,7 +118,8 @@ impl<S: package_directory::NonMetaStorage + Clone> CachingPackageServer<S> {
                     );
                     return Err(e);
                 }
-            };
+            }
+        };
         let scope_for_new_entry = {
             let mut packages = self.open_packages.lock().expect("poisoned mutex");
             let mut occupied;
@@ -151,6 +157,40 @@ impl<S: package_directory::NonMetaStorage + Clone> CachingPackageServer<S> {
     /// Packages with open fuchsia.io connections.
     pub fn open_packages(&self) -> HashSet<fuchsia_hash::Hash> {
         self.open_packages.lock().expect("poisoned mutex").keys().copied().collect::<HashSet<_>>()
+    }
+
+    /// Returns a callback to be given to `finspect::Node::record_lazy_child`.
+    /// Records the package hashes and their corresponding number of open non-blob connections.
+    pub fn record_lazy_inspect(
+        &self,
+    ) -> impl Fn() -> BoxFuture<'static, Result<finspect::Inspector, anyhow::Error>>
+           + Send
+           + Sync
+           + 'static {
+        let open_packages = Arc::downgrade(&self.open_packages);
+        move || {
+            let open_packages = open_packages.clone();
+            async move {
+                let inspector = finspect::Inspector::default();
+                if let Some(open_packages) = open_packages.upgrade() {
+                    let package_counts: HashMap<_, _> = {
+                        let open_packages = open_packages.lock().expect("poisoned mutex");
+                        open_packages
+                            .iter()
+                            .map(|(k, v)| (*k, Arc::strong_count(&v.1) as i64 - 1))
+                            .collect()
+                    };
+                    let root = inspector.root();
+                    let () = package_counts.into_iter().for_each(|(pkg, count)| {
+                        root.record_child(pkg.to_string(), |n| {
+                            n.record_int("non-blob connections", count)
+                        })
+                    });
+                }
+                Ok(inspector)
+            }
+            .boxed()
+        }
     }
 }
 
@@ -212,6 +252,7 @@ mod tests {
     use {
         super::*,
         assert_matches::assert_matches,
+        diagnostics_assertions::assert_data_tree,
         fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
         fuchsia_zircon as zx,
     };
@@ -228,7 +269,7 @@ mod tests {
 
         let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
         let () = server
-            .serve(metafar_blob.merkle, fio::OpenFlags::RIGHT_READABLE, server_end)
+            .serve(metafar_blob.merkle, fio::OpenFlags::RIGHT_READABLE, server_end, None)
             .await
             .unwrap();
 
@@ -258,7 +299,7 @@ mod tests {
 
         let (proxy0, server_end) = fidl::endpoints::create_proxy().unwrap();
         let () = server
-            .serve(metafar_blob.merkle, fio::OpenFlags::RIGHT_READABLE, server_end)
+            .serve(metafar_blob.merkle, fio::OpenFlags::RIGHT_READABLE, server_end, None)
             .await
             .unwrap();
         // One Arc in the cache and one Arc in the VFS connection.
@@ -271,7 +312,7 @@ mod tests {
 
         let (proxy1, server_end) = fidl::endpoints::create_proxy().unwrap();
         let () = server
-            .serve(metafar_blob.merkle, fio::OpenFlags::RIGHT_READABLE, server_end)
+            .serve(metafar_blob.merkle, fio::OpenFlags::RIGHT_READABLE, server_end, None)
             .await
             .unwrap();
         // One Arc in the cache and two Arcs in the VFS connections.
@@ -323,7 +364,7 @@ mod tests {
 
         let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
         let () = server
-            .serve(metafar_blob.merkle, fio::OpenFlags::RIGHT_READABLE, server_end)
+            .serve(metafar_blob.merkle, fio::OpenFlags::RIGHT_READABLE, server_end, None)
             .await
             .unwrap();
         // One Arc in the cache and one Arc in the VFS connection.
@@ -382,7 +423,7 @@ mod tests {
 
         let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
         assert_matches!(
-            server.serve([0; 32].into(), fio::OpenFlags::RIGHT_READABLE, server_end).await,
+            server.serve([0; 32].into(), fio::OpenFlags::RIGHT_READABLE, server_end, None).await,
             Err(package_directory::Error::MissingMetaFar)
         );
 
@@ -392,6 +433,38 @@ mod tests {
         );
         assert_eq!(server.open_packages().len(), 0);
 
+        drop(server);
+        let () = cleanup_fut.await;
+    }
+
+    #[fuchsia::test]
+    async fn inspect() {
+        let pkg = PackageBuilder::new("pkg-name").build().await.unwrap();
+        let (metafar_blob, _) = pkg.contents();
+        let (blobfs_fake, blobfs_client) = FakeBlobfs::new();
+        blobfs_fake.add_blob(metafar_blob.merkle, metafar_blob.contents);
+
+        let (server, cleanup_fut) = CachingPackageServer::new(blobfs_client);
+        let cleanup_fut = fuchsia_async::Task::spawn(cleanup_fut);
+
+        let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
+        let () = server
+            .serve(metafar_blob.merkle, fio::OpenFlags::RIGHT_READABLE, server_end, None)
+            .await
+            .unwrap();
+
+        let inspector = finspect::Inspector::default();
+        inspector.root().record_lazy_child("open-packages", server.record_lazy_inspect());
+
+        assert_data_tree!(inspector, root: {
+            "open-packages": {
+                pkg.hash().to_string() => {
+                    "non-blob connections": 1i64,
+                },
+            }
+        });
+
+        drop(proxy);
         drop(server);
         let () = cleanup_fut.await;
     }

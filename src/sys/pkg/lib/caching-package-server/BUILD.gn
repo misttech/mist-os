@@ -17,14 +17,17 @@ rustc_library("caching-package-server") {
 
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/pkg/lib/fuchsia-hash",
     "//src/sys/pkg/lib/package-directory",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
   ]
 
   test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-fs",
