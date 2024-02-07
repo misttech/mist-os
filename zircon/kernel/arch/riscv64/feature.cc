@@ -8,25 +8,31 @@
 
 #include <assert.h>
 #include <debug.h>
+#include <lib/arch/riscv64/feature.h>
 #include <pow2.h>
 #include <stdint.h>
 
 #include <arch/defines.h>
 #include <arch/riscv64.h>
+#include <phys/handoff.h>
 
 // Detected CPU features
-//
-// For now, assume the features are present as they are on QEMU.
-bool riscv_feature_cbom = true;
-bool riscv_feature_cboz = true;
-bool riscv_feature_svpbmt = true;
-bool riscv_feature_vector = true;
+bool riscv_feature_cbom = false;
+bool riscv_feature_cboz = false;
+bool riscv_feature_svpbmt = false;
+bool riscv_feature_vector = false;
 
 uint32_t riscv_cbom_size = 64;
 uint32_t riscv_cboz_size = 64;
 uint64_t riscv_vlenb = 0;
 
 void riscv64_feature_early_init() {
+  const arch::RiscvFeatures features = gPhysHandoff->arch_handoff.cpu_features;
+  riscv_feature_cbom = features[arch::RiscvFeature::kZicbom];
+  riscv_feature_cboz = features[arch::RiscvFeature::kZicboz];
+  riscv_feature_svpbmt = features[arch::RiscvFeature::kSvpbmt];
+  riscv_feature_vector = features[arch::RiscvFeature::kVector];
+
   if (riscv_feature_vector) {
     // We need vectors to have been enabled in order to read vlenb, but cannot
     // assume that they have been enabled at this point. Here is a good enough

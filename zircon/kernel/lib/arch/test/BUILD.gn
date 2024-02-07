@@ -23,6 +23,7 @@ if (is_host) {
       "nop-tests.cc",
       "paging-tests.cc",
       "power-tests.cc",
+      "riscv64-feature-tests.cc",
       "speculation-tests.cc",
     ]
     deps = [

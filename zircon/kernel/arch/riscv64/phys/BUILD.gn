@@ -35,9 +35,11 @@ if (toolchain_environment == "kernel.phys" ||
     deps = [
       ":arch-phys-info",
       ":arch-phys-info-asm",
+      "//src/lib/zbitl",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
+      "//zircon/kernel/phys:stdio",
     ]
   }
 
@@ -93,6 +95,7 @@ source_set("arch-phys-info") {
   ]
   public = [ "include/phys/arch/arch-phys-info.h" ]
   public_configs = [ ":includes" ]
+  public_deps = [ "//zircon/kernel/lib/arch" ]
 }
 
 hwreg_asm_header("arch-phys-info-asm") {

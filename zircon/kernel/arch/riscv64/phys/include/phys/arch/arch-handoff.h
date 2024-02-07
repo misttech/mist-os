@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_ARCH_RISCV64_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_
 #define ZIRCON_KERNEL_ARCH_RISCV64_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_
 
+#include <lib/arch/riscv64/feature.h>
 #include <lib/zbi-format/driver-config.h>
 #include <stdint.h>
 
@@ -17,6 +18,10 @@
 // physboot to the kernel proper at boot time.
 struct ArchPhysHandoff {
   uint64_t boot_hart_id;
+
+  // The lowest common denominator of all supported features/extensions across
+  // all harts.
+  arch::RiscvFeatures cpu_features;
 
   // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_RISCV_PLIC) payload.
   ktl::optional<zbi_dcfg_riscv_plic_driver_t> plic_driver;

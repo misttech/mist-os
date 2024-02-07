@@ -18,6 +18,7 @@ void HandoffPrep::ArchHandoff() {
   ArchPhysHandoff& arch_handoff = handoff_->arch_handoff;
 
   arch_handoff.boot_hart_id = gArchPhysInfo->boot_hart_id;
+  arch_handoff.cpu_features = gArchPhysInfo->cpu_features;
 }
 
 void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
