@@ -29,69 +29,69 @@ void JSONGenerator::Generate(const ConstantValue& value) {
   switch (value.kind) {
     case ConstantValue::Kind::kUint8:
     case ConstantValue::Kind::kZxUchar: {
-      auto& numeric_constant = reinterpret_cast<const NumericConstantValue<uint8_t>&>(value);
-      EmitNumeric<uint64_t>(static_cast<uint8_t>(numeric_constant), kAsString);
+      auto& numeric_constant = static_cast<const NumericConstantValue<uint8_t>&>(value);
+      EmitNumeric(numeric_constant.value, kAsString);
       break;
     }
     case ConstantValue::Kind::kUint16: {
-      auto& numeric_constant = reinterpret_cast<const NumericConstantValue<uint16_t>&>(value);
-      EmitNumeric<uint64_t>(static_cast<uint16_t>(numeric_constant), kAsString);
+      auto& numeric_constant = static_cast<const NumericConstantValue<uint16_t>&>(value);
+      EmitNumeric(numeric_constant.value, kAsString);
       break;
     }
     case ConstantValue::Kind::kUint32: {
-      auto& numeric_constant = reinterpret_cast<const NumericConstantValue<uint32_t>&>(value);
-      EmitNumeric<uint64_t>(static_cast<uint32_t>(numeric_constant), kAsString);
+      auto& numeric_constant = static_cast<const NumericConstantValue<uint32_t>&>(value);
+      EmitNumeric(numeric_constant.value, kAsString);
       break;
     }
     case ConstantValue::Kind::kUint64:
     case ConstantValue::Kind::kZxUsize64:
     case ConstantValue::Kind::kZxUintptr64: {
-      auto& numeric_constant = reinterpret_cast<const NumericConstantValue<uint64_t>&>(value);
-      EmitNumeric<uint64_t>(static_cast<uint64_t>(numeric_constant), kAsString);
+      auto& numeric_constant = static_cast<const NumericConstantValue<uint64_t>&>(value);
+      EmitNumeric(numeric_constant.value, kAsString);
       break;
     }
     case ConstantValue::Kind::kInt8: {
-      auto& numeric_constant = reinterpret_cast<const NumericConstantValue<int8_t>&>(value);
-      EmitNumeric<int64_t>(static_cast<int8_t>(numeric_constant), kAsString);
+      auto& numeric_constant = static_cast<const NumericConstantValue<int8_t>&>(value);
+      EmitNumeric(numeric_constant.value, kAsString);
       break;
     }
     case ConstantValue::Kind::kInt16: {
-      auto& numeric_constant = reinterpret_cast<const NumericConstantValue<int16_t>&>(value);
-      EmitNumeric<int64_t>(static_cast<int16_t>(numeric_constant), kAsString);
+      auto& numeric_constant = static_cast<const NumericConstantValue<int16_t>&>(value);
+      EmitNumeric(numeric_constant.value, kAsString);
       break;
     }
     case ConstantValue::Kind::kInt32: {
-      auto& numeric_constant = reinterpret_cast<const NumericConstantValue<int32_t>&>(value);
-      EmitNumeric<int64_t>(static_cast<int32_t>(numeric_constant), kAsString);
+      auto& numeric_constant = static_cast<const NumericConstantValue<int32_t>&>(value);
+      EmitNumeric(numeric_constant.value, kAsString);
       break;
     }
     case ConstantValue::Kind::kInt64: {
-      auto& numeric_constant = reinterpret_cast<const NumericConstantValue<int64_t>&>(value);
-      EmitNumeric<int64_t>(static_cast<int64_t>(numeric_constant), kAsString);
+      auto& numeric_constant = static_cast<const NumericConstantValue<int64_t>&>(value);
+      EmitNumeric(numeric_constant.value, kAsString);
       break;
     }
     case ConstantValue::Kind::kFloat32: {
-      auto& numeric_constant = reinterpret_cast<const NumericConstantValue<float>&>(value);
-      EmitNumeric<float>(static_cast<float>(numeric_constant), kAsString);
+      auto& numeric_constant = static_cast<const NumericConstantValue<float>&>(value);
+      EmitNumeric(numeric_constant.value, kAsString);
       break;
     }
     case ConstantValue::Kind::kFloat64: {
-      auto& numeric_constant = reinterpret_cast<const NumericConstantValue<double>&>(value);
-      EmitNumeric<double>(static_cast<double>(numeric_constant), kAsString);
+      auto& numeric_constant = static_cast<const NumericConstantValue<double>&>(value);
+      EmitNumeric(numeric_constant.value, kAsString);
       break;
     }
     case ConstantValue::Kind::kBool: {
-      auto& bool_constant = reinterpret_cast<const BoolConstantValue&>(value);
+      auto& bool_constant = static_cast<const BoolConstantValue&>(value);
       EmitBoolean(static_cast<bool>(bool_constant), kAsString);
       break;
     }
     case ConstantValue::Kind::kDocComment: {
-      auto& doc_comment_constant = reinterpret_cast<const DocCommentConstantValue&>(value);
+      auto& doc_comment_constant = static_cast<const DocCommentConstantValue&>(value);
       EmitString(doc_comment_constant.MakeContents());
       break;
     }
     case ConstantValue::Kind::kString: {
-      auto& string_constant = reinterpret_cast<const StringConstantValue&>(value);
+      auto& string_constant = static_cast<const StringConstantValue&>(value);
       EmitLiteral(string_constant.value);
       break;
     }
@@ -289,11 +289,11 @@ void JSONGenerator::Generate(const Name& name) {
   // and to satisfy the schema we must produce a proper compound identifier
   // (with a library name). We should solve this in a cleaner way.
   if (name.is_intrinsic() && name.decl_name() == "MAX") {
-    Generate(std::string_view("fidl/MAX"));
+    EmitString(std::string_view("fidl/MAX"));
   } else if (name.is_intrinsic() && name.decl_name() == "HEAD") {
-    Generate(std::string_view("fidl/HEAD"));
+    EmitString(std::string_view("fidl/HEAD"));
   } else {
-    Generate(NameFlatName(name));
+    EmitString(NameFlatName(name));
   }
 }
 

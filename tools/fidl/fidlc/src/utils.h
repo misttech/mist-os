@@ -159,17 +159,29 @@ ParseNumericResult ParseNumeric(std::string_view input, NumericType* out_value, 
     base = 2;
   }
   char* endptr;
-  if constexpr (std::is_unsigned<NumericType>::value) {
+  if constexpr (std::is_integral_v<NumericType> && std::is_unsigned_v<NumericType>) {
     if (input[0] == '-')
       return ParseNumericResult::kOutOfBounds;
     errno = 0;
+    // NOLINTNEXTLINE(google-runtime-int): strtoull returns unsigned long long.
     unsigned long long value = strtoull(startptr, &endptr, base);
     if (errno != 0)
       return ParseNumericResult::kMalformed;
     if (value > std::numeric_limits<NumericType>::max())
       return ParseNumericResult::kOutOfBounds;
     *out_value = static_cast<NumericType>(value);
-  } else if constexpr (std::is_floating_point<NumericType>::value) {
+  } else if constexpr (std::is_integral_v<NumericType> && std::is_signed_v<NumericType>) {
+    errno = 0;
+    // NOLINTNEXTLINE(google-runtime-int): strtoll returns long long.
+    long long value = strtoll(startptr, &endptr, base);
+    if (errno != 0)
+      return ParseNumericResult::kMalformed;
+    if (value > std::numeric_limits<NumericType>::max())
+      return ParseNumericResult::kOutOfBounds;
+    if (value < std::numeric_limits<NumericType>::lowest())
+      return ParseNumericResult::kOutOfBounds;
+    *out_value = static_cast<NumericType>(value);
+  } else if constexpr (std::is_floating_point_v<NumericType>) {
     errno = 0;
     long double value = strtold(startptr, &endptr);
     if (errno != 0)
@@ -180,15 +192,7 @@ ParseNumericResult ParseNumeric(std::string_view input, NumericType* out_value, 
       return ParseNumericResult::kOutOfBounds;
     *out_value = static_cast<NumericType>(value);
   } else {
-    errno = 0;
-    long long value = strtoll(startptr, &endptr, base);
-    if (errno != 0)
-      return ParseNumericResult::kMalformed;
-    if (value > std::numeric_limits<NumericType>::max())
-      return ParseNumericResult::kOutOfBounds;
-    if (value < std::numeric_limits<NumericType>::lowest())
-      return ParseNumericResult::kOutOfBounds;
-    *out_value = static_cast<NumericType>(value);
+    static_assert(false, "NumericType should be unsigned, signed, or float");
   }
   if (endptr != (input.data() + input.size()))
     return ParseNumericResult::kMalformed;

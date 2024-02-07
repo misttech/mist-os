@@ -89,7 +89,7 @@ class JsonWriter {
 
   void Generate(std::string value) { EmitString(value); }
 
-  void Generate(uint32_t value) { EmitNumeric<uint64_t>(value); }
+  void Generate(uint32_t value) { EmitNumeric(value); }
   void Generate(int64_t value) { EmitNumeric(value); }
   void Generate(uint64_t value) { EmitNumeric(value); }
 
@@ -251,18 +251,17 @@ class JsonWriter {
 
   template <typename T>
   void EmitNumeric(T value, ConstantStyle style = kAsConstant) {
-    // Enforce widening integers to 64 bits rather than instantiating for 8, 16,
-    // and 32 bits. In particular, uint8_t and int8_t are problematic because
-    // operator<< will print them as characters (e.g. 'A' for 65).
-    static_assert(std::is_same_v<T, uint64_t> || std::is_same_v<T, int64_t> ||
-                      std::is_same_v<T, float> || std::is_same_v<T, double>,
-                  "EmitNumeric can only be used with uint64_t, int64_t, float, or double");
+    // Unary plus promotes integers to be at least as wide as (unsigned) int.
+    // This ensures we don't print (u)int8_t as an ASCII character.
+    // https://en.cppreference.com/w/c/language/conversion#Integer_promotions
+    auto promoted_value = +value;
+    static_assert(sizeof(promoted_value) >= sizeof(int));
     switch (style) {
       case ConstantStyle::kAsConstant:
-        os_ << value;
+        os_ << promoted_value;
         break;
       case ConstantStyle::kAsString:
-        os_ << "\"" << value << "\"";
+        os_ << "\"" << promoted_value << "\"";
         break;
     }
   }

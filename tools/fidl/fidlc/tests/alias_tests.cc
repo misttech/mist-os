@@ -254,7 +254,7 @@ alias alias_of_vector_of_string = vector<string>;
   EXPECT_EQ(NameFlatName(invocation.from_alias->name), "example/alias_of_vector_of_string");
   EXPECT_EQ(invocation.element_type_resolved, nullptr);
   EXPECT_NE(invocation.size_resolved, nullptr);
-  EXPECT_EQ(static_cast<uint32_t>(*invocation.size_resolved), 8u);
+  EXPECT_EQ(invocation.size_resolved->value, 8u);
   EXPECT_EQ(invocation.nullability, Nullability::kNonnullable);
 }
 

@@ -59,8 +59,6 @@ struct NumericConstantValue final : ConstantValue {
 
   explicit NumericConstantValue(ValueType value) : ConstantValue(GetKind()), value(value) {}
 
-  explicit operator ValueType() const { return value; }
-
   friend bool operator==(const NumericConstantValue<ValueType>& l,
                          const NumericConstantValue<ValueType>& r) {
     return l.value == r.value;
@@ -144,6 +142,9 @@ struct NumericConstantValue final : ConstantValue {
     if constexpr (std::is_same_v<ValueType, float>)
       return Kind::kFloat32;
   }
+
+  template <typename TargetType>
+  bool ConvertTo(std::unique_ptr<ConstantValue>* out_value) const;
 };
 
 using SizeValue = NumericConstantValue<uint32_t>;

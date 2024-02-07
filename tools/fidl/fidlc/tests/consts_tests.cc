@@ -22,7 +22,7 @@ void CheckConstEq(TestLibrary& library, std::string_view name, PrimitiveType exp
   ASSERT_EQ(expected_constant_value_kind, const_decl->value->Value().kind);
   auto& numeric_const_value =
       static_cast<const NumericConstantValue<PrimitiveType>&>(const_decl->value->Value());
-  EXPECT_EQ(expected_value, static_cast<PrimitiveType>(numeric_const_value));
+  EXPECT_EQ(expected_value, numeric_const_value.value);
 }
 
 TEST(ConstsTests, GoodLiteralsTest) {
@@ -124,7 +124,7 @@ TEST(ConstsTests, GoodConstTestInt64) {
   ASSERT_COMPILED(library);
 }
 
-TEST(ConstsTests, GoodConstTesUint64) {
+TEST(ConstsTests, GoodConstTestUint64) {
   TestLibrary library;
   library.AddFile("good/fi-0066-a.test.fidl");
   ASSERT_COMPILED(library);
@@ -835,6 +835,141 @@ TEST(ConstsTests, GoodDeclaration) {
   TestLibrary library;
   library.AddFile("good/fi-0006.test.fidl");
   ASSERT_COMPILED(library);
+}
+
+TEST(ConstsTests, GoodIntegerConvertWider) {
+  TestLibrary library(R"FIDL(
+library example;
+const X uint16 = 23;
+const WIDE uint32 = X;
+)FIDL");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ConstsTests, GoodIntegerConvertNarrower) {
+  TestLibrary library(R"FIDL(
+library example;
+const X uint16 = 255;
+const NARROW uint8 = X;
+)FIDL");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ConstsTests, GoodIntegerConvertToSigned) {
+  TestLibrary library(R"FIDL(
+library example;
+const X uint16 = 23;
+const SIGNED int16 = X;
+)FIDL");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ConstsTests, GoodIntegerConvertToUnsigned) {
+  TestLibrary library(R"FIDL(
+library example;
+const X int16 = 23;
+const UNSIGNED uint16 = X;
+)FIDL");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ConstsTests, BadIntegerConvertNarrowerOutOfRange) {
+  TestLibrary library(R"FIDL(
+library example;
+const X uint16 = 256;
+const NARROW uint8 = X;
+)FIDL");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "example/X", "uint16", "uint8");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(ConstsTests, BadIntegerConvertToSignedOutOfRange) {
+  TestLibrary library(R"FIDL(
+library example;
+const X uint16 = 32768; // 2^15
+const SIGNED int16 = X;
+)FIDL");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "example/X", "uint16", "int16");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(ConstsTests, BadIntegerConvertToUnsignedNegative) {
+  TestLibrary library(R"FIDL(
+library example;
+const X int16 = -1;
+const UNSIGNED uint16 = X;
+)FIDL");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "example/X", "int16", "uint16");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(ConstsTests, GoodConvertFloatWider) {
+  TestLibrary library(R"FIDL(
+library example;
+const X float32 = 23;
+const WIDE float64 = X;
+)FIDL");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ConstsTests, GoodConvertFloatNarrower) {
+  TestLibrary library(R"FIDL(
+library example;
+const X float64 = 3.4028234663852886e38; // max float32
+const NARROW float32 = X;
+)FIDL");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ConstsTests, BadConvertFloatNarrowerOutOfRangePositive) {
+  TestLibrary library(R"FIDL(
+library example;
+const X float64 = 3.402823466385289e38; // just above max float32
+const NARROW float32 = X;
+)FIDL");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "example/X", "float64", "float32");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(ConstsTests, BadConvertFloatNarrowerOutOfRangeNegative) {
+  TestLibrary library(R"FIDL(
+library example;
+const X float64 = -3.402823466385289e38; // just below min float32
+const NARROW float32 = X;
+)FIDL");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "example/X", "float64", "float32");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+// It would be reasonable to allow conversions that don't lose precision (e.g.
+// for float64 up to 2^53-1) but for simplicity we don't allow it right now.
+TEST(ConstsTests, BadConvertIntegerToFloat) {
+  TestLibrary library(R"FIDL(
+library example;
+const X uint16 = 1;
+const FLOAT float32 = X;
+)FIDL");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "example/X", "uint16", "float32");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+// It would be reasonable to allow conversions from floats that are exact
+// integers, or to truncate, but for simplicity we don't allow it right now.
+TEST(ConstsTests, BadConvertFloatToInteger) {
+  TestLibrary library(R"FIDL(
+library example;
+const X float32 = 1;
+const INTEGER uint16 = X;
+)FIDL");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "example/X", "float32", "uint16");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace
