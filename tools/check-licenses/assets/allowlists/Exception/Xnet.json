@@ -1,0 +1,19 @@
+{
+  "result": {
+    "allowlists": [
+      {
+        "name": "Xnet",
+        "matchType": "Exception",
+        "entries": [
+          {
+            "projects": [
+              "third_party/shaderc/third_party"
+            ],
+            "bug": "fxbug.dev/324264023",
+            "notes": ["Temporary allowlist. Understand why the shaderc lib is matching to Xnet."]
+          }
+        ]
+      }
+    ]
+  }
+}
