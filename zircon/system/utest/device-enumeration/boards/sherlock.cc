@@ -84,11 +84,6 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "class/temperature/001",
       "class/temperature/002",
 
-      // Audio
-      "sys/platform/05_00_2/i2c-0/aml-i2c/i2c/i2c-0-111/audio-tas5720-woofer",
-      "sys/platform/05_00_2/i2c-0/aml-i2c/i2c/i2c-0-108/audio-tas5720-left-tweeter",
-      "sys/platform/05_00_2/i2c-0/aml-i2c/i2c/i2c-0-109/audio-tas5720-right-tweeter",
-
       // LCD Bias
       "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-62",
 

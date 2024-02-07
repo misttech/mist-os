@@ -11,12 +11,7 @@ driver_bind_rules("ti_tas5720-bind") {
   rules = "ti_tas5720.bind"
   bind_output = "tas5720.bindbc"
   tests = "tests.json"
-  deps = [
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.i2c",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.ti.platform",
-  ]
+  deps = [ "//src/devices/bind/fuchsia.ti.platform" ]
 }
 
 fuchsia_driver("tas5720-driver") {

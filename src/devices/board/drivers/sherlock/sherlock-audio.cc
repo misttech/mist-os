@@ -18,7 +18,6 @@
 #include <bind/fuchsia/codec/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
-#include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/ti/platform/cpp/bind.h>
 #include <ddktl/metadata/audio.h>
 #include <soc/aml-common/aml-audio.h>
@@ -29,6 +28,9 @@
 
 #include "sherlock-gpios.h"
 #include "sherlock.h"
+#include "src/devices/board/drivers/sherlock/sherlock-tweeter-left-bind.h"
+#include "src/devices/board/drivers/sherlock/sherlock-tweeter-right-bind.h"
+#include "src/devices/board/drivers/sherlock/sherlock-woofer-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 // Enables BT PCM audio.
@@ -43,7 +45,8 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 
 zx_status_t AddTas5720Device(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus,
                              const char* device_name, uint32_t device_instance_id,
-                             uint32_t i2c_address, const uint32_t* instance_count) {
+                             cpp20::span<const device_fragment_t> device_fragments,
+                             const uint32_t* instance_count) {
   fpbus::Node dev;
   dev.name() = device_name;
   dev.pid() = PDEV_PID_GENERIC;
@@ -59,40 +62,12 @@ zx_status_t AddTas5720Device(fdf::WireSyncClient<fuchsia_hardware_platform_bus::
       }},
   };
 
-  const auto gpio_init_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
-  };
-  const auto gpio_init_props = std::vector{
-      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
-  };
-
-  const auto i2c_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
-      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, static_cast<uint32_t>(SHERLOCK_I2C_A0_0)),
-      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS, i2c_address),
-  };
-  const auto i2c_props = std::vector{
-      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
-  };
-
-  std::vector<fuchsia_driver_framework::ParentSpec> parents = {
-      fuchsia_driver_framework::ParentSpec{{
-          .bind_rules = std::move(gpio_init_rules),
-          .properties = std::move(gpio_init_props),
-      }},
-      fuchsia_driver_framework::ParentSpec{{
-          .bind_rules = std::move(i2c_rules),
-          .properties = std::move(i2c_props),
-      }}};
-
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('5720');
-  auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
-      fidl::ToWire(fidl_arena, dev),
-      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = device_name, .parents = parents}}));
-
+  auto fragments = platform_bus_composite::MakeFidlFragment(fidl_arena, device_fragments.data(),
+                                                            device_fragments.size());
+  fdf::WireUnownedResult result =
+      pbus.buffer(arena)->AddComposite(fidl::ToWire(fidl_arena, dev), fragments, "i2c");
   if (!result.ok()) {
     zxlogf(ERROR, "Failed to send AddComposite request: %s", result.status_string());
     return result.status();
@@ -189,7 +164,7 @@ zx_status_t Sherlock::AudioInit() {
       .properties = enable_audio_gpio_props,
   }});
 
-  // Add a composite for each codec instance.
+  // Add a spec for the woofer, left tweeter, and right tweeter in that order.
   for (size_t i = 0; i < 3; i++) {
     auto codec_rules = std::vector{
         fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
@@ -251,7 +226,7 @@ zx_status_t Sherlock::AudioInit() {
 
     constexpr uint32_t woofer_instance_count = 1;
     zx_status_t status = AddTas5720Device(pbus_, "audio-tas5720-woofer", woofer_instance_count,
-                                          0x6f, &woofer_instance_count);
+                                          audio_tas5720_woofer_fragments, &woofer_instance_count);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to add woofer composite device: %s", zx_status_get_string(status));
       return status;
@@ -259,7 +234,7 @@ zx_status_t Sherlock::AudioInit() {
 
     constexpr uint32_t left_tweeter_instance_count = 2;
     status = AddTas5720Device(pbus_, "audio-tas5720-left-tweeter", left_tweeter_instance_count,
-                              0x6c, &left_tweeter_instance_count);
+                              audio_tas5720_tweeter_left_fragments, &left_tweeter_instance_count);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to add left tweeter composite device: %s",
              zx_status_get_string(status));
@@ -268,7 +243,7 @@ zx_status_t Sherlock::AudioInit() {
 
     constexpr uint32_t right_tweeter_instance_count = 3;
     status = AddTas5720Device(pbus_, "audio-tas5720-right-tweeter", right_tweeter_instance_count,
-                              0x6d, &right_tweeter_instance_count);
+                              audio_tas5720_tweeter_right_fragments, &right_tweeter_instance_count);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to add right tweeter composite device: %s",
              zx_status_get_string(status));
