@@ -378,11 +378,11 @@ async fn expect_data(channel: &mut Channel, expected: Vec<at::Response>) {
 
 /// Serializes and sends the provided AT `command` using the `channel` and then
 /// expects the `expected` response.
-async fn send_command_and_expect_response(
+fn send_command_and_expect_response(
     channel: &mut Channel,
     command: at::Command,
     expected: Vec<at::Response>,
-) {
+) -> impl futures::Future<Output = ()> + '_ {
     // Serialize and send.
     let mut bytes = Vec::new();
     let commands = vec![command];
@@ -390,7 +390,7 @@ async fn send_command_and_expect_response(
     let _ = channel.as_ref().write(&bytes);
 
     // Expect the `expected` data as a response.
-    expect_data(channel, expected).await;
+    expect_data(channel, expected)
 }
 
 // TODO(https://fxbug.dev/42151045) Stop using raw bytes.
@@ -437,10 +437,35 @@ async fn test_hfp_full_slc_init_procedure(tf: HfpAgIntegrationTest) {
     // Peer sends its HF features to the HFP component (AG) - we expect HFP to send
     // its AG features back.
     let hf_features_cmd = at::Command::Brsf { features: 0b11_1111_1111_1111 };
+
+    // AG Supported features bitmask:
+    // 0 Three-way calling
+    // 1 EC and/or NR function
+    // 2 Voice recognition function
+    // 3 In-band ring tone capability
+    //
+    // 4 Attach a number to a voice tag
+    // 5 Ability to reject a call
+    // 6 Enhanced call status
+    // 7 Enhanced call control
+    //
+    // 8 Extended Error Result Codes
+    // 9 Codec negotiation
+    // 10 HF Indicators
+    // 11 eSCO S4 Settings Supported
+    //
+    // 12 Enhanced Voice Recognition Status
+    // 13 Voice Recognition Text
+    // 14-31 Reserved for future use
+    let brsf_expected_ag_features = 0b0000_1111_0100_0000i64;
+
     send_command_and_expect_response(
         &mut remote,
         hf_features_cmd,
-        vec![at::success(at::Success::Brsf { features: 3906i64 }), at::Response::Ok],
+        vec![
+            at::success(at::Success::Brsf { features: brsf_expected_ag_features }),
+            at::Response::Ok,
+        ],
     )
     .await;
 

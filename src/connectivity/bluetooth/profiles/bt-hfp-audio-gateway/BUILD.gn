@@ -127,13 +127,14 @@ fuchsia_structured_config_rust_lib("hfp_profile_config") {
   cm_label = ":manifest"
 }
 
+# LINT.IfChange
 fuchsia_structured_config_values("default_config_values") {
   cm_label = ":manifest"
   values = {
     reject_incoming_voice_call = false
     three_way_calling = false
     in_band_ringtone = false
-    echo_canceling_and_noise_reduction = true
+    echo_canceling_and_noise_reduction = false
     voice_recognition = false
     attach_phone_number_to_voice_tag = false
     respond_and_hold = false
@@ -145,6 +146,8 @@ fuchsia_structured_config_values("default_config_values") {
     controller_encoding_msbc = true
   }
 }
+
+# LINT.ThenChange(//src/connectivity/bluetooth/profiles/tests/bt-hfp-audio-gateway-integration-tests/src/main.rs)
 
 fuchsia_component("component") {
   cm_label = ":manifest"
