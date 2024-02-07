@@ -137,6 +137,12 @@ impl AbstractPermission {
     }
 }
 
+impl From<Permission> for AbstractPermission {
+    fn from(permission: Permission) -> Self {
+        Self::System(permission)
+    }
+}
+
 pub trait ClassPermission {
     fn class(&self) -> ObjectClass;
 }
@@ -187,6 +193,8 @@ permission_enum! {
     Permission {
         /// Permissions for the well-known SELinux "process" object class.
         Process(ProcessPermission),
+        /// Permissions for the well-known SELinux "file" object class.
+        File(FilePermission),
     }
 }
 
@@ -241,9 +249,21 @@ impl ProcessPermission {
     }
 }
 
-impl From<Permission> for AbstractPermission {
-    fn from(permission: Permission) -> Self {
-        Self::System(permission)
+class_permission_enum! {
+    /// A well-known "file" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    FilePermission {
+        /// Permission to create a file.
+        Create,
+    }
+}
+
+impl FilePermission {
+    pub fn name(&self) -> &'static str {
+        match self {
+            FilePermission::Create => "create",
+        }
     }
 }
 

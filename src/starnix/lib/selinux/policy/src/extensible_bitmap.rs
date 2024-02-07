@@ -226,7 +226,7 @@ mod tests {
     };
     use std::{borrow::Borrow, marker::PhantomData};
 
-    pub struct ExtensibleBitmapIterator<PS: ParseStrategy, B: Borrow<ExtensibleBitmap<PS>>> {
+    pub(crate) struct ExtensibleBitmapIterator<PS: ParseStrategy, B: Borrow<ExtensibleBitmap<PS>>> {
         extensible_bitmap: B,
         i: u32,
         _marker: PhantomData<PS>,

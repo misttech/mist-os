@@ -16,8 +16,8 @@ use super::{
     parser::ParseStrategy,
     symbols::{
         find_class_by_name, find_class_permission_by_name, find_type_alias_or_attribute_by_name,
-        Category, Class, Classes, CommonSymbol, ConditionalBoolean, Permission, Role, Sensitivity,
-        SymbolList, Type, User,
+        Category, Class, Classes, CommonSymbol, CommonSymbols, ConditionalBoolean, Permission,
+        Role, Sensitivity, SymbolList, Type, User,
     },
     AccessVector, Parse, Validate,
 };
@@ -284,6 +284,10 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
     pub(crate) fn classes(&self) -> &Classes<PS> {
         &self.classes.data
+    }
+
+    pub(crate) fn common_symbols(&self) -> &CommonSymbols<PS> {
+        &self.common_symbols.data
     }
 
     #[cfg(feature = "selinux_policy_test_api")]

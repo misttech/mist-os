@@ -4,7 +4,7 @@
 
 use super::{
     parser::ParseStrategy,
-    symbols::{Class, Permission},
+    symbols::{Class, Classes, CommonSymbol, CommonSymbols, Permission},
     ParsedPolicy,
 };
 
@@ -25,7 +25,7 @@ pub(crate) struct PolicyIndex<PS: ParseStrategy> {
     classes: HashMap<sc::ObjectClass, usize>,
     /// Map from well-known permissions to their class's associated [`crate::symbols::Permissions`]
     /// collection.
-    permissions: HashMap<sc::Permission, usize>,
+    permissions: HashMap<sc::Permission, PermissionIndex>,
     /// The parsed binary policy.
     parsed_policy: ParsedPolicy<PS>,
 }
@@ -37,67 +37,52 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
     /// constructor. This operation fails if any well-known names are not found in `parsed_policy`.
     pub fn new(parsed_policy: ParsedPolicy<PS>) -> Result<Self, anyhow::Error> {
         let policy_classes = parsed_policy.classes();
+        let common_symbols = parsed_policy.common_symbols();
+
+        // Accumulate classes indexed by `selinux_common::ObjectClass`. If a class cannot be found
+        // by name, add it to `missed_classes` for thorough error reporting.
         let mut classes = HashMap::new();
-        let mut known_classes = sc::ObjectClass::all_variants();
-        for i in 0..policy_classes.len() {
-            let policy_class = &policy_classes[i];
-            let mut found = None;
-            for j in 0..known_classes.len() {
-                let known_class = &known_classes[j];
-                if policy_class.name_bytes() == known_class.name().as_bytes() {
-                    found = Some(j);
-                    break;
+        let mut missed_classes = vec![];
+        for known_class in sc::ObjectClass::all_variants().into_iter() {
+            match get_class_index_by_name(policy_classes, known_class.name()) {
+                Some(class_index) => {
+                    classes.insert(known_class, class_index);
+                }
+                None => {
+                    missed_classes.push(known_class);
                 }
             }
-            if let Some(j) = found {
-                let known_class = known_classes.remove(j);
-                classes.insert(known_class.clone(), i);
-            }
         }
-        if known_classes.len() > 0 {
+        if missed_classes.len() > 0 {
             return Err(anyhow::anyhow!(
                 "failed to locate well-known SELinux object classes {:?} in SELinux binary policy",
-                known_classes.iter().map(sc::ObjectClass::name).collect::<Vec<_>>()
+                missed_classes.iter().map(sc::ObjectClass::name).collect::<Vec<_>>()
             ));
         }
 
+        // Accumulate permissions indexed by `selinux_common::Permission`. If a permission cannot be
+        // found by name, add it to `missed_permissions` for thorough error reporting.
         let mut permissions = HashMap::new();
-        let mut known_permissions = sc::Permission::all_variants();
-        let mut i = 0;
-        while i < known_permissions.len() {
-            let known_permission = &known_permissions[i];
+        let mut missed_permissions = vec![];
+        for known_permission in sc::Permission::all_variants().into_iter() {
             let object_class = known_permission.class();
-            if let Some(class_idx) = classes.get(&object_class) {
-                let class = &policy_classes[*class_idx];
-                let mut found = None;
-                let class_permissions = class.permissions();
-                for j in 0..class_permissions.len() {
-                    let permission = &class_permissions[j];
-                    if permission.name_bytes() == known_permission.name().as_bytes() {
-                        found = Some(j);
-                        break;
-                    }
-                }
-                if let Some(j) = found {
-                    let known_permission = known_permissions.remove(i);
-                    permissions.insert(known_permission, j);
-
-                    // `i = i + 1 - 1 = i` on account of `known_permissions` removal.
+            if let Some(class_index) = classes.get(&object_class) {
+                let class = &policy_classes[*class_index];
+                if let Some(permission_index) =
+                    get_permission_index_by_name(common_symbols, class, known_permission.name())
+                {
+                    permissions.insert(known_permission, permission_index);
                 } else {
-                    // Known permission not found. Skip it and report the full set of missing
-                    // permissions after loop completes.
-                    i += 1
+                    missed_permissions.push(known_permission);
                 }
             } else {
-                // Permission class not found. Skip this permission and report the full set of
-                // missing permissions after loop completes.
-                i += 1;
+                missed_permissions.push(known_permission);
             }
         }
-        if known_permissions.len() > 0 {
+        if missed_permissions.len() > 0 {
             return Err(anyhow::anyhow!(
                 "failed to locate well-known SELinux object permissions {:?} in SELinux binary policy",
-                known_permissions
+                missed_permissions
                     .iter()
                     .map(|permission| {
                         let object_class = permission.class();
@@ -118,12 +103,117 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
 
     pub fn permission<'a>(&'a self, permission: &sc::Permission) -> &'a Permission<PS> {
         let target_class = self.class(&permission.class());
-        let permission_offset =
-            *self.permissions.get(permission).expect("policy permission index is exhaustive");
-        &target_class.permissions()[permission_offset]
+        match *self.permissions.get(permission).expect("policy permission index is exhaustive") {
+            PermissionIndex::Class { permission_index } => {
+                &target_class.permissions()[permission_index]
+            }
+            PermissionIndex::Common { common_symbol_index, permission_index } => {
+                let common_symbol = &self.parsed_policy().common_symbols()[common_symbol_index];
+                &common_symbol.permissions()[permission_index]
+            }
+        }
     }
 
     pub(crate) fn parsed_policy(&self) -> &ParsedPolicy<PS> {
         &self.parsed_policy
     }
+}
+
+/// Permissions may be stored in their associated [`Class`], or on the class's associated
+/// [`CommonSymbol`]. This is a consequence of a limited form of inheritance supported for SELinux
+/// policy classes. Classes may inherit from zero or one `common`. For example:
+///
+/// ```config
+/// common file { ioctl read write create [...] }
+/// class file inherits file { execute_no_trans entrypoint }
+/// ```
+///
+/// In the above example, the "ioctl" permission for the "file" `class` is stored as a permission
+/// on the "file" `common`, whereas the permission "execute_no_trans" is stored as a permission on
+/// the "file" `class`.
+#[derive(Debug)]
+enum PermissionIndex {
+    /// Permission is located at `Class::permissions()[permission_index]`.
+    Class { permission_index: usize },
+    /// Permission is located at
+    /// `ParsedPolicy::common_symbols()[common_symbol_index].permissions()[permission_index]`.
+    Common { common_symbol_index: usize, permission_index: usize },
+}
+
+fn get_class_index_by_name<'a, PS: ParseStrategy>(
+    classes: &'a Classes<PS>,
+    name: &str,
+) -> Option<usize> {
+    let name_bytes = name.as_bytes();
+    for i in 0..classes.len() {
+        if classes[i].name_bytes() == name_bytes {
+            return Some(i);
+        }
+    }
+
+    None
+}
+
+fn get_common_symbol_index_by_name_bytes<'a, PS: ParseStrategy>(
+    common_symbols: &'a CommonSymbols<PS>,
+    name_bytes: &[u8],
+) -> Option<usize> {
+    for i in 0..common_symbols.len() {
+        if common_symbols[i].name_bytes() == name_bytes {
+            return Some(i);
+        }
+    }
+
+    None
+}
+
+fn get_permission_index_by_name<'a, PS: ParseStrategy>(
+    common_symbols: &'a CommonSymbols<PS>,
+    class: &'a Class<PS>,
+    name: &str,
+) -> Option<PermissionIndex> {
+    if let Some(permission_index) = get_class_permission_index_by_name(class, name) {
+        Some(PermissionIndex::Class { permission_index })
+    } else if let Some(common_symbol_index) =
+        get_common_symbol_index_by_name_bytes(common_symbols, class.common_name_bytes())
+    {
+        let common_symbol = &common_symbols[common_symbol_index];
+        if let Some(permission_index) = get_common_permission_index_by_name(common_symbol, name) {
+            Some(PermissionIndex::Common { common_symbol_index, permission_index })
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn get_class_permission_index_by_name<'a, PS: ParseStrategy>(
+    class: &'a Class<PS>,
+    name: &str,
+) -> Option<usize> {
+    let name_bytes = name.as_bytes();
+    let permissions = class.permissions();
+    for i in 0..permissions.len() {
+        if permissions[i].name_bytes() == name_bytes {
+            return Some(i);
+        }
+    }
+
+    None
+}
+
+fn get_common_permission_index_by_name<'a, PS: ParseStrategy>(
+    common_symbol: &'a CommonSymbol<PS>,
+    name: &str,
+) -> Option<usize> {
+    let name_bytes = name.as_bytes();
+    let permissions = common_symbol.permissions();
+    for i in 0..permissions.len() {
+        if permissions[i].name_bytes() == name_bytes {
+            return Some(i);
+        }
+    }
+
+    None
 }

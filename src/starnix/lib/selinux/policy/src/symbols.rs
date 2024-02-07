@@ -116,6 +116,12 @@ array_type!(CommonSymbol, PS, CommonSymbolMetadata<PS>, Permissions<PS>);
 
 array_type_validate_deref_none_data_vec!(CommonSymbol);
 
+impl<PS: ParseStrategy> CommonSymbol<PS> {
+    pub fn permissions(&self) -> &Permissions<PS> {
+        &self.data
+    }
+}
+
 pub(crate) type CommonSymbols<PS> = Vec<CommonSymbol<PS>>;
 
 impl<PS: ParseStrategy> CommonSymbol<PS> {
@@ -517,7 +523,7 @@ fn find_common_symbol_by_name_bytes<'a, PS: ParseStrategy>(
 ///
 /// Each `class` may inherit from zero or one `common`, in which case the permissions specified in
 /// the denoted `common` are also permissions in `class`. Locating these "common" permissions is the
-/// reason that `classes` is received as a function input.
+/// reason that `common_symbols` is received as a function input.
 pub(crate) fn find_class_permission_by_name<'a, PS: ParseStrategy>(
     common_symbols: &'a CommonSymbols<PS>,
     class: &'a Class<PS>,
