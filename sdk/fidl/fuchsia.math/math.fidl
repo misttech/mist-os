@@ -121,6 +121,45 @@ type VecF = struct {
     y float32;
 };
 
+/// Represents a 3D vector with floating point coordinates.
+///
+/// This type does not specify units. Protocols that use this type should
+/// specify the characteristics of the vector space, including orientation and
+/// units.
+@available(added=19)
+type Vec3F = struct {
+    // The direction along the x-axis.
+    x float32;
+
+    // The direction along the y-axis.
+    y float32;
+
+    // The direction along the z-axis.
+    z float32;
+};
+
+/// Represents a 4D vector with floating point coordinates.
+///
+/// This type does not specify units. Protocols that use this type should
+/// specify the characteristics of the vector space, including orientation and
+/// units.
+@available(added=19)
+type Vec4F = struct {
+    // The direction along the x-axis.
+    x float32;
+
+    // The direction along the y-axis.
+    y float32;
+
+    // The direction along the z-axis.
+    z float32;
+
+    // The direction along the w-axis.
+    w float32;
+};
+@available(added=19)
+alias QuaternionF = Vec4F;
+
 /// An integral, rectangular, axis-aligned region in a 2D cartesian
 /// space.
 ///
