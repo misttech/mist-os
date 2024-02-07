@@ -393,8 +393,8 @@ impl DisplayDirectViewStrategy {
     async fn maybe_reallocate_display_resources(&mut self) -> Result<(), Error> {
         if self.display_resources.is_none() {
             instant!(
-                "gfx",
-                "DisplayDirectViewStrategy::allocate_display_resources",
+                c"gfx",
+                c"DisplayDirectViewStrategy::allocate_display_resources",
                 fuchsia_trace::Scope::Process,
                 "" => ""
             );
@@ -425,8 +425,8 @@ impl DisplayDirectViewStrategy {
         image: u64,
     ) {
         instant!(
-            "gfx",
-            "DisplayDirectViewStrategy::update_image",
+            c"gfx",
+            c"DisplayDirectViewStrategy::update_image",
             fuchsia_trace::Scope::Process,
             "image" => format!("{}", image).as_str()
         );
@@ -504,7 +504,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
         view_details: &ViewDetails,
         view_assistant: &mut ViewAssistantPtr,
     ) -> bool {
-        duration!("gfx", "DisplayDirectViewStrategy::update");
+        duration!(c"gfx", c"DisplayDirectViewStrategy::update");
         self.maybe_reallocate_display_resources()
             .await
             .expect("maybe_reallocate_display_resources");
@@ -527,14 +527,14 @@ impl ViewStrategy for DisplayDirectViewStrategy {
     }
 
     fn present(&mut self, view_details: &ViewDetails) {
-        duration!("gfx", "DisplayDirectViewStrategy::present");
+        duration!(c"gfx", c"DisplayDirectViewStrategy::present");
         if self.render_frame_count == 1 && self.presented.is_some() {
             return;
         }
         if let Some(prepared) = self.display_resources().frame_set.prepared {
             instant!(
-                "gfx",
-                "DisplayDirectViewStrategy::present",
+                c"gfx",
+                c"DisplayDirectViewStrategy::present",
                 fuchsia_trace::Scope::Process,
                 "prepared" => format!("{}", prepared).as_str()
             );
@@ -618,8 +618,8 @@ impl ViewStrategy for DisplayDirectViewStrategy {
     fn image_freed(&mut self, image_id: u64, collection_id: u32) {
         if BufferCollectionId(collection_id as u64) == self.collection_id {
             instant!(
-                "gfx",
-                "DisplayDirectViewStrategy::image_freed",
+                c"gfx",
+                c"DisplayDirectViewStrategy::image_freed",
                 fuchsia_trace::Scope::Process,
                 "image_freed" => format!("{}", image_id).as_str()
             );
@@ -651,8 +651,8 @@ impl ViewStrategy for DisplayDirectViewStrategy {
         let task = self.drop_display_resources_task.take();
         if task.is_some() {
             instant!(
-                "gfx",
-                "DisplayDirectViewStrategy::drop_display_resources",
+                c"gfx",
+                c"DisplayDirectViewStrategy::drop_display_resources",
                 fuchsia_trace::Scope::Process,
                 "" => ""
             );
@@ -663,7 +663,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
     async fn handle_display_coordinator_event(&mut self, event: CoordinatorEvent) {
         match event {
             CoordinatorEvent::OnVsync { timestamp, cookie, .. } => {
-                duration!("gfx", "DisplayDirectViewStrategy::OnVsync");
+                duration!(c"gfx", c"DisplayDirectViewStrategy::OnVsync");
                 let vsync_interval = Duration::from_nanos(
                     100_000_000_000 / self.display.info.modes[0].refresh_rate_e2 as i64,
                 );

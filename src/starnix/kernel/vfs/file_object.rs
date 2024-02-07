@@ -22,7 +22,7 @@ use crate::{
 use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
-use starnix_logging::{impossible_error, trace_category_starnix_mm, trace_duration, track_stub};
+use starnix_logging::{impossible_error, trace_duration, track_stub, CATEGORY_STARNIX_MM};
 use starnix_sync::{FileOpsIoctl, LockEqualOrBefore, Locked, Mutex, ReadOps, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -210,17 +210,17 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         filename: NamespaceNode,
     ) -> Result<UserAddress, Errno> {
         profile_duration!("FileOpsDefaultMmap");
-        trace_duration!(trace_category_starnix_mm!(), "FileOpsDefaultMmap");
+        trace_duration!(CATEGORY_STARNIX_MM, c"FileOpsDefaultMmap");
         let min_vmo_size = (vmo_offset as usize)
             .checked_add(round_up_to_system_page_size(length)?)
             .ok_or(errno!(EINVAL))?;
         let mut vmo = if options.contains(MappingOptions::SHARED) {
             profile_duration!("GetSharedVmo");
-            trace_duration!(trace_category_starnix_mm!(), "GetSharedVmo");
+            trace_duration!(CATEGORY_STARNIX_MM, c"GetSharedVmo");
             self.get_vmo(file, current_task, Some(min_vmo_size), prot_flags)?
         } else {
             profile_duration!("GetPrivateVmo");
-            trace_duration!(trace_category_starnix_mm!(), "GetPrivateVmo");
+            trace_duration!(CATEGORY_STARNIX_MM, c"GetPrivateVmo");
             // TODO(tbodt): Use PRIVATE_CLONE to have the filesystem server do the clone for us.
             let base_prot_flags = (prot_flags | ProtectionFlags::READ) - ProtectionFlags::WRITE;
             let vmo = self.get_vmo(file, current_task, Some(min_vmo_size), base_prot_flags)?;
@@ -228,7 +228,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
             if !prot_flags.contains(ProtectionFlags::WRITE) {
                 clone_flags |= zx::VmoChildOptions::NO_WRITE;
             }
-            trace_duration!(trace_category_starnix_mm!(), "CreatePrivateChildVmo");
+            trace_duration!(CATEGORY_STARNIX_MM, c"CreatePrivateChildVmo");
             Arc::new(
                 vmo.create_child(clone_flags, 0, vmo.get_size().map_err(impossible_error)?)
                     .map_err(impossible_error)?,

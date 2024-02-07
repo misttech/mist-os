@@ -236,8 +236,8 @@ impl FlatlandViewStrategy {
 
             let koid = flatland.as_channel().get_koid().unwrap().raw_koid();
             instant!(
-                "gfx",
-                "FlatlandViewStrategy::new",
+                c"gfx",
+                c"FlatlandViewStrategy::new",
                 fuchsia_trace::Scope::Process,
                 "flatland_koid" => koid
             );
@@ -586,7 +586,7 @@ impl FlatlandViewStrategy {
         let presentation_time = self.next_presentation_time();
         let plumber = self.plumber.as_mut().expect("plumber");
         if let Some(available) = plumber.frame_set.get_available_image() {
-            duration!("gfx", "FlatlandViewStrategy::render.render_to_image");
+            duration!(c"gfx", c"FlatlandViewStrategy::render.render_to_image");
             let available_index = plumber.image_indexes.get(&available).expect("index for image");
             let render_context = Self::make_view_assistant_context_with_time(
                 view_details,
@@ -624,8 +624,8 @@ impl FlatlandViewStrategy {
             true
         } else {
             instant!(
-                "gfx",
-                "FlatlandViewStrategy::no_available_image",
+                c"gfx",
+                c"FlatlandViewStrategy::no_available_image",
                 fuchsia_trace::Scope::Process
             );
             self.missed_frame = true;
@@ -708,7 +708,7 @@ impl ViewStrategy for FlatlandViewStrategy {
     }
 
     fn setup(&mut self, view_details: &ViewDetails, view_assistant: &mut ViewAssistantPtr) {
-        duration!("gfx", "FlatlandViewStrategy::setup");
+        duration!(c"gfx", c"FlatlandViewStrategy::setup");
         let render_context =
             Self::make_view_assistant_context(view_details, 0, 0, self.app_sender.clone());
         view_assistant.setup(&render_context).unwrap_or_else(|e| panic!("Setup error: {:?}", e));
@@ -722,14 +722,14 @@ impl ViewStrategy for FlatlandViewStrategy {
         view_assistant: &mut ViewAssistantPtr,
     ) -> bool {
         let size = view_details.physical_size.floor().to_u32();
-        duration!("gfx", "FlatlandViewStrategy::render",
+        duration!(c"gfx", c"FlatlandViewStrategy::render",
             "width" => size.width,
             "height" => size.height);
 
         self.render_timer_scheduled = false;
         if size.width > 0 && size.height > 0 {
             if self.num_presents_allowed == 0 {
-                instant!("gfx", "FlatlandViewStrategy::present_is_not_allowed",
+                instant!(c"gfx", c"FlatlandViewStrategy::present_is_not_allowed",
                     fuchsia_trace::Scope::Process,
                     "counts" => format!("{} pending {} allowed",
                         self.pending_present_count,
@@ -739,12 +739,12 @@ impl ViewStrategy for FlatlandViewStrategy {
             }
 
             if self.plumber.is_none() {
-                duration!("gfx", "FlatlandViewStrategy::render.create_plumber");
+                duration!(c"gfx", c"FlatlandViewStrategy::render.create_plumber");
                 self.create_plumber(size).await.expect("create_plumber");
             } else {
                 let current_size = self.plumber.as_ref().expect("plumber").size;
                 if current_size != size {
-                    duration!("gfx", "FlatlandViewStrategy::render.create_plumber");
+                    duration!(c"gfx", c"FlatlandViewStrategy::render.create_plumber");
                     let retired_plumber = self.plumber.take().expect("plumber");
                     self.retiring_plumbers.push(retired_plumber);
                     self.create_plumber(size).await.expect("create_plumber");
@@ -757,7 +757,7 @@ impl ViewStrategy for FlatlandViewStrategy {
     }
 
     fn present(&mut self, _view_details: &ViewDetails) {
-        duration!("gfx", "FlatlandViewStrategy::present");
+        duration!(c"gfx", c"FlatlandViewStrategy::present");
         if !self.missed_frame {
             assert!(self.num_presents_allowed > 0);
             let release_event = self.previous_present_release_event.take();
@@ -786,8 +786,8 @@ impl ViewStrategy for FlatlandViewStrategy {
         assert!(self.pending_present_count >= num_presents_handled);
         self.pending_present_count -= num_presents_handled;
         instant!(
-            "gfx",
-            "FlatlandViewStrategy::present_done",
+            c"gfx",
+            c"FlatlandViewStrategy::present_done",
             fuchsia_trace::Scope::Process,
             "presents" => format!("{} handled", num_presents_handled).as_str()
         );
@@ -838,8 +838,8 @@ impl ViewStrategy for FlatlandViewStrategy {
 
     fn image_freed(&mut self, image_id: u64, collection_id: u32) {
         instant!(
-            "gfx",
-            "FlatlandViewStrategy::image_freed",
+            c"gfx",
+            c"FlatlandViewStrategy::image_freed",
             fuchsia_trace::Scope::Process,
             "image_freed" => format!("{} in {}", image_id, collection_id).as_str()
         );
@@ -878,8 +878,8 @@ impl ViewStrategy for FlatlandViewStrategy {
             info.future_presentation_infos.as_ref().expect("future_presentation_infos");
         let present_intervals = future_presentation_infos.len();
         instant!(
-            "gfx",
-            "FlatlandViewStrategy::handle_on_next_frame_begin",
+            c"gfx",
+            c"FlatlandViewStrategy::handle_on_next_frame_begin",
             fuchsia_trace::Scope::Process,
             "counts" => format!("{} present_intervals", present_intervals).as_str()
         );

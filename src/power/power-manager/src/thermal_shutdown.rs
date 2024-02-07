@@ -162,7 +162,7 @@ impl ThermalShutdown {
 
     /// Polls the temperature sensor once and checks the reading against the configured threshold.
     async fn poll_temperature(&self) -> Result<(), Error> {
-        fuchsia_trace::duration!("power_manager", "ThermalShutdown::poll_temperature");
+        fuchsia_trace::duration!(c"power_manager", c"ThermalShutdown::poll_temperature");
         let timestamp = get_current_timestamp();
 
         if self.temperature_filter.get_temperature(timestamp).await?.filtered

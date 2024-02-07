@@ -335,7 +335,7 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
             .as_integer(Instant::now().duration_since(startup_time).as_micros() as i64),
     );
 
-    ftrace::instant!("app", "startup", ftrace::Scope::Process);
+    ftrace::instant!(c"app", c"startup", ftrace::Scope::Process);
 
     let _inspect_server_task =
         inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());

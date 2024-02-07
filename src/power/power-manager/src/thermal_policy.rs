@@ -250,15 +250,15 @@ impl ThermalPolicy {
         async move {
             while let Some(()) = periodic_timer.next().await {
                 fuchsia_trace::instant!(
-                    "power_manager",
-                    "ThermalPolicy::periodic_timer_fired",
+                    c"power_manager",
+                    c"ThermalPolicy::periodic_timer_fired",
                     fuchsia_trace::Scope::Thread
                 );
                 let result = self.iterate_thermal_control().await;
                 log_if_err!(result, "Error while running thermal control iteration");
                 fuchsia_trace::instant!(
-                    "power_manager",
-                    "ThermalPolicy::iterate_thermal_control_result",
+                    c"power_manager",
+                    c"ThermalPolicy::iterate_thermal_control_result",
                     fuchsia_trace::Scope::Thread,
                     "result" => format!("{:?}", result).as_str()
                 );
@@ -277,7 +277,7 @@ impl ThermalPolicy {
     ///     4. Use the integral error to derive thermal load and available power values
     ///     5. Update the relevant nodes with the new thermal load and available power information
     async fn iterate_thermal_control(&self) -> Result<(), Error> {
-        fuchsia_trace::duration!("power_manager", "ThermalPolicy::iterate_thermal_control");
+        fuchsia_trace::duration!(c"power_manager", c"ThermalPolicy::iterate_thermal_control");
 
         let timestamp = get_current_timestamp();
         let time_delta = self.get_time_delta(timestamp);
@@ -303,8 +303,8 @@ impl ThermalPolicy {
         let result = self.check_critical_temperature(temperature.raw).await;
         log_if_err!(result, "Error checking critical temperature");
         fuchsia_trace::instant!(
-            "power_manager",
-            "ThermalPolicy::check_critical_temperature_result",
+            c"power_manager",
+            c"ThermalPolicy::check_critical_temperature_result",
             fuchsia_trace::Scope::Thread,
             "result" => format!("{:?}", result).as_str()
         );
@@ -313,8 +313,8 @@ impl ThermalPolicy {
         let result = self.process_thermal_load(thermal_load).await;
         log_if_err!(result, "Error updating thermal load");
         fuchsia_trace::instant!(
-            "power_manager",
-            "ThermalPolicy::process_thermal_load_result",
+            c"power_manager",
+            c"ThermalPolicy::process_thermal_load_result",
             fuchsia_trace::Scope::Thread,
             "result" => format!("{:?}", result).as_str()
         );
@@ -365,31 +365,31 @@ impl ThermalPolicy {
         self.inspect.temperature_filtered.set(filtered_temperature.0);
         self.inspect.thermal_load.set(thermal_load.0.into());
         fuchsia_trace::instant!(
-            "power_manager",
-            "ThermalPolicy::thermal_control_iteration_data",
+            c"power_manager",
+            c"ThermalPolicy::thermal_control_iteration_data",
             fuchsia_trace::Scope::Thread,
             "timestamp" => timestamp.0
         );
         fuchsia_trace::counter!(
-            "power_manager",
-            "ThermalPolicy raw_temperature",
+            c"power_manager",
+            c"ThermalPolicy raw_temperature",
             0,
             "raw_temperature" => raw_temperature.0
         );
         fuchsia_trace::counter!(
-            "power_manager",
-            "ThermalPolicy filtered_temperature",
+            c"power_manager",
+            c"ThermalPolicy filtered_temperature",
             0,
             "filtered_temperature" => filtered_temperature.0
         );
         fuchsia_trace::counter!(
-            "power_manager",
-            "ThermalPolicy error_integral", 0,
+            c"power_manager",
+            c"ThermalPolicy error_integral", 0,
             "error_integral" => temperature_error_integral
         );
         fuchsia_trace::counter!(
-            "power_manager",
-            "ThermalPolicy thermal_load",
+            c"power_manager",
+            c"ThermalPolicy thermal_load",
             0,
             "thermal_load" => thermal_load.0
         );
@@ -400,16 +400,16 @@ impl ThermalPolicy {
     /// to initiate a system shutdown.
     async fn check_critical_temperature(&self, temperature: Celsius) -> Result<(), Error> {
         fuchsia_trace::duration!(
-            "power_manager",
-            "ThermalPolicy::check_critical_temperature",
+            c"power_manager",
+            c"ThermalPolicy::check_critical_temperature",
             "temperature" => temperature.0
         );
 
         // Temperature has exceeded the thermal shutdown temperature
         if temperature.0 >= self.config.policy_params.thermal_shutdown_temperature.0 {
             fuchsia_trace::instant!(
-                "power_manager",
-                "ThermalPolicy::thermal_shutdown_reached",
+                c"power_manager",
+                c"ThermalPolicy::thermal_shutdown_reached",
                 fuchsia_trace::Scope::Thread,
                 "temperature" => temperature.0,
                 "shutdown_temperature" => self.config.policy_params.thermal_shutdown_temperature.0
@@ -432,8 +432,8 @@ impl ThermalPolicy {
     /// the new value is sent out to `thermal_load_notify_nodes`.
     async fn process_thermal_load(&self, new_load: ThermalLoad) -> Result<(), Error> {
         fuchsia_trace::duration!(
-            "power_manager",
-            "ThermalPolicy::process_thermal_load",
+            c"power_manager",
+            c"ThermalPolicy::process_thermal_load",
             "new_load" => new_load.0
         );
 

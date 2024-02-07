@@ -75,7 +75,7 @@ async fn main() {
     let (initial_thread_koid, initial_thread) = threads.next().unwrap();
     let mut initial_thread = initial_thread.into_iter();
 
-    // instant!("test_puppet", "puppet_instant", Scope::Thread);
+    // instant!(c"test_puppet", c"puppet_instant", Scope::Thread);
     let instant = initial_thread.next().unwrap();
     let mut prev_timestamp = min_timestamp;
     let mut current_timestamp = record_timestamp(&instant).unwrap();
@@ -94,7 +94,7 @@ async fn main() {
         })
     );
 
-    // counter!("test_puppet", "puppet_counter", 0, "somedataseries" => 1);
+    // counter!(c"test_puppet", c"puppet_counter", 0, "somedataseries" => 1);
     let counter = initial_thread.next().unwrap();
     prev_timestamp = current_timestamp;
     current_timestamp = record_timestamp(&counter).unwrap();
@@ -116,7 +116,7 @@ async fn main() {
         })
     );
 
-    // counter!("test_puppet", "puppet_counter2", 1, "someotherdataseries" => std::u64::MAX - 1);
+    // counter!(c"test_puppet", c"puppet_counter2", 1, "someotherdataseries" => std::u64::MAX - 1);
     let second_counter = initial_thread.next().unwrap();
     prev_timestamp = current_timestamp;
     current_timestamp = record_timestamp(&second_counter).unwrap();
@@ -179,7 +179,7 @@ async fn main() {
     // puppet_duration_raii starts here.
     let before_duration_complete_start = current_timestamp;
 
-    // async_begin(async_id, cstr!("test_puppet"), cstr!("puppet_async"), &[]);
+    // async_begin(async_id, c"test_puppet", c"puppet_async", &[]);
     let async_begin = initial_thread.next().unwrap();
     prev_timestamp = current_timestamp;
     current_timestamp = record_timestamp(&async_begin).unwrap();
@@ -202,7 +202,7 @@ async fn main() {
     let (instant_thread_koid, instant_thread) = threads.next().unwrap();
     let mut instant_thread = instant_thread.into_iter();
 
-    // async_instant(async_id, cstr!("test_puppet"), cstr!("puppet_async_instant1"), &[]);
+    // async_instant(async_id, c"test_puppet", c"puppet_async_instant1", &[]);
     let nested_instant_begin = instant_thread.next().unwrap();
     prev_timestamp = current_timestamp;
     current_timestamp = record_timestamp(&nested_instant_begin).unwrap();
@@ -222,7 +222,7 @@ async fn main() {
     );
     assert_eq!(instant_thread.next(), None, "must have observed all events from instant thread");
 
-    // async_end(async_id, cstr!("test_puppet"), cstr!("puppet_async"), &[]);
+    // async_end(async_id, c"test_puppet", c"puppet_async", &[]);
     let async_end = initial_thread.next().unwrap();
     prev_timestamp = current_timestamp;
     current_timestamp = record_timestamp(&async_end).unwrap();
@@ -241,7 +241,7 @@ async fn main() {
         })
     );
 
-    // flow_begin!("test_puppet", "puppet_flow", flow_id);
+    // flow_begin!(c"test_puppet", c"puppet_flow", flow_id);
     let flow_begin = initial_thread.next().unwrap();
     prev_timestamp = current_timestamp;
     current_timestamp = record_timestamp(&flow_begin).unwrap();
@@ -284,7 +284,7 @@ async fn main() {
         })
     );
 
-    // duration!("test_puppet", "flow_thread"); (comes later because it's raii)
+    // duration!(c"test_puppet", c"flow_thread"); (comes later because it's raii)
     let duration_complete = flow_step_thread.next().unwrap();
     let duration_complete_start = match &duration_complete {
         fxt::TraceRecord::Event(fxt::EventRecord { timestamp, .. }) => *timestamp,
@@ -308,7 +308,7 @@ async fn main() {
     );
     assert_eq!(flow_step_thread.next(), None, "must have observed all events from flow thread");
 
-    // flow_end!("test_puppet", "puppet_flow", flow_id);
+    // flow_end!(c"test_puppet", c"puppet_flow", flow_id);
     let flow_end = initial_thread.next().unwrap();
     prev_timestamp = current_timestamp;
     current_timestamp = record_timestamp(&flow_end).unwrap();
@@ -348,64 +348,64 @@ async fn main() {
         );
     };
 
-    // instant!("test_puppet", "puppet_instant_args", Scope::Thread, "SomeNullArg" => ());
+    // instant!(c"test_puppet", c"puppet_instant_args", Scope::Thread, "SomeNullArg" => ());
     expect_instant_args(vec![fxt::Arg { name: "SomeNullArg".into(), value: fxt::ArgValue::Null }]);
 
-    // instant!("test_puppet", "puppet_instant_args", Scope::Thread, "SomeUint32" => 2145u32);
+    // instant!(c"test_puppet", c"puppet_instant_args", Scope::Thread, "SomeUint32" => 2145u32);
     expect_instant_args(vec![fxt::Arg {
         name: "SomeUint32".into(),
         value: fxt::ArgValue::Unsigned32(2145),
     }]);
 
-    // instant!("test_puppet", "puppet_instant_args", Scope::Thread, "SomeUint64" => 423621626134123415u64);
+    // instant!(c"test_puppet", c"puppet_instant_args", Scope::Thread, "SomeUint64" => 423621626134123415u64);
     expect_instant_args(vec![fxt::Arg {
         name: "SomeUint64".into(),
         value: fxt::ArgValue::Unsigned64(423621626134123415),
     }]);
 
-    // instant!("test_puppet", "puppet_instant_args", Scope::Thread, "SomeInt32" => -7i32);
+    // instant!(c"test_puppet", c"puppet_instant_args", Scope::Thread, "SomeInt32" => -7i32);
     expect_instant_args(vec![fxt::Arg {
         name: "SomeInt32".into(),
         value: fxt::ArgValue::Signed32(-7),
     }]);
 
-    // instant!("test_puppet", "puppet_instant_args", Scope::Thread, "SomeInt64" => -234516543631231i64);
+    // instant!(c"test_puppet", c"puppet_instant_args", Scope::Thread, "SomeInt64" => -234516543631231i64);
     expect_instant_args(vec![fxt::Arg {
         name: "SomeInt64".into(),
         value: fxt::ArgValue::Signed64(-234516543631231),
     }]);
 
-    // instant!("test_puppet", "puppet_instant_args", Scope::Thread, "SomeDouble" => std::f64::consts::PI);
+    // instant!(c"test_puppet", c"puppet_instant_args", Scope::Thread, "SomeDouble" => std::f64::consts::PI);
     expect_instant_args(vec![fxt::Arg {
         name: "SomeDouble".into(),
         value: fxt::ArgValue::Double(std::f64::consts::PI),
     }]);
 
-    // instant!("test_puppet", "puppet_instant_args", Scope::Thread, "SomeString" => "pong");
+    // instant!(c"test_puppet", c"puppet_instant_args", Scope::Thread, "SomeString" => "pong");
     expect_instant_args(vec![fxt::Arg {
         name: "SomeString".into(),
         value: fxt::ArgValue::String("pong".into()),
     }]);
 
-    // instant!("test_puppet", "puppet_instant_args", Scope::Thread, "SomeBool" => true);
+    // instant!(c"test_puppet", c"puppet_instant_args", Scope::Thread, "SomeBool" => true);
     expect_instant_args(vec![fxt::Arg {
         name: "SomeBool".into(),
         value: fxt::ArgValue::Boolean(true),
     }]);
 
-    // instant!("test_puppet", "puppet_instant_args", Scope::Thread, "SomePointer" => 4096usize as *const _);
+    // instant!(c"test_puppet", c"puppet_instant_args", Scope::Thread, "SomePointer" => 4096usize as *const _);
     expect_instant_args(vec![fxt::Arg {
         name: "SomePointer".into(),
         value: fxt::ArgValue::Pointer(4096),
     }]);
 
-    // instant!("test_puppet", "puppet_instant_args", Scope::Thread, "SomeKoid" => zx::Koid::from_raw(10));
+    // instant!(c"test_puppet", c"puppet_instant_args", Scope::Thread, "SomeKoid" => zx::Koid::from_raw(10));
     expect_instant_args(vec![fxt::Arg {
         name: "SomeKoid".into(),
         value: fxt::ArgValue::KernelObj(10),
     }]);
 
-    // duration!("test_puppet", "puppet_duration_raii");
+    // duration!(c"test_puppet", c"puppet_duration_raii");
     let duration_complete = initial_thread.next().unwrap();
     let duration_complete_start = match &duration_complete {
         fxt::TraceRecord::Event(fxt::EventRecord { timestamp, .. }) => *timestamp,

@@ -224,10 +224,8 @@ impl GpuUsageLogger {
         self.last_samples = current_samples;
 
         trace_args.push(fuchsia_trace::ArgValue::of("client_id", self.client_id.as_str()));
-        if let Some(context) =
-            fuchsia_trace::TraceCategoryContext::acquire(fuchsia_trace::cstr!("metrics_logger"))
-        {
-            fuchsia_trace::counter(&context, fuchsia_trace::cstr!("gpu"), 0, &trace_args);
+        if let Some(context) = fuchsia_trace::TraceCategoryContext::acquire(c"metrics_logger") {
+            fuchsia_trace::counter(&context, c"gpu", 0, &trace_args);
         }
     }
 }

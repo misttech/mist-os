@@ -297,29 +297,29 @@ async fn bench_tcp<'a, I: IpExt>(
         (client_sock, server_sock)
     };
 
-    fuchsia_trace::duration!("tun_socket_benchmarks", "test_group", "label" => &*label);
+    fuchsia_trace::duration!(c"tun_socket_benchmarks", c"test_group", "label" => &*label);
     let values = (0..iter_count)
         .map(|_| {
             let (send_buf, mut recv_buf) = generate_send_recv_bufs(transfer);
 
-            fuchsia_trace::duration!("tun_socket_benchmarks", "test_case");
+            fuchsia_trace::duration!(c"tun_socket_benchmarks", c"test_case");
             let now = std::time::Instant::now();
             let mut transferred = 0;
             while transferred < transfer {
-                fuchsia_trace::duration_begin!("tun_socket_benchmarks", "tcp_write");
+                fuchsia_trace::duration_begin!(c"tun_socket_benchmarks", c"tcp_write");
                 let wrote = client_sock.write(&send_buf[transferred..]).expect("write failed");
                 fuchsia_trace::duration_end!(
-                    "tun_socket_benchmarks", "tcp_write",
+                    c"tun_socket_benchmarks", c"tcp_write",
                     "bytes_written" => wrote as u64
                 );
                 transferred += wrote;
             }
             let mut transferred = 0;
             while transferred < transfer {
-                fuchsia_trace::duration_begin!("tun_socket_benchmarks", "tcp_read");
+                fuchsia_trace::duration_begin!(c"tun_socket_benchmarks", c"tcp_read");
                 let read = server_sock.read(&mut recv_buf[transferred..]).expect("read failed");
                 fuchsia_trace::duration_end!(
-                    "tun_socket_benchmarks", "tcp_read",
+                    c"tun_socket_benchmarks", c"tcp_read",
                     "bytes_read" => read as u64
                 );
                 transferred += read;
@@ -392,7 +392,7 @@ async fn bench_udp<'a, I: IpExt>(
         (client_sock, server_sock)
     };
 
-    fuchsia_trace::duration!("tun_socket_benchmarks", "test_group", "label" => &*label);
+    fuchsia_trace::duration!(c"tun_socket_benchmarks", c"test_group", "label" => &*label);
     let values = (0..iter_count)
         .map(|_| {
             // Allocate buffers that can hold the total transfer size so that the
@@ -401,18 +401,18 @@ async fn bench_udp<'a, I: IpExt>(
             // duration.
             let (send_buf, mut recv_buf) = generate_send_recv_bufs(message_count * message_size);
 
-            fuchsia_trace::duration!("tun_socket_benchmarks", "test_case");
+            fuchsia_trace::duration!(c"tun_socket_benchmarks", c"test_case");
             let now = std::time::Instant::now();
             for message_bytes in send_buf.chunks(message_size) {
                 let wrote = {
-                    fuchsia_trace::duration!("tun_socket_benchmarks", "udp_write");
+                    fuchsia_trace::duration!(c"tun_socket_benchmarks", c"udp_write");
                     client_sock.write(message_bytes.as_ref()).expect("write failed")
                 };
                 assert_eq!(wrote, message_size);
             }
             for recv_bytes in recv_buf.chunks_mut(message_size) {
                 let read = {
-                    fuchsia_trace::duration!("tun_socket_benchmarks", "udp_read");
+                    fuchsia_trace::duration!(c"tun_socket_benchmarks", c"udp_read");
                     server_sock.read(recv_bytes.as_mut()).expect("read failed")
                 };
                 assert_eq!(read, message_size);

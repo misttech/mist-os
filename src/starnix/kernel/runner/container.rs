@@ -41,8 +41,7 @@ use starnix_core::{
 };
 use starnix_kernel_config::Config;
 use starnix_logging::{
-    log_error, log_info, log_warn, trace_category_starnix, trace_duration,
-    trace_name_create_container,
+    log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::{
@@ -303,7 +302,7 @@ async fn create_container(
     config: &mut ConfigWrapper,
     task_complete: oneshot::Sender<TaskResult>,
 ) -> Result<Container, Error> {
-    trace_duration!(trace_category_starnix!(), trace_name_create_container!());
+    trace_duration!(CATEGORY_STARNIX, NAME_CREATE_CONTAINER);
     const DEFAULT_INIT: &str = "/container/init";
 
     // Install container svc into the kernel namespace

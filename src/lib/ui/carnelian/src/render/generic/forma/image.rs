@@ -208,7 +208,7 @@ impl VmoImage {
     }
 
     pub fn clear(&mut self, clear_color: [u8; 4]) {
-        duration!("gfx", "VmoImage::clear");
+        duration!(c"gfx", c"VmoImage::clear");
 
         if let Some((_, buffer_layer_cache)) = self.buffer_layer_cache.as_ref() {
             buffer_layer_cache.clear();

@@ -131,7 +131,7 @@ impl<D: DeviceOps> crate::MlmeImpl for ClientMlme<D> {
         bytes: &[u8],
         rx_info: banjo_fuchsia_wlan_softmac::WlanRxInfo,
     ) {
-        trace::duration!("wlan", "ClientMlme::handle_mac_frame_rx");
+        trace::duration!(c"wlan", c"ClientMlme::handle_mac_frame_rx");
         Self::on_mac_frame_rx(self, bytes, rx_info)
     }
     fn handle_eth_frame_tx(
@@ -139,7 +139,7 @@ impl<D: DeviceOps> crate::MlmeImpl for ClientMlme<D> {
         bytes: &[u8],
         async_id: trace::Id,
     ) -> Result<(), anyhow::Error> {
-        trace::duration!("wlan", "ClientMlme::handle_eth_frame_tx");
+        trace::duration!(c"wlan", c"ClientMlme::handle_eth_frame_tx");
         Self::on_eth_frame_tx(self, bytes, async_id).map_err(From::from)
     }
     fn handle_scan_complete(&mut self, status: zx::Status, scan_id: u64) {
@@ -237,7 +237,7 @@ impl<D: DeviceOps> ClientMlme<D> {
     }
 
     pub fn on_mac_frame_rx(&mut self, frame: &[u8], rx_info: banjo_wlan_softmac::WlanRxInfo) {
-        trace::duration!("wlan", "ClientMlme::on_mac_frame_rx");
+        trace::duration!(c"wlan", c"ClientMlme::on_mac_frame_rx");
         // TODO(https://fxbug.dev/42120906): Send the entire frame to scanner.
         match mac::MacFrame::parse(frame, false) {
             Some(mac::MacFrame::Mgmt { mgmt_hdr, body, .. }) => {
@@ -245,7 +245,7 @@ impl<D: DeviceOps> ClientMlme<D> {
                 let frame_ctrl = mgmt_hdr.frame_ctrl;
                 match mac::MgmtBody::parse(frame_ctrl.mgmt_subtype(), body) {
                     Some(mac::MgmtBody::Beacon { bcn_hdr, elements }) => {
-                        trace::duration!("wlan", "MgmtBody::Beacon");
+                        trace::duration!(c"wlan", c"MgmtBody::Beacon");
                         self.scanner.bind(&mut self.ctx).handle_ap_advertisement(
                             bssid,
                             bcn_hdr.beacon_interval,
@@ -255,7 +255,7 @@ impl<D: DeviceOps> ClientMlme<D> {
                         );
                     }
                     Some(mac::MgmtBody::ProbeResp { probe_resp_hdr, elements }) => {
-                        trace::duration!("wlan", "MgmtBody::ProbeResp");
+                        trace::duration!(c"wlan", c"MgmtBody::ProbeResp");
                         self.scanner.bind(&mut self.ctx).handle_ap_advertisement(
                             bssid,
                             probe_resp_hdr.beacon_interval,
@@ -500,7 +500,7 @@ impl<D: DeviceOps> ClientMlme<D> {
         bytes: B,
         async_id: trace::Id,
     ) -> Result<(), Error> {
-        trace::duration!("wlan", "ClientMlme::on_eth_frame_tx");
+        trace::duration!(c"wlan", c"ClientMlme::on_eth_frame_tx");
         match self.sta.as_mut() {
             None => Err(Error::Status(
                 format!("Ethernet frame dropped (Client does not exist)."),
@@ -630,7 +630,7 @@ impl Client {
     /// be the BSSID the client associated to and the receiver address should either be non-unicast
     /// or the client's MAC address.
     fn should_handle_frame<B: ByteSlice>(&self, mac_frame: &mac::MacFrame<B>) -> bool {
-        trace::duration!("wlan", "Client::should_handle_frame");
+        trace::duration!(c"wlan", c"Client::should_handle_frame");
 
         // Technically, |transmitter_addr| and |receiver_addr| would be more accurate but using src
         // src and dst to be consistent with |data_dst_addr()|.
@@ -862,7 +862,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             wtrace::async_begin_wlansoftmac_tx(async_id, "mlme");
             async_id
         });
-        trace::duration!("wlan", "BoundClient::send_data_frame");
+        trace::duration!(c"wlan", c"BoundClient::send_data_frame");
 
         let qos_ctrl = if qos_ctrl {
             Some(
@@ -1026,7 +1026,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         bytes: B,
         rx_info: banjo_wlan_softmac::WlanRxInfo,
     ) {
-        trace::duration!("wlan", "BoundClient::on_mac_frame");
+        trace::duration!(c"wlan", c"BoundClient::on_mac_frame");
         // Safe: |state| is never None and always replaced with Some(..).
         self.sta.state = Some(self.sta.state.take().unwrap().on_mac_frame(self, bytes, rx_info));
     }
@@ -1036,7 +1036,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         frame: B,
         async_id: trace::Id,
     ) -> Result<(), Error> {
-        trace::duration!("wlan", "BoundClient::on_eth_frame_tx");
+        trace::duration!(c"wlan", c"BoundClient::on_eth_frame_tx");
         // Safe: |state| is never None and always replaced with Some(..).
         let state = self.sta.state.take().unwrap();
         let result = state.on_eth_frame(self, frame, async_id);

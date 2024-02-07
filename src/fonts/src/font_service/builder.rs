@@ -321,8 +321,8 @@ where
             .map(|path| path.to_string_lossy().to_string())
             .unwrap_or_default();
         trace::duration!(
-                "fonts",
-                "font_service:builder:add_fonts_from_manifest_v2",
+            c"fonts",
+            c"font_service:builder:add_fonts_from_manifest_v2",
                 "path" => &path_string[..]);
         let manifest_v2 = self.convert_manifest_v1_to_v2(manifest_v1).await.map_err(|e| {
             FontServiceBuilderError::ConversionFromV1 {
@@ -352,7 +352,10 @@ where
                                 let asset_path = directory.join(&manifest_asset.file_name);
                                 let buffer = asset_loader.load_vmo_from_path(&asset_path)?;
                                 let font_info = {
-                                    trace::duration!("fonts", "FontInfoLoaderImpl:load_font_info");
+                                    trace::duration!(
+                                        c"fonts",
+                                        c"FontInfoLoaderImpl:load_font_info"
+                                    );
                                     font_info_loader
                                         .load_font_info(buffer, manifest_typeface.index)?
                                 };

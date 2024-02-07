@@ -82,7 +82,7 @@ impl SchedulingLib for ThroughputScheduler {
         let _guard = self.wait_guard.try_borrow_mut().expect("Only one wait at a time allowed");
         // Async tracing for the waiting period
         let _trace_guard =
-            trace::async_enter!(trace::Id::new(), "gfx", "ThroughputScheduler::WaitForPresent");
+            trace::async_enter!(trace::Id::new(), c"gfx", c"ThroughputScheduler::WaitForPresent");
 
         // Wait until we're ready to draw.
         SchedulingFuture { sched: &self.data }.await;

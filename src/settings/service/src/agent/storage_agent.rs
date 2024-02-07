@@ -91,7 +91,7 @@ where
         unordered.push(context.receptor.into_future());
         fasync::Task::spawn(async move {
             let id = ftrace::Id::new();
-            trace!(id, "storage_agent");
+            trace!(id, c"storage_agent");
             storage_agent.handle_messages(id, unordered).await
         })
         .detach();
@@ -118,7 +118,7 @@ where
                     service::Payload::Agent(agent::Payload::Invocation(invocation)),
                     client,
                 ) => {
-                    trace!(id, "agent event");
+                    trace!(id, c"agent event");
                     // Only initialize the message receptor once during Initialization.
                     if let Lifespan::Initialization = invocation.lifespan {
                         let receptor = self
@@ -138,7 +138,7 @@ where
                     service::Payload::Storage(Payload::Request(storage_request)),
                     responder,
                 ) => {
-                    trace!(id, "storage event");
+                    trace!(id, c"storage event");
                     storage_management.handle_request(storage_request, responder).await;
                 }
                 _ => {} // Other messages are ignored
@@ -195,15 +195,15 @@ where
     where
         S: DeviceStorageConvertible + Into<StorageInfo>,
     {
-        let guard = trace_guard!(id, "get store");
+        let guard = trace_guard!(id, c"get store");
         let store = self.device_storage_factory.get_store().await;
         drop(guard);
 
-        let guard = trace_guard!(id, "get data");
+        let guard = trace_guard!(id, c"get data");
         let storable: S = store.get::<S::Storable>().await.into();
         drop(guard);
 
-        let guard = trace_guard!(id, "reply");
+        let guard = trace_guard!(id, c"reply");
         // Ignore the receptor result.
         let _ = responder.reply(Payload::Response(StorageResponse::Read(storable.into())).into());
         drop(guard);
@@ -237,15 +237,15 @@ where
     where
         S: FidlStorageConvertible + Into<StorageInfo>,
     {
-        let guard = trace_guard!(id, "get fidl store");
+        let guard = trace_guard!(id, c"get fidl store");
         let store = self.fidl_storage_factory.get_store().await;
         drop(guard);
 
-        let guard = trace_guard!(id, "get data");
+        let guard = trace_guard!(id, c"get data");
         let storable: S = store.get::<S>().await;
         drop(guard);
 
-        let guard = trace_guard!(id, "reply");
+        let guard = trace_guard!(id, c"reply");
         // Ignore the receptor result.
         let _ = responder.reply(Payload::Response(StorageResponse::Read(storable.into())).into());
         drop(guard);
@@ -280,7 +280,7 @@ where
                         self.read::<AccessibilityInfo>(id, responder).await
                     }
                     SettingType::Audio => {
-                        trace!(id, "audio storage read");
+                        trace!(id, c"audio storage read");
                         self.read::<AudioInfo>(id, responder).await
                     }
                     SettingType::Display => self.read::<DisplayInfo>(id, responder).await,
@@ -301,7 +301,7 @@ where
                 SettingInfo::Unknown(info) => self.write(info, responder).await,
                 SettingInfo::Accessibility(info) => self.write(info, responder).await,
                 SettingInfo::Audio(info) => {
-                    trace!(id, "audio storage write");
+                    trace!(id, c"audio storage write");
                     self.write(info, responder).await
                 }
                 SettingInfo::Brightness(info) => self.write(info, responder).await,

@@ -8,14 +8,14 @@ pub use storage_trace::{self, TraceFutureExt};
 #[macro_export]
 macro_rules! duration {
     ($name:expr $(, $key:expr => $val:expr)*) => {
-        $crate::storage_trace::duration!("fxfs", $name $(,$key => $val)*);
+        $crate::storage_trace::duration!(c"fxfs", $name $(,$key => $val)*);
     }
 }
 
 #[macro_export]
 macro_rules! flow_begin {
     ($name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-        $crate::storage_trace::flow_begin!("fxfs", $name, $flow_id $(,$key => $val)*);
+        $crate::storage_trace::flow_begin!(c"fxfs", $name, $flow_id $(,$key => $val)*);
     }
 }
 
@@ -29,7 +29,7 @@ macro_rules! flow_step {
 #[macro_export]
 macro_rules! flow_end {
     ($name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-        $crate::storage_trace::flow_end!("fxfs", $name, $flow_id $(,$key => $val)*);
+        $crate::storage_trace::flow_end!(c"fxfs", $name, $flow_id $(,$key => $val)*);
     }
 }
 

@@ -68,7 +68,7 @@ where
     T: Responder<R> + Send + Sync + 'static,
 {
     async fn execute(self: Box<Self>, messenger: message::Messenger, id: ftrace::Id) {
-        trace!(id, "Independent Work execute");
+        trace!(id, c"Independent Work execute");
         // Send request through MessageHub.
         let mut response_listener = messenger.message(
             Payload::Request(self.request.clone()).into(),

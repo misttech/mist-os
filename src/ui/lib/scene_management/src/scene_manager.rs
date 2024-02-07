@@ -853,7 +853,7 @@ pub fn start_flatland_presentation_loop(
                 flatland_event = flatland_event_stream.next() => {
                     match flatland_event {
                         Some(Ok(ui_comp::FlatlandEvent::OnNextFrameBegin{ values })) => {
-                            trace::duration!("scene_manager", "SceneManager::OnNextFrameBegin",
+                            trace::duration!(c"scene_manager", c"SceneManager::OnNextFrameBegin",
                                              "debug_name" => &*debug_name);
                             let credits = values
                                           .additional_present_credits
@@ -872,7 +872,7 @@ pub fn start_flatland_presentation_loop(
                             scheduler.on_next_frame_begin(credits, infos);
                         }
                         Some(Ok(ui_comp::FlatlandEvent::OnFramePresented{ frame_presented_info })) => {
-                            trace::duration!("scene_manager", "SceneManager::OnFramePresented",
+                            trace::duration!(c"scene_manager", c"SceneManager::OnFramePresented",
                                              "debug_name" => &*debug_name);
                             let actual_presentation_time =
                                 zx::Time::from_nanos(frame_presented_info.actual_presentation_time);
@@ -903,9 +903,9 @@ pub fn start_flatland_presentation_loop(
                     }
                 }
                 present_parameters = scheduler.wait_to_update().fuse() => {
-                    trace::duration!("scene_manager", "SceneManager::Present",
+                    trace::duration!(c"scene_manager", c"SceneManager::Present",
                                      "debug_name" => &*debug_name);
-                    trace::flow_begin!("gfx", "Flatland::Present", present_count.into());
+                    trace::flow_begin!(c"gfx", c"Flatland::Present", present_count.into());
                     present_count += 1;
                     channels_awaiting_pingback.push_front(Vec::new());
                     if let Some(flatland) = weak_flatland.upgrade() {

@@ -129,7 +129,7 @@ where
     ) -> Result<ConnectionState, Error> {
         match request {
             fio::DirectoryRequest::Clone { flags, object, control_handle: _ } => {
-                trace::duration!("storage", "Directory::Clone");
+                trace::duration!(c"storage", c"Directory::Clone");
                 self.handle_clone(flags, object);
             }
             fio::DirectoryRequest::Reopen {
@@ -137,18 +137,18 @@ where
                 object_request,
                 control_handle: _,
             } => {
-                trace::duration!("storage", "Directory::Reopen");
+                trace::duration!(c"storage", c"Directory::Reopen");
                 // TODO(https://fxbug.dev/42157659): Handle unimplemented io2 method.
                 // Suppress any errors in the event a bad `object_request` channel was provided.
                 let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
             }
             fio::DirectoryRequest::Close { responder } => {
-                trace::duration!("storage", "Directory::Close");
+                trace::duration!(c"storage", c"Directory::Close");
                 responder.send(Ok(()))?;
                 return Ok(ConnectionState::Closed);
             }
             fio::DirectoryRequest::GetConnectionInfo { responder } => {
-                trace::duration!("storage", "Directory::GetConnectionInfo");
+                trace::duration!(c"storage", c"Directory::GetConnectionInfo");
                 // TODO(https://fxbug.dev/42157659): Restrict GET_ATTRIBUTES, ENUMERATE, and TRAVERSE.
                 // TODO(https://fxbug.dev/42157659): Implement MODIFY_DIRECTORY and UPDATE_ATTRIBUTES.
                 responder.send(fio::ConnectionInfo {
@@ -198,37 +198,37 @@ where
                 .await?;
             }
             fio::DirectoryRequest::UpdateAttributes { payload: _, responder } => {
-                trace::duration!("storage", "Directory::UpdateAttributes");
+                trace::duration!(c"storage", c"Directory::UpdateAttributes");
                 // TODO(https://fxbug.dev/42157659): Handle unimplemented io2 method.
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::ListExtendedAttributes { iterator, .. } => {
-                trace::duration!("storage", "Directory::ListExtendedAttributes");
+                trace::duration!(c"storage", c"Directory::ListExtendedAttributes");
                 iterator.close_with_epitaph(Status::NOT_SUPPORTED)?;
             }
             fio::DirectoryRequest::GetExtendedAttribute { responder, .. } => {
-                trace::duration!("storage", "Directory::GetExtendedAttribute");
+                trace::duration!(c"storage", c"Directory::GetExtendedAttribute");
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::SetExtendedAttribute { responder, .. } => {
-                trace::duration!("storage", "Directory::SetExtendedAttribute");
+                trace::duration!(c"storage", c"Directory::SetExtendedAttribute");
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::RemoveExtendedAttribute { responder, .. } => {
-                trace::duration!("storage", "Directory::RemoveExtendedAttribute");
+                trace::duration!(c"storage", c"Directory::RemoveExtendedAttribute");
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::GetFlags { responder } => {
-                trace::duration!("storage", "Directory::GetFlags");
+                trace::duration!(c"storage", c"Directory::GetFlags");
                 responder.send(Status::OK.into_raw(), self.options.to_io1())?;
             }
             fio::DirectoryRequest::SetFlags { flags: _, responder } => {
-                trace::duration!("storage", "Directory::SetFlags");
+                trace::duration!(c"storage", c"Directory::SetFlags");
                 responder.send(Status::NOT_SUPPORTED.into_raw())?;
             }
             fio::DirectoryRequest::Open { flags, mode: _, path, object, control_handle: _ } => {
                 {
-                    trace::duration!("storage", "Directory::Open");
+                    trace::duration!(c"storage", c"Directory::Open");
                     self.handle_open(flags, path, object);
                 }
                 // Since open typically spawns a task, yield to the executor now to give that task a
@@ -242,7 +242,7 @@ where
                 control_handle: _,
             } => {
                 {
-                    trace::duration!("storage", "Directory::Open2");
+                    trace::duration!(c"storage", c"Directory::Open2");
                     // Fill in rights from the parent connection if it's absent.
                     if let fio::ConnectionProtocols::Node(fio::NodeOptions {
                         rights,
@@ -286,7 +286,7 @@ where
                 yield_to_executor().await;
             }
             fio::DirectoryRequest::AdvisoryLock { request: _, responder } => {
-                trace::duration!("storage", "Directory::AdvisoryLock");
+                trace::duration!(c"storage", c"Directory::AdvisoryLock");
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::ReadDirents { max_bytes, responder } => {
@@ -298,13 +298,13 @@ where
                 .await?;
             }
             fio::DirectoryRequest::Enumerate { options: _, iterator, control_handle: _ } => {
-                trace::duration!("storage", "Directory::Enumerate");
+                trace::duration!(c"storage", c"Directory::Enumerate");
                 // TODO(https://fxbug.dev/42157659): Handle unimplemented io2 method.
                 // Suppress any errors in the event a bad `iterator` channel was provided.
                 let _ = iterator.close_with_epitaph(Status::NOT_SUPPORTED);
             }
             fio::DirectoryRequest::Rewind { responder } => {
-                trace::duration!("storage", "Directory::Rewind");
+                trace::duration!(c"storage", c"Directory::Rewind");
                 self.seek = Default::default();
                 responder.send(Status::OK.into_raw())?;
             }
@@ -317,7 +317,7 @@ where
                 .await?;
             }
             fio::DirectoryRequest::Watch { mask, options, watcher, responder } => {
-                trace::duration!("storage", "Directory::Watch");
+                trace::duration!(c"storage", c"Directory::Watch");
                 let status = if options != 0 {
                     Status::INVALID_ARGS
                 } else {
@@ -330,7 +330,7 @@ where
                 let () = responder.send(fio::DIRECTORY_PROTOCOL_NAME.as_bytes())?;
             }
             fio::DirectoryRequest::QueryFilesystem { responder } => {
-                trace::duration!("storage", "Directory::QueryFilesystem");
+                trace::duration!(c"storage", c"Directory::QueryFilesystem");
                 match self.directory.query_filesystem() {
                     Err(status) => responder.send(status.into_raw(), None)?,
                     Ok(info) => responder.send(0, Some(&info))?,

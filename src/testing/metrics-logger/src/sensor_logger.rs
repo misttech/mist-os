@@ -148,22 +148,17 @@ macro_rules! log_trace {
     ( $sensor_type:expr, $trace_args:expr) => {
         match $sensor_type {
             SensorType::Temperature => {
-                if let Some(context) = fuchsia_trace::TraceCategoryContext::acquire(
-                    fuchsia_trace::cstr!("metrics_logger"),
-                ) {
-                    fuchsia_trace::counter(
-                        &context,
-                        fuchsia_trace::cstr!("temperature"),
-                        0,
-                        $trace_args,
-                    );
+                if let Some(context) =
+                    fuchsia_trace::TraceCategoryContext::acquire(c"metrics_logger")
+                {
+                    fuchsia_trace::counter(&context, c"temperature", 0, $trace_args);
                 }
             }
             SensorType::Power => {
-                if let Some(context) = fuchsia_trace::TraceCategoryContext::acquire(
-                    fuchsia_trace::cstr!("metrics_logger"),
-                ) {
-                    fuchsia_trace::counter(&context, fuchsia_trace::cstr!("power"), 0, $trace_args);
+                if let Some(context) =
+                    fuchsia_trace::TraceCategoryContext::acquire(c"metrics_logger")
+                {
+                    fuchsia_trace::counter(&context, c"power", 0, $trace_args);
                 }
             }
         }
@@ -174,60 +169,60 @@ macro_rules! log_trace_statistics {
     ( $sensor_type:expr, $trace_args:expr) => {
         match $sensor_type {
             SensorType::Temperature => {
-                if let Some(context) = fuchsia_trace::TraceCategoryContext::acquire(
-                    fuchsia_trace::cstr!("metrics_logger"),
-                ) {
+                if let Some(context) =
+                    fuchsia_trace::TraceCategoryContext::acquire(c"metrics_logger")
+                {
                     fuchsia_trace::counter(
                         &context,
-                        fuchsia_trace::cstr!("temperature_min"),
+                        c"temperature_min",
                         0,
                         &$trace_args[Statistics::Min as usize],
                     );
                     fuchsia_trace::counter(
                         &context,
-                        fuchsia_trace::cstr!("temperature_max"),
+                        c"temperature_max",
                         0,
                         &$trace_args[Statistics::Max as usize],
                     );
                     fuchsia_trace::counter(
                         &context,
-                        fuchsia_trace::cstr!("temperature_avg"),
+                        c"temperature_avg",
                         0,
                         &$trace_args[Statistics::Avg as usize],
                     );
                     fuchsia_trace::counter(
                         &context,
-                        fuchsia_trace::cstr!("temperature_median"),
+                        c"temperature_median",
                         0,
                         &$trace_args[Statistics::Median as usize],
                     );
                 }
             }
             SensorType::Power => {
-                if let Some(context) = fuchsia_trace::TraceCategoryContext::acquire(
-                    fuchsia_trace::cstr!("metrics_logger"),
-                ) {
+                if let Some(context) =
+                    fuchsia_trace::TraceCategoryContext::acquire(c"metrics_logger")
+                {
                     fuchsia_trace::counter(
                         &context,
-                        fuchsia_trace::cstr!("power_min"),
+                        c"power_min",
                         0,
                         &$trace_args[Statistics::Min as usize],
                     );
                     fuchsia_trace::counter(
                         &context,
-                        fuchsia_trace::cstr!("power_max"),
+                        c"power_max",
                         0,
                         &$trace_args[Statistics::Max as usize],
                     );
                     fuchsia_trace::counter(
                         &context,
-                        fuchsia_trace::cstr!("power_avg"),
+                        c"power_avg",
                         0,
                         &$trace_args[Statistics::Avg as usize],
                     );
                     fuchsia_trace::counter(
                         &context,
-                        fuchsia_trace::cstr!("power_median"),
+                        c"power_median",
                         0,
                         &$trace_args[Statistics::Median as usize],
                     );

@@ -16,7 +16,6 @@ rustc_library("pty") {
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_rust",
-    "//src/lib/cstr",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-component",
@@ -27,6 +26,7 @@ rustc_library("pty") {
   ]
 
   test_deps = [
+    "//src/lib/cstr",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:futures",
   ]

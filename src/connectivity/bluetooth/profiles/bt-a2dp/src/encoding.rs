@@ -127,7 +127,7 @@ impl Stream for EncodedStream {
                 }
                 Some(Err(e)) => return Poll::Ready(Some(Err(e.into()))),
                 Some(Ok(bytes)) => {
-                    trace::instant!( "bt-a2dp-source", "Media:PacketReceived",
+                    trace::instant!( c"bt-a2dp-source", c"Media:PacketReceived",
                         trace::Scope::Thread, "bytes" => bytes.len() as u64);
                     self.encoder_input_buffers.push_back(bytes)
                 }

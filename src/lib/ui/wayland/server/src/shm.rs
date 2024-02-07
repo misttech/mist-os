@@ -28,7 +28,7 @@ impl Shm {
 
     /// Posts an event back to the client for each supported SHM pixel format.
     pub fn post_formats(&self, this: wl::ObjectId, client: &Client) -> Result<(), Error> {
-        ftrace::duration!("wayland", "Shm::post_formats");
+        ftrace::duration!(c"wayland", c"Shm::post_formats");
         for format in SUPPORTED_PIXEL_FORMATS.iter() {
             client.event_queue().post(this, WlShmEvent::Format { format: *format })?;
         }

@@ -219,14 +219,14 @@ impl RunningSourceTask {
             };
 
             for packet in packets {
-                trace::duration_begin!("bt-a2dp", "Media:PacketSent");
+                trace::duration_begin!(c"bt-a2dp", c"Media:PacketSent");
                 if let Err(e) = media_stream.write(&packet).await {
                     info!("Failed sending packet to peer: {}", e);
-                    trace::duration_end!("bt-a2dp", "Media:PacketSent");
+                    trace::duration_end!(c"bt-a2dp", c"Media:PacketSent");
                     return Ok(());
                 }
                 data_stream_inspect.record_transferred(packet.len(), fasync::Time::now());
-                trace::duration_end!("bt-a2dp", "Media:PacketSent");
+                trace::duration_end!(c"bt-a2dp", c"Media:PacketSent");
             }
         }
     }
@@ -241,7 +241,7 @@ impl RunningSourceTask {
         let stream_task_fut =
             Self::stream_task(codec_config, encoded_stream, media_stream, inspect);
         let wrapped_task = fasync::Task::spawn(async move {
-            trace::instant!("bt-a2dp", "Media:Start", trace::Scope::Thread);
+            trace::instant!(c"bt-a2dp", c"Media:Start", trace::Scope::Thread);
             let result = stream_task_fut
                 .await
                 .map_err(|e| MediaTaskError::Other(format!("Error in streaming audio: {}", e)));
@@ -259,7 +259,7 @@ impl MediaTask for RunningSourceTask {
 
     fn stop(&mut self) -> Result<(), MediaTaskError> {
         if let Some(task) = self.stream_task.take() {
-            trace::instant!("bt-a2dp", "Media:Stopped", trace::Scope::Thread);
+            trace::instant!(c"bt-a2dp", c"Media:Stopped", trace::Scope::Thread);
             drop(task);
         }
         // Either a result already happened, or we will just have sent an Ok(()) by dropping the result

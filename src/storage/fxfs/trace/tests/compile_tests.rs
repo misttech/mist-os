@@ -205,18 +205,18 @@ fn test_impl_attr_with_trace_all_methods_and_name() {
 #[fuchsia::test]
 fn test_duration() {
     let tace_only_var = 6;
-    fxfs_trace::duration!("some-duration");
-    fxfs_trace::duration!("some-duration", "arg" => 5);
-    fxfs_trace::duration!("some-duration", "arg" => 5, "arg2" => tace_only_var);
+    fxfs_trace::duration!(c"some-duration");
+    fxfs_trace::duration!(c"some-duration", "arg" => 5);
+    fxfs_trace::duration!(c"some-duration", "arg" => 5, "arg2" => tace_only_var);
 }
 
 #[fuchsia::test]
 fn test_flow_begin() {
     let tace_only_var = 6;
     let flow_id = 5u64;
-    fxfs_trace::flow_begin!("some-flow", flow_id);
-    fxfs_trace::flow_begin!("some-flow", flow_id, "arg" => 5);
-    fxfs_trace::flow_begin!("some-flow", flow_id, "arg" => 5, "arg2" => tace_only_var);
+    fxfs_trace::flow_begin!(c"some-flow", flow_id);
+    fxfs_trace::flow_begin!(c"some-flow", flow_id, "arg" => 5);
+    fxfs_trace::flow_begin!(c"some-flow", flow_id, "arg" => 5, "arg2" => tace_only_var);
 }
 
 #[fuchsia::test]
@@ -232,9 +232,9 @@ fn test_flow_step() {
 fn test_flow_end() {
     let tace_only_var = 6;
     let flow_id = 5u64;
-    fxfs_trace::flow_end!("some-flow", flow_id);
-    fxfs_trace::flow_end!("some-flow", flow_id, "arg" => 5);
-    fxfs_trace::flow_end!("some-flow", flow_id, "arg" => 5, "arg2" => tace_only_var);
+    fxfs_trace::flow_end!(c"some-flow", flow_id);
+    fxfs_trace::flow_end!(c"some-flow", flow_id, "arg" => 5);
+    fxfs_trace::flow_end!(c"some-flow", flow_id, "arg" => 5, "arg2" => tace_only_var);
 }
 
 #[fuchsia::test]

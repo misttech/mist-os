@@ -190,7 +190,7 @@ impl BlockDevice {
         mut chain: ReadableChain<'a, 'b, N, M>,
     ) -> Result<(), anyhow::Error> {
         let trace_id = ftrace::Id::random();
-        let _trace = ftrace::async_enter!(trace_id, "machina", "BlockDevice::process_chain");
+        let _trace = ftrace::async_enter!(trace_id, c"machina", c"BlockDevice::process_chain");
         let (mut chain, block_status) = match read_header(&mut chain) {
             Ok(header) => match header.request_type.get() {
                 wire::VIRTIO_BLK_T_IN => self.read(header, chain, trace_id).await?,
@@ -238,7 +238,7 @@ impl BlockDevice {
         chain: ReadableChain<'a, 'b, N, M>,
         trace_id: ftrace::Id,
     ) -> Result<(WritableChain<'a, 'b, N, M>, wire::VirtioBlockStatus), anyhow::Error> {
-        let _trace = ftrace::async_enter!(trace_id, "machina", "BlockDevice::read");
+        let _trace = ftrace::async_enter!(trace_id, c"machina", c"BlockDevice::read");
         // If there are extra readable bytes before the writable section of the chain, the request
         // is malformed.
         if chain.remaining()?.bytes != 0 {
@@ -295,7 +295,7 @@ impl BlockDevice {
         mut chain: ReadableChain<'a, 'b, N, M>,
         trace_id: ftrace::Id,
     ) -> Result<(WritableChain<'a, 'b, N, M>, wire::VirtioBlockStatus), anyhow::Error> {
-        let _trace = ftrace::async_enter!(trace_id, "machina", "BlockDevice::write");
+        let _trace = ftrace::async_enter!(trace_id, c"machina", c"BlockDevice::write");
         if self.mode.is_read_only() {
             return readable_chain_error(chain, wire::VirtioBlockStatus::IoError);
         }
@@ -325,7 +325,7 @@ impl BlockDevice {
         chain: ReadableChain<'a, 'b, N, M>,
         trace_id: ftrace::Id,
     ) -> Result<(WritableChain<'a, 'b, N, M>, wire::VirtioBlockStatus), anyhow::Error> {
-        let _trace = ftrace::async_enter!(trace_id, "machina", "BlockDevice::flush");
+        let _trace = ftrace::async_enter!(trace_id, c"machina", c"BlockDevice::flush");
         // Virtio 1.1, Section 5.2.6.1: A driver MUST set sector to 0 for a VIRTIO_BLK_T_FLUSH
         // request.
         if header.sector.get() != 0 {
@@ -353,7 +353,7 @@ impl BlockDevice {
         chain: ReadableChain<'a, 'b, N, M>,
         trace_id: ftrace::Id,
     ) -> Result<(WritableChain<'a, 'b, N, M>, wire::VirtioBlockStatus), anyhow::Error> {
-        let _trace = ftrace::async_enter!(trace_id, "machina", "BlockDevice::get_id");
+        let _trace = ftrace::async_enter!(trace_id, c"machina", c"BlockDevice::get_id");
         let mut chain = WritableChain::from_incomplete_readable(chain)?;
 
         // Section 5.2.6.1: The length of `data` MUST be 20 bytes for VIRTIO_BLK_T_GET_ID requests.

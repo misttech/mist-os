@@ -155,8 +155,8 @@ impl SystemProfileHandler {
         subscriber: ProfileSubscriber,
     ) {
         fuchsia_trace::instant!(
-            "power_manager",
-            "SystemProfileHandler::handle_new_service_connection",
+            c"power_manager",
+            c"SystemProfileHandler::handle_new_service_connection",
             fuchsia_trace::Scope::Thread
         );
 

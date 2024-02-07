@@ -118,7 +118,7 @@ impl NetdeviceWorker {
                 continue;
             };
 
-            trace_duration!("netdevice::recv");
+            trace_duration!(c"netdevice::recv");
 
             let frame_length = rx.len();
             // TODO(https://fxbug.dev/42051635): pass strongly owned buffers down
@@ -663,7 +663,7 @@ impl PortHandler {
     }
 
     pub(crate) fn send(&self, frame: &[u8]) -> Result<(), SendError> {
-        trace_duration!("netdevice::send");
+        trace_duration!(c"netdevice::send");
 
         let Self { port_id, inner: Inner { session, .. }, .. } = self;
         // NB: We currently send on a dispatcher, so we can't wait for new

@@ -263,11 +263,11 @@ async fn main_loop_impl<T: MlmeImpl>(
                         return Ok(())
                     },
                     DriverEvent::MacFrameRx { bytes, rx_info } => {
-                        trace::duration!("wlan", "DriverEvent::MacFrameRx");
+                        trace::duration!(c"wlan", c"DriverEvent::MacFrameRx");
                         mlme_impl.handle_mac_frame_rx(&bytes[..], rx_info);
                     }
                     DriverEvent::EthFrameTx { bytes, async_id } => {
-                        trace::duration!("wlan", "DriverEvent::EthFrameTx");
+                        trace::duration!(c"wlan", c"DriverEvent::EthFrameTx");
                         let _: Result<(), ()> = mlme_impl.handle_eth_frame_tx(&bytes[..], async_id)
                             .map_err(|e| {
                                 // TODO(https://fxbug.dev/42121991): Keep a counter of these failures.

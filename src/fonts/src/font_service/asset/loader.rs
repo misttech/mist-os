@@ -58,8 +58,8 @@ impl AssetLoader for AssetLoaderImpl {
     ) -> Result<io::DirectoryProxy, AssetCollectionError> {
         let package_url = package_locator.url.to_string();
         trace::duration!(
-            "fonts",
-            "asset:fetcher:fetch_package_directory",
+            c"fonts",
+            c"asset:fetcher:fetch_package_directory",
             "package_url" => &package_url[..]);
 
         // Get directory handle from FontResolver
@@ -84,8 +84,8 @@ impl AssetLoader for AssetLoaderImpl {
     fn load_vmo_from_path(&self, path: &Path) -> Result<mem::Buffer, AssetCollectionError> {
         let path_string = path.to_str().unwrap_or_default();
         trace::duration!(
-                "fonts",
-                "asset:fetcher:load_vmo_from_path",
+            c"fonts",
+            c"asset:fetcher:load_vmo_from_path",
                 "path" => path_string);
         let file = File::open(path)
             .map_err(|e| AssetCollectionError::LocalFileNotAccessible(path.to_owned(), e.into()))?;
@@ -105,8 +105,8 @@ impl AssetLoader for AssetLoaderImpl {
         file_name: &str,
     ) -> Result<mem::Buffer, AssetCollectionError> {
         trace::duration!(
-            "fonts",
-            "asset:collection:load_buffer_from_directory_proxy",
+            c"fonts",
+            c"asset:collection:load_buffer_from_directory_proxy",
             "file_name" => file_name);
 
         let packaged_file_error = |cause: Error| AssetCollectionError::PackagedFileError {

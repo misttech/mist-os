@@ -163,8 +163,8 @@ impl LogsArtifactsContainer {
                                 let trace_id = ftrace::Id::random();
                                 let _trace_guard = ftrace::async_enter!(
                                     trace_id,
-                                    "app",
-                                    "LogContainer::cursor.parse_message",
+                                    c"app",
+                                    c"LogContainer::cursor.parse_message",
                                     // An async duration cannot have multiple concurrent child async durations
                                     // so we include the nonce as metadata to manually determine relationship.
                                     "parent_trace_id" => u64::from(parent_trace_id),

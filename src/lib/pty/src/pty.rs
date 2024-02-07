@@ -4,7 +4,6 @@
 
 use {
     anyhow::{Context as _, Error},
-    cstr::cstr,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_hardware_pty::{DeviceMarker, DeviceProxy, WindowSize},
     fuchsia_component::client::connect_to_protocol,
@@ -31,7 +30,7 @@ pub struct ShellProcess {
 impl ServerPty {
     /// Creates a new instance of the Pty which must later be spawned.
     pub fn new() -> Result<Self, Error> {
-        ftrace::duration!("pty", "Pty:new");
+        ftrace::duration!(c"pty", c"Pty:new");
         let proxy =
             connect_to_protocol::<DeviceMarker>().context("could not connect to pty service")?;
         Ok(Self { proxy })
@@ -51,7 +50,7 @@ impl ServerPty {
         command: Option<&CStr>,
         environ: Option<&[&CStr]>,
     ) -> Result<ShellProcess, Error> {
-        let command = command.unwrap_or(&cstr!("/boot/bin/sh"));
+        let command = command.unwrap_or(&c"/boot/bin/sh");
         self.spawn_with_argv(command, &[command], environ).await
     }
 
@@ -61,7 +60,7 @@ impl ServerPty {
         argv: &[&CStr],
         environ: Option<&[&CStr]>,
     ) -> Result<ShellProcess, Error> {
-        ftrace::duration!("pty", "Pty:spawn");
+        ftrace::duration!(c"pty", c"Pty:spawn");
         let client_pty = self.open_client_pty().await.context("unable to create client_pty")?;
         let process = match fdio::spawn_etc(
             &zx::Job::from_handle(zx::Handle::invalid()),
@@ -112,7 +111,7 @@ impl ServerPty {
 
     /// Sends a message to the shell that the window has been resized.
     pub async fn resize(&self, window_size: WindowSize) -> Result<(), Error> {
-        ftrace::duration!("pty", "Pty:resize");
+        ftrace::duration!(c"pty", c"Pty:resize");
         let Self { proxy } = self;
         let () = proxy
             .set_window_size(&window_size)
@@ -125,7 +124,7 @@ impl ServerPty {
 
     /// Creates a File which is suitable to use as the client side of the Pty.
     async fn open_client_pty(&self) -> Result<File, Error> {
-        ftrace::duration!("pty", "Pty:open_client_pty");
+        ftrace::duration!(c"pty", c"Pty:open_client_pty");
         let (client_end, server_end) = fidl::endpoints::create_endpoints();
         let () = self.open_client(server_end).await.context("failed to open client")?;
         fdio::create_fd(client_end.into()).context("failed to create FD from client PTY")
@@ -136,7 +135,7 @@ impl ServerPty {
     /// connection to the newly created device.
     pub async fn open_client(&self, server_end: ServerEnd<DeviceMarker>) -> Result<(), Error> {
         let Self { proxy } = self;
-        ftrace::duration!("pty", "Pty:open_client");
+        ftrace::duration!(c"pty", c"Pty:open_client");
 
         let () = proxy
             .open_client(0, server_end)
@@ -172,6 +171,7 @@ impl ShellProcess {
 mod tests {
     use {
         super::*,
+        cstr::cstr,
         fuchsia_async as fasync,
         std::os::unix::io::AsRawFd as _,
         {futures::io::AsyncWriteExt as _, zx::AsHandleRef as _},
@@ -307,8 +307,7 @@ mod tests {
     async fn spawn_pty() -> Result<ShellProcess, Error> {
         let window_size = WindowSize { width: 300 as u32, height: 300 as u32 };
         let pty = ServerPty::new()?;
-        let process =
-            pty.spawn(Some(&cstr!("/pkg/bin/sh")), None).await.context("failed to spawn")?;
+        let process = pty.spawn(Some(&c"/pkg/bin/sh"), None).await.context("failed to spawn")?;
         let () = process.pty.resize(window_size).await?;
         Ok(process)
     }

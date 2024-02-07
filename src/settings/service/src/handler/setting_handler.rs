@@ -224,8 +224,7 @@ impl ClientImpl {
             let id = fuchsia_trace::Id::new();
             trace!(
                 id,
-
-                "setting handler",
+                c"setting handler",
                 "setting_type" => format!("{:?}", client.setting_type).as_str()
             );
             while let Ok((payload, message_client)) = context.receptor.next_of::<Payload>().await {
@@ -237,7 +236,7 @@ impl ClientImpl {
                     // current value from controller and then notify the caller as if it was a
                     // change in value.
                     Command::HandleRequest(Request::Rebroadcast) => {
-                        trace!(id, "handle rebroadcast");
+                        trace!(id, c"handle rebroadcast");
                         // Fetch the current value
                         let controller_reply =
                             Self::process_request(setting_type, &controller, Request::Get).await;
@@ -250,7 +249,7 @@ impl ClientImpl {
                         reply(message_client, controller_reply);
                     }
                     Command::HandleRequest(request) => {
-                        trace!(id, "handle request");
+                        trace!(id, c"handle request");
                         reply(
                             message_client,
                             Self::process_request(setting_type, &controller, request.clone()).await,
@@ -259,8 +258,7 @@ impl ClientImpl {
                     Command::ChangeState(state) => {
                         trace!(
                             id,
-
-                            "change state",
+                            c"change state",
                             "state" => format!("{state:?}").as_str()
                         );
                         match state {
@@ -397,8 +395,7 @@ pub mod persist {
         ) -> SettingInfo {
             let guard = trace_guard!(
                 id,
-
-                "read_setting_info send",
+                c"read_setting_info send",
                 "setting_type" => format!("{:?}", T::SETTING_TYPE).as_str()
             );
             let mut receptor = self.base.messenger.message(
@@ -413,8 +410,7 @@ pub mod persist {
 
             trace!(
                 id,
-
-                "read_setting_info receive",
+                c"read_setting_info receive",
                 "setting_type" => format!("{:?}", T::SETTING_TYPE).as_str()
             );
             if let Ok((payload, _)) = receptor.next_of::<storage::Payload>().await {
@@ -458,8 +454,7 @@ pub mod persist {
             let fst = format!("{setting_type:?}");
             let guard = trace_guard!(
                 id,
-
-                "write_setting send",
+                c"write_setting send",
                 "setting_type" => fst.as_str()
             );
             let mut receptor = self.base.messenger.message(
@@ -474,8 +469,7 @@ pub mod persist {
 
             trace!(
                 id,
-
-                "write_setting receive",
+                c"write_setting receive",
                 "setting_type" => fst.as_str()
             );
             while let Some(response) = receptor.next().await {
@@ -489,8 +483,7 @@ pub mod persist {
                     if let Ok(UpdateState::Updated) = result {
                         trace!(
                             id,
-
-                            "write_setting notify",
+                            c"write_setting notify",
                             "setting_type" => fst.as_str()
                         );
                         self.notify(Event::Changed(setting_info)).await;

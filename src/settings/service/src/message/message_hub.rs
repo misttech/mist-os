@@ -102,7 +102,7 @@ impl MessageHub {
         fasync::Task::spawn(async move {
             let id = ftrace::Id::new();
 
-            trace!(id, "message hub");
+            trace!(id, c"message hub");
             loop {
                 // We must prioritize the action futures. Exit actions
                 // take absolute priority. Message actions are ordered before
@@ -114,8 +114,7 @@ impl MessageHub {
                     message_action = action_rx.select_next_some() => {
                         trace!(
                             id,
-
-                            "message action"
+                            c"message action"
                         );
                         let (fingerprint, action, beacon) = message_action;
                         hub.process_request(id, fingerprint, action, beacon).await;
@@ -123,8 +122,7 @@ impl MessageHub {
                     messenger_action = messenger_rx.next() => {
                         trace!(
                             id,
-
-                            "messenger action"
+                            c"messenger action"
                         );
                         match messenger_action {
                             Some(action) => {
@@ -172,7 +170,7 @@ impl MessageHub {
     /// id of the current messenger possessing the message and not necessarily
     /// the original author.
     async fn send_to_next(&mut self, id: ftrace::Id, sender_id: MessengerId, message: Message) {
-        trace!(id, "send_to_next");
+        trace!(id, c"send_to_next");
         let mut recipients = vec![];
 
         let message_type = message.get_type();
@@ -412,8 +410,7 @@ impl MessageHub {
             MessengerAction::Create(messenger_descriptor, responder, messenger_tx) => {
                 trace!(
                     id,
-
-                    "process messenger request create",
+                    c"process messenger request create",
                     "messenger_type" => format!("{:?}", messenger_descriptor.messenger_type).as_str()
                 );
 
@@ -490,11 +487,11 @@ impl MessageHub {
             }
             #[cfg(test)]
             MessengerAction::CheckPresence(signature, responder) => {
-                trace!(id, "process messenger request check presence");
+                trace!(id, c"process messenger request check presence");
                 let _ = responder.send(Ok(self.resolve_messenger_id(&signature).is_ok()));
             }
             MessengerAction::DeleteBySignature(signature) => {
-                trace!(id, "process messenger request delete");
+                trace!(id, c"process messenger request delete");
                 self.delete_by_signature(signature)
             }
         }
@@ -528,14 +525,13 @@ impl MessageHub {
             MessageAction::Send(payload, message_type) => {
                 let guard = trace_guard!(
                     id,
-
-                    "process request send",
+                    c"process request send",
                     "payload" => format!("{payload:?}").as_str()
                 );
                 (Message::new(fingerprint, payload, message_type), guard)
             }
             MessageAction::Forward(forwarded_message) => {
-                let guard = trace_guard!(id, "process request forward");
+                let guard = trace_guard!(id, c"process request forward");
                 if let Some(beacon) = self.beacons.get(&fingerprint.id) {
                     match forwarded_message.get_type() {
                         MessageType::Origin(audience) => {

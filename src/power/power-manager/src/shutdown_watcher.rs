@@ -128,8 +128,8 @@ impl ShutdownWatcher {
         mut stream: fpower::RebootMethodsWatcherRegisterRequestStream,
     ) {
         fuchsia_trace::instant!(
-            "power_manager",
-            "ShutdownWatcher::handle_new_service_connection",
+            c"power_manager",
+            c"ShutdownWatcher::handle_new_service_connection",
             fuchsia_trace::Scope::Thread
         );
 
@@ -162,8 +162,8 @@ impl ShutdownWatcher {
     /// Adds a new RebootMethodsWatcher channel to the list of registered watchers.
     fn add_reboot_watcher(&self, watcher: fpower::RebootMethodsWatcherProxy) {
         fuchsia_trace::duration!(
-            "power_manager",
-            "ShutdownWatcher::add_reboot_watcher",
+            c"power_manager",
+            c"ShutdownWatcher::add_reboot_watcher",
             "watcher" => watcher.as_channel().raw_handle()
         );
 
@@ -190,8 +190,8 @@ impl ShutdownWatcher {
         request: ShutdownRequest,
     ) -> Result<MessageReturn, PowerManagerError> {
         fuchsia_trace::instant!(
-            "power_manager",
-            "ShutdownWatcher::handle_system_shutdown_message",
+            c"power_manager",
+            c"ShutdownWatcher::handle_system_shutdown_message",
             fuchsia_trace::Scope::Thread,
             "request" => format!("{:?}", request).as_str()
         );
@@ -212,8 +212,8 @@ impl ShutdownWatcher {
         // and not used anonymously at the macro callsite.
         let reason_str = format!("{:?}", reason);
         fuchsia_trace::duration!(
-            "power_manager",
-            "ShutdownWatcher::notify_reboot_watchers",
+            c"power_manager",
+            c"ShutdownWatcher::notify_reboot_watchers",
             "reason" => reason_str.as_str()
         );
 

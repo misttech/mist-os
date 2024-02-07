@@ -345,7 +345,7 @@ impl Info {
 
         async move {
             let id = fuchsia_trace::Id::new();
-            trace!(id, "job execution");
+            trace!(id, c"job execution");
             let mut state = State::Executing;
             std::mem::swap(&mut state, &mut self.state);
 

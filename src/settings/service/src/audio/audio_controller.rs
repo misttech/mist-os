@@ -93,7 +93,7 @@ impl VolumeController {
         volume: Vec<SetAudioStream>,
         id: ftrace::Id,
     ) -> SettingHandlerResult {
-        let guard = trace_guard!(id, "set volume updating counters");
+        let guard = trace_guard!(id, c"set volume updating counters");
         // Update counters for changed streams.
         for stream in &volume {
             // We don't care what the value of the counter is, just that it is different from the
@@ -108,7 +108,7 @@ impl VolumeController {
         drop(guard);
 
         if !(self.update_volume_streams(UpdateFrom::NewStreams(volume), true, id).await?) {
-            trace!(id, "set volume notifying");
+            trace!(id, c"set volume notifying");
             let info = self.get_info(id).await?.into();
             self.client.notify(Event::Changed(info)).await;
         }
@@ -129,12 +129,12 @@ impl VolumeController {
         id: ftrace::Id,
     ) -> Result<bool, ControllerError> {
         let mut new_vec = vec![];
-        trace!(id, "update volume streams");
-        let calculating_guard = trace_guard!(id, "check and bind");
+        trace!(id, c"update volume streams");
+        let calculating_guard = trace_guard!(id, c"check and bind");
         let (stored_value, new_streams) = match &update_from {
             UpdateFrom::AudioInfo(audio_info) => (None, audio_info.streams.iter()),
             UpdateFrom::NewStreams(streams) => {
-                trace!(id, "reading setting");
+                trace!(id, c"reading setting");
                 let stored_value = self.client.read_setting::<AudioInfo>(id).await;
                 for set_stream in streams.iter() {
                     let stored_stream = stored_value
@@ -164,11 +164,11 @@ impl VolumeController {
         };
 
         if push_to_audio_core {
-            let guard = trace_guard!(id, "push to core");
+            let guard = trace_guard!(id, c"push to core");
             self.check_and_bind_volume_controls(id, default_audio_info().streams.iter()).await?;
             drop(guard);
 
-            trace!(id, "setting core");
+            trace!(id, c"setting core");
             for stream in new_streams {
                 if let Some(volume_control) =
                     self.stream_volume_controls.get_mut(&stream.stream_type)
@@ -177,18 +177,18 @@ impl VolumeController {
                 }
             }
         } else {
-            trace!(id, "without push to core");
+            trace!(id, c"without push to core");
             self.check_and_bind_volume_controls(id, new_streams).await?;
         }
         drop(calculating_guard);
 
         if let Some(mut stored_value) = stored_value {
-            let guard = trace_guard!(id, "updating streams and counters");
+            let guard = trace_guard!(id, c"updating streams and counters");
             stored_value.streams = get_streams_array_from_map(&self.stream_volume_controls);
             stored_value.modified_counters = Some(self.modified_counters.clone());
             drop(guard);
 
-            let guard = trace_guard!(id, "writing setting");
+            let guard = trace_guard!(id, c"writing setting");
             let write_result = self.client.write_setting(stored_value.into(), id).await;
             drop(guard);
             Ok(write_result.notified())
@@ -203,12 +203,12 @@ impl VolumeController {
         id: ftrace::Id,
         streams: impl Iterator<Item = &AudioStream>,
     ) -> ControllerStateResult {
-        trace!(id, "check and bind fn");
+        trace!(id, c"check and bind fn");
         if self.audio_service_connected {
             return Ok(());
         }
 
-        let guard = trace_guard!(id, "connecting to service");
+        let guard = trace_guard!(id, c"connecting to service");
         let service_result = self
             .client
             .get_service_context()
@@ -230,7 +230,7 @@ impl VolumeController {
         drop(guard);
         let mut stream_tuples = Vec::new();
         for stream in streams {
-            trace!(id, "create stream volume control");
+            trace!(id, c"create stream volume control");
             let client = self.client.clone();
 
             // Generate a tuple with stream type and StreamVolumeControl.
@@ -246,7 +246,7 @@ impl VolumeController {
                         // AudioController.
                         let client = client.clone();
                         fasync::Task::spawn(async move {
-                            trace!(id, "stream exit");
+                            trace!(id, c"stream exit");
                             client
                                 .notify(Event::Exited(Err(ControllerError::UnexpectedError(
                                     "stream_volume_control exit".into(),
@@ -293,11 +293,11 @@ impl controller::Handle for AudioController {
         match request {
             Request::Restore => Some({
                 let id = ftrace::Id::new();
-                trace!(id, "controller restore");
+                trace!(id, c"controller restore");
                 self.volume.lock().await.restore(id).await.map(|_| None)
             }),
             Request::SetVolume(volume, id) => {
-                trace!(id, "controller set");
+                trace!(id, c"controller set");
                 // Validate volume contains valid volume level numbers.
                 for audio_stream in &volume {
                     if !audio_stream.has_valid_volume_level() {
@@ -324,7 +324,7 @@ impl controller::Handle for AudioController {
                 // Restore the volume state locally but do not push to the audio core.
                 Some({
                     let id = ftrace::Id::new();
-                    trace!(id, "controller startup");
+                    trace!(id, c"controller startup");
                     self.volume.lock().await.restore_volume_state(false, id).await
                 })
             }

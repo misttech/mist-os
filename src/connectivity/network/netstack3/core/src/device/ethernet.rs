@@ -912,7 +912,7 @@ where
         metadata: RecvEthernetFrameMeta<CC::DeviceId>,
         mut buffer: B,
     ) {
-        trace_duration!(bindings_ctx, "device::ethernet::receive_frame");
+        trace_duration!(bindings_ctx, c"device::ethernet::receive_frame");
         let RecvEthernetFrameMeta { device_id } = metadata;
         trace!("ethernet::receive_frame: device_id = {:?}", device_id);
         self.increment(|counters| &counters.recv_frame);

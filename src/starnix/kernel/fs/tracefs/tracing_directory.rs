@@ -9,7 +9,7 @@ use crate::{
         DynamicFileSource, FileObject, FileOps, FsNodeOps, SimpleFileNode,
     },
 };
-use starnix_logging::trace_category_atrace;
+use starnix_logging::CATEGORY_ATRACE;
 use starnix_sync::{Locked, WriteOps};
 use starnix_uapi::errors::Errno;
 
@@ -55,9 +55,7 @@ impl FileOps for TraceMarkerFile {
         _offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        if let Some(context) =
-            TraceCategoryContext::acquire(fuchsia_trace::cstr!(trace_category_atrace!()))
-        {
+        if let Some(context) = TraceCategoryContext::acquire(CATEGORY_ATRACE) {
             let bytes = data.read_all()?;
             if let Ok(mut event_stacks) = self.event_stacks.lock() {
                 let now = zx::ticks_get();

@@ -506,11 +506,11 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
     async fn handle_request(&mut self, req: fio::FileRequest) -> Result<ConnectionState, Error> {
         match req {
             fio::FileRequest::Clone { flags, object, control_handle: _ } => {
-                trace::duration!("storage", "File::Clone");
+                trace::duration!(c"storage", c"File::Clone");
                 self.handle_clone(flags, object);
             }
             fio::FileRequest::Reopen { rights_request: _, object_request, control_handle: _ } => {
-                trace::duration!("storage", "File::Reopen");
+                trace::duration!(c"storage", c"File::Reopen");
                 // TODO(https://fxbug.dev/42157659): Handle unimplemented io2 method.
                 // Suppress any errors in the event a bad `object_request` channel was provided.
                 let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
@@ -541,7 +541,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             }
             #[cfg(target_os = "fuchsia")]
             fio::FileRequest::Describe { responder } => {
-                trace::duration!("storage", "File::Describe");
+                trace::duration!(c"storage", c"File::Describe");
                 let stream = self.file.duplicate_stream()?;
                 responder.send(fio::FileInfo {
                     stream,
@@ -561,7 +561,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 .await?;
             }
             fio::FileRequest::GetConnectionInfo { responder } => {
-                trace::duration!("storage", "File::GetConnectionInfo");
+                trace::duration!(c"storage", c"File::GetConnectionInfo");
                 // TODO(https://fxbug.dev/42157659): Restrict GET_ATTRIBUTES.
                 responder.send(fio::ConnectionInfo {
                     rights: Some(self.options.rights),
@@ -726,11 +726,11 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 .await?;
             }
             fio::FileRequest::GetFlags { responder } => {
-                trace::duration!("storage", "File::GetFlags");
+                trace::duration!(c"storage", c"File::GetFlags");
                 responder.send(Status::OK.into_raw(), self.options.to_io1())?;
             }
             fio::FileRequest::SetFlags { flags, responder } => {
-                trace::duration!("storage", "File::SetFlags");
+                trace::duration!(c"storage", c"File::SetFlags");
                 self.options.is_append = flags.contains(fio::OpenFlags::APPEND);
                 responder.send(self.file.update_flags(self.options.to_io1()).into_raw())?;
             }
@@ -749,15 +749,15 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::FileRequest::AdvisoryLock { request: _, responder } => {
-                trace::duration!("storage", "File::AdvisoryLock");
+                trace::duration!(c"storage", c"File::AdvisoryLock");
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::FileRequest::Query { responder } => {
-                trace::duration!("storage", "File::Query");
+                trace::duration!(c"storage", c"File::Query");
                 responder.send(fio::FILE_PROTOCOL_NAME.as_bytes())?;
             }
             fio::FileRequest::QueryFilesystem { responder } => {
-                trace::duration!("storage", "File::QueryFilesystem");
+                trace::duration!(c"storage", c"File::QueryFilesystem");
                 match self.file.query_filesystem() {
                     Err(status) => responder.send(status.into_raw(), None)?,
                     Ok(info) => responder.send(0, Some(&info))?,

@@ -288,7 +288,7 @@ impl InputDispatcher {
     }
 
     fn add_keyboard_and_send_focus(&mut self, keyboard: ObjectRef<Keyboard>) -> Result<(), Error> {
-        ftrace::duration!("wayland", "InputDispatcher::add_keyboard_and_send_focus");
+        ftrace::duration!(c"wayland", c"InputDispatcher::add_keyboard_and_send_focus");
         if let Some(focus) = self.keyboard_focus {
             let serial = self.event_queue.next_serial();
             self.event_queue.post(
@@ -311,7 +311,7 @@ impl InputDispatcher {
     }
 
     fn send_keyboard_enter(&self, surface: ObjectRef<Surface>) -> Result<(), Error> {
-        ftrace::duration!("wayland", "InputDispatcher::send_keyboard_enter");
+        ftrace::duration!(c"wayland", c"InputDispatcher::send_keyboard_enter");
         let serial = self.event_queue.next_serial();
         self.keyboards.iter().try_for_each(|k| {
             self.event_queue.post(
@@ -322,7 +322,7 @@ impl InputDispatcher {
     }
 
     fn send_keyboard_modifiers(&self, modifiers: u32) -> Result<(), Error> {
-        ftrace::duration!("wayland", "InputDispatcher::send_keyboard_modifiers");
+        ftrace::duration!(c"wayland", c"InputDispatcher::send_keyboard_modifiers");
         let serial = self.event_queue.next_serial();
         self.keyboards.iter().try_for_each(|k| {
             self.event_queue.post(
@@ -339,7 +339,7 @@ impl InputDispatcher {
     }
 
     fn send_keyboard_leave(&self, surface: ObjectRef<Surface>) -> Result<(), Error> {
-        ftrace::duration!("wayland", "InputDispatcher::send_keyboard_leave");
+        ftrace::duration!(c"wayland", c"InputDispatcher::send_keyboard_leave");
         let serial = self.event_queue.next_serial();
         self.keyboards.iter().try_for_each(|k| {
             self.event_queue
@@ -355,7 +355,7 @@ impl InputDispatcher {
     ) -> Result<(), Error> {
         // Map usb keycodes to Linux because some apps don't use the provided keymap/assume Linux keycodes
         let linux_keycode = usb_to_linux_keycode(key.into_primitive());
-        ftrace::duration!("wayland", "InputDispatcher::send_key_event", "linux_keycode" => linux_keycode as u32);
+        ftrace::duration!(c"wayland", c"InputDispatcher::send_key_event", "linux_keycode" => linux_keycode as u32);
         let serial = self.event_queue.next_serial();
         self.keyboards.iter().try_for_each(|k| {
             self.event_queue.post(
@@ -370,7 +370,7 @@ impl InputDispatcher {
         source: ObjectRef<Surface>,
         event: &KeyEvent,
     ) -> Result<(), Error> {
-        ftrace::duration!("wayland", "InputDispatcher::handle_key_event");
+        ftrace::duration!(c"wayland", c"InputDispatcher::handle_key_event");
         if Some(source) == self.keyboard_focus_source && self.keyboard_focus.is_some() {
             let key = event.key.unwrap();
             let time_in_ms = (event.timestamp.unwrap() / 1_000_000) as u32;
@@ -399,7 +399,7 @@ impl InputDispatcher {
 
     /// Dispatches a keymap change event to all attached keyboards.
     pub fn send_keymap_event(&mut self, keymap_vmo: zx::Vmo) -> Result<()> {
-        ftrace::duration!("wayland", "InputDispatcher::send_keymap_event");
+        ftrace::duration!(c"wayland", c"InputDispatcher::send_keymap_event");
         let clone_vmo = move || {
             keymap_vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("handle can be duplicated")
         };
@@ -423,7 +423,7 @@ impl InputDispatcher {
         &mut self,
         new_focus: Option<ObjectRef<Surface>>,
     ) -> Result<(), Error> {
-        ftrace::duration!("wayland", "InputDispatcher::update_keyboard_focus");
+        ftrace::duration!(c"wayland", c"InputDispatcher::update_keyboard_focus");
         if new_focus == self.keyboard_focus {
             return Ok(());
         }
@@ -447,7 +447,7 @@ impl InputDispatcher {
         target: ObjectRef<Surface>,
         focused: bool,
     ) -> Result<(), Error> {
-        ftrace::duration!("wayland", "InputDispatcher::handle_keyboard_focus");
+        ftrace::duration!(c"wayland", c"InputDispatcher::handle_keyboard_focus");
         let keyboard_focus = if focused {
             self.keyboard_focus_source = Some(source);
             Some(target)
@@ -463,7 +463,7 @@ impl InputDispatcher {
         source: ObjectRef<Surface>,
         new_target: ObjectRef<Surface>,
     ) -> Result<(), Error> {
-        ftrace::duration!("wayland", "InputDispatcher::maybe_update_keyboard_focus");
+        ftrace::duration!(c"wayland", c"InputDispatcher::maybe_update_keyboard_focus");
         if Some(source) == self.keyboard_focus_source {
             self.update_keyboard_focus(Some(new_target))?;
         }
@@ -471,7 +471,7 @@ impl InputDispatcher {
     }
 
     fn send_pointer_enter(&self, surface: ObjectRef<Surface>, x: f32, y: f32) -> Result<(), Error> {
-        ftrace::duration!("wayland", "InputDispatcher::send_pointer_enter");
+        ftrace::duration!(c"wayland", c"InputDispatcher::send_pointer_enter");
         let serial = self.event_queue.next_serial();
         self.pointers.iter().try_for_each(|p| {
             self.event_queue.post(
@@ -487,7 +487,7 @@ impl InputDispatcher {
     }
 
     fn send_pointer_leave(&self, surface: ObjectRef<Surface>) -> Result<(), Error> {
-        ftrace::duration!("wayland", "InputDispatcher::send_pointer_leave");
+        ftrace::duration!(c"wayland", c"InputDispatcher::send_pointer_leave");
         let serial = self.event_queue.next_serial();
         self.pointers.iter().try_for_each(|p| {
             self.event_queue
@@ -500,7 +500,7 @@ impl InputDispatcher {
         new_focus: Option<ObjectRef<Surface>>,
         position: &[f32; 2],
     ) -> Result<(), Error> {
-        ftrace::duration!("wayland", "InputDispatcher::update_pointer_focus");
+        ftrace::duration!(c"wayland", c"InputDispatcher::update_pointer_focus");
         if new_focus == self.pointer_focus {
             return Ok(());
         }
@@ -525,14 +525,14 @@ impl InputDispatcher {
     }
 
     fn send_pointer_frame(&self) -> Result<(), Error> {
-        ftrace::duration!("wayland", "InputDispatcher::send_pointer_frame");
+        ftrace::duration!(c"wayland", c"InputDispatcher::send_pointer_frame");
         self.v5_pointers
             .iter()
             .try_for_each(|p| self.event_queue.post(p.id(), wl_pointer::Event::Frame))
     }
 
     fn send_touch_frame(&self) -> Result<(), Error> {
-        ftrace::duration!("wayland", "InputDispatcher::send_touch_frame");
+        ftrace::duration!(c"wayland", c"InputDispatcher::send_touch_frame");
         self.touches.iter().try_for_each(|p| self.event_queue.post(p.id(), wl_touch::Event::Frame))
     }
 
@@ -546,7 +546,7 @@ impl InputDispatcher {
         scroll_v: &Option<i64>,
         scroll_h: &Option<i64>,
     ) -> Result<(), Error> {
-        ftrace::duration!("wayland", "InputDispatcher::handle_pointer_event");
+        ftrace::duration!(c"wayland", c"InputDispatcher::handle_pointer_event");
         let time_in_ms = (timestamp / 1_000_000) as u32;
         let mut needs_frame = false;
 
@@ -681,7 +681,7 @@ impl InputDispatcher {
         position: &[f32; 2],
         phase: EventPhase,
     ) -> Result<(), Error> {
-        ftrace::duration!("wayland", "InputDispatcher::handle_touch_event");
+        ftrace::duration!(c"wayland", c"InputDispatcher::handle_touch_event");
         let time_in_ms = (timestamp / 1_000_000) as u32;
         let mut needs_frame = false;
         match phase {

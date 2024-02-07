@@ -309,7 +309,7 @@ impl CurveFitter {
         points: impl Iterator<Item = Point>,
         range: Range<usize>,
     ) -> impl Iterator<Item = (Point, Point, Point)> + '_ {
-        duration!("gfx", "CurveFitter::compute_control_points");
+        duration!(c"gfx", c"CurveFitter::compute_control_points");
         self.end_points.splice(.., points.map(|p| p.to_vector()));
         self.first_control_points.clear();
         self.second_control_points.clear();
@@ -1014,7 +1014,7 @@ impl Ink {
         render_context: &mut Context,
         context: &ViewAssistantContext,
     ) -> Result<(), Error> {
-        duration!("gfx", "update");
+        duration!(c"gfx", c"update");
 
         let time_now = Time::get_monotonic();
         let size = &context.size;

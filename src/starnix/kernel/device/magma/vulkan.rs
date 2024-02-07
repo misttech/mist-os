@@ -19,13 +19,6 @@ use fuchsia_zircon::AsHandleRef;
 use std::mem;
 use vk_sys as vk;
 
-/// Creates a `CStr` from the provided `bytes`.
-macro_rules! cstr {
-    ( $bytes:expr ) => {
-        ::std::ffi::CStr::from_bytes_with_nul($bytes).expect("CStr must end with '\\0'")
-    };
-}
-
 /// `BufferCollectionTokens` contains all the buffer collection tokens required to initialize a
 /// `Loader`.
 ///
@@ -164,7 +157,7 @@ impl Loader {
             pQueuePriorities: &0.0,
         };
 
-        let extension_names = [cstr!(b"VK_FUCHSIA_buffer_collection\0").as_ptr()];
+        let extension_names = [c"VK_FUCHSIA_buffer_collection".as_ptr()];
 
         let device_create_info = vk::DeviceCreateInfo {
             sType: vk::STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -373,7 +366,7 @@ pub fn app_info() -> vk::ApplicationInfo {
     vk::ApplicationInfo {
         sType: vk::STRUCTURE_TYPE_APPLICATION_INFO,
         pNext: std::ptr::null(),
-        pApplicationName: cstr!(b"starnix\0").as_ptr(),
+        pApplicationName: c"starnix".as_ptr(),
         applicationVersion: 0,
         pEngineName: std::ptr::null(),
         engineVersion: 0,

@@ -118,7 +118,6 @@ rustc_library_with_features("netstack3-core") {
     "//src/connectivity/network/lib/explicit",
     "//src/connectivity/network/lib/todo_unused",
     "//src/lib/const-unwrap",
-    "//src/lib/cstr",
     "//src/lib/dense-map",
     "//src/lib/network/packet",
     "//src/lib/replace-with",

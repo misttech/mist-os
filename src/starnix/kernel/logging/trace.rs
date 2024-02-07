@@ -9,45 +9,46 @@ pub use fuchsia_trace::Scope as TraceScope;
 #[doc(hidden)]
 pub use fuchsia_trace as __fuchsia_trace;
 
+use std::ffi::CStr;
+
 // The trace category used for starnix-related traces.
-fuchsia_trace::string_name_macro!(trace_category_starnix, "starnix");
+pub const CATEGORY_STARNIX: &'static CStr = c"starnix";
 
 // The trace category used for memory manager related traces.
-fuchsia_trace::string_name_macro!(trace_category_starnix_mm, "starnix:mm");
+pub const CATEGORY_STARNIX_MM: &'static CStr = c"starnix:mm";
 
 // The name used to track the duration in Starnix while executing a task.
-fuchsia_trace::string_name_macro!(trace_name_run_task, "RunTask");
+pub const NAME_RUN_TASK: &'static CStr = c"RunTask";
 
 // The trace category used for atrace events generated within starnix.
-fuchsia_trace::string_name_macro!(trace_category_atrace, "starnix:atrace");
+pub const CATEGORY_ATRACE: &'static CStr = c"starnix:atrace";
 
 // The name used to identify blob records from the container's Perfetto daemon.
-fuchsia_trace::string_name_macro!(trace_name_perfetto_blob, "starnix_perfetto");
+pub const NAME_PERFETTO_BLOB: &'static CStr = c"starnix_perfetto";
 
 // The name used to track the duration of a syscall.
-fuchsia_trace::string_name_macro!(trace_name_execute_syscall, "ExecuteSyscall");
+pub const NAME_EXECUTE_SYSCALL: &'static CStr = c"ExecuteSyscall";
 
 // The name used to track the duration of creating a container.
-fuchsia_trace::string_name_macro!(trace_name_create_container, "CreateContainer");
+pub const NAME_CREATE_CONTAINER: &'static CStr = c"CreateContainer";
 
 // The name used to track the start time of the starnix kernel.
-fuchsia_trace::string_name_macro!(trace_name_start_kernel, "StartKernel");
+pub const NAME_START_KERNEL: &'static CStr = c"StartKernel";
 
 // The name used to track when a thread was kicked.
-fuchsia_trace::string_name_macro!(trace_name_restricted_kick, "RestrictedKick");
+pub const NAME_RESTRICTED_KICK: &'static CStr = c"RestrictedKick";
 
 // The name used to track the duration for inline exception handling.
-fuchsia_trace::string_name_macro!(trace_name_handle_exception, "HandleException");
+pub const NAME_HANDLE_EXCEPTION: &'static CStr = c"HandleException";
 
 // The names used to track durations for restricted state I/O.
-fuchsia_trace::string_name_macro!(trace_name_read_restricted_state, "ReadRestrictedState");
-fuchsia_trace::string_name_macro!(trace_name_write_restricted_state, "WriteRestrictedState");
+pub const NAME_READ_RESTRICTED_STATE: &'static CStr = c"ReadRestrictedState";
+pub const NAME_WRITE_RESTRICTED_STATE: &'static CStr = c"WriteRestrictedState";
 
 // The name used to track the duration of checking whether the task loop should exit.
-fuchsia_trace::string_name_macro!(trace_name_check_task_exit, "CheckTaskExit");
+pub const NAME_CHECK_TASK_EXIT: &'static CStr = c"CheckTaskExit";
 
-// The argument used to track the name of a syscall.
-fuchsia_trace::string_name_macro!(trace_arg_name, "name");
+pub const ARG_NAME: &'static str = "name";
 
 #[inline]
 pub const fn regular_tracing_enabled() -> bool {
@@ -89,8 +90,8 @@ macro_rules! trace_duration {
         };
         let _scope = if $crate::regular_tracing_enabled() {
             Some($crate::__fuchsia_trace::duration(
-                $crate::__fuchsia_trace::cstr!($category),
-                $crate::__fuchsia_trace::cstr!($name),
+                $category,
+                $name,
                 _args.as_ref().unwrap()
             ))
         } else {

@@ -70,7 +70,7 @@ impl CopyOnWriteBackend {
         copied: Box<dyn BlockBackend>,
         trace_id: ftrace::Id,
     ) -> Result<Self, Error> {
-        let _trace = ftrace::async_enter!(trace_id, "machina", "CopyOnWriteBackend::new");
+        let _trace = ftrace::async_enter!(trace_id, c"machina", c"CopyOnWriteBackend::new");
         let (backing_attrs, copied_attrs) =
             futures::try_join!(backing.get_attrs(trace_id), copied.get_attrs(trace_id))?;
         if backing_attrs.capacity < copied_attrs.capacity {

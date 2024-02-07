@@ -148,7 +148,7 @@ impl TerminalScene {
     }
 
     pub fn update_size(&mut self, new_size: Size, cell_size: Size) {
-        ftrace::duration!("terminal", "Scene:TerminalScene:update_size");
+        ftrace::duration!(c"terminal", c"Scene:TerminalScene:update_size");
 
         self.grid_view.cell_size = cell_size;
         self.size = new_size;

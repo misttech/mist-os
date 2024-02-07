@@ -333,7 +333,7 @@ impl Common {
                     // Fifo has been closed.
                     return Err(zx::Status::CANCELED.into());
                 }
-                trace::duration!("storage", "BlockOp::start");
+                trace::duration!(c"storage", c"BlockOp::start");
                 let request_id = state.next_request_id;
                 let trace_flow_id = generate_trace_flow_id(request_id);
                 state.next_request_id = state.next_request_id.overflowing_add(1).0;
@@ -343,7 +343,7 @@ impl Common {
                 );
                 request.reqid = request_id;
                 request.trace_flow_id = generate_trace_flow_id(request_id);
-                trace::flow_begin!("storage", "BlockOp", trace_flow_id);
+                trace::flow_begin!(c"storage", c"BlockOp", trace_flow_id);
                 state.queue.push_back(request);
                 if let Some(waker) = state.poller_waker.clone() {
                     state.poll_send_requests(&mut Context::from_waker(&waker));
@@ -351,8 +351,8 @@ impl Common {
                 (request_id, trace_flow_id)
             };
             ResponseFuture::new(self.fifo_state.clone(), request_id).await?;
-            trace::duration!("storage", "BlockOp::end");
-            trace::flow_end!("storage", "BlockOp", trace_flow_id);
+            trace::duration!(c"storage", c"BlockOp::end");
+            trace::flow_end!(c"storage", c"BlockOp", trace_flow_id);
             Ok(())
         }
         .trace(trace_args)

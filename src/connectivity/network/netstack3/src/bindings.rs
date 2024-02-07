@@ -396,7 +396,7 @@ impl TracingContext for BindingsCtx {
     type DurationScope = fuchsia_trace::DurationScope<'static>;
 
     fn duration(&self, name: &'static CStr) -> fuchsia_trace::DurationScope<'static> {
-        fuchsia_trace::duration(cstr::cstr!("net"), name, &[])
+        fuchsia_trace::duration(c"net", name, &[])
     }
 }
 
@@ -409,7 +409,7 @@ impl TracingContext for BindingsCtx {
 /// scope in which the macro is called ends.
 macro_rules! trace_duration {
     ($name:expr) => {
-        fuchsia_trace::duration!("net", $name);
+        fuchsia_trace::duration!(c"net", $name);
     };
 }
 

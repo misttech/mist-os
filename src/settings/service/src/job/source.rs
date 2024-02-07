@@ -264,7 +264,7 @@ impl Handler {
         for execution_group in self.jobs.values_mut() {
             // If there are no jobs ready to become active, move to next group.
             if let Some(job_info) = execution_group.promote_next_to_active() {
-                let guard = trace_guard!(id, "prepare_execution");
+                let guard = trace_guard!(id, c"prepare_execution");
                 let execution =
                     job_info.prepare_execution(delegate, &mut self.stores, callback).await;
                 drop(guard);

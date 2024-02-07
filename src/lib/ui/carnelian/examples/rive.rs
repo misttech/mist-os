@@ -235,7 +235,7 @@ impl ViewAssistant for RiveViewAssistant {
         let mut request_render = false;
         for (animation_instance, is_animating) in scene_details.animations.iter_mut() {
             if *is_animating {
-                duration!("gfx", "rive::animation::advance");
+                duration!(c"gfx", c"rive::animation::advance");
                 animation_instance.advance(elapsed);
                 animation_instance.apply(scene_details.artboard.clone(), 1.0);
             }

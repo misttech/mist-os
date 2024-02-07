@@ -30,8 +30,8 @@ use futures::{
 };
 use starnix_lifecycle::DropWaiter;
 use starnix_logging::{
-    log_error, log_warn, trace_category_starnix, trace_duration, trace_flow_begin, trace_flow_end,
-    trace_flow_step,
+    log_error, log_warn, trace_duration, trace_flow_begin, trace_flow_end, trace_flow_step,
+    CATEGORY_STARNIX,
 };
 use starnix_sync::{FileOpsIoctl, Locked, Mutex, MutexGuard, ReadOps, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -47,24 +47,17 @@ use starnix_uapi::{
 };
 use std::{
     collections::{HashMap, HashSet, VecDeque},
+    ffi::CStr,
     rc::Rc,
     sync::{Arc, Weak},
 };
 
 // The name used to track the duration of a remote binder ioctl.
-fuchsia_trace::string_name_macro!(trace_name_remote_binder_ioctl, "remote_binder_ioctl");
-fuchsia_trace::string_name_macro!(
-    trace_name_remote_binder_ioctl_send_work,
-    "remote_binder_ioctl_send_work"
-);
-fuchsia_trace::string_name_macro!(
-    trace_name_remote_binder_ioctl_fidl_reply,
-    "remote_binder_ioctl_fidl_reply"
-);
-fuchsia_trace::string_name_macro!(
-    trace_name_remote_binder_ioctl_worker_process,
-    "remote_binder_ioctl_worker_process"
-);
+const NAME_REMOTE_BINDER_IOCTL: &'static CStr = c"remote_binder_ioctl";
+const NAME_REMOTE_BINDER_IOCTL_SEND_WORK: &'static CStr = c"remote_binder_ioctl_send_work";
+const NAME_REMOTE_BINDER_IOCTL_FIDL_REPLY: &'static CStr = c"remote_binder_ioctl_fidl_reply";
+const NAME_REMOTE_BINDER_IOCTL_WORKER_PROCESS: &'static CStr =
+    c"remote_binder_ioctl_worker_process";
 
 trait RemoteControllerConnector: Send + Sync + 'static {
     fn connect_to_remote_controller(
@@ -570,20 +563,13 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 waiter.await;
             }
             fbinder::BinderRequest::Ioctl { tid, request, parameter, responder } => {
-                trace_duration!(trace_category_starnix!(), trace_name_remote_binder_ioctl_send_work!(), "request" => request);
-                trace_flow_begin!(trace_category_starnix!(), trace_name_remote_binder_ioctl!(), tid.into(), "request" => request);
+                trace_duration!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL_SEND_WORK, "request" => request);
+                trace_flow_begin!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL, tid.into(), "request" => request);
 
                 let (responder, waiter) =
                     Self::make_synchronous_responder(responder, move |responder, e| {
-                        trace_duration!(
-                            trace_category_starnix!(),
-                            trace_name_remote_binder_ioctl_fidl_reply!()
-                        );
-                        trace_flow_end!(
-                            trace_category_starnix!(),
-                            trace_name_remote_binder_ioctl!(),
-                            tid.into()
-                        );
+                        trace_duration!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL_FIDL_REPLY);
+                        trace_flow_end!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL, tid.into());
 
                         let e = e.map_err(|e| {
                             fposix::Errno::from_primitive(e.code.error_code() as i32)
@@ -1011,15 +997,8 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                     koid,
                     responder,
                 } => {
-                    trace_duration!(
-                        trace_category_starnix!(),
-                        trace_name_remote_binder_ioctl_worker_process!()
-                    );
-                    trace_flow_step!(
-                        trace_category_starnix!(),
-                        trace_name_remote_binder_ioctl!(),
-                        koid.into()
-                    );
+                    trace_duration!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL_WORKER_PROCESS);
+                    trace_flow_step!(CATEGORY_STARNIX, NAME_REMOTE_BINDER_IOCTL, koid.into());
                     let result =
                         remote_binder_connection.ioctl(current_task, request, parameter.into());
                     // Once the potentially blocking calls is made, the task is ready to handle the

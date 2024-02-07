@@ -84,7 +84,6 @@ group("tests") {
     "chunked-compression:tests",
     "cobalt:tests",
     "containers/cpp:tests",
-    "cstr:tests",
     "ddk:tests",
     "ddktl:tests",
     "debug:tests",

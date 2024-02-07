@@ -52,7 +52,7 @@ impl controller::Handle for KeyboardController {
         match request {
             Request::SetKeyboardInfo(keyboard_info) => {
                 let id = fuchsia_trace::Id::new();
-                trace!(id, "set keyboard");
+                trace!(id, c"set keyboard");
                 let mut current = self.client.read_setting::<KeyboardInfo>(id).await;
                 if !keyboard_info.is_valid() {
                     return Some(Err(ControllerError::InvalidArgument(
@@ -76,7 +76,7 @@ impl controller::Handle for KeyboardController {
             }
             Request::Get => {
                 let id = fuchsia_trace::Id::new();
-                trace!(id, "get keyboard");
+                trace!(id, c"get keyboard");
                 Some(self.client.read_setting_info::<KeyboardInfo>(id).await.into_handler_result())
             }
             _ => None,

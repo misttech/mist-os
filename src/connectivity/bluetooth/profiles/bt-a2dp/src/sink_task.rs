@@ -234,9 +234,9 @@ impl RunningSinkTask {
             let task_finished = result_fut.clone();
             async move {
                 let start_time = fasync::Time::now();
-                trace::instant!("bt-a2dp", "Media:Start", trace::Scope::Thread);
+                trace::instant!(c"bt-a2dp", c"Media:Start", trace::Scope::Thread);
                 let _ = task_finished.await;
-                trace::instant!("bt-a2dp", "Media:Stop", trace::Scope::Thread);
+                trace::instant!(c"bt-a2dp", c"Media:Stop", trace::Scope::Thread);
                 let end_time = fasync::Time::now();
 
                 report_stream_metrics(metrics, &codec_type, (end_time - start_time).into_seconds())
@@ -289,8 +289,8 @@ async fn media_stream_task(
 
                 packet_count += 1;
                 // link incoming and outgoing flows together with shared duration event
-                trace::duration!("bt-a2dp", "Profile packet received");
-                trace::flow_end!("bluetooth", "ProfilePacket", packet_count.into());
+                trace::duration!(c"bt-a2dp", c"Profile packet received");
+                trace::flow_end!(c"bluetooth", c"ProfilePacket", packet_count.into());
 
                 if player.is_none() {
                     info!(%peer_id, "starting audio player");

@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub use cstr::cstr;
-
 use {
     fuchsia_zircon as zx,
     pin_project::pin_project,
@@ -227,20 +225,27 @@ impl<'a> ArgValue for &'a str {
 /// Example:
 ///
 /// ```rust
-/// instant!("foo", "bar", Scope::Process, "x" => 5, "y" => "boo");
+/// instant!(c"foo", c"bar", Scope::Process, "x" => 5, "y" => "boo");
 /// ```
 ///
 /// is equivalent to
 ///
 /// ```rust
-/// instant(cstr!("foo"), cstr!("bar"), Scope::Process,
+/// instant(c"foo", c"bar", Scope::Process,
+///     &[ArgValue::of("x", 5), ArgValue::of("y", "boo")]);
+/// ```
+/// or
+/// ```rust
+/// const FOO: &'static CStr = c"foo";
+/// const BAR: &'static CStr = c"bar";
+/// instant(FOO, BAR, Scope::Process,
 ///     &[ArgValue::of("x", 5), ArgValue::of("y", "boo")]);
 /// ```
 #[macro_export]
 macro_rules! instant {
     ($category:expr, $name:expr, $scope:expr $(, $key:expr => $val:expr)*) => {
-        if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
-            $crate::instant(&context, $crate::cstr!($name), $scope, &[$($crate::ArgValue::of($key, $val)),*]);
+        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
+            $crate::instant(&context, $name, $scope, &[$($crate::ArgValue::of($key, $val)),*]);
         }
     }
 }
@@ -265,18 +270,18 @@ pub fn instant(
 /// Example:
 ///
 /// ```rust
-/// alert!("foo", "bar");
+/// alert!(c"foo", c"bar");
 /// ```
 ///
 /// is equivalent to
 ///
 /// ```rust
-/// alert(cstr!("foo"), cstr!("bar"));
+/// alert(c"foo", c"bar");
 /// ```
 #[macro_export]
 macro_rules! alert {
     ($category:expr, $name:expr) => {
-        $crate::alert($crate::cstr!($category), $crate::cstr!($name))
+        $crate::alert($category, $name)
     };
 }
 
@@ -302,21 +307,21 @@ pub fn alert(category: &'static CStr, name: &'static CStr) {
 ///
 /// ```rust
 /// let id = 555;
-/// counter!("foo", "bar", id, "x" => 5, "y" => 10);
+/// counter!(c"foo", c"bar", id, "x" => 5, "y" => 10);
 /// ```
 ///
 /// is equivalent to
 ///
 /// ```rust
 /// let id = 555;
-/// counter(cstr!("foo"), cstr!("bar"), id,
+/// counter(c"foo", c"bar", id,
 ///     &[ArgValue::of("x", 5), ArgValue::of("y", 10)]);
 /// ```
 #[macro_export]
 macro_rules! counter {
     ($category:expr, $name:expr, $counter_id:expr $(, $key:expr => $val:expr)*) => {
-        if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
-            $crate::counter(&context, $crate::cstr!($name), $counter_id,
+        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
+            $crate::counter(&context, $name, $counter_id,
                 &[$($crate::ArgValue::of($key, $val)),*])
         }
     }
@@ -393,7 +398,7 @@ pub fn complete_duration(
 ///
 /// ```rust
 ///   {
-///       duration!("foo", "bar", "x" => 5, "y" => 10);
+///       duration!(c"foo", c"bar", "x" => 5, "y" => 10);
 ///       ...
 ///       ...
 ///       // event will be recorded on drop.
@@ -405,7 +410,7 @@ pub fn complete_duration(
 /// ```rust
 ///   {
 ///       let args = [ArgValue::of("x", 5), ArgValue::of("y", 10)];
-///       let _scope = duration(cstr!("foo"), cstr!("bar"), &args);
+///       let _scope = duration(c"foo", c"bar", &args);
 ///       ...
 ///       ...
 ///       // event will be recorded on drop.
@@ -415,9 +420,9 @@ pub fn complete_duration(
 macro_rules! duration {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)* $(,)?) => {
         let mut args;
-        let _scope = if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
+        let _scope = if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
             args = [$($crate::ArgValue::of($key, $val)),*];
-            Some($crate::duration($crate::cstr!($category), $crate::cstr!($name), &args))
+            Some($crate::duration($category, $name, &args))
         } else {
             None
         };
@@ -443,49 +448,47 @@ pub fn duration<'a>(
 
 /// Convenience macro for the `duration_begin` function.
 ///
-/// Example:
+/// Examples:
 ///
 /// ```rust
-/// duration_begin!("foo", "bar", "x" => 5, "y" => "boo");
+/// duration_begin!(c"foo", c"bar", "x" => 5, "y" => "boo");
 /// ```
 ///
-/// is equivalent to
-///
 /// ```rust
-/// duration_begin(cstr!("foo"), cstr!("bar"),
-///     &[ArgValue::of("x", 5), ArgValue::of("y", "boo")]);
+/// const FOO: &'static CStr = c"foo";
+/// const BAR: &'static CStr = c"bar";
+/// duration_begin!(FOO, BAR, "x" => 5, "y" => "boo");
 /// ```
 #[macro_export]
 macro_rules! duration_begin {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)* $(,)?) => {
-        if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
-        $crate::duration_begin(&context, $crate::cstr!($name),
-            &[$($crate::ArgValue::of($key, $val)),*])
+        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
+            $crate::duration_begin(&context, $name,
+                                   &[$($crate::ArgValue::of($key, $val)),*])
         }
-    }
+    };
 }
 
 /// Convenience macro for the `duration_end` function.
 ///
-/// Example:
+/// Examples:
 ///
 /// ```rust
-/// duration_end!("foo", "bar", "x" => 5, "y" => "boo");
+/// duration_end!(c"foo", c"bar", "x" => 5, "y" => "boo");
 /// ```
 ///
-/// is equivalent to
-///
 /// ```rust
-/// duration_end(cstr!("foo"), cstr!("bar"),
-///     &[ArgValue::of("x", 5), ArgValue::of("y", "boo")]);
+/// const FOO: &'static CStr = c"foo";
+/// const BAR: &'static CStr = c"bar";
+/// duration_end!(FOO, BAR, "x" => 5, "y" => "boo");
 /// ```
 #[macro_export]
 macro_rules! duration_end {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)* $(,)?) => {
-        if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
-            $crate::duration_end(&context, $crate::cstr!($name), &[$($crate::ArgValue::of($key, $val)),*])
+        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
+            $crate::duration_end(&context, $name, &[$($crate::ArgValue::of($key, $val)),*])
         }
-    }
+    };
 }
 
 /// Writes a duration begin event only.
@@ -586,7 +589,7 @@ pub fn async_enter(
 /// ```rust
 /// {
 ///     let id = Id::new();
-///     let _guard = async_enter!(id, "foo", "bar", "x" => 5, "y" => 10);
+///     let _guard = async_enter!(id, c"foo", c"bar", "x" => 5, "y" => 10);
 ///     ...
 ///     ...
 ///     // event recorded on drop
@@ -598,7 +601,7 @@ pub fn async_enter(
 /// ```rust
 /// {
 ///     let id = Id::new();
-///     let _guard = AsyncScope::begin(id, cstr!("foo"), cstr!("bar"), &[ArgValue::of("x", 5),
+///     let _guard = AsyncScope::begin(id, c"foo", c"bar", &[ArgValue::of("x", 5),
 ///         ArgValue::of("y", 10)]);
 ///     ...
 ///     ...
@@ -610,8 +613,8 @@ pub fn async_enter(
 #[macro_export]
 macro_rules! async_enter {
     ($id:expr, $category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
-            Some($crate::AsyncScope::begin($id, $crate::cstr!($category), $crate::cstr!($name), &[$($crate::ArgValue::of($key, $val)),*]))
+        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
+            Some($crate::AsyncScope::begin($id, $category, $name, &[$($crate::ArgValue::of($key, $val)),*]))
         } else {
             None
         }
@@ -626,7 +629,7 @@ macro_rules! async_enter {
 /// ```rust
 /// {
 ///     let id = Id::new();
-///     async_instant!(id, "foo", "bar", "x" => 5, "y" => 10);
+///     async_instant!(id, c"foo", c"bar", "x" => 5, "y" => 10);
 /// }
 /// ```
 ///
@@ -636,16 +639,16 @@ macro_rules! async_enter {
 /// {
 ///     let id = Id::new();
 ///     async_instant(
-///         id, cstr!("foo"), cstr!("bar"),
-///         &[ArgValue::of("x", 5), ArgValue::of("y", 10)]
+///         id, c"foo", c"bar",
+///         &[ArgValue::of(c"x", 5), ArgValue::of("y", 10)]
 ///     );
 /// }
 /// ```
 #[macro_export]
 macro_rules! async_instant {
     ($id:expr, $category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
-            $crate::async_instant($id, &context, $crate::cstr!($name), &[$($crate::ArgValue::of($key, $val)),*]);
+        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
+            $crate::async_instant($id, &context, $name, &[$($crate::ArgValue::of($key, $val)),*]);
         }
     }
 }
@@ -716,8 +719,8 @@ pub fn async_instant(
 #[macro_export]
 macro_rules! blob {
     ($category:expr, $name:expr, $bytes:expr $(, $key:expr => $val:expr)*) => {
-    if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
-        $crate::blob_fn(&context, $crate::cstr!($name), $bytes, &[$($crate::ArgValue::of($key, $val)),*])
+    if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
+        $crate::blob_fn(&context, $name, $bytes, &[$($crate::ArgValue::of($key, $val)),*])
     }
     }
 }
@@ -737,22 +740,21 @@ pub fn blob_fn(
 ///
 /// ```rust
 /// let flow_id = 1234;
-/// flow_begin!("foo", "bar", flow_id, "x" => 5, "y" => "boo");
+/// flow_begin!(c"foo", c"bar", flow_id, "x" => 5, "y" => "boo");
 /// ```
 ///
-/// is equivalent to
-///
 /// ```rust
-/// flow_begin(cstr!("foo"), cstr!("bar"), flow_id,
-///     &[ArgValue::of("x", 5), ArgValue::of("y", "boo")]);
+/// const FOO: &'static CStr = c"foo";
+/// const BAR: &'static CStr = c"bar";
+/// flow_begin!(c"foo", c"bar", flow_id);
 /// ```
 #[macro_export]
 macro_rules! flow_begin {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-    if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
-        $crate::flow_begin(&context, $crate::cstr!($name), $flow_id,
-            &[$($crate::ArgValue::of($key, $val)),*])
-    }
+        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
+            $crate::flow_begin(&context, $name, $flow_id,
+                               &[$($crate::ArgValue::of($key, $val)),*])
+        }
     }
 }
 
@@ -762,22 +764,21 @@ macro_rules! flow_begin {
 ///
 /// ```rust
 /// let flow_id = 1234;
-/// flow_step!("foo", "bar", flow_id, "x" => 5, "y" => "boo");
+/// flow_step!(c"foo", c"bar", flow_id, "x" => 5, "y" => "boo");
 /// ```
 ///
-/// is equivalent to
-///
 /// ```rust
-/// flow_step(cstr!("foo"), cstr!("bar"), flow_id,
-///     &[ArgValue::of("x", 5), ArgValue::of("y", "boo")]);
+/// const FOO: &'static CStr = c"foo";
+/// const BAR: &'static CStr = c"bar";
+/// flow_step!(c"foo", c"bar", flow_id);
 /// ```
 #[macro_export]
 macro_rules! flow_step {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-    if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
-        $crate::flow_step(&context, $crate::cstr!($name), $flow_id,
-            &[$($crate::ArgValue::of($key, $val)),*])
-    }
+        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
+            $crate::flow_step(&context, $name, $flow_id,
+                              &[$($crate::ArgValue::of($key, $val)),*])
+        }
     }
 }
 
@@ -787,22 +788,21 @@ macro_rules! flow_step {
 ///
 /// ```rust
 /// let flow_id = 1234;
-/// flow_end!("foo", "bar", flow_id, "x" => 5, "y" => "boo");
+/// flow_end!(c"foo", c"bar", flow_id, "x" => 5, "y" => "boo");
 /// ```
 ///
-/// is equivalent to
-///
 /// ```rust
-/// flow_end(cstr!("foo"), cstr!("bar"), flow_id,
-///     &[ArgValue::of("x", 5), ArgValue::of("y", "boo")]);
+/// const FOO: &'static CStr = c"foo";
+/// const BAR: &'static CStr = c"bar";
+/// flow_end!(c"foo", c"bar", flow_id);
 /// ```
 #[macro_export]
 macro_rules! flow_end {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-    if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
-        $crate::flow_end(&context, $crate::cstr!($name), $flow_id,
-            &[$($crate::ArgValue::of($key, $val)),*])
-    }
+        if let Some(context) = $crate::TraceCategoryContext::acquire($category) {
+            $crate::flow_end(&context, $name, $flow_id,
+                             &[$($crate::ArgValue::of($key, $val)),*])
+        }
     }
 }
 
@@ -1731,30 +1731,6 @@ mod sys {
     }
 }
 
-/// Creates a convenience macro that returns a string literal.
-///
-/// Example:
-///
-/// ```rust
-/// string_name_macro!(CATEGORY, "category");
-/// string_name_macro!(NAME, "name");
-///
-/// ...
-///
-/// duration!(CATEGORY!(), NAME!());
-/// ```
-#[macro_export]
-macro_rules! string_name_macro {
-    ($name:ident, $s:literal) => {
-        #[macro_export]
-        macro_rules! $name {
-            () => {
-                $s
-            };
-        }
-    };
-}
-
 /// Arguments for `TraceFuture` and `TraceFutureExt`. Use `trace_future_args!` to construct this
 /// object.
 pub struct TraceFutureArgs<'a> {
@@ -1782,15 +1758,15 @@ pub struct TraceFutureArgs<'a> {
 #[macro_export]
 macro_rules! __impl_trace_future_args {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {{
-        let context = $crate::TraceCategoryContext::acquire($crate::cstr!($category));
+        let context = $crate::TraceCategoryContext::acquire($category);
         let args = if context.is_some() {
             vec![$($crate::ArgValue::of($key, $val)),*]
         } else {
             vec![]
         };
         $crate::TraceFutureArgs {
-            category: $crate::cstr!($category),
-            name: $crate::cstr!($name),
+            category: $category,
+            name: $name,
             context: context,
             args: args,
             flow_id: $flow_id,
@@ -1808,7 +1784,7 @@ macro_rules! __impl_trace_future_args {
 /// ```
 /// async move {
 ///     ....
-/// }.trace(trace_future_args!("category", "name", "x" => 5, "y" => 10)).await;
+/// }.trace(trace_future_args!(c"category", c"name", "x" => 5, "y" => 10)).await;
 /// ```
 #[macro_export]
 macro_rules! trace_future_args {
@@ -1827,13 +1803,13 @@ pub trait TraceFutureExt: Future + Sized {
     /// Example:
     ///
     /// ```rust
-    /// future.trace(trace_future_args!("category", "name")).await;
+    /// future.trace(trace_future_args!(c"category", c"name")).await;
     /// ```
     ///
     /// Which is equivalent to:
     ///
     /// ```rust
-    /// TraceFuture::new(trace_future_args!("category", "name"), future).await;
+    /// TraceFuture::new(trace_future_args!(c"category", c"name"), future).await;
     /// ```
     fn trace<'a>(self, args: TraceFutureArgs<'a>) -> TraceFuture<'a, Self> {
         TraceFuture::new(args, self)

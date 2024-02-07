@@ -74,7 +74,7 @@ impl TryFrom<AudioRequest> for Job {
         match item {
             AudioRequest::Set { settings, responder } => {
                 let id = ftrace::Id::new();
-                let guard = trace_guard!(id, "audio fidl handler set");
+                let guard = trace_guard!(id, c"audio fidl handler set");
                 let responder = AudioSetTraceResponder { responder, _guard: guard };
                 match to_request(settings, id) {
                     Ok(request) => {
@@ -220,7 +220,7 @@ enum Error {
 }
 
 fn to_request(settings: AudioSettings, id: ftrace::Id) -> Result<Request, Error> {
-    trace!(id, "to_request");
+    trace!(id, c"to_request");
     settings
         .streams
         .map(|streams| {

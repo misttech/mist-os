@@ -130,7 +130,7 @@ impl CpuRenderer {
 
         *lines_builder = {
             let lines = {
-                duration!("gfx", "LinesBuilder::build");
+                duration!(c"gfx", c"LinesBuilder::build");
                 builder.build(|id| {
                     geom_id_to_order
                         .get(&id)
@@ -142,11 +142,11 @@ impl CpuRenderer {
             };
 
             {
-                duration!("gfx", "Rasterizer::rasterize");
+                duration!(c"gfx", c"Rasterizer::rasterize");
                 rasterizer.rasterize(&lines);
             }
             {
-                duration!("gfx", "Rasterizer::sort");
+                duration!(c"gfx", c"Rasterizer::sort");
                 rasterizer.sort();
             }
 
@@ -160,7 +160,7 @@ impl CpuRenderer {
             });
 
             {
-                duration!("gfx", "painter::for_each_row");
+                duration!(c"gfx", c"painter::for_each_row");
                 painter::for_each_row(
                     buffer.layout,
                     buffer.buffer,

@@ -523,7 +523,7 @@ where
     CC: IpSocketContext<I, BC>,
     O: SendOptions<I>,
 {
-    trace_duration!(bindings_ctx, "ip::send_packet");
+    trace_duration!(bindings_ctx, c"ip::send_packet");
 
     let IpSock { definition: IpSockDefinition { remote_ip, local_ip, device, proto }, options } =
         socket;

@@ -61,8 +61,8 @@ impl wl::MessageType for TestMessage {
 
     fn message_name(&self) -> &'static std::ffi::CStr {
         match self {
-            TestMessage::Message1 => fuchsia_trace::cstr!("test_message::message1"),
-            TestMessage::Message2 => fuchsia_trace::cstr!("test_message::message2"),
+            TestMessage::Message1 => c"test_message::message1",
+            TestMessage::Message2 => c"test_message::message2",
         }
     }
 }

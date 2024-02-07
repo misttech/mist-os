@@ -37,8 +37,6 @@ rustc_library("lib") {
     "//third_party/rust_crates:tracing",
   ]
 
-  test_deps = [ "//src/lib/cstr" ]
-
   sources = [
     "src/app.rs",
     "src/key_util.rs",

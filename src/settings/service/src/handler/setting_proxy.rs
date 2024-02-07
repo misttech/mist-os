@@ -235,8 +235,7 @@ impl SettingProxy {
             let id = ftrace::Id::new();
             trace!(
                 id,
-
-                "setting_proxy",
+                c"setting_proxy",
                 "setting_type" => format!("{setting_type:?}").as_str()
             );
             let receptor_fuse = receptor.fuse();
@@ -251,8 +250,7 @@ impl SettingProxy {
                     event = receptor_fuse.select_next_some() => {
                         trace!(
                             id,
-
-                            "service event"
+                            c"service event"
                         );
                         proxy.process_service_event(id, event).await;
                     }
@@ -262,8 +260,7 @@ impl SettingProxy {
                     request = proxy_fuse.select_next_some() => {
                         trace!(
                             id,
-
-                            "proxy request"
+                            c"proxy request"
                         );
                         proxy.process_proxy_request(id, request).await;
                     }
@@ -282,13 +279,13 @@ impl SettingProxy {
         if let MessageEvent::Message(payload, client) = event {
             match payload {
                 service::Payload::Setting(Payload::Request(request)) => {
-                    trace!(id, "process_service_request");
+                    trace!(id, c"process_service_request");
                     self.process_service_request(request, client).await;
                 }
                 service::Payload::Controller(setting_handler::Payload::Event(event)) => {
                     // Messages received after the client signature
                     // has been changed will be ignored.
-                    let guard = trace_guard!(id, "get author");
+                    let guard = trace_guard!(id, c"get author");
                     if Some(client.get_author()) != self.client_signature {
                         return;
                     }
@@ -296,11 +293,11 @@ impl SettingProxy {
 
                     match event {
                         Event::Changed(setting_info) => {
-                            trace!(id, "change notification");
+                            trace!(id, c"change notification");
                             self.notify(setting_info);
                         }
                         Event::Exited(result) => {
-                            trace!(id, "process exit");
+                            trace!(id, c"process exit");
                             self.process_exit(result);
                         }
                         Event::StateChanged(_) => {}
@@ -316,39 +313,39 @@ impl SettingProxy {
     async fn process_proxy_request(&mut self, id: ftrace::Id, request: ProxyRequest) {
         match request {
             ProxyRequest::Add(request) => {
-                trace!(id, "add request");
+                trace!(id, c"add request");
                 self.add_request(request);
             }
             ProxyRequest::Execute(recreate_handler) => {
-                trace!(id, "execute");
+                trace!(id, c"execute");
                 self.execute_next_request(id, recreate_handler).await;
             }
             ProxyRequest::RemoveActive => {
-                trace!(id, "remove active");
+                trace!(id, c"remove active");
                 self.remove_active_request();
             }
             ProxyRequest::TeardownTimeout => {
-                trace!(id, "teardown timeout");
+                trace!(id, c"teardown timeout");
                 self.start_teardown_timeout().await;
             }
             ProxyRequest::Teardown => {
-                trace!(id, "teardown");
+                trace!(id, c"teardown");
                 self.teardown_if_needed().await;
             }
             ProxyRequest::Retry => {
-                trace!(id, "retry");
+                trace!(id, c"retry");
                 self.retry();
             }
             ProxyRequest::HandleResult(result) => {
-                trace!(id, "handle result");
+                trace!(id, c"handle result");
                 self.handle_result(result);
             }
             ProxyRequest::Listen(event) => {
-                trace!(id, "handle listen");
+                trace!(id, c"handle listen");
                 self.handle_listen(event).await;
             }
             ProxyRequest::EndListen(request_id) => {
-                trace!(id, "handle end listen");
+                trace!(id, c"handle end listen");
                 self.listener_logger.lock().await.remove_listener(self.setting_type);
                 self.handle_end_listen(request_id).await;
             }
@@ -698,7 +695,7 @@ impl SettingProxy {
         let proxy_request_sender_clone = self.proxy_request_sender.clone();
 
         fasync::Task::spawn(async move {
-            trace!(id, "response");
+            trace!(id, c"response");
             while let Some(message_event) = receptor.next().await {
                 let handler_result = match message_event {
                     MessageEvent::Message(

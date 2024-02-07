@@ -178,7 +178,7 @@ impl VolumeChangeHandler {
             // of a system change is when the volume is reset after night mode deactivates.
             if last_user_volume.is_some() && change_source != Some(AudioSettingSource::System) {
                 let id = ftrace::Id::new();
-                trace!(id, "volume_change_handler set background");
+                trace!(id, c"volume_change_handler set background");
                 let mut receptor = self.messenger.message(
                     Payload::Request(Request::SetVolume(
                         vec![SetAudioStream {

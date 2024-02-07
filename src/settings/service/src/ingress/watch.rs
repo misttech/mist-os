@@ -222,7 +222,7 @@ impl<
         store_handle: data::StoreHandle,
         id: ftrace::Id,
     ) -> Result<(), WorkError> {
-        trace!(id, "Sequential Work execute");
+        trace!(id, c"Sequential Work execute");
         // Lock store for Job signature group.
         let mut store = store_handle.lock().await;
 
@@ -241,7 +241,7 @@ impl<
 
         // If a value was returned from the get call and considered updated (no existing or
         // different), return new value immediately.
-        trace!(id, "Get first response");
+        trace!(id, c"Get first response");
         let next_payload = self.get_next(&mut get_receptor).await?;
         if let Some(response) = self.process_response(next_payload, &mut store) {
             self.responder.respond(response.map(R::from).map_err(|err| {
@@ -253,7 +253,7 @@ impl<
 
         // Otherwise, loop a watch until an updated value is available
         loop {
-            trace!(id, "Get looped response");
+            trace!(id, c"Get looped response");
             let next_payload = self.get_next(&mut listen_receptor).await?;
             if let Some(response) = self.process_response(next_payload, &mut store) {
                 self.responder.respond(response.map(R::from).map_err(|err| {

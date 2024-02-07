@@ -6,7 +6,6 @@
 
 use anyhow::{format_err, Context};
 use argh::FromArgs;
-use cstr::cstr;
 use fdio::SpawnOptions;
 use fuchsia_runtime as runtime;
 use fuchsia_zircon as zx;
@@ -107,7 +106,7 @@ fn main() {
 fn spawn_sleeper(opts: Options) -> anyhow::Result<Box<dyn Any>> {
     let bin = env::args().next().ok_or(format_err!("couldn't get binary name"))?;
     let bin = CString::new(bin).unwrap();
-    let args: [&CStr; 2] = [&bin, cstr!("--sleep")];
+    let args: [&CStr; 2] = [&bin, c"--sleep"];
 
     if opts.unscoped {
         if opts.job || opts.kill {

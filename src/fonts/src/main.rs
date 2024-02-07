@@ -46,7 +46,7 @@ struct Args {
 #[fuchsia::main(logging_tags = ["fonts"])]
 async fn main() -> Result<()> {
     trace_provider::trace_provider_create_with_fdio();
-    trace::instant!("fonts", "startup", trace::Scope::Process);
+    trace::instant!(c"fonts", c"startup", trace::Scope::Process);
 
     // We have to convert legacy uses of "--font-manifest=<PATH>" to "--font-manifest <PATH>".
     let arg_strings: Vec<String> = std::env::args()

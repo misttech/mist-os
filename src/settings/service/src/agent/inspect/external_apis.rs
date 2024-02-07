@@ -192,7 +192,7 @@ impl ExternalApiInspectAgent {
             async move {
                 let _ = &context;
                 let id = fuchsia_trace::Id::new();
-                trace!(id, "external_api_inspect_agent");
+                trace!(id, c"external_api_inspect_agent");
                 let event = message_rx.fuse();
                 let agent_event = context.receptor.fuse();
                 futures::pin_mut!(agent_event, event);
@@ -204,7 +204,7 @@ impl ExternalApiInspectAgent {
                         message_event = message_event_fut => {
                             trace!(
                                 id,
-                                "message_event"
+                                c"message_event"
                             );
                             agent.process_message_event(message_event);
                             message_event_fut = event.select_next_some();
@@ -212,7 +212,7 @@ impl ExternalApiInspectAgent {
                         agent_message = agent_message_fut => {
                             trace!(
                                 id,
-                                "agent_event"
+                                c"agent_event"
                             );
                             if let MessageEvent::Message(
                                     service::Payload::Agent(Payload::Invocation(_)), client)

@@ -18,7 +18,7 @@ use perfetto_consumer_proto::perfetto::protos::{
     FtraceConfig, IpcFrame, ReadBuffersRequest, ReadBuffersResponse, TraceConfig,
 };
 use prost::Message;
-use starnix_logging::{log_error, trace_category_atrace, trace_name_perfetto_blob};
+use starnix_logging::{log_error, CATEGORY_ATRACE, NAME_PERFETTO_BLOB};
 use starnix_sync::{LockBefore, Locked, ReadOps, Unlocked, WriteOps};
 use starnix_uapi::{errno, errors::Errno, vfs::FdEvents, AF_UNIX, SOCK_STREAM};
 use std::{
@@ -375,7 +375,7 @@ impl CallbackState {
                         ..Default::default()
                     },
                 ];
-                if category_enabled(fuchsia_trace::cstr!(trace_category_atrace!())) {
+                if category_enabled(CATEGORY_ATRACE) {
                     data_sources.push(DataSource {
                         config: Some(DataSourceConfig {
                             name: Some("linux.ftrace".to_string()),
@@ -468,11 +468,9 @@ impl CallbackState {
 
                         read_buffers_request =
                             connection.read_buffers(locked, current_task, ReadBuffersRequest {})?;
-                        blob_name_ref = context.as_ref().map(|context| {
-                            context.register_string_literal(fuchsia_trace::cstr!(
-                                trace_name_perfetto_blob!()
-                            ))
-                        });
+                        blob_name_ref = context
+                            .as_ref()
+                            .map(|context| context.register_string_literal(NAME_PERFETTO_BLOB));
                     }
 
                     // IPC responses may be spread across multiple frames, so loop until we get a

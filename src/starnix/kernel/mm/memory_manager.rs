@@ -21,7 +21,7 @@ use once_cell::sync::Lazy;
 use range_map::RangeMap;
 use smallvec::SmallVec;
 use starnix_logging::{
-    impossible_error, log_warn, set_zx_name, trace_category_starnix_mm, trace_duration, track_stub,
+    impossible_error, log_warn, set_zx_name, trace_duration, track_stub, CATEGORY_STARNIX_MM,
 };
 use starnix_sync::{LockBefore, Locked, MmDumpable, OrderedMutex, RwLock};
 use starnix_uapi::{
@@ -657,7 +657,7 @@ fn map_in_vmar(
             // TODO(https://fxbug.dev/42082608) use a gentler signal when available
             zx::VmoOp::ALWAYS_NEED
         };
-        trace_duration!(trace_category_starnix_mm!(), "MmapCommitPages");
+        trace_duration!(CATEGORY_STARNIX_MM, c"MmapCommitPages");
         let _ = vmo.op_range(op, vmo_offset, length as u64);
         // "The mmap() call doesn't fail if the mapping cannot be populated."
     }

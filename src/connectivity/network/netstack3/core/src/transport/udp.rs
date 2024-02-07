@@ -1247,7 +1247,7 @@ fn receive_ip_packet<
     dst_ip: SpecifiedAddr<I::Addr>,
     mut buffer: B,
 ) -> Result<(), (B, TransportReceiveError)> {
-    trace_duration!(bindings_ctx, "udp::receive_ip_packet");
+    trace_duration!(bindings_ctx, c"udp::receive_ip_packet");
     core_ctx.increment(|counters| &counters.rx);
     trace!("received UDP packet: {:x?}", buffer.as_mut());
     let src_ip: I::Addr = src_ip.into();

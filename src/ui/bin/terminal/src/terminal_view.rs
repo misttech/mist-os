@@ -68,9 +68,6 @@ const BACKGROUND_COLOR: Color = Color { r: 0, g: 0, b: 0, a: 255 };
 // DPI buckets used to determine the scale factor.
 const DPI: &[u32] = &[160, 240, 320, 480];
 
-#[cfg(test)]
-use cstr::cstr;
-
 const BYTE_BUFFER_MAX_SIZE: usize = 128;
 
 struct ResizeEvent {
@@ -282,13 +279,7 @@ impl TerminalViewAssistant {
     #[cfg(test)]
     pub fn new_for_test() -> TerminalViewAssistant {
         let app_sender = AppSender::new_for_testing_purposes_only();
-        Self::new(
-            &app_sender,
-            Default::default(),
-            false,
-            vec![cstr!("/pkg/bin/sh").to_owned()],
-            vec![],
-        )
+        Self::new(&app_sender, Default::default(), false, vec![c"/pkg/bin/sh".to_owned()], vec![])
     }
 
     /// Checks if we need to perform a resize based on a new size.
@@ -423,7 +414,7 @@ impl TerminalViewAssistant {
                             );
                             0
                         });
-                        ftrace::duration!("terminal", "parse_bytes", "len" => read_count as u32);
+                        ftrace::duration!(c"terminal", c"parse_bytes", "len" => read_count as u32);
                         let mut term = term_clone.borrow_mut();
                         if read_count > 0 {
                             for byte in &read_buf[0..read_count] {
@@ -603,7 +594,7 @@ impl ViewAssistant for TerminalViewAssistant {
         ready_event: fuchsia_zircon::Event,
         context: &ViewAssistantContext,
     ) -> Result<(), Error> {
-        ftrace::duration!("terminal", "TerminalViewAssistant:render");
+        ftrace::duration!(c"terminal", c"TerminalViewAssistant:render");
 
         // we need to call spawn in this update block because calling it in the
         // setup method causes us to receive write events before the view is

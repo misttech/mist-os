@@ -378,7 +378,7 @@ async fn run(
 
             // A new snoop packet has been received from an hci device.
             (packet, snooper) = snoopers.select_next_some() => {
-                trace::duration!("bluetooth", "Snoop::ProcessPacket");
+                trace::duration!(c"bluetooth", c"Snoop::ProcessPacket");
                 handle_packet(packet, snooper, &mut snoopers, &mut subscribers,
                     &mut packet_logs, config.truncate_payload).await;
             },

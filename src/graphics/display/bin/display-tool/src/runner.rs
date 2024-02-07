@@ -141,21 +141,21 @@ impl<'a, S: Scene> DoubleBufferedFenceLoop<'a, S> {
             let current_presentation = &mut self.presentations[current_config];
 
             {
-                duration!("gfx", "frame", "id" => stats.num_frames);
+                duration!(c"gfx", c"frame", "id" => stats.num_frames);
                 {
-                    duration!("gfx", "update scene");
+                    duration!(c"gfx", c"update scene");
                     self.scene.update()?;
                 }
 
                 // Render the scene into the current presentation.
                 {
-                    duration!("gfx", "render frame", "image" => current_config as u32);
+                    duration!(c"gfx", c"render frame", "image" => current_config as u32);
                     self.scene.render(&mut current_presentation.image)?;
                 }
 
                 // Request the swap.
                 {
-                    duration!("gfx", "apply config");
+                    duration!(c"gfx", c"apply config");
                     self.coordinator
                         .apply_config(&self.build_display_configs(current_config))
                         .await?;

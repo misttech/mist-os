@@ -45,7 +45,6 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/fidl/fuchsia.time:fuchsia.time_rust",
     "//src/lib/async-utils",
-    "//src/lib/cstr",
     "//src/lib/diagnostics/inspect/runtime/rust:unchecked_includes",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/log/rust",

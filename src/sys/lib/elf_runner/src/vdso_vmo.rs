@@ -4,7 +4,6 @@
 
 use {
     crate::error::VdsoError,
-    cstr::cstr,
     fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
     fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
     lazy_static::lazy_static,
@@ -40,11 +39,11 @@ pub fn get_vdso_vmo(name: &CStr) -> Result<zx::Vmo, VdsoError> {
 /// Returns an owned VMO handle to the stable vDSO, duplicated from the handle
 /// provided to this process through its processargs bootstrap message.
 pub fn get_stable_vdso_vmo() -> Result<zx::Vmo, VdsoError> {
-    get_vdso_vmo(cstr!("vdso/stable"))
+    get_vdso_vmo(c"vdso/stable")
 }
 
 /// Returns an owned VMO handle to the next vDSO, duplicated from the handle
 /// provided to this process through its processargs bootstrap message.
 pub fn get_next_vdso_vmo() -> Result<zx::Vmo, VdsoError> {
-    get_vdso_vmo(cstr!("vdso/next"))
+    get_vdso_vmo(c"vdso/next")
 }

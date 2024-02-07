@@ -83,8 +83,8 @@ pub fn create_child_job() -> Result<Scoped<zx::Job>, zx::Status> {
 /// let _process = scoped_task::spawn_etc(
 ///     &scoped_task::job_default(),
 ///     SpawnOptions::CLONE_ALL,
-///     cstr!("/pkg/bin/echo"),
-///     &[cstr!("hello world")],
+///     c"/pkg/bin/echo",
+///     &[c"hello world"],
 ///     None,
 ///     &mut [],
 /// ).expect("could not spawn process");
@@ -112,8 +112,8 @@ pub fn spawn_etc<'a>(
 /// let _process = scoped_task::spawn(
 ///     &scoped_task::job_default(),
 ///     SpawnOptions::CLONE_ALL,
-///     cstr!("/pkg/bin/echo"),
-///     &[cstr!("hello world")],
+///     c"/pkg/bin/echo",
+///     &[c"hello world"],
 /// ).expect("could not spawn process");
 /// ```
 pub fn spawn<'a>(

@@ -189,7 +189,7 @@ fn handle_incoming_packet<I, BC, CC>(
         >,
     CC: TcpContext<I, BC> + TcpContext<I::OtherVersion, BC>,
 {
-    trace_duration!(bindings_ctx, "tcp::handle_incoming_packet");
+    trace_duration!(bindings_ctx, c"tcp::handle_incoming_packet");
     let mut tw_reuse = None;
 
     let mut addrs_to_search = AddrVecIter::<I, CC::WeakDeviceId, TcpPortSpec>::with_device(

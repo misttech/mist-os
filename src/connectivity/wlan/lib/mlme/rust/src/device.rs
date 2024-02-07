@@ -456,7 +456,7 @@ impl DeviceOps for Device {
             wtrace::async_begin_wlansoftmac_tx(async_id, "mlme");
             async_id
         });
-        trace::duration!("wlan", "Device::send_data_frame");
+        trace::duration!(c"wlan", c"Device::send_data_frame");
 
         if buf.as_slice().len() < REQUIRED_WLAN_HEADER_LEN {
             let status = zx::Status::BUFFER_TOO_SMALL;
@@ -670,7 +670,7 @@ pub struct WlanSoftmacIfcProtocolOps {
 
 #[no_mangle]
 extern "C" fn handle_recv(ctx: &mut crate::DriverEventSink, packet: *const WlanRxPacket) {
-    trace::duration!("wlan", "handle_recv");
+    trace::duration!(c"wlan", c"handle_recv");
 
     // TODO(https://fxbug.dev/42103773): C++ uses a buffer allocator for this, determine if we need one.
     let bytes =

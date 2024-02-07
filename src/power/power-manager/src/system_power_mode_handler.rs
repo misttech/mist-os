@@ -200,8 +200,8 @@ impl ClientStates {
     /// contained `ClientState` entry.
     fn process_system_power_modes_changed(&self, system_power_modes: &HashSet<SystemMode>) {
         fuchsia_trace::duration!(
-            "power_manager",
-            "SystemPowerModeHandler::process_system_power_modes_changed"
+            c"power_manager",
+            c"SystemPowerModeHandler::process_system_power_modes_changed"
         );
 
         self.states.borrow_mut().values_mut().for_each(|client_state| {
@@ -219,8 +219,8 @@ impl ClientStates {
         stream: fpowerclient::WatcherRequestStream,
     ) -> Result<(), Error> {
         fuchsia_trace::duration!(
-            "power_manager",
-            "SystemPowerModeHandler::connect_stream_for_client"
+            c"power_manager",
+            c"SystemPowerModeHandler::connect_stream_for_client"
         );
 
         match self.states.borrow_mut().get_mut(&client_type) {
@@ -350,7 +350,7 @@ fn spawn_watcher_handler(
     mut stream: fpowerclient::WatcherRequestStream,
     subscriber: PowerLevelSubscriber,
 ) {
-    fuchsia_trace::duration!("power_manager", "SystemPowerModeHandler::spawn_watcher_handler");
+    fuchsia_trace::duration!(c"power_manager", c"SystemPowerModeHandler::spawn_watcher_handler");
 
     fasync::Task::local(
         async move {
@@ -358,8 +358,8 @@ fn spawn_watcher_handler(
                 stream.try_next().await?
             {
                 fuchsia_trace::duration!(
-                    "power_manager",
-                    "SystemPowerModeHandler::spawn_watcher_handler::Watch"
+                    c"power_manager",
+                    c"SystemPowerModeHandler::spawn_watcher_handler::Watch"
                 );
 
                 // The responder for the `Watch` FIDL request is now owned by the subscriber. The
@@ -484,8 +484,8 @@ impl SystemPowerModeHandler {
         mut stream: fpowerclient::ConnectorRequestStream,
     ) {
         fuchsia_trace::duration!(
-            "power_manager",
-            "SystemPowerModeHandler::spawn_connector_handler"
+            c"power_manager",
+            c"SystemPowerModeHandler::spawn_connector_handler"
         );
 
         fasync::Task::local(
@@ -516,8 +516,8 @@ impl SystemPowerModeHandler {
         mut stream: fpowermode::RequesterRequestStream,
     ) {
         fuchsia_trace::duration!(
-            "power_manager",
-            "SystemPowerModeHandler::spawn_connector_handler"
+            c"power_manager",
+            c"SystemPowerModeHandler::spawn_connector_handler"
         );
 
         fasync::Task::local(
@@ -553,8 +553,8 @@ impl SystemPowerModeHandler {
         mut stream: fpowermode::ClientConfiguratorRequestStream,
     ) {
         fuchsia_trace::duration!(
-            "power_manager",
-            "SystemPowerModeHandler::spawn_connector_handler"
+            c"power_manager",
+            c"SystemPowerModeHandler::spawn_connector_handler"
         );
 
         fasync::Task::local(

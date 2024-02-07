@@ -154,7 +154,7 @@ impl Resolver for QueuedResolver {
     ) -> Result<(PackageDirectory, pkg::ResolutionContext), pkg::ResolveError> {
         let trace_id = ftrace::Id::random();
         let guard = ftrace::async_enter!(
-            trace_id, "app", "resolve",
+            trace_id, c"app", c"resolve",
             "url" => pkg_url.to_string().as_str(),
             // An async duration cannot have multiple concurrent child async durations
             // so we include the id as metadata to manually determine the
@@ -783,7 +783,7 @@ async fn get_hash(
 ) -> Result<BlobId, Status> {
     let pkg_url = AbsolutePackageUrl::parse(url).map_err(|e| handle_bad_package_url(e, url))?;
 
-    ftrace::duration_begin!("app", "get-hash", "url" => pkg_url.to_string().as_str());
+    ftrace::duration_begin!(c"app", c"get-hash", "url" => pkg_url.to_string().as_str());
     let hash_or_status = hash_from_base_or_repo_or_cache(
         repo_manager,
         rewriter,
@@ -794,7 +794,7 @@ async fn get_hash(
         eager_package_manager,
     )
     .await;
-    ftrace::duration_end!("app", "get-hash",
+    ftrace::duration_end!(c"app", c"get-hash",
         "status" => hash_or_status.err().unwrap_or(Status::OK).to_string().as_str());
     hash_or_status
 }

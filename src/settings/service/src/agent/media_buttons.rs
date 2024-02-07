@@ -118,7 +118,7 @@ impl EventHandler {
             let guard = trace_guard!(
                 id,
 
-                "media buttons send event",
+                c"media buttons send event",
                 "setting_type" => format!("{setting_type:?}").as_str()
             );
             let mut receptor = self.messenger.message(

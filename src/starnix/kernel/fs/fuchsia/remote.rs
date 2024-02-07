@@ -24,7 +24,7 @@ use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
-use starnix_logging::{impossible_error, log_warn, trace_category_starnix_mm, trace_duration};
+use starnix_logging::{impossible_error, log_warn, trace_duration, CATEGORY_STARNIX_MM};
 use starnix_sync::{
     FileOpsIoctl, Locked, Mutex, ReadOps, RwLock, RwLockReadGuard, RwLockWriteGuard, WriteOps,
 };
@@ -1421,7 +1421,7 @@ impl FileOps for RemoteFileObject {
         _length: Option<usize>,
         prot: ProtectionFlags,
     ) -> Result<Arc<zx::Vmo>, Errno> {
-        trace_duration!(trace_category_starnix_mm!(), "RemoteFileGetVmo");
+        trace_duration!(CATEGORY_STARNIX_MM, c"RemoteFileGetVmo");
         let vmo_cache = if prot == (ProtectionFlags::READ | ProtectionFlags::EXEC) {
             Some(&self.read_exec_vmo)
         } else if prot == ProtectionFlags::READ {

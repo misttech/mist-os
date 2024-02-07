@@ -591,8 +591,8 @@ async fn fetch_blob(
     let trace_id = ftrace::Id::random();
     let guard = ftrace::async_enter!(
         trace_id,
-        "app",
-        "fetch_blob_http",
+        c"app",
+        c"fetch_blob_http",
         // Async tracing does not support multiple concurrent child durations, so we create
         // a new top-level duration and attach the parent duration as metadata.
         "parent_trace_id" => u64::from(context.parent_trace_id),
@@ -696,8 +696,8 @@ async fn fetch_blob_http(
                     inspect.state(inspect::Http::DownloadBlob);
                     let guard = ftrace::async_enter!(
                         trace_id,
-                        "app",
-                        "download_blob",
+                        c"app",
+                        c"download_blob",
                         "hash" => merkle.to_string().as_str()
                     );
                     let res = download_blob(
@@ -791,7 +791,7 @@ async fn download_blob(
     inspect.state(inspect::Http::HttpGet);
     let (expected_len, content) =
         resume::resuming_get(client, uri, expected_len, blob_fetch_params, fetch_stats).await?;
-    ftrace::async_instant!(trace_id, "app", "header_received");
+    ftrace::async_instant!(trace_id, c"app", c"header_received");
 
     inspect.expected_size_bytes(expected_len);
 
@@ -812,8 +812,8 @@ async fn download_blob(
                 }
                 ftrace::async_instant!(
                     trace_id,
-                    "app",
-                    "read_chunk_from_hyper",
+                    c"app",
+                    c"read_chunk_from_hyper",
                     "size" => chunk.len() as u64
                 );
 
@@ -824,16 +824,16 @@ async fn download_blob(
                         &|size: u64| {
                             ftrace::async_begin(
                                 trace_id,
-                                ftrace::cstr!("app"),
-                                ftrace::cstr!("waiting_for_pkg_cache_to_ack_write"),
+                                c"app",
+                                c"waiting_for_pkg_cache_to_ack_write",
                                 &[ftrace::ArgValue::of("size", size)],
                             )
                         },
                         &|| {
                             ftrace::async_end(
                                 trace_id,
-                                ftrace::cstr!("app"),
-                                ftrace::cstr!("waiting_for_pkg_cache_to_ack_write"),
+                                c"app",
+                                c"waiting_for_pkg_cache_to_ack_write",
                                 &[],
                             )
                         },

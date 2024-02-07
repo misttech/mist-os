@@ -225,8 +225,8 @@ impl SnapshotData {
         let trace_id = ftrace::Id::random();
         let _trace_guard = ftrace::async_enter!(
             trace_id,
-            "app",
-            "SnapshotData::new",
+            c"app",
+            c"SnapshotData::new",
             // An async duration cannot have multiple concurrent child async durations
             // so we include the nonce as metadata to manually determine relationship.
             "parent_trace_id" => u64::from(parent_trace_id),
@@ -425,8 +425,8 @@ impl UnpopulatedInspectDataContainer {
         let trace_id = ftrace::Id::random();
         let trace_guard = ftrace::async_enter!(
             trace_id,
-            "app",
-            "ReaderServer::stream.populate",
+            c"app",
+            c"ReaderServer::stream.populate",
             // An async duration cannot have multiple concurrent child async durations
             // so we include the nonce as metadata to manually determine relationship.
             "parent_trace_id" => u64::from(parent_trace_id),

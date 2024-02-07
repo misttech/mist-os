@@ -225,8 +225,8 @@ impl CpuLoadLogger {
                             }
 
                             fuchsia_trace::counter!(
-                                "metrics_logger",
-                                "cpu_usage",
+                                c"metrics_logger",
+                                c"cpu_usage",
                                 trace_counter_id,
                                 "client_id" => self.client_id.as_str(),
                                 "max_perf_scale" => cluster.max_perf_scale,
@@ -250,8 +250,8 @@ impl CpuLoadLogger {
                         }
 
                         fuchsia_trace::counter!(
-                            "metrics_logger",
-                            "cpu_usage",
+                            c"metrics_logger",
+                            c"cpu_usage",
                             trace_counter_id,
                             "client_id" => self.client_id.as_str(),
                             "cpu_usage" => cpu_usage
@@ -260,8 +260,8 @@ impl CpuLoadLogger {
                     // TODO(https://fxbug.dev/42051550): Remove system_metrics_logger category after the
                     // e2e test is transitioned.
                     fuchsia_trace::counter!(
-                        "system_metrics_logger",
-                        "cpu_usage",
+                        c"system_metrics_logger",
+                        c"cpu_usage",
                         0,
                         "cpu_usage" => calculate_cpu_usage(
                             Vec::from_iter(0..cpu_num as u16), &last_sample, &current_sample)

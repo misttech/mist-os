@@ -84,7 +84,7 @@ impl ObjectMap {
     /// Looks up an object in the map and returns a downcasted reference to
     /// the implementation.
     pub fn get<T: Any>(&self, id: wl::ObjectId) -> Result<&T, ObjectLookupError> {
-        ftrace::duration!("wayland", "ObjectMap::get");
+        ftrace::duration!(c"wayland", c"ObjectMap::get");
         match self.objects.get(&id) {
             Some(entry) => match entry.receiver.data().downcast_ref() {
                 Some(t) => Ok(t),
@@ -97,7 +97,7 @@ impl ObjectMap {
     /// Looks up an object in the map and returns a downcasted mutable
     /// reference to the implementation.
     pub fn get_mut<T: Any>(&mut self, id: wl::ObjectId) -> Result<&mut T, ObjectLookupError> {
-        ftrace::duration!("wayland", "ObjectMap::get_mut");
+        ftrace::duration!(c"wayland", c"ObjectMap::get_mut");
         match self.objects.get_mut(&id) {
             Some(entry) => match entry.receiver.data_mut().downcast_mut() {
                 Some(t) => Ok(t),
@@ -112,7 +112,7 @@ impl ObjectMap {
         &self,
         header: &wl::MessageHeader,
     ) -> Result<(MessageReceiverFn, &'static wl::MessageSpec), Error> {
-        ftrace::duration!("wayland", "ObjectMap::lookup_internal");
+        ftrace::duration!(c"wayland", c"ObjectMap::lookup_internal");
         let ObjectMapEntry { request_spec, receiver } = self
             .objects
             .get(&header.sender)
@@ -135,7 +135,7 @@ impl ObjectMap {
         id: u32,
         receiver: R,
     ) -> Result<ObjectRef<R>, Error> {
-        ftrace::duration!("wayland", "ObjectMap::add_object");
+        ftrace::duration!(c"wayland", c"ObjectMap::add_object");
         self.add_object_raw(id, Box::new(RequestDispatcher::new(receiver)), &I::REQUESTS)?;
         Ok(ObjectRef::from_id(id))
     }
@@ -149,7 +149,7 @@ impl ObjectMap {
         receiver: Box<dyn MessageReceiver>,
         request_spec: &'static wl::MessageGroupSpec,
     ) -> Result<(), Error> {
-        ftrace::duration!("wayland", "ObjectMap::add_object_raw");
+        ftrace::duration!(c"wayland", c"ObjectMap::add_object_raw");
         if let Entry::Vacant(entry) = self.objects.entry(id) {
             entry.insert(ObjectMapEntry { receiver, request_spec });
             Ok(())
@@ -159,7 +159,7 @@ impl ObjectMap {
     }
 
     pub fn delete(&mut self, id: wl::ObjectId) -> Result<(), Error> {
-        ftrace::duration!("wayland", "ObjectMap::delete");
+        ftrace::duration!(c"wayland", c"ObjectMap::delete");
         if self.objects.remove(&id).is_some() {
             // TODO: Send wl_display::delete_id.
             Ok(())
@@ -370,9 +370,9 @@ fn receive_message<I: wl::Interface, R: RequestReceiver<I>>(
     args: Vec<wl::Arg>,
     client: &mut Client,
 ) -> Result<(), Error> {
-    ftrace::duration!("wayland", "receive_message");
+    ftrace::duration!(c"wayland", c"receive_message");
     let request = {
-        ftrace::duration!("wayland", "I::Request::from_args");
+        ftrace::duration!(c"wayland", c"I::Request::from_args");
         I::Incoming::from_args(opcode, args).unwrap()
     };
     if client.protocol_logging() {
@@ -380,7 +380,7 @@ fn receive_message<I: wl::Interface, R: RequestReceiver<I>>(
     }
 
     {
-        let _scope = ftrace::duration(ftrace::cstr!("wayland"), request.message_name(), &[]);
+        let _scope = ftrace::duration(c"wayland", request.message_name(), &[]);
         R::receive(ObjectRef(PhantomData, this), request, client)?;
     }
     Ok(())

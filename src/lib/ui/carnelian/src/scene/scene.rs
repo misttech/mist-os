@@ -266,7 +266,7 @@ impl Scene {
         render_context: &mut RenderContext,
         view_context: &ViewAssistantContext,
     ) {
-        duration!("gfx", "Scene::update_scene_layers");
+        duration!(c"gfx", c"Scene::update_scene_layers");
 
         for (facet_id, facet_entry) in &mut self.facets {
             let facet_layers = self.layers.entry(*facet_id).or_insert_with(|| BTreeMap::new());
@@ -301,7 +301,7 @@ impl Scene {
         corner_knockouts: &Option<Raster>,
         composition: &mut Composition,
     ) {
-        duration!("gfx", "Scene::update_composition");
+        duration!(c"gfx", c"Scene::update_composition");
 
         for (order, layer) in layers.into_iter() {
             composition.insert(Order::try_from(order).unwrap_or_else(|e| panic!("{}", e)), layer);

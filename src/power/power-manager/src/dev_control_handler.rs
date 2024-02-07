@@ -122,8 +122,8 @@ pub struct DeviceControlHandler {
 impl DeviceControlHandler {
     async fn handle_get_performance_state(&self) -> Result<MessageReturn, PowerManagerError> {
         fuchsia_trace::duration!(
-            "power_manager",
-            "DeviceControlHandler::handle_get_performance_state",
+            c"power_manager",
+            c"DeviceControlHandler::handle_get_performance_state",
             "driver" => self.driver_path.as_str()
         );
 
@@ -132,8 +132,8 @@ impl DeviceControlHandler {
         let result = self.get_performance_state().await;
         log_if_err!(result, "Failed to get performance state");
         fuchsia_trace::instant!(
-            "power_manager",
-            "DeviceControlHandler::get_performance_state_result",
+            c"power_manager",
+            c"DeviceControlHandler::get_performance_state_result",
             fuchsia_trace::Scope::Thread,
             "driver" => self.driver_path.as_str(),
             "result" => format!("{:?}", result).as_str()
@@ -165,8 +165,8 @@ impl DeviceControlHandler {
         in_state: u32,
     ) -> Result<MessageReturn, PowerManagerError> {
         fuchsia_trace::duration!(
-            "power_manager",
-            "DeviceControlHandler::handle_set_performance_state",
+            c"power_manager",
+            c"DeviceControlHandler::handle_set_performance_state",
             "driver" => self.driver_path.as_str(),
             "state" => in_state
         );
@@ -176,8 +176,8 @@ impl DeviceControlHandler {
         let result = self.set_performance_state(in_state).await;
         log_if_err!(result, "Failed to set performance state");
         fuchsia_trace::instant!(
-            "power_manager",
-            "DeviceControlHandler::set_performance_state_result",
+            c"power_manager",
+            c"DeviceControlHandler::set_performance_state_result",
             fuchsia_trace::Scope::Thread,
             "driver" => self.driver_path.as_str(),
             "result" => format!("{:?}", result).as_str()
@@ -225,7 +225,7 @@ impl Node for DeviceControlHandler {
     ///
     /// Connects to the temperature driver unless a proxy was already provided (in a test).
     async fn init(&self) -> Result<(), Error> {
-        fuchsia_trace::duration!("power_manager", "DeviceControlHandler::init");
+        fuchsia_trace::duration!(c"power_manager", c"DeviceControlHandler::init");
 
         // Connect to the driver. Typically this is None, but it may be set by tests.
         let mut option = self.driver_proxy.borrow_mut();

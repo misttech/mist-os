@@ -298,7 +298,7 @@ impl XdgSurface {
     /// Similar to `Surface`, an `XdgSurface` isn't of much use until a role
     /// has been assigned.
     pub fn set_xdg_role(&mut self, xdg_role: XdgSurfaceRole) -> Result<(), Error> {
-        ftrace::duration!("wayland", "XdgSurface::set_xdg_role");
+        ftrace::duration!(c"wayland", c"XdgSurface::set_xdg_role");
         // The role is valid unless a different role has been assigned before.
         let valid_role = match &self.xdg_role {
             Some(XdgSurfaceRole::Popup(_)) => match xdg_role {
@@ -341,7 +341,7 @@ impl XdgSurface {
     /// Each concrete `XdgSurface` role configuration sequence is concluded and
     /// committed by a xdg_surface::configure event.
     pub fn configure(this: ObjectRef<Self>, client: &mut Client) -> Result<(), Error> {
-        ftrace::duration!("wayland", "XdgSurface::configure");
+        ftrace::duration!(c"wayland", c"XdgSurface::configure");
         if let Some(xdg_surface) = this.try_get(client) {
             match xdg_surface.xdg_role {
                 Some(XdgSurfaceRole::Popup(popup)) => {
@@ -364,7 +364,7 @@ impl XdgSurface {
     /// wl_surface object for this xdg_surface, and simply delegates the request
     /// to the concrete surface.
     pub fn finalize_commit(this: ObjectRef<Self>, client: &mut Client) -> Result<bool, Error> {
-        ftrace::duration!("wayland", "XdgSurface::finalize_commit");
+        ftrace::duration!(c"wayland", c"XdgSurface::finalize_commit");
         if let Some(xdg_surface) = this.try_get(client) {
             match xdg_surface.xdg_role {
                 Some(XdgSurfaceRole::Popup(_)) => Ok(true),
@@ -379,7 +379,7 @@ impl XdgSurface {
     }
 
     pub fn shutdown(&self, client: &Client) {
-        ftrace::duration!("wayland", "XdgSurface::shutdown");
+        ftrace::duration!(c"wayland", c"XdgSurface::shutdown");
         self.view.as_ref().map(|v| v.lock().shutdown());
         match self.xdg_role {
             Some(XdgSurfaceRole::Popup(popup)) => {
@@ -416,7 +416,7 @@ impl XdgSurface {
         client: &mut Client,
         viewport_creation_token: ViewportCreationToken,
     ) -> Result<(), Error> {
-        ftrace::duration!("wayland", "XdgSurface::add_child_view");
+        ftrace::duration!(c"wayland", c"XdgSurface::add_child_view");
         let xdg_surface = this.get(client)?;
         let surface = xdg_surface.surface_ref().get(client)?;
         let flatland = surface
@@ -446,7 +446,7 @@ impl XdgSurface {
         local_offset: Option<(i32, i32)>,
         geometry: Rect,
     ) -> Result<(), Error> {
-        ftrace::duration!("wayland", "XdgSurface::spawn_child_view");
+        ftrace::duration!(c"wayland", c"XdgSurface::spawn_child_view");
         let creation_tokens =
             ViewCreationTokenPair::new().expect("failed to create ViewCreationTokenPair");
         let parent = parent_ref.get(client)?;
@@ -933,7 +933,7 @@ impl XdgPopup {
     /// Performs a configure sequence for the XdgPopup object referenced by
     /// `this`.
     pub fn configure(this: ObjectRef<Self>, client: &mut Client) -> Result<(), Error> {
-        ftrace::duration!("wayland", "XdgPopup::configure");
+        ftrace::duration!(c"wayland", c"XdgPopup::configure");
         let geometry = this.get(client)?.geometry;
         client.event_queue().post(
             this.id(),
@@ -1028,7 +1028,7 @@ impl XdgToplevel {
     /// Performs a configure sequence for the XdgToplevel object referenced by
     /// `this`.
     pub fn configure(this: ObjectRef<Self>, client: &mut Client) -> Result<(), Error> {
-        ftrace::duration!("wayland", "XdgToplevel::configure");
+        ftrace::duration!(c"wayland", c"XdgToplevel::configure");
         let (width, height, maximized, surface_ref) = {
             let (view, max_size, surface_ref, maybe_parent_ref) = {
                 let toplevel = this.get(client)?;
@@ -1119,7 +1119,7 @@ impl XdgToplevel {
     }
 
     fn close(this: ObjectRef<Self>, client: &mut Client) -> Result<(), Error> {
-        ftrace::duration!("wayland", "XdgToplevel::close");
+        ftrace::duration!(c"wayland", c"XdgToplevel::close");
         client.event_queue().post(this.id(), XdgToplevelEvent::Close)
     }
 
@@ -1149,7 +1149,7 @@ impl XdgToplevel {
         client: &mut Client,
         flatland: FlatlandPtr,
     ) -> Result<ViewProviderControlHandle, Error> {
-        ftrace::duration!("wayland", "XdgToplevel::spawn_view_provider");
+        ftrace::duration!(c"wayland", c"XdgToplevel::spawn_view_provider");
         // Create a new ViewProvider service, hand off the client endpoint to
         // our ViewSink to be presented.
         let (client_end, server_end) = create_endpoints::<ViewProviderMarker>();
@@ -1268,7 +1268,7 @@ impl XdgToplevel {
         client: &mut Client,
         flatland: FlatlandPtr,
     ) -> Result<ViewControllerProxy, Error> {
-        ftrace::duration!("wayland", "XdgToplevel::spawn_view");
+        ftrace::duration!(c"wayland", c"XdgToplevel::spawn_view");
         let (proxy, server_end) = create_proxy::<ViewControllerMarker>()?;
         let stream = proxy.take_event_stream();
         let creation_tokens = ViewCreationTokenPair::new().expect("failed to create token pair");
@@ -1366,7 +1366,7 @@ impl XdgToplevel {
     }
 
     pub fn finalize_commit(this: ObjectRef<Self>, client: &mut Client) -> Result<bool, Error> {
-        ftrace::duration!("wayland", "XdgToplevel::finalize_commit");
+        ftrace::duration!(c"wayland", c"XdgToplevel::finalize_commit");
         let top_level = this.get(client)?;
         // Initial commit requires that we spawn a view and send a configure event.
         if top_level.waiting_for_initial_commit {
@@ -1669,7 +1669,7 @@ impl XdgSurfaceView {
         view_controller: &XdgSurfaceViewPtr,
         client: &mut Client,
     ) -> Result<(), Error> {
-        ftrace::duration!("wayland", "XdgSurfaceView::finish_setup_scene");
+        ftrace::duration!(c"wayland", c"XdgSurfaceView::finish_setup_scene");
         let mut vc = view_controller.lock();
         vc.setup_scene();
         vc.attach(vc.surface, client)?;
@@ -1701,7 +1701,7 @@ impl XdgSurfaceView {
     }
 
     fn attach(&self, surface: ObjectRef<Surface>, client: &Client) -> Result<(), Error> {
-        ftrace::duration!("wayland", "XdgSurfaceView::attach");
+        ftrace::duration!(c"wayland", c"XdgSurfaceView::attach");
         let surface = surface.get(client)?;
         let surface_transform = surface.transform().expect("surface is missing a transform");
         self.flatland
@@ -1713,7 +1713,7 @@ impl XdgSurfaceView {
     }
 
     fn setup_scene(&self) {
-        ftrace::duration!("wayland", "XdgSurfaceView::setup_scene");
+        ftrace::duration!(c"wayland", c"XdgSurfaceView::setup_scene");
         self.root_transform.as_ref().map(|root_transform| {
             self.flatland.borrow().proxy().set_root_transform(&root_transform).expect("fidl error");
             // TODO(https://fxbug.dev/42172143): Add background color if there's no parent.
@@ -1726,7 +1726,7 @@ impl XdgSurfaceView {
     }
 
     fn update(&mut self) {
-        ftrace::duration!("wayland", "XdgSurfaceView::update");
+        ftrace::duration!(c"wayland", c"XdgSurfaceView::update");
         let translation = Vec_ { x: self.absolute_offset.0, y: self.absolute_offset.1 };
         self.flatland
             .borrow()
@@ -1736,7 +1736,7 @@ impl XdgSurfaceView {
     }
 
     pub fn handle_layout_changed(&mut self, logical_size: &SizeF) {
-        ftrace::duration!("wayland", "XdgSurfaceView::handle_layout_changed");
+        ftrace::duration!(c"wayland", c"XdgSurfaceView::handle_layout_changed");
         if *logical_size != self.logical_size {
             self.logical_size = *logical_size;
             for id in &self.children {
@@ -1753,7 +1753,7 @@ impl XdgSurfaceView {
         geometry: &Rect,
         local_offset: &Option<(i32, i32)>,
     ) {
-        ftrace::duration!("wayland", "XdgSurfaceView::set_geometry_and_local_offset");
+        ftrace::duration!(c"wayland", c"XdgSurfaceView::set_geometry_and_local_offset");
         self.geometry = *geometry;
         self.local_offset = *local_offset;
         let absolute_offset = Self::compute_absolute_offset(
@@ -1774,7 +1774,7 @@ impl XdgSurfaceView {
         viewport_creation_token: ViewportCreationToken,
         server_end: ServerEnd<ChildViewWatcherMarker>,
     ) {
-        ftrace::duration!("wayland", "XdgSurfaceView::add_child_view");
+        ftrace::duration!(c"wayland", c"XdgSurfaceView::add_child_view");
         let viewport_properties = ViewportProperties {
             logical_size: Some(SizeU {
                 width: self.logical_size.width.round() as u32,
@@ -1803,7 +1803,7 @@ impl XdgSurfaceView {
     }
 
     pub fn handle_view_disconnected(&mut self, id: u64) {
-        ftrace::duration!("wayland", "XdgSurfaceView::handle_view_disconnected");
+        ftrace::duration!(c"wayland", c"XdgSurfaceView::handle_view_disconnected");
         if self.children.remove(&id) {
             self.root_transform.as_ref().map(|root_transform| {
                 let child_transform = TransformId { value: id.into() };

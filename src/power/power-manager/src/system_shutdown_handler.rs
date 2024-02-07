@@ -216,8 +216,8 @@ impl SystemShutdownHandler {
         mut stream: fpowercontrol::AdminRequestStream,
     ) {
         fuchsia_trace::instant!(
-            "power_manager",
-            "SystemShutdownHandler::handle_new_service_connection",
+            c"power_manager",
+            c"SystemShutdownHandler::handle_new_service_connection",
             fuchsia_trace::Scope::Thread
         );
         fasync::Task::local(
@@ -279,8 +279,8 @@ impl SystemShutdownHandler {
     /// return. In all other cases, the function does not return.
     async fn handle_shutdown(&self, request: ShutdownRequest) -> Result<(), zx_status> {
         fuchsia_trace::instant!(
-            "power_manager",
-            "SystemShutdownHandler::handle_shutdown",
+            c"power_manager",
+            c"SystemShutdownHandler::handle_shutdown",
             fuchsia_trace::Scope::Thread,
             "request" => format!("{:?}", request).as_str()
         );
@@ -325,8 +325,8 @@ impl SystemShutdownHandler {
         let request = ShutdownRequest::SuspendToRam;
 
         fuchsia_trace::instant!(
-            "power_manager",
-            "SystemShutdownHandler::handle_suspend",
+            c"power_manager",
+            c"SystemShutdownHandler::handle_suspend",
             fuchsia_trace::Scope::Thread,
             "request" => format!("{:?}", request).as_str()
         );

@@ -73,8 +73,8 @@ pub(crate) async fn serve(
                     let trace_id = ftrace::Id::random();
                     let guard = ftrace::async_enter!(
                         trace_id,
-                        "app",
-                        "cache_get",
+                        c"app",
+                        c"cache_get",
                         "meta_far_blob_id" => meta_far_blob.blob_id.to_string().as_str(),
                         "gc_protection" => format!("{gc_protection:?}").as_str(),
                         // An async duration cannot have multiple concurrent child async durations

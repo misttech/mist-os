@@ -164,8 +164,8 @@ impl ArchiveAccessorServer {
             DataType::Inspect => {
                 let _trace_guard = ftrace::async_enter!(
                     trace_id,
-                    "app",
-                    "ArchiveAccessorServer::spawn",
+                    c"app",
+                    c"ArchiveAccessorServer::spawn",
                     "data_type" => "Inspect",
                     "trace_id" => u64::from(trace_id)
                 );
@@ -221,8 +221,8 @@ impl ArchiveAccessorServer {
             DataType::Logs => {
                 let _trace_guard = ftrace::async_enter!(
                     trace_id,
-                    "app",
-                    "ArchiveAccessorServer::spawn",
+                    c"app",
+                    c"ArchiveAccessorServer::spawn",
                     "data_type" => "Logs",
                     // An async duration cannot have multiple concurrent child async durations
                     // so we include the nonce as metadata to manually determine relationship.
@@ -563,8 +563,8 @@ where
                 let trace_id = ftrace::Id::random();
                 let _trace_guard = ftrace::async_enter!(
                     trace_id,
-                    "app",
-                    "BatchIterator::new.serialize",
+                    c"app",
+                    c"BatchIterator::new.serialize",
                     // An async duration cannot have multiple concurrent child async durations
                     // so we include the nonce as metadata to manually determine relationship.
                     "parent_trace_id" => u64::from(parent_trace_id),
@@ -664,8 +664,8 @@ where
             let trace_id = ftrace::Id::random();
             let _trace_guard = ftrace::async_enter!(
                 trace_id,
-                "app",
-                "BatchIterator::run.get_send_batch",
+                c"app",
+                c"BatchIterator::run.get_send_batch",
                 // An async duration cannot have multiple concurrent child async durations
                 // so we include the nonce as metadata to manually determine relationship.
                 "parent_trace_id" => u64::from(self.parent_trace_id),

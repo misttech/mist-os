@@ -253,7 +253,7 @@ impl Node for LidShutdown {
     ///
     /// Connects to the lid sensor driver unless a proxy was already provided (in a test).
     async fn init(&self) -> Result<(), Error> {
-        fuchsia_trace::duration!("power_manager", "LidShutdown::init");
+        fuchsia_trace::duration!(c"power_manager", c"LidShutdown::init");
 
         // Connect to the lid driver. Typically this is None, but it may be set by tests.
         let driver_proxy = match &self.mutable_inner.borrow().driver_proxy {

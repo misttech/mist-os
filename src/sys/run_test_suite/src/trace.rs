@@ -2,17 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(not(target_os = "fuchsia"))]
+use std::ffi::CStr;
+
 #[cfg(target_os = "fuchsia")]
 macro_rules! duration {
     ($name:expr) => {
-        ::fuchsia_trace::duration!("run_test_suite", $name);
+        ::fuchsia_trace::duration!(c"run_test_suite", $name);
     };
 }
 
 // On host we'll measure durations manually, then emit a trace level log.
 #[cfg(not(target_os = "fuchsia"))]
 macro_rules! duration {
-    ($name:expr) => {
+    ($name:literal) => {
         let _scope = crate::trace::DurationScope::new($name);
     };
 }
@@ -20,12 +23,12 @@ macro_rules! duration {
 #[cfg(not(target_os = "fuchsia"))]
 pub(crate) struct DurationScope {
     start: std::time::Instant,
-    name: &'static str,
+    name: &'static CStr,
 }
 
 #[cfg(not(target_os = "fuchsia"))]
 impl DurationScope {
-    pub(crate) fn new(name: &'static str) -> Self {
+    pub(crate) fn new(name: &'static CStr) -> Self {
         Self { name, start: std::time::Instant::now() }
     }
 }
@@ -34,7 +37,7 @@ impl DurationScope {
 impl std::ops::Drop for DurationScope {
     fn drop(&mut self) {
         tracing::trace!(
-            name = self.name,
+            name = self.name.to_string_lossy().to_string(),
             duration = self.start.elapsed().as_nanos() as u64,
             "DURATION_NANOS"
         );

@@ -252,7 +252,7 @@ impl Surface {
     /// The role can be updated as long as the type of role remains the same,
     /// it is an error to set a different type of role for that same surface.
     pub fn set_role(&mut self, role: SurfaceRole) -> Result<(), Error> {
-        ftrace::duration!("wayland", "Surface::set_role");
+        ftrace::duration!(c"wayland", c"Surface::set_role");
         // The role is valid unless a different role has been assigned before.
         let valid_role = match &self.role {
             Some(SurfaceRole::XdgSurface(_)) => match role {
@@ -300,7 +300,7 @@ impl Surface {
         callbacks: &mut Vec<ObjectRef<Callback>>,
         subsurfaces: &[(ObjectRef<Surface>, Option<ObjectRef<Subsurface>>)],
     ) -> Result<(), Error> {
-        ftrace::duration!("wayland", "Surface::commit_subsurfaces");
+        ftrace::duration!(c"wayland", c"Surface::commit_subsurfaces");
         for (index, entry) in subsurfaces.iter().enumerate() {
             entry.0.get_mut(client)?.z_order = index;
             if let Some(subsurface_ref) = entry.1 {
@@ -385,7 +385,7 @@ impl Surface {
     /// It is an error to call `set_flatland` multiple times for the same
     /// surface.
     pub fn set_flatland(&mut self, flatland: FlatlandPtr) -> Result<(), Error> {
-        ftrace::duration!("wayland", "Surface::set_flatland");
+        ftrace::duration!(c"wayland", c"Surface::set_flatland");
         if self.node.is_some() {
             Err(format_err!("Changing the Flatland instance for a surface is not supported"))
         } else {
@@ -480,7 +480,7 @@ impl Surface {
         task_queue: TaskQueue,
         callbacks: &mut Vec<ObjectRef<Callback>>,
     ) -> Result<(), Error> {
-        ftrace::duration!("wayland", "Surface::commit_self");
+        ftrace::duration!(c"wayland", c"Surface::commit_self");
 
         // Save the last buffer ID before applying updates.
         let last_buffer_id = self.content.as_ref().map(|content| content.id());
@@ -621,7 +621,7 @@ impl Surface {
     }
 
     fn present_now(&mut self) {
-        ftrace::duration!("wayland", "Surface::present_now");
+        ftrace::duration!(c"wayland", c"Surface::present_now");
         if let Some(flatland) = self.flatland() {
             // Wayland protocol doesn't provide a mechanism to control presentation time
             // so we ask Flatland to present contents immediately by specifying a presentation
@@ -637,7 +637,7 @@ impl Surface {
     }
 
     pub fn present_internal(this: ObjectRef<Self>, client: &mut Client) {
-        ftrace::duration!("wayland", "Surface::present_internal");
+        ftrace::duration!(c"wayland", c"Surface::present_internal");
         if let Some(surface) = this.try_get_mut(client) {
             if surface.present_credits == 0 {
                 surface.present_needed = true;
@@ -652,7 +652,7 @@ impl Surface {
         client: &mut Client,
         mut callbacks: Vec<ObjectRef<Callback>>,
     ) {
-        ftrace::duration!("wayland", "Surface::present");
+        ftrace::duration!(c"wayland", c"Surface::present");
         if let Some(surface) = this.try_get_mut(client) {
             surface.present_callbacks.append(&mut callbacks);
             if surface.present_credits == 0 {
@@ -664,7 +664,7 @@ impl Surface {
     }
 
     pub fn add_present_credits(this: ObjectRef<Self>, client: &mut Client, present_credits: u32) {
-        ftrace::duration!("wayland", "Surface::add_present_credits");
+        ftrace::duration!(c"wayland", c"Surface::add_present_credits");
         if let Some(surface) = this.try_get_mut(client) {
             surface.present_credits += present_credits;
             // Present immediately if needed.
@@ -798,7 +798,7 @@ impl SurfaceRole {
         client: &mut Client,
         callbacks: &mut Vec<ObjectRef<Callback>>,
     ) -> Result<bool, Error> {
-        ftrace::duration!("wayland", "SurfaceRole::commit");
+        ftrace::duration!(c"wayland", c"SurfaceRole::commit");
         match self {
             SurfaceRole::XdgSurface(xdg_surface_ref) => {
                 XdgSurface::finalize_commit(*xdg_surface_ref, client)

@@ -33,7 +33,6 @@ common_deps = [
   "//src/connectivity/network/lib/explicit",
   "//src/lib/async-utils",
   "//src/lib/const-unwrap",
-  "//src/lib/cstr",
   "//src/lib/debug/rust",
   "//src/lib/dense-map",
   "//src/lib/diagnostics/inspect/runtime/rust",

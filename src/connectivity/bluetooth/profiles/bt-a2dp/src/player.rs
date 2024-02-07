@@ -148,12 +148,12 @@ impl AudioConsumerSink {
 
     /// Push an encoded media frame into the buffer and signal that it's there to media.
     fn send_frame(&mut self, frame: &[u8], flags: u32) -> Result<(), Error> {
-        trace::duration!("bt-a2dp-sink", "Media:PacketSent");
+        trace::duration!(c"bt-a2dp-sink", c"Media:PacketSent");
 
         let buffer_index = self.copy_to_buffer(frame).ok_or(format_err!("No free buffers"))?;
 
         self.tx_count += 1;
-        trace::flow_begin!("stream-sink", "SendPacket", self.tx_count.into());
+        trace::flow_begin!(c"stream-sink", c"SendPacket", self.tx_count.into());
 
         let packet = StreamPacket {
             pts: NO_TIMESTAMP,
@@ -415,7 +415,7 @@ impl Player {
     /// Accepts a payload which may contain multiple frames and breaks it into
     /// frames and sends it to media.
     pub async fn push_payload(&mut self, payload: &[u8]) -> Result<(), Error> {
-        trace::duration_begin!("bt-a2dp-sink", "Media:PacketReceived");
+        trace::duration_begin!(c"bt-a2dp-sink", c"Media:PacketReceived");
         let rtp = RtpHeader::new(payload)?;
 
         let seq = rtp.sequence_number();
@@ -439,7 +439,7 @@ impl Player {
                         let _ = self.next_packet_flags.try_send(STREAM_PACKET_FLAG_DISCONTINUITY);
                         Err(e)
                     })?;
-                    trace::instant!("bt-a2dp-sink", "SBC frame", trace::Scope::Thread);
+                    trace::instant!(c"bt-a2dp-sink", c"SBC frame", trace::Scope::Thread);
                     if offset + len > payload.len() {
                         let _ = self.next_packet_flags.try_send(STREAM_PACKET_FLAG_DISCONTINUITY);
                         return Err(format_err!("Ran out of buffer for SBC frame"));
@@ -467,7 +467,7 @@ impl Player {
             info!("Failed to flush audio packets: {:?}", e);
         }
         self.playing = true;
-        trace::duration_end!("bt-a2dp-sink", "Media:PacketReceived");
+        trace::duration_end!(c"bt-a2dp-sink", c"Media:PacketReceived");
         Ok(())
     }
 

@@ -185,7 +185,7 @@ impl Facet for TextGridFacet {
         render_context: &mut RenderContext,
         _view_context: &ViewAssistantContext,
     ) -> std::result::Result<(), anyhow::Error> {
-        duration!("gfx", "TextGridFacet::update_layers");
+        duration!(c"gfx", c"TextGridFacet::update_layers");
 
         self.size = size;
 

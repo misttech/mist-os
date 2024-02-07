@@ -282,7 +282,7 @@ impl Client {
     /// Returns Err if no object is associated with the sender field in the
     /// message header, or if the objects receiver itself fails.
     pub(crate) fn handle_message(&mut self, mut message: wl::Message) -> Result<(), Error> {
-        ftrace::duration!("wayland", "Client::handle_message");
+        ftrace::duration!(c"wayland", c"Client::handle_message");
         while !message.is_empty() {
             let header = message.read_header()?;
             // Lookup the table entry for this object & fail if there is no entry
@@ -297,7 +297,7 @@ impl Client {
     }
 
     fn handle_task(&mut self, mut task: Task) -> Result<(), Error> {
-        ftrace::duration!("wayland", "Client::handle_task");
+        ftrace::duration!(c"wayland", c"Client::handle_task");
         task(self)
     }
 
@@ -314,7 +314,7 @@ enum EventQueueChannel {
 
 impl EventQueueChannel {
     fn write(&self, message: wl::Message) -> Result<(), Error> {
-        ftrace::duration!("wayland", "EventQueue::write_to_chan");
+        ftrace::duration!(c"wayland", c"EventQueue::write_to_chan");
         let (bytes, mut handles) = message.take();
         match self {
             EventQueueChannel::Local(sender) => {
@@ -350,7 +350,7 @@ impl EventQueue {
     where
         <E as wl::IntoMessage>::Error: std::marker::Send + 'static,
     {
-        ftrace::duration!("wayland", "EventQueue::post");
+        ftrace::duration!(c"wayland", c"EventQueue::post");
         if self.log_flag.get() {
             println!("<-e-- {}", event.log(sender));
         }
@@ -362,7 +362,7 @@ impl EventQueue {
     where
         <E as wl::IntoMessage>::Error: std::marker::Send + 'static,
     {
-        ftrace::duration!("wayland", "EventQueue::serialize");
+        ftrace::duration!(c"wayland", c"EventQueue::serialize");
         Ok(event.into_message(sender).unwrap())
     }
 

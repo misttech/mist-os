@@ -5,7 +5,25 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 
+# TODO(https://fxbug.dev/323626438): Remove the cstr crate when all use cases for the cstr!()
+# can be supported directly by C-string literals.
+#
+# In general, C-string literals should be preferred over using the cstr!() macro. There are
+# however some cases where C-string literals are known not to be sufficient:
+#
+#  - inside of a token tree parsed by the syn crate: https://github.com/dtolnay/syn/issues/1502
+#  - creating a C-string literal from an identifier inside of a macro implementation,
+#    i.e., stringify!() does not have a C-string literal equivalent.
+#
+cstr_full_deps_allowlist = [
+  "//src/connectivity/network/netstack-proxy:*",
+  "//src/lib/cstr:*",
+  "//src/lib/pty:*",
+  "//src/lib/trace/rust/bench:*",
+]
+
 rustc_library("cstr") {
+  visibility = cstr_full_deps_allowlist
   with_unit_tests = true
   edition = "2021"
   deps = [ "//third_party/rust_crates:static_assertions" ]

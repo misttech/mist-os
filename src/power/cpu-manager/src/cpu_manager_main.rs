@@ -164,8 +164,8 @@ impl CpuCluster {
         index: usize,
     ) -> Result<(), CpuManagerError> {
         fuchsia_trace::counter!(
-            "cpu_manager",
-            "CpuManagerMain P-state",
+            c"cpu_manager",
+            c"CpuManagerMain P-state",
             self.cluster_index as u64,
             &self.name => index as u32
         );
@@ -574,7 +574,7 @@ impl PerformanceModel {
 impl CpuManagerMain {
     // Returns a Vec of all CPU loads as fractional utilizations.
     async fn get_cpu_loads(&self) -> Result<Vec<f32>, Error> {
-        fuchsia_trace::duration!("cpu_manager", "CpuManagerMain::get_cpu_loads");
+        fuchsia_trace::duration!(c"cpu_manager", c"CpuManagerMain::get_cpu_loads");
 
         // Get load for all CPUs in the system
         match self.send_message(&self.cpu_stats_handler, &Message::GetCpuLoads).await {
@@ -623,8 +623,8 @@ impl CpuManagerMain {
     // Updates the current thermal state.
     async fn update_thermal_state(&self, index: usize) -> Result<(), CpuManagerError> {
         fuchsia_trace::duration!(
-            "cpu_manager",
-            "CpuManagerMain::update_thermal_state",
+            c"cpu_manager",
+            c"CpuManagerMain::update_thermal_state",
             "index" => index as u32
         );
 
@@ -673,8 +673,8 @@ impl CpuManagerMain {
         thermal_load: ThermalLoad,
     ) -> Result<MessageReturn, CpuManagerError> {
         fuchsia_trace::duration!(
-            "cpu_manager",
-            "CpuManagerMain::handle_update_thermal_load",
+            c"cpu_manager",
+            c"CpuManagerMain::handle_update_thermal_load",
             "thermal_load" => thermal_load.0
         );
 
@@ -688,8 +688,8 @@ impl CpuManagerMain {
 
         let available_power = self.calculate_available_power(thermal_load);
         fuchsia_trace::counter!(
-            "cpu_manager",
-            "CpuManagerMain available_power",
+            c"cpu_manager",
+            c"CpuManagerMain available_power",
             0,
             "available_power" => available_power.0
         );
@@ -701,8 +701,8 @@ impl CpuManagerMain {
     /// Calculate available power based on thermal load.
     fn calculate_available_power(&self, thermal_load: ThermalLoad) -> Watts {
         fuchsia_trace::duration!(
-            "cpu_manager",
-            "CpuManagerMain::calculate_available_power",
+            c"cpu_manager",
+            c"CpuManagerMain::calculate_available_power",
             "thermal_load" => thermal_load.0
         );
 
@@ -717,8 +717,8 @@ impl CpuManagerMain {
     /// log the error.
     async fn set_max_power_consumption(&self, available_power: Watts) {
         fuchsia_trace::duration!(
-            "cpu_manager",
-            "CpuManagerMain::set_max_power_consumption",
+            c"cpu_manager",
+            c"CpuManagerMain::set_max_power_consumption",
             "available_power" => available_power.0
         );
 
@@ -747,8 +747,8 @@ impl CpuManagerMain {
             last_performance += performance;
 
             fuchsia_trace::counter!(
-                "cpu_manager",
-                "CpuManagerMain cluster_load",
+                c"cpu_manager",
+                c"CpuManagerMain cluster_load",
                 cluster.cluster_index as u64,
                 &cluster.name => load as f64
             );
@@ -756,8 +756,8 @@ impl CpuManagerMain {
         }
         self.inspect.last_performance.set(last_performance.0);
         fuchsia_trace::counter!(
-            "cpu_manager",
-            "CpuManagerMain last_performance",
+            c"cpu_manager",
+            c"CpuManagerMain last_performance",
             0,
             "value (NormPerfs)" => last_performance.0
         );
@@ -772,8 +772,8 @@ impl CpuManagerMain {
         let (new_thermal_state_index, estimate) =
             self.select_thermal_state(available_power, performance_model);
         fuchsia_trace::counter!(
-            "cpu_manager",
-            "CpuManagerMain new_thermal_state_index",
+            c"cpu_manager",
+            c"CpuManagerMain new_thermal_state_index",
             0,
             "value" => new_thermal_state_index as u32
         );
@@ -785,16 +785,16 @@ impl CpuManagerMain {
         }
 
         fuchsia_trace::counter!(
-            "cpu_manager",
-            "CpuManagerMain projected_performance",
+            c"cpu_manager",
+            c"CpuManagerMain projected_performance",
             0,
             "value (NormPerfs)" => estimate.performance.0
         );
         self.inspect.projected_performance.set(estimate.performance.0);
 
         fuchsia_trace::counter!(
-            "cpu_manager",
-            "CpuManagerMain projected_power",
+            c"cpu_manager",
+            c"CpuManagerMain projected_power",
             0,
             "value (W)" => estimate.power.0
         );
@@ -838,7 +838,7 @@ impl Node for CpuManagerMain {
 
     /// Initializes internal state.
     async fn init(&self) -> Result<(), Error> {
-        fuchsia_trace::duration!("cpu_manager", "CpuManagerMain::init");
+        fuchsia_trace::duration!(c"cpu_manager", c"CpuManagerMain::init");
 
         let cluster_configs =
             ok_or_default_err!(self.mutable_inner.borrow_mut().cluster_configs.take())

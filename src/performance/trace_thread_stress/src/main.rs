@@ -13,15 +13,15 @@ fn thread_main(config: Arc<Config>) {
     while start.elapsed() < Duration::from_millis(config.duration_ms) {
         count += 1;
         fuchsia_trace::duration!(
-            "stress",
-            "simulated_work",
+            c"stress",
+            c"simulated_work",
             "iteration" => count,
             "arg_u64" => 0x1234567890abcdefu64,
             "arg_string" => "Blah blah blah");
         std::thread::sleep(Duration::from_millis(config.interval_ms));
         // Another trace event with a different size to make sure that records don't always exactly
         // overlap in streaming mode.
-        fuchsia_trace::duration!("stress", "small_duration");
+        fuchsia_trace::duration!(c"stress", c"small_duration");
     }
 }
 

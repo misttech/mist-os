@@ -33,7 +33,7 @@ use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{
-    log_error, log_trace, log_warn, trace_category_starnix, trace_duration, track_stub,
+    log_error, log_trace, log_warn, trace_duration, track_stub, CATEGORY_STARNIX,
 };
 use starnix_sync::{
     FileOpsIoctl, InterruptibleEvent, Locked, Mutex, MutexGuard, ReadOps, RwLock, WriteOps,
@@ -85,6 +85,7 @@ use starnix_uapi::{
 };
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
+    ffi::CStr,
     mem::MaybeUninit,
     ops::{Deref, DerefMut},
     sync::Arc,
@@ -92,7 +93,7 @@ use std::{
 use zerocopy::{AsBytes, FromBytes, NoCell};
 
 // The name used to track the duration of a local binder ioctl.
-fuchsia_trace::string_name_macro!(trace_name_binder_ioctl, "binder_ioctl");
+const NAME_BINDER_IOCTL: &'static CStr = c"binder_ioctl";
 
 /// Allows for sequential reading of a task's userspace memory.
 pub struct UserMemoryCursor {
@@ -3178,7 +3179,7 @@ impl BinderDriver {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        trace_duration!(trace_category_starnix!(), trace_name_binder_ioctl!(), "request" => request);
+        trace_duration!(CATEGORY_STARNIX, NAME_BINDER_IOCTL, "request" => request);
         let user_arg = UserAddress::from(arg);
         let binder_thread = binder_proc.lock().find_or_register_thread(current_task.get_tid());
         release_after!(binder_thread, current_task, {

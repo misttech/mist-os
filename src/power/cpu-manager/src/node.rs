@@ -49,8 +49,8 @@ pub trait Node {
         // "message" value) unconditionally, even when the tracing category is disabled. To avoid
         // that unnecessary computation, just use an instant event.
         fuchsia_trace::instant!(
-            "cpu_manager:messages",
-            "message_start",
+            c"cpu_manager:messages",
+            c"message_start",
             fuchsia_trace::Scope::Thread,
             "message" => format!("{:?}", msg).as_str(),
             "source_node" => self.name().as_str(),
@@ -59,8 +59,8 @@ pub trait Node {
 
         let result = node.handle_message(msg).await;
         fuchsia_trace::instant!(
-            "cpu_manager:messages",
-            "message_result",
+            c"cpu_manager:messages",
+            c"message_result",
             fuchsia_trace::Scope::Thread,
             "message" => format!("{:?}", msg).as_str(),
             "source_node" => self.name().as_str(),

@@ -545,8 +545,8 @@ impl ViewController {
     pub fn handle_metrics_changed(&mut self, metrics: Size) {
         if self.metrics != metrics {
             instant!(
-                "gfx",
-                "ViewController::metrics_changed",
+                c"gfx",
+                c"ViewController::metrics_changed",
                 fuchsia_trace::Scope::Process,
                 "old_device_pixel_ratio_x" => self.metrics.width as f64,
                 "old_device_pixel_ratio_y" => self.metrics.height as f64,
@@ -562,8 +562,8 @@ impl ViewController {
     pub fn handle_size_changed(&mut self, new_size: Size) {
         if self.logical_size != new_size {
             instant!(
-                "gfx",
-                "ViewController::size_changed",
+                c"gfx",
+                c"ViewController::size_changed",
                 fuchsia_trace::Scope::Process,
                 "old_logical_width" => self.logical_size.width as f64,
                 "old_logical_height" => self.logical_size.height as f64,

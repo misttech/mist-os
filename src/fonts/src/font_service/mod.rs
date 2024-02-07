@@ -220,8 +220,8 @@ where
         let query_family_string =
             (&query_family).map(|family| family.name.clone()).unwrap_or_default();
         trace::duration!(
-            "fonts",
-            "service:match_non_unique_typeface_request",
+            c"fonts",
+            c"service:match_non_unique_typeface_request",
             "family" => &query_family_string[..]
         );
         // TODO(https://fxbug.dev/42120730): If support for lazy trace args is added, include more query params, e.g.

@@ -27,7 +27,7 @@ use starnix_kernel_runner::{
     create_component_from_stream, serve_component_runner, serve_container_controller, Container,
     ContainerServiceConfig,
 };
-use starnix_logging::{log_debug, trace_category_starnix, trace_instant, trace_name_start_kernel};
+use starnix_logging::{log_debug, trace_instant, CATEGORY_STARNIX, NAME_START_KERNEL};
 
 /// Overrides the `zxio_maybe_faultable_copy` weak symbol found in zxio.
 #[no_mangle]
@@ -121,11 +121,7 @@ async fn main() -> Result<(), Error> {
     health.set_starting_up();
 
     fuchsia_trace_provider::trace_provider_create_with_fdio();
-    trace_instant!(
-        trace_category_starnix!(),
-        trace_name_start_kernel!(),
-        fuchsia_trace::Scope::Thread
-    );
+    trace_instant!(CATEGORY_STARNIX, NAME_START_KERNEL, fuchsia_trace::Scope::Thread);
 
     let container = async_lock::OnceCell::<Container>::new();
 

@@ -37,7 +37,7 @@ async fn create_backend(
     mode: BlockMode,
 ) -> Result<Box<dyn BlockBackend>, anyhow::Error> {
     let trace_id = ftrace::Id::random();
-    let _trace = ftrace::async_enter!(trace_id, "machina", "create_backend");
+    let _trace = ftrace::async_enter!(trace_id, c"machina", c"create_backend");
     let backend: Box<dyn BlockBackend> = match format {
         BlockFormat::File(file) => Box::new(FileBackend::new(file)?),
         BlockFormat::Block(block) => Box::new(RemoteBackend::new(block).await?),

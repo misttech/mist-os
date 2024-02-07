@@ -233,8 +233,8 @@ impl ClientStates {
     /// contained `ClientState` entry.
     fn process_new_thermal_load(&self, thermal_load: ThermalLoad, sensor: &str) {
         fuchsia_trace::duration!(
-            "power_manager",
-            "ThermalStateHandler::process_new_thermal_load",
+            c"power_manager",
+            c"ThermalStateHandler::process_new_thermal_load",
             "thermal_load" => thermal_load.0,
             "sensor" => sensor
         );
@@ -252,8 +252,8 @@ impl ClientStates {
     /// client entry.
     fn process_new_cpu_thermal_load(&self, thermal_load: ThermalLoad) {
         fuchsia_trace::duration!(
-            "power_manager",
-            "ThermalStateHandler::process_new_cpu_thermal_load",
+            c"power_manager",
+            c"ThermalStateHandler::process_new_cpu_thermal_load",
             "thermal_load" => thermal_load.0
         );
 
@@ -273,8 +273,8 @@ impl ClientStates {
         stream: fthermal::ClientStateWatcherRequestStream,
     ) -> Result<(), Error> {
         fuchsia_trace::duration!(
-            "power_manager",
-            "ThermalStateHandler::connect_stream_for_client",
+            c"power_manager",
+            c"ThermalStateHandler::connect_stream_for_client",
             "client_type" => client_type
         );
 
@@ -452,7 +452,7 @@ fn spawn_watcher_handler(
     mut stream: fthermal::ClientStateWatcherRequestStream,
     subscriber: ClientStateSubscriber,
 ) {
-    fuchsia_trace::duration!("power_manager", "ThermalStateHandler::spawn_watcher_handler");
+    fuchsia_trace::duration!(c"power_manager", c"ThermalStateHandler::spawn_watcher_handler");
 
     fasync::Task::local(
         async move {
@@ -460,8 +460,8 @@ fn spawn_watcher_handler(
                 stream.try_next().await?
             {
                 fuchsia_trace::duration!(
-                    "power_manager",
-                    "ThermalStateHandler::spawn_watcher_handler::Watch"
+                    c"power_manager",
+                    c"ThermalStateHandler::spawn_watcher_handler::Watch"
                 );
 
                 // The responder for the `Watch` FIDL request is now owned by the subscriber. The
@@ -550,7 +550,7 @@ impl ThermalStateHandler {
         self: Rc<Self>,
         mut stream: fthermal::ClientStateConnectorRequestStream,
     ) {
-        fuchsia_trace::duration!("power_manager", "ThermalStateHandler::spawn_connector_handler");
+        fuchsia_trace::duration!(c"power_manager", c"ThermalStateHandler::spawn_connector_handler");
 
         fasync::Task::local(
             async move {
@@ -582,8 +582,8 @@ impl ThermalStateHandler {
         sensor: &str,
     ) -> Result<MessageReturn, PowerManagerError> {
         fuchsia_trace::duration!(
-            "power_manager",
-            "ThermalStateHandler::handle_update_thermal_load",
+            c"power_manager",
+            c"ThermalStateHandler::handle_update_thermal_load",
             "thermal_load" => thermal_load.0,
             "sensor" => sensor
         );
@@ -613,8 +613,8 @@ impl ThermalStateHandler {
         thermal_load: ThermalLoad,
     ) -> Result<MessageReturn, PowerManagerError> {
         fuchsia_trace::duration!(
-            "power_manager",
-            "ThermalStateHandler::handle_update_cpu_thermal_load",
+            c"power_manager",
+            c"ThermalStateHandler::handle_update_cpu_thermal_load",
             "thermal_load" => thermal_load.0
         );
 

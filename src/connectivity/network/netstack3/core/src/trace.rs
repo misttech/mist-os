@@ -12,8 +12,8 @@
 /// returns. This macro encapsulates that logic such that the trace duration
 /// will end when the scope in which the macro is called ends.
 macro_rules! trace_duration {
-    ($ctx:ident, $name:expr) => {
-        let _scope = $ctx.duration(::cstr::cstr!($name));
+    ($ctx:ident, $name:literal) => {
+        let _scope = $ctx.duration($name);
     };
 }
 

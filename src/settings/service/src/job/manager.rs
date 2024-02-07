@@ -93,7 +93,7 @@ impl Manager {
         // 3) Executing jobs and handling the their results
         fasync::Task::spawn(async move {
             let id = ftrace::Id::new();
-            trace!(id, "job_manager");
+            trace!(id, c"job_manager");
             let source_fuse = receptor.fuse();
             let execution_fuse = execution_completion_receiver.fuse();
 
@@ -101,15 +101,15 @@ impl Manager {
             loop {
                 futures::select! {
                     source_event = source_fuse.select_next_some() => {
-                        trace!(id, "process_source_event");
+                        trace!(id, c"process_source_event");
                         manager.process_source_event(source_event).await;
                     },
                     (source_id, job_info) = execution_fuse.select_next_some() => {
-                        trace!(id, "process_completed_execution");
+                        trace!(id, c"process_completed_execution");
                         manager.process_completed_execution(source_id, job_info, id).await;
                     },
                     (job_info, stream) = manager.job_futures.select_next_some() => {
-                        trace!(id, "process_job");
+                        trace!(id, c"process_job");
                         // Since the manager owns job_futures, we should never reach the end of
                         // the stream.
                         let (source_id, job) = job_info.expect("job should be present");

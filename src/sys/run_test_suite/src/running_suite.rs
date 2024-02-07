@@ -49,7 +49,7 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
     log_display: diagnostics::LogDisplayConfiguration,
     cancel_fut: F,
 ) -> Result<Outcome, RunTestSuiteError> {
-    duration!("collect_suite");
+    duration!(c"collect_suite");
 
     let RunningSuite {
         mut event_stream, stopper, timeout, timeout_grace, max_severity_logs, ..

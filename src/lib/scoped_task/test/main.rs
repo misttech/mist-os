@@ -4,7 +4,6 @@
 
 #![cfg(test)]
 
-use cstr::cstr;
 use fdio::{self, SpawnOptions};
 use fuchsia_runtime as runtime;
 use fuchsia_zircon::{self as zx, AsHandleRef, Task};
@@ -76,7 +75,7 @@ fn run_test_with_c_args(args: &[&CStr], expect_success: bool) {
     println!("running spawner with args: {:?}", args);
 
     let child_job = runtime::job_default().create_child_job().unwrap();
-    let bin = cstr!("/pkg/bin/scoped_task_test_spawner");
+    let bin = c"/pkg/bin/scoped_task_test_spawner";
     let args: Vec<&CStr> = Some(bin).iter().chain(args.into_iter()).copied().collect();
 
     let process = fdio::spawn(

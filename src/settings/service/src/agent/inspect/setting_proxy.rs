@@ -220,7 +220,7 @@ impl SettingProxyInspectAgent {
             async move {
             let _ = &context;
             let id = fuchsia_trace::Id::new();
-            trace!(id, "setting_proxy_inspect_agent");
+            trace!(id, c"setting_proxy_inspect_agent");
             let event = message_rx.fuse();
             let agent_event = context.receptor.fuse();
             futures::pin_mut!(agent_event, event);
@@ -233,7 +233,7 @@ impl SettingProxyInspectAgent {
                     message_event = event.select_next_some() => {
                         trace!(
                             id,
-                            "message_event"
+                            c"message_event"
                         );
                         if let Some((setting_type, count, mut reply_receptor)) =
                             agent.process_message_event(message_event) {
@@ -257,7 +257,7 @@ impl SettingProxyInspectAgent {
                     agent_message = agent_event.select_next_some() => {
                         trace!(
                             id,
-                            "agent_event"
+                            c"agent_event"
                         );
                         if let MessageEvent::Message(
                                 service::Payload::Agent(Payload::Invocation(_invocation)), client)

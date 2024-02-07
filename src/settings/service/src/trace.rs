@@ -8,7 +8,7 @@
 #[macro_export]
 macro_rules! trace {
     ($nonce:expr, $name:expr $(, $key:expr => $val:expr)* $(,)?) => {
-        let _guard = ::fuchsia_trace::async_enter!($nonce, "setui", $name $(, $key => $val)*);
+        let _guard = ::fuchsia_trace::async_enter!($nonce, c"setui", $name $(, $key => $val)*);
     }
 }
 
@@ -17,6 +17,6 @@ macro_rules! trace {
 #[macro_export]
 macro_rules! trace_guard {
     ($nonce:expr, $name:expr $(, $key:expr => $val:expr)* $(,)?) => {
-        ::fuchsia_trace::async_enter!($nonce, "setui", $name $(, $key => $val)*)
+        ::fuchsia_trace::async_enter!($nonce, c"setui", $name $(, $key => $val)*)
     }
 }

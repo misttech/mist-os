@@ -276,7 +276,7 @@ async fn match_background_to_media(messenger: service::message::Messenger) {
     // If they are different, set the background volume to match the media volume.
     if media_volume != background_volume {
         let id = ftrace::Id::new();
-        trace!(id, "bluetooth_handler set background volume");
+        trace!(id, c"bluetooth_handler set background volume");
         let mut receptor = messenger.message(
             Payload::Request(Request::SetVolume(
                 vec![SetAudioStream {

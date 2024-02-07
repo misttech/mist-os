@@ -268,7 +268,7 @@ impl<'a> AppModel<'a> {
     }
 
     fn draw(&mut self, expected_presentation_time: zx::Time, renderer: &mut dyn Renderer) {
-        trace::duration!("gfx", "FlatlandViewProvider::draw");
+        trace::duration!(c"gfx", c"FlatlandViewProvider::draw");
 
         self.frame_count += 1;
         let buffer_index = self.frame_count % IMAGE_COUNT;
@@ -435,7 +435,7 @@ async fn main() {
                       additional_present_credits,
                       future_presentation_infos,
                   } => {
-                    trace::duration!("gfx", "FlatlandViewProvider::OnNextFrameBegin");
+                    trace::duration!(c"gfx", c"FlatlandViewProvider::OnNextFrameBegin");
                     let infos = future_presentation_infos
                     .iter()
                     .map(
@@ -447,7 +447,7 @@ async fn main() {
                     sched_lib.on_next_frame_begin(additional_present_credits, infos);
                   }
                   InternalMessage::OnFramePresented { frame_presented_info } => {
-                    trace::duration!("gfx", "FlatlandViewProvider::OnFramePresented");
+                    trace::duration!(c"gfx", c"FlatlandViewProvider::OnFramePresented");
                     let presented_infos = frame_presented_info.presentation_infos
                     .iter()
                     .map(|info| PresentedInfo{
@@ -483,9 +483,9 @@ async fn main() {
             }
           }
           present_parameters = sched_lib.wait_to_update().fuse() => {
-            trace::duration!("gfx", "FlatlandApp::PresentBegin");
+            trace::duration!(c"gfx", c"FlatlandApp::PresentBegin");
             app.draw(present_parameters.expected_presentation_time, renderer.deref_mut());
-            trace::flow_begin!("gfx", "Flatland::Present", present_count.into());
+            trace::flow_begin!(c"gfx", c"Flatland::Present", present_count.into());
             present_count += 1;
             flatland
                 .present(fland::PresentArgs {

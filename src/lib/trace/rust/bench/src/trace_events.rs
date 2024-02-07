@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use cstr::cstr;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
 use fuchsia_trace as trace;
 use fuchsia_trace::Scope;
@@ -9,17 +10,18 @@ use std::time::Duration;
 
 macro_rules! bench_trace_record_fn {
     ($bench:ident, $name:ident $(, $arg:expr)? $(, args: $key:expr => $val:expr)?) => {
+        let name = cstr!(stringify!($name));
         $bench = $bench
             .with_function(
                 concat!(stringify!($name), "/0Args"),
                 |b| {
-                    b.iter(|| {trace::$name!("benchmark", "name" $(, $arg)? $(, $key => $val)?);});
+                    b.iter(|| {trace::$name!(c"benchmark", name $(, $arg)? $(, $key => $val)?);});
                 }
             )
             .with_function(
                 concat!(stringify!($name), "/15Args"),
                 |b| {
-                    b.iter(|| {trace::$name!("benchmark", "name" $(, $arg)?,
+                    b.iter(|| {trace::$name!(c"benchmark", name $(, $arg)?,
                             "a"=>1,
                             "b"=>2,
                             "c"=>3,
@@ -42,17 +44,18 @@ macro_rules! bench_trace_record_fn {
 
 macro_rules! bench_async_trace_record_fn {
     ($bench:ident, $name:ident) => {
+        let name = cstr!(stringify!($name));
         $bench = $bench
             .with_function(
                 concat!(stringify!($name), "/0Args"),
                 |b| {
-                    b.iter(|| trace::$name!(fuchsia_trace::Id::new(), "benchmark", "name"));
+                    b.iter(|| trace::$name!(fuchsia_trace::Id::new(), c"benchmark", name));
                 }
             )
             .with_function(
                 concat!(stringify!($name), "/15Args"),
                 |b| {
-                    b.iter(|| trace::$name!(fuchsia_trace::Id::new(), "benchmark", "name",
+                    b.iter(|| trace::$name!(fuchsia_trace::Id::new(), c"benchmark", name,
                             "a"=>1,
                             "b"=>2,
                             "c"=>3,

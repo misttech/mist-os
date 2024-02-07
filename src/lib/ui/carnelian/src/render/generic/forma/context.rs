@@ -318,7 +318,7 @@ impl Context<Forma> for FormaContext {
                 .map(|cache| (composition.id.unwrap(), cache));
         }
 
-        duration_begin!("gfx", "render::Context<Forma>::render_composition");
+        duration_begin!(c"gfx", c"render::Context<Forma>::render_composition");
         self.renderer.render(
             &mut composition.composition,
             &mut image.as_buffer(),
@@ -329,7 +329,7 @@ impl Context<Forma> for FormaContext {
                 clip.origin.y as usize..(clip.origin.y + clip.size.height) as usize,
             )),
         );
-        duration_end!("gfx", "render::Context<Forma>::render_composition");
+        duration_end!(c"gfx", c"render::Context<Forma>::render_composition");
 
         // TODO: Motion blur support.
         if let Some(PostCopy { image: dst_image_id, copy_region, .. }) = ext.post_copy {

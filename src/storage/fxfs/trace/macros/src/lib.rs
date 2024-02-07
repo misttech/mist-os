@@ -362,7 +362,7 @@ fn add_tracing_to_fn(mut item_fn: ItemFn, args: TraceFnArgs) -> syn::Result<Toke
 /// }
 /// // Expands to:
 /// fn example_function() {
-///     fxfs_trace::duration!("example_function");
+///     fxfs_trace::duration!(c"example_function");
 ///     ...
 /// }
 /// ```

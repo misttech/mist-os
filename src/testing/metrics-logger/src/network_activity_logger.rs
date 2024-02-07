@@ -358,8 +358,8 @@ impl NetworkActivityLogger {
                     }
 
                     fuchsia_trace::counter!(
-                        "metrics_logger",
-                        "network_activity",
+                        c"metrics_logger",
+                        c"network_activity",
                         0,
                         "client_id" => self.client_id.as_str(),
                         "rx_bytes_per_sec" => rx_bytes_per_sec,

@@ -422,12 +422,6 @@ pub(crate) mod tests {
     use std::{ffi::CStr, mem::MaybeUninit, os::raw::c_char, ptr};
     use vk_sys as vk;
 
-    macro_rules! cstr {
-        ( $bytes:expr ) => {
-            CStr::from_bytes_with_nul($bytes).expect("CStr must end with '\\0'")
-        };
-    }
-
     macro_rules! vulkan_version {
         ( $major:expr, $minor:expr, $patch:expr ) => {
             ($major as u32) << 22 | ($minor as u32) << 12 | ($patch as u32)
@@ -452,7 +446,7 @@ pub(crate) mod tests {
                     pApplicationInfo: &vk::ApplicationInfo {
                         sType: vk::STRUCTURE_TYPE_APPLICATION_INFO,
                         pNext: ptr::null(),
-                        pApplicationName: cstr!(b"fuchsia-vulkan unit test\0").as_ptr(),
+                        pApplicationName: c"fuchsia-vulkan unit test".as_ptr(),
                         applicationVersion: 0,
                         pEngineName: ptr::null(),
                         engineVersion: 0,
@@ -650,7 +644,7 @@ pub(crate) mod tests {
     #[test]
     fn fuchsia_buffer_collection_function_valid() {
         let instance = create_vk_instance();
-        let extension_names = vec![cstr!(b"VK_FUCHSIA_buffer_collection\0").as_ptr()];
+        let extension_names = vec![c"VK_FUCHSIA_buffer_collection".as_ptr()];
         if !physical_device_supports_extension(instance, &extension_names) {
             println!("extension {:?} not supported, test skipped.", extension_names);
             return;
@@ -675,7 +669,7 @@ pub(crate) mod tests {
     #[test]
     fn fuchsia_external_memory_function_valid() {
         let instance = create_vk_instance();
-        let extension_names = vec![cstr!(b"VK_FUCHSIA_external_memory\0").as_ptr()];
+        let extension_names = vec![c"VK_FUCHSIA_external_memory".as_ptr()];
         if !physical_device_supports_extension(instance, &extension_names) {
             println!("extension {:?} not supported, test skipped.", extension_names);
             return;
@@ -697,7 +691,7 @@ pub(crate) mod tests {
     #[test]
     fn fuchsia_external_semaphore_function_valid() {
         let instance = create_vk_instance();
-        let extension_names = vec![cstr!(b"VK_FUCHSIA_external_semaphore\0").as_ptr()];
+        let extension_names = vec![c"VK_FUCHSIA_external_semaphore".as_ptr()];
         if !physical_device_supports_extension(instance, &extension_names) {
             println!("extension {:?} not supported, test skipped.", extension_names);
             return;

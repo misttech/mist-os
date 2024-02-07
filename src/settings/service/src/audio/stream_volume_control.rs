@@ -68,7 +68,7 @@ impl StreamVolumeControl {
         // and from set request has the validation.
         assert!(stream.has_valid_volume_level());
 
-        trace!(id, "StreamVolumeControl ctor");
+        trace!(id, c"StreamVolumeControl ctor");
         let mut control = StreamVolumeControl {
             stored_stream: stream,
             proxy: None,
@@ -134,7 +134,7 @@ impl StreamVolumeControl {
     }
 
     async fn bind_volume_control(&mut self, id: ftrace::Id) -> Result<(), ControllerError> {
-        trace!(id, "bind volume control");
+        trace!(id, c"bind volume control");
         if self.proxy.is_some() {
             return Ok(());
         }
@@ -147,7 +147,7 @@ impl StreamVolumeControl {
         let stream_type = self.stored_stream.stream_type;
         let usage = Usage::RenderUsage(AudioRenderUsage::from(stream_type));
 
-        let guard = trace_guard!(id, "bind usage volume control");
+        let guard = trace_guard!(id, c"bind usage volume control");
         if let Err(e) = call!(self.audio_service => bind_usage_volume_control(&usage, server_end)) {
             return Err(ControllerError::ExternalFailure(
                 SettingType::Audio,
@@ -158,7 +158,7 @@ impl StreamVolumeControl {
         }
         drop(guard);
 
-        let guard = trace_guard!(id, "set values");
+        let guard = trace_guard!(id, c"set values");
         // Once the volume control is bound, apply the persisted audio settings to it.
         if let Err(e) = vol_control_proxy.set_volume(self.stored_stream.user_volume_level) {
             return Err(ControllerError::ExternalFailure(
@@ -187,7 +187,7 @@ impl StreamVolumeControl {
             );
         }
 
-        trace!(id, "setup listener");
+        trace!(id, c"setup listener");
 
         let (exit_tx, mut exit_rx) = futures::channel::oneshot::channel::<()>();
         let publisher_clone = self.publisher.clone();
@@ -195,11 +195,11 @@ impl StreamVolumeControl {
         let early_exit_action = self.early_exit_action.clone();
         fasync::Task::spawn(async move {
             let id = ftrace::Id::new();
-            trace!(id, "bind volume handler");
+            trace!(id, c"bind volume handler");
             loop {
                 futures::select! {
                     _ = exit_rx => {
-                        trace!(id, "exit");
+                        trace!(id, c"exit");
                         if let Some(publisher) = publisher_clone {
                             // Send UNKNOWN_INSPECT_STRING for request-related args because it
                             // can't be tied back to the event that caused the proxy to close.
@@ -217,7 +217,7 @@ impl StreamVolumeControl {
                         return;
                     }
                     volume_event = volume_events.try_next() => {
-                        trace!(id, "volume_event");
+                        trace!(id, c"volume_event");
                         if volume_event.is_err() ||
                             volume_event.expect("should not be error").is_none()
                         {

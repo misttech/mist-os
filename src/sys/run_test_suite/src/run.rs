@@ -237,7 +237,7 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
     };
 
     let handle_run_events_fut = async move {
-        duration!("run_events");
+        duration!(c"run_events");
         let mut artifact_tasks = vec![];
         loop {
             let events = run_controller_ref.get_events().named("run_event").await?;

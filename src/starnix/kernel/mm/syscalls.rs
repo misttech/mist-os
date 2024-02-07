@@ -19,7 +19,7 @@ use crate::{
     },
 };
 use fuchsia_inspect_contrib::profile_duration;
-use starnix_logging::{log_trace, trace_category_starnix_mm, trace_duration, track_stub};
+use starnix_logging::{log_trace, trace_duration, track_stub, CATEGORY_STARNIX_MM};
 use starnix_uapi::{
     auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
     errno, error,
@@ -143,11 +143,11 @@ pub fn do_mmap(
     }
 
     if flags & MAP_ANONYMOUS != 0 {
-        trace_duration!(trace_category_starnix_mm!(), "AnonymousMmap");
+        trace_duration!(CATEGORY_STARNIX_MM, c"AnonymousMmap");
         profile_duration!("AnonymousMmap");
         current_task.mm().map_anonymous(addr, length, prot_flags, options, MappingName::None)
     } else {
-        trace_duration!(trace_category_starnix_mm!(), "FileBackedMmap");
+        trace_duration!(CATEGORY_STARNIX_MM, c"FileBackedMmap");
         profile_duration!("FileBackedMmap");
         // TODO(tbodt): maximize protection flags so that mprotect works
         let file = current_task.files.get(fd)?;

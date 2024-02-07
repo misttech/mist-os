@@ -472,7 +472,7 @@ impl App {
             app.app_init_common().await?;
             let startup_delay = Config::get().startup_delay;
             if !startup_delay.is_zero() {
-                duration!("gfx", "App::run-startup-delay");
+                duration!(c"gfx", c"App::run-startup-delay");
                 std::thread::sleep(Config::get().startup_delay);
             }
             while let Some(message) = internal_receiver.next().await {

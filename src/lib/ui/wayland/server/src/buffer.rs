@@ -65,7 +65,7 @@ impl Image {
         instance_id: ImageInstanceId,
         flatland: &FlatlandPtr,
     ) -> Rc<Content> {
-        ftrace::duration!("wayland", "Image::scenic_content");
+        ftrace::duration!(c"wayland", c"Image::scenic_content");
         let flatland_id = flatland.borrow().id();
         let id = match self.id.take().filter(|id| instance_id == id.1 && flatland_id == id.2) {
             Some(id) => id,
@@ -125,7 +125,7 @@ impl Buffer {
         instance_id: ImageInstanceId,
         flatland: &FlatlandPtr,
     ) -> Rc<Content> {
-        ftrace::duration!("wayland", "Buffer::image_content");
+        ftrace::duration!(c"wayland", c"Buffer::image_content");
         self.image.scenic_content(instance_id, flatland)
     }
 }

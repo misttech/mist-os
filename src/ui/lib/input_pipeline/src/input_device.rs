@@ -313,7 +313,7 @@ pub fn initialize_report_stream<InputDeviceProcessReportsFn>(
         loop {
             match report_stream.next().await {
                 Some(Ok(Ok(input_reports))) => {
-                    fuchsia_trace::duration!("input", "input-device-process-reports");
+                    fuchsia_trace::duration!(c"input", c"input-device-process-reports");
                     let mut inspect_receiver: Option<UnboundedReceiver<InputEvent>>;
                     for report in input_reports {
                         (previous_report, inspect_receiver) = process_reports(

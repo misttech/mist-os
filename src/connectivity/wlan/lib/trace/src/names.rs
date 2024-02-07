@@ -4,10 +4,9 @@
 
 use core::ffi::CStr;
 
-pub const CATEGORY_WLAN: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"wlan\0") };
-pub const NAME_WLANCFG_START: &'static CStr =
-    unsafe { CStr::from_bytes_with_nul_unchecked(b"wlancfg:start\0") };
+pub const CATEGORY_WLAN: &'static CStr = c"wlan";
+pub const NAME_WLANCFG_START: &'static CStr = c"wlancfg:start";
+
 // This name should be the same as defined in
 // //src/connectivity/wlan/drivers/lib/log/cpp/include/common/wlan/drivers/log.h
-pub const NAME_WLANSOFTMAC_TX: &'static CStr =
-    unsafe { CStr::from_bytes_with_nul_unchecked(b"wlansoftmac:tx\0") };
+pub const NAME_WLANSOFTMAC_TX: &'static CStr = c"wlansoftmac:tx";

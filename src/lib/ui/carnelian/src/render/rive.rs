@@ -63,7 +63,7 @@ impl RenderCache {
     }
 
     fn reset(&mut self) {
-        duration!("gfx", "render::Rive::RenderCache::reset");
+        duration!(c"gfx", c"render::Rive::RenderCache::reset");
 
         // Retain rasters used last frame and reset `was_used` field.
         self.cached_rasters
@@ -71,7 +71,7 @@ impl RenderCache {
     }
 
     pub fn with_renderer(&mut self, context: &RenderContext, f: impl FnOnce(&mut Renderer<'_>)) {
-        duration!("gfx", "render::Rive::RenderCache::with_renderer");
+        duration!(c"gfx", c"render::Rive::RenderCache::with_renderer");
 
         self.reset();
         f(&mut Renderer { context, cache: self, clip: None });

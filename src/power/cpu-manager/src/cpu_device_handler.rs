@@ -155,8 +155,8 @@ pub struct CpuDeviceHandler {
 impl CpuDeviceHandler {
     async fn handle_get_cpu_performance_states(&self) -> Result<MessageReturn, CpuManagerError> {
         fuchsia_trace::duration!(
-            "cpu_manager",
-            "CpuDeviceHandler::handle_get_cpu_performance_states",
+            c"cpu_manager",
+            c"CpuDeviceHandler::handle_get_cpu_performance_states",
             "driver" => self.driver_path.as_str()
         );
 
@@ -183,7 +183,7 @@ impl Node for CpuDeviceHandler {
     ///
     /// Connects to the cpu-ctrl driver unless a proxy was already provided (in a test).
     async fn init(&self) -> Result<(), Error> {
-        fuchsia_trace::duration!("cpu_manager", "CpuDeviceHandler::init");
+        fuchsia_trace::duration!(c"cpu_manager", c"CpuDeviceHandler::init");
 
         self.dev_control_handler.init().await.context("Failed to init dev_control_handler")?;
 
@@ -249,8 +249,8 @@ async fn get_pstates(
     cpu_ctrl_proxy: &fcpu_ctrl::DeviceProxy,
 ) -> Result<Vec<PState>, Error> {
     fuchsia_trace::duration!(
-        "cpu_manager",
-        "CpuDeviceHandler::get_pstates",
+        c"cpu_manager",
+        c"CpuDeviceHandler::get_pstates",
         "driver" => cpu_driver_path
     );
 
