@@ -6,7 +6,7 @@ use std::{collections::HashSet, num::NonZeroU64, pin::Pin};
 
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcp as fnet_dhcp;
-use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientExt as _, ClientProviderExt as _};
+use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientProviderExt as _};
 use fidl_fuchsia_net_ext::FromExt as _;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_name as fnet_name;
@@ -16,7 +16,8 @@ use fuchsia_zircon as zx;
 use anyhow::Context as _;
 use async_utils::stream::{StreamMap, Tagged, WithTag as _};
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource, DEFAULT_DNS_PORT};
-use futures::stream::StreamExt as _;
+use fuchsia_async::TimeoutExt as _;
+use futures::{channel::oneshot, stream::StreamExt as _, FutureExt};
 use net_types::{ip::Ipv4Addr, SpecifiedAddr};
 use tracing::{info, warn};
 
@@ -24,8 +25,8 @@ use crate::{dns, errors};
 
 #[derive(Debug)]
 pub(super) struct ClientState {
-    client: fnet_dhcp::ClientProxy,
     routers: HashSet<SpecifiedAddr<Ipv4Addr>>,
+    shutdown_sender: oneshot::Sender<()>,
 }
 
 pub(super) fn new_client_params() -> fnet_dhcp::NewClientParams {
@@ -48,7 +49,7 @@ pub(super) async fn probe_for_presence(provider: &fnet_dhcp::ClientProviderProxy
 
 pub(super) async fn update_configuration(
     interface_id: NonZeroU64,
-    ClientState { client: _, routers: configured_routers }: &mut ClientState,
+    ClientState { shutdown_sender: _, routers: configured_routers }: &mut ClientState,
     configuration: fnet_dhcp_ext::Configuration,
     dns_servers: &mut DnsServers,
     control: &fnet_interfaces_ext::admin::Control,
@@ -115,18 +116,35 @@ pub(super) fn start_client(
 ) -> ClientState {
     info!("starting DHCPv4 client for {} (id={})", interface_name, interface_id);
 
-    let client = client_provider.new_client_ext(interface_id, new_client_params());
+    let client = client_provider.new_client_end_ext(interface_id, new_client_params());
+    let (shutdown_sender, shutdown_receiver) = oneshot::channel();
 
     if let Some(stream) = configuration_streams.insert(
         interface_id,
-        fnet_dhcp_ext::configuration_stream(client.clone()).boxed().tagged(interface_id),
+        fnet_dhcp_ext::merged_configuration_stream(
+            client,
+            shutdown_receiver.map(|receive_result| match receive_result {
+                Ok(()) => (),
+                Err(oneshot::Canceled) => (),
+            }),
+        )
+        .boxed()
+        .tagged(interface_id),
     ) {
         let _: Pin<Box<InterfaceIdTaggedConfigurationStream>> = stream;
         unreachable!("only one DHCPv4 client may exist on {} (id={})", interface_name, interface_id)
     }
 
-    ClientState { client, routers: Default::default() }
+    ClientState { shutdown_sender, routers: Default::default() }
 }
+
+#[derive(Debug)]
+pub(super) enum AlreadyObservedClientExit {
+    Yes,
+    No,
+}
+
+const TIMEOUT_WAITING_FOR_CLIENT_SHUTDOWN: std::time::Duration = std::time::Duration::from_secs(10);
 
 pub(super) async fn stop_client(
     interface_id: NonZeroU64,
@@ -137,6 +155,7 @@ pub(super) async fn stop_client(
     control: &fnet_interfaces_ext::admin::Control,
     stack: &fnet_stack::StackProxy,
     lookup_admin: &fnet_name::LookupAdminProxy,
+    already_observed_exit: AlreadyObservedClientExit,
 ) {
     info!("stopping DHCPv4 client for {} (id={})", interface_name, interface_id);
 
@@ -151,9 +170,9 @@ pub(super) async fn stop_client(
     )
     .await;
 
-    let ClientState { client, routers: _ } = state;
+    let ClientState { shutdown_sender, routers: _ } = state;
 
-    let _: Pin<Box<InterfaceIdTaggedConfigurationStream>> =
+    let stream: Pin<Box<InterfaceIdTaggedConfigurationStream>> =
         configuration_streams.remove(&interface_id).unwrap_or_else(|| {
             unreachable!(
                 "DHCPv4 client must exist when stopping on {} (id={})",
@@ -161,12 +180,64 @@ pub(super) async fn stop_client(
             )
         });
 
-    client.shutdown_ext(client.take_event_stream()).await.unwrap_or_else(|e| {
-        warn!(
-            "error shutting down DHCPv4 client for {} (id={}): {:?}",
-            interface_name, interface_id, e,
-        )
-    });
+    match already_observed_exit {
+        AlreadyObservedClientExit::Yes => {
+            // We already saw the client exit due to some error, so just
+            // drop its configuration stream after having cleaned up
+            // any configuration we obtained from it.
+            drop(stream);
+        }
+        AlreadyObservedClientExit::No => {
+            // Tell the client to shut down.
+            shutdown_sender.send(()).expect(
+                "shutdown_receiver should not have been dropped, \
+                      as we still hold a stream holding it",
+            );
+
+            // Await the shutdown event.
+            let terminal_event_result = stream
+                .filter_map(|(_interface_id, item)| match item {
+                    Ok(config) => {
+                        warn!(
+                            "observed DHCPv4 config stream while awaiting shutdown on \
+                            {interface_name} (id={interface_id}): \
+                            {config:?}"
+                        );
+                        futures::future::ready(None)
+                    }
+                    Err(err) => futures::future::ready(Some(err)),
+                })
+                .next()
+                .map(Some)
+                // Avoid blocking forever on the DHCP client if it's not
+                // shutting down.
+                .on_timeout(TIMEOUT_WAITING_FOR_CLIENT_SHUTDOWN, || None)
+                .await;
+
+            match terminal_event_result {
+                None => {
+                    tracing::error!(
+                        "did not observe terminal event for DHCPv4 client on \
+                        {interface_name} (id={interface_id})"
+                    );
+                }
+                Some(err) => match err {
+                    None => {
+                        info!(
+                            "DHCPv4 client gracefully shut down on {interface_name} \
+                               (id={interface_id})"
+                        );
+                    }
+                    Some(err) => {
+                        warn!(
+                            "DHCPv4 client exited on {interface_name} (id={interface_id}) \
+                                (error={err:?})"
+                        );
+                    }
+                },
+            }
+        }
+    }
 }
 
 /// Start the DHCP server.

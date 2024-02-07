@@ -770,6 +770,13 @@ impl std::fmt::Debug for RequestStream {
     }
 }
 
+#[must_use]
+#[derive(Debug)]
+enum Dhcpv4ConfigurationHandlerResult {
+    ContinueOperation,
+    ClientStopped,
+}
+
 // Events associated with provisioning a device.
 #[derive(Debug)]
 enum ProvisioningEvent {
@@ -1277,7 +1284,75 @@ impl<'a> NetCfg<'a> {
             ProvisioningEvent::Dhcpv4Configuration(config) => {
                 let (interface_id, config) =
                     config.expect("DHCPv4 configuration stream is never exhausted");
-                self.handle_dhcpv4_configuration(interface_id, config).await;
+                match self.handle_dhcpv4_configuration(interface_id, config).await {
+                    Dhcpv4ConfigurationHandlerResult::ContinueOperation => (),
+                    Dhcpv4ConfigurationHandlerResult::ClientStopped => {
+                        let interface_name = self
+                            .interface_properties
+                            .get(&interface_id)
+                            .map(
+                                |fnet_interfaces_ext::PropertiesAndState {
+                                     state: (),
+                                     properties:
+                                         fnet_interfaces_ext::Properties {
+                                             id: _,
+                                             name,
+                                             device_class: _,
+                                             online: _,
+                                             addresses: _,
+                                             has_default_ipv4_route: _,
+                                             has_default_ipv6_route: _,
+                                         },
+                                 }| name.as_str(),
+                            )
+                            .unwrap_or("<removed>");
+                        let state = self
+                            .interface_states
+                            .get_mut(&interface_id)
+                            .map(
+                                |InterfaceState {
+                                     interface_naming_id: _,
+                                     control,
+                                     device_class: _,
+                                     config,
+                                     provisioning: _,
+                                 }| {
+                                    match config {
+                                        InterfaceConfigState::Host(HostInterfaceState {
+                                            dhcpv4_client,
+                                            dhcpv6_client_state: _,
+                                            dhcpv6_pd_config: _,
+                                        }) => Some((dhcpv4_client, control)),
+                                        InterfaceConfigState::WlanAp(_) => None,
+                                    }
+                                },
+                            )
+                            .flatten();
+
+                        match state {
+                            None => {
+                                tracing::error!(
+                                    "Trying to handle DHCPv4 client shutdown \
+                                (id={interface_id}), but no client is running on that interface"
+                                );
+                            }
+                            Some((dhcpv4_client, control)) => {
+                                Self::handle_dhcpv4_client_stop(
+                                    interface_id,
+                                    interface_name,
+                                    dhcpv4_client,
+                                    &mut self.dhcpv4_configuration_streams,
+                                    &mut self.dns_servers,
+                                    control,
+                                    &self.stack,
+                                    &self.lookup_admin,
+                                    dhcpv4::AlreadyObservedClientExit::Yes,
+                                )
+                                .await;
+                            }
+                        }
+                    }
+                }
             }
             ProvisioningEvent::Dhcpv6PrefixProviderRequest(res) => {
                 match res {
@@ -1353,6 +1428,7 @@ impl<'a> NetCfg<'a> {
         control: &fnet_interfaces_ext::admin::Control,
         stack: &fnet_stack::StackProxy,
         lookup_admin: &fnet_name::LookupAdminProxy,
+        already_observed_client_exit: dhcpv4::AlreadyObservedClientExit,
     ) {
         if let Some(fut) = dhcpv4_client.take().map(|c| {
             dhcpv4::stop_client(
@@ -1364,6 +1440,7 @@ impl<'a> NetCfg<'a> {
                 control,
                 stack,
                 lookup_admin,
+                already_observed_client_exit,
             )
         }) {
             fut.await
@@ -1411,6 +1488,7 @@ impl<'a> NetCfg<'a> {
                 control,
                 stack,
                 lookup_admin,
+                dhcpv4::AlreadyObservedClientExit::No,
             )
             .await
         }
@@ -1747,6 +1825,7 @@ impl<'a> NetCfg<'a> {
                                     &control,
                                     stack,
                                     lookup_admin,
+                                    dhcpv4::AlreadyObservedClientExit::No,
                                 )
                                     .await;
 
@@ -2723,17 +2802,51 @@ impl<'a> NetCfg<'a> {
         &mut self,
         interface_id: NonZeroU64,
         res: Result<fnet_dhcp_ext::Configuration, fnet_dhcp_ext::Error>,
-    ) {
+    ) -> Dhcpv4ConfigurationHandlerResult {
         let configuration = match res {
-            Ok(o) => o,
-            Err(e) => {
-                warn!(
-                    "DHCPv4 client on interface={} error while watching for configuration: {:?}",
-                    interface_id, e,
-                );
-
-                return;
+            Err(error) => {
+                match error {
+                    fnet_dhcp_ext::Error::UnexpectedExit(reason) => match reason {
+                        Some(reason) => match reason {
+                            fnet_dhcp::ClientExitReason::AddressRemovedByUser => {
+                                tracing::warn!(
+                                    "DHCP client exited because its \
+                                    bound address was removed (iface={interface_id})"
+                                );
+                            }
+                            reason @ (
+                                fnet_dhcp::ClientExitReason::ClientAlreadyExistsOnInterface
+                                | fnet_dhcp::ClientExitReason::WatchConfigurationAlreadyPending
+                                | fnet_dhcp::ClientExitReason::InvalidInterface
+                                | fnet_dhcp::ClientExitReason::InvalidParams
+                                | fnet_dhcp::ClientExitReason::NetworkUnreachable
+                                | fnet_dhcp::ClientExitReason::UnableToOpenSocket
+                                | fnet_dhcp::ClientExitReason::GracefulShutdown
+                                | fnet_dhcp::ClientExitReason::AddressStateProviderError
+                            ) => {
+                                tracing::error!("DHCP client unexpectedly exited \
+                                                (iface={interface_id}, reason={reason:?})");
+                            }
+                        },
+                        None => {
+                            tracing::error!(
+                                "DHCP client unexpectedly exited without \
+                                giving a reason (iface={interface_id})"
+                            );
+                        }
+                    },
+                    error @ (fnet_dhcp_ext::Error::ApiViolation(_)
+                    | fnet_dhcp_ext::Error::ForwardingEntry(_)
+                    | fnet_dhcp_ext::Error::Fidl(_)
+                    | fnet_dhcp_ext::Error::WrongExitReason(_)
+                    | fnet_dhcp_ext::Error::MissingExitReason) => {
+                        tracing::error!("DHCP client exited due to error \
+                                        (iface={interface_id}, error={error:?})");
+                    }
+                };
+                return Dhcpv4ConfigurationHandlerResult::ClientStopped;
             }
+            Ok(configuration) => configuration,
         };
 
         let (dhcpv4_client, control) = {
@@ -2771,7 +2884,9 @@ impl<'a> NetCfg<'a> {
             &self.stack,
             &self.lookup_admin,
         )
-        .await
+        .await;
+
+        Dhcpv4ConfigurationHandlerResult::ContinueOperation
     }
 
     async fn handle_dhcpv6_prefixes(
@@ -3619,7 +3734,7 @@ mod tests {
                 );
             };
 
-            let ((), (), (added_routers, stack), ()) = future::join4(
+            let (dhcpv4_result, (), (added_routers, stack), ()) = future::join4(
                 netcfg.handle_dhcpv4_configuration(got_interface_id, got_response),
                 run_lookup_admin_once(&mut lookup_admin, &dns_servers),
                 expect_add_default_routers,
@@ -3627,6 +3742,7 @@ mod tests {
             )
             .await;
             assert_eq!(netcfg.dns_servers.consolidated(), dns_servers);
+            assert_matches!(dhcpv4_result, Dhcpv4ConfigurationHandlerResult::ContinueOperation);
             let expected_routers =
                 routers.iter().cloned().map(fnet::IpAddress::Ipv4).collect::<HashSet<_>>();
             assert_eq!(added_routers, expected_routers);
@@ -3839,6 +3955,106 @@ mod tests {
 
         assert_eq!(expected_servers, &servers);
         responder.send(Ok(())).expect("send set dns servers response");
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn dhcpv4_handles_client_exit() {
+        let (
+            mut netcfg,
+            ServerEnds {
+                stack: _,
+                lookup_admin: _,
+                mut dhcpv4_client_provider,
+                dhcpv6_client_provider: _,
+            },
+        ) = test_netcfg(true /* with_dhcpv4_client_provider */)
+            .expect("error creating test netcfg");
+        let mut dns_watchers = DnsServerWatchers::empty();
+
+        // Mock a new interface being discovered by NetCfg (we only need to make NetCfg aware of a
+        // NIC with ID `INTERFACE_ID` to test DHCPv4).
+        let (control, _control_server_end) =
+            fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
+                .expect("create endpoints");
+        let device_class = fidl_fuchsia_hardware_network::DeviceClass::Virtual;
+        assert_matches::assert_matches!(
+            netcfg.interface_states.insert(
+                INTERFACE_ID,
+                InterfaceState::new_host(
+                    test_interface_naming_id(),
+                    control,
+                    device_class.into(),
+                    None,
+                    interface::ProvisioningAction::Local,
+                )
+            ),
+            None
+        );
+
+        // Make sure the DHCPv4 client is created on interface up.
+        let (_client_stream, control_handle, _responder) = {
+            netcfg
+                .handle_interface_watcher_event(
+                    fnet_interfaces::Event::Added(fnet_interfaces::Properties {
+                        id: Some(INTERFACE_ID.get()),
+                        name: Some("testif01".to_string()),
+                        device_class: Some(fnet_interfaces::DeviceClass::Device(
+                            fidl_fuchsia_hardware_network::DeviceClass::Virtual,
+                        )),
+                        online: Some(true),
+                        addresses: Some(Vec::new()),
+                        has_default_ipv4_route: Some(false),
+                        has_default_ipv6_route: Some(false),
+                        ..Default::default()
+                    }),
+                    &mut dns_watchers,
+                    &mut virtualization::Stub,
+                )
+                .await
+                .expect("error handling interface added event");
+
+            let (mut client_req_stream, control_handle) = match dhcpv4_client_provider
+                .try_next()
+                .await
+                .expect("get next dhcpv4 client provider event")
+                .expect("dhcpv4 client provider request")
+            {
+                fnet_dhcp::ClientProviderRequest::NewClient {
+                    interface_id,
+                    params,
+                    request,
+                    control_handle: _,
+                } => {
+                    assert_eq!(interface_id, INTERFACE_ID.get());
+                    assert_eq!(params, dhcpv4::new_client_params());
+                    request
+                        .into_stream_and_control_handle()
+                        .expect("error converting client server end to stream")
+                }
+                fnet_dhcp::ClientProviderRequest::CheckPresence { responder: _ } => {
+                    unreachable!("only called at startup")
+                }
+            };
+
+            let responder = expect_watch_dhcpv4_configuration(&mut client_req_stream);
+            (client_req_stream, control_handle, responder)
+        };
+
+        // Simulate the client exiting with an error.
+        control_handle
+            .send_on_exit(fnet_dhcp::ClientExitReason::UnableToOpenSocket)
+            .expect("sending OnExit should succeed");
+
+        let (got_interface_id, got_response) = netcfg
+            .dhcpv4_configuration_streams
+            .next()
+            .await
+            .expect("DHCPv4 configuration streams should never be exhausted");
+        assert_eq!(got_interface_id, INTERFACE_ID);
+
+        let dhcpv4_result =
+            netcfg.handle_dhcpv4_configuration(got_interface_id, got_response).await;
+        assert_matches!(dhcpv4_result, Dhcpv4ConfigurationHandlerResult::ClientStopped);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
