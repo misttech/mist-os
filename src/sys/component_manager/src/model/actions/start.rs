@@ -109,7 +109,7 @@ async fn do_start(
         |_: AbortError| StartActionError::Aborted { moniker: component.moniker.clone() };
 
     // Resolve the component and find the runner to use.
-    let (runner, resolved_component) = {
+    let (runner, resolved_component, program_input_dict) = {
         // Obtain the runner declaration under a short lock, as `open_runner` may lock the
         // resolved state re-entrantly.
         let resolved_state = component
@@ -121,7 +121,11 @@ async fn do_start(
                 moniker: component.moniker.clone(),
                 err: Box::new(err),
             })?;
-        (resolved_state.decl().get_runner(), resolved_state.resolved_component.clone())
+        (
+            resolved_state.decl().get_runner(),
+            resolved_state.resolved_component.clone(),
+            resolved_state.program_input_dict.clone(),
+        )
     };
     let runner = match runner {
         Some(runner) => open_runner(component, runner)
@@ -147,6 +151,7 @@ async fn do_start(
         resolved_component.package.as_ref(),
         component,
         &resolved_component.decl,
+        &program_input_dict,
         scope.clone(),
     )
     .await

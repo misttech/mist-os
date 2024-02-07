@@ -23,12 +23,11 @@ use {
     cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl},
     cm_types::Availability,
     fidl::epitaph::ChannelEpitaphExt,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fuchsia_zircon as zx,
     moniker::MonikerBase,
     sandbox::{AnyCapability, Open, Unit},
     std::{collections::BTreeMap, sync::Arc},
     tracing::{debug, info, warn},
-    vfs::execution_scope::ExecutionScope,
 };
 
 pub type RouteRequest = ::routing::RouteRequest;
@@ -68,21 +67,6 @@ pub(super) fn capability_into_open(capability: AnyCapability) -> Result<Open, Ro
         .map_err(crate::model::error::BedrockOpenError::from)
         .map_err(crate::model::error::OpenError::from)?;
     Ok(open)
-}
-
-pub(super) async fn open_capability(
-    capability: AnyCapability,
-    target: &Arc<ComponentInstance>,
-    route_request: &RouteRequest,
-    scope: ExecutionScope,
-    flags: fio::OpenFlags,
-    path: vfs::path::Path,
-    server_end: zx::Channel,
-) {
-    match capability_into_open(capability) {
-        Ok(open) => open.open(scope, flags, path, server_end),
-        Err(err) => report_routing_failure(route_request, target, err.into(), server_end).await,
-    }
 }
 
 /// Routes a capability from `target` to its source. Opens the capability if routing succeeds.

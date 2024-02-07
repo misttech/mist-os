@@ -3,14 +3,18 @@
 // found in the LICENSE file.
 
 use {
+    super::error::BedrockErrorIsAuthoritative,
     crate::{
         constants::PKG_PATH,
         model::{
             component::{ComponentInstance, Package, WeakComponentInstance},
             error::CreateNamespaceError,
-            routing::{self, route_and_open_capability, router, OpenOptions},
+            routing::{
+                self, route_and_open_capability,
+                router::{ErrorCapsule, Request, Router},
+                OpenOptions,
+            },
         },
-        sandbox_util::DictExt,
     },
     ::routing::{
         component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper, rights::Rights,
@@ -18,13 +22,14 @@ use {
     },
     cm_rust::{self, ComponentDecl, UseDecl, UseStorageDecl},
     cm_types::IterablePath,
+    cm_util::TaskGroup,
     fidl::{endpoints::ClientEnd, prelude::*},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{
         channel::mpsc::{unbounded, UnboundedSender},
         StreamExt,
     },
-    sandbox::{AnyCapability, Directory, Open},
+    sandbox::{AnyCapability, Dict, Directory, Open},
     serve_processargs::NamespaceBuilder,
     std::{collections::HashSet, sync::Arc},
     tracing::{error, warn},
@@ -39,6 +44,7 @@ pub async fn create_namespace(
     package: Option<&Package>,
     component: &Arc<ComponentInstance>,
     decl: &ComponentDecl,
+    program_input_dict: &Dict,
     scope: ExecutionScope,
 ) -> Result<NamespaceBuilder, CreateNamespaceError> {
     let not_found_sender = not_found_logging(component);
@@ -49,7 +55,7 @@ pub async fn create_namespace(
         add_pkg_directory(&mut namespace, pkg_dir)?;
     }
     let uses = deduplicate_event_stream(decl.uses.iter());
-    add_use_decls(&mut namespace, component, uses, scope).await?;
+    add_use_decls(&mut namespace, component, uses, program_input_dict, scope).await?;
     Ok(namespace)
 }
 
@@ -94,6 +100,7 @@ async fn add_use_decls(
     namespace: &mut NamespaceBuilder,
     component: &Arc<ComponentInstance>,
     uses: impl Iterator<Item = &UseDecl>,
+    program_input_dict: &Dict,
     scope: ExecutionScope,
 ) -> Result<(), CreateNamespaceError> {
     for use_ in uses {
@@ -115,15 +122,24 @@ async fn add_use_decls(
             cm_rust::UseDecl::Storage(storage) => {
                 storage_use(storage, use_, component, scope.clone()).await?
             }
-            cm_rust::UseDecl::Protocol(s) => {
-                service_or_protocol_use(UseDecl::Protocol(s.clone()), component.as_weak())
-            }
-            cm_rust::UseDecl::Service(s) => {
-                service_or_protocol_use(UseDecl::Service(s.clone()), component.as_weak())
-            }
-            cm_rust::UseDecl::EventStream(s) => {
-                service_or_protocol_use(UseDecl::EventStream(s.clone()), component.as_weak())
-            }
+            cm_rust::UseDecl::Protocol(s) => service_or_protocol_use(
+                UseDecl::Protocol(s.clone()),
+                component.as_weak(),
+                program_input_dict,
+                component.blocking_task_group(),
+            ),
+            cm_rust::UseDecl::Service(s) => service_or_protocol_use(
+                UseDecl::Service(s.clone()),
+                component.as_weak(),
+                program_input_dict,
+                component.blocking_task_group(),
+            ),
+            cm_rust::UseDecl::EventStream(s) => service_or_protocol_use(
+                UseDecl::EventStream(s.clone()),
+                component.as_weak(),
+                program_input_dict,
+                component.blocking_task_group(),
+            ),
             cm_rust::UseDecl::Runner(_) => {
                 std::process::abort();
             }
@@ -269,13 +285,77 @@ async fn route_directory(
 ///
 /// `component` is a weak pointer, which is important because we don't want the VFS
 /// closure to hold a strong pointer to this component lest it create a reference cycle.
-fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> Box<Open> {
-    let route_open_fn = move |scope: ExecutionScope,
+fn service_or_protocol_use(
+    use_: UseDecl,
+    component: WeakComponentInstance,
+    program_input_dict: &Dict,
+    blocking_task_group: TaskGroup,
+) -> Box<Open> {
+    // Bedrock routing.
+    if let UseDecl::Protocol(use_protocol_decl) = &use_ {
+        let request = Request {
+            rights: None,
+            relative_path: sandbox::Path::default(),
+            availability: use_protocol_decl.availability.clone(),
+            target: component.clone(),
+        };
+        let legacy_request = RouteRequest::UseProtocol(use_protocol_decl.clone());
+
+        // When there are router errors, they are sent to the error handler,
+        // which reports errors and may attempt routing again via legacy.
+        let errors_fn = move |err: ErrorCapsule| {
+            let legacy_request = legacy_request.clone();
+            let Ok(target) = component.upgrade() else {
+                return;
+            };
+            target.blocking_task_group().spawn(async move {
+                let (error, mut open_request) = err.manually_handle();
+                let open_options = OpenOptions {
+                    flags: open_request.flags,
+                    relative_path: open_request.relative_path.into_string(),
+                    server_chan: &mut open_request.server_end,
+                };
+                if error.is_bedrock_error_authoritative() {
+                    return routing::report_routing_failure(
+                        &legacy_request,
+                        &target,
+                        error.clone().into(),
+                        open_request.server_end,
+                    )
+                    .await;
+                }
+
+                // TODO(https://fxbug.dev/319546081): We can remove the fallback once bedrock
+                // properly communicates routing errors with fidelity on par with legacy routing.
+                if let Err(error) =
+                    routing::route_and_open_capability(&legacy_request, &target, open_options).await
+                {
+                    routing::report_routing_failure(
+                        &legacy_request,
+                        &target,
+                        error.into(),
+                        open_request.server_end,
+                    )
+                    .await;
+                }
+            });
+        };
+        // TODO(https://fxbug.dev/324138478): We will be able to assert that the program input dict
+        // must have the required capability if we always add a Router to the program input
+        // dict for every protocol use declaration.
+        let router = Router::from_routable(program_input_dict.clone())
+            .with_path(use_protocol_decl.target_path.iter_segments());
+        let open =
+            router.into_open(request, fio::DirentType::Service, blocking_task_group, errors_fn);
+        return Box::new(open);
+    };
+
+    // Legacy routing.
+    let route_open_fn = move |_scope: ExecutionScope,
                               flags: fio::OpenFlags,
                               relative_path: Path,
                               mut server_end: zx::Channel| {
         let use_ = use_.clone();
-        let weak_component = component.clone();
         let component = match component.upgrade() {
             Ok(component) => component,
             Err(e) => {
@@ -289,56 +369,10 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
         };
         let target = component.clone();
         let task = async move {
-            if let UseDecl::Protocol(use_protocol_decl) = &use_ {
-                let router = target.lock_resolved_state().await.ok().and_then(|state| {
-                    state
-                        .program_input_dict
-                        .get_capability(use_protocol_decl.target_path.iter_segments())
-                });
-                if let Some(router) = router {
-                    let result = router::route(
-                        &router,
-                        router::Request {
-                            rights: None,
-                            relative_path: sandbox::Path::default(),
-                            availability: use_protocol_decl.availability.clone(),
-                            target: weak_component,
-                        },
-                    )
-                    .await;
-                    match result {
-                        Ok(capability) => {
-                            return routing::open_capability(
-                                capability,
-                                &target,
-                                &RouteRequest::UseProtocol(use_protocol_decl.clone()),
-                                scope,
-                                flags,
-                                relative_path,
-                                server_end,
-                            )
-                            .await;
-                        }
-                        Err(_) => {
-                            // Fallthrough to legacy routing below, which will attempt
-                            // routing again and report an error.
-                        }
-                    }
-                }
-            }
             let (route_request, open_options) = {
                 match &use_ {
                     UseDecl::Service(use_service_decl) => {
                         (RouteRequest::UseService(use_service_decl.clone()),
-                             OpenOptions{
-                                 flags,
-                                 relative_path: relative_path.into_string(),
-                                 server_chan: &mut server_end
-                             }
-                         )
-                    },
-                    UseDecl::Protocol(use_protocol_decl) => {
-                        (RouteRequest::UseProtocol(use_protocol_decl.clone()),
                              OpenOptions{
                                  flags,
                                  relative_path: relative_path.into_string(),

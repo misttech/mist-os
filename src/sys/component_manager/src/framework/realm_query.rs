@@ -443,10 +443,15 @@ async fn construct_namespace(
     let mut state = instance.lock_state().await;
     match &mut *state {
         InstanceState::Resolved(r) => {
-            let namespace =
-                create_namespace(r.package(), &instance, r.decl(), r.execution_scope().clone())
-                    .await
-                    .unwrap();
+            let namespace = create_namespace(
+                r.package(),
+                &instance,
+                r.decl(),
+                &r.program_input_dict,
+                r.execution_scope().clone(),
+            )
+            .await
+            .unwrap();
             let ns = namespace.serve().unwrap();
             Ok(ns.into())
         }
