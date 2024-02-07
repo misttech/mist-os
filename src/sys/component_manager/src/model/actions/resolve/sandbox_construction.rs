@@ -7,7 +7,8 @@ use {
         capability::CapabilitySource,
         model::{
             component::{ComponentInstance, ResolvedInstanceState, WeakComponentInstance},
-            routing::router::{Completer, Request, Router},
+            error::RouteOrOpenError,
+            routing::router::{self, Completer, Request, Router},
         },
         sandbox_util::{DictExt, LaunchTaskOnReceive},
     },
@@ -18,9 +19,14 @@ use {
     },
     cm_rust::{self, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon},
     cm_types::{IterablePath, Name},
+    futures::future::{BoxFuture, FutureExt, Shared},
     moniker::{ChildName, ChildNameBase, MonikerBase},
     sandbox::{Capability, Dict, ErasedCapability, Open, Unit},
-    std::{collections::HashMap, iter, sync::Arc},
+    std::{
+        collections::HashMap,
+        iter,
+        sync::{self, Arc},
+    },
     tracing::warn,
 };
 
@@ -64,10 +70,10 @@ pub fn build_component_sandbox(
     component_output_dict: &Dict,
     program_input_dict: &Dict,
     program_output_dict: &Dict,
-    declared_dictionaries: &Dict,
     collection_dicts: &mut HashMap<Name, Dict>,
 ) -> ComponentSandbox {
     let mut output = ComponentSandbox::default();
+    let declared_dictionaries = Dict::new();
 
     for child in &decl.children {
         let child_name = Name::new(&child.name).unwrap();
@@ -81,10 +87,12 @@ pub fn build_component_sandbox(
     for capability in &decl.capabilities {
         extend_dict_with_capability(
             component,
+            children,
             decl,
             capability,
+            component_input,
             program_output_dict,
-            declared_dictionaries,
+            &declared_dictionaries,
         );
     }
 
@@ -158,8 +166,10 @@ pub fn build_component_sandbox(
 /// is a dict of routers, keyed by capability name.
 fn extend_dict_with_capability(
     component: &Arc<ComponentInstance>,
+    children: &HashMap<ChildName, Arc<ComponentInstance>>,
     decl: &cm_rust::ComponentDecl,
     capability: &cm_rust::CapabilityDecl,
+    component_input: &ComponentInput,
     program_output_dict: &Dict,
     declared_dictionaries: &Dict,
 ) {
@@ -180,16 +190,163 @@ fn extend_dict_with_capability(
             program_output_dict.insert_capability(iter::once(capability.name().as_str()), router);
         }
         cm_rust::CapabilityDecl::Dictionary(d) => {
-            let dict = declared_dictionaries
-                .get_capability::<Dict>(iter::once(d.name.as_str()))
-                .expect("dictionary should exist");
-            let router = Router::from_routable(dict);
-            program_output_dict.insert_capability(iter::once(d.name.as_str()), router);
+            extend_dict_with_dictionary(
+                component,
+                children,
+                d,
+                component_input,
+                program_output_dict,
+                declared_dictionaries,
+            );
         }
         _ => {
             // Capabilities not supported in bedrock yet.
         }
     }
+}
+
+fn extend_dict_with_dictionary(
+    component: &Arc<ComponentInstance>,
+    children: &HashMap<ChildName, Arc<ComponentInstance>>,
+    decl: &cm_rust::DictionaryDecl,
+    component_input: &ComponentInput,
+    program_output_dict: &Dict,
+    declared_dictionaries: &Dict,
+) {
+    let dict = Dict::new();
+    let router = if let Some(source) = decl.source.as_ref() {
+        let source_path = decl
+            .source_dictionary
+            .as_ref()
+            .expect("source_dictionary must be set if source is set");
+        let source_dict_router = match &source {
+            cm_rust::DictionarySource::Parent => {
+                match component_input.capabilities.get_router(source_path.iter_segments()) {
+                    Some(r) => r,
+                    None => return,
+                }
+            }
+            cm_rust::DictionarySource::Self_ => {
+                match program_output_dict.get_router(source_path.iter_segments()) {
+                    Some(r) => r,
+                    None => return,
+                }
+            }
+            cm_rust::DictionarySource::Child(child_ref) => {
+                assert!(child_ref.collection.is_none(), "unexpected dynamic offer target");
+                let child_name =
+                    ChildName::parse(child_ref.name.as_str()).expect("invalid child name");
+                let Some(child) = children.get(&child_name) else {
+                    return;
+                };
+                let child = child.as_weak();
+                new_forwarding_router_to_child(
+                    &component,
+                    child,
+                    source_path.clone(),
+                    RoutingError::BedrockSourceDictionaryExposeNotFound,
+                )
+            }
+        };
+        make_dict_extending_router(component.as_weak(), dict.clone(), source_dict_router)
+    } else {
+        Router::from_routable(dict.clone())
+    };
+    declared_dictionaries.insert_capability(iter::once(decl.name.as_str()), dict);
+    program_output_dict.insert_capability(iter::once(decl.name.as_str()), router);
+}
+
+/// Returns a [Router] that merges the contents of the [Dict] returned by
+/// `source_dict_router` into `dict`, then returns `dict`. Henceforth, the [Router]
+/// will return `dict` immediately.
+fn make_dict_extending_router(
+    component: WeakComponentInstance,
+    dict: Dict,
+    source_dict_router: Router,
+) -> Router {
+    enum State {
+        /// The router hasn't been called yet or failed on a previous run, not doing work.
+        NotStarted { source_dict_router: Router },
+        /// Working on resolving the source dict and extending. Concurrent callers will block
+        /// on the future.
+        Working { fut: Shared<BoxFuture<'static, Result<Dict, RouteOrOpenError>>> },
+        /// Work has completed, and `dict` can be returned immediately.
+        Resolved,
+    }
+
+    let state_lock = Arc::new(sync::Mutex::new(State::NotStarted { source_dict_router }));
+    let route_fn = move |request: Request, completer: Completer| {
+        let Ok(component) = component.upgrade() else {
+            completer.complete(Err(RoutingError::from(
+                ComponentInstanceError::instance_not_found(component.moniker.clone()),
+            )
+            .into()));
+            return;
+        };
+
+        let mut state = state_lock.lock().unwrap();
+        if let State::NotStarted { source_dict_router } = &*state {
+            let state_lock = state_lock.clone();
+            let source_dict_router = source_dict_router.clone();
+            let component = component.clone();
+            let dict = dict.clone();
+            let fut = async move {
+                let res = async {
+                    let source_request = Request {
+                        rights: None,
+                        relative_path: sandbox::Path::default(),
+                        availability: cm_types::Availability::Required,
+                        target: component.as_weak(),
+                    };
+                    let source_dict: Dict = router::route(&source_dict_router, source_request)
+                        .await
+                        .map(|d| d.try_into().expect("source_dict_router must return a Dict"))?;
+                    let mut entries = dict.lock_entries();
+                    let source_entries = source_dict.lock_entries();
+                    for source_key in source_entries.keys() {
+                        if entries.contains_key(source_key.as_str()) {
+                            return Err(RoutingError::BedrockSourceDictionaryCollision.into());
+                        }
+                    }
+                    for (source_key, source_value) in &*source_entries {
+                        entries.insert(source_key.clone(), source_value.clone());
+                    }
+                    Ok(())
+                }
+                .await;
+                let mut state = state_lock.lock().unwrap();
+                match &res {
+                    Ok(_) => {
+                        *state = State::Resolved;
+                    }
+                    Err(_) => {
+                        // Reset state so next route attempt will retry.
+                        *state = State::NotStarted { source_dict_router };
+                    }
+                }
+                res.map(|()| dict)
+            };
+            *state = State::Working { fut: fut.boxed().shared() };
+        }
+        match &*state {
+            State::NotStarted { .. } => unreachable!("handled above"),
+            State::Resolved => Router::from_routable(dict.clone()).route(request, completer),
+            State::Working { fut } => {
+                let fut = fut.clone();
+                component.blocking_task_group().spawn(async move {
+                    match fut.await {
+                        Ok(dict) => {
+                            Router::from_routable(dict).route(request, completer);
+                        }
+                        Err(e) => {
+                            completer.complete(Err(e));
+                        }
+                    };
+                });
+            }
+        };
+    };
+    Router::new(route_fn)
 }
 
 /// Extends the given dict based on offer declarations. All offer declarations in `offers` are

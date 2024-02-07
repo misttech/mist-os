@@ -992,3 +992,260 @@ async fn offer_dictionary_to_dictionary() {
         .await;
     }
 }
+
+#[fuchsia::test]
+async fn extend_from_self() {
+    // Tests extending a dictionary, when the source dictionary is defined by self.
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .protocol(ProtocolDeclBuilder::new("bar_svc").path("/svc/foo").build())
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "bar_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "bar_svc".parse().unwrap(),
+                    target: OfferTarget::static_child("leaf".into()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .dictionary(DictionaryDeclBuilder::new("origin_dict").build())
+                .dictionary(
+                    DictionaryDeclBuilder::new("self_dict")
+                        .source_dictionary(DictionarySource::Self_, "origin_dict")
+                        .build(),
+                )
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "A".parse().unwrap(),
+                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Parent,
+                    source_name: "bar_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "B".parse().unwrap(),
+                    target: OfferTarget::Capability("origin_dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Self_,
+                    source_name: "A".parse().unwrap(),
+                    source_dictionary: Some("self_dict".parse().unwrap()),
+                    target_path: "/svc/A".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Self_,
+                    source_name: "B".parse().unwrap(),
+                    source_dictionary: Some("self_dict".parse().unwrap()),
+                    target_path: "/svc/B".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .build(),
+        ),
+    ];
+
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    // Test using twice in a row
+    for _ in 0..2 {
+        for path in ["/svc/A", "/svc/B"] {
+            test.check_use(
+                "leaf".try_into().unwrap(),
+                CheckUse::Protocol {
+                    path: path.parse().unwrap(),
+                    expected_res: ExpectedResult::Ok,
+                },
+            )
+            .await;
+        }
+    }
+}
+
+#[fuchsia::test]
+async fn extend_from_parent() {
+    // Tests extending a dictionary, when the source dictionary is defined by parent.
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .protocol(ProtocolDeclBuilder::new("bar_svc").path("/svc/foo").build())
+                .dictionary(DictionaryDeclBuilder::new("origin_dict").build())
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "bar_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "B".parse().unwrap(),
+                    target: OfferTarget::Capability("origin_dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "origin_dict".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "origin_dict".parse().unwrap(),
+                    target: OfferTarget::static_child("leaf".into()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .dictionary(
+                    DictionaryDeclBuilder::new("self_dict")
+                        .source_dictionary(DictionarySource::Parent, "origin_dict")
+                        .build(),
+                )
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "A".parse().unwrap(),
+                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Self_,
+                    source_name: "A".parse().unwrap(),
+                    source_dictionary: Some("self_dict".parse().unwrap()),
+                    target_path: "/svc/A".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Self_,
+                    source_name: "B".parse().unwrap(),
+                    source_dictionary: Some("self_dict".parse().unwrap()),
+                    target_path: "/svc/B".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .build(),
+        ),
+    ];
+
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    // Test using twice in a row
+    for _ in 0..2 {
+        for path in ["/svc/A", "/svc/B"] {
+            test.check_use(
+                "leaf".try_into().unwrap(),
+                CheckUse::Protocol {
+                    path: path.parse().unwrap(),
+                    expected_res: ExpectedResult::Ok,
+                },
+            )
+            .await;
+        }
+    }
+}
+
+#[fuchsia::test]
+async fn extend_from_child() {
+    // Tests extending a dictionary, when the source dictionary is defined by a child.
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .dictionary(
+                    DictionaryDeclBuilder::new("self_dict")
+                        .source_dictionary(
+                            DictionarySource::Child(ChildRef {
+                                name: "leaf".into(),
+                                collection: None,
+                            }),
+                            "origin_dict",
+                        )
+                        .build(),
+                )
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "A".parse().unwrap(),
+                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Self_,
+                    source_name: "A".parse().unwrap(),
+                    source_dictionary: Some("self_dict".parse().unwrap()),
+                    target_path: "/svc/A".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Self_,
+                    source_name: "B".parse().unwrap(),
+                    source_dictionary: Some("self_dict".parse().unwrap()),
+                    target_path: "/svc/B".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .protocol(ProtocolDeclBuilder::new("bar_svc").path("/svc/foo").build())
+                .dictionary(DictionaryDeclBuilder::new("origin_dict").build())
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "bar_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "B".parse().unwrap(),
+                    target: OfferTarget::Capability("origin_dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "origin_dict".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "origin_dict".parse().unwrap(),
+                    target: ExposeTarget::Parent,
+                    availability: Availability::Required,
+                }))
+                .build(),
+        ),
+    ];
+
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    // Test using twice in a row
+    for _ in 0..2 {
+        for path in ["/svc/A", "/svc/B"] {
+            test.check_use(
+                ".".try_into().unwrap(),
+                CheckUse::Protocol {
+                    path: path.parse().unwrap(),
+                    expected_res: ExpectedResult::Ok,
+                },
+            )
+            .await;
+        }
+    }
+}

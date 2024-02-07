@@ -272,6 +272,15 @@ pub enum RoutingError {
     #[error("Routing request was abandoned by a router")]
     BedrockRoutingRequestCanceled,
 
+    #[error("Source dictionary was not found in child's exposes")]
+    BedrockSourceDictionaryExposeNotFound,
+
+    #[error(
+        "A capability in a dictionary extended from a source dictionary collides with \
+    a capability in the source dictionary that has the same key"
+    )]
+    BedrockSourceDictionaryCollision,
+
     #[error(transparent)]
     ComponentInstanceError(#[from] ComponentInstanceError),
 
@@ -337,6 +346,8 @@ impl RoutingError {
             | RoutingError::EventsRoutingError(_)
             | RoutingError::BedrockNotPresentInDictionary { .. }
             | RoutingError::BedrockObjectDestroyed { .. }
+            | RoutingError::BedrockSourceDictionaryExposeNotFound { .. }
+            | RoutingError::BedrockSourceDictionaryCollision { .. }
             | RoutingError::BedrockRoutingRequestCanceled { .. }
             | RoutingError::AvailabilityRoutingError(_) => zx::Status::NOT_FOUND,
             RoutingError::BedrockUnsupportedCapability { .. } => zx::Status::NOT_SUPPORTED,
