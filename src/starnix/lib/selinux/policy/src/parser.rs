@@ -27,6 +27,7 @@ trait ParseCursor: Sized {
     fn seek_forward(&mut self, num_bytes: usize) -> Result<(), Self::Error>;
 
     /// Consumes self and returns the inner representation of the complete parse input.
+    #[allow(dead_code)]
     fn into_inner(self) -> Self::Inner;
 }
 
@@ -49,6 +50,7 @@ impl<T: AsRef<[u8]>> ParseCursor for Cursor<T> {
         self.seek(SeekFrom::Current(num_bytes as i64)).map(|_| ())
     }
 
+    #[allow(dead_code)]
     fn into_inner(self) -> Self::Inner {
         self.into_inner()
     }

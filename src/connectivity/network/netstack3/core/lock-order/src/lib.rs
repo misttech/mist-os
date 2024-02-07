@@ -734,9 +734,6 @@ mod test {
         }
     }
 
-    #[derive(Debug)]
-    struct NotPresent;
-
     enum UnlockedUsize {}
     enum UnlockedELen {}
 
