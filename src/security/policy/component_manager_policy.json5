@@ -632,50 +632,6 @@
                     "/core/sshd-host/shell:**",
                 ],
             },
-
-            // TODO(https://fxbug.dev/42175614): not security policy; split out into separate file.
-            // TODO(https://fxbug.dev/42175379): once product assembly supports product-specific
-            // components running in the network realm, remove this policy.
-            {
-                source_moniker: "/core/network/netstack",
-                source: "component",
-                source_name: "fuchsia.posix.socket.raw.Provider",
-                capability: "protocol",
-                target_monikers: [
-                    "/core/network",
-                    "/core/network/netstack",
-                    "/core/lowpan-ot-driver",
-                    "/core/test_manager",
-                    "/core/testing/starnix-tests:**",
-                ],
-            },
-            {
-                source_moniker: "/core/network/netstack",
-                source: "component",
-                source_name: "fuchsia.net.root.Interfaces",
-                capability: "protocol",
-                target_monikers: [
-                    "/core/network",
-                    "/core/network/netstack",
-                    "/core/network/test-components:**",
-
-                    // TODO(https://fxbug.dev/42062982): Move away from Root API.
-                    "/core/weavestack",
-                ],
-            },
-            {
-                source_moniker: "/core/network/netstack",
-                source: "component",
-                source_name: "fuchsia.posix.socket.packet.Provider",
-                capability: "protocol",
-                target_monikers: [
-                    "/core/network",
-                    "/core/network/dhcpd",
-                    "/core/network/netstack/dhcp-client",
-                    "/core/network/netstack",
-                    "/core/network/test-components:**",
-                ],
-            },
             {
                 source_moniker: "/core/lowpanservice",
                 source: "component",
