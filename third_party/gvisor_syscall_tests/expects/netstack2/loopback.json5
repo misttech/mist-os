@@ -88,6 +88,10 @@
                 "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/ListenV6Any_ConnectV4Loopback",
                 "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/ListenV6Any_ConnectV6Loopback",
                 "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/ListenV6Loopback_ConnectV6Loopback",
+
+                // https://fxbug.dev/324268480
+                // This test sometimes times out in CI.
+                "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/ListenV4Any_ConnectV4MappedLoopback",
             ],
         },
     ],
