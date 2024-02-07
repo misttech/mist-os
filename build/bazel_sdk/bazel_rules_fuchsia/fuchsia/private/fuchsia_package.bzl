@@ -207,7 +207,7 @@ def fuchsia_unittest_package(
     test_component_mapping = {}
     for unit_test in unit_tests:
         run_tag = label_name(unit_test)
-        test_component_mapping[run_tag] = "%s_unit_test" % run_tag
+        test_component_mapping[run_tag] = "%s.%s.autogen_component" % (name, run_tag)
 
         fuchsia_component_for_unit_test(
             name = test_component_mapping[run_tag],
