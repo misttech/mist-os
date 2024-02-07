@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_DRIVER_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_DRIVER_H_
 
-#include <fidl/fuchsia.hardware.display.engine/cpp/driver/fidl.h>
+#include <fidl/fuchsia.hardware.display.engine/cpp/driver/wire.h>
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 
@@ -68,10 +68,15 @@ class Driver : public ddk::Device<Driver> {
 
  private:
   Controller* const controller_;
+
+  // DFV1 Parent
   zx_device_t* parent_;
 
   // FIDL Client
   fdf::WireSyncClient<fuchsia_hardware_display_engine::Engine> engine_;
+
+  // Whether to use the FIDL client. If false, use the Banjo client.
+  bool use_engine_ = false;
 
   // Banjo Client
   ddk::DisplayControllerImplProtocolClient dc_;

@@ -353,6 +353,10 @@ open protocol Engine {
         timestamp zx.Time;
         config_stamp box<fuchsia.hardware.display.types.ConfigStamp>;
     });
+
+    // A noop method with a response from the server that should be used
+    // by clients who optionally use this library to determine availability.
+    flexible IsAvailable() -> ();
 };
 
 service Service {
