@@ -25,7 +25,6 @@
 #include "tools/fidl/fidlc/src/name.h"
 #include "tools/fidl/fidlc/src/object.h"
 #include "tools/fidl/fidlc/src/properties.h"
-#include "tools/fidl/fidlc/src/traits.h"
 #include "tools/fidl/fidlc/src/type_shape.h"
 #include "tools/fidl/fidlc/src/types.h"
 #include "tools/fidl/fidlc/src/values.h"
@@ -302,14 +301,14 @@ struct TypeConstraints;
 // This allows all type compilation to share the code paths through the consume
 // step (i.e. RegisterDecl) and the compilation step (i.e. Typespace::Create),
 // while ensuring that users cannot refer to anonymous layouts by name.
-struct TypeConstructor final : public HasClone<TypeConstructor> {
+struct TypeConstructor final {
   TypeConstructor(Reference layout, std::unique_ptr<LayoutParameterList> parameters,
                   std::unique_ptr<TypeConstraints> constraints)
       : layout(std::move(layout)),
         parameters(std::move(parameters)),
         constraints(std::move(constraints)) {}
 
-  std::unique_ptr<TypeConstructor> Clone() const override;
+  std::unique_ptr<TypeConstructor> Clone() const;
 
   // Set during construction.
   Reference layout;
@@ -321,7 +320,7 @@ struct TypeConstructor final : public HasClone<TypeConstructor> {
   LayoutInvocation resolved_params;
 };
 
-struct LayoutParameter : public HasClone<LayoutParameter> {
+struct LayoutParameter {
  public:
   virtual ~LayoutParameter() = default;
   enum Kind : uint8_t {
@@ -336,6 +335,8 @@ struct LayoutParameter : public HasClone<LayoutParameter> {
   // two methods must return non-null, and the other one must return null.
   virtual TypeConstructor* AsTypeCtor() const = 0;
   virtual Constant* AsConstant() const = 0;
+
+  virtual std::unique_ptr<LayoutParameter> Clone() const = 0;
 
   const Kind kind;
   SourceSpan span;
@@ -381,24 +382,24 @@ struct IdentifierLayoutParameter final : public LayoutParameter {
   std::unique_ptr<Constant> as_constant;
 };
 
-struct LayoutParameterList final : public HasClone<LayoutParameterList> {
+struct LayoutParameterList final {
   LayoutParameterList() = default;
   LayoutParameterList(std::vector<std::unique_ptr<LayoutParameter>> items,
                       std::optional<SourceSpan> span)
       : items(std::move(items)), span(span) {}
 
-  std::unique_ptr<LayoutParameterList> Clone() const override;
+  std::unique_ptr<LayoutParameterList> Clone() const;
 
   std::vector<std::unique_ptr<LayoutParameter>> items;
   const std::optional<SourceSpan> span;
 };
 
-struct TypeConstraints final : public HasClone<TypeConstraints> {
+struct TypeConstraints final {
   TypeConstraints() = default;
   TypeConstraints(std::vector<std::unique_ptr<Constant>> items, std::optional<SourceSpan> span)
       : items(std::move(items)), span(span) {}
 
-  std::unique_ptr<TypeConstraints> Clone() const override;
+  std::unique_ptr<TypeConstraints> Clone() const;
 
   std::vector<std::unique_ptr<Constant>> items;
   const std::optional<SourceSpan> span;
@@ -422,13 +423,13 @@ struct Const final : public Decl {
 };
 
 struct Enum final : public TypeDecl {
-  struct Member : public Element, public HasCopy<Member> {
+  struct Member : public Element {
     Member(SourceSpan name, std::unique_ptr<Constant> value,
            std::unique_ptr<AttributeList> attributes)
         : Element(Element::Kind::kEnumMember, std::move(attributes)),
           name(name),
           value(std::move(value)) {}
-    Member Copy() const override;
+    Member Clone() const;
 
     SourceSpan name;
     std::unique_ptr<Constant> value;
@@ -461,13 +462,13 @@ struct Enum final : public TypeDecl {
 };
 
 struct Bits final : public TypeDecl {
-  struct Member : public Element, public HasCopy<Member> {
+  struct Member : public Element {
     Member(SourceSpan name, std::unique_ptr<Constant> value,
            std::unique_ptr<AttributeList> attributes)
         : Element(Element::Kind::kBitsMember, std::move(attributes)),
           name(name),
           value(std::move(value)) {}
-    Member Copy() const override;
+    Member Clone() const;
 
     SourceSpan name;
     std::unique_ptr<Constant> value;
@@ -496,13 +497,13 @@ struct Bits final : public TypeDecl {
 };
 
 struct Service final : public TypeDecl {
-  struct Member : public Element, public HasCopy<Member> {
+  struct Member : public Element {
     Member(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name,
            std::unique_ptr<AttributeList> attributes)
         : Element(Element::Kind::kServiceMember, std::move(attributes)),
           type_ctor(std::move(type_ctor)),
           name(name) {}
-    Member Copy() const override;
+    Member Clone() const;
 
     std::unique_ptr<TypeConstructor> type_ctor;
     SourceSpan name;
@@ -527,7 +528,7 @@ struct Struct;
 // C++. For backward-compatibility, Struct::Member is now an alias for this top-level
 // StructMember.
 // TODO(https://fxbug.dev/42113185): Move this to a nested class inside Struct.
-struct StructMember : public Element, public Object, public HasCopy<StructMember> {
+struct StructMember : public Element, public Object {
   StructMember(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name,
                std::unique_ptr<Constant> maybe_default_value,
                std::unique_ptr<AttributeList> attributes)
@@ -535,7 +536,7 @@ struct StructMember : public Element, public Object, public HasCopy<StructMember
         type_ctor(std::move(type_ctor)),
         name(name),
         maybe_default_value(std::move(maybe_default_value)) {}
-  StructMember Copy() const override;
+  StructMember Clone() const;
   std::any AcceptAny(VisitorAny* visitor) const override;
   FieldShape fieldshape(WireFormat wire_format) const;
 
@@ -574,7 +575,7 @@ struct Table;
 
 // See the comment on the StructMember class for why this is a top-level class.
 // TODO(https://fxbug.dev/42113185): Move this to a nested class inside Table::Member.
-struct TableMemberUsed : public Object, public HasClone<TableMemberUsed> {
+struct TableMemberUsed : public Object {
   TableMemberUsed(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name)
       : type_ctor(std::move(type_ctor)), name(name) {}
   std::unique_ptr<TypeConstructor> type_ctor;
@@ -584,14 +585,14 @@ struct TableMemberUsed : public Object, public HasClone<TableMemberUsed> {
 
   FieldShape fieldshape(WireFormat wire_format) const;
 
-  std::unique_ptr<TableMemberUsed> Clone() const override {
+  std::unique_ptr<TableMemberUsed> Clone() const {
     return std::make_unique<TableMemberUsed>(type_ctor->Clone(), name);
   }
 };
 
 // See the comment on the StructMember class for why this is a top-level class.
 // TODO(https://fxbug.dev/42113185): Move this to a nested class inside Table.
-struct TableMember : public Element, public Object, public HasCopy<TableMember> {
+struct TableMember : public Element, public Object {
   using Used = TableMemberUsed;
 
   TableMember(const RawOrdinal64* ordinal, std::unique_ptr<TypeConstructor> type, SourceSpan name,
@@ -605,7 +606,7 @@ struct TableMember : public Element, public Object, public HasCopy<TableMember> 
     return TableMember(ordinal, span, nullptr, std::move(attributes));
   }
 
-  TableMember Copy() const override;
+  TableMember Clone() const;
   std::any AcceptAny(VisitorAny* visitor) const override;
 
   // Owned by Library::raw_ordinals.
@@ -647,7 +648,7 @@ struct Union;
 
 // See the comment on the StructMember class for why this is a top-level class.
 // TODO(https://fxbug.dev/42113185): Move this to a nested class inside Union.
-struct UnionMemberUsed : public Object, public HasClone<UnionMemberUsed> {
+struct UnionMemberUsed : public Object {
   UnionMemberUsed(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name)
       : type_ctor(std::move(type_ctor)), name(name) {}
   std::unique_ptr<TypeConstructor> type_ctor;
@@ -657,7 +658,7 @@ struct UnionMemberUsed : public Object, public HasClone<UnionMemberUsed> {
 
   FieldShape fieldshape(WireFormat wire_format) const;
 
-  std::unique_ptr<UnionMemberUsed> Clone() const override {
+  std::unique_ptr<UnionMemberUsed> Clone() const {
     return std::make_unique<UnionMemberUsed>(type_ctor->Clone(), name);
   }
 
@@ -666,7 +667,7 @@ struct UnionMemberUsed : public Object, public HasClone<UnionMemberUsed> {
 
 // See the comment on the StructMember class for why this is a top-level class.
 // TODO(https://fxbug.dev/42113185): Move this to a nested class inside Union.
-struct UnionMember : public Element, public Object, public HasCopy<UnionMember> {
+struct UnionMember : public Element, public Object {
   using Used = UnionMemberUsed;
 
   UnionMember(const RawOrdinal64* ordinal, std::unique_ptr<TypeConstructor> type_ctor,
@@ -680,7 +681,7 @@ struct UnionMember : public Element, public Object, public HasCopy<UnionMember> 
     return UnionMember(ordinal, span, nullptr, std::move(attributes));
   }
 
-  UnionMember Copy() const override;
+  UnionMember Clone() const;
   std::any AcceptAny(VisitorAny* visitor) const override;
 
   // Owned by Library::raw_ordinals.
@@ -733,7 +734,7 @@ struct Union final : public TypeDecl {
 
 struct Overlay;
 
-struct OverlayMemberUsed : public Object, public HasClone<OverlayMemberUsed> {
+struct OverlayMemberUsed : public Object {
   OverlayMemberUsed(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name)
       : type_ctor(std::move(type_ctor)), name(name) {}
   std::unique_ptr<TypeConstructor> type_ctor;
@@ -743,14 +744,14 @@ struct OverlayMemberUsed : public Object, public HasClone<OverlayMemberUsed> {
 
   FieldShape fieldshape(WireFormat wire_format) const;
 
-  std::unique_ptr<OverlayMemberUsed> Clone() const override {
+  std::unique_ptr<OverlayMemberUsed> Clone() const {
     return std::make_unique<OverlayMemberUsed>(type_ctor->Clone(), name);
   }
 
   const Overlay* parent = nullptr;
 };
 
-struct OverlayMember final : public Element, public Object, public HasCopy<OverlayMember> {
+struct OverlayMember final : public Element, public Object {
   using Used = OverlayMemberUsed;
   OverlayMember(const RawOrdinal64* ordinal, std::unique_ptr<TypeConstructor> type_ctor,
                 SourceSpan name, std::unique_ptr<AttributeList> attributes)
@@ -763,7 +764,7 @@ struct OverlayMember final : public Element, public Object, public HasCopy<Overl
     return OverlayMember(ordinal, span, nullptr, std::move(attributes));
   }
 
-  OverlayMember Copy() const override;
+  OverlayMember Clone() const;
   std::any AcceptAny(VisitorAny* visitor) const override;
 
   // Owned by Library::raw_ordinals.
@@ -809,7 +810,7 @@ struct Overlay final : public TypeDecl {
 };
 
 struct Protocol final : public TypeDecl {
-  struct Method : public Element, public HasCopy<Method> {
+  struct Method : public Element {
     Method(std::unique_ptr<AttributeList> attributes, Strictness strictness,
            const RawIdentifier* identifier, SourceSpan name, bool has_request,
            std::unique_ptr<TypeConstructor> maybe_request, bool has_response,
@@ -826,7 +827,7 @@ struct Protocol final : public TypeDecl {
           generated_ordinal64(nullptr) {
       ZX_ASSERT(this->has_request || this->has_response);
     }
-    Method Copy() const override;
+    Method Clone() const;
 
     Strictness strictness;
     // Owned by Library::raw_identifiers.
@@ -866,7 +867,7 @@ struct Protocol final : public TypeDecl {
     ComposedProtocol(std::unique_ptr<AttributeList> attributes, Reference reference)
         : Element(Element::Kind::kProtocolCompose, std::move(attributes)),
           reference(std::move(reference)) {}
-    ComposedProtocol Copy() const;
+    ComposedProtocol Clone() const;
 
     Reference reference;
   };
@@ -902,7 +903,7 @@ struct Resource final : public Decl {
         : Element(Element::Kind::kResourceProperty, std::move(attributes)),
           type_ctor(std::move(type_ctor)),
           name(name) {}
-    Property Copy() const;
+    Property Clone() const;
 
     std::unique_ptr<TypeConstructor> type_ctor;
     SourceSpan name;

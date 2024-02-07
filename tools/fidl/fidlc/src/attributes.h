@@ -11,16 +11,15 @@
 #include <optional>
 
 #include "tools/fidl/fidlc/src/source_span.h"
-#include "tools/fidl/fidlc/src/traits.h"
 #include "tools/fidl/fidlc/src/values.h"
 
 namespace fidlc {
 
-struct AttributeArg final : public HasClone<AttributeArg> {
+struct AttributeArg final {
   AttributeArg(std::optional<SourceSpan> name, std::unique_ptr<Constant> value, SourceSpan span)
       : name(name), value(std::move(value)), span(span) {}
 
-  std::unique_ptr<AttributeArg> Clone() const override;
+  std::unique_ptr<AttributeArg> Clone() const;
 
   // Span of just the argument name, e.g. "bar". This is initially null for
   // arguments like `@foo("abc")`, but will be set during compilation.
@@ -34,7 +33,7 @@ struct AttributeArg final : public HasClone<AttributeArg> {
   static constexpr std::string_view kDefaultAnonymousName = "value";
 };
 
-struct Attribute final : public HasClone<Attribute> {
+struct Attribute final {
   Attribute(SourceSpan name, std::vector<std::unique_ptr<AttributeArg>> args, SourceSpan span)
       : name(name), args(std::move(args)), span(span) {}
 
@@ -44,7 +43,7 @@ struct Attribute final : public HasClone<Attribute> {
   // example it returns non-null for `@foo("x")` but not for `@foo(bar="x")`.
   AttributeArg* GetStandaloneAnonymousArg() const;
 
-  std::unique_ptr<Attribute> Clone() const override;
+  std::unique_ptr<Attribute> Clone() const;
 
   // Span of just the attribute name not including the "@", e.g. "foo".
   const SourceSpan name;
@@ -62,7 +61,7 @@ struct Attribute final : public HasClone<Attribute> {
 
 // In the flat AST, "no attributes" is represented by an AttributeList
 // containing an empty vector. (In the raw AST, null is used instead.)
-struct AttributeList final : public HasClone<AttributeList> {
+struct AttributeList final {
   AttributeList() = default;
   explicit AttributeList(std::vector<std::unique_ptr<Attribute>> attributes)
       : attributes(std::move(attributes)) {}
@@ -70,7 +69,7 @@ struct AttributeList final : public HasClone<AttributeList> {
   bool Empty() const { return attributes.empty(); }
   const Attribute* Get(std::string_view attribute_name) const;
   Attribute* Get(std::string_view attribute_name);
-  std::unique_ptr<AttributeList> Clone() const override;
+  std::unique_ptr<AttributeList> Clone() const;
 
   std::vector<std::unique_ptr<Attribute>> attributes;
 };

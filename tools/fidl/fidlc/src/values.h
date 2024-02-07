@@ -13,7 +13,6 @@
 #include "tools/fidl/fidlc/src/raw_ast.h"
 #include "tools/fidl/fidlc/src/reference.h"
 #include "tools/fidl/fidlc/src/source_span.h"
-#include "tools/fidl/fidlc/src/traits.h"
 
 namespace fidlc {
 
@@ -22,7 +21,7 @@ struct Type;
 // ConstantValue represents the concrete _value_ of a constant. (For the
 // _declaration_, see Const. For the _use_, see Constant.) ConstantValue has
 // derived classes for all the different kinds of constants.
-struct ConstantValue : public HasClone<ConstantValue> {
+struct ConstantValue {
   virtual ~ConstantValue() = default;
 
   enum class Kind : uint8_t {
@@ -45,6 +44,7 @@ struct ConstantValue : public HasClone<ConstantValue> {
   };
 
   virtual bool Convert(Kind kind, std::unique_ptr<ConstantValue>* out_value) const = 0;
+  virtual std::unique_ptr<ConstantValue> Clone() const = 0;
 
   const Kind kind;
 
@@ -219,7 +219,7 @@ struct StringConstantValue final : ConstantValue {
 // Const. For the _value_, see ConstantValue.) A Constant can either be a
 // reference to another constant (IdentifierConstant), a literal value
 // (LiteralConstant). Every Constant resolves to a concrete ConstantValue.
-struct Constant : HasClone<Constant> {
+struct Constant {
   virtual ~Constant() = default;
 
   enum class Kind : uint8_t { kIdentifier, kLiteral, kBinaryOperator };
@@ -229,7 +229,7 @@ struct Constant : HasClone<Constant> {
   bool IsResolved() const { return value_ != nullptr; }
   void ResolveTo(std::unique_ptr<ConstantValue> value, const Type* type);
   const ConstantValue& Value() const;
-  std::unique_ptr<Constant> Clone() const override;
+  std::unique_ptr<Constant> Clone() const;
 
   const Kind kind;
   const SourceSpan span;

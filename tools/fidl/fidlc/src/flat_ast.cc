@@ -533,7 +533,7 @@ static std::vector<T> FilterMembers(const std::vector<T>& all, VersionRange rang
   std::vector<T> result;
   for (auto& member : all) {
     if (VersionSet::Intersect(VersionSet(range), member.availability.set())) {
-      result.push_back(member.Copy());
+      result.push_back(member.Clone());
       result.back().availability = member.availability;
       result.back().availability.Narrow(range);
     }
@@ -643,50 +643,50 @@ std::unique_ptr<Decl> NewType::SplitImpl(VersionRange range) const {
   return std::make_unique<NewType>(attributes->Clone(), name, type_ctor->Clone());
 }
 
-Enum::Member Enum::Member::Copy() const {
+Enum::Member Enum::Member::Clone() const {
   return Member(name, value->Clone(), attributes->Clone());
 }
 
-Bits::Member Bits::Member::Copy() const {
+Bits::Member Bits::Member::Clone() const {
   return Member(name, value->Clone(), attributes->Clone());
 }
 
-Service::Member Service::Member::Copy() const {
+Service::Member Service::Member::Clone() const {
   return Member(type_ctor->Clone(), name, attributes->Clone());
 }
 
-Struct::Member Struct::Member::Copy() const {
+Struct::Member Struct::Member::Clone() const {
   return StructMember(type_ctor->Clone(), name,
                       maybe_default_value ? maybe_default_value->Clone() : nullptr,
                       attributes->Clone());
 }
 
-Table::Member Table::Member::Copy() const {
+Table::Member Table::Member::Clone() const {
   return TableMember(ordinal, span, maybe_used ? maybe_used->Clone() : nullptr,
                      attributes->Clone());
 }
 
-Union::Member Union::Member::Copy() const {
+Union::Member Union::Member::Clone() const {
   return UnionMember(ordinal, span, maybe_used ? maybe_used->Clone() : nullptr,
                      attributes->Clone());
 }
 
-Overlay::Member Overlay::Member::Copy() const {
+Overlay::Member Overlay::Member::Clone() const {
   return OverlayMember(ordinal, span, maybe_used ? maybe_used->Clone() : nullptr,
                        attributes->Clone());
 }
 
-Protocol::Method Protocol::Method::Copy() const {
+Protocol::Method Protocol::Method::Clone() const {
   return Method(attributes->Clone(), strictness, identifier, name, has_request,
                 maybe_request ? maybe_request->Clone() : nullptr, has_response,
                 maybe_response ? maybe_response->Clone() : nullptr, has_error);
 }
 
-Protocol::ComposedProtocol Protocol::ComposedProtocol::Copy() const {
+Protocol::ComposedProtocol Protocol::ComposedProtocol::Clone() const {
   return ComposedProtocol(attributes->Clone(), reference);
 }
 
-Resource::Property Resource::Property::Copy() const {
+Resource::Property Resource::Property::Clone() const {
   return Property(type_ctor->Clone(), name, attributes->Clone());
 }
 
