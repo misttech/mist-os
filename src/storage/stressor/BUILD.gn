@@ -11,6 +11,9 @@ rustc_library("lib") {
   name = "stressor_lib"
   edition = "2021"
   deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/lib/fdio/rust:fdio",
+    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:tracing",
   ]
@@ -26,7 +29,10 @@ rustc_binary("stressor_bin") {
   edition = "2021"
   deps = [
     ":lib",
-    "//src/lib/fuchsia",
+    "//src/lib/diagnostics/log/rust",
+    "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tracing",
   ]
   sources = [ "src/main.rs" ]
@@ -38,18 +44,9 @@ fuchsia_component("stressor_component") {
   manifest = "meta/stressor.cml"
 }
 
-fuchsia_component("aggressive_stressor_component") {
-  component_name = "aggressive_storage_stressor"
-  deps = [ ":stressor_bin" ]
-  manifest = "meta/stressor.aggressive.cml"
-}
-
 fuchsia_package("stressor_package") {
   package_name = "storage_stressor"
-  deps = [
-    ":aggressive_stressor_component",
-    ":stressor_component",
-  ]
+  deps = [ ":stressor_component" ]
 }
 
 group("stressor") {
@@ -58,8 +55,4 @@ group("stressor") {
 
 core_shard("core_shard") {
   shard_file = "meta/stressor.core_shard.cml"
-}
-
-core_shard("aggressive_core_shard") {
-  shard_file = "meta/stressor.aggressive_core_shard.cml"
 }

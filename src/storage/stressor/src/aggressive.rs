@@ -8,6 +8,8 @@
 //! This version also silently ignores errors such as out of space.
 
 use {
+    fidl_fuchsia_io as fio,
+    fuchsia_async::Time,
     rand::{distributions::WeightedIndex, prelude::*},
     std::{
         fs::File,
@@ -23,12 +25,16 @@ use {
 /// Designed to 'exercise' the filesystem and thrash the dirent cache.
 /// This cyclically works its way through 10000 files (the dirent cache holds 8000).
 /// On each iteration it will either read, write or rewrite a file.
-/// Unaligned random reads up to 256kB -- more than read-ahead boundaries at 128kiB.
-/// Non-sparse writes up to 256kB -- creates inner fragmentation without holes.
-/// Rewrite is an unlink and a write operation -- this creates fragmentation when disk fills.
+/// Unaligned random reads and append-only writes up to 128kB each in length.
+/// Write errors causes the file to be truncated to zero bytes.
 #[derive(Default)]
 pub struct Stressor {
+    /// Used to round-robin across NUM_FILES in order.
     file_counter: AtomicU64,
+    /// Tracks the number of bytes we have allocated.
+    bytes_stored: AtomicU64,
+    /// The target number of bytes we want to allocate before deleting files.
+    target_bytes: u64,
     op_stats: Mutex<[u64; NUM_OPS]>,
 }
 
@@ -51,8 +57,31 @@ const NUM_FILES: u64 = 10000;
 const WEIGHTS: [f64; NUM_OPS] = [/* READ: */ 1.0, /* WRITE: */ 2.0];
 
 impl Stressor {
-    pub fn new() -> Arc<Self> {
-        Arc::new(Stressor { file_counter: AtomicU64::new(0), ..Stressor::default() })
+    /// Creates a new aggressive stressor that will try to fill the disk until
+    /// `target_free_bytes` of free space remains.
+    pub fn new(target_free_bytes: u64) -> Arc<Self> {
+        // Work out how many bytes to target.
+        let dir = fio::DirectorySynchronousProxy::new(
+            fuchsia_async::Channel::from_channel(
+                fdio::transfer_fd(std::fs::File::open("/data").unwrap()).unwrap().into(),
+            )
+            .into(),
+        );
+        let info = dir.query_filesystem(Time::INFINITE.into()).unwrap().1.unwrap();
+        let bytes_stored = info.used_bytes;
+        let target_bytes = info.total_bytes - target_free_bytes;
+        tracing::info!(
+            "Aggressive stressor mode targetting {} of {} bytes on device.",
+            target_bytes,
+            info.total_bytes
+        );
+
+        Arc::new(Stressor {
+            file_counter: AtomicU64::new(0),
+            bytes_stored: AtomicU64::new(bytes_stored),
+            target_bytes,
+            ..Stressor::default()
+        })
     }
 
     /// Starts the stressor. Loops forever.
@@ -64,7 +93,12 @@ impl Stressor {
         // Sleep forever. No real stats to produce here as weights are constant.
         loop {
             std::thread::sleep(std::time::Duration::from_secs(10));
-            tracing::info!("counts: {:?}", self.op_stats.lock().unwrap());
+            tracing::info!(
+                "bytes_stored: {}, target_bytes {}, counts: {:?}",
+                self.bytes_stored.load(Ordering::Relaxed),
+                self.target_bytes,
+                self.op_stats.lock().unwrap()
+            );
         }
     }
 
@@ -80,7 +114,7 @@ impl Stressor {
                 READ => match File::options().read(true).write(false).open(&path) {
                     Ok(f) => {
                         let file_len = f.metadata().unwrap().len();
-                        let read_len = rng.gen_range(0..160 * 1024u64);
+                        let read_len = rng.gen_range(0..128 * 1024u64);
                         let end = file_len.saturating_sub(read_len);
                         let offset = rng.gen_range(0..end + 1);
                         buf.resize(read_len as usize, 0);
@@ -97,18 +131,26 @@ impl Stressor {
                     match File::options().create(true).read(true).write(true).open(&path) {
                         Ok(f) => {
                             let file_len = f.metadata().unwrap().len();
-                            let offset = rng.gen_range(0..file_len + 1);
-                            buf.resize(rng.gen_range(0..160 * 1024), 1);
-                            match f.write_at(&buf, offset) {
-                                Ok(_) => {}
-                                Err(_) => {
-                                    // When a write fails due to space, we truncate.
-                                    // In this way we fill up the disk then start fragmenting it.
-                                    // Until #![feature(io_error_more)] is stable, we have
-                                    // a catch-all here.
-                                    let _ = f.set_len(0).unwrap();
-                                }
-                            };
+                            if self.bytes_stored.load(Ordering::Relaxed) >= self.target_bytes {
+                                self.bytes_stored.fetch_sub(file_len, Ordering::Relaxed);
+                                let _ = f.set_len(0).unwrap();
+                            } else {
+                                buf.resize(rng.gen_range(0..128 * 1024), 1);
+                                match f.write_at(&buf, file_len) {
+                                    Ok(bytes) => {
+                                        self.bytes_stored
+                                            .fetch_add(bytes as u64, Ordering::Relaxed);
+                                    }
+                                    Err(_) => {
+                                        // When a write fails due to space, we truncate.
+                                        // In this way we fill up the disk then start fragmenting it.
+                                        // Until #![feature(io_error_more)] is stable, we have
+                                        // a catch-all here.
+                                        self.bytes_stored.fetch_sub(file_len, Ordering::Relaxed);
+                                        let _ = f.set_len(0).unwrap();
+                                    }
+                                };
+                            }
                         }
                         // Unfortunately ErrorKind::StorageFull is unstable so
                         // we rely on a catch-all here and assume write errors are
