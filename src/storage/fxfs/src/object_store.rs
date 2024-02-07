@@ -73,7 +73,7 @@ use {
         ops::Bound,
         sync::{
             atomic::{AtomicBool, AtomicU64, Ordering},
-            Arc, Mutex, Weak,
+            Arc, Mutex, OnceLock, Weak,
         },
     },
     storage_device::Device,
@@ -477,6 +477,10 @@ pub struct ObjectStore {
     // Contains the last object ID and, optionally, a cipher to be used when generating new object
     // IDs.
     last_object_id: Mutex<LastObjectId>,
+
+    // An optional callback to be invoked each time the ObjectStore flushes.  The callback is
+    // invoked at the end of flush, while the write lock is still held.
+    flush_callback: OnceLock<Box<dyn Fn(&ObjectStore) + Send + Sync + 'static>>,
 }
 
 #[derive(Clone, Default)]
@@ -523,6 +527,7 @@ impl ObjectStore {
             logical_read_ops: AtomicU64::new(0),
             logical_write_ops: AtomicU64::new(0),
             last_object_id: Mutex::new(last_object_id),
+            flush_callback: OnceLock::new(),
         })
     }
 
@@ -566,6 +571,7 @@ impl ObjectStore {
             logical_read_ops: AtomicU64::new(0),
             logical_write_ops: AtomicU64::new(0),
             last_object_id: Mutex::new(LastObjectId::default()),
+            flush_callback: OnceLock::new(),
         }
     }
 
@@ -681,6 +687,13 @@ impl ObjectStore {
         if trace != old_value {
             info!(store_id = self.store_object_id(), trace, "OS: trace",);
         }
+    }
+
+    /// Sets a callback to be invoked each time the ObjectStore flushes.  The callback is invoked at
+    /// the end of flush, while the write lock is still held.
+    /// Note that this can only be set once per ObjectStore; repeated calls will panic.
+    pub fn set_flush_callback<F: Fn(&ObjectStore) + Send + Sync + 'static>(&self, callback: F) {
+        self.flush_callback.set(Box::new(callback)).ok().unwrap();
     }
 
     pub fn is_root(&self) -> bool {
@@ -1496,7 +1509,7 @@ impl ObjectStore {
 
     /// Unlocks a store so that it is ready to be used.
     /// This is not thread-safe.
-    pub async fn unlock(&self, crypt: Arc<dyn Crypt>) -> Result<(), Error> {
+    pub async fn unlock(self: &Arc<Self>, crypt: Arc<dyn Crypt>) -> Result<(), Error> {
         self.unlock_inner(crypt, /*read_only=*/ false).await
     }
 
@@ -1507,11 +1520,15 @@ impl ObjectStore {
     /// Re-locking the store (which *must* be done with `Self::lock_read_only` will not trigger a
     /// flush, although the store might still be flushed during other operations.
     /// This is not thread-safe.
-    pub async fn unlock_read_only(&self, crypt: Arc<dyn Crypt>) -> Result<(), Error> {
+    pub async fn unlock_read_only(self: &Arc<Self>, crypt: Arc<dyn Crypt>) -> Result<(), Error> {
         self.unlock_inner(crypt, /*read_only=*/ true).await
     }
 
-    async fn unlock_inner(&self, crypt: Arc<dyn Crypt>, read_only: bool) -> Result<(), Error> {
+    async fn unlock_inner(
+        self: &Arc<Self>,
+        crypt: Arc<dyn Crypt>,
+        read_only: bool,
+    ) -> Result<(), Error> {
         match &*self.lock_state.lock().unwrap() {
             LockState::Locked => {}
             LockState::Unencrypted => bail!(FxfsError::InvalidArgs),

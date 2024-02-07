@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::{component::map_to_raw_status, fuchsia::errors::map_to_status},
+    crate::{
+        component::map_to_raw_status, fuchsia::errors::map_to_status,
+        volumes_directory::VolumesDirectory,
+    },
     async_trait::async_trait,
     fidl_fuchsia_fxfs::DebugRequest,
     fidl_fuchsia_io as fio,
@@ -16,7 +19,11 @@ use {
             AttributeKey, DataObjectHandle, HandleOptions, ObjectKey, ObjectKeyData, ObjectStore,
         },
     },
-    std::{ops::Bound, sync::Arc},
+    std::{
+        collections::BTreeMap,
+        ops::Bound,
+        sync::{Arc, Mutex, Weak},
+    },
     vfs::{
         attributes,
         common::rights_to_posix_mode_bits,
@@ -34,24 +41,35 @@ use {
     },
 };
 
+// To avoid dependency cycles, FxfsDebug stores weak references back to internal structures.  This
+// convenience method returns an appropriate error when these internal structures are dropped.
+fn upgrade_weak<T>(weak: &Weak<T>) -> Result<Arc<T>, Status> {
+    weak.upgrade().ok_or(Status::CANCELED)
+}
+
 /// Immutable read-only access to internal Fxfs objects (attribute 0).
 /// We open this as-required to avoid dealing with data that is otherwise cached in the handle
 /// (specifically file size).
 pub struct InternalFile {
     object_id: u64,
-    store: Arc<ObjectStore>,
+    store: Weak<ObjectStore>,
 }
 
 impl InternalFile {
-    pub fn new(object_id: u64, store: Arc<ObjectStore>) -> Arc<Self> {
+    pub fn new(object_id: u64, store: Weak<ObjectStore>) -> Arc<Self> {
         Arc::new(Self { object_id, store })
     }
 
     /// Opens the file and returns a handle
     async fn handle(&self) -> Result<DataObjectHandle<ObjectStore>, zx::Status> {
-        ObjectStore::open_object(&self.store, self.object_id, HandleOptions::default(), None)
-            .await
-            .map_err(map_to_status)
+        ObjectStore::open_object(
+            &upgrade_weak(&self.store)?,
+            self.object_id,
+            HandleOptions::default(),
+            None,
+        )
+        .await
+        .map_err(map_to_status)
     }
 }
 
@@ -191,28 +209,95 @@ impl FileIo for InternalFile {
     }
 }
 
-fn object_store_dir(
-    store: Arc<ObjectStore>,
-) -> Result<Arc<vfs::directory::immutable::Simple>, Status> {
-    let root = vfs::directory::immutable::simple();
+/// Exposes a VFS directory containing debug entries for a given object store.
+pub struct ObjectStoreDirectory {
+    vfs_root: Arc<vfs::directory::immutable::Simple>,
+    parent_store: Option<Weak<ObjectStore>>,
+    // Only set if `parent_store` is, since we only track persistent layers here.
+    layers: Option<Arc<vfs::directory::immutable::Simple>>,
+}
 
-    // TODO(b/313524454): This is currently frozen at creation time. Should be made dynamic.
-    let store_info_txt = format!("{:?}", store.store_info());
-    root.add_entry("store_info.txt", vfs::file::vmo::read_only(store_info_txt))?;
-    root.add_entry("objects", Arc::new(ObjectDirectory { store }))?;
+impl ObjectStoreDirectory {
+    pub fn new(
+        store: Arc<ObjectStore>,
+        parent_store: Option<Arc<ObjectStore>>,
+    ) -> Result<Arc<Self>, Status> {
+        let vfs_root = vfs::directory::immutable::simple();
+        let layers_dir = if parent_store.is_some() {
+            let layers_dir = vfs::directory::immutable::simple();
+            vfs_root.add_entry("layers", layers_dir.clone())?;
+            Some(layers_dir)
+        } else {
+            None
+        };
 
-    // TODO(b/313524454):
-    //  * graveyard_dir
-    //  * root_dir
-    //  * '/layers/*.txt' with contents of each layer file and the in-memory layer.
-    //  * '/lsm_tree' with full contents of the merged lsm_tree.
-    Ok(root)
+        vfs_root.add_entry(
+            "objects",
+            Arc::new(ObjectDirectory {
+                store: Arc::downgrade(&store),
+                store_object_id: store.store_object_id(),
+            }),
+        )?;
+
+        // TODO(b/313524454):
+        //  * graveyard_dir
+        //  * root_dir
+        //  * '/lsm_tree' with full contents of the merged lsm_tree.
+
+        let this = Arc::new(Self {
+            vfs_root,
+            parent_store: parent_store.as_ref().map(Arc::downgrade),
+            layers: layers_dir,
+        });
+        this.update_from_store(store.as_ref())?;
+
+        let this_clone = this.clone();
+        store.set_flush_callback(move |store| {
+            if let Err(e) = this_clone.update_from_store(store) {
+                tracing::warn!(?e, "debug: Failed to update store; debug info may be stale");
+            }
+        });
+
+        Ok(this)
+    }
+
+    fn update_from_store(&self, store: &ObjectStore) -> Result<(), Status> {
+        let store_info_txt = format!("{:?}", store.store_info());
+        self.vfs_root.remove_entry("store_info.txt", false)?;
+        self.vfs_root.add_entry("store_info.txt", vfs::file::vmo::read_only(store_info_txt))?;
+
+        let (layers_dir, parent_store) = if let Some(layers) = self.layers.as_ref() {
+            (layers, upgrade_weak(self.parent_store.as_ref().unwrap())?)
+        } else {
+            return Ok(());
+        };
+        for layer in layers_dir.filter_map(|name, _| Some(name.to_string())) {
+            layers_dir.remove_entry(layer, false)?;
+        }
+        let mut idx = 0;
+        let layer_object_ids = store
+            .tree()
+            .immutable_layer_set()
+            .layers
+            .iter()
+            .map(|layer| layer.handle().unwrap().object_id())
+            .collect::<Vec<_>>();
+        for object_id in layer_object_ids {
+            layers_dir.add_entry(
+                format!("{}", idx),
+                InternalFile::new(object_id, Arc::downgrade(&parent_store)),
+            )?;
+            idx += 1;
+        }
+        Ok(())
+    }
 }
 
 /// Exposes a VFS directory containing all objects in a store with a data attribute.
 /// Objects are named by their object_id in decimal.
 pub struct ObjectDirectory {
-    store: Arc<ObjectStore>,
+    store: Weak<ObjectStore>,
+    store_object_id: u64,
 }
 
 impl DirectoryEntry for ObjectDirectory {
@@ -223,7 +308,6 @@ impl DirectoryEntry for ObjectDirectory {
         mut path: vfs::path::Path,
         server_end: fidl::endpoints::ServerEnd<fio::NodeMarker>,
     ) {
-        // Fail if the path contains further segments.
         match path.next_with_ref() {
             (path_ref, Some(name)) => {
                 // Lookup an object by id and return it.
@@ -247,20 +331,18 @@ impl DirectoryEntry for ObjectDirectory {
     }
 
     fn entry_info(&self) -> vfs::directory::entry::EntryInfo {
-        vfs::directory::entry::EntryInfo::new(
-            self.store.store_object_id(),
-            fio::DirentType::Directory,
-        )
+        vfs::directory::entry::EntryInfo::new(self.store_object_id, fio::DirentType::Directory)
     }
 }
 
 #[async_trait]
 impl Node for ObjectDirectory {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
+        let id = upgrade_weak(&self.store)?.store_object_id();
         Ok(fio::NodeAttributes {
             mode: fio::MODE_TYPE_DIRECTORY
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false),
-            id: self.store.store_object_id(),
+            id,
             content_size: 0,
             storage_size: 0,
             link_count: 1,
@@ -273,6 +355,7 @@ impl Node for ObjectDirectory {
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, Status> {
+        let id = upgrade_weak(&self.store)?.store_object_id();
         Ok(attributes!(
             requested_attributes,
             Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
@@ -286,7 +369,7 @@ impl Node for ObjectDirectory {
                 content_size: 0,
                 storage_size: 0,
                 link_count: 1,
-                id: self.store.store_object_id(),
+                id: id
             }
         ))
     }
@@ -308,7 +391,8 @@ impl Directory for ObjectDirectory {
             TraversalPosition::Index(object_id) => *object_id,
             TraversalPosition::End => u64::MAX,
         };
-        let layer_set = self.store.tree().layer_set();
+        let store = upgrade_weak(&self.store)?;
+        let layer_set = store.tree().layer_set();
         let mut merger = layer_set.merger();
         let mut iter = merger
             .seek(Bound::Included(&ObjectKey::object(object_id)))
@@ -353,36 +437,81 @@ impl Directory for ObjectDirectory {
 }
 
 pub struct FxfsDebug {
-    root: Arc<vfs::directory::immutable::Simple>,
+    vfs_root: Arc<vfs::directory::immutable::Simple>,
+    root_store: Weak<ObjectStore>,
+    volumes_dir: Arc<vfs::directory::immutable::Simple>,
+    volumes: Mutex<BTreeMap<String, Arc<ObjectStoreDirectory>>>,
 }
 
 impl FxfsDebug {
-    pub async fn new(fs: &Arc<FxFilesystem>) -> Result<Arc<Self>, zx::Status> {
-        let root = vfs::directory::immutable::simple();
+    pub fn new(
+        fs: &Arc<FxFilesystem>,
+        volumes: &Arc<VolumesDirectory>,
+    ) -> Result<Arc<Self>, zx::Status> {
+        let vfs_root = vfs::directory::immutable::simple();
 
-        let root_parent_store = object_store_dir(fs.root_parent_store())?;
-        root.add_entry("root_parent_store", root_parent_store.clone())?;
-        let root_store = object_store_dir(fs.root_store())?;
-        root_parent_store.add_entry("root_store", root_store.clone())?;
-        root_parent_store.add_entry(
+        let root_parent_store = ObjectStoreDirectory::new(fs.root_parent_store(), None)?;
+        vfs_root.add_entry("root_parent_store", root_parent_store.vfs_root.clone())?;
+        let root_store = ObjectStoreDirectory::new(fs.root_store(), Some(fs.root_parent_store()))?;
+        root_parent_store.vfs_root.add_entry("root_store", root_store.vfs_root.clone())?;
+        root_parent_store.vfs_root.add_entry(
             "journal",
-            InternalFile::new(fs.super_block_header().journal_object_id, fs.root_parent_store()),
+            InternalFile::new(
+                fs.super_block_header().journal_object_id,
+                Arc::downgrade(&fs.root_parent_store()),
+            ),
         )?;
 
         // TODO(b/313524454): This should update dynamically.
         let superblock_header_txt = format!("{:?}", fs.super_block_header());
         root_store
+            .vfs_root
             .add_entry("superblock_header.txt", vfs::file::vmo::read_only(superblock_header_txt))?;
         // TODO(b/313524454): Enumerate SuperBlockInstance::A and B.
 
-        // TODO(b/313524454): Enumerate fs.object_manager().volumes_directory() under root_store.
+        // TODO(b/313524454): Enumerate fs.object_manager().volumes_directory() under root_store to
+        // find volumes which are not currently open.
+
         // TODO(b/313524454): Export Allocator info under root_store.
 
-        Ok(Arc::new(Self { root }))
+        let volumes_dir = vfs::directory::immutable::simple();
+        root_store.vfs_root.add_entry("volumes", volumes_dir.clone())?;
+        let this = Arc::new(Self {
+            vfs_root,
+            root_store: Arc::downgrade(&fs.root_store()),
+            volumes_dir,
+            volumes: Mutex::new(BTreeMap::new()),
+        });
+
+        let this_clone = this.clone();
+        volumes.set_on_mount_callback(move |name, volume| {
+            let add = volume.is_some();
+            if let Err(e) = this_clone.add_volume(name, volume) {
+                tracing::warn!(
+                    "debug: Failed to {} volume in debug directory: {e:?}",
+                    if add { "add" } else { "remove" }
+                );
+            }
+        });
+
+        Ok(this)
     }
 
     pub fn root(&self) -> Arc<vfs::directory::immutable::Simple> {
-        self.root.clone()
+        self.vfs_root.clone()
+    }
+
+    fn add_volume(&self, name: &str, volume: Option<Arc<ObjectStore>>) -> Result<(), Status> {
+        if let Some(volume) = volume {
+            let object_store_dir =
+                ObjectStoreDirectory::new(volume, Some(upgrade_weak(&self.root_store)?))?;
+            let node = object_store_dir.vfs_root.clone();
+            self.volumes.lock().unwrap().insert(name.to_string(), object_store_dir);
+            self.volumes_dir.add_entry(name, node)
+        } else {
+            self.volumes.lock().unwrap().remove(name);
+            self.volumes_dir.remove_entry(name, false).map(|_| ())
+        }
     }
 }
 

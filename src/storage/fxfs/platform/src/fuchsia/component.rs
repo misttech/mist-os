@@ -117,6 +117,7 @@ struct RunningState {
     // FsInspectTree can reference `fs` as a Weak<dyn FsInspect>`.
     fs: Arc<InspectedFxFilesystem>,
     volumes: Arc<VolumesDirectory>,
+    _debug: Arc<FxfsDebug>,
     _inspect_tree: Arc<FsInspectTree>,
 }
 
@@ -132,6 +133,7 @@ impl State {
         {
             info!("Stopping Fxfs runtime; remaining connections will be forcibly closed");
             let _ = outgoing_dir.remove_entry("volumes", /* must_be_directory: */ false);
+            let _ = outgoing_dir.remove_entry("debug", /* must_be_directory: */ false);
             volumes.terminate().await;
             let _ = fs.deref().close().await;
         }
@@ -306,7 +308,7 @@ impl Component {
             /* overwrite: */ true,
         )?;
 
-        let debug = FxfsDebug::new(&**fs).await?;
+        let debug = FxfsDebug::new(&**fs, &volumes)?;
         self.export_dir.add_entry_may_overwrite("debug", debug.root(), true)?;
 
         fs.allocator().track_statistics(&metrics::detail(), "allocator");
@@ -322,7 +324,12 @@ impl Component {
             "Mounted"
         );
 
-        *state = State::Running(RunningState { fs, volumes, _inspect_tree: inspect_tree });
+        *state = State::Running(RunningState {
+            fs,
+            volumes,
+            _debug: debug,
+            _inspect_tree: inspect_tree,
+        });
         Ok(())
     }
 

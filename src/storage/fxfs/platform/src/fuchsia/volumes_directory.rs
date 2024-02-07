@@ -37,12 +37,9 @@ use {
     fxfs_crypto::Crypt,
     fxfs_trace::{trace_future_args, TraceFutureExt},
     rustc_hash::FxHashMap as HashMap,
-    std::{
-        collections::hash_map::Entry::Occupied,
-        sync::{
-            atomic::{AtomicU64, Ordering},
-            Arc, Weak,
-        },
+    std::sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, OnceLock, Weak,
     },
     vfs::{
         self,
@@ -61,20 +58,24 @@ const MEBIBYTE: u64 = 1024 * 1024;
 pub struct VolumesDirectory {
     root_volume: RootVolume,
     directory_node: Arc<vfs::directory::immutable::Simple>,
-    mounted_volumes: futures::lock::Mutex<HashMap<u64, FxVolumeAndRoot>>,
+    mounted_volumes: futures::lock::Mutex<HashMap<u64, (String, FxVolumeAndRoot)>>,
     inspect_tree: Weak<FsInspectTree>,
     mem_monitor: Option<MemoryPressureMonitor>,
 
     /// A running estimate of the number of dirty bytes outstanding in all pager-backed VMOs across
     /// all volumes.
     pager_dirty_bytes_count: AtomicU64,
+
+    // A callback to invoke when a volume is added.  When the volume is removed, this is called
+    // again with `None` as the second parameter.
+    on_volume_added: OnceLock<Box<dyn Fn(&str, Option<Arc<ObjectStore>>) + Send + Sync>>,
 }
 
 /// Operations on VolumesDirectory that cannot be performed concurrently (i.e. most
 /// volume creation/removal ops) should exist on this guard instead of VolumesDirectory.
 pub struct MountedVolumesGuard<'a> {
     volumes_directory: Arc<VolumesDirectory>,
-    mounted_volumes: futures::lock::MutexGuard<'a, HashMap<u64, FxVolumeAndRoot>>,
+    mounted_volumes: futures::lock::MutexGuard<'a, HashMap<u64, (String, FxVolumeAndRoot)>>,
 }
 
 impl MountedVolumesGuard<'_> {
@@ -132,19 +133,22 @@ impl MountedVolumesGuard<'_> {
         let unique_id = zx::Event::create();
         let volume = FxVolumeAndRoot::new::<T>(
             Arc::downgrade(&self.volumes_directory),
-            store,
+            store.clone(),
             unique_id.get_koid().unwrap().raw_koid(),
         )
         .await?;
         volume
             .volume()
             .start_flush_task(flush_task_config, self.volumes_directory.mem_monitor.as_ref());
-        self.mounted_volumes.insert(store_id, volume.clone());
+        self.mounted_volumes.insert(store_id, (name.to_string(), volume.clone()));
         if let Some(inspect) = self.volumes_directory.inspect_tree.upgrade() {
             inspect.register_volume(
                 name.to_string(),
                 Arc::downgrade(volume.volume()) as Weak<dyn FsInspectVolume + Send + Sync>,
             )
+        }
+        if let Some(callback) = self.volumes_directory.on_volume_added.get() {
+            callback(name, Some(store));
         }
         Ok(volume)
     }
@@ -191,7 +195,10 @@ impl MountedVolumesGuard<'_> {
 
     async fn terminate(&mut self) {
         let volumes = std::mem::take(&mut *self.mounted_volumes);
-        for (_, volume) in volumes {
+        for (_, (name, volume)) in volumes {
+            if let Some(callback) = self.volumes_directory.on_volume_added.get() {
+                callback(&name, None);
+            }
             volume.volume().terminate().await;
         }
     }
@@ -199,7 +206,10 @@ impl MountedVolumesGuard<'_> {
     // Unmounts the volume identified by `store_id`.  The caller should take locks to avoid races if
     // necessary.
     async fn unmount(&mut self, store_id: u64) -> Result<(), Error> {
-        let volume = self.mounted_volumes.remove(&store_id).ok_or(FxfsError::NotFound)?;
+        let (name, volume) = self.mounted_volumes.remove(&store_id).ok_or(FxfsError::NotFound)?;
+        if let Some(callback) = self.volumes_directory.on_volume_added.get() {
+            callback(&name, None);
+        }
         volume.volume().terminate().await;
         Ok(())
     }
@@ -222,6 +232,7 @@ impl VolumesDirectory {
             inspect_tree,
             mem_monitor,
             pager_dirty_bytes_count: AtomicU64::new(0),
+            on_volume_added: OnceLock::new(),
         });
         let mut iter = me.root_volume.volume_directory().iter(&mut merger).await?;
         while let Some((name, store_id, object_descriptor)) = iter.get() {
@@ -371,7 +382,7 @@ impl VolumesDirectory {
             scope.wait().await;
             info!(store_id, "Last connection to volume closed, shutting down");
 
-            let mut mounted_volumes = me.mounted_volumes.lock().await;
+            let mut mounted_volumes = me.lock().await;
             let root_store = me.root_volume.volume_directory().store();
             let fs = root_store.filesystem();
             let _guard = fs
@@ -382,19 +393,9 @@ impl VolumesDirectory {
                 )])
                 .await;
 
-            let volume = {
-                let entry = mounted_volumes.entry(store_id);
-                if let Occupied(entry) = entry {
-                    if entry.get().volume().scope() == &scope {
-                        entry.remove_entry().1
-                    } else {
-                        return;
-                    }
-                } else {
-                    return;
-                }
-            };
-            volume.volume().terminate().await;
+            if let Err(e) = mounted_volumes.unmount(store_id).await {
+                warn!(?e, store_id, "Failed to unmount volume");
+            }
         })
         .detach();
 
@@ -499,7 +500,7 @@ impl VolumesDirectory {
                         );
 
                         let flushes = FuturesUnordered::new();
-                        for vol_and_root in volumes.values() {
+                        for (_, vol_and_root) in volumes.values() {
                             let vol = vol_and_root.volume().clone();
                             flushes.push(async move {
                                 vol.flush_all_files().await;
@@ -623,6 +624,16 @@ impl VolumesDirectory {
             }
         }
         Ok(())
+    }
+
+    /// Sets a callback which is invoked when a volume is added.  When the volume is removed, this
+    /// is called again with `None` as the second parameter.
+    /// Note that this can only be set once per VolumesDirectory; repeated calls will panic.
+    pub fn set_on_mount_callback<F: Fn(&str, Option<Arc<ObjectStore>>) + Send + Sync + 'static>(
+        &self,
+        callback: F,
+    ) {
+        self.on_volume_added.set(Box::new(callback)).ok().unwrap();
     }
 }
 

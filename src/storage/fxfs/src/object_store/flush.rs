@@ -96,6 +96,9 @@ impl ObjectStore {
         if trace {
             info!(store_id = self.store_object_id(), "OS: end flush");
         }
+        if let Some(callback) = self.flush_callback.get() {
+            callback(self);
+        }
 
         let mut counters = self.counters.lock().unwrap();
         counters.num_flushes += 1;
