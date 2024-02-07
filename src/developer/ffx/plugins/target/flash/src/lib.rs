@@ -20,12 +20,17 @@ use fidl_fuchsia_developer_ffx::TargetState;
 use fidl_fuchsia_developer_ffx::{
     FastbootInterface as FidlFastbootInterface, TargetInfo, TargetProxy, TargetRebootState,
 };
-use fuchsia_async::Timer;
+use fuchsia_async::{Time, Timer};
 use std::io::Write;
 use std::net::SocketAddr;
+use std::sync::Once;
 use termion::{color, style};
 
 const SSH_OEM_COMMAND: &str = "add-staged-bootloader-file ssh.authorized_keys";
+
+/// Seconds to wait for until we warn the user we cannot rediscover the target
+/// in the bootloader
+const WAIT_WARN_SECS: u64 = 20;
 
 #[derive(FfxTool)]
 pub struct FlashTool {
@@ -125,8 +130,8 @@ async fn flash_plugin_impl<W: Write>(
             tracing::info!("Target not connected, assuming Fastboot state");
         }
         Some(_) => {
-            // Wait 10 seconds to allow the  target to fully cycle to the bootloader
-            write!(writer, "Waiting for 10 seconds for Target to reboot")
+            // Wait to allow the Target to fully cycle to the bootloader
+            writeln!(writer, "Waiting for Target to reboot...")
                 .user_message("Error writing user message")?;
             writer.flush().user_message("Error flushing writer buffer")?;
 
@@ -138,17 +143,42 @@ async fn flash_plugin_impl<W: Write>(
                 .map_err(|e| anyhow!("Got error rebooting target: {:#?}", e))
                 .user_message("Got an error rebooting")?;
 
-            Timer::new(
-                Duration::seconds(10)
-                    .to_std()
-                    .user_message("Error converting 10 second duration to standard duration")?,
-            )
-            .await;
-            // Get the info again since the target changed state
-            info = target_proxy.identity().await.user_message("Error getting Target's identity")?;
+            let wait_duration = Duration::seconds(1)
+                .to_std()
+                .user_message("Error converting 1 seconds to Duration")?;
+            let once = Once::new();
+            let start = Time::now();
+            loop {
+                // Get the info again since the target changed state
+                info = target_proxy
+                    .identity()
+                    .await
+                    .user_message("Error getting the target's identity")?;
 
-            if !matches!(info.target_state, Some(TargetState::Fastboot)) {
-                ffx_bail!("Target was requested to reboot to the bootloader, but was found in {:#?} state", info.target_state)
+                if matches!(info.target_state, Some(TargetState::Fastboot)) {
+                    break;
+                }
+
+                // Warn the user
+                if Time::now() - start > fuchsia_async::Duration::from_secs(WAIT_WARN_SECS) {
+                    once.call_once(|| {
+                        let _ = writeln!(
+                            writer,
+                            "Have been waiting for Target \
+                                                {} to reboot to bootloader for \
+                                                more than {} seconds but still \
+                                                have not rediscovered it. You \
+                                                may want to cancel this \
+                                                operation and check your \
+                                                connection to the target",
+                            display_name(&info),
+                            WAIT_WARN_SECS
+                        );
+                    });
+                }
+
+                tracing::debug!("Target was requested to reboot to the bootloader, but was found in {:#?} state. Waiting 1 second.", info.target_state);
+                Timer::new(wait_duration).await;
             }
         }
         None => {
