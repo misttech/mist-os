@@ -63,6 +63,10 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
   }
 
   ZX_DEBUG_ASSERT(edid.has_value());
+
+  node.CreateByteVector(
+      "edid-bytes", cpp20::span(edid->base.edid_bytes(), edid->base.edid_length()), &properties);
+
   size_t i = 0;
   for (const display::DisplayTiming& t : edid->timings) {
     auto child = node.CreateChild(fbl::StringPrintf("timing-parameters-%lu", ++i).c_str());
