@@ -27,14 +27,17 @@ use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::FastbootInterface as FidlFastbootInterface;
 use fidl_fuchsia_developer_ffx::{TargetInfo, TargetProxy, TargetRebootState, TargetState};
-use fuchsia_async::Timer;
+use fuchsia_async::{Time, Timer};
 use std::io::{stdin, Write};
 use std::net::SocketAddr;
+use std::sync::Once;
 
 const MISSING_ZBI: &str = "Error: vbmeta parameter must be used with zbi parameter";
 
 const WARNING: &str = "WARNING: ALL SETTINGS USER CONTENT WILL BE ERASED!\n\
                         Do you want to continue? [yN]";
+
+const WAIT_WARN_SECS: u64 = 20;
 
 #[derive(FfxTool)]
 pub struct BootloaderTool {
@@ -67,8 +70,8 @@ impl FfxMain for BootloaderTool {
                 tracing::info!("Target not connected, assuming Fastboot state");
             }
             Some(mode) => {
-                // Wait 10 seconds to allow the target to fully cycle to the bootloader
-                write!(writer, "Waiting for 10 seconds for Target to reboot")
+                // Wait to allow the Target to fully cycle to the bootloader
+                writeln!(writer, "Waiting for Target to reboot to bootloader")
                     .user_message("Error writing user message")?;
                 writer.flush().user_message("Error flushing writer buffer")?;
 
@@ -81,22 +84,43 @@ impl FfxMain for BootloaderTool {
                     .map_err(|e| anyhow!("Got error rebooting target: {:#?}", e))
                     .user_message("Got an error rebooting")?;
 
-                Timer::new(
-                    Duration::seconds(10)
-                        .to_std()
-                        .user_message("Error converting 10 seconds to Duration")?,
-                )
-                .await;
+                let wait_duration = Duration::seconds(1)
+                    .to_std()
+                    .user_message("Error converting 1 seconds to Duration")?;
 
-                // Get the info again since the target changed state
-                info = self
-                    .target_proxy
-                    .identity()
-                    .await
-                    .user_message("Error getting the target's identity")?;
+                let once = Once::new();
+                let start = Time::now();
+                loop {
+                    // Get the info again since the target changed state
+                    info = self
+                        .target_proxy
+                        .identity()
+                        .await
+                        .user_message("Error getting the target's identity")?;
 
-                if !matches!(info.target_state, Some(TargetState::Fastboot)) {
-                    ffx_bail!("Target was requested to reboot to the bootloader, but was found in {:#?} state",info.target_state)
+                    if matches!(info.target_state, Some(TargetState::Fastboot)) {
+                        break;
+                    }
+
+                    if Time::now() - start > fuchsia_async::Duration::from_secs(WAIT_WARN_SECS) {
+                        once.call_once(|| {
+                            let _ = writeln!(
+                                writer,
+                                "Have been waiting for Target \
+                                                {} to reboot to bootloader for \
+                                                more than {} seconds but still \
+                                                have not rediscovered it. You \
+                                                may want to cancel this \
+                                                operation and check your \
+                                                connection to the target",
+                                display_name(&info),
+                                WAIT_WARN_SECS
+                            );
+                        });
+                    }
+
+                    tracing::debug!("Target was requested to reboot to the bootloader, but was found in {:#?} state. Waiting 1 second.", info.target_state);
+                    Timer::new(wait_duration).await;
                 }
             }
             None => {
