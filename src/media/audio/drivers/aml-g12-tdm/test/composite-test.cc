@@ -70,25 +70,6 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
  private:
   static constexpr size_t kMmioSize = 0x1000;
 
-  void GetMmio(fuchsia_hardware_platform_device::wire::DeviceGetMmioRequest* request,
-               GetMmioCompleter::Sync& completer) override {
-    if (request->index != 0) {
-      return completer.ReplyError(ZX_ERR_OUT_OF_RANGE);
-    }
-
-    zx::vmo vmo;
-    if (zx_status_t status = mmio_.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo); status != ZX_OK) {
-      return completer.ReplyError(status);
-    }
-
-    fidl::Arena arena;
-    completer.ReplySuccess(fuchsia_hardware_platform_device::wire::Mmio::Builder(arena)
-                               .offset(0)
-                               .size(kMmioSize)
-                               .vmo(std::move(vmo))
-                               .Build());
-  }
-
   void GetMmioById(fuchsia_hardware_platform_device::wire::DeviceGetMmioByIdRequest* request,
                    GetMmioByIdCompleter::Sync& completer) override {
     if (request->index != 0) {
@@ -113,9 +94,6 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  void GetInterrupt(fuchsia_hardware_platform_device::wire::DeviceGetInterruptRequest* request,
-                    GetInterruptCompleter::Sync& completer) override {}
-
   void GetInterruptById(
       fuchsia_hardware_platform_device::wire::DeviceGetInterruptByIdRequest* request,
       GetInterruptByIdCompleter::Sync& completer) override {}
@@ -123,15 +101,6 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
   void GetInterruptByName(
       fuchsia_hardware_platform_device::wire::DeviceGetInterruptByNameRequest* request,
       GetInterruptByNameCompleter::Sync& completer) override {}
-
-  void GetBti(fuchsia_hardware_platform_device::wire::DeviceGetBtiRequest* request,
-              GetBtiCompleter::Sync& completer) override {
-    zx::bti bti;
-    if (zx_status_t status = bti_.duplicate(ZX_RIGHT_SAME_RIGHTS, &bti); status != ZX_OK) {
-      return completer.ReplyError(status);
-    }
-    completer.ReplySuccess(std::move(bti));
-  }
 
   void GetBtiById(fuchsia_hardware_platform_device::wire::DeviceGetBtiByIdRequest* request,
                   GetBtiByIdCompleter::Sync& completer) override {
@@ -146,9 +115,6 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
                     GetBtiByNameCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
-
-  void GetSmc(fuchsia_hardware_platform_device::wire::DeviceGetSmcRequest* request,
-              GetSmcCompleter::Sync& completer) override {}
 
   void GetSmcById(fuchsia_hardware_platform_device::wire::DeviceGetSmcByIdRequest* request,
                   GetSmcByIdCompleter::Sync& completer) override {}

@@ -52,12 +52,6 @@ type Mmio = resource table {
 @discoverable
 open protocol Device {
     /// Returns a memory mapped IO (MMIO) resource for the given |index|.
-    /// DEPRECATED: Use `GetMmioById`.
-    flexible GetMmio(struct {
-        index uint32;
-    }) -> (Mmio) error zx.Status;
-
-    /// Returns a memory mapped IO (MMIO) resource for the given |index|.
     /// * error `ZX_ERR_OUT_OF_RANGE` if |index| is equal or greater than the number of
     /// mmios.
     /// * error `ZX_ERR_INTERNAL` if the retrieved mmio is not valid.
@@ -74,16 +68,6 @@ open protocol Device {
     flexible GetMmioByName(struct {
         name string:fuchsia.driver.framework.MAX_RESOURCE_NAME_LENGTH;
     }) -> (Mmio) error zx.Status;
-
-    /// Returns an interrupt handle for the given |index|.
-    /// |flags| is forwarded as the |options| parameter to `zx_interrupt_create`.
-    /// DEPRECATED: Use `GetInterruptById`.
-    flexible GetInterrupt(struct {
-        index uint32;
-        flags uint32;
-    }) -> (resource struct {
-        irq zx.Handle:INTERRUPT;
-    }) error zx.Status;
 
     /// Returns an interrupt handle for the given |index|.
     /// |flags| is forwarded as the |options| parameter to `zx_interrupt_create`.
@@ -110,14 +94,6 @@ open protocol Device {
     }) error zx.Status;
 
     /// Returns a bus transaction initiator (bti) handle for the given |index|.
-    /// DEPRECATED: Use `GetBtiById`.
-    flexible GetBti(struct {
-        index uint32;
-    }) -> (resource struct {
-        bti zx.Handle:BTI;
-    }) error zx.Status;
-
-    /// Returns a bus transaction initiator (bti) handle for the given |index|.
     /// * error `ZX_ERR_OUT_OF_RANGE` if |index| is equal or greater than the number of
     /// btis.
     /// * error `ZX_ERR_INTERNAL` if the retrieved bti is not valid.
@@ -135,14 +111,6 @@ open protocol Device {
         name string:fuchsia.driver.framework.MAX_RESOURCE_NAME_LENGTH;
     }) -> (resource struct {
         bti zx.Handle:BTI;
-    }) error zx.Status;
-
-    /// Returns a secure monitor call (smc) handle for the given |index|.
-    /// DEPRECATED: Use `GetSmcById`.
-    flexible GetSmc(struct {
-        index uint32;
-    }) -> (resource struct {
-        smc zx.Handle:RESOURCE;
     }) error zx.Status;
 
     /// Returns a secure monitor call (smc) handle for the given |index|.

@@ -119,21 +119,16 @@ class PlatformDevice : public PlatformDeviceType,
   zx_status_t PDevDeviceAdd(uint32_t index, const device_add_args_t* args, zx_device_t** device);
 
   // Platform device protocol FIDL implementation.
-  void GetMmio(GetMmioRequestView request, GetMmioCompleter::Sync& completer) override;
   void GetMmioById(GetMmioByIdRequestView request, GetMmioByIdCompleter::Sync& completer) override;
   void GetMmioByName(GetMmioByNameRequestView request,
                      GetMmioByNameCompleter::Sync& completer) override;
-  void GetInterrupt(GetInterruptRequestView request,
-                    GetInterruptCompleter::Sync& completer) override;
   void GetInterruptById(GetInterruptByIdRequestView request,
                         GetInterruptByIdCompleter::Sync& completer) override;
   void GetInterruptByName(GetInterruptByNameRequestView request,
                           GetInterruptByNameCompleter::Sync& completer) override;
-  void GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& completer) override;
   void GetBtiById(GetBtiByIdRequestView request, GetBtiByIdCompleter::Sync& completer) override;
   void GetBtiByName(GetBtiByNameRequestView request,
                     GetBtiByNameCompleter::Sync& completer) override;
-  void GetSmc(GetSmcRequestView request, GetSmcCompleter::Sync& completer) override;
   void GetSmcById(GetSmcByIdRequestView request, GetSmcByIdCompleter::Sync& completer) override;
   void GetSmcByName(GetSmcByNameRequestView request,
                     GetSmcByNameCompleter::Sync& completer) override;
