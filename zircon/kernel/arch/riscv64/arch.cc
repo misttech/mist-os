@@ -90,8 +90,8 @@ void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
 void arch_late_init_percpu() {
   // While it would be nicer to zero out vector state - and set it to initial -
   // earlier and next to the call to do so for FPU state, that is too early for
-  // `riscv_feature_vector` to have been set.
-  if (riscv_feature_vector) {
+  // vector feature bit to have been set.
+  if (gRiscvFeatures[arch::RiscvFeature::kVector]) {
     riscv64_vector_zero();
   }
 

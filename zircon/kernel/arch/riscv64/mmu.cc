@@ -9,6 +9,7 @@
 #include <bits.h>
 #include <debug.h>
 #include <inttypes.h>
+#include <lib/arch/riscv64/feature.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/counters.h>
 #include <lib/fit/defer.h>
@@ -138,7 +139,7 @@ pte_t mmu_flags_to_pte_attr(uint flags, bool global) {
   attr |= (global) ? RISCV64_PTE_G : 0;
 
   // Svpbmt support
-  if (riscv_feature_svpbmt) {
+  if (gRiscvFeatures[arch::RiscvFeature::kSvpbmt]) {
     switch (flags & ARCH_MMU_FLAG_CACHE_MASK) {
       case ARCH_MMU_FLAG_CACHED:
         attr |= RISCV64_PTE_PBMT_PMA;
@@ -459,7 +460,7 @@ uint Riscv64ArchVmAspace::MmuFlagsFromPte(pte_t pte) {
   mmu_flags |= (pte & RISCV64_PTE_X) ? ARCH_MMU_FLAG_PERM_EXECUTE : 0;
 
   // Svpbmt feature
-  if (riscv_feature_svpbmt) {
+  if (gRiscvFeatures[arch::RiscvFeature::kSvpbmt]) {
     switch (pte & RISCV64_PTE_PBMT_MASK) {
       case RISCV64_PTE_PBMT_PMA:
         // PMA state basically means default cache paramaters, as determined by physical address.
@@ -1792,7 +1793,7 @@ uint32_t arch_address_tagging_features() { return 0; }
 void arch_zero_page(void* _ptr) {
   const uintptr_t end_address = reinterpret_cast<uintptr_t>(_ptr) + PAGE_SIZE;
 
-  if (riscv_feature_cboz) {
+  if (gRiscvFeatures[arch::RiscvFeature::kZicboz]) {
     asm volatile(
         R"""(
       .balign 4

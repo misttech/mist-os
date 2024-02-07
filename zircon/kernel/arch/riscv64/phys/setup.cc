@@ -10,6 +10,7 @@
 #include <lib/zbitl/items/cpu-topology.h>
 #include <lib/zbitl/view.h>
 
+#include <ktl/optional.h>
 #include <ktl/string_view.h>
 #include <phys/arch/arch-phys-info.h>
 #include <phys/main.h>

@@ -7,14 +7,12 @@
 #ifndef ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_RISCV64_FEATURE_H_
 #define ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_RISCV64_FEATURE_H_
 
+#include <lib/arch/riscv64/feature.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-// RISC-V features
-extern bool riscv_feature_cboz;
-extern bool riscv_feature_cbom;
-extern bool riscv_feature_svpbmt;
-extern bool riscv_feature_vector;
+// RISC-V feature bitset.
+extern arch::RiscvFeatures gRiscvFeatures;
 
 extern uint32_t riscv_cboz_size;
 extern uint32_t riscv_cbom_size;

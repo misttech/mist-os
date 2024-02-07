@@ -118,7 +118,7 @@ zx_status_t arch_set_fp_regs(Thread* thread, const zx_thread_state_fp_regs_t* in
 zx_status_t arch_get_vector_regs(Thread* thread, zx_thread_state_vector_regs_t* out) {
   LTRACEF("thread %p out %p\n", thread, out);
 
-  if (!riscv_feature_vector) {
+  if (!gRiscvFeatures[arch::RiscvFeature::kVector]) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -132,7 +132,7 @@ zx_status_t arch_get_vector_regs(Thread* thread, zx_thread_state_vector_regs_t* 
 zx_status_t arch_set_vector_regs(Thread* thread, const zx_thread_state_vector_regs_t* in) {
   LTRACEF("thread %p in %p\n", thread, in);
 
-  if (!riscv_feature_vector) {
+  if (!gRiscvFeatures[arch::RiscvFeature::kVector]) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 

@@ -6,18 +6,18 @@
 
 #include "arch/riscv64/vector.h"
 
+#include <lib/arch/riscv64/feature.h>
 #include <stdint.h>
+#include <zircon/compiler.h>
 
 #include <arch/riscv64/feature.h>
 #include <kernel/thread.h>
-
-#include "ktl/optional.h"
-#include "zircon/compiler.h"
+#include <ktl/optional.h>
 
 // Save the current on-cpu vector state to the thread. Takes as an argument
 // the current HW status in the sstatus register.
 void riscv64_thread_vector_save(Thread* thread, Riscv64VectorStatus status) {
-  DEBUG_ASSERT(riscv_feature_vector);
+  DEBUG_ASSERT(gRiscvFeatures[arch::RiscvFeature::kVector]);
 
   switch (status) {
     case Riscv64VectorStatus::DIRTY:
@@ -51,7 +51,7 @@ void riscv64_thread_vector_save(Thread* thread, Riscv64VectorStatus status) {
 // should hold whether or not the sstatus.fs bits are currently RISCV64_CSR_SSTATUS_VS_INITIAL,
 // as an optimization to avoid re-reading sstatus any more than necessary.
 void riscv64_thread_vector_restore(const Thread* t, Riscv64VectorStatus status) {
-  DEBUG_ASSERT(riscv_feature_vector);
+  DEBUG_ASSERT(gRiscvFeatures[arch::RiscvFeature::kVector]);
 
   // Restore the state from the new thread
   if (t->arch().vector_dirty) {

@@ -78,9 +78,9 @@ void arch_setup_uspace_iframe(iframe_t* iframe, uintptr_t pc, uintptr_t sp, uint
   // assumption that the context switch routine would have defaulted the
   // FPU/vector state a the time this thread enters user space. All other bits
   // set to zero, default options.
-  iframe->status = RISCV64_CSR_SSTATUS_PIE | RISCV64_CSR_SSTATUS_UXL_64BIT |
-                   RISCV64_CSR_SSTATUS_FS_INITIAL |
-                   (riscv_feature_vector ? RISCV64_CSR_SSTATUS_VS_INITIAL : 0);
+  iframe->status =
+      RISCV64_CSR_SSTATUS_PIE | RISCV64_CSR_SSTATUS_UXL_64BIT | RISCV64_CSR_SSTATUS_FS_INITIAL |
+      (gRiscvFeatures[arch::RiscvFeature::kVector] ? RISCV64_CSR_SSTATUS_VS_INITIAL : 0);
 }
 
 // Switch to user mode, set the user stack pointer to user_stack_top, save the
@@ -133,7 +133,7 @@ void arch_context_switch(Thread* oldthread, Thread* newthread) {
     DEBUG_ASSERT(oldthread == Thread::Current().Get());
     riscv64_thread_fpu_save(oldthread, current_fpu_status);
 
-    if (riscv_feature_vector) {
+    if (gRiscvFeatures[arch::RiscvFeature::kVector]) {
       riscv64_thread_vector_save(oldthread, current_vector_status);
     }
   }
@@ -143,7 +143,7 @@ void arch_context_switch(Thread* oldthread, Thread* newthread) {
   // avoids potential issues with state getting out of sync if the kernel
   // panicked or the higher layer forgot to restore.
   riscv64_thread_fpu_restore(newthread, current_fpu_status);
-  if (riscv_feature_vector) {
+  if (gRiscvFeatures[arch::RiscvFeature::kVector]) {
     riscv64_thread_vector_restore(newthread, current_vector_status);
   }
 
@@ -177,7 +177,7 @@ vaddr_t arch_thread_get_blocked_fp(Thread* t) {
 
 void arch_save_user_state(Thread* thread) {
   riscv64_thread_fpu_save(thread, riscv64_fpu_status());
-  if (riscv_feature_vector) {
+  if (gRiscvFeatures[arch::RiscvFeature::kVector]) {
     riscv64_thread_vector_save(thread, riscv64_vector_status());
   }
   // Not saving debug state because there isn't any.
@@ -185,7 +185,7 @@ void arch_save_user_state(Thread* thread) {
 
 void arch_restore_user_state(Thread* thread) {
   riscv64_thread_fpu_restore(thread, riscv64_fpu_status());
-  if (riscv_feature_vector) {
+  if (gRiscvFeatures[arch::RiscvFeature::kVector]) {
     riscv64_thread_vector_restore(thread, riscv64_vector_status());
   }
 }

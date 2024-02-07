@@ -6,6 +6,7 @@
 
 #include <align.h>
 #include <lib/arch/cache.h>
+#include <lib/arch/riscv64/feature.h>
 #include <trace.h>
 
 #include <arch/interrupt.h>
@@ -23,7 +24,7 @@ inline void cache_op(vaddr_t start, size_t len, void (*cbofunc)(vaddr_t)) {
   // If the Zicbom feature is enabled, use the cbo* instructions.
   // If there is no zicbom feature, the cpu is assumed to be coherent with
   // external DMA and not need any sort of cache flushing.
-  if (riscv_feature_cbom) {
+  if (gRiscvFeatures[arch::RiscvFeature::kZicbom]) {
     const size_t stride = riscv_cbom_size;
     const vaddr_t end = start + len;
 
