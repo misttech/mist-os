@@ -44,7 +44,7 @@ fuchsia_microbenchmarks can be run the following ways:
     fx test fuchsia_microbenchmarks.cm -- --help
     ```
 
-*   **Maximal:** This approach uses the end to end host test setup as Infra builds on CI and CQ.
+*   **Maximal:** This approach uses the same end to end host test setup as Infra builds on CI and CQ.
     This runs the full suite multiple times, then outputs the results in fuchsiaperf.json files
     which can be post processed for the results.
 
