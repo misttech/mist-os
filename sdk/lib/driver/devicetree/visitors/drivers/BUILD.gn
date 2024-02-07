@@ -1,6 +1,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+import("//build/sdk/sdk_molecule.gni")
 
 group("tests") {
   deps = [
@@ -12,4 +13,21 @@ group("tests") {
     "registers:tests",
   ]
   testonly = true
+}
+
+sdk_molecule("devicetree-visitors") {
+  visibility = [
+    ":*",
+    "//sdk:*",
+  ]
+
+  deps = [
+    "//sdk/lib/driver/devicetree/visitors/drivers/clock-controllers/clockimpl-visitor:clockimpl-visitor_sdk",
+    "//sdk/lib/driver/devicetree/visitors/drivers/gpio-controllers/gpioimpl-visitor:gpioimpl-visitor_sdk",
+    "//sdk/lib/driver/devicetree/visitors/drivers/i2c-controllers/i2c-bus-visitor:i2c-bus-visitor_sdk",
+    "//sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gicv2:arm-gicv2_sdk",
+    "//sdk/lib/driver/devicetree/visitors/drivers/mali-gpu:mali-gpu-visitor_sdk",
+    "//sdk/lib/driver/devicetree/visitors/drivers/registers:registers-visitor_sdk",
+    "//sdk/lib/driver/devicetree/visitors/drivers/sysmem:sysmem-visitor_sdk",
+  ]
 }
