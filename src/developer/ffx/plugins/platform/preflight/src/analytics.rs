@@ -32,7 +32,7 @@ fn get_graphics_cards() -> Result<Vec<String>> {
 pub async fn report_preflight_analytics(action: &str) {
     let mut custom_dimensions = BTreeMap::new();
     if let Ok(cards) = get_graphics_cards() {
-        custom_dimensions.insert(ANALYTICS_CUSTOM_DIMENSION_2_KEY, cards.join(","));
+        custom_dimensions.insert(ANALYTICS_CUSTOM_DIMENSION_2_KEY, cards.join(",").into());
     }
 
     if let Err(e) =

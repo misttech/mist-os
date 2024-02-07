@@ -4,7 +4,7 @@
 
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing;
@@ -410,21 +410,10 @@ fn get_systime() -> u128 {
     since.as_micros()
 }
 
-/// Converts the old, UA, custom dimensions to the new, GA4, GA4Value type.
-/// Currently, to preserve existing clients, everything will become GA4Value::Str.
-/// This will go away once we remove UA analytics and refactor the clients to send specific types.
-pub fn convert_to_ga4values(custom_dimensions: BTreeMap<&str, String>) -> BTreeMap<&str, GA4Value> {
-    let custom_dimensions_ga4: &mut BTreeMap<&str, GA4Value> = &mut BTreeMap::new();
-    for (k, v) in custom_dimensions.iter() {
-        custom_dimensions_ga4.insert(*k, v.clone().into());
-    }
-    custom_dimensions_ga4.to_owned()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
 
     #[test]
     fn test_param_serde_flattening() {
@@ -556,18 +545,6 @@ mod tests {
     fn truncate_str_len_empty() {
         let result = truncate_string_to_len(&"", 3);
         assert_eq!(result, "");
-    }
-
-    #[test]
-    fn convert_to_ga4value_types() {
-        let custom_dimensions: &mut BTreeMap<&str, String> = &mut BTreeMap::new();
-        custom_dimensions.insert("bool", "True".to_string());
-        custom_dimensions.insert("i64", "1i64".to_string());
-        custom_dimensions.insert("str", "hello".to_string());
-        let actual = convert_to_ga4values(custom_dimensions.to_owned());
-        assert_eq!(actual.get("bool"), Some(&GA4Value::Str("True".to_string())));
-        assert_eq!(actual.get("i64"), Some(&GA4Value::Str("1i64".to_string())));
-        assert_eq!(actual.get("str"), Some(&GA4Value::Str("hello".to_string())));
     }
 
     #[test]

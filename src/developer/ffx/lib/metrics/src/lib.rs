@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use analytics::{
-    add_custom_event, init_with_invoker, make_batch, metrics_event_batch::MetricsEventBatch,
-    uuid_as_str,
-};
+use analytics::{add_custom_event, ga4_metrics, init_ga4_metrics_service};
 use anyhow::Result;
 use fidl_fuchsia_developer_ffx::VersionInfo;
 use fuchsia_async::TimeoutExt;
@@ -15,11 +12,8 @@ use std::{
 };
 use tracing;
 
-pub const GA_PROPERTY_ID: &str = "UA-127897021-9";
 pub const GA4_PROPERTY_ID: &str = "G-L10R82HSYT";
 pub const GA4_KEY: &str = "mHeVJ5GxQTCvAVCmVHn_dw";
-
-pub const ANALYTICS_CLIENTID_CUSTOM_DIMENSION_KEY: &str = "cd5";
 
 pub async fn init_metrics_svc(
     build_info: VersionInfo,
@@ -27,11 +21,10 @@ pub async fn init_metrics_svc(
     sdk_version: String,
 ) {
     let build_version = build_info.build_version;
-    init_with_invoker(
+    let _ = init_ga4_metrics_service(
         String::from("ffx"),
         build_version,
         sdk_version,
-        GA_PROPERTY_ID.to_string(),
         GA4_PROPERTY_ID.to_string(),
         GA4_KEY.to_string(),
         invoker,
@@ -39,50 +32,26 @@ pub async fn init_metrics_svc(
     .await;
 }
 
-pub async fn add_ffx_launch_and_timing_events(sanitized_args: String, time: String) -> Result<()> {
-    let mut batcher = make_batch().await?;
-    add_ffx_launch_event(&sanitized_args, &mut batcher).await?;
-    add_ffx_timing_event(&sanitized_args, time, &mut batcher).await?;
-    batcher.send_events().await
-}
-
-async fn add_ffx_launch_event(sanitized_args: &str, batcher: &mut MetricsEventBatch) -> Result<()> {
-    let mut custom_dimensions = BTreeMap::new();
-    add_client_id_as_custom_dimension(&mut custom_dimensions).await;
-    batcher.add_custom_event(None, Some(&sanitized_args), None, custom_dimensions).await
-}
-
-/// By adding clientId as a custom dimension, DataStudio dashboards will be able to
-/// accurately count unique users of ffx subcommands.
-async fn add_client_id_as_custom_dimension(custom_dimensions: &mut BTreeMap<&str, String>) {
-    if let Ok(uuid) = uuid_as_str().await {
-        custom_dimensions.insert(ANALYTICS_CLIENTID_CUSTOM_DIMENSION_KEY, uuid);
-    }
-}
-
-async fn add_ffx_timing_event(
-    sanitized_args: &str,
-    time: String,
-    batcher: &mut MetricsEventBatch,
-) -> Result<()> {
-    let mut custom_dimensions = BTreeMap::new();
-    add_client_id_as_custom_dimension(&mut custom_dimensions).await;
-    batcher.add_timing_event(Some(&sanitized_args), time, None, None, custom_dimensions).await
+pub async fn add_ffx_launch_event(sanitized_args: String, time: u128) -> Result<()> {
+    let u64_time = u64::try_from(time).unwrap_or(0);
+    let custom_dimensions = BTreeMap::from([("time", u64_time.into())]);
+    let mut metrics_svc = ga4_metrics().await?;
+    metrics_svc
+        .add_custom_event(None, Some(&sanitized_args), None, custom_dimensions, Some("invoke"))
+        .await?;
+    metrics_svc.send_events().await
 }
 
 /// Add a metric announcing what protocol our RCS proxy is using.
 pub async fn add_ffx_rcs_protocol_event(proto_name: &str) -> Result<()> {
-    let mut custom_dimensions = BTreeMap::new();
-    add_client_id_as_custom_dimension(&mut custom_dimensions).await;
-    add_custom_event(Some("ffx_rcs_protocol"), Some(&proto_name), None, custom_dimensions).await
+    add_custom_event(Some("ffx_rcs_protocol"), Some(&proto_name), None, BTreeMap::new()).await
 }
 
 pub async fn add_daemon_metrics_event(request_str: &str) {
     let request = request_str.to_string();
     let analytics_start = Instant::now();
     let analytics_task = fuchsia_async::Task::local(async move {
-        let custom_dimensions = BTreeMap::new();
-        match add_custom_event(Some("ffx_daemon"), Some(&request), None, custom_dimensions).await {
+        match add_custom_event(Some("ffx_daemon"), Some(&request), None, BTreeMap::new()).await {
             Err(e) => tracing::error!("metrics submission failed: {}", e),
             Ok(_) => tracing::debug!("metrics succeeded"),
         }
@@ -110,33 +79,13 @@ pub async fn add_flash_partition_event(
     file_size: u64,
     flash_time: &Duration,
 ) -> Result<()> {
-    let mut custom_dimensions = BTreeMap::from([
-        ("partition_name", partition_name.clone()),
-        ("product_name", product_name.clone()),
-        ("board_name", board_name.clone()),
-        ("file_size", file_size.to_string()),
-        ("flash_time", flash_time.as_millis().to_string()),
+    let u64_time = u64::try_from(flash_time.as_millis()).unwrap_or(0);
+    let custom_dimensions = BTreeMap::from([
+        ("partition_name", partition_name.clone().into()),
+        ("product_name", product_name.clone().into()),
+        ("board_name", board_name.clone().into()),
+        ("file_size", file_size.into()),
+        ("flash_time", u64_time.into()),
     ]);
-    add_client_id_as_custom_dimension(&mut custom_dimensions).await;
     add_custom_event(Some("ffx_flash"), None, None, custom_dimensions).await
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // #[test]
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn add_client_id_custom_dimension() {
-        // let version_info =  VersionInfo {commit_hash: None,
-        //     commit_timestamp: None, build_version: None,
-        //     abi_revision: None, api_level: None,
-        //     exec_path: None, build_id: None,
-        //     __source_breaking: fidl::marker::SourceBreaking};
-        let version_info = VersionInfo::default();
-        init_metrics_svc(version_info, None, String::from("test_version")).await;
-        let mut custom_dimensions = BTreeMap::new();
-        add_client_id_as_custom_dimension(&mut custom_dimensions).await;
-        assert_eq!("No uuid", &custom_dimensions["cd5"]);
-    }
 }

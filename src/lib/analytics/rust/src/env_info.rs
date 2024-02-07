@@ -5,10 +5,6 @@
 use home::home_dir;
 use std::path::PathBuf;
 
-pub fn os_and_release_desc() -> String {
-    format!("{} {}", get_os(), get_arch())
-}
-
 pub fn get_os() -> String {
     convert_macos_to_darwin(std::env::consts::OS)
 }
