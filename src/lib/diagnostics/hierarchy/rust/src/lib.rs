@@ -244,11 +244,28 @@ where
         self.children.iter().find(|node| node.name == name)
     }
 
+    /// Returns a mutable reference to the child of the given |name| if one exists.
+    pub fn get_child_mut(&mut self, name: &str) -> Option<&mut DiagnosticsHierarchy<Key>> {
+        self.children.iter_mut().find(|node| node.name == name)
+    }
+
     /// Returns the child of the given |path| if one exists.
     pub fn get_child_by_path(&self, path: &[&str]) -> Option<&DiagnosticsHierarchy<Key>> {
         let mut result = Some(self);
         for name in path {
             result = result.and_then(|node| node.get_child(name));
+        }
+        result
+    }
+
+    /// Returns a mutable reference to the child of the given |path| if one exists.
+    pub fn get_child_by_path_mut(
+        &mut self,
+        path: &[&str],
+    ) -> Option<&mut DiagnosticsHierarchy<Key>> {
+        let mut result = Some(self);
+        for name in path {
+            result = result.and_then(|node| node.get_child_mut(name));
         }
         result
     }
@@ -954,6 +971,29 @@ where
     Ok(result)
 }
 
+/// Filters a hierarchy given a tree selector.
+pub fn filter_tree<Key>(
+    root_node: DiagnosticsHierarchy<Key>,
+    selectors: &[TreeSelector],
+) -> Option<DiagnosticsHierarchy<Key>>
+where
+    Key: AsRef<str>,
+{
+    let mut matcher = HierarchyMatcher::default();
+    for selector in selectors {
+        match selector {
+            TreeSelector::SubtreeSelector(subtree_selector) => {
+                matcher.insert_subtree(subtree_selector.clone());
+            }
+            TreeSelector::PropertySelector(property_selector) => {
+                matcher.insert_property(property_selector.clone());
+            }
+            _ => {}
+        }
+    }
+    filter_hierarchy(root_node, &matcher)
+}
+
 /// Filters a diagnostics hierarchy using a set of path selectors and their associated property
 /// selectors.
 ///
@@ -1206,13 +1246,16 @@ mod tests {
             vec![b_prop.clone()],
             vec![child2.clone()],
         );
-        let hierarchy = DiagnosticsHierarchy::new(
+        let mut hierarchy = DiagnosticsHierarchy::new(
             "root".to_string(),
             vec![a_prop.clone()],
             vec![child.clone()],
         );
         assert_matches!(hierarchy.get_child("child"), Some(node) if *node == child);
+        assert_matches!(hierarchy.get_child_mut("child"), Some(node) if *node == child);
         assert_matches!(hierarchy.get_child_by_path(&vec!["child", "child2"]),
+                        Some(node) if *node == child2);
+        assert_matches!(hierarchy.get_child_by_path_mut(&vec!["child", "child2"]),
                         Some(node) if *node == child2);
         assert_matches!(hierarchy.get_property("a"), Some(prop) if *prop == a_prop);
         assert_matches!(hierarchy.get_property_by_path(&vec!["child", "b"]),
@@ -1940,5 +1983,46 @@ mod tests {
         );
         let test_selectors = vec!["*:root/session_started_at/0"];
         assert_eq!(parse_selectors_and_filter_hierarchy(hierarchy, test_selectors), None);
+    }
+
+    #[fuchsia::test]
+    fn test_filter_tree() {
+        let test_selectors = vec!["root/foo:11", "root:z", r#"root/bar/zed:13\/\:"#];
+        let parsed_test_selectors = test_selectors
+            .into_iter()
+            .map(|s| {
+                selectors::parse_tree_selector::<VerboseError>(s)
+                    .expect("All test selectors are valid and parsable.")
+            })
+            .collect::<Vec<_>>();
+
+        let result =
+            filter_tree(get_test_hierarchy(), &parsed_test_selectors).map(|mut hierarchy| {
+                hierarchy.sort();
+                hierarchy
+            });
+        assert_eq!(
+            result,
+            Some(DiagnosticsHierarchy::new(
+                "root",
+                vec![Property::Int("z".to_string(), -4),],
+                vec![
+                    DiagnosticsHierarchy::new(
+                        "bar",
+                        vec![],
+                        vec![DiagnosticsHierarchy::new(
+                            "zed",
+                            vec![Property::Int("13/:".to_string(), -4)],
+                            vec![],
+                        )],
+                    ),
+                    DiagnosticsHierarchy::new(
+                        "foo",
+                        vec![Property::Int("11".to_string(), -4),],
+                        vec![],
+                    )
+                ],
+            ))
+        );
     }
 }

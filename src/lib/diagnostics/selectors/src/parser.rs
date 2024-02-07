@@ -5,7 +5,7 @@
 use crate::{
     error::ParseError,
     types::*,
-    validate::{ValidateComponentSelectorExt, ValidateExt},
+    validate::{ValidateComponentSelectorExt, ValidateExt, ValidateTreeSelectorExt},
 };
 use nom::{
     self,
@@ -330,7 +330,7 @@ where
 }
 
 /// Parses a tree selector, which is a node selector and an optional property selector.
-fn tree_selector<'a, E>(input: &'a str) -> IResult<&'a str, TreeSelector<'a>, E>
+pub fn tree_selector<'a, E>(input: &'a str) -> IResult<&'a str, TreeSelector<'a>, E>
 where
     E: NomParseError<&'a str>,
 {
@@ -464,6 +464,25 @@ where
         Ok((_, selector)) => {
             selector.validate()?;
             Ok(selector)
+        }
+        Err(nom::Err::Error(e) | nom::Err::Failure(e)) => Err(E::to_error(input, e)),
+        _ => unreachable!("through the complete combinator we get rid of Incomplete"),
+    }
+}
+
+/// Parses the input into a `ComponentSelector` ignoring any whitespace around the component
+/// selector.
+pub fn consuming_tree_selector<'a, E>(input: &'a str) -> Result<TreeSelector<'a>, ParseError>
+where
+    E: ParsingError<'a>,
+{
+    let result = nom::combinator::all_consuming::<_, _, <E as ParsingError<'_>>::Internal, _>(
+        pair(spaced(tree_selector), multispace0),
+    )(input);
+    match result {
+        Ok((_, (tree_selector, _))) => {
+            tree_selector.validate()?;
+            Ok(tree_selector)
         }
         Err(nom::Err::Error(e) | nom::Err::Failure(e)) => Err(E::to_error(input, e)),
         _ => unreachable!("through the complete combinator we get rid of Incomplete"),

@@ -643,6 +643,26 @@ impl<K> PropertyAssertion<K> for NonZeroUintProperty {
     }
 }
 
+/// A PropertyAssertion that passes for non-zero, signed integers.
+///
+/// TODO(https://fxbug.dev/42140843): generalize this to use the >= operator.
+pub struct NonZeroIntProperty;
+
+impl<K> PropertyAssertion<K> for NonZeroIntProperty {
+    fn run(&self, actual: &Property<K>) -> Result<(), Error> {
+        match actual {
+            Property::Int(_, v) if *v != 0 => Ok(()),
+            Property::Int(_, v) if *v == 0 => {
+                Err(format_err!("expected non-zero signed integer, found 0"))
+            }
+            _ => Err(format_err!(
+                "expected non-zero signed integer, found {}",
+                actual.discriminant_name()
+            )),
+        }
+    }
+}
+
 /// A PropertyAssertion that passes for any Int.
 pub struct AnyIntProperty;
 
@@ -1365,6 +1385,42 @@ mod tests {
         );
         assert_data_tree!(diagnostics_hierarchy, key: {
             value1: NonZeroUintProperty,
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_nonzero_int_property_passes() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![Property::Int("value1".to_string(), 10), Property::Int("value2".to_string(), 20)],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: NonZeroIntProperty,
+            value2: NonZeroIntProperty,
+        });
+    }
+
+    #[fuchsia::test]
+    #[should_panic]
+    fn test_nonzero_int_property_fails_on_zero() {
+        let diagnostics_hierarchy =
+            DiagnosticsHierarchy::new("key", vec![Property::Int("value1".to_string(), 0)], vec![]);
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: NonZeroIntProperty,
+        });
+    }
+
+    #[fuchsia::test]
+    #[should_panic]
+    fn test_nonzero_int_property_fails() {
+        let diagnostics_hierarchy = DiagnosticsHierarchy::new(
+            "key",
+            vec![Property::Uint("value1".to_string(), 10u64)],
+            vec![],
+        );
+        assert_data_tree!(diagnostics_hierarchy, key: {
+            value1: NonZeroIntProperty,
         });
     }
 

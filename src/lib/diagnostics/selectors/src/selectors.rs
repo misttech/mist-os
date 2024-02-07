@@ -134,6 +134,17 @@ pub fn tokenize_string(
     return Ok(token_aggregator);
 }
 
+/// Converts an unparsed tree selector string into a TreeSelector.
+pub fn parse_tree_selector<'a, E>(
+    unparsed_tree_selector: &'a str,
+) -> Result<TreeSelector, ParseError>
+where
+    E: ParsingError<'a>,
+{
+    let result = parser::consuming_tree_selector::<E>(&unparsed_tree_selector)?;
+    Ok(result.into())
+}
+
 /// Converts an unparsed component selector string into a ComponentSelector.
 pub fn parse_component_selector<'a, E>(
     unparsed_component_selector: &'a str,
@@ -1204,5 +1215,21 @@ a:b:c
 
         assert!(parse_log_interest_selector_or_severity("RANDOM").is_err());
         assert!(parse_log_interest_selector_or_severity("core/foo#NO#YES").is_err());
+    }
+
+    #[test]
+    fn test_parse_tree_selector() {
+        let selector = parse_tree_selector::<VerboseError>("root/node*/nested:prop").unwrap();
+        assert_eq!(
+            selector,
+            TreeSelector::PropertySelector(PropertySelector {
+                node_path: vec![
+                    StringSelector::ExactMatch("root".into()),
+                    StringSelector::StringPattern("node*".into()),
+                    StringSelector::ExactMatch("nested".into()),
+                ],
+                target_properties: StringSelector::ExactMatch("prop".into())
+            }),
+        );
     }
 }
