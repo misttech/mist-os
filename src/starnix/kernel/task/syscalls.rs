@@ -722,6 +722,7 @@ pub fn sys_sched_setscheduler(
     let target_task = Task::from_weak(&weak)?;
     let rlimit = target_task.thread_group.get_rlimit(Resource::RTPRIO);
 
+    selinux_hooks::check_setsched_access(current_task, &target_task)?;
     let param: sched_param = current_task.read_object(param.into())?;
     let policy = SchedulerPolicy::from_sched_params(policy, param, rlimit)?;
     target_task.set_scheduler_policy(policy)?;

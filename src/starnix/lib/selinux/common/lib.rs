@@ -219,6 +219,8 @@ class_permission_enum! {
         Transition,
         /// Permission to get scheduling policy currently applied to a process.
         GetSched,
+        /// Permission to set scheduling policy for a process.
+        SetSched,
         /// Permission to get the process group ID.
         GetPgid,
         /// Permission to set the process group ID.
@@ -232,6 +234,7 @@ impl ProcessPermission {
             ProcessPermission::Fork => "fork",
             ProcessPermission::Transition => "transition",
             ProcessPermission::GetSched => "getsched",
+            ProcessPermission::SetSched => "setsched",
             ProcessPermission::GetPgid => "getpgid",
             ProcessPermission::SetPgid => "setpgid",
         }

@@ -76,6 +76,23 @@ pub fn check_getsched_access(source: &CurrentTask, target: &Task) -> Result<(), 
     }
 }
 
+/// Checks if setsched is allowed, if SELinux is enabled. Access is allowed if SELinux is disabled.
+pub fn check_setsched_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
+    match &source.kernel().security_server {
+        None => return Ok(()),
+        Some(security_server) => {
+            let source_sid = source.get_current_sid();
+            let target_sid = target.get_current_sid();
+            thread_group_hooks::check_setsched_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                source_sid,
+                target_sid,
+            )
+        }
+    }
+}
+
 /// Checks if getpgid is allowed, if SELinux is enabled. Access is allowed if SELinux is disabled.
 pub fn check_getpgid_access(source_task: &CurrentTask, target_task: &Task) -> Result<(), Errno> {
     match &source_task.kernel().security_server {
