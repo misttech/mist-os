@@ -640,6 +640,7 @@ config("vdso_config") {
   vdso_linker_script = "vdso/vdso.ld"
   vdso_version_script = "vdso/vdso-${current_cpu}.map"
   ldflags += [
+    "-Wl,--hash-style=both",
     "-Wl,-T," + rebase_path(vdso_linker_script, root_build_dir),
     "-Wl,--version-script," + rebase_path(vdso_version_script, root_build_dir),
   ]
