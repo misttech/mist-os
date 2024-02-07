@@ -16,7 +16,7 @@ use fidl_fuchsia_net_ext::IntoExt as _;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_stack as fnet_stack;
-use futures::{pin_mut, TryStreamExt as _};
+use futures::{pin_mut, Future, FutureExt, Stream, StreamExt as _, TryStreamExt as _};
 use net_declare::fidl_subnet;
 use net_types::{ip::Ipv4Addr, SpecifiedAddr, Witness as _};
 
@@ -72,6 +72,9 @@ pub enum Error {
     /// No ClientExitReason was provided, when one was expected.
     #[error("missing exit reason")]
     MissingExitReason,
+    /// The client unexpectedly exited.
+    #[error("unexpected exit; reason: {0:?}")]
+    UnexpectedExit(Option<fnet_dhcp::ClientExitReason>),
 }
 
 /// The default subnet used as the destination while populating a
@@ -241,6 +244,13 @@ pub trait ClientProviderExt {
         interface_id: NonZeroU64,
         new_client_params: fnet_dhcp::NewClientParams,
     ) -> fnet_dhcp::ClientProxy;
+
+    /// Construct a new DHCP client, returning a ClientEnd instead of a Proxy.
+    fn new_client_end_ext(
+        &self,
+        interface_id: NonZeroU64,
+        new_client_params: fnet_dhcp::NewClientParams,
+    ) -> fidl::endpoints::ClientEnd<fnet_dhcp::ClientMarker>;
 }
 
 impl ClientProviderExt for fnet_dhcp::ClientProviderProxy {
@@ -251,6 +261,17 @@ impl ClientProviderExt for fnet_dhcp::ClientProviderProxy {
     ) -> fnet_dhcp::ClientProxy {
         let (client, server) = fidl::endpoints::create_proxy::<fnet_dhcp::ClientMarker>()
             .expect("create DHCPv4 client fidl endpoints");
+        self.new_client(interface_id.get(), &new_client_params, server)
+            .expect("create new DHCPv4 client");
+        client
+    }
+
+    fn new_client_end_ext(
+        &self,
+        interface_id: NonZeroU64,
+        new_client_params: fnet_dhcp::NewClientParams,
+    ) -> fidl::endpoints::ClientEnd<fnet_dhcp::ClientMarker> {
+        let (client, server) = fidl::endpoints::create_endpoints::<fnet_dhcp::ClientMarker>();
         self.new_client(interface_id.get(), &new_client_params, server)
             .expect("create new DHCPv4 client");
         client
@@ -297,12 +318,135 @@ impl ClientExt for fnet_dhcp::ClientProxy {
     }
 }
 
+/// Produces a stream that merges together the configuration hanging get
+/// and the [`fnet_dhcp::ClientEvent::OnExit`] terminal event.
+/// The client will be shut down when `shutdown_future` completes.
+pub fn merged_configuration_stream(
+    // Takes a `[fidl::endpoints::ClientEnd]` so that we know we can take
+    // the event stream without panicking.
+    client_end: fidl::endpoints::ClientEnd<fnet_dhcp::ClientMarker>,
+    shutdown_future: impl Future<Output = ()> + 'static,
+) -> impl Stream<Item = Result<Configuration, Error>> + 'static {
+    let client = client_end.into_proxy().expect("into_proxy is infallible");
+    let event_stream = client.take_event_stream();
+
+    let proxy_for_shutdown = client.clone();
+    let shutdown_future = shutdown_future.map(move |()| proxy_for_shutdown.shutdown());
+    let configs = configuration_stream(client);
+
+    fn prio_left(_: &mut ()) -> futures::stream::PollNext {
+        futures::stream::PollNext::Left
+    }
+
+    // Events yielded from a merged stream of client hanging gets or terminal
+    // events.
+    #[derive(Debug)]
+    enum MergedClientEvent {
+        // A terminal event yielded by the client's event stream.
+        Terminal(Result<fnet_dhcp::ClientEvent, Error>),
+        // Configuration acquired via the client's hanging get stream.
+        WatchConfiguration(Result<Configuration, Error>),
+        // A marker event indicating shutdown was requested by the caller.
+        ShutdownRequested,
+    }
+
+    futures::stream::select_with_strategy(
+        futures::stream::select_with_strategy(
+            event_stream.map_err(Error::Fidl).map(MergedClientEvent::Terminal),
+            // Merge in any error we observed telling the client to shut down so
+            // that it can be observed as a problem with the terminal event
+            // stream.
+            futures::stream::once(shutdown_future).map(|result| match result {
+                Ok(()) => MergedClientEvent::ShutdownRequested,
+                Err(shutdown_err) => MergedClientEvent::Terminal(Err(Error::Fidl(shutdown_err))),
+            }),
+            prio_left,
+        )
+        // If the terminal event stream ends without showing an event, then
+        // we're missing an exit reason.
+        .chain(futures::stream::once(futures::future::ready(MergedClientEvent::Terminal(
+            Err(Error::MissingExitReason),
+        )))),
+        configs.map(MergedClientEvent::WatchConfiguration),
+        // Prioritize yielding terminal events.
+        prio_left,
+    )
+    .scan((false, false), |(stream_ended, shutdown_requested), item| {
+        if *stream_ended {
+            return futures::future::ready(None);
+        }
+
+        futures::future::ready(Some(match item {
+            MergedClientEvent::ShutdownRequested => {
+                assert!(!*shutdown_requested);
+                *shutdown_requested = true;
+                None
+            }
+            MergedClientEvent::Terminal(terminal_result) => {
+                *stream_ended = true;
+                match terminal_result {
+                    Ok(fnet_dhcp::ClientEvent::OnExit { reason }) => {
+                        if *shutdown_requested {
+                            match reason {
+                                fnet_dhcp::ClientExitReason::GracefulShutdown => None,
+                                fnet_dhcp::ClientExitReason::ClientAlreadyExistsOnInterface
+                                | fnet_dhcp::ClientExitReason::WatchConfigurationAlreadyPending
+                                | fnet_dhcp::ClientExitReason::InvalidInterface
+                                | fnet_dhcp::ClientExitReason::InvalidParams
+                                | fnet_dhcp::ClientExitReason::NetworkUnreachable
+                                | fnet_dhcp::ClientExitReason::UnableToOpenSocket
+                                | fnet_dhcp::ClientExitReason::AddressRemovedByUser
+                                | fnet_dhcp::ClientExitReason::AddressStateProviderError => {
+                                    Some(Err(Error::WrongExitReason(reason)))
+                                }
+                            }
+                        } else {
+                            Some(Err(Error::UnexpectedExit(Some(reason))))
+                        }
+                    }
+                    Err(err) => Some(Err(match err {
+                        err @ (Error::ApiViolation(_)
+                        | Error::ForwardingEntry(_)
+                        | Error::Fidl(_)
+                        | Error::UnexpectedExit(_)) => err,
+                        Error::WrongExitReason(reason) => {
+                            if *shutdown_requested {
+                                Error::WrongExitReason(reason)
+                            } else {
+                                Error::UnexpectedExit(Some(reason))
+                            }
+                        }
+                        Error::MissingExitReason => {
+                            if *shutdown_requested {
+                                Error::MissingExitReason
+                            } else {
+                                Error::UnexpectedExit(None)
+                            }
+                        }
+                    })),
+                }
+            }
+            MergedClientEvent::WatchConfiguration(watch_result) => {
+                match watch_result {
+                    Ok(config) => Some(Ok(config)),
+                    Err(err) => {
+                        // Treat all errors as fatal and stop the stream.
+                        *stream_ended = true;
+                        Some(Err(err))
+                    }
+                }
+            }
+        }))
+    })
+    .filter_map(|x| futures::future::ready(x))
+}
+
 /// Contains types used when testing the DHCP client.
 pub mod testutil {
     use super::*;
     use fuchsia_async as fasync;
     use fuchsia_zircon as zx;
-    use futures::{future::ready, StreamExt as _};
+    use futures::future::ready;
 
     /// Task for polling the DHCP client.
     pub struct DhcpClientTask {
@@ -337,6 +481,7 @@ pub mod testutil {
                                         | Error::ApiViolation(_)
                                         | Error::ForwardingEntry(_)
                                         | Error::WrongExitReason(_)
+                                        | Error::UnexpectedExit(_)
                                         | Error::MissingExitReason => Some(Err(e)),
                                     },
                                     Ok(item) => Some(Ok(item)),
@@ -396,13 +541,14 @@ mod test {
 
     use std::{collections::HashSet, num::NonZeroU64};
 
+    use assert_matches::assert_matches;
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_net as fnet;
     use fidl_fuchsia_net_dhcp as fnet_dhcp;
     use fidl_fuchsia_net_ext::IntoExt as _;
     use fidl_fuchsia_net_stack as fnet_stack;
     use fuchsia_async as fasync;
-    use futures::{join, pin_mut, FutureExt as _, StreamExt as _};
+    use futures::{channel::oneshot, join, pin_mut, FutureExt as _, StreamExt as _};
     use net_declare::net_ip_v4;
     use net_types::{
         ip::{Ip, Ipv4, Ipv4Addr},
@@ -688,5 +834,123 @@ mod test {
 
         let (shutdown_result, ()) = join!(shutdown_fut, server_fut);
         shutdown_result
+    }
+
+    #[test_case(
+        None ; "client does not exit until we tell it to"
+    )]
+    #[test_case(
+        Some(fnet_dhcp::ClientExitReason::NetworkUnreachable);
+        "client exits due to network unreachable"
+    )]
+    #[test_case(
+        Some(fnet_dhcp::ClientExitReason::GracefulShutdown);
+        "client exits due to GracefulShutdown of its own accord"
+    )]
+    #[fasync::run_singlethreaded(test)]
+    async fn merged_configuration_stream_exit(exit_reason: Option<fnet_dhcp::ClientExitReason>) {
+        const ADDRESS: fnet::Ipv4AddressWithPrefix =
+            net_declare::fidl_ip_v4_with_prefix!("192.0.2.1/32");
+
+        let (client, stream) = fidl::endpoints::create_request_stream::<fnet_dhcp::ClientMarker>()
+            .expect("create DHCP client client end and stream");
+
+        let server_fut = async move {
+            pin_mut!(stream);
+
+            let watch_config_responder = stream
+                .next()
+                .await
+                .expect("should not have ended")
+                .expect("should not have FIDL error")
+                .into_watch_configuration()
+                .expect("should be watch configuration");
+
+            let (_asp_client, asp_server) = fidl::endpoints::create_endpoints::<
+                fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
+            >();
+
+            watch_config_responder
+                .send(fnet_dhcp::ClientWatchConfigurationResponse {
+                    address: Some(fnet_dhcp::Address {
+                        address: Some(ADDRESS),
+                        address_parameters: Some(
+                            fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+                        ),
+                        address_state_provider: Some(asp_server),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                })
+                .expect("should successfully respond to hanging get");
+
+            // Should keep polling hanging get.
+            let _watch_config_responder = stream
+                .next()
+                .await
+                .expect("should not have ended")
+                .expect("should not have FIDL error")
+                .into_watch_configuration()
+                .expect("should be watch configuration");
+
+            if let Some(exit_reason) = exit_reason {
+                stream.control_handle().send_on_exit(exit_reason).expect("send on exit");
+            } else {
+                let _client_control_handle = stream
+                    .next()
+                    .await
+                    .expect("should not have ended")
+                    .expect("should not have FIDL error")
+                    .into_shutdown()
+                    .expect("should be shutdown request");
+                stream
+                    .control_handle()
+                    .send_on_exit(fnet_dhcp::ClientExitReason::GracefulShutdown)
+                    .expect("send on exit");
+            }
+        }
+        .fuse();
+
+        let client_fut = async move {
+            let (shutdown_sender, shutdown_receiver) = oneshot::channel();
+
+            let config_stream = crate::merged_configuration_stream(
+                client,
+                shutdown_receiver.map(|res| res.expect("shutdown_sender should not be dropped")),
+            )
+            .fuse();
+            pin_mut!(config_stream);
+
+            let initial_config = config_stream.next().await.expect("should not have ended");
+            let address = assert_matches!(initial_config,
+                Ok(crate::Configuration {
+                    address: Some(crate::Address { address, .. }),
+                    ..
+                }) => address
+            );
+            assert_eq!(address, ADDRESS);
+
+            if let Some(want_reason) = exit_reason {
+                // The DHCP client exits on its own.
+                let item = config_stream.next().await.expect("should not have ended");
+                let got_reason = assert_matches!(item,
+                    Err(Error::UnexpectedExit(Some(reason))) => reason
+                );
+                assert_eq!(got_reason, want_reason);
+
+                // The stream should have ended.
+                assert_matches!(config_stream.next().await, None);
+            } else {
+                // Poll the config stream once to indicate we're still hanging-getting.
+                assert_matches!(config_stream.next().now_or_never(), None);
+                shutdown_sender.send(()).expect("shutdown receiver should not have been dropped");
+
+                // Having sent a shutdown request, we expect the client to exit
+                // and the stream to end with no error.
+                assert_matches!(config_stream.next().await, None);
+            }
+        };
+
+        let ((), ()) = join!(client_fut, server_fut);
     }
 }
