@@ -29,16 +29,13 @@ foreach(target_name, test_list) {
     sources = [
       "$target_name.dart",
       "helpers.dart",
-      "summarize.dart",
     ]
 
     deps = [
       "//sdk/testing/sl4f/client",
-      "//third_party/dart-pkg/pub/args",
       "//third_party/dart-pkg/pub/logging",
       "//third_party/dart-pkg/pub/meta",
       "//third_party/dart-pkg/pub/test",
-      "//third_party/dart-pkg/pub/tuple",
     ]
 
     non_dart_deps = [ ":runtime_deps($host_toolchain)" ]
@@ -49,25 +46,6 @@ foreach(target_name, test_list) {
     ]
   }
 }
-
-dart_test("summarize_perf_results_test") {
-  sources = [
-    "summarize.dart",
-    "summarize_test.dart",
-  ]
-
-  deps = [
-    "//sdk/testing/sl4f/client",
-    "//third_party/dart-pkg/pub/args",
-    "//third_party/dart-pkg/pub/logging",
-    "//third_party/dart-pkg/pub/meta",
-    "//third_party/dart-pkg/pub/test",
-    "//third_party/dart-pkg/pub/tuple",
-  ]
-
-  non_dart_deps = [ ":runtime_deps($host_toolchain)" ]
-}
-test_list += [ "summarize_perf_results_test" ]
 
 _tests = [
   {
