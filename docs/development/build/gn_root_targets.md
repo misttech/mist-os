@@ -37,13 +37,13 @@ When GN parses this build plan the following happens:
 
 - Because it is still in the default toolchain, it instantiates all
   targets in that file too, and thus creates `//foo:C` and `//foo:D`,
-  even though the latter is no a dependency of `//:A` or `//:B`
+  even though the latter is not a dependency of `//:A` or `//:B`
 
 - It follows dependencies again, and will load `//bar/BUILD.gn`,
   evaluate it, and create all targets defined here, hence `//bar:E`
   and `//bar:F`
 
-This leads to the final build graph containing much more targets than
+This leads to the final build graph containing many more targets than
 needed, if one assumes that `//BUILD.gn` represents the root of the
 graph.
 
@@ -80,7 +80,7 @@ Thus GN creates 3 targets, instead of 6 in the final build graph.
 
 In practice, using this feature reduces the size of our GN build
 graph considerably, speeding up the `gn gen` time as well. For
-example, for a simple `fx set minimal.x64` configuration:
+example, using an `fx set minimal.x64` configuration:
 
 ```none {:.devsite-disable-click-to-copy}
                         Default     --root-pattern=//:*    Reduction
