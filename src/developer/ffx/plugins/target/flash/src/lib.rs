@@ -171,7 +171,22 @@ async fn flash_plugin_impl<W: Write>(
             if let Some(addr) = info.addresses.unwrap().into_iter().take(1).next() {
                 let target_addr: TargetAddr = addr.into();
                 let socket_addr: SocketAddr = target_addr.into();
-                let mut proxy = udp_proxy(&socket_addr).await?;
+
+                let target_name = if let Some(nodename) = info.nodename {
+                    nodename
+                } else {
+                    writeln!(
+                        writer,
+                        r"
+Warning: the target does not have a node name and is in UDP fastboot mode.
+Rediscovering the target after bootloader reboot will be impossible.
+Using address {} as node name",
+                        socket_addr.to_string()
+                    )
+                    .user_message("Error writing user message")?;
+                    socket_addr.to_string()
+                };
+                let mut proxy = udp_proxy(target_name, &socket_addr).await?;
                 from_manifest(&mut writer, cmd, &mut proxy).await.map_err(fho::Error::from)
             } else {
                 ffx_bail!("Could not get a valid address for target");
@@ -183,7 +198,22 @@ async fn flash_plugin_impl<W: Write>(
             if let Some(addr) = info.addresses.unwrap().into_iter().take(1).next() {
                 let target_addr: TargetAddr = addr.into();
                 let socket_addr: SocketAddr = target_addr.into();
-                let mut proxy = tcp_proxy(&socket_addr).await?;
+
+                let target_name = if let Some(nodename) = info.nodename {
+                    nodename
+                } else {
+                    writeln!(
+                        writer,
+                        r"
+Warning: the target does not have a node name and is in TCP fastboot mode.
+Rediscovering the target after bootloader reboot will be impossible.
+Using address {} as node name",
+                        socket_addr.to_string()
+                    )
+                    .user_message("Error writing user message")?;
+                    socket_addr.to_string()
+                };
+                let mut proxy = tcp_proxy(target_name, &socket_addr).await?;
                 from_manifest(&mut writer, cmd, &mut proxy).await.map_err(fho::Error::from)
             } else {
                 ffx_bail!("Could not get a valid address for target");

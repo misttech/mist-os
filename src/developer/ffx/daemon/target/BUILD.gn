@@ -21,7 +21,6 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/addr:lib",
     "//src/developer/ffx/lib/compat_info:lib",
     "//src/developer/ffx/lib/fastboot:lib",
-    "//src/developer/ffx/lib/fastboot/interface:lib",
     "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/ssh:lib",

@@ -256,7 +256,7 @@ where
     }
 }
 
-trait SerialNumberFinder: Send + 'static {
+pub trait SerialNumberFinder: Send + 'static {
     fn find_serial_numbers(&mut self) -> Vec<String>;
 }
 
@@ -282,7 +282,7 @@ where
 }
 
 impl FastbootUsbWatcher {
-    fn new<F, W, O>(event_handler: F, finder: W, opener: O, interval: Duration) -> Self
+    pub fn new<F, W, O>(event_handler: F, finder: W, opener: O, interval: Duration) -> Self
     where
         F: FastbootEventHandler,
         W: SerialNumberFinder,

@@ -14,8 +14,9 @@ use compat_info::{CompatibilityInfo, CompatibilityState};
 use ffx::{TargetAddrInfo, TargetIpPort};
 use ffx_daemon_core::events::{self, EventSynthesizer};
 use ffx_daemon_events::{FastbootInterface, TargetConnectionState, TargetEvent, TargetEventInfo};
-use ffx_fastboot::common::fastboot::tcp_proxy;
-use ffx_fastboot_interface::fastboot_interface::Fastboot;
+use ffx_fastboot::common::fastboot::{
+    ConnectionFactory, FastbootConnectionFactory, FastbootConnectionKind,
+};
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx::TargetState;
 use fidl_fuchsia_developer_remotecontrol::{IdentifyHostResponse, RemoteControlProxy};
@@ -1275,7 +1276,14 @@ impl Target {
         match self.fastboot_address() {
             None => Ok(false),
             Some(addr) => {
-                let mut fastboot_interface = tcp_proxy(&SocketAddr::from(addr.0)).await?;
+                let target_name = self.nodename_str();
+                let builder = ConnectionFactory {};
+                let mut fastboot_interface = builder
+                    .build_interface(FastbootConnectionKind::Tcp(
+                        target_name,
+                        SocketAddr::from(addr.0),
+                    ))
+                    .await?;
                 // Dont care what the result is, just need to get it
                 let _result = fastboot_interface.get_var(&"version".to_string()).await?;
                 Ok(true)

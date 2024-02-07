@@ -289,6 +289,10 @@ impl InterfaceFactoryBase<TcpNetworkInterface> for OneshotTcpFactory {
     async fn close(&self) {
         tracing::debug!("Closing Oneshot Fastboot TCP Factory for: {}", self.addr);
     }
+
+    async fn rediscover(&mut self) -> Result<()> {
+        Err(anyhow!("OneshotTcpFactory does not support the rediscover function. It is oneshot..."))
+    }
 }
 
 impl InterfaceFactory<TcpNetworkInterface> for OneshotTcpFactory {}
