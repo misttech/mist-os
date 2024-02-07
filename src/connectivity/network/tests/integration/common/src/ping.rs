@@ -10,6 +10,7 @@ use std::convert::TryFrom as _;
 
 use anyhow::Context as _;
 use futures::{FutureExt as _, StreamExt as _};
+use itertools::Itertools as _;
 
 /// A realm and associated data as a helper for issuing pings in tests.
 pub struct Node<'a> {
@@ -125,56 +126,70 @@ impl<'a> Node<'a> {
         pingable: &[Node<'_>],
     ) -> anyhow::Result<(), Vec<anyhow::Error>> {
         // NB: The interface ID of the sender is used as the scope_id for IPv6.
-        let futs = itertools::iproduct!(
-            pingable.iter().chain(std::iter::once(self)),
-            pingable.iter().chain(std::iter::once(self))
-        )
-        .map(
-            |(
-                Node {
-                    realm,
-                    local_interface_id: src_id,
-                    v4_addrs: src_v4_addrs,
-                    v6_addrs: src_v6_addrs,
-                },
-                Node {
-                    realm: _,
-                    local_interface_id: _,
-                    v4_addrs: dst_v4_addrs,
-                    v6_addrs: dst_v6_addrs,
-                },
-            )| {
-                const UNSPECIFIED_PORT: u16 = 0;
-                let v4_futs = (!src_v4_addrs.is_empty()).then(|| {
-                    dst_v4_addrs.iter().map(move |&addr| {
-                        realm
-                            .ping::<::ping::Ipv4>(std::net::SocketAddrV4::new(
+        let futs = pingable
+            .iter()
+            .chain(std::iter::once(self))
+            .tuple_combinations()
+            .map(
+                |(
+                    Node {
+                        realm,
+                        local_interface_id: src_id,
+                        v4_addrs: src_v4_addrs,
+                        v6_addrs: src_v6_addrs,
+                    },
+                    Node {
+                        realm: _,
+                        local_interface_id: _,
+                        v4_addrs: dst_v4_addrs,
+                        v6_addrs: dst_v6_addrs,
+                    },
+                )| {
+                    const UNSPECIFIED_PORT: u16 = 0;
+                    let v4_futs = (!src_v4_addrs.is_empty()).then(|| {
+                        dst_v4_addrs.iter().map(move |&addr| {
+                            let dst_sockaddr = std::net::SocketAddrV4::new(
                                 std::net::Ipv4Addr::from(addr.ipv4_bytes()),
                                 UNSPECIFIED_PORT,
-                            ))
-                            .left_future()
-                    })
-                });
-                let v6_futs = (!src_v6_addrs.is_empty()).then(|| {
-                    dst_v6_addrs.iter().map(move |&addr| {
-                        let dst_sockaddr = std::net::SocketAddrV6::new(
-                            std::net::Ipv6Addr::from(addr.ipv6_bytes()),
-                            UNSPECIFIED_PORT,
-                            0,
-                            if addr.is_unicast_link_local() {
-                                u32::try_from(*src_id).expect("interface ID does not fit into u32")
-                            } else {
-                                0
-                            },
-                        );
-                        realm.ping::<::ping::Ipv6>(dst_sockaddr).right_future()
-                    })
-                });
-                v4_futs.into_iter().flatten().chain(v6_futs.into_iter().flatten())
-            },
-        )
-        .flatten()
-        .collect::<futures::stream::FuturesUnordered<_>>();
+                            );
+                            realm
+                                .ping::<::ping::Ipv4>(dst_sockaddr)
+                                .map(move |r| {
+                                    r.with_context(|| {
+                                        format!("failed to ping {} from {:?}", dst_sockaddr, realm)
+                                    })
+                                })
+                                .left_future()
+                        })
+                    });
+                    let v6_futs = (!src_v6_addrs.is_empty()).then(|| {
+                        dst_v6_addrs.iter().map(move |&addr| {
+                            let dst_sockaddr = std::net::SocketAddrV6::new(
+                                std::net::Ipv6Addr::from(addr.ipv6_bytes()),
+                                UNSPECIFIED_PORT,
+                                0,
+                                if addr.is_unicast_link_local() {
+                                    u32::try_from(*src_id)
+                                        .expect("interface ID does not fit into u32")
+                                } else {
+                                    0
+                                },
+                            );
+                            realm
+                                .ping::<::ping::Ipv6>(dst_sockaddr)
+                                .map(move |r| {
+                                    r.with_context(|| {
+                                        format!("failed to ping {} from {:?}", dst_sockaddr, realm)
+                                    })
+                                })
+                                .right_future()
+                        })
+                    });
+                    v4_futs.into_iter().flatten().chain(v6_futs.into_iter().flatten())
+                },
+            )
+            .flatten()
+            .collect::<futures::stream::FuturesUnordered<_>>();
 
         let errors = futs
             .filter_map(|r| {

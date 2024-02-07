@@ -10,7 +10,11 @@
             ],
         },
         {
-            type: "expect_failure_with_err_logs",
+            type: "skip",
+
+            // TODO(https://fxbug.dev/42167696): Support bridging in NS3 and make
+            // these tests pass. NS3 currently doesn't support bridging at all, so
+            // the tests end up timing out due to pings stalling forever.
             matchers: [
                 "test_ns3*",
                 "test_remove_bridge_interface_disabled_ns3",

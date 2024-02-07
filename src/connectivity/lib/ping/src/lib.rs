@@ -172,6 +172,8 @@ pub trait Ip:
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Ipv4 {}
 
+// TODO(https://fxbug.dev/323955204): Implement ext trait on net_types::ip::Ipv4
+// instead and remove the Ipv4 type.
 impl Ip for Ipv4 {
     type Addr = std::net::SocketAddrV4;
 
@@ -186,6 +188,8 @@ impl Ip for Ipv4 {
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Ipv6 {}
 
+// TODO(https://fxbug.dev/323955204): Implement ext trait on net_types::ip::Ipv6
+// instead and remove the Ipv6 type.
 impl Ip for Ipv6 {
     type Addr = std::net::SocketAddrV6;
 

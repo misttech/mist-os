@@ -33,15 +33,17 @@ use futures::{
     Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
 use net_declare::{
-    fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_socket_addr, fidl_subnet, net_subnet_v4, net_subnet_v6,
-    std_ip_v4, std_socket_addr,
+    fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_socket_addr, fidl_subnet, net_addr_subnet,
+    net_subnet_v4, net_subnet_v6, std_ip_v4, std_socket_addr,
 };
 use net_types::{
     ethernet::Mac,
-    ip::{Ip, IpAddress as _, IpInvariant, Ipv4, Ipv4Addr, Ipv6},
+    ip::{AddrSubnetEither, Ip, IpAddress as _, IpInvariant, Ipv4, Ipv4Addr, Ipv6},
     Witness as _,
 };
-use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _, TestInterface};
+use netemul::{
+    InterfaceConfig, RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _, TestInterface,
+};
 use netstack_testing_common::{
     constants::ipv6 as ipv6_consts,
     devices,
@@ -2310,6 +2312,47 @@ async fn ping<N: Netstack>(name: &str) {
         .ping_pairwise(std::slice::from_ref(&node_b))
         .await
         .expect("failed to ping between nodes");
+}
+
+#[netstack_test]
+#[test_case(net_addr_subnet!("192.0.2.1/32"); "v4")]
+#[test_case(net_addr_subnet!("fe80::1234:5678:90ab:cdef/128"); "v6_link_local")]
+#[test_case(net_addr_subnet!("2001:db8::1/128"); "v6")]
+async fn ping_self<N: Netstack>(name: &str, addr: AddrSubnetEither) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+    let ep = sandbox.create_endpoint(name).await.expect("create endpoint");
+    let interface =
+        realm.install_endpoint(ep, InterfaceConfig::default()).await.expect("install endpoint");
+    interface.add_address(addr.into_ext()).await.expect("add address");
+
+    const UNSPECIFIED_PORT: u16 = 0;
+    match addr {
+        AddrSubnetEither::V4(v4) => {
+            realm
+                .ping::<::ping::Ipv4>(std::net::SocketAddrV4::new(
+                    v4.addr().get().into(),
+                    UNSPECIFIED_PORT,
+                ))
+                .await
+        }
+        AddrSubnetEither::V6(v6) => {
+            let v6 = v6.addr().get();
+            realm
+                .ping::<::ping::Ipv6>(std::net::SocketAddrV6::new(
+                    v6.into(),
+                    UNSPECIFIED_PORT,
+                    0,
+                    if v6.is_unicast_link_local() {
+                        u32::try_from(interface.id()).expect("interface ID should fit into u32")
+                    } else {
+                        0
+                    },
+                ))
+                .await
+        }
+    }
+    .expect("ping self address");
 }
 
 enum SocketType {
