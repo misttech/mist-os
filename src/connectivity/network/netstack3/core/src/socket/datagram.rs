@@ -4581,6 +4581,8 @@ pub(crate) fn update_ip_hop_limit<
     id: S::SocketId<I>,
     update: impl FnOnce(&mut SocketHopLimits<I>),
 ) {
+    // TODO(https://fxbug.dev/324279602): The options held by a connected
+    // socket's `IpSock` will now be out of sync with the options updated here.
     core_ctx.with_sockets_state_mut(|core_ctx, state| {
         let options = get_options_mut(core_ctx, state, id);
 
