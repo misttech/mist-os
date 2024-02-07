@@ -323,7 +323,9 @@ impl TestServer {
     ) -> Result<ftest::Result_, RunTestError> {
         // Exit codes used by Rust's libtest runner.
         const TR_OK: i64 = 50;
+        // TODO: https://fxbug.dev/324123495: Remove TR_FAILED after the next Rust toolchain roll.
         const TR_FAILED: i64 = 51;
+        const ABORTED: i64 = -1028;
 
         // Rust test binaries launched with `__RUST_TEST_INVOKE` don't care if a test is disabled,
         // so we must manually return early in order to skip a test.
@@ -386,7 +388,7 @@ impl TestServer {
             TR_OK => {
                 Ok(ftest::Result_ { status: Some(ftest::Status::Passed), ..Default::default() })
             }
-            TR_FAILED => {
+            TR_FAILED | ABORTED => {
                 // Add a preceding newline so that this does not mix with test output, as
                 // test output might not contain a newline at end.
                 test_stderr.write_str("\ntest failed.\n").await?;
