@@ -74,8 +74,9 @@ config("incremental") {
 }
 
 assert(
-    rust_incremental == "" || !rust_rbe_enable,
-    "Rust-incremental compilation is non-hermetic and hence, incompatible with remote execution.")
+    rust_incremental == "" || !rust_rbe_enable ||
+        rust_rbe_exec_strategy == "racing",
+    "Rust-incremental compilation is non-hermetic and is likely to cache-miss with remote execution.  However, you may race remote vs. local execution with `rust_rbe_exec_strategy = \"racing\"` (experimental).")
 
 config("one_codegen_unit") {
   # Disable codegen parallelism.
