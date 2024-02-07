@@ -213,7 +213,10 @@ def convert_trace_file_to_json(
         args.append("--compressed-input")
 
     _LOGGER.info(f"Running {args}")
-    subprocess.check_call(args)
+    conversion_output = subprocess.check_output(
+        args, text=True, stderr=subprocess.STDOUT
+    )
+    _LOGGER.debug("Output of running %s: %s", args, conversion_output)
 
     return output_path
 
