@@ -94,7 +94,6 @@
                 "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/ListenV4Any_ConnectV4Any",
                 "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/ListenV4Any_ConnectV4Loopback",
                 "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/ListenV4Any_ConnectV4MappedAny",
-                "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/ListenV4Any_ConnectV4MappedLoopback",
                 "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/ListenV4Loopback_ConnectV4Any",
                 "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/ListenV4Loopback_ConnectV4Loopback",
                 "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/ListenV4Loopback_ConnectV4MappedLoopback",
@@ -341,6 +340,9 @@
                 "All/SocketInetLoopbackTest.TCPUnblockWaitOnRemoteRdHUp/ListenV6Any_ConnectV4Loopback",
                 "All/SocketInetLoopbackTest.TCPUnblockWaitOnRemoteRdHUp/ListenV6Any_ConnectV4MappedAny",
                 "All/SocketInetLoopbackTest.TCPUnblockWaitOnRemoteRdHUp/ListenV6Any_ConnectV4MappedLoopback",
+
+                // This test sometimes times out in CI.
+                "All/SocketInetLoopbackTest.TCPAcceptBacklogSizes/ListenV4Any_ConnectV4MappedLoopback",
 
                 // TODO(https://issues.fuchsia.dev/319117141): Support listening
                 // in both stacks.
