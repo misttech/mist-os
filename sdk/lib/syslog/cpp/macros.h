@@ -412,26 +412,11 @@ bool ShouldCreateLogMessage(LogSeverity severity);
 // as incrementally "more vebose than" the baseline.
 fuchsia_logging::LogSeverity GetSeverityFromVerbosity(uint8_t verbosity);
 
-#define FX_VLOG_IS_ON(verbose_level) (verbose_level <= ::fuchsia_logging::GetVlogVerbosity())
-
-#define FX_VLOG_STREAM(verbose_level, tag)                                                   \
-  ::fuchsia_logging::LogMessage(GetSeverityFromVerbosity(verbose_level), __FILE__, __LINE__, \
-                                nullptr, tag)                                                \
-      .stream()
-
-#define FX_VLOGS(verbose_level) \
-  FX_LAZY_STREAM(FX_VLOG_STREAM(verbose_level, nullptr), FX_VLOG_IS_ON(verbose_level))
-
-#define FX_VLOGST(verbose_level, tag) \
-  FX_LAZY_STREAM(FX_VLOG_STREAM(verbose_level, tag), FX_VLOG_IS_ON(verbose_level))
-
 #ifndef NDEBUG
 #define FX_DLOGS(severity) FX_LOGS(severity)
-#define FX_DVLOGS(verbose_level) FX_VLOGS(verbose_level)
 #define FX_DCHECK(condition) FX_CHECK(condition)
 #else
 #define FX_DLOGS(severity) FX_EAT_STREAM_PARAMETERS(true)
-#define FX_DVLOGS(verbose_level) FX_EAT_STREAM_PARAMETERS(true)
 #define FX_DCHECK(condition) FX_EAT_STREAM_PARAMETERS(condition)
 #endif
 
