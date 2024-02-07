@@ -62,7 +62,7 @@ impl Puppet {
                 name: "message".to_string(),
                 value: Value::Text(test_log.to_string()),
             }],
-            severity: Severity::Error,
+            severity: Severity::Error.into_primitive(),
             timestamp: 0,
         };
         let spec = RecordSpec { file: test_file.clone(), line: test_line_32, record };
@@ -96,7 +96,7 @@ impl Puppet {
                 name: "message".to_string(),
                 value: Value::Text(long_test_log.to_string()),
             }],
-            severity: Severity::Info,
+            severity: Severity::Info.into_primitive(),
             timestamp: 0,
         };
         let spec = RecordSpec { file: test_file, line: test_line_32, record };
@@ -123,7 +123,7 @@ impl Puppet {
                 name: "message".to_string(),
                 value: Value::Text(long_test_log.to_string()),
             }],
-            severity: Severity::Trace,
+            severity: Severity::Trace.into_primitive(),
             timestamp: 0,
         };
         let spec = RecordSpec { file: test_file.clone(), line: test_line_32, record };
@@ -140,7 +140,7 @@ impl Puppet {
                 name: "message".to_string(),
                 value: Value::Text(long_test_log_valid.to_string()),
             }],
-            severity: Severity::Trace,
+            severity: Severity::Trace.into_primitive(),
             timestamp: 0,
         };
         let spec = RecordSpec { file: test_file, line: test_line_32, record };

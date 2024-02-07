@@ -509,7 +509,7 @@ fn legacy_message_severity() {
 fn test_from_structured() {
     let record = Record {
         timestamp: 72,
-        severity: StreamSeverity::Error,
+        severity: StreamSeverity::Error.into_primitive(),
         arguments: vec![
             Argument {
                 name: FILE_PATH_LABEL.to_string(),
@@ -568,7 +568,7 @@ fn test_from_structured() {
     // multiple tags
     let record = Record {
         timestamp: 72,
-        severity: StreamSeverity::Error,
+        severity: StreamSeverity::Error.into_primitive(),
         arguments: vec![
             Argument { name: TAG_LABEL.to_string(), value: Value::Text("tag1".to_string()) },
             Argument { name: TAG_LABEL.to_string(), value: Value::Text("tag2".to_string()) },
@@ -595,7 +595,11 @@ fn test_from_structured() {
     );
 
     // empty record
-    let record = Record { timestamp: 72, severity: StreamSeverity::Error, arguments: vec![] };
+    let record = Record {
+        timestamp: 72,
+        severity: StreamSeverity::Error.into_primitive(),
+        arguments: vec![],
+    };
     let mut buffer = Cursor::new(vec![0u8; MAX_DATAGRAM_LEN]);
     let mut encoder = Encoder::new(&mut buffer);
     encoder.write_record(&record).unwrap();
@@ -624,7 +628,7 @@ fn basic_structured_info() {
     let expected_timestamp = 72;
     let record = Record {
         timestamp: expected_timestamp,
-        severity: StreamSeverity::Error,
+        severity: StreamSeverity::Error.into_primitive(),
         arguments: vec![],
     };
     let mut buffer = Cursor::new(vec![0u8; MAX_DATAGRAM_LEN]);

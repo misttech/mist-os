@@ -257,7 +257,7 @@ mod tests {
         {
             let mut expected_trace = Record {
                 timestamp: observed_trace.timestamp,
-                severity: Severity::Trace,
+                severity: Severity::Trace.into_primitive(),
                 arguments: arg_prefix(),
             };
             expected_trace.arguments.push(metatag.clone());
@@ -275,7 +275,7 @@ mod tests {
         {
             let mut expected_debug = Record {
                 timestamp: observed_debug.timestamp,
-                severity: Severity::Debug,
+                severity: Severity::Debug.into_primitive(),
                 arguments: arg_prefix(),
             };
             expected_debug.arguments.push(metatag.clone());
@@ -293,7 +293,7 @@ mod tests {
         {
             let mut expected_info = Record {
                 timestamp: observed_info.timestamp,
-                severity: Severity::Info,
+                severity: Severity::Info.into_primitive(),
                 arguments: arg_prefix(),
             };
             expected_info.arguments.push(metatag.clone());
@@ -308,7 +308,7 @@ mod tests {
         {
             let mut expected_warn = Record {
                 timestamp: observed_warn.timestamp,
-                severity: Severity::Warn,
+                severity: Severity::Warn.into_primitive(),
                 arguments: arg_prefix(),
             };
             expected_warn.arguments.push(metatag.clone());
@@ -326,7 +326,7 @@ mod tests {
         {
             let mut expected_error = Record {
                 timestamp: observed_error.timestamp,
-                severity: Severity::Error,
+                severity: Severity::Error.into_primitive(),
                 arguments: arg_prefix(),
             };
             expected_error.arguments.push(Argument {
@@ -369,7 +369,7 @@ mod tests {
 
         let mut expected = Record {
             timestamp: observed.timestamp,
-            severity: Severity::Info,
+            severity: Severity::Info.into_primitive(),
             arguments: arg_prefix(),
         };
         expected.arguments.push(Argument {
@@ -402,7 +402,7 @@ mod tests {
 
             let mut expected = Record {
                 timestamp: observed.timestamp,
-                severity: Severity::Info,
+                severity: Severity::Info.into_primitive(),
                 arguments: arg_prefix(),
             };
             expected.arguments.push(Argument {
@@ -447,7 +447,7 @@ mod tests {
 
             let mut expected = Record {
                 timestamp: observed.timestamp,
-                severity: Severity::Info,
+                severity: Severity::Info.into_primitive(),
                 arguments: arg_prefix(),
             };
             expected
@@ -466,7 +466,7 @@ mod tests {
 
         let mut expected = Record {
             timestamp: observed.timestamp,
-            severity: Severity::Info,
+            severity: Severity::Info.into_primitive(),
             arguments: arg_prefix(),
         };
         expected.arguments.push(Argument { name: "tag".into(), value: Value::Text("foo".into()) });
@@ -495,7 +495,7 @@ mod tests {
         let observed = next_message();
         let mut expected = Record {
             timestamp: observed.timestamp,
-            severity: Severity::Info,
+            severity: Severity::Info.into_primitive(),
             arguments: arg_prefix(),
         };
         expected.arguments.push(Argument { name: "tag".into(), value: Value::Text("foo".into()) });
@@ -511,7 +511,7 @@ mod tests {
 
         let mut expected = Record {
             timestamp: observed.timestamp,
-            severity: Severity::Info,
+            severity: Severity::Info.into_primitive(),
             arguments: arg_prefix(),
         };
         expected.arguments.push(Argument { name: "tag".into(), value: Value::Text("bar".into()) });
@@ -560,7 +560,7 @@ mod tests {
                 record,
                 Record {
                     timestamp: record.timestamp,
-                    severity: Severity::Info,
+                    severity: Severity::Info.into_primitive(),
                     arguments: expected_args
                 }
             );

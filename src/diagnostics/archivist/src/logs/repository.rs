@@ -436,7 +436,7 @@ mod tests {
     fn make_message(msg: &str, timestamp: i64) -> GenericStoredMessage {
         let record = Record {
             timestamp,
-            severity: StreamSeverity::Debug,
+            severity: StreamSeverity::Debug.into_primitive(),
             arguments: vec![
                 Argument { name: "pid".to_string(), value: Value::UnsignedInt(1) },
                 Argument { name: "tid".to_string(), value: Value::UnsignedInt(2) },

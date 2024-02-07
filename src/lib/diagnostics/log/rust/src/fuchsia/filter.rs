@@ -84,7 +84,7 @@ impl InterestFilter {
 
     pub fn enabled_for_testing(&self, record: &TestRecord<'_>) -> bool {
         let min_severity = self.min_severity.read().unwrap();
-        record.severity >= *min_severity
+        record.severity >= (*min_severity).into_primitive()
     }
 }
 

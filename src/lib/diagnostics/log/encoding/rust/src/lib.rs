@@ -7,6 +7,7 @@
 #![warn(missing_docs)]
 
 use bitfield::bitfield;
+use fidl_fuchsia_diagnostics_stream::RawSeverity;
 use std::{borrow::Cow, convert::TryFrom};
 use tracing::{Level, Metadata};
 
@@ -149,6 +150,9 @@ impl<'a> ToString for StringRef<'a> {
 pub trait SeverityExt {
     /// Return the severity of this value.
     fn severity(&self) -> Severity;
+
+    /// Return the raw severity of this value.
+    fn raw_severity(&self) -> RawSeverity;
 }
 
 impl SeverityExt for Metadata<'_> {
@@ -159,6 +163,16 @@ impl SeverityExt for Metadata<'_> {
             Level::INFO => Severity::Info,
             Level::DEBUG => Severity::Debug,
             Level::TRACE => Severity::Trace,
+        }
+    }
+
+    fn raw_severity(&self) -> RawSeverity {
+        match *self.level() {
+            Level::ERROR => Severity::Error.into_primitive(),
+            Level::WARN => Severity::Warn.into_primitive(),
+            Level::INFO => Severity::Info.into_primitive(),
+            Level::DEBUG => Severity::Debug.into_primitive(),
+            Level::TRACE => Severity::Trace.into_primitive(),
         }
     }
 }
@@ -229,7 +243,7 @@ mod tests {
         expected_record.extend(timestamp.to_le_bytes());
 
         assert_roundtrips(
-            Record { timestamp, severity: Severity::Info, arguments: vec![] },
+            Record { timestamp, severity: Severity::Info.into_primitive(), arguments: vec![] },
             Encoder::write_record,
             try_parse_record,
             Some(&expected_record),
@@ -291,7 +305,7 @@ mod tests {
         assert_roundtrips(
             Record {
                 timestamp: zx::Time::get_monotonic().into_nanos(),
-                severity: Severity::Warn,
+                severity: Severity::Warn.into_primitive(),
                 arguments: vec![
                     Argument { name: String::from("signed"), value: Value::SignedInt(-10) },
                     Argument { name: String::from("unsigned"), value: Value::SignedInt(7) },
@@ -314,7 +328,7 @@ mod tests {
         assert_roundtrips(
             Record {
                 timestamp: zx::Time::get_monotonic().into_nanos(),
-                severity: Severity::Trace,
+                severity: Severity::Trace.into_primitive(),
                 arguments: vec![
                     Argument {
                         name: String::from("msg"),

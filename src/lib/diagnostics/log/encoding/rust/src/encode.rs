@@ -80,7 +80,7 @@ where
             }
 
             // If the severity is ERROR or higher, we add the file and line information.
-            if severity >= Severity::Error {
+            if severity >= Severity::Error.into_primitive() {
                 if let Some(mut file) = event.file() {
                     let split = file.split("../");
                     file = split.last().unwrap();
@@ -123,7 +123,7 @@ where
     fn write_inner<F>(
         &mut self,
         timestamp: zx::Time,
-        severity: Severity,
+        severity: fstream::RawSeverity,
         write_args: F,
     ) -> Result<(), EncodingError>
     where
@@ -139,7 +139,7 @@ where
 
         let mut header = Header(0);
         header.set_type(crate::TRACING_FORMAT_LOG_RECORD_TYPE);
-        header.set_severity(severity.into_primitive());
+        header.set_severity(severity);
 
         let length = self.buf.cursor() - starting_idx;
         header.set_len(length);
@@ -378,7 +378,7 @@ impl From<bool> for Value<'static> {
 /// Trait implemented by types which can be written by the Encoder.
 pub trait RecordEvent {
     /// Returns the record severity.
-    fn severity(&self) -> Severity;
+    fn severity(&self) -> u8;
     /// Returns the name of the file where the record was emitted.
     fn file(&self) -> Option<&str>;
     /// Returns the number of the line in the file where the record was emitted.
@@ -397,7 +397,7 @@ pub trait RecordEvent {
 /// Trait implemented by complete Records.
 pub trait RecordFields {
     /// Returns the record severity.
-    fn severity(&self) -> Severity;
+    fn severity(&self) -> u8;
 
     /// Returns the timestamp associated to this record.
     fn timestamp(&self) -> zx::Time;
@@ -469,8 +469,8 @@ impl<'a, S> RecordEvent for TracingEvent<'a, S>
 where
     for<'lookup> S: Subscriber + LookupSpan<'lookup>,
 {
-    fn severity(&self) -> Severity {
-        self.metadata.severity()
+    fn severity(&self) -> fstream::RawSeverity {
+        self.metadata.raw_severity()
     }
 
     fn file(&self) -> Option<&str> {
@@ -515,7 +515,7 @@ where
 /// Arguments to create a record for testing purposes.
 pub struct TestRecord<'a> {
     /// Severity of the log
-    pub severity: Severity,
+    pub severity: fstream::RawSeverity,
     /// Timestamp of the test record.
     pub timestamp: zx::Time,
     /// File that emitted the log.
@@ -540,7 +540,7 @@ impl TestRecord<'_> {
 }
 
 impl RecordEvent for TestRecord<'_> {
-    fn severity(&self) -> Severity {
+    fn severity(&self) -> fstream::RawSeverity {
         self.severity
     }
 
@@ -572,7 +572,7 @@ impl RecordEvent for TestRecord<'_> {
 }
 
 impl RecordFields for fstream::Record {
-    fn severity(&self) -> Severity {
+    fn severity(&self) -> u8 {
         self.severity
     }
 
@@ -949,7 +949,7 @@ mod tests {
         encoder
             .write_event(WriteEventParams::<_, &str, _> {
                 event: TestRecord {
-                    severity: Severity::Info,
+                    severity: Severity::Info.into_primitive(),
                     timestamp: zx::Time::from_nanos(12345),
                     file: None,
                     line: None,
@@ -967,7 +967,7 @@ mod tests {
             record,
             fstream::Record {
                 timestamp: 12345,
-                severity: Severity::Info,
+                severity: Severity::Info.into_primitive(),
                 arguments: vec![
                     fstream::Argument {
                         name: "pid".to_string(),
@@ -988,7 +988,7 @@ mod tests {
         encoder
             .write_event(WriteEventParams::<_, &str, _> {
                 event: TestRecord {
-                    severity: Severity::Error,
+                    severity: Severity::Error.into_primitive(),
                     timestamp: zx::Time::from_nanos(12345),
                     file: Some("foo.rs"),
                     line: Some(10),
@@ -1006,7 +1006,7 @@ mod tests {
             record,
             fstream::Record {
                 timestamp: 12345,
-                severity: Severity::Error,
+                severity: Severity::Error.into_primitive(),
                 arguments: vec![
                     fstream::Argument {
                         name: "pid".to_string(),
@@ -1035,7 +1035,7 @@ mod tests {
         encoder
             .write_event(WriteEventParams::<_, &str, _> {
                 event: TestRecord {
-                    severity: Severity::Warn,
+                    severity: Severity::Warn.into_primitive(),
                     timestamp: zx::Time::from_nanos(12345),
                     file: None,
                     line: None,
@@ -1053,7 +1053,7 @@ mod tests {
             record,
             fstream::Record {
                 timestamp: 12345,
-                severity: Severity::Warn,
+                severity: Severity::Warn.into_primitive(),
                 arguments: vec![
                     fstream::Argument {
                         name: "pid".to_string(),
@@ -1131,7 +1131,7 @@ mod tests {
             record,
             fstream::Record {
                 timestamp: record.timestamp,
-                severity: Severity::Info,
+                severity: Severity::Info.into_primitive(),
                 arguments: vec![
                     fstream::Argument {
                         name: "pid".to_string(),
@@ -1201,7 +1201,7 @@ mod tests {
             record,
             fstream::Record {
                 timestamp: record.timestamp,
-                severity: Severity::Info,
+                severity: Severity::Info.into_primitive(),
                 arguments: vec![
                     fstream::Argument {
                         name: "pid".to_string(),

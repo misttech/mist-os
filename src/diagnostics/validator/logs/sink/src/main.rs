@@ -409,7 +409,7 @@ where
                             stringify!($severity).to_string(),
                         ),
                     }],
-                    severity: Severity::$severity,
+                    severity: Severity::$severity.into_primitive(),
                     timestamp: 0,
                 },
             };
@@ -517,7 +517,7 @@ async fn assert_dot_removal(puppet: &mut Puppet, new_file_line_rules: bool) -> R
                 name: "key".to_string(),
                 value: diagnostics_log_encoding::Value::Text("value".to_string()),
             }],
-            severity: Severity::Error,
+            severity: Severity::Error.into_primitive(),
             timestamp: 0,
         },
     };
@@ -549,7 +549,8 @@ struct TestVector {
 
 impl TestVector {
     fn record(&self) -> Record {
-        let mut record = Record { arguments: vec![], severity: self.severity, timestamp: 0 };
+        let mut record =
+            Record { arguments: vec![], severity: self.severity.into_primitive(), timestamp: 0 };
         for (name, value) in &self.args {
             record.arguments.push(Argument { name: name.clone(), value: value.clone() });
         }
@@ -648,7 +649,8 @@ impl TestRecord {
                 return Ok(None);
             }
 
-            if (severity >= Severity::Error || args.new_file_line_rules) && args.override_file_line
+            if (severity >= Severity::Error.into_primitive() || args.new_file_line_rules)
+                && args.override_file_line
             {
                 if name == "file" {
                     sorted_args.insert(name, Value::Text(STUB_ERROR_FILENAME.to_owned()));
@@ -661,7 +663,11 @@ impl TestRecord {
             sorted_args.insert(name, value);
         }
 
-        Ok(Some(Self { timestamp, severity, arguments: sorted_args }))
+        Ok(Some(Self {
+            timestamp,
+            severity: Severity::from_primitive(severity).unwrap(),
+            arguments: sorted_args,
+        }))
     }
 }
 impl PartialEq<RecordAssertion> for TestRecord {

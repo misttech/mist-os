@@ -125,28 +125,8 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
 
   void EmitLog(fuchsia::validate::logs::RecordSpec spec, EmitLogCallback callback) override {
     fuchsia_syslog::LogBuffer buffer;
-    FuchsiaLogSeverity severity;
-    switch (spec.record.severity) {
-      case fuchsia::diagnostics::Severity::DEBUG:
-        severity = FUCHSIA_LOG_DEBUG;
-        break;
-      case fuchsia::diagnostics::Severity::ERROR:
-        severity = FUCHSIA_LOG_ERROR;
-        break;
-      case fuchsia::diagnostics::Severity::FATAL:
-        severity = FUCHSIA_LOG_FATAL;
-        break;
-      case fuchsia::diagnostics::Severity::INFO:
-        severity = FUCHSIA_LOG_INFO;
-        break;
-      case fuchsia::diagnostics::Severity::TRACE:
-        severity = FUCHSIA_LOG_TRACE;
-        break;
-      case fuchsia::diagnostics::Severity::WARN:
-        severity = FUCHSIA_LOG_WARNING;
-        break;
-    }
-    BeginRecord(&buffer, severity, spec.file.data(), spec.line, std::nullopt /* message */);
+    BeginRecord(&buffer, spec.record.severity, spec.file.data(), spec.line,
+                std::nullopt /* message */);
     for (auto& arg : spec.record.arguments) {
       switch (arg.value.Which()) {
         case fuchsia::diagnostics::stream::Value::kUnknown:
@@ -169,7 +149,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
           break;
       }
     }
-    if (severity >= min_log_level_) {
+    if (spec.record.severity >= min_log_level_) {
       buffer.FlushRecord();
     }
     callback();

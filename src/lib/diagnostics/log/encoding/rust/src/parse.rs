@@ -6,7 +6,6 @@
 //! diagnostic service APIs.
 
 use crate::{ArgType, Header, StringRef};
-use fidl_fuchsia_diagnostics::Severity;
 use fidl_fuchsia_diagnostics_stream::{Argument, Record, Value};
 use nom::{
     bytes::complete::take,
@@ -55,8 +54,7 @@ pub(crate) fn try_parse_record(buf: &[u8]) -> ParseResult<'_, Record> {
     } else {
         return Err(nom::Err::Failure(ParseError::ValueOutOfValidRange));
     };
-    let severity = Severity::from_primitive(header.severity())
-        .ok_or(nom::Err::Failure(ParseError::Unsupported))?;
+    let severity = header.severity();
 
     let (after_record, args_buf) = take(remaining_record_len)(var_len)?;
     let state = Rc::new(RefCell::new(ParseState::Initial));

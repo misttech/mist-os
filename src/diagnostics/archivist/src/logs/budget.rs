@@ -203,7 +203,7 @@ mod tests {
     fn fake_message_bytes(timestamp: i64) -> GenericStoredMessage {
         let record = Record {
             timestamp,
-            severity: StreamSeverity::Debug,
+            severity: StreamSeverity::Debug.into_primitive(),
             arguments: vec![
                 Argument { name: "pid".to_string(), value: Value::UnsignedInt(123) },
                 Argument { name: "tid".to_string(), value: Value::UnsignedInt(456) },

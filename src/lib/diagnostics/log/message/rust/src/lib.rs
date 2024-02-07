@@ -130,7 +130,7 @@ pub fn from_structured(source: MonikerWithUrl, bytes: &[u8]) -> Result<LogsData,
         let transcoded_i32: i32 = severity_untrusted.unwrap().to_string().parse().unwrap();
         LegacySeverity::try_from(transcoded_i32)?
     } else {
-        LegacySeverity::try_from(record.severity).unwrap()
+        LegacySeverity::try_from(record.severity as i32).unwrap()
     };
     let (severity, verbosity) = raw_severity.for_structured();
     builder = builder.set_severity(severity);
@@ -317,7 +317,7 @@ pub fn parse_basic_structured_info(bytes: &[u8]) -> Result<(i64, Severity), Mess
         let transcoded_i32: i32 = severity_untrusted.unwrap().to_string().parse().unwrap();
         LegacySeverity::try_from(transcoded_i32)?
     } else {
-        LegacySeverity::try_from(record.severity).unwrap()
+        LegacySeverity::try_from(record.severity as i32).unwrap()
     };
     let (severity, _) = raw_severity.for_structured();
     Ok((record.timestamp, severity))

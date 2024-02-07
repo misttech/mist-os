@@ -493,16 +493,20 @@ mod tests {
         let logs = vec![
             Record {
                 timestamp: 6,
-                severity: StreamSeverity::Info,
+                severity: StreamSeverity::Info.into_primitive(),
                 arguments: vec![Argument {
                     name: MESSAGE_LABEL.into(),
                     value: Value::Text("hi".to_string()),
                 }],
             },
-            Record { timestamp: 14, severity: StreamSeverity::Error, arguments: vec![] },
+            Record {
+                timestamp: 14,
+                severity: StreamSeverity::Error.into_primitive(),
+                arguments: vec![],
+            },
             Record {
                 timestamp: 19,
-                severity: StreamSeverity::Warn,
+                severity: StreamSeverity::Warn.into_primitive(),
                 arguments: vec![
                     Argument { name: PID_LABEL.into(), value: Value::UnsignedInt(0x1d1) },
                     Argument { name: TID_LABEL.into(), value: Value::UnsignedInt(0x1d2) },
@@ -516,7 +520,7 @@ mod tests {
             },
             Record {
                 timestamp: 21,
-                severity: StreamSeverity::Warn,
+                severity: StreamSeverity::Warn.into_primitive(),
                 arguments: vec![
                     Argument { name: TAG_LABEL.into(), value: Value::Text(String::from("tag-1")) },
                     Argument { name: TAG_LABEL.into(), value: Value::Text(String::from("tag-2")) },

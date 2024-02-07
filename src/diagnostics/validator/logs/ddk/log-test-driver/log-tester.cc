@@ -65,26 +65,25 @@ void LogTester::GetInfo(GetInfoCompleter::Sync& completer) {
 }
 
 void LogTester::EmitLog(EmitLogRequestView request, EmitLogCompleter::Sync& completer) {
-  using fuchsia_diagnostics::wire::Severity;
   fx_log_severity_t severity;
-  switch (request->spec.record.severity) {
-    case Severity::kTrace:
+  switch (static_cast<fx_log_severity_t>(request->spec.record.severity)) {
+    case FX_LOG_TRACE:
       severity = DDK_LOG_TRACE;
       break;
-    case Severity::kDebug:
+    case FX_LOG_DEBUG:
       zxlogf(INFO, "Got a request to log at debug level -- this would do nothing.");
       severity = DDK_LOG_DEBUG;
       break;
-    case Severity::kInfo:
+    case FX_LOG_INFO:
       severity = DDK_LOG_INFO;
       break;
-    case Severity::kWarn:
+    case FX_LOG_WARNING:
       severity = DDK_LOG_WARNING;
       break;
-    case Severity::kError:
+    case FX_LOG_ERROR:
       severity = DDK_LOG_ERROR;
       break;
-    case Severity::kFatal:
+    case FX_LOG_FATAL:
       // DDK doesn't appear to support FATAL logs.
       abort();
       break;

@@ -51,28 +51,8 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
 
   void EmitLog(fuchsia::validate::logs::RecordSpec spec, EmitLogCallback callback) override {
     syslog_runtime::LogBuffer buffer;
-    fuchsia_logging::LogSeverity severity;
-    switch (spec.record.severity) {
-      case fuchsia::diagnostics::Severity::DEBUG:
-        severity = fuchsia_logging::LOG_DEBUG;
-        break;
-      case fuchsia::diagnostics::Severity::ERROR:
-        severity = fuchsia_logging::LOG_ERROR;
-        break;
-      case fuchsia::diagnostics::Severity::FATAL:
-        severity = fuchsia_logging::LOG_FATAL;
-        break;
-      case fuchsia::diagnostics::Severity::INFO:
-        severity = fuchsia_logging::LOG_INFO;
-        break;
-      case fuchsia::diagnostics::Severity::TRACE:
-        severity = fuchsia_logging::LOG_TRACE;
-        break;
-      case fuchsia::diagnostics::Severity::WARN:
-        severity = fuchsia_logging::LOG_WARNING;
-        break;
-    }
-    syslog_runtime::BeginRecord(&buffer, severity, spec.file.data(), spec.line, nullptr, nullptr);
+    syslog_runtime::BeginRecord(&buffer, spec.record.severity, spec.file.data(), spec.line, nullptr,
+                                nullptr);
     for (auto& arg : spec.record.arguments) {
       switch (arg.value.Which()) {
         case fuchsia::diagnostics::stream::Value::kUnknown:

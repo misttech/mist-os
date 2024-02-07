@@ -162,7 +162,7 @@ mod tests {
         let timestamp = 107;
         let record = Record {
             timestamp,
-            severity: StreamSeverity::Fatal,
+            severity: StreamSeverity::Fatal.into_primitive(),
             arguments: vec![
                 Argument { name: "key".to_string(), value: Value::Text("value".to_string()) },
                 Argument { name: "tag".to_string(), value: Value::Text("tag-a".to_string()) },
