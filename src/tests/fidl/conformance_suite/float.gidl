@@ -173,7 +173,21 @@ encode_success("Float32QuietNaN") {
 
 // No decode_success because NaN != NaN.
 encode_success("Float32SignallingNaN") {
-    bindings_denylist = [dart],
+    // Dart and Python only represent 64 bit floats (no 32 bit floats).
+    // When converting a 32 bit NaN to a 64 bit NaN and back, there is a small
+    // section of data that isn't correctly converted. There are two kinds of
+    // NaN values: quiet and signalling (hence the quiet/signalling tests).
+    //
+    // When in Dart/Python, converting from a 32-bit float to a 64-bit float
+    // default sets the value from signalling to a default quiet value.
+    //
+    // See the following Python example:
+    //
+    // >>> import struct
+    // >>> f = struct.unpack('>f', b'\x7f\xa0\x00\x00')[0]) # Signalling float.
+    // >>> struct.pack('>f', f)
+    // b'\x7f\xe0\x00\x00'  # Quiet float.
+    bindings_denylist = [dart, fuchsia_controller],
     value = MyFloat32{
         value: raw_float(0b0_11111111_01000000000000000000000),
     },

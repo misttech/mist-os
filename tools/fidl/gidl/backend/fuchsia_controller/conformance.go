@@ -259,7 +259,12 @@ func visit(value ir.Value, decl mixer.Declaration) string {
 			return fmt.Sprintf("%v", primitive)
 		}
 	case ir.RawFloat:
-		return fmt.Sprintf("float(%#b)", value)
+		switch decl.(*mixer.FloatDecl).Subtype() {
+		case fidlgen.Float32:
+			return fmt.Sprintf("struct.unpack('>f', bytes.fromhex('%08x'))[0]", value)
+		case fidlgen.Float64:
+			return fmt.Sprintf("struct.unpack('>d', bytes.fromhex('%016x'))[0]", value)
+		}
 	case string:
 		return fmt.Sprintf("%q", value)
 	case nil:

@@ -23,7 +23,6 @@ class ObjectConverter : public fidl_codec::TypeVisitor {
   bool HandleNone(const fidl_codec::Type* type);
   void VisitList(const fidl_codec::ElementSequenceType* type, std::optional<size_t> count);
   void VisitInteger(bool is_signed);
-  void VisitFloat();
   // TypeVisitor implementation
   void VisitType(const fidl_codec::Type* type) override;
   void VisitEmptyPayloadType(const fidl_codec::EmptyPayloadType* type) override;

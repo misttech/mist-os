@@ -236,14 +236,6 @@ void ObjectConverter::VisitType(const fidl_codec::Type* type) {
   PyErr_Format(PyExc_TypeError, "Unknown FIDL type: '%s'.", type->Name().c_str());
 }
 
-void ObjectConverter::VisitFloat() {
-  double res = PyFloat_AsDouble(obj_);
-  if (res == -1.0 && PyErr_Occurred()) {
-    return;
-  }
-  result_ = std::make_unique<fidl_codec::DoubleValue>(res);
-}
-
 void ObjectConverter::VisitList(const fidl_codec::ElementSequenceType* type,
                                 std::optional<size_t> count) {
   if (!count && HandleNone(type)) {
@@ -356,8 +348,20 @@ void ObjectConverter::VisitHandleType(const fidl_codec::HandleType* type) {
   result_ = std::make_unique<fidl_codec::HandleValue>(handle_disp);
 }
 
-void ObjectConverter::VisitFloat32Type(const fidl_codec::Float32Type* type) { VisitFloat(); }
+void ObjectConverter::VisitFloat32Type(const fidl_codec::Float32Type* type) {
+  double res = PyFloat_AsDouble(obj_);
+  if (res == -1.0 && PyErr_Occurred()) {
+    return;
+  }
+  result_ = std::make_unique<fidl_codec::DoubleValue>(static_cast<float>(res));
+}
 
-void ObjectConverter::VisitFloat64Type(const fidl_codec::Float64Type* type) { VisitFloat(); }
+void ObjectConverter::VisitFloat64Type(const fidl_codec::Float64Type* type) {
+  double res = PyFloat_AsDouble(obj_);
+  if (res == -1.0 && PyErr_Occurred()) {
+    return;
+  }
+  result_ = std::make_unique<fidl_codec::DoubleValue>(res);
+}
 
 }  // namespace converter

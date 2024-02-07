@@ -6,6 +6,7 @@
 
 import fuchsia_controller_py
 import fidl.test_conformance as test_conformance
+import struct
 import unittest
 
 def create_handle(cls):
@@ -23,8 +24,8 @@ class ConformanceTests(unittest.TestCase):
         handle_defs = {{ .HandleDefs }}
         {{- end }}
         value = {{ .Value }}
-        bytes, hdls = value.encode()
-        self.assertEqual(bytes, {{ .Bytes }})
+        b, hdls = value.encode()
+        self.assertEqual(b, {{ .Bytes }})
         {{- if .HandleDefs }}
         for i, hdl in enumerate(handle_defs):
             # Element 1 is the handle (these return dispositions).
