@@ -6,8 +6,8 @@ to the computer system via a **display connection**.
 
 [**Graphics**][computer-graphics] hardware and software "figures out" what will
 be displayed to the user, and is ultimately responsible for creating
-**image data**, which is a low-level description of an image that can be
-processed by a display device.
+**image data**, which is a low-level description of a two-dimensional
+[image][image] that can be processed by a display device.
 
 The **display engine** is the hardware inside the computer system that drives
 the display connection. The display engine's primary responsibility is turning
@@ -19,9 +19,15 @@ interacts with the human user's sight.
 Under normal operation, this process of transmitting and displaying images is
 repeated continuously at a high frequency. Thanks to
 [flicker fusion][flicker-fusion], human eyes perceive a series of images
-displayed in quick succession as continuous motion. In this context, the images
-are called [**frames**][frame], and the frequency of this process is called
-[**the frame rate**][frame-rate].
+displayed in quick succession as continuous motion. The sequence of images is
+called a "moving" image, the individual images are called [**frames**][frame],
+and the frequency of this process is called [**the frame rate**][frame-rate].
+The display connection is said to carry **[video][video] data**, a low-level
+description of the sequence of frames.
+
+The Fuchsia display stack only supports **video displays**, which are display
+devices that can represent arbitrary images (within a digital approximation).
+For a contrasting example, the display stack does not support segment displays.
 
 ## The display path
 
@@ -97,8 +103,8 @@ concerns.
 * Configuration - setting up the initial operation parameters of the hardware
   (DDIC and panel) at the other side of the connection, and changing these
   operating parameters in response to user requests or changes in circumstances
-* Image transmission - all the display connections supported by Fuchsia use the
-  [raster scan][raster-scan] pattern
+* Video transmission - all the display connections supported by Fuchsia transmit
+  video data using the [raster scan][raster-scan] pattern
 
 In many modern use cases, such as mobile and embedded devices, the display
 engine and DDIC are in the same [housing][device-housing], also known as
@@ -214,6 +220,7 @@ This section will be expanded in the future.
 [hdmi]: https://en.wikipedia.org/wiki/HDMI
 [human-vision-perception]: https://en.wikipedia.org/wiki/Visual_perception
 [human-vision-system]: https://en.wikipedia.org/wiki/Visual_system
+[image]: https://en.wikipedia.org/wiki/Image
 [lcd-panel]: https://en.wikipedia.org/wiki/Liquid-crystal_display
 [oled-panel]: https://en.wikipedia.org/wiki/OLED
 [pixel]: https://en.wikipedia.org/wiki/Pixel
@@ -223,3 +230,4 @@ This section will be expanded in the future.
 [soc]: https://en.wikipedia.org/wiki/System_on_a_chip
 [spi]: https://en.wikipedia.org/wiki/Serial_Peripheral_Interface
 [subpixel]: https://en.wikipedia.org/wiki/Pixel#Subpixels
+[video]: https://en.wikipedia.org/wiki/Video
