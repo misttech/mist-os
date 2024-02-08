@@ -9,7 +9,7 @@ interface is used.
 """
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Optional
 
 
 TEST_OUTDIR_ENV = "FUCHSIA_TEST_OUTDIR"
@@ -74,6 +74,6 @@ class BaseDriver(ABC):
         pass
 
     @abstractmethod
-    def teardown(self, *args: Any) -> None:
+    def teardown(self) -> None:
         """Performs any required clean up upon Mobly test completion."""
         pass

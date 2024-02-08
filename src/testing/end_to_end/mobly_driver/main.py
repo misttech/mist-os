@@ -64,7 +64,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 
-def main() -> None:
+def main():
     """Executes the Mobly test via Mobly Driver.
 
     This function determines the appropriate Mobly Driver implementation to use
