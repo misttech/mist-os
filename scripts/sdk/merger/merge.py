@@ -54,7 +54,7 @@ import tempfile
 
 from operator import itemgetter
 from functools import total_ordering
-from typing import Any, Dict, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, Optional, Sequence, Set, Tuple, TypeVar
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 FUCHSIA_ROOT = os.path.dirname(  # $root
@@ -150,6 +150,24 @@ def _write_file_if_changed(path: Path, data: str):
 
     with open(path, "w") as f:
         f.write(data)
+
+
+T = TypeVar("T")
+K = TypeVar("K")
+
+
+def _merge_variants(
+    v1: Sequence[T], v2: Sequence[T], dedup_key: Callable[[T], K]
+) -> list[T]:
+    """Merge two sequences of variants, dropping any instances from `v2` whose
+    key (according to `dedup_key`) matches an entry of `v1`."""
+    result = [*v1]
+
+    for variant in v2:
+        if not any(dedup_key(variant) == dedup_key(v) for v in v1):
+            result.append(variant)
+
+    return result
 
 
 class ElementMeta(object):
@@ -299,22 +317,28 @@ class ElementMeta(object):
         if type == "cc_prebuilt_library":
             meta = meta_one
             meta["binaries"].update(meta_two.get("binaries", {}))
-            meta["variants"] = meta_one.get("variants", []) + meta_two.get(
-                "variants", []
+            meta["variants"] = _merge_variants(
+                meta_one.get("variants", []),
+                meta_two.get("variants", []),
+                lambda v: v["constraints"],
             )
         elif type == "loadable_module":
             meta = meta_one
             meta["binaries"].update(meta_two.get("binaries", {}))
         elif type == "package":
             meta = meta_one
-            meta["variants"] = meta_one.get("variants", []) + meta_two.get(
-                "variants", []
+            meta["variants"] = _merge_variants(
+                meta_one.get("variants", []),
+                meta_two.get("variants", []),
+                lambda v: (v["api_level"], v["arch"]),
             )
         elif type == "sysroot":
             meta = meta_one
             meta["versions"].update(meta_two.get("versions", {}))
-            meta["variants"] = meta_one.get("variants", []) + meta_two.get(
-                "variants", []
+            meta["variants"] = _merge_variants(
+                meta_one.get("variants", []),
+                meta_two.get("variants", []),
+                lambda v: v["constraints"],
             )
         elif type in ["ffx_tool", "host_tool", "companion_host_tool"]:
             meta = meta_one
