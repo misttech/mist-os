@@ -183,8 +183,6 @@ pub struct Device {
     event_sink: mpsc::UnboundedSender<fidl_mlme::MlmeEvent>,
 }
 
-unsafe impl Send for Device {}
-
 impl Device {
     pub fn new(
         raw_device: DeviceInterface,
@@ -723,8 +721,6 @@ impl<'a> WlanSoftmacIfcProtocol<'a> {
     }
 }
 
-// Our device is used inside a separate worker thread, so we force Rust to allow this.
-unsafe impl Send for DeviceInterface {}
 
 /// A `Device` allows transmitting frames and MLME messages.
 #[repr(C)]
