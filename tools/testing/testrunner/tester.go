@@ -774,30 +774,32 @@ func (t *FFXTester) Close() error {
 }
 
 func (t *FFXTester) EnsureSinks(ctx context.Context, sinks []runtests.DataSinkReference, outputs *TestOutputs) error {
+	useFFXEarlyBoot := t.experimentLevel >= 1
 	if !t.EnabledForTesting() {
-		return t.sshTester.EnsureSinks(ctx, sinks, outputs)
+		if useFFXEarlyBoot {
+			if sshTester, ok := t.sshTester.(*FuchsiaSSHTester); ok {
+				sshTester.IgnoreEarlyBoot()
+			}
+		}
+		if err := t.sshTester.EnsureSinks(ctx, sinks, outputs); err != nil {
+			return err
+		}
+		if !useFFXEarlyBoot {
+			return nil
+		}
 	}
 	sinksPerTest := make(map[string]runtests.DataSinkReference)
 	for _, testOutDir := range t.testOutDirs {
-		runResult, err := ffxutil.GetRunResult(testOutDir)
-		if err != nil {
+		if err := t.getSinks(ctx, testOutDir, sinksPerTest, useFFXEarlyBoot); err != nil {
 			return err
 		}
-		runArtifactDir := filepath.Join(testOutDir, runResult.ArtifactDir)
-		seen := make(map[string]struct{})
-		startTime := clock.Now(ctx)
-		// The runResult's artifacts should contain a directory with the profiles from
-		// component v2 tests along with a summary.json that lists the data sinks per test.
-		// It should also contain a second directory with early boot data sinks.
-		for artifact := range runResult.Artifacts {
-			artifactPath := filepath.Join(runArtifactDir, artifact)
-			if err := t.getSinks(artifactPath, sinksPerTest, seen); err != nil {
-				return err
-			}
-		}
-		copyDuration := clock.Now(ctx).Sub(startTime)
-		if len(seen) > 0 {
-			logger.Debugf(ctx, "copied %d data sinks in %s", len(seen), copyDuration)
+	}
+	if useFFXEarlyBoot {
+		if err := t.getEarlyBootProfiles(ctx, sinksPerTest); err != nil {
+			// OTA tests cause this command to fail, but aren't used for collecting
+			// coverage anyway. If this fails, just log the error and continue
+			// processing the rest of the data sinks.
+			logger.Debugf(ctx, "failed to determine early boot data sinks: %s", err)
 		}
 	}
 	// If there were early boot sinks, record the "early_boot_sinks" test in the outputs
@@ -812,48 +814,67 @@ func (t *FFXTester) EnsureSinks(ctx context.Context, sinks []runtests.DataSinkRe
 	if len(sinksPerTest) > 0 {
 		outputs.updateDataSinks(sinksPerTest, "v2")
 	}
-	// Copy v1 sinks.
-	if sshTester, ok := t.sshTester.(*FuchsiaSSHTester); ok {
+	// Copy v1 sinks using the sshTester if ffx was used for testing.
+	if sshTester, ok := t.sshTester.(*FuchsiaSSHTester); ok && t.EnabledForTesting() {
 		return sshTester.copySinks(ctx, sinks, t.localOutputDir)
 	}
 	return nil
 }
 
-func (t *FFXTester) getSinks(artifactDir string, sinksPerTest map[string]runtests.DataSinkReference, seen map[string]struct{}) error {
-	return filepath.WalkDir(artifactDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
+func (t *FFXTester) getEarlyBootProfiles(ctx context.Context, sinksPerTest map[string]runtests.DataSinkReference) error {
+	testOutDir := filepath.Join(t.localOutputDir, "early-boot-profiles")
+	if err := os.MkdirAll(testOutDir, os.ModePerm); err != nil {
+		return err
+	}
+	if err := t.ffx.RunWithTarget(ctx, "test", "early-boot-profile", "--output-directory", testOutDir); err != nil {
+		return err
+	}
+	return t.getSinks(ctx, testOutDir, sinksPerTest, false)
+}
+
+func (t *FFXTester) getSinks(ctx context.Context, testOutDir string, sinksPerTest map[string]runtests.DataSinkReference, ignoreEarlyBoot bool) error {
+	runResult, err := ffxutil.GetRunResult(testOutDir)
+	if err != nil {
+		return err
+	}
+	runArtifactDir := filepath.Join(testOutDir, runResult.ArtifactDir)
+	seen := make(map[string]struct{})
+	startTime := clock.Now(ctx)
+	// The runResult's artifacts should contain a directory with the profiles from
+	// component v2 tests along with a summary.json that lists the data sinks per test.
+	// It should also contain a second directory with early boot data sinks.
+	for artifact := range runResult.Artifacts {
+		artifactPath := filepath.Join(runArtifactDir, artifact)
+		if err := t.getSinksFromArtifactDir(ctx, artifactPath, sinksPerTest, seen, ignoreEarlyBoot); err != nil {
 			return err
 		}
-		// If the path is a directory, check for the summary.json and copy all
-		// profiles to the localOutputDir. If the directory does not have a
-		// summary.json, that means it doesn't contain profile artifacts, so ignore
-		// it.
-		if d.IsDir() {
-			summaryPath := filepath.Join(path, runtests.TestSummaryFilename)
-			f, err := os.Open(summaryPath)
-			if os.IsNotExist(err) {
-				return nil
-			}
-			if err != nil {
-				return err
-			}
-			defer f.Close()
+	}
+	copyDuration := clock.Now(ctx).Sub(startTime)
+	if len(seen) > 0 {
+		logger.Debugf(ctx, "copied %d data sinks in %s", len(seen), copyDuration)
+	}
+	return nil
+}
 
-			var summary runtests.TestSummary
-			if err = json.NewDecoder(f).Decode(&summary); err != nil {
-				return fmt.Errorf("failed to read test summary from %q: %w", summaryPath, err)
-			}
-			if err := t.getSinksPerTest(path, summary, sinksPerTest, seen); err != nil {
-				return err
-			}
-			return filepath.SkipDir
+func (t *FFXTester) getSinksFromArtifactDir(ctx context.Context, artifactDir string, sinksPerTest map[string]runtests.DataSinkReference, seen map[string]struct{}, ignoreEarlyBoot bool) error {
+	summaryPath := filepath.Join(artifactDir, runtests.TestSummaryFilename)
+	f, err := os.Open(summaryPath)
+	if os.IsNotExist(err) {
+		if ignoreEarlyBoot {
+			return nil
 		}
-		// Else, if the path is a .profraw file, then it must be an early boot profile.
-		if filepath.Ext(path) == ".profraw" {
-			return t.getEarlyBootSink(path, sinksPerTest, seen)
-		}
-		return nil
-	})
+		return t.getEarlyBootSinks(ctx, artifactDir, sinksPerTest, seen)
+	}
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	var summary runtests.TestSummary
+	if err = json.NewDecoder(f).Decode(&summary); err != nil {
+		return fmt.Errorf("failed to read test summary from %q: %w", summaryPath, err)
+	}
+	return t.getSinksPerTest(artifactDir, summary, sinksPerTest, seen)
 }
 
 // getSinksPerTest moves sinks from sinkDir to the localOutputDir and records
@@ -879,28 +900,48 @@ func (t *FFXTester) getSinksPerTest(sinkDir string, summary runtests.TestSummary
 	return nil
 }
 
-// getEarlyBootSink moves the early boot sink to the localOutputDir and records it with
+// getEarlyBootSinks moves the early boot sinks to the localOutputDir and records it with
 // an "early_boot_sinks" test in sinksPerTest.
-func (t *FFXTester) getEarlyBootSink(path string, sinksPerTest map[string]runtests.DataSinkReference, seen map[string]struct{}) error {
-	sinkFile := filepath.Base(path)
-	if _, ok := seen[path]; !ok {
-		newPath := filepath.Join(t.localOutputDir, "v2", sinkFile)
-		if err := os.MkdirAll(filepath.Dir(newPath), os.ModePerm); err != nil {
+func (t *FFXTester) getEarlyBootSinks(ctx context.Context, sinkDir string, sinksPerTest map[string]runtests.DataSinkReference, seen map[string]struct{}) error {
+	return filepath.WalkDir(sinkDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
 			return err
 		}
-		if err := os.Rename(path, newPath); err != nil {
+		// TODO(https://fxbug.dev/132081): Remove hardcoded check for logs once they
+		// are moved to a separate location.
+		if d.IsDir() || filepath.Ext(path) == ".log" {
+			return nil
+		}
+		// Record the file as an early boot profile.
+		sinkFile, err := filepath.Rel(sinkDir, path)
+		if err != nil {
 			return err
 		}
-		seen[path] = struct{}{}
-	}
-	earlyBootSinks, ok := sinksPerTest[earlyBootSinksTestName]
-	if !ok {
-		earlyBootSinks = runtests.DataSinkReference{Sinks: runtests.DataSinkMap{}}
-	}
-	// TODO(https://fxbug.dev/42082223): Don't hardcode llvm-profile sink type.
-	earlyBootSinks.Sinks["llvm-profile"] = append(earlyBootSinks.Sinks["llvm-profile"], runtests.DataSink{Name: sinkFile, File: sinkFile})
-	sinksPerTest[earlyBootSinksTestName] = earlyBootSinks
-	return nil
+		if _, ok := seen[path]; !ok {
+			newPath := filepath.Join(t.localOutputDir, "v2", sinkFile)
+			if err := os.MkdirAll(filepath.Dir(newPath), os.ModePerm); err != nil {
+				return err
+			}
+			if err := os.Rename(path, newPath); err != nil {
+				return err
+			}
+			seen[path] = struct{}{}
+		}
+		earlyBootSinks, ok := sinksPerTest[earlyBootSinksTestName]
+		if !ok {
+			earlyBootSinks = runtests.DataSinkReference{Sinks: runtests.DataSinkMap{}}
+		}
+
+		// The directory under sinkDir is named after the type of sinks it contains.
+		sinkType := strings.Split(filepath.ToSlash(sinkFile), "/")[0]
+		if _, ok := earlyBootSinks.Sinks[sinkType]; !ok {
+			earlyBootSinks.Sinks[sinkType] = []runtests.DataSink{}
+		}
+		earlyBootSinks.Sinks[sinkType] = append(earlyBootSinks.Sinks[sinkType], runtests.DataSink{Name: sinkFile, File: sinkFile})
+
+		sinksPerTest[earlyBootSinksTestName] = earlyBootSinks
+		return nil
+	})
 }
 
 func (t *FFXTester) RunSnapshot(ctx context.Context, snapshotFile string) error {
@@ -949,6 +990,7 @@ type FuchsiaSSHTester struct {
 	localOutputDir              string
 	connectionErrorRetryBackoff retry.Backoff
 	serialSocket                serialClient
+	ignoreEarlyBoot             bool
 }
 
 // NewFuchsiaSSHTester returns a FuchsiaSSHTester associated to a fuchsia
@@ -1119,10 +1161,22 @@ func (t *FuchsiaSSHTester) Test(ctx context.Context, test testsharder.Test, stdo
 	return testResult, nil
 }
 
+// IgnoreEarlyBoot should be called from the FFXTester if it uses
+// the FuchsiaSSHTester to run tests but wants to collect early
+// boot profiles separately using ffx instead of getting it using
+// the FuchsiaSSHTester's EnsureSinks() method.
+func (t *FuchsiaSSHTester) IgnoreEarlyBoot() {
+	t.ignoreEarlyBoot = true
+}
+
 func (t *FuchsiaSSHTester) EnsureSinks(ctx context.Context, sinkRefs []runtests.DataSinkReference, outputs *TestOutputs) error {
 	// Collect v2 references.
-	v2Sinks, err := t.copier.GetReferences(dataOutputDirV2)
-	if err != nil {
+	var v2Sinks map[string]runtests.DataSinkReference
+	var err error
+	if err := t.runCopierWithRetry(ctx, func() error {
+		v2Sinks, err = t.copier.GetReferences(dataOutputDirV2)
+		return err
+	}); err != nil {
 		// If we fail to get v2 sinks, just log the error but continue to copy v1 sinks.
 		logger.Debugf(ctx, "failed to determine data sinks for v2 tests: %s", err)
 	}
@@ -1136,9 +1190,15 @@ func (t *FuchsiaSSHTester) EnsureSinks(ctx context.Context, sinkRefs []runtests.
 		}
 		outputs.updateDataSinks(v2Sinks, "v2")
 	}
+	if t.ignoreEarlyBoot {
+		return t.copySinks(ctx, sinkRefs, t.localOutputDir)
+	}
 	// Collect early boot coverage.
-	earlyBootSinks, err := t.copier.GetAllDataSinks(dataOutputDirEarlyBoot)
-	if err != nil {
+	var earlyBootSinks []runtests.DataSink
+	if err := t.runCopierWithRetry(ctx, func() error {
+		earlyBootSinks, err = t.copier.GetAllDataSinks(dataOutputDirEarlyBoot)
+		return err
+	}); err != nil {
 		logger.Debugf(ctx, "failed to determine early boot data sinks: %s", err)
 	}
 	if len(earlyBootSinks) > 0 {
@@ -1167,30 +1227,40 @@ func (t *FuchsiaSSHTester) EnsureSinks(ctx context.Context, sinkRefs []runtests.
 	return t.copySinks(ctx, sinkRefs, t.localOutputDir)
 }
 
-func (t *FuchsiaSSHTester) copySinks(ctx context.Context, sinkRefs []runtests.DataSinkReference, localOutputDir string) error {
+func (t *FuchsiaSSHTester) runCopierWithRetry(ctx context.Context, copierFunc func() error) error {
 	strategy := retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), 4)
 	disconnected := false
-	if err := retry.Retry(ctx, strategy, func() error {
+	return retry.Retry(ctx, strategy, func() error {
 		if disconnected {
-			logger.Debugf(ctx, "reconnecting to retry downloading data sinks...")
+			logger.Debugf(ctx, "reconnecting to retry getting data sinks...")
 			if err := t.reconnect(ctx); err != nil {
 				return retry.Fatal(err)
 			}
 			disconnected = false
-			logger.Debugf(ctx, "successfully reconnected, will retry downloading data sinks")
+			logger.Debugf(ctx, "successfully reconnected, will retry getting data sinks")
 		}
+
+		if err := copierFunc(); err != nil {
+			if errors.Is(err, sftp.ErrSSHFxConnectionLost) {
+				logger.Warningf(ctx, "connection lost while getting data sinks: %s", err)
+				disconnected = true
+				return err
+			}
+			return retry.Fatal(err)
+		}
+		return nil
+	}, nil)
+}
+
+func (t *FuchsiaSSHTester) copySinks(ctx context.Context, sinkRefs []runtests.DataSinkReference, localOutputDir string) error {
+	if err := t.runCopierWithRetry(ctx, func() error {
 		startTime := clock.Now(ctx)
 
 		// Copy() is assumed to be idempotent and thus safe to retry, which is
 		// the case for the SFTP-based data sink copier.
 		sinkMap, err := t.copier.Copy(sinkRefs, localOutputDir)
 		if err != nil {
-			if errors.Is(err, sftp.ErrSSHFxConnectionLost) {
-				logger.Warningf(ctx, "connection lost while downlading data sinks: %s", err)
-				disconnected = true
-				return err
-			}
-			return retry.Fatal(err)
+			return err
 		}
 		copyDuration := clock.Now(ctx).Sub(startTime)
 		sinkRef := runtests.DataSinkReference{Sinks: sinkMap}
@@ -1199,7 +1269,7 @@ func (t *FuchsiaSSHTester) copySinks(ctx context.Context, sinkRefs []runtests.Da
 			logger.Debugf(ctx, "copied %d data sinks in %s", numSinks, copyDuration)
 		}
 		return nil
-	}, nil); err != nil {
+	}); err != nil {
 		return fmt.Errorf("failed to copy data sinks off target: %w", err)
 	}
 	return nil
