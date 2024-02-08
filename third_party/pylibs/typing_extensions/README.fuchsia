@@ -7,11 +7,6 @@ Description:
 typing_extensions is backported and experimental type hints for Python
 
 
-Changes made to Work with Fuchsia:
-
-Added __init__.py to ensure the directory is treated as a Python package,
-enabling proper imports.
-
 Upgrading the version of mypy_extensions:
 
 Run `integration/third_party/pylibs/update-pylibs.sh` script to automatically
