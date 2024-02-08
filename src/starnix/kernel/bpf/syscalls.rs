@@ -7,7 +7,7 @@
 
 use crate::{
     bpf::{
-        fs::{get_bpf_object, get_selinux_context, BpfFsDir, BpfFsObject, BpfHandle, BpfObject},
+        fs::{get_bpf_object, get_selinux_context, BpfFsDir, BpfFsObject, BpfHandle},
         map::Map,
         program::{Program, ProgramInfo},
     },
@@ -63,24 +63,21 @@ fn read_attr<Attr: FromBytes>(
     current_task.read_object_partial(UserRef::new(attr_addr), attr_size)
 }
 
-fn install_bpf_fd(current_task: &CurrentTask, obj: impl BpfObject) -> Result<SyscallResult, Errno> {
-    install_bpf_handle_fd(current_task, BpfHandle::new(obj))
-}
-
-fn install_bpf_handle_fd(
+fn install_bpf_fd(
     current_task: &CurrentTask,
-    handle: BpfHandle,
+    obj: impl Into<BpfHandle>,
 ) -> Result<SyscallResult, Errno> {
+    let handle: BpfHandle = obj.into();
     // All BPF FDs have the CLOEXEC flag turned on by default.
     let file = Anon::new_file(current_task, Box::new(handle), OpenFlags::CLOEXEC);
     Ok(current_task.add_file(file, FdFlags::CLOEXEC)?.into())
 }
 
-struct BpfTypeFormat {
+#[derive(Clone)]
+pub struct BpfTypeFormat {
     #[allow(dead_code)]
     data: Vec<u8>,
 }
-impl BpfObject for BpfTypeFormat {}
 
 pub fn sys_bpf(
     locked: &mut Locked<'_, Unlocked>,
@@ -130,7 +127,7 @@ pub fn sys_bpf(
             log_trace!("BPF_MAP_LOOKUP_ELEM");
             let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
             let map = get_bpf_object(current_task, map_fd)?;
-            let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
+            let map = map.as_map()?;
 
             let key = current_task.read_memory_to_vec(
                 UserAddress::from(elem_attr.key),
@@ -149,7 +146,7 @@ pub fn sys_bpf(
             log_trace!("BPF_MAP_UPDATE_ELEM");
             let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
             let map = get_bpf_object(current_task, map_fd)?;
-            let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
+            let map = map.as_map()?;
 
             let flags = elem_attr.flags;
             let key = current_task.read_memory_to_vec(
@@ -171,7 +168,7 @@ pub fn sys_bpf(
             log_trace!("BPF_MAP_DELETE_ELEM");
             let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
             let map = get_bpf_object(current_task, map_fd)?;
-            let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
+            let map = map.as_map()?;
 
             let key = current_task.read_memory_to_vec(
                 UserAddress::from(elem_attr.key),
@@ -189,7 +186,7 @@ pub fn sys_bpf(
             log_trace!("BPF_MAP_GET_NEXT_KEY");
             let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
             let map = get_bpf_object(current_task, map_fd)?;
-            let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
+            let map = map.as_map()?;
             let key = if elem_attr.key != 0 {
                 let key = current_task.read_memory_to_vec(
                     UserAddress::from(elem_attr.key),
@@ -284,7 +281,7 @@ pub fn sys_bpf(
             // TODO(tbodt): This might be the wrong error code, write a test program to find out
             let node =
                 node.entry.node.downcast_ops::<BpfFsObject>().ok_or_else(|| errno!(EINVAL))?;
-            install_bpf_handle_fd(current_task, node.handle.clone())
+            install_bpf_fd(current_task, node.handle.clone())
         }
 
         // Obtain information about the eBPF object corresponding to bpf_fd.
@@ -295,28 +292,32 @@ pub fn sys_bpf(
             let bpf_fd = FdNumber::from_raw(get_info_attr.bpf_fd as i32);
             let object = get_bpf_object(current_task, bpf_fd)?;
 
-            let mut info = if let Some(map) = object.downcast::<Map>() {
-                bpf_map_info {
-                    type_: map.schema.map_type,
-                    id: 0, // not used by android as far as I can tell
-                    key_size: map.schema.key_size,
-                    value_size: map.schema.value_size,
-                    max_entries: map.schema.max_entries,
-                    map_flags: map.flags,
-                    ..Default::default()
+            let mut info = match object {
+                BpfHandle::Map(map) => {
+                    bpf_map_info {
+                        type_: map.schema.map_type,
+                        id: 0, // not used by android as far as I can tell
+                        key_size: map.schema.key_size,
+                        value_size: map.schema.value_size,
+                        max_entries: map.schema.max_entries,
+                        map_flags: map.flags,
+                        ..Default::default()
+                    }
+                    .as_bytes()
+                    .to_owned()
                 }
-                .as_bytes()
-                .to_owned()
-            } else if let Some(_prog) = object.downcast::<Program>() {
-                #[allow(unknown_lints, clippy::unnecessary_struct_initialization)]
-                bpf_prog_info {
-                    // Doesn't matter yet
-                    ..Default::default()
+                BpfHandle::Program(_) => {
+                    #[allow(unknown_lints, clippy::unnecessary_struct_initialization)]
+                    bpf_prog_info {
+                        // Doesn't matter yet
+                        ..Default::default()
+                    }
+                    .as_bytes()
+                    .to_owned()
                 }
-                .as_bytes()
-                .to_owned()
-            } else {
-                return error!(EINVAL);
+                _ => {
+                    return error!(EINVAL);
+                }
             };
 
             // If info_len is larger than info, write out the full length of info and write the

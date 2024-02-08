@@ -6,6 +6,7 @@
 #![allow(non_upper_case_globals)]
 
 use crate::{
+    bpf::{map::Map, program::Program, syscalls::BpfTypeFormat},
     task::{CurrentTask, Kernel, Task},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
@@ -18,7 +19,6 @@ use crate::{
 use starnix_logging::track_stub;
 use starnix_sync::{Locked, ReadOps, WriteOps};
 use starnix_uapi::{
-    as_any::AsAny,
     auth::FsCred,
     device_type::DeviceType,
     errno, error,
@@ -42,12 +42,47 @@ pub fn get_selinux_context(path: &FsStr) -> FsString {
     }
 }
 
-pub trait BpfObject: Send + Sync + AsAny + 'static {}
-
 /// A reference to a BPF object that can be stored in either an FD or an entry in the /sys/fs/bpf
 /// filesystem.
 #[derive(Clone)]
-pub struct BpfHandle(Arc<dyn BpfObject>);
+pub enum BpfHandle {
+    Program(Arc<Program>),
+    Map(Arc<Map>),
+    BpfTypeFormat(Arc<BpfTypeFormat>),
+}
+
+impl BpfHandle {
+    pub fn as_map(&self) -> Result<&Arc<Map>, Errno> {
+        match self {
+            Self::Map(ref map) => Ok(map),
+            _ => error!(EINVAL),
+        }
+    }
+    pub fn as_program(&self) -> Result<&Arc<Program>, Errno> {
+        match self {
+            Self::Program(ref program) => Ok(program),
+            _ => error!(EINVAL),
+        }
+    }
+}
+
+impl From<Program> for BpfHandle {
+    fn from(program: Program) -> Self {
+        Self::Program(Arc::new(program))
+    }
+}
+
+impl From<Map> for BpfHandle {
+    fn from(map: Map) -> Self {
+        Self::Map(Arc::new(map))
+    }
+}
+
+impl From<BpfTypeFormat> for BpfHandle {
+    fn from(format: BpfTypeFormat) -> Self {
+        Self::BpfTypeFormat(Arc::new(format))
+    }
+}
 
 impl FileOps for BpfHandle {
     fileops_impl_nonseekable!();
@@ -72,16 +107,6 @@ impl FileOps for BpfHandle {
     ) -> Result<usize, Errno> {
         track_stub!(TODO("https://fxbug.dev/322873841"), "bpf handle write");
         error!(EINVAL)
-    }
-}
-
-impl BpfHandle {
-    pub fn new(obj: impl BpfObject) -> Self {
-        Self(Arc::new(obj))
-    }
-
-    pub fn downcast<T: BpfObject>(&self) -> Option<&T> {
-        (*self.0).as_any().downcast_ref::<T>()
     }
 }
 

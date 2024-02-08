@@ -4,7 +4,7 @@
 
 use crate::{
     bpf::{
-        fs::{get_bpf_object, BpfHandle, BpfObject},
+        fs::{get_bpf_object, BpfHandle},
         helpers::BPF_HELPERS,
         map::Map,
     },
@@ -66,8 +66,6 @@ pub struct Program {
     _objects: Vec<BpfHandle>,
 }
 
-impl BpfObject for Program {}
-
 fn map_ubpf_error(e: UbpfError) -> Errno {
     log_error!("Failed to load BPF program: {:?}", e);
     errno!(EINVAL)
@@ -124,8 +122,8 @@ fn link(
                 instruction.set_src_reg(0);
                 let fd = FdNumber::from_raw(instruction.imm);
                 let object = get_bpf_object(current_task, fd)?;
-                let map = object.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
-                let map_ptr = (map as *const Map) as u64;
+                let map = object.as_map()?;
+                let map_ptr = (map.as_ref() as *const Map) as u64;
                 let (high, low) = ((map_ptr >> 32) as i32, map_ptr as i32);
                 instruction.imm = low;
                 // The validation that the next instruction op code is correct will be done by

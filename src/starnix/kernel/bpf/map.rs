@@ -4,7 +4,7 @@
 
 #![allow(non_upper_case_globals)]
 
-use crate::{bpf::fs::BpfObject, mm::MemoryAccessor, task::CurrentTask};
+use crate::{mm::MemoryAccessor, task::CurrentTask};
 use dense_map::DenseMap;
 use starnix_logging::track_stub;
 use starnix_sync::{BpfMapEntries, Locked, OrderedMutex, Unlocked};
@@ -44,8 +44,6 @@ pub struct Map {
     // This field should be private to this module.
     entries: OrderedMutex<MapStore, BpfMapEntries>,
 }
-
-impl BpfObject for Map {}
 
 impl Map {
     pub fn new(schema: MapSchema, flags: u32) -> Result<Self, Errno> {

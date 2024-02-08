@@ -4,7 +4,7 @@
 
 use crate::{
     bpf::{
-        fs::{get_bpf_object, BpfHandle},
+        fs::get_bpf_object,
         program::{Program, ProgramType},
     },
     mm::MemoryAccessorExt,
@@ -129,7 +129,7 @@ struct UnixSocketInner {
     pub keepalive: bool,
 
     /// See SO_ATTACH_BPF.
-    bpf_program: Option<BpfHandle>,
+    bpf_program: Option<Arc<Program>>,
 
     /// Unix credentials of the owner of this socket, for SO_PEERCRED.
     credentials: Option<ucred>,
@@ -384,15 +384,14 @@ impl UnixSocket {
         inner.keepalive = keepalive;
     }
 
-    fn set_bpf_program(&self, bpf_program: Option<BpfHandle>) -> Result<(), Errno> {
-        if let Some(program) = bpf_program.as_ref() {
-            let program = program.downcast::<Program>().ok_or_else(|| errno!(EINVAL))?;
+    fn set_bpf_program(&self, program: Option<Arc<Program>>) -> Result<(), Errno> {
+        if let Some(program) = program.as_ref() {
             if program.info.program_type != ProgramType::SocketFilter {
                 return error!(EINVAL);
             }
         }
         let mut inner = self.lock();
-        inner.bpf_program = bpf_program;
+        inner.bpf_program = program;
         Ok(())
     }
 
@@ -737,7 +736,7 @@ impl SocketOps for UnixSocket {
                 SO_ATTACH_BPF => {
                     let fd: FdNumber = task.read_object(user_opt.try_into()?)?;
                     let object = get_bpf_object(task, fd)?;
-                    self.set_bpf_program(Some(object))?;
+                    self.set_bpf_program(Some(object.as_program()?.clone()))?;
                 }
                 _ => return error!(ENOPROTOOPT),
             },
