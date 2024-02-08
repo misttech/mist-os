@@ -8,7 +8,8 @@ use core::sync::atomic::{AtomicU64, Ordering};
 use net_types::ip::{Ip, Ipv4, Ipv6};
 
 use crate::{
-    context::{ContextPair, CounterContext},
+    base::ContextPair,
+    context::CounterContext,
     device::{arp::ArpCounters, DeviceCounters},
     inspect::Inspector,
     ip::{

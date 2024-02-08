@@ -7,7 +7,8 @@ use lock_order::Unlocked;
 use net_types::ip::Ip;
 
 use crate::{
-    context::{ContextPair as _, ContextProvider, CoreCtx, CtxPair, TimerHandler as _},
+    base::ContextPair as _,
+    context::{ContextProvider, CoreCtx, CtxPair, TimerHandler as _},
     counters::CountersApi,
     device::{
         api::{DeviceAnyApi, DeviceApi},

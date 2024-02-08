@@ -39,6 +39,7 @@ use core::{convert::Infallible as Never, ffi::CStr, fmt::Debug, time::Duration};
 
 use lock_order::Unlocked;
 
+use netstack3_base::ContextPair;
 use packet::{BufferMut, Serializer};
 use rand::{CryptoRng, RngCore};
 
@@ -296,42 +297,6 @@ pub(crate) type CoreCtxAndResource<'a, BT, R, L> =
 pub type UnlockedCoreCtx<'a, BT> = CoreCtx<'a, BT, Unlocked>;
 
 pub(crate) use locked::Locked;
-
-/// A pair of core and bindings contexts.
-///
-/// This trait exists so implementers can be agnostic on the storage of the
-/// contexts, since all we need from a context pair is mutable references from
-/// both contexts.
-pub trait ContextPair {
-    type CoreContext;
-    type BindingsContext;
-
-    /// Gets a mutable reference to both contexts.
-    fn contexts(&mut self) -> (&mut Self::CoreContext, &mut Self::BindingsContext);
-
-    /// Gets a mutable reference to the core context.
-    fn core_ctx(&mut self) -> &mut Self::CoreContext {
-        let (core_ctx, _) = self.contexts();
-        core_ctx
-    }
-
-    /// Gets a mutable reference to the bindings context.
-    fn bindings_ctx(&mut self) -> &mut Self::BindingsContext {
-        let (_, bindings_ctx) = self.contexts();
-        bindings_ctx
-    }
-}
-
-impl<'a, C> ContextPair for &'a mut C
-where
-    C: ContextPair,
-{
-    type CoreContext = C::CoreContext;
-    type BindingsContext = C::BindingsContext;
-    fn contexts(&mut self) -> (&mut Self::CoreContext, &mut Self::BindingsContext) {
-        C::contexts(self)
-    }
-}
 
 /// A type that provides a context implementation.
 ///

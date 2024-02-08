@@ -111,6 +111,10 @@ rustc_library_with_features("netstack3-core") {
 
     # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
     "fakestd",
+
+    # Placeholder comment so the auto formatter does not move one of these
+    # dependencies above "fakestd".
+    "base:netstack3-base",
     "lock-order",
     "macros:netstack3-macros",
     "//src/connectivity/lib/net-types",

@@ -12,7 +12,7 @@ use net_types::{
 };
 
 use crate::{
-    context::ContextPair,
+    base::ContextPair,
     device::{AnyDevice, DeviceIdContext},
     inspect::{Inspector, InspectorDeviceExt},
     ip::{

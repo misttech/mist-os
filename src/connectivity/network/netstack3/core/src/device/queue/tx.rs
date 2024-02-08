@@ -297,13 +297,13 @@ mod tests {
     }
 
     /// A trait providing a shortcut to instantiate a [`TransmitQueueApi`] from a context.
-    trait TransmitQueueApiExt: crate::context::ContextPair + Sized {
+    trait TransmitQueueApiExt: crate::base::ContextPair + Sized {
         fn transmit_queue_api<D>(&mut self) -> TransmitQueueApi<D, &mut Self> {
             TransmitQueueApi::new(self)
         }
     }
 
-    impl<O> TransmitQueueApiExt for O where O: crate::context::ContextPair + Sized {}
+    impl<O> TransmitQueueApiExt for O where O: crate::base::ContextPair + Sized {}
 
     impl TransmitQueueContext<FakeLinkDevice, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn with_transmit_queue_mut<

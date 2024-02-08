@@ -45,6 +45,11 @@ pub mod benchmarks;
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil;
 
+/// Base types used throughout Netstack3 Core.
+pub mod base {
+    pub use netstack3_base::ContextPair;
+}
+
 /// The device layer.
 pub mod device {
     pub(crate) mod api;

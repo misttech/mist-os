@@ -34,9 +34,8 @@ use tracing::{debug, trace};
 pub(crate) use crate::socket::datagram::IpExt;
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl, ProtocolFlowId},
-    context::{
-        ContextPair, CounterContext, InstantContext, NonTestCtxMarker, RngContext, TracingContext,
-    },
+    base::ContextPair,
+    context::{CounterContext, InstantContext, NonTestCtxMarker, RngContext, TracingContext},
     convert::BidirectionalConverter,
     counters::Counter,
     data_structures::socketmap::{IterShadows as _, SocketMap, Tagged},

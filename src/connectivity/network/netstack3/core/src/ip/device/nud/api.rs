@@ -13,7 +13,8 @@ use net_types::{
 use thiserror::Error;
 
 use crate::{
-    context::{ContextPair, EventContext as _, InstantContext as _},
+    base::ContextPair,
+    context::{EventContext as _, InstantContext as _},
     device::{link::LinkDevice, DeviceIdContext},
     error::NotFoundError,
     inspect::Inspector,
