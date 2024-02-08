@@ -136,16 +136,9 @@ void Gatt2ClientServer::WatchServices(std::vector<fb::Uuid> fidl_uuids,
   std::transform(fidl_uuids.begin(), fidl_uuids.end(), std::inserter(uuids, uuids.begin()),
                  [](const fb::Uuid& uuid) { return bt::UUID(uuid.value); });
 
-  // Only allow 1 callback at a time. Close the server if this is violated.
-  if (watch_services_request_) {
-    bt_log(WARN, "fidl", "%s: call received while previous call is still pending", __FUNCTION__);
-    binding()->Close(ZX_ERR_ALREADY_BOUND);
-    server_error_cb_();
-    return;
-  }
-
   // If the UUID filter list is changed between requests, perform a fresh ListServices() call to
   // ensure existing services that match the new UUIDs are reported to the client.
+  // Dropping the old watch_services_request_ with no new results.
   if (uuids != prev_watch_services_uuids_) {
     bt_log(DEBUG, "fidl", "WatchServices: UUIDs changed from previous call (peer: %s)",
            bt_str(peer_id_));
@@ -153,6 +146,18 @@ void Gatt2ClientServer::WatchServices(std::vector<fb::Uuid> fidl_uuids,
     // Clear old watch service results as we're about to get a fresh list of services.
     next_watch_services_result_.reset();
     prev_watch_services_uuids_ = uuids;
+    if (watch_services_request_) {
+      watch_services_request_.value()({}, {});
+      watch_services_request_.reset();
+    }
+  }
+
+  // Only allow 1 callback at a time. Close the server if this is violated.
+  if (watch_services_request_) {
+    bt_log(WARN, "fidl", "%s: call received while previous call is still pending", __FUNCTION__);
+    binding()->Close(ZX_ERR_ALREADY_BOUND);
+    server_error_cb_();
+    return;
   }
 
   watch_services_request_.emplace(std::move(callback));

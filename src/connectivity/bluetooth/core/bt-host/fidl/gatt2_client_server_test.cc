@@ -193,6 +193,130 @@ TEST_F(Gatt2ClientServerTest,
   EXPECT_EQ(updated[0].handle().value, kSvcStartHandle3);
 }
 
+TEST_F(Gatt2ClientServerTest,
+       WatchServicesWithUuidsListsServicesOnFirstRequestAndListsAgainWhenUuidsChanged) {
+  const bt::att::Handle kSvcStartHandle0(1);
+  const bt::att::Handle kSvcEndHandle0(kSvcStartHandle0);
+  bt::gatt::ServiceData svc_data_0(bt::gatt::ServiceKind::PRIMARY, kSvcStartHandle0, kSvcEndHandle0,
+                                   kTestServiceUuid0);
+  fake_gatt()->AddPeerService(kPeerId, svc_data_0);
+
+  const bt::att::Handle kSvcStartHandle1(2);
+  const bt::att::Handle kSvcEndHandle1(kSvcStartHandle1);
+  bt::gatt::ServiceData svc_data_1(bt::gatt::ServiceKind::PRIMARY, kSvcStartHandle1, kSvcEndHandle1,
+                                   kTestServiceUuid1);
+  fake_gatt()->AddPeerService(kPeerId, svc_data_1);
+
+  std::vector<fbg::ServiceInfo> updated;
+  std::vector<fbg::Handle> removed;
+  int watch_cb_count = 0;
+  proxy()->WatchServices(
+      /*uuids=*/{fb::Uuid{kTestServiceUuid0.value()}},
+      [&](std::vector<fbg::ServiceInfo> cb_updated, std::vector<fbg::Handle> cb_removed) {
+        watch_cb_count++;
+        updated = std::move(cb_updated);
+        removed = std::move(cb_removed);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_EQ(watch_cb_count, 1);
+  EXPECT_EQ(removed.size(), 0u);
+  ASSERT_EQ(updated.size(), 1u);
+  ASSERT_TRUE(updated[0].has_handle());
+  EXPECT_EQ(updated[0].handle().value, kSvcStartHandle0);
+
+  updated.clear();
+  removed.clear();
+  watch_cb_count = 0;
+
+  // WatchServices before service update. Request should be queued.
+  proxy()->WatchServices(
+      /*uuids=*/{fb::Uuid{kTestServiceUuid0.value()}},
+      [&](std::vector<fbg::ServiceInfo> cb_updated, std::vector<fbg::Handle> cb_removed) {
+        watch_cb_count++;
+        updated = std::move(cb_updated);
+        removed = std::move(cb_removed);
+      });
+
+  // Service should be ignored because UUID does not match.
+  const bt::att::Handle kSvcStartHandle2(3);
+  const bt::att::Handle kSvcEndHandle2(kSvcStartHandle2);
+  bt::gatt::ServiceData svc_data_2(bt::gatt::ServiceKind::PRIMARY, kSvcStartHandle2, kSvcEndHandle2,
+                                   kTestServiceUuid1);
+  fake_gatt()->AddPeerService(kPeerId, svc_data_2, /*notify=*/true);
+  RunLoopUntilIdle();
+  EXPECT_EQ(watch_cb_count, 0);
+  EXPECT_EQ(updated.size(), 0u);
+  EXPECT_EQ(removed.size(), 0u);
+
+  // Changing the UUID matched means that the previous call completes, but with no new updates.
+  std::vector<fbg::ServiceInfo> updated_srv2;
+  std::vector<fbg::Handle> removed_srv2;
+  int watch_srv2_cb_count = 0;
+  proxy()->WatchServices(
+      /*uuids=*/{fb::Uuid{kTestServiceUuid1.value()}},
+      [&](std::vector<fbg::ServiceInfo> cb_updated, std::vector<fbg::Handle> cb_removed) {
+        watch_srv2_cb_count++;
+        updated_srv2 = std::move(cb_updated);
+        removed_srv2 = std::move(cb_removed);
+      });
+
+  RunLoopUntilIdle();
+  // Initial one should have been completed, with no new info.
+  EXPECT_EQ(watch_cb_count, 1);
+  EXPECT_EQ(updated.size(), 0u);
+  EXPECT_EQ(removed.size(), 0u);
+  watch_cb_count = 0;
+
+  // Second service UUID completes with the services for the second UUID
+  EXPECT_EQ(watch_srv2_cb_count, 1);
+  EXPECT_EQ(updated_srv2.size(), 2u);
+  EXPECT_EQ(removed_srv2.size(), 0u);
+  watch_srv2_cb_count = 0;
+  updated_srv2.clear();
+
+  // Service UUID matches initial search, which is finished, so no response should be received.
+  const bt::att::Handle kSvcStartHandle3(4);
+  const bt::att::Handle kSvcEndHandle3(kSvcStartHandle3);
+  bt::gatt::ServiceData svc_data_3(bt::gatt::ServiceKind::PRIMARY, kSvcStartHandle3, kSvcEndHandle3,
+                                   kTestServiceUuid0);
+  fake_gatt()->AddPeerService(kPeerId, svc_data_3, /*notify=*/true);
+  RunLoopUntilIdle();
+  EXPECT_EQ(watch_cb_count, 0);
+  EXPECT_EQ(watch_srv2_cb_count, 0);
+
+  // Queueing up a new srv2 call should not reply immediately.
+  proxy()->WatchServices(
+      /*uuids=*/{fb::Uuid{kTestServiceUuid1.value()}},
+      [&](std::vector<fbg::ServiceInfo> cb_updated, std::vector<fbg::Handle> cb_removed) {
+        watch_srv2_cb_count++;
+        updated_srv2 = std::move(cb_updated);
+        removed_srv2 = std::move(cb_removed);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_EQ(watch_srv2_cb_count, 0);
+
+  // Switching back to the original UUID at this point re-lists all the services again, and the
+  // second search finishes with an empty response as the end.
+  proxy()->WatchServices(
+      /*uuids=*/{fb::Uuid{kTestServiceUuid0.value()}},
+      [&](std::vector<fbg::ServiceInfo> cb_updated, std::vector<fbg::Handle> cb_removed) {
+        watch_cb_count++;
+        updated = std::move(cb_updated);
+        removed = std::move(cb_removed);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_EQ(watch_cb_count, 1);
+  EXPECT_EQ(removed.size(), 0u);
+  EXPECT_EQ(updated.size(), 2u);
+
+  EXPECT_EQ(watch_srv2_cb_count, 1);
+  EXPECT_EQ(removed_srv2.size(), 0u);
+  EXPECT_EQ(updated_srv2.size(), 0u);
+}
+
 TEST_F(Gatt2ClientServerTest, ServiceWatcherResultsIgnoredBeforeWatchServices) {
   const bt::att::Handle kSvcStartHandle0(1);
   const bt::att::Handle kSvcEndHandle0(kSvcStartHandle0);

@@ -211,6 +211,8 @@ closed protocol Client {
     ///   `characteristics` and `includes` fields will be null. If a service has
     ///   been added/modified and then removed since the last call, it will only
     ///   be present in `removed`, not `updated`.
+    ///   If concluded due to a new call with a new `uuids` value, `updated`
+    ///   will be empty.
     /// - response `removed` the handles of the services that have been removed
     ///   since the last call to WatchServices().
     strict WatchServices(struct {
