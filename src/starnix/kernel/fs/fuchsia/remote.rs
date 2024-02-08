@@ -365,6 +365,7 @@ fn get_name_str<'a>(name_bytes: &'a FsStr) -> Result<&'a str, Errno> {
 impl FsNodeOps for RemoteNode {
     fn create_file_ops(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         node: &FsNode,
         _current_task: &CurrentTask,
         flags: OpenFlags,
@@ -958,6 +959,7 @@ impl FsNodeOps for RemoteSpecialNode {
 
     fn create_file_ops(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -1648,7 +1650,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_tree() -> Result<(), anyhow::Error> {
-        let (kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
         let (server, client) = zx::Channel::create();
         fdio::open("/pkg", rights, server).expect("failed to open /pkg");
@@ -1671,7 +1673,7 @@ mod test {
         let mut context = LookupContext::default();
         let _test_file = root
             .lookup_child(&current_task, &mut context, "bin/hello_starnix".into())?
-            .open(&current_task, OpenFlags::RDONLY, true)?;
+            .open(&mut locked, &current_task, OpenFlags::RDONLY, true)?;
         Ok(())
     }
 
@@ -1964,7 +1966,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |_, current_task| {
+                move |locked, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -1986,7 +1988,7 @@ mod test {
                     let dir_handle = ns
                         .root()
                         .entry
-                        .open_anonymous(&current_task, OpenFlags::RDONLY)
+                        .open_anonymous(locked, &current_task, OpenFlags::RDONLY)
                         .expect("open failed");
 
                     #[derive(Default)]
@@ -2021,7 +2023,7 @@ mod test {
 
                     let dir_handle = sub_dir1
                         .entry
-                        .open_anonymous(&current_task, OpenFlags::RDONLY)
+                        .open_anonymous(locked, &current_task, OpenFlags::RDONLY)
                         .expect("open failed");
                     let mut sink = Sink::default();
                     dir_handle.readdir(&current_task, &mut sink).expect("readdir failed");
@@ -2031,7 +2033,7 @@ mod test {
 
                     let dir_handle = sub_dir2
                         .entry
-                        .open_anonymous(&current_task, OpenFlags::RDONLY)
+                        .open_anonymous(locked, &current_task, OpenFlags::RDONLY)
                         .expect("open failed");
                     let mut sink = Sink::default();
                     dir_handle.readdir(&current_task, &mut sink).expect("readdir failed");
@@ -2572,8 +2574,9 @@ mod test {
                         .create_node(&current_task, "file".into(), MODE, DeviceType::NONE)
                         .expect("create_node failed");
                     // Write to file (this should update mtime (time_modify))
-                    let file =
-                        child.open(&current_task, OpenFlags::RDWR, true).expect("open failed");
+                    let file = child
+                        .open(locked, &current_task, OpenFlags::RDWR, true)
+                        .expect("open failed");
                     // Call `refresh_info(..)` to refresh `time_modify` with the time managed by the
                     // underlying filesystem
                     let time_before_write = child
@@ -2770,8 +2773,9 @@ mod test {
                         .root()
                         .create_node(&current_task, "file".into(), MODE, DeviceType::NONE)
                         .expect("create_node failed");
-                    let file =
-                        child.open(&current_task, OpenFlags::RDWR, true).expect("open failed");
+                    let file = child
+                        .open(locked, &current_task, OpenFlags::RDWR, true)
+                        .expect("open failed");
                     // Call `refresh_info(..)` to refresh ctime and mtime with the time managed by the
                     // underlying filesystem
                     let (ctime_before_write, mtime_before_write) = {

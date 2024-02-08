@@ -25,6 +25,7 @@ use crate::{
     vfs::{FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions, FsStr},
 };
 use starnix_logging::log_trace;
+use starnix_sync::{LockBefore, ReadOps};
 use starnix_syscalls::{
     decls::{Syscall, SyscallDecl},
     SyscallResult,
@@ -231,11 +232,15 @@ pub fn create_remotefs_filesystem(
     RemoteFs::new_fs(kernel, root.into_channel(), options, rights)
 }
 
-pub fn create_filesystem_from_spec<'a>(
+pub fn create_filesystem_from_spec<'a, L>(
+    locked: &mut Locked<'_, L>,
     creator: &impl FileSystemCreator,
     pkg: &fio::DirectorySynchronousProxy,
     spec: &'a str,
-) -> Result<(&'a FsStr, FileSystemHandle), Error> {
+) -> Result<(&'a FsStr, FileSystemHandle), Error>
+where
+    L: LockBefore<ReadOps>,
+{
     let kernel = creator.kernel();
 
     let mut iter = spec.splitn(4, ':');
@@ -263,7 +268,7 @@ pub fn create_filesystem_from_spec<'a>(
     let fs = match fs_type {
         "remote_bundle" => RemoteBundle::new_fs(kernel, pkg, rights, fs_src)?,
         "remotefs" => create_remotefs_filesystem(kernel, pkg, rights, options)?,
-        _ => creator.create_filesystem(fs_type.into(), options)?,
+        _ => creator.create_filesystem(locked, fs_type.into(), options)?,
     };
     Ok((mount_point.into(), fs))
 }

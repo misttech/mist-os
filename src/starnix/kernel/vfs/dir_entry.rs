@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use bitflags::bitflags;
-use starnix_sync::{RwLock, RwLockWriteGuard};
+use starnix_sync::{LockEqualOrBefore, Locked, ReadOps, RwLock, RwLockWriteGuard};
 use starnix_uapi::{
     auth::FsCred,
     errno, error,
@@ -143,13 +143,17 @@ impl DirEntry {
     }
 
     /// Returns a file handle to this entry, associated with an anonymous namespace.
-    pub fn open_anonymous(
+    pub fn open_anonymous<L>(
         self: &DirEntryHandle,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         flags: OpenFlags,
-    ) -> Result<FileHandle, Errno> {
+    ) -> Result<FileHandle, Errno>
+    where
+        L: LockEqualOrBefore<ReadOps>,
+    {
         FileObject::new(
-            self.node.create_file_ops(current_task, flags)?,
+            self.node.create_file_ops(locked, current_task, flags)?,
             NamespaceNode::new_anonymous(self.clone()),
             flags,
         )

@@ -17,7 +17,8 @@ use once_cell::sync::OnceCell;
 use rand::Rng;
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{
-    LockBefore, Locked, ReadOps, RwLock, RwLockReadGuard, RwLockWriteGuard, Unlocked, WriteOps,
+    LockBefore, LockEqualOrBefore, Locked, ReadOps, RwLock, RwLockReadGuard, RwLockWriteGuard,
+    Unlocked, WriteOps,
 };
 use starnix_uapi::{
     auth::FsCred,
@@ -180,10 +181,17 @@ impl ActiveEntry {
         Ok(entry.is_whiteout())
     }
 
-    fn read_dir_entries(&self, current_task: &CurrentTask) -> Result<Vec<DirEntryInfo>, Errno> {
+    fn read_dir_entries<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<Vec<DirEntryInfo>, Errno>
+    where
+        L: LockBefore<ReadOps>,
+    {
         let mut sink = DirentSinkAdapter::default();
         self.entry()
-            .open_anonymous(current_task, OpenFlags::DIRECTORY)?
+            .open_anonymous(locked, current_task, OpenFlags::DIRECTORY)?
             .readdir(current_task, &mut sink)?;
         Ok(sink.items)
     }
@@ -261,8 +269,8 @@ impl OverlayNode {
         current_task: &CurrentTask,
     ) -> Result<&ActiveEntry, Errno>
     where
-        L: LockBefore<ReadOps>,
         L: LockBefore<WriteOps>,
+        L: LockEqualOrBefore<ReadOps>,
     {
         self.ensure_upper_maybe_copy(locked, current_task, UpperCopyMode::CopyAll)
     }
@@ -275,8 +283,8 @@ impl OverlayNode {
         copy_mode: UpperCopyMode,
     ) -> Result<&ActiveEntry, Errno>
     where
-        L: LockBefore<ReadOps>,
         L: LockBefore<WriteOps>,
+        L: LockEqualOrBefore<ReadOps>,
     {
         self.upper.get_or_try_init(|| {
             let lower = self.lower.as_ref().expect("lower is expected when upper is missing");
@@ -359,8 +367,8 @@ impl OverlayNode {
     ) -> Result<ActiveEntry, Errno>
     where
         F: Fn(&ActiveEntry, &FsStr) -> Result<ActiveEntry, Errno>,
-        L: LockBefore<ReadOps>,
         L: LockBefore<WriteOps>,
+        L: LockBefore<ReadOps>,
     {
         let upper = self.ensure_upper(locked, current_task)?;
 
@@ -390,10 +398,11 @@ impl OverlayNode {
     /// `prepare_to_unlink()` checks that the directory doesn't contain anything other
     /// than whiteouts and if that is the case then it unlinks all of them.
     fn prepare_to_unlink(self: &Arc<OverlayNode>, current_task: &CurrentTask) -> Result<(), Errno> {
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps. Needs to be before ReadOps
         if self.main_entry().entry().node.is_dir() {
             let mut lower_entries = BTreeSet::new();
             if let Some(dir) = &self.lower {
-                for item in dir.read_dir_entries(current_task)?.drain(..) {
+                for item in dir.read_dir_entries(&mut locked, current_task)?.drain(..) {
                     if !dir.is_whiteout_child(current_task, &item)? {
                         lower_entries.insert(item.name);
                     }
@@ -402,7 +411,7 @@ impl OverlayNode {
 
             if let Some(dir) = self.upper.get() {
                 let mut to_remove = Vec::<FsString>::new();
-                for item in dir.read_dir_entries(current_task)?.drain(..) {
+                for item in dir.read_dir_entries(&mut locked, current_task)?.drain(..) {
                     if !dir.is_whiteout_child(current_task, &item)? {
                         return error!(ENOTEMPTY);
                     }
@@ -438,11 +447,11 @@ impl OverlayNode {
 impl FsNodeOps for Arc<OverlayNode> {
     fn create_file_ops(
         &self,
+        locked: &mut Locked<'_, ReadOps>,
         node: &FsNode,
         current_task: &CurrentTask,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
         if flags.can_write() {
             // Only upper FS can be writable.
             let copy_mode = if flags.contains(OpenFlags::TRUNC) {
@@ -450,19 +459,23 @@ impl FsNodeOps for Arc<OverlayNode> {
             } else {
                 UpperCopyMode::CopyAll
             };
-            self.ensure_upper_maybe_copy(&mut locked, current_task, copy_mode)?;
+            self.ensure_upper_maybe_copy(locked, current_task, copy_mode)?;
         }
 
         let ops: Box<dyn FileOps> = if node.is_dir() {
             Box::new(OverlayDirectory { node: self.clone(), dir_entries: Default::default() })
         } else {
             let state = match (self.upper.get(), &self.lower) {
-                (Some(upper), _) => {
-                    OverlayFileState::Upper(upper.entry().open_anonymous(current_task, flags)?)
-                }
-                (None, Some(lower)) => {
-                    OverlayFileState::Lower(lower.entry().open_anonymous(current_task, flags)?)
-                }
+                (Some(upper), _) => OverlayFileState::Upper(upper.entry().open_anonymous(
+                    locked,
+                    current_task,
+                    flags,
+                )?),
+                (None, Some(lower)) => OverlayFileState::Lower(lower.entry().open_anonymous(
+                    locked,
+                    current_task,
+                    flags,
+                )?),
                 _ => panic!("Expected either upper or lower node"),
             };
 
@@ -694,7 +707,14 @@ struct OverlayDirectory {
 }
 
 impl OverlayDirectory {
-    fn refresh_dir_entries(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+    fn refresh_dir_entries<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<ReadOps>,
+    {
         let mut entries = DirEntries::new();
 
         let upper_is_opaque = self.node.upper_is_opaque.get().is_some();
@@ -704,7 +724,7 @@ impl OverlayDirectory {
         // items that are not present in the upper.
         let mut upper_set = BTreeSet::new();
         if let Some(dir) = self.node.upper.get() {
-            for item in dir.read_dir_entries(current_task)?.drain(..) {
+            for item in dir.read_dir_entries(locked, current_task)?.drain(..) {
                 // Fill `upper_set` only if we will need it later.
                 if merge_with_lower {
                     upper_set.insert(item.name.clone());
@@ -717,7 +737,7 @@ impl OverlayDirectory {
 
         if merge_with_lower {
             if let Some(dir) = &self.node.lower {
-                for item in dir.read_dir_entries(current_task)?.drain(..) {
+                for item in dir.read_dir_entries(locked, current_task)?.drain(..) {
                     if !upper_set.contains(&item.name)
                         && !dir.is_whiteout_child(current_task, &item)?
                     {
@@ -752,8 +772,9 @@ impl FileOps for OverlayDirectory {
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): FileOpsReaddir before ReadOps before Read/Write ops
         if sink.offset() == 0 {
-            self.refresh_dir_entries(current_task)?;
+            self.refresh_dir_entries(&mut locked, current_task)?;
         }
 
         emit_dotdot(file, sink)?;
@@ -806,9 +827,14 @@ impl FileOps for OverlayFile {
 
                 {
                     let mut write_state = self.state.write();
-                    *write_state = OverlayFileState::Upper(
-                        upper.entry().open_anonymous(current_task, self.flags)?,
-                    );
+
+                    // TODO(mariagl): don't hold write_state while calling open_anonymous.
+                    // It may call back into read(), causing lock order inversion.
+                    *write_state = OverlayFileState::Upper(upper.entry().open_anonymous(
+                        locked,
+                        current_task,
+                        self.flags,
+                    )?);
                 }
                 state = self.state.read();
             }
@@ -862,10 +888,14 @@ pub struct OverlayFs {
 }
 
 impl OverlayFs {
-    pub fn new_fs(
+    pub fn new_fs<L>(
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno> {
+    ) -> Result<FileSystemHandle, Errno>
+    where
+        L: LockBefore<ReadOps>,
+    {
         let mount_options = fs_args::generic_parse_mount_options(options.params.as_ref());
         match mount_options.get("redirect_dir".as_bytes()) {
             None => (),
@@ -876,9 +906,9 @@ impl OverlayFs {
             }
         }
 
-        let lower = resolve_dir_param(current_task, &mount_options, "lowerdir".into())?;
-        let upper = resolve_dir_param(current_task, &mount_options, "upperdir".into())?;
-        let work = resolve_dir_param(current_task, &mount_options, "workdir".into())?;
+        let lower = resolve_dir_param(locked, current_task, &mount_options, "lowerdir".into())?;
+        let upper = resolve_dir_param(locked, current_task, &mount_options, "upperdir".into())?;
+        let work = resolve_dir_param(locked, current_task, &mount_options, "workdir".into())?;
 
         let lower_fs = lower.entry().node.fs().clone();
         let upper_fs = upper.entry().node.fs().clone();
@@ -1025,18 +1055,22 @@ impl FileSystemOps for Arc<OverlayFs> {
 /// Helper used to resolve directories passed in mount options. The directory is resolved in the
 /// namespace of the calling process, but only `DirEntry` is returned (detached from the
 /// namespace). The corresponding file systems may be unmounted before overlayfs that uses them.
-fn resolve_dir_param(
+fn resolve_dir_param<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     mount_options: &HashMap<FsString, FsString>,
     name: &FsStr,
-) -> Result<ActiveEntry, Errno> {
+) -> Result<ActiveEntry, Errno>
+where
+    L: LockBefore<ReadOps>,
+{
     let path = mount_options.get(&**name).ok_or_else(|| {
         log_error!("overlayfs: {name} was not specified");
         errno!(EINVAL)
     })?;
 
     current_task
-        .open_file(path.as_ref(), OpenFlags::RDONLY | OpenFlags::DIRECTORY)
+        .open_file(locked, path.as_ref(), OpenFlags::RDONLY | OpenFlags::DIRECTORY)
         .map(|f| ActiveEntry { entry: f.name.entry.clone(), mount: f.name.mount.clone() })
         .map_err(|e| {
             log_error!("overlayfs: Failed to lookup {path}: {}", e);
@@ -1052,11 +1086,11 @@ fn copy_file_content<L>(
     to: &ActiveEntry,
 ) -> Result<(), Errno>
 where
+    L: LockEqualOrBefore<ReadOps>,
     L: LockBefore<WriteOps>,
-    L: LockBefore<ReadOps>,
 {
-    let from_file = from.entry().open_anonymous(current_task, OpenFlags::RDONLY)?;
-    let to_file = to.entry().open_anonymous(current_task, OpenFlags::WRONLY)?;
+    let from_file = from.entry().open_anonymous(locked, current_task, OpenFlags::RDONLY)?;
+    let to_file = to.entry().open_anonymous(locked, current_task, OpenFlags::WRONLY)?;
 
     const BUFFER_SIZE: usize = 4096;
 

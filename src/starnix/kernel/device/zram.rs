@@ -17,6 +17,7 @@ use crate::{
 };
 use fuchsia_zircon as zx;
 use starnix_logging::{bug_ref, log_error};
+use starnix_sync::{Locked, ReadOps};
 use starnix_uapi::{
     auth::FsCred,
     device_type::{DeviceType, ZRAM_MAJOR},
@@ -93,6 +94,7 @@ impl FsNodeOps for ZramDeviceDirectory {
 
     fn create_file_ops(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,

@@ -19,6 +19,7 @@ use fidl::{
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use starnix_logging::track_stub;
+use starnix_sync::{LockBefore, Locked, ReadOps, Unlocked};
 use starnix_uapi::{
     device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode, ino_t, off_t,
     open_flags::OpenFlags,
@@ -33,22 +34,30 @@ use vfs::{
 };
 
 /// Returns a handle implementing a fuchsia.io.Node delegating to the given `file`.
-pub fn serve_file(
+pub fn serve_file<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     file: &FileObject,
-) -> Result<(ClientEnd<fio::NodeMarker>, execution_scope::ExecutionScope), Errno> {
+) -> Result<(ClientEnd<fio::NodeMarker>, execution_scope::ExecutionScope), Errno>
+where
+    L: LockBefore<ReadOps>,
+{
     let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
-    let scope = serve_file_at(server_end, current_task, file)?;
+    let scope = serve_file_at(locked, server_end, current_task, file)?;
     Ok((client_end, scope))
 }
 
-pub fn serve_file_at(
+pub fn serve_file_at<L>(
+    locked: &mut Locked<'_, L>,
     server_end: ServerEnd<fio::NodeMarker>,
     current_task: &CurrentTask,
     file: &FileObject,
-) -> Result<execution_scope::ExecutionScope, Errno> {
+) -> Result<execution_scope::ExecutionScope, Errno>
+where
+    L: LockBefore<ReadOps>,
+{
     // Reopen file object to not share state with the given FileObject.
-    let file = file.name.open(current_task, file.flags(), false)?;
+    let file = file.name.open(locked, current_task, file.flags(), false)?;
     let open_flags = file.flags();
     let kernel = current_task.kernel();
     let starnix_file = StarnixNodeConnection::new(Arc::downgrade(kernel), file);
@@ -112,12 +121,16 @@ impl StarnixNodeConnection {
 
     /// Reopen the current `StarnixNodeConnection` with the given `OpenFlags`. The new file will not share
     /// state. It is equivalent to opening the same file, not dup'ing the file descriptor.
-    fn reopen(
+    fn reopen<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         flags: fio::OpenFlags,
-    ) -> Result<Arc<Self>, Errno> {
-        let file = self.file.name.open(current_task, flags.into(), true)?;
+    ) -> Result<Arc<Self>, Errno>
+    where
+        L: LockBefore<ReadOps>,
+    {
+        let file = self.file.name.open(locked, current_task, flags.into(), true)?;
         Ok(StarnixNodeConnection::new(self.kernel.clone(), file))
     }
 
@@ -218,18 +231,22 @@ impl StarnixNodeConnection {
     }
 
     /// Implementation of `vfs::directory::entry::DirectoryEntry::open`.
-    async fn directory_entry_open(
+    async fn directory_entry_open<L>(
         self: Arc<Self>,
+        locked: &mut Locked<'_, L>,
         scope: execution_scope::ExecutionScope,
         flags: fio::OpenFlags,
         path: path::Path,
         server_end: &mut ServerEnd<fio::NodeMarker>,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<ReadOps>,
+    {
         let current_task = self.task().await?;
         if self.is_dir() {
             if path.is_dot() {
                 // Reopen the current directory.
-                let dir = self.reopen(&current_task, flags)?;
+                let dir = self.reopen(locked, &current_task, flags)?;
                 flags
                     .to_object_request(std::mem::replace(server_end, zx::Handle::invalid().into()))
                     .handle(|object_request| {
@@ -249,6 +266,7 @@ impl StarnixNodeConnection {
             let must_create_directory =
                 flags.contains(fio::OpenFlags::DIRECTORY | fio::OpenFlags::CREATE);
             let file = match current_task.open_namespace_node_at(
+                locked,
                 node.clone(),
                 name,
                 flags.into(),
@@ -260,7 +278,7 @@ impl StarnixNodeConnection {
                     let name = node.create_node(&current_task, name, mode, DeviceType::NONE)?;
                     let flags =
                         flags & !(fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT);
-                    name.open(&current_task, flags.into(), false)?
+                    name.open(locked, &current_task, flags.into(), false)?
                 }
                 f => f?,
             };
@@ -279,7 +297,7 @@ impl StarnixNodeConnection {
         if !path.is_dot() {
             return error!(EINVAL);
         }
-        let file = self.reopen(&current_task, flags)?;
+        let file = self.reopen(locked, &current_task, flags)?;
         flags
             .to_object_request(std::mem::replace(server_end, zx::Handle::invalid().into()))
             .handle(|object_request| {
@@ -641,11 +659,13 @@ impl directory::entry::DirectoryEntry for StarnixNodeConnection {
         path: path::Path,
         mut server_end: ServerEnd<fio::NodeMarker>,
     ) {
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/324394958): propagate through DirectoryEntry
         scope.spawn({
             let scope = scope.clone();
             async move {
-                if let Err(errno) =
-                    self.directory_entry_open(scope, flags, path, &mut server_end).await
+                if let Err(errno) = self
+                    .directory_entry_open(&mut locked, scope, flags, path, &mut server_end)
+                    .await
                 {
                     vfs::common::send_on_open_with_error(
                         flags.contains(fio::OpenFlags::DESCRIBE),
@@ -683,14 +703,12 @@ mod tests {
 
     #[::fuchsia::test]
     async fn access_file_system() {
-        let (kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let fs = TmpFs::new_fs(&kernel);
 
-        let (root_handle, scope) = serve_file(
-            &current_task,
-            &fs.root().open_anonymous(&current_task, OpenFlags::RDWR).expect("open"),
-        )
-        .expect("serve");
+        let file =
+            &fs.root().open_anonymous(&mut locked, &current_task, OpenFlags::RDWR).expect("open");
+        let (root_handle, scope) = serve_file(&mut locked, &current_task, file).expect("serve");
 
         // Capture information from the filesystem in the main thread. The filesystem must not be
         // transferred to the other thread.

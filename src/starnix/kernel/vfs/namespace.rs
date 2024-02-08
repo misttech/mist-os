@@ -28,7 +28,7 @@ use fidl_fuchsia_io as fio;
 use macro_rules_attribute::apply;
 use ref_cast::RefCast;
 use starnix_logging::log_warn;
-use starnix_sync::{Locked, Mutex, RwLock, WriteOps};
+use starnix_sync::{LockBefore, Locked, Mutex, ReadOps, RwLock, WriteOps};
 use starnix_uapi::{
     arc_key::{ArcKey, PtrKey, WeakKey},
     device_type::DeviceType,
@@ -110,6 +110,7 @@ impl FsNodeOps for Arc<Namespace> {
 
     fn create_file_ops(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -641,8 +642,9 @@ impl fmt::Debug for Mount {
 pub trait FileSystemCreator {
     fn kernel(&self) -> &Arc<Kernel>;
 
-    fn create_filesystem(
+    fn create_filesystem<L: LockBefore<ReadOps>>(
         &self,
+        locked: &mut Locked<'_, L>,
         fs_type: &FsStr,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno>;
@@ -667,8 +669,9 @@ impl FileSystemCreator for Arc<Kernel> {
         self
     }
 
-    fn create_filesystem(
+    fn create_filesystem<L: LockBefore<ReadOps>>(
         &self,
+        _locked: &mut Locked<'_, L>,
         fs_type: &FsStr,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
@@ -705,8 +708,9 @@ impl FileSystemCreator for CurrentTask {
         (self as &Task).kernel()
     }
 
-    fn create_filesystem(
+    fn create_filesystem<L: LockBefore<ReadOps>>(
         &self,
+        locked: &mut Locked<'_, L>,
         fs_type: &FsStr,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
@@ -717,9 +721,9 @@ impl FileSystemCreator for CurrentTask {
             b"fusectl" => new_fusectl_fs(self, options),
             b"devpts" => Ok(dev_pts_fs(self, options).clone()),
             b"devtmpfs" => Ok(dev_tmp_fs(self).clone()),
-            b"ext4" => ExtFilesystem::new_fs(kernel, self, options),
+            b"ext4" => ExtFilesystem::new_fs(locked, kernel, self, options),
             b"functionfs" => FunctionFs::new_fs(self, options),
-            b"overlay" => OverlayFs::new_fs(self, options),
+            b"overlay" => OverlayFs::new_fs(locked, self, options),
             b"proc" => Ok(proc_fs(self, options).clone()),
             b"tracefs" => Ok(trace_fs(self, options).clone()),
             b"selinuxfs" => {
@@ -730,7 +734,7 @@ impl FileSystemCreator for CurrentTask {
                 }
             }
             b"sysfs" => Ok(sys_fs(self, options).clone()),
-            _ => kernel.create_filesystem(fs_type, options),
+            _ => kernel.create_filesystem(locked, fs_type, options),
         }
     }
 }
@@ -1021,14 +1025,18 @@ impl NamespaceNode {
     /// This function is the primary way of instantiating FileObjects. Each
     /// FileObject records the NamespaceNode that created it in order to
     /// remember its path in the Namespace.
-    pub fn open(
+    pub fn open<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         flags: OpenFlags,
         check_access: bool,
-    ) -> Result<FileHandle, Errno> {
+    ) -> Result<FileHandle, Errno>
+    where
+        L: LockBefore<ReadOps>,
+    {
         FileObject::new(
-            self.entry.node.open(current_task, &self.mount, flags, check_access)?,
+            self.entry.node.open(locked, current_task, &self.mount, flags, check_access)?,
             self.clone(),
             flags,
         )

@@ -290,6 +290,7 @@ impl FsNodeOps for UEventFsNode {
 
     fn create_file_ops(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,

@@ -305,6 +305,7 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
 
     fn create_file_ops(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -831,6 +832,7 @@ impl FsNodeOps for Arc<FuseNode> {
 
     fn create_file_ops(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         node: &FsNode,
         current_task: &CurrentTask,
         flags: OpenFlags,

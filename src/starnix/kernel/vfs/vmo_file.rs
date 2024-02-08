@@ -16,6 +16,7 @@ use crate::{
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, track_stub};
+use starnix_sync::{LockBefore, Locked, ReadOps};
 use starnix_uapi::{
     errno, error, errors::Errno, file_mode::mode, open_flags::OpenFlags, seal_flags::SealFlags,
 };
@@ -55,6 +56,7 @@ impl FsNodeOps for VmoFileNode {
 
     fn create_file_ops(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         node: &FsNode,
         _current_task: &CurrentTask,
         flags: OpenFlags,
@@ -369,12 +371,16 @@ impl FileOps for VmoFileObject {
     }
 }
 
-pub fn new_memfd(
+pub fn new_memfd<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     mut name: FsString,
     seals: SealFlags,
     flags: OpenFlags,
-) -> Result<FileHandle, Errno> {
+) -> Result<FileHandle, Errno>
+where
+    L: LockBefore<ReadOps>,
+{
     let fs = anon_fs(current_task.kernel());
     let node = fs.create_node(
         current_task,
@@ -383,7 +389,7 @@ pub fn new_memfd(
     );
     node.write_guard_state.lock().enable_sealing(seals);
 
-    let ops = node.open(current_task, &MountInfo::detached(), flags, false)?;
+    let ops = node.open(locked, current_task, &MountInfo::detached(), flags, false)?;
 
     // In /proc/[pid]/fd, the target of this memfd's symbolic link is "/memfd:[name]".
     let mut local_name = FsString::from("/memfd:");

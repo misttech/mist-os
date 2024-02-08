@@ -23,7 +23,9 @@ use bitflags::bitflags;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use starnix_logging::{log_error, track_stub};
-use starnix_sync::{Mutex, RwLock, RwLockReadGuard};
+use starnix_sync::{
+    LockBefore, LockEqualOrBefore, Locked, Mutex, ReadOps, RwLock, RwLockReadGuard,
+};
 use starnix_uapi::{
     as_any::AsAny,
     auth::{
@@ -505,6 +507,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// be assigned an FdNumber.
     fn create_file_ops(
         &self,
+        locked: &mut Locked<'_, ReadOps>,
         node: &FsNode,
         _current_task: &CurrentTask,
         flags: OpenFlags,
@@ -761,6 +764,7 @@ macro_rules! fs_node_impl_symlink {
 
         fn create_file_ops(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::ReadOps>,
             _node: &crate::vfs::FsNode,
             _current_task: &CurrentTask,
             _flags: starnix_uapi::open_flags::OpenFlags,
@@ -952,6 +956,7 @@ impl FsNodeOps for SpecialNode {
 
     fn create_file_ops(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -1119,21 +1124,30 @@ impl FsNode {
         self.record_locks.release_locks(owner);
     }
 
-    pub fn create_file_ops(
+    pub fn create_file_ops<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        self.ops().create_file_ops(self, current_task, flags)
+    ) -> Result<Box<dyn FileOps>, Errno>
+    where
+        L: LockEqualOrBefore<ReadOps>,
+    {
+        let mut locked = locked.cast_locked::<ReadOps>();
+        self.ops().create_file_ops(&mut locked, self, current_task, flags)
     }
 
-    pub fn open(
+    pub fn open<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         flags: OpenFlags,
         check_access: bool,
-    ) -> Result<Box<dyn FileOps>, Errno> {
+    ) -> Result<Box<dyn FileOps>, Errno>
+    where
+        L: LockBefore<ReadOps>,
+    {
         // If O_PATH is set, there is no need to create a real FileOps because
         // most file operations are disabled.
         if flags.contains(OpenFlags::PATH) {
@@ -1165,7 +1179,7 @@ impl FsNode {
             FileMode::IFIFO => Pipe::open(current_task, self.fifo.as_ref().unwrap(), flags),
             // UNIX domain sockets can't be opened.
             FileMode::IFSOCK => error!(ENXIO),
-            _ => self.create_file_ops(current_task, flags),
+            _ => self.create_file_ops(locked, current_task, flags),
         }
     }
 
@@ -1975,8 +1989,9 @@ mod tests {
         let mut buffer = VecOutputBuffer::new(CONTENT_LEN);
 
         // Read from the zero device.
-        let device_file =
-            current_task.open_file("zero".into(), OpenFlags::RDONLY).expect("open device file");
+        let device_file = current_task
+            .open_file(&mut locked, "zero".into(), OpenFlags::RDONLY)
+            .expect("open device file");
         device_file.read(&mut locked, &current_task, &mut buffer).expect("read from zero");
 
         // Assert the contents.

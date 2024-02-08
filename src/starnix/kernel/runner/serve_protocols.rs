@@ -24,18 +24,22 @@ use starnix_core::{
     },
 };
 use starnix_logging::{log_error, log_warn};
-use starnix_sync::{LockBefore, Locked, TaskRelease, Unlocked};
+use starnix_sync::{LockBefore, Locked, ReadOps, TaskRelease, Unlocked};
 use starnix_uapi::{open_flags::OpenFlags, uapi};
 use std::{ffi::CString, sync::Arc};
 
 use super::start_component;
 
-pub fn expose_root(
+pub fn expose_root<L>(
+    locked: &mut Locked<'_, L>,
     system_task: &CurrentTask,
     server_end: ServerEnd<fio::DirectoryMarker>,
-) -> Result<(), Error> {
-    let root_file = system_task.open_file("/".into(), OpenFlags::RDONLY)?;
-    serve_file_at(server_end.into_channel().into(), system_task, &root_file)?;
+) -> Result<(), Error>
+where
+    L: LockBefore<ReadOps>,
+{
+    let root_file = system_task.open_file(locked, "/".into(), OpenFlags::RDONLY)?;
+    serve_file_at(locked, server_end.into_channel().into(), system_task, &root_file)?;
     Ok(())
 }
 
@@ -98,11 +102,14 @@ where
         let (sender, receiver) = oneshot::channel();
         let pty = execute_task_with_prerun_result(
             current_task,
-            move |_, current_task| {
-                let executable =
-                    current_task.open_file(binary_path.as_bytes().into(), OpenFlags::RDONLY)?;
-                current_task.exec(executable, binary_path, argv, environ)?;
-                let (pty, pts) = create_main_and_replica(&current_task, window_size)?;
+            move |locked, current_task| {
+                let executable = current_task.open_file(
+                    locked,
+                    binary_path.as_bytes().into(),
+                    OpenFlags::RDONLY,
+                )?;
+                current_task.exec(locked, executable, binary_path, argv, environ)?;
+                let (pty, pts) = create_main_and_replica(locked, &current_task, window_size)?;
                 let fd_flags = FdFlags::empty();
                 assert_eq!(0, current_task.add_file(pts.clone(), fd_flags)?.raw());
                 assert_eq!(1, current_task.add_file(pts.clone(), fd_flags)?.raw());

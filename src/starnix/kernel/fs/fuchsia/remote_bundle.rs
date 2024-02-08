@@ -174,6 +174,7 @@ impl FsNodeOps for File {
 
     fn create_file_ops(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -386,6 +387,7 @@ impl FsNodeOps for DirectoryObject {
 
     fn create_file_ops(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -544,7 +546,7 @@ mod test {
         let test_file = test_dir
             .lookup_child(&current_task, &mut context, "file".into())
             .expect("lookup failed")
-            .open(&current_task, OpenFlags::RDONLY, true)
+            .open(&mut locked, &current_task, OpenFlags::RDONLY, true)
             .expect("open failed");
 
         let mut buffer = VecOutputBuffer::new(64);
@@ -601,8 +603,9 @@ mod test {
             panic!("unexpected symlink type");
         }
 
-        let opened_dir =
-            test_dir.open(&current_task, OpenFlags::RDONLY, true).expect("open failed");
+        let opened_dir = test_dir
+            .open(&mut locked, &current_task, OpenFlags::RDONLY, true)
+            .expect("open failed");
 
         struct Sink {
             offset: off_t,

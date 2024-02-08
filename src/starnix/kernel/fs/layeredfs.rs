@@ -11,6 +11,7 @@ use crate::{
         MountInfo, SeekTarget,
     },
 };
+use starnix_sync::{Locked, ReadOps};
 use starnix_uapi::{errno, errors::Errno, ino_t, off_t, open_flags::OpenFlags, statfs};
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -59,13 +60,14 @@ impl FsNodeOps for Arc<LayeredFs> {
 
     fn create_file_ops(
         &self,
+        locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         current_task: &CurrentTask,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(LayeredFsRootNodeOps {
             fs: self.clone(),
-            root_file: self.base_fs.root().open_anonymous(current_task, flags)?,
+            root_file: self.base_fs.root().open_anonymous(locked, current_task, flags)?,
         }))
     }
 
@@ -161,8 +163,13 @@ impl FileOps for LayeredFsRootNodeOps {
 mod test {
     use super::*;
     use crate::{fs::tmpfs::TmpFs, testing::*};
+    use starnix_sync::Unlocked;
 
-    fn get_root_entry_names(current_task: &CurrentTask, fs: &FileSystem) -> Vec<Vec<u8>> {
+    fn get_root_entry_names(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fs: &FileSystem,
+    ) -> Vec<Vec<u8>> {
         struct DirentNameCapturer {
             pub names: Vec<Vec<u8>>,
             offset: off_t,
@@ -185,7 +192,7 @@ mod test {
         }
         let mut sink = DirentNameCapturer { names: vec![], offset: 0 };
         fs.root()
-            .open_anonymous(current_task, OpenFlags::RDONLY)
+            .open_anonymous(locked, current_task, OpenFlags::RDONLY)
             .expect("open")
             .readdir(current_task, &mut sink)
             .expect("readdir");
@@ -194,11 +201,11 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_remove_duplicates() {
-        let (kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let base = TmpFs::new_fs(&kernel);
         base.root().create_dir(&current_task, "d1".into()).expect("create_dir");
         base.root().create_dir(&current_task, "d2".into()).expect("create_dir");
-        let base_entries = get_root_entry_names(&current_task, &base);
+        let base_entries = get_root_entry_names(&mut locked, &current_task, &base);
         assert_eq!(base_entries.len(), 4);
         assert!(base_entries.contains(&b".".to_vec()));
         assert!(base_entries.contains(&b"..".to_vec()));
@@ -213,7 +220,7 @@ mod test {
                 ("d3".into(), TmpFs::new_fs(&kernel)),
             ]),
         );
-        let layered_fs_entries = get_root_entry_names(&current_task, &layered_fs);
+        let layered_fs_entries = get_root_entry_names(&mut locked, &current_task, &layered_fs);
         assert_eq!(layered_fs_entries.len(), 5);
         assert!(layered_fs_entries.contains(&b".".to_vec()));
         assert!(layered_fs_entries.contains(&b"..".to_vec()));

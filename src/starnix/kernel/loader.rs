@@ -16,6 +16,7 @@ use fuchsia_zircon::{
 };
 use process_builder::{elf_load, elf_parse};
 use starnix_logging::{log_error, log_warn};
+use starnix_sync::{LockBefore, Locked, ReadOps};
 use starnix_uapi::{
     errno, error, errors::Errno, from_status_like_fdio, open_flags::OpenFlags,
     time::SCHEDULER_CLOCK_HZ, user_address::UserAddress, AT_BASE, AT_CLKTCK, AT_EGID, AT_ENTRY,
@@ -269,20 +270,25 @@ const MAX_RECURSION_DEPTH: usize = 5;
 
 /// Resolves a file into a validated executable ELF, following script interpreters to a fixed
 /// recursion depth. `argv` may change due to script interpreter logic.
-pub fn resolve_executable(
+pub fn resolve_executable<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     file: FileHandle,
     path: CString,
     argv: Vec<CString>,
     environ: Vec<CString>,
     selinux_state: Option<SeLinuxResolvedElfState>,
-) -> Result<ResolvedElf, Errno> {
-    resolve_executable_impl(current_task, file, path, argv, environ, 0, selinux_state)
+) -> Result<ResolvedElf, Errno>
+where
+    L: LockBefore<ReadOps>,
+{
+    resolve_executable_impl(locked, current_task, file, path, argv, environ, 0, selinux_state)
 }
 
 /// Resolves a file into a validated executable ELF, following script interpreters to a fixed
 /// recursion depth.
-fn resolve_executable_impl(
+fn resolve_executable_impl<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     file: FileHandle,
     path: CString,
@@ -290,7 +296,10 @@ fn resolve_executable_impl(
     environ: Vec<CString>,
     recursion_depth: usize,
     selinux_state: Option<SeLinuxResolvedElfState>,
-) -> Result<ResolvedElf, Errno> {
+) -> Result<ResolvedElf, Errno>
+where
+    L: LockBefore<ReadOps>,
+{
     if recursion_depth > MAX_RECURSION_DEPTH {
         return error!(ELOOP);
     }
@@ -305,14 +314,24 @@ fn resolve_executable_impl(
         Err(_) => return error!(EINVAL),
     }
     if &header == HASH_BANG {
-        resolve_script(current_task, vmo, path, argv, environ, recursion_depth, selinux_state)
+        resolve_script(
+            locked,
+            current_task,
+            vmo,
+            path,
+            argv,
+            environ,
+            recursion_depth,
+            selinux_state,
+        )
     } else {
-        resolve_elf(current_task, file, vmo, argv, environ, selinux_state)
+        resolve_elf(locked, current_task, file, vmo, argv, environ, selinux_state)
     }
 }
 
 /// Resolves a #! script file into a validated executable ELF.
-fn resolve_script(
+fn resolve_script<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     vmo: Arc<zx::Vmo>,
     path: CString,
@@ -320,7 +339,10 @@ fn resolve_script(
     environ: Vec<CString>,
     recursion_depth: usize,
     selinux_state: Option<SeLinuxResolvedElfState>,
-) -> Result<ResolvedElf, Errno> {
+) -> Result<ResolvedElf, Errno>
+where
+    L: LockBefore<ReadOps>,
+{
     // All VMOs have sizes in multiple of the system page size, so as long as we only read a page or
     // less, we should never read past the end of the VMO.
     // Since Linux 5.1, the max length of the interpreter following the #! is 255.
@@ -329,7 +351,8 @@ fn resolve_script(
     vmo.read(&mut buffer, 0).map_err(|_| errno!(EINVAL))?;
 
     let mut args = parse_interpreter_line(&buffer)?;
-    let interpreter = current_task.open_file(args[0].as_bytes().into(), OpenFlags::RDONLY)?;
+    let interpreter =
+        current_task.open_file(locked, args[0].as_bytes().into(), OpenFlags::RDONLY)?;
 
     // Append the original script executable path as an argument.
     args.push(path);
@@ -339,6 +362,7 @@ fn resolve_script(
 
     // Recurse and resolve the interpreter executable
     resolve_executable_impl(
+        locked,
         current_task,
         interpreter,
         args[0].clone(),
@@ -388,14 +412,18 @@ fn parse_interpreter_line(line: &[u8]) -> Result<Vec<CString>, Errno> {
 }
 
 /// Resolves a file handle into a validated executable ELF.
-fn resolve_elf(
+fn resolve_elf<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     file: FileHandle,
     vmo: Arc<zx::Vmo>,
     argv: Vec<CString>,
     environ: Vec<CString>,
     selinux_state: Option<SeLinuxResolvedElfState>,
-) -> Result<ResolvedElf, Errno> {
+) -> Result<ResolvedElf, Errno>
+where
+    L: LockBefore<ReadOps>,
+{
     let elf_headers = elf_parse::Elf64Headers::from_vmo(&vmo).map_err(elf_parse_error_to_errno)?;
     let interp = if let Some(interp_hdr) = elf_headers
         .program_header_with_type(elf_parse::SegmentType::Interp)
@@ -407,7 +435,8 @@ fn resolve_elf(
         vmo.read(&mut interp, interp_hdr.offset as u64)
             .map_err(|status| from_status_like_fdio!(status))?;
         let interp = CStr::from_bytes_until_nul(&interp).map_err(|_| errno!(EINVAL))?;
-        let interp_file = current_task.open_file(interp.to_bytes().into(), OpenFlags::RDONLY)?;
+        let interp_file =
+            current_task.open_file(locked, interp.to_bytes().into(), OpenFlags::RDONLY)?;
         let interp_vmo = interp_file.get_vmo(
             current_task,
             None,
@@ -654,17 +683,24 @@ mod tests {
         assert_eq!(stack_start_addr, original_stack_start_addr - payload_size);
     }
 
-    fn exec_hello_starnix(current_task: &mut CurrentTask) -> Result<(), Errno> {
+    fn exec_hello_starnix<L>(
+        locked: &mut Locked<'_, L>,
+        current_task: &mut CurrentTask,
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<ReadOps>,
+    {
         let argv = vec![CString::new("bin/hello_starnix").unwrap()];
-        let executable = current_task.open_file(argv[0].as_bytes().into(), OpenFlags::RDONLY)?;
-        current_task.exec(executable, argv[0].clone(), argv, vec![])?;
+        let executable =
+            current_task.open_file(locked, argv[0].as_bytes().into(), OpenFlags::RDONLY)?;
+        current_task.exec(locked, executable, argv[0].clone(), argv, vec![])?;
         Ok(())
     }
 
     #[::fuchsia::test]
     async fn test_load_hello_starnix() {
-        let (_kernel, mut current_task, _) = create_kernel_task_and_unlocked_with_pkgfs();
-        exec_hello_starnix(&mut current_task).expect("failed to load executable");
+        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
+        exec_hello_starnix(&mut locked, &mut current_task).expect("failed to load executable");
         assert!(current_task.mm().get_mapping_count() > 0);
     }
 
@@ -673,7 +709,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_snapshot_hello_starnix() {
         let (kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
-        exec_hello_starnix(&mut current_task).expect("failed to load executable");
+        exec_hello_starnix(&mut locked, &mut current_task).expect("failed to load executable");
 
         let current2 = create_task(&mut locked, &kernel, "another-task");
         current_task.mm().snapshot_to(&mut locked, current2.mm()).expect("failed to snapshot mm");

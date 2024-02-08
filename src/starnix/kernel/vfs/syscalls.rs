@@ -23,7 +23,7 @@ use crate::{
 };
 use fuchsia_zircon as zx;
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{Locked, Mutex, Unlocked};
+use starnix_sync::{LockBefore, Locked, Mutex, ReadOps, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     __kernel_fd_set,
@@ -516,6 +516,7 @@ pub fn sys_sendfile(
 ///
 /// Reads user_path from user memory and then calls through to Task::open_file_at.
 fn open_file_at(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -524,7 +525,13 @@ fn open_file_at(
 ) -> Result<FileHandle, Errno> {
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
     log_trace!(%dir_fd, %path, "open_file_at");
-    current_task.open_file_at(dir_fd, path.as_ref(), OpenFlags::from_bits_truncate(flags), mode)
+    current_task.open_file_at(
+        locked,
+        dir_fd,
+        path.as_ref(),
+        OpenFlags::from_bits_truncate(flags),
+        mode,
+    )
 }
 
 fn lookup_parent_at<T, F>(
@@ -630,14 +637,14 @@ fn lookup_at(
 }
 
 pub fn sys_openat(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
     flags: u32,
     mode: FileMode,
 ) -> Result<FdNumber, Errno> {
-    let file = open_file_at(current_task, dir_fd, user_path, flags, mode)?;
+    let file = open_file_at(locked, current_task, dir_fd, user_path, flags, mode)?;
     let fd_flags = get_fd_flags(flags);
     current_task.add_file(file, fd_flags)
 }
@@ -1425,7 +1432,7 @@ pub fn sys_dup3(
 const MEMFD_NAME_MAX_LEN: usize = 250;
 
 pub fn sys_memfd_create(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     user_name: UserCString,
     flags: u32,
@@ -1464,7 +1471,7 @@ pub fn sys_memfd_create(
         SealFlags::SEAL
     };
 
-    let file = new_memfd(current_task, name, seals, OpenFlags::RDWR)?;
+    let file = new_memfd(locked, current_task, name, seals, OpenFlags::RDWR)?;
 
     let mut fd_flags = FdFlags::empty();
     if flags & MFD_CLOEXEC != 0 {
@@ -1475,7 +1482,7 @@ pub fn sys_memfd_create(
 }
 
 pub fn sys_mount(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     source_addr: UserCString,
     target_addr: UserCString,
@@ -1505,7 +1512,15 @@ pub fn sys_mount(
     } else if flags.intersects(MountFlags::SHARED | MountFlags::PRIVATE | MountFlags::DOWNSTREAM) {
         do_mount_change_propagation_type(current_task, target, flags)
     } else {
-        do_mount_create(current_task, source_addr, target, filesystemtype_addr, data_addr, flags)
+        do_mount_create(
+            locked,
+            current_task,
+            source_addr,
+            target,
+            filesystemtype_addr,
+            data_addr,
+            flags,
+        )
     }
 }
 
@@ -1582,14 +1597,18 @@ fn do_mount_change_propagation_type(
     Ok(())
 }
 
-fn do_mount_create(
+fn do_mount_create<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     source_addr: UserCString,
     target: NamespaceNode,
     filesystemtype_addr: UserCString,
     data_addr: UserCString,
     flags: MountFlags,
-) -> Result<(), Errno> {
+) -> Result<(), Errno>
+where
+    L: LockBefore<ReadOps>,
+{
     let mut source_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
     let source = if source_addr.is_null() {
         Default::default()
@@ -1618,7 +1637,7 @@ fn do_mount_create(
         params: data.into(),
     };
 
-    let fs = current_task.create_filesystem(fs_type, options)?;
+    let fs = current_task.create_filesystem(locked, fs_type, options)?;
     target.mount(WhatToMount::Fs(fs), flags)
 }
 
@@ -2579,7 +2598,8 @@ mod tests {
     async fn test_sys_lseek() -> Result<(), Errno> {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
         let fd = FdNumber::from_raw(10);
-        let file_handle = current_task.open_file("data/testfile.txt".into(), OpenFlags::RDONLY)?;
+        let file_handle =
+            current_task.open_file(&mut locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
         let file_size = file_handle.node().stat(&current_task).unwrap().st_size;
         current_task.files.insert(&current_task, fd, file_handle).unwrap();
 
@@ -2605,7 +2625,8 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sys_dup() -> Result<(), Errno> {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
-        let file_handle = current_task.open_file("data/testfile.txt".into(), OpenFlags::RDONLY)?;
+        let file_handle =
+            current_task.open_file(&mut locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
         let oldfd = current_task.add_file(file_handle, FdFlags::empty())?;
         let newfd = sys_dup(&mut locked, &current_task, oldfd)?;
 
@@ -2621,7 +2642,8 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sys_dup3() -> Result<(), Errno> {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
-        let file_handle = current_task.open_file("data/testfile.txt".into(), OpenFlags::RDONLY)?;
+        let file_handle =
+            current_task.open_file(&mut locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
         let oldfd = current_task.add_file(file_handle, FdFlags::empty())?;
         let newfd = FdNumber::from_raw(2);
         sys_dup3(&mut locked, &current_task, oldfd, newfd, O_CLOEXEC)?;
@@ -2644,7 +2666,7 @@ mod tests {
         // Makes sure that dup closes the old file handle before the fd points
         // to the new file handle.
         let second_file_handle =
-            current_task.open_file("data/testfile.txt".into(), OpenFlags::RDONLY)?;
+            current_task.open_file(&mut locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
         let different_file_fd = current_task.add_file(second_file_handle, FdFlags::empty())?;
         assert!(!Arc::ptr_eq(&files.get(oldfd).unwrap(), &files.get(different_file_fd).unwrap()));
         sys_dup3(&mut locked, &current_task, oldfd, different_file_fd, O_CLOEXEC)?;
@@ -2688,7 +2710,8 @@ mod tests {
 
         // Create the file that will be used to stat.
         let file_path = "data/testfile.txt";
-        let _file_handle = current_task.open_file(file_path.into(), OpenFlags::RDONLY).unwrap();
+        let _file_handle =
+            current_task.open_file(&mut locked, file_path.into(), OpenFlags::RDONLY).unwrap();
 
         // Write the path to user memory.
         let path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -2754,7 +2777,7 @@ mod tests {
         // Create the file that will be renamed.
         let old_user_path = "data/testfile.txt";
         let _old_file_handle =
-            current_task.open_file(old_user_path.into(), OpenFlags::RDONLY).unwrap();
+            current_task.open_file(&mut locked, old_user_path.into(), OpenFlags::RDONLY).unwrap();
 
         // Write the path to user memory.
         let old_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -2765,7 +2788,7 @@ mod tests {
         // Create a second file that we will attempt to rename to.
         let new_user_path = "data/testfile2.txt";
         let _new_file_handle =
-            current_task.open_file(new_user_path.into(), OpenFlags::RDONLY).unwrap();
+            current_task.open_file(&mut locked, new_user_path.into(), OpenFlags::RDONLY).unwrap();
 
         // Write the path to user memory.
         let new_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);

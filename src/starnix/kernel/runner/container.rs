@@ -43,7 +43,7 @@ use starnix_kernel_config::Config;
 use starnix_logging::{
     log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
-use starnix_sync::{Locked, Unlocked};
+use starnix_sync::{LockBefore, Locked, ReadOps, Unlocked};
 use starnix_uapi::{
     auth::Credentials,
     errno,
@@ -166,6 +166,7 @@ impl Container {
 
     async fn serve_outgoing_directory(
         &self,
+        locked: &mut Locked<'_, Unlocked>,
         outgoing_dir: Option<zx::Channel>,
     ) -> Result<(), Error> {
         if let Some(outgoing_dir) = outgoing_dir {
@@ -180,7 +181,7 @@ impl Container {
             // Expose the root of the container's filesystem.
             let (fs_root, fs_root_server_end) = fidl::endpoints::create_proxy()?;
             fs.add_remote("fs_root", fs_root);
-            expose_root(self.system_task(), fs_root_server_end)?;
+            expose_root(locked, self.system_task(), fs_root_server_end)?;
 
             fs.serve_connection(outgoing_dir.into()).map_err(|_| errno!(EINVAL))?;
 
@@ -211,9 +212,13 @@ impl Container {
         Ok(())
     }
 
-    pub async fn serve(&self, service_config: ContainerServiceConfig) -> Result<(), Error> {
+    pub async fn serve(
+        &self,
+        locked: &mut Locked<'_, Unlocked>,
+        service_config: ContainerServiceConfig,
+    ) -> Result<(), Error> {
         let (r, _) = futures::join!(
-            self.serve_outgoing_directory(service_config.config.outgoing_dir),
+            self.serve_outgoing_directory(locked, service_config.config.outgoing_dir),
             server_component_controller(service_config.request_stream, service_config.receiver)
         );
         r
@@ -361,7 +366,7 @@ async fn create_container(
         security_server,
     )
     .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
-    let fs_context = create_fs_context(&kernel, &features, config, &pkg_dir_proxy)
+    let fs_context = create_fs_context(locked, &kernel, &features, config, &pkg_dir_proxy)
         .source_context("creating FsContext")?;
     let init_pid = kernel.pids.write().allocate_pid();
     // Lots of software assumes that the pid for the init process is 1.
@@ -381,7 +386,7 @@ async fn create_container(
     // Register common devices and add them in sysfs and devtmpfs.
     init_common_devices(&system_task);
 
-    mount_filesystems(&system_task, config, &pkg_dir_proxy)
+    mount_filesystems(locked, &system_task, config, &pkg_dir_proxy)
         .source_context("mounting filesystems")?;
 
     // Run all common features that were specified in the .cml.
@@ -398,14 +403,16 @@ async fn create_container(
             .collect::<Vec<_>>();
 
     let executable = system_task
-        .open_file(argv[0].as_bytes().into(), OpenFlags::RDONLY)
+        .open_file(locked, argv[0].as_bytes().into(), OpenFlags::RDONLY)
         .with_source_context(|| format!("opening init: {:?}", &argv[0]))?;
 
     let init_task = create_init_task(locked, &kernel, init_pid, Arc::clone(&fs_context), config)
         .with_source_context(|| format!("creating init task: {:?}", &config.init))?;
     execute_task_with_prerun_result(
         init_task,
-        move |_, init_task| init_task.exec(executable, argv[0].clone(), argv.clone(), vec![]),
+        move |locked, init_task| {
+            init_task.exec(locked, executable, argv[0].clone(), argv.clone(), vec![])
+        },
         move |result| {
             log_info!("Finished running init process: {:?}", result);
             let _ = task_complete.send(result);
@@ -420,17 +427,22 @@ async fn create_container(
     Ok(Container { kernel, _node: node, _thread_bound: Default::default() })
 }
 
-fn create_fs_context(
+fn create_fs_context<L>(
+    locked: &mut Locked<'_, L>,
     kernel: &Arc<Kernel>,
     features: &Features,
     config: &ConfigWrapper,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
-) -> Result<Arc<FsContext>, Error> {
+) -> Result<Arc<FsContext>, Error>
+where
+    L: LockBefore<ReadOps>,
+{
     // The mounts are applied in the order listed. Mounting will fail if the designated mount
     // point doesn't exist in a previous mount. The root must be first so other mounts can be
     // applied on top of it.
     let mut mounts_iter = config.mounts.iter();
     let (root_point, root_fs) = create_filesystem_from_spec(
+        locked,
         kernel,
         pkg_dir_proxy,
         mounts_iter.next().ok_or_else(|| anyhow!("Mounts list is empty"))?,
@@ -508,17 +520,21 @@ fn create_init_task(
     Ok(task)
 }
 
-fn mount_filesystems(
+fn mount_filesystems<L>(
+    locked: &mut Locked<'_, L>,
     system_task: &CurrentTask,
     config: &ConfigWrapper,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    L: LockBefore<ReadOps>,
+{
     let mut mounts_iter = config.mounts.iter();
     // Skip the first mount, that was used to create the root filesystem.
     let _ = mounts_iter.next();
     for mount_spec in mounts_iter {
         let (mount_point, child_fs) =
-            create_filesystem_from_spec(system_task, pkg_dir_proxy, mount_spec)
+            create_filesystem_from_spec(locked, system_task, pkg_dir_proxy, mount_spec)
                 .with_source_context(|| {
                     format!("creating filesystem from spec: {}", &mount_spec)
                 })?;
@@ -553,20 +569,23 @@ mod test {
     use super::wait_for_init_file;
     use fuchsia_async as fasync;
     use futures::{SinkExt, StreamExt};
-    use starnix_core::{
-        testing::{create_kernel_and_task, create_kernel_task_and_unlocked},
-        vfs::FdNumber,
-    };
+    use starnix_core::{testing::create_kernel_task_and_unlocked, vfs::FdNumber};
     use starnix_uapi::{file_mode::FileMode, open_flags::OpenFlags, signals::SIGCHLD, CLONE_FS};
 
     #[fuchsia::test]
     async fn test_init_file_already_exists() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (mut sender, mut receiver) = futures::channel::mpsc::unbounded();
 
         let path = "/path";
         current_task
-            .open_file_at(FdNumber::AT_FDCWD, path.into(), OpenFlags::CREAT, FileMode::default())
+            .open_file_at(
+                &mut locked,
+                FdNumber::AT_FDCWD,
+                path.into(),
+                OpenFlags::CREAT,
+                FileMode::default(),
+            )
             .expect("Failed to create file");
 
         fasync::Task::local(async move {
@@ -600,7 +619,13 @@ mod test {
 
         // Create the file that is being waited on.
         current_task
-            .open_file_at(FdNumber::AT_FDCWD, path.into(), OpenFlags::CREAT, FileMode::default())
+            .open_file_at(
+                &mut locked,
+                FdNumber::AT_FDCWD,
+                path.into(),
+                OpenFlags::CREAT,
+                FileMode::default(),
+            )
             .expect("Failed to create file");
 
         // Wait for the file creation to be detected.

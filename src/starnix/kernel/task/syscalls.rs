@@ -181,7 +181,7 @@ pub fn sys_execve(
 }
 
 pub fn sys_execveat(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -247,9 +247,9 @@ pub fn sys_execveat(
         // for that file, which is undesirable here.
         //
         // See https://man7.org/linux/man-pages/man3/fexecve.3.html#DESCRIPTION
-        file.name.open(current_task, OpenFlags::RDONLY, false)?
+        file.name.open(locked, current_task, OpenFlags::RDONLY, false)?
     } else {
-        current_task.open_file_at(dir_fd, path.as_ref(), open_flags, FileMode::default())?
+        current_task.open_file_at(locked, dir_fd, path.as_ref(), open_flags, FileMode::default())?
     };
 
     // This path can affect script resolution (the path is appended to the script args)
@@ -281,7 +281,7 @@ pub fn sys_execveat(
 
     let path = CString::new(path).map_err(|_| errno!(EINVAL))?;
 
-    current_task.exec(executable, path, argv, environ)?;
+    current_task.exec(locked, executable, path, argv, environ)?;
     Ok(())
 }
 
@@ -1614,7 +1614,7 @@ pub fn sys_swapon(
     track_stub!(TODO("https://fxbug.dev/322893905"), "swapon validate flags");
 
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
-    let file = current_task.open_file(path.as_ref(), OpenFlags::RDWR)?;
+    let file = current_task.open_file(locked, path.as_ref(), OpenFlags::RDWR)?;
 
     let node = file.node();
     let mode = node.info().mode;
@@ -1658,7 +1658,7 @@ pub fn sys_swapoff(
     }
 
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
-    let file = current_task.open_file(path.as_ref(), OpenFlags::RDWR)?;
+    let file = current_task.open_file(locked, path.as_ref(), OpenFlags::RDWR)?;
 
     let mut swap_files = current_task.kernel().swap_files.lock(locked);
     let original_length = swap_files.len();

@@ -73,6 +73,7 @@ impl FsNodeOps for FunctionFsRootDir {
 
     fn create_file_ops(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -88,6 +89,7 @@ impl FsNodeOps for Arc<FunctionFsControlEndpoint> {
 
     fn create_file_ops(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,

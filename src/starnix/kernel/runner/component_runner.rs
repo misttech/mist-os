@@ -159,7 +159,7 @@ pub async fn start_component(
         current_task,
         {
             let mount_record = mount_record.clone();
-            move |_, current_task| {
+            move |locked, current_task| {
                 let cwd_path =
                     FsString::from(get_program_string(&start_info, "cwd").unwrap_or(&pkg_path));
                 let cwd = current_task.lookup_path(
@@ -179,12 +179,11 @@ pub async fn start_component(
                 if let Some(local_mounts) = local_mounts {
                     for mount in local_mounts.iter() {
                         let (mount_point, child_fs) =
-                            create_filesystem_from_spec(current_task, &pkg, mount).map_err(
-                                |e| {
+                            create_filesystem_from_spec(locked, current_task, &pkg, mount)
+                                .map_err(|e| {
                                     log_error!("Error while mounting the filesystems: {e:?}");
                                     errno!(EINVAL)
-                                },
-                            )?;
+                                })?;
                         let mount_point = current_task.lookup_path_from_root(mount_point)?;
                         mount_record.lock().mount(
                             mount_point,
@@ -207,9 +206,12 @@ pub async fn start_component(
                 let mut argv = vec![binary_path.clone()];
                 argv.extend(args);
 
-                let executable =
-                    current_task.open_file(binary_path.as_bytes().into(), OpenFlags::RDONLY)?;
-                current_task.exec(executable, binary_path, argv, environ)?;
+                let executable = current_task.open_file(
+                    locked,
+                    binary_path.as_bytes().into(),
+                    OpenFlags::RDONLY,
+                )?;
+                current_task.exec(locked, executable, binary_path, argv, environ)?;
 
                 Ok(WeakRef::from(&current_task.task))
             }

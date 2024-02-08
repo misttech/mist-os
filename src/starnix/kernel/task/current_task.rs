@@ -30,7 +30,7 @@ use fuchsia_zircon::{
 };
 use starnix_logging::{log_error, log_warn, set_zx_name, track_file_not_found, track_stub};
 use starnix_sync::{
-    EventWaitGuard, LockBefore, Locked, MmDumpable, RwLock, RwLockWriteGuard, TaskRelease,
+    EventWaitGuard, LockBefore, Locked, MmDumpable, ReadOps, RwLock, RwLockWriteGuard, TaskRelease,
     WakeReason,
 };
 use starnix_syscalls::{decls::Syscall, SyscallResult};
@@ -382,13 +382,21 @@ impl CurrentTask {
     ///
     /// Returns a FileHandle but does not install the FileHandle in the FdTable
     /// for this task.
-    pub fn open_file(&self, path: &FsStr, flags: OpenFlags) -> Result<FileHandle, Errno> {
+    pub fn open_file<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        path: &FsStr,
+        flags: OpenFlags,
+    ) -> Result<FileHandle, Errno>
+    where
+        L: LockBefore<ReadOps>,
+    {
         if flags.contains(OpenFlags::CREAT) {
             // In order to support OpenFlags::CREAT we would need to take a
             // FileMode argument.
             return error!(EINVAL);
         }
-        self.open_file_at(FdNumber::AT_FDCWD, path, flags, FileMode::default())
+        self.open_file_at(locked, FdNumber::AT_FDCWD, path, flags, FileMode::default())
     }
 
     /// Resolves a path for open.
@@ -479,28 +487,36 @@ impl CurrentTask {
     ///
     /// Returns a FileHandle but does not install the FileHandle in the FdTable
     /// for this task.
-    pub fn open_file_at(
+    pub fn open_file_at<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         dir_fd: FdNumber,
         path: &FsStr,
         flags: OpenFlags,
         mode: FileMode,
-    ) -> Result<FileHandle, Errno> {
+    ) -> Result<FileHandle, Errno>
+    where
+        L: LockBefore<ReadOps>,
+    {
         if path.is_empty() {
             return error!(ENOENT);
         }
 
         let (dir, path) = self.resolve_dir_fd(dir_fd, path)?;
-        self.open_namespace_node_at(dir, path, flags, mode)
+        self.open_namespace_node_at(locked, dir, path, flags, mode)
     }
 
-    pub fn open_namespace_node_at(
+    pub fn open_namespace_node_at<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         dir: NamespaceNode,
         path: &FsStr,
         flags: OpenFlags,
         mode: FileMode,
-    ) -> Result<FileHandle, Errno> {
+    ) -> Result<FileHandle, Errno>
+    where
+        L: LockBefore<ReadOps>,
+    {
         // 64-bit kernels force the O_LARGEFILE flag to be on.
         let mut flags = flags | OpenFlags::LARGEFILE;
         if flags.contains(OpenFlags::PATH) {
@@ -590,7 +606,7 @@ impl CurrentTask {
         // > open() call that creates a read-only file may well return a  read/write  file
         // > descriptor.
 
-        name.open(self, flags, !created)
+        name.open(locked, self, flags, !created)
     }
 
     /// A wrapper for FsContext::lookup_parent_at that resolves the given
@@ -666,13 +682,17 @@ impl CurrentTask {
         self.lookup_path(&mut context, self.fs().root(), path)
     }
 
-    pub fn exec(
+    pub fn exec<L>(
         &mut self,
+        locked: &mut Locked<'_, L>,
         executable: FileHandle,
         path: CString,
         argv: Vec<CString>,
         environ: Vec<CString>,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<ReadOps>,
+    {
         // Executable must be a regular file
         if !executable.name.entry.node.is_reg() {
             return error!(EACCES);
@@ -685,8 +705,15 @@ impl CurrentTask {
 
         let elf_selinux_state = selinux_hooks::check_exec_access(self)?;
 
-        let resolved_elf =
-            resolve_executable(self, executable, path.clone(), argv, environ, elf_selinux_state)?;
+        let resolved_elf = resolve_executable(
+            locked,
+            self,
+            executable,
+            path.clone(),
+            argv,
+            environ,
+            elf_selinux_state,
+        )?;
 
         if self.thread_group.read().tasks_count() > 1 {
             track_stub!(TODO("https://fxbug.dev/297434895"), "exec on multithread process");

@@ -763,7 +763,7 @@ mod tests {
         let backing_node = FsNode::new_root(PassthroughTestFile::new_node(expected_contents));
         let backing_file = Anon::new_file(
             &current_task,
-            backing_node.create_file_ops(&current_task, OpenFlags::RDONLY).unwrap(),
+            backing_node.create_file_ops(&mut locked, &current_task, OpenFlags::RDONLY).unwrap(),
             OpenFlags::RDONLY,
         );
         let loop_file =
@@ -782,7 +782,7 @@ mod tests {
         let backing_node = FsNode::new_root(PassthroughTestFile::new_node(b"hello, world!"));
         let backing_file = Anon::new_file(
             &current_task,
-            backing_node.create_file_ops(&current_task, OpenFlags::RDONLY).unwrap(),
+            backing_node.create_file_ops(&mut locked, &current_task, OpenFlags::RDONLY).unwrap(),
             OpenFlags::RDONLY,
         );
         let loop_file =

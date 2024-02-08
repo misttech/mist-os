@@ -23,7 +23,7 @@ use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, trace_duration, track_stub, CATEGORY_STARNIX_MM};
-use starnix_sync::{FileOpsIoctl, LockEqualOrBefore, Locked, Mutex, ReadOps, WriteOps};
+use starnix_sync::{FileOpsIoctl, LockEqualOrBefore, Locked, Mutex, ReadOps, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,
@@ -353,7 +353,8 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
-        serve_file(current_task, file).map(|c| Some(c.0.into_handle()))
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): FileOpsToHandle before ReadOps
+        serve_file(&mut locked, current_task, file).map(|c| Some(c.0.into_handle()))
     }
 
     /// Returns the associated pid_t.
@@ -1527,7 +1528,7 @@ mod tests {
             })
             .expect("create_node failed");
         let file_handle = file
-            .open_anonymous(&current_task, OpenFlags::APPEND | OpenFlags::RDWR)
+            .open_anonymous(&mut locked, &current_task, OpenFlags::APPEND | OpenFlags::RDWR)
             .expect("open failed");
         let done = Arc::new(AtomicBool::new(false));
 

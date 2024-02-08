@@ -73,11 +73,15 @@ pub fn dev_pts_fs(current_task: &CurrentTask, options: FileSystemOptions) -> &Fi
 /// This function assumes that `/dev/ptmx` is the `DevPtmxFile` and that devpts
 /// is mounted at `/dev/pts`. These assumptions are necessary so that the
 /// `FileHandle` objects returned have appropriate `NamespaceNode` objects.
-pub fn create_main_and_replica(
+pub fn create_main_and_replica<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     window_size: uapi::winsize,
-) -> Result<(FileHandle, FileHandle), Errno> {
-    let pty_file = current_task.open_file("/dev/ptmx".into(), OpenFlags::RDWR)?;
+) -> Result<(FileHandle, FileHandle), Errno>
+where
+    L: LockBefore<ReadOps>,
+{
+    let pty_file = current_task.open_file(locked, "/dev/ptmx".into(), OpenFlags::RDWR)?;
     let pty = pty_file.downcast_file::<DevPtmxFile>().ok_or_else(|| errno!(ENOTTY))?;
     {
         let mut terminal = pty.terminal.write();
@@ -85,7 +89,7 @@ pub fn create_main_and_replica(
         terminal.window_size = window_size;
     }
     let pts_path = FsString::from(format!("/dev/pts/{}", pty.terminal.id));
-    let pts_file = current_task.open_file(pts_path.as_ref(), OpenFlags::RDWR)?;
+    let pts_file = current_task.open_file(locked, pts_path.as_ref(), OpenFlags::RDWR)?;
     Ok((pty_file, pts_file))
 }
 
@@ -167,6 +171,7 @@ impl FsNodeOps for DevPtsRootDir {
 
     fn create_file_ops(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -907,30 +912,42 @@ mod tests {
         root.lookup_child(task, &mut Default::default(), name)
     }
 
-    fn open_file_with_flags(
+    fn open_file_with_flags<L>(
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
         name: &FsStr,
         flags: OpenFlags,
-    ) -> Result<FileHandle, Errno> {
+    ) -> Result<FileHandle, Errno>
+    where
+        L: LockBefore<ReadOps>,
+    {
         let node = lookup_node(current_task, fs, name)?;
-        node.open(current_task, flags, true)
+        node.open(locked, current_task, flags, true)
     }
 
-    fn open_file(
-        current_task: &CurrentTask,
-        fs: &FileSystemHandle,
-        name: &FsStr,
-    ) -> Result<FileHandle, Errno> {
-        open_file_with_flags(current_task, fs, name, OpenFlags::RDWR | OpenFlags::NOCTTY)
-    }
-
-    fn open_ptmx_and_unlock<L: LockBefore<FileOpsIoctl>>(
+    fn open_file<L>(
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
-    ) -> Result<FileHandle, Errno> {
-        let file = open_file_with_flags(current_task, fs, "ptmx".into(), OpenFlags::RDWR)?;
+        name: &FsStr,
+    ) -> Result<FileHandle, Errno>
+    where
+        L: LockBefore<ReadOps>,
+    {
+        open_file_with_flags(locked, current_task, fs, name, OpenFlags::RDWR | OpenFlags::NOCTTY)
+    }
+
+    fn open_ptmx_and_unlock<L>(
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        fs: &FileSystemHandle,
+    ) -> Result<FileHandle, Errno>
+    where
+        L: LockBefore<ReadOps>,
+        L: LockBefore<FileOpsIoctl>,
+    {
+        let file = open_file_with_flags(locked, current_task, fs, "ptmx".into(), OpenFlags::RDWR)?;
 
         // Unlock terminal
         ioctl::<i32, L>(locked, current_task, &file, TIOCSPTLCK, &0)?;
@@ -953,7 +970,7 @@ mod tests {
         let fs = dev_pts_fs(&task, Default::default());
         lookup_node(&task, fs, "0".into()).unwrap_err();
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
-        let _pts = open_file(&task, fs, "0".into()).expect("open file");
+        let _pts = open_file(&mut locked, &task, fs, "0".into()).expect("open file");
         std::mem::drop(ptmx);
         task.trigger_delayed_releaser();
         lookup_node(&task, fs, "0".into()).unwrap_err();
@@ -983,7 +1000,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn opening_inexistant_replica_fails() {
-        let (kernel, task) = create_kernel_and_task();
+        let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
         // Initialize pts devices
         dev_pts_fs(&task, Default::default());
         let fs = TmpFs::new_fs(&kernel);
@@ -1002,7 +1019,7 @@ mod tests {
             })
             .expect("custom_pts");
         let node = NamespaceNode::new_anonymous(pts.clone());
-        assert!(node.open(&task, OpenFlags::RDONLY, true).is_err());
+        assert!(node.open(&mut locked, &task, OpenFlags::RDONLY, true).is_err());
     }
 
     #[::fuchsia::test]
@@ -1014,7 +1031,8 @@ mod tests {
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
         set_controlling_terminal(&mut locked, &task, &ptmx, false)
             .expect("set_controlling_terminal");
-        let tty = open_file_with_flags(&task, devfs, "tty".into(), OpenFlags::RDWR).expect("tty");
+        let tty = open_file_with_flags(&mut locked, &task, devfs, "tty".into(), OpenFlags::RDWR)
+            .expect("tty");
         // Check that tty is the main terminal by calling the ioctl TIOCGPTN and checking it is
         // has the same result as on ptmx.
         assert_eq!(
@@ -1024,10 +1042,11 @@ mod tests {
 
         // Detach the controlling terminal.
         ioctl::<i32, Unlocked>(&mut locked, &task, &ptmx, TIOCNOTTY, &0).expect("detach terminal");
-        let pts = open_file(&task, fs, "0".into()).expect("open file");
+        let pts = open_file(&mut locked, &task, fs, "0".into()).expect("open file");
         set_controlling_terminal(&mut locked, &task, &pts, false)
             .expect("set_controlling_terminal");
-        let tty = open_file_with_flags(&task, devfs, "tty".into(), OpenFlags::RDWR).expect("tty");
+        let tty = open_file_with_flags(&mut locked, &task, devfs, "tty".into(), OpenFlags::RDWR)
+            .expect("tty");
         // TIOCGPTN is not implemented on replica terminals
         assert!(ioctl::<i32, Unlocked>(&mut locked, &task, &tty, TIOCGPTN, &0).is_err());
     }
@@ -1040,7 +1059,7 @@ mod tests {
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
         assert_eq!(ptmx.ioctl(&mut locked, &task, 42, Default::default()), error!(ENOTTY));
 
-        let pts_file = open_file(&task, fs, "0".into()).expect("open file");
+        let pts_file = open_file(&mut locked, &task, fs, "0".into()).expect("open file");
         assert_eq!(pts_file.ioctl(&mut locked, &task, 42, Default::default()), error!(ENOTTY));
     }
 
@@ -1060,12 +1079,12 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_new_terminal_is_locked() {
-        let (_kernel, task) = create_kernel_and_task();
+        let (_kernel, task, mut locked) = create_kernel_task_and_unlocked();
         let fs = dev_pts_fs(&task, Default::default());
-        let _ptmx_file = open_file(&task, fs, "ptmx".into()).expect("open file");
+        let _ptmx_file = open_file(&mut locked, &task, fs, "ptmx".into()).expect("open file");
 
         let pts = lookup_node(&task, fs, "0".into()).expect("component_lookup");
-        assert_eq!(pts.open(&task, OpenFlags::RDONLY, true).map(|_| ()), error!(EIO));
+        assert_eq!(pts.open(&mut locked, &task, OpenFlags::RDONLY, true).map(|_| ()), error!(EIO));
     }
 
     #[::fuchsia::test]
@@ -1078,14 +1097,14 @@ mod tests {
         // Check that the lock is not set.
         assert_eq!(ioctl::<i32, Unlocked>(&mut locked, &task, &ptmx, TIOCGPTLCK, &0), Ok(0));
         // /dev/pts/0 can be opened
-        pts.open(&task, OpenFlags::RDONLY, true).expect("open");
+        pts.open(&mut locked, &task, OpenFlags::RDONLY, true).expect("open");
 
         // Lock the terminal
         ioctl::<i32, Unlocked>(&mut locked, &task, &ptmx, TIOCSPTLCK, &42).expect("ioctl");
         // Check that the lock is set.
         assert_eq!(ioctl::<i32, Unlocked>(&mut locked, &task, &ptmx, TIOCGPTLCK, &0), Ok(1));
         // /dev/pts/0 cannot be opened
-        assert_eq!(pts.open(&task, OpenFlags::RDONLY, true).map(|_| ()), error!(EIO));
+        assert_eq!(pts.open(&mut locked, &task, OpenFlags::RDONLY, true).map(|_| ()), error!(EIO));
     }
 
     #[::fuchsia::test]
@@ -1096,7 +1115,7 @@ mod tests {
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
         let ptmx_stat = ptmx.node().stat(&task).expect("stat");
         assert_eq!(ptmx_stat.st_blksize as usize, BLOCK_SIZE);
-        let pts = open_file(&task, fs, "0".into()).expect("open file");
+        let pts = open_file(&mut locked, &task, fs, "0".into()).expect("open file");
         let pts_stats = pts.node().stat(&task).expect("stat");
         assert_eq!(pts_stats.st_mode & FileMode::PERMISSIONS.bits(), 0o620);
         assert_eq!(pts_stats.st_uid, 22);
@@ -1118,9 +1137,14 @@ mod tests {
             .controlling_terminal
             .is_none());
         // Opening the terminal should not set the terminal of the session with the NOCTTY flag.
-        let _opened_replica2 =
-            open_file_with_flags(&task, fs, "0".into(), OpenFlags::RDWR | OpenFlags::NOCTTY)
-                .expect("open file");
+        let _opened_replica2 = open_file_with_flags(
+            &mut locked,
+            &task,
+            fs,
+            "0".into(),
+            OpenFlags::RDWR | OpenFlags::NOCTTY,
+        )
+        .expect("open file");
         assert!(task
             .thread_group
             .read()
@@ -1132,7 +1156,8 @@ mod tests {
 
         // Opening the replica terminal should set the terminal of the session.
         let _opened_replica2 =
-            open_file_with_flags(&task, fs, "0".into(), OpenFlags::RDWR).expect("open file");
+            open_file_with_flags(&mut locked, &task, fs, "0".into(), OpenFlags::RDWR)
+                .expect("open file");
         assert!(task
             .thread_group
             .read()
@@ -1151,7 +1176,7 @@ mod tests {
 
         let fs = dev_pts_fs(&task1, Default::default());
         let opened_main = open_ptmx_and_unlock(&mut locked, &task1, fs).expect("ptmx");
-        let opened_replica = open_file(&task2, fs, "0".into()).expect("open file");
+        let opened_replica = open_file(&mut locked, &task2, fs, "0".into()).expect("open file");
 
         assert_eq!(
             ioctl::<i32, Unlocked>(&mut locked, &task1, &opened_main, TIOCGPGRP, &0),
@@ -1188,9 +1213,14 @@ mod tests {
 
         let fs = dev_pts_fs(&task1, Default::default());
         let _opened_main = open_ptmx_and_unlock(&mut locked, &task1, fs).expect("ptmx");
-        let wo_opened_replica =
-            open_file_with_flags(&task1, fs, "0".into(), OpenFlags::WRONLY | OpenFlags::NOCTTY)
-                .expect("open file");
+        let wo_opened_replica = open_file_with_flags(
+            &mut locked,
+            &task1,
+            fs,
+            "0".into(),
+            OpenFlags::WRONLY | OpenFlags::NOCTTY,
+        )
+        .expect("open file");
         assert!(!wo_opened_replica.can_read());
 
         // FD must be readable for setting the terminal.
@@ -1199,7 +1229,7 @@ mod tests {
             error!(EPERM)
         );
 
-        let opened_replica = open_file(&task2, fs, "0".into()).expect("open file");
+        let opened_replica = open_file(&mut locked, &task2, fs, "0".into()).expect("open file");
         // Task must be session leader for setting the terminal.
         assert_eq!(
             set_controlling_terminal(&mut locked, &task2, &opened_replica, false),
@@ -1263,7 +1293,7 @@ mod tests {
 
         let fs = dev_pts_fs(&task1, Default::default());
         let _opened_main = open_ptmx_and_unlock(&mut locked, &init, fs).expect("ptmx");
-        let opened_replica = open_file(&task2, fs, "0".into()).expect("open file");
+        let opened_replica = open_file(&mut locked, &task2, fs, "0".into()).expect("open file");
 
         // Cannot change the foreground process group if the terminal is not the controlling
         // terminal
@@ -1342,7 +1372,7 @@ mod tests {
 
         let fs = dev_pts_fs(&task1, Default::default());
         let _opened_main = open_ptmx_and_unlock(&mut locked, &task1, fs).expect("ptmx");
-        let opened_replica = open_file(&task1, fs, "0".into()).expect("open file");
+        let opened_replica = open_file(&mut locked, &task1, fs, "0".into()).expect("open file");
 
         // Cannot detach the controlling terminal when none is attached terminal
         assert_eq!(
@@ -1377,7 +1407,7 @@ mod tests {
         let (_kernel, task, mut locked) = create_kernel_task_and_unlocked();
         let fs = dev_pts_fs(&task, Default::default());
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
-        let pts = open_file(&task, fs, "0".into()).expect("open file");
+        let pts = open_file(&mut locked, &task, fs, "0".into()).expect("open file");
 
         let has_data_ready_to_read = |fd: &FileHandle| {
             fd.query_events(&task).expect("query_events").contains(FdEvents::POLLIN)

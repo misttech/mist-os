@@ -14,7 +14,7 @@ use crate::{
 };
 use bstr::B;
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{Mutex, MutexGuard};
+use starnix_sync::{Locked, Mutex, MutexGuard, ReadOps};
 use starnix_uapi::{
     auth::FsCred,
     device_type::DeviceType,
@@ -220,6 +220,7 @@ impl FsNodeOps for TmpfsDirectory {
 
     fn create_file_ops(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -337,6 +338,7 @@ impl FsNodeOps for TmpfsSpecialNode {
 
     fn create_file_ops(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -382,7 +384,7 @@ mod test {
             .create_node(&current_task, path.into(), mode!(IFREG, 0o777), DeviceType::NONE)
             .unwrap();
 
-        let wr_file = current_task.open_file(path.into(), OpenFlags::RDWR).unwrap();
+        let wr_file = current_task.open_file(&mut locked, path.into(), OpenFlags::RDWR).unwrap();
 
         let test_seq = 0..10000u16;
         let test_vec = test_seq.collect::<Vec<_>>();
@@ -410,7 +412,7 @@ mod test {
             .root()
             .create_node(&current_task, path.into(), mode!(IFREG, 0o777), DeviceType::NONE)
             .unwrap();
-        let rd_file = current_task.open_file(path.into(), OpenFlags::RDONLY).unwrap();
+        let rd_file = current_task.open_file(&mut locked, path.into(), OpenFlags::RDONLY).unwrap();
 
         // Verify that attempting to read past the EOF (i.e. at a non-zero offset) returns 0
         let buffer_size = 0x10000;
@@ -428,6 +430,7 @@ mod test {
         let path = "test.bin";
         let file = current_task
             .open_file_at(
+                &mut locked,
                 FdNumber::AT_FDCWD,
                 path.into(),
                 OpenFlags::CREAT | OpenFlags::RDONLY,
@@ -443,7 +446,13 @@ mod test {
         assert!(file.write(&mut locked, &current_task, &mut VecInputBuffer::new(&[])).is_err());
 
         let file = current_task
-            .open_file_at(FdNumber::AT_FDCWD, path.into(), OpenFlags::WRONLY, FileMode::EMPTY)
+            .open_file_at(
+                &mut locked,
+                FdNumber::AT_FDCWD,
+                path.into(),
+                OpenFlags::WRONLY,
+                FileMode::EMPTY,
+            )
             .expect("failed to open file WRONLY");
 
         assert!(file.read(&mut locked, &current_task, &mut VecOutputBuffer::new(0)).is_err());
@@ -455,7 +464,13 @@ mod test {
         );
 
         let file = current_task
-            .open_file_at(FdNumber::AT_FDCWD, path.into(), OpenFlags::RDWR, FileMode::EMPTY)
+            .open_file_at(
+                &mut locked,
+                FdNumber::AT_FDCWD,
+                path.into(),
+                OpenFlags::RDWR,
+                FileMode::EMPTY,
+            )
             .expect("failed to open file RDWR");
 
         assert_eq!(
@@ -485,14 +500,17 @@ mod test {
         // At this point, all the nodes are dropped.
 
         current_task
-            .open_file("/usr/bin".into(), OpenFlags::RDONLY | OpenFlags::DIRECTORY)
+            .open_file(&mut locked, "/usr/bin".into(), OpenFlags::RDONLY | OpenFlags::DIRECTORY)
             .expect("failed to open /usr/bin");
         assert_eq!(
             errno!(ENOENT),
-            current_task.open_file("/usr/bin/test.txt".into(), OpenFlags::RDWR).unwrap_err()
+            current_task
+                .open_file(&mut locked, "/usr/bin/test.txt".into(), OpenFlags::RDWR)
+                .unwrap_err()
         );
         current_task
             .open_file_at(
+                &mut locked,
                 FdNumber::AT_FDCWD,
                 "/usr/bin/test.txt".into(),
                 OpenFlags::RDWR | OpenFlags::CREAT,
@@ -500,11 +518,11 @@ mod test {
             )
             .expect("failed to create test.txt");
         let txt = current_task
-            .open_file("/usr/bin/test.txt".into(), OpenFlags::RDWR)
+            .open_file(&mut locked, "/usr/bin/test.txt".into(), OpenFlags::RDWR)
             .expect("failed to open test.txt");
 
         let usr_bin = current_task
-            .open_file("/usr/bin".into(), OpenFlags::RDONLY)
+            .open_file(&mut locked, "/usr/bin".into(), OpenFlags::RDONLY)
             .expect("failed to open /usr/bin");
         usr_bin
             .name
@@ -512,7 +530,9 @@ mod test {
             .expect("failed to unlink test.text");
         assert_eq!(
             errno!(ENOENT),
-            current_task.open_file("/usr/bin/test.txt".into(), OpenFlags::RDWR).unwrap_err()
+            current_task
+                .open_file(&mut locked, "/usr/bin/test.txt".into(), OpenFlags::RDWR)
+                .unwrap_err()
         );
         assert_eq!(
             errno!(ENOENT),
@@ -530,15 +550,18 @@ mod test {
         std::mem::drop(txt);
         assert_eq!(
             errno!(ENOENT),
-            current_task.open_file("/usr/bin/test.txt".into(), OpenFlags::RDWR).unwrap_err()
+            current_task
+                .open_file(&mut locked, "/usr/bin/test.txt".into(), OpenFlags::RDWR)
+                .unwrap_err()
         );
         std::mem::drop(usr_bin);
 
-        let usr =
-            current_task.open_file("/usr".into(), OpenFlags::RDONLY).expect("failed to open /usr");
+        let usr = current_task
+            .open_file(&mut locked, "/usr".into(), OpenFlags::RDONLY)
+            .expect("failed to open /usr");
         assert_eq!(
             errno!(ENOENT),
-            current_task.open_file("/usr/foo".into(), OpenFlags::RDONLY).unwrap_err()
+            current_task.open_file(&mut locked, "/usr/foo".into(), OpenFlags::RDONLY).unwrap_err()
         );
         usr.name
             .unlink(&current_task, "bin".into(), UnlinkKind::Directory, false)

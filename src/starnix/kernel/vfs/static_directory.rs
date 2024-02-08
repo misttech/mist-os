@@ -10,6 +10,7 @@ use crate::{
         FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, SeekTarget,
     },
 };
+use starnix_sync::{Locked, ReadOps};
 use starnix_uapi::{
     auth::FsCred,
     device_type::DeviceType,
@@ -149,6 +150,7 @@ impl FsNodeOps for Arc<StaticDirectory> {
 
     fn create_file_ops(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,

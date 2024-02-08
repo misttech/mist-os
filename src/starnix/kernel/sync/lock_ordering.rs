@@ -19,6 +19,9 @@ lock_level!(ProcessGroupState);
 lock_level!(FileOpsIoctl);
 
 // These lock levels are use to denote write and read operations for FileOps and SocketOps
+// TODO(https://fxbug.dev/324065824): FsNodeCreateFileOps is also using the same level as read() because of
+// the circular dependency in OverlayFS implementation:
+// read -> open_anonymous -> create_file_ops -> create_upper_maybe_copy -> copy_file_content -> read
 lock_level!(ReadOps);
 lock_level!(WriteOps);
 
@@ -35,6 +38,6 @@ impl_lock_after!(Unlocked => TaskRelease);
 
 impl_lock_after!(TaskRelease => FileOpsIoctl);
 // FileOpsIoctl is before read/write because SocketFile.ioctl ends up indirectly calling FileOps.read and FileOps.write
-impl_lock_after!(FileOpsIoctl => ReadOps);
+impl_lock_after!(FileOpsIoctl  => ReadOps);
 impl_lock_after!(ReadOps => WriteOps);
 impl_lock_after!(WriteOps => ProcessGroupState);

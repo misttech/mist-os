@@ -28,6 +28,7 @@ use starnix_kernel_runner::{
     ContainerServiceConfig,
 };
 use starnix_logging::{log_debug, trace_instant, CATEGORY_STARNIX, NAME_START_KERNEL};
+use starnix_sync::Unlocked;
 
 /// Overrides the `zxio_maybe_faultable_copy` weak symbol found in zxio.
 #[no_mangle]
@@ -155,6 +156,7 @@ async fn main() -> Result<(), Error> {
     fs.for_each_concurrent(None, |request: KernelServices| async {
         match request {
             KernelServices::ContainerRunner(stream) => {
+                let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320465852): Reuse an existing Locked context
                 let mut config: Option<ContainerServiceConfig> = None;
                 let container = container
                     .get_or_try_init(|| build_container(stream, &mut config))
@@ -162,7 +164,7 @@ async fn main() -> Result<(), Error> {
                     .expect("failed to start container");
                 if let Some(config) = config {
                     container
-                        .serve(config)
+                        .serve(&mut locked, config)
                         .await
                         .expect("failed to serve the expected services from the container");
                 }
