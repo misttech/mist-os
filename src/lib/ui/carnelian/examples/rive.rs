@@ -246,10 +246,10 @@ impl ViewAssistant for RiveViewAssistant {
                 request_render = true;
             }
         }
-        duration_begin!("gfx", "rive::artboard::advance");
+        duration_begin!(c"gfx", c"rive::artboard::advance");
         let artboard_ref = scene_details.artboard.as_ref();
         artboard_ref.advance(elapsed);
-        duration_end!("gfx", "rive::artboard::advance");
+        duration_end!(c"gfx", c"rive::artboard::advance");
 
         scene_details.scene.render(render_context, ready_event, context)?;
         self.scene_details = Some(scene_details);
