@@ -269,7 +269,8 @@ impl BlobDirectory {
                 let handle = ObjectStore::create_object(
                     self.volume(),
                     &mut transaction,
-                    HandleOptions::default(),
+                    // Checksums are redundant for blobs, which are already content-verified.
+                    HandleOptions { skip_checksums: true, ..Default::default() },
                     None,
                     None,
                 )

@@ -396,15 +396,26 @@ impl<S: HandleOwner> Directory<S> {
         name: &str,
         create_attributes: Option<&fio::MutableNodeAttributes>,
     ) -> Result<DataObjectHandle<S>, Error> {
-        ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let handle = ObjectStore::create_object(
-            self.owner(),
+        self.create_child_file_with_options(
             transaction,
-            HandleOptions::default(),
-            None,
+            name,
             create_attributes,
+            HandleOptions::default(),
         )
-        .await?;
+        .await
+    }
+
+    pub async fn create_child_file_with_options<'a>(
+        &self,
+        transaction: &mut Transaction<'a>,
+        name: &str,
+        create_attributes: Option<&fio::MutableNodeAttributes>,
+        options: HandleOptions,
+    ) -> Result<DataObjectHandle<S>, Error> {
+        ensure!(!self.is_deleted(), FxfsError::Deleted);
+        let handle =
+            ObjectStore::create_object(self.owner(), transaction, options, None, create_attributes)
+                .await?;
         self.add_child_file(transaction, name, &handle).await?;
         self.copy_project_id_to_object_in_txn(transaction, handle.object_id())?;
         Ok(handle)

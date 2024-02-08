@@ -16,7 +16,7 @@ use {
             directory::Directory,
             transaction::{lock_keys, LockKey},
             volume::root_volume,
-            DirectWriter, ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID,
+            DirectWriter, HandleOptions, ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID,
         },
         round::round_up,
         serialized_types::BlobMetadata,
@@ -265,7 +265,13 @@ async fn install_blob(
         .await
         .context("new transaction")?;
     handle = directory
-        .create_child_file(&mut transaction, merkle.as_str(), None)
+        .create_child_file_with_options(
+            &mut transaction,
+            merkle.as_str(),
+            None,
+            // Checksums are redundant for blobs, which are already content-verified.
+            HandleOptions { skip_checksums: true, ..Default::default() },
+        )
         .await
         .context("create child file")?;
     transaction.commit().await.context("transaction commit")?;

@@ -287,7 +287,6 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         &self,
         buf: BufferRef<'_>,
         device_offset: u64,
-        compute_checksum: bool,
     ) -> Result<Checksums, Error> {
         if self.trace() {
             info!(
@@ -302,7 +301,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         store.device_write_ops.fetch_add(1, Ordering::Relaxed);
         let mut checksums = Vec::new();
         try_join!(store.device.write(device_offset, buf), async {
-            if compute_checksum {
+            if !self.options.skip_checksums {
                 let block_size = self.block_size();
                 for chunk in buf.as_slice().chunks_exact(block_size as usize) {
                     checksums.push(fletcher64(chunk, 0));
@@ -310,7 +309,11 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             }
             Ok(())
         })?;
-        Ok(if compute_checksum { Checksums::Fletcher(checksums) } else { Checksums::None })
+        Ok(if !self.options.skip_checksums {
+            Checksums::Fletcher(checksums)
+        } else {
+            Checksums::None
+        })
     }
 
     /// Flushes the underlying device.  This is expensive and should be used sparingly.
@@ -848,7 +851,6 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         offset: u64,
         buf: MutableBufferRef<'_>,
         device_offset: u64,
-        compute_checksum: bool,
     ) -> Result<Checksums, Error> {
         let mut transfer_buf;
         let block_size = self.block_size();
@@ -866,12 +868,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             keys.encrypt(range.start, 0, transfer_buf_ref.as_mut_slice())?;
         }
 
-        self.write_aligned(
-            transfer_buf_ref.as_ref(),
-            device_offset - (offset - range.start),
-            compute_checksum,
-        )
-        .await
+        self.write_aligned(transfer_buf_ref.as_ref(), device_offset - (offset - range.start)).await
     }
 
     // Writes to multiple ranges with data provided in `buf`.  The buffer can be modified in place
@@ -931,7 +928,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 Result::<_, Error>::Ok((
                     device_range.start,
                     len,
-                    self.write_aligned(head.as_ref(), device_range.start, true).await?,
+                    self.write_aligned(head.as_ref(), device_range.start).await?,
                 ))
             });
         }

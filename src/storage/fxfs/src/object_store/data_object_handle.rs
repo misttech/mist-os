@@ -280,11 +280,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         offset: u64,
         buf: MutableBufferRef<'_>,
         device_offset: u64,
-        compute_checksum: bool,
     ) -> Result<Checksums, Error> {
-        self.handle
-            .write_at(self.attribute_id(), offset, buf, device_offset, compute_checksum)
-            .await
+        self.handle.write_at(self.attribute_id(), offset, buf, device_offset).await
     }
 
     /// Zeroes the given range.  The range must be aligned.  Returns the amount of data deallocated.
@@ -801,7 +798,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                     }
                 };
                 let (current_buf, remaining_buf) = buf.split_at_mut(bytes_to_write);
-                writes.push(self.write_at(offset, current_buf, device_offset, false));
+                writes.push(self.write_at(offset, current_buf, device_offset));
                 if remaining_buf.len() == 0 {
                     break;
                 } else {
