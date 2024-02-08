@@ -275,18 +275,24 @@ impl ObjectStoreDirectory {
             layers_dir.remove_entry(layer, false)?;
         }
         let mut idx = 0;
-        let layer_object_ids = store
+        let layers = store
             .tree()
             .immutable_layer_set()
             .layers
             .iter()
-            .map(|layer| layer.handle().unwrap().object_id())
+            // NB: some layers in the immutable set might not be persistent layers yet (i.e. they
+            // are sealed in-memory layers).  We still want to track the layer file indexes
+            // correctly, so plumb them through as None here.
+            .map(|layer| {
+                layer
+                    .handle()
+                    .map(|h| InternalFile::new(h.object_id(), Arc::downgrade(&parent_store)))
+            })
             .collect::<Vec<_>>();
-        for object_id in layer_object_ids {
-            layers_dir.add_entry(
-                format!("{}", idx),
-                InternalFile::new(object_id, Arc::downgrade(&parent_store)),
-            )?;
+        for layer in layers {
+            if let Some(layer) = layer {
+                layers_dir.add_entry(format!("{}", idx), layer)?;
+            }
             idx += 1;
         }
         Ok(())
