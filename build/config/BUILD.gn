@@ -611,6 +611,10 @@ config("default_warnings") {
     # There is ongoing discussion about whether it should apply to C++ or not.
     # See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=96868 for details.
     "-Wno-missing-field-initializers",
+
+    # TODO(https://fxbug.dev/324268041): Disable "-Wextra-qualification" which
+    # warns when an extra qualifier appears on a member.
+    "-Wno-extra-qualification",
   ]
 
   cflags_cc = []
