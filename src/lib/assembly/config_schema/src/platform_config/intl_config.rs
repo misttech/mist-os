@@ -26,6 +26,17 @@ pub enum Type {
     SmallWithTimezone,
 }
 
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::None => write!(f, "none"),
+            Type::Default => write!(f, "default"),
+            Type::Small => write!(f, "small"),
+            Type::SmallWithTimezone => write!(f, "small_with_timezone"),
+        }
+    }
+}
+
 /// Platform configuration options for the input area.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
