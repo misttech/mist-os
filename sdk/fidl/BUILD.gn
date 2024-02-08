@@ -230,6 +230,7 @@ group("sdk_partner_libs") {
 _sdk_partner_internal_fidl_libraries = [
   "fuchsia.audio.controller",
   "fuchsia.dash",
+  "fuchsia.bluetooth.pandora",
   "fuchsia.debugdata",
   "fuchsia.debugger",
   "fuchsia.developer.ffxdaemonlifecycle",
