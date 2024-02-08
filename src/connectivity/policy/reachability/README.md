@@ -71,7 +71,7 @@ by using a hostname.
 ## Reference
 
 State Machine Diagram
-![state machine for network checker](doc/state_machine.svg)
+![state machine for network checker](doc/state_machine.png)
 
 [`fuchsia.net.reachability`]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.net.reachability/reachability.fidl
 [`fuchsia.net.interfaces`]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.net.interfaces/interfaces.fidl
