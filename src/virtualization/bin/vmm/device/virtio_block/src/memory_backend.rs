@@ -15,6 +15,7 @@ use {
     std::rc::Rc,
 };
 
+#[allow(dead_code)]
 trait AsByteRange {
     fn as_byte_range(&self) -> std::ops::Range<usize>;
 }

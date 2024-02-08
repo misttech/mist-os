@@ -27,6 +27,7 @@ pub trait BuiltinCapability {
     /// Serves an instance of the capability given an appropriate RequestStream.
     /// Returns when the channel backing the RequestStream is closed or an
     /// unrecoverable error occurs.
+    #[allow(dead_code)]
     async fn serve(
         self: Arc<Self>,
         mut stream: <Self::Marker as ProtocolMarker>::RequestStream,
@@ -34,6 +35,7 @@ pub trait BuiltinCapability {
 
     /// Returns true if the builtin capability matches the requested `capability`
     /// and should be served.
+    #[allow(dead_code)]
     fn matches_routed_capability(&self, capability: &InternalCapability) -> bool;
 }
 

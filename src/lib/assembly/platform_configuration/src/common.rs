@@ -692,6 +692,7 @@ pub(crate) trait DefaultByBuildType {
 /// A trait which declares that a type T implements a fn which returns an instance of type T by
 /// default (with respect to the build_type) or because the T struct has already been instantiated
 pub(crate) trait OptionDefaultByBuildTypeExt<T: DefaultByBuildType> {
+    #[allow(dead_code)]
     fn value_or_default_from_build_type(self, build_type: &BuildType) -> T;
 }
 

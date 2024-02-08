@@ -584,6 +584,7 @@ pub(crate) trait DatagramStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
     ) -> O;
 
     /// Calls the function with access to a [`DatagramBoundStateContext`].
+    #[allow(dead_code)]
     fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketsStateCtx<'_>) -> O>(
         &mut self,
         cb: F,
@@ -782,6 +783,7 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSoc
     >>::BoundSocketId;
 
     /// Converts an other-IP-version address to an address for IP version `I`.
+    #[allow(dead_code)]
     fn from_other_ip_addr(&self, addr: <I::OtherVersion as Ip>::Addr) -> I::Addr;
 
     /// The local id allocator for sockets in the `I` stack.

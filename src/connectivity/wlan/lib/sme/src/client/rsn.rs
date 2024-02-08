@@ -47,6 +47,7 @@ pub trait Supplicant: std::fmt::Debug + std::marker::Send {
         -> Result<(), Error>;
     fn on_rsna_response_timeout(&self) -> EstablishRsnaFailureReason;
     fn on_rsna_completion_timeout(&self) -> EstablishRsnaFailureReason;
+    #[allow(dead_code)]
     fn on_pmk_available(
         &mut self,
         update_sink: &mut UpdateSink,

@@ -24,6 +24,7 @@ pub use router::{AscenddClientRouting, ListPeersContext, ListablePeer, Router};
 pub use test_util::NodeIdGenerator;
 
 /// Utility trait to trace a variable to the log.
+#[allow(dead_code)]
 pub(crate) trait Trace {
     /// Trace the caller - add `msg` as text to display, and `ctx` as some context
     /// for the system that caused this value to be traced.

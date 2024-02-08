@@ -26,6 +26,7 @@ pub struct AtomicFuture {
 /// Its only method is `try_poll`, which itself is thread-safe.
 /// (See comments on method implementation for details)
 unsafe impl Sync for AtomicFuture {}
+#[allow(dead_code)]
 trait AssertSend: Send {}
 impl AssertSend for AtomicFuture {}
 

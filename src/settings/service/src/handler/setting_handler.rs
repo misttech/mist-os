@@ -91,6 +91,7 @@ pub enum Event {
     StateChanged(State),
 }
 
+#[allow(dead_code)]
 pub(crate) trait StorageFactory: StorageFactoryTrait + Send + Sync {}
 impl<T: StorageFactoryTrait + Send + Sync> StorageFactory for T {}
 
@@ -150,6 +151,7 @@ pub(crate) mod controller {
     use super::*;
 
     #[async_trait]
+    #[allow(dead_code)]
     pub(crate) trait Create: Sized {
         async fn create(client: Arc<ClientImpl>) -> Result<Self, ControllerError>;
     }

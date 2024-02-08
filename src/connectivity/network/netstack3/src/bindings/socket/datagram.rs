@@ -971,6 +971,7 @@ pub(crate) struct SocketControlInfo<I: Ip, T: Transport<I>> {
     id: T::SocketId,
 }
 
+#[allow(dead_code)]
 pub(crate) trait SocketWorkerDispatcher:
     RequestHandlerDispatcher<Ipv4, Udp>
     + RequestHandlerDispatcher<Ipv6, Udp>

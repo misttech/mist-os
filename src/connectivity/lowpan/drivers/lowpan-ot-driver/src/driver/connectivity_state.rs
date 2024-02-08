@@ -24,6 +24,7 @@ pub trait ConnectivityStateExt {
     fn is_commissioning(&self) -> bool;
 
     /// Returns true if the current state is invalid during initialization.
+    #[allow(dead_code)]
     fn is_invalid_during_initialization(&self) -> bool;
 
     /// Returns true if the current state allows network packets to be sent and received.

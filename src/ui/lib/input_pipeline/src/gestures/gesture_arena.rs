@@ -166,6 +166,7 @@ pub(super) trait Contender: std::fmt::Debug + AsAny {
 }
 
 pub trait AsAny {
+    #[allow(dead_code)]
     fn as_any(&self) -> &dyn Any;
 }
 

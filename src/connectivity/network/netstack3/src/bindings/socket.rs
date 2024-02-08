@@ -317,12 +317,14 @@ pub(crate) trait SockAddr: std::fmt::Debug + Sized + Send {
     fn addr(&self) -> Self::AddrType;
 
     /// Set this [`SockAddr`]'s address.
+    #[allow(dead_code)]
     fn set_addr(&mut self, addr: Self::AddrType);
 
     /// Gets this `SockAddr`'s port.
     fn port(&self) -> u16;
 
     /// Set this [`SockAddr`]'s port.
+    #[allow(dead_code)]
     fn set_port(&mut self, port: u16);
 
     /// Gets a `SpecifiedAddr` witness type for this `SockAddr`'s address.

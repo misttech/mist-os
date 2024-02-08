@@ -619,6 +619,7 @@ impl<S: ServiceConnect + 'static> TargetChannelUpdater for TargetChannelManager<
 }
 
 // For mocking
+#[allow(dead_code)]
 pub trait CurrentChannelUpdater: Send + Sync + 'static {}
 impl CurrentChannelUpdater for CurrentChannelManager {}
 

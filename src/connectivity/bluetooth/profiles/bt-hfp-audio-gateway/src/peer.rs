@@ -73,6 +73,7 @@ impl From<fidl_fuchsia_bluetooth_hfp_test::ConnectionBehavior> for ConnectionBeh
 /// Manages the Service Level Connection, Audio Connection, and FIDL APIs for a peer device.
 #[async_trait]
 pub trait Peer: Future<Output = PeerId> + Unpin + Send {
+    #[allow(dead_code)]
     fn id(&self) -> PeerId;
 
     /// Pass a new profile event into the Peer. The Peer can then react to the event as it sees
@@ -87,6 +88,7 @@ pub trait Peer: Future<Output = PeerId> + Unpin + Send {
     ///
     /// Returns an error if the fidl endpoints cannot be built or the request cannot be processed
     /// by the Peer.
+    #[allow(dead_code)]
     async fn build_handler(&mut self) -> Result<ServerEnd<PeerHandlerMarker>, Error>;
 
     /// Provide the `Peer` with the battery level of this device.

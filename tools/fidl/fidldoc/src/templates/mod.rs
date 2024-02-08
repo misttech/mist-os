@@ -32,6 +32,7 @@ pub fn lower_snake_case(
 pub trait FidldocTemplate {
     fn render_main_page(&self, main_fidl_json: &Value) -> Result<(), Error>;
     fn render_library(&self, package: &str, fidl_json: &Value) -> Result<(), Error>;
+    #[allow(dead_code)]
     fn name(&self) -> String;
     fn include_static_files(&self) -> Result<(), Error>;
 }

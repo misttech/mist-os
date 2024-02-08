@@ -765,6 +765,7 @@ pub trait InnerIcmpContext<I: IcmpIpExt + IpExt, BC: IcmpBindingsContext<I, Self
     );
 
     /// Calls the function with an immutable reference to ICMP sockets.
+    #[allow(dead_code)]
     fn with_icmp_sockets<O, F: FnOnce(&BoundSockets<I, Self::WeakDeviceId>) -> O>(
         &mut self,
         cb: F,

@@ -333,6 +333,7 @@ trait MeasurableOutOfLine {
   fn measure_out_of_line(&self, size_agg: &mut SizeAgg);
 }
 
+#[allow(dead_code)]
 trait MeasurableHandles {
   fn measure_handles(&self, size_agg: &mut SizeAgg);
 }

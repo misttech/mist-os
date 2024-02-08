@@ -55,6 +55,7 @@ pub async fn check_for_system_update(
 // For mocking
 trait FileSystem {
     fn read_to_string(&self, path: &str) -> io::Result<String>;
+    #[allow(dead_code)]
     fn remove_file(&mut self, path: &str) -> io::Result<()>;
 }
 

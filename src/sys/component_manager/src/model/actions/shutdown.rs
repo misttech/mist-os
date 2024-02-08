@@ -354,6 +354,7 @@ pub trait Component {
     fn uses(&self) -> Vec<UseDecl>;
 
     /// Current view of this component's `exposes` declarations.
+    #[allow(dead_code)]
     fn exposes(&self) -> Vec<ExposeDecl>;
 
     /// Current view of this component's `offers` declarations.
@@ -363,6 +364,7 @@ pub trait Component {
     fn capabilities(&self) -> Vec<CapabilityDecl>;
 
     /// Current view of this component's `collections` declarations.
+    #[allow(dead_code)]
     fn collections(&self) -> Vec<CollectionDecl>;
 
     /// Current view of this component's `environments` declarations.

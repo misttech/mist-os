@@ -81,6 +81,7 @@ const OVERNET_ENABLE_USB: &str = "overnet.enable_usb";
 
 // This is just for mocking config values for unit testing.
 #[async_trait(?Send)]
+#[allow(dead_code)]
 trait ConfigReader: Send + Sync {
     async fn get(&self, q: &str) -> Result<Option<String>>;
 }

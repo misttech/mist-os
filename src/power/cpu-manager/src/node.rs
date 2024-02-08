@@ -73,6 +73,7 @@ pub trait Node {
     /// Send a message to a list of other nodes. The message is sent to each node in a separate
     /// Future and all are joined before returning. The results from all nodes are returned in a
     /// vector in the same node-ordering that was provided.
+    #[allow(dead_code)]
     async fn send_message_to_many(
         &self,
         nodes: &Vec<Rc<dyn Node>>,
