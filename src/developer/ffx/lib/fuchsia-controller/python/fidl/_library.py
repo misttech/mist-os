@@ -420,6 +420,7 @@ def bits_or_enum_root_type(ir, type_name: str) -> enum.EnumMeta:
     setattr(ty, "__fidl_kind__", type_name)
     setattr(ty, "__doc__", docstring(ir))
     setattr(ty, "__members_for_aliasing__", members)
+    setattr(ty, "__strict__", bool(ir["strict"]))
     return ty
 
 

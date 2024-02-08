@@ -295,6 +295,8 @@ void ObjectConverter::VisitInt64Type(const fidl_codec::Int64Type* type) { VisitI
 
 void ObjectConverter::VisitEnumType(const fidl_codec::EnumType* type) {
   py::Object abs(PyNumber_Absolute(obj_));
+  py::Object strict_obj(GetAttr(obj_, "__strict__"));
+  bool strict = PyBool_Check(strict_obj.get()) && Py_True == strict_obj.get();
   bool negative = false;
   if (!PyObject_RichCompareBool(abs.get(), obj_, Py_EQ)) {
     negative = true;
@@ -303,6 +305,12 @@ void ObjectConverter::VisitEnumType(const fidl_codec::EnumType* type) {
   if (as_int == convert::MINUS_ONE_U64 && PyErr_Occurred()) {
     return;
   }
+  // If this is non-strict, just encode it as-is and call it a day.
+  if (!strict) {
+    result_ = std::make_unique<fidl_codec::IntegerValue>(as_int, negative);
+    return;
+  }
+
   for (const auto& member : type->enum_definition().members()) {
     if (member.absolute_value() == as_int && member.negative() == negative) {
       result_ =
@@ -310,9 +318,8 @@ void ObjectConverter::VisitEnumType(const fidl_codec::EnumType* type) {
       return;
     }
   }
-  auto str = py::Object(PyObject_Str(obj_));
-  PyErr_Format(PyExc_TypeError, "Unexpected enum value: %s == %" PRIu64,
-               PyUnicode_AsUTF8AndSize(str.get(), nullptr), as_int);
+  PyErr_Format(PyExc_TypeError, "Unexpected enum value for type '%s' == %" PRIu64,
+               type->Name().c_str(), as_int);
 }
 
 void ObjectConverter::VisitBitsType(const fidl_codec::BitsType* type) {
