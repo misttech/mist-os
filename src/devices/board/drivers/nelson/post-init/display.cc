@@ -102,8 +102,7 @@ const std::map<uint32_t, uint32_t> kBootloaderPanelTypeToDisplayPanelType = {
     {3, PANEL_P070ACB_FT},
     {4, PANEL_KD070D82_FT_9365},
     {5, PANEL_TV070WSM_FT_9365},
-    // TODO(https://fxbug.dev/321270400): Remove this.
-    {6, PANEL_TV070WSM_ST7703I},
+    // 6 was for PANEL_TV070WSM_ST7703I.
 };
 
 zx::result<uint32_t> GetDisplayPanelTypeFromBootloaderMetadata(uint32_t bootloader_metadata) {
