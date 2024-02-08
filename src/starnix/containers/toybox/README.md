@@ -10,6 +10,7 @@ To get started, use `docker` to download the container and save it as a TAR file
 sudo docker pull tianon/toybox
 sudo docker save tianon/toybox:latest -o local/toybox.tar
 sudo chmod a+r local/toybox.tar
+```
 
 Then, use `convert_tarball_to_starnix_container` to convert the container into a Fuchsia package. Before
 running this command, make sure to build Fuchsia using an `fx set` command that has
