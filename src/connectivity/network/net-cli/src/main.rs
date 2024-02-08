@@ -7,7 +7,8 @@ use component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirTyp
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_net_debug as fdebug;
 use fidl_fuchsia_net_dhcp as fdhcp;
-use fidl_fuchsia_net_filter_deprecated as ffilter;
+use fidl_fuchsia_net_filter as ffilter;
+use fidl_fuchsia_net_filter_deprecated as ffilter_deprecated;
 use fidl_fuchsia_net_interfaces as finterfaces;
 use fidl_fuchsia_net_name as fname;
 use fidl_fuchsia_net_neighbor as fneighbor;
@@ -112,9 +113,18 @@ impl net_cli::ServiceConnector<fdhcp::Server_Marker> for Connector {
 }
 
 #[async_trait::async_trait]
-impl net_cli::ServiceConnector<ffilter::FilterMarker> for Connector {
-    async fn connect(&self) -> Result<<ffilter::FilterMarker as ProtocolMarker>::Proxy, Error> {
-        self.connect_to_exposed_protocol::<ffilter::FilterMarker>(NETSTACK_MONIKER).await
+impl net_cli::ServiceConnector<ffilter_deprecated::FilterMarker> for Connector {
+    async fn connect(
+        &self,
+    ) -> Result<<ffilter_deprecated::FilterMarker as ProtocolMarker>::Proxy, Error> {
+        self.connect_to_exposed_protocol::<ffilter_deprecated::FilterMarker>(NETSTACK_MONIKER).await
+    }
+}
+
+#[async_trait::async_trait]
+impl net_cli::ServiceConnector<ffilter::StateMarker> for Connector {
+    async fn connect(&self) -> Result<<ffilter::StateMarker as ProtocolMarker>::Proxy, Error> {
+        self.connect_to_exposed_protocol::<ffilter::StateMarker>(NETSTACK_MONIKER).await
     }
 }
 

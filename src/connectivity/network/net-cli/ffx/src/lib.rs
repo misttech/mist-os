@@ -13,7 +13,8 @@ use fidl_fuchsia_developer_remotecontrol as fremotecontrol;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_net_debug as fdebug;
 use fidl_fuchsia_net_dhcp as fdhcp;
-use fidl_fuchsia_net_filter_deprecated as ffilter;
+use fidl_fuchsia_net_filter as ffilter;
+use fidl_fuchsia_net_filter_deprecated as ffilter_deprecated;
 use fidl_fuchsia_net_interfaces as finterfaces;
 use fidl_fuchsia_net_name as fname;
 use fidl_fuchsia_net_neighbor as fneighbor;
@@ -93,11 +94,21 @@ impl net_cli::ServiceConnector<fdhcp::Server_Marker> for FfxConnector<'_> {
 }
 
 #[async_trait::async_trait]
-impl net_cli::ServiceConnector<ffilter::FilterMarker> for FfxConnector<'_> {
+impl net_cli::ServiceConnector<ffilter_deprecated::FilterMarker> for FfxConnector<'_> {
     async fn connect(
         &self,
-    ) -> Result<<ffilter::FilterMarker as ProtocolMarker>::Proxy, anyhow::Error> {
-        self.remotecontrol_connect::<ffilter::FilterMarker>(NETSTACK_MONIKER_SUFFIX).await
+    ) -> Result<<ffilter_deprecated::FilterMarker as ProtocolMarker>::Proxy, anyhow::Error> {
+        self.remotecontrol_connect::<ffilter_deprecated::FilterMarker>(NETSTACK_MONIKER_SUFFIX)
+            .await
+    }
+}
+
+#[async_trait::async_trait]
+impl net_cli::ServiceConnector<ffilter::StateMarker> for FfxConnector<'_> {
+    async fn connect(
+        &self,
+    ) -> Result<<ffilter::StateMarker as ProtocolMarker>::Proxy, anyhow::Error> {
+        self.remotecontrol_connect::<ffilter::StateMarker>(NETSTACK_MONIKER_SUFFIX).await
     }
 }
 

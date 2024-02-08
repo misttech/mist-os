@@ -7,7 +7,9 @@ use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_debug as fdebug;
 use fidl_fuchsia_net_dhcp as fdhcp;
 use fidl_fuchsia_net_ext as fnet_ext;
+use fidl_fuchsia_net_filter as fnet_filter;
 use fidl_fuchsia_net_filter_deprecated as ffilter_deprecated;
+use fidl_fuchsia_net_filter_ext as fnet_filter_ext;
 use fidl_fuchsia_net_interfaces as finterfaces;
 use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as finterfaces_ext;
@@ -74,6 +76,7 @@ pub trait NetCliDepsConnector:
     + ServiceConnector<fname::LookupMarker>
     + ServiceConnector<fnet_migration::ControlMarker>
     + ServiceConnector<fnet_migration::StateMarker>
+    + ServiceConnector<fnet_filter::StateMarker>
 {
 }
 
@@ -92,6 +95,7 @@ impl<O> NetCliDepsConnector for O where
         + ServiceConnector<fname::LookupMarker>
         + ServiceConnector<fnet_migration::ControlMarker>
         + ServiceConnector<fnet_migration::StateMarker>
+        + ServiceConnector<fnet_filter::StateMarker>
 {
 }
 
@@ -988,11 +992,16 @@ async fn do_filter_deprecated<C: NetCliDepsConnector, W: std::io::Write>(
 async fn do_filter<C: NetCliDepsConnector, W: std::io::Write>(
     mut out: W,
     cmd: opts::filter::FilterEnum,
-    _connector: &C,
+    connector: &C,
 ) -> Result<(), Error> {
     match cmd {
         opts::filter::FilterEnum::List(opts::filter::List {}) => {
-            writeln!(out, "TODO(b/322163298): implement this sub command.")?;
+            let state = connect_with_context::<fnet_filter::StateMarker, _>(connector).await?;
+            let stream = fnet_filter_ext::event_stream_from_state(state)?;
+            futures::pin_mut!(stream);
+            let resources: HashMap<_, _> =
+                fnet_filter_ext::get_existing_resources(&mut stream).await?;
+            writeln!(out, "resources = {resources:#?}")?;
         }
     }
     Ok(())
@@ -1551,6 +1560,7 @@ mod tests {
         routes_v4: Option<froutes::StateV4Proxy>,
         routes_v6: Option<froutes::StateV6Proxy>,
         name_lookup: Option<fname::LookupProxy>,
+        filter: Option<fnet_filter::StateProxy>,
     }
 
     #[async_trait::async_trait]
@@ -1687,6 +1697,15 @@ mod tests {
             &self,
         ) -> Result<<fnet_migration::StateMarker as ProtocolMarker>::Proxy, Error> {
             unimplemented!("stack migration not supported");
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ServiceConnector<fnet_filter::StateMarker> for TestConnector {
+        async fn connect(
+            &self,
+        ) -> Result<<fnet_filter::StateMarker as ProtocolMarker>::Proxy, Error> {
+            self.filter.as_ref().cloned().ok_or(anyhow::anyhow!("connector has no filter instance"))
         }
     }
 
@@ -3758,16 +3777,82 @@ mac               -
         );
     }
 
-    #[test_case(opts::filter::FilterEnum::List(opts::filter::List {}); "list")]
     #[fasync::run_singlethreaded(test)]
-    async fn test_do_filter(cmd: opts::filter::FilterEnum) {
+    async fn test_do_filter() {
         let mut output = Vec::new();
-        let connector = TestConnector { ..Default::default() };
-        let op = do_filter(&mut output, cmd.clone(), &connector).await;
+        let (filter, mut requests) =
+            fidl::endpoints::create_proxy_and_stream::<fnet_filter::StateMarker>()
+                .expect("failed to create proxy and request stream for filter server");
 
-        assert_eq!(true, op.is_ok());
+        let connector = TestConnector { filter: Some(filter), ..Default::default() };
+        let op = do_filter(
+            &mut output,
+            opts::filter::FilterEnum::List(opts::filter::List {}),
+            &connector,
+        );
+        let op_succeeds = async move {
+            let req = requests
+                .try_next()
+                .await
+                .expect("receiving request")
+                .expect("request stream should not have ended");
+            let (_options, server_end, _state_control_handle) =
+                req.into_get_watcher().expect("request should be of type GetWatcher");
 
-        const WANT_OUTPUT: &str = "TODO(b/322163298): implement this sub command.";
+            let mut watcher_request_stream = server_end.into_stream().expect("watcher FIDL error");
+
+            let events = [
+                fnet_filter::Event::Existing(fnet_filter::ExistingResource {
+                    controller: "test controller".to_string(),
+                    resource: fnet_filter::Resource::Namespace(fnet_filter::Namespace {
+                        id: Option::Some("test namespace".to_string()),
+                        domain: Option::Some(fnet_filter::Domain::Ipv4),
+                        ..Default::default()
+                    }),
+                }),
+                fnet_filter::Event::Idle(fnet_filter::Empty),
+            ];
+            let () = watcher_request_stream
+                .try_next()
+                .await
+                .expect("watcher watch FIDL error")
+                .expect("watcher request stream should not have ended")
+                .into_watch()
+                .expect("request should be of type Watch")
+                .send(&events)
+                .expect("responder.send should succeed");
+
+            assert_matches!(
+                watcher_request_stream.try_next().await.expect("watcher watch FIDL error"),
+                None,
+                "remaining watcher request stream should be empty because client should close \
+                watcher channel after observing existing resources"
+            );
+
+            Ok(())
+        };
+        let ((), ()) = futures::future::try_join(op, op_succeeds)
+            .await
+            .expect("filter server command should succeed");
+
+        const WANT_OUTPUT: &str = r#"resources = {
+    ControllerId(
+        "test controller",
+    ): {
+        Namespace(
+            NamespaceId(
+                "test namespace",
+            ),
+        ): Namespace(
+            Namespace {
+                id: NamespaceId(
+                    "test namespace",
+                ),
+                domain: Ipv4,
+            },
+        ),
+    },
+}"#;
         let got_output = std::str::from_utf8(&output).unwrap();
         pretty_assertions::assert_eq!(
             trim_whitespace_for_comparison(got_output),
