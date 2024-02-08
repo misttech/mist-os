@@ -1483,7 +1483,7 @@ impl FuseMutableState {
         }
         let header: uapi::fuse_out_header = data.read_to_object()?;
         let payload_size = std::cmp::min(
-            (header.len as usize) - std::mem::size_of::<uapi::fuse_out_header>(),
+            (header.len as usize).saturating_sub(std::mem::size_of::<uapi::fuse_out_header>()),
             data.available(),
         );
         self.waiters.notify_value(header.unique);
@@ -1512,7 +1512,7 @@ impl FuseMutableState {
         if operation.is_async() {
             self.operations.remove(&header.unique);
         }
-        Ok(payload_size)
+        Ok(data.bytes_read())
     }
 
     fn handle_async(

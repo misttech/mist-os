@@ -16,11 +16,18 @@
 #include <sys/xattr.h>
 #include <unistd.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <thread>
+#include <vector>
+
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 #include <linux/fuse.h>
 #include <linux/magic.h>
 
+#include "src/lib/fxl/strings/string_printf.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
 #define OK_OR_RETURN(x) \
@@ -123,6 +130,245 @@ class FuseTest : public ::testing::Test {
 
   test_helper::ForkHelper fork_helper_;
   std::optional<std::string> base_dir_;
+};
+
+class FuseServer {
+ public:
+  virtual ~FuseServer() {}
+
+  const test_helper::ScopedFD& fuse_fd() { return fuse_fd_; }
+
+  testing::AssertionResult Mount(const std::string& path) {
+    OK_OR_RETURN(OpenFuseDevice());
+
+    struct stat stat_buffer;
+    if (stat(path.c_str(), &stat_buffer) == -1) {
+      return testing::AssertionFailure() << "Failed to stat mount path: " << strerror(errno);
+    }
+
+    std::string options =
+        fxl::StringPrintf("fd=%i,rootmode=%o,user_id=%u,group_id=%u", fuse_fd_.get(),
+                          stat_buffer.st_mode & S_IFMT, getuid(), getgid());
+    if (mount("fuse", path.c_str(), "fuse", 0, options.c_str()) == -1) {
+      return testing::AssertionFailure() << "Failed to mount fuse device: " << strerror(errno);
+    }
+    return testing::AssertionSuccess();
+  }
+
+  bool ServeOnce() {
+    std::vector<std::byte> buffer;
+    bool unmounted = false;
+    EXPECT_TRUE(ReadRequest(&buffer, &unmounted));
+    if (unmounted) {
+      return false;
+    }
+    EXPECT_TRUE(HandleFuseMessage(buffer));
+    return true;
+  }
+
+ protected:
+  virtual testing::AssertionResult HandleFuseMessage(const std::vector<std::byte>& message) {
+    const struct fuse_in_header* in_header =
+        reinterpret_cast<const struct fuse_in_header*>(message.data());
+    switch (in_header->opcode) {
+      case FUSE_INIT: {
+        struct fuse_init_in init_in = {};
+        memcpy(&init_in, message.data(), sizeof(init_in));
+        OK_OR_RETURN(HandleInit(in_header, &init_in, message));
+        break;
+      }
+      case FUSE_ACCESS: {
+        struct fuse_access_in access_in = {};
+        memcpy(&access_in, message.data(), sizeof(access_in));
+        OK_OR_RETURN(HandleAccess(in_header, &access_in, message));
+        break;
+      }
+      case FUSE_LOOKUP: {
+        OK_OR_RETURN(HandleLookup(in_header, message));
+        break;
+      }
+      case FUSE_OPEN: {
+        struct fuse_open_in open_in = {};
+        memcpy(&open_in, message.data(), sizeof(open_in));
+        OK_OR_RETURN(HandleOpen(in_header, &open_in, message));
+        break;
+      }
+      case FUSE_FLUSH: {
+        struct fuse_flush_in flush_in = {};
+        memcpy(&flush_in, message.data(), sizeof(flush_in));
+        OK_OR_RETURN(HandleFlush(in_header, &flush_in, message));
+        break;
+      }
+      case FUSE_RELEASE: {
+        struct fuse_release_in release_in = {};
+        memcpy(&release_in, message.data(), sizeof(release_in));
+        OK_OR_RETURN(HandleRelease(in_header, &release_in, message));
+        break;
+      }
+      default:
+        return testing::AssertionFailure() << "Unknown FUSE opcode: " << in_header->opcode;
+    }
+    return testing::AssertionSuccess();
+  }
+
+  virtual testing::AssertionResult HandleInit(const struct fuse_in_header* in_header,
+                                              const struct fuse_init_in* init_in,
+                                              const std::vector<std::byte>& message) {
+    struct fuse_init_out init_out = {};
+    init_out.major = FUSE_KERNEL_VERSION;
+    init_out.minor = FUSE_KERNEL_MINOR_VERSION;
+    return WriteStructResponse(in_header, init_out);
+  }
+
+  virtual testing::AssertionResult HandleAccess(const struct fuse_in_header* in_header,
+                                                const struct fuse_access_in* access_in,
+                                                const std::vector<std::byte>& message) {
+    return WriteAckResponse(in_header);
+  }
+
+  virtual testing::AssertionResult HandleLookup(const struct fuse_in_header* in_header,
+                                                const std::vector<std::byte>& message) {
+    struct fuse_entry_out entry_out = {};
+    entry_out.nodeid = next_nodeid_++;
+    entry_out.generation = 1;
+    entry_out.attr.ino = entry_out.nodeid;
+    entry_out.attr.mode = S_IFREG;
+    return WriteStructResponse(in_header, entry_out);
+  }
+
+  virtual testing::AssertionResult HandleOpen(const struct fuse_in_header* in_header,
+                                              const struct fuse_open_in* open_in,
+                                              const std::vector<std::byte>& message) {
+    struct fuse_open_out open_out = {};
+    open_out.fh = GetNextFileHandle();
+    return WriteStructResponse(in_header, open_out);
+  }
+
+  virtual testing::AssertionResult HandleFlush(const struct fuse_in_header* in_header,
+                                               const struct fuse_flush_in* flush_in,
+                                               const std::vector<std::byte>& message) {
+    return WriteAckResponse(in_header);
+  }
+
+  virtual testing::AssertionResult HandleRelease(const struct fuse_in_header* in_header,
+                                                 const struct fuse_release_in* release_in,
+                                                 const std::vector<std::byte>& message) {
+    return WriteAckResponse(in_header);
+  }
+
+  testing::AssertionResult WriteAckResponse(const struct fuse_in_header* in_header) {
+    struct fuse_out_header out_header = {};
+    out_header.len = sizeof(out_header);
+    out_header.unique = in_header->unique;
+
+    auto data = reinterpret_cast<std::byte*>(&out_header);
+    std::vector<std::byte> response(data, data + sizeof(out_header));
+    return WriteResponse(response);
+  }
+
+  template <typename Data>
+  testing::AssertionResult WriteStructResponse(const struct fuse_in_header* in_header, Data data) {
+    struct fuse_out_header out_header = {};
+    uint32_t payload_len = sizeof(Data);
+    uint32_t response_len = payload_len + sizeof(out_header);
+    out_header.len = response_len;
+    out_header.unique = in_header->unique;
+    std::vector<std::byte> response(response_len);
+    memcpy(response.data(), &out_header, sizeof(out_header));
+    memcpy(response.data() + sizeof(out_header), &data, sizeof(Data));
+    return WriteResponse(response);
+  }
+
+  testing::AssertionResult WriteResponse(std::vector<std::byte> response) {
+    ssize_t actual = HANDLE_EINTR(write(fuse_fd_.get(), response.data(), response.size()));
+    if (actual != static_cast<ssize_t>(response.size())) {
+      return testing::AssertionFailure()
+             << "Failed to write FUSE response: Got " << actual << " Expected " << response.size()
+             << ": " << strerror(errno);
+    }
+    return testing::AssertionSuccess();
+  }
+
+  uint64_t GetNextFileHandle() { return next_fh_++; }
+
+ private:
+  testing::AssertionResult ReadRequest(std::vector<std::byte>* request, bool* unmounted) {
+    // There doesn't seem to be a good value to use for the max request size. We just pick
+    // something large that works for our cases.
+    const size_t kMaxRequestSize = 64ul * FUSE_MIN_READ_BUFFER;
+    request->resize(kMaxRequestSize);
+    ssize_t actual = HANDLE_EINTR(read(fuse_fd_.get(), request->data(), request->size()));
+    if (actual == -1) {
+      if (errno == ENODEV) {
+        request->clear();
+        *unmounted = true;
+        return testing::AssertionSuccess();
+        ;
+      }
+      return testing::AssertionFailure() << "Failed to read FUSE request: " << strerror(errno);
+    }
+    request->resize(actual);
+    *unmounted = false;
+    return testing::AssertionSuccess();
+  }
+
+  testing::AssertionResult OpenFuseDevice() {
+    fuse_fd_ = test_helper::ScopedFD(open("/dev/fuse", O_RDWR));
+    if (!fuse_fd_.is_valid()) {
+      return testing::AssertionFailure() << "Failed to open /dev/fuse: " << strerror(errno);
+    }
+    return testing::AssertionSuccess();
+  }
+
+  test_helper::ScopedFD fuse_fd_;
+  uint64_t next_fh_ = 1;
+  uint64_t next_nodeid_ = 2;  // 1 is reserved for the root.
+};
+
+class FuseServerTest : public ::testing::Test {
+ public:
+  void SetUp() override {
+    if (!test_helper::HasSysAdmin()) {
+      GTEST_SKIP() << "Not running with sysadmin capabilities, skipping suite.";
+    }
+  }
+
+  void TearDown() override {
+    if (mount_dir_) {
+      if (umount(mount_dir_->c_str()) != 0) {
+        FAIL() << "Unable to umount: " << strerror(errno);
+      }
+      mount_dir_.reset();
+      server_thread_.join();
+    }
+  }
+
+ protected:
+  std::string GetMountDir() { return *mount_dir_; }
+
+  testing::AssertionResult Mount(std::unique_ptr<FuseServer> server) {
+    std::string mount_dir = "/tmp/fuse_mount_dir_XXXXXX";
+    if (mkdtemp(const_cast<char*>(mount_dir.c_str())) == nullptr) {
+      return testing::AssertionFailure()
+             << "Unable to create temporary directory: " << strerror(errno);
+    }
+
+    OK_OR_RETURN(server->Mount(mount_dir));
+    mount_dir_ = mount_dir;
+    server_ = std::move(server);
+
+    server_thread_ = std::thread([this] {
+      while (server_->ServeOnce()) {
+      }
+    });
+
+    return testing::AssertionSuccess();
+  }
+
+ private:
+  std::optional<std::string> mount_dir_;
+  std::unique_ptr<FuseServer> server_;
+  std::thread server_thread_;
 };
 
 TEST_F(FuseTest, ReadWriteUnMountedDevFuse) {
@@ -382,6 +628,69 @@ TEST_F(FuseTest, XAttr) {
   ASSERT_EQ(fremovexattr(fd.get(), attribute_name), 0);
   ASSERT_EQ(fgetxattr(fd.get(), attribute_name, nullptr, 0), -1);
   ASSERT_EQ(errno, ENODATA);
+}
+
+TEST_F(FuseServerTest, OpenAndClose) {
+  ASSERT_TRUE(Mount(std::make_unique<FuseServer>()));
+
+  std::string filename = GetMountDir() + "/file";
+  test_helper::ScopedFD fd(open(filename.c_str(), O_RDWR | O_CREAT));
+  ASSERT_TRUE(fd.is_valid());
+  fd.reset();
+}
+
+TEST_F(FuseServerTest, HeaderLengthUnderflow) {
+  class HeaderLengthUnderflowServer : public FuseServer {
+    testing::AssertionResult HandleAccess(const struct fuse_in_header* in_header,
+                                          const struct fuse_access_in* access_in,
+                                          const std::vector<std::byte>& message) override {
+      uint32_t response_len = sizeof(struct fuse_out_header);
+      std::vector<std::byte> response;
+      response.resize(response_len);
+      struct fuse_out_header* out_header =
+          reinterpret_cast<struct fuse_out_header*>(response.data());
+      out_header->len = 0;
+      out_header->unique = in_header->unique;
+      return WriteResponse(response);
+    }
+  };
+
+  ASSERT_TRUE(Mount(std::make_unique<HeaderLengthUnderflowServer>()));
+
+  std::string filename = GetMountDir() + "/file";
+  test_helper::ScopedFD fd(open(filename.c_str(), O_RDWR | O_CREAT));
+  ASSERT_TRUE(fd.is_valid());
+  fd.reset();
+}
+
+TEST_F(FuseServerTest, OverlongHeaderLength) {
+  class OverlongHeaderLengthServer : public FuseServer {
+    testing::AssertionResult HandleOpen(const struct fuse_in_header* in_header,
+                                        const struct fuse_open_in* open_in,
+                                        const std::vector<std::byte>& message) override {
+      const uint32_t kBogusHeaderLengthAddition = 1024;
+
+      struct fuse_open_out open_out = {};
+      open_out.fh = GetNextFileHandle();
+
+      struct fuse_out_header out_header = {};
+      uint32_t payload_len = sizeof(open_out);
+      uint32_t response_len = payload_len + sizeof(out_header);
+      out_header.len = response_len + kBogusHeaderLengthAddition;
+      out_header.unique = in_header->unique;
+      std::vector<std::byte> response(response_len);
+      memcpy(response.data(), &out_header, sizeof(out_header));
+      memcpy(response.data() + sizeof(out_header), &open_out, sizeof(open_out));
+      return WriteResponse(response);
+    }
+  };
+
+  ASSERT_TRUE(Mount(std::make_unique<OverlongHeaderLengthServer>()));
+
+  std::string filename = GetMountDir() + "/file";
+  test_helper::ScopedFD fd(open(filename.c_str(), O_RDWR | O_CREAT));
+  ASSERT_TRUE(fd.is_valid());
+  fd.reset();
 }
 
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_
