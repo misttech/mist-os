@@ -33,33 +33,35 @@ the oldest file to ensure that reads don't end up hitting cached handles which m
 caches.
 
 The aim of this variant here is to provide a load source that exacerbates fragmentation of files and
-free space to allow for benchmarking of improvements in this area.
+free space to allow for benchmarking of improvements in this area. It is enabled the same as the
+default (gentle) variant above.
 
-This variant can be configured with a target amount of free space by writing a JSON file to disk
-as follows:
+This variant is configured with a target amount of free space by writing a JSON file to disk:
 
 ```
-$ echo '{"Aggressive":{"target_free_bytes":10485760}}' > /data/persistent/storage_stressor:0/data/config.json
+# Replace the number  with an appropriate amount of free bytes to affect free-space fragmentation.
+# The following values have been used in benchmarks.
+$ echo '{"Aggressive":{"target_free_bytes":0}}' > /data/persistent/storage_stressor:0/data/config.json
+$ echo '{"Aggressive":{"target_free_bytes":4194304}}' > /data/persistent/storage_stressor:0/data/config.json
+$ echo '{"Aggressive":{"target_free_bytes":16777216}}' > /data/persistent/storage_stressor:0/data/config.json
+$ echo '{"Aggressive":{"target_free_bytes":67108864}}' > /data/persistent/storage_stressor:0/data/config.json
+$ echo '{"Aggressive":{"target_free_bytes":268435456}}' > /data/persistent/storage_stressor:0/data/config.json
+$ echo '{"Aggressive":{"target_free_bytes":1073741824}}' > /data/persistent/storage_stressor:0/data/config.json
 $ dm reboot
 ```
 
-(Replace number with an appropriate amount of free bytes to target to affect free-space
-fragmentation.)
-
-This variant is otherwise configured the same as the gentle variant above.
-
 You can monitor its progress using `fx log`.
 
-Note that this variant is designed to fill up the disk so it may be useful to start the emulator
-with a larger image size. e.g. 800MB-2GiB:
+Note that this variant is designed to fill up the disk.
+If you don't make the disk large enough, it is unlikely that many files will be large enough to
+write out all 10000 files with a sufficiently large size.
+It may be useful to start the emulator with a larger image size. e.g. 800MB-2GiB:
 
 ```
 $ fx build
-$ IMAGE_SIZE=838860800 fx qemu -k -N -a x64 -c -y
+$ IMAGE_SIZE=838860800 fx qemu -k -N -a x64 -c -y # 800MiB
+$ IMAGE_SIZE=4294967296 fx qemu -k -N -a x64 -c -y # 4GiB
 ```
-
-If you don't make the disk large enough, it is unlikely that many files will be large enough to
-properly capture read-ahead behaviour.
 
 You can inspect the logical and device IO ratios for the data partition via:
 

@@ -27,15 +27,16 @@ use {
 /// On each iteration it will either read, write or rewrite a file.
 /// Unaligned random reads and append-only writes up to 128kB each in length.
 /// Write errors causes the file to be truncated to zero bytes.
-#[derive(Default)]
 pub struct Stressor {
     /// Used to round-robin across NUM_FILES in order.
     file_counter: AtomicU64,
     /// Tracks the number of bytes we have allocated.
     bytes_stored: AtomicU64,
-    /// The target number of bytes we want to allocate before deleting files.
+    /// The target number of bytes we want the filesystem to consume in steady-state.
     target_bytes: u64,
     op_stats: Mutex<[u64; NUM_OPS]>,
+    /// A handle to the directory used to query filesystem info periodically.
+    dir: fio::DirectorySynchronousProxy,
 }
 
 #[derive(Eq, PartialEq)]
@@ -60,7 +61,6 @@ impl Stressor {
     /// Creates a new aggressive stressor that will try to fill the disk until
     /// `target_free_bytes` of free space remains.
     pub fn new(target_free_bytes: u64) -> Arc<Self> {
-        // Work out how many bytes to target.
         let dir = fio::DirectorySynchronousProxy::new(
             fuchsia_async::Channel::from_channel(
                 fdio::transfer_fd(std::fs::File::open("/data").unwrap()).unwrap().into(),
@@ -68,19 +68,19 @@ impl Stressor {
             .into(),
         );
         let info = dir.query_filesystem(Time::INFINITE.into()).unwrap().1.unwrap();
-        let bytes_stored = info.used_bytes;
-        let target_bytes = info.total_bytes - target_free_bytes;
+
         tracing::info!(
-            "Aggressive stressor mode targetting {} of {} bytes on device.",
-            target_bytes,
+            "Aggressive stressor mode targetting {} free bytes on a {} byte volume.",
+            target_free_bytes,
             info.total_bytes
         );
 
         Arc::new(Stressor {
             file_counter: AtomicU64::new(0),
-            bytes_stored: AtomicU64::new(bytes_stored),
-            target_bytes,
-            ..Stressor::default()
+            bytes_stored: AtomicU64::new(info.used_bytes),
+            target_bytes: info.total_bytes - target_free_bytes,
+            op_stats: Default::default(),
+            dir,
         })
     }
 
@@ -90,15 +90,18 @@ impl Stressor {
             let this = self.clone();
             std::thread::spawn(move || this.worker());
         }
-        // Sleep forever. No real stats to produce here as weights are constant.
+        // Sleep forever, periodically updating bytes stored.
+        // This update is racy but close enough for our purposes.
         loop {
+            let info = self.dir.query_filesystem(Time::INFINITE.into()).unwrap().1.unwrap();
             std::thread::sleep(std::time::Duration::from_secs(10));
             tracing::info!(
-                "bytes_stored: {}, target_bytes {}, counts: {:?}",
+                "bytes_stored: {}, target_bytes {}, counts: {:?}, info: {info:?}",
                 self.bytes_stored.load(Ordering::Relaxed),
                 self.target_bytes,
                 self.op_stats.lock().unwrap()
             );
+            self.bytes_stored.store(info.used_bytes, Ordering::SeqCst);
         }
     }
 
@@ -146,8 +149,25 @@ impl Stressor {
                                         // In this way we fill up the disk then start fragmenting it.
                                         // Until #![feature(io_error_more)] is stable, we have
                                         // a catch-all here.
-                                        self.bytes_stored.fetch_sub(file_len, Ordering::Relaxed);
                                         let _ = f.set_len(0).unwrap();
+                                        // Metadata (layer files and such) can take up megabytes of
+                                        // space that is not tracked in `self.bytes_stored`.
+                                        // If we hit this code path then we've blown through
+                                        // available space but not hit our 'bytes_stored' limit.
+                                        //
+                                        // Writes are relatively small compared to the potential
+                                        // layer file size so even though it's a bit racy, we will
+                                        // accept the potential inaccuracy of concurrent writes
+                                        // and adjust bytes_stored here based on the filesystem's
+                                        // internal tally.
+                                        let info = self
+                                            .dir
+                                            .query_filesystem(Time::INFINITE.into())
+                                            .unwrap()
+                                            .1
+                                            .unwrap();
+                                        tracing::info!("Correcting bytes_stored. {info:?}");
+                                        self.bytes_stored.store(info.used_bytes, Ordering::SeqCst);
                                     }
                                 };
                             }
