@@ -26,7 +26,9 @@
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
-static const std::vector<fpbus::Mmio> display_mmios{
+namespace {
+
+const std::vector<fpbus::Mmio> display_mmios{
     {{
         // VPU
         .base = S905D3_VPU_BASE,
@@ -70,7 +72,7 @@ static const std::vector<fpbus::Mmio> display_mmios{
     }},
 };
 
-static const std::vector<fpbus::Irq> display_irqs{
+const std::vector<fpbus::Irq> display_irqs{
     {{
         .irq = S905D3_VIU1_VSYNC_IRQ,
         .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
@@ -85,71 +87,89 @@ static const std::vector<fpbus::Irq> display_irqs{
     }},
 };
 
-static const std::vector<fpbus::Bti> display_btis{
+const std::vector<fpbus::Bti> display_btis{
     {{
         .iommu_index = 0,
         .bti_id = BTI_DISPLAY,
     }},
 };
 
-// Composite binding rules for display driver.
-
-// DisplayInit's bootloader_display_id must match the enum used by u-boot and the GT6853 touch
-// driver.
-
-uint32_t uboot_mapping[] = {
-    PANEL_UNKNOWN,             // 0 - invalid
-    PANEL_KD070D82_FT,         // 1
-    PANEL_TV070WSM_FT_NELSON,  // 2
-    PANEL_P070ACB_FT,          // 3 - should be unused
-    PANEL_KD070D82_FT_9365,    // 4
-    PANEL_TV070WSM_FT_9365,    // 5
-    PANEL_TV070WSM_ST7703I,    // 6
+// The keys in the map must match the enum used by the bootloader.
+const std::map<uint32_t, uint32_t> kBootloaderPanelTypeToDisplayPanelType = {
+    {1, PANEL_KD070D82_FT},
+    {2, PANEL_TV070WSM_FT_NELSON},
+    // TODO(https://fxbug.dev/324461617): Remove this.
+    {3, PANEL_P070ACB_FT},
+    {4, PANEL_KD070D82_FT_9365},
+    {5, PANEL_TV070WSM_FT_9365},
+    // TODO(https://fxbug.dev/321270400): Remove this.
+    {6, PANEL_TV070WSM_ST7703I},
 };
-zx::result<> PostInit::InitDisplay() {
-  uint32_t bootloader_display_id = display_id_;
 
-  // This is tightly coupled to the u-boot supplied metadata and the GT6853 touch driver.
-  zx::result metadata =
+zx::result<uint32_t> GetDisplayPanelTypeFromBootloaderMetadata(uint32_t bootloader_metadata) {
+  if (kBootloaderPanelTypeToDisplayPanelType.find(bootloader_metadata) !=
+      kBootloaderPanelTypeToDisplayPanelType.end()) {
+    return zx::ok(kBootloaderPanelTypeToDisplayPanelType.at(bootloader_metadata));
+  }
+  return zx::error(ZX_ERR_NOT_FOUND);
+}
+
+zx::result<uint32_t> GetDisplayPanelTypeFromGpioPanelPins(uint32_t gpio_panel_type_pins) {
+  switch (gpio_panel_type_pins) {
+    case 0b10:
+      return zx::ok(PANEL_TV070WSM_FT_NELSON);
+    case 0b11:
+      return zx::ok(PANEL_TV070WSM_FT_9365);
+    case 0b01:
+      return zx::ok(PANEL_KD070D82_FT_9365);
+    case 0b00:
+      return zx::ok(PANEL_KD070D82_FT);
+  }
+  FDF_LOG(ERROR, "Invalid GPIO panel type pins value: %d", gpio_panel_type_pins);
+  return zx::error(ZX_ERR_INVALID_ARGS);
+}
+
+}  // namespace
+
+zx::result<> PostInit::InitDisplay() {
+  // The value of the metadata is provided by the bootloader which performs the
+  // panel detection logic.
+  zx::result<std::unique_ptr<uint32_t>> metadata =
       compat::GetMetadata<uint32_t>(incoming(), DEVICE_METADATA_BOARD_PRIVATE, "pbus");
-  if (metadata.is_ok() && *metadata) {
-    bootloader_display_id = **metadata;
+
+  uint32_t panel_type = PANEL_UNKNOWN;
+  if (metadata.is_ok() && metadata.value() != nullptr) {
+    uint32_t metadata_value = *metadata.value();
+    FDF_LOG(DEBUG, "Detecting panel from bootloader-provided metadata (%" PRIu32 ")",
+            metadata_value);
+    zx::result<uint32_t> panel_type_result =
+        GetDisplayPanelTypeFromBootloaderMetadata(metadata_value);
+    if (!panel_type_result.is_ok()) {
+      FDF_LOG(ERROR, "Failed to get display type from bootloader metadata (%" PRIu32 "): %s",
+              metadata_value, panel_type_result.status_string());
+      return panel_type_result.take_error();
+    }
+    panel_type = panel_type_result.value();
   } else {
-    FDF_LOG(ERROR, "no panel type metadata (%s), falling back to GPIO inspection",
+    FDF_LOG(INFO, "Failed to get panel data (%s), falling back to GPIO inspection",
             zx_status_get_string(metadata.error_value()));
+    zx::result<uint32_t> panel_type_result = GetDisplayPanelTypeFromGpioPanelPins(display_id_);
+    if (!panel_type_result.is_ok()) {
+      FDF_LOG(ERROR, "Failed to get display type from GPIO inspection (%" PRIu32 "): %s",
+              display_id_, panel_type_result.status_string());
+      return panel_type_result.take_error();
+    }
+    panel_type = panel_type_result.value();
   }
 
   display_panel_t display_panel_info[] = {
       {
           .width = 600,
           .height = 1024,
-          .panel_type = PANEL_UNKNOWN,
+          .panel_type = panel_type,
       },
   };
 
-  if (bootloader_display_id && bootloader_display_id < std::size(uboot_mapping)) {
-    display_panel_info[0].panel_type = uboot_mapping[bootloader_display_id];
-    FDF_LOG(DEBUG, "bootloader provided display panel %d", display_panel_info[0].panel_type);
-  }
-  if (display_panel_info[0].panel_type == PANEL_UNKNOWN) {
-    switch (display_id_) {
-      case 0b10:
-        display_panel_info[0].panel_type = PANEL_TV070WSM_FT_NELSON;
-        break;
-      case 0b11:
-        display_panel_info[0].panel_type = PANEL_TV070WSM_FT_9365;
-        break;
-      case 0b01:
-        display_panel_info[0].panel_type = PANEL_KD070D82_FT_9365;
-        break;
-      case 0b00:
-        display_panel_info[0].panel_type = PANEL_KD070D82_FT;
-        break;
-      default:
-        FDF_LOG(ERROR, "invalid display panel detected: %d", display_id_);
-        return zx::error(ZX_ERR_INVALID_ARGS);
-    }
-  }
   const std::vector<fpbus::Metadata> display_panel_metadata{
       {{
           .type = DEVICE_METADATA_DISPLAY_CONFIG,
@@ -170,6 +190,7 @@ zx::result<> PostInit::InitDisplay() {
   display_dev.irq() = display_irqs;
   display_dev.bti() = display_btis;
 
+  // Composite binding rules for display driver.
   std::vector<fuchsia_driver_framework::BindRule> dsi_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_display_dsi::BIND_PROTOCOL_IMPL),
   };
