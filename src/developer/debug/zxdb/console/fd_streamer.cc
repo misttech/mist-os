@@ -31,7 +31,7 @@ std::unique_ptr<debug::BufferedFD> StreamFDToConsole(fbl::unique_fd fd, Console*
             break;
         }
         if (!data.empty()) {
-          console->Write(data, false);
+          console->WriteIfEmbedded(data);
         }
       });
   streamer->set_error_callback([console = console->GetWeakPtr()]() {

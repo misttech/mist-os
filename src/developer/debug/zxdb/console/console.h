@@ -48,6 +48,8 @@ class Console : debug::LogBackend {
 
   // Writes the given output to the console.
   virtual void Write(const OutputBuffer& output, bool add_newline = true) = 0;
+  // Writes the given output to the console only if the console is currently in Embedded mode.
+  virtual void WriteIfEmbedded(const OutputBuffer& output) = 0;
 
   // Clears the contents of the console.
   virtual void Clear() = 0;
