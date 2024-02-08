@@ -135,7 +135,6 @@ wrap_with_decompressor("blobfs-integration") {
     "fuchsia.inspect.InspectSink",
     "fuchsia.logger.LogSink",
     "fuchsia.process.Launcher",
-    "fuchsia.sys.Launcher",
   ]
 }
 
@@ -174,7 +173,6 @@ wrap_with_decompressor("blobfs-mount") {
   forwarded_protocols = [
     "fuchsia.logger.LogSink",
     "fuchsia.process.Launcher",
-    "fuchsia.sys.Launcher",
   ]
 }
 
@@ -237,7 +235,6 @@ wrap_with_decompressor("blobfs-sync") {
   forwarded_protocols = [
     "fuchsia.logger.LogSink",
     "fuchsia.process.Launcher",
-    "fuchsia.sys.Launcher",
   ]
 }
 
@@ -270,7 +267,6 @@ wrap_with_decompressor("blobfs-superblock") {
   forwarded_protocols = [
     "fuchsia.logger.LogSink",
     "fuchsia.process.Launcher",
-    "fuchsia.sys.Launcher",
   ]
 }
 
@@ -307,7 +303,6 @@ wrap_with_decompressor("blobfs-verifier-service") {
   forwarded_protocols = [
     "fuchsia.logger.LogSink",
     "fuchsia.process.Launcher",
-    "fuchsia.sys.Launcher",
   ]
 }
 
@@ -386,7 +381,6 @@ wrap_with_decompressor("blobfs-fragmentation") {
   forwarded_protocols = [
     "fuchsia.logger.LogSink",
     "fuchsia.process.Launcher",
-    "fuchsia.sys.Launcher",
   ]
 }
 
@@ -399,7 +393,6 @@ wrap_with_decompressor("blobfs-max-reservation") {
   forwarded_protocols = [
     "fuchsia.logger.LogSink",
     "fuchsia.process.Launcher",
-    "fuchsia.sys.Launcher",
   ]
 }
 
@@ -412,7 +405,6 @@ wrap_with_decompressor("blobfs-no-space") {
   forwarded_protocols = [
     "fuchsia.logger.LogSink",
     "fuchsia.process.Launcher",
-    "fuchsia.sys.Launcher",
   ]
 }
 
@@ -425,7 +417,6 @@ wrap_with_decompressor("blobfs-use-second-bitmap") {
   forwarded_protocols = [
     "fuchsia.logger.LogSink",
     "fuchsia.process.Launcher",
-    "fuchsia.sys.Launcher",
   ]
 }
 
