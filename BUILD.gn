@@ -1881,6 +1881,12 @@ group("root_targets") {
     # at runtime!
     "//build/fidl:all_fidl_json",
   ]
+
+  # TODO(b/324385881): Investigate whether we can remove this.
+  # Required by `fx publish` at runtime.
+  if (!use_bringup_assembly) {
+    deps += [ "//build/images/updates:prepare_publish" ]
+  }
 }
 
 # A GN pool matching the special Ninja 'console' pool. Any action() that
