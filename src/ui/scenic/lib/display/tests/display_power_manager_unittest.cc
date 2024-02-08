@@ -63,7 +63,8 @@ TEST_F(DisplayPowerManagerMockTest, Ok) {
   display_manager()->SetDefaultDisplayForTests(
       std::make_shared<display::Display>(kDisplayId, kDisplayWidth, kDisplayHeight));
 
-  display::test::MockDisplayCoordinator mock_display_coordinator;
+  display::test::MockDisplayCoordinator mock_display_coordinator(
+      fuchsia::hardware::display::Info{});
   mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel(), dispatcher());
   mock_display_coordinator.set_set_display_power_result(ZX_OK);
 
@@ -111,7 +112,8 @@ TEST_F(DisplayPowerManagerMockTest, NoDisplay) {
 
   display_manager()->SetDefaultDisplayForTests(nullptr);
 
-  display::test::MockDisplayCoordinator mock_display_coordinator;
+  display::test::MockDisplayCoordinator mock_display_coordinator(
+      fuchsia::hardware::display::Info{});
   mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel(), dispatcher());
 
   RunLoopUntilIdle();
@@ -146,7 +148,8 @@ TEST_F(DisplayPowerManagerMockTest, NotSupported) {
   display_manager()->SetDefaultDisplayForTests(
       std::make_shared<display::Display>(kDisplayId, kDisplayWidth, kDisplayHeight));
 
-  display::test::MockDisplayCoordinator mock_display_coordinator;
+  display::test::MockDisplayCoordinator mock_display_coordinator(
+      fuchsia::hardware::display::Info{});
   mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel(), dispatcher());
   mock_display_coordinator.set_set_display_power_result(ZX_ERR_NOT_SUPPORTED);
 

@@ -40,7 +40,8 @@ class DisplayCoordinatorListenerTest : public gtest::TestLoopFixture {
   void SetUp() {
     ChannelPair coordinator_channel = CreateChannelPair();
 
-    mock_display_coordinator_ = std::make_unique<MockDisplayCoordinator>();
+    mock_display_coordinator_ =
+        std::make_unique<MockDisplayCoordinator>(fuchsia::hardware::display::Info{});
     mock_display_coordinator_->Bind(std::move(coordinator_channel.server));
 
     auto coordinator = std::make_shared<fuchsia::hardware::display::CoordinatorSyncPtr>();

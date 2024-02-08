@@ -47,7 +47,11 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
       fuchsia::hardware::display::types::LayerId, fuchsia::hardware::display::types::Transform,
       fuchsia::hardware::display::types::Frame, fuchsia::hardware::display::types::Frame)>;
 
-  MockDisplayCoordinator() : binding_(this) {}
+  using SetDisplayModeFn = std::function<void(fuchsia::hardware::display::types::DisplayId,
+                                              fuchsia::hardware::display::Mode)>;
+
+  explicit MockDisplayCoordinator(fuchsia::hardware::display::Info display_info)
+      : display_info_(std::move(display_info)), binding_(this) {}
 
   void NotImplemented_(const std::string& name) final {}
 
@@ -172,11 +176,22 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
     }
   }
 
+  void SetDisplayMode(fuchsia::hardware::display::types::DisplayId display_id,
+                      fuchsia::hardware::display::Mode mode) override;
+
+  // Sends an `OnDisplayChanged()` event to the display coordinator client
+  // with the default display being added.
+  //
+  // Must be called only after the MockDisplayCoordinator is bound to a channel.
+  void SendOnDisplayChangedEvent();
+
   EventSender_& events() { return binding_.events(); }
 
   void ResetCoordinatorBinding() { binding_.Close(ZX_ERR_INTERNAL); }
 
   fidl::Binding<fuchsia::hardware::display::Coordinator>& binding() { return binding_; }
+
+  const fuchsia::hardware::display::Info& display_info() const { return display_info_; }
 
   // Number of times each function has been called.
   uint32_t check_config_count() const { return check_config_count_; }
@@ -188,6 +203,7 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   uint32_t acknowledge_vsync_count() const { return acknowledge_vsync_count_; }
   uint32_t set_display_layers_count() const { return set_display_layers_count_; }
   uint32_t set_layer_primary_position_count() const { return set_layer_primary_position_count_; }
+  uint32_t set_display_mode_count() const { return set_display_mode_count_; }
 
  private:
   CheckConfigFn check_config_fn_;
@@ -197,6 +213,7 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   AcknowledgeVsyncFn acknowledge_vsync_fn_;
   SetDisplayLayersFn set_display_layers_fn_;
   SetLayerPrimaryPositionFn set_layer_primary_position_fn_;
+  SetDisplayModeFn set_display_mode_fn_;
 
   uint32_t check_config_count_ = 0;
   uint32_t set_display_color_conversion_count_ = 0;
@@ -205,8 +222,11 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   uint32_t acknowledge_vsync_count_ = 0;
   uint32_t set_display_layers_count_ = 0;
   uint32_t set_layer_primary_position_count_ = 0;
+  uint32_t set_display_mode_count_ = 0;
   zx_status_t set_display_power_result_ = ZX_OK;
   bool display_power_on_ = true;
+
+  const fuchsia::hardware::display::Info display_info_;
 
   fidl::Binding<fuchsia::hardware::display::Coordinator> binding_;
 };
