@@ -7,20 +7,26 @@
 //! This event loop receives events from netstack. Thsose events are used by the reachability
 //! monitor to infer the connectivity state.
 
+use reachability_handler::ReachabilityState;
+
 use {
     anyhow::{anyhow, Context as _},
-    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net_debug as fnet_debug,
+    fidl_fuchsia_hardware_network as fhardware_network,
+    fidl_fuchsia_net_debug as fnet_debug,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _},
-    fidl_fuchsia_net_neighbor as fnet_neighbor, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_neighbor as fnet_neighbor,
+    fidl_fuchsia_net_routes as fnet_routes,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext,
     fuchsia_async::{self as fasync},
     fuchsia_inspect::{health::Reporter, Inspector},
     fuchsia_zircon as zx,
     futures::{channel::mpsc, pin_mut, prelude::*, select},
     named_timer::NamedTimeoutExt,
+    // net_declare::std_ip,
     reachability_core::{
         dig::Dig,
+        fetch::Fetch,
         ping::Ping,
         route_table::RouteTable,
         telemetry::{self, TelemetryEvent, TelemetrySender},
@@ -138,6 +144,19 @@ async fn handle_network_check_message<'a>(
                     .dig(&parameters.interface_name, &parameters.domain)
                     .await;
                 (cookie, NetworkCheckResult::ResolveDns { parameters, ips })
+            }));
+        }
+        NetworkCheckAction::Fetch(parameters) => {
+            netcheck_futures.push(Box::pin(async move {
+                let success = reachability_core::fetch::Fetcher
+                    .fetch(
+                        &parameters.interface_name,
+                        &parameters.domain,
+                        &parameters.path,
+                        &parameters.ip,
+                    )
+                    .await;
+                (cookie, NetworkCheckResult::Fetch { parameters, success })
             }));
         }
     }
@@ -543,11 +562,17 @@ impl EventLoop {
             .check_interface_state(zx::Time::get_monotonic(), &SystemDispatcher {}, view)
             .await;
 
-        let (system_internet, system_gateway) = {
+        let (system_internet, system_gateway, system_dns, system_http) = {
             match monitor.begin(view) {
                 Ok(NetworkCheckerOutcome::MustResume) => return,
                 Ok(NetworkCheckerOutcome::Complete) => {
-                    (monitor.state().system_has_internet(), monitor.state().system_has_gateway())
+                    let monitor_state = monitor.state();
+                    (
+                        monitor_state.system_has_internet(),
+                        monitor_state.system_has_gateway(),
+                        monitor_state.system_has_dns(),
+                        monitor_state.system_has_http(),
+                    )
                 }
                 Err(e) => {
                     info!("begin network check error: {:?}", e);
@@ -557,9 +582,11 @@ impl EventLoop {
         };
 
         handler
-            .update_state(|state| {
-                state.internet_available = system_internet;
-                state.gateway_reachable = system_gateway;
+            .replace_state(ReachabilityState {
+                internet_available: system_internet,
+                gateway_reachable: system_gateway,
+                dns_active: system_dns,
+                http_active: system_http,
             })
             .await;
     }
@@ -573,20 +600,22 @@ impl EventLoop {
         match self.monitor.resume(cookie, result) {
             Ok(NetworkCheckerOutcome::MustResume) => {}
             Ok(NetworkCheckerOutcome::Complete) => {
-                let (system_internet, system_gateway, system_dns) = {
+                let (system_internet, system_gateway, system_dns, system_http) = {
                     let monitor_state = self.monitor.state();
                     (
                         monitor_state.system_has_internet(),
                         monitor_state.system_has_gateway(),
-                        monitor_state.system_has_active_dns(),
+                        monitor_state.system_has_dns(),
+                        monitor_state.system_has_http(),
                     )
                 };
 
                 self.handler
-                    .update_state(|state| {
-                        state.internet_available = system_internet;
-                        state.gateway_reachable = system_gateway;
-                        state.dns_active = system_dns;
+                    .replace_state(ReachabilityState {
+                        internet_available: system_internet,
+                        gateway_reachable: system_gateway,
+                        dns_active: system_dns,
+                        http_active: system_http,
                     })
                     .await;
             }

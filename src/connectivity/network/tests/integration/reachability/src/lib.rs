@@ -38,7 +38,7 @@ use packet_formats::{
     ipv6::Ipv6PacketBuilder,
     testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame,
 };
-use reachability_core::{State, FIDL_TIMEOUT_ID};
+use reachability_core::{LinkState, State, FIDL_TIMEOUT_ID};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use test_case::test_case;
 use tracing::info;
@@ -109,9 +109,9 @@ fn reply_if_echo_request(
     });
     match r {
         Ok((src_mac, dst_mac, src_ip, dst_ip, _ttl, message, _code)) => {
-            return match want {
-                State::Gateway => dst_ip == *gateway_v4,
-                State::Internet => dst_ip == *gateway_v4 || dst_ip == INTERNET_V4,
+            return match want.link {
+                LinkState::Gateway => dst_ip == *gateway_v4,
+                LinkState::Internet => dst_ip == *gateway_v4 || dst_ip == INTERNET_V4,
                 _ => false,
             }
             .then(|| {
@@ -159,9 +159,9 @@ fn reply_if_echo_request(
     });
     match r {
         Ok((src_mac, dst_mac, src_ip, dst_ip, _ttl, message, _code)) => {
-            return match want {
-                State::Gateway => dst_ip == *gateway_v6,
-                State::Internet => dst_ip == *gateway_v6 || dst_ip == INTERNET_V6,
+            return match want.link {
+                LinkState::Gateway => dst_ip == *gateway_v6,
+                LinkState::Internet => dst_ip == *gateway_v6 || dst_ip == INTERNET_V6,
                 _ => false,
             }
             .then(|| {
@@ -218,7 +218,7 @@ fn extract_reachability_states(
 ) -> (HashMap<u64, IpStates>, IpStates) {
     let get_per_ip_state = |states: &diagnostics_hierarchy::DiagnosticsHierarchy| {
         let (_, state): (i64, _) = states.children.iter().fold(
-            (-1, State::None),
+            (-1, State::from(LinkState::None)),
             |(latest_seqnum, latest_state), state| {
                 let seqnum = state
                     .name
@@ -230,9 +230,11 @@ fn extract_reachability_states(
                 match state.properties.iter().find_map(|p| {
                     if p.key() == "state" {
                         p.string().map(|s| {
-                            s.parse::<State>().unwrap_or_else(|e| {
-                                panic!("failed to parse reachability state: {}: {:?}", s, e)
-                            })
+                            s.parse::<LinkState>()
+                                .unwrap_or_else(|e| {
+                                    panic!("failed to parse reachability state: {}: {:?}", s, e)
+                                })
+                                .into()
                         })
                     } else {
                         None
@@ -526,24 +528,24 @@ async fn accelerate_fake_clock(fake_clock: &ftesting::FakeClockControlProxy) -> 
 #[netstack_test]
 #[test_case(
     "gateway",
-    &[(InterfaceConfig::new_primary(LOWER_METRIC), State::Gateway)];
+    &[(InterfaceConfig::new_primary(LOWER_METRIC), LinkState::Gateway.into())];
     "gateway")]
 #[test_case(
     "internet",
-    &[(InterfaceConfig::new_primary(LOWER_METRIC), State::Internet)];
+    &[(InterfaceConfig::new_primary(LOWER_METRIC), LinkState::Internet.into())];
     "internet")]
 #[test_case(
     "gateway_gateway",
     &[
-        (InterfaceConfig::new_primary(LOWER_METRIC), State::Gateway),
-        (InterfaceConfig::new_secondary(HIGHER_METRIC), State::Gateway),
+        (InterfaceConfig::new_primary(LOWER_METRIC), LinkState::Gateway.into()),
+        (InterfaceConfig::new_secondary(HIGHER_METRIC), LinkState::Gateway.into()),
     ];
     "gateway_gateway")]
 #[test_case(
     "gateway_internet",
     &[
-        (InterfaceConfig::new_primary(LOWER_METRIC), State::Gateway),
-        (InterfaceConfig::new_secondary(HIGHER_METRIC), State::Internet),
+        (InterfaceConfig::new_primary(LOWER_METRIC), LinkState::Gateway.into()),
+        (InterfaceConfig::new_secondary(HIGHER_METRIC), LinkState::Internet.into()),
     ];
     "gateway_internet")]
 // This test case guards against the regression where if ICMP echo requests are routed according
@@ -554,15 +556,15 @@ async fn accelerate_fake_clock(fake_clock: &ftesting::FakeClockControlProxy) -> 
 #[test_case(
     "internet_gateway",
     &[
-        (InterfaceConfig::new_primary(LOWER_METRIC), State::Internet),
-        (InterfaceConfig::new_secondary(HIGHER_METRIC), State::Gateway),
+        (InterfaceConfig::new_primary(LOWER_METRIC), LinkState::Internet.into()),
+        (InterfaceConfig::new_secondary(HIGHER_METRIC), LinkState::Gateway.into()),
     ];
     "internet_gateway")]
 #[test_case(
     "internet_internet",
     &[
-        (InterfaceConfig::new_primary(LOWER_METRIC), State::Internet),
-        (InterfaceConfig::new_secondary(HIGHER_METRIC), State::Internet),
+        (InterfaceConfig::new_primary(LOWER_METRIC), LinkState::Internet.into()),
+        (InterfaceConfig::new_secondary(HIGHER_METRIC), LinkState::Internet.into()),
     ];
     "internet_internet")]
 async fn test_state<N: Netstack>(
@@ -638,7 +640,7 @@ async fn test_state<N: Netstack>(
 
     let IpStates { ipv4: want_system_ipv4, ipv6: want_system_ipv6 } =
         want_interfaces.values().fold(
-            IpStates::new(State::None),
+            IpStates::new(LinkState::None.into()),
             |IpStates { ipv4: best_ipv4, ipv6: best_ipv6 }, &IpStates { ipv4, ipv6 }| IpStates {
                 ipv4: if ipv4 > best_ipv4 { ipv4 } else { best_ipv4 },
                 ipv6: if ipv6 > best_ipv6 { ipv6 } else { best_ipv6 },
@@ -813,9 +815,9 @@ impl<'a> ReachabilityTestHelper<'a> {
 }
 
 #[netstack_test]
-#[test_case(State::Internet, State::Internet)]
-#[test_case(State::Internet, State::Gateway)]
-#[test_case(State::Internet, State::Up)]
+#[test_case(LinkState::Internet.into(), LinkState::Internet.into())]
+#[test_case(LinkState::Internet.into(), LinkState::Gateway.into())]
+#[test_case(LinkState::Internet.into(), LinkState::Up.into())]
 async fn test_internet_available<N: Netstack>(name: &str, state1: State, state2: State) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let env = setup_reachability_env::<N>(name, &sandbox, false).await;
@@ -833,15 +835,15 @@ async fn test_internet_available<N: Netstack>(name: &str, state1: State, state2:
 }
 
 #[netstack_test]
-#[test_case(State::Internet, State::Internet)]
-#[test_case(State::Internet, State::Gateway)]
-#[test_case(State::Internet, State::Up)]
+#[test_case(LinkState::Internet.into(), LinkState::Internet.into())]
+#[test_case(LinkState::Internet.into(), LinkState::Gateway.into())]
+#[test_case(LinkState::Internet.into(), LinkState::Up.into())]
 async fn test_internet_comes_up<N: Netstack>(name: &str, state1: State, state2: State) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let env = setup_reachability_env::<N>(name, &sandbox, false).await;
     let configs = vec![
-        (InterfaceConfig::new_primary(LOWER_METRIC), State::Up),
-        (InterfaceConfig::new_secondary(HIGHER_METRIC), State::Up),
+        (InterfaceConfig::new_primary(LOWER_METRIC), LinkState::Up.into()),
+        (InterfaceConfig::new_secondary(HIGHER_METRIC), LinkState::Up.into()),
     ];
     let mut helper = ReachabilityTestHelper::new(name, &env, configs).await;
 
@@ -852,14 +854,14 @@ async fn test_internet_comes_up<N: Netstack>(name: &str, state1: State, state2: 
 }
 
 #[netstack_test]
-#[test_case(State::Gateway, State::Gateway)]
-#[test_case(State::Up, State::Up)]
+#[test_case(LinkState::Gateway.into(), LinkState::Gateway.into())]
+#[test_case(LinkState::Up.into(), LinkState::Up.into())]
 async fn test_internet_goes_down<N: Netstack>(name: &str, state1: State, state2: State) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let env = setup_reachability_env::<N>(name, &sandbox, false).await;
     let configs = vec![
-        (InterfaceConfig::new_primary(LOWER_METRIC), State::Internet),
-        (InterfaceConfig::new_secondary(HIGHER_METRIC), State::Internet),
+        (InterfaceConfig::new_primary(LOWER_METRIC), LinkState::Internet.into()),
+        (InterfaceConfig::new_secondary(HIGHER_METRIC), LinkState::Internet.into()),
     ];
     let mut helper = ReachabilityTestHelper::new(name, &env, configs).await;
 
@@ -873,8 +875,8 @@ async fn test_internet_goes_down<N: Netstack>(name: &str, state1: State, state2:
 }
 
 #[netstack_test]
-#[test_case(State::Gateway, State::Gateway)]
-#[test_case(State::Gateway, State::Up)]
+#[test_case(LinkState::Gateway.into(), LinkState::Gateway.into())]
+#[test_case(LinkState::Gateway.into(), LinkState::Up.into())]
 async fn test_gateway_goes_down<N: Netstack>(name: &str, state1: State, state2: State) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let env = setup_reachability_env::<N>(name, &sandbox, false).await;
@@ -888,7 +890,7 @@ async fn test_gateway_goes_down<N: Netstack>(name: &str, state1: State, state2: 
     assert_eq!(snapshot.gateway_reachable, Some(true));
     assert_eq!(snapshot.internet_available, Some(false));
 
-    helper.set_iface_states(vec![State::Up, State::Up]);
+    helper.set_iface_states(vec![LinkState::Up.into(), LinkState::Up.into()]);
     let snapshot = helper.next_snapshot_with_gateway(false).await;
     assert_eq!(snapshot.gateway_reachable, Some(false));
     assert_eq!(snapshot.internet_available, Some(false));
@@ -899,8 +901,8 @@ async fn test_internet_to_gateway_state<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let env = setup_reachability_env::<N>(name, &sandbox, false).await;
     let configs = vec![
-        (InterfaceConfig::new_primary(LOWER_METRIC), State::Internet),
-        (InterfaceConfig::new_secondary(HIGHER_METRIC), State::Gateway),
+        (InterfaceConfig::new_primary(LOWER_METRIC), LinkState::Internet.into()),
+        (InterfaceConfig::new_secondary(HIGHER_METRIC), LinkState::Gateway.into()),
     ];
     let mut helper = ReachabilityTestHelper::new(name, &env, configs).await;
 
@@ -908,7 +910,7 @@ async fn test_internet_to_gateway_state<N: Netstack>(name: &str) {
     assert_eq!(snapshot.gateway_reachable, Some(true));
     assert_eq!(snapshot.internet_available, Some(true));
 
-    helper.set_iface_states(vec![State::Gateway, State::Gateway]);
+    helper.set_iface_states(vec![LinkState::Gateway.into(), LinkState::Gateway.into()]);
     let snapshot = helper.next_snapshot_with_gateway(true).await;
     assert_eq!(snapshot.gateway_reachable, Some(true));
     assert_eq!(snapshot.internet_available, Some(false));

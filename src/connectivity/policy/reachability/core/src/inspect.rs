@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{Proto, State},
+    crate::{LinkState, Proto},
     fuchsia_inspect::Node,
     fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode},
 };
@@ -30,10 +30,10 @@ impl InspectInfo {
 
         InspectInfo { _node: node, v4, v6 }
     }
-    pub(crate) fn log_state(&mut self, proto: Proto, state: State) {
+    pub(crate) fn log_link_state(&mut self, proto: Proto, link_state: LinkState) {
         match proto {
-            Proto::IPv4 => inspect_log!(self.v4, state: format!("{:?}", state)),
-            Proto::IPv6 => inspect_log!(self.v6, state: format!("{:?}", state)),
+            Proto::IPv4 => inspect_log!(self.v4, state: format!("{:?}", link_state)),
+            Proto::IPv6 => inspect_log!(self.v6, state: format!("{:?}", link_state)),
         }
     }
 }
@@ -60,7 +60,7 @@ mod tests {
             }
         });
 
-        i.log_state(Proto::IPv4, State::Internet);
+        i.log_link_state(Proto::IPv4, LinkState::Internet);
         assert_data_tree!(inspector, root: contains {
             id: {
                 name:"myname",
@@ -77,8 +77,8 @@ mod tests {
                 }
             }
         });
-        i.log_state(Proto::IPv4, State::Gateway);
-        i.log_state(Proto::IPv6, State::Local);
+        i.log_link_state(Proto::IPv4, LinkState::Gateway);
+        i.log_link_state(Proto::IPv6, LinkState::Local);
         assert_data_tree!(inspector, root: contains {
             id: {
                 name:"myname",

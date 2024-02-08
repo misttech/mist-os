@@ -52,4 +52,8 @@ type Snapshot = table {
     /// network.
     @available(added=11)
     3: dns_active bool;
+    /// Indicates whether HTTP fetching is functional via any configured
+    /// network.
+    @available(added=HEAD)
+    4: http_active bool;
 };

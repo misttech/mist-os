@@ -29,6 +29,7 @@ pub struct ReachabilityState {
     pub internet_available: bool,
     pub gateway_reachable: bool,
     pub dns_active: bool,
+    pub http_active: bool,
 }
 
 impl From<ReachabilityState> for freachability::Snapshot {
@@ -37,6 +38,7 @@ impl From<ReachabilityState> for freachability::Snapshot {
             internet_available: Some(state.internet_available),
             gateway_reachable: Some(state.gateway_reachable),
             dns_active: Some(state.dns_active),
+            http_active: Some(state.http_active),
             ..Default::default()
         }
     }
@@ -55,6 +57,7 @@ impl ReachabilityHandler {
             internet_available: false,
             gateway_reachable: false,
             dns_active: false,
+            http_active: false,
         };
         let broker = hanging_get::HangingGet::new(state.clone().into(), notify_fn);
         let publisher = broker.new_publisher();
@@ -65,7 +68,11 @@ impl ReachabilityHandler {
         }
     }
 
-    pub async fn update_state(&mut self, update_callback: impl FnOnce(&mut ReachabilityState)) {
+    pub async fn replace_state(&mut self, new_state: ReachabilityState) {
+        self.update_state(|state| *state = new_state).await;
+    }
+
+    async fn update_state(&mut self, update_callback: impl FnOnce(&mut ReachabilityState)) {
         let mut current_state_guard = self.state.lock().await;
         let previous_state = current_state_guard.clone();
 
@@ -207,10 +214,11 @@ mod tests {
         // Verify no response as state hasn't changed.
         assert_matches!(client.get_reachability_state(&mut executor), Ok(None));
 
-        executor.run_singlethreaded(handler.update_state(|state| {
-            state.internet_available = true;
-            state.gateway_reachable = true;
-            state.dns_active = true;
+        executor.run_singlethreaded(handler.replace_state(ReachabilityState {
+            internet_available: true,
+            gateway_reachable: true,
+            dns_active: true,
+            http_active: true,
         }));
 
         assert_matches!(
@@ -219,6 +227,7 @@ mod tests {
                 internet_available: Some(true),
                 gateway_reachable: Some(true),
                 dns_active: Some(true),
+                http_active: Some(true),
                 ..
             }))
         );

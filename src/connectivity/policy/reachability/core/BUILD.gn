@@ -44,6 +44,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:num-traits",
+    "//third_party/rust_crates:socket2",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
@@ -56,10 +57,12 @@ rustc_library("lib") {
     "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:test-case",
+    "//third_party/rust_crates:url",
   ]
 
   sources = [
     "src/dig.rs",
+    "src/fetch.rs",
     "src/inspect.rs",
     "src/lib.rs",
     "src/neighbor_cache.rs",
@@ -75,8 +78,14 @@ rustc_library("lib") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_unittest_package("reachability-core-lib-test") {
+fuchsia_test_component("reachability-core-lib-test-component") {
+  manifest = "meta/reachability_core_lib_test.cml"
   deps = [ ":lib_test" ]
+}
+
+fuchsia_test_package("reachability-core-lib-test") {
+  test_components = [ ":reachability-core-lib-test-component" ]
+  deps = [ "//src/connectivity/network:netstack-for-tests" ]
 }
 
 group("tests") {

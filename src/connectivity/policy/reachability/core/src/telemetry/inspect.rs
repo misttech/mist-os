@@ -14,6 +14,7 @@ pub struct Stats {
     pub(crate) reachability_lost_count: TimeSeries<u32>,
     pub(crate) internet_available_sec: TimeSeries<i32>,
     pub(crate) dns_active_sec: TimeSeries<i32>,
+    pub(crate) http_active_sec: TimeSeries<i32>,
     pub(crate) total_duration_sec: TimeSeries<i32>,
     pub(crate) ipv4_state: TimeSeries<SumAndCount>,
     pub(crate) ipv6_state: TimeSeries<SumAndCount>,
@@ -25,6 +26,7 @@ impl Stats {
             reachability_lost_count: TimeSeries::new(create_saturating_add_fn),
             internet_available_sec: TimeSeries::new(create_saturating_add_fn),
             dns_active_sec: TimeSeries::new(create_saturating_add_fn),
+            http_active_sec: TimeSeries::new(create_saturating_add_fn),
 
             // `total_duration_sec` is served as the denominator for duration stats like
             // `internet_available_sec` and `dns_active_sec`. This is really only needed
@@ -47,6 +49,7 @@ impl Stats {
         self.reachability_lost_count.log_inspect_uint_array(node, "reachability_lost_count");
         self.internet_available_sec.log_inspect_int_array(node, "internet_available_sec");
         self.dns_active_sec.log_inspect_int_array(node, "dns_active_sec");
+        self.http_active_sec.log_inspect_int_array(node, "http_active_sec");
         self.total_duration_sec.log_inspect_int_array(node, "total_duration_sec");
         self.ipv4_state.log_avg_inspect_double_array(node, "ipv4_state");
         self.ipv6_state.log_avg_inspect_double_array(node, "ipv6_state");

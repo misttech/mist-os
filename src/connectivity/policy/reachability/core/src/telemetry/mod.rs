@@ -96,16 +96,16 @@ struct SystemStateSummary {
 }
 
 impl SystemStateSummary {
-    fn ipv4_state_val(&self) -> u32 {
+    fn ipv4_link_state_val(&self) -> u32 {
         match self.system_state.ipv4 {
-            Some(s) => s as u32,
+            Some(s) => s.link as u32,
             None => 0u32,
         }
     }
 
-    fn ipv6_state_val(&self) -> u32 {
+    fn ipv6_link_state_val(&self) -> u32 {
         match self.system_state.ipv6 {
-            Some(s) => s as u32,
+            Some(s) => s.link as u32,
             None => 0u32,
         }
     }
@@ -339,23 +339,24 @@ impl Telemetry {
                 let gateway_reachable =
                     convert::convert_yes_no_dim(prev.system_state.has_gateway());
                 let dns_active = convert::convert_yes_no_dim(prev.system_state.has_dns());
+                let http_status = if prev.system_state.has_http() {
+                    metrics::NetworkPolicyMetricDimensionHttpStatus::HttpOnly
+                } else {
+                    metrics::NetworkPolicyMetricDimensionHttpStatus::Neither
+                };
                 // We only log metric when at least one of IPv4 or IPv6 is in the SystemState.
                 if let Some(route_config) = route_config_dim {
                     metric_events.push(
                         MetricEvent::builder(
                             metrics::REACHABILITY_GLOBAL_SNAPSHOT_DURATION_METRIC_ID,
                         )
-                        .with_event_codes(
-                            // TODO(zmbush): Switch back to
-                            // metrics::ReachabilityGlobalSnapshotDurationEventCodes
-                            // after fxr/972232 lands.
-                            [
-                                route_config.as_event_code(),
-                                internet_available.as_event_code(),
-                                gateway_reachable.as_event_code(),
-                                dns_active.as_event_code(),
-                            ],
-                        )
+                        .with_event_codes(metrics::ReachabilityGlobalSnapshotDurationEventCodes {
+                            route_config,
+                            internet_available,
+                            gateway_reachable,
+                            dns_active,
+                            http_status,
+                        })
                         .as_integer(duration_cobalt.into_micros()),
                     );
                 }
@@ -365,6 +366,9 @@ impl Telemetry {
                 }
                 if prev.system_state.has_dns() {
                     self.stats.lock().dns_active_sec.log_value(&duration_sec_inspect);
+                }
+                if prev.system_state.has_http() {
+                    self.stats.lock().http_active_sec.log_value(&duration_sec_inspect);
                 }
             }
         }
@@ -403,11 +407,11 @@ impl Telemetry {
             self.stats
                 .lock()
                 .ipv4_state
-                .log_value(&SumAndCount { sum: new_state.ipv4_state_val(), count: 1 });
+                .log_value(&SumAndCount { sum: new_state.ipv4_link_state_val(), count: 1 });
             self.stats
                 .lock()
                 .ipv6_state
-                .log_value(&SumAndCount { sum: new_state.ipv6_state_val(), count: 1 });
+                .log_value(&SumAndCount { sum: new_state.ipv6_link_state_val(), count: 1 });
         }
 
         if !metric_events.is_empty() {
@@ -478,15 +482,18 @@ impl Telemetry {
             if current.system_state.has_dns() {
                 self.stats.lock().dns_active_sec.log_value(&duration_sec_inspect);
             }
+            if current.system_state.has_http() {
+                self.stats.lock().http_active_sec.log_value(&duration_sec_inspect);
+            }
 
             self.stats
                 .lock()
                 .ipv4_state
-                .log_value(&SumAndCount { sum: current.ipv4_state_val(), count: 1 });
+                .log_value(&SumAndCount { sum: current.ipv4_link_state_val(), count: 1 });
             self.stats
                 .lock()
                 .ipv6_state
-                .log_value(&SumAndCount { sum: current.ipv6_state_val(), count: 1 });
+                .log_value(&SumAndCount { sum: current.ipv6_link_state_val(), count: 1 });
         }
         self.state_last_refreshed_for_inspect = now;
     }
@@ -500,6 +507,8 @@ impl Telemetry {
 
 #[cfg(test)]
 mod tests {
+    use crate::{ApplicationState, LinkState};
+
     use super::*;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_metrics::MetricEventPayload;
@@ -516,7 +525,7 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_test();
 
         let mut update = SystemStateUpdate {
-            system_state: IpVersions { ipv4: Some(State::Internet), ipv6: None },
+            system_state: IpVersions { ipv4: Some(LinkState::Internet.into()), ipv6: None },
         };
         test_helper
             .telemetry_sender
@@ -524,7 +533,13 @@ mod tests {
 
         test_helper.advance_by(25.seconds(), &mut test_fut);
 
-        update.system_state = IpVersions { ipv4: Some(State::DnsResolved), ipv6: None };
+        update.system_state = IpVersions {
+            ipv4: Some(State {
+                link: LinkState::Internet,
+                application: ApplicationState { dns_resolved: true, http_fetch_succeeded: true },
+            }),
+            ipv6: None,
+        };
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
@@ -550,6 +565,8 @@ mod tests {
                 metrics::ReachabilityGlobalSnapshotDurationMetricDimensionGatewayReachable::Yes
                     as u32,
                 metrics::ReachabilityGlobalSnapshotDurationMetricDimensionDnsActive::No as u32,
+                metrics::ReachabilityGlobalSnapshotDurationMetricDimensionHttpStatus::Neither
+                    as u32,
             ]
         );
 
@@ -577,8 +594,10 @@ mod tests {
                     as u32,
                 metrics::ReachabilityGlobalSnapshotDurationMetricDimensionGatewayReachable::Yes
                     as u32,
-                // This time dns_active is Yes
+                // This time dns_active is Yes, and http_status is HttpOnly
                 metrics::ReachabilityGlobalSnapshotDurationMetricDimensionDnsActive::Yes as u32,
+                metrics::ReachabilityGlobalSnapshotDurationMetricDimensionHttpStatus::HttpOnly
+                    as u32,
             ]
         );
     }
@@ -588,7 +607,13 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_test();
 
         let mut update = SystemStateUpdate {
-            system_state: IpVersions { ipv4: None, ipv6: Some(State::DnsResolved) },
+            system_state: IpVersions {
+                ipv4: None,
+                ipv6: Some(State {
+                    link: LinkState::Internet,
+                    application: ApplicationState { dns_resolved: true, ..Default::default() },
+                }),
+            },
             ..SystemStateUpdate::default()
         };
         test_helper
@@ -596,7 +621,10 @@ mod tests {
             .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
         test_helper.advance_test_fut(&mut test_fut);
 
-        update.system_state = IpVersions { ipv4: None, ipv6: Some(State::Internet) };
+        update.system_state = IpVersions {
+            ipv4: None,
+            ipv6: Some(State { link: LinkState::Internet, ..Default::default() }),
+        };
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
@@ -614,7 +642,10 @@ mod tests {
 
         test_helper.cobalt_events.clear();
 
-        update.system_state = IpVersions { ipv4: None, ipv6: Some(State::Down) };
+        update.system_state = IpVersions {
+            ipv4: None,
+            ipv6: Some(State { link: LinkState::Down, ..Default::default() }),
+        };
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
@@ -628,7 +659,13 @@ mod tests {
         test_helper.cobalt_events.clear();
 
         test_helper.advance_by(2.hours(), &mut test_fut);
-        update.system_state = IpVersions { ipv4: Some(State::DnsResolved), ipv6: None };
+        update.system_state = IpVersions {
+            ipv4: Some(State {
+                link: LinkState::Internet,
+                application: ApplicationState { dns_resolved: true, ..Default::default() },
+            }),
+            ipv6: None,
+        };
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
@@ -738,14 +775,20 @@ mod tests {
             time_series.lock().internet_available_sec.minutely_iter().map(|v| *v).collect();
         let dns_active_sec: Vec<_> =
             time_series.lock().dns_active_sec.minutely_iter().map(|v| *v).collect();
+        let http_active_sec: Vec<_> =
+            time_series.lock().http_active_sec.minutely_iter().map(|v| *v).collect();
         let total_duration_sec: Vec<_> =
             time_series.lock().total_duration_sec.minutely_iter().map(|v| *v).collect();
         assert_eq!(internet_available_sec, vec![0]);
         assert_eq!(dns_active_sec, vec![0]);
+        assert_eq!(http_active_sec, vec![0]);
         assert_eq!(total_duration_sec, vec![20]);
 
         let mut update = SystemStateUpdate {
-            system_state: IpVersions { ipv4: Some(State::Internet), ipv6: None },
+            system_state: IpVersions {
+                ipv4: Some(State { link: LinkState::Internet, ..Default::default() }),
+                ipv6: None,
+            },
         };
         test_helper
             .telemetry_sender
@@ -765,13 +808,22 @@ mod tests {
             time_series.lock().internet_available_sec.minutely_iter().map(|v| *v).collect();
         let dns_active_sec: Vec<_> =
             time_series.lock().dns_active_sec.minutely_iter().map(|v| *v).collect();
+        let http_active_sec: Vec<_> =
+            time_series.lock().http_active_sec.minutely_iter().map(|v| *v).collect();
         let total_duration_sec: Vec<_> =
             time_series.lock().total_duration_sec.minutely_iter().map(|v| *v).collect();
         assert_eq!(internet_available_sec, vec![15]);
         assert_eq!(dns_active_sec, vec![0]);
+        assert_eq!(http_active_sec, vec![0]);
         assert_eq!(total_duration_sec, vec![40]);
 
-        update.system_state = IpVersions { ipv4: Some(State::DnsResolved), ipv6: None };
+        update.system_state = IpVersions {
+            ipv4: Some(State {
+                link: LinkState::Internet,
+                application: ApplicationState { dns_resolved: true, ..Default::default() },
+            }),
+            ipv6: None,
+        };
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
@@ -785,10 +837,42 @@ mod tests {
             time_series.lock().internet_available_sec.minutely_iter().map(|v| *v).collect();
         let dns_active_sec: Vec<_> =
             time_series.lock().dns_active_sec.minutely_iter().map(|v| *v).collect();
+        let http_active_sec: Vec<_> =
+            time_series.lock().http_active_sec.minutely_iter().map(|v| *v).collect();
         let total_duration_sec: Vec<_> =
             time_series.lock().total_duration_sec.minutely_iter().map(|v| *v).collect();
         assert_eq!(internet_available_sec, vec![25, 40]);
         assert_eq!(dns_active_sec, vec![10, 40]);
+        assert_eq!(http_active_sec, vec![0]);
+        assert_eq!(total_duration_sec, vec![40]);
+
+        update.system_state = IpVersions {
+            ipv4: Some(State {
+                link: LinkState::Internet,
+                application: ApplicationState { dns_resolved: true, http_fetch_succeeded: true },
+            }),
+            ipv6: None,
+        };
+        test_helper
+            .telemetry_sender
+            .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
+
+        test_helper.advance_by(60.seconds(), &mut test_fut);
+
+        // Now 120 seconds mark
+
+        let time_series = test_helper.get_time_series(&mut test_fut);
+        let internet_available_sec: Vec<_> =
+            time_series.lock().internet_available_sec.minutely_iter().map(|v| *v).collect();
+        let dns_active_sec: Vec<_> =
+            time_series.lock().dns_active_sec.minutely_iter().map(|v| *v).collect();
+        let http_active_sec: Vec<_> =
+            time_series.lock().http_active_sec.minutely_iter().map(|v| *v).collect();
+        let total_duration_sec: Vec<_> =
+            time_series.lock().total_duration_sec.minutely_iter().map(|v| *v).collect();
+        assert_eq!(internet_available_sec, vec![25, 60, 40]);
+        assert_eq!(dns_active_sec, vec![10, 60, 40]);
+        assert_eq!(http_active_sec, vec![0, 20, 40]);
         assert_eq!(total_duration_sec, vec![40]);
     }
 
@@ -797,7 +881,13 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_test();
 
         let mut update = SystemStateUpdate {
-            system_state: IpVersions { ipv4: None, ipv6: Some(State::DnsResolved) },
+            system_state: IpVersions {
+                ipv4: None,
+                ipv6: Some(State {
+                    link: LinkState::Internet,
+                    application: ApplicationState { dns_resolved: true, ..Default::default() },
+                }),
+            },
             ..SystemStateUpdate::default()
         };
         test_helper
@@ -810,7 +900,10 @@ mod tests {
             time_series.lock().reachability_lost_count.minutely_iter().map(|v| *v).collect();
         assert_eq!(reachability_lost_count, vec![0]);
 
-        update.system_state = IpVersions { ipv4: None, ipv6: Some(State::Internet) };
+        update.system_state = IpVersions {
+            ipv4: None,
+            ipv6: Some(State { link: LinkState::Internet, ..Default::default() }),
+        };
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
@@ -827,7 +920,10 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_test();
 
         let mut update = SystemStateUpdate {
-            system_state: IpVersions { ipv4: None, ipv6: Some(State::Gateway) },
+            system_state: IpVersions {
+                ipv4: None,
+                ipv6: Some(State { link: LinkState::Gateway, ..Default::default() }),
+            },
             ..SystemStateUpdate::default()
         };
         test_helper
@@ -843,7 +939,7 @@ mod tests {
         assert_eq!(ipv4_state, vec![SumAndCount { sum: 0, count: 1 }]);
         assert_eq!(ipv6_state, vec![SumAndCount { sum: 25, count: 1 }]);
 
-        update.system_state.ipv6 = Some(State::Internet);
+        update.system_state.ipv6 = Some(State { link: LinkState::Internet, ..Default::default() });
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
