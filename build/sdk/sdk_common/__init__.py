@@ -3,18 +3,23 @@
 # found in the LICENSE file.
 
 import collections
+import difflib
 import functools
 import json
+import pathlib
+import yaml
+
+from typing import Sequence, Optional, List, Any, Iterator
 
 
-class File(object):
+class File:
     """Wrapper class for file definitions."""
 
-    def __init__(self, json):
-        self.source = json["source"]
-        self.destination = json["destination"]
+    def __init__(self, json) -> None:
+        self.source: str = json["source"]
+        self.destination: str = json["destination"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "{%s <-- %s}" % (self.destination, self.source)
 
 
@@ -22,15 +27,16 @@ class File(object):
 class Atom(object):
     """Wrapper class for atom data, adding convenience methods."""
 
-    def __init__(self, json):
+    def __init__(self, json) -> None:
         self.json = json
-        self.id = json["id"]
-        self.metadata = json["meta"]
-        self.label = json["gn-label"]
-        self.category = json["category"]
-        self.deps = json["deps"]
-        self.files = [File(f) for f in json["files"]]
-        self.type = json["type"]
+        self.id: str = json["id"]
+        self.metadata: str = json["meta"]
+        self.label: str = json["gn-label"]
+        self.category: str = json["category"]
+        self.area: Optional[str] = json["area"]
+        self.deps: Sequence[str] = json["deps"]
+        self.files: Sequence[File] = [File(f) for f in json["files"]]
+        self.type: str = json["type"]
 
     def __str__(self):
         return str(self.id)
@@ -66,21 +72,20 @@ def gather_dependencies(manifests):
     return (direct_deps, atoms)
 
 
-def detect_collisions(atoms):
-    """Detects name collisions in a given atom list."""
+def detect_collisions(atoms: Sequence[Atom]) -> Iterator[str]:
+    """Detects name collisions in a given atom list. Yields a series of error
+    messages as strings."""
     mappings = collections.defaultdict(lambda: [])
     for atom in atoms:
         mappings[atom.id].append(atom)
-    has_collisions = False
     for id, group in mappings.items():
         if len(group) == 1:
             continue
-        has_collisions = True
         labels = [a.label for a in group]
-        print("Targets sharing the SDK id %s:" % id)
+        msg = "Targets sharing the SDK id %s:\n" % id
         for label in labels:
-            print(" - %s" % label)
-    return has_collisions
+            msg += " - %s\n" % label
+        yield msg
 
 
 CATEGORIES = [
@@ -94,21 +99,70 @@ CATEGORIES = [
 ]
 
 
-def index_for_category(category):
+def _index_for_category(category: str):
     if not category in CATEGORIES:
         raise Exception('Unknown SDK category "%s"' % category)
     return CATEGORIES.index(category)
 
 
-def detect_category_violations(category, atoms):
-    """Detects mismatches in publication categories."""
-    has_violations = False
-    category_index = index_for_category(category)
+def detect_category_violations(
+    category: str, atoms: Sequence[Atom]
+) -> Iterator[str]:
+    """Yields strings describing mismatches in publication categories."""
+    category_index = _index_for_category(category)
     for atom in atoms:
-        if index_for_category(atom.category) < category_index:
-            has_violations = True
-            print(
+        if _index_for_category(atom.category) < category_index:
+            yield (
                 "%s has publication level %s, incompatible with %s"
                 % (atom, atom.category, category)
             )
-    return has_violations
+
+
+def area_names_from_file(parsed_areas: Any) -> List[str]:
+    """Given a parsed version of docs/contribute/governance/areas/_areas.yaml,
+    return a list of acceptable area names."""
+    return [area["name"] for area in parsed_areas] + ["Unknown"]
+
+
+class Validator:
+    """Helper class to validate sets of IDK atoms."""
+
+    def __init__(self, valid_areas: Sequence[str]) -> None:
+        """Construct a validator with a given set of areas. Exposed for
+        testing. Use Validator.from_areas_file_path instead."""
+        self._valid_areas = valid_areas
+
+    @classmethod
+    def from_areas_file_path(cls, areas_file: pathlib.Path) -> "Validator":
+        """Build a Validator given a path to
+        docs/contribute/governance/areas/_areas.yaml."""
+        with areas_file.open() as f:
+            parsed_areas = yaml.load(f, Loader=yaml.Loader)
+            return Validator(area_names_from_file(parsed_areas))
+
+    def detect_violations(
+        self, category: Optional[str], atoms: Sequence[Atom]
+    ) -> Iterator[str]:
+        """Yield strings describing all violations found in `atoms`."""
+        yield from detect_collisions(atoms)
+        if category:
+            yield from detect_category_violations(category, atoms)
+        yield from self.detect_area_violations(atoms)
+
+    def detect_area_violations(self, atoms: Sequence[Atom]) -> Iterator[str]:
+        """Yields strings describing any invalid API areas in `atoms`."""
+        for atom in atoms:
+            if atom.area is None or atom.area in self._valid_areas:
+                continue
+            if matches := difflib.get_close_matches(
+                atom.area, self._valid_areas
+            ):
+                yield (
+                    "%s specifies invalid API area '%s'. Did you mean one of these? %s"
+                    % (atom, atom.area, matches)
+                )
+            else:
+                yield (
+                    "%s specifies invalid API area '%s'. Valid areas: %s"
+                    % (atom, atom.area, self._valid_areas)
+                )

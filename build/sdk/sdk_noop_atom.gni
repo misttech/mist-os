@@ -23,6 +23,13 @@ import("//build/python/python_action.gni")
 #     If this attribute is set, "id" and "type" must be set as well.
 #     Type: string
 #
+#   area (optional)
+#     The API area responsible for maintaining this SDK atom. See
+#     docs/contribute/governance/areas/_areas.yaml for the list of areas.
+#     "Unknown" is also a valid option. By default, the area will be `null` in
+#     the build manifest.
+#     Type: string
+#
 #   type (optional)
 #     Describes the type of the element.
 #     If this attribute is set, "id" and "category" must be set as well.
@@ -55,6 +62,10 @@ template("sdk_noop_atom") {
 
       public_deps = [ ":${meta_target_name}" ]
 
+      _areas_file = "//docs/contribute/governance/areas/_areas.yaml"
+
+      inputs = [ _areas_file ]
+
       outputs = [ manifest_file ]
 
       args = [
@@ -68,10 +79,19 @@ template("sdk_noop_atom") {
         get_label_info(":${target_name}", "label_with_toolchain"),
         "--category",
         invoker.category,
+        "--areas-file-path",
+        rebase_path(_areas_file, root_build_dir),
         "--type",
         invoker.type,
         "--noop-atom",
       ]
+
+      if (defined(invoker.area)) {
+        args += [
+          "--area",
+          invoker.area,
+        ]
+      }
     }
   } else {
     generated_file(target_name) {

@@ -62,6 +62,13 @@
                         "public"
                     ]
                 },
+                "area": {
+                    "description": "API council area that owns this atom",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
                 "plasa": {
                     "description": "The plasa API fragment files",
                     "type": "array",

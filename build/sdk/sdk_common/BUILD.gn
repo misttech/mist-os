@@ -15,6 +15,7 @@ if (is_host) {
 
 python_library("sdk_common") {
   sources = [ "__init__.py" ]
+  library_deps = [ "//third_party/pyyaml:yaml" ]
 }
 
 group("tests") {

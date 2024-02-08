@@ -6,11 +6,11 @@
 import argparse
 import json
 import os
+import pathlib
 import sys
 
 from sdk_common import (
-    detect_category_violations,
-    detect_collisions,
+    Validator,
     gather_dependencies,
 )
 
@@ -26,16 +26,24 @@ def main():
     parser.add_argument(
         "--category", help="Minimum publication level", required=False
     )
+    parser.add_argument(
+        "--areas-file-path",
+        type=pathlib.Path,
+        help="Path to docs/contribute/governance/areas/_areas.yaml",
+        required=True,
+    )
     args = parser.parse_args()
 
     (direct_deps, atoms) = gather_dependencies(args.deps)
-    if detect_collisions(atoms):
-        print("Name collisions detected!")
+
+    v = Validator.from_areas_file_path(areas_file=args.areas_file_path)
+    violations = [*v.detect_violations(args.category, atoms)]
+    if violations:
+        print("Errors detected!")
+        for msg in violations:
+            print(msg)
         return 1
-    if args.category:
-        if detect_category_violations(args.category, atoms):
-            print("Publication level violations detected!")
-            return 1
+
     manifest = {
         "ids": [],
         "atoms": [a.json for a in sorted(list(atoms))],
