@@ -119,23 +119,30 @@ def main():
     blobs_dst_dir = args.tuf_repo_name + "/repository/blobs"
     with open(args.package_manifests_list) as f:
         package_manifest_list_json = json.load(f)
-        package_manifest_paths = package_manifest_list_json["content"][
-            "manifests"
+        package_manifest_paths = [
+            pathlib.Path(p)
+            for p in package_manifest_list_json["content"]["manifests"]
         ]
 
-    for package_manifest_path in package_manifest_paths:
-        depfile_inputs.add(package_manifest_path)
-        with open(package_manifest_path) as f:
+    # use package_manifest_paths as a worklist that expands as paths are traversed
+    while len(package_manifest_paths) > 0:
+        package_manifest_path = package_manifest_paths.pop()
+        depfile_inputs.add(str(package_manifest_path))
+        with package_manifest_path.open() as f:
             package_manifest = json_load(PackageManifest, f)
         # TODO(https://fxbug.dev/42180820) extract this into a constructor for PackageManifest?
         for blob_entry in package_manifest.blobs:
             src = blob_entry.source_path
             if package_manifest.blob_sources_relative == "file":
-                src = pathlib.Path(package_manifest_path).parent / src
+                src = package_manifest_path.parent / src
             merkle = blob_entry.merkle
             merkle_to_source[merkle] = src
             dst = os.path.join(blobs_dst_dir, merkle)
             add_content_entry(content, dst, src, args.src_dir, depfile_inputs)
+        for subpackage in package_manifest.subpackages:
+            package_manifest_paths.append(
+                package_manifest_path.parent / subpackage.manifest_path
+            )
 
     # Parse the timestamp.json file to extract the version of the
     # snapshot.json file to use, copy it to the archive, then parse it.
