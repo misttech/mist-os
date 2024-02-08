@@ -49,6 +49,215 @@ namespace iob {
 // ZX_IOB_DISCIPLINE_TYPE_* value once defined.
 class BlobIdAllocator {
  public:
+  // The possible failure modes of Allocate().
+  enum class AllocateError {
+    // The header was invalid (purportedly either with indices extending past
+    // the blob head offset or the blob head offset extending past the length
+    // of the buffer). Suggests invalid initialization or corruption.
+    kInvalidHeader,
+
+    // The would-be bookkeeping index slot for the new allocated ID is
+    // non-empty (i.e., not in the initialized state). Suggests corruption.
+    kNonEmptyIndex,
+
+    // Out Of Memory: there is insufficient memory available for the requested
+    // allocation. (What is available can be queried with RemainingBytes().)
+    kOutOfMemory,
+  };
+
+  // The possible failure modes of blob access, either via iteration via
+  // IterableView or GetBlob().
+  enum class BlobError {
+    // The header was invalid (purportedly either with indices extending past
+    // the blob head offset or the blob head offset extending past the length
+    // of the buffer). Suggests invalid initialization or corruption.
+    kInvalidHeader,
+
+    // The requested ID has not yet been allocated.
+    kUnallocatedId,
+
+    // Suggests a lost race in which the requested ID is valid and the header
+    // has been updated to reflect that, but the bookkeeping index has not yet
+    // been committed. Such a case unfortunately is indistinguishable from the
+    // other possibility that the index was already committed but then
+    // subsequently corrupted with zeroes. Where there is confidence in the
+    // first case, this call should be retried.
+    kUncommittedIndex,
+
+    // The corresponding bookkeeping index is invalid, with the blob
+    // purportedly not being contained within [blob head, end of region).
+    // Suggests corruption.
+    kInvalidIndex,
+  };
+
+  // IterableView provides a more conventional means of iterating through the
+  // blobs and IDs within a BlobIdAllocator, which cannot be done on the latter
+  // as that would not be threadsafe. IterableView follows an "error-checking
+  // view" pattern: the container/range/view API of begin() and end() iterators
+  // is supported, but when begin() or iterator::operator++() encounters an
+  // error, it simply returns end() so that loops terminate normally.
+  // Thereafter, take_error() must be called to check whether the loop
+  // terminated because it may have encountered an error. Once begin() has been
+  // called, take_error() must be called before the IterableView is destroyed,
+  // so no error goes undetected. After take_error() is called the error state
+  // is consumed and take_error() cannot be called again until another begin()
+  // or iterator::operator++() call has been made.
+  //
+  // An IterableView is intended to be constructed via
+  // BlobIdAllocator::iterable().
+  class IterableView {
+   public:
+    struct value_type {
+      uint32_t id;
+      cpp20::span<const std::byte> blob;
+    };
+
+    class iterator {
+     public:
+      // Iterator traits.
+      using iterator_category = std::forward_iterator_tag;
+      using reference = const IterableView::value_type&;
+      using value_type = IterableView::value_type;
+      using pointer = const IterableView::value_type*;
+      using difference_type = size_t;
+
+      // The default-constructed iterator is invalid for all uses except
+      // equality comparison.
+      iterator() = default;
+
+      bool operator==(const iterator& other) const {
+        return other.view_ == view_ && other.value_.id == value_.id;
+      }
+
+      bool operator!=(const iterator& other) const { return !(*this == other); }
+
+      iterator& operator++() {  // prefix
+        AssertNotDefaultOrEnd(__func__);
+        view_->StartIteration();
+        Update(value_.id + 1);
+        return *this;
+      }
+
+      iterator operator++(int) {  // postfix
+        iterator old = *this;
+        ++*this;
+        return old;
+      }
+
+      reference operator*() const {
+        AssertNotDefaultOrEnd(__func__);
+        return value_;
+      }
+
+      pointer operator->() const {
+        AssertNotDefaultOrEnd(__func__);
+        return &value_;
+      }
+
+     private:
+      // This is only so that begin(), end(), and find() may use the private
+      // constructor below, as well as `kEndId`.
+      friend class IterableView;
+
+      static constexpr uint32_t kEndId = -1;
+
+      iterator(IterableView* view, uint32_t id) : view_(view) { Update(id); }
+
+      // Checks that one is not trying to operate on a default-constructed or
+      // end iterator.
+      void AssertNotDefaultOrEnd(const char* func) const {
+        ZX_ASSERT_MSG(
+            view_, "%s on default-constructed iob::BlobIdAllocator::IterableView::iterator", func);
+        ZX_ASSERT_MSG(value_.id != kEndId,
+                      "%s on iob::BlobIdAllocator::IterableView::end() iterator", func);
+      }
+
+      void Update(uint32_t id) {
+        if (id >= view_->allocator_->next_id()) {
+          value_ = {kEndId, {}};
+          return;
+        }
+
+        if (auto result = view_->allocator_->GetBlob(id); result.is_error()) {
+          view_->Fail(result.error_value());
+          value_ = {kEndId, {}};
+        } else {
+          value_ = {id, result.value()};
+        }
+      }
+
+      IterableView* view_ = nullptr;
+      value_type value_ = {};
+    };
+
+    ~IterableView() {
+      ZX_ASSERT_MSG(!std::holds_alternative<BlobError>(error_),
+                    "iob::BlobIdAllocator::IterableView destroyed after error without check");
+      ZX_ASSERT_MSG(
+          !std::holds_alternative<NoError>(error_),
+          "iob::BlobIdAllocator::IterableView destroyed after successful iteration without check");
+    }
+
+    // After calling begin(), it's mandatory to call take_error() before
+    // destroying the IterableView object. See the IterableView docstring
+    // for more detail.
+    iterator begin() { return find(0); }
+
+    iterator end() { return {this, iterator::kEndId}; }
+
+    // Returns the iterator associated with a given ID if allocated, or else
+    // end(). As with end(), it's mandatory to call take_error() after calling
+    // find().
+    iterator find(uint32_t id) {
+      StartIteration();
+      return {this, id};
+    }
+
+    // Check the container for errors after using iterators. See the
+    // IterableView docstring for more detail.
+    fit::result<BlobError> take_error() {
+      ErrorState result = error_;
+      error_ = Taken{};
+      if (std::holds_alternative<BlobError>(result)) {
+        return fit::error{std::get<BlobError>(result)};
+      }
+      ZX_ASSERT_MSG(!std::holds_alternative<Taken>(result),
+                    "iob::BlobIdAllocator::IterableView::take_error() was already called");
+      return fit::ok();
+    }
+
+   private:
+    struct Unused {};
+    struct NoError {};
+    struct Taken {};
+
+    using ErrorState = std::variant<Unused, NoError, BlobError, Taken>;
+
+    // This is only so that BlobIdAllocator::iterable() can use the private
+    // constructor below.
+    friend class BlobIdAllocator;
+    explicit IterableView(BlobIdAllocator* allocator) : allocator_(allocator) {}
+
+    void StartIteration() {
+      ZX_ASSERT_MSG(!std::holds_alternative<BlobError>(error_),
+                    "iob::BlobIdAllocator::IterableView iterators used without taking prior error");
+      error_ = NoError{};
+    }
+
+    void Fail(BlobError error) {
+      ZX_DEBUG_ASSERT_MSG(
+          !std::holds_alternative<BlobError>(error_),
+          "Fail() in error state: missing iob::BlobIdAllocator::IterableView::StartIteration() call?");
+      ZX_DEBUG_ASSERT_MSG(
+          !std::holds_alternative<Unused>(error_),
+          "Fail() in Unused state: missing iob::BlobIdAllocator::IterableView::StartIteration() call?");
+      error_ = error;
+    }
+
+    BlobIdAllocator* allocator_ = nullptr;
+    ErrorState error_;
+  };
+
   // Constructs a view into an ID allocator IOBuffer region. If the provided
   // memory does not yet reflect this layout, Init() must be called before any
   // other method.
@@ -79,6 +288,13 @@ class BlobIdAllocator {
         std::memory_order_release);
   }
 
+  // Provides an iterable view into the allocator, scoped to the lifetime of
+  // this object.
+  IterableView iterable() { return IterableView(this); }
+
+  // The next ID to be allocated.
+  uint32_t next_id() const { return header().load(std::memory_order_relaxed).next_id; }
+
   // The remaining number of available bytes in the allocator (including those
   // that might be used for bookkeeping). fit::failed() is returned in the case
   // of an invalid header (see `AllocateError::kInvalidHeader` for more
@@ -86,22 +302,6 @@ class BlobIdAllocator {
   fit::result<fit::failed, size_t> RemainingBytes() const {
     return header().load(std::memory_order_relaxed).RemainingBytes(bytes_.size());
   }
-
-  // The possible failure modes of Allocate().
-  enum class AllocateError {
-    // The header was invalid (purportedly either with indices extending past
-    // the blob head offset or the blob head offset extending past the length
-    // of the buffer). Suggests invalid initialization or corruption.
-    kInvalidHeader,
-
-    // The would-be bookkeeping index slot for the new allocated ID is
-    // non-empty (i.e., not in the initialized state). Suggests corruption.
-    kNonEmptyIndex,
-
-    // Out Of Memory: there is insufficient memory available for the requested
-    // allocation. (What is available can be queried with RemainingBytes().)
-    kOutOfMemory,
-  };
 
   // Attempts to store the provided blob and allocate its ID.
   fit::result<AllocateError, uint32_t> Allocate(cpp20::span<const std::byte> blob) {
@@ -174,38 +374,14 @@ class BlobIdAllocator {
     return fit::ok(id);
   }
 
-  // The possible failure modes of GetBlob().
-  enum class GetBlobError {
-    // The header was invalid (purportedly either with indices extending past
-    // the blob head offset or the blob head offset extending past the length
-    // of the buffer). Suggests invalid initialization or corruption.
-    kInvalidHeader,
-
-    // The requested ID has not yet been allocated.
-    kUnallocatedId,
-
-    // Suggests a lost race in which the requested ID is valid and the header
-    // has been updated to reflect that, but the bookkeeping index has not yet
-    // been committed. Such a case unfortunately is indistinguishable from the
-    // other possibility that the index was already committed but then
-    // subsequently corrupted with zeroes. Where there is confidence in the
-    // first case, this call should be retried.
-    kUncommittedIndex,
-
-    // The corresponding bookkeeping index is invalid, with the blob
-    // purportedly not being contained within [blob head, end of region).
-    // Suggests corruption.
-    kInvalidIndex,
-  };
-
   // Returns the blob corresponding to a given ID.
-  fit::result<GetBlobError, cpp20::span<const std::byte>> GetBlob(uint32_t id) const {
+  fit::result<BlobError, cpp20::span<const std::byte>> GetBlob(uint32_t id) const {
     Header hdr = header().load(std::memory_order_relaxed);
     if (!hdr.IsValid(bytes_.size())) [[unlikely]] {
-      return fit::error{GetBlobError::kInvalidHeader};
+      return fit::error{BlobError::kInvalidHeader};
     }
     if (id >= hdr.next_id) {
-      return fit::error{GetBlobError::kUnallocatedId};
+      return fit::error{BlobError::kUnallocatedId};
     }
 
     // We load the index with acquire semantics as this ensures the following:
@@ -215,10 +391,10 @@ class BlobIdAllocator {
     //     were written with release semantics.
     Index index = GetIndex(id).load(std::memory_order_acquire);
     if (index.size == 0 && index.offset == 0) [[unlikely]] {
-      return fit::error{GetBlobError::kUncommittedIndex};
+      return fit::error{BlobError::kUncommittedIndex};
     }
     if (!index.IsValid(hdr.blob_head, bytes_.size())) [[unlikely]] {
-      return fit::error{GetBlobError::kInvalidIndex};
+      return fit::error{BlobError::kInvalidIndex};
     }
     return fit::ok(bytes_.subspan(index.offset, index.size));
   }
@@ -248,7 +424,7 @@ class BlobIdAllocator {
 
   // Represents a blob bookkeeping index.
   struct alignas(8) Index {
-    // See GetBlobError::kInvalidIndex. The current blob head offset and length
+    // See BlobError::kInvalidIndex. The current blob head offset and length
     // of the region must be provided, and are assumed to have already been
     // validated.
     constexpr bool IsValid(uint32_t blob_head, size_t length) const {

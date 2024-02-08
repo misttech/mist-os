@@ -53,6 +53,10 @@ TEST(IobBlobIdAllocatorTests, InvalidHeader) {
     auto allocated = allocator.Allocate(kBlob);
     ASSERT_TRUE(allocated.is_ok());
     EXPECT_EQ(0u, allocated.value());
+
+    iob::BlobIdAllocator::IterableView view = allocator.iterable();
+    EXPECT_NE(view.end(), view.begin());
+    EXPECT_TRUE(view.take_error().is_ok());
   }
 
   // The blob head now extends past the buffer, so the header is invalid.
@@ -60,7 +64,12 @@ TEST(IobBlobIdAllocatorTests, InvalidHeader) {
   {
     auto blob = allocator.GetBlob(0u);
     ASSERT_TRUE(blob.is_error());
-    EXPECT_EQ(iob::BlobIdAllocator::GetBlobError::kInvalidHeader, blob.error_value());
+    EXPECT_EQ(iob::BlobIdAllocator::BlobError::kInvalidHeader, blob.error_value());
+
+    iob::BlobIdAllocator::IterableView view = allocator.iterable();
+    EXPECT_EQ(view.end(), view.begin());
+    auto error = view.take_error();
+    EXPECT_EQ(iob::BlobIdAllocator::BlobError::kInvalidHeader, error.error_value());
   }
 
   // The entry end now extends past the blob head, so the header is invalid.
@@ -69,7 +78,12 @@ TEST(IobBlobIdAllocatorTests, InvalidHeader) {
   {
     auto blob = allocator.GetBlob(0u);
     ASSERT_TRUE(blob.is_error());
-    EXPECT_EQ(iob::BlobIdAllocator::GetBlobError::kInvalidHeader, blob.error_value());
+    EXPECT_EQ(iob::BlobIdAllocator::BlobError::kInvalidHeader, blob.error_value());
+
+    iob::BlobIdAllocator::IterableView view = allocator.iterable();
+    EXPECT_EQ(view.end(), view.begin());
+    auto error = view.take_error();
+    EXPECT_EQ(iob::BlobIdAllocator::BlobError::kInvalidHeader, error.error_value());
   }
 }
 
@@ -132,6 +146,27 @@ TEST(IobBlobIdAllocatorTests, SingleThreaded) {
     ASSERT_TRUE(allocated.is_error());
     EXPECT_EQ(iob::BlobIdAllocator::AllocateError::kOutOfMemory, allocated.error_value());
   }
+
+  iob::BlobIdAllocator::IterableView view = allocator.iterable();
+  unsigned count = 0;
+  for (auto [id, blob] : view) {
+    EXPECT_EQ(count, id);
+    switch (count++) {
+      case 0u:
+        ASSERT_EQ(kBlobA.size(), blob.size());
+        EXPECT_EQ(0, memcmp(blob.data(), kBlobA.data(), kBlobA.size()));
+        break;
+      case 1u:
+        ASSERT_EQ(kBlobB.size(), blob.size());
+        EXPECT_EQ(0, memcmp(blob.data(), kBlobB.data(), kBlobB.size()));
+        break;
+      default:
+        EXPECT_TRUE(false);
+        break;
+    }
+  }
+  EXPECT_EQ(2u, count);
+  EXPECT_TRUE(view.take_error().is_ok());
 }
 
 TEST(IobBlobIdAllocatorTests, MultiThreaded) {
@@ -167,18 +202,76 @@ TEST(IobBlobIdAllocatorTests, MultiThreaded) {
 
   // Similarly, all recorded blobs should be of size 1 and have values ranging
   // 0 to 99 in some nondeterministic order.
+  iob::BlobIdAllocator::IterableView view = allocator.iterable();
   std::array<std::byte, 100> blob_values;
-  for (uint32_t i = 0; i < 100; ++i) {
-    auto result = allocator.GetBlob(i);
-    ASSERT_TRUE(result.is_ok());
-    cpp20::span<const std::byte> blob = result.value();
+  size_t count = 0;
+  for (auto [id, blob] : view) {
     ASSERT_EQ(1u, blob.size());
-    blob_values[i] = blob[0];
+    blob_values[count++] = blob[0];
   }
+  EXPECT_EQ(100u, count);
+  EXPECT_TRUE(view.take_error().is_ok());
+
   std::sort(blob_values.begin(), blob_values.end());
   for (uint8_t i = 0; i < 100; ++i) {
     EXPECT_EQ(std::byte{i}, blob_values[i]);
   }
+}
+
+TEST(IobBlobIdAllocatorTests, GetBlob) {
+  static constexpr std::array<std::byte, 10> kBlobA{std::byte{'a'}};
+  static constexpr std::array<std::byte, 20> kBlobB{std::byte{'b'}};
+  static constexpr std::array<std::byte, 30> kBlobC{std::byte{'c'}};
+  static constexpr std::array<cpp20::span<const std::byte>, 3> kBlobs{kBlobA, kBlobB, kBlobC};
+
+  alignas(8) std::array<std::byte, 100> buffer;
+  iob::BlobIdAllocator allocator(buffer);
+  allocator.Init();
+
+  // Allocate IDs for the blobs.
+  for (auto blob : kBlobs) {
+    auto allocated = allocator.Allocate(blob);
+    ASSERT_TRUE(allocated.is_ok());
+  }
+
+  iob::BlobIdAllocator::IterableView view = allocator.iterable();
+  unsigned count = 0;
+  for (auto [id, expected] : view) {
+    EXPECT_EQ(count, id);
+    auto result = allocator.GetBlob(count++);
+    ASSERT_TRUE(result.is_ok());
+    auto actual = result.value();
+    ASSERT_EQ(expected.size(), actual.size());
+    EXPECT_EQ(0, memcmp(expected.data(), actual.data(), actual.size()));
+  }
+  EXPECT_EQ(3u, count);
+  EXPECT_TRUE(view.take_error().is_ok());
+}
+
+TEST(IobBlobIdAllocatorTests, Find) {
+  static constexpr std::array<std::byte, 10> kBlobA{std::byte{'a'}};
+  static constexpr std::array<std::byte, 20> kBlobB{std::byte{'b'}};
+  static constexpr std::array<std::byte, 30> kBlobC{std::byte{'c'}};
+  static constexpr std::array<cpp20::span<const std::byte>, 3> kBlobs{kBlobA, kBlobB, kBlobC};
+
+  alignas(8) std::array<std::byte, 100> buffer;
+  iob::BlobIdAllocator allocator(buffer);
+  allocator.Init();
+
+  // Allocate IDs for the blobs.
+  for (auto blob : kBlobs) {
+    auto allocated = allocator.Allocate(blob);
+    ASSERT_TRUE(allocated.is_ok());
+  }
+
+  auto view = allocator.iterable();
+  for (uint32_t id = 0; id < 3; ++id) {
+    auto it = view.find(id);
+    ASSERT_NE(it, view.end());
+    EXPECT_EQ(id, it->id);
+  }
+  EXPECT_EQ(view.end(), view.find(3));
+  EXPECT_TRUE(view.take_error().is_ok());
 }
 
 }  // namespace
