@@ -256,6 +256,17 @@ elif is_feature_enabled "incremental_legacy"; then
   exit 1
 fi
 
+if is_feature_enabled "foreground_repo_server" && [[ "$(ffx-repository-server-state)" != "disabled" ]]; then
+  fx-warn "The 'foreground_repo_server' feature is enabled. An already running"
+  fx-warn "foreground server may not be detected correctly yet. Please consider"
+  fx-warn "running the following commands:"
+  fx-warn ""
+  fx-warn "$ ffx config set repository.server.listen \"\""
+  fx-warn "$ ffx doctor --restart-daemon"
+  fx-warn ""
+  fx-warn "Then restart \"fx serve\""
+fi
+
 # Error out if we can't start a package server.
 check-if-we-can-start-package-server "${server_mode}" "" "${port}"
 err=$?
