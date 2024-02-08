@@ -16,6 +16,7 @@
         fallback: "false",
     },
     use: [
+        { service: "fuchsia.hardware.network.driver.Service" },
         { protocol: "fuchsia.scheduler.ProfileProvider" },
     ],
 }

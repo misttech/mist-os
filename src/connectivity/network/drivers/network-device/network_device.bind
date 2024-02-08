@@ -3,4 +3,12 @@
 // found in the LICENSE file.
 
 using fuchsia.network;
-fuchsia.BIND_PROTOCOL == fuchsia.network.BIND_PROTOCOL.IMPL;
+using fuchsia.hardware.network.driver;
+
+if fuchsia.BIND_PROTOCOL == fuchsia.network.BIND_PROTOCOL.IMPL {
+    true;
+} else if fuchsia.hardware.network.driver.Service == fuchsia.hardware.network.driver.Service.DriverTransport {
+    true;
+} else {
+    false;
+}
