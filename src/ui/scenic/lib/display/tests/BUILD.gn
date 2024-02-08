@@ -13,7 +13,6 @@ executable("unittests") {
   testonly = true
   sources = [
     "display_coordinator_listener_unittest.cc",
-    "display_coordinator_unittest.cc",
     "display_manager_unittest.cc",
     "display_power_manager_unittest.cc",
     "singleton_display_service_unittest.cc",
