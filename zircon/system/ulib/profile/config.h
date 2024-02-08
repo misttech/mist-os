@@ -33,6 +33,10 @@ enum class ProfileScope {
 FBL_ENABLE_ENUM_BITS(ProfileScope)
 
 struct Profile {
+  Profile(ProfileScope ps, zx_profile_info_t info) : scope(ps), info(info) {}
+  Profile(ProfileScope ps, zx_profile_info_t info,
+          std::vector<fuchsia_scheduler::Parameter> outputs)
+      : scope(ps), info(info), output_parameters(outputs) {}
   ProfileScope scope{ProfileScope::None};
   zx_profile_info_t info{};
   zx::profile profile{};
@@ -63,6 +67,9 @@ class Role {
   static fit::result<zx_status_t, Role> Create(std::string_view name_with_selectors,
                                                bool ignore_selectors = false);
 
+  // TODO(https://fxbug.dev/321037780): Remove IsTestRole once the ProfileProvider has been
+  // deprecated, as the RoleManager has its own integration tests that do not rely on a hardcoded
+  // test role.
   bool IsTestRole() const { return name_ == "fuchsia.test-role"; }
   bool HasSelector(std::string selector) const;
   std::string name() const { return name_; }

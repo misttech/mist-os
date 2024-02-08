@@ -490,7 +490,7 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
       continue;
     }
 
-    Profile p{scope, info};
+    std::vector<Parameter> output_parameters = {};
     if (profile.value.HasMember("output_parameters")) {
       const auto& output_param_member = profile.value["output_parameters"];
       if (!output_param_member.IsObject()) {
@@ -501,13 +501,13 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
       }
       for (const auto& m : IterateMembers(output_param_member)) {
         if (m.value.IsInt()) {
-          p.output_parameters.push_back(
+          output_parameters.push_back(
               Parameter{m.name.GetString(), ParameterValue::WithIntValue(m.value.GetInt())});
         } else if (m.value.IsDouble()) {
-          p.output_parameters.push_back(
+          output_parameters.push_back(
               Parameter{m.name.GetString(), ParameterValue::WithFloatValue(m.value.GetDouble())});
         } else if (m.value.IsString()) {
-          p.output_parameters.push_back(
+          output_parameters.push_back(
               Parameter{m.name.GetString(), ParameterValue::WithStringValue(m.value.GetString())});
         } else {
           FX_SLOG(WARNING, "Output parameter value must be a float, integer, or string!",
@@ -518,6 +518,7 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
       }
     }
 
+    Profile p(scope, info, output_parameters);
     const auto [iter, added] = profiles->insert(std::pair{std::move(role.value()), std::move(p)});
     if (!added) {
       const ProfileScope existing_scope = iter->second.scope;
@@ -534,7 +535,7 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
                 FX_KV("type", type_name), FX_KV("profile_name", profile_name),
                 FX_KV("scope", ToString(scope)), FX_KV("profile_name", profile_name),
                 FX_KV("tag", "ProfileProvider"));
-        iter->second = Profile{scope, info};
+        iter->second = Profile(scope, info, std::move(output_parameters));
       }
     }
   }  // for (const auto& profile : IterateMembers(document))

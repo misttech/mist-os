@@ -143,15 +143,20 @@ void RoleManager::SetRole(SetRoleRequestView request, SetRoleCompleter::Sync& co
     return;
   }
 
-  std::optional<std::vector<fuchsia_scheduler::Parameter>> input_params =
-      fidl::ToNatural(request->input_parameters());
-  if (!input_params.has_value()) {
-    FX_SLOG(WARNING, "Unable to take ownership of input parameters.", FX_KV("role", role_name),
-            FX_KV("tag", "RoleManager"));
-    completer.ReplyError(ZX_ERR_INVALID_ARGS);
-    return;
+  std::vector<fuchsia_scheduler::Parameter> input_params = {};
+  if (request->has_input_parameters()) {
+    std::optional<std::vector<fuchsia_scheduler::Parameter>> maybe_input_params =
+        fidl::ToNatural(request->input_parameters());
+    if (!maybe_input_params.has_value()) {
+      FX_SLOG(WARNING, "Unable to take ownership of input parameters.", FX_KV("role", role_name),
+              FX_KV("tag", "RoleManager"));
+      completer.ReplyError(ZX_ERR_INVALID_ARGS);
+      return;
+    }
+    input_params = maybe_input_params.value();
   }
-  const fit::result role = Role::Create(role_name, input_params.value());
+
+  const fit::result role = Role::Create(role_name, input_params);
   if (role.is_error()) {
     completer.ReplyError(role.error_value());
     return;
@@ -162,18 +167,6 @@ void RoleManager::SetRole(SetRoleRequestView request, SetRoleCompleter::Sync& co
   // Select the profile parameters based on the role selector.
   fidl::Arena arena;
   auto builder = fuchsia_scheduler::wire::RoleManagerSetRoleResponse::Builder(arena);
-
-  // Handle the test role case specially.
-  if (role->IsTestRole()) {
-    if (role->HasSelector("not-found")) {
-      completer.ReplyError(ZX_ERR_NOT_FOUND);
-    } else if (role->HasSelector("ok")) {
-      completer.ReplySuccess(builder.Build());
-    } else {
-      completer.ReplyError(ZX_ERR_INVALID_ARGS);
-    }
-    return;
-  }
 
   // Look for the requested role in the profile map and set the profile if found.
   if (auto search = profile_map.find(*role); search != profile_map.cend()) {
@@ -200,7 +193,7 @@ int main(int argc, const char** argv) {
 
   zx::result create_result = RoleManager::Create();
   if (create_result.is_error()) {
-    FX_LOGS(ERROR) << "failed to create role manager service: " << create_result.status_string();
+    FX_LOGS(ERROR) << "Failed to create role manager service: " << create_result.status_string();
     return -1;
   }
   std::unique_ptr<RoleManager> role_manager_service = std::move(create_result.value());
@@ -209,19 +202,19 @@ int main(int argc, const char** argv) {
   zx::result result =
       outgoing.AddProtocol<fuchsia_scheduler::RoleManager>(std::move(role_manager_service));
   if (result.is_error()) {
-    FX_LOGS(ERROR) << "failed to add RoleManager protocol: " << result.status_string();
+    FX_LOGS(ERROR) << "Failed to add RoleManager protocol: " << result.status_string();
     return -1;
   }
 
   result = outgoing.ServeFromStartupInfo();
   if (result.is_error()) {
-    FX_LOGS(ERROR) << "failed to serve outgoing directory: " << result.status_string();
+    FX_LOGS(ERROR) << "Failed to serve outgoing directory: " << result.status_string();
     return -1;
   }
-  FX_LOGS(INFO) << "starting role manager\n";
+  FX_LOGS(INFO) << "Starting role manager\n";
   zx_status_t status = loop.Run();
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "failed to run async loop: " << zx_status_get_string(status);
+    FX_LOGS(ERROR) << "Failed to run async loop: " << zx_status_get_string(status);
   }
   return 0;
 }
