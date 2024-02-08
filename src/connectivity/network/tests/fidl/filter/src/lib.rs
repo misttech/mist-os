@@ -575,13 +575,6 @@ async fn push_change_missing_required_field(name: &str) {
     // invalid types that we are testing.
     let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
     control.open_controller("test", server_end).expect("open controller");
-    let fnet_filter::NamespaceControllerEvent::OnIdAssigned { id: _ } = controller
-        .take_event_stream()
-        .next()
-        .await
-        .expect("controller should receive event")
-        .expect("controller should be assigned ID");
-
     assert_eq!(
         controller
             .push_changes(&[fnet_filter::Change::Create(fnet_filter::Resource::Namespace(
@@ -611,13 +604,6 @@ async fn push_change_invalid_interface_matcher(name: &str) {
     // invalid types that we are testing.
     let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
     control.open_controller("test", server_end).expect("open controller");
-    let fnet_filter::NamespaceControllerEvent::OnIdAssigned { id: _ } = controller
-        .take_event_stream()
-        .next()
-        .await
-        .expect("controller should receive event")
-        .expect("controller should be assigned ID");
-
     assert_eq!(
         controller
             .push_changes(&[fnet_filter::Change::Create(fnet_filter::Resource::Rule(
@@ -693,13 +679,6 @@ async fn push_change_invalid_address_matcher(name: &str, matcher: fnet_filter::A
     // invalid types that we are testing.
     let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
     control.open_controller("test", server_end).expect("open controller");
-    let fnet_filter::NamespaceControllerEvent::OnIdAssigned { id: _ } = controller
-        .take_event_stream()
-        .next()
-        .await
-        .expect("controller should receive event")
-        .expect("controller should be assigned ID");
-
     assert_eq!(
         controller
             .push_changes(&[fnet_filter::Change::Create(fnet_filter::Resource::Rule(
@@ -738,13 +717,6 @@ async fn push_change_invalid_port_matcher(name: &str) {
     // invalid types that we are testing.
     let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
     control.open_controller("test", server_end).expect("open controller");
-    let fnet_filter::NamespaceControllerEvent::OnIdAssigned { id: _ } = controller
-        .take_event_stream()
-        .next()
-        .await
-        .expect("controller should receive event")
-        .expect("controller should be assigned ID");
-
     assert_eq!(
         controller
             .push_changes(&[fnet_filter::Change::Create(fnet_filter::Resource::Rule(
@@ -801,12 +773,6 @@ async fn push_changes_index_based_error_return(name: &str, pos: InvalidChangePos
     // invalid types that we are testing.
     let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
     control.open_controller("test", server_end).expect("open controller");
-    let fnet_filter::NamespaceControllerEvent::OnIdAssigned { id: _ } = controller
-        .take_event_stream()
-        .next()
-        .await
-        .expect("controller should receive event")
-        .expect("controller should be assigned ID");
 
     // Create a batch of valid changes, and insert an invalid change somewhere in the batch.
     let mut changes =
