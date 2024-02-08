@@ -5,7 +5,7 @@
 use packet_formats::ip::IpExt;
 
 use crate::{
-    context::{FilterBindingsTypes, FilterContext},
+    context::{FilterBindingsTypes, FilterIpContext},
     matchers::InterfaceProperties,
     packets::IpPacket,
     state::{Action, Hook, Routine, Rule},
@@ -99,10 +99,10 @@ pub trait FilterHandler<I: IpExt, BT: FilterBindingsTypes> {
 /// The "production" implementation of packet filtering.
 ///
 /// Provides an implementation of [`FilterHandler`] for any `CC` that implements
-/// [`FilterContext`].
+/// [`FilterIpContext`].
 pub struct FilterImpl<'a, CC>(pub &'a mut CC);
 
-impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterContext<I, BT>> FilterHandler<I, BT>
+impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandler<I, BT>
     for FilterImpl<'_, CC>
 {
     fn ingress_hook<B, P, D>(&mut self, packet: &mut P, interface: &D) -> Verdict

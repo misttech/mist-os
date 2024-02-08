@@ -9,13 +9,15 @@
 
 extern crate fakealloc as alloc;
 
+mod api;
 mod context;
 mod logic;
 mod matchers;
 mod packets;
 mod state;
 
-pub use context::{FilterBindingsTypes, FilterContext};
+pub use api::FilterApi;
+pub use context::{FilterBindingsTypes, FilterContext, FilterIpContext};
 pub use logic::{FilterHandler, FilterImpl, Verdict};
 pub use matchers::{
     AddressMatcher, AddressMatcherType, InterfaceMatcher, InterfaceProperties, PacketMatcher,

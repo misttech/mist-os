@@ -15,6 +15,7 @@ use crate::{
         queue::api::{ReceiveQueueApi, TransmitQueueApi},
         socket::DeviceSocketApi,
     },
+    filter::FilterApi,
     ip::{
         api::{RoutesAnyApi, RoutesApi},
         device::{
@@ -67,6 +68,12 @@ where
     pub fn device_socket(self) -> DeviceSocketApi<CoreApiCtxPair<'a, BP>> {
         let Self(ctx) = self;
         DeviceSocketApi::new(ctx)
+    }
+
+    /// Gets access to the filtering API.
+    pub fn filter(self) -> FilterApi<CoreApiCtxPair<'a, BP>> {
+        let Self(ctx) = self;
+        FilterApi::new(ctx)
     }
 
     /// Gets access to the routes API for IP version `I`.

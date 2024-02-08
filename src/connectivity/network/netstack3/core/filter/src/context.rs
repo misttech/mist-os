@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use net_types::ip::{Ipv4, Ipv6};
 use packet_formats::ip::IpExt;
 
 use crate::state::State;
@@ -16,7 +17,7 @@ pub trait FilterBindingsTypes {
     type DeviceClass;
 }
 
-/// The execution context for packet filtering.
+/// The IP version-specific execution context for packet filtering.
 ///
 /// This trait exists to abstract over access to the filtering state. It is
 /// useful to implement filtering logic in terms of this trait, as opposed to,
@@ -24,9 +25,22 @@ pub trait FilterBindingsTypes {
 /// directly as an argument, because it allows Netstack3 Core to use lock
 /// ordering types to enforce that filtering state is only acquired at or before
 /// a given lock level, while keeping test code free of locking concerns.
-pub trait FilterContext<I: IpExt, BT: FilterBindingsTypes> {
+pub trait FilterIpContext<I: IpExt, BT: FilterBindingsTypes> {
     /// Calls the function with a reference to filtering state.
     fn with_filter_state<O, F: FnOnce(&State<I, BT::DeviceClass>) -> O>(&mut self, cb: F) -> O;
+}
+
+/// A context for mutably accessing all filtering state at once, to allow IPv4
+/// and IPv6 filtering state to be modified atomically.
+pub trait FilterContext<BT: FilterBindingsTypes> {
+    /// Calls the function with a mutable reference to all filtering state.
+    fn with_all_filter_state_mut<
+        O,
+        F: FnOnce(&mut State<Ipv4, BT::DeviceClass>, &mut State<Ipv6, BT::DeviceClass>) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O;
 }
 
 #[cfg(test)]
@@ -54,7 +68,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpExt> FilterContext<I, FakeBindingsTypes> for FakeCtx<I> {
+    impl<I: IpExt> FilterIpContext<I, FakeBindingsTypes> for FakeCtx<I> {
         fn with_filter_state<O, F: FnOnce(&State<I, FakeDeviceClass>) -> O>(&mut self, cb: F) -> O {
             let Self(state) = self;
             cb(&*state)
