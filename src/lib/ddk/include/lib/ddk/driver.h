@@ -381,6 +381,8 @@ zx_handle_t get_root_resource(zx_device_t* dev);
 
 zx_handle_t get_mmio_resource(zx_device_t* dev);
 
+zx_handle_t get_msi_resource(zx_device_t* dev);
+
 zx_handle_t get_power_resource(zx_device_t* dev);
 
 zx_handle_t get_ioport_resource(zx_device_t* dev);

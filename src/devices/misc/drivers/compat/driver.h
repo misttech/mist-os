@@ -53,6 +53,8 @@ class Driver : public fdf::DriverBase {
 
   zx_handle_t GetMmioResource();
 
+  zx_handle_t GetMsiResource();
+
   zx_handle_t GetPowerResource();
 
   zx_handle_t GetIoportResource();
@@ -153,6 +155,7 @@ class Driver : public fdf::DriverBase {
   // API resources.
   zx::resource root_resource_;
   zx::resource mmio_resource_;
+  zx::resource msi_resource_;
   zx::resource power_resource_;
   zx::resource ioport_resource_;
   zx::resource irq_resource_;

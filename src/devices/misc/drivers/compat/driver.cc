@@ -186,6 +186,18 @@ zx::result<zx::resource> GetInfoResource(fdf::Namespace& ns) {
   return zx::ok(std::move(result.value().resource));
 }
 
+zx::result<zx::resource> GetMsiResource(fdf::Namespace& ns) {
+  zx::result resource = ns.Connect<fkernel::MsiResource>();
+  if (resource.is_error()) {
+    return resource.take_error();
+  }
+  fidl::WireResult result = fidl::WireCall(resource.value())->Get();
+  if (!result.ok()) {
+    return zx::error(result.status());
+  }
+  return zx::ok(std::move(result.value().resource));
+}
+
 }  // namespace
 
 namespace compat {
@@ -437,6 +449,18 @@ zx_handle_t Driver::GetMmioResource() {
     }
   }
   return mmio_resource_.get();
+}
+
+zx_handle_t Driver::GetMsiResource() {
+  if (!msi_resource_.is_valid()) {
+    zx::result resource = ::GetMsiResource(*incoming());
+    if (resource.is_ok()) {
+      msi_resource_ = std::move(resource.value());
+    } else {
+      FDF_LOGL(WARNING, *logger_, "Failed to get msi_resource '%s'", resource.status_string());
+    }
+  }
+  return msi_resource_.get();
 }
 
 zx_handle_t Driver::GetPowerResource() {

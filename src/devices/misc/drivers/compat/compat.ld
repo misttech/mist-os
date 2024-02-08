@@ -17,6 +17,7 @@
     get_framebuffer_resource;
     get_ioport_resource;
     get_mmio_resource;
+    get_msi_resource;
     get_irq_resource;
     get_info_resource;
     get_smc_resource;

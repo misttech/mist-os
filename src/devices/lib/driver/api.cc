@@ -64,6 +64,8 @@ __EXPORT zx_handle_t get_framebuffer_resource(zx_device_t* dev) { return ZX_ERR_
 
 __EXPORT zx_handle_t get_iommu_resource(zx_device_t* dev) { return ZX_ERR_NOT_SUPPORTED; }
 
+__EXPORT zx_handle_t get_msi_resource(zx_device_t* dev) { return ZX_ERR_NOT_SUPPORTED; }
+
 __EXPORT zx_handle_t get_power_resource(zx_device_t* dev) { return ZX_ERR_NOT_SUPPORTED; }
 
 __EXPORT zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_device_t* dev, const char* path,

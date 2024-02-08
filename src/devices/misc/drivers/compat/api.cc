@@ -57,6 +57,10 @@ __EXPORT zx_handle_t get_mmio_resource(zx_device_t* device) {
   return device->driver()->GetMmioResource();
 }
 
+__EXPORT zx_handle_t get_msi_resource(zx_device_t* device) {
+  return device->driver()->GetMmioResource();
+}
+
 __EXPORT zx_handle_t get_power_resource(zx_device_t* device) {
   return device->driver()->GetPowerResource();
 }
