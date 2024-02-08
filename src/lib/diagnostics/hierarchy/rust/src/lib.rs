@@ -868,6 +868,28 @@ pub struct HierarchyMatcher {
 }
 
 impl HierarchyMatcher {
+    pub fn new<I>(selectors: I) -> Result<Self, Error>
+    where
+        I: Iterator<Item = Selector>,
+    {
+        let mut matcher = HierarchyMatcher::default();
+        for selector in selectors {
+            selector.validate().map_err(|e| Error::Selectors(e.into()))?;
+
+            // Safe to unwrap since we already validated the selector.
+            match selector.tree_selector.unwrap() {
+                TreeSelector::SubtreeSelector(subtree_selector) => {
+                    matcher.insert_subtree(subtree_selector);
+                }
+                TreeSelector::PropertySelector(property_selector) => {
+                    matcher.insert_property(property_selector);
+                }
+                _ => return Err(Error::Selectors(selectors::Error::InvalidTreeSelector)),
+            }
+        }
+        Ok(matcher)
+    }
+
     fn insert_subtree(&mut self, selector: SubtreeSelector) {
         self.insert(selector.node_path, None);
     }
@@ -2001,6 +2023,44 @@ mod tests {
                 hierarchy.sort();
                 hierarchy
             });
+        assert_eq!(
+            result,
+            Some(DiagnosticsHierarchy::new(
+                "root",
+                vec![Property::Int("z".to_string(), -4),],
+                vec![
+                    DiagnosticsHierarchy::new(
+                        "bar",
+                        vec![],
+                        vec![DiagnosticsHierarchy::new(
+                            "zed",
+                            vec![Property::Int("13/:".to_string(), -4)],
+                            vec![],
+                        )],
+                    ),
+                    DiagnosticsHierarchy::new(
+                        "foo",
+                        vec![Property::Int("11".to_string(), -4),],
+                        vec![],
+                    )
+                ],
+            ))
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_matcher_from_iterator() {
+        let matcher = HierarchyMatcher::new(
+            ["*:root/foo:11", "*:root:z", r#"*:root/bar/zed:13\/\:"#].into_iter().map(|s| {
+                selectors::parse_selector::<VerboseError>(s)
+                    .expect("All test selectors are valid and parsable.")
+            }),
+        )
+        .expect("create matcher from iterator of selectors");
+        let result = filter_hierarchy(get_test_hierarchy(), &matcher).map(|mut hierarchy| {
+            hierarchy.sort();
+            hierarchy
+        });
         assert_eq!(
             result,
             Some(DiagnosticsHierarchy::new(

@@ -68,7 +68,8 @@ lazy_static! {
 }
 
 impl Tag {
-    pub fn new(tag: String) -> Result<Self, Error> {
+    pub fn new(tag: impl Into<String>) -> Result<Self, Error> {
+        let tag = tag.into();
         if !NAME_VALIDATOR.is_match(&tag) {
             bail!("Invalid tag {} must match [a-z][a-z-]*", tag);
         }
@@ -124,6 +125,12 @@ impl Display for Tag {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let Self(name) = self;
         name.fmt(f)
+    }
+}
+
+impl PartialEq<str> for Tag {
+    fn eq(&self, other: &str) -> bool {
+        self.0 == other
     }
 }
 
@@ -236,5 +243,10 @@ mod test {
         assert!(try_insert_items(&mut config, bad_serv).is_err());
         // Can't duplicate tags in the same service
         assert!(try_insert_items(&mut config, tagb_servb).is_err());
+    }
+
+    #[test]
+    fn test_tag_equals_str() {
+        assert_eq!(&Tag::new("foo").unwrap(), "foo");
     }
 }
