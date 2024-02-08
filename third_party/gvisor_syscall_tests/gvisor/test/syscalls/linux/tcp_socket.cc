@@ -2594,8 +2594,8 @@ TEST_P(SimpleTcpSocketTest, SynRcvdOnListenerShutdown) {
                     SyscallSucceedsWithValue(1));
 
         EXPECT_EQ(poll_fd.revents,
-        // TODO(https://fxbug.dev/42156248): Remove when other signals are asserted
-        // together with POLLERR in Fuchsia.
+        // TODO(https://fxbug.dev/42156248): Remove when other signals are
+        // asserted together with POLLERR in Fuchsia.
 #if defined(__Fuchsia__)
                   POLLOUT
 #else
