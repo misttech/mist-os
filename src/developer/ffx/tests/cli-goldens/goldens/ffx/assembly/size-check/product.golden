@@ -102,6 +102,18 @@
       "short": null,
       "description": "maximum amount that the size of blobfs can increase in one CL. This value is propagated to the gerrit size report.",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "platform-resources-budget"
+        }
+      },
+      "optionality": "optional",
+      "long": "--platform-resources-budget",
+      "short": null,
+      "description": "maximum amount of bytes the platform resources can consume.",
+      "hidden": false
     }
   ],
   "notes": [],

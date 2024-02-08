@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::operations::size_check::breakdown::SizeBreakdown;
+use crate::operations::size_check::breakdown::{SizeBreakdown, SizeResult};
 use crate::operations::size_check::visualization::generate_visualization;
 use anyhow::{format_err, Context, Result};
 use assembly_manifest::{AssemblyManifest, BlobfsContents, Image};
@@ -15,6 +15,8 @@ use std::fs;
 use gcs::{client::Client, gs_url::split_gs_url};
 
 const TOTAL_BLOBFS_GERRIT_COMPONENT_NAME: &str = "Total BlobFS contents";
+const TOTAL_RESOURCES_GERRIT_COMPONENT_NAME: &str = "Platform Resources";
+const RESOURCES_CREEP_BUDGET: &u64 = &2097152; // 2.0 MiB
 
 /// Verifies that the product budget is not exceeded.
 pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> {
@@ -38,17 +40,17 @@ pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> 
 
     let max_contents_size = blobfs_contents.maximum_contents_size;
     let breakdown = SizeBreakdown::from_contents(&blobfs_contents);
-    let total_blobfs_size = breakdown.total_size();
+    let size = breakdown.calculate_size();
     let contents_fit = match max_contents_size {
         None => true,
-        Some(max) => total_blobfs_size <= max,
+        Some(max) => size.consumed_bytes <= max,
     };
 
     if let Some(size_breakdown_output) = args.size_breakdown_output {
         let lines = breakdown.get_print_lines();
         fs::write(
             size_breakdown_output,
-            format!("{}\nTotal size: {} bytes", lines.join("\n"), total_blobfs_size),
+            format!("{}\nTotal size: {} bytes", lines.join("\n"), size.consumed_bytes),
         )
         .context("writing size breakdown output")?;
     }
@@ -76,7 +78,7 @@ pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> 
         diff.print();
     } else if args.verbose {
         breakdown.print();
-        println!("Total size: {total_blobfs_size} bytes");
+        println!("Total size: {} bytes", size.consumed_bytes);
     }
 
     if let Some(gerrit_output) = args.gerrit_output {
@@ -86,12 +88,16 @@ pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> 
         let blobfs_creep_budget = args.blobfs_creep_budget.ok_or_else(|| {
             format_err!("Cannot create gerrit report when blobfs_creep_budget is none")
         })?;
+        let platform_resources_budget = args.platform_resources_budget.ok_or_else(|| {
+            format_err!("Cannot create gerrit report when platform_resources_budget is none")
+        })?;
         fs::write(
             gerrit_output,
             serde_json::to_string(&create_gerrit_report(
-                total_blobfs_size,
+                &size,
                 max_contents_size,
                 blobfs_creep_budget,
+                platform_resources_budget,
             ))?,
         )
         .context("writing gerrit report")?;
@@ -113,7 +119,7 @@ pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> 
     if !contents_fit {
         println!(
             "BlobFS contents size ({}) exceeds max_contents_size ({}).",
-            total_blobfs_size,
+            size.consumed_bytes,
             max_contents_size.unwrap(), // Value is always present when budget is exceeded.
         );
         if !args.verbose {
@@ -173,14 +179,18 @@ fn extract_blob_contents(assembly_manifest: &AssemblyManifest) -> Option<&Blobfs
 
 /// Builds a report with the gerrit size format.
 fn create_gerrit_report(
-    total_blobfs_size: u64,
+    size: &SizeResult,
     max_contents_size: u64,
     blobfs_creep_budget: u64,
+    platform_resources_budget: u64,
 ) -> serde_json::Value {
     json!({
-        TOTAL_BLOBFS_GERRIT_COMPONENT_NAME: total_blobfs_size,
-        format!("{TOTAL_BLOBFS_GERRIT_COMPONENT_NAME}.budget"): max_contents_size,
-        format!("{TOTAL_BLOBFS_GERRIT_COMPONENT_NAME}.creepBudget"): blobfs_creep_budget
+        TOTAL_BLOBFS_GERRIT_COMPONENT_NAME: size.consumed_bytes - size.consumed_bytes_resources,
+        format!("{TOTAL_BLOBFS_GERRIT_COMPONENT_NAME}.budget"): max_contents_size - platform_resources_budget,
+        format!("{TOTAL_BLOBFS_GERRIT_COMPONENT_NAME}.creepBudget"): blobfs_creep_budget,
+        TOTAL_RESOURCES_GERRIT_COMPONENT_NAME: size.consumed_bytes_resources,
+        format!("{TOTAL_RESOURCES_GERRIT_COMPONENT_NAME}.budget"): platform_resources_budget,
+        format!("{TOTAL_RESOURCES_GERRIT_COMPONENT_NAME}.creepBudget"): RESOURCES_CREEP_BUDGET,
     })
 }
 
@@ -222,13 +232,21 @@ mod tests {
 
     #[test]
     fn gerrit_report_test() {
-        let gerrit_report = create_gerrit_report(151, 200, 20);
+        let gerrit_report = create_gerrit_report(
+            &SizeResult { consumed_bytes: 151, consumed_bytes_resources: 30 },
+            200,
+            20,
+            50,
+        );
         assert_eq!(
             gerrit_report,
             json!({
-                TOTAL_BLOBFS_GERRIT_COMPONENT_NAME: 151,
-                format!("{TOTAL_BLOBFS_GERRIT_COMPONENT_NAME}.budget"): 200,
+                TOTAL_BLOBFS_GERRIT_COMPONENT_NAME: 121,
+                format!("{TOTAL_BLOBFS_GERRIT_COMPONENT_NAME}.budget"): 150,
                 format!("{TOTAL_BLOBFS_GERRIT_COMPONENT_NAME}.creepBudget"): 20,
+                TOTAL_RESOURCES_GERRIT_COMPONENT_NAME: 30,
+                format!("{TOTAL_RESOURCES_GERRIT_COMPONENT_NAME}.budget"): 50,
+                format!("{TOTAL_RESOURCES_GERRIT_COMPONENT_NAME}.creepBudget"): 2097152,
             })
         )
     }

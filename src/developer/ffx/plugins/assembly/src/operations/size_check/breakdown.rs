@@ -7,10 +7,39 @@ use assembly_manifest::BlobfsContents;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashSet};
 
+/// These are resources supplied by the platform that the product does not need to be specifically
+/// aware of. We will calculate the space consumed by these resources and subtract that space from
+/// the total space allowed in blobfs.
+const RESOURCES: &'static [&'static str] = &[
+    "lib/VkLayer_image_pipe_swapchain.so",
+    "lib/ld.so.1",
+    "lib/libasync-default.so",
+    "lib/libfdio.so",
+    "lib/libsyslog.so",
+    "lib/libtrace-engine.so",
+    "lib/libtrace-provider-so.so",
+    "lib/libvulkan.so",
+    "lib/libc++.so.2",
+    "lib/libc++abi.so.1",
+    "lib/libunwind.so.1",
+    "lib/libre2.so",
+];
+
 #[derive(Clone)]
 pub struct SizeBreakdown {
+    /// Map of package name to breakdown.
     pub packages: BTreeMap<String, PackageBreakdown>,
+    /// Map of blob merkle to breakdown.
     pub blobs: BTreeMap<String, BlobBreakdown>,
+}
+
+/// The result of a size calculation.
+#[derive(Debug, PartialEq)]
+pub struct SizeResult {
+    /// How many bytes are used up including resources.
+    pub consumed_bytes: u64,
+    /// How many bytes are used up only by resources.
+    pub consumed_bytes_resources: u64,
 }
 
 impl SizeBreakdown {
@@ -18,8 +47,16 @@ impl SizeBreakdown {
         println!("{}", self.get_print_lines().join("\n"));
     }
 
-    pub fn total_size(&self) -> u64 {
-        self.blobs.iter().map(|(_, b)| b.size).sum()
+    pub fn calculate_size(&self) -> SizeResult {
+        let resources: HashSet<String> =
+            HashSet::from_iter(RESOURCES.iter().map(|s| s.to_string()));
+        let consumed_bytes = self.blobs.values().map(|b| b.size).sum();
+        let consumed_bytes_resources = self
+            .blobs
+            .values()
+            .filter_map(|b| if b.is_resource(&resources) { Some(b.size) } else { None })
+            .sum();
+        SizeResult { consumed_bytes, consumed_bytes_resources }
     }
 
     pub fn get_print_lines(&self) -> Vec<String> {
@@ -77,7 +114,9 @@ fn wrap_path(indent: usize, length: usize, path: &String) -> String {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct PackageBreakdown {
+    /// Name of the package.
     pub name: String,
+    /// Map of blob path in the package to breakdown.
     pub blobs: BTreeMap<String, BlobBreakdown>,
 }
 
@@ -137,6 +176,15 @@ impl BlobBreakdown {
         let references =
             references.into_iter().map(|r| PackageReferenceDiff::updated(r.name, r.path)).collect();
         BlobDiff::unchanged(hash, size, psize, references)
+    }
+
+    fn is_resource(&self, resources: &HashSet<String>) -> bool {
+        for reference in &self.references {
+            if resources.contains(&reference.path) {
+                return true;
+            }
+        }
+        return false;
     }
 
     fn diff(&self, before: &Self) -> BlobDiff {
@@ -335,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn test_total_size() {
+    fn test_calculate_size() {
         let breakdown = SizeBreakdown {
             // total size calculation does not use packages.
             packages: BTreeMap::new(),
@@ -382,9 +430,23 @@ mod tests {
                         }],
                     },
                 ),
+                // Add a resource that should be added to the resources group.
+                (
+                    "lib/ld.so.1".to_string(),
+                    BlobBreakdown {
+                        hash: "defghijklm".to_string(),
+                        size: 10,
+                        psize: 10,
+                        references: vec![PackageReference {
+                            path: "lib/ld.so.1".to_string(),
+                            name: "pkg-one".to_string(),
+                        }],
+                    },
+                ),
             ]),
         };
-        assert_eq!(45, breakdown.total_size());
+        let expected_total = SizeResult { consumed_bytes: 55, consumed_bytes_resources: 10 };
+        assert_eq!(expected_total, breakdown.calculate_size());
     }
 
     #[test]

@@ -25,7 +25,8 @@ def fuchsia_size_checker(
         size_checker_file = None,
         blobfs_capacity = None,
         max_blob_contents_size = None,
-        blobfs_creep_limit = 102400):
+        blobfs_creep_limit = 102400,
+        platform_resources_budget = 6657271):
     """An implementation of size checker that run product size checker, blobfs package size checker and non-blobfs size chekcer. It will also aggregate all the reports and create a merged report.
 
     Args:
@@ -35,11 +36,13 @@ def fuchsia_size_checker(
         blobfs_capacity: Total Capacity of BlobFS.
         max_blob_contents_size: Total size of BlobFS contents.
         blobfs_creep_limit: Creep limit for Blobfs, this is how much BlobFS contents can increase in one CL.
+        platform_resources_budget: Size allocated for platform resources.
     """
     fuchsia_product_size_check(
         name = name + "_product",
         product_image = product_image,
         blobfs_creep_limit = blobfs_creep_limit,
+        platform_resources_budget = platform_resources_budget,
     )
 
     fuchsia_package_size_check(

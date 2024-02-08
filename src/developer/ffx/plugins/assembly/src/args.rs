@@ -232,6 +232,9 @@ pub struct ProductSizeCheckArgs {
     /// This value is propagated to the gerrit size report.
     #[argh(option)]
     pub blobfs_creep_budget: Option<u64>,
+    /// maximum amount of bytes the platform resources can consume.
+    #[argh(option)]
+    pub platform_resources_budget: Option<u64>,
 }
 
 /// Select an Oauth2 authorization mode.

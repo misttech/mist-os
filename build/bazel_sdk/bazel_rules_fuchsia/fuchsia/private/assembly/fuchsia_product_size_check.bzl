@@ -23,7 +23,8 @@ $FFX \
     --size-breakdown-output $SIZE_FILE \
     --visualization-dir $VISUALIZATION_DIR \
     --gerrit-output $SIZE_REPORT_PRODUCT_FILE \
-    --blobfs-creep-budget $CREEP_LIMIT
+    --blobfs-creep-budget $CREEP_LIMIT \
+    --platform-resources-budget $PLATFORM_RESOURCES_BUDGET
 """
 
 def _fuchsia_product_size_check_impl(ctx):
@@ -47,6 +48,7 @@ def _fuchsia_product_size_check_impl(ctx):
             "VISUALIZATION_DIR": visualization_dir.path,
             "SIZE_REPORT_PRODUCT_FILE": size_report_product_file.path,
             "CREEP_LIMIT": str(ctx.attr.blobfs_creep_limit),
+            "PLATFORM_RESOURCES_BUDGET": str(ctx.attr.platform_resources_budget),
         },
         progress_message = "Size checking for %s" % ctx.label.name,
     )
@@ -72,6 +74,14 @@ fuchsia_product_size_check = rule(
         ),
         "blobfs_creep_limit": attr.int(
             doc = "Creep limit for Blobfs, this is how much BlobFS contents can increase in one CL",
+        ),
+        "platform_resources_budget": attr.int(
+            doc = """Space allocated for shared platform resources.
+            These are typically shared libraries provided by the Fuchsia SDK
+            that can be included in many different components. It can be helpful
+            to isolate these resources into a separate budget to enforce a
+            specific number of unique copies, and to have a distinct creep
+            budget""",
         ),
     },
 )
