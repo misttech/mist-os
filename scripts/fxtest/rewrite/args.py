@@ -111,9 +111,6 @@ class Flags:
             if self.status is None:
                 self.status = termout.is_valid()
 
-        if self.has_debugger():
-            self.status = False
-
     def has_debugger(self) -> bool:
         return bool(self.break_on_failure or self.breakpoints)
 

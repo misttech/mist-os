@@ -190,9 +190,6 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
         recorder.emit_warning_message(
             "🛑 Debugger integration is currently experimental, follow https://fxbug.dev/319320287 for updates 🛑"
         )
-        recorder.emit_info_message(
-            f"⚠️  Status output is disabled because debugger was requested. ⚠️ "
-        )
 
     # Print a message for users who want to know how to see all test output.
     if not flags.output:
