@@ -27,6 +27,8 @@ type DependencyType = strict enum {
     PASSIVE = 2;
 };
 
+const MAX_ELEMENT_NAME_LEN uint16 = 1024;
+
 /// A token that represents the right to add a dependency upon another
 /// element. Should first be registered with Power Broker via
 /// ElementControl.RegisterDependencyToken of the required element.
@@ -54,7 +56,7 @@ open protocol Topology {
     /// open control channels for that element.
     flexible AddElement(resource struct {
         /// Human-readable name for logging and debug purposes.
-        element_name string:1024;
+        element_name string:MAX_ELEMENT_NAME_LEN;
         /// The initial current power level of the element.
         initial_current_level PowerLevel;
         /// All power levels that are valid for this element. Any level not
@@ -255,4 +257,52 @@ open protocol Status {
 
 type StatusError = flexible enum {
     UNKNOWN = 1;
+};
+
+/// PowerLevel name lengths are limited to reduce Inspect space usage
+const MAX_LEVEL_NAME_LEN uint16 = 16;
+
+/// Status client endpoint and stable identifier for a specific Power Element
+type ElementStatusEndpoint = resource table {
+    1: identifier string:MAX_ELEMENT_NAME_LEN;
+    2: status client_end:Status;
+};
+
+/// Mapping of a plaintext name to a PowerLevel
+type PowerLevelName = table {
+    1: level PowerLevel;
+    2: name string:MAX_LEVEL_NAME_LEN;
+};
+
+/// Mapping of a vector of [`fuchsia.power.broker/PowerLevelName`] to a Power
+/// Element via its stable identifier
+type ElementPowerLevelNames = table {
+    1: identifier string:MAX_ELEMENT_NAME_LEN;
+    2: levels vector<PowerLevelName>:MAX_VALID_POWER_LEVELS;
+};
+
+/// Provides an interface to retrieve information about PowerElements managed by a component.
+@discoverable
+open protocol ElementInfoProvider {
+    /// Returns mappings of PowerLevels to plaintext names for each element managed
+    /// by a component. Returns an error if no mappings can be returned.
+    flexible GetElementPowerLevelNames() -> (resource struct {
+        level_names vector<ElementPowerLevelNames>:MAX;
+    }) error ElementInfoProviderError;
+
+    /// Returns available Status client endpoints and stable identifiers for each
+    /// element managed by a component. Returns an error if no endpoints can be
+    /// returned (i.e. no elements were able to implement the Status channel).
+    flexible GetStatusEndpoints() -> (resource struct {
+        endpoints vector<ElementStatusEndpoint>:MAX;
+    }) error ElementInfoProviderError;
+};
+
+type ElementInfoProviderError = flexible enum {
+    UNKNOWN = 0;
+    FAILED = 1;
+};
+
+service ElementInfoProviderService {
+    status_provider client_end:ElementInfoProvider;
 };
