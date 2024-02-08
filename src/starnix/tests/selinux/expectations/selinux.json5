@@ -22,7 +22,6 @@
                 "*selinux_mkdir*",
                 "*selinux_msg*",
                 "*selinux_open*",
-                "*selinux_ptrace*",
                 "*selinux_readlink*",
                 "*selinux_relabel*",
                 "*selinux_rename*",

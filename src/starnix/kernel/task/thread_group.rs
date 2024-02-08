@@ -22,6 +22,7 @@ use crate::{
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use macro_rules_attribute::apply;
+use selinux::SecurityId;
 use starnix_lifecycle::{AtomicU64Counter, DropNotifier};
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{LockBefore, Locked, Mutex, MutexGuard, ProcessGroupState, RwLock};
@@ -1158,6 +1159,14 @@ impl ThreadGroup {
             }
         }
         None
+    }
+
+    /// Get the SELinux security ID of the thread group, or `None` if not set.
+    pub fn get_current_sid(&self) -> Option<SecurityId> {
+        // TODO(http://b/316181721): to avoid TOCTOU issues, once initial security contexts are
+        // propagated to tasks in the system, in some cases using this API will need to be replaced
+        // with call sites holding the state lock while making updates.
+        self.mutable_state.read().selinux_state.as_ref().map(|state| state.current_sid.clone())
     }
 }
 

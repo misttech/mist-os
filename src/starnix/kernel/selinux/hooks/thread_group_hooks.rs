@@ -186,6 +186,16 @@ pub(crate) fn check_signal_access(
     }
 }
 
+/// Checks if the task with `source_sid` is allowed to trace the task with `target_sid`.
+pub(crate) fn check_ptrace_access(
+    status: &impl SecurityServerStatus,
+    permission_check: &impl PermissionCheck,
+    source_sid: Option<SecurityId>,
+    target_sid: Option<SecurityId>,
+) -> Result<(), Errno> {
+    check_permission(status, permission_check, source_sid, target_sid, ProcessPermission::Ptrace)
+}
+
 /// Checks if `permission` is allowed from the task with `source_sid` to the task with `target_sid`.
 fn check_permission(
     status: &impl SecurityServerStatus,
@@ -770,5 +780,48 @@ mod tests {
                 error!(EACCES)
             );
         }
+    }
+
+    #[fuchsia::test]
+    fn ptrace_access_allowed_for_allowed_type() {
+        let security_server = security_server_with_policy();
+        let source_security_context =
+            SecurityContext::try_from("u:object_r:test_ptrace_tracer_yes_t")
+                .expect("invalid security context");
+        let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
+        let target_security_context = SecurityContext::try_from("u:object_r:test_ptrace_traced_t")
+            .expect("invalid security context");
+        let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
+
+        assert_eq!(
+            check_ptrace_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                source_sid,
+                target_sid
+            ),
+            Ok(())
+        );
+    }
+
+    #[fuchsia::test]
+    fn ptrace_access_denied_for_denied_type() {
+        let security_server = security_server_with_policy();
+        let source_security_context =
+            SecurityContext::try_from("u:object_r:test_ptrace_tracer_no_t")
+                .expect("invalid security context");
+        let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
+        let target_security_context = SecurityContext::try_from("u:object_r:test_ptrace_traced_t")
+            .expect("invalid security context");
+        let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
+        assert_eq!(
+            check_ptrace_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                source_sid,
+                target_sid
+            ),
+            error!(EACCES)
+        );
     }
 }

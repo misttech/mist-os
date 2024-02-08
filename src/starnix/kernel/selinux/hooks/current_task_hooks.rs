@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::sync::Arc;
+
 use super::thread_group_hooks::{self, SeLinuxResolvedElfState};
-use crate::task::{CurrentTask, Task};
+use crate::task::{CurrentTask, Task, ThreadGroup};
 
 use starnix_uapi::{errors::Errno, signals::Signal};
 
@@ -144,6 +146,48 @@ pub fn check_signal_access(
                 source_sid,
                 target_sid,
                 signal,
+            )
+        }
+    }
+}
+
+/// Checks if tracing the current task is allowed, if SELinux is enabled. Access is allowed if
+/// SELinux is disabled.
+pub fn check_ptrace_traceme_access(
+    parent: &Arc<ThreadGroup>,
+    current_task: &CurrentTask,
+) -> Result<(), Errno> {
+    match &current_task.kernel().security_server {
+        None => return Ok(()),
+        Some(security_server) => {
+            let source_sid = parent.get_current_sid();
+            let target_sid = current_task.get_current_sid();
+            thread_group_hooks::check_ptrace_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                source_sid,
+                target_sid,
+            )
+        }
+    }
+}
+
+/// Checks if `current_task` is allowed to trace `tracee_task`, if SELinux is enabled. Access is
+/// allowed if SELinux is disabled.
+pub fn check_ptrace_attach_access(
+    current_task: &CurrentTask,
+    tracee_task: &Task,
+) -> Result<(), Errno> {
+    match &current_task.kernel().security_server {
+        None => return Ok(()),
+        Some(security_server) => {
+            let source_sid = current_task.get_current_sid();
+            let target_sid = tracee_task.get_current_sid();
+            thread_group_hooks::check_ptrace_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                source_sid,
+                target_sid,
             )
         }
     }

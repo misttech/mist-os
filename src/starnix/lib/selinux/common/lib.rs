@@ -241,6 +241,8 @@ class_permission_enum! {
         SigStop,
         /// Permission to send SIGCHLD to a process.
         SigChld,
+        /// Permission to trace a process.
+        Ptrace,
     }
 }
 
@@ -257,6 +259,7 @@ impl ProcessPermission {
             ProcessPermission::SigKill => "sigkill",
             ProcessPermission::SigStop => "sigstop",
             ProcessPermission::SigChld => "sigchld",
+            ProcessPermission::Ptrace => "ptrace",
         }
     }
 }
