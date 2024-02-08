@@ -105,6 +105,20 @@ treats a destination port of 0 as a wildcard, delivering packets to the socket
 regardless of the packet's source port (note that the packet's source address
 must still match the socket's remote address).
 
+### Local delivery across devices with strict device requirements
+
+Like Linux, Netstack3 is weak host when delivering packets locally. In
+particular, it's possible for a socket bound to an address on one local
+interface to send to a destination address that's assigned to a different local
+interface. Unlike Linux, Netstack3 prohibits cross-device
+local delivery when strict device requirements are in effect, due to:
+
+  1. the sending socket being bound to an interface with `SO_BINDTODEVICE`, or
+  2. at least one of the source or destination addresses requires a scope ID.
+
+It is technically possible to permit this, but doing so correctly is difficult,
+so this is forbidden for now until a clear need for this arises.
+
 [Fuchsia RFC-0184]: /docs/contribute/governance/rfcs/0184_posix_compatibility_for_the_system_netstack
 [`fuchsia.posix.socket`]: /sdk/fidl/fuchsia.posix.socket/socket.fidl
 [core and bindings]: ./CORE_BINDINGS.md#core-and-bindings

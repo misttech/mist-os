@@ -115,7 +115,7 @@ where
             )
         })
         .transpose()?;
-    let ResolvedRoute { device, src_addr, next_hop } =
+    let ResolvedRoute { device, src_addr, local_delivery_device: _, next_hop } =
         match ctx.api().routes::<A::Version>().resolve_route(sanitized_dst) {
             Err(e) => {
                 info!("Resolve failed for {}, {:?}", destination, e);

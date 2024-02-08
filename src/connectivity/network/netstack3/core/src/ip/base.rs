@@ -722,7 +722,7 @@ pub(crate) fn resolve_route_to_destination<
     addr: Option<RoutableIpAddr<I::Addr>>,
 ) -> Result<ResolvedRoute<I, CC::DeviceId>, ResolveRouteError> {
     enum LocalDelivery<A, D> {
-        WeakLoopback(A),
+        WeakLoopback { addr: A, device: D },
         StrongForDevice(D),
     }
 
@@ -738,7 +738,7 @@ pub(crate) fn resolve_route_to_destination<
     //
     // TODO(https://fxbug.dev/42175703): Encode the delivery of locally-
     // destined packets to loopback in the route table.
-    let local_delivery_instructions: Option<LocalDelivery<RoutableIpAddr<I::Addr>, &CC::DeviceId>> =
+    let local_delivery_instructions: Option<LocalDelivery<RoutableIpAddr<I::Addr>, CC::DeviceId>> =
         addr.and_then(|addr| {
             match device {
                 Some(device) => match core_ctx.address_status_for_device(addr.into(), device) {
@@ -747,19 +747,39 @@ pub(crate) fn resolve_route_to_destination<
                         // requested egress interface, route locally via the strong
                         // host model.
                         is_unicast_assigned::<I>(&status)
-                            .then_some(LocalDelivery::StrongForDevice(device))
+                            .then_some(LocalDelivery::StrongForDevice(device.clone()))
                     }
                     AddressStatus::Unassigned => None,
                 },
                 None => {
                     // If the destination is an address assigned on an interface,
                     // and an egress interface wasn't specifically selected, route
-                    // via the loopback device operating in a weak host model.
+                    // via the loopback device operating in a weak host model, with
+                    // the exception that if either the source or destination
+                    // addresses needs a zone ID, then use strong host to enforce
+                    // that the source and destination addresses are assigned to
+                    // the same interface.
+                    //
+                    // TODO(https://fxbug.dev/322539434): Linux is more permissive
+                    // about allowing cross-device local delivery even when
+                    // SO_BINDTODEVICE or link-local addresses are involved, and this
+                    // behavior may need to be emulated.
                     core_ctx
                         .with_address_statuses(addr.into(), |mut it| {
-                            it.any(|(_device, status)| is_unicast_assigned::<I>(&status))
+                            it.find_map(|(device, status)| {
+                                is_unicast_assigned::<I>(&status).then_some(device)
+                            })
                         })
-                        .then_some(LocalDelivery::WeakLoopback(addr))
+                        .map(|device| {
+                            if local_ip.is_some_and(|local_ip| {
+                                crate::socket::must_have_zone(local_ip.as_ref())
+                            }) || crate::socket::must_have_zone(addr.as_ref())
+                            {
+                                LocalDelivery::StrongForDevice(device)
+                            } else {
+                                LocalDelivery::WeakLoopback { addr, device }
+                            }
+                        })
                 }
             }
         });
@@ -771,22 +791,25 @@ pub(crate) fn resolve_route_to_destination<
                 Some(loopback) => loopback,
             };
 
-            let local_ip = match local_delivery {
-                LocalDelivery::WeakLoopback(addr) => match local_ip {
+            let (local_ip, dest_device) = match local_delivery {
+                LocalDelivery::WeakLoopback { addr, device } => match local_ip {
                     Some(local_ip) => core_ctx
                         .with_address_statuses(local_ip.into(), |mut it| {
-                            it.any(|(_device, status)| is_unicast_assigned::<I>(&status))
+                            it.find_map(|(device, status)| {
+                                is_unicast_assigned::<I>(&status).then_some(device)
+                            })
                         })
-                        .then_some(local_ip)
+                        .map(|device| (local_ip, device))
                         .ok_or(ResolveRouteError::NoSrcAddr)?,
-                    None => addr,
+                    None => (addr, device),
                 },
                 LocalDelivery::StrongForDevice(device) => {
-                    get_local_addr(core_ctx, local_ip, device, addr)?
+                    (get_local_addr(core_ctx, local_ip, &device, addr)?, device)
                 }
             };
             Ok(ResolvedRoute {
                 src_addr: local_ip,
+                local_delivery_device: Some(dest_device),
                 device: loopback,
                 next_hop: NextHop::RemoteAsNeighbor,
             })
@@ -823,6 +846,7 @@ pub(crate) fn resolve_route_to_destination<
                 .map(|(Destination { device, next_hop }, local_ip)| ResolvedRoute {
                     src_addr: local_ip,
                     device,
+                    local_delivery_device: None,
                     next_hop,
                 })
         }
@@ -4993,6 +5017,25 @@ mod tests {
         fn mac(self) -> UnicastAddr<Mac> {
             UnicastAddr::new(Mac::new([0, 1, 2, 3, 4, self.index().try_into().unwrap()])).unwrap()
         }
+
+        fn link_local_addr(self) -> IpDeviceAddr<Ipv6Addr> {
+            match self {
+                Self::First | Self::Second => SpecifiedAddr::new(Ipv6Addr::new([
+                    0xfe80,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    self.index().try_into().unwrap(),
+                ]))
+                .unwrap()
+                .try_into()
+                .unwrap(),
+                Self::Loopback => panic!("should not generate link local addresses for loopback"),
+            }
+        }
     }
 
     fn remote_ip<I: TestIpExt>() -> SpecifiedAddr<I::Addr> {
@@ -5012,6 +5055,18 @@ mod tests {
         }
         let (mut ctx, device_ids) = builder.build();
         let mut device_ids = device_ids.into_iter().map(Into::into).collect::<Vec<_>>();
+
+        if I::VERSION.is_v6() {
+            for device in [Device::First, Device::Second] {
+                ctx.core_api()
+                    .device_ip::<Ipv6>()
+                    .add_ip_addr_subnet(
+                        &device_ids[device.index()],
+                        AddrSubnet::new(device.link_local_addr().addr(), 64).unwrap(),
+                    )
+                    .unwrap();
+            }
+        }
 
         let loopback_id = ctx
             .core_api()
@@ -5056,9 +5111,12 @@ mod tests {
             dest_ip,
         )
         // Convert device IDs in any route so it's easier to compare.
-        .map(|ResolvedRoute { src_addr, device, next_hop }| {
+        .map(|ResolvedRoute { src_addr, device, local_delivery_device, next_hop }| {
             let device = Device::from_index(device_ids.iter().position(|d| d == &device).unwrap());
-            ResolvedRoute { src_addr, device, next_hop }
+            let local_delivery_device = local_delivery_device.map(|device| {
+                Device::from_index(device_ids.iter().position(|d| d == &device).unwrap())
+            });
+            ResolvedRoute { src_addr, device, local_delivery_device, next_hop }
         })
     }
 
@@ -5067,18 +5125,20 @@ mod tests {
                 None,
                 Device::First.ip_address(),
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::Loopback,
-                    next_hop: NextHop::RemoteAsNeighbor }); "local delivery")]
+                    local_delivery_device: Some(Device::First), next_hop: NextHop::RemoteAsNeighbor
+                }); "local delivery")]
     #[test_case(Some(Device::First.ip_address()),
                 None,
                 Device::First.ip_address(),
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::Loopback,
-                    next_hop: NextHop::RemoteAsNeighbor }); "local delivery specified local addr")]
+                    local_delivery_device: Some(Device::First), next_hop: NextHop::RemoteAsNeighbor
+                }); "local delivery specified local addr")]
     #[test_case(Some(Device::First.ip_address()),
                 Some(Device::First),
                 Device::First.ip_address(),
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::Loopback,
-                    next_hop: NextHop::RemoteAsNeighbor });
-                    "local delivery specified device and addr")]
+                    local_delivery_device: Some(Device::First), next_hop: NextHop::RemoteAsNeighbor
+                }); "local delivery specified device and addr")]
     #[test_case(None,
                 Some(Device::Loopback),
                 Device::First.ip_address(),
@@ -5087,7 +5147,8 @@ mod tests {
     #[test_case(None,
                 Some(Device::Loopback),
                 Device::Loopback.ip_address(),
-                Ok(ResolvedRoute { src_addr: Device::Loopback.ip_address(), device: Device::Loopback,
+                Ok(ResolvedRoute { src_addr: Device::Loopback.ip_address(),
+                    device: Device::Loopback, local_delivery_device: Some(Device::Loopback),
                     next_hop: NextHop::RemoteAsNeighbor,
                 }); "local delivery to loopback addr via specified loopback device no addr")]
     #[test_case(None,
@@ -5107,26 +5168,31 @@ mod tests {
                 None,
                 remote_ip::<I>().try_into().unwrap(),
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
-                    next_hop: NextHop::RemoteAsNeighbor }); "remote delivery")]
+                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor });
+                "remote delivery")]
     #[test_case(Some(Device::First.ip_address()),
                 None,
                 remote_ip::<I>().try_into().unwrap(),
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
-                    next_hop: NextHop::RemoteAsNeighbor }); "remote delivery specified addr")]
+                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor });
+                "remote delivery specified addr")]
     #[test_case(Some(Device::Second.ip_address()), None, remote_ip::<I>().try_into().unwrap(),
                 Err(ResolveRouteError::NoSrcAddr); "remote delivery specified addr no route")]
     #[test_case(None,
                 Some(Device::First),
                 remote_ip::<I>().try_into().unwrap(),
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
-                    next_hop: NextHop::RemoteAsNeighbor }); "remote delivery specified device")]
+                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor });
+                "remote delivery specified device")]
     #[test_case(None, Some(Device::Second), remote_ip::<I>().try_into().unwrap(),
                 Err(ResolveRouteError::Unreachable); "remote delivery specified device no route")]
     #[test_case(Some(Device::Second.ip_address()),
                 None,
                 Device::First.ip_address(),
                 Ok(ResolvedRoute {src_addr: Device::Second.ip_address(), device: Device::Loopback,
-                    next_hop: NextHop::RemoteAsNeighbor }); "local delivery cross device")]
+                    local_delivery_device: Some(Device::Second),
+                    next_hop: NextHop::RemoteAsNeighbor });
+                "local delivery cross device")]
     #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
     fn lookup_route<I: Ip + TestIpExt + crate::IpExt>(
         local_ip: Option<IpDeviceAddr<I::Addr>>,
@@ -5155,22 +5221,26 @@ mod tests {
     #[test_case(None,
                 None,
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
-                    next_hop: NextHop::RemoteAsNeighbor }); "no constraints")]
+                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor });
+                "no constraints")]
     #[test_case(Some(Device::First.ip_address()),
                 None,
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
-                    next_hop: NextHop::RemoteAsNeighbor }); "constrain local addr")]
+                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor });
+                "constrain local addr")]
     #[test_case(Some(Device::Second.ip_address()), None,
                 Ok(ResolvedRoute { src_addr: Device::Second.ip_address(), device: Device::Second,
-                    next_hop: NextHop::RemoteAsNeighbor });
-                    "constrain local addr to second device")]
+                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor });
+                "constrain local addr to second device")]
     #[test_case(None,
                 Some(Device::First),
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
-                    next_hop: NextHop::RemoteAsNeighbor }); "constrain device")]
+                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor });
+                "constrain device")]
     #[test_case(None, Some(Device::Second),
                 Ok(ResolvedRoute { src_addr: Device::Second.ip_address(), device: Device::Second,
-                    next_hop: NextHop::RemoteAsNeighbor }); "constrain to second device")]
+                    local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor });
+                "constrain to second device")]
     #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
     fn lookup_route_multiple_devices_with_route<I: Ip + TestIpExt + crate::IpExt>(
         local_ip: Option<IpDeviceAddr<I::Addr>>,
@@ -5202,6 +5272,41 @@ mod tests {
             local_ip,
             remote_ip::<I>().try_into().unwrap(),
         );
+        assert_eq!(result, expected_result);
+    }
+
+    #[test_case(None, None, Device::Second.link_local_addr(),
+                Ok(ResolvedRoute { src_addr: Device::Second.link_local_addr(),
+                    device: Device::Loopback, local_delivery_device: Some(Device::Second),
+                    next_hop: NextHop::RemoteAsNeighbor });
+                "local delivery no local address to link-local")]
+    #[test_case(Some(Device::Second.ip_address()), None, Device::Second.link_local_addr(),
+                Ok(ResolvedRoute { src_addr: Device::Second.ip_address(), device: Device::Loopback,
+                    local_delivery_device: Some(Device::Second),
+                    next_hop: NextHop::RemoteAsNeighbor });
+                "local delivery same device to link-local")]
+    #[test_case(Some(Device::Second.link_local_addr()), None, Device::Second.ip_address(),
+                Ok(ResolvedRoute { src_addr: Device::Second.link_local_addr(),
+                    device: Device::Loopback, local_delivery_device: Some(Device::Second),
+                    next_hop: NextHop::RemoteAsNeighbor });
+                "local delivery same device from link-local")]
+    #[test_case(Some(Device::First.ip_address()), None, Device::Second.link_local_addr(),
+                Err(ResolveRouteError::NoSrcAddr);
+                "local delivery cross device to link-local")]
+    #[test_case(Some(Device::First.link_local_addr()), None, Device::Second.ip_address(),
+                Err(ResolveRouteError::NoSrcAddr);
+                "local delivery cross device from link-local")]
+    fn lookup_route_v6only(
+        local_ip: Option<IpDeviceAddr<Ipv6Addr>>,
+        egress_device: Option<Device>,
+        dest_ip: RoutableIpAddr<Ipv6Addr>,
+        expected_result: Result<ResolvedRoute<Ipv6, Device>, ResolveRouteError>,
+    ) {
+        set_logger_for_test();
+
+        let (mut ctx, device_ids) = make_test_ctx::<Ipv6>();
+
+        let result = do_route_lookup(&mut ctx, device_ids, egress_device, local_ip, dest_ip);
         assert_eq!(result, expected_result);
     }
 }

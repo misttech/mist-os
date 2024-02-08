@@ -30,11 +30,6 @@
                 // SocketMap correctly takes bound devices into account.
                 "tcp_connect_bound_to_device_ns3",
                 "tcp_bind_with_zone_connect_unzoned_ns3",
-
-                // TODO(https://fxbug.dev/323958072): Prevent this test from
-                // failing due to the socket being bound to loopback and returning
-                // a routing error.
-                "ping_self_ns3::v6_link_local",
             ],
         },
         {
@@ -44,6 +39,11 @@
                 // Reenable once Netstack2 uses the bound device when
                 // connecting.
                 "tcp_connect_bound_to_device_ns2",
+
+                // TODO(https://fxbug.dev/42084713): Make this test pass
+                // by delivering looped-back packets to a socket bound to
+                // a non-loopback device.
+                "ping_self_ns3::v6_link_local",
             ],
         },
     ],

@@ -437,7 +437,7 @@ impl<
         // TODO(https://fxbug.dev/323389672): Cache a reference to the route to
         // avoid the route lookup on send as long as the routing table hasn't
         // changed in between these operations.
-        let ResolvedRoute { src_addr, device: route_device, next_hop: _ } =
+        let ResolvedRoute { src_addr, device: route_device, local_delivery_device, next_hop: _ } =
             match self.lookup_route(bindings_ctx, device, local_ip, remote_ip) {
                 Ok(r) => r,
                 Err(e) => return Err((e.into(), options)),
@@ -447,7 +447,12 @@ impl<
         // set that in the socket definition. Otherwise defer to what was provided.
         let socket_device = (crate::socket::must_have_zone(src_addr.as_ref())
             || crate::socket::must_have_zone(remote_ip.as_ref()))
-        .then_some(route_device)
+        .then(|| {
+            // NB: The route device might be loopback, and in such cases
+            // we want to bind the socket to the device the source IP is
+            // assigned to instead.
+            local_delivery_device.unwrap_or(route_device)
+        })
         .as_ref()
         .or(device)
         .map(|d| self.downgrade_device_id(d));
@@ -537,7 +542,7 @@ where
         None
     };
 
-    let ResolvedRoute { src_addr: got_local_ip, device, next_hop } =
+    let ResolvedRoute { src_addr: got_local_ip, local_delivery_device: _, device, next_hop } =
         match core_ctx.lookup_route(bindings_ctx, device.as_ref(), Some(*local_ip), *remote_ip) {
             Ok(o) => o,
             Err(e) => return Err((body, IpSockSendError::Unroutable(e))),
@@ -586,7 +591,7 @@ impl<
             .map(|d| self.upgrade_weak_device_id(d).ok_or(ResolveRouteError::Unreachable))
             .transpose()?;
 
-        let ResolvedRoute { src_addr: _, device, next_hop: _ } = self
+        let ResolvedRoute { src_addr: _, local_delivery_device: _, device, next_hop: _ } = self
             .lookup_route(bindings_ctx, device.as_ref(), Some(*local_ip), *remote_ip)
             .map_err(MmsError::NoDevice)?;
         let mtu = IpDeviceContext::<I, BC>::get_mtu(self, &device);
@@ -1087,7 +1092,12 @@ pub(crate) mod testutil {
             }
         };
 
-        Ok(ResolvedRoute { src_addr: local_ip, device: device.clone(), next_hop })
+        Ok(ResolvedRoute {
+            src_addr: local_ip,
+            device: device.clone(),
+            local_delivery_device: None,
+            next_hop,
+        })
     }
 
     impl<

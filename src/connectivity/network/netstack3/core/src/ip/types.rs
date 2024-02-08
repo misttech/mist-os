@@ -374,6 +374,11 @@ pub struct ResolvedRoute<I: Ip, D> {
     pub src_addr: RoutableIpAddr<I::Addr>,
     /// The device over which this destination can be reached.
     pub device: D,
+    /// Present when `device` is loopback with the device that the destination
+    /// address is assigned to.
+    ///
+    /// NB: it's possible that `local_delivery_device` is itself loopback.
+    pub local_delivery_device: Option<D>,
     /// The next hop via which this destination can be reached.
     pub next_hop: NextHop<I::Addr>,
 }
