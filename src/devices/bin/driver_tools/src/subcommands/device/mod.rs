@@ -6,10 +6,8 @@ pub mod args;
 
 use {
     anyhow::{format_err, Context, Result},
-    args::{
-        BindCommand, DeviceCommand, DeviceSubcommand, LogLevelCommand, RebindCommand, UnbindCommand,
-    },
-    fidl_fuchsia_device as fdev, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx,
+    args::{BindCommand, DeviceCommand, DeviceSubcommand, RebindCommand, UnbindCommand},
+    fidl_fuchsia_device as fdev, fidl_fuchsia_io as fio,
 };
 
 pub async fn device(cmd: DeviceCommand, dev: fio::DirectoryProxy) -> Result<()> {
@@ -32,18 +30,6 @@ pub async fn device(cmd: DeviceCommand, dev: fio::DirectoryProxy) -> Result<()> 
                 .map_err(|err| format_err!("{:?}", err))
                 .context("Failed to rebind")?;
             println!("Rebind of {} to {} is complete", driver_url_suffix, device_path);
-        }
-        DeviceSubcommand::LogLevel(LogLevelCommand { ref device_path, log_level }) => {
-            let device = connect_to_device(dev, device_path)?;
-            if let Some(log_level) = log_level {
-                zx::Status::ok(device.set_min_driver_log_severity(log_level.clone().into()).await?)
-                    .map_err(|err| format_err!("{:?}", err))?;
-                println!("Set {} log level to {}", device_path, log_level);
-            } else {
-                let (status, severity) = device.get_min_driver_log_severity().await?;
-                zx::Status::ok(status).map_err(|err| format_err!("{:?}", err))?;
-                println!("Current log severity: {:#?}", severity);
-            }
         }
     }
     Ok(())

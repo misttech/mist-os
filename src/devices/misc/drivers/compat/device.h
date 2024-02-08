@@ -165,9 +165,6 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   void UnbindChildren(UnbindChildrenCompleter::Sync& completer) override;
   void ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) override;
   void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override;
-  void GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& completer) override;
-  void SetMinDriverLogSeverity(SetMinDriverLogSeverityRequestView request,
-                               SetMinDriverLogSeverityCompleter::Sync& completer) override;
 
   // This calls Unbind on the device and then frees it.
   void UnbindAndRelease();

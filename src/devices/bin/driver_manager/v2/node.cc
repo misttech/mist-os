@@ -1225,15 +1225,6 @@ void Node::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
   completer.ReplySuccess(fidl::StringView::FromExternal(MakeTopologicalPath()));
 }
 
-void Node::GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& completer) {
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-
-void Node::SetMinDriverLogSeverity(SetMinDriverLogSeverityRequestView request,
-                                   SetMinDriverLogSeverityCompleter::Sync& completer) {
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-
 Devnode::Target Node::CreateDevfsPassthrough(
     std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> connector,
     std::optional<fuchsia_device_fs::ConnectionType> connector_supports) {

@@ -30,7 +30,6 @@ pub enum DeviceSubcommand {
     Bind(BindCommand),
     Unbind(UnbindCommand),
     Rebind(RebindCommand),
-    LogLevel(LogLevelCommand),
 }
 
 #[derive(ArgsInfo, FromArgs, Clone, PartialEq, Debug)]

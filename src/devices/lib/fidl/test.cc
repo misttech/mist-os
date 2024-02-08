@@ -45,14 +45,6 @@ class TestInterface : public devfs_fidl::DeviceInterface {
   void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override {
     ZX_PANIC("Unimplemented");
   }
-  void GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& completer) override {
-    ZX_PANIC("Unimplemented");
-  }
-  void SetMinDriverLogSeverity(
-      fuchsia_device::wire::ControllerSetMinDriverLogSeverityRequest* request,
-      SetMinDriverLogSeverityCompleter::Sync& completer) override {
-    ZX_PANIC("Unimplemented");
-  }
 };
 
 class MultiplexTest : public zxtest::TestWithParam<std::tuple<bool, bool>> {

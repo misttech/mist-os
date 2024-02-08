@@ -4,7 +4,6 @@
 library fuchsia.device;
 
 using zx;
-using fuchsia.logger;
 
 /// Maxmium length for a device name
 const MAX_DEVICE_NAME_LEN uint64 = 32;
@@ -165,16 +164,4 @@ closed protocol Controller {
     strict GetTopologicalPath() -> (struct {
         path string:MAX_DEVICE_PATH_LEN;
     }) error zx.Status;
-
-    /// Return the current logging flags for this device's driver
-    strict GetMinDriverLogSeverity() -> (struct {
-        status zx.Status;
-        severity fuchsia.logger.LogLevelFilter;
-    });
-    /// Set the logging flags for this device's driver.
-    strict SetMinDriverLogSeverity(struct {
-        severity fuchsia.logger.LogLevelFilter;
-    }) -> (struct {
-        status zx.Status;
-    });
 };

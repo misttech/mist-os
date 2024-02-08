@@ -708,8 +708,8 @@ fpromise::promise<void> Device::Remove() {
   // Since all executors for the compat devices in the driver share a dispatcher,
   // we are guaranteed that this task cannot be running at the same time as
   // the task that destructs the device.
-  executor_.schedule_task(WaitForInitToComplete().then(
-      [device = this](fpromise::result<void, zx_status_t>& init) {
+  executor_.schedule_task(
+      WaitForInitToComplete().then([device = this](fpromise::result<void, zx_status_t>& init) {
         // If we don't have a controller, return early.
         // We are probably in a state where we are waiting for the controller to finish being
         // removed.
@@ -1190,18 +1190,6 @@ void Device::ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) {
 
 void Device::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
   completer.ReplySuccess(fidl::StringView::FromExternal("/dev/" + topological_path_));
-}
-
-void Device::GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& completer) {
-  uint8_t severity = logger().GetSeverity();
-  completer.Reply(ZX_OK, fuchsia_logger::wire::LogLevelFilter(severity));
-}
-
-void Device::SetMinDriverLogSeverity(SetMinDriverLogSeverityRequestView request,
-                                     SetMinDriverLogSeverityCompleter::Sync& completer) {
-  FuchsiaLogSeverity severity = static_cast<FuchsiaLogSeverity>(request->severity);
-  logger().SetSeverity(severity);
-  completer.Reply(ZX_OK);
 }
 
 }  // namespace compat

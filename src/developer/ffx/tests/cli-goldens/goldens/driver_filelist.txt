@@ -4,7 +4,6 @@ ffx/driver/conformance/test.golden
 ffx/driver/debug-bind.golden
 ffx/driver/device.golden
 ffx/driver/device/bind.golden
-ffx/driver/device/log-level.golden
 ffx/driver/device/rebind.golden
 ffx/driver/device/unbind.golden
 ffx/driver/disable.golden

@@ -232,15 +232,6 @@ class NetworkDeviceImpl : public EndpointImpl,
         fuchsia::device::Controller_GetTopologicalPath_Response(fxl::JoinStrings(parts, "/"))));
   }
 
-  void GetMinDriverLogSeverity(GetMinDriverLogSeverityCallback callback) override {
-    callback(ZX_ERR_NOT_SUPPORTED, fuchsia::logger::LogLevelFilter::NONE);
-  }
-
-  void SetMinDriverLogSeverity(fuchsia::logger::LogLevelFilter severity,
-                               SetMinDriverLogSeverityCallback callback) override {
-    callback(ZX_ERR_NOT_SUPPORTED);
-  }
-
  private:
   void ListenForFrames() {
     if (!tun_device_.is_bound()) {

@@ -559,15 +559,6 @@ impl BlockServer {
             VolumeAndNodeRequest::GetTopologicalPath { responder } => {
                 responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
-            VolumeAndNodeRequest::GetMinDriverLogSeverity { responder } => {
-                responder.send(
-                    zx::sys::ZX_ERR_NOT_SUPPORTED,
-                    fidl_fuchsia_logger::LogLevelFilter::None,
-                )?;
-            }
-            VolumeAndNodeRequest::SetMinDriverLogSeverity { severity: _, responder } => {
-                responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED)?;
-            }
         }
         Ok(())
     }
