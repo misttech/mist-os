@@ -8,7 +8,7 @@ import os
 import api_infra
 from mobly import keys
 from mobly import records
-from typing import List, Dict, Any
+from typing import Any
 
 LATEST_RES_SYMLINK_NAME: str = "latest"
 
@@ -20,7 +20,7 @@ TRANSPORT_KEY: str = "transport"
 FFX_PATH_KEY: str = "ffx_path"
 FFX_SUBTOOLS_SEARCH_PATH_KEY: str = "ffx_subtools_search_path"
 
-MoblyConfigComponent = Dict[str, Any]
+MoblyConfigComponent = dict[str, Any]
 
 
 class ApiException(Exception):
@@ -81,9 +81,9 @@ def new_testbed_config(
     log_path: str,
     ffx_path: str,
     transport: str,
-    mobly_controllers: List[Dict[str, Any]],
+    mobly_controllers: list[dict[str, Any]],
     test_params_dict: MoblyConfigComponent,
-    botanist_honeydew_map: Dict[str, str],
+    botanist_honeydew_map: dict[str, str],
     ffx_subtools_search_path: str | None,
 ) -> MoblyConfigComponent:
     """Returns a Mobly testbed config which is required for running Mobly tests.
@@ -148,7 +148,7 @@ def new_testbed_config(
     Returns:
       A Mobly Config that corresponds to the user-specified arguments.
     """
-    controllers = {}
+    controllers: dict[str, list[dict[str, Any]]] = {}
     for controller in mobly_controllers:
         controller_type = controller["type"]
         del controller["type"]
@@ -214,7 +214,7 @@ def get_config_with_test_params(
         raise ApiException("Unexpected Mobly config content: %s" % e)
 
 
-def set_transport(mobly_config: MoblyConfigComponent, transport: str):
+def set_transport(mobly_config: MoblyConfigComponent, transport: str) -> None:
     """Updates all fuchsia device configs to use the specified transport.
 
     Overwrites the existing value if the key already exists.
@@ -226,7 +226,7 @@ def set_transport(mobly_config: MoblyConfigComponent, transport: str):
     _set_per_device_config(mobly_config, TRANSPORT_KEY, transport)
 
 
-def set_ffx_path(mobly_config: MoblyConfigComponent, ffx_path: str):
+def set_ffx_path(mobly_config: MoblyConfigComponent, ffx_path: str) -> None:
     """Updates all fuchsia device configs to use the specified ffx_path.
 
     Overwrites the existing value if the key already exists.
@@ -240,7 +240,7 @@ def set_ffx_path(mobly_config: MoblyConfigComponent, ffx_path: str):
 
 def set_ffx_subtools_search_path(
     mobly_config: MoblyConfigComponent, subtools_search_path: str
-):
+) -> None:
     """Updates all fuchsia device configs to use the specified ffx_path.
 
     Overwrites the existing value if the key already exists.
@@ -256,7 +256,7 @@ def set_ffx_subtools_search_path(
 
 def _set_per_device_config(
     mobly_config: MoblyConfigComponent, key: str, value: object
-):
+) -> None:
     """Updates all fuchsia device configs to contain a key-value pair.
 
     Overwrites the existing value if the key already exists.

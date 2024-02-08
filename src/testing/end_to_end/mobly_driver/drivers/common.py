@@ -4,6 +4,8 @@
 # found in the LICENSE file.
 """Contains common methods used by BaseDriver implementations."""
 
+from typing import Any
+
 import json
 
 import yaml
@@ -17,7 +19,7 @@ class DriverException(Exception):
     """Raised when the Mobly Driver encounters an unexpected error."""
 
 
-def read_yaml_from_file(filepath: str):
+def read_yaml_from_file(filepath: str) -> Any:
     """Returns a Python object representing the |filepath|'s YAML content.
 
     Args:
@@ -40,7 +42,7 @@ def read_yaml_from_file(filepath: str):
             )
 
 
-def read_json_from_file(filepath: str):
+def read_json_from_file(filepath: str) -> Any:
     """Returns a Python object representing the |filepath|'s JSON content.
 
     Args:
