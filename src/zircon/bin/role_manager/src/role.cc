@@ -7,6 +7,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/thread.h>
@@ -43,6 +44,10 @@ class RoleManager : public fidl::WireServer<fuchsia_scheduler::RoleManager> {
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
  private:
+  // Makes a best effort attempt to log the request to the syslog if a sufficient log level has
+  // been specified.
+  void LogRequest(SetRoleRequestView request);
+
   RoleManager(zx::resource profile_resource, ConfiguredProfiles profiles)
       : profile_resource_(std::move(profile_resource)), profiles_(std::move(profiles)) {}
   zx::resource profile_resource_;
@@ -109,39 +114,53 @@ void RoleManager::handle_unknown_method(
   FX_SLOG(ERROR, "Got request to handle unknown method", FX_KV("tag", "RoleManager"));
 }
 
-void RoleManager::SetRole(SetRoleRequestView request, SetRoleCompleter::Sync& completer) {
-  // Log the requested role and PID:TID of the thread or vmar being assigned.
+void RoleManager::LogRequest(SetRoleRequestView request) {
+  // Return early if debug logging is not enabled. This allows us to bypass an extra
+  // zx_object_get_info syscall.
+  if (fuchsia_logging::GetMinLogLevel() > fuchsia_logging::LOG_DEBUG) {
+    return;
+  }
+
+  zx_info_handle_basic_t handle_info{};
   const std::string_view role_name{request->role().role.get()};
-  zx_status_t status = ZX_OK;
-  zx_handle_t target_handle = ZX_HANDLE_INVALID;
   if (request->target().is_thread()) {
-    target_handle = request->target().thread().get();
-    zx_info_handle_basic_t handle_info{};
-    status = request->target().thread().get_info(ZX_INFO_HANDLE_BASIC, &handle_info,
-                                                 sizeof(handle_info), nullptr, nullptr);
+    zx_status_t status = request->target().thread().get_info(ZX_INFO_HANDLE_BASIC, &handle_info,
+                                                             sizeof(handle_info), nullptr, nullptr);
     if (status != ZX_OK) {
-      completer.ReplyError(status);
+      FX_SLOG(ERROR, "Failed to get info for thread: ", FX_KV("role", role_name),
+              FX_KV("status", status), FX_KV("tag", "RoleManager"));
       return;
     }
     FX_SLOG(DEBUG, "Role requested for thread:", FX_KV("role", role_name),
             FX_KV("pid", handle_info.related_koid), FX_KV("tid", handle_info.koid),
             FX_KV("tag", "RoleManager"));
   } else if (request->target().is_vmar()) {
-    target_handle = request->target().vmar().get();
-    zx_info_handle_basic_t handle_info{};
     zx_status_t status = request->target().vmar().get_info(ZX_INFO_HANDLE_BASIC, &handle_info,
                                                            sizeof(handle_info), nullptr, nullptr);
     if (status != ZX_OK) {
-      completer.ReplyError(status);
+      FX_SLOG(ERROR, "Failed to get info for vmar: ", FX_KV("role", role_name),
+              FX_KV("status", status), FX_KV("tag", "RoleManager"));
       return;
     }
     FX_SLOG(DEBUG, "Role requested for vmar:", FX_KV("role", role_name),
             FX_KV("pid", handle_info.related_koid), FX_KV("koid", handle_info.koid),
             FX_KV("tag", "RoleManager"));
+  }
+}
+
+void RoleManager::SetRole(SetRoleRequestView request, SetRoleCompleter::Sync& completer) {
+  const std::string_view role_name{request->role().role.get()};
+  zx_handle_t target_handle = ZX_HANDLE_INVALID;
+  if (request->target().is_thread()) {
+    target_handle = request->target().thread().get();
+  } else if (request->target().is_vmar()) {
+    target_handle = request->target().vmar().get();
   } else {
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
+
+  LogRequest(request);
 
   std::vector<fuchsia_scheduler::Parameter> input_params = {};
   if (request->has_input_parameters()) {
@@ -164,13 +183,11 @@ void RoleManager::SetRole(SetRoleRequestView request, SetRoleCompleter::Sync& co
 
   const auto& profile_map = request->target().is_thread() ? profiles_.thread : profiles_.memory;
 
-  // Select the profile parameters based on the role selector.
+  // Look for the requested role in the profile map and set the profile if found.
   fidl::Arena arena;
   auto builder = fuchsia_scheduler::wire::RoleManagerSetRoleResponse::Builder(arena);
-
-  // Look for the requested role in the profile map and set the profile if found.
   if (auto search = profile_map.find(*role); search != profile_map.cend()) {
-    status = zx_object_set_profile(target_handle, search->second.profile.get(), 0);
+    zx_status_t status = zx_object_set_profile(target_handle, search->second.profile.get(), 0);
     if (status != ZX_OK) {
       completer.ReplyError(status);
       return;
