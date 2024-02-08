@@ -5,6 +5,7 @@
 
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 # Because files are directly passed, the mypy --exclude flag is bypassed. As a
@@ -49,7 +50,15 @@ def run_mypy_checks(files: list[str]) -> int:
                 str(config_path),
             ]
             + files,
-            env={"PYTHONPATH": f"{pylibs_dir}:{pylibs_dir}/mypy/src"},
+            env={
+                "PYTHONPATH": os.pathsep.join(
+                    [
+                        str(pylibs_dir / "mypy" / "src"),
+                        str(pylibs_dir / "mypy_extensions" / "src"),
+                        str(pylibs_dir / "typing_extensions" / "src" / "src"),
+                    ]
+                )
+            },
             capture_output=True,
             text=True,
             check=True,
