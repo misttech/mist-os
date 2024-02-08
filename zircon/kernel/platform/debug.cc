@@ -80,8 +80,8 @@ struct UartSyncPolicy {
     template <typename Guard, typename T>
     void Wait(Guard& guard, T&& enable_tx_interrupt) TA_REQ(guard) {
       if (is_tx_irq_enabled) {
-        guard.CallUnlocked([this]() { tx_fifo_not_full_.Signal(); });
         enable_tx_interrupt();
+        guard.CallUnlocked([this]() { tx_fifo_not_full_.Wait(); });
       } else {
         arch::Yield();
       }
