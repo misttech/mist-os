@@ -102,8 +102,12 @@ pub mod error;
 pub mod filter {
     pub(crate) mod integration;
 
-    pub use netstack3_filter::FilterBindingsTypes;
-    pub(crate) use netstack3_filter::{FilterContext, FilterHandler, FilterImpl, State};
+    pub use netstack3_filter::{
+        Action, AddressMatcher, AddressMatcherType, FilterBindingsTypes, Hook, InterfaceMatcher,
+        InterfaceProperties, IpRoutines, NatRoutines, PacketMatcher, PortMatcher, Routine, Rule,
+        State, TransportProtocolMatcher, UninstalledRoutine,
+    };
+    pub(crate) use netstack3_filter::{FilterContext, FilterHandler, FilterImpl};
 }
 
 /// Facilities for inspecting stack state for debugging.

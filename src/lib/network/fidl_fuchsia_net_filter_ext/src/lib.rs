@@ -219,7 +219,7 @@ impl TryFrom<fnet_filter::Namespace> for Namespace {
 }
 
 /// Extension type for [`fnet_filter::IpInstallationHook`].
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum IpHook {
     Ingress,
     LocalIngress,
@@ -258,7 +258,7 @@ impl TryFrom<fnet_filter::IpInstallationHook> for IpHook {
 }
 
 /// Extension type for [`fnet_filter::NatInstallationHook`].
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum NatHook {
     Ingress,
     LocalIngress,
@@ -550,11 +550,11 @@ pub struct AddressRange {
 }
 
 impl AddressRange {
-    fn start(&self) -> fnet::IpAddress {
+    pub fn start(&self) -> fnet::IpAddress {
         *self.range.start()
     }
 
-    fn end(&self) -> fnet::IpAddress {
+    pub fn end(&self) -> fnet::IpAddress {
         *self.range.end()
     }
 }
@@ -671,6 +671,10 @@ impl PortMatcher {
             return Err(PortMatcherError::InvalidPortRange);
         }
         Ok(Self { range: start..=end, invert })
+    }
+
+    pub fn range(&self) -> &RangeInclusive<u16> {
+        &self.range
     }
 
     pub fn start(&self) -> u16 {
@@ -1265,10 +1269,6 @@ pub enum ChangeCommitError {
     RuleNotFound,
     #[error("the specified resource already exists")]
     AlreadyExists,
-    #[error("rule specifies a matcher that is unavailable in rule's context")]
-    MatcherUnavailable,
-    #[error("rule has an action that is invalid for the rule's routine")]
-    InvalidActionForRoutine,
     #[error("the change includes a rule that jumps to an installed routine")]
     TargetRoutineIsInstalled,
 }
@@ -1282,8 +1282,6 @@ impl TryFrom<fnet_filter::CommitError> for ChangeCommitError {
             fnet_filter::CommitError::RoutineNotFound => Ok(Self::RoutineNotFound),
             fnet_filter::CommitError::RuleNotFound => Ok(Self::RuleNotFound),
             fnet_filter::CommitError::AlreadyExists => Ok(Self::AlreadyExists),
-            fnet_filter::CommitError::MatcherUnavailable => Ok(Self::MatcherUnavailable),
-            fnet_filter::CommitError::InvalidActionForRoutine => Ok(Self::InvalidActionForRoutine),
             fnet_filter::CommitError::TargetRoutineIsInstalled => {
                 Ok(Self::TargetRoutineIsInstalled)
             }
@@ -1302,6 +1300,12 @@ impl TryFrom<fnet_filter::CommitError> for ChangeCommitError {
 pub enum CommitError {
     #[error("failed to call FIDL method: {0}")]
     CallMethod(fidl::Error),
+    #[error("rule has a matcher that is unavailable in its context: {0:?}")]
+    RuleWithInvalidMatcher(RuleId),
+    #[error("rule has an action that is invalid for its routine: {0:?}")]
+    RuleWithInvalidAction(RuleId),
+    #[error("routine forms a cycle {0:?}")]
+    CyclicalRoutineGraph(RoutineId),
     #[error("invalid change was pushed: {0:?}")]
     ErrorOnChange(Vec<(Change, ChangeCommitError)>),
     #[error("unknown FIDL type: {0}")]
@@ -1435,6 +1439,15 @@ impl Controller {
         let committed_changes = std::mem::take(&mut self.pending_changes);
         match self.controller.commit(options).await.map_err(CommitError::CallMethod)? {
             fnet_filter::CommitResult::Ok(fnet_filter::Empty {}) => Ok(()),
+            fnet_filter::CommitResult::RuleWithInvalidMatcher(rule_id) => {
+                Err(CommitError::RuleWithInvalidMatcher(rule_id.into()))
+            }
+            fnet_filter::CommitResult::RuleWithInvalidAction(rule_id) => {
+                Err(CommitError::RuleWithInvalidAction(rule_id.into()))
+            }
+            fnet_filter::CommitResult::CyclicalRoutineGraph(routine_id) => {
+                Err(CommitError::CyclicalRoutineGraph(routine_id.into()))
+            }
             fnet_filter::CommitResult::ErrorOnChange(results) => {
                 let errors: Result<_, CommitError> = committed_changes
                     .into_iter()
@@ -1447,8 +1460,6 @@ impl Controller {
                         | fnet_filter::CommitError::RoutineNotFound
                         | fnet_filter::CommitError::RuleNotFound
                         | fnet_filter::CommitError::AlreadyExists
-                        | fnet_filter::CommitError::MatcherUnavailable
-                        | fnet_filter::CommitError::InvalidActionForRoutine
                         | fnet_filter::CommitError::TargetRoutineIsInstalled) => {
                             let error = error
                                 .try_into()

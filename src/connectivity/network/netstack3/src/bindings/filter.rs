@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 mod controller;
+mod conversion;
 
 use std::collections::{hash_map::Entry, HashMap};
 use std::num::NonZeroUsize;
@@ -17,10 +18,11 @@ use futures::{
     TryStreamExt as _,
 };
 use itertools::Itertools as _;
+use net_types::ip::{Ipv4, Ipv6};
 use thiserror::Error;
 use tracing::{error, warn};
 
-use controller::Controller;
+use controller::{CommitResult, Controller};
 
 // The maximum number of events a client for the `fuchsia.net.filter/Watcher` is
 // allowed to have queued. Clients will be dropped if they exceed this limit.
@@ -35,6 +37,13 @@ pub(crate) struct UpdateDispatcher(Arc<Mutex<UpdateDispatcherInner>>);
 struct UpdateDispatcherInner {
     resources: HashMap<fnet_filter_ext::ControllerId, Controller>,
     clients: Vec<WatcherSink>,
+}
+
+enum CommitError {
+    RuleWithInvalidMatcher(fnet_filter_ext::RuleId),
+    RuleWithInvalidAction(fnet_filter_ext::RuleId),
+    CyclicalRoutineGraph(fnet_filter_ext::RoutineId),
+    ErrorOnChange { index: usize, error: fnet_filter::CommitError },
 }
 
 impl UpdateDispatcherInner {
@@ -83,25 +92,47 @@ impl UpdateDispatcherInner {
 
     fn commit_changes(
         &mut self,
-        controller: &fnet_filter_ext::ControllerId,
+        controller_id: &fnet_filter_ext::ControllerId,
         changes: Vec<fnet_filter_ext::Change>,
         idempotent: bool,
-    ) -> Result<(), (usize, fnet_filter::CommitError)> {
+    ) -> Result<(), CommitError> {
         let Self { resources, clients } = self;
 
         // NB: we update NS3 core and broadcast the updates to clients under a
         // single lock to ensure bindings and core see updates in the same
         // order.
 
-        let events = resources
-            .get_mut(controller)
+        let CommitResult { events, new_state, core_state_v4, core_state_v6 } = resources
+            .get_mut(controller_id)
             .expect("controller should not be removed while serving")
-            .validate_and_apply(changes, idempotent)?;
+            .validate_and_convert_changes(changes, idempotent)?;
+
+        // Merge the new Core state from this controller with existing state
+        // from all the other controllers. Note that this is an infallible
+        // operation because the Core state has already been validated for each
+        // controller.
+        let (v4, v6) = resources.iter().filter(|(id, _)| *id != controller_id).fold(
+            (core_state_v4.clone(), core_state_v6.clone()),
+            |(mut v4, mut v6), (_id, controller)| {
+                v4.merge(&controller.core_state_v4);
+                v6.merge(&controller.core_state_v6);
+                (v4, v6)
+            },
+        );
 
         // TODO(https://fxbug.dev/318738286): propagate changes to Netstack3
-        // Core once the necessary functionality is available. This will require
-        // merging this controller's state with all state owned by other
-        // controllers.
+        // Core once the API exists.
+        let (_new_core_state_v4, _new_core_state_v6): (
+            netstack3_core::filter::State<Ipv4, fnet_filter::DeviceClass>,
+            netstack3_core::filter::State<Ipv6, fnet_filter::DeviceClass>,
+        ) = (v4.into(), v6.into());
+
+        // Only if validation was successful do we actually commit the changes.
+        // This ensures that the state will never be only partially updated.
+        resources
+            .get_mut(controller_id)
+            .expect("controller should not be removed while serving")
+            .apply_new_state(new_state, core_state_v4, core_state_v6);
 
         // Notify all existing watchers of the update, if it was not a no-op.
         if !events.is_empty() {
@@ -109,10 +140,10 @@ impl UpdateDispatcherInner {
                 .into_iter()
                 .map(|event| match event {
                     controller::Event::Added(resource) => {
-                        fnet_filter_ext::Event::Added(controller.clone(), resource)
+                        fnet_filter_ext::Event::Added(controller_id.clone(), resource)
                     }
                     controller::Event::Removed(resource) => {
-                        fnet_filter_ext::Event::Removed(controller.clone(), resource)
+                        fnet_filter_ext::Event::Removed(controller_id.clone(), resource)
                     }
                 })
                 .chain(std::iter::once(fnet_filter_ext::Event::EndOfUpdate));
@@ -439,17 +470,28 @@ async fn serve_controller(
                 let result = dispatcher.lock().await.commit_changes(id, changes, idempotent);
                 let result = match result {
                     Ok(()) => fnet_filter::CommitResult::Ok(fnet_filter::Empty {}),
-                    Err((i, error)) => {
-                        let errors = std::iter::repeat(fnet_filter::CommitError::Ok)
-                            .take(i)
-                            .chain(std::iter::once(error))
-                            .chain(
-                                std::iter::repeat(fnet_filter::CommitError::NotReached)
-                                    .take(num_changes - i - 1),
-                            )
-                            .collect::<Vec<_>>();
-                        fnet_filter::CommitResult::ErrorOnChange(errors)
-                    }
+                    Err(error) => match error {
+                        CommitError::RuleWithInvalidMatcher(rule) => {
+                            fnet_filter::CommitResult::RuleWithInvalidMatcher(rule.into())
+                        }
+                        CommitError::RuleWithInvalidAction(rule) => {
+                            fnet_filter::CommitResult::RuleWithInvalidAction(rule.into())
+                        }
+                        CommitError::CyclicalRoutineGraph(routine) => {
+                            fnet_filter::CommitResult::CyclicalRoutineGraph(routine.into())
+                        }
+                        CommitError::ErrorOnChange { index, error } => {
+                            let errors = std::iter::repeat(fnet_filter::CommitError::Ok)
+                                .take(index)
+                                .chain(std::iter::once(error))
+                                .chain(
+                                    std::iter::repeat(fnet_filter::CommitError::NotReached)
+                                        .take(num_changes - index - 1),
+                                )
+                                .collect::<Vec<_>>();
+                            fnet_filter::CommitResult::ErrorOnChange(errors)
+                        }
+                    },
                 };
                 responder.send(result)?;
             }

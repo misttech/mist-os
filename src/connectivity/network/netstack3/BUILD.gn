@@ -86,6 +86,8 @@ common_sources = [
   "src/bindings/devices.rs",
   "src/bindings/filter.rs",
   "src/bindings/filter/controller.rs",
+  "src/bindings/filter/conversion.rs",
+  "src/bindings/filter/conversion/matchers.rs",
   "src/bindings/inspect.rs",
   "src/bindings/integration_tests.rs",
   "src/bindings/interfaces_admin.rs",

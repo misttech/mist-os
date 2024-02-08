@@ -13,6 +13,7 @@ use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use futures::{FutureExt as _, StreamExt as _};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_subnet};
+use net_types::ip::IpInvariant;
 use netstack_testing_common::{
     realms::{Netstack3, TestSandboxExt as _},
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
@@ -1259,6 +1260,329 @@ async fn commit_failure_clears_pending_changes_and_does_not_change_state(name: &
     );
 }
 
+enum Domain {
+    IpAgnostic,
+    IpSpecific,
+}
+
+enum InvalidMatcher {
+    AddressRange,
+    Subnet,
+    TransportProtocol,
+}
+
+fn invalid_address_range_matcher<I: net_types::ip::Ip>() -> fnet_filter_ext::Matchers {
+    fnet_filter_ext::Matchers {
+        src_addr: Some(fnet_filter_ext::AddressMatcher {
+            matcher: fnet_filter_ext::AddressMatcherType::Range(
+                fnet_filter_ext::AddressRange::try_from({
+                    let IpInvariant((start, end)) = I::map_ip(
+                        (),
+                        // IPv6 range in an IPv4 namespace
+                        |()| IpInvariant((fidl_ip!("2001:db8::1"), fidl_ip!("2001:db8::2"))),
+                        // IPv4 range in an IPv6 namespace
+                        |()| IpInvariant((fidl_ip!("192.0.2.1"), fidl_ip!("192.0.2.2"))),
+                    );
+                    fnet_filter::AddressRange { start, end }
+                })
+                .unwrap(),
+            ),
+            invert: false,
+        }),
+        ..Default::default()
+    }
+}
+
+fn invalid_subnet_matcher<I: net_types::ip::Ip>() -> fnet_filter_ext::Matchers {
+    fnet_filter_ext::Matchers {
+        src_addr: Some(fnet_filter_ext::AddressMatcher {
+            matcher: fnet_filter_ext::AddressMatcherType::Subnet(
+                fnet_filter_ext::Subnet::try_from({
+                    let IpInvariant(subnet) = I::map_ip(
+                        (),
+                        // IPv6 subnet in an IPv4 namespace
+                        |()| IpInvariant(fidl_subnet!("2001:db8::/64")),
+                        // IPv4 subnet in an IPv6 namespace
+                        |()| IpInvariant(fidl_subnet!("192.0.2.0/24")),
+                    );
+                    subnet
+                })
+                .unwrap(),
+            ),
+            invert: false,
+        }),
+        ..Default::default()
+    }
+}
+
+fn invalid_transport_protocol_matcher<I: net_types::ip::Ip>() -> fnet_filter_ext::Matchers {
+    fnet_filter_ext::Matchers {
+        transport_protocol: Some({
+            let IpInvariant(matcher) = I::map_ip(
+                (),
+                // ICMPv6 in an IPv4 namespace
+                |()| IpInvariant(fnet_filter_ext::TransportProtocolMatcher::Icmpv6),
+                // ICMPv4 in an IPv6 namespace
+                |()| IpInvariant(fnet_filter_ext::TransportProtocolMatcher::Icmp),
+            );
+            matcher
+        }),
+        ..Default::default()
+    }
+}
+
+#[netstack_test]
+#[test_case(Domain::IpSpecific, InvalidMatcher::AddressRange)]
+#[test_case(Domain::IpSpecific, InvalidMatcher::Subnet)]
+#[test_case(Domain::IpSpecific, InvalidMatcher::TransportProtocol)]
+#[test_case(Domain::IpAgnostic, InvalidMatcher::AddressRange)]
+#[test_case(Domain::IpAgnostic, InvalidMatcher::Subnet)]
+#[test_case(Domain::IpAgnostic, InvalidMatcher::TransportProtocol)]
+async fn ip_specific_matcher_in_namespace<I: net_types::ip::Ip>(
+    name: &str,
+    domain: Domain,
+    matcher: InvalidMatcher,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller =
+        fnet_filter_ext::Controller::new(&control, &fnet_filter_ext::ControllerId(name.to_owned()))
+            .await
+            .expect("create controller");
+
+    let namespace_id = fnet_filter_ext::NamespaceId(String::from("ip-specific-namespace"));
+    let routine_id = fnet_filter_ext::RoutineId {
+        namespace: namespace_id.clone(),
+        name: String::from("routine"),
+    };
+    let invalid_rule_id = fnet_filter_ext::RuleId { routine: routine_id.clone(), index: 0 };
+    let resources = [
+        fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
+            id: namespace_id,
+            domain: match domain {
+                Domain::IpAgnostic => fnet_filter_ext::Domain::AllIp,
+                Domain::IpSpecific => {
+                    let IpInvariant(domain) = I::map_ip(
+                        (),
+                        |()| IpInvariant(fnet_filter_ext::Domain::Ipv4),
+                        |()| IpInvariant(fnet_filter_ext::Domain::Ipv6),
+                    );
+                    domain
+                }
+            },
+        }),
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
+            id: routine_id,
+            routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                fnet_filter_ext::InstalledIpRoutine {
+                    hook: fnet_filter_ext::IpHook::Ingress,
+                    priority: 0,
+                },
+            )),
+        }),
+        fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
+            id: invalid_rule_id.clone(),
+            matchers: match matcher {
+                InvalidMatcher::AddressRange => invalid_address_range_matcher::<I>(),
+                InvalidMatcher::Subnet => invalid_subnet_matcher::<I>(),
+                InvalidMatcher::TransportProtocol => invalid_transport_protocol_matcher::<I>(),
+            },
+            action: fnet_filter_ext::Action::Drop,
+        }),
+    ];
+    controller
+        .push_changes(resources.iter().cloned().map(fnet_filter_ext::Change::Create).collect())
+        .await
+        .expect("push changes");
+
+    let result = controller.commit().await;
+    match domain {
+        Domain::IpAgnostic => result.expect("commit should succeed"),
+        Domain::IpSpecific => {
+            let invalid_rule = assert_matches!(
+                result,
+                Err(fnet_filter_ext::CommitError::RuleWithInvalidMatcher(rule_id)) => rule_id
+            );
+            assert_eq!(invalid_rule, invalid_rule_id);
+        }
+    }
+}
+
+#[netstack_test]
+#[test_case(Domain::IpSpecific, InvalidMatcher::AddressRange)]
+#[test_case(Domain::IpSpecific, InvalidMatcher::Subnet)]
+#[test_case(Domain::IpSpecific, InvalidMatcher::TransportProtocol)]
+#[test_case(Domain::IpAgnostic, InvalidMatcher::AddressRange)]
+#[test_case(Domain::IpAgnostic, InvalidMatcher::Subnet)]
+#[test_case(Domain::IpAgnostic, InvalidMatcher::TransportProtocol)]
+async fn jump_to_routine_with_ip_specific_matcher_in_namespace<I: net_types::ip::Ip>(
+    name: &str,
+    domain: Domain,
+    matcher: InvalidMatcher,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller =
+        fnet_filter_ext::Controller::new(&control, &fnet_filter_ext::ControllerId(name.to_owned()))
+            .await
+            .expect("create controller");
+
+    let namespace_id = fnet_filter_ext::NamespaceId(String::from("ip-specific-namespace"));
+    let routine_id = fnet_filter_ext::RoutineId {
+        namespace: namespace_id.clone(),
+        name: String::from("routine"),
+    };
+    const TARGET_ROUTINE: &str = "target-routine";
+    let target_routine_id = fnet_filter_ext::RoutineId {
+        namespace: namespace_id.clone(),
+        name: TARGET_ROUTINE.to_owned(),
+    };
+    let target_rule_id = fnet_filter_ext::RuleId { routine: target_routine_id.clone(), index: 0 };
+    let resources = [
+        fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
+            id: namespace_id,
+            domain: match domain {
+                Domain::IpAgnostic => fnet_filter_ext::Domain::AllIp,
+                Domain::IpSpecific => {
+                    let IpInvariant(domain) = I::map_ip(
+                        (),
+                        |()| IpInvariant(fnet_filter_ext::Domain::Ipv4),
+                        |()| IpInvariant(fnet_filter_ext::Domain::Ipv6),
+                    );
+                    domain
+                }
+            },
+        }),
+        // Target routine includes a rule with an IP-version-specific matcher.
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
+            id: target_routine_id,
+            routine_type: fnet_filter_ext::RoutineType::Ip(None),
+        }),
+        fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
+            id: target_rule_id.clone(),
+            // Note that the matcher is not invalid per se -- it is invalid only because it
+            // is IP-specific *and* is installed in a namespace with a *different* IP-
+            // specific domain (when `domain` is `Domain::IpSpecific`).
+            matchers: match matcher {
+                InvalidMatcher::AddressRange => invalid_address_range_matcher::<I>(),
+                InvalidMatcher::Subnet => invalid_subnet_matcher::<I>(),
+                InvalidMatcher::TransportProtocol => invalid_transport_protocol_matcher::<I>(),
+            },
+            action: fnet_filter_ext::Action::Drop,
+        }),
+        // Installed routine jumps to target routine.
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
+            id: routine_id.clone(),
+            routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                fnet_filter_ext::InstalledIpRoutine {
+                    hook: fnet_filter_ext::IpHook::Ingress,
+                    priority: 0,
+                },
+            )),
+        }),
+        fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
+            id: fnet_filter_ext::RuleId { routine: routine_id, index: 0 },
+            matchers: fnet_filter_ext::Matchers::default(),
+            action: fnet_filter_ext::Action::Jump(TARGET_ROUTINE.to_owned()),
+        }),
+    ];
+    controller
+        .push_changes(resources.iter().cloned().map(fnet_filter_ext::Change::Create).collect())
+        .await
+        .expect("push changes");
+
+    let result = controller.commit().await;
+    match domain {
+        Domain::IpAgnostic => result.expect("commit should succeed"),
+        Domain::IpSpecific => {
+            // Note that the matcher is invalid only in the context of the namespace in
+            // which it is installed.
+            let invalid_rule = assert_matches!(
+                result,
+                Err(fnet_filter_ext::CommitError::RuleWithInvalidMatcher(rule_id)) => rule_id
+            );
+            assert_eq!(invalid_rule, target_rule_id);
+        }
+    }
+}
+
+#[netstack_test]
+#[test_case(
+    fnet_filter_ext::RoutineType::Ip(Some(
+        fnet_filter_ext::InstalledIpRoutine {
+            hook: fnet_filter_ext::IpHook::Ingress,
+            priority: 0,
+        },
+    )),
+    fnet_filter_ext::RoutineType::Nat(None);
+    "jump from IP routine to NAT routine"
+)]
+#[test_case(
+    fnet_filter_ext::RoutineType::Nat(Some(
+        fnet_filter_ext::InstalledNatRoutine {
+            hook: fnet_filter_ext::NatHook::Ingress,
+            priority: 0,
+        },
+    )),
+    fnet_filter_ext::RoutineType::Ip(None);
+    "jump from NAT routine to IP routine"
+)]
+async fn jump_to_routine_of_different_type(
+    name: &str,
+    calling_routine: fnet_filter_ext::RoutineType,
+    target_routine: fnet_filter_ext::RoutineType,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller =
+        fnet_filter_ext::Controller::new(&control, &fnet_filter_ext::ControllerId(name.to_owned()))
+            .await
+            .expect("create controller");
+
+    let routine_id = fnet_filter_ext::RoutineId {
+        namespace: fnet_filter_ext::NamespaceId::test_value(),
+        name: String::from("routine"),
+    };
+    const TARGET_ROUTINE: &str = "target-routine";
+    let target_routine_id = fnet_filter_ext::RoutineId {
+        namespace: fnet_filter_ext::NamespaceId::test_value(),
+        name: TARGET_ROUTINE.to_owned(),
+    };
+    let rule_id = fnet_filter_ext::RuleId { routine: routine_id.clone(), index: 0 };
+    let resources = [
+        fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace::test_value()),
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
+            id: target_routine_id,
+            routine_type: target_routine,
+        }),
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
+            id: routine_id,
+            routine_type: calling_routine,
+        }),
+        fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
+            id: rule_id.clone(),
+            matchers: fnet_filter_ext::Matchers::default(),
+            action: fnet_filter_ext::Action::Jump(TARGET_ROUTINE.to_owned()),
+        }),
+    ];
+    controller
+        .push_changes(resources.iter().cloned().map(fnet_filter_ext::Change::Create).collect())
+        .await
+        .expect("push changes");
+
+    let invalid_rule = assert_matches!(
+        controller.commit().await,
+        Err(fnet_filter_ext::CommitError::RuleWithInvalidAction(rule_id)) => rule_id
+    );
+    assert_eq!(invalid_rule, rule_id);
+}
+
 #[netstack_test]
 async fn rule_jumps_to_installed_routine(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
@@ -1324,4 +1648,125 @@ async fn rule_jumps_to_installed_routine(name: &str) {
         &fnet_filter_ext::Change::Create(resources.into_iter().last().unwrap())
     );
     assert_eq!(error, &fnet_filter_ext::ChangeCommitError::TargetRoutineIsInstalled);
+}
+
+#[netstack_test]
+#[test_case(
+    fnet_filter_ext::RoutineType::Ip(Some(
+        fnet_filter_ext::InstalledIpRoutine {
+            hook: fnet_filter_ext::IpHook::Ingress,
+            priority: 0,
+        },
+    ));
+    "cycle is in IP installation hook"
+)]
+#[test_case(
+    fnet_filter_ext::RoutineType::Ip(None);
+    "cycle is between uninstalled routines only"
+)]
+async fn routine_cycle(name: &str, calling_routine: fnet_filter_ext::RoutineType) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller =
+        fnet_filter_ext::Controller::new(&control, &fnet_filter_ext::ControllerId(name.to_owned()))
+            .await
+            .expect("create controller");
+
+    let routine_id = fnet_filter_ext::RoutineId {
+        namespace: fnet_filter_ext::NamespaceId::test_value(),
+        name: String::from("calling-routine"),
+    };
+
+    const CIRCULAR_ROUTINE: &str = "circular-routine";
+    let circular_routine_id = fnet_filter_ext::RoutineId {
+        namespace: fnet_filter_ext::NamespaceId::test_value(),
+        name: CIRCULAR_ROUTINE.to_owned(),
+    };
+
+    let resources = [
+        fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace::test_value()),
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
+            id: circular_routine_id.clone(),
+            routine_type: fnet_filter_ext::RoutineType::Ip(None),
+        }),
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
+            id: routine_id.clone(),
+            routine_type: calling_routine,
+        }),
+        fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
+            id: fnet_filter_ext::RuleId { routine: routine_id, index: 0 },
+            matchers: fnet_filter_ext::Matchers::default(),
+            action: fnet_filter_ext::Action::Jump(CIRCULAR_ROUTINE.to_owned()),
+        }),
+        fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
+            id: fnet_filter_ext::RuleId { routine: circular_routine_id.clone(), index: 0 },
+            matchers: fnet_filter_ext::Matchers::default(),
+            action: fnet_filter_ext::Action::Jump(CIRCULAR_ROUTINE.to_owned()),
+        }),
+    ];
+    controller
+        .push_changes(resources.iter().cloned().map(fnet_filter_ext::Change::Create).collect())
+        .await
+        .expect("push changes");
+
+    let invalid_routine = assert_matches!(
+        controller.commit().await,
+        Err(fnet_filter_ext::CommitError::CyclicalRoutineGraph(routine_id)) => routine_id
+    );
+    assert_eq!(invalid_routine, circular_routine_id);
+}
+
+#[netstack_test]
+async fn uninstalled_routine_validated_even_if_unreachable<I: net_types::ip::Ip>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller =
+        fnet_filter_ext::Controller::new(&control, &fnet_filter_ext::ControllerId(name.to_owned()))
+            .await
+            .expect("create controller");
+
+    let namespace_id = fnet_filter_ext::NamespaceId(String::from("ip-specific-namespace"));
+    let routine_id = fnet_filter_ext::RoutineId {
+        namespace: namespace_id.clone(),
+        name: String::from("routine"),
+    };
+    let rule_id = fnet_filter_ext::RuleId { routine: routine_id.clone(), index: 0 };
+    let resources = [
+        fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
+            id: namespace_id,
+            domain: {
+                let IpInvariant(domain) = I::map_ip(
+                    (),
+                    |()| IpInvariant(fnet_filter_ext::Domain::Ipv4),
+                    |()| IpInvariant(fnet_filter_ext::Domain::Ipv6),
+                );
+                domain
+            },
+        }),
+        // Uninstalled routine includes a rule with an IP-version-specific matcher.
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
+            id: routine_id,
+            routine_type: fnet_filter_ext::RoutineType::Ip(None),
+        }),
+        fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
+            id: rule_id.clone(),
+            matchers: invalid_address_range_matcher::<I>(),
+            action: fnet_filter_ext::Action::Drop,
+        }),
+    ];
+    controller
+        .push_changes(resources.iter().cloned().map(fnet_filter_ext::Change::Create).collect())
+        .await
+        .expect("push changes");
+
+    let result = controller.commit().await;
+    let invalid_rule = assert_matches!(
+        result,
+        Err(fnet_filter_ext::CommitError::RuleWithInvalidMatcher(rule_id)) => rule_id
+    );
+    assert_eq!(invalid_rule, rule_id);
 }

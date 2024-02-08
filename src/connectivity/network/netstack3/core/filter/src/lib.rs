@@ -22,4 +22,4 @@ pub use matchers::{
     PortMatcher, TransportProtocolMatcher,
 };
 pub use packets::{IpPacket, TransportPacket};
-pub use state::{Action, Hook, Routine, Rule, State};
+pub use state::{Action, Hook, IpRoutines, NatRoutines, Routine, Rule, State, UninstalledRoutine};

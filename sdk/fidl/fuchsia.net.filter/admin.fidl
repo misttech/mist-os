@@ -126,12 +126,31 @@ closed protocol NamespaceController {
     }) -> (@generated_name("CommitResult") flexible resource union {
         /// The commit was successfully applied.
         1: ok Empty;
+        /// One of the changes in the commit caused the specified rule's matcher
+        /// to be invalid for the context in which the rule will be evaluated.
+        ///
+        /// For example, this could be a matcher on the ingress interface on
+        /// a rule that is in a routine installed in the egress hook, or a
+        /// matcher on the source address specifying an IPv4 subnet that is
+        /// in an IPv6-only namespace.
+        2: rule_with_invalid_matcher RuleId;
+        /// One of the changes in the commit caused the specified rule's action
+        /// to be invalid for the context in which the rule will be evaluated.
+        ///
+        /// For example, this could be a NAT action in an IP routine.
+        3: rule_with_invalid_action RuleId;
+        /// The routine graph forms a cycle, including (at least) the specified
+        /// routine.
+        ///
+        /// Each uninstalled routine and all of the routines it directly or
+        /// transitively jumps to must form a DAG.
+        4: cyclical_routine_graph RoutineId;
         /// At least one of the changes provided was invalid given the current
         /// state when `Commit` was called. In order to be maximally
         /// informative, a vector of results is returned where each result
         /// corresponds to the change at the same index (across all batches of
         /// pending changes).
-        2: error_on_change vector<@generated_name("CommitError") flexible enum {
+        5: error_on_change vector<@generated_name("CommitError") flexible enum {
             /// The change was not validated because an invalid change was
             /// encountered before it.
             NOT_REACHED = 1;
@@ -145,21 +164,8 @@ closed protocol NamespaceController {
             RULE_NOT_FOUND = 5;
             /// One of the specified resources already exists.
             ALREADY_EXISTS = 6;
-            /// The change included a rule with a matcher specified that is
-            /// unavailable in the context in which the rule will be evaluated.
-            ///
-            /// For example, this could be a matcher on the ingress interface on
-            /// a rule that is in a routine installed in the egress hook, or a
-            /// matcher on the source address specifying an IPv4 subnet that is
-            /// in an IPv6-only namespace.
-            MATCHER_UNAVAILABLE = 7;
-            /// The change included a rule with an action that was not valid for
-            /// the routine to which the rule was appended.
-            ///
-            /// For example, this could be a NAT action in an IP routine.
-            INVALID_ACTION_FOR_ROUTINE = 8;
             /// The change includes a rule that jumps to an installed routine.
-            TARGET_ROUTINE_IS_INSTALLED = 9;
+            TARGET_ROUTINE_IS_INSTALLED = 7;
         }>:MAX_COMMIT_SIZE;
     });
 };

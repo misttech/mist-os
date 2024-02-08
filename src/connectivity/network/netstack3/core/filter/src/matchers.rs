@@ -100,8 +100,12 @@ impl<A: IpAddress> Matcher<A> for AddressMatcherType<A> {
 /// A matcher for IP addresses.
 #[derive(Clone, Debug)]
 pub struct AddressMatcher<A: IpAddress> {
-    pub(crate) matcher: AddressMatcherType<A>,
-    pub(crate) invert: bool,
+    /// The type of the address matcher.
+    pub matcher: AddressMatcherType<A>,
+    /// Whether to check for an "inverse" or "negative" match (in which case,
+    /// if the matcher criteria do *not* apply, it *is* considered a match, and
+    /// vice versa).
+    pub invert: bool,
 }
 
 impl<A: IpAddress> Matcher<A> for AddressMatcher<A> {
@@ -114,8 +118,12 @@ impl<A: IpAddress> Matcher<A> for AddressMatcher<A> {
 /// A matcher for transport-layer port numbers.
 #[derive(Clone, Debug)]
 pub struct PortMatcher {
-    pub(crate) range: RangeInclusive<u16>,
-    pub(crate) invert: bool,
+    /// The range of port numbers in which the tested port number must fall.
+    pub range: RangeInclusive<u16>,
+    /// Whether to check for an "inverse" or "negative" match (in which case,
+    /// if the matcher criteria do *not* apply, it *is* considered a match, and
+    /// vice versa).
+    pub invert: bool,
 }
 
 impl Matcher<u16> for PortMatcher {
@@ -126,11 +134,16 @@ impl Matcher<u16> for PortMatcher {
 }
 
 /// A matcher for transport-layer protocol or port numbers.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TransportProtocolMatcher<P> {
-    pub(crate) proto: P,
-    pub(crate) src_port: Option<PortMatcher>,
-    pub(crate) dst_port: Option<PortMatcher>,
+    /// The transport-layer protocol.
+    pub proto: P,
+    /// If set, the matcher for the source port or identifier of the transport
+    /// header.
+    pub src_port: Option<PortMatcher>,
+    /// If set, the matcher for the destination port or identifier of the
+    /// transport header.
+    pub dst_port: Option<PortMatcher>,
 }
 
 impl<P: PartialEq, T: TransportPacket> Matcher<(P, Option<T>)> for TransportProtocolMatcher<P> {
@@ -145,14 +158,23 @@ impl<P: PartialEq, T: TransportPacket> Matcher<(P, Option<T>)> for TransportProt
 }
 
 /// Top-level matcher for IP packets.
-#[derive(Derivative, Debug)]
+#[derive(Derivative, Debug, Clone)]
 #[derivative(Default(bound = ""))]
 pub struct PacketMatcher<I: IpExt, DeviceClass> {
-    pub(crate) in_interface: Option<InterfaceMatcher<DeviceClass>>,
-    pub(crate) out_interface: Option<InterfaceMatcher<DeviceClass>>,
-    pub(crate) src_address: Option<AddressMatcher<I::Addr>>,
-    pub(crate) dst_address: Option<AddressMatcher<I::Addr>>,
-    pub(crate) transport_protocol: Option<TransportProtocolMatcher<I::Proto>>,
+    /// The interface on which the packet entered the stack.
+    ///
+    /// Only available in `INGRESS`, `LOCAL_INGRESS`, and `FORWARDING`.
+    pub in_interface: Option<InterfaceMatcher<DeviceClass>>,
+    /// The interface through which the packet exits the stack.
+    ///
+    /// Only available in `FORWARDING`, `LOCAL_EGRESS`, and `EGRESS`.
+    pub out_interface: Option<InterfaceMatcher<DeviceClass>>,
+    /// Matcher for the source IP address.
+    pub src_address: Option<AddressMatcher<I::Addr>>,
+    /// Matcher for the destination IP address.
+    pub dst_address: Option<AddressMatcher<I::Addr>>,
+    /// Matchers for the transport layer.
+    pub transport_protocol: Option<TransportProtocolMatcher<I::Proto>>,
 }
 
 impl<I: IpExt, DeviceClass> PacketMatcher<I, DeviceClass> {

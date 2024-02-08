@@ -2,21 +2,108 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::{btree_map, hash_map, BTreeMap, HashMap};
+use std::{
+    collections::{btree_map, hash_map, BTreeMap, HashMap},
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
+use derivative::Derivative;
 use fidl_fuchsia_net_filter as fnet_filter;
 use fidl_fuchsia_net_filter_ext as fnet_filter_ext;
+use net_types::ip::{Ipv4, Ipv6};
+
+use super::CommitError;
 
 #[derive(Debug, Clone, PartialEq)]
-struct Rule {
-    matchers: fnet_filter_ext::Matchers,
-    action: fnet_filter_ext::Action,
+pub(super) struct Rule {
+    pub matchers: fnet_filter_ext::Matchers,
+    pub action: fnet_filter_ext::Action,
+}
+
+/// When there are two routines that are installed on the same hook with the
+/// same priority, the routine that was installed earlier will be evaluated
+/// first. This atomic counter is incremented on addition of each routine,
+/// giving us a monotonically increasing value we can use to sort routines in
+/// order of installation.
+static ROUTINE_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Debug, Clone, Derivative)]
+#[derivative(PartialEq)]
+pub(super) struct InstalledIpRoutine {
+    pub hook: fnet_filter_ext::IpHook,
+    pub priority: i32,
+    #[derivative(PartialEq = "ignore")]
+    pub installation_order: usize,
+}
+
+#[derive(Debug, Clone, Derivative)]
+#[derivative(PartialEq)]
+pub(super) struct InstalledNatRoutine {
+    pub hook: fnet_filter_ext::NatHook,
+    pub priority: i32,
+    #[derivative(PartialEq = "ignore")]
+    pub installation_order: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(super) enum RoutineType {
+    Ip(Option<InstalledIpRoutine>),
+    Nat(Option<InstalledNatRoutine>),
+}
+
+impl RoutineType {
+    pub fn is_installed(&self) -> bool {
+        // The `InstalledIpRoutine` or `InstalledNatRoutine` configuration is
+        // optional, and when omitted, signifies an uninstalled routine.
+        match self {
+            Self::Ip(Some(_)) | Self::Nat(Some(_)) => true,
+            Self::Ip(None) | Self::Nat(None) => false,
+        }
+    }
+}
+
+impl From<fnet_filter_ext::RoutineType> for RoutineType {
+    fn from(routine_type: fnet_filter_ext::RoutineType) -> Self {
+        match routine_type {
+            fnet_filter_ext::RoutineType::Ip(installation) => Self::Ip(installation.map(
+                |fnet_filter_ext::InstalledIpRoutine { hook, priority }| InstalledIpRoutine {
+                    hook,
+                    priority,
+                    installation_order: ROUTINE_COUNTER.fetch_add(1, Ordering::SeqCst),
+                },
+            )),
+            fnet_filter_ext::RoutineType::Nat(installation) => Self::Nat(installation.map(
+                |fnet_filter_ext::InstalledNatRoutine { hook, priority }| InstalledNatRoutine {
+                    hook,
+                    priority,
+                    installation_order: ROUTINE_COUNTER.fetch_add(1, Ordering::SeqCst),
+                },
+            )),
+        }
+    }
+}
+
+impl From<&RoutineType> for fnet_filter_ext::RoutineType {
+    fn from(routine_type: &RoutineType) -> Self {
+        match routine_type {
+            RoutineType::Ip(installation) => Self::Ip(installation.as_ref().map(
+                |InstalledIpRoutine { hook, priority, installation_order: _ }| {
+                    fnet_filter_ext::InstalledIpRoutine { hook: *hook, priority: *priority }
+                },
+            )),
+            RoutineType::Nat(installation) => Self::Nat(installation.as_ref().map(
+                |InstalledNatRoutine { hook, priority, installation_order: _ }| {
+                    fnet_filter_ext::InstalledNatRoutine { hook: *hook, priority: *priority }
+                },
+            )),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
-struct Routine {
-    routine_type: fnet_filter_ext::RoutineType,
-    rules: BTreeMap<u32, Rule>,
+pub(super) struct Routine {
+    pub routine_type: RoutineType,
+    pub rules: BTreeMap<u32, Rule>,
 }
 
 impl Routine {
@@ -36,9 +123,9 @@ impl Routine {
 }
 
 #[derive(Debug, Clone)]
-struct Namespace {
-    domain: fnet_filter_ext::Domain,
-    routines: HashMap<String, Routine>,
+pub(super) struct Namespace {
+    pub domain: fnet_filter_ext::Domain,
+    pub routines: HashMap<String, Routine>,
 }
 
 impl Namespace {
@@ -61,12 +148,27 @@ impl Namespace {
 #[derive(Debug, Default)]
 pub(crate) struct Controller {
     namespaces: HashMap<fnet_filter_ext::NamespaceId, Namespace>,
+    // This converted state is retained by the `Controller` to make easier to
+    // merge this controller's state with that of another that is being updated,
+    // without having to re-do all the conversion work for each controller
+    // whenever any of them is updated.
+    //
+    // It is always updated atomically with `namespaces`.
+    pub core_state_v4: super::conversion::State<Ipv4>,
+    pub core_state_v6: super::conversion::State<Ipv6>,
 }
 
 #[derive(Clone)]
 pub(crate) enum Event {
     Added(fnet_filter_ext::Resource),
     Removed(fnet_filter_ext::ResourceId),
+}
+
+pub(crate) struct CommitResult {
+    pub events: Vec<Event>,
+    pub new_state: HashMap<fnet_filter_ext::NamespaceId, Namespace>,
+    pub core_state_v4: super::conversion::State<Ipv4>,
+    pub core_state_v6: super::conversion::State<Ipv6>,
 }
 
 impl Controller {
@@ -110,7 +212,7 @@ impl Controller {
                             namespace: namespace_id.clone(),
                             name: routine_id.clone(),
                         },
-                        routine_type: routine_type.clone(),
+                        routine_type: routine_type.into(),
                     });
                     let rules = rules.iter().map(|(index, Rule { matchers, action })| {
                         fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
@@ -131,19 +233,28 @@ impl Controller {
         })
     }
 
-    pub(crate) fn validate_and_apply(
+    pub(crate) fn validate_and_convert_changes(
         &mut self,
         changes: Vec<fnet_filter_ext::Change>,
         idempotent: bool,
-    ) -> Result<Vec<Event>, (usize, fnet_filter::CommitError)> {
+    ) -> Result<CommitResult, CommitError> {
         let validator = Validator::new(self.namespaces.clone());
-        let (result, events) = validator.validate(changes, idempotent)?;
+        let (new_state, events) = validator.validate(changes, idempotent)?;
 
-        // Only if validation was successful do we actually commit the changes.
-        // This ensures that the state will never be only partially updated.
-        self.namespaces = result;
+        let (v4, v6) = super::conversion::convert_to_core(new_state.clone())?;
 
-        Ok(events)
+        Ok(CommitResult { events, new_state, core_state_v4: v4, core_state_v6: v6 })
+    }
+
+    pub(crate) fn apply_new_state(
+        &mut self,
+        new_state: HashMap<fnet_filter_ext::NamespaceId, Namespace>,
+        v4: super::conversion::State<Ipv4>,
+        v6: super::conversion::State<Ipv6>,
+    ) {
+        self.namespaces = new_state;
+        self.core_state_v4 = v4;
+        self.core_state_v6 = v6;
     }
 }
 
@@ -160,10 +271,7 @@ impl Validator {
         mut self,
         changes: Vec<fnet_filter_ext::Change>,
         idempotent: bool,
-    ) -> Result<
-        (HashMap<fnet_filter_ext::NamespaceId, Namespace>, Vec<Event>),
-        (usize, fnet_filter::CommitError),
-    > {
+    ) -> Result<(HashMap<fnet_filter_ext::NamespaceId, Namespace>, Vec<Event>), CommitError> {
         let mut events = Vec::new();
         for (i, change) in changes.into_iter().enumerate() {
             match change {
@@ -178,7 +286,7 @@ impl Validator {
                     self.remove_resource(id, idempotent).map(|removals| events.extend(removals))
                 }
             }
-            .map_err(|e| (i, e))?;
+            .map_err(|e| CommitError::ErrorOnChange { index: i, error: e })?;
         }
         let Self { namespaces } = self;
         Ok((namespaces, events))
@@ -214,6 +322,7 @@ impl Validator {
                     .namespaces
                     .get_mut(&namespace)
                     .ok_or(fnet_filter::CommitError::NamespaceNotFound)?;
+                let routine_type = routine_type.into();
                 match namespace.routines.entry(name) {
                     hash_map::Entry::Vacant(entry) => {
                         let _ = entry.insert(Routine { routine_type, rules: BTreeMap::default() });
