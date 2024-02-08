@@ -7,7 +7,7 @@
 import json
 import os
 
-from typing import Dict, Optional
+from typing import Any, Optional
 
 import yaml
 
@@ -100,7 +100,7 @@ class InfraDriver(base_mobly_driver.BaseDriver):
             test_params = {}
             if self._params_path:
                 test_params = common.read_yaml_from_file(self._params_path)
-            botanist_honeydew_translation_map: Dict[str, str] = {
+            botanist_honeydew_translation_map: dict[str, str] = {
                 "nodename": "name",
                 "ssh_key": "ssh_private_key",
             }
@@ -118,7 +118,7 @@ class InfraDriver(base_mobly_driver.BaseDriver):
         except (IOError, OSError) as e:
             raise common.DriverException("Failed to open file: %")
 
-    def teardown(self, *args) -> None:
+    def teardown(self, *args: Any) -> None:
         """Performs any required clean up upon Mobly test completion."""
         results_path = api_mobly.get_result_path(
             self._log_path, self._TESTBED_NAME

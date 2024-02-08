@@ -38,3 +38,9 @@ warn_return_any = false
 # maintain an exclusion list within fuchsia/build/python/mypy_checker.py
 # and ignore files from the  mypy command.
 exclude = []
+
+# 'yaml' module imports aren't working with the global
+# 'ignore_missing_imports' flag. Overriding using overridesr entry.
+[[tool.mypy.overrides]]
+module = "yaml"
+ignore_missing_imports = true

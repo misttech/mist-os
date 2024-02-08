@@ -46,6 +46,7 @@ if (is_host) {
   _md_bin_name = "mobly_driver.pyz"
   python_binary(_md_bin_target) {
     testonly = true
+    enable_pytype = true
     main_source = "main.py"
     sources = [
       "api_ffx.py",

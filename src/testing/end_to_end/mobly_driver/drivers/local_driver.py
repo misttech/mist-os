@@ -207,5 +207,5 @@ class LocalDriver(base_mobly_driver.BaseDriver):
 
         return yaml.dump(config)
 
-    def teardown(self, *args) -> None:
+    def teardown(self, *args: Any) -> None:
         pass
