@@ -137,24 +137,25 @@ where
 }
 
 impl ConfigFile {
+    #[cfg(test)]
     fn from_map(path: Option<PathBuf>, contents: ConfigMap) -> Self {
         Self { path, contents, dirty: false, flush: true }
     }
 
-    fn from_buf(path: Option<PathBuf>, buffer: impl Read) -> Self {
+    fn from_buf(path: Option<PathBuf>, buffer: impl Read, flush: bool) -> Self {
         let contents = read_json(buffer)
             .as_ref()
             .and_then(Value::as_object)
             .cloned()
             .unwrap_or_else(Map::default);
-        Self { path, contents, dirty: false, flush: true }
+        Self { path, contents, dirty: false, flush }
     }
 
     fn from_file(path: &Path) -> Result<Self> {
         let file = OpenOptions::new().read(true).open(path);
 
         match file {
-            Ok(buf) => Ok(Self::from_buf(Some(path.to_owned()), BufReader::new(buf))),
+            Ok(buf) => Ok(Self::from_buf(Some(path.to_owned()), BufReader::new(buf), true)),
             Err(e) if e.kind() == ErrorKind::NotFound => Ok(Self {
                 path: Some(path.to_owned()),
                 contents: ConfigMap::default(),
@@ -169,7 +170,7 @@ impl ConfigFile {
         let file = OpenOptions::new().read(true).open(path);
 
         match file {
-            Ok(buf) => Ok(Self::from_buf(Some(path.to_owned()), BufReader::new(buf))),
+            Ok(buf) => Ok(Self::from_buf(Some(path.to_owned()), BufReader::new(buf), false)),
             Err(e) if e.kind() == ErrorKind::NotFound => Ok(Self {
                 path: Some(path.to_owned()),
                 contents: ConfigMap::default(),
@@ -218,6 +219,7 @@ impl ConfigFile {
     }
 }
 
+#[cfg(test)]
 impl Default for ConfigFile {
     fn default() -> Self {
         Self::from_map(None, Map::default())
@@ -245,6 +247,9 @@ impl Config {
         let user_conf = env.get_user();
         let build_conf = env.get_build();
         let is_isolated = env.context().env_kind().is_isolated();
+        if !is_isolated {
+            tracing::debug!("Non isolated context {:?}", env.context().env_kind());
+        }
         let from_file =
             if is_isolated { ConfigFile::from_nonflushing_file } else { ConfigFile::from_file };
         let user = user_conf.as_deref().map(from_file).transpose()?;
@@ -467,9 +472,9 @@ mod test {
     #[test]
     fn test_persistent_build() -> Result<()> {
         let persistent_config = Config::new(
-            Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL))),
-            Some(ConfigFile::from_buf(None, BufReader::new(BUILD))),
-            Some(ConfigFile::from_buf(None, BufReader::new(USER))),
+            Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL), true)),
+            Some(ConfigFile::from_buf(None, BufReader::new(BUILD), true)),
+            Some(ConfigFile::from_buf(None, BufReader::new(USER), true)),
             Map::default(),
             Map::default(),
         );
@@ -511,9 +516,9 @@ mod test {
     #[test]
     fn test_priority_iterator() -> Result<()> {
         let test = Config {
-            user: Some(ConfigFile::from_buf(None, BufReader::new(USER))),
-            build: Some(ConfigFile::from_buf(None, BufReader::new(BUILD))),
-            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL))),
+            user: Some(ConfigFile::from_buf(None, BufReader::new(USER), true)),
+            build: Some(ConfigFile::from_buf(None, BufReader::new(BUILD), true)),
+            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL), true)),
             default: serde_json::from_slice(DEFAULT)?,
             runtime: serde_json::from_slice(RUNTIME)?,
         };
@@ -531,7 +536,7 @@ mod test {
     #[test]
     fn test_priority_iterator_with_nones() -> Result<()> {
         let test = Config {
-            user: Some(ConfigFile::from_buf(None, BufReader::new(USER))),
+            user: Some(ConfigFile::from_buf(None, BufReader::new(USER), true)),
             build: None,
             global: None,
             default: serde_json::from_slice(DEFAULT)?,
@@ -551,9 +556,9 @@ mod test {
     #[test]
     fn test_get() -> Result<()> {
         let test = Config {
-            user: Some(ConfigFile::from_buf(None, BufReader::new(USER))),
-            build: Some(ConfigFile::from_buf(None, BufReader::new(BUILD))),
-            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL))),
+            user: Some(ConfigFile::from_buf(None, BufReader::new(USER), true)),
+            build: Some(ConfigFile::from_buf(None, BufReader::new(BUILD), true)),
+            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL), true)),
             default: serde_json::from_slice(DEFAULT)?,
             runtime: ConfigMap::default(),
         };
@@ -563,9 +568,9 @@ mod test {
         assert_eq!(value.unwrap(), Value::String(String::from("Build")));
 
         let test_build = Config {
-            user: Some(ConfigFile::from_buf(None, BufReader::new(USER))),
+            user: Some(ConfigFile::from_buf(None, BufReader::new(USER), true)),
             build: None,
-            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL))),
+            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL), true)),
             default: serde_json::from_slice(DEFAULT)?,
             runtime: ConfigMap::default(),
         };
@@ -577,7 +582,7 @@ mod test {
         let test_global = Config {
             user: None,
             build: None,
-            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL))),
+            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL), true)),
             default: serde_json::from_slice(DEFAULT)?,
             runtime: ConfigMap::default(),
         };
@@ -614,7 +619,7 @@ mod test {
     #[test]
     fn test_set_non_map_value() -> Result<()> {
         let mut test = Config {
-            user: Some(ConfigFile::from_buf(None, BufReader::new(ERROR))),
+            user: Some(ConfigFile::from_buf(None, BufReader::new(ERROR), true)),
             build: None,
             global: None,
             default: ConfigMap::default(),
@@ -629,9 +634,9 @@ mod test {
     #[test]
     fn test_get_nonexistent_config() -> Result<()> {
         let test = Config {
-            user: Some(ConfigFile::from_buf(None, BufReader::new(USER))),
-            build: Some(ConfigFile::from_buf(None, BufReader::new(BUILD))),
-            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL))),
+            user: Some(ConfigFile::from_buf(None, BufReader::new(USER), true)),
+            build: Some(ConfigFile::from_buf(None, BufReader::new(BUILD), true)),
+            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL), true)),
             default: serde_json::from_slice(DEFAULT)?,
             runtime: ConfigMap::default(),
         };
@@ -643,9 +648,9 @@ mod test {
     #[test]
     fn test_set() -> Result<()> {
         let mut test = Config {
-            user: Some(ConfigFile::from_buf(None, BufReader::new(USER))),
-            build: Some(ConfigFile::from_buf(None, BufReader::new(BUILD))),
-            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL))),
+            user: Some(ConfigFile::from_buf(None, BufReader::new(USER), true)),
+            build: Some(ConfigFile::from_buf(None, BufReader::new(BUILD), true)),
+            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL), true)),
             default: serde_json::from_slice(DEFAULT)?,
             runtime: ConfigMap::default(),
         };
@@ -659,9 +664,9 @@ mod test {
     #[test]
     fn test_set_twice_does_not_change_config() -> Result<()> {
         let mut test = Config {
-            user: Some(ConfigFile::from_buf(None, BufReader::new(USER))),
-            build: Some(ConfigFile::from_buf(None, BufReader::new(BUILD))),
-            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL))),
+            user: Some(ConfigFile::from_buf(None, BufReader::new(USER), true)),
+            build: Some(ConfigFile::from_buf(None, BufReader::new(BUILD), true)),
+            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL), true)),
             default: serde_json::from_slice(DEFAULT)?,
             runtime: ConfigMap::default(),
         };
@@ -735,9 +740,9 @@ mod test {
     #[test]
     fn test_remove() -> Result<()> {
         let mut test = Config {
-            user: Some(ConfigFile::from_buf(None, BufReader::new(USER))),
-            build: Some(ConfigFile::from_buf(None, BufReader::new(BUILD))),
-            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL))),
+            user: Some(ConfigFile::from_buf(None, BufReader::new(USER), true)),
+            build: Some(ConfigFile::from_buf(None, BufReader::new(BUILD), true)),
+            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL), true)),
             default: serde_json::from_slice(DEFAULT)?,
             runtime: ConfigMap::default(),
         };
@@ -778,9 +783,9 @@ mod test {
     #[test]
     fn test_display() -> Result<()> {
         let test = Config {
-            user: Some(ConfigFile::from_buf(None, BufReader::new(USER))),
-            build: Some(ConfigFile::from_buf(None, BufReader::new(BUILD))),
-            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL))),
+            user: Some(ConfigFile::from_buf(None, BufReader::new(USER), true)),
+            build: Some(ConfigFile::from_buf(None, BufReader::new(BUILD), true)),
+            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL), true)),
             default: serde_json::from_slice(DEFAULT)?,
             runtime: ConfigMap::default(),
         };
@@ -810,7 +815,7 @@ mod test {
     #[test]
     fn test_mapping() -> Result<()> {
         let test = Config {
-            user: Some(ConfigFile::from_buf(None, BufReader::new(MAPPED))),
+            user: Some(ConfigFile::from_buf(None, BufReader::new(MAPPED), true)),
             build: None,
             global: None,
             default: ConfigMap::default(),
@@ -899,7 +904,7 @@ mod test {
     #[test]
     fn test_nested_set_from_already_populated_tree() -> Result<()> {
         let mut test = Config {
-            user: Some(ConfigFile::from_buf(None, BufReader::new(NESTED))),
+            user: Some(ConfigFile::from_buf(None, BufReader::new(NESTED), true)),
             build: None,
             global: None,
             default: ConfigMap::default(),
@@ -918,7 +923,7 @@ mod test {
     #[test]
     fn test_nested_set_override_literals() -> Result<()> {
         let mut test = Config {
-            user: Some(ConfigFile::from_buf(None, BufReader::new(LITERAL))),
+            user: Some(ConfigFile::from_buf(None, BufReader::new(LITERAL), true)),
             build: None,
             global: None,
             default: ConfigMap::default(),
@@ -953,7 +958,7 @@ mod test {
     #[test]
     fn test_nested_remove_throws_error_if_key_not_found() -> Result<()> {
         let mut test = Config {
-            user: Some(ConfigFile::from_buf(None, BufReader::new(NESTED))),
+            user: Some(ConfigFile::from_buf(None, BufReader::new(NESTED), true)),
             build: None,
             global: None,
             default: ConfigMap::default(),
@@ -967,7 +972,7 @@ mod test {
     #[test]
     fn test_nested_remove_deletes_literals() -> Result<()> {
         let mut test = Config {
-            user: Some(ConfigFile::from_buf(None, BufReader::new(DEEP))),
+            user: Some(ConfigFile::from_buf(None, BufReader::new(DEEP), true)),
             build: None,
             global: None,
             default: ConfigMap::default(),
@@ -982,7 +987,7 @@ mod test {
     #[test]
     fn test_nested_remove_deletes_subtrees() -> Result<()> {
         let mut test = Config {
-            user: Some(ConfigFile::from_buf(None, BufReader::new(DEEP))),
+            user: Some(ConfigFile::from_buf(None, BufReader::new(DEEP), true)),
             build: None,
             global: None,
             default: ConfigMap::default(),
@@ -997,9 +1002,9 @@ mod test {
     #[test]
     fn test_additive_mode() -> Result<()> {
         let test = Config {
-            user: Some(ConfigFile::from_buf(None, BufReader::new(USER))),
-            build: Some(ConfigFile::from_buf(None, BufReader::new(BUILD))),
-            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL))),
+            user: Some(ConfigFile::from_buf(None, BufReader::new(USER), true)),
+            build: Some(ConfigFile::from_buf(None, BufReader::new(BUILD), true)),
+            global: Some(ConfigFile::from_buf(None, BufReader::new(GLOBAL), true)),
             default: serde_json::from_slice(DEFAULT)?,
             runtime: serde_json::from_slice(RUNTIME)?,
         };
