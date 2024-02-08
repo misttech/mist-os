@@ -128,9 +128,8 @@ REPLACEMENTS = [
     # Use CStr to represent constant C strings. The inputs look like:
     #   pub const FS_KEY_DESC_PREFIX: &[u8; 9usize] = b"fscrypt:\0";
     (
-        r': &\[u8; [0-9]+(usize)?\] = (b".*\\0");\n',
-        ": &'static std::ffi::CStr = "
-        "unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(\\2) };\n",
+        r': &\[u8; [0-9]+(usize)?\] = b"(.*)\\0";\n',
+        ': &\'static std::ffi::CStr = c"\\2";\n',
     ),
     # Change `__IncompleteArrayField` representation to `transparent`, which is necessary to
     # allow it to derive `AsBytes`.
