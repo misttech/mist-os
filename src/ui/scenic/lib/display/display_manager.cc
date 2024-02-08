@@ -42,7 +42,7 @@ void DisplayManager::BindDefaultDisplayCoordinator(
   default_display_coordinator_listener_ =
       std::make_shared<display::DisplayCoordinatorListener>(default_display_coordinator_);
   default_display_coordinator_listener_->InitializeCallbacks(
-      /*on_invalid_cb=*/nullptr, fit::bind_member<&DisplayManager::OnDisplaysChanged>(this),
+      fit::bind_member<&DisplayManager::OnDisplaysChanged>(this),
       fit::bind_member<&DisplayManager::OnClientOwnershipChange>(this));
 
   // Set up callback to handle Vsync notifications, and ask coordinator to send these notifications.

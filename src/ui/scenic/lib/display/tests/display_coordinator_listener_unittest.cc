@@ -65,117 +65,28 @@ class DisplayCoordinatorListenerTest : public gtest::TestLoopFixture {
 
 using DisplayCoordinatorListenerBasicTest = gtest::TestLoopFixture;
 
-// Verify the documented constructor behavior.
+// Verify the documented constructor behavior doesn't cause any crash.
 TEST_F(DisplayCoordinatorListenerBasicTest, ConstructorArgs) {
-  {
-    // Valid arguments.
-    ChannelPair coordinator_channel = CreateChannelPair();
+  // Valid arguments.
+  ChannelPair coordinator_channel = CreateChannelPair();
 
-    auto coordinator = std::make_shared<fuchsia::hardware::display::CoordinatorSyncPtr>();
-    coordinator->Bind(std::move(coordinator_channel.client));
-    DisplayCoordinatorListener listener(coordinator);
-
-    EXPECT_TRUE(listener.valid());
-  }
-
-  {
-    ChannelPair coordinator_channel = CreateChannelPair();
-
-    // Unbound coordinator.
-    auto coordinator = std::make_shared<fuchsia::hardware::display::CoordinatorSyncPtr>();
-    DisplayCoordinatorListener listener(coordinator);
-
-    EXPECT_FALSE(listener.valid());
-  }
-
-  {
-    ChannelPair device_channel = CreateChannelPair();
-
-    auto coordinator = std::make_shared<fuchsia::hardware::display::CoordinatorSyncPtr>();
-    coordinator->Bind(zx::channel());
-    DisplayCoordinatorListener listener(coordinator);
-
-    EXPECT_FALSE(listener.valid());
-  }
+  auto coordinator = std::make_shared<fuchsia::hardware::display::CoordinatorSyncPtr>();
+  coordinator->Bind(std::move(coordinator_channel.client));
+  DisplayCoordinatorListener listener(coordinator);
 }
 
-// Verify that DisplayCoordinator connects to the FIDL service.
-TEST_F(DisplayCoordinatorListenerTest, Connect) {
-  display_coordinator_listener()->InitializeCallbacks(/*on_invalid_cb=*/nullptr,
-                                                      /*displays_changed_cb=*/nullptr,
+// Verify that DisplayCoordinator connects to the FIDL service and the
+// connection can be torn down when the coordinator server channel is closed.
+TEST_F(DisplayCoordinatorListenerTest, ConnectAndDisconnect) {
+  display_coordinator_listener()->InitializeCallbacks(/*displays_changed_cb=*/nullptr,
                                                       /*client_ownership_change_cb=*/nullptr);
 
-  EXPECT_TRUE(display_coordinator_listener()->valid());
   EXPECT_TRUE(mock_display_coordinator()->binding().is_bound());
   RunLoopUntilIdle();
-  EXPECT_TRUE(display_coordinator_listener()->valid());
-  EXPECT_TRUE(mock_display_coordinator()->binding().is_bound());
-}
-
-// Verify that DisplayCoordinator becomes invalid when the coordinator channel is closed.
-TEST_F(DisplayCoordinatorListenerTest, DisconnectCoordinatorChannel) {
-  uint on_invalid_count = 0;
-  auto on_invalid_cb = [&on_invalid_count]() { on_invalid_count++; };
-  display_coordinator_listener()->InitializeCallbacks(std::move(on_invalid_cb),
-                                                      /*displays_changed_cb=*/nullptr,
-                                                      /*client_ownership_change_cb=*/nullptr);
-
-  EXPECT_TRUE(display_coordinator_listener()->valid());
-  EXPECT_TRUE(mock_display_coordinator()->binding().is_bound());
-  RunLoopUntilIdle();
-  EXPECT_TRUE(display_coordinator_listener()->valid());
   EXPECT_TRUE(mock_display_coordinator()->binding().is_bound());
 
   mock_display_coordinator()->ResetCoordinatorBinding();
   RunLoopUntilIdle();
-  EXPECT_EQ(1u, on_invalid_count);
-  EXPECT_FALSE(display_coordinator_listener()->valid());
-
-  // Expect no crashes on teardown.
-  ResetDisplayCoordinatorListener();
-  RunLoopUntilIdle();
-}
-
-// Verify that DisplayCoordinator becomes invalid when the coordinator channel is closed, but that
-// we don't receive a callback after ClearCallbacks.
-TEST_F(DisplayCoordinatorListenerTest, DisconnectCoordinatorChannelAfterClearCallbacks) {
-  uint on_invalid_count = 0;
-  auto on_invalid_cb = [&on_invalid_count]() { on_invalid_count++; };
-  display_coordinator_listener()->InitializeCallbacks(std::move(on_invalid_cb),
-                                                      /*displays_changed_cb=*/nullptr,
-                                                      /*client_ownership_change_cb=*/nullptr);
-
-  EXPECT_TRUE(display_coordinator_listener()->valid());
-  EXPECT_TRUE(mock_display_coordinator()->binding().is_bound());
-  RunLoopUntilIdle();
-  EXPECT_TRUE(display_coordinator_listener()->valid());
-  EXPECT_TRUE(mock_display_coordinator()->binding().is_bound());
-  display_coordinator_listener()->ClearCallbacks();
-  mock_display_coordinator()->ResetCoordinatorBinding();
-  RunLoopUntilIdle();
-  EXPECT_EQ(0u, on_invalid_count);
-  EXPECT_FALSE(display_coordinator_listener()->valid());
-}
-
-// Verify that DisplayCoordinator becomes invalid when the device and coordinator channel is closed,
-// and that we don't get the callback twice.
-TEST_F(DisplayCoordinatorListenerTest, DisconnectCoordinatorAndDeviceChannel) {
-  uint on_invalid_count = 0;
-  auto on_invalid_cb = [&on_invalid_count]() { on_invalid_count++; };
-  display_coordinator_listener()->InitializeCallbacks(std::move(on_invalid_cb),
-                                                      /*displays_changed_cb=*/nullptr,
-                                                      /*client_ownership_change_cb=*/nullptr);
-
-  EXPECT_TRUE(display_coordinator_listener()->valid());
-  EXPECT_TRUE(mock_display_coordinator()->binding().is_bound());
-  RunLoopUntilIdle();
-  EXPECT_TRUE(display_coordinator_listener()->valid());
-  EXPECT_TRUE(mock_display_coordinator()->binding().is_bound());
-
-  ResetMockDisplayCoordinator();
-  RunLoopUntilIdle();
-  EXPECT_EQ(1u, on_invalid_count);
-  EXPECT_FALSE(display_coordinator_listener()->valid());
 
   // Expect no crashes on teardown.
   ResetDisplayCoordinatorListener();
@@ -193,9 +104,8 @@ TEST_F(DisplayCoordinatorListenerTest, OnDisplaysChanged) {
         displays_removed = removed;
       };
 
-  display_coordinator_listener()->InitializeCallbacks(
-      /*on_invalid_cb=*/nullptr, std::move(displays_changed_cb),
-      /*client_ownership_change_cb=*/nullptr);
+  display_coordinator_listener()->InitializeCallbacks(std::move(displays_changed_cb),
+                                                      /*client_ownership_change_cb=*/nullptr);
   fuchsia::hardware::display::Mode test_mode;
   test_mode.horizontal_resolution = 1024;
   test_mode.vertical_resolution = 800;
@@ -241,8 +151,7 @@ TEST_F(DisplayCoordinatorListenerTest, OnClientOwnershipChangeCallback) {
   auto client_ownership_change_cb = [&has_ownership](bool ownership) { has_ownership = ownership; };
 
   display_coordinator_listener()->InitializeCallbacks(
-      /*on_invalid_cb=*/nullptr, /*displays_changed_cb=*/nullptr,
-      std::move(client_ownership_change_cb));
+      /*displays_changed_cb=*/nullptr, std::move(client_ownership_change_cb));
 
   mock_display_coordinator()->events().OnClientOwnershipChange(true);
   EXPECT_FALSE(has_ownership);
@@ -274,9 +183,9 @@ TEST_F(DisplayCoordinatorListenerTest, OnVsyncCallback) {
     last_timestamp = timestamp;
     last_config_stamp = std::move(stamp);
   };
-  display_coordinator_listener()->InitializeCallbacks(/*on_invalid_cb=*/nullptr,
-                                                      /*displays_changed_cb=*/nullptr,
-                                                      /*client_ownership_change_cb=*/nullptr);
+  display_coordinator_listener()->InitializeCallbacks(
+      /*displays_changed_cb=*/nullptr,
+      /*client_ownership_change_cb=*/nullptr);
   display_coordinator_listener()->SetOnVsyncCallback(std::move(vsync_cb));
 
   constexpr fuchsia::hardware::display::types::DisplayId kTestDisplayId = {.value = 1};
