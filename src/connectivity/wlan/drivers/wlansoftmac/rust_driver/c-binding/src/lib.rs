@@ -7,9 +7,11 @@
 // Explicitly declare usage for cbindgen.
 
 use {
-    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_async as fasync, fuchsia_trace as trace,
-    fuchsia_zircon as zx,
-    std::ffi::c_void,
+    diagnostics_log::PublishOptions,
+    fidl_fuchsia_wlan_softmac as fidl_softmac,
+    fuchsia_async::LocalExecutor,
+    fuchsia_trace as trace, fuchsia_zircon as zx,
+    std::{ffi::c_void, sync::Once},
     trace::Id as TraceId,
     tracing::error,
     wlan_mlme::{
@@ -20,6 +22,8 @@ use {
     wlan_trace as wtrace,
     wlansoftmac_rust::WlanSoftmacHandle,
 };
+
+static LOGGER_ONCE: Once = Once::new();
 
 /// Cast a *mut c_void to a usize. This is normally done to workaround the Send trait which *mut c_void does
 /// not implement
@@ -64,6 +68,18 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
     buf_provider: BufferProvider,
     wlan_softmac_bridge_client_handle: zx::sys::zx_handle_t,
 ) -> zx::sys::zx_status_t {
+    // The Fuchsia syslog must not be initialized from Rust more than once per process. In the case of MLME,
+    // that means we can only call it once for both the client and ap modules. Ensure this by using a shared
+    // `Once::call_once()`.
+    LOGGER_ONCE.call_once(|| {
+        // Initialize logging with a tag that can be used to filter for forwarding to console
+        diagnostics_log::initialize_sync(
+            PublishOptions::default()
+                .tags(&["wlan"])
+                .enable_metatag(diagnostics_log::Metatag::Target),
+        );
+    });
+
     let wlan_softmac_bridge_proxy = {
         let handle = unsafe { fidl::Handle::from_raw(wlan_softmac_bridge_client_handle) };
         let channel = fidl::Channel::from(handle);
@@ -73,7 +89,7 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
 
     // SAFETY: Cast *mut c_void to usize so the constructed lambda will be Send. This is safe since
     // InitCompleter will not move to a thread in a different address space.
-    let mut executor = fasync::LocalExecutor::new();
+    let mut executor = LocalExecutor::new();
     executor.run_singlethreaded(async move {
         let init_completer = unsafe { ptr_as_usize(init_completer) };
         zx::Status::from(

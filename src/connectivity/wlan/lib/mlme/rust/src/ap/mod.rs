@@ -13,7 +13,6 @@ use {
         ddk_converter,
         device::{self, DeviceOps},
         error::Error,
-        logger,
     },
     banjo_fuchsia_wlan_softmac as banjo_wlan_softmac, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_minstrel as fidl_minstrel, fidl_fuchsia_wlan_mlme as fidl_mlme,
@@ -181,7 +180,6 @@ impl<D> Ap<D> {
         timer: Timer<TimedEvent>,
         bssid: Bssid,
     ) -> Self {
-        logger::init();
         Self { ctx: Context::new(device, buf_provider, timer, bssid), bss: None }
     }
 

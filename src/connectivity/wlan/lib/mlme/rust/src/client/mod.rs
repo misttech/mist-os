@@ -19,7 +19,6 @@ use {
         device::{self, DeviceOps},
         disconnect::LocallyInitiated,
         error::Error,
-        logger,
     },
     anyhow::{self, format_err},
     banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
@@ -212,8 +211,6 @@ impl<D: DeviceOps> ClientMlme<D> {
         buf_provider: BufferProvider,
         timer: Timer<TimedEvent>,
     ) -> Result<Self, Error> {
-        logger::init();
-
         let iface_mac = device::try_query_iface_mac(&mut device)?;
         Ok(Self {
             sta: None,
