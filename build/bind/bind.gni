@@ -92,6 +92,9 @@ template("_bind_library_sdk") {
     id = "sdk://bind/$library_name"
 
     category = invoker.sdk_category
+    if (defined(invoker.sdk_area)) {
+      area = invoker.sdk_area
+    }
 
     meta = {
       source = meta_file
@@ -754,6 +757,14 @@ template("_bind_library_rust") {
 #   rust_golden_file (optional)
 #     [string] Path to the golden file for the rust file.
 #
+#   sdk_category (optional)
+#     [string] Publication level of the library in SDKs.
+#     See //build/sdk/sdk_atom.gni.
+#
+#   sdk_area (optional)
+#     [string] The API area responsible for maintaining this SDK atom.
+#     See //build/sdk/sdk_atom.gni.
+#
 #   testonly, visibility
 #     Forwarded from invoker.
 #
@@ -765,6 +776,7 @@ template("bind_library") {
                            "*",
                            [
                              "sdk_category",
+                             "sdk_area",
                              "rust_golden_file",
                            ])
   }
@@ -776,6 +788,7 @@ template("bind_library") {
                              "*",
                              [
                                "sdk_category",
+                               "sdk_area",
                                "cpp_golden_file",
                              ])
     }

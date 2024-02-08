@@ -10,7 +10,7 @@ import unittest
 from sdk_common import Atom, Validator, detect_category_violations
 
 
-def _atom(name: str, category: str, area="Unknown") -> Atom:
+def _atom(name: str, category: str, area=None) -> Atom:
     return Atom(
         {
             "id": name,
@@ -71,12 +71,31 @@ class SdkCommonTests(unittest.TestCase):
             ],
         )
 
+    def test_area_required(self) -> None:
+        v = Validator(valid_areas=["Kernel", "Unknown"])
+        atoms = [
+            _atom("hello", "internal"),
+            _atom("world", "public", "Kernel"),
+        ]
+        self.assertEqual([*v.detect_area_violations(atoms)], [])
+
+        atoms = [
+            _atom("hello", "internal"),
+            _atom("world", "public"),
+        ]
+        self.assertEqual(
+            [*v.detect_area_violations(atoms)],
+            [
+                "world must specify an API area. Valid areas: ['Kernel', 'Unknown']",
+            ],
+        )
+
     def test_validator_detects_all_problems(self) -> None:
         v = Validator(valid_areas=["Unknown"])
         # Category violation
         atoms = [
             _atom("hello", "internal", "So Not A Real Area"),
-            _atom("hello", "public", "Unknown"),
+            _atom("hello", "public"),
         ]
         self.assertEqual(
             [*v.detect_violations("partner", atoms)],
@@ -87,6 +106,7 @@ class SdkCommonTests(unittest.TestCase):
 """,
                 "hello has publication level internal, incompatible with partner",
                 "hello specifies invalid API area 'So Not A Real Area'. Valid areas: ['Unknown']",
+                "hello must specify an API area. Valid areas: ['Unknown']",
             ],
         )
 

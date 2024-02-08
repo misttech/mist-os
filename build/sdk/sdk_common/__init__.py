@@ -124,6 +124,24 @@ def area_names_from_file(parsed_areas: Any) -> List[str]:
     return [area["name"] for area in parsed_areas] + ["Unknown"]
 
 
+_AREA_REQUIRED_CATEGORIES = ["public", "partner", "partner_internal"]
+_AREA_OPTIONAL_TYPES = [
+    "cc_prebuilt_library",
+    "cc_source_library",
+    "companion_host_tool",
+    "dart_library",
+    "data",
+    "documentation",
+    "ffx_tool",
+    "fidl_library",
+    "host_tool",
+    "loadable_module",
+    "package",
+    "sysroot",
+    "version_history",
+]
+
+
 class Validator:
     """Helper class to validate sets of IDK atoms."""
 
@@ -152,17 +170,29 @@ class Validator:
     def detect_area_violations(self, atoms: Sequence[Atom]) -> Iterator[str]:
         """Yields strings describing any invalid API areas in `atoms`."""
         for atom in atoms:
-            if atom.area is None or atom.area in self._valid_areas:
-                continue
-            if matches := difflib.get_close_matches(
-                atom.area, self._valid_areas
+            if (
+                atom.area is None
+                and atom.category in _AREA_REQUIRED_CATEGORIES
+                and atom.type not in _AREA_OPTIONAL_TYPES
             ):
                 yield (
-                    "%s specifies invalid API area '%s'. Did you mean one of these? %s"
-                    % (atom, atom.area, matches)
+                    "%s must specify an API area. Valid areas: %s"
+                    % (
+                        atom,
+                        self._valid_areas,
+                    )
                 )
-            else:
-                yield (
-                    "%s specifies invalid API area '%s'. Valid areas: %s"
-                    % (atom, atom.area, self._valid_areas)
-                )
+
+            if atom.area is not None and atom.area not in self._valid_areas:
+                if matches := difflib.get_close_matches(
+                    atom.area, self._valid_areas
+                ):
+                    yield (
+                        "%s specifies invalid API area '%s'. Did you mean one of these? %s"
+                        % (atom, atom.area, matches)
+                    )
+                else:
+                    yield (
+                        "%s specifies invalid API area '%s'. Valid areas: %s"
+                        % (atom, atom.area, self._valid_areas)
+                    )

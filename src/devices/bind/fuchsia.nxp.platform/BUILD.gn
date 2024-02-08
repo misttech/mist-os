@@ -6,5 +6,6 @@ import("//build/bind/bind.gni")
 
 bind_library("fuchsia.nxp.platform") {
   sdk_category = "partner"
+  sdk_area = "Unknown"
   source = "fuchsia.nxp.platform.bind"
 }

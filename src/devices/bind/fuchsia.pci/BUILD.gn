@@ -6,6 +6,7 @@ import("//build/bind/bind.gni")
 
 bind_library("fuchsia.pci") {
   sdk_category = "partner"
+  sdk_area = "Unknown"
   source = "fuchsia.pci.bind"
 }
 
