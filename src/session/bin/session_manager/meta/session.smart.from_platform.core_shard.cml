@@ -58,7 +58,10 @@
 
         // Route services provided only by physical hardware.
         {
-            protocol: [ "fuchsia.castauth.CastKeySigner" ],
+            protocol: [
+                "fuchsia.castauth.CastCertificateRetriever",
+                "fuchsia.castauth.CastKeySigner",
+            ],
             from: "#cast_auth_server",
             to: "#session-manager",
             source_availability: "unknown",
