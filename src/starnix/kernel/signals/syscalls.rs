@@ -6,6 +6,7 @@ pub use super::signal_handling::sys_restart_syscall;
 use super::signalfd::SignalFd;
 use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt},
+    selinux::hooks::current_task_hooks as selinux_hooks,
     signals::{
         restore_from_signal_handler, send_signal, SignalDetail, SignalInfo, SignalInfoHeader,
         SI_HEADER_SIZE,
@@ -318,10 +319,10 @@ fn send_unchecked_signal(
         return Ok(());
     }
 
-    send_signal(
-        target,
-        SignalInfo { code: si_code, ..SignalInfo::default(Signal::try_from(unchecked_signal)?) },
-    )
+    let signal = Signal::try_from(unchecked_signal)?;
+    selinux_hooks::check_signal_access(current_task, &target, signal)?;
+
+    send_signal(target, SignalInfo { code: si_code, ..SignalInfo::default(signal) })
 }
 
 fn send_unchecked_signal_info(
@@ -342,6 +343,8 @@ fn send_unchecked_signal_info(
     }
 
     let signal = Signal::try_from(unchecked_signal)?;
+    selinux_hooks::check_signal_access(current_task, &target, signal)?;
+
     let siginfo = read_siginfo(current_task, signal, siginfo_ref)?;
     if target.get_pid() != current_task.get_pid() && (siginfo.code >= 0 || siginfo.code == SI_TKILL)
     {
@@ -525,8 +528,11 @@ pub fn sys_rt_sigqueueinfo(
 ) -> Result<(), Errno> {
     let weak_task = current_task.kernel().pids.read().get_task(tgid);
     let thread_group = Task::from_weak(&weak_task)?.thread_group.clone();
-    let lock = thread_group.read();
-    let target = lock.get_signal_target(unchecked_signal).ok_or_else(|| errno!(ESRCH))?;
+    let target = thread_group
+        .read()
+        .get_signal_target(unchecked_signal)
+        .map(TempRef::into_static)
+        .ok_or_else(|| errno!(ESRCH))?;
     send_unchecked_signal_info(current_task, &target, unchecked_signal, siginfo_ref)
 }
 

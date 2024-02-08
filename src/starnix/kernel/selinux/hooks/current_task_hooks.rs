@@ -5,7 +5,7 @@
 use super::thread_group_hooks::{self, SeLinuxResolvedElfState};
 use crate::task::{CurrentTask, Task};
 
-use starnix_uapi::errors::Errno;
+use starnix_uapi::{errors::Errno, signals::Signal};
 
 /// Check if creating a task is allowed, if SELinux is enabled. Access is allowed if SELinux is disabled.
 pub fn check_task_create_access(current_task: &CurrentTask) -> Result<(), Errno> {
@@ -122,6 +122,28 @@ pub fn check_setpgid_access(source_task: &CurrentTask, target_task: &Task) -> Re
                 &security_server.as_permission_check(),
                 source_sid,
                 target_sid,
+            )
+        }
+    }
+}
+
+/// Checks if sending a signal is allowed, if SELinux is enabled. Access is allowed if SELinux is disabled.
+pub fn check_signal_access(
+    source_task: &CurrentTask,
+    target_task: &Task,
+    signal: Signal,
+) -> Result<(), Errno> {
+    match &source_task.kernel().security_server {
+        None => return Ok(()),
+        Some(security_server) => {
+            let source_sid = source_task.get_current_sid();
+            let target_sid = target_task.get_current_sid();
+            thread_group_hooks::check_signal_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                source_sid,
+                target_sid,
+                signal,
             )
         }
     }

@@ -233,6 +233,14 @@ class_permission_enum! {
         GetPgid,
         /// Permission to set the process group ID.
         SetPgid,
+        /// Permission to send a signal other than SIGKILL, SIGSTOP, or SIGCHLD to a process.
+        Signal,
+        /// Permission to send SIGKILL to a process.
+        SigKill,
+        /// Permission to send SIGSTOP to a process.
+        SigStop,
+        /// Permission to send SIGCHLD to a process.
+        SigChld,
     }
 }
 
@@ -245,6 +253,10 @@ impl ProcessPermission {
             ProcessPermission::SetSched => "setsched",
             ProcessPermission::GetPgid => "getpgid",
             ProcessPermission::SetPgid => "setpgid",
+            ProcessPermission::Signal => "signal",
+            ProcessPermission::SigKill => "sigkill",
+            ProcessPermission::SigStop => "sigstop",
+            ProcessPermission::SigChld => "sigchld",
         }
     }
 }

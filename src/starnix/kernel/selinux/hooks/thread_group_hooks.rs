@@ -8,7 +8,11 @@ use selinux::{
     SecurityId,
 };
 use selinux_common::{security_context::SecurityContext, ProcessPermission};
-use starnix_uapi::{error, errors::Errno};
+use starnix_uapi::{
+    error,
+    errors::Errno,
+    signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP},
+};
 use std::sync::Arc;
 
 /// Checks if creating a task is allowed.
@@ -137,6 +141,51 @@ pub(crate) fn check_setpgid_access(
     check_permission(status, permission_check, source_sid, target_sid, ProcessPermission::SetPgid)
 }
 
+/// Checks if the task with `source_sid` is allowed to send `signal` to the task with `target_sid`.
+pub(crate) fn check_signal_access(
+    status: &impl SecurityServerStatus,
+    permission_check: &impl PermissionCheck,
+    source_sid: Option<SecurityId>,
+    target_sid: Option<SecurityId>,
+    signal: Signal,
+) -> Result<(), Errno> {
+    match signal {
+        // The `sigkill` permission is required for sending SIGKILL.
+        SIGKILL => check_permission(
+            status,
+            permission_check,
+            source_sid,
+            target_sid,
+            ProcessPermission::SigKill,
+        ),
+        // The `sigstop` permission is required for sending SIGSTOP.
+        SIGSTOP => check_permission(
+            status,
+            permission_check,
+            source_sid,
+            target_sid,
+            ProcessPermission::SigStop,
+        ),
+        // The `sigchld` permission is required for sending SIGCHLD.
+        SIGCHLD => check_permission(
+            status,
+            permission_check,
+            source_sid,
+            target_sid,
+            ProcessPermission::SigChld,
+        ),
+        // The `signal` permission is required for sending any signal other than SIGKILL, SIGSTOP
+        // or SIGCHLD.
+        _ => check_permission(
+            status,
+            permission_check,
+            source_sid,
+            target_sid,
+            ProcessPermission::Signal,
+        ),
+    }
+}
+
 /// Checks if `permission` is allowed from the task with `source_sid` to the task with `target_sid`.
 fn check_permission(
     status: &impl SecurityServerStatus,
@@ -214,6 +263,7 @@ pub struct SeLinuxResolvedElfState {
 mod tests {
     use super::*;
     use selinux::security_server::Mode;
+    use starnix_uapi::signals::SIGTERM;
 
     const HOOKS_TESTS_BINARY_POLICY: &[u8] =
         include_bytes!("../../../lib/selinux/testdata/micro_policies/hooks_tests_policy.pp");
@@ -606,5 +656,119 @@ mod tests {
             ),
             error!(EACCES)
         );
+    }
+
+    #[fuchsia::test]
+    fn sigkill_access_allowed_for_allowed_type() {
+        let security_server = security_server_with_policy();
+        let source_security_context = SecurityContext::try_from("u:object_r:test_kill_sigkill_t")
+            .expect("invalid security context");
+        let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
+        let target_security_context = SecurityContext::try_from("u:object_r:test_kill_target_t")
+            .expect("invalid security context");
+        let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
+
+        assert_eq!(
+            check_signal_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                source_sid,
+                target_sid,
+                SIGKILL,
+            ),
+            Ok(())
+        );
+    }
+
+    #[fuchsia::test]
+    fn sigchld_access_allowed_for_allowed_type() {
+        let security_server = security_server_with_policy();
+        let source_security_context = SecurityContext::try_from("u:object_r:test_kill_sigchld_t")
+            .expect("invalid security context");
+        let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
+        let target_security_context = SecurityContext::try_from("u:object_r:test_kill_target_t")
+            .expect("invalid security context");
+        let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
+
+        assert_eq!(
+            check_signal_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                source_sid,
+                target_sid,
+                SIGCHLD,
+            ),
+            Ok(())
+        );
+    }
+
+    #[fuchsia::test]
+    fn sigstop_access_allowed_for_allowed_type() {
+        let security_server = security_server_with_policy();
+        let source_security_context = SecurityContext::try_from("u:object_r:test_kill_sigstop_t")
+            .expect("invalid security context");
+        let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
+        let target_security_context = SecurityContext::try_from("u:object_r:test_kill_target_t")
+            .expect("invalid security context");
+        let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
+
+        assert_eq!(
+            check_signal_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                source_sid,
+                target_sid,
+                SIGSTOP,
+            ),
+            Ok(())
+        );
+    }
+
+    #[fuchsia::test]
+    fn signal_access_allowed_for_allowed_type() {
+        let security_server = security_server_with_policy();
+        let source_security_context = SecurityContext::try_from("u:object_r:test_kill_signal_t")
+            .expect("invalid security context");
+        let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
+        let target_security_context = SecurityContext::try_from("u:object_r:test_kill_target_t")
+            .expect("invalid security context");
+        let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
+
+        // The `signal` permission allows signals other than SIGKILL, SIGCHLD, SIGSTOP.
+        assert_eq!(
+            check_signal_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                source_sid,
+                target_sid,
+                SIGTERM,
+            ),
+            Ok(())
+        );
+    }
+
+    #[fuchsia::test]
+    fn signal_access_denied_for_denied_signals() {
+        let security_server = security_server_with_policy();
+        let source_security_context = SecurityContext::try_from("u:object_r:test_kill_signal_t")
+            .expect("invalid security context");
+        let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
+        let target_security_context = SecurityContext::try_from("u:object_r:test_kill_target_t")
+            .expect("invalid security context");
+        let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
+
+        // The `signal` permission does not allow SIGKILL, SIGCHLD or SIGSTOP.
+        for signal in [SIGCHLD, SIGKILL, SIGSTOP] {
+            assert_eq!(
+                check_signal_access(
+                    security_server.as_ref(),
+                    &security_server.as_permission_check(),
+                    source_sid.clone(),
+                    target_sid.clone(),
+                    signal,
+                ),
+                error!(EACCES)
+            );
+        }
     }
 }
