@@ -41,6 +41,7 @@ executable("unittests") {
     "dispatcher_holder_unittest.cc",
     "escher_vulkan_smoke_test.cc",
     "object_linker_unittest.cc",
+    "range_inclusive_unittest.cc",
     "validate_eventpair_unittest.cc",
   ]
   deps = [
