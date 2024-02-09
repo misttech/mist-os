@@ -5,7 +5,7 @@
 """Input Latency Benchmark."""
 
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.interfaces.affordances.ui import custom_types
+from honeydew.typing import ui as ui_custom_types
 from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import test_runner
 
@@ -56,7 +56,7 @@ class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):
             # fps vsync interval. 100 taps span the entire vsync interval 1 time at
             # 100 equidistant points.
             self.dut.user_input.tap(
-                location=custom_types.Coordinate(x=500, y=500),
+                location=ui_custom_types.Coordinate(x=500, y=500),
                 tap_event_count=100,
                 duration=3350,
             )

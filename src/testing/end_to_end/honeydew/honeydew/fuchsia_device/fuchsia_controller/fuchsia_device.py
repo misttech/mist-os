@@ -17,7 +17,7 @@ import fidl.fuchsia_hwinfo as f_hwinfo
 import fidl.fuchsia_io as f_io
 import fuchsia_controller_py as fcp
 
-from honeydew import custom_types, errors
+from honeydew import errors
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
 from honeydew.fuchsia_device import base_fuchsia_device
 from honeydew.interfaces.affordances import tracing
@@ -35,6 +35,7 @@ from honeydew.interfaces.transports import (
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
+from honeydew.typing import custom_types
 from honeydew.utils import properties
 
 _FC_PROXIES: dict[str, custom_types.FidlEndpoint] = {
@@ -113,7 +114,9 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice):
         Raises:
             errors.FuchsiaControllerError: Failed to instantiate.
         """
-        fuchsia_controller_obj: fuchsia_controller_transport_interface.FuchsiaController = fuchsia_controller_transport.FuchsiaController(
+        fuchsia_controller_obj: (
+            fuchsia_controller_transport_interface.FuchsiaController
+        ) = fuchsia_controller_transport.FuchsiaController(
             device_name=self.device_name,
             device_ip=self._ip_address,
             ffx_transport=self.ffx,

@@ -8,6 +8,18 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+class Coordinate:
+    x: int
+    y: int
+
+
+@dataclass(frozen=True)
+class Size:
+    width: int
+    height: int
+
+
+@dataclass(frozen=True)
 class Pixel:
     """Pixel object with r,g,b,a values in the 0-255 range"""
 

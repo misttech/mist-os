@@ -6,10 +6,10 @@
 import abc
 from typing import Any
 
-from honeydew.interfaces.affordances.ui import custom_types
+from honeydew.typing import ui as ui_custom_types
 
 DEFAULTS: dict[str, Any] = {
-    "TOUCH_SCREEN_SIZE": custom_types.Size(width=1000, height=1000),
+    "TOUCH_SCREEN_SIZE": ui_custom_types.Size(width=1000, height=1000),
     "TAP_EVENT_COUNT": 1,
     "DURATION": 300,
 }
@@ -21,8 +21,8 @@ class UserInput(abc.ABC):
     @abc.abstractmethod
     def tap(
         self,
-        location: custom_types.Coordinate,
-        touch_screen_size: custom_types.Size = DEFAULTS["TOUCH_SCREEN_SIZE"],
+        location: ui_custom_types.Coordinate,
+        touch_screen_size: ui_custom_types.Size = DEFAULTS["TOUCH_SCREEN_SIZE"],
         tap_event_count: int = DEFAULTS["TAP_EVENT_COUNT"],
         duration: int = DEFAULTS["DURATION"],
     ) -> None:

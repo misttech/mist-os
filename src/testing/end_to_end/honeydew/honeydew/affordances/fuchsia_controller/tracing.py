@@ -13,10 +13,11 @@ import fidl.fuchsia_tracing as f_tracing
 import fidl.fuchsia_tracing_controller as f_tracingcontroller
 import fuchsia_controller_py as fc
 
-from honeydew import custom_types, errors
+from honeydew import errors
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import fuchsia_controller as fc_transport
+from honeydew.typing import custom_types
 
 _FC_PROXIES: dict[str, custom_types.FidlEndpoint] = {
     "TracingController": custom_types.FidlEndpoint(
@@ -39,7 +40,9 @@ class Tracing(tracing.Tracing):
         self._name: str = device_name
         self._fc_transport: fc_transport.FuchsiaController = fuchsia_controller
 
-        self._trace_controller_proxy: f_tracingcontroller.Controller.Client | None
+        self._trace_controller_proxy: (
+            f_tracingcontroller.Controller.Client | None
+        )
 
         self._trace_socket: fc.Socket | None
         self._session_initialized: bool

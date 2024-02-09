@@ -11,11 +11,12 @@ from unittest import mock
 
 import fuchsia_controller_py as fuchsia_controller
 
-from honeydew import custom_types, errors
+from honeydew import errors
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
+from honeydew.typing import custom_types
 
 _IPV4: str = "11.22.33.44"
 _IPV4_OBJ: ipaddress.IPv4Address = ipaddress.IPv4Address(_IPV4)

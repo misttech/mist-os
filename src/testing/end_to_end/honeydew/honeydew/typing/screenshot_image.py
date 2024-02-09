@@ -9,7 +9,6 @@ from importlib import resources as impresources
 
 import png
 
-from honeydew.interfaces.affordances.ui import custom_types
 from honeydew.typing import ui as ui_types
 
 _BYTES_PER_PIXEL: int = 4
@@ -51,7 +50,7 @@ class ScreenshotImage:
     """
 
     # Size of the image
-    size: custom_types.Size
+    size: ui_types.Size
     # pixel data - 4 bytes per pixel
     data: bytes
 
@@ -141,7 +140,7 @@ class ScreenshotImage:
                 width = len(data) // _BYTES_PER_PIXEL
                 height = 1
                 data = ScreenshotImage._swap_rgba_and_bgra(data)
-                return ScreenshotImage(custom_types.Size(width, height), data)
+                return ScreenshotImage(ui_types.Size(width, height), data)
             case ScreenshotImageType.PNG:
                 (width, height, rows, _) = png.Reader(bytes=data).asRGBA8()
                 # Flatten 2d array in a 1d array:
@@ -149,7 +148,7 @@ class ScreenshotImage:
                 for row in rows:
                     image_data.extend(row)
                 return ScreenshotImage(
-                    custom_types.Size(width, height), bytes(image_data)
+                    ui_types.Size(width, height), bytes(image_data)
                 )
 
     @staticmethod

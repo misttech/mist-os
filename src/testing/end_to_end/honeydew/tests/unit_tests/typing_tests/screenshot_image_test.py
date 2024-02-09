@@ -13,13 +13,11 @@ import png
 from parameterized import parameterized
 
 # Disabling pylint to reduce verbosity for widely used trivial types
-from honeydew.interfaces.affordances.ui.custom_types import (  # pylint: disable=g-importing-member
-    Size,
-)
 from honeydew.typing.screenshot_image import (  # pylint: disable=g-importing-member
     ScreenshotImage,
 )
 from honeydew.typing.ui import Pixel  # pylint: disable=g-importing-member
+from honeydew.typing.ui import Size  # pylint: disable=g-importing-member
 
 RED = Pixel(255, 0, 0)
 GREEN = Pixel(0, 255, 0)

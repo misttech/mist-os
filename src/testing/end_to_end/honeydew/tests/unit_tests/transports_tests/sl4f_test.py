@@ -11,8 +11,9 @@ from unittest import mock
 
 from parameterized import parameterized
 
-from honeydew import custom_types, errors
+from honeydew import errors
 from honeydew.transports import ffx, sl4f
+from honeydew.typing import custom_types
 
 # pylint: disable=protected-access
 

@@ -7,8 +7,8 @@
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, test_runner
 
-from honeydew.interfaces.affordances.ui import custom_types
 from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.typing import ui as ui_custom_types
 
 TOUCH_APP = (
     "fuchsia-pkg://fuchsia.com/flatland-examples#meta/"
@@ -43,7 +43,7 @@ class UserInputAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         before = self.device.screenshot.take()
 
         self.device.user_input.tap(
-            location=custom_types.Coordinate(x=1, y=2), tap_event_count=1
+            location=ui_custom_types.Coordinate(x=1, y=2), tap_event_count=1
         )
 
         after = self.device.screenshot.take()

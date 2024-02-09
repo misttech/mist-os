@@ -12,12 +12,13 @@ from unittest import mock
 import fuchsia_controller_py as fuchsia_controller
 
 import honeydew
-from honeydew import custom_types, errors
+from honeydew import errors
 from honeydew.fuchsia_device import base_fuchsia_device
 from honeydew.fuchsia_device.fuchsia_controller import (
     fuchsia_device as fc_fuchsia_device,
 )
 from honeydew.fuchsia_device.sl4f import fuchsia_device as sl4f_fuchsia_device
+from honeydew.typing import custom_types
 
 _INPUT_ARGS: dict[str, Any] = {
     "ffx_config": custom_types.FFXConfig(

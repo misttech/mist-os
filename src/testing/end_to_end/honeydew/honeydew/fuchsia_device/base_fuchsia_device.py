@@ -12,7 +12,7 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
-from honeydew import custom_types, errors
+from honeydew import errors
 from honeydew.affordances.ffx import session as session_ffx
 from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
 from honeydew.interfaces.affordances import session
@@ -36,6 +36,7 @@ from honeydew.interfaces.transports import ssh as ssh_transport_interface
 from honeydew.transports import fastboot as fastboot_transport
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import ssh as ssh_transport
+from honeydew.typing import custom_types
 from honeydew.utils import properties
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -65,9 +66,9 @@ class BaseFuchsiaDevice(
 
         self._ip_address_port: custom_types.IpPort | None = device_ip_port
 
-        self._ip_address: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
-            None
-        )
+        self._ip_address: (
+            ipaddress.IPv4Address | ipaddress.IPv6Address | None
+        ) = None
         if self._ip_address_port:
             self._ip_address = self._ip_address_port.ip
 

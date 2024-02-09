@@ -9,7 +9,7 @@ import subprocess
 from collections.abc import Iterable
 from typing import Any
 
-from honeydew import custom_types
+from honeydew.typing import custom_types
 from honeydew.utils import properties
 
 TIMEOUTS: dict[str, float] = {

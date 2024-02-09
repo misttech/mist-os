@@ -12,12 +12,12 @@ from unittest import mock
 import fuchsia_controller_py as fuchsia_controller
 from parameterized import parameterized
 
-from honeydew import custom_types
 from honeydew.fuchsia_device import base_fuchsia_device
 from honeydew.fuchsia_device.sl4f import fuchsia_device
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
+from honeydew.typing import custom_types
 
 _INPUT_ARGS: dict[str, Any] = {
     "device_name": "fuchsia-emulator",
@@ -70,21 +70,28 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        with mock.patch.object(
-            fuchsia_device.sl4f_transport.SL4F, "start_server", autospec=True
-        ) as mock_sl4f_start_server, mock.patch.object(
-            fuchsia_device.sl4f_transport.SL4F,
-            "check_connection",
-            autospec=True,
-        ) as mock_sl4f_check_connection, mock.patch.object(
-            base_fuchsia_device.ssh_transport.SSH,
-            "check_connection",
-            autospec=True,
-        ) as mock_ssh_check_connection, mock.patch.object(
-            base_fuchsia_device.ffx_transport.FFX,
-            "check_connection",
-            autospec=True,
-        ) as mock_ffx_check_connection:
+        with (
+            mock.patch.object(
+                fuchsia_device.sl4f_transport.SL4F,
+                "start_server",
+                autospec=True,
+            ) as mock_sl4f_start_server,
+            mock.patch.object(
+                fuchsia_device.sl4f_transport.SL4F,
+                "check_connection",
+                autospec=True,
+            ) as mock_sl4f_check_connection,
+            mock.patch.object(
+                base_fuchsia_device.ssh_transport.SSH,
+                "check_connection",
+                autospec=True,
+            ) as mock_ssh_check_connection,
+            mock.patch.object(
+                base_fuchsia_device.ffx_transport.FFX,
+                "check_connection",
+                autospec=True,
+            ) as mock_ffx_check_connection,
+        ):
             self.fd_obj = fuchsia_device.FuchsiaDevice(
                 device_name=_INPUT_ARGS["device_name"],
                 ssh_private_key=_INPUT_ARGS["ssh_private_key"],

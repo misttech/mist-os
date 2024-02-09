@@ -9,7 +9,6 @@ import logging
 from http.client import RemoteDisconnected
 from typing import Any
 
-from honeydew import custom_types
 from honeydew.affordances.sl4f import tracing as tracing_sl4f
 from honeydew.affordances.sl4f.bluetooth.profiles import (
     bluetooth_avrcp as bluetooth_avrcp_sl4f,
@@ -37,6 +36,7 @@ from honeydew.interfaces.affordances.wlan import (
 )
 from honeydew.interfaces.transports import sl4f as sl4f_transport_interface
 from honeydew.transports import sl4f as sl4f_transport
+from honeydew.typing import custom_types
 from honeydew.utils import common, properties
 
 _SL4F_METHODS: dict[str, str] = {

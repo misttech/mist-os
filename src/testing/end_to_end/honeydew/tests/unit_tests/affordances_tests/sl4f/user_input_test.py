@@ -8,8 +8,9 @@ import unittest
 from unittest import mock
 
 from honeydew.affordances.sl4f.ui import user_input as sl4f_user_input
-from honeydew.interfaces.affordances.ui import custom_types, user_input
+from honeydew.interfaces.affordances.ui import user_input
 from honeydew.transports import sl4f as sl4f_transport
+from honeydew.typing import ui as ui_custom_types
 
 
 # pylint: disable=protected-access
@@ -23,7 +24,7 @@ class UserInputSL4FTests(unittest.TestCase):
 
     def test_tap_only_required(self) -> None:
         """Test for UserInput.tap() method with only required params."""
-        self.user_input_obj.tap(location=custom_types.Coordinate(x=1, y=2))
+        self.user_input_obj.tap(location=ui_custom_types.Coordinate(x=1, y=2))
         self.sl4f_obj.run.assert_called_once_with(
             method="input_facade.Tap",
             params={
@@ -39,8 +40,8 @@ class UserInputSL4FTests(unittest.TestCase):
     def test_tap_all_params(self) -> None:
         """Test for UserInput.tap() method with all params."""
         self.user_input_obj.tap(
-            location=custom_types.Coordinate(x=1, y=2),
-            touch_screen_size=custom_types.Size(width=3, height=4),
+            location=ui_custom_types.Coordinate(x=1, y=2),
+            touch_screen_size=ui_custom_types.Size(width=3, height=4),
             tap_event_count=5,
             duration=6,
         )

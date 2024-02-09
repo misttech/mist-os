@@ -9,11 +9,12 @@ import logging
 
 import fuchsia_controller_py as fuchsia_controller
 
-from honeydew import custom_types, errors
+from honeydew import errors
 from honeydew.interfaces.transports import ffx as ffx_interface
 from honeydew.interfaces.transports import (
     fuchsia_controller as fuchsia_controller_interface,
 )
+from honeydew.typing import custom_types
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -35,9 +36,9 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
     ) -> None:
         self._name: str = device_name
 
-        self._ip_address: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
-            device_ip
-        )
+        self._ip_address: (
+            ipaddress.IPv4Address | ipaddress.IPv6Address | None
+        ) = device_ip
         self._target: str
         if self._ip_address:
             self._target = str(self._ip_address)

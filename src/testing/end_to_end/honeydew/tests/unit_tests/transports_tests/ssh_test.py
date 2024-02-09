@@ -12,8 +12,9 @@ from unittest import mock
 
 from parameterized import parameterized
 
-from honeydew import custom_types, errors
+from honeydew import errors
 from honeydew.transports import ffx, ssh
+from honeydew.typing import custom_types
 
 _IPV4: str = "11.22.33.44"
 _IPV4_OBJ: ipaddress.IPv4Address = ipaddress.IPv4Address(_IPV4)

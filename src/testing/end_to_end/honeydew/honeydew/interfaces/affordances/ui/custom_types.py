@@ -5,7 +5,7 @@
 
 from dataclasses import dataclass
 
-# TODO(b/320551643): Move to honeydew.typing.ui
+# TODO(b/320551643): Remove this file once https://turquoise-internal-review.git.corp.google.com/c/vendor/google/+/806870 lands
 
 
 @dataclass(frozen=True)

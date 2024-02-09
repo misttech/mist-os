@@ -8,7 +8,7 @@ import abc
 import subprocess
 from typing import Any
 
-from honeydew import custom_types
+from honeydew.typing import custom_types
 
 TIMEOUTS: dict[str, float] = {
     "COMMAND_RESPONSE": 60,

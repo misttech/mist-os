@@ -10,9 +10,10 @@ import subprocess
 import time
 from typing import Any
 
-from honeydew import custom_types, errors
+from honeydew import errors
 from honeydew.interfaces.transports import ffx as ffx_interface
 from honeydew.interfaces.transports import ssh as ssh_interface
+from honeydew.typing import custom_types
 
 _DEFAULTS: dict[str, Any] = {
     "USERNAME": "fuchsia",

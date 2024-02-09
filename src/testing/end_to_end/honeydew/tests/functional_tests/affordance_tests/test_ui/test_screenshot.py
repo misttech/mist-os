@@ -11,8 +11,8 @@ import time
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, test_runner
 
-from honeydew import custom_types as honeydew_types
 from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.typing import custom_types
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class ScreenshotAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
         _LOGGER.info("Launching %s", EXAMPLE_URL)
         self.device.log_message_to_device(
-            f"Launching test app {EXAMPLE_URL}...", honeydew_types.LEVEL.INFO
+            f"Launching test app {EXAMPLE_URL}...", custom_types.LEVEL.INFO
         )
         self.device.session.add_component(EXAMPLE_URL)
 
@@ -63,7 +63,7 @@ class ScreenshotAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
         _LOGGER.info("Taking screenshot...")
         self.device.log_message_to_device(
-            "Taking screenshot...", honeydew_types.LEVEL.INFO
+            "Taking screenshot...", custom_types.LEVEL.INFO
         )
         image = self.device.screenshot.take()
 

@@ -6,7 +6,7 @@
 
 import logging
 
-from honeydew import custom_types, errors, transports
+from honeydew import errors, transports
 from honeydew.fuchsia_device.fuchsia_controller import (
     fuchsia_device as fc_fuchsia_device,
 )
@@ -15,6 +15,7 @@ from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
 from honeydew.transports import ffx
+from honeydew.typing import custom_types
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

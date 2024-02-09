@@ -8,7 +8,8 @@ import logging
 from typing import Any, Dict, List
 
 import honeydew
-from honeydew import custom_types, transports
+from honeydew import transports
+from honeydew.typing import custom_types
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )

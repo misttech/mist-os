@@ -10,9 +10,10 @@ import time
 from collections.abc import Iterable
 from typing import Any
 
-from honeydew import custom_types, errors
+from honeydew import errors
 from honeydew.interfaces.transports import ffx as ffx_interface
 from honeydew.interfaces.transports import sl4f as sl4f_interface
+from honeydew.typing import custom_types
 from honeydew.utils import http_utils, properties
 
 _FFX_CMDS: dict[str, list[str]] = {
@@ -52,9 +53,9 @@ class SL4F(sl4f_interface.SL4F):
         device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
     ) -> None:
         self._name: str = device_name
-        self._ip_address: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
-            device_ip
-        )
+        self._ip_address: (
+            ipaddress.IPv4Address | ipaddress.IPv6Address | None
+        ) = device_ip
         self._ffx_transport: ffx_interface.FFX = ffx_transport
 
         self.start_server()

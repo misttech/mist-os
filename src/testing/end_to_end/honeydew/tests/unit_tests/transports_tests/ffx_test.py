@@ -13,8 +13,9 @@ from unittest import mock
 import fuchsia_controller_py as fuchsia_controller
 from parameterized import parameterized
 
-from honeydew import custom_types, errors
+from honeydew import errors
 from honeydew.transports import ffx
+from honeydew.typing import custom_types
 
 # pylint: disable=protected-access
 _TARGET_NAME: str = "fuchsia-emulator"

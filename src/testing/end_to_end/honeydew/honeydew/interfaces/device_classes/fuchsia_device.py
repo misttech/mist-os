@@ -7,7 +7,6 @@
 import abc
 from collections.abc import Callable
 
-from honeydew import custom_types
 from honeydew.interfaces.affordances import session, tracing
 from honeydew.interfaces.affordances.bluetooth.profiles import (
     bluetooth_avrcp,
@@ -25,6 +24,7 @@ from honeydew.interfaces.transports import (
 )
 from honeydew.interfaces.transports import sl4f as sl4f_transport
 from honeydew.interfaces.transports import ssh as ssh_transport
+from honeydew.typing import custom_types
 from honeydew.utils import properties
 
 TIMEOUTS: dict[str, float] = {

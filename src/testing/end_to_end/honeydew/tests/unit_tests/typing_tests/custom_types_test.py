@@ -9,7 +9,7 @@ import unittest
 
 from parameterized import parameterized
 
-from honeydew import custom_types
+from honeydew.typing import custom_types
 
 
 class CustomTypesTests(unittest.TestCase):

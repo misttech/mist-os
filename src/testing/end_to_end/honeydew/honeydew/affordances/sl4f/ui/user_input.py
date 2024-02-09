@@ -5,8 +5,9 @@
 
 from typing import Any
 
-from honeydew.interfaces.affordances.ui import custom_types, user_input
+from honeydew.interfaces.affordances.ui import user_input
 from honeydew.transports import sl4f as sl4f_transport
+from honeydew.typing import ui as ui_custom_types
 
 _SL4F_METHODS: dict[str, str] = {
     "Tap": "input_facade.Tap",
@@ -25,8 +26,8 @@ class UserInput(user_input.UserInput):
 
     def tap(
         self,
-        location: custom_types.Coordinate,
-        touch_screen_size: custom_types.Size = user_input.DEFAULTS[
+        location: ui_custom_types.Coordinate,
+        touch_screen_size: ui_custom_types.Size = user_input.DEFAULTS[
             "TOUCH_SCREEN_SIZE"
         ],
         tap_event_count: int = user_input.DEFAULTS["TAP_EVENT_COUNT"],

@@ -12,12 +12,13 @@ from unittest import mock
 import fuchsia_controller_py as fuchsia_controller
 from parameterized import parameterized
 
-from honeydew import custom_types, errors
+from honeydew import errors
 from honeydew.fuchsia_device import base_fuchsia_device
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
+from honeydew.typing import custom_types
 
 # pylint: disable=protected-access
 _INPUT_ARGS: dict[str, Any] = {
@@ -57,18 +58,22 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        with mock.patch.object(
-            base_fuchsia_device.ssh_transport.SSH,
-            "check_connection",
-            autospec=True,
-        ) as mock_ssh_check_connection, mock.patch.object(
-            base_fuchsia_device.ffx_transport.FFX,
-            "check_connection",
-            autospec=True,
-        ) as mock_ffx_check_connection, mock.patch(
-            # pylint: disable=line-too-long
-            "honeydew.fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice.__abstractmethods__",
-            set(),
+        with (
+            mock.patch.object(
+                base_fuchsia_device.ssh_transport.SSH,
+                "check_connection",
+                autospec=True,
+            ) as mock_ssh_check_connection,
+            mock.patch.object(
+                base_fuchsia_device.ffx_transport.FFX,
+                "check_connection",
+                autospec=True,
+            ) as mock_ffx_check_connection,
+            mock.patch(
+                # pylint: disable=line-too-long
+                "honeydew.fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice.__abstractmethods__",
+                set(),
+            ),
         ):
             # pylint: disable=abstract-class-instantiated
             self.fd_obj = base_fuchsia_device.BaseFuchsiaDevice(

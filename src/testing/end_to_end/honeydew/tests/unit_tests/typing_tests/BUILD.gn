@@ -5,6 +5,16 @@
 import("//build/python/python_host_test.gni")
 
 if (is_host) {
+  python_host_test("custom_types_test") {
+    main_source = "custom_types_test.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//third_party/parameterized",
+    ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+  }
+
   python_host_test("screenshot_image_test") {
     main_source = "screenshot_image_test.py"
     libraries = [
@@ -20,5 +30,8 @@ if (is_host) {
 
 group("tests") {
   testonly = true
-  public_deps = [ ":screenshot_image_test($host_toolchain)" ]
+  public_deps = [
+    ":custom_types_test($host_toolchain)",
+    ":screenshot_image_test($host_toolchain)",
+  ]
 }

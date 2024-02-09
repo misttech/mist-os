@@ -8,7 +8,7 @@ import abc
 
 import fuchsia_controller_py as fuchsia_controller
 
-from honeydew import custom_types
+from honeydew.typing import custom_types
 
 TIMEOUTS: dict[str, float] = {
     "TARGET_WAIT": 15,

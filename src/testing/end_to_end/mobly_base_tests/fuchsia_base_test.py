@@ -9,7 +9,8 @@ import logging
 import os
 from typing import Dict, List
 
-from honeydew import custom_types, transports
+from honeydew import transports
+from honeydew.typing import custom_types
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.interfaces.auxiliary_devices import power_switch
 from honeydew.auxiliary_devices import power_switch_dmc
