@@ -293,14 +293,14 @@ zx::result<display::DriverImageId> GpuDevice::Import(
     return zx::error(status);
   }
 
-  status = allocate_2d_resource(&import_data->resource_id, row_bytes / pixel_size, image->height,
-                                pixel_format);
+  status = Create2DResource(&import_data->resource_id, row_bytes / pixel_size, image->height,
+                            pixel_format);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to allocate 2D resource: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
-  status = attach_backing(import_data->resource_id, paddr, size);
+  status = AttachResourceBacking(import_data->resource_id, paddr, size);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to attach resource backing store: %s", zx_status_get_string(status));
     return zx::error(status);
@@ -636,7 +636,7 @@ const ResponseType& GpuDevice::ExchangeRequestResponse(const RequestType& reques
   return *reinterpret_cast<ResponseType*>(response_span.data());
 }
 
-zx_status_t GpuDevice::get_display_info() {
+zx_status_t GpuDevice::GetDisplayInfo() {
   const virtio_abi::GetDisplayInfoCommand command = {
       .header = {.type = virtio_abi::ControlType::kGetDisplayInfoCommand},
   };
@@ -687,8 +687,8 @@ std::optional<virtio_abi::ResourceFormat> To2DResourceFormat(
 
 }  // namespace
 
-zx_status_t GpuDevice::allocate_2d_resource(uint32_t* resource_id, uint32_t width, uint32_t height,
-                                            fuchsia_images2::wire::PixelFormat pixel_format) {
+zx_status_t GpuDevice::Create2DResource(uint32_t* resource_id, uint32_t width, uint32_t height,
+                                        fuchsia_images2::wire::PixelFormat pixel_format) {
   ZX_ASSERT(resource_id);
 
   zxlogf(TRACE, "Allocate2DResource");
@@ -711,7 +711,7 @@ zx_status_t GpuDevice::allocate_2d_resource(uint32_t* resource_id, uint32_t widt
   return ResponseTypeToZxStatus(response.header.type);
 }
 
-zx_status_t GpuDevice::attach_backing(uint32_t resource_id, zx_paddr_t ptr, size_t buf_len) {
+zx_status_t GpuDevice::AttachResourceBacking(uint32_t resource_id, zx_paddr_t ptr, size_t buf_len) {
   ZX_ASSERT(ptr);
 
   zxlogf(TRACE,
@@ -731,10 +731,11 @@ zx_status_t GpuDevice::attach_backing(uint32_t resource_id, zx_paddr_t ptr, size
   return ResponseTypeToZxStatus(response.header.type);
 }
 
-zx_status_t GpuDevice::set_scanout(uint32_t scanout_id, uint32_t resource_id, uint32_t width,
-                                   uint32_t height) {
+zx_status_t GpuDevice::SetScanoutProperties(uint32_t scanout_id, uint32_t resource_id,
+                                            uint32_t width, uint32_t height) {
   zxlogf(TRACE,
-         "SetScanout - scanout ID %" PRIu32 ", resource ID %" PRIu32 ", size %" PRIu32 "x%" PRIu32,
+         "SetScanoutProperties - scanout ID %" PRIu32 ", resource ID %" PRIu32 ", size %" PRIu32
+         "x%" PRIu32,
          scanout_id, resource_id, width, height);
 
   const virtio_abi::SetScanoutCommand command = {
@@ -754,7 +755,7 @@ zx_status_t GpuDevice::set_scanout(uint32_t scanout_id, uint32_t resource_id, ui
   return ResponseTypeToZxStatus(response.header.type);
 }
 
-zx_status_t GpuDevice::flush_resource(uint32_t resource_id, uint32_t width, uint32_t height) {
+zx_status_t GpuDevice::FlushResource(uint32_t resource_id, uint32_t width, uint32_t height) {
   zxlogf(TRACE, "FlushResource - resource ID %" PRIu32 ", size %" PRIu32 "x%" PRIu32, resource_id,
          width, height);
 
@@ -768,7 +769,7 @@ zx_status_t GpuDevice::flush_resource(uint32_t resource_id, uint32_t width, uint
   return ResponseTypeToZxStatus(response.header.type);
 }
 
-zx_status_t GpuDevice::transfer_to_host_2d(uint32_t resource_id, uint32_t width, uint32_t height) {
+zx_status_t GpuDevice::TransferToHost2D(uint32_t resource_id, uint32_t width, uint32_t height) {
   zxlogf(TRACE, "Transfer2DResourceToHost - resource ID %" PRIu32 ", size %" PRIu32 "x%" PRIu32,
          resource_id, width, height);
 
@@ -810,7 +811,7 @@ void GpuDevice::virtio_gpu_flusher() {
     if (fb_change) {
       uint32_t res_id = displayed_fb_ ? displayed_fb_->resource_id : 0;
       zx_status_t status =
-          set_scanout(pmode_id_, res_id, pmode_.geometry.width, pmode_.geometry.height);
+          SetScanoutProperties(pmode_id_, res_id, pmode_.geometry.width, pmode_.geometry.height);
       if (status != ZX_OK) {
         zxlogf(ERROR, "Failed to set scanout: %s", zx_status_get_string(status));
         continue;
@@ -818,15 +819,15 @@ void GpuDevice::virtio_gpu_flusher() {
     }
 
     if (displayed_fb_) {
-      zx_status_t status = transfer_to_host_2d(displayed_fb_->resource_id, pmode_.geometry.width,
-                                               pmode_.geometry.height);
+      zx_status_t status = TransferToHost2D(displayed_fb_->resource_id, pmode_.geometry.width,
+                                            pmode_.geometry.height);
       if (status != ZX_OK) {
         zxlogf(ERROR, "Failed to transfer resource: %s", zx_status_get_string(status));
         continue;
       }
 
       status =
-          flush_resource(displayed_fb_->resource_id, pmode_.geometry.width, pmode_.geometry.height);
+          FlushResource(displayed_fb_->resource_id, pmode_.geometry.width, pmode_.geometry.height);
       if (status != ZX_OK) {
         zxlogf(ERROR, "Failed to flush resource: %s", zx_status_get_string(status));
         continue;
@@ -851,7 +852,7 @@ zx_status_t GpuDevice::Start() {
   zxlogf(TRACE, "Start()");
 
   // Get the display info and see if we find a valid pmode
-  zx_status_t status = get_display_info();
+  zx_status_t status = GetDisplayInfo();
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to get display info: %s", zx_status_get_string(status));
     return status;

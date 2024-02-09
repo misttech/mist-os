@@ -170,14 +170,45 @@ class GpuDevice : public virtio::Device,
                                             uint32_t pixel_size, uint32_t row_bytes,
                                             fuchsia_images2::wire::PixelFormat pixel_format);
 
-  zx_status_t get_display_info();
-  zx_status_t allocate_2d_resource(uint32_t* resource_id, uint32_t width, uint32_t height,
-                                   fuchsia_images2::wire::PixelFormat pixel_format);
-  zx_status_t attach_backing(uint32_t resource_id, zx_paddr_t ptr, size_t buf_len);
-  zx_status_t set_scanout(uint32_t scanout_id, uint32_t resource_id, uint32_t width,
-                          uint32_t height);
-  zx_status_t flush_resource(uint32_t resource_id, uint32_t width, uint32_t height);
-  zx_status_t transfer_to_host_2d(uint32_t resource_id, uint32_t width, uint32_t height);
+  // Retrieves the current output configuration.
+  //
+  // virtio spec Section 5.7.6.8 "Device Operation: controlq", operation
+  // VIRTIO_GPU_CMD_GET_DISPLAY_INFO.
+  zx_status_t GetDisplayInfo();
+
+  // Creates a 2D resource on the virtio host.
+  //
+  // The resource ID is automatically allocated.
+  //
+  // virtio spec Section 5.7.6.8 "Device Operation: controlq", operation
+  // VIRTIO_GPU_CMD_RESOURCE_CREATE_2D.
+  zx_status_t Create2DResource(uint32_t* resource_id, uint32_t width, uint32_t height,
+                               fuchsia_images2::wire::PixelFormat pixel_format);
+
+  // Sets scanout parameters for one scanout.
+  //
+  // virtio spec Section 5.7.6.8 "Device Operation: controlq", operation
+  // VIRTIO_GPU_CMD_SET_SCANOUT.
+  zx_status_t SetScanoutProperties(uint32_t scanout_id, uint32_t resource_id, uint32_t width,
+                                   uint32_t height);
+
+  // Flushes any scanouts that use `resource_id` to the host screen.
+  //
+  // virtio spec Section 5.7.6.8 "Device Operation: controlq", operation
+  // VIRTIO_GPU_CMD_RESOURCE_FLUSH.
+  zx_status_t FlushResource(uint32_t resource_id, uint32_t width, uint32_t height);
+
+  // Transfers data from a guest resource to host memory.
+  //
+  // virtio spec Section 5.7.6.8 "Device Operation: controlq", operation
+  // VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D.
+  zx_status_t TransferToHost2D(uint32_t resource_id, uint32_t width, uint32_t height);
+
+  // Assigns an array of guest pages as the backing store for a resource.
+  //
+  // virtio spec Section 5.7.6.8 "Device Operation: controlq", operation
+  // VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING.
+  zx_status_t AttachResourceBacking(uint32_t resource_id, zx_paddr_t ptr, size_t buf_len);
 
   // Initializes the sysmem Allocator client used to import incoming buffer
   // collection tokens.
