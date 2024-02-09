@@ -4,6 +4,7 @@
 
 #ifndef SRC_PERFORMANCE_TRACE_MANAGER_BUFFER_FORWARDER_H_
 #define SRC_PERFORMANCE_TRACE_MANAGER_BUFFER_FORWARDER_H_
+#include <lib/stdcompat/span.h>
 #include <lib/zx/socket.h>
 
 #include <utility>
@@ -40,14 +41,14 @@ class BufferForwarder {
   TransferStatus WriteChunkBy(ForwardStrategy strategy, const zx::vmo& vmo, size_t vmo_offset,
                               size_t size) const;
 
-  // Writes |len| bytes from |buffer| to the output socket. Returns
+ private:
+  // Writes the contents of |data| to the output socket. Returns
   // TransferStatus::kComplete if the entire buffer has been
   // successfully transferred. A return value of
   // TransferStatus::kReceiverDead indicates that the peer was closed
   // during the transfer.
-  TransferStatus WriteBuffer(const void* buffer, size_t len) const;
+  TransferStatus WriteBuffer(cpp20::span<const uint8_t> data) const;
 
- private:
   const zx::socket destination_;
 };
 }  // namespace tracing
