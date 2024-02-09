@@ -15,8 +15,8 @@ int main() {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   async_dispatcher_t* dispatcher = loop.dispatcher();
   std::unique_ptr<trace::TraceProviderWithFdio> trace_provider;
-  FX_CHECK(trace::TraceProviderWithFdio::CreateSynchronously(dispatcher, "provider_puppet_cpp",
-                                                             &trace_provider, nullptr));
+  FX_CHECK(trace::TraceProviderWithFdio::CreateSynchronously(dispatcher, nullptr, &trace_provider,
+                                                             nullptr));
   FX_CHECK(trace_provider->is_valid());
 
   // Run before emitting trace events so that the already-started trace session is observed.

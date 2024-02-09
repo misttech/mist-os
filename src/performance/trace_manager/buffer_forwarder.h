@@ -15,6 +15,13 @@ class BufferForwarder {
  public:
   explicit BufferForwarder(zx::socket destination) : destination_(std::move(destination)) {}
 
+  // Write the FxT Magic Bytes to the underlying socket.
+  TransferStatus WriteMagicNumberRecord() const;
+
+  TransferStatus WriteProviderInfoRecord(uint32_t provider_id, const std::string& name) const;
+  TransferStatus WriteProviderSectionRecord(uint32_t provider_id) const;
+  TransferStatus WriteProviderBufferOverflowEvent(uint32_t provider_id) const;
+
   // Writes |len| bytes from |buffer| to the output socket. Returns
   // TransferStatus::kComplete if the entire buffer has been
   // successfully transferred. A return value of

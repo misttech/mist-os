@@ -458,27 +458,12 @@ void TraceSession::Abort() {
 }
 
 void TraceSession::WriteTraceInfo() {
-  auto status = WriteMagicNumberRecord();
-  if (status != TransferStatus::kComplete) {
-    FX_LOGS(ERROR) << "Failed to write magic number record: " << status;
-  }
-}
-
-TransferStatus TraceSession::WriteMagicNumberRecord() {
-  size_t num_words = 1u;
-  std::vector<uint64_t> record(num_words);
-  record[0] = trace::MagicNumberRecordFields::Type::Make(
-                  trace::ToUnderlyingType(trace::RecordType::kMetadata)) |
-              trace::MagicNumberRecordFields::RecordSize::Make(num_words) |
-              trace::MagicNumberRecordFields::MetadataType::Make(
-                  trace::ToUnderlyingType(trace::MetadataType::kTraceInfo)) |
-              trace::MagicNumberRecordFields::TraceInfoType::Make(
-                  trace::ToUnderlyingType(trace::TraceInfoType::kMagicNumber)) |
-              trace::MagicNumberRecordFields::Magic::Make(trace::kMagicValue);
   // This won't block as we're only called after the consumer connects, and
   // this is the first record written.
-  return buffer_forwarder_->WriteBuffer(reinterpret_cast<uint8_t*>(record.data()),
-                                        trace::WordsToBytes(num_words));
+  if (auto status = buffer_forwarder_->WriteMagicNumberRecord();
+      status != TransferStatus::kComplete) {
+    FX_LOGS(ERROR) << "Failed to write magic number record: " << status;
+  }
 }
 
 void TraceSession::TransitionToState(State new_state) {

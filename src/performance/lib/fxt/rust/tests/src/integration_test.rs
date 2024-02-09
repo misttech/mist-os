@@ -22,6 +22,8 @@ const COLLECTION_NAME: &str = "dynamic";
 const CHILD_NAME: &str = "provider_puppet";
 const CPP_PUPPET_SUBPATH: &str = "meta/provider_puppet_cpp.cm";
 const RUST_PUPPET_SUBPATH: &str = "meta/provider_puppet_rust.cm";
+const CPP_PUPPET_PROVIDER_NAME: &str = "provider_puppet_cpp.cm";
+const RUST_PUPPET_PROVIDER_NAME: &str = "provider_puppet_rust.cm";
 const TRACE_CATEGORIES: &[&str] = &["test_puppet"];
 
 fn slash_pkg_contains(subpath: &str) -> bool {
@@ -30,10 +32,10 @@ fn slash_pkg_contains(subpath: &str) -> bool {
 
 #[fuchsia::main]
 async fn main() {
-    let puppet_subpath = if slash_pkg_contains(RUST_PUPPET_SUBPATH) {
-        RUST_PUPPET_SUBPATH
+    let (puppet_subpath, provider_name) = if slash_pkg_contains(RUST_PUPPET_SUBPATH) {
+        (RUST_PUPPET_SUBPATH, RUST_PUPPET_PROVIDER_NAME)
     } else if slash_pkg_contains(CPP_PUPPET_SUBPATH) {
-        CPP_PUPPET_SUBPATH
+        (CPP_PUPPET_SUBPATH, CPP_PUPPET_PROVIDER_NAME)
     } else {
         panic!("must be packaged with a recognized puppet url");
     };
@@ -65,8 +67,8 @@ async fn main() {
     let (puppet_process_koid, puppet_process) = per_process.into_iter().next().unwrap();
 
     // The test controls the test manager instance so the puppet will be the first provider, and
-    // the puppet does not configure a provider name for itself.
-    let expected_provider = Some(fxt::Provider { id: 1, name: "".into() });
+    // the puppet gets the default provider name.
+    let expected_provider = Some(fxt::Provider { id: 1, name: provider_name.into() });
 
     // koids are incremented monotonically and we store our threads in a BTreeMap, so our iteration
     // order matches thread creation order.

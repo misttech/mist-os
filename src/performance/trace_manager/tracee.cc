@@ -444,7 +444,7 @@ TransferStatus Tracee::TransferRecords(const std::shared_ptr<const BufferForward
                      << " records were dropped";
     // If we can't write the buffer overflow record, it's not the end of the
     // world.
-    if (WriteProviderBufferOverflowEvent(socket) != TransferStatus::kComplete) {
+    if (output_->WriteProviderBufferOverflowEvent(bundle_->id) != TransferStatus::kComplete) {
       FX_LOGS(DEBUG) << *bundle_
                      << ": Failed to write provider event (buffer overflow) record to trace.";
     }
@@ -655,62 +655,12 @@ void Tracee::NotifyBufferSaved(uint32_t wrapped_count, uint64_t durable_data_end
 TransferStatus Tracee::WriteProviderIdRecord(
     const std::shared_ptr<const BufferForwarder>& socket) const {
   if (provider_info_record_written_) {
-    return WriteProviderSectionRecord(socket);
+    return output_->WriteProviderSectionRecord(bundle_->id);
   } else {
-    auto status = WriteProviderInfoRecord(socket);
+    auto status = output_->WriteProviderInfoRecord(bundle_->id, bundle_->name);
     provider_info_record_written_ = true;
     return status;
   }
-}
-
-TransferStatus Tracee::WriteProviderInfoRecord(
-    const std::shared_ptr<const BufferForwarder>& socket) const {
-  FX_LOGS(DEBUG) << *bundle_ << ": writing provider info record";
-  std::string label("");  // TODO(https://fxbug.dev/42106751): Provide meaningful labels or remove
-                          // labels from the trace wire format altogether.
-  size_t num_words = 1u + trace::BytesToWords(trace::Pad(label.size()));
-  std::vector<uint64_t> record(num_words);
-  record[0] = trace::ProviderInfoMetadataRecordFields::Type::Make(
-                  trace::ToUnderlyingType(trace::RecordType::kMetadata)) |
-              trace::ProviderInfoMetadataRecordFields::RecordSize::Make(num_words) |
-              trace::ProviderInfoMetadataRecordFields::MetadataType::Make(
-                  trace::ToUnderlyingType(trace::MetadataType::kProviderInfo)) |
-              trace::ProviderInfoMetadataRecordFields::Id::Make(bundle_->id) |
-              trace::ProviderInfoMetadataRecordFields::NameLength::Make(label.size());
-  memcpy(&record[1], label.c_str(), label.size());
-  return output_->WriteBuffer(reinterpret_cast<uint8_t*>(record.data()),
-                              trace::WordsToBytes(num_words));
-}
-
-TransferStatus Tracee::WriteProviderSectionRecord(
-    const std::shared_ptr<const BufferForwarder>& socket) const {
-  FX_LOGS(DEBUG) << *bundle_ << ": writing provider section record";
-  size_t num_words = 1u;
-  std::vector<uint64_t> record(num_words);
-  record[0] = trace::ProviderSectionMetadataRecordFields::Type::Make(
-                  trace::ToUnderlyingType(trace::RecordType::kMetadata)) |
-              trace::ProviderSectionMetadataRecordFields::RecordSize::Make(num_words) |
-              trace::ProviderSectionMetadataRecordFields::MetadataType::Make(
-                  trace::ToUnderlyingType(trace::MetadataType::kProviderSection)) |
-              trace::ProviderSectionMetadataRecordFields::Id::Make(bundle_->id);
-  return output_->WriteBuffer(reinterpret_cast<uint8_t*>(record.data()),
-                              trace::WordsToBytes(num_words));
-}
-
-TransferStatus Tracee::WriteProviderBufferOverflowEvent(
-    const std::shared_ptr<const BufferForwarder>& socket) const {
-  size_t num_words = 1u;
-  std::vector<uint64_t> record(num_words);
-  record[0] = trace::ProviderEventMetadataRecordFields::Type::Make(
-                  trace::ToUnderlyingType(trace::RecordType::kMetadata)) |
-              trace::ProviderEventMetadataRecordFields::RecordSize::Make(num_words) |
-              trace::ProviderEventMetadataRecordFields::MetadataType::Make(
-                  trace::ToUnderlyingType(trace::MetadataType::kProviderEvent)) |
-              trace::ProviderEventMetadataRecordFields::Id::Make(bundle_->id) |
-              trace::ProviderEventMetadataRecordFields::Event::Make(
-                  trace::ToUnderlyingType(trace::ProviderEventType::kBufferOverflow));
-  return output_->WriteBuffer(reinterpret_cast<uint8_t*>(record.data()),
-                              trace::WordsToBytes(num_words));
 }
 
 void Tracee::Abort() {

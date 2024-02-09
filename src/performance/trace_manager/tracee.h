@@ -139,13 +139,6 @@ class Tracee {
   // ProviderSection records tell the reader to switch back to that provider.
   TransferStatus WriteProviderIdRecord(const std::shared_ptr<const BufferForwarder>& socket) const;
 
-  TransferStatus WriteProviderInfoRecord(
-      const std::shared_ptr<const BufferForwarder>& socket) const;
-  TransferStatus WriteProviderSectionRecord(
-      const std::shared_ptr<const BufferForwarder>& socket) const;
-  TransferStatus WriteProviderBufferOverflowEvent(
-      const std::shared_ptr<const BufferForwarder>& socket) const;
-
   void NotifyBufferSaved(uint32_t wrapped_count, uint64_t durable_data_end);
 
   // Called when a problem is detected warranting shutting the connection down.

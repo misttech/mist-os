@@ -153,8 +153,6 @@ class TraceSession : public fxl::RefCountedThreadSafe<TraceSession> {
   // N.B. Upon return |this| will have been deleted.
   void Abort();
 
-  TransferStatus WriteMagicNumberRecord();
-
   void TransitionToState(State state);
 
   State state_ = State::kReady;

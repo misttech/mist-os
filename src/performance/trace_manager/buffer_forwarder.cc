@@ -5,8 +5,62 @@
 #include "src/performance/trace_manager/buffer_forwarder.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace-engine/fields.h>
 
 namespace tracing {
+
+TransferStatus BufferForwarder::WriteMagicNumberRecord() const {
+  size_t num_words = 1u;
+  uint64_t record = trace::MagicNumberRecordFields::Type::Make(
+                        trace::ToUnderlyingType(trace::RecordType::kMetadata)) |
+                    trace::MagicNumberRecordFields::RecordSize::Make(num_words) |
+                    trace::MagicNumberRecordFields::MetadataType::Make(
+                        trace::ToUnderlyingType(trace::MetadataType::kTraceInfo)) |
+                    trace::MagicNumberRecordFields::TraceInfoType::Make(
+                        trace::ToUnderlyingType(trace::TraceInfoType::kMagicNumber)) |
+                    trace::MagicNumberRecordFields::Magic::Make(trace::kMagicValue);
+  return WriteBuffer(reinterpret_cast<uint8_t*>(&record), trace::WordsToBytes(num_words));
+}
+
+TransferStatus BufferForwarder::WriteProviderInfoRecord(uint32_t provider_id,
+                                                        const std::string& name) const {
+  size_t num_words = 1u + trace::BytesToWords(trace::Pad(name.size()));
+  std::vector<uint64_t> record(num_words);
+  record[0] = trace::ProviderInfoMetadataRecordFields::Type::Make(
+                  trace::ToUnderlyingType(trace::RecordType::kMetadata)) |
+              trace::ProviderInfoMetadataRecordFields::RecordSize::Make(num_words) |
+              trace::ProviderInfoMetadataRecordFields::MetadataType::Make(
+                  trace::ToUnderlyingType(trace::MetadataType::kProviderInfo)) |
+              trace::ProviderInfoMetadataRecordFields::Id::Make(provider_id) |
+              trace::ProviderInfoMetadataRecordFields::NameLength::Make(name.size());
+  memcpy(&record[1], name.c_str(), name.size());
+  return WriteBuffer(reinterpret_cast<uint8_t*>(record.data()), trace::WordsToBytes(num_words));
+}
+
+TransferStatus BufferForwarder::WriteProviderSectionRecord(uint32_t provider_id) const {
+  size_t num_words = 1u;
+  uint64_t record = trace::ProviderSectionMetadataRecordFields::Type::Make(
+                        trace::ToUnderlyingType(trace::RecordType::kMetadata)) |
+                    trace::ProviderSectionMetadataRecordFields::RecordSize::Make(num_words) |
+                    trace::ProviderSectionMetadataRecordFields::MetadataType::Make(
+                        trace::ToUnderlyingType(trace::MetadataType::kProviderSection)) |
+                    trace::ProviderSectionMetadataRecordFields::Id::Make(provider_id);
+  return WriteBuffer(reinterpret_cast<uint8_t*>(&record), trace::WordsToBytes(num_words));
+}
+
+TransferStatus BufferForwarder::WriteProviderBufferOverflowEvent(uint32_t provider_id) const {
+  size_t num_words = 1u;
+  uint64_t record = trace::ProviderEventMetadataRecordFields::Type::Make(
+                        trace::ToUnderlyingType(trace::RecordType::kMetadata)) |
+                    trace::ProviderEventMetadataRecordFields::RecordSize::Make(num_words) |
+                    trace::ProviderEventMetadataRecordFields::MetadataType::Make(
+                        trace::ToUnderlyingType(trace::MetadataType::kProviderEvent)) |
+                    trace::ProviderEventMetadataRecordFields::Id::Make(provider_id) |
+                    trace::ProviderEventMetadataRecordFields::Event::Make(
+                        trace::ToUnderlyingType(trace::ProviderEventType::kBufferOverflow));
+  return WriteBuffer(reinterpret_cast<uint8_t*>(&record), trace::WordsToBytes(num_words));
+}
+
 TransferStatus BufferForwarder::WriteBuffer(const void* buffer, size_t len) const {
   auto data = reinterpret_cast<const uint8_t*>(buffer);
   size_t offset = 0;
