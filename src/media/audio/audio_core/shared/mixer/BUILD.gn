@@ -46,14 +46,7 @@ source_set("mixer") {
   configs += [ "//build/config:optimize_speed" ]
 
   # Allow some of our loops to be vectorized by the compiler.
-  cflags = [
-    "-ffast-math",
-
-    # Allow inf/nan until we sanitize these out of streams (not normally allowed with -ffast-math).
-    "-fhonor-infinities",
-    "-fhonor-nans",
-    "-fno-finite-math-only",
-  ]
+  configs += [ "//build/config:fast-math" ]
 }
 
 group("tools") {
