@@ -4,33 +4,44 @@
 
 import("//build/python/python_library.gni")
 
-assert(is_host)
+if (is_host) {
+  python_library("fuchsia_base_test") {
+    testonly = true
+    library_name = "fuchsia_base_test"
+    sources = [
+      "__init__.py",
+      "fuchsia_base_test.py",
+    ]
+    library_deps = [
+      "//src/testing/end_to_end/mobly_controller",
+      "//third_party/mobly",
+    ]
+  }
 
-python_library("fuchsia_base_test") {
-  testonly = true
-  library_name = "fuchsia_base_test"
-  sources = [
-    "__init__.py",
-    "fuchsia_base_test.py",
-  ]
-  library_deps = [
-    "//src/testing/end_to_end/mobly_controller",
-    "//third_party/mobly",
-  ]
+  # NOTE: fuchsia_power_base_test requires associated on device packages to be available. Since python
+  # libraries are only built on the host, if you depend on `fuchsia_power_base_test` then you must
+  # also include a target_deps for the packages:
+  #
+  #```
+  #  target_deps = [ "//src/tests/end_to_end/mobly_base_tests:fuchsia_power_base_tests_packages" ]
+  #```
+  python_library("fuchsia_power_base_test") {
+    testonly = true
+
+    # Add "_lib" suffix to avoid import collision in the PYZ file when
+    # `fuchsia_power_base_test` is used as the source in both Python lib and test
+    library_name = "fuchsia_power_base_test_lib"
+    sources = [
+      "__init__.py",
+      "fuchsia_power_base_test.py",
+    ]
+    library_deps = [
+      ":fuchsia_base_test",
+      "//src/performance/lib/perf_publish",
+    ]
+  }
 }
 
-python_library("fuchsia_power_base_test") {
-  testonly = true
-
-  # Add "_lib" suffix to avoid import collision in the PYZ file when
-  # `fuchsia_power_base_test` is used as the source in both Python lib and test
-  library_name = "fuchsia_power_base_test_lib"
-  sources = [
-    "__init__.py",
-    "fuchsia_power_base_test.py",
-  ]
-  library_deps = [
-    ":fuchsia_base_test",
-    "//src/performance/lib/perf_publish",
-  ]
+group("fuchsia_power_base_test_packages") {
+  deps = [ "//src/tests/end_to_end/power/load_generator" ]
 }

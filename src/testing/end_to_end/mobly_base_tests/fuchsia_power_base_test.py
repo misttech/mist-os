@@ -7,6 +7,7 @@
 It is assumed that this is a hybrid test, with a host-side and a single target-side component.
 """
 
+import json
 import logging
 import os
 import signal
@@ -108,13 +109,55 @@ class FuchsiaPowerBaseTest(fuchsia_base_test.FuchsiaBaseTest):
 
         Power measurement result is streamed to |self.power_trace_path|.
         """
+
+        def _component_is_running(moniker: str) -> bool:
+            output = json.loads(
+                self.device.ffx.run(
+                    ["--machine", "json", "component", "show", moniker],
+                )
+            )
+            return (
+                "resolved" in output
+                and "started" in output["resolved"]
+                and output["resolved"]["started"] != None
+            )
+
         with self._start_power_measurement() as proc:
             self._wait_first_sample(proc)
             ffx_test_args = self.ffx_test_args + [
                 "--output-directory",
                 self.test_case_path,
             ]
+            load_generator_moniker = (
+                "/core/ffx-laboratory:load_generator" + str(time.time())
+            )
             try:
+                # Before running the actual test, run component with a known load pattern. Since
+                # power draw strongly correlates to cpu usage, we can use the pattern to match the
+                # up the measurements.
+                self.device.ffx.run(
+                    [
+                        "component",
+                        "run",
+                        load_generator_moniker,
+                        "fuchsia-pkg://fuchsia.com/load_generator#meta/load_generator.cm",
+                        "--config",
+                        "load_pattern=[0,100,100,100,200,100,300]",
+                    ],
+                    capture_output=False,
+                )
+
+                # The load pattern will run for a second but ffx run will return immediately. Wait
+                # for the load pattern to finish before proceeding.
+                total_waited = 0
+                while _component_is_running(load_generator_moniker):
+                    if total_waited > 60:
+                        raise RuntimeError(
+                            "Failed to sucessfully launch and wait for the load generator"
+                        )
+                    time.sleep(1)
+                    total_waited += 1
+
                 self.device.ffx.run_test_component(
                     self.ffx_test_url,
                     ffx_test_args=ffx_test_args,
@@ -123,6 +166,10 @@ class FuchsiaPowerBaseTest(fuchsia_base_test.FuchsiaBaseTest):
                 )
             finally:
                 self._stop_power_measurement(proc)
+                self.device.ffx.run(
+                    ["component", "destroy", load_generator_moniker],
+                    capture_output=False,
+                )
 
 
 if __name__ == "__main__":
