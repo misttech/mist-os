@@ -10,6 +10,8 @@
 // This file provides macros primarily useful for the assembly code that
 // defines an exception vector routine that stvec points to.
 
+#include <lib/arch/asm.h>
+
 #ifdef __ASSEMBLER__  // clang-format off
 
 // This sets up the CFI state to represent the vector entry point conditions.
@@ -29,44 +31,13 @@
   // The interrupted PC is found in the sepc CSR, which has a DWARF number.
 #ifndef __clang__  // TODO(https://fxbug.dev/42073127)
   .cfi_register 64, sepc
+  // The previous sepc value is no longer available.
+  .cfi_undefined sepc
 #endif
 
   // All other registers still have their interrupted state.
-  .cfi_same_value x0
-  .cfi_same_value x1
-  .cfi_same_value x2
-  .cfi_same_value x3
-  .cfi_same_value x4
-  .cfi_same_value x5
-  .cfi_same_value x6
-  .cfi_same_value x7
-  .cfi_same_value x8
-  .cfi_same_value x9
-  .cfi_same_value x10
-  .cfi_same_value x11
-  .cfi_same_value x12
-  .cfi_same_value x13
-  .cfi_same_value x14
-  .cfi_same_value x15
-  .cfi_same_value x16
-  .cfi_same_value x17
-  .cfi_same_value x18
-  .cfi_same_value x19
-  .cfi_same_value x20
-  .cfi_same_value x21
-  .cfi_same_value x22
-  .cfi_same_value x23
-  .cfi_same_value x24
-  .cfi_same_value x25
-  .cfi_same_value x26
-  .cfi_same_value x27
-  .cfi_same_value x28
-  .cfi_same_value x29
-  .cfi_same_value x30
-  .cfi_same_value x31
-
-  // TODO(mcgrathr): unwind for float regs?
-
+  .cfi.all_integer .cfi_same_value
+  .cfi.all_vectorfp .cfi_same_value
 .endm
 
 #endif  // clang-format on

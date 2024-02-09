@@ -161,6 +161,9 @@
   // The interrupted PC value is found in ELR_ELx.
   .cfi_register 32, 33 // This is the DWARF register number for ELR_mode.
 
+  // The previous value of ELR_ELx is no longer available.
+  .cfi_undefined 33
+
   // There are DWARF register numbers for each TPIDR_ELx.  We don't bother with
   // a CFI rule for those registers for two reasons: we can't statically
   // determine which ELx we're talking about here, and there are separate
@@ -189,69 +192,8 @@
   .cfi_def_cfa sp, 0
 
   // All other registers still have their interrupted state.
-  .cfi_same_value x0
-  .cfi_same_value x1
-  .cfi_same_value x2
-  .cfi_same_value x3
-  .cfi_same_value x4
-  .cfi_same_value x5
-  .cfi_same_value x6
-  .cfi_same_value x7
-  .cfi_same_value x8
-  .cfi_same_value x9
-  .cfi_same_value x10
-  .cfi_same_value x11
-  .cfi_same_value x12
-  .cfi_same_value x13
-  .cfi_same_value x14
-  .cfi_same_value x15
-  .cfi_same_value x16
-  .cfi_same_value x17
-  .cfi_same_value x18
-  .cfi_same_value x19
-  .cfi_same_value x20
-  .cfi_same_value x21
-  .cfi_same_value x22
-  .cfi_same_value x23
-  .cfi_same_value x24
-  .cfi_same_value x25
-  .cfi_same_value x26
-  .cfi_same_value x27
-  .cfi_same_value x28
-  .cfi_same_value x29
-  .cfi_same_value x30
-  .cfi_same_value q0
-  .cfi_same_value q1
-  .cfi_same_value q2
-  .cfi_same_value q3
-  .cfi_same_value q4
-  .cfi_same_value q5
-  .cfi_same_value q6
-  .cfi_same_value q7
-  .cfi_same_value q8
-  .cfi_same_value q9
-  .cfi_same_value q10
-  .cfi_same_value q11
-  .cfi_same_value q12
-  .cfi_same_value q13
-  .cfi_same_value q14
-  .cfi_same_value q15
-  .cfi_same_value q16
-  .cfi_same_value q17
-  .cfi_same_value q18
-  .cfi_same_value q19
-  .cfi_same_value q20
-  .cfi_same_value q21
-  .cfi_same_value q22
-  .cfi_same_value q23
-  .cfi_same_value q24
-  .cfi_same_value q25
-  .cfi_same_value q26
-  .cfi_same_value q27
-  .cfi_same_value q28
-  .cfi_same_value q29
-  .cfi_same_value q30
-  .cfi_same_value q31
+  .cfi.all_integer .cfi_same_value
+  .cfi.all_vectorfp .cfi_same_value
 .endm
 
 // The rest of the macros are implementation details of .vbar_table.
