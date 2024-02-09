@@ -87,8 +87,8 @@ executable("driver_manager") {
     ":driver_manager_config",
     "v2:driver_development_service",
     "v2:driver_runner",
+    "//sdk/lib/scheduler/cpp",
     "//src/devices/lib/log",
-    "//src/lib/scheduler/cpp",
     "//src/sys/lib/stdout-to-debuglog/cpp",
   ]
 

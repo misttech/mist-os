@@ -56,8 +56,8 @@ executable("memfs_bin") {
   sources = [ "component.cc" ]
   deps = [
     ":lib",
+    "//sdk/lib/scheduler/cpp",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/scheduler/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]

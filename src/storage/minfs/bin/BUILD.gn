@@ -13,8 +13,8 @@ executable("minfs") {
   deps = [
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
     "//sdk/lib/fdio",
+    "//sdk/lib/scheduler/cpp",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/scheduler/cpp",
     "//src/storage/minfs",
     "//zircon/system/ulib/zx",
   ]

@@ -15,7 +15,7 @@ test("profile") {
   deps = [
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/lib/fdio",
-    "//src/lib/scheduler/cpp",
+    "//sdk/lib/scheduler/cpp",
     "//zircon/system/ulib/profile",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
