@@ -9,12 +9,15 @@
 
 __BEGIN_CDECLS
 
-// posix mode conversions ------------------------------------------------------
-
-// These are defined in zxio today because the "mode" field in
-// |fuchsia.io/NodeAttributes| is POSIX, whereas the "protocols" and "abilities"
-// field in |zxio_node_attributes_t| aligns with |fuchsia.io|.
-
+// Approximates POSIX mode bits based on the `protocols` and `abilities` of a `fuchsia.io/Node`.
+// Only some fuchsia.io servers support POSIX attributes, which can be set/retrieved as part of
+// `fuchsia.io/MutableNodeAttributes`. For servers/filesystems that do not support POSIX attributes,
+// this function can be used to *approximate* the equivalent POSIX mode bits (type and permissions).
+//
+// `protocols` is used to derive the file's type (e.g. `S_IFREG` or `S_IFDIR`), and a combination
+// of `protocols` and `abilities` is used to derive the owner permission bits (`S_I*USR`).
+//
+// **NOTE**: Only owner bits (`S_IRUSR` / `S_IWUSR` / `S_IXUSR`) are set on the resulting mode.
 uint32_t zxio_get_posix_mode(zxio_node_protocols_t protocols, zxio_abilities_t abilities);
 
 __END_CDECLS

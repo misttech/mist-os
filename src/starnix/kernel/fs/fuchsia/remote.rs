@@ -294,7 +294,7 @@ pub fn new_remote_file(
             ..Default::default()
         })
         .map_err(|status| from_status_like_fdio!(status))?;
-    let mode = get_mode(&attrs)?;
+    let mode = get_mode(&attrs);
     let ops: Box<dyn FileOps> = match handle_type {
         zx::ObjectType::CHANNEL | zx::ObjectType::VMO | zx::ObjectType::DEBUGLOG => {
             if mode.is_dir() {
@@ -346,13 +346,22 @@ pub fn update_info_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attribute
     }
 }
 
-fn get_mode(attrs: &zxio_node_attributes_t) -> Result<FileMode, Errno> {
-    let mut mode =
-        FileMode::from_bits(unsafe { zxio_get_posix_mode(attrs.protocols, attrs.abilities) });
-    let user_perms = mode.bits() & 0o700;
-    // Make sure the same permissions are granted to user, group, and other.
-    mode |= FileMode::from_bits((user_perms >> 3) | (user_perms >> 6));
-    Ok(mode)
+fn get_mode(attrs: &zxio_node_attributes_t) -> FileMode {
+    if attrs.protocols & ZXIO_NODE_PROTOCOL_SYMLINK != 0 {
+        // We don't set the mode for symbolic links , so we synthesize it instead.
+        FileMode::IFLNK | FileMode::ALLOW_ALL
+    } else if attrs.has.mode {
+        // If the filesystem supports POSIX mode bits, use that directly.
+        FileMode::from_bits(attrs.mode)
+    } else {
+        // The filesystem doesn't support the `mode` attribute, so synthesize it from the node's
+        // fuchsia.io protocols/abilities.
+        let mode =
+            FileMode::from_bits(unsafe { zxio_get_posix_mode(attrs.protocols, attrs.abilities) });
+        let user_perms = mode.bits() & 0o700;
+        // Make sure the same permissions are granted to user, group, and other.
+        mode | FileMode::from_bits((user_perms >> 3) | (user_perms >> 6))
+    }
 }
 
 fn get_name_str<'a>(name_bytes: &'a FsStr) -> Result<&'a str, Errno> {
@@ -464,7 +473,7 @@ impl FsNodeOps for RemoteNode {
                     ..Default::default()
                 })
                 .map_err(|status| from_status_like_fdio!(status, name))?;
-            mode = get_mode(&attrs)?;
+            mode = get_mode(&attrs);
             node_id = attrs.id;
         }
 
@@ -588,6 +597,7 @@ impl FsNodeOps for RemoteNode {
             let mut attrs = zxio_node_attributes_t {
                 has: zxio_node_attr_has_t {
                     protocols: true,
+                    abilities: true,
                     mode: true,
                     uid: true,
                     gid: true,
@@ -615,12 +625,7 @@ impl FsNodeOps for RemoteNode {
                     )
                     .map_err(|status| from_status_like_fdio!(status, name))?,
             );
-            if attrs.protocols & ZXIO_NODE_PROTOCOL_SYMLINK != 0 {
-                // We don't set the mode for symbolic links, so we synthesize it instead.
-                mode = FileMode::IFLNK | FileMode::ALLOW_ALL;
-            } else {
-                mode = FileMode::from_bits(attrs.mode);
-            }
+            mode = get_mode(&attrs);
             node_id = attrs.id;
             rdev = DeviceType::from_bits(attrs.rdev);
             owner = FsCred { uid: attrs.uid, gid: attrs.gid };
@@ -649,7 +654,7 @@ impl FsNodeOps for RemoteNode {
                     ..Default::default()
                 })
                 .map_err(|status| from_status_like_fdio!(status))?;
-            mode = get_mode(&attrs)?;
+            mode = get_mode(&attrs);
             node_id = attrs.id;
             rdev = DeviceType::from_bits(0);
             fsverity_enabled = false;

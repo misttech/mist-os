@@ -321,6 +321,8 @@ impl vfs::node::Node for FxFile {
         let props = self.handle.get_properties().await.map_err(map_to_status)?;
         let descriptor =
             self.handle.uncached_handle().get_descriptor().await.map_err(map_to_status)?;
+        // TODO(https://fxbug.dev/324112547): Missing POSIX attributes should not be reported (i.e.
+        // they should be set to `None` instead of `0`).
         Ok(attributes!(
             requested_attributes,
             Mutable {

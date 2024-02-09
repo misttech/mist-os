@@ -787,6 +787,8 @@ impl vfs::node::Node for FxDirectory {
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, zx::Status> {
         let props = self.directory.get_properties().await.map_err(map_to_status)?;
+        // TODO(https://fxbug.dev/324112547): Missing POSIX attributes should not be reported (i.e.
+        // they should be set to `None` instead of `0`).
         Ok(attributes!(
             requested_attributes,
             Mutable {
