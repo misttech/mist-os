@@ -183,6 +183,8 @@ pub enum ProductBundle {
 /// Private helper for serializing the ProductBundle. A ProductBundle cannot be deserialized
 /// without going through `try_from_path` in order to require that we use this helper, and the
 /// `directory` field gets populated.
+// TODO(https://fxbug.dev/324167674): fix.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 enum SerializationHelper {

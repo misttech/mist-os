@@ -33,6 +33,8 @@ pub struct PortMapping {
 }
 
 /// Used when reading the instance data as a return value.
+// TODO(https://fxbug.dev/324167674): fix.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum EngineOption {
     DoesExist(EmulatorInstanceData),

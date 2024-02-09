@@ -103,6 +103,8 @@ impl ClientApi for Client {
     }
 }
 
+// TODO(https://fxbug.dev/324167674): fix.
+#[allow(clippy::large_enum_variant)]
 pub enum ManualRequest {
     Connect(types::ConnectSelection),
     Disconnect((types::DisconnectReason, oneshot::Sender<()>)),

@@ -154,6 +154,8 @@ impl fmt::Display for Measurements {
     }
 }
 
+// TODO(https://fxbug.dev/324167674): fix.
+#[allow(clippy::large_enum_variant)]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum VsockPerfResult {
     BenchmarkComplete(Measurements),

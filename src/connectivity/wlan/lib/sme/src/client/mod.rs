@@ -468,6 +468,8 @@ impl From<ServingApInfo> for fidl_sme::ServingApInfo {
     }
 }
 
+// TODO(https://fxbug.dev/324167674): fix.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum ClientSmeStatus {
     Connected(ServingApInfo),

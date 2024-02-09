@@ -51,6 +51,8 @@ pub(crate) struct EmulatorWatcher {
     // Hold a reference here to the watcher to keep it in scope.
     _watcher: RecommendedWatcher,
 }
+// TODO(https://fxbug.dev/324167674): fix.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq)]
 /// Enum for the payload of emulator instances to check.
 /// This is done to allow non-async events from notify::Watcher

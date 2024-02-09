@@ -53,6 +53,8 @@ pub enum DriverSubCommand {
     TestNode(TestNodeCommand),
 }
 
+// TODO(https://fxbug.dev/324167674): fix.
+#[allow(clippy::large_enum_variant)]
 #[cfg(not(target_os = "fuchsia"))]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]

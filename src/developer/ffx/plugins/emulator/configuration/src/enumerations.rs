@@ -38,6 +38,8 @@ impl Default for EngineConsoleType {
 display_impl!(EngineConsoleType);
 
 /// Indicates which details the "show" command should return.
+// TODO(https://fxbug.dev/324167674): fix.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum ShowDetail {
     All,

@@ -367,6 +367,8 @@ pub struct QueryStatusResult {
     connection_state: ConnectionStateInfo,
 }
 
+// TODO(https://fxbug.dev/324167674): fix.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum ConnectionStateInfo {
     Idle,
@@ -543,6 +545,8 @@ pub fn serve_telemetry(
     (sender, fut)
 }
 
+// TODO(https://fxbug.dev/324167674): fix.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 enum ConnectionState {
     // Like disconnected, but no downtime is tracked.

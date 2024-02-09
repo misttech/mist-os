@@ -13,6 +13,8 @@ pub struct FuzzCtlCommand {
 }
 
 /// Individual subcommands that can be run from the command line.
+// TODO(https://fxbug.dev/324167674): fix.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, FromArgs, PartialEq)]
 #[argh(subcommand)]
 pub enum FuzzCtlSubcommand {
