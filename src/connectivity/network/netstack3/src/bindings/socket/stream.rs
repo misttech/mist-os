@@ -1272,20 +1272,27 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 respond_not_supported!("stream::GetIpv6MulticastLoopback", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpv6Only { value, responder } => {
-                // TODO(https://fxbug.dev/42095034): support dual-stack sockets.
+                let Self { data: BindingData { id, .. }, ctx } = self;
                 responder
                     .send(
-                        match I::VERSION {
-                            IpVersion::V6 => value,
-                            IpVersion::V4 => false,
-                        }
-                        .then_some(())
-                        .ok_or(fposix::Errno::Enoprotoopt),
+                        ctx.api()
+                            .tcp()
+                            .set_dual_stack_enabled(id, !value)
+                            .map_err(IntoErrno::into_errno),
                     )
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpv6Only { responder } => {
-                respond_not_supported!("stream::GetIpv6Only", responder);
+                let Self { data: BindingData { id, .. }, ctx } = self;
+                responder
+                    .send(
+                        ctx.api()
+                            .tcp()
+                            .dual_stack_enabled(id)
+                            .map(|enabled| !enabled)
+                            .map_err(IntoErrno::into_errno),
+                    )
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpv6ReceiveTrafficClass {
                 value: _,

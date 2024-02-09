@@ -229,6 +229,14 @@ impl<L, BC: BindingsContext> tcp::socket::TcpDualStackContext<Ipv6> for CoreCtx<
     fn other_demux_id_converter(&self) -> Self::Converter {
         tcp::socket::Ipv6SocketIdToIpv4DemuxIdConverter
     }
+
+    fn dual_stack_enabled(&self, ip_options: &tcp::socket::Ipv6Options) -> bool {
+        ip_options.dual_stack_enabled
+    }
+
+    fn set_dual_stack_enabled(&self, ip_options: &mut tcp::socket::Ipv6Options, value: bool) {
+        ip_options.dual_stack_enabled = value;
+    }
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>>

@@ -244,7 +244,7 @@ fn handle_incoming_packet<I, BC, CC>(
                         let disposition = core_ctx.with_socket_mut_isn_transport_demux(
                             &listener_id,
                             |core_ctx, socket_state, isn| {
-                                let TcpSocketState { socket_state } = socket_state;
+                                let TcpSocketState { socket_state, ip_options: _ } = socket_state;
                                 match core_ctx {
                                     MaybeDualStack::NotDualStack((core_ctx, converter)) => {
                                         try_handle_incoming_for_listener::<I, I, CC, BC, _>(
@@ -297,7 +297,7 @@ fn handle_incoming_packet<I, BC, CC>(
                         let disposition = core_ctx.with_socket_mut_isn_transport_demux(
                             &listener_id,
                             |core_ctx, socket_state, isn| {
-                                let TcpSocketState { socket_state } = socket_state;
+                                let TcpSocketState { socket_state, ip_options: _ } = socket_state;
                                 match core_ctx {
                                     MaybeDualStack::NotDualStack((_core_ctx, _converter)) => {
                                         // TODO(https://issues.fuchsia.dev/42085913):
@@ -461,7 +461,7 @@ where
 {
     let disposition =
         core_ctx.with_socket_mut_transport_demux(&conn_id, |core_ctx, socket_state| {
-            let TcpSocketState { socket_state } = socket_state;
+            let TcpSocketState { socket_state, ip_options: _ } = socket_state;
             let conn_and_addr = assert_matches!(
                 socket_state,
                 TcpSocketStateInner::Bound(BoundSocketState::Connected((conn_and_addr, _sharing)))

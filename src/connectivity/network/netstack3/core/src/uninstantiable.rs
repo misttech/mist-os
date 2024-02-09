@@ -360,4 +360,12 @@ impl<I: tcp_socket::DualStackIpExt, P> tcp_socket::TcpDualStackContext<I>
     fn other_demux_id_converter(&self) -> Self::Converter {
         self.uninstantiable_unreachable()
     }
+
+    fn dual_stack_enabled(&self, _ip_options: &I::DualStackIpOptions) -> bool {
+        self.uninstantiable_unreachable()
+    }
+
+    fn set_dual_stack_enabled(&self, _ip_options: &mut I::DualStackIpOptions, _value: bool) {
+        self.uninstantiable_unreachable()
+    }
 }
