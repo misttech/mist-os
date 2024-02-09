@@ -11,6 +11,14 @@
 
 namespace {
 
+using ::testing::AllOf;
+using ::testing::ElementsAre;
+using ::testing::ElementsAreArray;
+using ::testing::Eq;
+using ::testing::Field;
+using ::testing::FieldsAre;
+using ::testing::Optional;
+
 FORMAT_TYPED_TEST_SUITE(ElfldltlDwarfTests);
 
 template <class Elf>
@@ -87,7 +95,7 @@ TYPED_TEST(ElfldltlDwarfTests, SectionDataRead) {
     EXPECT_EQ(read->initial_length_size(), 4u);
     EXPECT_EQ(read->offset_size(), 4u);
     EXPECT_EQ(read->contents().size(), 1u);
-    EXPECT_THAT(read->contents(), ::testing::ElementsAre(kOneByte));
+    EXPECT_THAT(read->contents(), ElementsAre(kOneByte));
   }
   {
     constexpr TestData<InitialLength64<Elf>, std::byte> kOneByteData{kOneByte};
@@ -98,7 +106,7 @@ TYPED_TEST(ElfldltlDwarfTests, SectionDataRead) {
     EXPECT_EQ(read->initial_length_size(), 12u);
     EXPECT_EQ(read->offset_size(), 8u);
     EXPECT_EQ(read->contents().size(), 1u);
-    EXPECT_THAT(read->contents(), ::testing::ElementsAre(kOneByte));
+    EXPECT_THAT(read->contents(), ElementsAre(kOneByte));
   }
 }
 
@@ -116,8 +124,8 @@ TYPED_TEST(ElfldltlDwarfTests, SectionDataConsume) {
   auto [read, rest] = elfldltl::dwarf::SectionData::Consume<Elf>(diag, AsBytes(kData));
   ASSERT_TRUE(read);
   EXPECT_EQ(read->contents().size(), 1u);
-  EXPECT_THAT(read->contents(), ::testing::ElementsAre(kOneByte));
-  EXPECT_THAT(rest, ::testing::ElementsAreArray(kData.rest));
+  EXPECT_THAT(read->contents(), ElementsAre(kOneByte));
+  EXPECT_THAT(rest, ElementsAreArray(kData.rest));
 }
 
 TYPED_TEST(ElfldltlDwarfTests, SectionDataReadOffset) {
@@ -135,7 +143,7 @@ TYPED_TEST(ElfldltlDwarfTests, SectionDataReadOffset) {
     ASSERT_TRUE(read);
     EXPECT_EQ(read->contents().size_bytes(), 5u);
     auto offset = read->template read_offset<Elf>(1);
-    EXPECT_THAT(offset, ::testing::Optional(::testing::Eq(1234u)));
+    EXPECT_THAT(offset, Optional(Eq(1234u)));
   }
   {
     struct [[gnu::packed]] DataWithOffset {
@@ -147,7 +155,7 @@ TYPED_TEST(ElfldltlDwarfTests, SectionDataReadOffset) {
     ASSERT_TRUE(read);
     EXPECT_EQ(read->contents().size_bytes(), 9u);
     auto offset = read->template read_offset<Elf>(1);
-    EXPECT_THAT(offset, ::testing::Optional(::testing::Eq(1234567890u)));
+    EXPECT_THAT(offset, Optional(Eq(1234567890u)));
   }
 }
 
