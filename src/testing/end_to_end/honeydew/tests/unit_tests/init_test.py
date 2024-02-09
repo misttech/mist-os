@@ -71,7 +71,7 @@ class InitTests(unittest.TestCase):
         self.assertIsInstance(
             honeydew.create_device(
                 device_name="fuchsia-emulator",
-                transport=honeydew.transports.TRANSPORT.SL4F,
+                transport=custom_types.TRANSPORT.SL4F,
                 ssh_private_key="/tmp/pkey",
                 ffx_config=_INPUT_ARGS["ffx_config"],
             ),
@@ -117,7 +117,7 @@ class InitTests(unittest.TestCase):
             honeydew.create_device(
                 device_name="fuchsia-emulator",
                 ssh_private_key="/tmp/pkey",
-                transport=honeydew.transports.TRANSPORT.FUCHSIA_CONTROLLER,
+                transport=custom_types.TRANSPORT.FUCHSIA_CONTROLLER,
                 ffx_config=_INPUT_ARGS["ffx_config"],
             ),
             fc_fuchsia_device.FuchsiaDevice,
@@ -175,7 +175,7 @@ class InitTests(unittest.TestCase):
         self.assertIsInstance(
             honeydew.create_device(
                 device_name=device_name,
-                transport=honeydew.transports.TRANSPORT.SL4F,
+                transport=custom_types.TRANSPORT.SL4F,
                 ssh_private_key="/tmp/pkey",
                 device_ip_port=device_ip_port,
                 ffx_config=_INPUT_ARGS["ffx_config"],
@@ -230,7 +230,7 @@ class InitTests(unittest.TestCase):
         with self.assertRaises(errors.FuchsiaDeviceError):
             honeydew.create_device(
                 device_name=device_name,
-                transport=honeydew.transports.TRANSPORT.SL4F,
+                transport=custom_types.TRANSPORT.SL4F,
                 ssh_private_key="/tmp/pkey",
                 device_ip_port=device_ip_port,
                 ffx_config=_INPUT_ARGS["ffx_config"],

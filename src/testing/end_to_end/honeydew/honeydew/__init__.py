@@ -6,7 +6,7 @@
 
 import logging
 
-from honeydew import errors, transports
+from honeydew import errors
 from honeydew.fuchsia_device.fuchsia_controller import (
     fuchsia_device as fc_fuchsia_device,
 )
@@ -23,7 +23,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 # List all the public methods
 def create_device(
     device_name: str,
-    transport: transports.TRANSPORT,
+    transport: custom_types.TRANSPORT,
     ffx_config: custom_types.FFXConfig,
     device_ip_port: custom_types.IpPort | None = None,
     ssh_private_key: str | None = None,
@@ -71,7 +71,7 @@ def create_device(
             )
             ffx_transport.add_target()
 
-        if transport == transports.TRANSPORT.SL4F:
+        if transport == custom_types.TRANSPORT.SL4F:
             return sl4f_fuchsia_device.FuchsiaDevice(
                 device_name,
                 ffx_config,
@@ -79,7 +79,7 @@ def create_device(
                 ssh_private_key,
                 ssh_user,
             )
-        else:  # transports.TRANSPORT.FUCHSIA_CONTROLLER
+        else:  # custom_types.TRANSPORT.FUCHSIA_CONTROLLER
             return fc_fuchsia_device.FuchsiaDevice(
                 device_name,
                 ffx_config,

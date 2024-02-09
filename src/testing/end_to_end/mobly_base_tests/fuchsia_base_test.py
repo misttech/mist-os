@@ -7,9 +7,7 @@
 import enum
 import logging
 import os
-from typing import Dict, List
 
-from honeydew import transports
 from honeydew.typing import custom_types
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.interfaces.auxiliary_devices import power_switch
@@ -58,7 +56,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         self._any_test_failed: bool = False
         self._process_user_params()
 
-        self.fuchsia_devices: List[
+        self.fuchsia_devices: list[
             fuchsia_device.FuchsiaDevice
         ] = self.register_controller(fuchsia_device_mobly_controller)
 
@@ -171,7 +169,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
 
     def _get_controller_configs(
         self, controller_type: str
-    ) -> List[Dict[str, str]]:
+    ) -> list[dict[str, str]]:
         """Return testbed config associated with a specific Mobly Controller.
 
         Args:
@@ -218,7 +216,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
 
     def _get_device_config(
         self, controller_type: str, identifier_key: str, identifier_value: str
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Return testbed config associated with a specific device of a
         particular mobly controller type.
 
@@ -348,7 +346,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         Returns:
             True if transport is set to Fuchsia-Controller, else False
         """
-        device_config: Dict[str, str] = self._get_device_config(
+        device_config: dict[str, str] = self._get_device_config(
             controller_type="FuchsiaDevice",
             identifier_key="name",
             identifier_value=fx_device.device_name,
@@ -356,7 +354,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
 
         if (
             device_config["transport"]
-            in transports.FUCHSIA_CONTROLLER_TRANSPORTS
+            == custom_types.TRANSPORT.FUCHSIA_CONTROLLER
         ):
             return True
 

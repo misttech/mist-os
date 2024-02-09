@@ -212,19 +212,9 @@ def _parse_device_config(config: Dict[str, str]) -> Dict[str, Any]:
 
     for config_key, config_value in config.items():
         if config_key == "transport":
-            if config["transport"] == "sl4f":
-                device_config["transport"] = transports.TRANSPORT.SL4F
-            elif (
-                config["transport"] in transports.FUCHSIA_CONTROLLER_TRANSPORTS
-            ):
-                device_config[
-                    "transport"
-                ] = transports.TRANSPORT.FUCHSIA_CONTROLLER
-            else:
-                raise ValueError(
-                    f"Invalid transport `{config_value}` passed for "
-                    f"{config['name']}"
-                )
+            device_config["transport"] = custom_types.TRANSPORT(
+                config["transport"]
+            )
         elif config_key == "device_ip_port":
             try:
                 device_config[

@@ -13,12 +13,22 @@ from dataclasses import dataclass
 import fuchsia_controller_py as fuchsia_controller
 
 
-class LEVEL(enum.Enum):
+class LEVEL(enum.StrEnum):
     """Logging level that need to specified to log a message onto device"""
 
-    INFO = enum.auto()
-    WARNING = enum.auto()
-    ERROR = enum.auto()
+    INFO = "Info"
+    WARNING = "Warning"
+    ERROR = "Error"
+
+
+class TRANSPORT(enum.StrEnum):
+    """Different Host-(Fuchsia)Target interaction transports supported."""
+
+    # use SL4F for Host-(Fuchsia)Target interactions.
+    SL4F = "sl4f"
+
+    # use Fuchsia-Controller for Host-(Fuchsia)Target interactions.
+    FUCHSIA_CONTROLLER = "fuchsia-controller"
 
 
 @dataclass(frozen=True)
