@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/dwarf/cfi-entry.h>
 #include <lib/elfldltl/dwarf/eh-frame-hdr.h>
 #include <lib/elfldltl/dwarf/encoding.h>
 #include <lib/elfldltl/dwarf/section-data.h>
@@ -719,6 +720,80 @@ TYPED_TEST(ElfldltlDwarfTests, EhFrameHdr) {
   EXPECT_EQ(eh_frame_hdr.size(), 3u);
 
   EXPECT_THAT(eh_frame_hdr, ElementsAreArray(kEntries));
+}
+
+constexpr uint32_t kFdeVaddr = 0x370;
+
+template <class Elf>
+struct [[gnu::packed]] TestEhFrame {
+  using Addr = typename Elf::Addr;
+  using Word = typename Elf::Word;
+
+  struct TestCie {
+    [[gnu::packed]] Word cie_id = elfldltl::dwarf::kEhFrameCieId;
+    uint8_t version = 1;
+    char augmentation[4] = "zLR";
+    uint8_t code_alignment_factor = 1;
+    uint8_t data_alignment_factor = -8 & 0x7f;
+    uint8_t return_address_register = 16;
+    uint8_t augmentation_data[3] = {2, 0, 0x1b};
+    uint8_t instructions[5] = {0x0c, 0x07, 0x08, 0x90, 0x01};
+  };
+  using CieData = TestData<InitialLength32<Elf>, TestCie>;
+
+  struct TestFde {
+    [[gnu::packed]] Word cie_pointer = sizeof(CieData) + sizeof(Word);
+    [[gnu::packed]] Word initial_location =  // sdata4 | pcrel encoded:
+        0x1000 -                             // Absolute address.
+        (kFdeVaddr +                         // FDE start address.
+         sizeof(Word) +                      // Initial length
+         sizeof(Word));                      // CIE_pointer
+    [[gnu::packed]] Word address_range = 5;
+    uint8_t augmentation_data_size = sizeof(Addr);
+    [[gnu::packed]] Addr lsda = 0x534c55;
+    uint8_t instructions[3] = {0x08, 0x00, 0};
+  };
+  using FdeData = TestData<InitialLength32<Elf>, TestFde>;
+
+  [[gnu::packed]] CieData cie;
+  [[gnu::packed]] FdeData fde;
+};
+
+template <class Elf>
+constexpr TestEhFrame<Elf> kTestEhFrame{};
+
+TYPED_TEST(ElfldltlDwarfTests, CfiEntry) {
+  using Elf = typename TestFixture::Elf;
+
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+
+  cpp20::span kData = AsBytes(kTestEhFrame<Elf>);
+  const cpp20::span<std::byte> kImage{
+      const_cast<std::byte*>(kData.data()),
+      cpp20::span(kData).size_bytes(),
+  };
+  elfldltl::DirectMemory memory{kImage, 0x358};
+
+  auto fde = elfldltl::dwarf::CfiEntry::ReadEhFrameFromMemory<Elf>(diag, memory, kFdeVaddr);
+  ASSERT_TRUE(fde);
+
+  auto cie = fde->template ReadEhFrameCieFromMemory<Elf>(diag, memory);
+  ASSERT_TRUE(cie);
+
+  auto cie_info = cie->template DecodeCie<Elf>(diag, *fde->cie_pointer());
+  ASSERT_TRUE(cie_info);
+
+  EXPECT_EQ(cie_info->return_address_register, 16u);
+  EXPECT_EQ(cie_info->initial_instructions.size_bytes(), 5u);
+  EXPECT_FALSE(cie_info->signal_frame);
+
+  auto fde_info = fde->template DecodeFde<Elf>(diag, kFdeVaddr, *cie_info);
+  ASSERT_TRUE(fde_info);
+
+  EXPECT_EQ(fde_info->initial_location, 0x1000u);
+  EXPECT_EQ(fde_info->address_range, 5u);
+  EXPECT_EQ(fde_info->lsda, 0x534c55u);
+  EXPECT_EQ(fde_info->instructions.size_bytes(), 3u);
 }
 
 }  // namespace
