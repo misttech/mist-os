@@ -41,6 +41,10 @@ workbench_platform_config = {
         "use_icu": "with_icu",
         "with_camera": False,
     },
+    "timekeeper": {
+        "first_sampling_delay_sec": 86400,
+        "back_off_time_between_pull_samples_sec": 86400,
+    },
     "media": {
         "audio_device_registry_enabled": True,
     },
