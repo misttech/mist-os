@@ -868,7 +868,7 @@ impl IntoErrno for SocketAddressError {
     fn into_errno(self) -> fposix::Errno {
         match self {
             SocketAddressError::Device(d) => d.into_errno(),
-            SocketAddressError::UnexpectedZone => todo!(),
+            SocketAddressError::UnexpectedZone => fposix::Errno::Einval,
         }
     }
 }
