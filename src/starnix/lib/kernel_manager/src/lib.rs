@@ -91,26 +91,18 @@ impl StarnixKernel {
     }
 }
 
-/// Takes a `name` and generates a `String` suitable to use as the name of a component in a
-/// collection.
+/// Generate a random name for the kernel.
 ///
-/// Used to avoid collisions.
-fn append_random_suffix(name: &str) -> String {
+/// We used to include some human-readable parts in the name, but people were
+/// tempted to make them load-bearing. We now just generate 7 random alphanumeric
+/// characters.
+fn generate_kernel_name(_start_info: &frunner::ComponentStartInfo) -> Result<String, Error> {
     let random_id: String = rand::thread_rng()
         .sample_iter(&rand::distributions::Alphanumeric)
         .take(7)
         .map(char::from)
         .collect();
-    name.to_owned() + "_" + &random_id
-}
-
-fn generate_kernel_name(start_info: &frunner::ComponentStartInfo) -> Result<String, Error> {
-    let container_url = start_info.resolved_url.clone().ok_or(anyhow!("Missing resolved URL"))?;
-    let container_name = container_url
-        .split('/')
-        .last()
-        .expect("Could not find last path component in resolved URL");
-    Ok(append_random_suffix(container_name))
+    Ok(random_id)
 }
 
 async fn open_exposed_directory(
