@@ -11,12 +11,12 @@
 
 namespace {
 
-zx::result<fidl::SyncClient<fuchsia_scheduler::ProfileProvider>> ConnectToProfileProvider() {
+zx::result<fidl::WireSyncClient<fuchsia_scheduler::ProfileProvider>> ConnectToProfileProvider() {
   auto client_end_result = component::Connect<fuchsia_scheduler::ProfileProvider>();
   if (!client_end_result.is_ok()) {
     return client_end_result.take_error();
   }
-  return zx::ok(fidl::SyncClient(std::move(*client_end_result)));
+  return zx::ok(fidl::WireSyncClient(std::move(*client_end_result)));
 }
 
 zx_status_t SetRole(const zx_handle_t borrowed_handle, std::string_view role) {
@@ -35,16 +35,18 @@ zx_status_t SetRole(const zx_handle_t borrowed_handle, std::string_view role) {
     return dup_status;
   }
 
-  auto result =
-      (*client)->SetProfileByRole({{.handle = std::move(handle), .role = std::string{role}}});
-  if (!result.is_ok()) {
-    FX_LOGS(WARNING) << "Failed to call SetProfileByRole, error=" << result.error_value()
+  fidl::WireResult result =
+      (*client)->SetProfileByRole(std::move(handle), fidl::StringView::FromExternal(role));
+  if (!result.ok()) {
+    FX_LOGS(WARNING) << "Failed to call SetProfileByRole, error=" << result.error()
                      << ". This may be expected if the component does not have access to "
                         "fuchsia.scheduler.ProfileProvider";
-    return result.error_value().status();
+    return result.status();
   }
-
-  return result->status();
+  if (result->status != ZX_OK) {
+    FX_LOGS(WARNING) << "Failed to SetProfileByRole, error=" << result->status;
+  }
+  return result->status;
 }
 
 }  // anonymous namespace
