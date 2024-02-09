@@ -51,6 +51,7 @@ library_headers("headers") {
     "lib/elfldltl/container.h",
     "lib/elfldltl/diagnostics-ostream.h",
     "lib/elfldltl/diagnostics.h",
+    "lib/elfldltl/dwarf/encoding.h",
     "lib/elfldltl/dwarf/section-data.h",
     "lib/elfldltl/dynamic.h",
     "lib/elfldltl/fd.h",
@@ -98,7 +99,7 @@ static_library("elfldltl") {
   public_deps = [ ":headers" ]
   complete_static_lib = true
 
-  sources = []
+  sources = [ "leb128.cc" ]
   deps = []
   if (is_elf) {
     if (toolchain_base_environment == "user") {

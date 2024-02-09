@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/dwarf/encoding.h>
 #include <lib/elfldltl/dwarf/section-data.h>
+#include <lib/elfldltl/memory.h>
 #include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/elfldltl/testing/typed-test.h>
 
@@ -242,6 +244,413 @@ TYPED_TEST(ElfldltlDwarfTests, SectionDataReadFail) {
         elfldltl::dwarf::SectionData::Read<Elf>(expected, AsBytes(kTooShortForLength64), kErrorArg);
     EXPECT_FALSE(read);
   }
+}
+
+TEST(ElfldltlDwarfTests, Uleb128) {
+  EXPECT_EQ(elfldltl::dwarf::Uleb128::Read(kNoBytes), std::nullopt);
+
+  constexpr uint8_t kOneByte{17};
+  EXPECT_THAT(elfldltl::dwarf::Uleb128::Read(AsBytes(kOneByte)), Optional(FieldsAre(17u, 1u)));
+
+  constexpr uint8_t kTwoByte[] = {0x80 | (0xaau & 0x7f), 0xaau >> 7};
+  EXPECT_THAT(elfldltl::dwarf::Uleb128::Read(AsBytes(kTwoByte)), Optional(FieldsAre(0xaau, 2u)));
+
+  constexpr uint8_t kThreeByte[] = {
+      0x80 | (0xaabbu & 0x7f),
+      0x80 | ((0xaabbu >> 7) & 0x7f),
+      ((0xaabbu >> 14) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Uleb128::Read(AsBytes(kThreeByte)),
+              Optional(FieldsAre(0xaabbu, 3u)));
+
+  constexpr uint8_t kFourByte[] = {
+      0x80 | (0xaabbccu & 0x7f),
+      0x80 | ((0xaabbccu >> 7) & 0x7f),
+      0x80 | ((0xaabbccu >> 14) & 0x7f),
+      ((0xaabbccu >> 21) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Uleb128::Read(AsBytes(kFourByte)),
+              Optional(FieldsAre(0xaabbccu, 4u)));
+
+  constexpr uint8_t kFiveByte[] = {
+      0x80 | (0xaabbccddu & 0x7f),         0x80 | ((0xaabbccddu >> 7) & 0x7f),
+      0x80 | ((0xaabbccddu >> 14) & 0x7f), 0x80 | ((0xaabbccddu >> 21) & 0x7f),
+      ((0xaabbccdd >> 28) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Uleb128::Read(AsBytes(kFiveByte)),
+              Optional(FieldsAre(0xaabbccddu, 5u)));
+
+  constexpr uint8_t kSixByte[] = {
+      0x80 | (0xaabbccddeeu & 0x7f),         0x80 | ((0xaabbccddeeu >> 7) & 0x7f),
+      0x80 | ((0xaabbccddeeu >> 14) & 0x7f), 0x80 | ((0xaabbccddeeu >> 21) & 0x7f),
+      0x80 | ((0xaabbccddeeu >> 28) & 0x7f), ((0xaabbccddeeu >> 35) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Uleb128::Read(AsBytes(kSixByte)),
+              Optional(FieldsAre(0xaabbccddeeu, 6u)));
+
+  constexpr uint8_t kSevenByte[] = {
+      0x80 | (0xaabbccddeeffu & 0x7f),         0x80 | ((0xaabbccddeeffu >> 7) & 0x7f),
+      0x80 | ((0xaabbccddeeffu >> 14) & 0x7f), 0x80 | ((0xaabbccddeeffu >> 21) & 0x7f),
+      0x80 | ((0xaabbccddeeffu >> 28) & 0x7f), 0x80 | ((0xaabbccddeeffu >> 35) & 0x7f),
+      ((0xaabbccddeeffu >> 42) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Uleb128::Read(AsBytes(kSevenByte)),
+              Optional(FieldsAre(0xaabbccddeeffu, 7u)));
+
+  constexpr uint8_t kEightByte[] = {
+      0x80 | (0xaabbccddeeff11u & 0x7f),         0x80 | ((0xaabbccddeeff11u >> 7) & 0x7f),
+      0x80 | ((0xaabbccddeeff11u >> 14) & 0x7f), 0x80 | ((0xaabbccddeeff11u >> 21) & 0x7f),
+      0x80 | ((0xaabbccddeeff11u >> 28) & 0x7f), 0x80 | ((0xaabbccddeeff11u >> 35) & 0x7f),
+      0x80 | ((0xaabbccddeeff11u >> 42) & 0x7f), ((0xaabbccddeeff11u >> 49) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Uleb128::Read(AsBytes(kEightByte)),
+              Optional(FieldsAre(0xaabbccddeeff11u, 8u)));
+
+  constexpr uint8_t kNineByte[] = {
+      0x80 | (0x77bbccddeeff1122u & 0x7f),         0x80 | ((0x77bbccddeeff1122u >> 7) & 0x7f),
+      0x80 | ((0x77bbccddeeff1122u >> 14) & 0x7f), 0x80 | ((0x77bbccddeeff1122u >> 21) & 0x7f),
+      0x80 | ((0x77bbccddeeff1122u >> 28) & 0x7f), 0x80 | ((0x77bbccddeeff1122u >> 35) & 0x7f),
+      0x80 | ((0x77bbccddeeff1122u >> 42) & 0x7f), 0x80 | ((0x77bbccddeeff1122u >> 49) & 0x7f),
+      ((0x77bbccddeeff1122u >> 56) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Uleb128::Read(AsBytes(kNineByte)),
+              Optional(FieldsAre(0x77bbccddeeff1122u, 9u)));
+
+  constexpr uint8_t kTenByte[] = {
+      0x80 | (0xffffffffffffffffu & 0x7f),         0x80 | ((0xffffffffffffffffu >> 7) & 0x7f),
+      0x80 | ((0xffffffffffffffffu >> 14) & 0x7f), 0x80 | ((0xffffffffffffffffu >> 21) & 0x7f),
+      0x80 | ((0xffffffffffffffffu >> 28) & 0x7f), 0x80 | ((0xffffffffffffffffu >> 35) & 0x7f),
+      0x80 | ((0xffffffffffffffffu >> 42) & 0x7f), 0x80 | ((0xffffffffffffffffu >> 49) & 0x7f),
+      0x80 | ((0xffffffffffffffffu >> 56) & 0x7f), ((0xffffffffffffffffu >> 63) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Uleb128::Read(AsBytes(kTenByte)),
+              Optional(FieldsAre(0xffffffffffffffffu, 10u)));
+
+  constexpr uint8_t kTooManyBytes[17] = {0x80 | 23, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+                                         0x80,      0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0};
+  EXPECT_EQ(elfldltl::dwarf::Uleb128::Read(AsBytes(kTooManyBytes)), std::nullopt);
+}
+
+TEST(ElfldltlDwarfTests, Sleb128) {
+  EXPECT_EQ(elfldltl::dwarf::Sleb128::Read(kNoBytes), std::nullopt);
+
+  constexpr uint8_t kOneByte{17};
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kOneByte)), Optional(FieldsAre(17, 1u)));
+
+  constexpr uint8_t kTwoByte[] = {0x80 | (0xaau & 0x7f), 0xaau >> 7};
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kTwoByte)), Optional(FieldsAre(0xaa, 2u)));
+
+  constexpr uint8_t kThreeByte[] = {
+      0x80 | (0xaabbu & 0x7f),
+      0x80 | ((0xaabbu >> 7) & 0x7f),
+      ((0xaabbu >> 14) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kThreeByte)), Optional(FieldsAre(0xaabb, 3u)));
+
+  constexpr uint8_t kFourByte[] = {
+      0x80 | (0xaabbcc & 0x7f),
+      0x80 | ((0xaabbcc >> 7) & 0x7f),
+      0x80 | ((0xaabbcc >> 14) & 0x7f),
+      ((0xaabbcc >> 21) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kFourByte)), Optional(FieldsAre(0xaabbcc, 4)));
+
+  constexpr uint8_t kFiveByte[] = {
+      0x80 | (0xaabbccdd & 0x7f),         0x80 | ((0xaabbccdd >> 7) & 0x7f),
+      0x80 | ((0xaabbccdd >> 14) & 0x7f), 0x80 | ((0xaabbccdd >> 21) & 0x7f),
+      ((0xaabbccdd >> 28) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kFiveByte)),
+              Optional(FieldsAre(0xaabbccdd, 5u)));
+
+  constexpr uint8_t kSixByte[] = {
+      0x80 | (0xaabbccddee & 0x7f),         0x80 | ((0xaabbccddee >> 7) & 0x7f),
+      0x80 | ((0xaabbccddee >> 14) & 0x7f), 0x80 | ((0xaabbccddee >> 21) & 0x7f),
+      0x80 | ((0xaabbccddee >> 28) & 0x7f), ((0xaabbccddee >> 35) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kSixByte)),
+              Optional(FieldsAre(0xaabbccddee, 6u)));
+
+  constexpr uint8_t kSevenByte[] = {
+      0x80 | (0xaabbccddeeff & 0x7f),         0x80 | ((0xaabbccddeeff >> 7) & 0x7f),
+      0x80 | ((0xaabbccddeeff >> 14) & 0x7f), 0x80 | ((0xaabbccddeeff >> 21) & 0x7f),
+      0x80 | ((0xaabbccddeeff >> 28) & 0x7f), 0x80 | ((0xaabbccddeeff >> 35) & 0x7f),
+      ((0xaabbccddeeff >> 42) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kSevenByte)),
+              Optional(FieldsAre(0xaabbccddeeff, 7u)));
+
+  constexpr uint8_t kEightByte[] = {
+      0x80 | (0x7abbccddeeff11 & 0x7f),         0x80 | ((0x7abbccddeeff11 >> 7) & 0x7f),
+      0x80 | ((0x7abbccddeeff11 >> 14) & 0x7f), 0x80 | ((0x7abbccddeeff11 >> 21) & 0x7f),
+      0x80 | ((0x7abbccddeeff11 >> 28) & 0x7f), 0x80 | ((0x7abbccddeeff11 >> 35) & 0x7f),
+      0x80 | ((0x7abbccddeeff11 >> 42) & 0x7f), ((0x7abbccddeeff11 >> 49) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kEightByte)),
+              Optional(FieldsAre(0x7abbccddeeff11, 8u)));
+
+  constexpr uint8_t kNineByte[] = {
+      0x80 | (0x33bbccddeeff1122 & 0x7f),         0x80 | ((0x33bbccddeeff1122 >> 7) & 0x7f),
+      0x80 | ((0x33bbccddeeff1122 >> 14) & 0x7f), 0x80 | ((0x33bbccddeeff1122 >> 21) & 0x7f),
+      0x80 | ((0x33bbccddeeff1122 >> 28) & 0x7f), 0x80 | ((0x33bbccddeeff1122 >> 35) & 0x7f),
+      0x80 | ((0x33bbccddeeff1122 >> 42) & 0x7f), 0x80 | ((0x33bbccddeeff1122 >> 49) & 0x7f),
+      ((0x33bbccddeeff1122 >> 56) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kNineByte)),
+              Optional(FieldsAre(0x33bbccddeeff1122, 9u)));
+
+  constexpr uint8_t kOneByteNegative{-17 & 0x7f};
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kOneByteNegative)),
+              Optional(FieldsAre(-17, 1u)));
+
+  constexpr uint8_t kTwoByteNegative[] = {0x80 | (-0xaa & 0x7f), (-0xaau >> 7) & 0x7f};
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kTwoByteNegative)),
+              Optional(FieldsAre(-0xaa, 2u)));
+
+  constexpr uint8_t kThreeByteNegative[] = {
+      0x80 | (-0xaabb & 0x7f),
+      0x80 | ((-0xaabb >> 7) & 0x7f),
+      ((-0xaabb >> 14) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kThreeByteNegative)),
+              Optional(FieldsAre(-0xaabb, 3u)));
+
+  constexpr uint8_t kFourByteNegative[] = {
+      0x80 | (-0xaabbcc & 0x7f),
+      0x80 | ((-0xaabbcc >> 7) & 0x7f),
+      0x80 | ((-0xaabbcc >> 14) & 0x7f),
+      ((-0xaabbcc >> 21) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kFourByteNegative)),
+              Optional(FieldsAre(-0xaabbcc, 4)));
+
+  constexpr uint8_t kFiveByteNegative[] = {
+      0x80 | (-0xaabbccdd & 0x7f),         0x80 | ((-0xaabbccdd >> 7) & 0x7f),
+      0x80 | ((-0xaabbccdd >> 14) & 0x7f), 0x80 | ((-0xaabbccdd >> 21) & 0x7f),
+      ((-0xaabbccdd >> 28) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kFiveByteNegative)),
+              Optional(FieldsAre(-0xaabbccdd, 5u)));
+
+  constexpr uint8_t kSixByteNegative[] = {
+      0x80 | (-0x33bbccddee & 0x7f),         0x80 | ((-0x33bbccddee >> 7) & 0x7f),
+      0x80 | ((-0x33bbccddee >> 14) & 0x7f), 0x80 | ((-0x33bbccddee >> 21) & 0x7f),
+      0x80 | ((-0x33bbccddee >> 28) & 0x7f), ((-0x33bbccddee >> 35) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kSixByteNegative)),
+              Optional(FieldsAre(-0x33bbccddee, 6u)));
+
+  constexpr uint8_t kSevenByteNegative[] = {
+      0x80 | (-0x33bbccddeeff & 0x7f),         0x80 | ((-0x33bbccddeeff >> 7) & 0x7f),
+      0x80 | ((-0x33bbccddeeff >> 14) & 0x7f), 0x80 | ((-0x33bbccddeeff >> 21) & 0x7f),
+      0x80 | ((-0x33bbccddeeff >> 28) & 0x7f), 0x80 | ((-0x33bbccddeeff >> 35) & 0x7f),
+      ((-0x33bbccddeeff >> 42) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kSevenByteNegative)),
+              Optional(FieldsAre(-0x33bbccddeeff, 7u)));
+
+  constexpr uint8_t kEightByteNegative[] = {
+      0x80 | (-0x7abbccddeeff11 & 0x7f),         0x80 | ((-0x7abbccddeeff11 >> 7) & 0x7f),
+      0x80 | ((-0x7abbccddeeff11 >> 14) & 0x7f), 0x80 | ((-0x7abbccddeeff11 >> 21) & 0x7f),
+      0x80 | ((-0x7abbccddeeff11 >> 28) & 0x7f), 0x80 | ((-0x7abbccddeeff11 >> 35) & 0x7f),
+      0x80 | ((-0x7abbccddeeff11 >> 42) & 0x7f), ((-0x7abbccddeeff11 >> 49) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kEightByteNegative)),
+              Optional(FieldsAre(-0x7abbccddeeff11, 8u)));
+
+  constexpr uint8_t kNineByteNegative[] = {
+      0x80 | (-0x33bbccddeeff1122 & 0x7f),         0x80 | ((-0x33bbccddeeff1122 >> 7) & 0x7f),
+      0x80 | ((-0x33bbccddeeff1122 >> 14) & 0x7f), 0x80 | ((-0x33bbccddeeff1122 >> 21) & 0x7f),
+      0x80 | ((-0x33bbccddeeff1122 >> 28) & 0x7f), 0x80 | ((-0x33bbccddeeff1122 >> 35) & 0x7f),
+      0x80 | ((-0x33bbccddeeff1122 >> 42) & 0x7f), 0x80 | ((-0x33bbccddeeff1122 >> 49) & 0x7f),
+      ((-0x33bbccddeeff1122 >> 56) & 0x7f),
+  };
+  EXPECT_THAT(elfldltl::dwarf::Sleb128::Read(AsBytes(kNineByteNegative)),
+              Optional(FieldsAre(-0x33bbccddeeff1122, 9u)));
+
+  constexpr uint8_t kTooManyBytes[17] = {0x80 | (-23 & 0x7f),
+                                         0x80,
+                                         0x80,
+                                         0x80,
+                                         0x80,
+                                         0x80,
+                                         0x80,
+                                         0x80,
+                                         0x80,
+                                         0x80,
+                                         0x80,
+                                         0x80,
+                                         0x80,
+                                         0x80,
+                                         0x80,
+                                         0x80,
+                                         0};
+  EXPECT_EQ(elfldltl::dwarf::Sleb128::Read(AsBytes(kTooManyBytes)), std::nullopt);
+}
+
+template <typename T>
+constexpr uint8_t kSize = sizeof(T);
+
+TYPED_TEST(ElfldltlDwarfTests, EncodedPtr) {
+  using elfldltl::dwarf::EncodedPtr;
+  using Elf = typename TestFixture::Elf;
+  using Addr = typename Elf::Addr;
+  using Half = typename Elf::Half;
+  using Word = typename Elf::Word;
+  using Xword = typename Elf::Xword;
+
+  EncodedPtr ptr;
+  EXPECT_EQ(ptr.ptr, 0u);
+  EXPECT_EQ(ptr.encoded_size, 0u);
+  EXPECT_EQ(ptr.encoding, EncodedPtr::kOmit);
+  EXPECT_EQ(EncodedPtr::Type(ptr.encoding), EncodedPtr::kOmit);
+  EXPECT_EQ(EncodedPtr::Modifier(ptr.encoding), EncodedPtr::kAbs);
+  EXPECT_FALSE(EncodedPtr::Signed(ptr.encoding));
+  EXPECT_FALSE(EncodedPtr::Indirect(ptr.encoding));
+
+  EXPECT_EQ(EncodedPtr::Normalize<Elf>(EncodedPtr::kPtr),
+            kSize<Addr> == 4 ? EncodedPtr::kUdata4 : EncodedPtr::kUdata8);
+
+  EXPECT_EQ(EncodedPtr::EncodedSize(EncodedPtr::kOmit, kSize<Addr>), 0u);
+  EXPECT_EQ(EncodedPtr::EncodedSize(EncodedPtr::kPtr, kSize<Addr>), kSize<Addr>);
+  EXPECT_EQ(EncodedPtr::EncodedSize(EncodedPtr::kSigned, kSize<Addr>), kSize<Addr>);
+  EXPECT_EQ(EncodedPtr::EncodedSize(EncodedPtr::kUdata2, kSize<Addr>), 2u);
+  EXPECT_EQ(EncodedPtr::EncodedSize(EncodedPtr::kUdata4, kSize<Addr>), 4u);
+  EXPECT_EQ(EncodedPtr::EncodedSize(EncodedPtr::kUdata8, kSize<Addr>), 8u);
+  EXPECT_EQ(EncodedPtr::EncodedSize(EncodedPtr::kSdata2, kSize<Addr>), 2u);
+  EXPECT_EQ(EncodedPtr::EncodedSize(EncodedPtr::kSdata4, kSize<Addr>), 4u);
+  EXPECT_EQ(EncodedPtr::EncodedSize(EncodedPtr::kSdata8, kSize<Addr>), 8u);
+  EXPECT_EQ(EncodedPtr::EncodedSize(EncodedPtr::kUleb128, kSize<Addr>), EncodedPtr::kDynamicSize);
+  EXPECT_EQ(EncodedPtr::EncodedSize(EncodedPtr::kSleb128, kSize<Addr>), EncodedPtr::kDynamicSize);
+
+  EXPECT_EQ(EncodedPtr::Read<Elf>(EncodedPtr::kPtr, kNoBytes), std::nullopt);
+
+  constexpr Addr addr = 0x12345678;
+  EXPECT_THAT(
+      EncodedPtr::Read<Elf>(EncodedPtr::kPtr, AsBytes(addr)),
+      Optional(AllOf(Field(&EncodedPtr::ptr, addr), Field(&EncodedPtr::encoding, EncodedPtr::kPtr),
+                     Field(&EncodedPtr::encoded_size, kSize<Addr>))));
+
+  constexpr Half half = 0x1234;
+  EXPECT_THAT(EncodedPtr::Read<Elf>(EncodedPtr::kUdata2, AsBytes(half)),
+              Optional(AllOf(Field(&EncodedPtr::ptr, half),
+                             Field(&EncodedPtr::encoding, EncodedPtr::kUdata2),
+                             Field(&EncodedPtr::encoded_size, kSize<Half>))));
+
+  constexpr Word word = 0x12345678;
+  EXPECT_THAT(EncodedPtr::Read<Elf>(EncodedPtr::kUdata4, AsBytes(word)),
+              Optional(AllOf(Field(&EncodedPtr::ptr, word),
+                             Field(&EncodedPtr::encoding, EncodedPtr::kUdata4),
+                             Field(&EncodedPtr::encoded_size, kSize<Word>))));
+
+  constexpr Xword xword = 0x12345678abcdef12;
+  EXPECT_THAT(EncodedPtr::Read<Elf>(EncodedPtr::kUdata8, AsBytes(xword)),
+              Optional(AllOf(Field(&EncodedPtr::ptr, xword),
+                             Field(&EncodedPtr::encoding, EncodedPtr::kUdata8),
+                             Field(&EncodedPtr::encoded_size, kSize<Xword>))));
+
+  constexpr typename Half::Signed shalf = -0x1234;
+  EXPECT_THAT(EncodedPtr::Read<Elf>(EncodedPtr::kSdata2, AsBytes(shalf)),
+              Optional(AllOf(Field(&EncodedPtr::sptr, shalf),
+                             Field(&EncodedPtr::encoding, EncodedPtr::kSdata2),
+                             Field(&EncodedPtr::encoded_size, kSize<Half>))));
+
+  constexpr typename Word::Signed sword = -0x12345678;
+  EXPECT_THAT(EncodedPtr::Read<Elf>(EncodedPtr::kSdata4, AsBytes(sword)),
+              Optional(AllOf(Field(&EncodedPtr::sptr, sword),
+                             Field(&EncodedPtr::encoding, EncodedPtr::kSdata4),
+                             Field(&EncodedPtr::encoded_size, kSize<Word>))));
+
+  constexpr typename Xword::Signed sxword = -0x12345678abcdef12;
+  EXPECT_THAT(EncodedPtr::Read<Elf>(EncodedPtr::kSdata8, AsBytes(sxword)),
+              Optional(AllOf(Field(&EncodedPtr::sptr, sxword),
+                             Field(&EncodedPtr::encoding, EncodedPtr::kSdata8),
+                             Field(&EncodedPtr::encoded_size, kSize<Xword>))));
+
+  constexpr uint8_t kThreeByte[] = {
+      0x80 | (0xaabbu & 0x7f),
+      0x80 | ((0xaabbu >> 7) & 0x7f),
+      ((0xaabbu >> 14) & 0x7f),
+  };
+  EXPECT_THAT(EncodedPtr::Read<Elf>(EncodedPtr::kUleb128, AsBytes(kThreeByte)),
+              Optional(AllOf(Field(&EncodedPtr::ptr, 0xaabbu),
+                             Field(&EncodedPtr::encoding, EncodedPtr::kUleb128),
+                             Field(&EncodedPtr::encoded_size, uint8_t{3}))));
+
+  constexpr uint8_t kThreeByteNegative[] = {
+      0x80 | (-0xaabb & 0x7f),
+      0x80 | ((-0xaabb >> 7) & 0x7f),
+      ((-0xaabb >> 14) & 0x7f),
+  };
+  EXPECT_THAT(EncodedPtr::Read<Elf>(EncodedPtr::kSleb128, AsBytes(kThreeByte)),
+              Optional(AllOf(Field(&EncodedPtr::ptr, 0xaabbu),
+                             Field(&EncodedPtr::encoding, EncodedPtr::kSleb128),
+                             Field(&EncodedPtr::encoded_size, uint8_t{3}))));
+  EXPECT_THAT(EncodedPtr::Read<Elf>(EncodedPtr::kSleb128, AsBytes(kThreeByteNegative)),
+              Optional(AllOf(Field(&EncodedPtr::ptr, -0xaabb),
+                             Field(&EncodedPtr::encoding, EncodedPtr::kSleb128),
+                             Field(&EncodedPtr::encoded_size, uint8_t{3}))));
+}
+
+TYPED_TEST(ElfldltlDwarfTests, EncodedPtrFromMemory) {
+  using elfldltl::dwarf::EncodedPtr;
+  using Elf = typename TestFixture::Elf;
+  using Addr = typename Elf::Addr;
+  using size_type = typename Elf::size_type;
+
+  static constexpr size_type kMemoryBase = 0x12345000;
+  static constexpr size_type kEncodedAt = 0x12345ea0;
+  static constexpr size_type kIndirectEncodedAt = 0x12345bb0;
+  static constexpr size_type kRelIndirectEncodedAt = 0x12345bc0;
+  static constexpr size_type kBadIndirectEncodedAt = 0x12345bd0;
+  static constexpr size_type kIndirectedTo = 0x12345120;
+  static constexpr size_type kDirectValue = 0xabcdef12;
+  static constexpr Addr kIndirectValue = 0x1234abcd;
+  static constexpr auto kData = []() {
+    std::array<Addr, 0x1000 / sizeof(Addr)> words{};
+    for (Addr& word : words) {
+      word = 0xdeadbeef;
+    }
+    auto set = [&words](size_type addr, Addr value) {
+      words[(addr - kMemoryBase) / sizeof(Addr)] = value;
+    };
+    set(kEncodedAt, kDirectValue);
+    set(kIndirectEncodedAt, kIndirectedTo);
+    set(kRelIndirectEncodedAt, kIndirectedTo - kRelIndirectEncodedAt);
+    set(kBadIndirectEncodedAt, 0xbad1230 - kBadIndirectEncodedAt);
+    set(kIndirectedTo, kIndirectValue);
+    return words;
+  }();
+  const cpp20::span<std::byte> kImage{
+      const_cast<std::byte*>(cpp20::as_bytes(cpp20::span{kData}).data()),
+      cpp20::span(kData).size_bytes(),
+  };
+
+  elfldltl::DirectMemory memory{kImage, kMemoryBase};
+
+  EXPECT_EQ(EncodedPtr::FromMemory<Elf>(EncodedPtr::kPtr, memory, 0xbad10000, kSize<Addr>),
+            std::nullopt);
+
+  EXPECT_THAT(EncodedPtr::FromMemory<Elf>(EncodedPtr::kPtr, memory, kEncodedAt, kSize<Addr>),
+              Optional(kDirectValue));
+
+  EXPECT_THAT(
+      EncodedPtr::FromMemory<Elf>(static_cast<uint8_t>(EncodedPtr::kPtr) | EncodedPtr::kPcrel,
+                                  memory, kEncodedAt, kSize<Addr>),
+      Optional(kEncodedAt + kDirectValue));
+
+  EXPECT_THAT(EncodedPtr::FromMemory<Elf>(EncodedPtr::kPtr | EncodedPtr::kIndirect, memory,
+                                          kIndirectEncodedAt, kSize<Addr>),
+              Optional(kIndirectValue));
+
+  EXPECT_THAT(
+      EncodedPtr::FromMemory<Elf>(EncodedPtr::kPtr | EncodedPtr::kIndirect | EncodedPtr::kPcrel,
+                                  memory, kRelIndirectEncodedAt, kSize<Addr>),
+      Optional(kIndirectValue));
+
+  EXPECT_EQ(EncodedPtr::FromMemory<Elf>(EncodedPtr::kPtr | EncodedPtr::kIndirect, memory,
+                                        kBadIndirectEncodedAt, kSize<Addr>),
+            std::nullopt);
 }
 
 }  // namespace
