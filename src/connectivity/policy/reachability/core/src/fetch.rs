@@ -30,7 +30,7 @@ async fn fetch<FA: FetchAddr + std::marker::Sync>(
     host: &str,
     path: &str,
     addr: &FA,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<u8> {
     let timeout = zx::Time::after(FETCH_TIMEOUT);
     let addr = addr.as_socket_addr();
     let socket = socket2::Socket::new(
@@ -62,13 +62,15 @@ async fn fetch<FA: FetchAddr + std::marker::Sync>(
         .on_timeout(timeout, || Err(format_err!("Reading response from TcpStream timed out")))
         .await?;
     let resp = String::from_utf8(bytes)?;
-    let success = resp.contains("200 OK\r\n");
-
-    if !success {
-        return Err(format_err!("HEAD request failed while fetching {host}{path}: {resp}"));
+    let first_line = resp.split("\r\n").next().expect("split always returns at least one item");
+    if let [http, code, ..] = first_line.split(' ').collect::<Vec<_>>().as_slice() {
+        if !http.starts_with("HTTP/") {
+            return Err(format_err!("Response header malformed: {first_line}"));
+        }
+        Ok(code.parse().map_err(|e| format_err!("While parsing status code: {e:?}"))?)
+    } else {
+        Err(format_err!("Response header malformed: {first_line}"))
     }
-
-    Ok(())
 }
 
 pub trait FetchAddr {
@@ -95,7 +97,7 @@ pub trait Fetch {
         host: &str,
         path: &str,
         addr: &FA,
-    ) -> bool;
+    ) -> Option<u8>;
 }
 
 pub struct Fetcher;
@@ -108,13 +110,13 @@ impl Fetch for Fetcher {
         host: &str,
         path: &str,
         addr: &FA,
-    ) -> bool {
+    ) -> Option<u8> {
         let r = fetch(interface_name, host, path, addr).await;
         match r {
-            Ok(()) => true,
+            Ok(code) => Some(code),
             Err(e) => {
                 warn!("error while fetching {host}{path}: {e:?}");
-                false
+                None
             }
         }
     }
@@ -201,6 +203,7 @@ mod test {
         };
 
         assert!(result.is_ok(), "Expected OK, got: {result:?}");
+        assert_eq!(result.ok(), Some(200));
         let request = request.expect("no request body");
         assert!(request.contains(&format!("HEAD {path} HTTP/1.1")));
         assert!(request.contains(&format!("host: {domain}")));

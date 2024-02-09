@@ -710,7 +710,7 @@ pub struct NetworkCheckCookie {
 pub enum NetworkCheckResult {
     Ping { parameters: PingParameters, success: bool },
     ResolveDns { parameters: ResolveDnsParameters, ips: Option<ResolvedIps> },
-    Fetch { parameters: FetchParameters, success: bool },
+    Fetch { parameters: FetchParameters, status: Option<u8> },
 }
 
 #[derive(Debug, Clone)]
@@ -739,6 +739,8 @@ pub struct FetchParameters {
     pub ip: std::net::IpAddr,
     /// Path to send request to.
     pub path: String,
+    /// The expected HTTP status codes.
+    pub expected_statuses: Vec<u8>,
 }
 
 impl NetworkCheckResult {
@@ -772,9 +774,9 @@ impl NetworkCheckResult {
         }
     }
 
-    fn fetch_result(self) -> Option<(FetchParameters, bool)> {
+    fn fetch_result(self) -> Option<(FetchParameters, Option<u8>)> {
         match self {
-            NetworkCheckResult::Fetch { parameters, success } => Some((parameters, success)),
+            NetworkCheckResult::Fetch { parameters, status } => Some((parameters, status)),
             _ => None,
         }
     }
@@ -1327,6 +1329,7 @@ impl<Time: TimeProvider> NetworkChecker for Monitor<Time> {
                         domain: domain.clone(),
                         ip,
                         path: GENERATE_204.into(),
+                        expected_statuses: vec![204],
                     });
                     match self
                         .network_check_sender
@@ -1353,7 +1356,7 @@ impl<Time: TimeProvider> NetworkChecker for Monitor<Time> {
                 }
             }
             NetworkCheckState::FetchHttp => {
-                let (FetchParameters { interface_name, ip, .. }, success) =
+                let (FetchParameters { interface_name, ip, expected_statuses, .. }, status) =
                     result.fetch_result().ok_or(anyhow!(
                         "resume: mismatched state and result {interface_name} ({})",
                         cookie.id
@@ -1365,8 +1368,10 @@ impl<Time: TimeProvider> NetworkChecker for Monitor<Time> {
                     ctx.fetches_completed, ctx.fetches_expected
                 );
 
-                if success {
-                    let () = Self::handle_fetch_success(ctx, ip);
+                if let Some(status) = status {
+                    if expected_statuses.contains(&status) {
+                        let () = Self::handle_fetch_success(ctx, ip);
+                    }
                 }
 
                 if ctx.fetches_completed == ctx.fetches_expected {
@@ -1650,7 +1655,7 @@ mod tests {
     #[derive(Default, Copy, Clone)]
     struct FakeFetch {
         expected_url: Option<&'static str>,
-        response: bool,
+        response: Option<u8>,
     }
 
     #[async_trait]
@@ -1661,7 +1666,7 @@ mod tests {
             domain: &str,
             path: &str,
             _addr: &FA,
-        ) -> bool {
+        ) -> Option<u8> {
             if let Some(expected) = self.expected_url {
                 assert_eq!(
                     format!("http://{domain}{path}"),
@@ -1715,7 +1720,7 @@ mod tests {
                             }
                         }
                         NetworkCheckAction::Fetch(parameters) => {
-                            let success = f
+                            let status = f
                                 .fetch(
                                     &parameters.interface_name,
                                     &parameters.domain,
@@ -1724,7 +1729,7 @@ mod tests {
                                 )
                                 .await;
                             match monitor
-                                .resume(cookie, NetworkCheckResult::Fetch { parameters, success })
+                                .resume(cookie, NetworkCheckResult::Fetch { parameters, status })
                             {
                                 // Has reached final state.
                                 Ok(NetworkCheckerOutcome::Complete) => return,
@@ -1992,7 +1997,7 @@ mod tests {
                 FakeDig::new(vec![std_ip!("1.2.3.0"), std_ip!("123::")]),
                 FakeFetch {
                     expected_url: Some("http://www.gstatic.com/generate_204"),
-                    response: true
+                    response: Some(204)
                 },
                 None,
                 ping_internet_addr,
@@ -2437,7 +2442,7 @@ mod tests {
                         FakeDig::new(vec![std_ip!("1.2.3.0"), std_ip!("123::")]), // First, use a good digger
                         FakeFetch {
                             expected_url: Some("http://www.gstatic.com/generate_204"),
-                            response: true
+                            response: Some(204)
                         },
                     ),
                     (
@@ -2449,7 +2454,7 @@ mod tests {
                         FakeDig { response: None }, // Then, use one that fails
                         FakeFetch {
                             expected_url: Some("http://www.gstatic.com/generate_204"),
-                            response: true
+                            response: Some(204)
                         },
                     ),
                 ],
@@ -2492,7 +2497,7 @@ mod tests {
                         FakeDig::new(vec![std_ip!("1.2.3.0"), std_ip!("123::")]), // First, use a good digger
                         FakeFetch {
                             expected_url: Some("http://www.gstatic.com/generate_204"),
-                            response: true
+                            response: Some(204)
                         },
                     ),
                     (
@@ -2504,7 +2509,7 @@ mod tests {
                         FakeDig { response: None }, // Then, use one that fails
                         FakeFetch {
                             expected_url: Some("http://www.gstatic.com/generate_204"),
-                            response: true
+                            response: Some(204)
                         },
                     ),
                 ],
@@ -2547,7 +2552,7 @@ mod tests {
                         FakeDig::new(vec![std_ip!("1.2.3.0"), std_ip!("123::")]), // First, use a good digger
                         FakeFetch {
                             expected_url: Some("http://www.gstatic.com/generate_204"),
-                            response: false
+                            response: None
                         },
                     ),
                     (
@@ -2559,7 +2564,7 @@ mod tests {
                         FakeDig { response: None }, // Then, use one that fails
                         FakeFetch {
                             expected_url: Some("http://www.gstatic.com/generate_204"),
-                            response: false
+                            response: None,
                         },
                     ),
                 ],
@@ -2596,7 +2601,7 @@ mod tests {
                         FakeDig::new(vec![std_ip!("1.2.3.0"), std_ip!("123::")]), // First, use a good digger
                         FakeFetch {
                             expected_url: Some("http://www.gstatic.com/generate_204"),
-                            response: false
+                            response: None
                         },
                     ),
                     (
@@ -2608,7 +2613,7 @@ mod tests {
                         FakeDig { response: None }, // Then, use one that fails
                         FakeFetch {
                             expected_url: Some("http://www.gstatic.com/generate_204"),
-                            response: false
+                            response: None
                         },
                     ),
                 ],
