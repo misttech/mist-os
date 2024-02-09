@@ -63,6 +63,7 @@ struct ResolverDefinition {
   constexpr auto bias() const { return module_->load_bias(); }
 
   constexpr auto tls_module_id() const { return module_->tls_module_id(); }
+  constexpr bool uses_static_tls() const { return module_->uses_static_tls(); }
   constexpr auto static_tls_bias() const { return module_->static_tls_bias(); }
 
   template <

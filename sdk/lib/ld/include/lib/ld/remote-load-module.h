@@ -291,8 +291,8 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
     return OnModules(modules, allocate);
   }
 
-  template <class Diagnostics>
-  bool Relocate(Diagnostics& diag, const List& modules) {
+  template <class Diagnostics, typename TlsDescResolver>
+  bool Relocate(Diagnostics& diag, const List& modules, const TlsDescResolver& tls_desc_resolver) {
     auto mutable_memory = elfldltl::LoadInfoMutableMemory{
         diag, load_info(), elfldltl::SegmentWithVmo::GetMutableMemory<LoadInfo>{vmo_.borrow()}};
     if (!mutable_memory.Init()) {
@@ -301,18 +301,17 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
     if (!elfldltl::RelocateRelative(diag, mutable_memory, reloc_info(), load_bias())) {
       return false;
     }
-    auto tlsdesc_resolver = [&diag](auto&&... args) {
-      diag.FormatError("TODO(https://fxbug.dev/42078961): remote TLSDESC not implemented yet");
-      return TlsDescGot{};
-    };
-    auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, tlsdesc_resolver);
+    auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, tls_desc_resolver);
     return elfldltl::RelocateSymbolic(mutable_memory, diag, reloc_info(), symbol_info(),
                                       load_bias(), resolver);
   }
 
-  template <class Diagnostics>
-  static bool RelocateModules(Diagnostics& diag, List& modules) {
-    auto relocate = [&](auto& module) { return module.Relocate(diag, modules); };
+  template <class Diagnostics, typename TlsDescResolver>
+  static bool RelocateModules(Diagnostics& diag, List& modules,
+                              TlsDescResolver&& tls_desc_resolver) {
+    auto relocate = [&](auto& module) -> bool {
+      return module.Relocate(diag, modules, tls_desc_resolver);
+    };
     return OnModules(modules, relocate);
   }
 

@@ -213,8 +213,13 @@ void LdRemoteProcessTests::Load(std::string_view executable_name) {
   // Choose load addresses.
   EXPECT_TRUE(RemoteModule::AllocateModules(diag, modules, root_vmar().borrow()));
 
+  // Acquire a StaticTlsDescResolver that uses the stub dynamic linker's entry
+  // TLSDESC points.  Note this could in the general case be modified later by:
+  // `tls_desc_resolver.SetHook(TlsdescRuntime::kStatic, custom_hook_address);`
+  auto tls_desc_resolver = abi_stub.tls_desc_resolver(loaded_stub.load_bias());
+
   // Apply relocations to segment VMOs.
-  EXPECT_TRUE(RemoteModule::RelocateModules(diag, modules));
+  EXPECT_TRUE(RemoteModule::RelocateModules(diag, modules, tls_desc_resolver));
 
   // Now that load addresses have been chosen, populate the remote ABI data.
   abi_result = std::move(remote_abi).Finish(diag, abi_stub, loaded_stub, modules);
@@ -224,7 +229,6 @@ void LdRemoteProcessTests::Load(std::string_view executable_name) {
   EXPECT_TRUE(RemoteModule::LoadModules(diag, modules));
 
   // Use the executable's entry point at its loaded address.
-
   set_entry(decode_result->main_exec.relative_entry + loaded_exec.load_bias());
 
   // Locate the loaded vDSO to pass its base pointer to the test process.

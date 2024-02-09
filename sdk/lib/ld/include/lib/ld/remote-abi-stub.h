@@ -56,7 +56,8 @@ class RemoteAbiStub {
   using Sym = typename Elf::Sym;
   using RemoteModule = RemoteLoadModule<Elf>;
   using LocalAbi = abi::Abi<Elf>;
-  using TlsdescRuntimeHooks = std::array<Addr, kTlsdescRuntimeCount>;
+  using TlsDescResolver = ld::StaticTlsDescResolver<Elf>;
+  using TlsdescRuntimeHooks = typename TlsDescResolver::RuntimeHooks;
 
   // Exact size of the data segment.  This includes whatever file data gives it
   // a page-aligned starting vaddr, but the total size is not page-aligned.
@@ -75,6 +76,14 @@ class RemoteAbiStub {
   // Fetch a particular TLSDESC runtime entry point.
   Addr tlsdesc_runtime(TlsdescRuntime hook) const {
     return tlsdesc_runtime_[static_cast<size_t>(hook)];
+  }
+
+  // Return a TLSDESC resolver callable object that can be passed to
+  // elfldltl::MakeSymbolResolver for static TLS layouts.  It will use entry
+  // points in the stub dynamic linker acquired by Init, applying the given
+  // load bias for where the stub dynamic linker is to be loaded.
+  TlsDescResolver tls_desc_resolver(size_type stub_load_bias) const {
+    return TlsDescResolver{tlsdesc_runtime_, stub_load_bias};
   }
 
   // Init() calculates and records all those values by examining the stub

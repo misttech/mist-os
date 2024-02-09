@@ -250,6 +250,67 @@ constexpr std::optional<TlsdescRuntime> TlsdescRuntimeFromMagic(uintptr_t magic)
   return std::nullopt;
 }
 
+// This provides a callable object for resolving TLSDESC relocations.  It can
+// be passed directly to elfldltl::MakeSymbolResolver (by reference).
+//
+// The constructor requires an array of Elf::Addr indexed by the TlsdescRuntime
+// enum values (as from ld::RemoteAbiStub), and a load bias applied to those
+// addresses.  Individual hooks can be replaced later with SetHook.
+//
+template <class Elf>
+class StaticTlsDescResolver {
+ public:
+  using size_type = typename Elf::size_type;
+  using Addr = typename Elf::Addr;
+  using Addend = typename Elf::Addend;
+  using TlsDescGot = typename Elf::TlsDescGot;
+  using RuntimeHooks = std::array<Addr, kTlsdescRuntimeCount>;
+
+  explicit constexpr StaticTlsDescResolver(const RuntimeHooks& hooks, size_type bias = 0) {
+    for (size_t i = 0; i < hooks.size(); ++i) {
+      hooks_[i] = hooks[i] + bias;
+    }
+  }
+
+  constexpr Addr GetHook(TlsdescRuntime hook) const { return hooks_[static_cast<size_t>(hook)]; }
+
+  constexpr void SetHook(TlsdescRuntime hook, size_type value) {
+    hooks_[static_cast<size_t>(hook)] = value;
+  }
+
+  // Handle an undefined weak TLSDESC reference.  There are two special runtime
+  // resolvers for this case: one for zero addend, and one for nonzero addend.
+  constexpr TlsDescGot operator()(Addend addend) const {
+    if (addend == 0) {
+      return {.function = GetHook(TlsdescRuntime::kUndefinedWeak)};
+    }
+    return {
+        .function = GetHook(TlsdescRuntime::kUndefinedWeakAddend),
+        .value = cpp20::bit_cast<size_type>(addend),
+    };
+  }
+
+  // Handle a TLSDESC reference to a defined symbol.  The runtime resolver just
+  // loads the static TLS offset from the value slot.  When the relocation is
+  // applied the addend will be added to the value computed here from the
+  // symbol's value and module's PT_TLS offset.
+  template <class Diagnostics, class Definition>
+  constexpr std::optional<TlsDescGot> operator()(Diagnostics& diag, const Definition& defn) const {
+    assert(!defn.undefined_weak());
+    // Note that defn.uses_static_tls() need not be true: this resolver is only
+    // used at all when the module being relocated is in the Initial Exec set,
+    // so anything its references resolve to will also be in the Initial Exec
+    // set even if it wasn't marked with DF_STATIC_TLS at link time.
+    return TlsDescGot{
+        .function = GetHook(TlsdescRuntime::kStatic),
+        .value = defn.symbol().value + defn.static_tls_bias(),
+    };
+  }
+
+ private:
+  RuntimeHooks hooks_;
+};
+
 }  // namespace ld
 
 #endif  // __ASSEMBLER__

@@ -24,7 +24,6 @@ namespace ld::testing {
 class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessTestsBase {
  public:
   static constexpr bool kCanCollectLog = false;
-  static constexpr bool kHasTlsdesc = false;  // TODO(https://fxbug.dev/318890954)
 
   LdRemoteProcessTests();
   ~LdRemoteProcessTests();

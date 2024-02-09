@@ -304,10 +304,6 @@ TYPED_TEST(LdLoadTests, TlsGlobalDynamicAccess) {
 }
 
 TYPED_TEST(LdLoadTests, TlsDescAccess) {
-  if constexpr (!TestFixture::kHasTlsdesc) {
-    GTEST_SKIP() << "test requires TLS support";
-  }
-
   constexpr int64_t kReturnValue = 17;
   constexpr int64_t kSkipReturnValue = 77;
 
