@@ -13,6 +13,7 @@
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
+#include <cstring>
 #include <memory>
 #include <utility>
 
@@ -30,7 +31,8 @@ zx_status_t GpuDeviceDriver::Create(zx_device_t* parent) {
   zx_status_t status =
       device_get_variable(parent, "driver.virtio-gpu.disable", flag, sizeof(flag), nullptr);
   // If gpu disabled:
-  if (status == ZX_OK && (!strcmp(flag, "1") || !strcmp(flag, "true") || !strcmp(flag, "on"))) {
+  if (status == ZX_OK && (!std::strncmp(flag, "1", 2) || !std::strncmp(flag, "true", 5) ||
+                          !std::strncmp(flag, "on", 3))) {
     zxlogf(INFO, "driver.virtio-gpu.disabled=1, not binding to the GPU");
     return ZX_ERR_NOT_FOUND;
   }
