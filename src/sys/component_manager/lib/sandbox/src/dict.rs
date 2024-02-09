@@ -1,8 +1,6 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use anyhow::{Context, Error};
-use clonable_error::ClonableError;
 use derivative::Derivative;
 use fidl::endpoints::{create_request_stream, ClientEnd, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
@@ -12,10 +10,8 @@ use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::TryStreamExt;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
-    fmt::Debug,
     sync::{Arc, Mutex, MutexGuard},
 };
-use thiserror::Error;
 use tracing::warn;
 use vfs::{
     directory::{
@@ -24,7 +20,7 @@ use vfs::{
         immutable::simple as pfs,
     },
     execution_scope::ExecutionScope,
-    name::{Name, ParseNameError},
+    name::Name,
     path::Path,
 };
 
@@ -111,10 +107,8 @@ impl Dict {
     pub async fn serve_dict(
         &mut self,
         mut stream: fsandbox::DictionaryRequestStream,
-    ) -> Result<(), Error> {
-        while let Some(request) =
-            stream.try_next().await.context("failed to read request from stream")?
-        {
+    ) -> Result<(), fidl::Error> {
+        while let Some(request) = stream.try_next().await? {
             match request {
                 fsandbox::DictionaryRequest::Insert { key, value, responder, .. } => {
                     let result = match self.lock_entries().entry(key) {
@@ -127,7 +121,7 @@ impl Dict {
                             Err(_) => Err(fsandbox::DictionaryError::BadCapability),
                         },
                     };
-                    responder.send(result).context("failed to send response")?;
+                    responder.send(result)?;
                 }
                 fsandbox::DictionaryRequest::Get { key, responder } => {
                     let result = match self.entries.lock().unwrap().get(&key) {
@@ -137,7 +131,7 @@ impl Dict {
                             Err(fsandbox::DictionaryError::NotFound)
                         }
                     };
-                    responder.send(result).context("failed to send response")?;
+                    responder.send(result)?;
                 }
                 fsandbox::DictionaryRequest::Remove { key, responder } => {
                     let result = match self.entries.lock().unwrap().remove(&key) {
@@ -147,7 +141,7 @@ impl Dict {
                             Err(fsandbox::DictionaryError::NotFound)
                         }
                     };
-                    responder.send(result).context("failed to send response")?;
+                    responder.send(result)?;
                 }
                 fsandbox::DictionaryRequest::Read { responder } => {
                     let items = self
@@ -158,7 +152,7 @@ impl Dict {
                             fsandbox::DictionaryItem { key: key.clone(), value }
                         })
                         .collect();
-                    responder.send(items).context("failed to send response")?;
+                    responder.send(items)?;
                 }
                 fsandbox::DictionaryRequest::Clone2 { request, control_handle: _ } => {
                     // The clone is registered under the koid of the client end.
@@ -205,7 +199,6 @@ impl Dict {
                 }
             }
         }
-
         Ok(())
     }
 
@@ -247,22 +240,6 @@ impl From<Dict> for fsandbox::Capability {
     }
 }
 
-/// This error is returned when a [Dict] cannot be converted into an [Open] capability.
-#[derive(Error, Debug)]
-enum TryIntoOpenError {
-    /// A key is not a valid `fuchsia.io` node name.
-    #[error("key is not a valid `fuchsia.io` node name")]
-    ParseNameError(#[from] vfs::name::ParseNameError),
-
-    /// A value could not be converted into an [Open] capability.
-    #[error("value at '{key}' could not be converted into an Open capability")]
-    ConvertIntoOpen {
-        key: String,
-        #[source]
-        err: ConversionError,
-    },
-}
-
 impl Capability for Dict {
     /// Convert this [Dict] capability into [Open] by recursively converting the entries
     /// to [Open], then building a VFS directory where each entry is a remote VFS node.
@@ -270,16 +247,11 @@ impl Capability for Dict {
     fn try_into_open(self: Self) -> Result<Open, ConversionError> {
         let dir = pfs::simple();
         for (key, value) in self.lock_entries().iter() {
-            let open: Open = value.clone().try_into_open().map_err(|err| {
-                ClonableError::from(anyhow::Error::from(TryIntoOpenError::ConvertIntoOpen {
-                    key: key.clone(),
-                    err,
-                }))
-            })?;
-            let key: Name = key.clone().try_into().map_err(|err: ParseNameError| {
-                ClonableError::from(anyhow::Error::from(TryIntoOpenError::from(err)))
-            })?;
-
+            let open: Open = value
+                .clone()
+                .try_into_open()
+                .map_err(|err| ConversionError::Nested { key: key.clone(), err: Box::new(err) })?;
+            let key: Name = key.clone().try_into()?;
             match dir.add_entry_impl(key, open.into_remote(), false) {
                 Ok(()) => {}
                 Err(AlreadyExists) => {
@@ -343,7 +315,7 @@ async fn serve_dict_iterator(
 mod tests {
     use super::*;
     use crate::{Data, Unit};
-    use anyhow::Result;
+    use anyhow::{Error, Result};
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream, Proxy};
     use fidl_fuchsia_unknown as funknown;
@@ -373,7 +345,7 @@ mod tests {
             Ok(())
         };
 
-        try_join!(client, server).map(|_| ())?;
+        try_join!(client, server).unwrap();
 
         let mut entries = dict.lock_entries();
 
@@ -417,7 +389,7 @@ mod tests {
             Ok(())
         };
 
-        try_join!(client, server).map(|_| ())?;
+        try_join!(client, server).unwrap();
 
         // Removing the entry with Remove should remove it from `entries`.
         assert!(dict.lock_entries().is_empty());
@@ -450,7 +422,7 @@ mod tests {
             Ok(())
         };
 
-        try_join!(client, server).map(|_| ())?;
+        try_join!(client, server).unwrap();
 
         // The capability should remain in the Dict.
         assert_eq!(dict.lock_entries().len(), 1);
@@ -485,7 +457,8 @@ mod tests {
             Ok(())
         };
 
-        try_join!(client, server).map(|_| ())
+        try_join!(client, server).unwrap();
+        Ok(())
     }
 
     /// Tests that the `Dict.Remove` returns `NOT_FOUND` when there is no item with the given key.
@@ -504,7 +477,8 @@ mod tests {
             Ok(())
         };
 
-        try_join!(client, server).map(|_| ())
+        try_join!(client, server).unwrap();
+        Ok(())
     }
 
     #[fuchsia::test]
@@ -695,7 +669,7 @@ mod tests {
     async fn try_into_open_error_not_supported() {
         let dict = Dict::new();
         dict.lock_entries().insert(CAP_KEY.to_string(), Box::new(Unit::default()));
-        assert_matches!(dict.try_into_open(), Err(ConversionError::Other { .. }));
+        assert_matches!(dict.try_into_open(), Err(ConversionError::Nested { .. }));
     }
 
     #[fuchsia::test]
@@ -713,7 +687,7 @@ mod tests {
         // This string is too long to be a valid fuchsia.io name.
         let bad_name = "a".repeat(10000);
         dict.lock_entries().insert(bad_name, Box::new(placeholder_open));
-        assert_matches!(dict.try_into_open(), Err(ConversionError::Other { .. }));
+        assert_matches!(dict.try_into_open(), Err(ConversionError::ParseName(_)));
     }
 
     /// Convert a dict `{ CAP_KEY: open }` to [Open].

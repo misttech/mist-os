@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use anyhow::Result;
+
 use fidl_fuchsia_component_sandbox as fsandbox;
 use futures::{future::BoxFuture, FutureExt};
 use std::sync::Arc;
@@ -13,18 +13,18 @@ use crate::{AnyCapability, Capability};
 /// The inner function that generates the capability can be called multiple times to produce
 /// multiple capabilities for a single Lazy. Clones of Lazy call the same function.
 #[derive(Capability, Clone)]
-pub struct Lazy(Arc<dyn Fn() -> BoxFuture<'static, Result<AnyCapability>> + Send + Sync>);
+pub struct Lazy(Arc<dyn Fn() -> BoxFuture<'static, Result<AnyCapability, ()>> + Send + Sync>);
 
 impl Lazy {
     pub fn new<F>(func: F) -> Self
     where
-        F: Fn() -> BoxFuture<'static, Result<AnyCapability>> + Send + Sync + 'static,
+        F: Fn() -> BoxFuture<'static, Result<AnyCapability, ()>> + Send + Sync + 'static,
     {
         Self(Arc::new(func))
     }
 
     /// Call the function to get a future for the capability.
-    pub fn get(&self) -> BoxFuture<'static, Result<AnyCapability>> {
+    pub fn get(&self) -> BoxFuture<'static, Result<AnyCapability, ()>> {
         self.0()
     }
 
@@ -34,7 +34,10 @@ impl Lazy {
     /// and the `Err` value is returned as-is.
     pub fn map<F>(self, func: F) -> Self
     where
-        F: Fn(AnyCapability) -> BoxFuture<'static, Result<AnyCapability>> + Send + Sync + 'static,
+        F: Fn(AnyCapability) -> BoxFuture<'static, Result<AnyCapability, ()>>
+            + Send
+            + Sync
+            + 'static,
     {
         let func = Arc::new(func);
         Self::new(move || {
@@ -67,7 +70,6 @@ impl From<Lazy> for fsandbox::Capability {
 mod test {
     use super::*;
     use crate::{Data, Unit};
-    use anyhow::anyhow;
     use futures::FutureExt;
 
     #[fuchsia::test]
@@ -112,7 +114,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_lazy_error() {
-        let lazy = Lazy::new(|| Box::pin(async { Err(anyhow!("some error")) }));
+        let lazy = Lazy::new(|| Box::pin(async { Err(()) }));
         assert!(lazy.get().await.is_err());
     }
 

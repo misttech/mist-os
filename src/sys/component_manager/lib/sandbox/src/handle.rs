@@ -1,8 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use anyhow::{anyhow, Context, Error};
-use clonable_error::ClonableError;
+
 use fidl::endpoints::{create_request_stream, ClientEnd, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
@@ -37,10 +36,8 @@ impl OneShotHandle {
     pub(crate) async fn serve_handle_capability(
         &self,
         mut stream: fsandbox::HandleCapabilityRequestStream,
-    ) -> Result<(), Error> {
-        while let Some(request) =
-            stream.try_next().await.context("failed to read request from stream")?
-        {
+    ) -> Result<(), fidl::Error> {
+        while let Some(request) = stream.try_next().await? {
             match request {
                 fsandbox::HandleCapabilityRequest::Clone2 { request, control_handle: _ } => {
                     // The clone is registered under the koid of the client end.
@@ -51,7 +48,7 @@ impl OneShotHandle {
                     self.clone().serve_and_register(stream, koid);
                 }
                 fsandbox::HandleCapabilityRequest::GetHandle { responder } => {
-                    responder.send(self.get_handle()).context("failed to send response")?;
+                    responder.send(self.get_handle())?;
                 }
             }
         }
@@ -81,13 +78,9 @@ impl Capability for OneShotHandle {
     ///
     /// The handle must be a channel that speaks the `Openable` protocol.
     fn try_into_open(self) -> Result<Open, ConversionError> {
-        let handle = self
-            .get_handle()
-            .map_err(|err| ClonableError::from(anyhow!("could not get handle: {:?}", err)))?;
+        let handle = self.get_handle().map_err(|err| ConversionError::Handle { err })?;
 
-        let basic_info = handle.basic_info().map_err(|status| {
-            ClonableError::from(anyhow!("failed to get handle info: {}", status))
-        })?;
+        let basic_info = handle.basic_info().map_err(|_| ConversionError::NotSupported)?;
         if basic_info.object_type != zx::ObjectType::CHANNEL {
             return Err(ConversionError::NotSupported);
         }
@@ -135,7 +128,7 @@ impl From<OneShotHandle> for fsandbox::Capability {
 mod tests {
     use super::*;
     use crate::AnyCapability;
-    use anyhow::{anyhow, Context, Result};
+    use anyhow::{Context, Result};
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, create_proxy_and_stream, Proxy};
     use fidl_fuchsia_component_sandbox as fsandbox;
@@ -158,11 +151,7 @@ mod tests {
         let server = one_shot.serve_handle_capability(handle_stream);
 
         let client = async move {
-            let handle = handle_proxy
-                .get_handle()
-                .await
-                .context("failed to call GetHandle")?
-                .map_err(|err| anyhow!("failed to get handle: {:?}", err))?;
+            let handle = handle_proxy.get_handle().await.unwrap().unwrap();
 
             // The handle should be for same Event that was in the OneShotHandle.
             let got_koid = handle.get_koid().unwrap();
@@ -171,7 +160,7 @@ mod tests {
             Ok(())
         };
 
-        try_join!(client, server).map(|_| ())?;
+        try_join!(client, server).unwrap();
 
         Ok(())
     }
@@ -188,18 +177,16 @@ mod tests {
         let server = one_shot.serve_handle_capability(handle_stream);
 
         let client = async move {
-            let first_result =
-                handle_proxy.get_handle().await.context("failed to call GetHandle")?;
+            let first_result = handle_proxy.get_handle().await.unwrap();
             assert!(first_result.is_ok());
 
-            let second_result =
-                handle_proxy.get_handle().await.context("failed to call GetHandle")?;
+            let second_result = handle_proxy.get_handle().await.unwrap();
             assert_eq!(Err(fsandbox::HandleCapabilityError::Unavailable), second_result);
 
             Ok(())
         };
 
-        try_join!(client, server).map(|_| ())?;
+        try_join!(client, server).unwrap();
 
         Ok(())
     }

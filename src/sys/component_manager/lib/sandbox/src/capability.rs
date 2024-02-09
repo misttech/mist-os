@@ -2,17 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::{AnyCapability, AnyCast, Open};
-use clonable_error::ClonableError;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use std::fmt::Debug;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
 pub enum ConversionError {
+    #[error("could not get handle: {err:?}")]
+    Handle { err: fsandbox::HandleCapabilityError },
+    #[error("`{0}` is not a valid `fuchsia.io` node name")]
+    ParseName(#[from] vfs::name::ParseNameError),
     #[error("conversion to type is not supported")]
     NotSupported,
-    #[error(transparent)]
-    Other(#[from] ClonableError),
+    #[error("value at `{key}` could not be converted")]
+    Nested {
+        key: String,
+        #[source]
+        err: Box<ConversionError>,
+    },
 }
 
 /// Errors arising from conversion between Rust and FIDL types.
