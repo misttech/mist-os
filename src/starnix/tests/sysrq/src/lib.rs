@@ -19,6 +19,7 @@ use fuchsia_component_test::{
 };
 use fuchsia_fs::OpenFlags;
 use futures::StreamExt;
+use tracing::info;
 
 // LINT.IfChange
 const SYSRQ_PANIC_MESSAGE: &str = "crashing from SysRq";
@@ -28,12 +29,17 @@ const SYSRQ_PANIC_MESSAGE: &str = "crashing from SysRq";
 async fn c_crash() {
     let mut events = EventStream::open().await.unwrap();
     let builder = RealmBuilder::with_params(
-        RealmBuilderParams::new().from_relative_url("#meta/kernel_with_container.cm"),
+        RealmBuilderParams::new()
+            .realm_name("c_crash")
+            .from_relative_url("#meta/kernel_with_container.cm"),
     )
     .await
     .unwrap();
+
+    info!("starting realm");
     let kernel_with_container = builder.build().await.unwrap();
     let realm_moniker = format!("realm_builder:{}", kernel_with_container.root.child_name());
+    info!(%realm_moniker, "started");
     let container_moniker = format!("{realm_moniker}/debian_container");
     let kernel_moniker = format!("{realm_moniker}/kernel");
 
@@ -42,7 +48,12 @@ async fn c_crash() {
         .snapshot_then_subscribe::<Logs>()
         .unwrap();
 
+    // Open sysrq-trigger to start the kernel, then make sure we see its logs.
     let sysrq = open_sysrq_trigger(&kernel_with_container).await;
+    let first_kernel_log = kernel_logs.next().await.unwrap().unwrap();
+    info!(?first_kernel_log, "receiving logs from starnix kernel now that it's started");
+
+    info!("writing c to sysrq");
     fuchsia_fs::file::write(&sysrq, "c")
         .await
         .expect_err("kernel should close channel before replying");
@@ -56,6 +67,7 @@ async fn c_crash() {
         ExitStatus::Crash(..)
     );
 
+    info!("looking for panic message");
     let kernel_panic_msg = loop {
         let next = kernel_logs
             .next()
@@ -63,6 +75,7 @@ async fn c_crash() {
             .expect("must see desired messages before end")
             .expect("must not see errors in stream");
         if next.severity() == Severity::Error && next.msg() == Some("PANIC") {
+            info!(?next, "found panic message");
             break next;
         }
     };
@@ -79,7 +92,9 @@ async fn c_crash() {
 #[fuchsia::test]
 async fn c_reboot() {
     let builder = RealmBuilder::with_params(
-        RealmBuilderParams::new().from_relative_url("#meta/kernel_with_container.cm"),
+        RealmBuilderParams::new()
+            .realm_name("c_reboot")
+            .from_relative_url("#meta/kernel_with_container.cm"),
     )
     .await
     .unwrap();
@@ -111,13 +126,20 @@ async fn c_reboot() {
         )
         .await
         .unwrap();
+    info!("starting realm");
     let kernel_with_container = builder.build().await.unwrap();
+    let realm_moniker = format!("realm_builder:{}", kernel_with_container.root.child_name());
+    info!(%realm_moniker, "started");
 
     let sysrq = open_sysrq_trigger(&kernel_with_container).await;
 
     // Spawn a task to send the initial message, without blocking for a return since this won't.
-    let _writer = Task::spawn(async move { fuchsia_fs::file::write(&sysrq, "c").await });
+    let _writer = Task::spawn(async move {
+        info!("writing c to sysrq");
+        fuchsia_fs::file::write(&sysrq, "c").await
+    });
 
+    info!("waiting for power admin request");
     let mut admin_client = admin_requests.next().await.unwrap();
     assert_matches!(
         admin_client.next().await.unwrap().unwrap(),
@@ -126,6 +148,7 @@ async fn c_reboot() {
 }
 
 async fn open_sysrq_trigger(realm: &RealmInstance) -> FileProxy {
+    info!("opening sysrq trigger");
     // Some clients of the file[0] truncate it on open[1] despite not having contents.
     // [0] https://cs.android.com/android/platform/superproject/main/+/main:system/core/init/reboot.cpp;l=391;drc=97047b54e952e2d08b10e6d37d510ca653cace00
     // [1] https://cs.android.com/android/platform/superproject/main/+/main:system/libbase/file.cpp;l=274;drc=4b992a8da56ea5777f9364033a85ad89af680e10
@@ -140,6 +163,7 @@ async fn open_sysrq_trigger(realm: &RealmInstance) -> FileProxy {
 }
 
 async fn wait_for_exit_status(events: &mut EventStream, moniker: &str) -> ExitStatus {
+    info!(%moniker, "waiting for exit status");
     EventMatcher::ok()
         .moniker(moniker)
         .wait::<Stopped>(events)
