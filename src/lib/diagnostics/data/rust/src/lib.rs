@@ -622,6 +622,8 @@ pub struct LogsDataBuilder {
     args: BuilderArgs,
     /// List of KVPs from the user
     keys: Vec<Property<LogsField>>,
+    /// The message verbosity
+    raw_severity: Option<i64>,
 }
 
 /// Arguments used to create a new [`LogsDataBuilder`].
@@ -649,6 +651,7 @@ impl LogsDataBuilder {
             tags: vec![],
             tid: None,
             keys: vec![],
+            raw_severity: None,
         }
     }
 
@@ -713,6 +716,13 @@ impl LogsDataBuilder {
         self
     }
 
+    /// Sets the raw severity level
+    #[must_use = "You must call build on your builder to consume its result"]
+    pub fn override_raw_severity(mut self, value: i64) -> Self {
+        self.raw_severity = Some(value);
+        self
+    }
+
     /// Sets the thread ID that logged the message
     #[must_use = "You must call build on your builder to consume its result"]
     pub fn set_tid(mut self, value: u64) -> Self {
@@ -725,6 +735,9 @@ impl LogsDataBuilder {
         let mut args = vec![];
         if let Some(msg) = self.msg {
             args.push(LogsProperty::String(LogsField::MsgStructured, msg));
+        }
+        if let Some(verbosity) = self.raw_severity {
+            args.push(LogsProperty::Int(LogsField::Verbosity, verbosity));
         }
         let mut payload_fields = vec![DiagnosticsHierarchy::new("message", args, vec![])];
         if !self.keys.is_empty() {

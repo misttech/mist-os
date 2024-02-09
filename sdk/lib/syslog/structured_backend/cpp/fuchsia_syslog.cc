@@ -253,12 +253,6 @@ struct RecordState final {
             ByteOffset::FromBuffer(0, sizeof(fuchsia_syslog::internal::LogBufferData::data)))) {}
   // Header of the record itself
   uint64_t* header;
-  // The corrected severity -- FIDL doesn't permit sending
-  // arbitrary values for enums, and the Rust side decodes this
-  // into a FIDL type, because of this we need to correct the severity
-  // to a valid FIDL severity and encode the raw severity separately
-  // so that Rust can decode it properly.
-  FuchsiaLogSeverity corrected_severity;
   FuchsiaLogSeverity raw_severity;
   // arg_size in words
   WordOffset<log_word_t> arg_size;
@@ -447,7 +441,6 @@ class Encoder final {
 };
 
 const char kMessageFieldName[] = "message";
-const char kVerbosityFieldName[] = "verbosity";
 const char kPidFieldName[] = "pid";
 const char kTidFieldName[] = "tid";
 const char kDroppedLogsFieldName[] = "dropped_logs";
@@ -469,13 +462,6 @@ void LogBuffer::BeginRecord(FuchsiaLogSeverity severity,
                             cpp17::optional<cpp17::string_view> file_name, unsigned int line,
                             cpp17::optional<cpp17::string_view> message, zx::unowned_socket socket,
                             uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid) {
-  cpp17::optional<int8_t> raw_severity;
-  // Validate that the severity matches the FIDL definition in
-  // sdk/fidl/fuchsia.diagnostics/severity.fidl.
-  if ((severity % 0x10) || (severity > 0x60) || (severity < 0x10)) {
-    raw_severity = severity;
-    severity = FUCHSIA_LOG_DEBUG;
-  }
   // Initialize the encoder targeting the passed buffer, and begin the record.
   auto time = zx::clock::get_monotonic();
   auto* state = RecordState::CreatePtr(&data_);
@@ -484,7 +470,6 @@ void LogBuffer::BeginRecord(FuchsiaLogSeverity severity,
   // inside the LogBuffer.
   new (state) RecordState;
   state->socket = std::move(socket);
-  state->corrected_severity = severity;
   ExternalDataBuffer external_buffer(&data_);
   Encoder<ExternalDataBuffer> encoder(external_buffer);
   encoder.Begin(*state, time, severity);
@@ -494,11 +479,6 @@ void LogBuffer::BeginRecord(FuchsiaLogSeverity severity,
   encoder.AppendArgumentKey(record, SliceFromArray(kTidFieldName));
   encoder.AppendArgumentValue(record, static_cast<uint64_t>(tid));
   record.dropped_count = dropped_count;
-  // Initialize optional fields if set.
-  if (raw_severity) {
-    encoder.AppendArgumentKey(record, SliceFromString(kVerbosityFieldName));
-    encoder.AppendArgumentValue(record, static_cast<int64_t>(raw_severity.value()));
-  }
   if (dropped_count) {
     encoder.AppendArgumentKey(record, SliceFromString(kDroppedLogsFieldName));
     encoder.AppendArgumentValue(record, static_cast<uint64_t>(dropped_count));

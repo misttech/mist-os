@@ -506,6 +506,69 @@ fn legacy_message_severity() {
 }
 
 #[fuchsia::test]
+fn test_raw_severity_parsing_and_conversions() {
+    let record = Record {
+        timestamp: 72,
+        severity: 0x30 - 2, // INFO-2
+        arguments: vec![
+            Argument {
+                name: FILE_PATH_LABEL.to_string(),
+                value: Value::Text("some_file.cc".to_string()),
+            },
+            Argument { name: LINE_NUMBER_LABEL.to_string(), value: Value::UnsignedInt(420) },
+            Argument { name: "arg1".to_string(), value: Value::SignedInt(-23) },
+            Argument { name: "arg2".to_string(), value: Value::Boolean(true) },
+            Argument { name: PID_LABEL.to_string(), value: Value::UnsignedInt(43) },
+            Argument { name: TID_LABEL.to_string(), value: Value::UnsignedInt(912) },
+            Argument { name: DROPPED_LABEL.to_string(), value: Value::UnsignedInt(2) },
+            Argument { name: TAG_LABEL.to_string(), value: Value::Text("tag".to_string()) },
+            Argument { name: MESSAGE_LABEL.to_string(), value: Value::Text("msg".to_string()) },
+        ],
+    };
+
+    let mut buffer = Cursor::new(vec![0u8; MAX_DATAGRAM_LEN]);
+    let mut encoder = Encoder::new(&mut buffer);
+    encoder.write_record(&record).unwrap();
+    let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
+    let parsed = crate::from_structured(get_test_identity(), encoded).unwrap();
+    assert_eq!(
+        parsed,
+        LogsDataBuilder::new(BuilderArgs {
+            timestamp_nanos: zx::Time::from_nanos(72).into(),
+            component_url: Some(TEST_IDENTITY.url.clone()),
+            moniker: TEST_IDENTITY.moniker.clone(),
+            severity: Severity::Debug,
+        })
+        .set_dropped(2)
+        .set_file("some_file.cc".to_string())
+        .set_line(420)
+        .set_pid(43u64)
+        .set_tid(912u64)
+        .add_tag("tag")
+        .set_message("msg".to_string())
+        .override_raw_severity(2)
+        .add_key(LogsProperty::Int(LogsField::Other("arg1".to_string()), -23i64))
+        .add_key(LogsProperty::Bool(LogsField::Other("arg2".to_string()), true))
+        .build()
+    );
+
+    let severity: i32 = 0x30 - 2; // INFO-2
+    let message: LogMessage = parsed.into();
+    assert_eq!(
+        message,
+        LogMessage {
+            severity,
+            time: 72,
+            dropped_logs: 2,
+            pid: 43,
+            tid: 912,
+            msg: "[some_file.cc(420)] msg arg1=-23 arg2=true".into(),
+            tags: vec!["tag".into()]
+        }
+    );
+}
+
+#[fuchsia::test]
 fn test_from_structured() {
     let record = Record {
         timestamp: 72,

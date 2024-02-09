@@ -130,14 +130,16 @@ pub fn from_structured(source: MonikerWithUrl, bytes: &[u8]) -> Result<LogsData,
         let transcoded_i32: i32 = severity_untrusted.unwrap().to_string().parse().unwrap();
         LegacySeverity::try_from(transcoded_i32)?
     } else {
-        LegacySeverity::try_from(record.severity as i32).unwrap()
+        // Cast from the u8 to i8 since verbosity is signed
+        let transcoded_i32 = i8::from_le_bytes(record.severity.to_le_bytes()) as i32;
+        LegacySeverity::try_from(transcoded_i32)?
     };
     let (severity, verbosity) = raw_severity.for_structured();
     builder = builder.set_severity(severity);
 
     let mut result = builder.build();
 
-    if severity_untrusted.is_some() && verbosity.is_some() {
+    if verbosity.is_some() {
         result.set_legacy_verbosity(verbosity.unwrap())
     }
     Ok(result)
@@ -317,7 +319,9 @@ pub fn parse_basic_structured_info(bytes: &[u8]) -> Result<(i64, Severity), Mess
         let transcoded_i32: i32 = severity_untrusted.unwrap().to_string().parse().unwrap();
         LegacySeverity::try_from(transcoded_i32)?
     } else {
-        LegacySeverity::try_from(record.severity as i32).unwrap()
+        // Cast from the u8 to i8 since verbosity is signed
+        let transcoded_i32 = i8::from_le_bytes(record.severity.to_le_bytes()) as i32;
+        LegacySeverity::try_from(transcoded_i32)?
     };
     let (severity, _) = raw_severity.for_structured();
     Ok((record.timestamp, severity))
