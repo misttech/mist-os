@@ -41,9 +41,8 @@ const char* config_path = nullptr;
 zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_device_t* device, const char* path,
                                       zx_handle_t* fw, size_t* size) {
   const std::string_view path_str(path);
-  if ((path_str == GT6853_CONFIG_9364_PATH || path_str == GT6853_CONFIG_9365_PATH ||
-       path_str == GT6853_CONFIG_7703_PATH) &&
-      config_vmo && config_vmo->is_valid()) {
+  if ((path_str == GT6853_CONFIG_9364_PATH || path_str == GT6853_CONFIG_9365_PATH) && config_vmo &&
+      config_vmo->is_valid()) {
     config_path = path;
     *fw = config_vmo->get();
     *size = config_size;
@@ -623,35 +622,6 @@ TEST_F(Gt6853Test, ConfigDownloadPanelType9365) {
   auto config_data = i2c().SyncCall(&FakeTouchDevice::get_config_data);
   EXPECT_STREQ(reinterpret_cast<const char*>(config_data.data()), "Config number zero");
   EXPECT_STREQ(config_path, GT6853_CONFIG_9365_PATH);
-  EXPECT_EQ(config_data.size(), 0x0304 - 121);
-}
-
-TEST_F(Gt6853Test, ConfigDownloadPanelType7703) {
-  config_size = 2338;
-  ASSERT_OK(zx::vmo::create(fbl::round_up(config_size, ZX_PAGE_SIZE), 0, &config_vmo_));
-
-  const uint32_t config_size_le = htole32(config_size);
-  ASSERT_OK(config_vmo_.write(&config_size_le, 0, sizeof(config_size_le)));
-  ASSERT_OK(WriteConfigData({0x2b}, 4));
-  ASSERT_OK(WriteConfigData({0x03}, 9));
-  ASSERT_OK(WriteConfigData({0x16, 0x00, 0x1a, 0x03, 0x1e, 0x06}, 16));
-  ASSERT_OK(WriteConfigData({0x04, 0x03, 0x00, 0x00}, 0x0016));
-  ASSERT_OK(WriteConfigData({0x02}, 0x0016 + 20));
-  ASSERT_OK(WriteConfigString("Config number two", 0x0016 + 121));
-  ASSERT_OK(WriteConfigData({0x04, 0x03, 0x00, 0x00}, 0x031a));
-  ASSERT_OK(WriteConfigData({0x00}, 0x031a + 20));
-  ASSERT_OK(WriteConfigString("Config number zero", 0x031a + 121));
-  ASSERT_OK(WriteConfigData({0x04, 0x03, 0x00, 0x00}, 0x061e));
-  ASSERT_OK(WriteConfigData({0x01}, 0x061e + 20));
-  ASSERT_OK(WriteConfigString("Config number one", 0x061e + 121));
-
-  i2c().SyncCall(&FakeTouchDevice::set_sensor_id, 0);
-
-  ASSERT_OK(Init(6));  // kPanelTypeBoeSit7703
-
-  auto config_data = i2c().SyncCall(&FakeTouchDevice::get_config_data);
-  EXPECT_STREQ(reinterpret_cast<const char*>(config_data.data()), "Config number zero");
-  EXPECT_STREQ(config_path, GT6853_CONFIG_7703_PATH);
   EXPECT_EQ(config_data.size(), 0x0304 - 121);
 }
 

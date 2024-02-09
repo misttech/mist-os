@@ -13,10 +13,11 @@ enum {
   // These values are shared with the bootloader, and must be kept in sync.
   kPanelTypeKdFiti9364 = 1,
   kPanelTypeBoeFiti9364 = 2,
+  // TODO(https://fxbug.dev/324461617): Remove this.
   kPanelTypeInxFiti9364 = 3,
   kPanelTypeKdFiti9365 = 4,
   kPanelTypeBoeFiti9365 = 5,
-  kPanelTypeBoeSit7703 = 6,
+  // 6 was for kPanelTypeBoeSit7703.
 };
 
 // There are three config files, one for each DDIC. A config file may contain multiple configs; the
@@ -30,8 +31,6 @@ inline const char* PanelTypeToConfigPath(uint32_t panel_type_id) {
     case kPanelTypeKdFiti9365:
     case kPanelTypeBoeFiti9365:
       return GT6853_CONFIG_9365_PATH;
-    case kPanelTypeBoeSit7703:
-      return GT6853_CONFIG_7703_PATH;
     default:
       return nullptr;
   }
@@ -49,8 +48,6 @@ inline const char* PanelTypeToNameString(uint32_t panel_type_id) {
       return "kd_fiti9365";
     case kPanelTypeBoeFiti9365:
       return "boe_fiti9365";
-    case kPanelTypeBoeSit7703:
-      return "boe_sit7703";
     default:
       return "unknown";
   }
