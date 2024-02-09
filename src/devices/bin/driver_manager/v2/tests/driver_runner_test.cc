@@ -795,12 +795,13 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_OfferMissingSource) {
 
   fdfw::NodeAddArgs args({
       .name = "second",
-      .offers =
+      .offers2 =
           {
               {
-                  fuchsia_component_decl::Offer::WithProtocol(fdecl::OfferProtocol({
-                      .target_name = std::make_optional<std::string>("fuchsia.package.Renamed"),
-                  })),
+                  fuchsia_driver_framework::Offer::WithZirconTransport(
+                      fuchsia_component_decl::Offer::WithProtocol(fdecl::OfferProtocol({
+                          .target_name = std::make_optional<std::string>("fuchsia.package.Renamed"),
+                      }))),
               },
           },
   });
@@ -822,17 +823,19 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_OfferHasRef) {
 
   fdfw::NodeAddArgs args({
       .name = "second",
-      .offers =
+      .offers2 =
           {
               {
-                  fuchsia_component_decl::Offer::WithProtocol(fdecl::OfferProtocol({
-                      .source = fdecl::Ref::WithSelf(fdecl::SelfRef()),
-                      .source_name = "fuchsia.package.Protocol",
-                  })),
-                  fuchsia_component_decl::Offer::WithProtocol(fdecl::OfferProtocol({
-                      .source_name = "fuchsia.package.Protocol",
-                      .target = fdecl::Ref::WithSelf(fdecl::SelfRef()),
-                  })),
+                  fuchsia_driver_framework::Offer::WithZirconTransport(
+                      fuchsia_component_decl::Offer::WithProtocol(fdecl::OfferProtocol({
+                          .source = fdecl::Ref::WithSelf(fdecl::SelfRef()),
+                          .source_name = "fuchsia.package.Protocol",
+                      }))),
+                  fuchsia_driver_framework::Offer::WithZirconTransport(
+                      fuchsia_component_decl::Offer::WithProtocol(fdecl::OfferProtocol({
+                          .source_name = "fuchsia.package.Protocol",
+                          .target = fdecl::Ref::WithSelf(fdecl::SelfRef()),
+                      }))),
               },
           },
   });
@@ -963,15 +966,6 @@ TEST_F(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
 
   fdfw::NodeAddArgs args({
       .name = "second",
-      .offers =
-          {
-              {
-                  fuchsia_component_decl::Offer::WithProtocol(fdecl::OfferProtocol({
-                      .source_name = "fuchsia.package.Protocol",
-                      .target_name = "fuchsia.package.Renamed",
-                  })),
-              },
-          },
       .symbols =
           {
               {
@@ -979,6 +973,16 @@ TEST_F(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
                       .name = "sym",
                       .address = 0xfeed,
                   }),
+              },
+          },
+      .offers2 =
+          {
+              {
+                  fuchsia_driver_framework::Offer::WithZirconTransport(
+                      fuchsia_component_decl::Offer::WithProtocol(fdecl::OfferProtocol({
+                          .source_name = "fuchsia.package.Protocol",
+                          .target_name = "fuchsia.package.Renamed",
+                      }))),
               },
           },
   });
@@ -1010,15 +1014,6 @@ TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
   PrepareRealmForSecondDriverComponentStart();
   fdfw::NodeAddArgs args({
       .name = "second",
-      .offers =
-          {
-              {
-                  fuchsia_component_decl::Offer::WithProtocol(fdecl::OfferProtocol({
-                      .source_name = "fuchsia.package.Protocol",
-                      .target_name = "fuchsia.package.Renamed",
-                  })),
-              },
-          },
       .symbols =
           {
               {
@@ -1026,6 +1021,16 @@ TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
                       .name = "sym",
                       .address = 0xfeed,
                   }),
+              },
+          },
+      .offers2 =
+          {
+              {
+                  fuchsia_driver_framework::Offer::WithZirconTransport(
+                      fuchsia_component_decl::Offer::WithProtocol(fdecl::OfferProtocol({
+                          .source_name = "fuchsia.package.Protocol",
+                          .target_name = "fuchsia.package.Renamed",
+                      }))),
               },
           },
   });
@@ -1807,8 +1812,7 @@ TEST_F(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
                                    CreateChildRef("dev.dev-group-1.test-group", "boot-drivers")});
 }
 
-// Start a driver and inspect the driver runner.
-TEST_F(DriverRunnerTest, StartAndInspect) {
+TEST_F(DriverRunnerTest, StartAndInspectLegacyOffers) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -1820,10 +1824,12 @@ TEST_F(DriverRunnerTest, StartAndInspect) {
       .offers =
           {
               {
+
                   fuchsia_component_decl::Offer::WithProtocol(fdecl::OfferProtocol({
                       .source_name = "fuchsia.package.ProtocolA",
                       .target_name = "fuchsia.package.RenamedA",
                   })),
+
                   fuchsia_component_decl::Offer::WithProtocol(fdecl::OfferProtocol({
                       .source_name = "fuchsia.package.ProtocolB",
                       .target_name = "fuchsia.package.RenamedB",
@@ -1841,6 +1847,85 @@ TEST_F(DriverRunnerTest, StartAndInspect) {
                       .name = "symbol-B",
                       .address = 0x1985,
                   }),
+              },
+          },
+  });
+  std::shared_ptr<CreatedChild> child =
+      root_driver->driver->AddChild(std::move(args), false, false);
+  EXPECT_TRUE(RunLoopUntilIdle());
+
+  auto hierarchy = Inspect();
+  ASSERT_EQ("root", hierarchy.node().name());
+  ASSERT_EQ(3ul, hierarchy.children().size());
+
+  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
+                                                   .node_name = {"node_topology"},
+                                                   .child_names = {"dev"},
+                                               }));
+
+  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {.node_name = {"node_topology", "dev"},
+                                                .child_names = {"second"},
+                                                .str_properties = {
+                                                    {"driver", root_driver_url},
+                                                }}));
+
+  ASSERT_NO_FATAL_FAILURE(
+      CheckNode(hierarchy, {.node_name = {"node_topology", "dev", "second"},
+                            .child_names = {},
+                            .str_properties = {
+                                {"offers", "fuchsia.package.RenamedA, fuchsia.package.RenamedB"},
+                                {"symbols", "symbol-A, symbol-B"},
+                                {"driver", "unbound"},
+                            }}));
+
+  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
+                                                   .node_name = {"orphan_nodes"},
+                                               }));
+
+  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
+                                                   .node_name = {"dfv1_composites"},
+                                               }));
+
+  StopDriverComponent(std::move(root_driver->controller));
+  realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers")});
+}
+
+// Start a driver and inspect the driver runner.
+TEST_F(DriverRunnerTest, StartAndInspect) {
+  SetupDriverRunner();
+
+  auto root_driver = StartRootDriver();
+  ASSERT_EQ(ZX_OK, root_driver.status_value());
+
+  PrepareRealmForSecondDriverComponentStart();
+  fdfw::NodeAddArgs args({
+      .name = "second",
+      .symbols =
+          {
+              {
+                  fdfw::NodeSymbol({
+                      .name = "symbol-A",
+                      .address = 0x2301,
+                  }),
+                  fdfw::NodeSymbol({
+                      .name = "symbol-B",
+                      .address = 0x1985,
+                  }),
+              },
+          },
+      .offers2 =
+          {
+              {
+                  fuchsia_driver_framework::Offer::WithZirconTransport(
+                      fuchsia_component_decl::Offer::WithProtocol(fdecl::OfferProtocol({
+                          .source_name = "fuchsia.package.ProtocolA",
+                          .target_name = "fuchsia.package.RenamedA",
+                      }))),
+                  fuchsia_driver_framework::Offer::WithZirconTransport(
+                      fuchsia_component_decl::Offer::WithProtocol(fdecl::OfferProtocol({
+                          .source_name = "fuchsia.package.ProtocolB",
+                          .target_name = "fuchsia.package.RenamedB",
+                      }))),
               },
           },
   });

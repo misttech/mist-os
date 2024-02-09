@@ -11,30 +11,71 @@
 #include <fidl/fuchsia.component.decl/cpp/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
+#include <lib/component/incoming/cpp/constants.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/fidl/cpp/wire/traits.h>
+#include <lib/fidl_driver/cpp/transport.h>
 
 #include <string_view>
 
 namespace fdf {
 
-fuchsia_component_decl::Offer MakeOffer(std::string_view service_name,
-                                        std::string_view instance_name);
+fuchsia_component_decl::Offer MakeOffer(
+    std::string_view service_name, std::string_view instance_name = component::kDefaultInstance);
+
+fuchsia_component_decl::wire::Offer MakeOffer(
+    fidl::AnyArena& arena, std::string_view service_name,
+    std::string_view instance_name = component::kDefaultInstance);
 
 template <typename Service>
-fuchsia_component_decl::Offer MakeOffer(std::string_view instance_name) {
+fuchsia_component_decl::Offer MakeOffer(
+    std::string_view instance_name = component::kDefaultInstance) {
   static_assert(fidl::IsServiceV<Service>, "Service must be a fidl Service");
   return MakeOffer(Service::Name, instance_name);
 }
 
-fuchsia_component_decl::wire::Offer MakeOffer(fidl::AnyArena& arena, std::string_view service_name,
-                                              std::string_view instance_name);
 template <typename Service>
-fuchsia_component_decl::wire::Offer MakeOffer(fidl::AnyArena& arena,
-                                              std::string_view instance_name) {
+fuchsia_component_decl::wire::Offer MakeOffer(
+    fidl::AnyArena& arena, std::string_view instance_name = component::kDefaultInstance) {
   static_assert(fidl::IsServiceV<Service>, "Service must be a fidl Service");
   return MakeOffer(arena, Service::Name, instance_name);
 }
+
+#if __Fuchsia_API_level__ >= 18
+
+template <typename Service>
+fuchsia_driver_framework::Offer MakeOffer2(
+    std::string_view instance_name = component::kDefaultInstance) {
+  static_assert(fidl::IsServiceV<Service>, "Service must be a fidl Service");
+  if constexpr (std::is_same_v<typename Service::Transport, fidl::internal::DriverTransport>) {
+    return fuchsia_driver_framework::Offer::WithDriverTransport(
+        MakeOffer(Service::Name, instance_name));
+  } else if constexpr (std::is_same_v<typename Service::Transport,
+                                      fidl::internal::ChannelTransport>) {
+    return fuchsia_driver_framework::Offer::WithZirconTransport(
+        MakeOffer(Service::Name, instance_name));
+  } else {
+    static_assert(std::false_type{}, "Service must be using DriverTransport or ChannelTransport.");
+  }
+}
+
+template <typename Service>
+fuchsia_driver_framework::wire::Offer MakeOffer2(
+    fidl::AnyArena& arena, std::string_view instance_name = component::kDefaultInstance) {
+  static_assert(fidl::IsServiceV<Service>, "Service must be a fidl Service");
+  if constexpr (std::is_same_v<typename Service::Transport, fidl::internal::DriverTransport>) {
+    return fuchsia_driver_framework::wire::Offer::WithDriverTransport(
+        arena, MakeOffer(arena, Service::Name, instance_name));
+  } else if constexpr (std::is_same_v<typename Service::Transport,
+                                      fidl::internal::ChannelTransport>) {
+    return fuchsia_driver_framework::wire::Offer::WithZirconTransport(
+        arena, MakeOffer(arena, Service::Name, instance_name));
+  } else {
+    static_assert(std::false_type{}, "Service must be using DriverTransport or ChannelTransport.");
+  }
+}
+
+#endif  //  __Fuchsia_API_level__ >= 18
 
 inline fuchsia_driver_framework::NodeProperty MakeProperty(uint32_t key, uint32_t value) {
   return fuchsia_driver_framework::NodeProperty{

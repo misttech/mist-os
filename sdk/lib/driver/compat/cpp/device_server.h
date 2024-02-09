@@ -126,6 +126,8 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
   // Create offers to offer this interface to another component.
   std::vector<fuchsia_component_decl::wire::Offer> CreateOffers(fidl::ArenaBase& arena);
   std::vector<fuchsia_component_decl::Offer> CreateOffers();
+  std::vector<fuchsia_driver_framework::wire::Offer> CreateOffers2(fidl::ArenaBase& arena);
+  std::vector<fuchsia_driver_framework::Offer> CreateOffers2();
 
   std::string_view name() const { return name_; }
   std::string topological_path() const { return topological_path_.value_or(""); }
@@ -197,6 +199,15 @@ class SyncInitializedDeviceServer {
   std::vector<fuchsia_component_decl::Offer> CreateOffers() {
     ZX_ASSERT(device_server_);
     return device_server_->CreateOffers();
+  }
+
+  std::vector<fuchsia_driver_framework::wire::Offer> CreateOffers2(fidl::ArenaBase& arena) {
+    ZX_ASSERT(device_server_);
+    return device_server_->CreateOffers2(arena);
+  }
+  std::vector<fuchsia_driver_framework::Offer> CreateOffers2() {
+    ZX_ASSERT(device_server_);
+    return device_server_->CreateOffers2();
   }
 
   const compat::DeviceServer& inner() const {
@@ -280,6 +291,15 @@ class AsyncInitializedDeviceServer {
   std::vector<fuchsia_component_decl::Offer> CreateOffers() {
     ZX_ASSERT(device_server_);
     return device_server_->CreateOffers();
+  }
+
+  std::vector<fuchsia_driver_framework::wire::Offer> CreateOffers2(fidl::ArenaBase& arena) {
+    ZX_ASSERT(device_server_);
+    return device_server_->CreateOffers2(arena);
+  }
+  std::vector<fuchsia_driver_framework::Offer> CreateOffers2() {
+    ZX_ASSERT(device_server_);
+    return device_server_->CreateOffers2();
   }
 
   const compat::DeviceServer& inner() const {

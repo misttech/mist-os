@@ -453,6 +453,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.driver.framework/NodeAddArgs.offers2",
+        "ordinal": "6",
+        "type": "vector<fuchsia.driver.framework/Offer>:128"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.driver.framework/NodeAddArgs.properties",
         "ordinal": "4",
         "type": "vector<fuchsia.driver.framework/NodeProperty>:64"
@@ -670,6 +676,23 @@
     {
         "kind": "table",
         "name": "fuchsia.driver.framework/NodeSymbol"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/Offer.driver_transport",
+        "ordinal": "2",
+        "type": "fuchsia.component.decl/Offer"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.driver.framework/Offer.zircon_transport",
+        "ordinal": "1",
+        "type": "fuchsia.component.decl/Offer"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.driver.framework/Offer",
+        "strictness": "flexible"
     },
     {
         "kind": "struct/member",

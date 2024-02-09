@@ -246,6 +246,33 @@ std::vector<fcd::Offer> DeviceServer::CreateOffers() {
   return offers;
 }
 
+std::vector<fuchsia_driver_framework::wire::Offer> DeviceServer::CreateOffers2(
+    fidl::ArenaBase& arena) {
+  std::vector<fuchsia_driver_framework::wire::Offer> offers;
+  // Create the main fuchsia.driver.compat.Service offer.
+  offers.push_back(fdf::MakeOffer2<fuchsia_driver_compat::Service>(arena, name()));
+
+  if (service_offers_) {
+    auto service_offers = service_offers_->CreateOffers2(arena);
+    offers.reserve(offers.size() + service_offers.size());
+    offers.insert(offers.end(), service_offers.begin(), service_offers.end());
+  }
+  return offers;
+}
+
+std::vector<fuchsia_driver_framework::Offer> DeviceServer::CreateOffers2() {
+  std::vector<fuchsia_driver_framework::Offer> offers;
+  // Create the main fuchsia.driver.compat.Service offer.
+  offers.push_back(fdf::MakeOffer2<fuchsia_driver_compat::Service>(name()));
+
+  if (service_offers_) {
+    auto service_offers = service_offers_->CreateOffers2();
+    offers.reserve(offers.size() + service_offers.size());
+    offers.insert(offers.end(), service_offers.begin(), service_offers.end());
+  }
+  return offers;
+}
+
 void DeviceServer::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
   ZX_ASSERT(topological_path_.has_value());
   completer.Reply(fidl::StringView::FromExternal(topological_path_.value()));

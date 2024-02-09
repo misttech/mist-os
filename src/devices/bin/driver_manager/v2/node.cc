@@ -85,13 +85,16 @@ uint32_t GetProtocolId(const std::vector<fdf::wire::NodeProperty>& properties) {
   return protocol_id;
 }
 
-fit::result<fdf::wire::NodeError, fdecl::Offer> AddOfferToNodeOffer(fdecl::Offer add_offer,
-                                                                    fdecl::Ref source) {
+// Processes the offer by validating it has a source_name and adding a source ref to it.
+// Returns the offer back out.
+fit::result<fdf::wire::NodeError, fdecl::Offer> ProcessNodeOffer(fdecl::Offer add_offer,
+                                                                 fdecl::Ref source) {
   auto has_source_name =
       VisitOffer<bool>(add_offer, [](const auto& decl) { return decl->source_name().has_value(); });
   if (!has_source_name.value_or(false)) {
     return fit::as_error(fdf::wire::NodeError::kOfferSourceNameMissing);
   }
+
   auto has_ref = VisitOffer<bool>(add_offer, [](const auto& decl) {
     return decl->source().has_value() || decl->target().has_value();
   });
@@ -106,6 +109,33 @@ fit::result<fdf::wire::NodeError, fdecl::Offer> AddOfferToNodeOffer(fdecl::Offer
   });
 
   return fit::ok(std::move(add_offer));
+}
+
+// Processes the offer by validating it has a source_name and adding a source ref to it.
+// Returns a tuple containing the offer as well as node property that provides transport
+// information for the offer.
+fit::result<fdf::wire::NodeError, std::tuple<fdecl::Offer, fdf::NodeProperty>>
+ProcessNodeOfferWithTransportProperty(fdecl::Offer add_offer, fdecl::Ref source,
+                                      const std::string& transport_for_property) {
+  auto result = ProcessNodeOffer(std::move(add_offer), std::move(source));
+  if (result.is_error()) {
+    return result.take_error();
+  }
+
+  auto processed_offer = std::move(result.value());
+
+  std::optional<fdf::NodeProperty> node_property = std::nullopt;
+  VisitOffer<bool>(processed_offer, [&node_property, &transport_for_property](const auto& decl) {
+    auto& name = decl->source_name();
+    if (name.has_value()) {
+      const std::string& name_str = name.value();
+      node_property.emplace(fdf::MakeProperty(name_str, name_str + "." + transport_for_property));
+    }
+
+    return true;
+  });
+
+  return fit::ok(std::make_tuple(std::move(processed_offer), std::move(node_property.value())));
 }
 
 bool IsDefaultOffer(std::string_view target_name) {
@@ -664,8 +694,28 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
       std::make_shared<Node>(name, std::vector<std::weak_ptr<Node>>{weak_from_this()},
                              *node_manager_, dispatcher_, std::move(inspect));
 
-  if (args.offers().has_value()) {
-    child->offers_.reserve(args.offers().value().size());
+  if (args.properties().has_value()) {
+    child->properties_.reserve(args.properties()->size() + 1);  // + 1 for DFv2 prop.
+    for (auto& property : args.properties().value()) {
+      child->properties_.emplace_back(fidl::ToWire(child->arena_, property));
+    }
+  }
+
+  // We set a property for DFv2 devices.
+  child->properties_.emplace_back(fdf::MakeProperty(
+      child->arena_, bind_fuchsia_platform::DRIVER_FRAMEWORK_VERSION, static_cast<uint32_t>(2)));
+
+  auto& deprecated_offers = args.offers();
+  auto& fdf_offers = args.offers2();
+  if (deprecated_offers.has_value() || fdf_offers.has_value()) {
+    size_t n = 0;
+    if (deprecated_offers.has_value()) {
+      n += deprecated_offers.value().size();
+    }
+    if (fdf_offers.has_value()) {
+      n += fdf_offers.value().size();
+    }
+    child->offers_.reserve(n);
 
     // Find a parent node with a collection. This indicates that a driver has
     // been bound to the node, and the driver is running within the collection.
@@ -678,27 +728,51 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
                                   .name(source_node->MakeComponentMoniker())
                                   .collection(CollectionName(source_node->collection_)));
 
-    for (auto& offer : args.offers().value()) {
-      fit::result new_offer = AddOfferToNodeOffer(offer, source_ref);
-      if (new_offer.is_error()) {
-        LOGF(ERROR, "Failed to add Node '%s': Bad add offer: %d",
-             child->MakeTopologicalPath().c_str(), new_offer.error_value());
-        return new_offer.take_error();
+    if (deprecated_offers.has_value()) {
+      for (auto& offer : deprecated_offers.value()) {
+        fit::result new_offer = ProcessNodeOffer(offer, source_ref);
+        if (new_offer.is_error()) {
+          LOGF(ERROR, "Failed to add Node '%s': Bad add offer: %d",
+               child->MakeTopologicalPath().c_str(), new_offer.error_value());
+          return new_offer.take_error();
+        }
+
+        child->offers_.emplace_back(fidl::ToWire(child->arena_, new_offer.value()));
       }
-      child->offers_.push_back(fidl::ToWire(child->arena_, new_offer.value()));
+    }
+
+    if (fdf_offers.has_value()) {
+      for (auto& fdf_offer : fdf_offers.value()) {
+        std::optional<fuchsia_component_decl::Offer> offer;
+        std::optional<std::string> transport;
+
+        switch (fdf_offer.Which()) {
+          case fdf::Offer::Tag::kZirconTransport:
+            offer.emplace(fdf_offer.zircon_transport().value());
+            transport.emplace("ZirconTransport");
+            break;
+          case fdf::Offer::Tag::kDriverTransport:
+            offer.emplace(fdf_offer.driver_transport().value());
+            transport.emplace("DriverTransport");
+            break;
+          default:
+            LOGF(ERROR, "Unknown offer transport type %d", fdf_offer.Which());
+            return fit::error(fdf::NodeError::kInternal);
+        }
+
+        fit::result new_offer =
+            ProcessNodeOfferWithTransportProperty(offer.value(), source_ref, transport.value());
+        if (new_offer.is_error()) {
+          LOGF(ERROR, "Failed to add Node '%s': Bad add offer: %d",
+               child->MakeTopologicalPath().c_str(), new_offer.error_value());
+          return new_offer.take_error();
+        }
+        auto [processed_offer, property] = std::move(new_offer.value());
+        child->offers_.emplace_back(fidl::ToWire(child->arena_, processed_offer));
+        child->properties_.emplace_back(fidl::ToWire(child->arena_, property));
+      }
     }
   }
-
-  if (args.properties().has_value()) {
-    child->properties_.reserve(args.properties()->size() + 1);  // + 1 for DFv2 prop.
-    for (auto& property : args.properties().value()) {
-      child->properties_.emplace_back(fidl::ToWire(child->arena_, property));
-    }
-  }
-
-  // We set a property for DFv2 devices.
-  child->properties_.emplace_back(fdf::MakeProperty(
-      child->arena_, bind_fuchsia_platform::DRIVER_FRAMEWORK_VERSION, static_cast<uint32_t>(2)));
 
   child->SetAndPublishInspect();
 

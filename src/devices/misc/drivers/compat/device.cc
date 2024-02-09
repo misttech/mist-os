@@ -84,12 +84,17 @@ bool HasOp(const zx_protocol_device_t* ops, T member) {
   return ops != nullptr && ops->*member != nullptr;
 }
 
-std::vector<std::string> MakeServiceOffers(device_add_args_t* zx_args) {
+std::vector<std::string> MakeZirconServiceOffers(device_add_args_t* zx_args) {
   std::vector<std::string> offers;
   for (const auto& offer :
        cpp20::span(zx_args->fidl_service_offers, zx_args->fidl_service_offer_count)) {
     offers.push_back(std::string(offer));
   }
+  return offers;
+}
+
+std::vector<std::string> MakeDriverServiceOffers(device_add_args_t* zx_args) {
+  std::vector<std::string> offers;
   for (const auto& offer :
        cpp20::span(zx_args->runtime_service_offers, zx_args->runtime_service_offer_count)) {
     offers.push_back(std::string(offer));
@@ -156,9 +161,6 @@ std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
   }
 
   for (auto value : cpp20::span(zx_args->fidl_service_offers, zx_args->fidl_service_offer_count)) {
-    properties.emplace_back(
-        fdf::MakeProperty(arena, value, std::string(value) + ".ZirconTransport"));
-
     auto property = fidl_offer_to_device_prop(arena, value);
     if (property) {
       properties.push_back(*property);
@@ -167,9 +169,6 @@ std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
 
   for (auto value :
        cpp20::span(zx_args->runtime_service_offers, zx_args->runtime_service_offer_count)) {
-    properties.emplace_back(
-        fdf::MakeProperty(arena, value, std::string(value) + ".DriverTransport"));
-
     auto property = fidl_offer_to_device_prop(arena, value);
     if (property) {
       properties.push_back(*property);
@@ -374,7 +373,7 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
     service_offers = ServiceOffersV1(
         outgoing_name,
         fidl::ClientEnd<fuchsia_io::Directory>(zx::channel(zx_args->outgoing_dir_channel)),
-        MakeServiceOffers(zx_args));
+        MakeZirconServiceOffers(zx_args), MakeDriverServiceOffers(zx_args));
   }
 
   if (zx_args->inspect_vmo != ZX_HANDLE_INVALID) {
@@ -473,7 +472,7 @@ zx_status_t Device::ExportAfterInit() {
 zx_status_t Device::CreateNode() {
   // Create NodeAddArgs from `zx_args`.
   fidl::Arena arena;
-  auto offers = device_server_.CreateOffers(arena);
+  auto offers = device_server_.CreateOffers2(arena);
 
   std::vector<fdf::wire::NodeSymbol> symbols;
   symbols.emplace_back(fdf::wire::NodeSymbol::Builder(arena)
@@ -489,8 +488,8 @@ zx_status_t Device::CreateNode() {
       fdf::wire::NodeAddArgs::Builder(arena)
           .name(fidl::StringView::FromExternal(name_))
           .symbols(fidl::VectorView<fdf::wire::NodeSymbol>::FromExternal(symbols))
-          .offers(fidl::VectorView<fcd::wire::Offer>::FromExternal(offers.data(), offers.size()))
-          .properties(fidl::VectorView<fdf::wire::NodeProperty>::FromExternal(properties_));
+          .properties(fidl::VectorView<fdf::wire::NodeProperty>::FromExternal(properties_))
+          .offers2(fidl::VectorView<fdf::wire::Offer>::FromExternal(offers.data(), offers.size()));
 
   // Create NodeController, so we can control the device.
   auto controller_ends = fidl::CreateEndpoints<fdf::NodeController>();
