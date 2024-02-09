@@ -26,9 +26,6 @@ use anyhow::Context as _;
 use std::fmt::Debug;
 
 /// A parsed binary policy.
-///
-/// TODO: Eliminate `dead_code` guard.
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct ParsedPolicy<PS: ParseStrategy> {
     /// A distinctive number that acts as a binary format-specific header for SELinux binary policy
