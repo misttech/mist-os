@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::apply::{apply_system_update, ApplyProgress, ApplyState};
-use crate::channel::{CurrentChannelManager, TargetChannelManager};
+use crate::channel::TargetChannelManager;
 use crate::check::{check_for_system_update, SystemUpdateStatus};
 use crate::connect::ServiceConnect;
 use crate::update_monitor::{AttemptNotifier, StateNotifier, UpdateMonitor};
@@ -617,11 +617,6 @@ impl<S: ServiceConnect + 'static> TargetChannelUpdater for TargetChannelManager<
         TargetChannelManager::get_target_channel_update_url(self)
     }
 }
-
-// For mocking
-#[allow(dead_code)]
-pub trait CurrentChannelUpdater: Send + Sync + 'static {}
-impl CurrentChannelUpdater for CurrentChannelManager {}
 
 // For mocking
 pub trait UpdateApplier: Send + Sync + 'static {

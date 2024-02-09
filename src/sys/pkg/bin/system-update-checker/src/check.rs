@@ -55,8 +55,6 @@ pub async fn check_for_system_update(
 // For mocking
 trait FileSystem {
     fn read_to_string(&self, path: &str) -> io::Result<String>;
-    #[allow(dead_code)]
-    fn remove_file(&mut self, path: &str) -> io::Result<()>;
 }
 
 struct RealFileSystem;
@@ -64,9 +62,6 @@ struct RealFileSystem;
 impl FileSystem for RealFileSystem {
     fn read_to_string(&self, path: &str) -> io::Result<String> {
         std::fs::read_to_string(path)
-    }
-    fn remove_file(&mut self, path: &str) -> io::Result<()> {
-        std::fs::remove_file(path)
     }
 }
 
@@ -349,14 +344,6 @@ pub mod test_check_for_system_update_impl {
                     )
                 })
                 .map(|s| s.to_string())
-        }
-        fn remove_file(&mut self, path: &str) -> io::Result<()> {
-            self.contents.remove(path).and(Some(())).ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!("fake file system cannot remove non-existent file: {path}"),
-                )
-            })
         }
     }
 
