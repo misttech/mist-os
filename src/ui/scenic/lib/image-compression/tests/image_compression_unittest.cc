@@ -4,10 +4,13 @@
 
 #include "src/ui/scenic/lib/image-compression/image_compression.h"
 
+#include <fidl/fuchsia.ui.compression.internal/cpp/hlcpp_conversion.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/syslog/cpp/macros.h>
 #include <png.h>
+
+#include <iostream>
 
 #include <gtest/gtest.h>
 
@@ -103,8 +106,8 @@ std::vector<uint8_t> PngToBGRA(fuchsia::math::SizeU size, zx::vmo& png_vmo) {
 class ImageCompressionTest : public gtest::TestLoopFixture {
  protected:
   void SetUp() override {
-    image_compression_ =
-        std::make_unique<ImageCompression>(fidl::HLCPPToNatural(client_ptr_.NewRequest()));
+    image_compression_ = std::make_unique<ImageCompression>();
+    image_compression_->Connect(fidl::HLCPPToNatural(client_ptr_.NewRequest()), dispatcher());
 
     // Handle 4k tests.
     if (is_4k_) {

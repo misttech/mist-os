@@ -384,6 +384,7 @@ executable("flatland_pixeltest_bin") {
   deps = [
     ":common_deps_cts",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
+    "//sdk/fidl/fuchsia.ui.compression.internal:fuchsia.ui.compression.internal_cpp",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
     "//src/lib/testing/loop_fixture",
     "//src/ui/scenic/lib/allocation:allocation",

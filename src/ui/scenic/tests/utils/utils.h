@@ -43,7 +43,9 @@ Vec4 angleAxis(float angle, const Vec3& vec);
 // display.
 ui_testing::Screenshot TakeScreenshot(
     const fuchsia::ui::composition::ScreenshotSyncPtr& screenshotter, uint64_t width,
-    uint64_t height, int display_rotation = 0);
+    uint64_t height, int display_rotation = 0,
+    fuchsia::ui::composition::ScreenshotFormat format =
+        fuchsia::ui::composition::ScreenshotFormat::BGRA_RAW);
 
 }  // namespace integration_tests
 

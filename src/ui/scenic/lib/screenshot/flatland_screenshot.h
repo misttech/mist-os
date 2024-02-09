@@ -5,6 +5,7 @@
 #ifndef SRC_UI_SCENIC_LIB_SCREENSHOT_FLATLAND_SCREENSHOT_H_
 #define SRC_UI_SCENIC_LIB_SCREENSHOT_FLATLAND_SCREENSHOT_H_
 
+#include <fidl/fuchsia.ui.compression.internal/cpp/fidl.h>
 #include <fuchsia/io/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 
@@ -29,6 +30,7 @@ class FlatlandScreenshot : public fuchsia::ui::composition::Screenshot {
   FlatlandScreenshot(std::unique_ptr<ScreenCapture> screen_capturer,
                      std::shared_ptr<Allocator> allocator, fuchsia::math::SizeU display_size,
                      int display_rotation,
+                     fidl::Client<fuchsia_ui_compression_internal::ImageCompressor> client,
                      fit::function<void(FlatlandScreenshot*)> destroy_instance_function);
 
   ~FlatlandScreenshot() override;
@@ -39,6 +41,7 @@ class FlatlandScreenshot : public fuchsia::ui::composition::Screenshot {
                 TakeFileCallback callback) override;
 
  private:
+  void FinishTake(zx::vmo response_vmo);
   zx::vmo HandleFrameRender();
   void GetNextFrame();
 
@@ -53,6 +56,8 @@ class FlatlandScreenshot : public fuchsia::ui::composition::Screenshot {
 
   // The buffer collection where the display gets rendered into.
   fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info_{};
+
+  fidl::Client<fuchsia_ui_compression_internal::ImageCompressor> client_;
 
   // Called when this instance should be destroyed.
   fit::function<void(FlatlandScreenshot*)> destroy_instance_function_;

@@ -5,26 +5,33 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/inspect/component/cpp/component.h>
-#include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include "lib/component/outgoing/cpp/outgoing_directory.h"
 #include "src/ui/scenic/lib/image-compression/image_compression.h"
 
 int main(int argc, const char** argv) {
   // Create the main async event loop.
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  // Create an instance of the application state.
-  image_compression::App app(loop.dispatcher());
-
-  auto component_context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
+  component::OutgoingDirectory outgoing(loop.dispatcher());
 
   // Initialize inspect
   inspect::ComponentInspector inspector(loop.dispatcher(), inspect::PublishOptions{});
   inspector.Health().StartingUp();
 
-  // Serve a protocol using:
-  // component_context->outgoing()->AddPublicService<MyProtocol>(..);
+  image_compression::ImageCompression impl;
+
+  ZX_ASSERT(outgoing
+                .AddUnmanagedProtocol<fuchsia_ui_compression_internal::ImageCompressor>(
+                    impl.GetHandler(loop.dispatcher()))
+                .is_ok());
+
+  zx::result result = outgoing.ServeFromStartupInfo();
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to serve outgoing directory: " << result.status_string();
+    return -1;
+  }
 
   inspector.Health().Ok();
   FX_LOGS(DEBUG) << "Initialized.";

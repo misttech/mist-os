@@ -15,6 +15,7 @@ executable("unittests") {
 
   sources = [
     "flatland_screenshot_unittest.cc",
+    "mock_image_compression.h",
     "util_unittest.cc",
   ]
 

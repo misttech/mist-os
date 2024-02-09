@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/tests/utils/utils.h"
 
+#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/id.h>
 
@@ -12,6 +13,7 @@
 namespace integration_tests {
 
 using InputCommand = fuchsia::ui::input::Command;
+using fuchsia::ui::composition::ScreenshotFormat;
 using fuchsia::ui::input::PointerEvent;
 using fuchsia::ui::input::PointerEventPhase;
 using fuchsia::ui::input::PointerEventType;
@@ -151,9 +153,9 @@ Vec4 angleAxis(float angle, const Vec3& vec) {
 
 ui_testing::Screenshot TakeScreenshot(
     const fuchsia::ui::composition::ScreenshotSyncPtr& screenshotter, uint64_t width,
-    uint64_t height, int display_rotation) {
+    uint64_t height, int display_rotation, ScreenshotFormat format) {
   fuchsia::ui::composition::ScreenshotTakeRequest request;
-  request.set_format(fuchsia::ui::composition::ScreenshotFormat::BGRA_RAW);
+  request.set_format(format);
 
   fuchsia::ui::composition::ScreenshotTakeResponse response;
   auto status = screenshotter->Take(std::move(request), &response);

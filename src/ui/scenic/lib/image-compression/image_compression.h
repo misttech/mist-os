@@ -9,29 +9,30 @@
 #include <fidl/fuchsia.ui.compression.internal/cpp/hlcpp_conversion.h>
 #include <fuchsia/ui/compression/internal/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
+#include <lib/syslog/cpp/macros.h>
 
 namespace image_compression {
 
-// This is the component's main class. It holds all of the component's state.
-class App {
- public:
-  explicit App(async_dispatcher_t* dispatcher);
-
- private:
-  async_dispatcher_t* dispatcher_ = nullptr;
-};
-
-// This class implements the ImageCompressor protocol. It is stateless.
+// This class implements the ImageCompressor protocol.
 class ImageCompression : public fidl::Server<fuchsia_ui_compression_internal::ImageCompressor> {
  public:
-  ImageCompression(
-      fidl::ServerEnd<fuchsia_ui_compression_internal::ImageCompressor> image_compressor);
-
   // |fidl::Server<fuchsia_ui_compression_internal::ImageCompressor>|
   void EncodePng(EncodePngRequest& request, EncodePngCompleter::Sync& completer) override;
 
+  fidl::ProtocolHandler<fuchsia_ui_compression_internal::ImageCompressor> GetHandler(
+      async_dispatcher_t* dispatcher) {
+    return bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure);
+  }
+
+  void Connect(fidl::ServerEnd<fuchsia_ui_compression_internal::ImageCompressor> request,
+               async_dispatcher_t* dispatcher) {
+    bindings_.AddBinding(dispatcher, std::move(request), this, fidl::kIgnoreBindingClosure);
+  }
+
+  void OnFidlClosed(fidl::UnbindInfo info) {}
+
  private:
-  fidl::ServerBinding<fuchsia_ui_compression_internal::ImageCompressor> binding_;
+  fidl::ServerBindingGroup<fuchsia_ui_compression_internal::ImageCompressor> bindings_;
 };
 
 }  // namespace image_compression

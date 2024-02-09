@@ -4,23 +4,30 @@
 
 #include "src/ui/scenic/lib/screenshot/flatland_screenshot.h"
 
+#include <fidl/fuchsia.ui.compression.internal/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 
+#include <iostream>
 #include <utility>
 
 #include <gtest/gtest.h>
 
-#include "src/lib/fsl/handles/object_info.h"
+#include "src/lib/fsl/vmo/sized_vmo.h"
+#include "src/lib/fsl/vmo/vector.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
 #include "src/ui/scenic/lib/flatland/renderer/null_renderer.h"
+#include "src/ui/scenic/lib/image-compression/image_compression.h"
 #include "src/ui/scenic/lib/screen_capture/screen_capture_buffer_collection_importer.h"
+#include "src/ui/scenic/lib/screenshot/screenshot_manager.h"
+#include "src/ui/scenic/lib/screenshot/tests/mock_image_compression.h"
 
 using allocation::BufferCollectionImporter;
 using fuchsia::ui::composition::ScreenshotFormat;
 using fuchsia::ui::composition::ScreenshotTakeFileResponse;
 using fuchsia::ui::composition::ScreenshotTakeResponse;
+using fuchsia::ui::compression::internal::ImageCompressorEncodePngRequest;
 using screen_capture::ScreenCaptureBufferCollectionImporter;
 
 namespace screenshot {
@@ -29,14 +36,30 @@ namespace test {
 constexpr auto kDisplayWidth = 100u;
 constexpr auto kDisplayHeight = 200u;
 
+fidl::Endpoints<fuchsia_ui_compression_internal::ImageCompressor> CreateImageCompressorEndpoints() {
+  zx::result<fidl::Endpoints<fuchsia_ui_compression_internal::ImageCompressor>> endpoints_result =
+      fidl::CreateEndpoints<fuchsia_ui_compression_internal::ImageCompressor>();
+  FX_CHECK(endpoints_result.is_ok())
+      << "Failed to create endpoints: " << endpoints_result.status_string();
+  return std::move(endpoints_result.value());
+}
+
 class FlatlandScreenshotTest : public gtest::RealLoopFixture,
-                               public ::testing::WithParamInterface<int> {
+                               public ::testing::WithParamInterface<
+                                   std::tuple<fuchsia::ui::composition::ScreenshotFormat, int>> {
  public:
   FlatlandScreenshotTest() = default;
   void SetUp() override {
     renderer_ = std::make_shared<flatland::NullRenderer>();
     importer_ = std::make_shared<ScreenCaptureBufferCollectionImporter>(
         utils::CreateSysmemAllocatorSyncPtr("ScreenshotTest"), renderer_);
+
+    auto compressor_channel = CreateImageCompressorEndpoints();
+    mock_compressor_.Bind(compressor_channel.server.TakeChannel(), async_get_default_dispatcher());
+
+    screenshot::CompressorEventHandler event_handler;
+    fidl::Client client(std::move(compressor_channel.client), async_get_default_dispatcher(),
+                        &event_handler);
 
     std::vector<std::shared_ptr<BufferCollectionImporter>> screenshot_importers;
     screenshot_importers.push_back(importer_);
@@ -63,7 +86,8 @@ class FlatlandScreenshotTest : public gtest::RealLoopFixture,
     fuchsia::math::SizeU display_size = {.width = kDisplayWidth, .height = kDisplayHeight};
 
     flatland_screenshotter_ = std::make_unique<screenshot::FlatlandScreenshot>(
-        std::move(screen_capturer_), flatland_allocator_, display_size, GetParam(), [](auto...) {});
+        std::move(screen_capturer_), flatland_allocator_, display_size, std::get<1>(GetParam()),
+        std::move(client), [](auto...) {});
     RunLoopUntilIdle();
   }
 
@@ -93,6 +117,8 @@ class FlatlandScreenshotTest : public gtest::RealLoopFixture,
     return take_file_response;
   }
 
+  MockImageCompression mock_compressor_;
+
  private:
   sys::testing::ComponentContextProvider context_provider_;
 
@@ -104,12 +130,42 @@ class FlatlandScreenshotTest : public gtest::RealLoopFixture,
   std::unique_ptr<screen_capture::ScreenCapture> screen_capturer_;
 };
 
-INSTANTIATE_TEST_SUITE_P(ParameterizedFlatlandScreenshotTest, FlatlandScreenshotTest,
-                         testing::Values(0, 90, 180, 270));
+INSTANTIATE_TEST_SUITE_P(
+    ParameterizedFlatlandScreenshotTest, FlatlandScreenshotTest,
+    ::testing::Combine(::testing::Values(fuchsia::ui::composition::ScreenshotFormat::BGRA_RAW,
+                                         fuchsia::ui::composition::ScreenshotFormat::PNG),
+                       ::testing::Values(0, 90, 180, 270)));
 
 TEST_P(FlatlandScreenshotTest, SimpleTest) {
+  const auto& [format, rotation] = GetParam();
+  if (format == fuchsia::ui::composition::ScreenshotFormat::PNG) {
+    EXPECT_CALL(mock_compressor_, EncodePng(testing::_, testing::_))
+        .Times(1)
+        .WillOnce([](ImageCompressorEncodePngRequest request,
+                     MockImageCompression::EncodePngCallback callback) -> void {
+          fuchsia::ui::compression::internal::ImageCompressor_EncodePng_Result result;
+          if (!request.has_raw_vmo() || !request.has_png_vmo() || !request.has_image_dimensions()) {
+            result.set_err(fuchsia::ui::compression::internal::ImageCompressionError::MISSING_ARGS);
+          } else {
+            uint64_t in_vmo_size;
+            FX_CHECK(request.raw_vmo().get_size(&in_vmo_size) == ZX_OK);
+            fsl::SizedVmo raw_image =
+                fsl::SizedVmo(std::move(*request.mutable_raw_vmo()), in_vmo_size);
+            std::vector<uint8_t> imgdata;
+            fsl::VectorFromVmo(raw_image, &imgdata);
+
+            FX_CHECK(request.png_vmo().write(imgdata.data(), 0, imgdata.size() * sizeof(uint8_t)) ==
+                     ZX_OK);
+
+            fuchsia::ui::compression::internal::ImageCompressor_EncodePng_Response value;
+            result.set_response(value);
+          }
+          callback(std::move(result));
+        });
+  }
+
   fuchsia::ui::composition::ScreenshotTakeRequest request;
-  request.set_format(fuchsia::ui::composition::ScreenshotFormat::BGRA_RAW);
+  request.set_format(format);
 
   fuchsia::ui::composition::ScreenshotTakeResponse take_response;
   bool done = false;
@@ -129,7 +185,7 @@ TEST_P(FlatlandScreenshotTest, SimpleTest) {
   EXPECT_EQ(NumCurrentServedScreenshots(), 0u);
 
   // Width and height are flipped when the display is rotated by 90 or 270 degrees.
-  if (GetParam() == 90 || GetParam() == 270) {
+  if (rotation == 90 || rotation == 270) {
     EXPECT_EQ(take_response.size().width, kDisplayHeight);
     EXPECT_EQ(take_response.size().height, kDisplayWidth);
 

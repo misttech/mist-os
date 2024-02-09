@@ -8,6 +8,7 @@
 
 #include <memory>
 
+#include "lib/component/incoming/cpp/protocol.h"
 #include "src/ui/scenic/lib/screen_capture/screen_capture.h"
 
 namespace screenshot {
@@ -31,8 +32,20 @@ void ScreenshotManager::CreateBinding(
   std::unique_ptr<ScreenCapture> screen_capture = std::make_unique<ScreenCapture>(
       buffer_collection_importers_, renderer_, [this]() { return get_renderables_(); });
 
+  // fuchsia_ui_compression_internal::ImageCompressor client_ptr;
+  zx::result client_end = component::Connect<fuchsia_ui_compression_internal::ImageCompressor>();
+  if (!client_end.is_ok()) {
+    FX_LOGS(ERROR) << "Error connecting to the |ImageCompressor| protocol: "
+                   << client_end.status_string();
+    return;
+  }
+
+  CompressorEventHandler event_handler;
+  fidl::Client client(std::move(*client_end), async_get_default_dispatcher(), &event_handler);
+
   bindings_.AddBinding(std::make_unique<screenshot::FlatlandScreenshot>(
                            std::move(screen_capture), allocator_, display_size_, display_rotation_,
+                           std::move(client),
                            [this](screenshot::FlatlandScreenshot* sc) {
                              bindings_.CloseBinding(sc, ZX_ERR_SHOULD_WAIT);
                            }),

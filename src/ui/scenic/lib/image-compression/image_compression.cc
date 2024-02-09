@@ -22,15 +22,6 @@
 
 namespace image_compression {
 
-App::App(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
-  async::PostTask(dispatcher_, []() { std::cout << "Hello, Fuchsia!" << std::endl; });
-}
-
-ImageCompression::ImageCompression(
-    fidl::ServerEnd<fuchsia_ui_compression_internal::ImageCompressor> image_compressor)
-    : binding_(async_get_default_dispatcher(), std::move(image_compressor), this,
-               [](fidl::UnbindInfo) {}) {}
-
 void ImageCompression::EncodePng(EncodePngRequest& request, EncodePngCompleter::Sync& completer) {
   // This is an async protocol.
   auto async_completer = completer.ToAsync();

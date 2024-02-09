@@ -46,6 +46,14 @@ class ScreenshotManager {
       bindings_;
 };
 
+class CompressorEventHandler
+    : public fidl::AsyncEventHandler<fuchsia_ui_compression_internal::ImageCompressor> {
+ public:
+  void on_fidl_error(fidl::UnbindInfo error) override { FX_LOGS(ERROR) << error; }
+
+  CompressorEventHandler() = default;
+};
+
 }  // namespace screenshot
 
 #endif  // SRC_UI_SCENIC_LIB_SCREENSHOT_SCREENSHOT_MANAGER_H_
