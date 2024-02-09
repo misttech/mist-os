@@ -15,9 +15,12 @@
 #include <string>
 
 #include <bind/fuchsia/amlogic/platform/a311d/cpp/bind.h>
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/vreg/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/power/cpp/bind.h>
 #include <bind/fuchsia/pwm/cpp/bind.h>
 #include <ddk/metadata/power.h>
@@ -55,36 +58,32 @@ enum VregIdx {
   VREG_COUNT,
 };
 
-constexpr zx_bind_inst_t vreg_pwm_ao_d_match[] = {
-    BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_VREG),
-    BI_MATCH_IF(EQ, BIND_PWM_ID, A311D_PWM_AO_D),
-};
+const std::vector<fuchsia_driver_framework::BindRule> kVregPwmAoDRules = {
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            static_cast<uint32_t>(ZX_FIDL_PROTOCOL_VREG)),
+    fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID, static_cast<uint32_t>(A311D_PWM_AO_D))};
+const std::vector<fuchsia_driver_framework::NodeProperty> kVregPwmAoDProperties = {
+    fdf::MakeProperty(bind_fuchsia_hardware_vreg::SERVICE,
+                      bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeProperty(bind_fuchsia_amlogic_platform::PWM_ID,
+                      bind_fuchsia_amlogic_platform::PWM_ID_AO_D)};
 
-constexpr zx_bind_inst_t vreg_pwm_a_match[] = {
-    BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_VREG),
-    BI_MATCH_IF(EQ, BIND_PWM_ID, A311D_PWM_A),
-};
-
-constexpr device_fragment_part_t vreg_pwm_ao_d_fragment[] = {
-    {std::size(vreg_pwm_ao_d_match), vreg_pwm_ao_d_match},
-};
-
-constexpr device_fragment_part_t vreg_pwm_a_fragment[] = {
-    {std::size(vreg_pwm_a_match), vreg_pwm_a_match},
-};
-
-// Fragments for the "power-impl" composite.
-constexpr device_fragment_t power_impl_fragments[] = {
-    {"vreg-pwm-ao-d", std::size(vreg_pwm_ao_d_fragment), vreg_pwm_ao_d_fragment},
-    {"vreg-pwm-a", std::size(vreg_pwm_a_fragment), vreg_pwm_a_fragment},
-};
+const std::vector<fuchsia_driver_framework::BindRule> kVregPwmARules = {
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            static_cast<uint32_t>(ZX_FIDL_PROTOCOL_VREG)),
+    fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID, static_cast<uint32_t>(A311D_PWM_A))};
+const std::vector<fuchsia_driver_framework::NodeProperty> kVregPwmAProperties = {
+    fdf::MakeProperty(bind_fuchsia_hardware_vreg::SERVICE,
+                      bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeProperty(bind_fuchsia_amlogic_platform::PWM_ID,
+                      bind_fuchsia_amlogic_platform::PWM_ID_A)};
 
 static const fpbus::Node power_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "aml-power-impl-composite";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_A311D;
-  dev.did() = PDEV_DID_AMLOGIC_POWER;
+  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_A311D;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_POWER;
   return dev;
 }();
 
@@ -133,9 +132,9 @@ const std::vector<fdf::ParentSpec> kPowerArmcoreParents = {
 zx_status_t AddBigCore(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
   fpbus::Node big_core_dev;
   big_core_dev.name() = "pd-big-core";
-  big_core_dev.vid() = PDEV_VID_GENERIC;
-  big_core_dev.pid() = PDEV_PID_GENERIC;
-  big_core_dev.did() = PDEV_DID_POWER_CORE;
+  big_core_dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
+  big_core_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  big_core_dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_POWER_CORE;
   big_core_dev.instance_id() = 0;
   big_core_dev.metadata() = std::vector<fpbus::Metadata>{
       {{
@@ -166,9 +165,9 @@ zx_status_t AddBigCore(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Platfo
 zx_status_t AddLittleCore(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
   fpbus::Node little_core_dev;
   little_core_dev.name() = "pd-little-core";
-  little_core_dev.vid() = PDEV_VID_GENERIC;
-  little_core_dev.pid() = PDEV_PID_GENERIC;
-  little_core_dev.did() = PDEV_DID_POWER_CORE;
+  little_core_dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
+  little_core_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  little_core_dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_POWER_CORE;
   little_core_dev.instance_id() = 1;
   little_core_dev.metadata() = std::vector<fpbus::Metadata>{
       {{
@@ -230,9 +229,9 @@ zx_status_t Vim3::PowerInit() {
 
   fpbus::Node vreg_dev;
   vreg_dev.name() = "vreg";
-  vreg_dev.vid() = PDEV_VID_GENERIC;
-  vreg_dev.pid() = PDEV_PID_GENERIC;
-  vreg_dev.did() = PDEV_DID_PWM_VREG;
+  vreg_dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
+  vreg_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  vreg_dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_PWM_VREG;
   vreg_dev.metadata() = std::vector<fpbus::Metadata>{
       {{
           .type = DEVICE_METADATA_VREG,
@@ -292,18 +291,20 @@ zx_status_t Vim3::PowerInit() {
   fidl_arena.Reset();
 
   fdf::Arena arena('PWR_');
-  auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
+  const std::vector<fdf::ParentSpec> kAmlPowerImplComposite = {
+      fdf::ParentSpec{{kVregPwmAoDRules, kVregPwmAoDProperties}},
+      fdf::ParentSpec{{kVregPwmARules, kVregPwmAProperties}}};
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, power_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, power_impl_fragments,
-                                               std::size(power_impl_fragments)),
-      {});
+      fidl::ToWire(fidl_arena, fdf::CompositeNodeSpec{{.name = "aml-power-impl-composite",
+                                                       .parents = kAmlPowerImplComposite}}));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Power(power_dev) request failed: %s",
-           __func__, result.FormatDescription().data());
+    zxlogf(ERROR, "AddCompositeNodeSpec Power(power_dev) request failed: %s",
+           result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Power(power_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Power(power_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

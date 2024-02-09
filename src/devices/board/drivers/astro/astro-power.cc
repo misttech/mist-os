@@ -12,9 +12,12 @@
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/google/platform/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/power/cpp/bind.h>
+#include <bind/fuchsia/pwm/cpp/bind.h>
 #include <ddk/metadata/power.h>
 #include <soc/aml-common/aml-power.h>
 #include <soc/aml-s905d2/s905d2-power.h>
@@ -22,7 +25,6 @@
 
 #include "astro-gpios.h"
 #include "astro.h"
-#include "src/devices/board/drivers/astro/pwm-ao-d-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace fdf {
@@ -54,9 +56,9 @@ constexpr power_domain_t domains[] = {
 zx_status_t AddPowerImpl(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
   fpbus::Node dev;
   dev.name() = "aml-power-impl-composite";
-  dev.vid() = PDEV_VID_GOOGLE;
-  dev.pid() = PDEV_PID_ASTRO;
-  dev.did() = PDEV_DID_AMLOGIC_POWER;
+  dev.vid() = bind_fuchsia_google_platform::BIND_PLATFORM_DEV_VID_GOOGLE;
+  dev.pid() = bind_fuchsia_google_platform::BIND_PLATFORM_DEV_PID_ASTRO;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_POWER;
   dev.metadata() = std::vector<fpbus::Metadata>{
       {{
           .type = DEVICE_METADATA_AML_VOLTAGE_TABLE,
@@ -72,14 +74,25 @@ zx_status_t AddPowerImpl(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Plat
       }},
   };
 
+  const std::vector<fuchsia_driver_framework::BindRule> kPwmRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID, static_cast<uint32_t>(S905D2_PWM_AO_D))};
+  const std::vector<fuchsia_driver_framework::NodeProperty> kPwmProps = {
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_amlogic_platform::PWM_ID,
+                        bind_fuchsia_amlogic_platform::PWM_ID_AO_D)};
+  const std::vector<fdf::ParentSpec> kParents = {fdf::ParentSpec{{kPwmRules, kPwmProps}}};
+
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('POWR');
-  auto fragments = platform_bus_composite::MakeFidlFragment(fidl_arena, aml_power_impl_fragments,
-                                                            std::size(aml_power_impl_fragments));
-  fdf::WireUnownedResult result =
-      pbus.buffer(arena)->AddComposite(fidl::ToWire(fidl_arena, dev), fragments, "pdev");
+  fdf::WireUnownedResult result = pbus.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, dev),
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "aml-power-impl-composite", .parents = kParents}}));
+
   if (!result.ok()) {
-    zxlogf(ERROR, "Failed to send AddComposite request: %s", result.status_string());
+    zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request: %s", result.status_string());
     return result.status();
   }
   if (result->is_error()) {

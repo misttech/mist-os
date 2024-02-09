@@ -2,23 +2,43 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+composite aml_power_impl;
+
 using fuchsia.amlogic.platform;
 using fuchsia.google.platform;
+using fuchsia.hardware.vreg;
+using fuchsia.pwm;
 
-fuchsia.BIND_COMPOSITE == 1;
-fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.POWER;
-if fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE {
-  accept fuchsia.BIND_PLATFORM_DEV_PID {
-    fuchsia.google.platform.BIND_PLATFORM_DEV_PID.ASTRO,
-    fuchsia.google.platform.BIND_PLATFORM_DEV_PID.LUIS,
-    // fuchsia.google.platform.BIND_PLATFORM_DEV_PID.SHERLOCK,
+primary node "pdev" {
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.POWER;
+  if fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE {
+    fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.google.platform.BIND_PLATFORM_DEV_PID.ASTRO;
+  } else if fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC {
+    accept fuchsia.BIND_PLATFORM_DEV_PID {
+      fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D,
+      fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A5,
+    }
+  } else {
+    false;
   }
-} else if fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC {
-  accept fuchsia.BIND_PLATFORM_DEV_PID {
-    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D,
-    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A5,
-  }
-} else {
-  false;
 }
 
+optional node "pwm-ao-d" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pwm.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.amlogic.platform.PWM_ID == fuchsia.amlogic.platform.PWM_ID.AO_D;
+}
+
+optional node "pwm-a" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pwm.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.amlogic.platform.PWM_ID == fuchsia.amlogic.platform.PWM_ID.A;
+}
+
+optional node "vreg-pwm-ao-d" {
+  fuchsia.hardware.vreg.Service == fuchsia.hardware.vreg.Service.ZirconTransport;
+  fuchsia.amlogic.platform.PWM_ID == fuchsia.amlogic.platform.PWM_ID.AO_D;
+}
+
+optional node "vreg-pwm-a" {
+  fuchsia.hardware.vreg.Service == fuchsia.hardware.vreg.Service.ZirconTransport;
+  fuchsia.amlogic.platform.PWM_ID == fuchsia.amlogic.platform.PWM_ID.A;
+}
