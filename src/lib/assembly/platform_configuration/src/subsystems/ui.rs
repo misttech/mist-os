@@ -72,12 +72,54 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             .field("i_can_haz_display_id", -1i64)?
             .field("i_can_haz_display_mode", -1i64)?
             .field("display_rotation", ui_config.display_rotation)?
-            .field("min_display_horizontal_resolution_px", -1)?
-            .field("max_display_horizontal_resolution_px", -1)?
-            .field("min_display_vertical_resolution_px", -1)?
-            .field("max_display_vertical_resolution_px", -1)?
-            .field("min_display_refresh_rate_millihertz", -1)?
-            .field("max_display_refresh_rate_millihertz", -1)?;
+            .field(
+                "min_display_horizontal_resolution_px",
+                ui_config
+                    .display_mode_horizontal_resolution_px_range
+                    .start
+                    .map(|v| v as i32)
+                    .unwrap_or(-1),
+            )?
+            .field(
+                "max_display_horizontal_resolution_px",
+                ui_config
+                    .display_mode_horizontal_resolution_px_range
+                    .end
+                    .map(|v| v as i32)
+                    .unwrap_or(-1),
+            )?
+            .field(
+                "min_display_vertical_resolution_px",
+                ui_config
+                    .display_mode_vertical_resolution_px_range
+                    .start
+                    .map(|v| v as i32)
+                    .unwrap_or(-1),
+            )?
+            .field(
+                "max_display_vertical_resolution_px",
+                ui_config
+                    .display_mode_vertical_resolution_px_range
+                    .end
+                    .map(|v| v as i32)
+                    .unwrap_or(-1),
+            )?
+            .field(
+                "min_display_refresh_rate_millihertz",
+                ui_config
+                    .display_mode_refresh_rate_millihertz_range
+                    .start
+                    .map(|v| v as i32)
+                    .unwrap_or(-1),
+            )?
+            .field(
+                "max_display_refresh_rate_millihertz",
+                ui_config
+                    .display_mode_refresh_rate_millihertz_range
+                    .end
+                    .map(|v| v as i32)
+                    .unwrap_or(-1),
+            )?;
 
         let mut scene_manager_config =
             builder.package("scene_manager").component("meta/scene_manager.cm")?;

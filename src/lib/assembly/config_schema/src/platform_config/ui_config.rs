@@ -61,6 +61,18 @@ pub struct PlatformUiConfig {
     /// The renderer Scenic should use.
     #[serde(default)]
     pub renderer: RendererType,
+
+    /// The constraints on the display mode horizontal resolution, in pixels.
+    #[serde(default)]
+    pub display_mode_horizontal_resolution_px_range: UnsignedIntegerRangeInclusive,
+
+    /// The constraints on the display mode vertical resolution, in pixels.
+    #[serde(default)]
+    pub display_mode_vertical_resolution_px_range: UnsignedIntegerRangeInclusive,
+
+    /// The constraints on the display mode refresh rate, in millihertz (10^-3 Hz).
+    #[serde(default)]
+    pub display_mode_refresh_rate_millihertz_range: UnsignedIntegerRangeInclusive,
 }
 
 impl Default for PlatformUiConfig {
@@ -78,6 +90,9 @@ impl Default for PlatformUiConfig {
             brightness_manager: Default::default(),
             with_synthetic_device_support: Default::default(),
             renderer: Default::default(),
+            display_mode_horizontal_resolution_px_range: Default::default(),
+            display_mode_vertical_resolution_px_range: Default::default(),
+            display_mode_refresh_rate_millihertz_range: Default::default(),
         }
     }
 }
@@ -150,3 +165,12 @@ pub enum RendererType {
     Vulkan,
 }
 // LINT.ThenChange(/src/ui/scenic/bin/app.h)
+
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+pub struct UnsignedIntegerRangeInclusive {
+    /// The inclusive lower bound of the range. If None, the range is unbounded.
+    pub start: Option<u32>,
+
+    /// The inclusive upper bound of the range. If None, the range is unbounded.
+    pub end: Option<u32>,
+}
