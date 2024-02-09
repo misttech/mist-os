@@ -6,6 +6,7 @@
 #include <lib/zx/channel.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 
 #include <vulkan/vk_icd.h>

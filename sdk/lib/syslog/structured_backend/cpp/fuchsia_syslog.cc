@@ -4,6 +4,8 @@
 
 #include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
 
+#include <stdlib.h>
+
 namespace {
 
 // Represents a byte offset that has no alignment guarantees.

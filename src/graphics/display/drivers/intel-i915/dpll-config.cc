@@ -8,6 +8,7 @@
 #include <zircon/assert.h>
 
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 
 namespace i915 {
