@@ -57,6 +57,13 @@ class SquareloadTest(fuchsia_power_base_test.FuchsiaPowerBaseTest):
         model: trace_model.Model = trace_importing.create_model_from_file_path(
             trace_json_path
         )
+
+        power_test_utils.merge_power_data(
+            model,
+            self.power_trace_path,
+            os.path.join(self.log_path, f"{self.metric_name}.fxt"),
+        )
+
         cpu_results: list[trace_metrics.TestCaseResult] = cpu.metrics_processor(
             model, {"aggregateMetricsOnly": True}
         )

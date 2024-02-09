@@ -4,17 +4,40 @@
 # found in the LICENSE file.
 """Fuchsia power test utility library."""
 
+# keep-sorted start
+from collections import deque
+from collections.abc import Iterable
+from dataclasses import dataclass
+from typing import Tuple, Dict, List
 import abc
+import array
 import csv
 import dataclasses
 import enum
+import itertools
+import json
 import logging
+import math
+import operator
 import os
 import signal
+import struct
 import subprocess
 import time
 
-from trace_processing import trace_metrics, trace_model
+# keep-sorted end
+# keep-sorted start
+from trace_processing import trace_metrics
+from trace_processing import trace_model
+from trace_processing import trace_time
+
+# keep-sorted end
+
+
+SAMPLE_INTERVAL_NS = 200000
+
+# Traces use "ticks" which is a hardware dependent time duration
+TICKS_PER_NS = 0.024
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,6 +48,64 @@ _MEASUREPOWER_PATH_ENV_VARIABLE = "MEASUREPOWER_PATH"
 
 def _avg(avg: float, value: float, count: int) -> float:
     return avg + (value - avg) / count
+
+
+def weighted_average(arr: List[float], weights: List[float]) -> float:
+    return sum(
+        itertools.starmap(
+            operator.mul,
+            zip(arr, weights, strict=True),
+        )
+    ) / sum(weights)
+
+
+# We don't have numpy in the vendored python libraries so we'll have to roll our own correlate
+# functionality which will be slooooow.
+#
+# Normally, we'd compute the cross correlation and then take the argmax to line up the signals the
+# closest. Instead we'll do the argmax and the correlation at the same time to save on allocations.
+def cross_correlate_arg_max(
+    signal: Iterable[float], feature: Iterable[float]
+) -> (float, int):
+    """Cross correlate two 1d signals and return the maximum correlation. Correlation is only done
+    where the signals overlap completely.
+
+    Returns
+        (correlation, idx)
+        Where correlation is the maximum correlation between the signals and idx is the argmax that
+        it occurred at.
+    """
+    # Slide our feature across the signal and compute the dot product at each point
+    return max(
+        # Produce items of the form [(correlation1, idx1), (correlation2, idx2), ...] of which we
+        # want the highest correlation.
+        map(
+            lambda base: (
+                # Fancy itertools based dot product
+                sum(
+                    itertools.starmap(
+                        operator.mul,
+                        zip(
+                            itertools.islice(signal, base, base + len(feature)),
+                            feature,
+                            strict=True,
+                        ),
+                    )
+                ),
+                base,
+            ),
+            # Take a sliding window dot product. E.g. if we have the arrays
+            # [1,2,3,4] and [1,2]
+            #
+            # The sliding window dot product is
+            # [
+            #     [1,2] o [1,2],
+            #     [2,3] o [1,2],
+            #     [3,5] o [1,2],
+            # ]
+            range(len(signal) - len(feature) + 1),
+        )
+    )
 
 
 @dataclasses.dataclass
@@ -413,3 +494,373 @@ def create_power_sampler(
             config, measurepower_path=measurepower_path
         )
     return _RealPowerSampler(config)
+
+
+def read_fuchsia_trace_cpu_usage(
+    model: trace_model.Model,
+) -> Dict[int, Tuple[trace_time.TimePoint, float]]:
+    """
+    Read through the given fuchsia trace and return:
+
+    Args:
+        model: the model to extrace cpu usage data from
+
+    Returns:
+        {cpu: [timestamp, usage]}
+        where the timestamp is in ticks and usage is a 0.0 or 1.0 depending on if a
+        processes was scheduled for that interval.
+    """
+    scheduling_intervals = {}
+
+    for cpu, intervals in model.scheduling_records.items():
+        scheduling_intervals[cpu] = list(
+            map(
+                lambda record: (record.start, 0.0 if record.is_idle() else 1.0),
+                # Drop the waking records, the don't count towards cpu usage.
+                filter(
+                    lambda record: isinstance(
+                        record, trace_model.ContextSwitch
+                    ),
+                    intervals,
+                ),
+            )
+        )
+        # The records are _probably_ sorted as is, but there's no guarantee of it.
+        # Let's guarantee it.
+        scheduling_intervals[cpu].sort(key=lambda kv: kv[0])
+
+    return scheduling_intervals
+
+
+def read_power_samples(power_trace_path):
+    """Return a tuple of the current and power samples from the power csv"""
+    current_samples = []
+    voltage_samples = []
+    with open(power_trace_path, "r") as power_csv:
+        reader = csv.reader(power_csv)
+        next(reader)
+        for _, current, voltage in reader:
+            current_samples.append(float(current))
+            voltage_samples.append(float(voltage))
+
+    return (current_samples, voltage_samples)
+
+
+def append_power_data(
+    fxt_path: str,
+    current_samples: List[float],
+    voltage_samples: List[float],
+    starting_ticks: int,
+):
+    """
+    Given a list of voltage and current samples spaced 200us apart and a starting timestamp, append
+    them to the trace at `fxt_path`.
+
+    Args:
+        fxt_path: the fxt file to write to
+        current_samples: the current samples to append
+        voltage_samples: the voltage samples to append
+        starting_ticks: offset from the beginning of the trace in "ticks"
+    """
+    with open(fxt_path, "ab") as merged_trace:
+        # Virtual koids have a top bit as 1, the remaining doesn't matter as long as it's unique.
+        fake_process_koid = 0x8C01_1EC7_EDDA_7A10  # CollectedData10
+        fake_thread_koid = 0x8C01_1EC7_EDDA_7A20  # CollectedData20
+        fake_thread_ref = 0xFF
+
+        def inline_string_ref(string: str):
+            # Inline fxt ids have their top bit set to 1. The remaining bits indicate the number of
+            # inline bytes.
+            return 0x8000 | len(string)
+
+        # See //docs/reference/tracing/trace-format for the below trace format
+        def thread_record_header(thread_ref: int) -> int:
+            thread_record_type = 3
+            thread_record_size_words = 3
+            return (
+                thread_ref << 16
+                | thread_record_size_words << 4
+                | thread_record_type
+            )
+
+        def kernel_object_record_header(
+            num_args: int, name_ref: str, obj_type: int, size_words: int
+        ) -> int:
+            kernel_object_record_header_type = 7
+            return (
+                num_args << 40
+                | name_ref << 24
+                | obj_type << 16
+                | size_words << 4
+                | kernel_object_record_header_type
+            )
+
+        # The a fake process and thread records
+        merged_trace.write(
+            thread_record_header(fake_thread_ref).to_bytes(8, "little")
+        )
+        merged_trace.write(fake_process_koid.to_bytes(8, "little"))
+        merged_trace.write(fake_thread_koid.to_bytes(8, "little"))
+
+        ZX_OBJ_TYPE_PROCESS = 1
+        ZX_OBJ_TYPE_THREAD = 2
+
+        # Name the fake process
+        merged_trace.write(
+            kernel_object_record_header(
+                0,
+                inline_string_ref("Power Measurements"),
+                ZX_OBJ_TYPE_PROCESS,
+                5,  # 1 word header, 1 word koid, 3 words for name stream
+            ).to_bytes(8, "little")
+        )
+        merged_trace.write(fake_process_koid.to_bytes(8, "little"))
+        merged_trace.write(b"Power Measurements\0\0\0\0\0\0")
+
+        # Name the fake thread
+        merged_trace.write(
+            kernel_object_record_header(
+                0,
+                inline_string_ref("Power Measurements"),
+                ZX_OBJ_TYPE_THREAD,
+                5,  # 1 word header, 1 word koid, 3 words for name stream
+            ).to_bytes(8, "little")
+        )
+        merged_trace.write(fake_thread_koid.to_bytes(8, "little"))
+        merged_trace.write(b"Power Measurements\0\0\0\0\0\0")
+
+        timestamp = starting_ticks
+
+        def counter_event_header(
+            name_id,
+            category_id,
+            thread_ref,
+            num_args,
+            record_words,
+        ):
+            counter_event_type = 1 << 16
+            event_record_type = 4
+            return (
+                (name_id << 48)
+                | (category_id << 32)
+                | (thread_ref << 24)
+                | (num_args << 20)
+                | counter_event_type
+                | record_words << 4
+                | event_record_type
+            )
+
+        # We write all our data to the same counter
+        COUNTER_ID = 0x000_0000_0000_0001
+
+        # Now write our sample data as counter events into the trace
+        for current, voltage in zip(current_samples, voltage_samples):
+            # Emit the counter track
+            merged_trace.write(
+                counter_event_header(
+                    inline_string_ref("Metrics"),
+                    inline_string_ref("Metrics"),
+                    0xFF,
+                    3,
+                    # 1 word counter, 1 word ts,
+                    # 2 words inline strings, 9 words arguments,
+                    # 1 word counter id = 14
+                    14,
+                ).to_bytes(8, "little")
+            )
+            merged_trace.write(timestamp.to_bytes(8, "little"))
+            # Inline strings need to be 0 padded to a multiple of 8 bytes.
+            merged_trace.write(b"Metrics\0")
+            merged_trace.write(b"Metrics\0")
+
+            def double_argument_header(name_ref: int, size: int):
+                argument_type = 5
+                return name_ref << 16 | size << 4 | argument_type
+
+            # Write the Voltage
+            merged_trace.write(
+                double_argument_header(
+                    inline_string_ref("Voltage"), 3
+                ).to_bytes(8, "little")
+            )
+            merged_trace.write(b"Voltage\0")
+            data = [float(voltage)]
+            s = struct.pack("d" * len(data), *data)
+            merged_trace.write(s)
+
+            # Write the Current
+            merged_trace.write(
+                double_argument_header(
+                    inline_string_ref("Current"), 3
+                ).to_bytes(8, "little")
+            )
+            merged_trace.write(b"Current\0")
+            data = [float(current)]
+            s = struct.pack("d" * len(data), *data)
+            merged_trace.write(s)
+
+            # Write the Power
+            merged_trace.write(
+                double_argument_header(inline_string_ref("Power"), 3).to_bytes(
+                    8, "little"
+                )
+            )
+            merged_trace.write(b"Power\0\0\0")
+            data = [float(current) * float(voltage)]
+            s = struct.pack("d" * len(data), *data)
+            merged_trace.write(s)
+
+            # Write the counter_id
+            merged_trace.write(COUNTER_ID.to_bytes(8, "little"))
+
+            timestamp += int(SAMPLE_INTERVAL_NS * TICKS_PER_NS)
+
+
+def build_usage_samples(
+    scheduling_intervals: Dict[int, Tuple[trace_time.TimePoint, float]]
+) -> Dict[int, List[float]]:
+    usage_samples = {}
+    # Our per cpu records likely don't all start and end at the same time.
+    # We'll pad the other cpu tracks with idle time on either side.
+    max_len = 0
+    earliest_ts = min(map(lambda x: x[1][0][0], scheduling_intervals.items()))
+    for cpu, intervals in scheduling_intervals.items():
+        # The power samples are a fixed interval apart. We'll synthesize cpu
+        # usage samples that also track over the same interval in this array.
+        cpu_usage_samples = []
+
+        # To make the conversion, let's start by converting our list of
+        # [(start_time, work)] into [(duration, work)]. We could probably do this
+        # in one pass, but doing this conversion first makes the logic easier
+        # to reason about.
+        (prev_ts, prev_work) = intervals[0]
+
+        # Idle pad the beginning of our intervals to start from a fixed timestamp.
+        weighted_work = deque([(prev_ts - earliest_ts, 0.0)])
+        for ts, work in intervals[1:]:
+            weighted_work.append((ts - prev_ts, prev_work))
+            (prev_ts, prev_work) = (ts, work)
+
+        # Finally, to get our fixed sample intervals, we'll use our [(duration,
+        # work)] list and pop chunks of work `sample_interval` ticks at a time.
+        # Then once we've accumulated enough weighted work to fill the
+        # schedule, we'll take the weighted average and call that our cpu usage
+        # for the interval.
+        usage = []
+        durations = []
+        interval_duration_remaining = trace_time.TimeDelta(SAMPLE_INTERVAL_NS)
+
+        for duration, work in weighted_work:
+            if interval_duration_remaining - duration >= trace_time.TimeDelta():
+                # This duration doesn't fill or finish a full sample interval,
+                # just append it to the accumulator lists.
+                usage.append(work)
+                durations.append(duration.to_nanoseconds())
+                interval_duration_remaining -= duration
+            else:
+                # We have enough work to record a sample. Insert what we need
+                # to top off the interval and add it to cpu_usage_samples
+                partial_duration = interval_duration_remaining
+                usage.append(work)
+                durations.append(partial_duration.to_nanoseconds())
+                duration -= partial_duration
+
+                average = weighted_average(usage, durations)
+                cpu_usage_samples.append(average)
+
+                # Now use up the rest of the duration. Not that it's possible
+                # that this duration might actually be longer a full sampling
+                # interval so we should synthesize multiple samples in that
+                # case.
+                remaining_duration = trace_time.TimeDelta(
+                    duration.to_nanoseconds() % SAMPLE_INTERVAL_NS
+                )
+                num_extra_intervals = int(
+                    duration.to_nanoseconds() / SAMPLE_INTERVAL_NS
+                )
+                cpu_usage_samples.extend(
+                    [work for _ in range(0, num_extra_intervals)]
+                )
+
+                # Reset our accumulators with the leftover bits
+                usage = [work]
+                durations = [remaining_duration.to_nanoseconds()]
+                interval_duration_remaining = (
+                    trace_time.TimeDelta(SAMPLE_INTERVAL_NS)
+                    - remaining_duration
+                )
+
+        usage_samples[cpu] = cpu_usage_samples
+        max_len = max(max_len, len(cpu_usage_samples))
+
+    # Idle pad the end of our intervals to all contain the same number
+    for cpu, samples in usage_samples.items():
+        samples.extend([0 for _ in range(len(samples), max_len)])
+    return usage_samples
+
+
+def merge_power_data(
+    model: trace_model.Model, power_trace_path: str, fxt_path: str
+):
+    # We'll start by reading in the fuchsia cpu data from the trace model
+    scheduling_intervals = read_fuchsia_trace_cpu_usage(model)
+    current_samples, voltage_samples = read_power_samples(power_trace_path)
+
+    # We can't just append the power data to the beginning of the trace. The
+    # trace starts before the power collection starts at some unknown offset.
+    # We'll have to first find this offset.
+    #
+    # We know that CPU usage and current draw are highly correlated. So we'll
+    # have the test start by running a cpu intensive workload in a known
+    # pattern for the first few seconds before starting the test. We can then
+    # synthesize cpu usage over the same duration and attempt to correlate the
+    # signals.
+
+    # The power samples come in at fixed intervals. We'll construct cpu usage
+    # data in the same intervals to attempt to correlate it at each offset.
+    # We'll assume the highest correlated offset is the delay the power
+    # sampling started at and we'll insert the samples starting at that
+    # timepoint.
+    earliest_ts = min(map(lambda x: x[1][0][0], scheduling_intervals.items()))
+
+    # The trace model give us per cpu information about which processes start at
+    # which time. To compare it to the power samples we need to convert it into
+    # something of the form ["usage_sample_1", "usage_sample_2", ...] where
+    # each "usage_sample_n" is the cpu usage over a 200us duration.
+    usage_samples = build_usage_samples(scheduling_intervals)
+
+    # Now take take the average cpu usage across each cpu to get overall cpu usage which should
+    # correlate to our power/current samples.
+    merged = [samples for cpu, samples in usage_samples.items()]
+    avg_cpu_combined = [0] * len(merged[0])
+
+    for i in range(0, len(avg_cpu_combined)):
+        total = 0
+        for j in range(0, len(merged)):
+            total += merged[j][i]
+        avg_cpu_combined[i] = total / len(merged)
+
+    # Finally, we can get the cross correlation between power and cpu usage. We run a known cpu
+    # heavy workload in the first 5ish seconds of the test so we limit our signal correlation to
+    # that portion. The power reading shouldn't be delayed by more than a second, so we take the
+    # first 4 seconds of the power readings and attempt to match it up.
+    (
+        strongest_correlation,
+        strongest_correlation_idx,
+    ) = cross_correlate_arg_max(
+        avg_cpu_combined[0:25000], current_samples[0:20000]
+    )
+    offset_ns = strongest_correlation_idx * SAMPLE_INTERVAL_NS
+
+    print(f"Delaying power readings by {offset_ns/1000/1000}ms")
+    starting_ticks = int(
+        (earliest_ts + trace_time.TimeDelta(offset_ns))
+        .to_epoch_delta()
+        .to_nanoseconds()
+        * TICKS_PER_NS
+    )
+    print(f"Aligning Power Trace to start at {starting_ticks} ticks")
+
+    append_power_data(
+        fxt_path, current_samples, voltage_samples, starting_ticks
+    )

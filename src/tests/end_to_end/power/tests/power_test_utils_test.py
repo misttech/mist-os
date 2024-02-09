@@ -3,8 +3,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Unit tests for the perf metric publishing code."""
+# keep-sorted start
 
 import dataclasses
+import itertools
 import json
 import signal
 import tempfile
@@ -12,9 +14,14 @@ import time
 import unittest
 import unittest.mock as mock
 
+# keep-sorted end
+
+# keep-sorted start
 from pathlib import Path
 from power_test_utils import power_test_utils
-from trace_processing import trace_metrics
+from trace_processing import trace_importing, trace_metrics, trace_model
+
+# keep-sorted end
 
 _METRIC_NAME = "M3tr1cN4m3"
 _MEASUREPOWER_PATH = "path/to/power"
@@ -164,3 +171,41 @@ class PowerSamplerTest(unittest.TestCase):
                 self.config_width_measurepower_path
             )
             self.assertIsInstance(sampler, power_test_utils._RealPowerSampler)
+
+    def test_weighted_average(self) -> None:
+        vals = [3, 2, 3, 4]
+        weights = [1, 1, 1, 1]
+        self.assertEqual(power_test_utils.weighted_average(vals, weights), 3)
+
+        vals = [3, 2, 3, 4]
+        weights = [1, 2, 3, 4]
+        # (3 + 4 + 9 + 16) / 10 = 3.2
+        self.assertEqual(power_test_utils.weighted_average(vals, weights), 3.2)
+
+    def test_cross_correlate_arg_max(self) -> None:
+        signal = [1, 2, 3, 4, 5, 6]
+        feature = [1]
+        self.assertEqual(
+            power_test_utils.cross_correlate_arg_max(signal, feature), (6, 5)
+        )
+
+        signal = [1, 2, 3, 4, 5, 6]
+        feature = [1, 2]
+        self.assertEqual(
+            power_test_utils.cross_correlate_arg_max(signal, feature), (17, 4)
+        )
+
+        signal = [0, 0, 0, 1, 4, 3, 2, 0]
+        feature = [1, 4, 3, 2]
+        self.assertEqual(
+            power_test_utils.cross_correlate_arg_max(signal, feature), (30, 3)
+        )
+
+        large_signal = list(range(30000))
+        large_feature = list(range(20000))
+        self.assertEqual(
+            power_test_utils.cross_correlate_arg_max(
+                large_signal, large_feature
+            ),
+            (4666366670000, 10000),
+        )

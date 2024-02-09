@@ -8,7 +8,10 @@ import("//build/testing/host_test_data.gni")
 if (is_host) {
   python_host_test("power_test_utils_test") {
     main_source = "power_test_utils_test.py"
-    libraries = [ "//src/tests/end_to_end/power:power_test_utils" ]
+    libraries = [
+      "//src/tests/end_to_end/power:power_test_utils",
+      "//src/performance/lib/trace_processing",
+    ]
     deps = [ ":runtime_deps" ]
   }
 
