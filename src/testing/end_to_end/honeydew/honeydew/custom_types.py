@@ -21,7 +21,7 @@ class LEVEL(enum.Enum):
     ERROR = enum.auto()
 
 
-@dataclass
+@dataclass(frozen=True)
 class IpPort:
     """Dataclass that holds IP Address and Port
 
@@ -39,14 +39,10 @@ class IpPort:
         Raises:
             ValueError
         """
-        self.ip = ipaddress.ip_address(self.ip)
-
-        if self.port:
-            self.port = int(self.port)
-            if self.port < 1:
-                raise ValueError(
-                    f"port number: {self.port} was not a positive integer"
-                )
+        if self.port is not None and self.port < 1:
+            raise ValueError(
+                f"port number: {self.port} was not a positive integer"
+            )
 
     def __str__(self) -> str:
         host: str = f"{self.ip}"
@@ -129,6 +125,7 @@ class IpPort:
             raise e
 
 
+@dataclass(frozen=True)
 class TargetSshAddress(IpPort):
     """Dataclass that holds target's ssh address information.
 
@@ -138,6 +135,7 @@ class TargetSshAddress(IpPort):
     """
 
 
+@dataclass(frozen=True)
 class Sl4fServerAddress(IpPort):
     """Dataclass that holds sl4f server address information.
 
@@ -147,7 +145,7 @@ class Sl4fServerAddress(IpPort):
     """
 
 
-@dataclass
+@dataclass(frozen=True)
 class FFXConfig:
     """Dataclass that holds FFX config information.
 
@@ -183,7 +181,7 @@ class FFXConfig:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class FidlEndpoint:
     """Dataclass that holds FIDL end point information.
 

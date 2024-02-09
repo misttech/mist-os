@@ -73,7 +73,7 @@ class RequestStatus(enum.StrEnum):
     REJECTED_DUPLICATE_REQUEST = "RejectedDuplicateRequest"
 
 
-@dataclass
+@dataclass(frozen=True)
 class NetworkConfig:
     """Network information used to establish a connection.
 
@@ -89,7 +89,7 @@ class NetworkConfig:
         return self.ssid < other.ssid
 
 
-@dataclass
+@dataclass(frozen=True)
 class NetworkIdentifier:
     """Combination of ssid and the security type.
 
@@ -104,7 +104,7 @@ class NetworkIdentifier:
         return self.ssid < other.ssid
 
 
-@dataclass
+@dataclass(frozen=True)
 class NetworkState:
     """Information about a network's current connections and attempts.
 
@@ -119,7 +119,7 @@ class NetworkState:
         return self.network_identifier < other.network_identifier
 
 
-@dataclass
+@dataclass(frozen=True)
 class ClientStateSummary:
     """Information about the current client state for the device.
 

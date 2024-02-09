@@ -107,6 +107,7 @@ class CustomTypesTests(unittest.TestCase):
             ("invalid_double_scope", "[::1%e%eth0]:100"),
             ("invalid_double_percent", "[::1%%eth0]:100"),
             ("invalid_negative_port", "[::1]:-1"),
+            ("invalid_zero_port", "[::1]:0"),
             ("invalid_port_number", "[::1]:asdf"),
         ]
     )
