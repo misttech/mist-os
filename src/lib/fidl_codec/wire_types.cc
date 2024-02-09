@@ -1089,7 +1089,14 @@ std::unique_ptr<Type> Type::GetType(LibraryLoader* loader, const rapidjson::Valu
     return std::make_unique<VectorType>(GetType(loader, element_type));
   }
   if (kind == "request") {
-    return std::make_unique<HandleType>();
+    std::optional<zx_obj_type_t> object_type = std::nullopt;
+    std::optional<zx_obj_type_t> rights = std::nullopt;
+    std::string_view transport = type["protocol_transport"].GetString();
+    if (transport == "Channel") {
+      object_type = std::optional<zx_obj_type_t>(ZX_OBJ_TYPE_CHANNEL);
+      rights = std::optional<zx_rights_t>(ZX_DEFAULT_CHANNEL_RIGHTS);
+    }
+    return std::make_unique<HandleType>(rights, object_type, type["nullable"].GetBool());
   }
   if (kind == "primitive") {
     return Type::TypeFromPrimitive(type);

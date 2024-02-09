@@ -20,16 +20,17 @@ class ConformanceTests(unittest.TestCase):
 {{ range .EncodeSuccessCases }}
     def test_{{ .Name }}_encode(self):
         {{- if .HandleDefs }}
-
         handle_defs = {{ .HandleDefs }}
         {{- end }}
         value = {{ .Value }}
         b, hdls = value.encode()
         self.assertEqual(b, {{ .Bytes }})
-        {{- if .HandleDefs }}
-        for i, hdl in enumerate(handle_defs):
-            # Element 1 is the handle (these return dispositions).
-            self.assertEqual(hdls[i][1], hdl)
+        {{- if .Handles }}
+        self.assertEqual([hdl[1] for hdl in hdls], {{ .Handles }})
+        {{- else if .HandleDispositions }}
+        self.assertEqual(hdls, {{ .HandleDispositions }})
+        {{- else }}
+        self.assertEqual(hdls, [])
         {{- end }}
 {{ end }}
 

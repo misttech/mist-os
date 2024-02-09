@@ -31,7 +31,7 @@ type conformanceTmplInput struct {
 }
 
 type encodeSuccessCase struct {
-	Name, Context, HandleDefs, Value, Bytes string
+	Name, Context, HandleDefs, Handles, HandleDispositions, Value, Bytes string
 }
 
 type decodeSuccessCase struct{}
@@ -83,6 +83,13 @@ func encodeSuccessCases(gidlEncodeSuccesses []ir.EncodeSuccess, schema mixer.Sch
 				Value:      value,
 				Bytes:      buildBytes(encoding.Bytes),
 			}
+			if len(newCase.HandleDefs) != 0 {
+				if encodeSuccess.CheckHandleRights {
+					newCase.HandleDispositions = buildRawHandleDispositions(encoding.HandleDispositions)
+				} else {
+					newCase.Handles = buildRawHandles(encoding.HandleDispositions)
+				}
+			}
 			encodeSuccessCases = append(encodeSuccessCases, newCase)
 		}
 	}
@@ -110,6 +117,33 @@ func buildHandleDefs(defs []ir.HandleDef) string {
 	builder.WriteString("[\n")
 	for _, d := range defs {
 		builder.WriteString(fmt.Sprintf("create_handle(fuchsia_controller_py.%s).take(),\n", handleTypeName(d.Subtype)))
+	}
+	builder.WriteString("]")
+	return builder.String()
+}
+
+func buildRawHandleDispositions(defs []ir.HandleDisposition) string {
+	if len(defs) == 0 {
+		return ""
+	}
+	var builder strings.Builder
+	builder.WriteString("[")
+	for _, d := range defs {
+		// MOVE operation at idx 0, result ZX_OK at last idx.
+		builder.WriteString(fmt.Sprintf("(0, handle_defs[%d], %d, %d, 0),", d.Handle, d.Type, d.Rights))
+	}
+	builder.WriteString("]")
+	return builder.String()
+}
+
+func buildRawHandles(defs []ir.HandleDisposition) string {
+	if len(defs) == 0 {
+		return ""
+	}
+	var builder strings.Builder
+	builder.WriteString("[")
+	for _, d := range defs {
+		builder.WriteString(fmt.Sprintf("handle_defs[%d],", d.Handle))
 	}
 	builder.WriteString("]")
 	return builder.String()
