@@ -114,7 +114,10 @@ class TestMagmaSyncFile : public testing::Test {
             std::vector<int>& initial_fence_state, bool one_shot = false) {
     ASSERT_TRUE(is_valid_handle(fd));
 
-    uint32_t fence_count = static_cast<uint32_t>(initial_fence_state.size());
+    // Signaled fences get deleted.
+    uint32_t merged_fence_count =
+        std::max(1u, static_cast<uint32_t>(
+                         std::count(initial_fence_state.begin(), initial_fence_state.end(), 0)));
 
     int expected_status = 1;
     for (int status : initial_fence_state) {
@@ -126,7 +129,7 @@ class TestMagmaSyncFile : public testing::Test {
     // Get the number of fences
     struct sync_file_info info = {};
     ASSERT_EQ(0, ioctl(fd, SYNC_IOC_FILE_INFO, &info));
-    ASSERT_EQ(info.num_fences, fence_count);
+    ASSERT_EQ(info.num_fences, merged_fence_count);
 
     // Allocate info storage
     std::vector<sync_fence_info> fence_info(info.num_fences);
@@ -141,7 +144,7 @@ class TestMagmaSyncFile : public testing::Test {
     EXPECT_STREQ(info.name, expected_name);
     EXPECT_EQ(info.status, expected_status);
     EXPECT_EQ(info.flags, 0u);
-    EXPECT_EQ(info.num_fences, fence_count);
+    EXPECT_EQ(info.num_fences, merged_fence_count);
 
     for (uint32_t i = 0; i < info.num_fences; i++) {
       // For testing convenience, we assume null terminated strings
@@ -150,7 +153,7 @@ class TestMagmaSyncFile : public testing::Test {
       EXPECT_STREQ(fence_info[i].obj_name, "");
       EXPECT_STREQ(fence_info[i].driver_name, DRIVER_NAME);
       EXPECT_EQ(fence_info[i].flags, 0u);
-      if (initial_fence_state[i]) {
+      if (expected_status) {
         EXPECT_EQ(fence_info[i].status, 1);
         EXPECT_NE(fence_info[i].timestamp_ns, 0u);
       } else {
@@ -186,7 +189,7 @@ class TestMagmaSyncFile : public testing::Test {
     EXPECT_STREQ(info.name, expected_name);
     EXPECT_EQ(info.status, 1);
     EXPECT_EQ(info.flags, 0u);
-    EXPECT_EQ(info.num_fences, fence_count);
+    EXPECT_EQ(info.num_fences, merged_fence_count);
     for (uint32_t i = 0; i < info.num_fences; i++) {
       // For testing convenience, we assume null terminated strings
       ASSERT_EQ(fence_info[i].obj_name[31], 0);
@@ -216,7 +219,7 @@ class TestMagmaSyncFile : public testing::Test {
     EXPECT_STREQ(info.name, expected_name);
     EXPECT_EQ(info.status, one_shot ? 1 : 0);
     EXPECT_EQ(info.flags, 0u);
-    EXPECT_EQ(info.num_fences, fence_count);
+    EXPECT_EQ(info.num_fences, merged_fence_count);
     for (uint32_t i = 0; i < info.num_fences; i++) {
       // For testing convenience, we assume null terminated strings
       ASSERT_EQ(fence_info[i].obj_name[31], 0);

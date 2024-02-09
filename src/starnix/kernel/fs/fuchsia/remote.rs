@@ -77,6 +77,7 @@ impl RemoteFs {
 
 const REMOTE_FS_MAGIC: u32 = u32::from_be_bytes(*b"f.io");
 const SYNC_IOC_FILE_INFO: u8 = 4;
+const SYNC_IOC_MERGE: u8 = 3;
 
 impl FileSystemOps for RemoteFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
@@ -1463,9 +1464,11 @@ impl FileOps for RemoteFileObject {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        // TODO(b/304273929): Change the SyncFence implementation to not rely on VMOs and
+        // TODO(b/305781995): Change the SyncFence implementation to not rely on VMOs and
         // remove this ioctl. This is temporary solution.
-        if ((request >> 8) as u8 == SYNC_IOC_MAGIC) && (request as u8 == SYNC_IOC_FILE_INFO) {
+        if (request >> 8) as u8 == SYNC_IOC_MAGIC && (request as u8 == SYNC_IOC_FILE_INFO)
+            || (request as u8 == SYNC_IOC_MERGE)
+        {
             let mut sync_points: Vec<SyncPoint> = vec![];
             let vmo = self.get_vmo(file, current_task, Some(8), ProtectionFlags::READ)?;
             sync_points.push(SyncPoint { timeline: Timeline::Hwc, handle: vmo });

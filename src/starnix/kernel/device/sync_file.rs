@@ -176,7 +176,32 @@ impl FileOps for SyncFile {
                     return error!(EINVAL);
                 }
 
-                // TODO(https://fxbug.dev/42078834): remove sync points that are already signaled?
+                // Remove sync points that are already signaled.
+                let mut i = 0 as usize;
+                let mut last_signaled_timestamp_ns = 0;
+                let mut last_signaled_sync_point: Option<SyncPoint> = None;
+                while i < fence.sync_points.len() {
+                    if fence.sync_points[i].handle.wait_handle(zx::Signals::USER_0, zx::Time::ZERO)
+                        != Err(zx::Status::TIMED_OUT)
+                    {
+                        let mut vmo_bytes = vec![0; 8];
+                        let result =
+                            fence.sync_points[i].handle.read(&mut vmo_bytes, /*offset=*/ 0);
+                        assert!(result.is_ok());
+                        let timestamp_ns = u64::from_le_bytes(vmo_bytes[0..8].try_into().unwrap());
+                        let removed = fence.sync_points.remove(i);
+                        if i == 0 && timestamp_ns >= last_signaled_timestamp_ns {
+                            last_signaled_timestamp_ns = timestamp_ns;
+                            last_signaled_sync_point = Some(removed);
+                        }
+                        continue;
+                    }
+                    i += 1;
+                }
+                if fence.sync_points.is_empty() {
+                    fence.sync_points.push(last_signaled_sync_point.expect("No sync points left."));
+                }
+
                 let name = merge_data.name.map(|x| x as u8);
                 let file = Anon::new_file(
                     current_task,
