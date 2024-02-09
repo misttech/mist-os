@@ -63,6 +63,10 @@ func (t *fakeTester) Test(ctx context.Context, test testsharder.Test, stdout, st
 	return testResult(test, result), nil
 }
 
+func (t *fakeTester) ProcessResult(ctx context.Context, test testsharder.Test, outDir string, testResult *TestResult, err error) (*TestResult, error) {
+	return testResult, err
+}
+
 func (t *fakeTester) Close() error {
 	t.funcCalls = append(t.funcCalls, closeFunc)
 	return nil
