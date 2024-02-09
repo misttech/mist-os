@@ -1882,9 +1882,8 @@ group("root_targets") {
     "//build/fidl:all_fidl_json",
   ]
 
-  # TODO(b/324385881): Investigate whether we can remove this.
-  # Required by `fx publish` at runtime.
-  if (!use_bringup_assembly) {
+  # Required by `fx publish` at runtime. Only included when package serving processes are needed.
+  if (has_board && !use_bringup_assembly) {
     deps += [ "//build/images/updates:prepare_publish" ]
   }
 }
