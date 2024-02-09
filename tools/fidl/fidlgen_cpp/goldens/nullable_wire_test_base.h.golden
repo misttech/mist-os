@@ -26,7 +26,7 @@ class WireTestBase<::test_nullable::SimpleProtocol> : public ::fidl::WireServer<
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_nullable::SimpleProtocol> : public ::fidl::WireSyncEventHandler<::test_nullable::SimpleProtocol> {
+class WireSyncEventHandlerTestBase<::test_nullable::SimpleProtocol> : public ::fidl::WireSyncEventHandler<::test_nullable::SimpleProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_nullable::SimpleProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;

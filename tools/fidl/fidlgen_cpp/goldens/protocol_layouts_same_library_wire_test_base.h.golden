@@ -51,7 +51,7 @@ class WireTestBase<::test_protocollayoutssamelibrary::ComposedProtocol> : public
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocollayoutssamelibrary::ComposedProtocol> : public ::fidl::WireSyncEventHandler<::test_protocollayoutssamelibrary::ComposedProtocol> {
+class WireSyncEventHandlerTestBase<::test_protocollayoutssamelibrary::ComposedProtocol> : public ::fidl::WireSyncEventHandler<::test_protocollayoutssamelibrary::ComposedProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_protocollayoutssamelibrary::ComposedProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
@@ -137,7 +137,7 @@ class WireTestBase<::test_protocollayoutssamelibrary::MainProtocol> : public ::f
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocollayoutssamelibrary::MainProtocol> : public ::fidl::WireSyncEventHandler<::test_protocollayoutssamelibrary::MainProtocol> {
+class WireSyncEventHandlerTestBase<::test_protocollayoutssamelibrary::MainProtocol> : public ::fidl::WireSyncEventHandler<::test_protocollayoutssamelibrary::MainProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_protocollayoutssamelibrary::MainProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;

@@ -81,7 +81,7 @@ class WireTestBase<::test_protocolpayloads::MainProtocol> : public ::fidl::WireS
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocolpayloads::MainProtocol> : public ::fidl::WireSyncEventHandler<::test_protocolpayloads::MainProtocol> {
+class WireSyncEventHandlerTestBase<::test_protocolpayloads::MainProtocol> : public ::fidl::WireSyncEventHandler<::test_protocolpayloads::MainProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_protocolpayloads::MainProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;

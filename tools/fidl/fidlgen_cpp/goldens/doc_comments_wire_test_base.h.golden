@@ -25,7 +25,7 @@ class WireTestBase<::test_doccomments::Interface> : public ::fidl::WireServer<::
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_doccomments::Interface> : public ::fidl::WireSyncEventHandler<::test_doccomments::Interface> {
+class WireSyncEventHandlerTestBase<::test_doccomments::Interface> : public ::fidl::WireSyncEventHandler<::test_doccomments::Interface> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_doccomments::Interface>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;

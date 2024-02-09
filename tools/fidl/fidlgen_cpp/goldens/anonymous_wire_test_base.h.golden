@@ -26,7 +26,7 @@ class WireTestBase<::test_anonymous::SomeProtocol> : public ::fidl::WireServer<:
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_anonymous::SomeProtocol> : public ::fidl::WireSyncEventHandler<::test_anonymous::SomeProtocol> {
+class WireSyncEventHandlerTestBase<::test_anonymous::SomeProtocol> : public ::fidl::WireSyncEventHandler<::test_anonymous::SomeProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_anonymous::SomeProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;

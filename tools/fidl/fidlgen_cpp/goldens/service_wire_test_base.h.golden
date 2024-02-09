@@ -25,7 +25,7 @@ class WireTestBase<::test_service::FirstProtocol> : public ::fidl::WireServer<::
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_service::FirstProtocol> : public ::fidl::WireSyncEventHandler<::test_service::FirstProtocol> {
+class WireSyncEventHandlerTestBase<::test_service::FirstProtocol> : public ::fidl::WireSyncEventHandler<::test_service::FirstProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_service::FirstProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
@@ -43,7 +43,7 @@ class WireTestBase<::test_service::SecondProtocol> : public ::fidl::WireServer<:
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_service::SecondProtocol> : public ::fidl::WireSyncEventHandler<::test_service::SecondProtocol> {
+class WireSyncEventHandlerTestBase<::test_service::SecondProtocol> : public ::fidl::WireSyncEventHandler<::test_service::SecondProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_service::SecondProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;

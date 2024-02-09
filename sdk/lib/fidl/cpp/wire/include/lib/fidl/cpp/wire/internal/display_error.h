@@ -38,11 +38,11 @@ size_t FormatDisplayError(const T& value, char* destination, size_t capacity) {
 // TODO(https://fxbug.dev/42177190): |zx_status_t| dispatches to this path today.
 // Ideally we would like to print the human readable status name.
 template <>
-struct fidl::internal::DisplayError<int32_t> {
+struct DisplayError<int32_t> {
   static size_t Format(const int32_t& value, char* destination, size_t capacity);
 };
 template <>
-struct fidl::internal::DisplayError<uint32_t> {
+struct DisplayError<uint32_t> {
   static size_t Format(const uint32_t& value, char* destination, size_t capacity);
 };
 

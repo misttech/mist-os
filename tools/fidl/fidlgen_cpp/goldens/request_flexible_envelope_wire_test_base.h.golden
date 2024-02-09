@@ -31,7 +31,7 @@ class WireTestBase<::test_requestflexibleenvelope::Protocol> : public ::fidl::Wi
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_requestflexibleenvelope::Protocol> : public ::fidl::WireSyncEventHandler<::test_requestflexibleenvelope::Protocol> {
+class WireSyncEventHandlerTestBase<::test_requestflexibleenvelope::Protocol> : public ::fidl::WireSyncEventHandler<::test_requestflexibleenvelope::Protocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_requestflexibleenvelope::Protocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;

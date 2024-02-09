@@ -29,7 +29,7 @@ class WireTestBase<::test_union::TestProtocol> : public ::fidl::WireServer<::tes
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_union::TestProtocol> : public ::fidl::WireSyncEventHandler<::test_union::TestProtocol> {
+class WireSyncEventHandlerTestBase<::test_union::TestProtocol> : public ::fidl::WireSyncEventHandler<::test_union::TestProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_union::TestProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;

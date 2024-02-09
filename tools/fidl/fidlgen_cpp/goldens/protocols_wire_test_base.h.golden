@@ -48,7 +48,7 @@ class WireTestBase<::test_protocols::WithAndWithoutRequestResponse> : public ::f
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocols::WithAndWithoutRequestResponse> : public ::fidl::WireSyncEventHandler<::test_protocols::WithAndWithoutRequestResponse> {
+class WireSyncEventHandlerTestBase<::test_protocols::WithAndWithoutRequestResponse> : public ::fidl::WireSyncEventHandler<::test_protocols::WithAndWithoutRequestResponse> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_protocols::WithAndWithoutRequestResponse>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
@@ -84,7 +84,7 @@ class WireTestBase<::test_protocols::WithErrorSyntax> : public ::fidl::WireServe
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocols::WithErrorSyntax> : public ::fidl::WireSyncEventHandler<::test_protocols::WithErrorSyntax> {
+class WireSyncEventHandlerTestBase<::test_protocols::WithErrorSyntax> : public ::fidl::WireSyncEventHandler<::test_protocols::WithErrorSyntax> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_protocols::WithErrorSyntax>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
@@ -118,7 +118,7 @@ class WireTestBase<::test_protocols::ChannelProtocol> : public ::fidl::WireServe
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocols::ChannelProtocol> : public ::fidl::WireSyncEventHandler<::test_protocols::ChannelProtocol> {
+class WireSyncEventHandlerTestBase<::test_protocols::ChannelProtocol> : public ::fidl::WireSyncEventHandler<::test_protocols::ChannelProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_protocols::ChannelProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
@@ -145,7 +145,7 @@ class WireTestBase<::test_protocols::Transitional> : public ::fidl::WireServer<:
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocols::Transitional> : public ::fidl::WireSyncEventHandler<::test_protocols::Transitional> {
+class WireSyncEventHandlerTestBase<::test_protocols::Transitional> : public ::fidl::WireSyncEventHandler<::test_protocols::Transitional> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_protocols::Transitional>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
@@ -166,7 +166,7 @@ class WireTestBase<::test_protocols::DiscoverableProtocol> : public ::fidl::Wire
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocols::DiscoverableProtocol> : public ::fidl::WireSyncEventHandler<::test_protocols::DiscoverableProtocol> {
+class WireSyncEventHandlerTestBase<::test_protocols::DiscoverableProtocol> : public ::fidl::WireSyncEventHandler<::test_protocols::DiscoverableProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_protocols::DiscoverableProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
@@ -180,7 +180,7 @@ class WireTestBase<::test_protocols::AnotherDiscoverableProtocol> : public ::fid
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocols::AnotherDiscoverableProtocol> : public ::fidl::WireSyncEventHandler<::test_protocols::AnotherDiscoverableProtocol> {
+class WireSyncEventHandlerTestBase<::test_protocols::AnotherDiscoverableProtocol> : public ::fidl::WireSyncEventHandler<::test_protocols::AnotherDiscoverableProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_protocols::AnotherDiscoverableProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
@@ -204,7 +204,7 @@ class WireTestBase<::test_protocols::HandleRightsProtocol> : public ::fidl::Wire
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocols::HandleRightsProtocol> : public ::fidl::WireSyncEventHandler<::test_protocols::HandleRightsProtocol> {
+class WireSyncEventHandlerTestBase<::test_protocols::HandleRightsProtocol> : public ::fidl::WireSyncEventHandler<::test_protocols::HandleRightsProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_protocols::HandleRightsProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
@@ -236,7 +236,7 @@ class WireTestBase<::test_protocols::WithProtocolEnds> : public ::fidl::WireServ
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocols::WithProtocolEnds> : public ::fidl::WireSyncEventHandler<::test_protocols::WithProtocolEnds> {
+class WireSyncEventHandlerTestBase<::test_protocols::WithProtocolEnds> : public ::fidl::WireSyncEventHandler<::test_protocols::WithProtocolEnds> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_protocols::WithProtocolEnds>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
@@ -255,7 +255,7 @@ class WireTestBase<::test_protocols::ManyParameters> : public ::fidl::WireServer
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocols::ManyParameters> : public ::fidl::WireSyncEventHandler<::test_protocols::ManyParameters> {
+class WireSyncEventHandlerTestBase<::test_protocols::ManyParameters> : public ::fidl::WireSyncEventHandler<::test_protocols::ManyParameters> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_protocols::ManyParameters>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
@@ -274,7 +274,7 @@ class WireTestBase<::test_protocols::MethodWithUnion> : public ::fidl::WireServe
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocols::MethodWithUnion> : public ::fidl::WireSyncEventHandler<::test_protocols::MethodWithUnion> {
+class WireSyncEventHandlerTestBase<::test_protocols::MethodWithUnion> : public ::fidl::WireSyncEventHandler<::test_protocols::MethodWithUnion> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_protocols::MethodWithUnion>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;

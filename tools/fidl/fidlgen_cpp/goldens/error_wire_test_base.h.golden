@@ -26,7 +26,7 @@ class WireTestBase<::test_error::Example> : public ::fidl::WireServer<::test_err
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_error::Example> : public ::fidl::WireSyncEventHandler<::test_error::Example> {
+class WireSyncEventHandlerTestBase<::test_error::Example> : public ::fidl::WireSyncEventHandler<::test_error::Example> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_error::Example>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;

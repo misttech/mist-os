@@ -26,7 +26,7 @@ class WireTestBase<::test_placementofattributes::ExampleProtocol> : public ::fid
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_placementofattributes::ExampleProtocol> : public ::fidl::WireSyncEventHandler<::test_placementofattributes::ExampleProtocol> {
+class WireSyncEventHandlerTestBase<::test_placementofattributes::ExampleProtocol> : public ::fidl::WireSyncEventHandler<::test_placementofattributes::ExampleProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_placementofattributes::ExampleProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;

@@ -26,7 +26,7 @@ class WireTestBase<::test_inheritance::Super> : public ::fidl::WireServer<::test
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_inheritance::Super> : public ::fidl::WireSyncEventHandler<::test_inheritance::Super> {
+class WireSyncEventHandlerTestBase<::test_inheritance::Super> : public ::fidl::WireSyncEventHandler<::test_inheritance::Super> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_inheritance::Super>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
@@ -45,7 +45,7 @@ class WireTestBase<::test_inheritance::Sub> : public ::fidl::WireServer<::test_i
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_inheritance::Sub> : public ::fidl::WireSyncEventHandler<::test_inheritance::Sub> {
+class WireSyncEventHandlerTestBase<::test_inheritance::Sub> : public ::fidl::WireSyncEventHandler<::test_inheritance::Sub> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_inheritance::Sub>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;

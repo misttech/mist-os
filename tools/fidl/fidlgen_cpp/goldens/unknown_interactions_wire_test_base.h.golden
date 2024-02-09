@@ -96,7 +96,7 @@ class WireTestBase<::test_unknowninteractions::UnknownInteractionsProtocol> : pu
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_unknowninteractions::UnknownInteractionsProtocol> : public ::fidl::WireSyncEventHandler<::test_unknowninteractions::UnknownInteractionsProtocol> {
+class WireSyncEventHandlerTestBase<::test_unknowninteractions::UnknownInteractionsProtocol> : public ::fidl::WireSyncEventHandler<::test_unknowninteractions::UnknownInteractionsProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_unknowninteractions::UnknownInteractionsProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
@@ -204,7 +204,7 @@ class WireTestBase<::test_unknowninteractions::UnknownInteractionsAjarProtocol> 
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_unknowninteractions::UnknownInteractionsAjarProtocol> : public ::fidl::WireSyncEventHandler<::test_unknowninteractions::UnknownInteractionsAjarProtocol> {
+class WireSyncEventHandlerTestBase<::test_unknowninteractions::UnknownInteractionsAjarProtocol> : public ::fidl::WireSyncEventHandler<::test_unknowninteractions::UnknownInteractionsAjarProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_unknowninteractions::UnknownInteractionsAjarProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
@@ -305,7 +305,7 @@ class WireTestBase<::test_unknowninteractions::UnknownInteractionsClosedProtocol
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_unknowninteractions::UnknownInteractionsClosedProtocol> : public ::fidl::WireSyncEventHandler<::test_unknowninteractions::UnknownInteractionsClosedProtocol> {
+class WireSyncEventHandlerTestBase<::test_unknowninteractions::UnknownInteractionsClosedProtocol> : public ::fidl::WireSyncEventHandler<::test_unknowninteractions::UnknownInteractionsClosedProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_unknowninteractions::UnknownInteractionsClosedProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;

@@ -26,7 +26,7 @@ class WireTestBase<::test_inheritancewithrecursivedecl::Parent> : public ::fidl:
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_inheritancewithrecursivedecl::Parent> : public ::fidl::WireSyncEventHandler<::test_inheritancewithrecursivedecl::Parent> {
+class WireSyncEventHandlerTestBase<::test_inheritancewithrecursivedecl::Parent> : public ::fidl::WireSyncEventHandler<::test_inheritancewithrecursivedecl::Parent> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_inheritancewithrecursivedecl::Parent>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
@@ -50,7 +50,7 @@ class WireTestBase<::test_inheritancewithrecursivedecl::Child> : public ::fidl::
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_inheritancewithrecursivedecl::Child> : public ::fidl::WireSyncEventHandler<::test_inheritancewithrecursivedecl::Child> {
+class WireSyncEventHandlerTestBase<::test_inheritancewithrecursivedecl::Child> : public ::fidl::WireSyncEventHandler<::test_inheritancewithrecursivedecl::Child> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_inheritancewithrecursivedecl::Child>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;

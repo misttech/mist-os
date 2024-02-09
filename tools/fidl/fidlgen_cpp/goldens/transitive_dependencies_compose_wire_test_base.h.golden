@@ -25,7 +25,7 @@ class WireTestBase<::test_transitivedependenciescompose::Top> : public ::fidl::W
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_transitivedependenciescompose::Top> : public ::fidl::WireSyncEventHandler<::test_transitivedependenciescompose::Top> {
+class WireSyncEventHandlerTestBase<::test_transitivedependenciescompose::Top> : public ::fidl::WireSyncEventHandler<::test_transitivedependenciescompose::Top> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_transitivedependenciescompose::Top>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;

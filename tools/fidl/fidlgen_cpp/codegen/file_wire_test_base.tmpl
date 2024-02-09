@@ -52,7 +52,7 @@ fidl/{{ .LibraryDots }}/cpp/wire_test_base.h
   };
 
   template<>
-  class {{ .WireSyncEventHandlerTestBase }} : public {{ .WireSyncEventHandler }} {
+  class {{ .WireSyncEventHandlerTestBase.Name }} : public {{ .WireSyncEventHandler }} {
    public:
     virtual ~{{ .WireSyncEventHandlerTestBase.Name }}() = default;
     virtual void NotImplemented_(const std::string& name) = 0;

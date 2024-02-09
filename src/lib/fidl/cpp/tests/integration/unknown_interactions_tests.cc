@@ -19,7 +19,7 @@ struct FakeUnknownMethod {
 
 namespace fidl::internal {
 template <>
-struct ::fidl::internal::WireOrdinal<FakeUnknownMethod> {
+struct WireOrdinal<FakeUnknownMethod> {
   static constexpr uint64_t value = FakeUnknownMethod::kOrdinal;
 };
 }  // namespace fidl::internal

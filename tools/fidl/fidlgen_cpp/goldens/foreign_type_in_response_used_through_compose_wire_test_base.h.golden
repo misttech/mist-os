@@ -25,7 +25,7 @@ class WireTestBase<::test_foreigntypeinresponseusedthroughcompose::Top> : public
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_foreigntypeinresponseusedthroughcompose::Top> : public ::fidl::WireSyncEventHandler<::test_foreigntypeinresponseusedthroughcompose::Top> {
+class WireSyncEventHandlerTestBase<::test_foreigntypeinresponseusedthroughcompose::Top> : public ::fidl::WireSyncEventHandler<::test_foreigntypeinresponseusedthroughcompose::Top> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_foreigntypeinresponseusedthroughcompose::Top>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;

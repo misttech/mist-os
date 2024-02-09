@@ -147,7 +147,7 @@ class WireTestBase<::test_typesinprotocols::Protocol> : public ::fidl::WireServe
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_typesinprotocols::Protocol> : public ::fidl::WireSyncEventHandler<::test_typesinprotocols::Protocol> {
+class WireSyncEventHandlerTestBase<::test_typesinprotocols::Protocol> : public ::fidl::WireSyncEventHandler<::test_typesinprotocols::Protocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_typesinprotocols::Protocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;

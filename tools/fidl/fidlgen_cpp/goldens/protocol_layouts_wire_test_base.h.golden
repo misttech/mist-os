@@ -96,7 +96,7 @@ class WireTestBase<::test_protocollayouts::MainProtocol> : public ::fidl::WireSe
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocollayouts::MainProtocol> : public ::fidl::WireSyncEventHandler<::test_protocollayouts::MainProtocol> {
+class WireSyncEventHandlerTestBase<::test_protocollayouts::MainProtocol> : public ::fidl::WireSyncEventHandler<::test_protocollayouts::MainProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_protocollayouts::MainProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
@@ -178,7 +178,7 @@ class WireTestBase<::test_protocollayouts::OpenProtocol> : public ::fidl::WireSe
 };
 
 template <>
-class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocollayouts::OpenProtocol> : public ::fidl::WireSyncEventHandler<::test_protocollayouts::OpenProtocol> {
+class WireSyncEventHandlerTestBase<::test_protocollayouts::OpenProtocol> : public ::fidl::WireSyncEventHandler<::test_protocollayouts::OpenProtocol> {
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_protocollayouts::OpenProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
