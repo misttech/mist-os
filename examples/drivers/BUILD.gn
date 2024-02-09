@@ -8,6 +8,7 @@ group("drivers") {
     "dotmatrix_display",
     "driver_test_realm/sample-driver",
     "fidl_bindlib_codegen",
+    "simple/dfv2:pkg",
     "transport",
     "v2/demo-libc:component",
     "v2/demo-number:component",
@@ -18,6 +19,7 @@ group("hermetic_tests") {
   testonly = true
   deps = [
     "driver_test_realm:hermetic_tests",
+    "simple/dfv2/tests:simple-driver-hermetic-test-pkg",
     "transport:hermetic_tests",
     "v2/demo-number:hermetic_tests",
   ]

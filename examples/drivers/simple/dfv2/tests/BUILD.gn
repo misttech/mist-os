@@ -1,0 +1,28 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/test.gni")
+
+test("simple-driver-test") {
+  output_name = "simple-driver-test"
+  sources = [
+    "//examples/drivers/simple/dfv2/simple_driver.cc",
+    "test.cc",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+fuchsia_unittest_package("simple-driver-hermetic-test-pkg") {
+  package_name = "simple_driver_test"
+  deps = [ ":simple-driver-test" ]
+}
