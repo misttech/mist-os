@@ -104,8 +104,10 @@ fn is_fastboot_match(info: &InterfaceInfo) -> bool {
     let errs: Vec<_> = results.into_iter().filter_map(|r| r.err()).collect();
 
     if !errs.is_empty() {
+        let serial = extract_serial_number(info);
         tracing::debug!(
-            "Interface is not valid fastboot match. Encountered errors: \n\t{}",
+            "Interface with serial {} is not valid fastboot match. Encountered errors: \n\t{}",
+            serial,
             errs.clone().into_iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n\t")
         );
         false
@@ -242,16 +244,17 @@ pub enum FastbootEvent {
     Lost(String),
 }
 
+#[allow(async_fn_in_trait)]
 pub trait FastbootEventHandler: Send + 'static {
     /// Handles an event.
-    fn handle_event(&mut self, event: Result<FastbootEvent>);
+    async fn handle_event(&mut self, event: Result<FastbootEvent>);
 }
 
 impl<F> FastbootEventHandler for F
 where
     F: FnMut(Result<FastbootEvent>) -> () + Send + 'static,
 {
-    fn handle_event(&mut self, x: Result<FastbootEvent>) -> () {
+    async fn handle_event(&mut self, x: Result<FastbootEvent>) -> () {
         self(x)
     }
 }
@@ -353,7 +356,7 @@ where
     loop {
         let event = receiver.recv().await.map_err(|e| anyhow!(e));
         tracing::trace!("Event loop received event: {:#?}", event);
-        handler.handle_event(event);
+        handler.handle_event(event).await;
     }
 }
 

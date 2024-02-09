@@ -37,7 +37,9 @@ struct OpenInterfaceLiveTester;
 
 impl UsbLiveTester for OpenInterfaceLiveTester {
     async fn is_usb_live(self, serial: &String) -> bool {
-        open_interface_with_serial(serial.as_str()).await.is_ok()
+        let res = open_interface_with_serial(serial.as_str()).await;
+        tracing::debug!("UsbLiveTester got response opening interface with serial: {:?}", res);
+        res.is_ok()
     }
 }
 
@@ -60,7 +62,7 @@ impl<T> FastbootEventHandler for UsbTargetHandler<T>
 where
     T: UsbLiveTester + 'static,
 {
-    fn handle_event(&mut self, event: Result<FastbootEvent>) {
+    async fn handle_event(&mut self, event: Result<FastbootEvent>) {
         if self.tx.is_none() {
             tracing::warn!("Handling an event but our sender is none. Returning early.");
             return;
@@ -72,9 +74,11 @@ where
                         let ts_clone = self.target_serial.clone();
                         // Test if it is live...  if it isn't, then return
                         let tester = self.test.clone();
-                        let res = futures::executor::block_on(async move {
-                            tester.is_usb_live(&ts_clone).await
-                        });
+                        tracing::debug!(
+                            "Discovered target with serial {}, testing if it is live...",
+                            self.target_serial
+                        );
+                        let res = tester.is_usb_live(&ts_clone).await;
                         if res == true {
                             tracing::debug!("USB Device with serial {} is ready to respond to fastboot commands", self.target_serial);
                             let _ = self.tx.take().unwrap().send(());
