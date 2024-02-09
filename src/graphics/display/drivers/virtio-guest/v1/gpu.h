@@ -9,13 +9,13 @@
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <lib/ddk/device.h>
 #include <lib/stdcompat/span.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
 #include <lib/zx/pmt.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
-#include <semaphore.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -37,10 +37,7 @@ namespace virtio_display {
 
 class Ring;
 
-class GpuDevice;
-using DeviceType = ddk::Device<GpuDevice, ddk::GetProtocolable, ddk::Initializable>;
 class GpuDevice : public virtio::Device,
-                  public DeviceType,
                   public ddk::DisplayControllerImplProtocol<GpuDevice, ddk::base_protocol> {
  public:
   // Exposed for testing. Production code must use the Create() factory method.
@@ -68,9 +65,7 @@ class GpuDevice : public virtio::Device,
 
   zx_status_t Init() override;
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
-
-  void DdkInit(ddk::InitTxn txn);
-  void DdkRelease();
+  zx_status_t Start();
 
   void IrqRingUpdate() override;
   void IrqConfigChange() override;
@@ -184,16 +179,12 @@ class GpuDevice : public virtio::Device,
   zx_status_t flush_resource(uint32_t resource_id, uint32_t width, uint32_t height);
   zx_status_t transfer_to_host_2d(uint32_t resource_id, uint32_t width, uint32_t height);
 
-  zx_status_t Start();
-
   // Initializes the sysmem Allocator client used to import incoming buffer
   // collection tokens.
   //
   // On success, returns ZX_OK and the sysmem allocator client will be open
   // until the device is released.
   zx_status_t InitSysmemAllocatorClient();
-
-  std::thread start_thread_ = {};
 
   // Ensures that a single ExchangeRequestResponse() call is in progress.
   fbl::Mutex exchange_request_response_mutex_;
@@ -247,6 +238,8 @@ class GpuDevice : public virtio::Device,
   display_controller_interface_protocol_t dc_intf_ = {};
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;
+
+  zx_device_t* const bus_device_;
 
   // Imported sysmem buffer collections.
   std::unordered_map<display::DriverBufferCollectionId,

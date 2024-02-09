@@ -35,6 +35,7 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
+#include "src/graphics/display/drivers/virtio-guest/v1/gpu-device-driver.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-abi.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
@@ -383,8 +384,9 @@ zx_status_t GpuDevice::DisplayControllerImplGetSysmemConnection(zx::channel sysm
   // We can't use DdkConnectFragmentFidlProtocol here because it wants to create the endpoints but
   // we only have the server_end here.
   using ServiceMember = fuchsia_hardware_sysmem::Service::AllocatorV1;
-  zx_status_t status = device_connect_fragment_fidl_protocol(
-      parent_, "sysmem", ServiceMember::ServiceName, ServiceMember::Name, sysmem_handle.release());
+  zx_status_t status =
+      device_connect_fragment_fidl_protocol(bus_device_, "sysmem", ServiceMember::ServiceName,
+                                            ServiceMember::Name, sysmem_handle.release());
   if (status != ZX_OK) {
     return status;
   }
@@ -458,13 +460,13 @@ GpuDevice::GpuDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<virti
                      zx_paddr_t virtio_queue_buffer_pool_physical_address,
                      cpp20::span<uint8_t> virtio_queue_buffer_pool)
     : virtio::Device(std::move(bti), std::move(backend)),
-      DeviceType(bus_device),
       virtio_queue_(this),
       virtio_queue_buffer_pool_vmo_(std::move(virtio_queue_buffer_pool_vmo)),
       virtio_queue_buffer_pool_pin_(std::move(virtio_queue_buffer_pool_pin)),
       virtio_queue_buffer_pool_physical_address_(virtio_queue_buffer_pool_physical_address),
       virtio_queue_buffer_pool_(virtio_queue_buffer_pool),
-      sysmem_(std::move(sysmem_client)) {}
+      sysmem_(std::move(sysmem_client)),
+      bus_device_(bus_device) {}
 
 GpuDevice::~GpuDevice() {
   io_buffer_release(&gpu_req_);
@@ -479,8 +481,8 @@ GpuDevice::~GpuDevice() {
 // static
 zx::result<std::unique_ptr<GpuDevice>> GpuDevice::Create(zx_device_t* bus_device) {
   zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> sysmem_client_result =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1>(bus_device,
-                                                                                    "sysmem");
+      DdkDeviceType::DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1>(
+          bus_device, "sysmem");
   if (sysmem_client_result.is_error()) {
     zxlogf(ERROR, "Failed to get sysmem client: %s", sysmem_client_result.status_string());
     return sysmem_client_result.take_error();
@@ -944,25 +946,7 @@ zx_status_t GpuDevice::Init() {
   StartIrqThread();
   DriverStatusOk();
 
-  status = DdkAdd("virtio-gpu-display");
-
-  return status;
-}
-
-void GpuDevice::DdkInit(ddk::InitTxn txn) {
-  // Start a worker thread that runs through a sequence to finish initializing the GPU
-  start_thread_ = std::thread([this, init_txn = std::move(txn)]() mutable {
-    zx_status_t status = Start();
-    init_txn.Reply(status);
-  });
-}
-
-void GpuDevice::DdkRelease() {
-  if (start_thread_.joinable()) {
-    start_thread_.join();
-  }
-
-  virtio::Device::Release();
+  return ZX_OK;
 }
 
 void GpuDevice::IrqRingUpdate() {

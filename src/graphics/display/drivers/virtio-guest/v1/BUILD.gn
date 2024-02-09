@@ -28,9 +28,10 @@ group("tests") {
 source_set("common_srcs") {
   configs += [ "//build/config:all_source" ]
   sources = [
+    "gpu-device-driver.cc",
+    "gpu-device-driver.h",
     "gpu.cc",
     "gpu.h",
-    "gpu_driver.cc",
     "virtio-abi.cc",
     "virtio-abi.h",
   ]
