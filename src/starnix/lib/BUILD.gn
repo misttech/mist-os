@@ -18,15 +18,13 @@ group("tests") {
 
   deps = [
     "extended_pstate:tests",
+    "kill_job_on_panic:tests",
     "range_map:tests",
     "selinux:tests",
     "starnix-uapi:tests",
     "syncio:tests",
     "ubpf:tests",
     "usercopy:tests",
-
-    # TODO(https://fxbug.dev/42082178): Disabled due to flakiness.
-    # "kill_job_on_panic:tests",
   ]
 }
 
