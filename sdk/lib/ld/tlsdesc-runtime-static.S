@@ -5,14 +5,19 @@
 #include <lib/arch/asm.h>
 #include <lib/ld/tlsdesc.h>
 
+#ifndef TLSDESC_RETAIN
+#error "build system must define TLSDESC_RETAIN"
+#endif
+
 #if defined(__aarch64__)
 
 // The GOT slot contains the offset from TPIDR_EL0.  Just return it.
 //
 // Since the function is so tiny, keep it naturally-aligned (it's a mere 8
 // bytes) just to be sure it can never straddle a cache line.
-.function _ld_tlsdesc_runtime_static, global, align=8
+.function _ld_tlsdesc_runtime_static, global, retain=TLSDESC_RETAIN, align=8
   .tlsdesc.cfi
+  .tlsdesc.lsda kStatic
 
   // On entry x0 contains the argument: the address of the GOT slot pair.
   // The first word holds our own PC, the second the static TLS offset.
@@ -30,8 +35,9 @@
 //
 // Since the function is so tiny, keep it naturally-aligned (it's actually
 // only 5 bytes) just to be sure it can never straddle a cache line.
-.function _ld_tlsdesc_runtime_static, global, align=8
+.function _ld_tlsdesc_runtime_static, global, retain=TLSDESC_RETAIN, align=8
   .tlsdesc.cfi
+  .tlsdesc.lsda kStatic
 
   // On entry %rax contains the argument: the address of the GOT slot pair.
   // The first word holds our own PC, the second the static TLS offset.
@@ -52,8 +58,9 @@
 //
 // Since the function is so tiny, keep it naturally-aligned just to be sure it
 // can never straddle a cache line.
-.function _ld_tlsdesc_runtime_static, global, align=4
+.function _ld_tlsdesc_runtime_static, global, retain=TLSDESC_RETAIN, align=4
   .tlsdesc.cfi
+  .tlsdesc.lsda kStatic
 
   // On entry a0 contains the argument: the address of the GOT slot range.
   // The first word holds our own PC, the second the static TLS offset.

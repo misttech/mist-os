@@ -9,9 +9,8 @@ import("//build/toolchain/ifs_shared_library.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
 
-# TODO(https://fxbug.dev/42072830): This will be used for the static library of support
-# code.  It provides access to additional <lib/ld/...> headers for support code
-# that isn't itself part of of the passive ABI.
+# This provides access to additional <lib/ld/...> headers for support code in
+# the `ld` namespace, which isn't itself part of of the passive ABI.
 library_headers("headers") {
   headers = [
     "lib/ld/load-module.h",
@@ -57,6 +56,8 @@ ifs_shared_library("ld") {
   public_deps = [ ":abi-headers" ]
 }
 
+# This provides access to the <lib/ld/...> headers that specify the passive ABI
+# defined in the `ld::abi` C++ namespace.
 library_headers("abi-headers") {
   headers = [
     "lib/ld/abi.h",
@@ -138,7 +139,10 @@ loadable_module("ld-stub") {
     "//build/config/zircon:nolibc",
     ":abi-soname",
   ]
-  deps = [ ":abi" ]
+  deps = [
+    ":abi",
+    ":tlsdesc.no-gc",
+  ]
 
   # Since it has no C++ code (only a data definition), it doesn't really matter
   # for this to use the user.basic build environment as the startup dynamic
@@ -378,15 +382,32 @@ source_set("linux-syscalls") {
   include_dirs = [ "//third_party/linux-syscall-support/src" ]
 }
 
-source_set("tlsdesc") {
-  public_deps = [
-    ":headers",
-    "//zircon/kernel/lib/arch",
-  ]
-  sources = [
-    "tlsdesc-runtime-static.S",
-    "tlsdesc-runtime-undefined-weak.S",
-  ]
+# The TLSDESC runtime assembly code is provided in library form as needed for
+# use by an in-process dynamic linker (ld-startup and libdl).  The stub dynamic
+# linker includes this code but with neither references nor exported symbols,
+# so it needs a mandatory-linked version of the code that's immune to GC.
+template("_tlsdesc_runtime") {
+  target(invoker.target_type, target_name) {
+    public_deps = [
+      ":headers",
+      "//zircon/kernel/lib/arch",
+    ]
+    sources = [
+      "tlsdesc-runtime-static.S",
+      "tlsdesc-runtime-undefined-weak.S",
+    ]
+    defines = [ "TLSDESC_RETAIN=${invoker.retain}" ]
+  }
+}
+
+_tlsdesc_runtime("tlsdesc") {
+  target_type = "static_library"
+  retain = ""
+}
+
+_tlsdesc_runtime("tlsdesc.no-gc") {
+  target_type = "source_set"
+  retain = "R"
 }
 
 user_basic_redirect("ld-startup.basic") {

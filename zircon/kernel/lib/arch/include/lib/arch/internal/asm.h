@@ -36,7 +36,7 @@
 // via `_.entity.end`.  The \name, \scope, and \nosection arguments are
 // passed through from caller and validated here; the rest are provided by
 // each entity-defining macro.
-.macro _.entity name, scope, align, nosection, entity, type, epilogue
+.macro _.entity name, scope, align, nosection, retain, entity, type, epilogue
   // First make sure that entity and `.end_*` pairs are matched (no nesting).
   _.entity.assert
   .purgem _.entity.assert
@@ -57,8 +57,13 @@
 
   // Unless given the `nosection` flag argument, enter a per-entity section.
   .ifb \nosection
+    .ifnb \retain
+      .ifnc \retain,R
+        .error "retain argument to \entity directive must be `R` or empty"
+      .endif
+    .endif
     // The specific section name and details depend on the entity type.
-    _.entity.pushsection.\type \name
+    _.entity.pushsection.\type \name, \retain
   .else
     .ifnc \nosection, nosection
       .error "final argument to \entity directive must be exactly `nosection`"
@@ -76,44 +81,44 @@
 
 // Subroutines of _.entity selected by the \type argument.
 
-.macro _.entity.pushsection.function name
+.macro _.entity.pushsection.function name, retain
 #ifdef __ELF__
   // The function goes into the .text section in its own section group.
   // This lets any metadata associated with the function travel in its
   // group by using `.pushsection .metadata-section, "...?", ...`.
-  .pushsection .text, "axG", %progbits, \name
+  .pushsection .text, "axG\retain", %progbits, \name
 #else
   .text
 #endif
 .endm
 
-.macro _.entity.pushsection.bss name
+.macro _.entity.pushsection.bss name, retain
 #ifdef __ELF__
-  .pushsection .bss.\name, "aw", %nobits
+  .pushsection .bss.\name, "aw\retain", %nobits
 #else
   .bss
 #endif
 .endm
 
-.macro _.entity.pushsection.data name
+.macro _.entity.pushsection.data name, retain
 #ifdef __ELF__
-  .pushsection .data.\name, "aw", %progbits
+  .pushsection .data.\name, "aw\retain", %progbits
 #else
   .data
 #endif
 .endm
 
-.macro _.entity.pushsection.relro name
+.macro _.entity.pushsection.relro name, retain
 #ifdef __ELF__
-  .pushsection .data.rel.ro.\name, "aw", %progbits
+  .pushsection .data.rel.ro.\name, "aw\retain", %progbits
 #else
   .section .rdata, "dr"
 #endif
 .endm
 
-.macro _.entity.pushsection.rodata name
+.macro _.entity.pushsection.rodata name, retain
 #ifdef __ELF__
-  .pushsection .rodata.\name, "a", %progbits
+  .pushsection .rodata.\name, "a\retain", %progbits
 #else
   .section .rdata, "dr"
 #endif

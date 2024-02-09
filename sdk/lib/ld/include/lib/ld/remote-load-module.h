@@ -96,6 +96,20 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
 
   const elfldltl::MappedVmoFile& mapped_vmo() const { return mapped_vmo_; }
 
+  // Create and return a memory-adaptor object that serves as a wrapper around
+  // this module's LoadInfo and MappedVmoFile.  This is used to translate
+  // vaddrs into file-relative offsets in order to read from the VMO.
+  MetadataMemory metadata_memory() const {
+    return MetadataMemory{
+        load_info(),
+        // The DirectMemory API expects a mutable *this just because it's the
+        // API exemplar and toolkit pieces shouldn't presume a Memory API
+        // object is usable as const&.  But MappedVmoFile in fact is all const
+        // after Init.
+        const_cast<elfldltl::MappedVmoFile&>(mapped_vmo_),
+    };
+  }
+
   // Initialize the module from the provided VMO, representing either the
   // binary or shared library to be loaded.  Create the data structures that
   // make make the VMO readable, and scan and decode its phdrs to set and
@@ -469,11 +483,6 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
 
     return {std::move(modules), std::move(predecoded_positions)};
   }
-
-  // Create and return a memory-adaptor object that serves as a wrapper
-  // around this module's LoadInfo and MappedVmoFile. This is used to
-  // translate vaddrs into file-relative offsets in order to read from the VMO.
-  MetadataMemory metadata_memory() { return MetadataMemory{load_info(), mapped_vmo_}; }
 
   template <class Diagnostics>
   fit::result<bool> InitMappedVmo(Diagnostics& diag, zx::vmo vmo) {

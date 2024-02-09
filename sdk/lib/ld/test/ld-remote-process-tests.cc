@@ -128,6 +128,33 @@ void LdRemoteProcessTests::Load(std::string_view executable_name) {
   EXPECT_NE(abi_stub.rdebug_offset(), abi_stub.abi_offset())
       << "with data_size() " << abi_stub.data_size();
 
+  // Verify that the TLSDESC entry points were found in the stub and that their
+  // addresses pass some basic smell tests.
+  const RemoteModule& predecoded_stub = predecoded_modules[kStub];
+  std::set<elfldltl::Elf<>::size_type> tlsdesc_entrypoints;
+  const auto segment_is_executable = [](const auto& segment) -> bool {
+    return segment.executable();
+  };
+  for (const elfldltl::Elf<>::size_type entry : abi_stub.tlsdesc_runtime()) {
+    // Must be nonzero.
+    EXPECT_NE(entry, 0u);
+
+    // Must lie within the module bounds.
+    EXPECT_GT(entry, predecoded_stub.load_info().vaddr_start());
+    EXPECT_LT(entry - predecoded_stub.load_info().vaddr_start(),
+              predecoded_stub.load_info().vaddr_size());
+
+    // Must be inside an executable segment.
+    auto segment = predecoded_stub.load_info().FindSegment(entry);
+    ASSERT_NE(segment, predecoded_stub.load_info().segments().end());
+    EXPECT_TRUE(std::visit(segment_is_executable, *segment));
+
+    // Must be unique.
+    auto [it, inserted] = tlsdesc_entrypoints.insert(entry);
+    EXPECT_TRUE(inserted) << "duplicate entry point " << entry;
+  }
+  EXPECT_EQ(tlsdesc_entrypoints.size(), kTlsdescRuntimeCount);
+
   // First just decode all the modules: the executable and dependencies.
   auto get_dep_vmo = [this](const RemoteModule::Soname& soname) {
     return mock_loader_->LoadObject(std::string{soname.str()});

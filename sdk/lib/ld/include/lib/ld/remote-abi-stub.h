@@ -5,21 +5,25 @@
 #ifndef LIB_LD_REMOTE_ABI_STUB_H_
 #define LIB_LD_REMOTE_ABI_STUB_H_
 
+#include <lib/elfldltl/dwarf/cfi-entry.h>
+#include <lib/elfldltl/dwarf/eh-frame-hdr.h>
 #include <lib/elfldltl/symbol.h>
 
+#include <array>
+
 #include "abi.h"
-#include "module.h"
 #include "remote-load-module.h"
+#include "tlsdesc.h"
 
 namespace ld {
 
 // In the remote dynamic linking case, the passive ABI is anchored by the "stub
 // dynamic linker" (ld-stub.so in the build).  This shared library gets loaded
 // as an implicit dependency to stand in for the in-process startup dynamic
-// linker that's usually there at runtime.  Aside from the normal metadata
-// (TODO(https://fxbug.dev/318890954): it will later have a code segment for
-// the TLSDESC callbacks too), it consists of a final ZeroFillSegment or
-// DataWithZeroFillSegment that holds space for the passive ABI symbols.
+// linker that's usually there at runtime.  Aside from the normal metadata and
+// a tiny code segment containing TLSDESC runtime hook code, it consists of a
+// final ZeroFillSegment or DataWithZeroFillSegment that holds space for the
+// passive ABI symbols.
 //
 // The RemoteAbiStub object collects data about the layout and symbols in the
 // stub dynamic linker as decoded into a RemoteLoadModule.  The Init() method
@@ -31,15 +35,28 @@ namespace ld {
 // This object is used by the RemoteAbiHeap to modify a RemoteLoadModule for
 // the specific instantiation of the stub dynamic linker for a particular
 // remote dynamic linking domain (or zygote thereof).
+//
+// RemoteAbiStub also collects a set of TLSDESC runtime entry point addresses.
+// These are not encoded as symbols, but obscured inside the .eh_frame table.
+// They are self-identifying to this code by a private protocol with the
+// assembly code that defines them (see <lib/ld/tlsdesc.h>), but in a way that
+// will be harmlessly ignored by other consumers of the stub dynamic linker's
+// .eh_frame CFI encoding such as runtime unwinders or debuggers.  Users of the
+// RemoteAbiStub::tlsdesc_runtime methods should stay tightly coupled to the
+// TLSDESC runtime assembly code that's described in <lib/ld/tlsdesc.h> so that
+// the stub dynamic linker used at runtime came from the same ld library source
+// tree as this class.
 
 template <class Elf = elfldltl::Elf<>>
 class RemoteAbiStub {
  public:
   using size_type = typename Elf::size_type;
   using Addr = typename Elf::Addr;
+  using Phdr = typename Elf::Phdr;
   using Sym = typename Elf::Sym;
   using RemoteModule = RemoteLoadModule<Elf>;
   using LocalAbi = abi::Abi<Elf>;
+  using TlsdescRuntimeHooks = std::array<Addr, kTlsdescRuntimeCount>;
 
   // Exact size of the data segment.  This includes whatever file data gives it
   // a page-aligned starting vaddr, but the total size is not page-aligned.
@@ -51,6 +68,14 @@ class RemoteAbiStub {
 
   // Offset into the segment where _r_debug sits.
   size_type rdebug_offset() const { return rdebug_offset_; }
+
+  // Module-relative addresses of the TLSDESC runtime entry points.
+  const TlsdescRuntimeHooks& tlsdesc_runtime() const { return tlsdesc_runtime_; }
+
+  // Fetch a particular TLSDESC runtime entry point.
+  Addr tlsdesc_runtime(TlsdescRuntime hook) const {
+    return tlsdesc_runtime_[static_cast<size_t>(hook)];
+  }
 
   // Init() calculates and records all those values by examining the stub
   // dynamic linker previously decoded.  The module reference is only used to
@@ -66,10 +91,24 @@ class RemoteAbiStub {
     // Find the unrounded vaddr size.  The PT_LOADs are in ascending vaddr
     // order, so the last one will be the highest addressed, while the module's
     // vaddr_start will correspond to the first one's vaddr.
-    for (auto it = ld_stub.module().phdrs.rbegin(); it != ld_stub.module().phdrs.rend(); ++it) {
-      if (it->type == elfldltl::ElfPhdrType::kLoad) {
-        data_size_ = it->vaddr + it->memsz;
-        break;
+    const Phdr* eh_frame_hdr = nullptr;
+    for (auto it = ld_stub.module().phdrs.rbegin();
+         (data_size_ == 0 || !eh_frame_hdr) &&  // Bail early when done.
+         it != ld_stub.module().phdrs.rend();
+         ++it) {
+      switch (it->type()) {
+        case elfldltl::ElfPhdrType::kLoad:
+          if (data_size_ == 0) {
+            data_size_ = it->vaddr + it->memsz;
+          }
+          break;
+        case elfldltl::ElfPhdrType::kEhFrameHdr:
+          if (!eh_frame_hdr) {
+            eh_frame_hdr = &*it;
+          }
+          break;
+        default:
+          break;
       }
     }
     assert(ld_stub.load_info().VisitSegment(
@@ -117,16 +156,119 @@ class RemoteAbiStub {
     return get_offset(abi_offset_, abi::kAbiSymbol, sizeof(Abi)) &&
            get_offset(rdebug_offset_, abi::kRDebugSymbol, sizeof(RDebug)) &&
            (no_overlap(abi_offset_, sizeof(Abi), rdebug_offset_, sizeof(RDebug)) ||
-            diag.FormatError("stub ", LocalAbi::kSoname.str(), " symbols overlap!"));
+            diag.FormatError("stub ", LocalAbi::kSoname.str(), " symbols overlap!")) &&
+           FindTlsdescRuntime(diag, eh_frame_hdr, ld_stub);
   }
 
  private:
   using Abi = abi::Abi<Elf, elfldltl::RemoteAbiTraits>;
   using RDebug = typename Elf::template RDebug<elfldltl::RemoteAbiTraits>;
 
+  using EhFrameHdr = elfldltl::dwarf::EhFrameHdr<Elf>;
+
+  // In lieu of symbols that would be directly visible to users, the stub
+  // dynamic linker unofficially "exports" its TLSDESC entry point addresses
+  // via breadcrumbs in the .eh_frame CFI.  There is one FDE for each entry
+  // point function (each is small and contiguous), where the FDE starts at the
+  // entry point.  Each FDE sets its LSDA pointer (via .cfi_lsda in the
+  // assembly code via the .tlsdesc.lsda assembly macro in <lib/lfd/tlsdesc.h>)
+  // even though there is no personality routine.  The LSDA has no real purpose
+  // in the absence of a personality routine, so unwinders will just decode it
+  // and ignore it since there is no personality routine to pass it to.
+  //
+  // This takes the PT_GNU_EH_FRAME phdr and decodes all the FDEs in the stub,
+  // checking each for a magic number in its LSDA that corresponds to one of
+  // the <lib/ld/tlsdesc.h> entry point functions.
+  template <class Diagnostics>
+  bool FindTlsdescRuntime(Diagnostics& diag, const Phdr* phdr, const RemoteModule& ld_stub) {
+    using namespace std::string_view_literals;
+
+    if (!phdr) [[unlikely]] {
+      return diag.FormatError("stub "sv, LocalAbi::kSoname.str(),
+                              " missing PT_GNU_EH_FRAME program header"sv);
+    }
+
+    auto memory = ld_stub.metadata_memory();
+    if (memory.base() != 0) [[unlikely]] {
+      return diag.FormatError("stub "sv, LocalAbi::kSoname.str(), " has base address ",
+                              memory.base());
+    }
+
+    EhFrameHdr eh_frame_hdr;
+    if (!eh_frame_hdr.Init(diag, memory, *phdr, " in stub "sv, LocalAbi::kSoname.str()))
+        [[unlikely]] {
+      return false;
+    }
+
+    if (eh_frame_hdr.size() != kTlsdescRuntimeCount &&
+        !diag.FormatWarning(  //
+            "stub "sv, LocalAbi::kSoname.str(), " PT_GNU_EH_FRAME table"sv,
+            elfldltl::FileAddress{phdr->vaddr}, " has "sv, eh_frame_hdr.size(),
+            " FDEs != expected "sv, kTlsdescRuntimeCount)) [[unlikely]] {
+      return false;
+    }
+
+    for (auto [pc, fde_vaddr] : eh_frame_hdr) {
+      std::optional<elfldltl::dwarf::CfiEntry> fde =
+          elfldltl::dwarf::CfiEntry::ReadEhFrameFromMemory<Elf>(
+              diag, memory, fde_vaddr, " in stub "sv, LocalAbi::kSoname.str(),
+              " PT_GNU_EH_FRAME table"sv);
+      if (!fde) [[unlikely]] {
+        return false;
+      }
+      std::optional<elfldltl::dwarf::CfiEntry> cie = fde->template ReadEhFrameCieFromMemory<Elf>(
+          diag, memory, " for FDE"sv, elfldltl::FileAddress{fde_vaddr}, " in stub "sv,
+          LocalAbi::kSoname.str(), " PT_GNU_EH_FRAME table"sv);
+      if (!cie) [[unlikely]] {
+        return false;
+      }
+      std::optional<elfldltl::dwarf::CfiCie> cie_info =
+          cie->DecodeCie(diag, fde->cie_pointer().value_or(0));
+      if (!cie_info) [[unlikely]] {
+        return false;
+      }
+      std::optional<elfldltl::dwarf::CfiFde> fde_info = fde->DecodeFde(diag, fde_vaddr, *cie_info);
+      if (!fde_info) [[unlikely]] {
+        return false;
+      }
+
+      auto found_hook = TlsdescRuntimeFromMagic(fde_info->lsda);
+      if (!found_hook) [[unlikely]] {
+        if (!diag.FormatError("stub "sv, LocalAbi::kSoname.str(),
+                              " .eh_frame FDE has unrecognized LSDA value "sv, fde_info->lsda,
+                              elfldltl::FileAddress{pc})) {
+          return false;
+        }
+        continue;
+      }
+      Addr& hook_slot = tlsdesc_runtime_[static_cast<size_t>(*found_hook)];
+      if (hook_slot != 0 &&  // A valid PC was already stored for this hook.
+          !diag.FormatError("stub "sv, LocalAbi::kSoname.str(), " .eh_frame FDE"sv,
+                            elfldltl::FileAddress{fde_vaddr}, " with same magic LSDA value "sv,
+                            fde_info->lsda, elfldltl::FileAddress{hook_slot}, " and"sv,
+                            elfldltl::FileAddress{pc})) {
+        return false;
+      }
+      hook_slot = pc;
+      if (hook_slot == 0 &&  // Zero isn't plausible for a hook PC.
+          !diag.FormatError("stub "sv, LocalAbi::kSoname.str(), " .eh_frame FDE"sv,
+                            elfldltl::FileAddress{pc}, " with magic LSDA value "sv, fde_info->lsda,
+                            " has zero PC!"sv)) {
+        return false;
+      }
+    }
+
+    return std::none_of(tlsdesc_runtime_.begin(), tlsdesc_runtime_.end(),
+                        [](Addr hook) { return hook == 0; }) ||
+           diag.FormatError("stub "sv, LocalAbi::kSoname.str(),
+                            " .eh_frame is missing some FDEs with expected"
+                            " magic LSDA values for TLSDESC entry points"sv);
+  }
+
   size_type abi_offset_ = 0;
   size_type rdebug_offset_ = 0;
   size_type data_size_ = 0;
+  TlsdescRuntimeHooks tlsdesc_runtime_ = {};
 };
 
 }  // namespace ld

@@ -106,7 +106,11 @@
 ///     - Optional: Must be exactly `nosection` to indicate this function goes
 ///     into the assembly's current section rather than a per-function section.
 ///
-.macro .function name, scope=local, cfi=abi, align=, nosection=
+///   * retain
+///     - Optional: `R` for SHF_GNU_RETAIN, empty for not.
+///     - Default: ``
+///
+.macro .function name, scope=local, cfi=abi, align=, nosection=, retain=
   // Validate the \cfi argument.  The valid values correspond to
   // the `_.function.cfi.{start,end}.\cfi` subroutine macros.
   .ifnc \cfi, abi
@@ -116,7 +120,8 @@
       .endif
     .endif
   .endif
-  _.entity \name, \scope, \align, \nosection, function, function, _.function.end.\cfi
+
+  _.entity \name, \scope, \align, \nosection, \retain, function, function, _.function.end.\cfi
   _.function.start.\cfi
 .endm  // .function
 
@@ -157,7 +162,11 @@
 ///     - Optional: Must be exactly `nosection` to indicate this object goes
 ///     into the assembly's current section rather than a per-object section.
 ///
-.macro .object name, type=data, scope=local, align=, nosection=
+///   * retain
+///     - Optional: `R` for SHF_GNU_RETAIN, empty for not.
+///     - Default: ``
+///
+.macro .object name, type=data, scope=local, align=, nosection=, retain=
   .ifnc \type, bss
     .ifnc \type, data
       .ifnc \type, relro
@@ -167,7 +176,7 @@
       .endif
     .endif
   .endif
-  _.entity \name, \scope, \align, \nosection, object, \type
+  _.entity \name, \scope, \align, \nosection, \retain, object, \type
 .endm  // .start_object
 
 #endif  // clang-format on

@@ -39,7 +39,65 @@
 // it also chooses the value to store in the second slot, which is some kind of
 // offset or address that includes the addend and symbol value calculations.
 
+// This enumerates the canonical entry points provided by a startup dynamic
+// linker for the different kinds of TLSDESC resolution needed in the simple
+// static TLS cases.  These entry points and their semantics are not part of
+// the TLSDESC ABI, they are just implementation details provided by library
+// code that can be used in a dynamic linker implementation.  Each of these
+// canonical implementations has a corresponding definition of what must be
+// stored in the second GOT slot, below called the "argument" (though each
+// psABI calling convention actually passes the address of the first GOT slot
+// in a register, from which the adjacent slot must be loaded).
+//
+//  * kStatic handles a fixed offset from the thread pointer.  The argument is
+//    that final offset, which already includes any relocation addend as well
+//    as the symbol's offset into the PT_TLS and the definer's TLS block's
+//    offset from the thread pointer.  The hook returns that offset to be added
+//    to the thread pointer: the same offset in every thread so the TLS block
+//    offset must be statically assigned before new threads can be created.
+//    The dynamic linker must perform the static TLS layout to assign
+//    correctly-aligned and sized regions relative to the thread pointer
+//    (<lib/elfldltl/tls-layout.h> handles the details of that arithmetic), and
+//    then install this entry point alongside the relocation's symbol's
+//    definer's TLS block offset plus the symbol value and relocation addend.
+//
+//  * kUndefinedWeak handles an undefined weak STT_TLS symbol where there was
+//    no relocation addend.  The argument is ignored.  The hook returns the
+//    thread pointer negated, so the address resolves as zero (a null pointer)
+//    when the thread pointer is added to the return value.  The dynamic linker
+//    need only store the entry point in the GOT.
+//
+//  * kUndefinedWeakAddend handles an undefined weak STT_TLS symbol where there
+//    was a nonzero relocation addend.  The argument is the addend.  The hook
+//    returns the thread pointer negated plus the addend, to yield the same
+//    result as applying the addend to a byte pointer that was null.  The
+//    dynamic linker must store the entry point and addend in the GOT.
+//
+#define LD_TLSDESC_STATIC_HOOKS(Macro) \
+  Macro(kStatic) Macro(kUndefinedWeak) Macro(kUndefinedWeakAddend)
+
+#define LD_TLSDESC_STATIC_HOOKS_FIRST_MAGIC 0x00534c54  // LE 'TLS\0'
+
 #ifdef __ASSEMBLER__  // clang-format off
+
+// In assembly, `.tlsdesc.lsda kName` with one of the LD_TLSDESC_STATIC_HOOKS
+// names described above yields a `.cfi_lsda DW_EH_PE_absptr, <magic number>`
+// that will give the current FDE an LSDA value magic corresponding to the
+// ld::TlsdescStaticHook C++ enum defined below.  The library's implementation
+// code uses these to aid in locating entry points in the stub dynamic linker
+// with no ELF symbols.
+.macro .tlsdesc.lsda name
+  .cfi_lsda 0, .Ltlsdesc.hook.\name // 0 is DW_EH_PE_absptr encoding: no reloc.
+.endm
+  // This bit just gets all the .Ltlsdesc.hook.\name values defined.
+  // These local symbols will usually be elided from the symbol table.
+  .macro _.tlsdesc.hook.const name
+    .Ltlsdesc.hook.\name = LD_TLSDESC_STATIC_HOOKS_FIRST_MAGIC + \@ - 1
+  .endm
+#define _LD_TLSDESC_HOOK_CONST(name) _.tlsdesc.hook.const name;
+  LD_TLSDESC_STATIC_HOOKS(_LD_TLSDESC_HOOK_CONST)
+#undef _LD_TLSDESC_HOOK_CONST
+  .purgem _.tlsdesc.hook.const
 
 // The pseudo-op `.tlsdesc.cfi`, given `.cfi_startproc` initial state,
 // resets CFI to indicate the special ABI for the R_*_TLSDESC callback
@@ -123,8 +181,10 @@ tlsdesc.value_offset = 8
 #else  // clang-format on
 
 #include <lib/elfldltl/layout.h>
+#include <lib/elfldltl/symbol.h>
 
 #include <cstddef>
+#include <optional>
 
 namespace [[gnu::visibility("hidden")]] ld {
 
@@ -155,6 +215,40 @@ ptrdiff_t _ld_tlsdesc_runtime_undefined_weak_addend(const elfldltl::Elf<>::TlsDe
 ptrdiff_t _ld_tlsdesc_runtime_static(const elfldltl::Elf<>::TlsDescGot& got);
 
 }  // extern "C"
+
+// ld::TlsdescRuntime::k* can be used as indices into an array of
+// kTlsdescRuntimeCount to cover all the entry points.
+
+enum class TlsdescRuntime {
+#define LD_TLSDESC_RUNTIME_CONST(name) name,
+  LD_TLSDESC_STATIC_HOOKS(LD_TLSDESC_RUNTIME_CONST)
+#undef LD_TLSDESC_RUNTIME_CONST
+};
+
+inline constexpr size_t kTlsdescRuntimeCount = []() {
+  size_t n = 0;
+#define LD_TLSDESC_RUNTIME_MAX(name) ++n;
+  LD_TLSDESC_STATIC_HOOKS(LD_TLSDESC_RUNTIME_MAX)
+#undef LD_TLSDESC_RUNTIME_MAX
+  return n;
+}();
+
+// For each hook there is a different uint32_t magic number that will be found
+// in its FDE's LSDA.
+template <TlsdescRuntime Hook>
+inline constexpr uint32_t kTlsdescRuntimeMagic =
+    LD_TLSDESC_STATIC_HOOKS_FIRST_MAGIC + static_cast<uint32_t>(Hook);
+
+// In the stub dynamic linker, the only FDEs should be for these entry points,
+// so each one's LSDA should correspond to one of the TlsdescRuntime indices.
+constexpr std::optional<TlsdescRuntime> TlsdescRuntimeFromMagic(uintptr_t magic) {
+  if (magic >= LD_TLSDESC_STATIC_HOOKS_FIRST_MAGIC &&
+      magic < LD_TLSDESC_STATIC_HOOKS_FIRST_MAGIC + kTlsdescRuntimeCount) {
+    magic -= LD_TLSDESC_STATIC_HOOKS_FIRST_MAGIC;
+    return static_cast<TlsdescRuntime>(magic);
+  }
+  return std::nullopt;
+}
 
 }  // namespace ld
 

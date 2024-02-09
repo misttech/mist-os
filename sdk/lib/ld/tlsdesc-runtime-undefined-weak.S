@@ -5,11 +5,16 @@
 #include <lib/arch/asm.h>
 #include <lib/ld/tlsdesc.h>
 
+#ifndef TLSDESC_RETAIN
+#error "build system must define TLSDESC_RETAIN"
+#endif
+
 #if defined(__aarch64__)
 
 // Return -$tp so that adding $tp yields zero, i.e. nullptr.
-.function _ld_tlsdesc_runtime_undefined_weak, global
+.function _ld_tlsdesc_runtime_undefined_weak, global, retain=TLSDESC_RETAIN
   .tlsdesc.cfi
+  .tlsdesc.lsda kUndefinedWeak
 
   mrs x0, TPIDR_EL0
   neg x0, x0
@@ -19,8 +24,9 @@
 .end_function
 
 // Return addend-$tp so that adding $tp looks like nullptr+addend.
-.function _ld_tlsdesc_runtime_undefined_weak_addend, global
+.function _ld_tlsdesc_runtime_undefined_weak_addend, global, retain=TLSDESC_RETAIN
   .tlsdesc.cfi
+  .tlsdesc.lsda kUndefinedWeakAddend
 
   // Only x0 and x30 can be clobbered, so another register must be saved.
   stp x1, xzr, [sp, #-16]!
@@ -50,8 +56,9 @@
 #elif defined(__riscv)
 
 // Return -$tp so that adding $tp yields zero, i.e. nullptr.
-.function _ld_tlsdesc_runtime_undefined_weak, global, align=4
+.function _ld_tlsdesc_runtime_undefined_weak, global, retain=TLSDESC_RETAIN, align=4
   .tlsdesc.cfi
+  .tlsdesc.lsda kUndefinedWeak
 
   tlsdesc.sub a0, zero, tp
 
@@ -64,8 +71,9 @@
 .end_function
 
 // Return addend-$tp so that adding $tp looks like nullptr+addend.
-.function _ld_tlsdesc_runtime_undefined_weak_addend, global
+.function _ld_tlsdesc_runtime_undefined_weak_addend, global, retain=TLSDESC_RETAIN
   .tlsdesc.cfi
+  .tlsdesc.lsda kUndefinedWeakAddend
 
   // On entry a0 contains the argument: the address of the GOT slot range.
   tlsdesc.load a0, tlsdesc.value_offset(a0)
@@ -83,8 +91,9 @@
 #elif defined(__x86_64__)
 
 // Return -$tp so that adding $tp yields zero, i.e. nullptr.
-.function _ld_tlsdesc_runtime_undefined_weak, global
+.function _ld_tlsdesc_runtime_undefined_weak, global, retain=TLSDESC_RETAIN
   .tlsdesc.cfi
+  .tlsdesc.lsda kUndefinedWeak
 
   // On entry %rax contains the argument: the address of the GOT slot pair.
   // On exit %rax contains the return value: offset from $tp (%fs.base).
@@ -97,8 +106,9 @@
 .end_function
 
 // Return addend-$tp so that adding $tp looks like nullptr+addend.
-.function _ld_tlsdesc_runtime_undefined_weak_addend, global
+.function _ld_tlsdesc_runtime_undefined_weak_addend, global, retain=TLSDESC_RETAIN
   .tlsdesc.cfi
+  .tlsdesc.lsda kUndefinedWeakAddend
 
   // On entry %rax contains the argument: the address of the GOT slot pair.
   // On exit %rax contains the return value: offset from $tp (%fs.base).
