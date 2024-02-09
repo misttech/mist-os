@@ -84,7 +84,6 @@ const (
 // Tester describes the interface for all different types of testers.
 type Tester interface {
 	Test(context.Context, testsharder.Test, io.Writer, io.Writer, string) (*TestResult, error)
-	ProcessResult(context.Context, testsharder.Test, string, *TestResult, error) (*TestResult, error)
 	Close() error
 	EnsureSinks(context.Context, []runtests.DataSinkReference, *TestOutputs) error
 	RunSnapshot(context.Context, string) error
@@ -146,7 +145,6 @@ type SubprocessTester struct {
 	dir            string
 	localOutputDir string
 	sProps         *sandboxingProps
-	testRuns       map[string]string
 }
 
 type sandboxingProps struct {
@@ -164,7 +162,6 @@ func NewSubprocessTester(dir string, env []string, localOutputDir, nsjailPath, n
 		dir:            dir,
 		env:            env,
 		localOutputDir: localOutputDir,
-		testRuns:       make(map[string]string),
 	}
 	// If the caller provided a path to NsJail, then intialize sandboxing properties.
 	if nsjailPath != "" {
@@ -188,18 +185,6 @@ func NewSubprocessTester(dir string, env []string, localOutputDir, nsjailPath, n
 		s.sProps.cwd = cwd
 	}
 	return s, nil
-}
-
-func (t *SubprocessTester) setTestRun(test testsharder.Test, profileRelDir string) {
-	t.testRuns[test.Path] = profileRelDir
-}
-
-func (t *SubprocessTester) getTestRun(test testsharder.Test) string {
-	profileRelDir, ok := t.testRuns[test.Path]
-	if !ok {
-		return ""
-	}
-	return profileRelDir
 }
 
 func (t *SubprocessTester) Test(ctx context.Context, test testsharder.Test, stdout io.Writer, stderr io.Writer, outDir string) (*TestResult, error) {
@@ -437,7 +422,6 @@ func (t *SubprocessTester) Test(ctx context.Context, test testsharder.Test, stdo
 		}
 	}
 	err := r.Run(ctx, testCmd, subprocess.RunOptions{Stdout: stdout, Stderr: stderr})
-	t.setTestRun(test, profileRelDir)
 	if err == nil {
 		testResult.Result = runtests.TestSuccess
 	} else if errors.Is(err, context.DeadlineExceeded) {
@@ -445,15 +429,7 @@ func (t *SubprocessTester) Test(ctx context.Context, test testsharder.Test, stdo
 	} else {
 		testResult.FailReason = err.Error()
 	}
-	return testResult, nil
-}
 
-func (t *SubprocessTester) ProcessResult(ctx context.Context, test testsharder.Test, outDir string, testResult *TestResult, err error) (*TestResult, error) {
-	profileRelDir := t.getTestRun(test)
-	if profileRelDir == "" {
-		return testResult, err
-	}
-	profileAbsDir := filepath.Join(t.localOutputDir, profileRelDir)
 	var sinks []runtests.DataSink
 	profileErr := filepath.WalkDir(profileAbsDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -479,7 +455,7 @@ func (t *SubprocessTester) ProcessResult(ctx context.Context, test testsharder.T
 			llvmProfileSinkType: sinks,
 		}
 	}
-	return testResult, err
+	return testResult, nil
 }
 
 func (t *SubprocessTester) EnsureSinks(ctx context.Context, sinkRefs []runtests.DataSinkReference, _ *TestOutputs) error {
@@ -555,14 +531,6 @@ type FFXTester struct {
 
 	// The test output dirs from all the calls to Test().
 	testOutDirs []string
-
-	// A map of the test PackageURL to data needed for processing the test results.
-	testRuns map[string]ffxTestRun
-}
-
-type ffxTestRun struct {
-	result        *ffxutil.TestRunResult
-	totalDuration time.Duration
 }
 
 // NewFFXTester returns an FFXTester.
@@ -577,7 +545,6 @@ func NewFFXTester(ctx context.Context, ffx FFXInstance, sshTester Tester, localO
 		sshTester:       sshTester,
 		localOutputDir:  localOutputDir,
 		experimentLevel: experimentLevel,
-		testRuns:        make(map[string]ffxTestRun),
 	}, nil
 }
 
@@ -587,13 +554,30 @@ func (t *FFXTester) EnabledForTesting() bool {
 
 func (t *FFXTester) Test(ctx context.Context, test testsharder.Test, stdout, stderr io.Writer, outDir string) (*TestResult, error) {
 	if t.EnabledForTesting() {
-		return BaseTestResultFromTest(test), t.testWithFile(ctx, test, stdout, stderr, outDir)
+		finalTestResult := BaseTestResultFromTest(test)
+		testResult, err := t.testWithFile(ctx, test, stdout, stderr, outDir)
+		if err != nil {
+			finalTestResult.FailReason = err.Error()
+		} else if testResult == nil {
+			finalTestResult.FailReason = "expected 1 test result, got none"
+		} else {
+			finalTestResult = testResult
+		}
+		if finalTestResult.Result != runtests.TestSuccess {
+			err = retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), maxReconnectAttempts), func() error {
+				return t.ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
+			}, nil)
+			if err != nil {
+				return finalTestResult, err
+			}
+		}
+		return finalTestResult, nil
 	}
 	return t.sshTester.Test(ctx, test, stdout, stderr, outDir)
 }
 
 // testWithFile runs `ffx test` with -test-file and returns the test result.
-func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, stdout, stderr io.Writer, outDir string) error {
+func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, stdout, stderr io.Writer, outDir string) (*TestResult, error) {
 	testDef := []build.TestListEntry{{
 		Name:   test.PackageURL,
 		Labels: []string{test.Label},
@@ -620,51 +604,14 @@ func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, std
 	startTime := clock.Now(ctx)
 	runResult, err := t.ffx.Test(ctx, build.TestList{Data: testDef, SchemaID: build.TestListSchemaIDExperimental}, outDir, extraArgs...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if runResult == nil {
-		return fmt.Errorf("no test result was found")
+		return nil, fmt.Errorf("no test result was found")
 	}
-	t.setTestRun(test, runResult, clock.Now(ctx).Sub(startTime))
-	return nil
-}
-
-func (t *FFXTester) setTestRun(test testsharder.Test, runResult *ffxutil.TestRunResult, duration time.Duration) {
-	t.testRuns[test.PackageURL] = ffxTestRun{runResult, duration}
-}
-
-func (t *FFXTester) getTestRun(test testsharder.Test) (*ffxutil.TestRunResult, time.Duration) {
-	run := t.testRuns[test.PackageURL]
-	return run.result, run.totalDuration
-}
-
-func (t *FFXTester) ProcessResult(ctx context.Context, test testsharder.Test, outDir string, testResult *TestResult, err error) (*TestResult, error) {
-	if !t.EnabledForTesting() {
-		return t.sshTester.ProcessResult(ctx, test, outDir, testResult, err)
-	}
-	finalTestResult := testResult
-	if err == nil {
-		runResult, totalDuration := t.getTestRun(test)
-		testOutDir := runResult.GetTestOutputDir()
-		t.testOutDirs = append(t.testOutDirs, testOutDir)
-		testResult, err = processTestResult(runResult, test, totalDuration, false)
-	}
-	if err != nil {
-		finalTestResult.FailReason = err.Error()
-	} else if testResult == nil {
-		finalTestResult.FailReason = "expected 1 test result, got none"
-	} else {
-		finalTestResult = testResult
-	}
-	if finalTestResult.Result != runtests.TestSuccess {
-		err = retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), maxReconnectAttempts), func() error {
-			return t.ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
-		}, nil)
-		if err != nil {
-			return finalTestResult, err
-		}
-	}
-	return finalTestResult, nil
+	testOutDir := runResult.GetTestOutputDir()
+	t.testOutDirs = append(t.testOutDirs, testOutDir)
+	return processTestResult(runResult, test, clock.Now(ctx).Sub(startTime), false)
 }
 
 func processTestResult(runResult *ffxutil.TestRunResult, test testsharder.Test, totalDuration time.Duration, removeProfiles bool) (*TestResult, error) {
@@ -1044,7 +991,6 @@ type FuchsiaSSHTester struct {
 	connectionErrorRetryBackoff retry.Backoff
 	serialSocket                serialClient
 	ignoreEarlyBoot             bool
-	testRuns                    map[string]sshTestRun
 }
 
 // NewFuchsiaSSHTester returns a FuchsiaSSHTester associated to a fuchsia
@@ -1065,7 +1011,6 @@ func NewFuchsiaSSHTester(ctx context.Context, addr net.IPAddr, sshKeyFile, local
 		localOutputDir:              localOutputDir,
 		connectionErrorRetryBackoff: retry.NewConstantBackoff(time.Second),
 		serialSocket:                &serialSocket{serialSocketPath},
-		testRuns:                    make(map[string]sshTestRun),
 	}, nil
 }
 
@@ -1130,23 +1075,6 @@ func (t *FuchsiaSSHTester) runSSHCommandWithRetry(ctx context.Context, command [
 	}, nil)
 }
 
-type sshTestRun struct {
-	targetOutDir  string
-	totalDuration time.Duration
-}
-
-func (t *FuchsiaSSHTester) setTestRun(test testsharder.Test, targetOutDir string, duration time.Duration) {
-	t.testRuns[test.PackageURL] = sshTestRun{targetOutDir, duration}
-}
-
-func (t *FuchsiaSSHTester) getTestRun(test testsharder.Test) (string, time.Duration) {
-	run, ok := t.testRuns[test.PackageURL]
-	if !ok {
-		return "", 0
-	}
-	return run.targetOutDir, run.totalDuration
-}
-
 // Test runs a test over SSH.
 func (t *FuchsiaSSHTester) Test(ctx context.Context, test testsharder.Test, stdout io.Writer, stderr io.Writer, outDir string) (*TestResult, error) {
 	testResult := BaseTestResultFromTest(test)
@@ -1166,24 +1094,13 @@ func (t *FuchsiaSSHTester) Test(ctx context.Context, test testsharder.Test, stdo
 	}
 	startTime := clock.Now(ctx)
 	testErr := t.runSSHCommandWithRetry(ctx, command, stdout, stderr)
-	if setOutputDir {
-		t.setTestRun(test, targetOutDir, clock.Now(ctx).Sub(startTime))
-	}
-	if t.isTimeoutError(test, testErr) {
-		testResult.Result = runtests.TestAborted
-	} else if testErr != nil {
-		testResult.FailReason = testErr.Error()
-	} else {
+	if testErr == nil {
 		testResult.Result = runtests.TestSuccess
 	}
-	return testResult, testErr
-}
 
-func (t *FuchsiaSSHTester) ProcessResult(ctx context.Context, test testsharder.Test, outDir string, testResult *TestResult, testErr error) (*TestResult, error) {
-	targetOutDir, totalDuration := t.getTestRun(test)
 	// Collect test outputs. This is a best effort. If any of the following steps
 	// to process the outputs fail, just log the failure but don't fail the test.
-	if targetOutDir != "" {
+	if setOutputDir {
 		outputs, err := t.copier.GetAllDataSinks(targetOutDir)
 		if err != nil {
 			logger.Debugf(ctx, "failed to get test outputs: %s", err)
@@ -1210,7 +1127,7 @@ func (t *FuchsiaSSHTester) ProcessResult(ctx context.Context, test testsharder.T
 			if err != nil {
 				logger.Debugf(ctx, "failed to get run result: %s", err)
 			} else if runResult != nil {
-				if result, err := processTestResult(runResult, test, totalDuration, true); err != nil {
+				if result, err := processTestResult(runResult, test, clock.Now(ctx).Sub(startTime), true); err != nil {
 					// Log the error and continue to construct the test result
 					// without the run_summary.json in the outputs.
 					logger.Debugf(ctx, "failed to process run result: %s", err)
@@ -1231,6 +1148,14 @@ func (t *FuchsiaSSHTester) ProcessResult(ctx context.Context, test testsharder.T
 		// then the device has likely become unresponsive and there's no use in
 		// continuing to try to run tests, so mark the error as fatal.
 		return nil, testErr
+	}
+
+	if t.isTimeoutError(test, testErr) {
+		testResult.Result = runtests.TestAborted
+	} else if testErr != nil {
+		testResult.FailReason = testErr.Error()
+	} else {
+		testResult.Result = runtests.TestSuccess
 	}
 
 	return testResult, nil
@@ -1622,10 +1547,6 @@ func (t *FuchsiaSerialTester) Test(ctx context.Context, test testsharder.Test, s
 	}
 	testResult.Result = runtests.TestSuccess
 	return testResult, nil
-}
-
-func (t *FuchsiaSerialTester) ProcessResult(ctx context.Context, test testsharder.Test, outDir string, testResult *TestResult, err error) (*TestResult, error) {
-	return testResult, err
 }
 
 func (t *FuchsiaSerialTester) EnsureSinks(_ context.Context, _ []runtests.DataSinkReference, _ *TestOutputs) error {

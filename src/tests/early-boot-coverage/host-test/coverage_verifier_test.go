@@ -152,17 +152,16 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 	var address net.IPAddr = ipv6
 
 	t.Log("Establishing SSH Session.")
-	runnerCtx := context.Background()
-	runner, err = testrunner.NewFuchsiaSSHTester(runnerCtx, address, config.Test.SshKeyFile, outDir, "")
+	runner_ctx := context.Background()
+	runner, err = testrunner.NewFuchsiaSSHTester(runner_ctx, address, config.Test.SshKeyFile, outDir, "")
 	if err != nil {
 		t.Fatalf("Error initializing Fuchsia SSH Test. Reason: %s", err)
 	}
 	defer runner.Close()
 
-	testCtx := context.Background()
+	test_ctx := context.Background()
 	t.Logf("Running Test: %s", config.Test.Name)
-	testResult, err := runner.Test(testCtx, shard, os.Stdout, os.Stdout, "")
-	testResult, err = runner.ProcessResult(testCtx, shard, "", testResult, err)
+	test_result, err := runner.Test(test_ctx, shard, os.Stdout, os.Stdout, "")
 	if err != nil {
 		t.Fatalf("Test execution failed. Reason: %s", err)
 	}
@@ -173,7 +172,7 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 		t.Fatalf("Test output creation failed. Reason: %s", err)
 	}
 
-	if err := outputs.Record(ctx, *testResult); err != nil {
+	if err := outputs.Record(ctx, *test_result); err != nil {
 		t.Fatalf("Failed to record data sinks. Reason: %s", err)
 	}
 
@@ -195,11 +194,11 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 		t.Logf("Test[%d] Name %s Sink count: %d", curr, test.Name, len(test.DataSinks))
 		for _, sinks := range test.DataSinks {
 			for _, sink := range sinks {
-				pathComponents := strings.Split(sink.Name, string(os.PathSeparator))
-				if pathComponents[0] == "llvm-profile" {
+				path_components := strings.Split(sink.Name, string(os.PathSeparator))
+				if path_components[0] == "llvm-profile" {
 					rawProfiles = append(rawProfiles, filepath.Join(outDir, sink.File))
 				} else {
-					t.Logf("Unexpected data sink: %s", pathComponents[0])
+					t.Logf("Unexpected data sink: %s", path_components[0])
 				}
 			}
 		}

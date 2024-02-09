@@ -612,7 +612,8 @@ func runTestOnce(
 	var err error
 	select {
 	case res := <-ch:
-		result, err = t.ProcessResult(testCtx, test, outDir, res.result, res.err)
+		result = res.result
+		err = res.err
 		timeout = test.Timeout
 	case <-timeoutCh:
 		result.Result = runtests.TestAborted

@@ -276,7 +276,6 @@ func TestSubprocessTester(t *testing.T) {
 			}
 			tester := SubprocessTester{
 				localOutputDir: tmpDir,
-				testRuns:       make(map[string]string),
 			}
 			if c.useSandboxing {
 				tester.sProps = &sandboxingProps{
@@ -308,10 +307,7 @@ func TestSubprocessTester(t *testing.T) {
 				return runner
 			}
 			outDir := filepath.Join(tmpDir, c.test.Path)
-			ctx := context.Background()
-			test := testsharder.Test{Test: c.test}
-			testResult, err := tester.Test(ctx, test, io.Discard, io.Discard, outDir)
-			testResult, err = tester.ProcessResult(ctx, test, outDir, testResult, err)
+			testResult, err := tester.Test(context.Background(), testsharder.Test{Test: c.test}, io.Discard, io.Discard, outDir)
 			if err != nil {
 				t.Errorf("tester.Test got error: %s, want nil", err)
 			}
@@ -417,7 +413,6 @@ func TestFFXTester(t *testing.T) {
 				client:                      client,
 				copier:                      copier,
 				connectionErrorRetryBackoff: &retry.ZeroBackoff{},
-				testRuns:                    make(map[string]sshTestRun),
 			}
 			var outcome string
 			switch c.expectedResult {
@@ -449,9 +444,7 @@ func TestFFXTester(t *testing.T) {
 				RunAlgorithm: testsharder.StopOnSuccess,
 			}
 			ctx := context.Background()
-			outDir := t.TempDir()
-			testResult, err := tester.Test(ctx, test, io.Discard, io.Discard, outDir)
-			testResult, err = tester.ProcessResult(ctx, test, outDir, testResult, err)
+			testResult, err := tester.Test(ctx, test, io.Discard, io.Discard, t.TempDir())
 			if err != nil {
 				t.Errorf("tester.Test got unexpected error: %s", err)
 			}
@@ -608,7 +601,6 @@ func TestSSHTester(t *testing.T) {
 				copier:                      copier,
 				connectionErrorRetryBackoff: &retry.ZeroBackoff{},
 				serialSocket:                serialSocket,
-				testRuns:                    make(map[string]sshTestRun),
 			}
 
 			defer func() {
@@ -624,9 +616,7 @@ func TestSSHTester(t *testing.T) {
 				RunAlgorithm: testsharder.StopOnSuccess,
 				Timeout:      time.Second,
 			}
-			outDir := t.TempDir()
-			testResult, err := tester.Test(context.Background(), test, io.Discard, io.Discard, outDir)
-			testResult, err = tester.ProcessResult(context.Background(), test, outDir, testResult, err)
+			testResult, err := tester.Test(context.Background(), test, io.Discard, io.Discard, "unused-out-dir")
 			expectedResult := runtests.TestSuccess
 			if c.expectedResult != "" {
 				expectedResult = c.expectedResult

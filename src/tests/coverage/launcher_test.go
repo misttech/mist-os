@@ -192,9 +192,7 @@ func runCoverageTest(t *testing.T, testOutDir string) string {
 
 	defer tester.Close()
 	ctx := context.Background()
-	outDir := t.TempDir()
-	result, err := tester.Test(ctx, test, os.Stdout, os.Stdout, filepath.Join(testOutDir, outDir))
-	result, err = tester.ProcessResult(ctx, test, outDir, result, err)
+	result, err := tester.Test(ctx, test, os.Stdout, os.Stdout, filepath.Join(testOutDir, "test-outputs"))
 	if err != nil {
 		t.Fatalf("failed to run the test: %s", err)
 	}
