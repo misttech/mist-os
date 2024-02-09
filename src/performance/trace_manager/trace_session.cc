@@ -21,7 +21,7 @@ TraceSession::TraceSession(zx::socket destination, std::vector<std::string> enab
                            TraceProviderSpecMap&& provider_specs, zx::duration start_timeout,
                            zx::duration stop_timeout, fit::closure abort_handler,
                            AlertCallback alert_callback)
-    : destination_(std::move(destination)),
+    : buffer_forwarder_(std::make_shared<BufferForwarder>(std::move(destination))),
       enabled_categories_(std::move(enabled_categories)),
       buffer_size_megabytes_(buffer_size_megabytes),
       buffering_mode_(buffering_mode),
@@ -36,7 +36,6 @@ TraceSession::~TraceSession() {
   session_start_timeout_.Cancel();
   session_stop_timeout_.Cancel();
   session_terminate_timeout_.Cancel();
-  destination_.reset();
 }
 
 void TraceSession::AddProvider(TraceProviderBundle* provider) {
@@ -62,7 +61,7 @@ void TraceSession::AddProvider(TraceProviderBundle* provider) {
   FX_LOGS(DEBUG) << "Adding provider " << *provider << ", buffer size " << buffer_size_megabytes
                  << "MB";
 
-  tracees_.emplace_back(std::make_unique<Tracee>(this, provider));
+  tracees_.emplace_back(std::make_unique<Tracee>(buffer_forwarder_, provider));
   std::vector<std::string> categories_clone(provider_specific_categories.begin(),
                                             provider_specific_categories.end());
   if (!tracees_.back()->Initialize(
@@ -431,7 +430,7 @@ void TraceSession::RemoveDeadProvider(TraceProviderBundle* bundle) {
 bool TraceSession::WriteProviderData(Tracee* tracee) {
   FX_DCHECK(!tracee->results_written());
 
-  switch (tracee->TransferRecords(destination_)) {
+  switch (tracee->TransferRecords(buffer_forwarder_)) {
     case TransferStatus::kComplete:
       break;
     case TransferStatus::kProviderError:
@@ -478,8 +477,8 @@ TransferStatus TraceSession::WriteMagicNumberRecord() {
               trace::MagicNumberRecordFields::Magic::Make(trace::kMagicValue);
   // This won't block as we're only called after the consumer connects, and
   // this is the first record written.
-  return WriteBufferToSocket(destination_, reinterpret_cast<uint8_t*>(record.data()),
-                             trace::WordsToBytes(num_words));
+  return buffer_forwarder_->WriteBuffer(reinterpret_cast<uint8_t*>(record.data()),
+                                        trace::WordsToBytes(num_words));
 }
 
 void TraceSession::TransitionToState(State new_state) {

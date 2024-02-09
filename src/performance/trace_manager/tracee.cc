@@ -60,8 +60,8 @@ uint64_t GetBufferWordsWritten(const uint64_t* buffer, uint64_t size_in_words) {
 
 }  // namespace
 
-Tracee::Tracee(const TraceSession* session, const TraceProviderBundle* bundle)
-    : session_(session), bundle_(bundle), wait_(this), weak_ptr_factory_(this) {}
+Tracee::Tracee(std::shared_ptr<const BufferForwarder> output, const TraceProviderBundle* bundle)
+    : output_(std::move(output)), bundle_(bundle), wait_(this), weak_ptr_factory_(this) {}
 
 Tracee::~Tracee() {
   if (dispatcher_) {
@@ -259,12 +259,12 @@ void Tracee::OnFifoReadable(async_dispatcher_t* dispatcher, async::WaitBase* wai
         FX_LOGS(INFO) << "Buffer save request from " << *bundle_
                       << ", wrapped_count=" << wrapped_count << ", durable_data_end=0x" << std::hex
                       << durable_data_end;
-        async::PostTask(dispatcher_, [weak = weak_ptr_factory_.GetWeakPtr(), wrapped_count,
-                                      durable_data_end] {
-          if (weak) {
-            weak->TransferBuffer(weak->session_->destination(), wrapped_count, durable_data_end);
-          }
-        });
+        async::PostTask(dispatcher_,
+                        [weak = weak_ptr_factory_.GetWeakPtr(), wrapped_count, durable_data_end] {
+                          if (weak) {
+                            weak->TransferBuffer(weak->output_, wrapped_count, durable_data_end);
+                          }
+                        });
       } else {
         FX_LOGS(WARNING) << *bundle_ << ": Received TRACE_PROVIDER_SAVE_BUFFER in state " << state_;
       }
@@ -327,8 +327,9 @@ bool Tracee::VerifyBufferHeader(const trace::internal::BufferHeaderReader* heade
   return true;
 }
 
-TransferStatus Tracee::DoWriteChunk(const zx::socket& socket, uint64_t vmo_offset, uint64_t size,
-                                    const char* name, bool by_size) const {
+TransferStatus Tracee::DoWriteChunk(const std::shared_ptr<const BufferForwarder>& socket,
+                                    uint64_t vmo_offset, uint64_t size, const char* name,
+                                    bool by_size) const {
   FX_LOGS(INFO) << *bundle_ << ": Writing chunk for " << name << ": vmo offset 0x" << std::hex
                 << vmo_offset << ", size 0x" << std::hex << size
                 << (by_size ? ", by-size" : ", by-record");
@@ -370,26 +371,28 @@ TransferStatus Tracee::DoWriteChunk(const zx::socket& socket, uint64_t vmo_offse
     bytes_written = size;
   }
 
-  auto status =
-      WriteBufferToSocket(socket, reinterpret_cast<const void*>(offset_addr), bytes_written);
+  auto status = output_->WriteBuffer(reinterpret_cast<const void*>(offset_addr), bytes_written);
   if (status != TransferStatus::kComplete) {
     FX_LOGS(DEBUG) << *bundle_ << ": Failed to write " << name << " records";
   }
   return status;
 }
 
-TransferStatus Tracee::WriteChunkByRecords(const zx::socket& socket, uint64_t vmo_offset,
-                                           uint64_t size, const char* name) const {
+TransferStatus Tracee::WriteChunkByRecords(const std::shared_ptr<const BufferForwarder>& socket,
+                                           uint64_t vmo_offset, uint64_t size,
+                                           const char* name) const {
   return DoWriteChunk(socket, vmo_offset, size, name, false);
 }
 
-TransferStatus Tracee::WriteChunkBySize(const zx::socket& socket, uint64_t vmo_offset,
-                                        uint64_t size, const char* name) const {
+TransferStatus Tracee::WriteChunkBySize(const std::shared_ptr<const BufferForwarder>& socket,
+                                        uint64_t vmo_offset, uint64_t size,
+                                        const char* name) const {
   return DoWriteChunk(socket, vmo_offset, size, name, true);
 }
 
-TransferStatus Tracee::WriteChunk(const zx::socket& socket, uint64_t offset, uint64_t last,
-                                  uint64_t end, uint64_t buffer_size, const char* name) const {
+TransferStatus Tracee::WriteChunk(const std::shared_ptr<const BufferForwarder>& socket,
+                                  uint64_t offset, uint64_t last, uint64_t end,
+                                  uint64_t buffer_size, const char* name) const {
   ZX_DEBUG_ASSERT(last <= buffer_size);
   ZX_DEBUG_ASSERT(end <= buffer_size);
   ZX_DEBUG_ASSERT(end == 0 || last <= end);
@@ -405,7 +408,7 @@ TransferStatus Tracee::WriteChunk(const zx::socket& socket, uint64_t offset, uin
   }
 }
 
-TransferStatus Tracee::TransferRecords(const zx::socket& socket) const {
+TransferStatus Tracee::TransferRecords(const std::shared_ptr<const BufferForwarder>& socket) const {
   FX_DCHECK(socket);
   FX_DCHECK(buffer_vmo_);
 
@@ -538,8 +541,8 @@ std::optional<controller::ProviderStats> Tracee::GetStats() const {
   return std::nullopt;
 }
 
-void Tracee::TransferBuffer(const zx::socket& socket, uint32_t wrapped_count,
-                            uint64_t durable_data_end) {
+void Tracee::TransferBuffer(const std::shared_ptr<const BufferForwarder>& socket,
+                            uint32_t wrapped_count, uint64_t durable_data_end) {
   FX_DCHECK(buffering_mode_ == fuchsia::tracing::BufferingMode::STREAMING);
   FX_DCHECK(socket);
   FX_DCHECK(buffer_vmo_);
@@ -556,8 +559,8 @@ void Tracee::TransferBuffer(const zx::socket& socket, uint32_t wrapped_count,
   NotifyBufferSaved(wrapped_count, durable_data_end);
 }
 
-bool Tracee::DoTransferBuffer(const zx::socket& socket, uint32_t wrapped_count,
-                              uint64_t durable_data_end) {
+bool Tracee::DoTransferBuffer(const std::shared_ptr<const BufferForwarder>& socket,
+                              uint32_t wrapped_count, uint64_t durable_data_end) {
   if (wrapped_count == 0 && last_wrapped_count_ == 0) {
     // ok
   } else if (wrapped_count != last_wrapped_count_ + 1) {
@@ -649,7 +652,8 @@ void Tracee::NotifyBufferSaved(uint32_t wrapped_count, uint64_t durable_data_end
   }
 }
 
-TransferStatus Tracee::WriteProviderIdRecord(const zx::socket& socket) const {
+TransferStatus Tracee::WriteProviderIdRecord(
+    const std::shared_ptr<const BufferForwarder>& socket) const {
   if (provider_info_record_written_) {
     return WriteProviderSectionRecord(socket);
   } else {
@@ -659,7 +663,8 @@ TransferStatus Tracee::WriteProviderIdRecord(const zx::socket& socket) const {
   }
 }
 
-TransferStatus Tracee::WriteProviderInfoRecord(const zx::socket& socket) const {
+TransferStatus Tracee::WriteProviderInfoRecord(
+    const std::shared_ptr<const BufferForwarder>& socket) const {
   FX_LOGS(DEBUG) << *bundle_ << ": writing provider info record";
   std::string label("");  // TODO(https://fxbug.dev/42106751): Provide meaningful labels or remove
                           // labels from the trace wire format altogether.
@@ -673,11 +678,12 @@ TransferStatus Tracee::WriteProviderInfoRecord(const zx::socket& socket) const {
               trace::ProviderInfoMetadataRecordFields::Id::Make(bundle_->id) |
               trace::ProviderInfoMetadataRecordFields::NameLength::Make(label.size());
   memcpy(&record[1], label.c_str(), label.size());
-  return WriteBufferToSocket(socket, reinterpret_cast<uint8_t*>(record.data()),
-                             trace::WordsToBytes(num_words));
+  return output_->WriteBuffer(reinterpret_cast<uint8_t*>(record.data()),
+                              trace::WordsToBytes(num_words));
 }
 
-TransferStatus Tracee::WriteProviderSectionRecord(const zx::socket& socket) const {
+TransferStatus Tracee::WriteProviderSectionRecord(
+    const std::shared_ptr<const BufferForwarder>& socket) const {
   FX_LOGS(DEBUG) << *bundle_ << ": writing provider section record";
   size_t num_words = 1u;
   std::vector<uint64_t> record(num_words);
@@ -687,11 +693,12 @@ TransferStatus Tracee::WriteProviderSectionRecord(const zx::socket& socket) cons
               trace::ProviderSectionMetadataRecordFields::MetadataType::Make(
                   trace::ToUnderlyingType(trace::MetadataType::kProviderSection)) |
               trace::ProviderSectionMetadataRecordFields::Id::Make(bundle_->id);
-  return WriteBufferToSocket(socket, reinterpret_cast<uint8_t*>(record.data()),
-                             trace::WordsToBytes(num_words));
+  return output_->WriteBuffer(reinterpret_cast<uint8_t*>(record.data()),
+                              trace::WordsToBytes(num_words));
 }
 
-TransferStatus Tracee::WriteProviderBufferOverflowEvent(const zx::socket& socket) const {
+TransferStatus Tracee::WriteProviderBufferOverflowEvent(
+    const std::shared_ptr<const BufferForwarder>& socket) const {
   size_t num_words = 1u;
   std::vector<uint64_t> record(num_words);
   record[0] = trace::ProviderEventMetadataRecordFields::Type::Make(
@@ -702,8 +709,8 @@ TransferStatus Tracee::WriteProviderBufferOverflowEvent(const zx::socket& socket
               trace::ProviderEventMetadataRecordFields::Id::Make(bundle_->id) |
               trace::ProviderEventMetadataRecordFields::Event::Make(
                   trace::ToUnderlyingType(trace::ProviderEventType::kBufferOverflow));
-  return WriteBufferToSocket(socket, reinterpret_cast<uint8_t*>(record.data()),
-                             trace::WordsToBytes(num_words));
+  return output_->WriteBuffer(reinterpret_cast<uint8_t*>(record.data()),
+                              trace::WordsToBytes(num_words));
 }
 
 void Tracee::Abort() {

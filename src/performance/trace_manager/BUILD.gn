@@ -9,6 +9,8 @@ source_set("lib") {
   sources = [
     "app.cc",
     "app.h",
+    "buffer_forwarder.cc",
+    "buffer_forwarder.h",
     "config.cc",
     "config.h",
     "trace_manager.cc",

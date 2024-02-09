@@ -18,6 +18,7 @@
 #include <trace-reader/reader_internal.h>
 
 #include "src/lib/fxl/memory/weak_ptr.h"
+#include "src/performance/trace_manager/buffer_forwarder.h"
 #include "src/performance/trace_manager/trace_provider_bundle.h"
 #include "src/performance/trace_manager/util.h"
 
@@ -54,7 +55,7 @@ class Tracee {
   // The size of the initialization record.
   static constexpr size_t kInitRecordSizeBytes = 16;
 
-  explicit Tracee(const TraceSession* session, const TraceProviderBundle* bundle);
+  explicit Tracee(std::shared_ptr<const BufferForwarder> output, const TraceProviderBundle* bundle);
   ~Tracee();
 
   bool operator==(TraceProviderBundle* bundle) const;
@@ -74,16 +75,17 @@ class Tracee {
   std::optional<controller::ProviderStats> GetStats() const;
 
   // Transfer all collected records to |socket|.
-  TransferStatus TransferRecords(const zx::socket& socket) const;
+  TransferStatus TransferRecords(const std::shared_ptr<const BufferForwarder>& socket) const;
 
   // Save the buffer specified by |wrapped_count|.
   // This is a callback from the TraceSession loop.
   // That's why the result is void and not Tracee::TransferStatus.
-  void TransferBuffer(const zx::socket& socket, uint32_t wrapped_count, uint64_t durable_data_end);
+  void TransferBuffer(const std::shared_ptr<const BufferForwarder>& socket, uint32_t wrapped_count,
+                      uint64_t durable_data_end);
 
   // Helper for |TransferBuffer()|, returns true on success.
-  bool DoTransferBuffer(const zx::socket& socket, uint32_t wrapped_count,
-                        uint64_t durable_data_end);
+  bool DoTransferBuffer(const std::shared_ptr<const BufferForwarder>& socket,
+                        uint32_t wrapped_count, uint64_t durable_data_end);
 
   const TraceProviderBundle* bundle() const { return bundle_; }
   State state() const { return state_; }
@@ -120,33 +122,37 @@ class Tracee {
   // This function handles both cases. If |by_size| is false then run through
   // the buffer computing the size of each record until we find no more
   // records. If |by_size| is true then |size| is the number of bytes to write.
-  TransferStatus DoWriteChunk(const zx::socket& socket, size_t vmo_offset, size_t size,
-                              const char* name, bool by_size) const;
+  TransferStatus DoWriteChunk(const std::shared_ptr<const BufferForwarder>& socket,
+                              size_t vmo_offset, size_t size, const char* name, bool by_size) const;
 
-  TransferStatus WriteChunkByRecords(const zx::socket& socket, uint64_t vmo_offset, uint64_t size,
-                                     const char* name) const;
-  TransferStatus WriteChunkBySize(const zx::socket& socket, uint64_t vmo_offset, uint64_t size,
-                                  const char* name) const;
-  TransferStatus WriteChunk(const zx::socket& socket, uint64_t offset, uint64_t last, uint64_t end,
-                            uint64_t buffer_size, const char* name) const;
+  TransferStatus WriteChunkByRecords(const std::shared_ptr<const BufferForwarder>& socket,
+                                     uint64_t vmo_offset, uint64_t size, const char* name) const;
+  TransferStatus WriteChunkBySize(const std::shared_ptr<const BufferForwarder>& socket,
+                                  uint64_t vmo_offset, uint64_t size, const char* name) const;
+  TransferStatus WriteChunk(const std::shared_ptr<const BufferForwarder>& socket, uint64_t offset,
+                            uint64_t last, uint64_t end, uint64_t buffer_size,
+                            const char* name) const;
 
   // Write a ProviderInfo record the first time this is called.
   // For subsequent calls write a ProviderSection record.
   // The ProviderInfo record defines the provider, and subsequent
   // ProviderSection records tell the reader to switch back to that provider.
-  TransferStatus WriteProviderIdRecord(const zx::socket& socket) const;
+  TransferStatus WriteProviderIdRecord(const std::shared_ptr<const BufferForwarder>& socket) const;
 
-  TransferStatus WriteProviderInfoRecord(const zx::socket& socket) const;
-  TransferStatus WriteProviderSectionRecord(const zx::socket& socket) const;
-  TransferStatus WriteProviderBufferOverflowEvent(const zx::socket& socket) const;
+  TransferStatus WriteProviderInfoRecord(
+      const std::shared_ptr<const BufferForwarder>& socket) const;
+  TransferStatus WriteProviderSectionRecord(
+      const std::shared_ptr<const BufferForwarder>& socket) const;
+  TransferStatus WriteProviderBufferOverflowEvent(
+      const std::shared_ptr<const BufferForwarder>& socket) const;
 
   void NotifyBufferSaved(uint32_t wrapped_count, uint64_t durable_data_end);
 
   // Called when a problem is detected warranting shutting the connection down.
   void Abort();
 
-  const TraceSession* const session_;
-  const TraceProviderBundle* const bundle_;
+  const std::shared_ptr<const BufferForwarder> output_;
+  const TraceProviderBundle* bundle_;
   State state_ = State::kReady;
 
   fuchsia::tracing::BufferingMode buffering_mode_;

@@ -32,13 +32,6 @@ std::ostream& operator<<(std::ostream& out, fuchsia::tracing::BufferDisposition 
 
 std::ostream& operator<<(std::ostream& out, controller::SessionState state);
 
-// Writes |len| bytes from |buffer| to |socket|. Returns
-// TransferStatus::kComplete if the entire buffer has been
-// successfully transferred. A return value of
-// TransferStatus::kReceiverDead indicates that the peer was closed
-// during the transfer.
-TransferStatus WriteBufferToSocket(const zx::socket& socket, const void* buffer, size_t len);
-
 }  // namespace tracing
 
 #endif  // SRC_PERFORMANCE_TRACE_MANAGER_UTIL_H_

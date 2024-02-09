@@ -22,6 +22,7 @@
 
 #include "src/lib/fxl/memory/ref_counted.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
+#include "src/performance/trace_manager/buffer_forwarder.h"
 #include "src/performance/trace_manager/trace_provider_bundle.h"
 #include "src/performance/trace_manager/tracee.h"
 
@@ -63,18 +64,14 @@ class TraceSession : public fxl::RefCountedThreadSafe<TraceSession> {
   //
   // |abort_handler| is invoked whenever the session encounters
   // unrecoverable errors that render the session dead.
-  explicit TraceSession(zx::socket destination, std::vector<std::string> categories,
-                        size_t buffer_size_megabytes,
-                        fuchsia::tracing::BufferingMode buffering_mode,
-                        TraceProviderSpecMap&& provider_specs, zx::duration start_timeout,
-                        zx::duration stop_timeout, fit::closure abort_handler,
-                        AlertCallback alert_callback);
+  TraceSession(zx::socket destination, std::vector<std::string> categories,
+               size_t buffer_size_megabytes, fuchsia::tracing::BufferingMode buffering_mode,
+               TraceProviderSpecMap&& provider_specs, zx::duration start_timeout,
+               zx::duration stop_timeout, fit::closure abort_handler, AlertCallback alert_callback);
 
   // Frees all allocated resources and closes the outgoing
   // connection.
   ~TraceSession();
-
-  const zx::socket& destination() const { return destination_; }
 
   // For testing.
   State state() const { return state_; }
@@ -161,7 +158,7 @@ class TraceSession : public fxl::RefCountedThreadSafe<TraceSession> {
   void TransitionToState(State state);
 
   State state_ = State::kReady;
-  zx::socket destination_;
+  std::shared_ptr<BufferForwarder> buffer_forwarder_;
   fidl::VectorPtr<std::string> enabled_categories_;
   size_t buffer_size_megabytes_;
   fuchsia::tracing::BufferingMode buffering_mode_;
