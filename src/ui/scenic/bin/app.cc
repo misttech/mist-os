@@ -19,6 +19,7 @@
 #include "src/lib/fxl/functional/cancelable_callback.h"
 #include "src/ui/lib/escher/vk/pipeline_builder.h"
 #include "src/ui/scenic/lib/display/color_converter.h"
+#include "src/ui/scenic/lib/display/display_manager.h"
 #include "src/ui/scenic/lib/display/display_power_manager.h"
 #include "src/ui/scenic/lib/flatland/engine/engine.h"
 #include "src/ui/scenic/lib/flatland/engine/engine_types.h"
@@ -33,6 +34,7 @@
 #include "src/ui/scenic/lib/utils/escher_provider.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/lib/utils/metrics_impl.h"
+#include "src/ui/scenic/lib/utils/range_inclusive.h"
 #include "src/ui/scenic/lib/view_tree/snapshot_dump.h"
 #include "src/ui/scenic/scenic_structured_config.h"
 
@@ -64,6 +66,34 @@ std::optional<uint64_t> GetDisplayMode(const scenic_structured_config::Config& v
     return std::nullopt;
   }
   return values.i_can_haz_display_mode();
+}
+
+utils::RangeInclusive<int> CreateRangeFromStructuredConfigValues(int left, int right) {
+  if (left >= 0 && right >= 0) {
+    ZX_DEBUG_ASSERT(left <= right);
+    return utils::RangeInclusive<int>(left, right);
+  }
+  if (left >= 0) {
+    return utils::RangeInclusive<int>(left, utils::PositiveInfinity{});
+  }
+  if (right >= 0) {
+    return utils::RangeInclusive<int>(utils::NegativeInfinity{}, right);
+  }
+  return utils::RangeInclusive<int>();
+}
+
+scenic_impl::display::DisplayModeConstraints GetDisplayModeConstraints(
+    const scenic_structured_config::Config& values) {
+  return {
+      .width_px_range =
+          CreateRangeFromStructuredConfigValues(values.min_display_horizontal_resolution_px(),
+                                                values.max_display_horizontal_resolution_px()),
+      .height_px_range = CreateRangeFromStructuredConfigValues(
+          values.min_display_vertical_resolution_px(), values.max_display_vertical_resolution_px()),
+      .refresh_rate_millihertz_range =
+          CreateRangeFromStructuredConfigValues(values.min_display_refresh_rate_millihertz(),
+                                                values.max_display_refresh_rate_millihertz()),
+  };
 }
 
 std::string ToString(RendererType type) {
@@ -194,8 +224,9 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
     : executor_(async_get_default_dispatcher()),
       app_context_(std::move(app_context)),
       config_values_(GetConfig()),
-      // TODO(https://fxbug.dev/42117030): subsystems requiring graceful shutdown *on a loop* should register
-      // themselves. It is preferable to cleanly shutdown using destructors only, if possible.
+      // TODO(https://fxbug.dev/42117030): subsystems requiring graceful shutdown *on a loop* should
+      // register themselves. It is preferable to cleanly shutdown using destructors only, if
+      // possible.
       shutdown_manager_(
           ShutdownManager::New(async_get_default_dispatcher(), std::move(quit_callback))),
       metrics_logger_(
@@ -288,6 +319,7 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
   // Instantiate DisplayManager and schedule a task to inject the display coordinator into it, once
   // it becomes available.
   display_manager_.emplace(GetDisplayId(config_values_), GetDisplayMode(config_values_),
+                           GetDisplayModeConstraints(config_values_),
                            [this, completer = std::move(display_bridge.completer),
                             display_wait_log = std::move(display_wait_log)]() mutable {
                              completer.complete_ok(display_manager_->default_display_shared());
@@ -372,7 +404,8 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     pipeline_builder->set_log_pipeline_creation_callback(
         [metrics_logger = &metrics_logger_](const vk::GraphicsPipelineCreateInfo* graphics_info,
                                             const vk::ComputePipelineCreateInfo* compute_info) {
-          // TODO(https://fxbug.dev/42126999): pre-warm compute pipelines in addition to graphics pipelines.
+          // TODO(https://fxbug.dev/42126999): pre-warm compute pipelines in addition to graphics
+          // pipelines.
           if (compute_info) {
             FX_LOGS(WARNING) << "Unexpected lazy creation of Vulkan compute pipeline.";
             return;

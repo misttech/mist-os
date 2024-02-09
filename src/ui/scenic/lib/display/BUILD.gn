@@ -26,6 +26,7 @@ source_set("display") {
     "//sdk/fidl/fuchsia.ui.display.internal:fuchsia.ui.display.internal_hlcpp",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
+    "//src/lib/fidl/cpp:hlcpp_conversion",
     "//src/lib/fsl",
     "//src/lib/fxl",
     "//src/ui/scenic/lib/utils:utils",

@@ -9,10 +9,10 @@
 #include <fidl/fuchsia.hardware.display/cpp/hlcpp_conversion.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/ui/scenic/cpp/fidl.h>
+#include <lib/fidl/cpp/comparison.h>
+#include <lib/fidl/cpp/hlcpp_conversion.h>
+#include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
-
-#include "lib/fidl/cpp/comparison.h"
-#include "lib/fit/function.h"
 
 namespace scenic_impl {
 namespace display {
@@ -21,16 +21,46 @@ namespace {
 
 static constexpr uint32_t kMillihertzPerCentihertz = 10;
 
+std::optional<size_t> PickFirstDisplayModeSatisfyingConstraints(
+    cpp20::span<const fuchsia_hardware_display::Mode> modes,
+    const DisplayModeConstraints& constraints) {
+  for (size_t i = 0; i < modes.size(); ++i) {
+    if (constraints.ModeSatisfiesConstraints(modes[i])) {
+      return std::make_optional(i);
+    }
+  }
+  return std::nullopt;
+}
+
+}  // namespace
+
+bool DisplayModeConstraints::ModeSatisfiesConstraints(
+    const fuchsia_hardware_display::Mode& mode) const {
+  if (!width_px_range.Contains(static_cast<int>(mode.horizontal_resolution()))) {
+    return false;
+  }
+  if (!height_px_range.Contains(static_cast<int>(mode.vertical_resolution()))) {
+    return false;
+  }
+  const int refresh_rate_millihertz =
+      static_cast<int>(mode.refresh_rate_e2() * kMillihertzPerCentihertz);
+  if (!refresh_rate_millihertz_range.Contains(refresh_rate_millihertz)) {
+    return false;
+  }
+  return true;
 }
 
 DisplayManager::DisplayManager(fit::closure display_available_cb)
-    : DisplayManager(std::nullopt, std::nullopt, std::move(display_available_cb)) {}
+    : DisplayManager(std::nullopt, std::nullopt, /*display_mode_constraints=*/{},
+                     std::move(display_available_cb)) {}
 
 DisplayManager::DisplayManager(
     std::optional<fuchsia::hardware::display::types::DisplayId> i_can_haz_display_id,
-    std::optional<uint64_t> i_can_haz_display_mode, fit::closure display_available_cb)
+    std::optional<size_t> display_mode_index_override,
+    DisplayModeConstraints display_mode_constraints, fit::closure display_available_cb)
     : i_can_haz_display_id_(i_can_haz_display_id),
-      i_can_haz_display_mode_(i_can_haz_display_mode),
+      display_mode_index_override_(display_mode_index_override),
+      display_mode_constraints_(std::move(display_mode_constraints)),
       display_available_cb_(std::move(display_available_cb)) {}
 
 void DisplayManager::BindDefaultDisplayCoordinator(
@@ -66,26 +96,42 @@ void DisplayManager::OnDisplaysChanged(
     }
 
     if (!default_display_) {
-      size_t mode_idx = 0;
+      size_t mode_index = 0;
 
       // Set display mode if requested.
-      if (i_can_haz_display_mode_.has_value()) {
-        if (*i_can_haz_display_mode_ < display.modes.size()) {
-          mode_idx = *i_can_haz_display_mode_;
-          (*default_display_coordinator_)
-              ->SetDisplayMode(
-                  fuchsia::hardware::display::types::DisplayId{.value = display.id.value},
-                  display.modes[mode_idx]);
-          (*default_display_coordinator_)->ApplyConfig();
+      if (display_mode_index_override_.has_value()) {
+        if (*display_mode_index_override_ < display.modes.size()) {
+          mode_index = *display_mode_index_override_;
         } else {
-          FX_LOGS(ERROR) << "Requested display mode=" << *i_can_haz_display_mode_
+          FX_LOGS(ERROR) << "Requested display mode=" << *display_mode_index_override_
                          << " doesn't exist for display with id=" << display.id.value;
         }
+      } else {
+        std::vector<fuchsia_hardware_display::Mode> natural_modes =
+            fidl::HLCPPToNatural(display.modes);
+        std::optional<size_t> mode_index_satisfying_constraints =
+            PickFirstDisplayModeSatisfyingConstraints(natural_modes, display_mode_constraints_);
+
+        // TODO(https://fxbug.dev/42097581): handle this more robustly.
+        FX_CHECK(mode_index_satisfying_constraints.has_value())
+            << "Failed to find a display mode satisfying all display constraints for "
+               "display with id="
+            << display.id.value;
+
+        mode_index = *mode_index_satisfying_constraints;
+      }
+
+      if (mode_index != 0) {
+        (*default_display_coordinator_)
+            ->SetDisplayMode(
+                fuchsia::hardware::display::types::DisplayId{.value = display.id.value},
+                display.modes[mode_index]);
+        (*default_display_coordinator_)->ApplyConfig();
       }
 
       std::vector<fuchsia_images2::PixelFormat> pixel_formats =
           fidl::HLCPPToNatural(display.pixel_format);
-      auto& mode = display.modes[mode_idx];
+      const fuchsia::hardware::display::Mode& mode = display.modes[mode_index];
       default_display_ = std::make_unique<Display>(
           display.id, mode.horizontal_resolution, mode.vertical_resolution,
           display.horizontal_size_mm, display.vertical_size_mm, std::move(pixel_formats),
