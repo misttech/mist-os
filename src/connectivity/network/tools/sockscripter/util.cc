@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 
 #include <climits>
+#include <cstdlib>
 
 #include "netinet/in.h"
 
