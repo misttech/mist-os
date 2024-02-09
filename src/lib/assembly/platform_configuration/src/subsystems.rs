@@ -365,8 +365,12 @@ fn configure_subsystems(
     )
     .context("Configuring the 'Forensics' subsystem")?;
 
-    timekeeper::TimekeeperSubsystem::define_configuration(context, &(), builder)
-        .context("Configuring the 'Timekeeper' subsystem")?;
+    timekeeper::TimekeeperSubsystem::define_configuration(
+        context,
+        &config.platform.timekeeper,
+        builder,
+    )
+    .context("Configuring the 'timekeeper' subsystem")?;
 
     Ok(())
 }

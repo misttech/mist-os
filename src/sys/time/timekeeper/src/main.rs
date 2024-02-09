@@ -94,6 +94,10 @@ impl Config {
         zx::Duration::from_seconds(self.source_config.back_off_time_between_pull_samples_sec)
     }
 
+    fn get_first_sampling_delay(&self) -> zx::Duration {
+        zx::Duration::from_seconds(self.source_config.first_sampling_delay_sec)
+    }
+
     fn get_primary_uses_pull(&self) -> bool {
         self.source_config.primary_uses_pull
     }
@@ -432,6 +436,7 @@ use tests::make_test_config;
 #[cfg(test)]
 mod tests {
     use std::matches;
+    use test_case::test_case;
     use {
         super::*,
         crate::{
@@ -466,7 +471,7 @@ mod tests {
         (Arc::new(clock), initial_update_ticks)
     }
 
-    pub fn make_test_config() -> Arc<Config> {
+    pub fn make_test_config_with_delay(delay: i64) -> Arc<Config> {
         Arc::new(Config::from(timekeeper_config::Config {
             disable_delays: true,
             oscillator_error_std_dev_ppm: 15,
@@ -475,11 +480,16 @@ mod tests {
             initial_frequency_ppm: 1_000_000,
             monitor_uses_pull: false,
             back_off_time_between_pull_samples_sec: 0,
+            first_sampling_delay_sec: delay,
             monitor_time_source_url: "".to_string(),
             primary_uses_pull: false,
             utc_start_at_startup: false,
             early_exit: false,
         }))
+    }
+
+    pub fn make_test_config() -> Arc<Config> {
+        make_test_config_with_delay(0)
     }
 
     #[fuchsia::test]
@@ -566,6 +576,80 @@ mod tests {
         ]);
     }
 
+    #[test_case(0; "no pause")]
+    #[test_case(1; "one second pause")]
+    #[fuchsia::test]
+    fn successful_update_with_delay(delay: i64) {
+        let mut executor = fasync::TestExecutor::new();
+        let (primary_clock, primary_ticks) = create_clock();
+        let rtc = FakeRtc::valid(INVALID_RTC_TIME);
+        let diagnostics = Arc::new(FakeDiagnostics::new());
+        let config = make_test_config_with_delay(delay);
+
+        let monotonic_ref = zx::Time::get_monotonic();
+
+        // Maintain UTC until no more work remains
+        let mut fut = maintain_utc(
+            PrimaryTrack {
+                clock: Arc::clone(&primary_clock),
+                time_source: FakePushTimeSource::events(vec![
+                    TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
+                    TimeSourceEvent::from(Sample::new(
+                        monotonic_ref + OFFSET,
+                        monotonic_ref,
+                        STD_DEV,
+                    )),
+                ])
+                .into(),
+            },
+            None,
+            Some(rtc.clone()),
+            Arc::clone(&diagnostics),
+            Arc::clone(&config),
+        )
+        .boxed();
+
+        // This is slightly silly, but allows us to run the clock maintenance
+        // in fake time, waking up appropriate delay timers along the way.
+        // Tests running in fake time always have similar silliness where
+        // timer wakeups are involved.
+        let _ = executor.run_until_stalled(&mut fut); // Get to the first delay.
+
+        // This will wake the delay timer *if* one exists. This is a non-obvious
+        // feature of run_until_stalled: it does *not* wake timers. So without
+        // this the "one second delay" will never get out of the pause and the
+        // test will fail, proving that the pause does exist.
+        // On the other hand, the fact that both "no pause" and
+        // "one second pause" have an identical result means that the delay does
+        // not affect the normal operation of the clock manager.
+        executor.wake_next_timer();
+        let _ = executor.run_until_stalled(&mut fut); // Finish clock update work.
+
+        // Check that the clocks are set.
+        assert!(primary_clock.get_details().unwrap().last_value_update_ticks > primary_ticks);
+        assert!(rtc.last_set().is_some());
+
+        // Check that the correct diagnostic events were logged.
+        diagnostics.assert_events(&[
+            Event::Initialized { clock_state: InitialClockState::NotSet },
+            Event::InitializeRtc {
+                outcome: InitializeRtcOutcome::InvalidBeforeBackstop,
+                time: Some(INVALID_RTC_TIME),
+            },
+            Event::TimeSourceStatus { role: Role::Primary, status: ftexternal::Status::Ok },
+            Event::KalmanFilterUpdated {
+                track: Track::Primary,
+                monotonic: monotonic_ref,
+                utc: monotonic_ref + OFFSET,
+                sqrt_covariance: STD_DEV,
+            },
+            Event::StartClock {
+                track: Track::Primary,
+                source: StartClockSource::External(Role::Primary),
+            },
+            Event::WriteRtc { outcome: WriteRtcOutcome::Succeeded },
+        ]);
+    }
     #[fuchsia::test]
     fn no_update_invalid_rtc() {
         let mut executor = fasync::TestExecutor::new();

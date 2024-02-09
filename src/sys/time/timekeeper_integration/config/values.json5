@@ -6,6 +6,7 @@
     initial_frequency_ppm: 1000000,
     monitor_uses_pull: false,
     back_off_time_between_pull_samples_sec: 5,
+    first_sampling_delay_sec: 0,
     primary_uses_pull: false,
     monitor_time_source_url: "",
     utc_start_at_startup: true,

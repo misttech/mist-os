@@ -338,6 +338,17 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
     /// Maintain the clock indefinitely. This future will never complete.
     async fn maintain_clock(mut self, async_commands: mpsc::Receiver<()>) {
         let pull_delay = self.config.get_back_off_time_between_pull_samples();
+        let first_delay = self.config.get_first_sampling_delay();
+
+        // Pause before first sampling is sometimes useful. But not if no delay
+        // was ordered, so as not to change the scheduling order.
+        if first_delay != zx::Duration::ZERO {
+            // This should be an uncommon setting, so log it.
+            info!("delaying first time source sample by: {:?}", first_delay);
+            _ = fasync::Timer::new(fasync::Time::after(first_delay)).await;
+            info!("delay done");
+        }
+
         let details = self.clock.get_details().expect("failed to get UTC clock details");
         let mut clock_started =
             details.backstop.into_nanos() != details.ticks_to_synthetic.synthetic_offset;

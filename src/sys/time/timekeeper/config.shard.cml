@@ -43,6 +43,10 @@
         // time source, expressed in seconds.
         back_off_time_between_pull_samples_sec: { type: "int64" },
 
+        // The time to wait before sampling the time source for the first time,
+        // expressed in seconds.
+        first_sampling_delay_sec: { type: "int64" },
+
         // Flag for enabling usage of `PullSource` API for the primary track.
         // If set to false, `PullSource` is not used.
         primary_uses_pull: { type: "bool" },

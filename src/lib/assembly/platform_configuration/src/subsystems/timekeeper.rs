@@ -5,11 +5,13 @@
 use crate::subsystems::prelude::*;
 use anyhow::{Context, Result};
 
+use assembly_config_schema::platform_config::timekeeper_config::TimekeeperConfig;
+
 pub(crate) struct TimekeeperSubsystem;
-impl DefineSubsystemConfiguration<()> for TimekeeperSubsystem {
+impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
     fn define_configuration(
         context: &ConfigurationContext<'_>,
-        _: &(),
+        config: &TimekeeperConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> Result<()> {
         let mut config_builder = builder
@@ -43,7 +45,9 @@ impl DefineSubsystemConfiguration<()> for TimekeeperSubsystem {
             .field("initial_frequency_ppm", 1_000_000)?
             .field("primary_uses_pull", true)?
             .field("monitor_uses_pull", false)?
-            .field("back_off_time_between_pull_samples_sec", 300)?
+            .field("back_off_time_between_pull_samples_sec",
+                config.back_off_time_between_pull_samples_sec)?
+            .field("first_sampling_delay_sec", config.first_sampling_delay_sec)?
             .field("utc_start_at_startup", utc_start_at_startup)?
             .field("early_exit", early_exit)?;
 

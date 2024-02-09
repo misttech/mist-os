@@ -28,6 +28,7 @@ pub mod setui_config;
 pub mod starnix_config;
 pub mod storage_config;
 pub mod swd_config;
+pub mod timekeeper_config;
 pub mod ui_config;
 pub mod virtualization_config;
 
@@ -167,6 +168,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for the power area.
     #[serde(default)]
     pub power: power_config::PowerConfig,
+
+    /// Platform configuration options for time maintenance and timekeeping.
+    #[serde(default)]
+    pub timekeeper: timekeeper_config::TimekeeperConfig,
 }
 
 // LINT.IfChange
