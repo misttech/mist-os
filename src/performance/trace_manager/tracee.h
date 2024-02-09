@@ -10,7 +10,6 @@
 #include <lib/fidl/cpp/vector.h>
 #include <lib/fit/function.h>
 #include <lib/zx/fifo.h>
-#include <lib/zx/socket.h>
 #include <lib/zx/vmo.h>
 
 #include <iosfwd>
@@ -74,18 +73,16 @@ class Tracee {
 
   std::optional<controller::ProviderStats> GetStats() const;
 
-  // Transfer all collected records to |socket|.
-  TransferStatus TransferRecords(const std::shared_ptr<const BufferForwarder>& socket) const;
+  // Transfer all collected records to output_.
+  TransferStatus TransferRecords() const;
 
   // Save the buffer specified by |wrapped_count|.
   // This is a callback from the TraceSession loop.
   // That's why the result is void and not Tracee::TransferStatus.
-  void TransferBuffer(const std::shared_ptr<const BufferForwarder>& socket, uint32_t wrapped_count,
-                      uint64_t durable_data_end);
+  void TransferBuffer(uint32_t wrapped_count, uint64_t durable_data_end);
 
   // Helper for |TransferBuffer()|, returns true on success.
-  bool DoTransferBuffer(const std::shared_ptr<const BufferForwarder>& socket,
-                        uint32_t wrapped_count, uint64_t durable_data_end);
+  bool DoTransferBuffer(uint32_t wrapped_count, uint64_t durable_data_end);
 
   const TraceProviderBundle* bundle() const { return bundle_; }
   State state() const { return state_; }
@@ -111,33 +108,13 @@ class Tracee {
 
   bool VerifyBufferHeader(const trace::internal::BufferHeaderReader* header) const;
 
-  // Write the records in the buffer at |vmo_offset| to |socket|.
-  // |size| is the size in bytes of the chunk to examine, which may be more
-  // than was written if |by_size| is false. It must always be a multiple of 8.
-  //
-  // In oneshot mode we assume the end of written records don't look like
-  // records and we can just run through the buffer examining records to
-  // compute how many are there. This is problematic (without extra effort) in
-  // circular and streaming modes as records are written and rewritten.
-  // This function handles both cases. If |by_size| is false then run through
-  // the buffer computing the size of each record until we find no more
-  // records. If |by_size| is true then |size| is the number of bytes to write.
-  TransferStatus DoWriteChunk(const std::shared_ptr<const BufferForwarder>& socket,
-                              size_t vmo_offset, size_t size, const char* name, bool by_size) const;
-
-  TransferStatus WriteChunkByRecords(const std::shared_ptr<const BufferForwarder>& socket,
-                                     uint64_t vmo_offset, uint64_t size, const char* name) const;
-  TransferStatus WriteChunkBySize(const std::shared_ptr<const BufferForwarder>& socket,
-                                  uint64_t vmo_offset, uint64_t size, const char* name) const;
-  TransferStatus WriteChunk(const std::shared_ptr<const BufferForwarder>& socket, uint64_t offset,
-                            uint64_t last, uint64_t end, uint64_t buffer_size,
-                            const char* name) const;
-
   // Write a ProviderInfo record the first time this is called.
   // For subsequent calls write a ProviderSection record.
   // The ProviderInfo record defines the provider, and subsequent
   // ProviderSection records tell the reader to switch back to that provider.
-  TransferStatus WriteProviderIdRecord(const std::shared_ptr<const BufferForwarder>& socket) const;
+  TransferStatus WriteProviderIdRecord() const;
+  TransferStatus WriteChunk(uint64_t offset, uint64_t last, uint64_t end,
+                            uint64_t buffer_size) const;
 
   void NotifyBufferSaved(uint32_t wrapped_count, uint64_t durable_data_end);
 

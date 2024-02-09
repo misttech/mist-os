@@ -7,6 +7,8 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/fields.h>
 
+#include "lib/fit/defer.h"
+
 namespace tracing {
 
 TransferStatus BufferForwarder::WriteMagicNumberRecord() const {
@@ -61,6 +63,77 @@ TransferStatus BufferForwarder::WriteProviderBufferOverflowEvent(uint32_t provid
   return WriteBuffer(reinterpret_cast<uint8_t*>(&record), trace::WordsToBytes(num_words));
 }
 
+uint64_t GetBufferWordsWritten(const uint64_t* buffer, uint64_t size_in_words) {
+  const uint64_t* start = buffer;
+  const uint64_t* current = start;
+  const uint64_t* end = start + size_in_words;
+
+  while (current < end) {
+    auto type = trace::RecordFields::Type::Get<trace::RecordType>(*current);
+    uint64_t length;
+    if (type != trace::RecordType::kLargeRecord) {
+      length = trace::RecordFields::RecordSize::Get<size_t>(*current);
+    } else {
+      length = trace::LargeBlobFields::RecordSize::Get<size_t>(*current);
+    }
+
+    if (length == 0 || length > trace::RecordFields::kMaxRecordSizeBytes ||
+        current + length >= end) {
+      break;
+    }
+    current += length;
+  }
+
+  return current - start;
+}
+
+TransferStatus BufferForwarder::WriteChunkBy(BufferForwarder::ForwardStrategy strategy,
+                                             const zx::vmo& vmo, uint64_t vmo_offset,
+                                             uint64_t size) const {
+  FX_LOGS(INFO) << ": Writing chunk: vmo offset 0x" << std::hex << vmo_offset << ", size 0x"
+                << std::hex << size
+                << (strategy == ForwardStrategy::Size ? ", by-size" : ", by-record");
+
+  // TODO(gmtr): This is run on the async loop and we may block on the socket write below. We should
+  // instead write as much as possible to the socket and if we get ZX_SHOULD_WAIT we instead
+  // schedule a continuation on the async loop when the socket becomes writable.
+
+  uint64_t size_in_words = trace::BytesToWords(size);
+  // For paranoia purposes verify size is a multiple of the word size so we
+  // don't risk overflowing the buffer later.
+  FX_DCHECK(trace::WordsToBytes(size_in_words) == size);
+
+  // The passed in vmo_offset isn't necessarily page aligned. Unlike zx_vmar_read, zx_vmar_map
+  // requires a page aligned offset, so we'll need to fudge the offset a bit. Truncate the offset to
+  // be page aligned and then add back the extra bytes to the size of the region that we are mapping
+  // and then also offset the addr we get back from the mapping.
+  uint64_t page_aligned_offset = vmo_offset & (~(ZX_PAGE_SIZE - 1));
+  uint64_t page_aligned_remainder = vmo_offset % ZX_PAGE_SIZE;
+
+  zx_vaddr_t addr;
+  zx_status_t map_result = zx::vmar::root_self()->map(ZX_VM_PERM_READ, 0, vmo, page_aligned_offset,
+                                                      size + page_aligned_remainder, &addr);
+  if (map_result != ZX_OK) {
+    FX_PLOGS(ERROR, map_result) << "Failed to read data from buffer_vmo: " << "offset="
+                                << page_aligned_offset << ", size=" << size;
+    return TransferStatus::kProviderError;
+  }
+  auto d = fit::defer([addr, size]() { zx::vmar::root_self()->unmap(addr, size); });
+
+  zx_vaddr_t offset_addr = addr + page_aligned_remainder;
+  uint64_t bytes_written;
+  if (strategy == BufferForwarder::ForwardStrategy::Records) {
+    uint64_t words_written =
+        GetBufferWordsWritten(reinterpret_cast<const uint64_t*>(offset_addr), size_in_words);
+    bytes_written = trace::WordsToBytes(words_written);
+    FX_LOGS(INFO) << "By-record -> " << bytes_written << " bytes";
+  } else {
+    bytes_written = size;
+  }
+
+  return WriteBuffer(reinterpret_cast<const void*>(offset_addr), bytes_written);
+}
+
 TransferStatus BufferForwarder::WriteBuffer(const void* buffer, size_t len) const {
   auto data = reinterpret_cast<const uint8_t*>(buffer);
   size_t offset = 0;
@@ -93,4 +166,5 @@ TransferStatus BufferForwarder::WriteBuffer(const void* buffer, size_t len) cons
 
   return TransferStatus::kComplete;
 }
+
 }  // namespace tracing

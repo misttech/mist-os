@@ -430,7 +430,7 @@ void TraceSession::RemoveDeadProvider(TraceProviderBundle* bundle) {
 bool TraceSession::WriteProviderData(Tracee* tracee) {
   FX_DCHECK(!tracee->results_written());
 
-  switch (tracee->TransferRecords(buffer_forwarder_)) {
+  switch (tracee->TransferRecords()) {
     case TransferStatus::kComplete:
       break;
     case TransferStatus::kProviderError:
