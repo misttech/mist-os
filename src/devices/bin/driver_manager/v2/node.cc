@@ -29,8 +29,9 @@ namespace {
 
 const std::string kUnboundUrl = "unbound";
 
-// TODO(https://fxbug.dev/42075799): Remove this flag once composite node spec rebind once all clients
-// are updated to the new Rebind() behavior and this is fully implemented on both DFv1 and DFv2.
+// TODO(https://fxbug.dev/42075799): Remove this flag once composite node spec rebind once all
+// clients are updated to the new Rebind() behavior and this is fully implemented on both DFv1 and
+// DFv2.
 constexpr bool kEnableCompositeNodeSpecRebind = false;
 
 template <typename R, typename F>
@@ -351,8 +352,8 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
 }
 
 Node::~Node() {
-  // TODO(https://fxbug.dev/42085057): Notify the NodeRemovalTracker if the node is deallocated before
-  // shutdown is complete.
+  // TODO(https://fxbug.dev/42085057): Notify the NodeRemovalTracker if the node is deallocated
+  // before shutdown is complete.
   if (GetNodeState() != NodeState::kStopped) {
     LOGF(INFO, "Node %s deallocating while at state %s", MakeComponentMoniker().c_str(),
          GetShutdownHelper().NodeStateAsString());
