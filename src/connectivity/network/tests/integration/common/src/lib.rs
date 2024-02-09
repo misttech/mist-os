@@ -19,8 +19,14 @@ pub mod realms;
 
 use anyhow::Context as _;
 use component_events::events::EventStream;
+use diagnostics_hierarchy::{filter_hierarchy, DiagnosticsHierarchy, HierarchyMatcher};
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_diagnostics::Selector;
+use fidl_fuchsia_inspect_deprecated::InspectMarker;
+use fidl_fuchsia_io as fio;
 use fidl_fuchsia_netemul as fnetemul;
 use fuchsia_async::{self as fasync, DurationExt as _};
+use fuchsia_component::client;
 use fuchsia_zircon as zx;
 use futures::{
     future::FutureExt as _,
@@ -200,6 +206,35 @@ pub async fn get_inspect_data(
                 fasync::Timer::new(zx::Duration::from_millis(100).after_now()).await;
             }
         }
+    }
+}
+
+/// Read an Inspect hierarchy and filter it down to properties of interest from the diagnostics
+/// directory of Netstack2. For any other component, please use `get_inspect_data`, this function
+/// doesn't apply to any other component and won't work.
+// TODO(https://fxbug.dev/324494668): remove when Netstack2 is gone.
+pub async fn get_deprecated_netstack2_inspect_data(
+    diagnostics_dir: &fio::DirectoryProxy,
+    subdir: &str,
+    selectors: impl IntoIterator<Item = Selector>,
+) -> DiagnosticsHierarchy {
+    let matcher = HierarchyMatcher::new(selectors.into_iter()).expect("invalid selectors");
+    loop {
+        // NOTE: For current test purposes we just need to read from the deprecated inspect
+        // protocol. If this changes in the future, then we'll need to update this code to be able
+        // to read from other kind-of files such as fuchsia.inspect.Tree or a *.inspect VMO file.
+        let proxy = client::connect_to_named_protocol_at_dir_root::<InspectMarker>(
+            diagnostics_dir,
+            &format!("{subdir}/{}", InspectMarker::PROTOCOL_NAME),
+        )
+        .unwrap();
+        match inspect_fidl_load::load_hierarchy(proxy).await {
+            Ok(hierarchy) => return filter_hierarchy(hierarchy, &matcher).unwrap(),
+            Err(err) => {
+                println!("Failed to load hierarchy, retrying. Error: {err:?}")
+            }
+        }
+        fasync::Timer::new(fasync::Duration::from_millis(100)).await;
     }
 }
 

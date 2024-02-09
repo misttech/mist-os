@@ -12,11 +12,11 @@ use fidl_fuchsia_netemul as fnetemul;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObj};
 use fuchsia_zircon as zx;
-
 use futures::StreamExt as _;
 use netemul::{TestRealm, TestSandbox};
 use netstack_testing_common::realms::{constants, Netstack, NetstackVersion, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
+use std::borrow::Cow;
 
 const MOCK_SERVICES_NAME: &str = "mock";
 const CONFIG_PATH: &str = "/pkg/data/netstack.persist";
@@ -248,6 +248,15 @@ fn extract_node_subtree_selector(selector: &str) -> &str {
     selector.split(":").skip(2).next().expect("raw selector does not follow schema")
 }
 
+fn persistence_tag_to_ns2_diagnostics_dir(tag: &persistence_config::Tag) -> Cow<'static, str> {
+    match tag.as_str() {
+        "fidl" => Cow::from("fidlStats"),
+        "nics" => Cow::from("interfaces"),
+        "runtime" => Cow::from("configuration"),
+        other => Cow::from(format!("{other}")),
+    }
+}
+
 async fn test_persistence<N, F>(name: &str, validate_payload: F)
 where
     N: Netstack,
@@ -297,28 +306,43 @@ where
             // of the selector, and combine it with a test realm specific component
             // selector.
             .map(|v| {
-                diagnostics_reader::ComponentSelector::new(vec![
-                    SANDBOX_MONIKER.to_string(),
-                    realm_moniker.clone(),
-                    NETSTACK_MONIKER.to_string(),
-                ])
-                .with_tree_selector(extract_node_subtree_selector(v).to_string())
+                selectors::parse_selector::<selectors::VerboseError>(&format!(
+                    "{SANDBOX_MONIKER}/{realm_moniker}/{NETSTACK_MONIKER}:{}",
+                    extract_node_subtree_selector(v),
+                ))
+                .unwrap()
             });
 
-        // Retrieve the inspect payload from the archivist.
-        let mut archive_reader = diagnostics_reader::ArchiveReader::new();
-        let archive_reader =
-            archive_reader.add_selectors(selectors).retry(diagnostics_reader::RetryConfig::EMPTY);
-        let inspect_payload = archive_reader
-            .snapshot::<diagnostics_reader::Inspect>()
-            .await
-            .expect("snapshot failed")
-            .into_iter()
-            .filter_map(|v| v.payload)
-            .next();
+        let inspect_payload = match N::VERSION {
+            NetstackVersion::ProdNetstack2 | NetstackVersion::Netstack2 { .. } => {
+                let diagnostics_dir = realm.open_diagnostics_directory(NETSTACK_MONIKER).unwrap();
+                let subdir = persistence_tag_to_ns2_diagnostics_dir(tag);
+                netstack_testing_common::get_deprecated_netstack2_inspect_data(
+                    &diagnostics_dir,
+                    &subdir,
+                    selectors,
+                )
+                .await
+            }
+            NetstackVersion::ProdNetstack3 | NetstackVersion::Netstack3 => {
+                // Retrieve the inspect payload from the archivist.
+                let mut archive_reader = diagnostics_reader::ArchiveReader::new();
+                let archive_reader = archive_reader
+                    .add_selectors(selectors)
+                    .retry(diagnostics_reader::RetryConfig::EMPTY);
+                archive_reader
+                    .snapshot::<diagnostics_reader::Inspect>()
+                    .await
+                    .expect("snapshot failed")
+                    .into_iter()
+                    .filter_map(|v| v.payload)
+                    .next()
+                    .expect("no payload in snapshot")
+            }
+        };
 
         // Assert on payload.
-        validate_payload(inspect_payload.expect("no payload in snapshot"), tag, tag_config);
+        validate_payload(inspect_payload, tag, tag_config);
     }
 }
 

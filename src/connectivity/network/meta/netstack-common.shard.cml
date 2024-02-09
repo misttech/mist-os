@@ -6,7 +6,6 @@
 // by the system netstack should be listed here.
 {
     include: [
-        "inspect/client.shard.cml",
         "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],

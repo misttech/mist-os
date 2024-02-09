@@ -4,6 +4,8 @@
 {
     include: [
         "//src/connectivity/network/meta/netstack-common.shard.cml",
+        "inspect/offer.shard.cml",
+        "inspect/use.shard.cml",
         "trace/client.shard.cml",
     ],
     program: {

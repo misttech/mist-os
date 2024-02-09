@@ -31,6 +31,14 @@
         },
     ],
     use: [
+        // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
+        {
+            directory: "netstack-diagnostics",
+            from: "parent",
+            rights: [ "connect" ],
+            path: "/netstack-diagnostics",
+            availability: "optional",
+        },
         {
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",

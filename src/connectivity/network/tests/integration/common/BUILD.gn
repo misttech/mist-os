@@ -11,7 +11,10 @@ rustc_library("netstack_testing_common") {
   deps = [
     ":client_includes",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
+    "//sdk/fidl/fuchsia.inspect.deprecated:fuchsia.inspect.deprecated_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.debug:fuchsia.net.debug_rust",
     "//sdk/fidl/fuchsia.net.dhcp:fuchsia.net.dhcp_rust",
@@ -44,6 +47,7 @@ rustc_library("netstack_testing_common") {
     "//src/connectivity/network/testing/netemul/fidl:fuchsia.netemul_rust",
     "//src/connectivity/network/testing/netemul/rust:lib",
     "//src/connectivity/network/testing/network-test-realm/fidl:fuchsia.net.test.realm_rust",
+    "//src/diagnostics/lib/inspect-fidl-load",
     "//src/lib/const-unwrap",
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/reader/rust",

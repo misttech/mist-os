@@ -19,6 +19,13 @@
                 "fuchsia.net.stack.Log",
             ],
         },
+
+        // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
+        {
+            directory: "diagnostics",
+            rights: [ "connect" ],
+            path: "/diagnostics",
+        },
     ],
     use: [
         {
@@ -37,6 +44,12 @@
                 "fuchsia.net.multicast.admin.Ipv4RoutingTableController",
                 "fuchsia.net.stack.Log",
             ],
+            from: "self",
+        },
+
+        // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
+        {
+            directory: "diagnostics",
             from: "self",
         },
     ],

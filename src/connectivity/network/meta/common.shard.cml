@@ -261,5 +261,13 @@
             protocol: [ "fuchsia.net.masquerade.Factory" ],
             from: "#netcfg",
         },
+
+        // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
+        {
+            directory: "diagnostics",
+            from: "#netstack",
+            as: "netstack-diagnostics",
+            availability: "optional",
+        },
     ],
 }

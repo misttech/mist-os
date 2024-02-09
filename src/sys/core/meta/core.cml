@@ -677,5 +677,12 @@
             from: "#trace_manager",
             source_availability: "unknown",
         },
+
+        // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
+        {
+            directory: "netstack-diagnostics",
+            from: "#network",
+            availability: "optional",
+        },
     ],
 }

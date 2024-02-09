@@ -9,9 +9,10 @@
 use std::{collections::HashMap, convert::TryFrom as _, num::NonZeroU16};
 
 use diagnostics_assertions::{
-    assert_data_tree, tree_assertion, AnyProperty, NonZeroUintProperty, PropertyAssertion,
+    assert_data_tree, tree_assertion, AnyProperty, NonZeroIntProperty, PropertyAssertion,
     TreeAssertion,
 };
+use fidl_fuchsia_io as fio;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
 use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
@@ -19,13 +20,13 @@ use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 
 use const_unwrap::const_unwrap_option;
-use diagnostics_hierarchy::Property;
+use diagnostics_hierarchy::{DiagnosticsHierarchy, Property};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_mac, fidl_subnet};
 use net_types::ip::Ip as _;
 use netemul::InStack;
 use netstack_testing_common::{
-    constants, get_inspect_data,
+    constants,
     realms::{KnownServiceProvider, Netstack, TestSandboxExt as _},
     Result,
 };
@@ -223,9 +224,9 @@ async fn inspect_nic(name: &str) {
         .map_err(zx::Status::from_raw)
         .expect("add_entry failed");
 
-    let data = get_inspect_data(&realm, "netstack", "NICs", "interfaces")
-        .await
-        .expect("get_inspect_data failed");
+    let diagnostics_dir =
+        realm.open_diagnostics_directory("netstack").expect("failed to open diagnostics dir");
+    let data = get_inspect_data(&diagnostics_dir, "NICs", "interfaces").await;
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
     assert_data_tree!(data, NICs: {
@@ -339,11 +340,7 @@ async fn inspect_nic(name: &str) {
                 fidl_fuchsia_net_ext::IpAddress::from(BOB_IP).to_string() => {
                     "Link address": fidl_fuchsia_net_ext::MacAddress::from(BOB_MAC).to_string(),
                     State: "Static",
-                    // TODO(https://fxbug.dev/42159018): Use NonZeroIntProperty once we are able to
-                    // distinguish between signed and unsigned integers from the
-                    // fuchsia.diagnostics FIDL. This is currently not possible because the inspect
-                    // data is serialized into JSON then converted back, losing type information.
-                    "Last updated": NonZeroUintProperty,
+                    "Last updated": NonZeroIntProperty,
                 }
             },
             "Network Endpoint Stats": {
@@ -363,6 +360,8 @@ async fn inspect_routing_table(name: &str) {
     type N = netstack_testing_common::realms::Netstack2;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
+    let diagnostics_dir =
+        realm.open_diagnostics_directory("netstack").expect("diagnostics dir exists");
 
     // NB: The Netstack component won't be started until we attempt to access
     // one of its FIDL services. Connect to fuchsia.net.interfaces/State to
@@ -404,9 +403,7 @@ async fn inspect_routing_table(name: &str) {
         "Enabled": AnyProperty,
     }));
 
-    let data = get_inspect_data(&realm, "netstack", "Routes", "routes")
-        .await
-        .expect("get_inspect_data failed");
+    let data = get_inspect_data(&diagnostics_dir, "Routes", "routes").await;
     let () = routing_table_assertion
         .run(&data)
         .unwrap_or_else(|e| panic!("tree assertion fails: {}, inspect data is: {:#?}", e, data));
@@ -470,9 +467,10 @@ async fn inspect_dhcp(
     // due to an invalid PacketType.
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
-    let realm = sandbox
-        .create_netstack_realm::<N, _>(format!("{}-{}", netstack_test_name, test_case_name))
-        .expect("failed to create realm");
+    let name = format!("{netstack_test_name}-{test_case_name}");
+    let realm = sandbox.create_netstack_realm::<N, _>(&name).expect("failed to create realm");
+    let diagnostics_dir =
+        realm.open_diagnostics_directory("netstack").expect("diagnostics dir exists");
     // Create the fake endpoint before installing an endpoint in the netstack to ensure
     // that we receive all DHCP messages sent by the client.
     let fake_ep = network.create_fake_endpoint().expect("failed to create fake endpoint");
@@ -618,8 +616,7 @@ async fn inspect_dhcp(
 
     loop {
         let data = get_inspect_data(
-            &realm,
-            "netstack",
+            &diagnostics_dir,
             std::iter::once(DISCARD_STATS_NAME)
                 .chain(path)
                 .into_iter()
@@ -628,8 +625,7 @@ async fn inspect_dhcp(
                 .join("/"),
             "interfaces",
         )
-        .await
-        .expect("failed to get inspect data");
+        .await;
         match tree_assertion.run(&data) {
             Ok(()) => break,
             Err(err) => {
@@ -657,10 +653,11 @@ async fn inspect_stat_counters(name: &str) {
     let _stack = realm
         .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
         .expect("failed to connect to fuchsia.net.stack/Stack");
+    let diagnostics_dir =
+        realm.open_diagnostics_directory("netstack").expect("diagnostics dir exists");
 
-    let data = get_inspect_data(&realm, "netstack", r#"Networking\ Stat\ Counters"#, "counters")
-        .await
-        .expect("get_inspect_data failed");
+    let data =
+        get_inspect_data(&diagnostics_dir, r#"Networking\ Stat\ Counters"#, "counters").await;
     // TODO(https://fxbug.dev/42140843): change AnyProperty to AnyUintProperty when available.
     assert_data_tree!(data, "Networking Stat Counters": {
         DroppedPackets: AnyProperty,
@@ -1029,11 +1026,16 @@ async fn inspect_socket_stats(name: &str) {
         .await
         .expect("create packet socket");
 
-    let data = get_inspect_data(&realm, "netstack", r#"Socket\ Info"#, "sockets")
-        .await
-        .expect("Socket Info inspect data should be present");
+    let diagnostics_dir =
+        realm.open_diagnostics_directory("netstack").expect("diagnostics dir exists");
+    let mut data = get_inspect_data(&diagnostics_dir, r#"Socket\ Info"#, "sockets").await;
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
+    // TODO(https://fxbug.dev/324494938): We are getting the property ChecksumErrors duplicated in
+    // one case. Remove it before asserting as assert_data_tree expects it to be present only once.
+    let receive_errors = data.get_child_by_path_mut(&["1", "Stats", "ReceiveErrors"]).unwrap();
+    receive_errors.properties.sort_by(|a, b| a.key().cmp(b.key()));
+    receive_errors.properties.dedup_by_key(|p| p.key().clone());
     assert_data_tree!(data, "Socket Info": contains {
         "1": {
             BindAddress: "",
@@ -1483,6 +1485,8 @@ async fn inspect_for_sampler(name: &str) {
     let _stack = realm
         .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
         .expect("failed to connect to fuchsia.net.stack/Stack");
+    let diagnostics_dir =
+        realm.open_diagnostics_directory("netstack").expect("diagnostics dir exists");
 
     // We can pass any sample rate here. It is not used at all in this test.
     const MINIMUM_SAMPLE_RATE_SEC: i64 = 60;
@@ -1506,18 +1510,7 @@ async fn inspect_for_sampler(name: &str) {
                     .selector,
                 selectors => panic!("expected one selector but got {:#?}", selectors),
             };
-        let fidl_fuchsia_diagnostics::Selector { component_selector, tree_selector, .. } = selector;
-        let fidl_fuchsia_diagnostics::ComponentSelector { moniker_segments, .. } =
-            component_selector.as_ref().expect("component_selector");
-        let component_moniker = match moniker_segments
-            .as_ref()
-            .expect("moniker_segments")
-            .last()
-            .expect("last moniker segment")
-        {
-            fidl_fuchsia_diagnostics::StringSelector::ExactMatch(segment) => segment,
-            selector => panic!("expected exact match selector but got {:#?}", selector),
-        };
+        let fidl_fuchsia_diagnostics::Selector { tree_selector, .. } = selector;
         let (tree_selector, expected_key) = match tree_selector.as_ref().expect("tree_selector") {
             fidl_fuchsia_diagnostics::TreeSelector::PropertySelector(
                 fidl_fuchsia_diagnostics::PropertySelector { node_path, target_properties },
@@ -1540,13 +1533,11 @@ async fn inspect_for_sampler(name: &str) {
             selector => panic!("expected property selector but got {:#?}", selector),
         };
         let data = get_inspect_data(
-            &realm,
-            component_moniker,
-            format!("{}:{}", tree_selector, expected_key),
+            &diagnostics_dir,
+            &format!("{tree_selector}:{expected_key}"),
             "counters",
         )
-        .await
-        .expect("get_inspect_data failed");
+        .await;
         let properties: Vec<_> = data
             .property_iter()
             .filter_map(|(_hierarchy_path, property_opt): (Vec<&str>, _)| property_opt)
@@ -1636,11 +1627,29 @@ async fn inspect_config(
     }
     inspect_assertion.add_child_assertion(config_data_assertion);
 
+    let diagnostics_dir =
+        realm.open_diagnostics_directory("netstack").expect("diagnostics dir exists");
     let data =
-        get_inspect_data(&realm, "netstack", r#"Runtime\ Configuration\ Flags"#, "configuration")
-            .await
-            .expect("get inspect data");
+        get_inspect_data(&diagnostics_dir, r#"Runtime\ Configuration\ Flags"#, "configuration")
+            .await;
     inspect_assertion
         .run(&data)
         .unwrap_or_else(|e| panic!("unexpected inspect data: {:?}; got {:#?}", e, data));
+}
+
+async fn get_inspect_data(
+    diagnostics_dir: &fio::DirectoryProxy,
+    tree_selector: impl AsRef<str>,
+    subdir: &str,
+) -> DiagnosticsHierarchy {
+    let tree_selector = tree_selector.as_ref();
+    let selector =
+        selectors::parse_selector::<selectors::VerboseError>(&format!("netstack:{tree_selector}"))
+            .expect("parse selector");
+    netstack_testing_common::get_deprecated_netstack2_inspect_data(
+        diagnostics_dir,
+        subdir,
+        [selector],
+    )
+    .await
 }

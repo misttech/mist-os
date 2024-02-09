@@ -264,6 +264,12 @@ closed protocol ManagedRealm {
     /// The realm will send an `OnShutdown` event when shutdown is complete and
     /// before closing the channel.
     strict Shutdown();
+    /// Opens the diagnostics directory exposed by the component `child_name`.
+    // TODO(https://fxbug.dev/324494668): remove when Netstack2 is gone.
+    strict OpenDiagnosticsDirectory(resource struct {
+        child_name fuchsia.component.name;
+        directory server_end:fuchsia.io.Directory;
+    });
     /// Signals that shutdown is complete and the channel will be closed.
     strict -> OnShutdown();
 };

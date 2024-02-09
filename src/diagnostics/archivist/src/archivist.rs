@@ -11,6 +11,7 @@ use crate::{
         sources::EventSource,
         types::*,
     },
+    identity::ComponentIdentity,
     inspect::{repository::InspectRepository, servers::*},
     logs::{
         repository::LogsRepository,
@@ -33,6 +34,7 @@ use futures::{
     future::{self, abortable},
     prelude::*,
 };
+use moniker::ExtendedMoniker;
 use std::{path::Path, sync::Arc};
 use tracing::{debug, error, info, warn};
 
@@ -153,6 +155,20 @@ impl Archivist {
             if let Err(e) = fdio::service_connect(&format!("/svc/{name}"), remote) {
                 error!("Couldn't connect to service {}: {:?}", name, e);
             }
+        }
+
+        // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
+        if let Ok(dir) = fuchsia_fs::directory::open_in_namespace(
+            "/netstack-diagnostics",
+            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+        ) {
+            inspect_repo.add_inspect_handle(
+                Arc::new(ComponentIdentity::new(
+                    ExtendedMoniker::parse_str("core/network/netstack").unwrap(),
+                    "fuchsia-pkg://fuchsia.com/netstack#meta/netstack2.cm",
+                )),
+                dir,
+            );
         }
 
         Self {

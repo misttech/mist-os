@@ -75,6 +75,10 @@ impl Tag {
         }
         Ok(Self(tag))
     }
+
+    pub fn as_str(&self) -> &str {
+        self.0.as_ref()
+    }
 }
 
 impl ServiceName {
@@ -91,8 +95,7 @@ impl Deref for Tag {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        let Self(tag) = self;
-        tag
+        self.as_str()
     }
 }
 

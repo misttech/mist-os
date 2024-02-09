@@ -209,6 +209,7 @@ async fn create_realm_instance(
     {
         let source = source.ok_or(CreateRealmError::SourceNotProvided)?;
         let name = name.ok_or(CreateRealmError::NameNotProvided)?;
+        let diagnostics_name = format!("{name}-diagnostics");
         let mut child = ChildOptions::new();
         if eager.unwrap_or(false) {
             child = child.eager();
@@ -274,6 +275,20 @@ async fn create_realm_instance(
                 }
             }
         }
+        // TODO(https://fxbug.dev/324494668): delete when Netstack2 is gone.
+        let () = builder
+            .add_route(
+                Route::new()
+                    .capability(
+                        Capability::directory("diagnostics")
+                            .path("/diagnostics")
+                            .rights(fio::Operations::CONNECT)
+                            .as_(diagnostics_name.clone()),
+                    )
+                    .from(&child_ref)
+                    .to(Ref::parent()),
+            )
+            .await?;
         if let Some(uses) = uses {
             match uses {
                 ChildUses::Capabilities(caps) => {
@@ -748,6 +763,24 @@ impl ManagedRealm {
                     responder
                         .send(response.map_err(zx::Status::into_raw))
                         .context("responding to StopChildComponent request")?;
+                }
+                ManagedRealmRequest::OpenDiagnosticsDirectory {
+                    child_name,
+                    directory,
+                    control_handle: _,
+                } => {
+                    let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY;
+
+                    realm
+                        .root
+                        .get_exposed_dir()
+                        .open(
+                            flags,
+                            fio::ModeType::empty(),
+                            &format!("{child_name}-diagnostics"),
+                            ServerEnd::new(directory.into_channel()),
+                        )
+                        .context(format!("opening diagnostics dir for {child_name}"))?;
                 }
                 ManagedRealmRequest::Shutdown { control_handle } => {
                     let () = realm.destroy().await.context("destroy realm")?;

@@ -294,6 +294,15 @@
             availability: "optional",
         },
 
+        // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
+        {
+            directory: "netstack-diagnostics",
+            from: "#core",
+            to: "#bootstrap",
+            dependency: "weak",
+            availability: "optional",
+        },
+
         // Trace manager may be excluded from builds where tracing is not
         // expected to be used for observability, such as in the bringup
         // product and non-eng builds of any product.

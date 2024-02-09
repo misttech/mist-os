@@ -12,6 +12,7 @@ pub mod guest;
 use std::{borrow::Cow, num::NonZeroU64, ops::DerefMut as _, path::Path};
 
 use fidl_fuchsia_hardware_network as fnetwork;
+use fidl_fuchsia_io as fio;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcp as fnet_dhcp;
 use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientProviderExt};
@@ -267,6 +268,16 @@ impl<'a> TestRealm<'a> {
             Result::Ok(proxy)
         })()
         .context(S::DEBUG_NAME)
+    }
+
+    /// Opens the diagnostics directory of a component.
+    pub fn open_diagnostics_directory(&self, child_name: &str) -> Result<fio::DirectoryProxy> {
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let () = self
+            .realm
+            .open_diagnostics_directory(child_name, server_end)
+            .context("open diagnostics dir")?;
+        Ok(proxy)
     }
 
     /// Connects to a protocol within the realm.

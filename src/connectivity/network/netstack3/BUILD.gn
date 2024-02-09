@@ -35,7 +35,6 @@ common_deps = [
   "//src/lib/const-unwrap",
   "//src/lib/debug/rust",
   "//src/lib/dense-map",
-  "//src/lib/diagnostics/inspect/runtime/rust",
   "//src/lib/diagnostics/inspect/rust",
   "//src/lib/diagnostics/log/rust",
   "//src/lib/fidl/rust/fidl",
@@ -61,6 +60,10 @@ common_deps = [
   "//third_party/rust_crates:rand",
   "//third_party/rust_crates:thiserror",
   "//third_party/rust_crates:tracing",
+
+  # TODO(https://fxbug.dev/42175119): re-enable check includes when the inspect/client.shard.cml
+  # stops exposing diagnostics from framework.
+  "//src/lib/diagnostics/inspect/runtime/rust:unchecked_includes",
 ]
 
 common_test_deps = [
