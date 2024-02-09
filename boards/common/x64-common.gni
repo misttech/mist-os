@@ -49,7 +49,7 @@ board_driver_package_labels += [
   "//src/graphics/drivers/msd-intel-gen",
 
   # Add the fake battery drive to devices without battery
-  "//src/power/fake-battery:fake-battery",
+  "//src/power/fake-powersource:fake-battery",
 ]
 
 board_package_labels += [

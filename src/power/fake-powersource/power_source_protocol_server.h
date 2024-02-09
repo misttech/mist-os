@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_POWER_FAKE_BATTERY_POWER_SOURCE_PROTOCOL_SERVER_H_
-#define SRC_POWER_FAKE_BATTERY_POWER_SOURCE_PROTOCOL_SERVER_H_
+#ifndef SRC_POWER_FAKE_POWERSOURCE_POWER_SOURCE_PROTOCOL_SERVER_H_
+#define SRC_POWER_FAKE_POWERSOURCE_POWER_SOURCE_PROTOCOL_SERVER_H_
 
 #include <fidl/fuchsia.hardware.powersource/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.powersource/cpp/natural_types.h>
 #include <lib/zx/event.h>
 #include <zircon/types.h>
 
-#include "src/power/fake-battery/power_source_state.h"
+#include "power_source_state.h"
 
-namespace fake_battery {
+namespace fake_powersource {
 
 class PowerSourceState;
 
@@ -38,11 +38,16 @@ class PowerSourceProtocolServer : public fidl::Server<fuchsia_hardware_powersour
 
   void Notify() override { SignalClient(); }
 
+  void Serve(async_dispatcher_t* dispatcher,
+             fidl::ServerEnd<fuchsia_hardware_powersource::Source> server);
+
  private:
   std::shared_ptr<PowerSourceState> state_;
   zx::event state_event_;
+
+  fidl::ServerBindingGroup<fuchsia_hardware_powersource::Source> bindings_;
 };
 
-}  // namespace fake_battery
+}  // namespace fake_powersource
 
-#endif  // SRC_POWER_FAKE_BATTERY_POWER_SOURCE_PROTOCOL_SERVER_H_
+#endif  // SRC_POWER_FAKE_POWERSOURCE_POWER_SOURCE_PROTOCOL_SERVER_H_

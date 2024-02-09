@@ -60,6 +60,7 @@
 #define PDEV_DID_TCS3400_LIGHT          0x34  // TCS3400 light
 #define PDEV_DID_ADC_BUTTONS            0x35  // ADC buttons
 #define PDEV_DID_BUTTONS                0x36  // Buttons
+#define PDEV_DID_FAKE_AC                0x37  // Fake ac for test
 
 // QEMU emulator
 #define PDEV_VID_QEMU               0x01

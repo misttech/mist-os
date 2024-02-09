@@ -11,7 +11,7 @@
 using fuchsia_hardware_powersource::PowerType;
 using fuchsia_hardware_powersource::SourceInfo;
 
-namespace fake_battery {
+namespace fake_powersource {
 
 PowerSourceProtocolServer::PowerSourceProtocolServer(std::shared_ptr<PowerSourceState> state)
     : state_(std::move(state)) {
@@ -45,9 +45,7 @@ zx_status_t PowerSourceProtocolServer::SignalClient() {
 
 // TODO(https://fxbug.dev/42081644): when a cli is being developed, this will be made adjustable.
 void PowerSourceProtocolServer::GetPowerInfo(GetPowerInfoCompleter::Sync& completer) {
-  SourceInfo source_info{PowerType::kBattery, fuchsia_hardware_powersource::kPowerStateCharging |
-                                                  fuchsia_hardware_powersource::kPowerStateOnline};
-  completer.Reply({ZX_OK, source_info});
+  completer.Reply({ZX_OK, state_->source_info()});
 }
 
 void PowerSourceProtocolServer::GetStateChangeEvent(GetStateChangeEventCompleter::Sync& completer) {
@@ -61,7 +59,16 @@ void PowerSourceProtocolServer::GetStateChangeEvent(GetStateChangeEventCompleter
 }
 
 void PowerSourceProtocolServer::GetBatteryInfo(GetBatteryInfoCompleter::Sync& completer) {
-  completer.Reply({ZX_OK, state_->battery_info()});
+  if (state_->source_info().type() == fuchsia_hardware_powersource::PowerType::kBattery) {
+    completer.Reply({ZX_OK, state_->battery_info()});
+  } else {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
 }
 
-}  // namespace fake_battery
+void PowerSourceProtocolServer::Serve(
+    async_dispatcher_t* dispatcher, fidl::ServerEnd<fuchsia_hardware_powersource::Source> server) {
+  bindings_.AddBinding(dispatcher, std::move(server), this, fidl::kIgnoreBindingClosure);
+}
+
+}  // namespace fake_powersource

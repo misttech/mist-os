@@ -9,7 +9,7 @@
 
 #include "power_source_state.h"
 
-namespace fake_battery {
+namespace fake_powersource {
 
 SimulatorImpl::SimulatorImpl(std::shared_ptr<PowerSourceState> source)
     : source_state_(std::move(source)) {}
@@ -30,4 +30,10 @@ void SimulatorImpl::SetBatteryInfo(SetBatteryInfoRequest& request,
     source_state_->NotifyObservers();
 }
 
-}  // namespace fake_battery
+void SimulatorImpl::Serve(
+    async_dispatcher_t* dispatcher,
+    fidl::ServerEnd<fuchsia_hardware_powersource_test::SourceSimulator> server) {
+  bindings_.AddBinding(dispatcher, std::move(server), this, fidl::kIgnoreBindingClosure);
+}
+
+}  // namespace fake_powersource

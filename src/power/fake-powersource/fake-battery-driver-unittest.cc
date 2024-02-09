@@ -20,7 +20,7 @@
 #include "driver.h"
 #include "power_source_protocol_server.h"
 
-namespace fake_battery::testing {
+namespace fake_powersource::testing {
 namespace {
 using fuchsia_hardware_powersource::wire::BatteryInfo;
 using fuchsia_hardware_powersource::wire::BatteryUnit;
@@ -57,7 +57,7 @@ class FakeBatteryDriverTest : public ::testing::Test {
     EXPECT_EQ(ZX_OK, result.status_value());
   }
 
-  fdf_testing::DriverUnderTest<fake_battery::Driver>& driver() { return driver_; }
+  fdf_testing::DriverUnderTest<fake_powersource::Driver>& driver() { return driver_; }
 
   async_dispatcher_t* env_dispatcher() { return test_env_dispatcher_->async_dispatcher(); }
 
@@ -77,7 +77,7 @@ class FakeBatteryDriverTest : public ::testing::Test {
   async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
       env_dispatcher(), std::in_place};
 
-  fdf_testing::DriverUnderTest<fake_battery::Driver> driver_;
+  fdf_testing::DriverUnderTest<fake_powersource::Driver> driver_;
 };
 
 TEST_F(FakeBatteryDriverTest, CanGetInfo) {
@@ -126,7 +126,7 @@ TEST_F(FakeBatteryDriverTest, CatGetEvent) {
   fidl::WireSyncClient<fuchsia_hardware_powersource::Source> client(std::move(device_client_end));
 
   device_result = node_server().SyncCall([](fdf_testing::TestNode* root_node) {
-    return root_node->children().at("power-simulator").ConnectToDevice();
+    return root_node->children().at("battery-source-simulator").ConnectToDevice();
   });
   ASSERT_EQ(ZX_OK, device_result.status_value());
 
@@ -184,4 +184,4 @@ TEST_F(FakeBatteryDriverTest, CatGetEvent) {
 }
 
 }  // namespace
-}  // namespace fake_battery::testing
+}  // namespace fake_powersource::testing

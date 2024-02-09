@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_POWER_FAKE_BATTERY_POWER_SOURCE_STATE_H_
-#define SRC_POWER_FAKE_BATTERY_POWER_SOURCE_STATE_H_
+#ifndef SRC_POWER_FAKE_POWERSOURCE_POWER_SOURCE_STATE_H_
+#define SRC_POWER_FAKE_POWERSOURCE_POWER_SOURCE_STATE_H_
 
 #include <fidl/fuchsia.hardware.powersource/cpp/fidl.h>
 
 #include <unordered_set>
 
-namespace fake_battery {
+namespace fake_powersource {
 
 // This abstract class just defines an interface for observers to be notified.
 class Observer {
@@ -20,6 +20,7 @@ class Observer {
 // A state of data corresponding to one power node (and / or one simulator node).
 class PowerSourceState {
  public:
+  explicit PowerSourceState(fuchsia_hardware_powersource::SourceInfo info);
   // The PowerSourceState lives longer than the observers since the observers are server instances
   // which can be spawned and destroyed. Therefore class PowerSourceState doesn't own observers.
   // The observer must live until it calls RemoveObserver to remove itself from the observers_.
@@ -32,6 +33,7 @@ class PowerSourceState {
 
   void set_battery_info(const fuchsia_hardware_powersource::BatteryInfo& info);
   fuchsia_hardware_powersource::BatteryInfo battery_info() const { return battery_info_; }
+  fuchsia_hardware_powersource::SourceInfo source_info() const { return source_info_; }
 
  private:
   fuchsia_hardware_powersource::BatteryInfo battery_info_{{
@@ -47,9 +49,10 @@ class PowerSourceState {
       .remaining_capacity = 2900,
       .present_voltage = 2910,
   }};
+  fuchsia_hardware_powersource::SourceInfo source_info_;
   std::unordered_set<Observer*> observers_;
 };
 
-}  // namespace fake_battery
+}  // namespace fake_powersource
 
-#endif  // SRC_POWER_FAKE_BATTERY_POWER_SOURCE_STATE_H_
+#endif  // SRC_POWER_FAKE_POWERSOURCE_POWER_SOURCE_STATE_H_

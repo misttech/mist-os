@@ -6,7 +6,10 @@
 
 #include <lib/driver/logging/cpp/structured_logger.h>
 
-namespace fake_battery {
+namespace fake_powersource {
+
+PowerSourceState::PowerSourceState(fuchsia_hardware_powersource::SourceInfo info)
+    : source_info_(info) {}
 
 void PowerSourceState::NotifyObservers() {
   // Make a copy of the observers so each observer can remove themselves after notify.
@@ -29,4 +32,4 @@ void PowerSourceState::set_battery_info(const fuchsia_hardware_powersource::Batt
   battery_info_ = info;
 }
 
-}  // namespace fake_battery
+}  // namespace fake_powersource
