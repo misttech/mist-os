@@ -23,6 +23,11 @@ product_assembly_configuration("terminal") {
       group1 = true
     }
 
+    bluetooth = {
+      type = "standard"
+      snoop = "lazy"
+    }
+
     storage = {
       configure_fshost = true
       filesystems = {

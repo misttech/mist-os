@@ -14,7 +14,6 @@ impl DefineSubsystemConfiguration<InputGroupsConfig> for InputGroupsSubsystem {
     ) -> anyhow::Result<()> {
         if config.group1 {
             builder.platform_bundle("input_group_one");
-            builder.platform_bundle("bluetooth_core");
         }
         if config.group2 {
             builder.platform_bundle("input_group_two");

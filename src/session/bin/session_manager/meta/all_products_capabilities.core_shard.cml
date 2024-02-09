@@ -26,6 +26,7 @@
             ],
             from: "#bluetooth-core",
             to: "#session-manager",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.ui.brightness.Control",

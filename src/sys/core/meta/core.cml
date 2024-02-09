@@ -36,11 +36,6 @@
             startup: "eager",
         },
         {
-            name: "bluetooth-core",
-            url: "fuchsia-pkg://fuchsia.com/bt-init#meta/bt-init.cm",
-            environment: "#core-env",
-        },
-        {
             name: "sysmem_connector",
             url: "fuchsia-pkg://fuchsia.com/sysmem_connector#meta/sysmem_connector.cm",
 
@@ -171,17 +166,10 @@
             availability: "optional",
         },
         {
-            protocol: "fuchsia.bluetooth.snoop.Snoop",
-            from: "#bt-snoop",
-            to: "#bluetooth-core",
-            source_availability: "unknown",
-        },
-        {
             protocol: [ "fuchsia.device.NameProvider" ],
             from: "parent",
             to: [
                 "#agis",
-                "#bluetooth-core",
                 "#mdns",
                 "#network",
             ],
@@ -235,10 +223,7 @@
         {
             protocol: "fuchsia.stash.SecureStore",
             from: "#stash_secure",
-            to: [
-                "#bluetooth-core",
-                "#network",
-            ],
+            to: [ "#network" ],
         },
         {
             directory: "config-data",
@@ -500,22 +485,6 @@
             to: "#vulkan_loader",
             subdir: "goldfish-sync",
         },
-
-        // TODO(https://fxbug.dev/42085239): Remove bt-host driver code
-        {
-            directory: "dev-class",
-            from: "parent",
-            as: "dev-bt-host",
-            to: "#bluetooth-core",
-            subdir: "bt-host",
-        },
-        {
-            directory: "dev-class",
-            from: "parent",
-            as: "dev-bt-hci",
-            to: "#bluetooth-core",
-            subdir: "bt-hci",
-        },
         {
             directory: "dev-class",
             from: "parent",
@@ -527,7 +496,6 @@
             protocol: "fuchsia.metrics.MetricEventLoggerFactory",
             from: "#cobalt",
             to: [
-                "#bluetooth-core",
                 "#cobalt_system_metrics",
                 "#pkg-resolver",
                 "#sysmem_connector",

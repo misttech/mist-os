@@ -24,7 +24,7 @@ pub struct BluetoothProfilesConfig;
 /// Platform configuration options for Bluetooth.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type", rename_all = "lowercase", deny_unknown_fields)]
-pub enum BluetoothConfig2 {
+pub enum BluetoothConfig {
     /// The standard Bluetooth configuration includes the "core" set of components that provide
     /// basic Bluetooth functionality (GATT, Advertising, etc.) and optional profiles and tools.
     /// This is expected to be the default and most common configuration used in the platform.
@@ -45,36 +45,19 @@ pub enum BluetoothConfig2 {
     },
 }
 
-impl Default for BluetoothConfig2 {
-    fn default() -> BluetoothConfig2 {
+impl Default for BluetoothConfig {
+    fn default() -> BluetoothConfig {
         // The default platform configuration does not include any Bluetooth packages.
-        BluetoothConfig2::Coreless { snoop: Snoop::None }
+        BluetoothConfig::Coreless { snoop: Snoop::None }
     }
 }
 
-impl BluetoothConfig2 {
+impl BluetoothConfig {
     pub fn snoop(&self) -> Snoop {
         match &self {
             Self::Standard { snoop, .. } => *snoop,
             Self::Coreless { snoop, .. } => *snoop,
         }
-    }
-}
-
-// TODO(b/292109810): Add more configuration options for core & profiles. Replace with
-// `BluetoothConfig2` after soft migration.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct BluetoothConfig {
-    #[serde(default)]
-    pub snoop: Snoop,
-    #[serde(default, rename = "type")]
-    pub type_: String,
-}
-
-impl BluetoothConfig {
-    pub fn snoop(&self) -> Snoop {
-        self.snoop
     }
 }
 
@@ -89,8 +72,8 @@ mod tests {
             "snoop": "lazy",
         });
 
-        let parsed: BluetoothConfig2 = serde_json::from_value(json).unwrap();
-        let expected = BluetoothConfig2::Standard { profiles: None, snoop: Snoop::Lazy };
+        let parsed: BluetoothConfig = serde_json::from_value(json).unwrap();
+        let expected = BluetoothConfig::Standard { profiles: None, snoop: Snoop::Lazy };
 
         assert_eq!(parsed, expected);
     }
@@ -102,8 +85,8 @@ mod tests {
             "snoop": "eager",
         });
 
-        let parsed: BluetoothConfig2 = serde_json::from_value(json).unwrap();
-        let expected = BluetoothConfig2::Coreless { snoop: Snoop::Eager };
+        let parsed: BluetoothConfig = serde_json::from_value(json).unwrap();
+        let expected = BluetoothConfig::Coreless { snoop: Snoop::Eager };
 
         assert_eq!(parsed, expected);
     }
@@ -115,7 +98,7 @@ mod tests {
             "profiles": "",
         });
 
-        let parsed_result: Result<BluetoothConfig2, _> = serde_json::from_value(json);
+        let parsed_result: Result<BluetoothConfig, _> = serde_json::from_value(json);
         assert!(parsed_result.is_err());
     }
 }

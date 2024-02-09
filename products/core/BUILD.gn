@@ -25,6 +25,11 @@ _base_driver_packages = [
 _platform_configuration_base = {
   build_type = "eng"
 
+  bluetooth = {
+    type = "standard"
+    snoop = "lazy"
+  }
+
   input_groups = {
     group1 = true
   }

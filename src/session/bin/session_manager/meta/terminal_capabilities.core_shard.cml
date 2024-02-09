@@ -56,6 +56,7 @@
             protocol: "fuchsia.bluetooth.sys.HostWatcher",
             from: "#bluetooth-core",
             to: "#session-manager",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.virtualization.LinuxManager",

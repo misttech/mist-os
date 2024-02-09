@@ -36,6 +36,7 @@
             ],
             from: "#bluetooth-core",
             to: "#sl4f",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.buildinfo.Provider",

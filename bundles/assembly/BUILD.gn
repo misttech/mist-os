@@ -1767,6 +1767,19 @@ assembly_input_bundle("bluetooth_core") {
       driver_components = [ "meta/bt-host.cm" ]
     },
   ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/connectivity/bluetooth/core/bt-init/meta/bt-init.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
 }
 
 # Bluetooth snoop support
