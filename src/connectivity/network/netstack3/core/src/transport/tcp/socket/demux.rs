@@ -49,7 +49,7 @@ use crate::{
             HandshakeStatus, Listener, ListenerAddrState, ListenerSharingState, MaybeDualStack,
             MaybeListener, PrimaryRc, TcpApi, TcpBindingsContext, TcpBindingsTypes, TcpContext,
             TcpDemuxContext, TcpDualStackContext, TcpIpTransportContext, TcpPortSpec, TcpSocketId,
-            TcpSocketSetEntry, TcpSocketState,
+            TcpSocketSetEntry, TcpSocketState, TcpSocketStateInner,
         },
         state::{BufferProvider, Closed, DataAcked, Initial, State, TimeWait},
         BufferSizes, ConnectionError, Control, Mss, SocketOptions,
@@ -243,37 +243,41 @@ fn handle_incoming_packet<I, BC, CC>(
                     EitherStack::ThisStack(listener_id) => {
                         let disposition = core_ctx.with_socket_mut_isn_transport_demux(
                             &listener_id,
-                            |core_ctx, socket_state, isn| match core_ctx {
-                                MaybeDualStack::NotDualStack((core_ctx, converter)) => {
-                                    try_handle_incoming_for_listener::<I, I, CC, BC, _>(
-                                        core_ctx,
-                                        bindings_ctx,
-                                        isn,
-                                        socket_state,
-                                        incoming,
-                                        conn_addr,
-                                        incoming_device,
-                                        &mut tw_reuse,
-                                        move |conn, addr| converter.convert_back((conn, addr)),
-                                        I::into_demux_socket_id,
-                                    )
-                                }
-                                MaybeDualStack::DualStack((core_ctx, converter)) => {
-                                    try_handle_incoming_for_listener::<_, _, CC, BC, _>(
-                                        core_ctx,
-                                        bindings_ctx,
-                                        isn,
-                                        socket_state,
-                                        incoming,
-                                        conn_addr,
-                                        incoming_device,
-                                        &mut tw_reuse,
-                                        move |conn, addr| {
-                                            converter
-                                                .convert_back(EitherStack::ThisStack((conn, addr)))
-                                        },
-                                        I::into_demux_socket_id,
-                                    )
+                            |core_ctx, socket_state, isn| {
+                                let TcpSocketState { socket_state } = socket_state;
+                                match core_ctx {
+                                    MaybeDualStack::NotDualStack((core_ctx, converter)) => {
+                                        try_handle_incoming_for_listener::<I, I, CC, BC, _>(
+                                            core_ctx,
+                                            bindings_ctx,
+                                            isn,
+                                            socket_state,
+                                            incoming,
+                                            conn_addr,
+                                            incoming_device,
+                                            &mut tw_reuse,
+                                            move |conn, addr| converter.convert_back((conn, addr)),
+                                            I::into_demux_socket_id,
+                                        )
+                                    }
+                                    MaybeDualStack::DualStack((core_ctx, converter)) => {
+                                        try_handle_incoming_for_listener::<_, _, CC, BC, _>(
+                                            core_ctx,
+                                            bindings_ctx,
+                                            isn,
+                                            socket_state,
+                                            incoming,
+                                            conn_addr,
+                                            incoming_device,
+                                            &mut tw_reuse,
+                                            move |conn, addr| {
+                                                converter.convert_back(EitherStack::ThisStack((
+                                                    conn, addr,
+                                                )))
+                                            },
+                                            I::into_demux_socket_id,
+                                        )
+                                    }
                                 }
                             },
                         );
@@ -293,6 +297,7 @@ fn handle_incoming_packet<I, BC, CC>(
                         let disposition = core_ctx.with_socket_mut_isn_transport_demux(
                             &listener_id,
                             |core_ctx, socket_state, isn| {
+                                let TcpSocketState { socket_state } = socket_state;
                                 match core_ctx {
                                     MaybeDualStack::NotDualStack((_core_ctx, _converter)) => {
                                         // TODO(https://issues.fuchsia.dev/42085913):
@@ -456,9 +461,10 @@ where
 {
     let disposition =
         core_ctx.with_socket_mut_transport_demux(&conn_id, |core_ctx, socket_state| {
+            let TcpSocketState { socket_state } = socket_state;
             let conn_and_addr = assert_matches!(
                 socket_state,
-                TcpSocketState::Bound(BoundSocketState::Connected((conn_and_addr, _sharing)))
+                TcpSocketStateInner::Bound(BoundSocketState::Connected((conn_and_addr, _sharing)))
                     => conn_and_addr,
                 "invalid socket ID"
             );
@@ -796,7 +802,7 @@ fn try_handle_incoming_for_listener<SockI, WireI, CC, BC, DC>(
     core_ctx: &mut DC,
     bindings_ctx: &mut BC,
     isn: &IsnGenerator<BC::Instant>,
-    socket_state: &mut TcpSocketState<SockI, CC::WeakDeviceId, BC>,
+    socket_state: &mut TcpSocketStateInner<SockI, CC::WeakDeviceId, BC>,
     incoming: Segment<&[u8]>,
     incoming_addrs: ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>,
     incoming_device: &CC::DeviceId,
@@ -829,7 +835,7 @@ where
 {
     let (maybe_listener, sharing, listener_addr) = assert_matches!(
         socket_state,
-        TcpSocketState::Bound(BoundSocketState::Listener(l)) => l,
+        TcpSocketStateInner::Bound(BoundSocketState::Listener(l)) => l,
         "invalid socket ID"
     );
 
@@ -958,7 +964,7 @@ where
             let ip_sock = ip_sock.clone();
             match socketmap.conns_mut().try_insert_with(addr, sharing, move |addr, sharing| {
                 let (id, primary) =
-                    TcpSocketId::new(TcpSocketState::Bound(BoundSocketState::Connected((
+                    TcpSocketId::new(TcpSocketStateInner::Bound(BoundSocketState::Connected((
                         make_connection(
                             Connection {
                                 accept_queue: Some(accept_queue_clone),
