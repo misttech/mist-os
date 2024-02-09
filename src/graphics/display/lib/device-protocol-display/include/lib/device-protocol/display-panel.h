@@ -60,11 +60,7 @@
 // Touch IC: Goodix GT6853
 #define PANEL_KD070D82_FT_9365 UINT8_C(0x0a)
 
-// Panel: BOE TV070WSM-TG1
-// DDIC: Sitronix ST7703I
-// Board: Nelson
-// Touch IC: Goodix GT6853
-#define PANEL_TV070WSM_ST7703I UINT8_C(0x0b)
+// 0x0b was for PANEL_TV070WSM_ST7703I
 
 // Khadas TS-050
 // Panel: Microtech MTF050FHDI-03

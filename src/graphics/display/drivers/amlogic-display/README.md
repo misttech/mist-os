@@ -224,9 +224,6 @@ the future.
 * [Novatek NT35596 Data Sheet][nt35596-datasheet] - Version 0.05,
   dated 2012/06/22, distributed by Khadas for TS-050, referenced as
   "NT35596 datasheet"
-* [Sitronix ST7703I Data Sheet][st7703i-datasheet] - Version 1.03,
-  dated August 2018, distributed by Newhaven Display International, referenced
-  as "ST7701I datasheet"
 
 [a311d-datasheet]: https://dl.khadas.com/products/vim3/datasheet/a311d_datasheet_08_wesion.pdf
 [a311d2-datasheet]: https://dl.khadas.com/products/vim4/datasheet/amlogic_a311d2_datasheet_v06.pdf
@@ -242,5 +239,4 @@ the future.
 [mipi-dphy-spec]: https://www.mipi.org/specifications/d-phy
 [mipi-dcs-spec]: https://www.mipi.org/specifications/display-command-set
 [nt35596-datasheet]: https://dl.khadas.com/products/add-ons/ts050/nt35596_datasheet_v0.0511.pdf
-[st7703i-datasheet]: https://support.newhavendisplay.com/hc/en-us/articles/13398995909655-ST7703I
 [ts050-panel-spec]: https://www.icbanq.com/icdownload/data/ICBShop/Board/MTF050FHDI-03-spec(350%20nits).pdf

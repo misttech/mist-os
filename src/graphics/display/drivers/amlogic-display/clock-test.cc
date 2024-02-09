@@ -19,8 +19,8 @@ namespace {
 
 const std::vector<display_setting_t> kDisplaySettingsForTesting = [] {
   static constexpr uint32_t kPanelIdsToTest[] = {
-      PANEL_TV070WSM_FT_ASTRO, PANEL_P070ACB_FT,       PANEL_P101DEZ_FT,         PANEL_TV101WXM_FT,
-      PANEL_KD070D82_FT,       PANEL_TV070WSM_ST7703I, PANEL_TV070WSM_FT_NELSON,
+      PANEL_TV070WSM_FT_ASTRO, PANEL_P070ACB_FT,  PANEL_P101DEZ_FT,
+      PANEL_TV101WXM_FT,       PANEL_KD070D82_FT, PANEL_TV070WSM_FT_NELSON,
   };
 
   std::vector<display_setting_t> display_settings = {};

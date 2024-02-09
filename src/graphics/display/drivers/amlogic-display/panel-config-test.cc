@@ -64,12 +64,6 @@ TEST(PanelConfig, Kd070d82Ft9365) {
   EXPECT_STREQ(config_kd070d82_ft_9365->name, "KD070D82_FT_9365");
 }
 
-TEST(PanelConfig, Tv070wsmSt7703i) {
-  const PanelConfig* config_tv070wsm_st7703i = GetPanelConfig(PANEL_TV070WSM_ST7703I);
-  ASSERT_NE(config_tv070wsm_st7703i, nullptr);
-  EXPECT_STREQ(config_tv070wsm_st7703i->name, "TV070WSM_ST7703I");
-}
-
 TEST(PanelConfig, Mtf050fhdi03) {
   const PanelConfig* config_mtf050fhdi_03 = GetPanelConfig(PANEL_MTF050FHDI_03);
   ASSERT_NE(config_mtf050fhdi_03, nullptr);
@@ -135,13 +129,6 @@ TEST(PanelDisplaySetting, Tv070wsmFt9365) {
   EXPECT_EQ(timing_tv070wsm_ft_9365->v_active, 1024u);
 }
 
-TEST(PanelDisplaySetting, Tv070wsmSt7703i) {
-  const display_setting_t* timing_tv070wsm_st7703i = GetPanelDisplaySetting(PANEL_TV070WSM_ST7703I);
-  ASSERT_NE(timing_tv070wsm_st7703i, nullptr);
-  EXPECT_EQ(timing_tv070wsm_st7703i->h_active, 600u);
-  EXPECT_EQ(timing_tv070wsm_st7703i->v_active, 1024u);
-}
-
 TEST(PanelDisplaySetting, P101dezFt) {
   const display_setting_t* timing_p101dez_ft = GetPanelDisplaySetting(PANEL_P101DEZ_FT);
   ASSERT_NE(timing_p101dez_ft, nullptr);
@@ -187,6 +174,9 @@ TEST(PanelDisplaySetting, InvalidPanels) {
 
   const display_setting_t* timing_0x06 = GetPanelDisplaySetting(0x06);
   EXPECT_EQ(timing_0x06, nullptr);
+
+  const display_setting_t* timing_0x0b = GetPanelDisplaySetting(0x0b);
+  EXPECT_EQ(timing_0x0b, nullptr);
 
   const display_setting_t* timing_overly_large = GetPanelDisplaySetting(0x0e);
   EXPECT_EQ(timing_overly_large, nullptr);
@@ -234,15 +224,6 @@ TEST(RefreshRate, Tv070wsmFt9365) {
   const display::DisplayTiming timing_tv070wsm_ft_9365 =
       display::ToDisplayTiming(*setting_tv070wsm_ft_9365);
   EXPECT_EQ(timing_tv070wsm_ft_9365.vertical_field_refresh_rate_millihertz(), 60'000);
-}
-
-TEST(RefreshRate, Tv070wsmSt7703i) {
-  const display_setting_t* setting_tv070wsm_st7703i =
-      GetPanelDisplaySetting(PANEL_TV070WSM_ST7703I);
-  ASSERT_NE(setting_tv070wsm_st7703i, nullptr);
-  const display::DisplayTiming timing_tv070wsm_st7703i =
-      display::ToDisplayTiming(*setting_tv070wsm_st7703i);
-  EXPECT_EQ(timing_tv070wsm_st7703i.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
 TEST(RefreshRate, P101dezFt) {

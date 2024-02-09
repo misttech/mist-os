@@ -64,7 +64,6 @@ zx::result<uint32_t> GetMipiDsiDisplayId(ddk::DsiImplProtocolClient dsiimpl) {
   // The following command address and response size are specified on:
   // - JD9364 datasheet, Section 10.2.3 "RDDIDIF", page 146
   // - JD9365D datasheet, Section 10.2.3 "RDDIDIF", page 130
-  // - ST7703I datasheet, Section 6.2.3 "Read Display ID", page 81
   // - NT35596 datasheet, Section 6.1 "User Command Set (Command 1)", page 158
   constexpr uint8_t kCommandReadDisplayIdentificationInformation = 0x04;
   constexpr int kCommandReadDisplayIdentificationInformationResponseSize = 3;

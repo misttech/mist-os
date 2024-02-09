@@ -159,30 +159,6 @@ constexpr PanelConfig kKd070d82Ft9365PanelConfig = {
     .power_off = kLcdPowerOffSequenceForAstroSherlockNelson,
 };
 
-constexpr PanelConfig kTv070wsmSt7703iPanelConfig = {
-    .name = "TV070WSM_ST7703I",
-    .dsi_on = lcd_init_sequence_TV070WSM_ST7703I,
-    .dsi_off = lcd_shutdown_sequence,
-    .power_on = kLcdPowerOnSequenceForAstroSherlockNelson,
-    .power_off = kLcdPowerOffSequenceForAstroSherlockNelson,
-};
-
-constexpr display_setting_t kTv070wsmSt7703iDisplaySetting = {
-    .lane_num = 4,
-    .bit_rate_max = 400,
-    .lcd_clock = 44226000,
-    .h_active = 600,
-    .v_active = 1024,
-    .h_period = 700,
-    .v_period = 1053,
-    .hsync_width = 24,
-    .hsync_bp = 36,
-    .hsync_pol = 0,
-    .vsync_width = 2,
-    .vsync_bp = 8,
-    .vsync_pol = 0,
-};
-
 constexpr PanelConfig kVim3Ts050PanelConfig = {
     .name = "MTF050FHDI_03",
     .dsi_on = lcd_init_sequence_MTF050FHDI_03,
@@ -238,8 +214,6 @@ const PanelConfig* GetPanelConfig(uint32_t panel_type) {
       return &kKd070d82FtPanelConfig;
     case PANEL_KD070D82_FT_9365:
       return &kKd070d82Ft9365PanelConfig;
-    case PANEL_TV070WSM_ST7703I:
-      return &kTv070wsmSt7703iPanelConfig;
     case PANEL_MTF050FHDI_03:
       return &kVim3Ts050PanelConfig;
     case PANEL_TV070WSM_FT_NELSON:
@@ -266,8 +240,6 @@ const display_setting_t* GetPanelDisplaySetting(uint32_t panel_type) {
       return &kTv101wxmFitipowerDisplaySetting;
     case PANEL_P101DEZ_FT:
       return &kP101dezFitipowerDisplaySetting;
-    case PANEL_TV070WSM_ST7703I:
-      return &kTv070wsmSt7703iDisplaySetting;
     case PANEL_MTF050FHDI_03:
       return &kMtf050fhdi03DisplaySetting;
   }
