@@ -256,6 +256,7 @@ def copy_file_if_changed(src_path: str, dst_path: str):
         is_src_readonly = file_mode & stat.S_IWUSR == 0
         if not is_src_readonly:
             try:
+                os.makedirs(os.path.dirname(dst_path), exist_ok=True)
                 os.link(src_path, dst_path)
                 # Update timestamp to avoid Ninja no-op failures that can
                 # happen because Bazel does not maintain consistent timestamps
