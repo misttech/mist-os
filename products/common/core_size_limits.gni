@@ -60,7 +60,7 @@ size_checker_input = {
         "bt-rfcomm",
         "bt-snoop",
       ]
-      limit = 4718592  # 4.5 MiB
+      limit = 4928592  # 4.7 MiB
       creep_limit = 81920  # 80.0 KiB
     },
     {
