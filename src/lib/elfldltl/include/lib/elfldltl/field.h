@@ -76,7 +76,7 @@ class FieldStorage {
     value_type x{};
     for (auto it = first; it != last; ++it) {
       x <<= 8;
-      x |= *it;
+      x |= cpp20::bit_cast<uint8_t>(*it);
     }
     return x;
   }

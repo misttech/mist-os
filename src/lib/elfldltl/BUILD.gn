@@ -51,6 +51,7 @@ library_headers("headers") {
     "lib/elfldltl/container.h",
     "lib/elfldltl/diagnostics-ostream.h",
     "lib/elfldltl/diagnostics.h",
+    "lib/elfldltl/dwarf/eh-frame-hdr.h",
     "lib/elfldltl/dwarf/encoding.h",
     "lib/elfldltl/dwarf/section-data.h",
     "lib/elfldltl/dynamic.h",

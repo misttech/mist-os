@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/dwarf/eh-frame-hdr.h>
 #include <lib/elfldltl/dwarf/encoding.h>
 #include <lib/elfldltl/dwarf/section-data.h>
 #include <lib/elfldltl/memory.h>
@@ -651,6 +652,73 @@ TYPED_TEST(ElfldltlDwarfTests, EncodedPtrFromMemory) {
   EXPECT_EQ(EncodedPtr::FromMemory<Elf>(EncodedPtr::kPtr | EncodedPtr::kIndirect, memory,
                                         kBadIndirectEncodedAt, kSize<Addr>),
             std::nullopt);
+}
+
+TYPED_TEST(ElfldltlDwarfTests, EhFrameHdr) {
+  using Elf = typename TestFixture::Elf;
+  using size_type = typename Elf::size_type;
+  using Word = typename Elf::Word;
+  using Phdr = typename Elf::Phdr;
+  using value_type = elfldltl::dwarf::EhFrameHdrEntry<size_type>;
+
+  elfldltl::dwarf::EhFrameHdr<Elf> eh_frame_hdr;
+  EXPECT_TRUE(eh_frame_hdr.empty());
+
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+
+  constexpr std::array kEntries{
+      value_type{0x1000, 0x370},
+      value_type{0x1005, 0x3f0},
+      value_type{0x1011, 0x46c},
+  };
+
+  std::stringstream os;
+  for (const value_type& entry : kEntries) {
+    os << entry << "\n";
+  }
+  EXPECT_EQ(os.str(), R"""([PC 0x1000 -> FDE 0x370]
+[PC 0x1005 -> FDE 0x3f0]
+[PC 0x1011 -> FDE 0x46c]
+)""");
+
+  constexpr size_type kVaddr = 0x334;
+  constexpr size_type kEhFrameVaddr = 0x358;
+  static constexpr std::array<Word, 9> kData = {
+      Word{std::array{
+          std::byte{0x01},  // version 1
+          std::byte{0x1b},  // eh_frame_ptr sdata pcrel
+          std::byte{0x03},  // fde_count udata4
+          std::byte{0x3b},  // fde_table sdata4 datarel
+      }},
+      0x20,  // eh_frame_ptr
+      3,     // FDE count
+      0xccc,
+      0x3c,
+      0xcd1,
+      0xbc,
+      0xcdd,
+      0x138,
+  };
+  const cpp20::span<std::byte> kImage{
+      const_cast<std::byte*>(cpp20::as_bytes(cpp20::span{kData}).data()),
+      cpp20::span(kData).size_bytes(),
+  };
+
+  elfldltl::DirectMemory memory{kImage, kVaddr};
+
+  constexpr Phdr kPhdr = {
+      .type = elfldltl::ElfPhdrType::kEhFrameHdr,
+      .vaddr = kVaddr,
+      .filesz = sizeof(kData),
+  };
+
+  ASSERT_TRUE(eh_frame_hdr.Init(diag, memory, kPhdr));
+
+  EXPECT_EQ(eh_frame_hdr.eh_frame_ptr(), kEhFrameVaddr);
+
+  EXPECT_EQ(eh_frame_hdr.size(), 3u);
+
+  EXPECT_THAT(eh_frame_hdr, ElementsAreArray(kEntries));
 }
 
 }  // namespace
