@@ -14,7 +14,10 @@ use pin_project::pin_project;
 use std::{
     collections::{BTreeMap, BTreeSet},
     pin::Pin,
-    sync::{Arc, Weak},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Weak,
+    },
 };
 use thiserror::Error;
 use tracing::{debug, error};
@@ -282,6 +285,7 @@ impl Dispatcher {
 
 struct EventStreamLogger {
     counters: BTreeMap<EventType, inspect::UintProperty>,
+    diagnostics_ready_seen_node: inspect::Node,
     component_log_node: BoundedListNode,
     counters_node: inspect::Node,
     _node: inspect::Node,
@@ -292,16 +296,19 @@ impl EventStreamLogger {
     pub fn new(node: inspect::Node) -> Self {
         let counters_node = node.create_child("event_counts");
         let recent_events_node = node.create_child("recent_events");
+        let diagnostics_ready_seen_node = node.create_child("diagnostics_ready_seen");
         Self {
             _node: node,
             counters: BTreeMap::new(),
             counters_node,
             component_log_node: BoundedListNode::new(recent_events_node, RECENT_EVENT_LIMIT),
+            diagnostics_ready_seen_node,
         }
     }
 
     /// Log a new component event to inspect.
     pub fn log(&mut self, event: &Event) {
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
         let ty = event.ty();
         if self.counters.contains_key(&ty) {
             self.counters.get_mut(&ty).unwrap().add(1);
@@ -311,8 +318,13 @@ impl EventStreamLogger {
         }
         // TODO(https://fxbug.dev/42174041): leverage string references for the payload.
         match &event.payload {
-            EventPayload::DiagnosticsReady(DiagnosticsReadyPayload { component, .. })
-            | EventPayload::LogSinkRequested(LogSinkRequestedPayload { component, .. })
+            EventPayload::DiagnosticsReady(DiagnosticsReadyPayload { component, .. }) => {
+                let index = COUNTER.fetch_add(1, Ordering::Relaxed);
+                self.diagnostics_ready_seen_node
+                    .record_string(format!("{index}"), component.moniker.to_string());
+                self.log_inspect(ty.as_ref(), component);
+            }
+            EventPayload::LogSinkRequested(LogSinkRequestedPayload { component, .. })
             | EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                 component, ..
             }) => {
@@ -681,6 +693,9 @@ mod tests {
                     diagnostics_ready: 1u64,
                     log_sink_requested: 1u64,
                     inspect_sink_requested: 1u64,
+                },
+                diagnostics_ready_seen: {
+                    "0": "a/b"
                 },
                 recent_events: {
                     "0": {
