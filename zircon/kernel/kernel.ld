@@ -85,8 +85,7 @@ SECTIONS
     }
 
     .text : {
-        *(.text* .sram.text)
-        *(.gnu.linkonce.t.*)
+        *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.text*)))
     }
 
     PROVIDE_HIDDEN(__code_end = .);
@@ -139,7 +138,7 @@ SECTIONS
     } :rodata :note
 
     .rodata : {
-        *(.rodata* .gnu.linkonce.r.*)
+        *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.rodata*)))
     } :rodata
 
     BootCpuidLeaf : {
@@ -258,7 +257,26 @@ SECTIONS
         *(.data.cpu_align_exclusive)
         . = ALIGN(128);
 
-        *(.data .data.* .gnu.linkonce.d.*)
+        *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.data*)))
+
+        /*
+         * NOTE!  When any of the various special sections listed below
+         * with __start_* and __stop_* symbols is actually empty, then
+         * using `__secname : ALIGN(N) { ... }` sets the zero-length
+         * section's address to the next N-aligned boundary up, but it
+         * *does not* insert any padding into the image.  Notably, the
+         * __start_* and __stop_* symbols will point to the aligned
+         * address where the section would have been if it weren't
+         * empty, even if that is off the end of the image!  That's not
+         * a problem directly for those symbols, since them being equal
+         * means no iterations and no dereferences.  But it also means
+         * that *later* symbols in the script such as __data_end will be
+         * pushed forward, possibly past the actual end of the image.
+         * And that one matters!  So extend the (always non-empty) .data
+         * section to include the alignment padding that will be implied
+         * in the symbol values below if all those sections are empty.
+         */
+        . =  ALIGN(8);
     }
 
     /*
@@ -301,6 +319,11 @@ SECTIONS
      * without adding initialized data to fill!  Everything depends on the
      * __data_end address exactly matching the end of the raw kernel's
      * load image for relative address arithmetic.
+     *
+     * To wit, see the note above about padding in .data that actually
+     * does make sure this is aligned, in effect, though that's not
+     * really the part that matters--just to prevent . being advanced by
+     * the aligned empty sections above that don't contribute fill data.
      */
     PROVIDE_HIDDEN(__data_end = .);
 
@@ -348,9 +371,7 @@ SECTIONS
                (kcountdesc_end - kcountdesc_begin) * 8 * SMP_MAX_CPUS / 64,
                "kcounters_arena size mismatch");
 
-        *(.bss*)
-        *(.gnu.linkonce.b.*)
-        *(COMMON)
+        *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.bss*)))
     }
 
     /*
