@@ -12,6 +12,13 @@
 
 #include <lib/arch/internal/asm.h>
 
+#define DW_CFA_expression 0x10      // ULEB128 regno, ULEB128 length, bytes
+#define DW_CFA_val_expression 0x16  // ditto
+#define DW_OP_breg(n) (0x70 + (n))  // n <= 31; SLEB128 offset
+#define DW_OP_bregx 0x92            // ULEB128 regno, SLEB128 offset
+#define DW_OP_deref 0x06
+#define DW_OP_xor 0x27
+
 #ifdef __ASSEMBLER__  // clang-format off
 
 /// Defines an ELF symbol at the current assembly position (or with an

@@ -156,13 +156,13 @@
 
   // The "return address" to find the caller's PC is via the rule for the PC
   // "register", not the CFI default of x30 (LR).
-  .cfi_return_column 32  // This is the DWARG register number for the PC.
+  .cfi_return_column DW_REGNO_PC
 
   // The interrupted PC value is found in ELR_ELx.
-  .cfi_register 32, 33 // This is the DWARF register number for ELR_mode.
+  .cfi_register DW_REGNO_PC, DW_REGNO_ELR_ELx
 
   // The previous value of ELR_ELx is no longer available.
-  .cfi_undefined 33
+  .cfi_undefined DW_REGNO_ELR_ELx
 
   // There are DWARF register numbers for each TPIDR_ELx.  We don't bother with
   // a CFI rule for those registers for two reasons: we can't statically

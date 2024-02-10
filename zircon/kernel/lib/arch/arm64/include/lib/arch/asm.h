@@ -10,6 +10,12 @@
 // Get the generic file.
 #include_next <lib/arch/asm.h>
 
+// The assembler doesn't recognize these as register names in .cfi_*,
+// but it accepts raw DWARF register numbers.
+#define DW_REGNO_PC 32
+#define DW_REGNO_ELR_ELx 33
+#define DW_REGNO_TPIDR_EL1 37
+
 #ifdef __ASSEMBLER__  // clang-format off
 
 #ifndef __has_feature
@@ -38,6 +44,13 @@ shadow_call_sp .req x18
   .irp reg,q0,q1,q2,q3,q4,q5,q6,q7,q8,q9,q10,q11,q12,q13,q14,q15,q16,q17,q18,q19,q20,q21,q22,q23,q24,q25,q26,q27,q28,q29,q30,q31
     \op \reg
   .endr
+.endm
+
+// Add an immediate value to SP, adjusting CFI assuming the CFA rule
+// uses an offset from SP.
+.macro .add.sp imm
+  add sp, sp, #\imm
+  .cfi_adjust_cfa_offset -(\imm)
 .endm
 
 // Standard prologue sequence for FP setup, with CFI.

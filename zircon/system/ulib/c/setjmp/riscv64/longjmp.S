@@ -7,14 +7,6 @@
 
 #include "setjmp_impl.h"
 
-#define DW_CFA_val_expression 0x16
-#define DW_CFA_expression 0x0f
-#define DW_OP_breg0 0x70
-#define DW_OP_breg10 (DW_OP_breg0 + 10)  // x10 is a0
-#define DW_OP_breg12 (DW_OP_breg0 + 12)  // x12 is a2
-#define DW_OP_deref 0x06
-#define DW_OP_xor 0x27
-
 .function longjmp, export
 
   // The sanitizer runtime wants to be informed of non-local exits.
@@ -63,9 +55,9 @@
    // CFI to find regno at \offset(a0).
   .macro jb_cfi regno, offset
     .if \offset < 0x7f
-      .cfi_escape DW_CFA_expression, \regno, 2, DW_OP_breg10, \offset
+      .cfi_escape DW_CFA_expression, \regno, 2, DW_OP_breg(10), \offset
     .elseif \offset < 0x3fff
-      .cfi_escape DW_CFA_expression, \regno, 3, DW_OP_breg10, \
+      .cfi_escape DW_CFA_expression, \regno, 3, DW_OP_breg(10), \
         (\offset & 0x7f) | 0x80, \offset >> 7
     .else
       .error "offset too large for two-byte SLEB128"
@@ -87,8 +79,8 @@
       .error "offset too large for one-byte SLEB128"
     .endif
     .cfi_escape DW_CFA_val_expression, \regno, 7, \
-                DW_OP_breg10, \offset, DW_OP_deref, \
-                DW_OP_breg12, \offset, DW_OP_deref, DW_OP_xor
+                DW_OP_breg(10), \offset, DW_OP_deref, \
+                DW_OP_breg(12), \offset, DW_OP_deref, DW_OP_xor
   .endm
 
   jb_cfi_mangled 1, JB_PC*8  // ra
@@ -129,7 +121,7 @@
     ld x\regno, \offset(a2)
     // CFI to compute x\regno as (x\regno ^ x\tmpno).
     .cfi_escape DW_CFA_val_expression, \regno, 5, \
-                DW_OP_breg0 + \regno, 0, DW_OP_breg0 + \tmpno, 0, DW_OP_xor
+                DW_OP_breg(\regno), 0, DW_OP_breg(\tmpno), 0, DW_OP_xor
   .endm
   load_mangler 1, JB_PC*8, 13     // a3 = x13
   load_mangler 2, JB_SP*8, 14     // a4 = x14
