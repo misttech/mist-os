@@ -27,7 +27,12 @@ llvm::DWARFUnit* DwarfUnitImpl::GetLLVMUnit() const { return unit_; }
 
 int DwarfUnitImpl::GetDwarfVersion() const { return unit_->getVersion(); }
 
-llvm::DWARFDie DwarfUnitImpl::GetUnitDie() const { return unit_->getUnitDIE(true); }
+llvm::DWARFDie DwarfUnitImpl::GetUnitDie() const {
+  // Request that the unit DIEs be extracted (false parameter means "not unit die only"). Some
+  // operations that use this will iterate through the unit's DIEs which requires the cache to
+  // be populated (LLVM doesn't do this lazily and will just report "no children").
+  return unit_->getUnitDIE(false);
+}
 
 LazySymbol DwarfUnitImpl::FunctionForRelativeAddress(uint64_t relative_address) const {
   if (!binary_) {
