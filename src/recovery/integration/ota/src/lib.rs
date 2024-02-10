@@ -164,8 +164,6 @@ async fn route_capabilities_from_parent(
         "fuchsia.net.name.Lookup",
         "fuchsia.posix.socket.Provider",
         "fuchsia.process.Launcher",
-        "fuchsia.sys.Environment",
-        "fuchsia.sys.Loader",
     ] {
         builder
             .add_route(
