@@ -8,13 +8,25 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/clock/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/clock/cpp/bind.h>
+#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
+#include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <soc/aml-meson/g12b-clk.h>
 #include <soc/aml-t931/t931-hw.h>
 
 #include "sherlock.h"
 #include "src/devices/board/drivers/sherlock/sherlock-hevc-enc-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -56,12 +68,45 @@ static const std::vector<fpbus::Irq> sherlock_hevc_enc_irqs{
     }},
 };
 
+const std::vector<fdf::BindRule> kSysmemRules = std::vector{fdf::MakeAcceptBindRule(
+    bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE)};
+
+const std::vector<fdf::NodeProperty> kSysmemProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
+                      bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
+};
+
+const std::vector<fdf::BindRule> kClkDosRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, g12b_clk::G12B_CLK_DOS),
+};
+const std::vector<fdf::NodeProperty> kClkDosProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                      bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, bind_fuchsia_clock::FUNCTION_DOS),
+};
+
 static const fpbus::Node hevc_enc_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "aml-hevc-enc";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_T931;
-  dev.did() = PDEV_DID_AMLOGIC_HEVC_ENC;
+  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_T931;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_HEVC_ENC;
+  dev.mmio() = sherlock_hevc_enc_mmios;
+  dev.bti() = sherlock_hevc_enc_btis;
+  dev.irq() = sherlock_hevc_enc_irqs;
+  return dev;
+}();
+
+// TODO(b/42072838): Remove this duplicate pbus node once we finished migrating
+// to composite node specs.
+static const fpbus::Node hevc_enc_dev_old = []() {
+  fpbus::Node dev = {};
+  dev.name() = "aml-hevc-enc-old";
+  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_T931;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_HEVC_ENC;
   dev.mmio() = sherlock_hevc_enc_mmios;
   dev.bti() = sherlock_hevc_enc_btis;
   dev.irq() = sherlock_hevc_enc_irqs;
@@ -70,19 +115,40 @@ static const fpbus::Node hevc_enc_dev = []() {
 
 zx_status_t Sherlock::HevcEncInit() {
   fidl::Arena<> fidl_arena;
+
+  std::vector<fdf::ParentSpec> kHevcEncParents = {
+      fdf::ParentSpec{{kSysmemRules, kSysmemProperties}},
+      fdf::ParentSpec{{kClkDosRules, kClkDosProperties}}};
   fdf::Arena arena('HEVC');
-  auto result = pbus_.buffer(arena)->AddComposite(
+  auto composite_result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, hevc_enc_dev),
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "aml-hevc-enc", .parents = kHevcEncParents}}));
+  if (!composite_result.ok()) {
+    zxlogf(ERROR, "AddCompositeNodeSpec HevcEnc(hevc_enc_dev) request failed: %s",
+           composite_result.FormatDescription().data());
+    return composite_result.status();
+  }
+  if (composite_result->is_error()) {
+    zxlogf(ERROR, "AddCompositeNodeSpec HevcEnc(hevc_enc_dev) failed: %s",
+           zx_status_get_string(composite_result->error_value()));
+    return composite_result->error_value();
+  }
+
+  // TODO(b/42072838): Remove this legacy composite once we migrate the driver to specs.
+  fdf::Arena arena_old('HEVO');
+  auto result = pbus_.buffer(arena_old)->AddComposite(
+      fidl::ToWire(fidl_arena, hevc_enc_dev_old),
       platform_bus_composite::MakeFidlFragment(fidl_arena, aml_hevc_enc_fragments,
                                                std::size(aml_hevc_enc_fragments)),
       "pdev");
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite HevcEnc(hevc_enc_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddComposite HevcEnc(hevc_enc_dev_old) request failed: %s", __func__,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite HevcEnc(hevc_enc_dev) failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddComposite HevcEnc(hevc_enc_dev_old) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

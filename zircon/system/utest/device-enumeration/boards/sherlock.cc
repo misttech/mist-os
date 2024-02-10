@@ -48,7 +48,6 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:04:1c/aml_nna",
       "sys/platform/05:04:1d",  // pwm
       "sys/platform/05:00:1c/aml_light",
-      "sys/platform/05:04:23/aml-video-enc",
       "sys/platform/05:04:17/aml-gpu-composite/aml-gpu",
       "sys/platform/05:04:13/aml_pdm/sherlock-audio-pdm-in",
       "sys/platform/05:04:12:1/aml_tdm/sherlock-audio-i2s-out",
@@ -111,6 +110,13 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
+
+  static const char* kVideoEncDevicePaths[] = {
+      "sys/platform/05:04:23/aml-video-enc",
+      "sys/platform/05:04:23/aml-video-enc-old",
+  };
+  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(
+      cpp20::span(kVideoEncDevicePaths, std::size(kVideoEncDevicePaths))));
 }
 
 }  // namespace
