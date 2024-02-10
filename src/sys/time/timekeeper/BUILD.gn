@@ -10,7 +10,6 @@ group("timekeeper") {
   deps = [
     ":service",
     ":tests",
-    ":timekeeper-config-values",
   ]
 }
 
@@ -107,11 +106,6 @@ fuchsia_component_manifest("manifest") {
 
 fuchsia_structured_config_rust_lib("timekeeper-config") {
   cm_label = ":manifest"
-}
-
-fuchsia_structured_config_values("timekeeper-config-values") {
-  cm_label = ":manifest"
-  values_source = "config/values.json5"
 }
 
 fuchsia_component("service") {
