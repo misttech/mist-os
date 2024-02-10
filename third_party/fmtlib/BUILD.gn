@@ -3,12 +3,21 @@
 # found in the LICENSE file.
 
 config("fmtlib_config") {
+  # TODO(https://fxbug.dev/324487189): Remove once https://github.com/fmtlib/fmt/pull/3610
+  # has been rolled in, which should happen as a side effect of fixing this bug.
   cflags = [ "-Wno-deprecated-literal-operator" ]
   include_dirs = [ "src/include" ]
 }
 
+# TODO(https://fxbug.dev/324487189): Remove once fixed upstream and rolled in.
+config("disable_deprecated_declarations_warnings") {
+  visibility = [ ":*" ]
+  cflags = [ "-Wno-deprecated-declarations" ]
+}
+
 source_set("fmtlib") {
   public_configs = [ ":fmtlib_config" ]
+  configs += [ ":disable_deprecated_declarations_warnings" ]
   sources = [
     "src/src/format.cc",
     "src/src/os.cc",
