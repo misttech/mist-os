@@ -20,7 +20,6 @@
 #include <list>
 #include <vector>
 
-#include "src/lib/fxl/memory/ref_counted.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
 #include "src/performance/trace_manager/buffer_forwarder.h"
 #include "src/performance/trace_manager/trace_provider_bundle.h"
@@ -32,7 +31,7 @@ namespace controller = fuchsia::tracing::controller;
 
 // TraceSession keeps track of all TraceProvider instances that
 // are active for a tracing session.
-class TraceSession : public fxl::RefCountedThreadSafe<TraceSession> {
+class TraceSession {
  public:
   enum class State {
     // The session is ready to be initialized.

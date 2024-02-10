@@ -70,7 +70,7 @@ class TraceManager : public controller::Controller, public provider::Registry {
   const Config config_;
 
   uint32_t next_provider_id_ = 1u;
-  fxl::RefPtr<TraceSession> session_;
+  std::unique_ptr<TraceSession> session_;
   std::list<TraceProviderBundle> providers_;
   std::queue<std::string> alerts_;
   std::queue<WatchAlertCallback> watch_alert_callbacks_;

@@ -27,7 +27,7 @@ constexpr uint32_t kMinBufferSizeMegabytes = 1;
 
 // These defaults are copied from fuchsia.tracing/trace_controller.fidl.
 constexpr uint32_t kDefaultBufferSizeMegabytesHint = 4;
-constexpr uint32_t kDefaultStartTimeoutMilliseconds = 5000;
+constexpr zx::duration kDefaultStartTimeout{zx::msec(5000)};
 constexpr fuchsia::tracing::BufferingMode kDefaultBufferingMode =
     fuchsia::tracing::BufferingMode::ONESHOT;
 
@@ -72,7 +72,7 @@ void TraceManager::OnEmptyControllerSet() {
       FX_LOGS(INFO) << "Controller is gone, terminating trace";
       session_->Terminate([this](controller::TerminateResult result) {
         FX_LOGS(INFO) << "Trace terminated";
-        session_ = nullptr;
+        session_.reset();
       });
     }
   }
@@ -152,18 +152,18 @@ void TraceManager::InitializeTracing(controller::TraceConfig config, zx::socket 
 
   std::vector<std::string> categories;
   if (config.has_categories()) {
-    categories = std::move(config.categories());
+    categories = config.categories();
   }
 
-  uint64_t start_timeout_milliseconds = kDefaultStartTimeoutMilliseconds;
+  zx::duration start_timeout = kDefaultStartTimeout;
   if (config.has_start_timeout_milliseconds()) {
-    start_timeout_milliseconds = config.start_timeout_milliseconds();
+    start_timeout = zx::msec(config.start_timeout_milliseconds());
   }
 
-  session_ = fxl::MakeRefCounted<TraceSession>(
+  session_ = std::make_unique<TraceSession>(
       std::move(output), std::move(categories), default_buffer_size_megabytes,
-      tracing_buffering_mode, std::move(provider_specs), zx::msec(start_timeout_milliseconds),
-      kStopTimeout, [this]() { session_ = nullptr; },
+      tracing_buffering_mode, std::move(provider_specs), start_timeout, kStopTimeout,
+      [this]() { session_.reset(); },
       [this](const std::string& alert_name) { OnAlert(alert_name); });
 
   // The trace header is written now to ensure it appears first, and to avoid
@@ -197,7 +197,7 @@ void TraceManager::TerminateTracing(controller::TerminateOptions options,
                           controller::TerminateResult result) {
     FX_LOGS(INFO) << "Terminated trace";
     terminate_callback(std::move(result));
-    session_ = nullptr;
+    session_.reset();
   });
 }
 
