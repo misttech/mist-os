@@ -4,8 +4,6 @@
 
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/scheduler/role.h>
-#include <lib/syslog/cpp/log_settings.h>
-#include <lib/syslog/cpp/macros.h>
 
 #include <sdk/lib/component/incoming/cpp/protocol.h>
 
@@ -20,10 +18,12 @@ zx::result<fidl::WireSyncClient<fuchsia_scheduler::ProfileProvider>> ConnectToPr
 }
 
 zx_status_t SetRole(const zx_handle_t borrowed_handle, std::string_view role) {
+// TODO(https://fxbug.dev/323262398): Remove this check once the necessary API is in the SDK.
+#if __Fuchsia_API_level__ < FUCHSIA_HEAD
+  return ZX_ERR_NOT_SUPPORTED;
+#endif  // #if __Fuchsia_API_level__ < FUCHSIA_HEAD
   static zx::result client = ConnectToProfileProvider();
   if (!client.is_ok()) {
-    FX_PLOGS(WARNING, client.status_value())
-        << "Failed to connect to fuchsia.scheduler.ProfileProvider";
     return client.error_value();
   }
 
@@ -31,20 +31,13 @@ zx_status_t SetRole(const zx_handle_t borrowed_handle, std::string_view role) {
   const zx_status_t dup_status =
       zx_handle_duplicate(borrowed_handle, ZX_RIGHT_SAME_RIGHTS, handle.reset_and_get_address());
   if (dup_status != ZX_OK) {
-    FX_PLOGS(ERROR, dup_status) << "Failed to duplicate thread handle";
     return dup_status;
   }
 
   fidl::WireResult result =
       (*client)->SetProfileByRole(std::move(handle), fidl::StringView::FromExternal(role));
   if (!result.ok()) {
-    FX_LOGS(WARNING) << "Failed to call SetProfileByRole, error=" << result.error()
-                     << ". This may be expected if the component does not have access to "
-                        "fuchsia.scheduler.ProfileProvider";
     return result.status();
-  }
-  if (result->status != ZX_OK) {
-    FX_LOGS(WARNING) << "Failed to SetProfileByRole, error=" << result->status;
   }
   return result->status;
 }

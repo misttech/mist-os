@@ -17,7 +17,6 @@ sdk_source_set("cpp") {
     ":headers",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/lib/component/incoming/cpp:cpp",
-    "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/zx",
   ]
 }
