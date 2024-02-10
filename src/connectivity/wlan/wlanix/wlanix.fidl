@@ -83,6 +83,15 @@ open protocol WifiChip {
     flexible CreateStaIface(resource table {
         1: iface server_end:WifiStaIface;
     }) -> () error zx.Status;
+    /// Get the names of all active ifaces.
+    flexible GetStaIfaceNames() -> (table {
+        1: iface_names vector<string:16>:MAX;
+    });
+    /// Request a new connection to an existing iface.
+    flexible GetStaIface(resource table {
+        1: iface_name string:16;
+        2: iface server_end:WifiStaIface;
+    }) -> () error zx.Status;
     /// Request the destruction of a STA iface on the chip.
     flexible RemoveStaIface(resource table {
         1: iface_name string:16;

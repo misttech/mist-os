@@ -111,6 +111,25 @@ void FakeWlanix::CreateStaIface(fuchsia_wlan_wlanix::wire::WifiChipCreateStaIfac
   completer.ReplySuccess();
 }
 
+void FakeWlanix::GetStaIfaceNames(GetStaIfaceNamesCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kWifiChipGetStaIfaceNames});
+  fidl::Arena arena;
+  auto builder = fuchsia_wlan_wlanix::wire::WifiChipGetStaIfaceNamesResponse::Builder(arena);
+  std::vector<fidl::StringView> iface_names = {};
+  builder.iface_names(fidl::VectorView<fidl::StringView>::FromExternal(iface_names));
+  completer.Reply(builder.Build());
+}
+
+void FakeWlanix::GetStaIface(fuchsia_wlan_wlanix::wire::WifiChipGetStaIfaceRequest* request,
+                             GetStaIfaceCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kWifiChipGetStaIface});
+  if (!request->has_iface_name() || !request->has_iface()) {
+    ZX_ASSERT_MSG(false, "expect `iface_name` and `iface` to be present");
+  }
+  fidl::BindServer(dispatcher_, std::move(request->iface()), this);
+  completer.ReplySuccess();
+}
+
 void FakeWlanix::RemoveStaIface(fuchsia_wlan_wlanix::wire::WifiChipRemoveStaIfaceRequest* request,
                                 RemoveStaIfaceCompleter::Sync& completer) {
   AppendCommand(Command{.tag = CommandTag::kWifiChipRemoveStaIface});

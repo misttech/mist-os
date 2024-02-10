@@ -86,6 +86,32 @@ async fn handle_wifi_chip_request(
                 }
             }
         }
+        fidl_wlanix::WifiChipRequest::GetStaIfaceNames { responder } => {
+            // TODO(b/323586414): Unit test once we actually support this.
+            info!("fidl_wlanix::WifiChipRequest::GetStaIfaceNames");
+            let names = vec![IFACE_NAME.to_string()];
+            let response = fidl_wlanix::WifiChipGetStaIfaceNamesResponse {
+                iface_names: Some(names),
+                ..Default::default()
+            };
+            responder.send(&response).context("send GetStaIfaceNames response")?;
+        }
+        fidl_wlanix::WifiChipRequest::GetStaIface { payload, responder } => {
+            // TODO(b/323586414): Unit test once we actually support this.
+            info!("fidl_wlanix::WifiChipRequest::GetStaIface");
+            match payload.iface {
+                Some(iface) => {
+                    let reqs = iface.into_stream().context("create WifiStaIface stream")?;
+                    responder.send(Ok(())).context("send GetStaIface response")?;
+                    serve_wifi_sta_iface(reqs).await;
+                }
+                None => {
+                    responder
+                        .send(Err(zx::sys::ZX_ERR_INVALID_ARGS))
+                        .context("send GetStaIface response")?;
+                }
+            }
+        }
         fidl_wlanix::WifiChipRequest::RemoveStaIface { payload: _, responder, .. } => {
             info!("fidl_wlanix::WifiChipRequest::RemoveStaIface");
             responder.send(Ok(()))?;
