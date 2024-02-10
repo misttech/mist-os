@@ -285,8 +285,10 @@ then
   do
     new_tok="$tok"  # unchanged by default
     case "$tok" in
-      -fdebug-prefix-map=*=* | -fcanon-prefix-map=*=* | -ffile-prefix-map=*=* )
-        new_tok="${tok/$PWD/$remote_working_dir}"
+      # Note: -ffile-prefix-map=... is equivalent to all of the other three
+      # combined.
+      -fdebug-prefix-map=*=* | -ffile-prefix-map=*=* | -fproile-prefix-map=*=* | -fmacro-prefix-map=*=* )
+        new_tok="${tok/$working_subdir/$remote_canonical_working_subdir}"
         new_tok="${new_tok/$_local_exec_root/$remote_exec_root}"
         ;;
     esac
