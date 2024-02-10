@@ -340,7 +340,8 @@
   .end_function
 .endm
 
-// main vector table, aligned on 2048 byte boundary
+// Put the vector table in its own section that's aligned to 2048.
+.pushsection .text.arm64_el1_exception, "ax", %progbits
 .balign 0x800
 .label arm64_el1_exception_base, global
 .size arm64_el1_exception_base, 0x800
@@ -400,6 +401,11 @@ iframe.invalid_exception arm64_el1_fiq_lower_el_32, 0x32
 
 .org 0x780
 iframe.invalid_exception arm64_el1_err_exc_lower_el_32, 0x33
+
+.popsection
+
+// Start the rest of the code on its own cache line.
+.balign 64
 
 
 // All the iframe.sync_exception ..., lower_el_64 cases jump here.
