@@ -63,6 +63,8 @@ KCOUNTER(vm_vmo_no_reclamation_strategy, "vm.vmo.no_reclamation_strategy")
 KCOUNTER(vm_vmo_dont_need, "vm.vmo.dont_need")
 KCOUNTER(vm_vmo_always_need, "vm.vmo.always_need")
 KCOUNTER(vm_vmo_always_need_skipped_reclaim, "vm.vmo.always_need_skipped_reclaim")
+KCOUNTER(vm_vmo_compression_zero_slot, "vm.vmo.compression.zero_empty_slot")
+KCOUNTER(vm_vmo_compression_marker, "vm.vmo.compression_zero_marker")
 
 void ZeroPage(paddr_t pa) {
   void* ptr = paddr_to_physmap(pa);
@@ -6250,10 +6252,21 @@ bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset
       page = nullptr;
     } else {
       ASSERT(ktl::holds_alternative<VmCompressor::ZeroTag>(compression_result));
-      // TODO(https://fxbug.dev/42138396): determine if we can decommit the slot instead of placing a
-      // marker.
       old_ref = slot->ReleaseReference();
-      *slot = VmPageOrMarker::Marker();
+      // Check if we can clear the slot, or if we need to insert a marker. Unlike the full zero
+      // pages this simply needs to check if there's any visible content above us, and then if there
+      // isn't if the root is immutable or not (i.e. if it has a page source).
+      VmCowPages* page_owner;
+      uint64_t owner_offset;
+      if (!FindInitialPageContentLocked(offset, &page_owner, &owner_offset, nullptr).current() &&
+          !page_owner->page_source_) {
+        *slot = VmPageOrMarker::Empty();
+        page_list_.ReturnEmptySlot(offset);
+        vm_vmo_compression_zero_slot.Add(1);
+      } else {
+        *slot = VmPageOrMarker::Marker();
+        vm_vmo_compression_marker.Add(1);
+      }
       reclamation_event_count_++;
     }
     // Temporary reference has been replaced, can return it to the compressor.
