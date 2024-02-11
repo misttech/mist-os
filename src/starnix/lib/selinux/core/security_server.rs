@@ -357,7 +357,7 @@ mod tests {
 
     #[fuchsia::test]
     fn sid_to_security_context() {
-        let security_context = SecurityContext::try_from("u:unconfined_r:unconfined_t")
+        let security_context = SecurityContext::try_from("u:unconfined_r:unconfined_t:s0")
             .expect("creating security context should succeed");
         let security_server = SecurityServer::new(Mode::Enable);
         let sid = security_server.security_context_to_sid(&security_context);
@@ -369,9 +369,9 @@ mod tests {
 
     #[fuchsia::test]
     fn sids_for_different_security_contexts_differ() {
-        let security_context1 = SecurityContext::try_from("u:object_r:file_t")
+        let security_context1 = SecurityContext::try_from("u:object_r:file_t:s0")
             .expect("creating security context should succeed");
-        let security_context2 = SecurityContext::try_from("u:unconfined_r:unconfined_t")
+        let security_context2 = SecurityContext::try_from("u:unconfined_r:unconfined_t:s0")
             .expect("creating security context should succeed");
         let security_server = SecurityServer::new(Mode::Enable);
         let sid1 = security_server.security_context_to_sid(&security_context1);
@@ -381,7 +381,7 @@ mod tests {
 
     #[fuchsia::test]
     fn sids_for_same_security_context_are_equal() {
-        let security_context_str = "u:unconfined_r:unconfined_t";
+        let security_context_str = "u:unconfined_r:unconfined_t:s0";
         let security_context1 = SecurityContext::try_from(security_context_str)
             .expect("creating security context should succeed");
         let security_context2 = SecurityContext::try_from(security_context_str)
@@ -395,9 +395,9 @@ mod tests {
 
     #[fuchsia::test]
     fn compute_access_vector_allows_all() {
-        let security_context1 = SecurityContext::try_from("u:object_r:file_t")
+        let security_context1 = SecurityContext::try_from("u:object_r:file_t:s0")
             .expect("creating security context should succeed");
-        let security_context2 = SecurityContext::try_from("u:unconfined_r:unconfined_t")
+        let security_context2 = SecurityContext::try_from("u:unconfined_r:unconfined_t:s0")
             .expect("creating security context should succeed");
         let security_server = SecurityServer::new(Mode::Enable);
         let sid1 = security_server.security_context_to_sid(&security_context1);

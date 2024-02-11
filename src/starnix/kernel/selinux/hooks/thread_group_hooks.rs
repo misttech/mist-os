@@ -327,8 +327,8 @@ mod tests {
     #[fuchsia::test]
     fn task_create_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
-        let security_context =
-            SecurityContext::try_from("u:object_r:fork_yes_t").expect("invalid security context");
+        let security_context = SecurityContext::try_from("u:object_r:fork_yes_t:s0")
+            .expect("invalid security context");
         let sid = Some(security_server.security_context_to_sid(&security_context));
 
         assert_eq!(
@@ -345,7 +345,7 @@ mod tests {
     fn task_create_denied_for_denied_type() {
         let security_server = security_server_with_policy();
         let security_context =
-            SecurityContext::try_from("u:object_r:fork_no_t").expect("invalid security context");
+            SecurityContext::try_from("u:object_r:fork_no_t:s0").expect("invalid security context");
         let sid = Some(security_server.security_context_to_sid(&security_context));
 
         assert_eq!(
@@ -395,11 +395,11 @@ mod tests {
         let security_server = security_server_with_policy();
 
         let current_security_context =
-            SecurityContext::try_from("u:object_r:exec_transition_source_t")
+            SecurityContext::try_from("u:object_r:exec_transition_source_t:s0")
                 .expect("invalid security context");
         let current_sid = security_server.security_context_to_sid(&current_security_context);
         let exec_security_context =
-            SecurityContext::try_from("u:object_r:exec_transition_target_t")
+            SecurityContext::try_from("u:object_r:exec_transition_target_t:s0")
                 .expect("invalid security context");
         let exec_sid = security_server.security_context_to_sid(&exec_security_context);
         let selinux_state = Some(SeLinuxThreadGroupState {
@@ -425,11 +425,11 @@ mod tests {
     fn exec_access_denied_for_denied_type() {
         let security_server = security_server_with_policy();
         let current_security_context =
-            SecurityContext::try_from("u:object_r:exec_transition_target_t")
+            SecurityContext::try_from("u:object_r:exec_transition_target_t:s0")
                 .expect("invalid security context");
         let current_sid = security_server.security_context_to_sid(&current_security_context);
         let exec_security_context =
-            SecurityContext::try_from("u:object_r:exec_transition_source_t")
+            SecurityContext::try_from("u:object_r:exec_transition_source_t:s0")
                 .expect("invalid security context");
         let exec_sid = security_server.security_context_to_sid(&exec_security_context);
         let selinux_state = Some(SeLinuxThreadGroupState {
@@ -459,7 +459,7 @@ mod tests {
         let mut selinux_state = Some(initial_state.clone());
 
         let elf_security_context =
-            SecurityContext::try_from("u:object_r:type_t").expect("invalid security context");
+            SecurityContext::try_from("u:object_r:type_t:s0").expect("invalid security context");
         let elf_sid = security_server.security_context_to_sid(&elf_security_context);
         let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
         assert_ne!(elf_sid, initial_state.current_sid);
@@ -480,7 +480,7 @@ mod tests {
         let mut selinux_state = Some(initial_state.clone());
 
         let elf_security_context =
-            SecurityContext::try_from("u:object_r:type_t").expect("invalid security context");
+            SecurityContext::try_from("u:object_r:type_t:s0").expect("invalid security context");
         let elf_sid = security_server.security_context_to_sid(&elf_security_context);
         let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
         assert_ne!(elf_sid, initial_state.current_sid);
@@ -518,7 +518,7 @@ mod tests {
         let mut selinux_state = Some(initial_state.clone());
 
         let elf_security_context =
-            SecurityContext::try_from("u:object_r:type_t").expect("invalid security context");
+            SecurityContext::try_from("u:object_r:type_t:s0").expect("invalid security context");
         let elf_sid = security_server.security_context_to_sid(&elf_security_context);
         let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
         assert_ne!(elf_sid, initial_state.current_sid);
@@ -544,10 +544,11 @@ mod tests {
     #[fuchsia::test]
     fn getsched_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
-        let source_security_context = SecurityContext::try_from("u:object_r:test_getsched_yes_t")
-            .expect("invalid security context");
+        let source_security_context =
+            SecurityContext::try_from("u:object_r:test_getsched_yes_t:s0")
+                .expect("invalid security context");
         let target_security_context =
-            SecurityContext::try_from("u:object_r:test_getsched_target_t")
+            SecurityContext::try_from("u:object_r:test_getsched_target_t:s0")
                 .expect("invalid security context");
         let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
@@ -566,10 +567,10 @@ mod tests {
     #[fuchsia::test]
     fn getsched_access_denied_for_denied_type() {
         let security_server = security_server_with_policy();
-        let source_security_context = SecurityContext::try_from("u:object_r:test_getsched_no_t")
+        let source_security_context = SecurityContext::try_from("u:object_r:test_getsched_no_t:s0")
             .expect("invalid security context");
         let target_security_context =
-            SecurityContext::try_from("u:object_r:test_getsched_target_t")
+            SecurityContext::try_from("u:object_r:test_getsched_target_t:s0")
                 .expect("invalid security context");
         let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
@@ -588,11 +589,12 @@ mod tests {
     #[fuchsia::test]
     fn setsched_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
-        let source_security_context = SecurityContext::try_from("u:object_r:test_setsched_yes_t")
-            .expect("invalid security context");
+        let source_security_context =
+            SecurityContext::try_from("u:object_r:test_setsched_yes_t:s0")
+                .expect("invalid security context");
         let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
         let target_security_context =
-            SecurityContext::try_from("u:object_r:test_setsched_target_t")
+            SecurityContext::try_from("u:object_r:test_setsched_target_t:s0")
                 .expect("invalid security context");
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
         assert_eq!(
@@ -609,11 +611,11 @@ mod tests {
     #[fuchsia::test]
     fn setsched_access_denied_for_denied_type() {
         let security_server = security_server_with_policy();
-        let source_security_context = SecurityContext::try_from("u:object_r:test_setsched_no_t")
+        let source_security_context = SecurityContext::try_from("u:object_r:test_setsched_no_t:s0")
             .expect("invalid security context");
         let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
         let target_security_context =
-            SecurityContext::try_from("u:object_r:test_setsched_target_t")
+            SecurityContext::try_from("u:object_r:test_setsched_target_t:s0")
                 .expect("invalid security context");
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
         assert_eq!(
@@ -630,11 +632,12 @@ mod tests {
     #[fuchsia::test]
     fn getpgid_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
-        let source_security_context = SecurityContext::try_from("u:object_r:test_getpgid_yes_t")
+        let source_security_context = SecurityContext::try_from("u:object_r:test_getpgid_yes_t:s0")
             .expect("invalid security context");
         let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
-        let target_security_context = SecurityContext::try_from("u:object_r:test_getpgid_target_t")
-            .expect("invalid security context");
+        let target_security_context =
+            SecurityContext::try_from("u:object_r:test_getpgid_target_t:s0")
+                .expect("invalid security context");
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
 
         assert_eq!(
@@ -651,11 +654,12 @@ mod tests {
     #[fuchsia::test]
     fn getpgid_access_denied_for_denied_type() {
         let security_server = security_server_with_policy();
-        let source_security_context = SecurityContext::try_from("u:object_r:test_getpgid_no_t")
+        let source_security_context = SecurityContext::try_from("u:object_r:test_getpgid_no_t:s0")
             .expect("invalid security context");
         let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
-        let target_security_context = SecurityContext::try_from("u:object_r:test_getpgid_target_t")
-            .expect("invalid security context");
+        let target_security_context =
+            SecurityContext::try_from("u:object_r:test_getpgid_target_t:s0")
+                .expect("invalid security context");
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
         assert_eq!(
             check_getpgid_access(
@@ -671,10 +675,11 @@ mod tests {
     #[fuchsia::test]
     fn sigkill_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
-        let source_security_context = SecurityContext::try_from("u:object_r:test_kill_sigkill_t")
-            .expect("invalid security context");
+        let source_security_context =
+            SecurityContext::try_from("u:object_r:test_kill_sigkill_t:s0")
+                .expect("invalid security context");
         let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
-        let target_security_context = SecurityContext::try_from("u:object_r:test_kill_target_t")
+        let target_security_context = SecurityContext::try_from("u:object_r:test_kill_target_t:s0")
             .expect("invalid security context");
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
 
@@ -693,10 +698,11 @@ mod tests {
     #[fuchsia::test]
     fn sigchld_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
-        let source_security_context = SecurityContext::try_from("u:object_r:test_kill_sigchld_t")
-            .expect("invalid security context");
+        let source_security_context =
+            SecurityContext::try_from("u:object_r:test_kill_sigchld_t:s0")
+                .expect("invalid security context");
         let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
-        let target_security_context = SecurityContext::try_from("u:object_r:test_kill_target_t")
+        let target_security_context = SecurityContext::try_from("u:object_r:test_kill_target_t:s0")
             .expect("invalid security context");
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
 
@@ -715,10 +721,11 @@ mod tests {
     #[fuchsia::test]
     fn sigstop_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
-        let source_security_context = SecurityContext::try_from("u:object_r:test_kill_sigstop_t")
-            .expect("invalid security context");
+        let source_security_context =
+            SecurityContext::try_from("u:object_r:test_kill_sigstop_t:s0")
+                .expect("invalid security context");
         let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
-        let target_security_context = SecurityContext::try_from("u:object_r:test_kill_target_t")
+        let target_security_context = SecurityContext::try_from("u:object_r:test_kill_target_t:s0")
             .expect("invalid security context");
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
 
@@ -737,10 +744,10 @@ mod tests {
     #[fuchsia::test]
     fn signal_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
-        let source_security_context = SecurityContext::try_from("u:object_r:test_kill_signal_t")
+        let source_security_context = SecurityContext::try_from("u:object_r:test_kill_signal_t:s0")
             .expect("invalid security context");
         let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
-        let target_security_context = SecurityContext::try_from("u:object_r:test_kill_target_t")
+        let target_security_context = SecurityContext::try_from("u:object_r:test_kill_target_t:s0")
             .expect("invalid security context");
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
 
@@ -760,10 +767,10 @@ mod tests {
     #[fuchsia::test]
     fn signal_access_denied_for_denied_signals() {
         let security_server = security_server_with_policy();
-        let source_security_context = SecurityContext::try_from("u:object_r:test_kill_signal_t")
+        let source_security_context = SecurityContext::try_from("u:object_r:test_kill_signal_t:s0")
             .expect("invalid security context");
         let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
-        let target_security_context = SecurityContext::try_from("u:object_r:test_kill_target_t")
+        let target_security_context = SecurityContext::try_from("u:object_r:test_kill_target_t:s0")
             .expect("invalid security context");
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
 
@@ -786,11 +793,12 @@ mod tests {
     fn ptrace_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
         let source_security_context =
-            SecurityContext::try_from("u:object_r:test_ptrace_tracer_yes_t")
+            SecurityContext::try_from("u:object_r:test_ptrace_tracer_yes_t:s0")
                 .expect("invalid security context");
         let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
-        let target_security_context = SecurityContext::try_from("u:object_r:test_ptrace_traced_t")
-            .expect("invalid security context");
+        let target_security_context =
+            SecurityContext::try_from("u:object_r:test_ptrace_traced_t:s0")
+                .expect("invalid security context");
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
 
         assert_eq!(
@@ -808,11 +816,12 @@ mod tests {
     fn ptrace_access_denied_for_denied_type() {
         let security_server = security_server_with_policy();
         let source_security_context =
-            SecurityContext::try_from("u:object_r:test_ptrace_tracer_no_t")
+            SecurityContext::try_from("u:object_r:test_ptrace_tracer_no_t:s0")
                 .expect("invalid security context");
         let source_sid = Some(security_server.security_context_to_sid(&source_security_context));
-        let target_security_context = SecurityContext::try_from("u:object_r:test_ptrace_traced_t")
-            .expect("invalid security context");
+        let target_security_context =
+            SecurityContext::try_from("u:object_r:test_ptrace_traced_t:s0")
+                .expect("invalid security context");
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
         assert_eq!(
             check_ptrace_access(
