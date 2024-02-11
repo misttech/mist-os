@@ -71,7 +71,6 @@ GpuDeviceDriver::~GpuDeviceDriver() {
   if (start_thread_.joinable()) {
     start_thread_.join();
   }
-  gpu_device_->Release();
 }
 
 zx::result<> GpuDeviceDriver::Init() {

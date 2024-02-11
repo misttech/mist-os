@@ -14,12 +14,16 @@
 #include <lib/fake-bti/bti.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/pmt.h>
+#include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/compiler.h>
+
+#include <memory>
 
 #include <virtio/virtio.h>
 
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-abi.h"
+#include "src/graphics/display/drivers/virtio-guest/v1/virtio-pci-device.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 
 #define USE_GTEST
@@ -35,6 +39,8 @@
 #include "src/lib/testing/predicates/status.h"
 
 namespace sysmem = fuchsia_sysmem;
+
+namespace virtio_display {
 
 namespace {
 // Use a stub buffer collection instead of the real sysmem since some tests may
@@ -190,6 +196,10 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
         .capability_set_limit = 1,
     });
 
+    zx::result<std::unique_ptr<VirtioPciDevice>> virtio_device_result =
+        VirtioPciDevice::Create(std::move(bti), std::move(backend));
+    ASSERT_OK(virtio_device_result.status_value());
+
     fake_sysmem_ = std::make_unique<MockAllocator>(dispatcher());
     zx::result<fidl::Endpoints<fuchsia_sysmem::Allocator>> sysmem_endpoints =
         fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
@@ -197,9 +207,8 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
     auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
     fidl::BindServer(dispatcher(), std::move(sysmem_server), fake_sysmem_.get());
 
-    device_ = std::make_unique<virtio_display::GpuDevice>(
-        nullptr, std::move(bti), std::move(backend), std::move(sysmem_client), zx::vmo(), zx::pmt(),
-        zx_paddr_t{0}, cpp20::span(virtio_queue_buffer_pool_));
+    device_ = std::make_unique<virtio_display::GpuDevice>(nullptr, std::move(sysmem_client),
+                                                          std::move(virtio_device_result).value());
 
     RunLoopUntilIdle();
   }
@@ -431,3 +440,5 @@ TEST_F(VirtioGpuTest, ImportImage) {
 }
 
 }  // namespace
+
+}  // namespace virtio_display
