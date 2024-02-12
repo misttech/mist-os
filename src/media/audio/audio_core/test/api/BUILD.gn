@@ -39,6 +39,14 @@ loadable_module("audio-core-api-test-effects") {
   ]
 }
 
+source_set("audio_api_pipeline_test_shared") {
+  testonly = true
+  sources = [ "audio_renderer_pipeline_test_shared.h" ]
+  deps = [
+    "//src/media/audio/audio_core/testing/integration:hermetic_pipeline_test",
+  ]
+}
+
 source_set("audio_api_test_shared") {
   testonly = true
   sources = [
@@ -49,9 +57,7 @@ source_set("audio_api_test_shared") {
   ]
   deps = [
     "//sdk/lib/media/audio/cpp",
-    "//src/media/audio/audio_core/testing/integration:hermetic_pipeline_test",
-    "//src/media/audio/lib/clock",
-    "//src/media/audio/lib/clock/testing",
+    "//src/media/audio/audio_core/testing/integration:hermetic_audio_test",
   ]
 }
 
@@ -76,7 +82,6 @@ audio_core_api_test_component("audio-capturer-test") {
   source = "audio_capturer_test.cc"
   executable_deps = [
     ":audio_api_test_shared",
-    "//sdk/lib/media/audio/cpp",
     "//src/media/audio/lib/clock",
     "//src/media/audio/lib/clock/testing",
   ]
@@ -85,12 +90,7 @@ audio_core_api_test_component("audio-capturer-test") {
 
 audio_core_api_test_component("audio-capturer-error-test") {
   source = "audio_capturer_error_test.cc"
-  executable_deps = [
-    ":audio_api_test_shared",
-    "//sdk/lib/media/audio/cpp",
-    "//src/media/audio/lib/clock",
-    "//src/media/audio/lib/clock/testing",
-  ]
+  executable_deps = [ ":audio_api_test_shared" ]
   test_type = "system"
 }
 
@@ -145,7 +145,6 @@ audio_core_api_test_component("audio-renderer-test") {
   source = "audio_renderer_test.cc"
   executable_deps = [
     ":audio_api_test_shared",
-    "//sdk/lib/media/audio/cpp",
     "//src/media/audio/lib/clock",
     "//src/media/audio/lib/clock/testing",
   ]
@@ -155,7 +154,7 @@ audio_core_api_test_component("audio-renderer-test") {
 audio_core_api_test_component("audio-renderer-pipeline-test") {
   source = "audio_renderer_pipeline_test.cc"
   executable_deps = [
-    ":audio_api_test_shared",
+    ":audio_api_pipeline_test_shared",
     "//src/media/audio/audio_core/shared/mixer",
     "//src/media/audio/lib/analysis",
   ]
@@ -170,7 +169,7 @@ audio_core_api_test_component("audio-renderer-error-test") {
 
 audio_core_api_test_component("audio-renderer-pipeline-error-test") {
   source = "audio_renderer_pipeline_error_test.cc"
-  executable_deps = [ ":audio_api_test_shared" ]
+  executable_deps = [ ":audio_api_pipeline_test_shared" ]
   test_type = "system"
 }
 
