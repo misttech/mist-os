@@ -282,6 +282,11 @@ board_input_bundle("main_bundle") {
       package_set = "base"
       driver_components = [ "meta/wlanphy.cm" ]
     },
+    {
+      package_target = "//src/power/fake-powersource:fake-battery"
+      package_set = "base"
+      driver_components = [ "meta/fake_battery.cm" ]
+    },
   ]
   kernel_cmdline = [
     # TODO(b/322009732): Switch to a config api for these, when available.
