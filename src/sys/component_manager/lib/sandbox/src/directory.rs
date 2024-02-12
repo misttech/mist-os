@@ -9,12 +9,11 @@ use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use vfs::execution_scope::ExecutionScope;
 
-use crate::{registry, Capability, Open};
+use crate::{registry, CapabilityTrait, Open};
 
 /// A capability that is a `fuchsia.io` directory.
 ///
 /// The directory may optionally be backed by a future that serves its contents.
-#[derive(Capability)]
 pub struct Directory {
     /// The FIDL representation of this [Directory].
     ///
@@ -95,7 +94,7 @@ impl Clone for Directory {
     }
 }
 
-impl Capability for Directory {}
+impl CapabilityTrait for Directory {}
 
 impl From<ClientEnd<fio::DirectoryMarker>> for Directory {
     fn from(client_end: ClientEnd<fio::DirectoryMarker>) -> Self {
@@ -113,7 +112,7 @@ impl From<Directory> for ClientEnd<fio::DirectoryMarker> {
 
         // Move this capability into the registry.
         let koid = client_end.get_koid().unwrap();
-        registry::insert(Box::new(directory), koid);
+        registry::insert(directory.into(), koid);
 
         client_end
     }

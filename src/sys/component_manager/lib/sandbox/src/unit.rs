@@ -4,12 +4,12 @@
 use fidl_fuchsia_component_sandbox as fsandbox;
 use std::fmt::Debug;
 
-use crate::Capability;
+use crate::CapabilityTrait;
 
-#[derive(Capability, Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Unit;
 
-impl Capability for Unit {}
+impl CapabilityTrait for Unit {}
 
 impl From<Unit> for fsandbox::UnitCapability {
     fn from(_unit: Unit) -> Self {

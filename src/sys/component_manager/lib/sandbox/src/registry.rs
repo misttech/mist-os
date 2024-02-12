@@ -7,21 +7,21 @@ use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use crate::AnyCapability;
+use crate::Capability;
 
 lazy_static! {
     static ref REGISTRY: Mutex<Registry> = Mutex::new(Registry::default());
 }
 
 /// Inserts a capability into the global registry.
-pub(crate) fn insert(capability: AnyCapability, koid: zx::Koid) {
+pub(crate) fn insert(capability: Capability, koid: zx::Koid) {
     let mut registry = REGISTRY.lock().unwrap();
     let existing = registry.insert(koid, Entry { capability, task: None });
     assert!(existing.is_none());
 }
 
 /// Inserts a capability with an associated task into the global registry.
-pub(crate) fn insert_with_task(capability: AnyCapability, koid: zx::Koid, task: fasync::Task<()>) {
+pub(crate) fn insert_with_task(capability: Capability, koid: zx::Koid, task: fasync::Task<()>) {
     let mut registry = REGISTRY.lock().unwrap();
     let existing = registry.insert(koid, Entry { capability, task: Some(task) });
     assert!(existing.is_none());
@@ -30,13 +30,13 @@ pub(crate) fn insert_with_task(capability: AnyCapability, koid: zx::Koid, task: 
 /// Removes a capability from the global registry and returns it, if it exists.
 ///
 /// The associated task is dropped, if any.
-pub(crate) fn remove(koid: zx::Koid) -> Option<AnyCapability> {
+pub(crate) fn remove(koid: zx::Koid) -> Option<Capability> {
     let mut registry = REGISTRY.lock().unwrap();
     registry.remove(koid).map(|entry| entry.capability)
 }
 
 pub struct Entry {
-    pub capability: AnyCapability,
+    pub capability: Capability,
     pub task: Option<fasync::Task<()>>,
 }
 
@@ -70,6 +70,7 @@ impl Registry {
 mod tests {
     use super::*;
     use crate::Unit;
+    use assert_matches::assert_matches;
 
     /// Tests that a capability can be inserted and retrieved from a Registry.
     #[test]
@@ -79,11 +80,11 @@ mod tests {
         // Insert a Unit capability into the registry.
         let koid = zx::Koid::from_raw(123);
         let unit = Unit::default();
-        assert!(registry.insert(koid, Entry { capability: Box::new(unit), task: None }).is_none());
+        assert!(registry.insert(koid, Entry { capability: unit.into(), task: None }).is_none());
 
         // Remove a capability with the same koid. It should be a Unit.
         let entry = registry.remove(koid).unwrap();
-        let got_unit: Unit = entry.capability.try_into().unwrap();
-        assert_eq!(got_unit, Unit::default());
+        let got_unit = entry.capability;
+        assert_matches!(got_unit, Capability::Unit(_));
     }
 }

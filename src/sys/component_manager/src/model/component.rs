@@ -77,7 +77,7 @@ use {
         lock::{MappedMutexGuard, Mutex, MutexGuard},
     },
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
-    sandbox::{AnyCapability, Capability, Dict, Open},
+    sandbox::{Capability, CapabilityTrait, Dict, Open},
     std::iter::Iterator,
     std::{
         boxed::Box,
@@ -619,9 +619,12 @@ impl ComponentInstance {
         // Merge `ChildArgs.dictionary` entries into the child sandbox.
         if let Some(dictionary_client_end) = child_args.dictionary {
             let fidl_capability = fsandbox::Capability::Dictionary(dictionary_client_end);
-            let any: AnyCapability =
+            let any: Capability =
                 fidl_capability.try_into().map_err(|_| AddDynamicChildError::InvalidDictionary)?;
-            let dict: Dict = any.try_into().map_err(|_| AddDynamicChildError::InvalidDictionary)?;
+            let dict = match any {
+                Capability::Dictionary(d) => d,
+                _ => return Err(AddDynamicChildError::InvalidDictionary),
+            };
             let dict_entries = {
                 let mut entries = dict.lock_entries();
                 std::mem::replace(&mut *entries, std::collections::BTreeMap::new())
@@ -635,11 +638,15 @@ impl ComponentInstance {
                 // are Open capabilities and convert them to Router here.
                 //
                 // TODO(https://fxbug.dev/319542502): Consider using the external Router type, once it exists
-                let open: Open =
-                    value.try_into().map_err(|_| AddDynamicChildError::InvalidDictionary)?;
-                let router: Router = Router::from_routable(open);
+                let router = match value {
+                    Capability::Open(o) => Router::from_routable(o),
+                    _ => return Err(AddDynamicChildError::InvalidDictionary),
+                };
 
-                if child_dict_entries.insert(key.clone(), Box::new(router)).is_some() {
+                if child_dict_entries
+                    .insert(key.clone(), Capability::Router(Box::new(router)))
+                    .is_some()
+                {
                     return Err(AddDynamicChildError::StaticRouteConflict { capability_name: key });
                 }
             }
@@ -1750,7 +1757,7 @@ impl ResolvedInstanceState {
                 weak_component.clone(),
                 capability.name().clone(),
             );
-            dict.insert_capability(iter::once(name), router);
+            dict.insert_capability(iter::once(name), router.into());
         }
         dict
     }
@@ -1908,7 +1915,7 @@ impl ResolvedInstanceState {
                 | CapabilityTypeName::Config => fio::DirentType::Unknown,
             };
             let open = Open::new(routing_fn, dirent_type);
-            target_dict.insert_capability(iter::once(target_name), open);
+            target_dict.insert_capability(iter::once(target_name), open.into());
         }
     }
 
@@ -2553,7 +2560,7 @@ trait RouterExt: Routable + Clone + Send + Sync + 'static {
             task_group.spawn(async move {
                 source.hooks.dispatch(&event).await;
                 if receiver.is_taken() {
-                    completer.complete(Ok(Box::new(sender)))
+                    completer.complete(Ok(sender.into()))
                 } else {
                     router.route(request, completer)
                 }

@@ -13,7 +13,7 @@ use std::fmt::Debug;
 use std::sync::{Arc, OnceLock};
 use vfs::{common::send_on_open_with_error, execution_scope::ExecutionScope};
 
-use crate::{registry, Capability, ConversionError, Directory, OneShotHandle};
+use crate::{registry, CapabilityTrait, ConversionError, Directory, OneShotHandle};
 
 /// An [Open] capability lets the holder obtain other capabilities by pipelining
 /// a [zx::Channel], usually treated as the server endpoint of some FIDL protocol.
@@ -41,7 +41,7 @@ use crate::{registry, Capability, ConversionError, Directory, OneShotHandle};
 ///   the remaining relative path if any, or "." if the path terminates at that entry.
 ///
 /// Intuitively this is akin to mounting a remote VFS node in a directory.
-#[derive(Capability, Clone)]
+#[derive(Clone)]
 pub struct Open {
     open_fn: Arc<OpenFn>,
     entry_type: fio::DirentType,
@@ -192,7 +192,7 @@ impl Open {
 
         // Move this capability into the registry.
         let task = fasync::Task::spawn(fut);
-        registry::insert_with_task(Box::new(self), koid, task);
+        registry::insert_with_task(self.into(), koid, task);
     }
 }
 
@@ -205,7 +205,7 @@ impl fmt::Debug for Open {
     }
 }
 
-impl Capability for Open {
+impl CapabilityTrait for Open {
     fn try_into_open(self) -> Result<Open, ConversionError> {
         Ok(self)
     }
@@ -370,7 +370,7 @@ fn join_path(base: &Path, mut relative: vfs::path::Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Dict, Directory, OneShotHandle, Receiver};
+    use crate::{Capability, Dict, Directory, OneShotHandle, Receiver};
     use anyhow::Result;
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, spawn_stream_handler, ClientEnd, Proxy};
@@ -685,7 +685,7 @@ mod tests {
     async fn test_sender_into_open_via_dict() {
         let dict = Dict::new();
         let (receiver, sender) = Receiver::new();
-        dict.lock_entries().insert("echo".to_owned(), Box::new(sender));
+        dict.lock_entries().insert("echo".to_owned(), Capability::Sender(sender));
 
         let open: Open = dict.try_into_open().unwrap();
         let (client_end, server_end) = zx::Channel::create();
@@ -705,7 +705,7 @@ mod tests {
 
         let dict = Dict::new();
         let (receiver, sender) = Receiver::new();
-        dict.lock_entries().insert("echo".to_owned(), Box::new(sender));
+        dict.lock_entries().insert("echo".to_owned(), Capability::Sender(sender));
 
         let open: Open = dict.try_into_open().unwrap();
         let (client_end, server_end) = zx::Channel::create();

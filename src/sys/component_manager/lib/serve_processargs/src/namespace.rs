@@ -6,7 +6,7 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_io as fio;
 use futures::channel::mpsc::{unbounded, UnboundedSender};
 use namespace::{Entry as NamespaceEntry, Namespace, NamespaceError, Path as NamespacePath, Tree};
-use sandbox::{AnyCapability, Dict, Directory};
+use sandbox::{Capability, Dict};
 use std::sync::Arc;
 use thiserror::Error;
 use vfs::execution_scope::ExecutionScope;
@@ -14,7 +14,7 @@ use vfs::execution_scope::ExecutionScope;
 /// A builder object for assembling a program's incoming namespace.
 pub struct NamespaceBuilder {
     /// Mapping from namespace path to capabilities that can be turned into `Directory`.
-    entries: Tree<AnyCapability>,
+    entries: Tree<Capability>,
 
     /// Path-not-found errors are sent here.
     not_found: UnboundedSender<String>,
@@ -50,23 +50,26 @@ impl NamespaceBuilder {
     /// namespace entry at the parent directory of `path`.
     pub fn add_object(
         self: &mut Self,
-        cap: AnyCapability,
+        cap: Capability,
         path: &NamespacePath,
     ) -> Result<(), BuildNamespaceError> {
         let dirname = path.dirname_ns_path();
 
         // Get the entry, or if it doesn't exist, make an empty dictionary.
-        let any: &AnyCapability = match self.entries.get(&dirname) {
+        let any = match self.entries.get(&dirname) {
             Some(dir) => dir,
             None => {
                 let dict = self.make_dict_with_not_found_logging(path.dirname().into());
-                self.entries.add(&dirname, Box::new(dict))?
+                self.entries.add(&dirname, Capability::Dictionary(dict))?
             }
         };
 
         // Cast the namespace entry as a Dict. This may fail if the user added a duplicate
         // namespace entry that is not a Dict (see `add_entry`).
-        let dict: &Dict = any.try_into().map_err(|_e| NamespaceError::Duplicate(path.clone()))?;
+        let dict = match any {
+            Capability::Dictionary(d) => d,
+            _ => Err(NamespaceError::Duplicate(path.clone()))?,
+        };
 
         // Insert the capability into the Dict.
         {
@@ -84,7 +87,7 @@ impl NamespaceBuilder {
     /// opens the `path`.
     pub fn add_entry(
         self: &mut Self,
-        cap: AnyCapability,
+        cap: Capability,
         path: &NamespacePath,
     ) -> Result<(), BuildNamespaceError> {
         self.entries.add(path, cap)?;
@@ -97,16 +100,19 @@ impl NamespaceBuilder {
             .flatten()
             .into_iter()
             .map(|(path, cap)| -> Result<NamespaceEntry, BuildNamespaceError> {
-                let directory: Directory = if (&*cap).as_any().is::<Directory>() {
-                    cap.try_into().unwrap()
-                } else {
-                    let open = cap.try_into_open().map_err(|err| {
-                        BuildNamespaceError::Conversion { path: path.clone(), err: Arc::new(err) }
-                    })?;
-                    open.into_directory(
-                        fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-                        self.scope.clone(),
-                    )
+                let directory = match cap {
+                    Capability::Directory(d) => d,
+                    cap => {
+                        let open =
+                            cap.try_into_open().map_err(|err| BuildNamespaceError::Conversion {
+                                path: path.clone(),
+                                err: Arc::new(err),
+                            })?;
+                        open.into_directory(
+                            fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
+                            self.scope.clone(),
+                        )
+                    }
                 };
                 let client_end: ClientEnd<fio::DirectoryMarker> = directory.into();
                 Ok(NamespaceEntry { path, directory: client_end.into() })
@@ -160,9 +166,9 @@ mod tests {
         std::str::FromStr,
     };
 
-    fn open_cap() -> AnyCapability {
+    fn open_cap() -> Capability {
         let (open, _receiver) = multishot();
-        Box::new(open)
+        Capability::Open(open)
     }
 
     fn ns_path(str: &str) -> NamespacePath {
@@ -269,7 +275,7 @@ mod tests {
         let (open, receiver) = multishot();
 
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        namespace.add_object(Box::new(open), &ns_path("/svc/a")).unwrap();
+        namespace.add_object(Capability::Open(open), &ns_path("/svc/a")).unwrap();
         let ns = namespace.serve().unwrap();
 
         let mut ns = ns.flatten();

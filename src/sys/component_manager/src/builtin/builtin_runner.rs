@@ -16,7 +16,7 @@ use fuchsia_zircon::{self as zx, Clock};
 use futures::{future::BoxFuture, Future, FutureExt, TryStreamExt};
 use routing::policy::ScopedPolicyChecker;
 use runner::component::{ChannelEpitaph, Controllable, Controller};
-use sandbox::{Capability, Dict};
+use sandbox::{Capability, CapabilityTrait, Dict};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::warn;
@@ -247,14 +247,14 @@ impl ElfRunnerProgram {
             let mut entries = svc.lock_entries();
             entries.insert(
                 fcrunner::ComponentRunnerMarker::PROTOCOL_NAME.to_string(),
-                Box::new(elf_runner.into_open(WeakComponentInstance::invalid())),
+                Capability::Open(elf_runner.into_open(WeakComponentInstance::invalid())),
             );
             entries.insert(
                 freport::SnapshotProviderMarker::PROTOCOL_NAME.to_string(),
-                Box::new(snapshot_provider.into_open(WeakComponentInstance::invalid())),
+                Capability::Open(snapshot_provider.into_open(WeakComponentInstance::invalid())),
             );
         }
-        output.lock_entries().insert(SVC.to_string(), Box::new(svc));
+        output.lock_entries().insert(SVC.to_string(), Capability::Dictionary(svc));
 
         let this = Self { task_group, execution_scope: ExecutionScope::new(), output, job };
         this
@@ -437,7 +437,9 @@ mod tests {
         let (ch1, ch2) = zx::Channel::create();
         let (not_found, _) = channel::mpsc::unbounded();
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), not_found);
-        namespace.add_entry(Box::new(Directory::new(pkg)), &Path::new("/pkg").unwrap()).unwrap();
+        namespace
+            .add_entry(Capability::Directory(Directory::new(pkg)), &Path::new("/pkg").unwrap())
+            .unwrap();
 
         let moniker = Moniker::try_from(vec!["signal_then_hang"]).unwrap();
         let token = builtin_runner.elf_runner_resources.instance_registry.add_for_tests(moniker);

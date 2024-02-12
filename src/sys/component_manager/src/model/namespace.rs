@@ -29,7 +29,7 @@ use {
         channel::mpsc::{unbounded, UnboundedSender},
         StreamExt,
     },
-    sandbox::{AnyCapability, Dict, Directory, Open},
+    sandbox::{Capability, Dict, Directory, Open},
     serve_processargs::NamespaceBuilder,
     std::{collections::HashSet, sync::Arc},
     tracing::{error, warn},
@@ -91,7 +91,7 @@ fn add_pkg_directory(
     let client_end = ClientEnd::new(pkg_dir.into_channel().unwrap().into_zx_channel());
     let directory: sandbox::Directory = client_end.into();
     let path = cm_types::Path::new(PKG_PATH.to_str().unwrap()).unwrap();
-    namespace.add_entry(Box::new(directory), path.as_ref())?;
+    namespace.add_entry(Capability::Directory(directory), path.as_ref())?;
     Ok(())
 }
 
@@ -115,31 +115,34 @@ async fn add_use_decls(
 
         let target_path =
             use_.path().ok_or_else(|| CreateNamespaceError::UseDeclWithoutPath(use_.clone()))?;
-        let capability: AnyCapability = match use_ {
+        let capability: Capability = match use_ {
             cm_rust::UseDecl::Directory(_) => {
-                directory_use(&use_, component.as_weak(), scope.clone())
+                directory_use(&use_, component.as_weak(), scope.clone()).into()
             }
             cm_rust::UseDecl::Storage(storage) => {
-                storage_use(storage, use_, component, scope.clone()).await?
+                storage_use(storage, use_, component, scope.clone()).await?.into()
             }
             cm_rust::UseDecl::Protocol(s) => service_or_protocol_use(
                 UseDecl::Protocol(s.clone()),
                 component.as_weak(),
                 program_input_dict,
                 component.blocking_task_group(),
-            ),
+            )
+            .into(),
             cm_rust::UseDecl::Service(s) => service_or_protocol_use(
                 UseDecl::Service(s.clone()),
                 component.as_weak(),
                 program_input_dict,
                 component.blocking_task_group(),
-            ),
+            )
+            .into(),
             cm_rust::UseDecl::EventStream(s) => service_or_protocol_use(
                 UseDecl::EventStream(s.clone()),
                 component.as_weak(),
                 program_input_dict,
                 component.blocking_task_group(),
-            ),
+            )
+            .into(),
             cm_rust::UseDecl::Runner(_) => {
                 std::process::abort();
             }
@@ -176,7 +179,7 @@ async fn storage_use(
     use_decl: &UseDecl,
     component: &Arc<ComponentInstance>,
     scope: ExecutionScope,
-) -> Result<Box<Directory>, CreateNamespaceError> {
+) -> Result<Directory, CreateNamespaceError> {
     // Prevent component from using storage capability if it is restricted to the component ID
     // index, and the component isn't in the index.
     // To check that the storage capability is restricted to the storage decl, we have
@@ -206,7 +209,7 @@ fn directory_use(
     use_: &UseDecl,
     component: WeakComponentInstance,
     scope: ExecutionScope,
-) -> Box<Directory> {
+) -> Directory {
     let flags = match use_ {
         UseDecl::Directory(dir) => Rights::from(dir.rights).into_legacy(),
         UseDecl::Storage(_) => fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -246,7 +249,7 @@ fn directory_use(
     };
 
     let open = Open::new(open_fn, fio::DirentType::Directory);
-    Box::new(open.into_directory(flags, scope))
+    open.into_directory(flags, scope)
 }
 
 async fn route_directory(
@@ -290,7 +293,7 @@ fn service_or_protocol_use(
     component: WeakComponentInstance,
     program_input_dict: &Dict,
     blocking_task_group: TaskGroup,
-) -> Box<Open> {
+) -> Open {
     // Bedrock routing.
     if let UseDecl::Protocol(use_protocol_decl) = &use_ {
         let request = Request {
@@ -347,7 +350,7 @@ fn service_or_protocol_use(
             .with_path(use_protocol_decl.target_path.iter_segments());
         let open =
             router.into_open(request, fio::DirentType::Service, blocking_task_group, errors_fn);
-        return Box::new(open);
+        return open;
     };
 
     // Legacy routing.
@@ -403,8 +406,7 @@ fn service_or_protocol_use(
         component.blocking_task_group().spawn(task)
     };
 
-    let open = Open::new(route_open_fn, fio::DirentType::Service);
-    Box::new(open)
+    Open::new(route_open_fn, fio::DirentType::Service)
 }
 
 fn not_found_logging(component: &Arc<ComponentInstance>) -> UnboundedSender<String> {

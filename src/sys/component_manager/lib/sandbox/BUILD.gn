@@ -7,10 +7,7 @@ import("//build/rust/rustc_library.gni")
 
 group("tests") {
   testonly = true
-  deps = [
-    ":sandbox-unittests",
-    "macro:tests",
-  ]
+  deps = [ ":sandbox-unittests" ]
 }
 
 rustc_library("sandbox") {
@@ -18,10 +15,10 @@ rustc_library("sandbox") {
   with_unit_tests = true
 
   deps = [
-    "macro:sandbox-macro",
     "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/from-enum",
     "//src/lib/fuchsia-async",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/lib/vfs/rust:vfs",
@@ -52,9 +49,7 @@ rustc_library("sandbox") {
     "src/dict.rs",
     "src/directory.rs",
     "src/handle.rs",
-    "src/lazy.rs",
     "src/lib.rs",
-    "src/opaque.rs",
     "src/open.rs",
     "src/optional.rs",
     "src/receiver.rs",

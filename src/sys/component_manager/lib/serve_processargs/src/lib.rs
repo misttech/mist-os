@@ -5,7 +5,7 @@ use fuchsia_runtime::{HandleInfo, HandleType};
 use futures::channel::mpsc::UnboundedSender;
 use process_builder::StartupHandle;
 use processargs::ProcessArgs;
-use sandbox::{AnyCapability, Dict, DictKey, OneShotHandle};
+use sandbox::{Capability, Dict, DictKey};
 use std::collections::HashMap;
 use std::iter::once;
 use thiserror::Error;
@@ -87,7 +87,7 @@ pub fn add_to_processargs(
 
     // Iterate over the delivery map.
     // Take entries away from dict and install them accordingly.
-    visit_map(delivery_map, dict, &mut |cap: AnyCapability, delivery: &Delivery| match delivery {
+    visit_map(delivery_map, dict, &mut |cap: Capability, delivery: &Delivery| match delivery {
         Delivery::NamespacedObject(path) => {
             namespace.add_object(cap, path.as_ref()).map_err(DeliveryError::NamespaceError)
         }
@@ -125,14 +125,16 @@ pub enum DeliveryError {
     NamespaceError(namespace::BuildNamespaceError),
 
     #[error("capability `{0:?}` is not allowed to be installed into processargs")]
-    UnsupportedCapability(AnyCapability),
+    UnsupportedCapability(Capability),
 }
 
-fn translate_handle(cap: AnyCapability, info: &HandleInfo) -> Result<StartupHandle, DeliveryError> {
+fn translate_handle(cap: Capability, info: &HandleInfo) -> Result<StartupHandle, DeliveryError> {
     validate_handle_type(info.handle_type())?;
 
-    let one_shot: OneShotHandle =
-        cap.clone().try_into().map_err(|_| DeliveryError::UnsupportedCapability(cap.clone()))?;
+    let one_shot = match cap.clone() {
+        Capability::OneShotHandle(h) => h,
+        c => return Err(DeliveryError::UnsupportedCapability(c)),
+    };
     let handle = one_shot.get_handle().map_err(|_| DeliveryError::UnsupportedCapability(cap))?;
 
     Ok(StartupHandle { handle, info: *info })
@@ -141,7 +143,7 @@ fn translate_handle(cap: AnyCapability, info: &HandleInfo) -> Result<StartupHand
 fn visit_map(
     map: &DeliveryMap,
     dict: Dict,
-    f: &mut impl FnMut(AnyCapability, &Delivery) -> Result<(), DeliveryError>,
+    f: &mut impl FnMut(Capability, &Delivery) -> Result<(), DeliveryError>,
 ) -> Result<(), DeliveryError> {
     let mut entries = dict.lock_entries();
     for (key, entry) in map {
@@ -149,8 +151,10 @@ fn visit_map(
             Some(value) => match entry {
                 DeliveryMapEntry::Delivery(delivery) => f(value, delivery)?,
                 DeliveryMapEntry::Dict(sub_map) => {
-                    let nested_dict: Dict =
-                        value.try_into().map_err(|_| DeliveryError::NotADict(key.to_owned()))?;
+                    let nested_dict: Dict = match value {
+                        Capability::Dictionary(d) => d,
+                        _ => return Err(DeliveryError::NotADict(key.to_owned())),
+                    };
                     visit_map(sub_map, nested_dict, f)?;
                 }
             },
@@ -271,7 +275,7 @@ mod tests {
         let dict = Dict::new();
         dict.lock_entries().insert(
             "stdin".to_string(),
-            Box::new(OneShotHandle::from(sock0.into_handle().into_handle())),
+            Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle().into_handle())),
         );
         let delivery_map = hashmap! {
             "stdin".to_string() => DeliveryMapEntry::Delivery(
@@ -309,11 +313,12 @@ mod tests {
 
         // Put a socket at "/handles/stdin". This implements a capability bundling pattern.
         let handles = Dict::new();
-        handles
-            .lock_entries()
-            .insert("stdin".to_string(), Box::new(OneShotHandle::from(sock0.into_handle())));
+        handles.lock_entries().insert(
+            "stdin".to_string(),
+            Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
+        );
         let dict = Dict::new();
-        dict.lock_entries().insert("handles".to_string(), Box::new(handles));
+        dict.lock_entries().insert("handles".to_string(), Capability::Dictionary(handles));
 
         let delivery_map = hashmap! {
             "handles".to_string() => DeliveryMapEntry::Dict(hashmap! {
@@ -344,11 +349,12 @@ mod tests {
         let mut processargs = ProcessArgs::new();
 
         let handles = Dict::new();
-        handles
-            .lock_entries()
-            .insert("stdin".to_string(), Box::new(OneShotHandle::from(ep0.into_handle())));
+        handles.lock_entries().insert(
+            "stdin".to_string(),
+            Capability::OneShotHandle(OneShotHandle::from(ep0.into_handle())),
+        );
         let dict = Dict::new();
-        dict.lock_entries().insert("handles".to_string(), Box::new(handles));
+        dict.lock_entries().insert("handles".to_string(), Capability::Dictionary(handles));
 
         let delivery_map = hashmap! {
             "handles".to_string() => DeliveryMapEntry::Dict(hashmap! {
@@ -385,8 +391,10 @@ mod tests {
         // The type of "/handles" is a socket capability but we try to open it as a dict and extract
         // a "stdin" inside. This should fail.
         let dict = Dict::new();
-        dict.lock_entries()
-            .insert("handles".to_string(), Box::new(OneShotHandle::from(sock0.into_handle())));
+        dict.lock_entries().insert(
+            "handles".to_string(),
+            Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
+        );
 
         let delivery_map = hashmap! {
             "handles".to_string() => DeliveryMapEntry::Dict(hashmap! {
@@ -409,8 +417,10 @@ mod tests {
 
         let mut processargs = ProcessArgs::new();
         let dict = Dict::new();
-        dict.lock_entries()
-            .insert("stdin".to_string(), Box::new(OneShotHandle::from(sock0.into_handle())));
+        dict.lock_entries().insert(
+            "stdin".to_string(),
+            Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
+        );
         let delivery_map = DeliveryMap::new();
 
         assert_matches!(
@@ -426,8 +436,10 @@ mod tests {
 
         let mut processargs = ProcessArgs::new();
         let dict = Dict::new();
-        dict.lock_entries()
-            .insert("stdin".to_string(), Box::new(OneShotHandle::from(sock0.into_handle())));
+        dict.lock_entries().insert(
+            "stdin".to_string(),
+            Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
+        );
         let delivery_map = hashmap! {
             "stdin".to_string() => DeliveryMapEntry::Delivery(
                 Delivery::Handle(HandleInfo::new(HandleType::DirectoryRequest, 0))
@@ -470,8 +482,8 @@ mod tests {
         let dict = Dict::new();
         {
             let mut entries = dict.lock_entries();
-            entries.insert("normal".to_string(), Box::new(open));
-            entries.insert("closed".to_string(), Box::new(peer_closed_open));
+            entries.insert("normal".to_string(), Capability::Open(open));
+            entries.insert("closed".to_string(), Capability::Open(peer_closed_open));
         }
         let delivery_map = hashmap! {
             "normal".to_string() => DeliveryMapEntry::Delivery(
@@ -531,7 +543,7 @@ mod tests {
         let dict = Dict::new();
         {
             let mut entries = dict.lock_entries();
-            entries.insert("normal".to_string(), Box::new(open));
+            entries.insert("normal".to_string(), Capability::Open(open));
         }
         let delivery_map = hashmap! {
             "normal".to_string() => DeliveryMapEntry::Delivery(
@@ -586,7 +598,7 @@ mod tests {
 
         let mut processargs = ProcessArgs::new();
         let dict = Dict::new();
-        dict.lock_entries().insert("data".to_string(), Box::new(directory));
+        dict.lock_entries().insert("data".to_string(), Capability::Directory(directory));
         let delivery_map = hashmap! {
             "data".to_string() => DeliveryMapEntry::Delivery(
                 Delivery::NamespaceEntry(cm_types::Path::from_str("/data").unwrap())
@@ -644,8 +656,10 @@ mod tests {
 
         let mut processargs = ProcessArgs::new();
         let dict = Dict::new();
-        dict.lock_entries()
-            .insert("stdin".to_string(), Box::new(OneShotHandle::from(sock0.into_handle())));
+        dict.lock_entries().insert(
+            "stdin".to_string(),
+            Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
+        );
         let delivery_map = hashmap! {
             "stdin".to_string() => DeliveryMapEntry::Delivery(
                 Delivery::NamespacedObject(cm_types::Path::from_str("/svc/fuchsia.Normal").unwrap())

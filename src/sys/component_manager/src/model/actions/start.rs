@@ -36,7 +36,7 @@ use {
     fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess, fuchsia_zircon as zx,
     futures::channel::oneshot,
     moniker::Moniker,
-    sandbox::Dict,
+    sandbox::{Capability, Dict},
     serve_processargs::NamespaceBuilder,
     std::string::ToString,
     std::sync::Arc,
@@ -161,7 +161,7 @@ async fn do_start(
     })?;
     for NamespaceEntry { directory, path } in additional_namespace_entries {
         let directory: sandbox::Directory = directory.into();
-        namespace_builder.add_entry(Box::new(directory), &path).map_err(|err| {
+        namespace_builder.add_entry(Capability::Directory(directory), &path).map_err(|err| {
             StartActionError::CreateNamespaceError {
                 moniker: component.moniker.clone(),
                 err: CreateNamespaceError::BuildNamespaceError(err),

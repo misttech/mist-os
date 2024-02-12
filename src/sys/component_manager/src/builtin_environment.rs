@@ -429,7 +429,7 @@ impl RootComponentInputBuilder {
             }),
         );
 
-        self.input.insert_capability(iter::once(P::PROTOCOL_NAME), launch.into_router());
+        self.input.insert_capability(iter::once(P::PROTOCOL_NAME), launch.into_router().into());
     }
 
     fn build(self) -> ComponentInput {
@@ -1292,7 +1292,7 @@ impl BuiltinEnvironment {
             }),
         );
         self.root_component_input
-            .insert_capability(iter::once(name.as_str()), launch.into_router());
+            .insert_capability(iter::once(name.as_str()), launch.into_router().into());
     }
 
     #[cfg(test)]

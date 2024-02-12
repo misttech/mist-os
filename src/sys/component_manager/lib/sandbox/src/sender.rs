@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{registry, Capability, ConversionError, Open};
+use crate::{registry, CapabilityTrait, ConversionError, Open};
 use fidl::endpoints::{create_request_stream, ClientEnd, ControlHandle, RequestStream, ServerEnd};
 use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_component_sandbox as fsandbox;
@@ -19,7 +19,7 @@ pub struct Message {
 }
 
 /// A capability that transfers another capability to a [Receiver].
-#[derive(Capability, Debug)]
+#[derive(Debug)]
 pub struct Sender {
     inner: mpsc::UnboundedSender<Message>,
 
@@ -85,7 +85,7 @@ impl Sender {
 
         // Move this capability into the registry.
         let task = fasync::Task::spawn(fut);
-        registry::insert_with_task(Box::new(self), koid, task);
+        registry::insert_with_task(self.into(), koid, task);
     }
 
     /// Sets this Sender's client end to the provided one.
@@ -114,7 +114,7 @@ impl From<Sender> for Open {
     }
 }
 
-impl Capability for Sender {
+impl CapabilityTrait for Sender {
     fn try_into_open(self) -> Result<Open, ConversionError> {
         Ok(self.into())
     }

@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 use crate::{AnyCapability, AnyCast, Open};
 use fidl_fuchsia_component_sandbox as fsandbox;
+use from_enum::FromEnum;
+use fuchsia_zircon::{AsHandleRef, HandleRef};
 use std::fmt::Debug;
 use thiserror::Error;
 
@@ -32,9 +34,170 @@ pub enum RemoteError {
     Unregistered,
 }
 
+#[derive(FromEnum, Debug, Clone)]
+pub enum Capability {
+    Unit(crate::Unit),
+    Sender(crate::Sender),
+    Receiver(crate::Receiver),
+    Open(crate::Open),
+    Dictionary(crate::Dict),
+    Data(crate::Data),
+    Directory(crate::Directory),
+    OneShotHandle(crate::OneShotHandle),
+    Optional(crate::Optional),
+    // The Router type is defined outside of this crate, so it needs to still be an
+    // AnyCapability.
+    // TODO(b/324870669): Move Router to the bedrock library.
+    Router(AnyCapability),
+}
+
+impl Capability {
+    pub fn to_dictionary(self) -> Option<crate::Dict> {
+        match self {
+            Capability::Dictionary(d) => Some(d),
+            _ => None,
+        }
+    }
+
+    pub fn try_into_open(self) -> Result<Open, ConversionError> {
+        match self {
+            Capability::Sender(s) => s.try_into_open(),
+            Capability::Receiver(s) => s.try_into_open(),
+            Capability::Open(s) => s.try_into_open(),
+            Capability::Router(s) => s.try_into_open(),
+            Capability::Dictionary(s) => s.try_into_open(),
+            Capability::Data(s) => s.try_into_open(),
+            Capability::Unit(s) => s.try_into_open(),
+            Capability::Directory(s) => s.try_into_open(),
+            Capability::OneShotHandle(s) => s.try_into_open(),
+            Capability::Optional(s) => s.try_into_open(),
+        }
+    }
+
+    pub fn into_fidl(self) -> fsandbox::Capability {
+        match self {
+            Capability::Sender(s) => s.into_fidl(),
+            Capability::Receiver(s) => s.into_fidl(),
+            Capability::Open(s) => s.into_fidl(),
+            Capability::Router(s) => s.into_fidl(),
+            Capability::Dictionary(s) => s.into_fidl(),
+            Capability::Data(s) => s.into_fidl(),
+            Capability::Unit(s) => s.into_fidl(),
+            Capability::Directory(s) => s.into_fidl(),
+            Capability::OneShotHandle(s) => s.into_fidl(),
+            Capability::Optional(s) => s.into_fidl(),
+        }
+    }
+}
+
+/// Given a reference to a handle, returns a copy of a capability from the registry that was added
+/// with the handle's koid.
+///
+/// Returns [RemoteError::Unregistered] if the capability is not in the registry.
+fn try_from_handle_in_registry<'a>(handle_ref: HandleRef<'_>) -> Result<Capability, RemoteError> {
+    let koid = handle_ref.get_koid().unwrap();
+    let capability = crate::registry::remove(koid).ok_or(RemoteError::Unregistered)?;
+    Ok(capability)
+}
+
+impl From<Capability> for fsandbox::Capability {
+    fn from(capability: Capability) -> Self {
+        capability.into_fidl()
+    }
+}
+
+impl TryFrom<fsandbox::Capability> for Capability {
+    type Error = RemoteError;
+
+    /// Converts the FIDL capability back to a Rust AnyCapability.
+    ///
+    /// In most cases, the AnyCapability was previously inserted into the registry when it
+    /// was converted to a FIDL capability. This method takes it out of the registry.
+    fn try_from(capability: fsandbox::Capability) -> Result<Self, Self::Error> {
+        match capability {
+            fsandbox::Capability::Unit(_) => Ok(crate::Unit::default().into()),
+            fsandbox::Capability::Handle(client_end) => {
+                try_from_handle_in_registry(client_end.as_handle_ref())
+            }
+            fsandbox::Capability::Data(data_capability) => {
+                Ok(crate::Data::try_from(data_capability)?.into())
+            }
+            fsandbox::Capability::Cloneable(client_end) => {
+                try_from_handle_in_registry(client_end.as_handle_ref())
+            }
+            fsandbox::Capability::Dictionary(client_end) => {
+                let mut any = try_from_handle_in_registry(client_end.as_handle_ref())?;
+                // Cache the client end so it can be reused in future conversions to FIDL.
+                {
+                    match any {
+                        Capability::Dictionary(ref mut d) => {
+                            d.set_client_end(client_end);
+                        }
+                        _ => panic!("BUG: registry has a non-Dict capability under a Dict koid"),
+                    }
+                }
+                Ok(any)
+            }
+            fsandbox::Capability::Sender(client_end) => {
+                let mut any = try_from_handle_in_registry(client_end.as_handle_ref())?;
+                // Cache the client end so it can be reused in future conversions to FIDL.
+                {
+                    match any {
+                        Capability::Sender(ref mut s) => {
+                            s.set_client_end(client_end);
+                        }
+                        _ => {
+                            panic!("BUG: registry has a non-Sender capability under a Sender koid")
+                        }
+                    }
+                }
+                Ok(any)
+            }
+            fsandbox::Capability::Receiver(server_end) => {
+                let mut any = try_from_handle_in_registry(server_end.as_handle_ref())?;
+                // Cache the client end so it can be reused in future conversions to FIDL.
+                {
+                    match any {
+                        Capability::Receiver(ref mut r) => {
+                            r.set_server_end(server_end);
+                        }
+                        _ => panic!(
+                            "BUG: registry has a non-Receiver capability under a Receiver koid"
+                        ),
+                    }
+                }
+                Ok(any)
+            }
+            fsandbox::Capability::Open(client_end) => {
+                try_from_handle_in_registry(client_end.as_handle_ref())
+            }
+            fsandbox::Capability::Directory(client_end) => {
+                let mut any = try_from_handle_in_registry(client_end.as_handle_ref())?;
+                // Cache the client end so it can be reused in future conversions to FIDL.
+                {
+                    match any {
+                        Capability::Directory(ref mut d) => {
+                            d.set_client_end(client_end);
+                        }
+                        _ => panic!(
+                            "BUG: registry has a non-Directory capability under a Directory koid"
+                        ),
+                    }
+                }
+                Ok(any)
+            }
+            fsandbox::Capability::Optional(optional) => match optional.value {
+                Some(capability) => (*capability).try_into(),
+                None => Ok(crate::Optional::void().into()),
+            },
+            fsandbox::CapabilityUnknown!() => Err(RemoteError::UnknownVariant),
+        }
+    }
+}
+
 /// The capability trait, implemented by all capabilities.
-pub trait Capability:
-    AnyCast + Into<fsandbox::Capability> + TryFrom<AnyCapability> + Clone + Debug + Send + Sync
+pub trait CapabilityTrait:
+    AnyCast + Into<fsandbox::Capability> + Clone + Debug + Send + Sync
 {
     /// Attempt to convert `self` to a capability of type [Open].
     ///

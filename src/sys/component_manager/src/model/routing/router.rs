@@ -15,7 +15,7 @@ use futures::{
     channel::oneshot::{self, Canceled},
     Future,
 };
-use sandbox::{AnyCapability, Capability, Dict, Open, Path};
+use sandbox::{AnyCapability, Capability, CapabilityTrait, Dict, Open, Path};
 use std::{fmt, sync::Arc};
 use vfs::execution_scope::ExecutionScope;
 use zx::HandleBased;
@@ -32,7 +32,7 @@ pub trait Routable {
 /// During routing, a request usually traverses through the component topology,
 /// passing through several routers, ending up at some router that will fulfill
 /// the completer instead of forwarding it upstream.
-#[derive(Capability, Clone)]
+#[derive(Clone)]
 pub struct Router {
     route_fn: Arc<RouteFn>,
 }
@@ -68,7 +68,13 @@ impl fmt::Debug for Router {
 }
 
 // TODO(b/314343346): Complete or remove the Router implementation of sandbox::Capability
-impl Capability for Router {}
+impl CapabilityTrait for Router {}
+
+impl From<Router> for Capability {
+    fn from(router: Router) -> Self {
+        Capability::Router(Box::new(router))
+    }
+}
 
 /// If `T` is [`Routable`], then a `Weak<T>` is also [`Routable`], except the request
 /// may fail if the weak pointer has expired.
@@ -102,6 +108,9 @@ impl Router {
                 completer.complete(Err(error.clone()));
             }),
         }
+    }
+    pub fn from_any(any: AnyCapability) -> Router {
+        *any.into_any().downcast::<Router>().unwrap()
     }
 
     /// Package a [`Routable`] object into a [`Router`].
@@ -176,34 +185,32 @@ impl Router {
         let out = Dict::new();
         let mut out_entries = out.lock_entries();
         for (key, value) in &*entries {
-            let value = if value.as_any().is::<Dict>() {
-                let dict: &Dict = value.try_into().unwrap();
-                Box::new(Self::dict_routers_to_open(
+            let value = match value {
+                Capability::Dictionary(dict) => Capability::Dictionary(Self::dict_routers_to_open(
                     weak_component,
                     dict,
                     routing_task_group.clone(),
-                ))
-            } else if value.as_any().is::<Router>() {
-                let router: &Router = value.try_into().unwrap();
-                let request = Request {
-                    rights: None,
-                    relative_path: sandbox::Path::default(),
-                    target: weak_component.clone(),
-                    // Use the weakest availability, so that it gets immediately upgraded to
-                    // the availability in `router`.
-                    availability: cm_types::Availability::Transitional,
-                };
-                // TODO: Should we convert the Open to a Directory here if the Router wraps a
-                // Dict?
-                let open = router.clone().into_open(
-                    request,
-                    fio::DirentType::Service,
-                    routing_task_group.clone(),
-                    |_| {},
-                );
-                Box::new(open)
-            } else {
-                value.clone()
+                )),
+                Capability::Router(r) => {
+                    let router = Router::from_any(r.clone());
+                    let request = Request {
+                        rights: None,
+                        relative_path: sandbox::Path::default(),
+                        target: weak_component.clone(),
+                        // Use the weakest availability, so that it gets immediately upgraded to
+                        // the availability in `router`.
+                        availability: cm_types::Availability::Transitional,
+                    };
+                    // TODO: Should we convert the Open to a Directory here if the Router wraps a
+                    // Dict?
+                    Capability::Open(router.into_open(
+                        request,
+                        fio::DirentType::Service,
+                        routing_task_group.clone(),
+                        |_| {},
+                    ))
+                }
+                other => other.clone(),
             };
             out_entries.insert(key.clone(), value);
         }
@@ -245,19 +252,16 @@ impl Router {
                     let result = route(&router, request).await;
                     match result {
                         Ok(capability) => {
-                            // Connect to the capability by converting it into [Open], then open it.
-                            let capability = if (&*capability).as_any().is::<Dict>() {
-                                // HACK: Dict needs special casing because [Dict::try_into_open]
-                                // is unaware of [Router].
-                                let capability: Dict = capability.clone().try_into().unwrap();
-                                let capability = Self::dict_routers_to_open(
+                            // HACK: Dict needs special casing because [Dict::try_into_open]
+                            // is unaware of [Router].
+                            let capability = match capability {
+                                Capability::Dictionary(d) => Self::dict_routers_to_open(
                                     &target,
-                                    &capability,
+                                    &d,
                                     routing_task_group_clone,
-                                );
-                                Box::new(capability) as AnyCapability
-                            } else {
-                                capability
+                                )
+                                .into(),
+                                cap => cap,
                             };
                             match super::capability_into_open(capability) {
                                 Ok(open) => open.open(scope, flags, relative_path, server_end),
@@ -342,35 +346,19 @@ impl From<Router> for fsandbox::Capability {
     }
 }
 
-impl Routable for AnyCapability {
-    fn route(&self, request: Request, completer: Completer) {
-        let capability = self.clone();
-        match try_get_routable(self) {
-            Ok(router) => router.route(request, completer),
-            Err(_) => {
-                if request.relative_path.is_empty() {
-                    completer.complete(Ok(capability.clone()));
-                } else {
-                    completer.complete(Err(RoutingError::BedrockUnsupportedCapability.into()))
-                }
-            }
-        }
-    }
-}
-
 /// The completer pattern avoids boxing futures at each router in the chain.
 /// Instead of building a chain of boxed futures during recursive route calls,
 /// each router can pass the completer buck to the next router.
 pub struct Completer {
-    sender: oneshot::Sender<Result<AnyCapability, RouteOrOpenError>>,
+    sender: oneshot::Sender<Result<Capability, RouteOrOpenError>>,
 }
 
 impl Completer {
-    pub fn complete(self, result: Result<AnyCapability, RouteOrOpenError>) {
+    pub fn complete(self, result: Result<Capability, RouteOrOpenError>) {
         let _ = self.sender.send(result);
     }
 
-    pub fn new() -> (impl Future<Output = Result<AnyCapability, RouteOrOpenError>>, Self) {
+    pub fn new() -> (impl Future<Output = Result<Capability, RouteOrOpenError>>, Self) {
         let (sender, receiver) = oneshot::channel();
         let fut = async move {
             let result: Result<_, Canceled> = receiver.await;
@@ -381,24 +369,28 @@ impl Completer {
     }
 }
 
-/// If the capability implements [`Routable`], then get a reference to that trait. Otherwise fail.
-fn try_get_routable<'a>(capability: &'a AnyCapability) -> Result<&'a dyn Routable, ()> {
-    // These are all the capability types that we know implements `Routable`.
-    // This approach will need to be revised once we have capability types
-    // outside of the sandbox and routing crates.
-    let result: Result<&Dict, _> = capability.try_into();
-    if let Ok(dict) = result {
-        return Ok(dict);
+fn try_routable_from_enum(capability: Capability) -> Option<Router> {
+    match capability {
+        Capability::Dictionary(c) => Some(Router::from_routable(c)),
+        Capability::Open(c) => Some(Router::from_routable(c)),
+        Capability::Router(c) => Some(Router::from_any(c)),
+        _ => None,
     }
-    let result: Result<&Open, _> = capability.try_into();
-    if let Ok(open) = result {
-        return Ok(open);
+}
+
+impl Routable for Capability {
+    fn route(&self, request: Request, completer: Completer) {
+        match try_routable_from_enum(self.clone()) {
+            Some(router) => router.route(request, completer),
+            None => {
+                if request.relative_path.is_empty() {
+                    completer.complete(Ok(self.clone()));
+                } else {
+                    completer.complete(Err(RoutingError::BedrockUnsupportedCapability.into()))
+                }
+            }
+        }
     }
-    let result: Result<&Router, _> = capability.try_into();
-    if let Ok(router) = result {
-        return Ok(router);
-    }
-    Err(())
 }
 
 /// Dictionary supports routing requests:
@@ -409,7 +401,7 @@ fn try_get_routable<'a>(capability: &'a AnyCapability) -> Result<&'a dyn Routabl
 impl Routable for Dict {
     fn route(&self, mut request: Request, completer: Completer) {
         let Some(name) = request.relative_path.next() else {
-            completer.complete(Ok(Box::new(self.clone())));
+            completer.complete(Ok(self.clone().into()));
             return;
         };
         let entries = self.lock_entries();
@@ -437,7 +429,7 @@ impl Routable for Open {
         if let Some(rights) = request.rights {
             open = open.downscope_rights(rights)
         }
-        completer.complete(Ok(Box::new(open) as AnyCapability));
+        completer.complete(Ok(open.into()));
     }
 }
 
@@ -448,7 +440,7 @@ impl Routable for Router {
 }
 
 /// Obtain a capability from `router`, following the description in `request`.
-pub async fn route(router: &Router, request: Request) -> Result<AnyCapability, RouteOrOpenError> {
+pub async fn route(router: &Router, request: Request) -> Result<Capability, RouteOrOpenError> {
     let (fut, completer) = Completer::new();
     router.route(request, completer);
     fut.await
@@ -488,12 +480,12 @@ impl Routable for PolicyCheckRouter {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use sandbox::{Data, Message, Receiver, Sender};
+    use sandbox::{Data, Message, Receiver};
     use std::iter;
 
     #[fuchsia::test]
     async fn availability_good() {
-        let source: AnyCapability = Box::new(Data::String("hello".to_string()));
+        let source: Capability = Data::String("hello".to_string()).into();
         let base = Router::from_routable(source);
         let proxy = base.with_availability(Availability::Optional);
         let capability = route(
@@ -507,13 +499,16 @@ mod tests {
         )
         .await
         .unwrap();
-        let capability: Data = capability.try_into().unwrap();
+        let capability = match capability {
+            Capability::Data(d) => d,
+            c => panic!("Bad enum {:#?}", c),
+        };
         assert_eq!(capability, Data::String("hello".to_string()));
     }
 
     #[fuchsia::test]
     async fn availability_bad() {
-        let source: AnyCapability = Box::new(Data::String("hello".to_string()));
+        let source: Capability = Data::String("hello".to_string()).into();
         let base = Router::from_routable(source);
         let proxy = base.with_availability(Availability::Optional);
         let error = route(
@@ -541,9 +536,8 @@ mod tests {
         // We want to test vending a sender with a router, dropping the associated receiver, and
         // then using the sender. The objective is to observe an error, and not panic.
         let (receiver, sender) = Receiver::new();
-        let router = Router::new(move |_request, completer| {
-            completer.complete(Ok(Box::new(sender.clone())))
-        });
+        let router =
+            Router::new(move |_request, completer| completer.complete(Ok(sender.clone().into())));
 
         let capability = route(
             &router,
@@ -556,7 +550,10 @@ mod tests {
         )
         .await
         .unwrap();
-        let sender: Sender = capability.try_into().unwrap();
+        let sender = match capability {
+            Capability::Sender(c) => c,
+            c => panic!("Bad enum {:#?}", c),
+        };
 
         drop(receiver);
         let (ch1, _ch2) = zx::Channel::create();
@@ -569,11 +566,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn with_path() {
-        let source: AnyCapability = Box::new(Data::String("hello".to_string()));
+        let source = Capability::Data(Data::String("hello".to_string()));
         let dict1 = Dict::new();
         dict1.lock_entries().insert("source".to_owned(), source);
         let dict2 = Dict::new();
-        dict2.lock_entries().insert("dict1".to_owned(), Box::new(dict1));
+        dict2.lock_entries().insert("dict1".to_owned(), Capability::Dictionary(dict1));
 
         let base_router = Router::from_routable(dict2);
         let downscoped_router = base_router.with_path(iter::once("dict1"));
@@ -589,21 +586,24 @@ mod tests {
         )
         .await
         .unwrap();
-        let capability: Data = capability.try_into().unwrap();
+        let capability = match capability {
+            Capability::Data(d) => d,
+            c => panic!("Bad enum {:#?}", c),
+        };
         assert_eq!(capability, Data::String("hello".to_string()));
     }
 
     #[fuchsia::test]
     async fn with_path_deep() {
-        let source: AnyCapability = Box::new(Data::String("hello".to_string()));
+        let source = Capability::Data(Data::String("hello".to_string()));
         let dict1 = Dict::new();
         dict1.lock_entries().insert("source".to_owned(), source);
         let dict2 = Dict::new();
-        dict2.lock_entries().insert("dict1".to_owned(), Box::new(dict1));
+        dict2.lock_entries().insert("dict1".to_owned(), Capability::Dictionary(dict1));
         let dict3 = Dict::new();
-        dict3.lock_entries().insert("dict2".to_owned(), Box::new(dict2));
+        dict3.lock_entries().insert("dict2".to_owned(), Capability::Dictionary(dict2));
         let dict4 = Dict::new();
-        dict4.lock_entries().insert("dict3".to_owned(), Box::new(dict3));
+        dict4.lock_entries().insert("dict3".to_owned(), Capability::Dictionary(dict3));
 
         let base_router = Router::from_routable(dict4);
         let downscoped_router = base_router.with_path(vec!["dict3", "dict2"].into_iter());
@@ -619,7 +619,10 @@ mod tests {
         )
         .await
         .unwrap();
-        let capability: Data = capability.try_into().unwrap();
+        let capability = match capability {
+            Capability::Data(d) => d,
+            c => panic!("Bad enum {:#?}", c),
+        };
         assert_eq!(capability, Data::String("hello".to_string()));
     }
 }

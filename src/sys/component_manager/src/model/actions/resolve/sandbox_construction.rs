@@ -21,7 +21,7 @@ use {
     cm_types::{IterablePath, Name},
     futures::future::{BoxFuture, FutureExt, Shared},
     moniker::{ChildName, ChildNameBase, MonikerBase},
-    sandbox::{Capability, Dict, ErasedCapability, Open, Unit},
+    sandbox::{Capability, Dict, Unit},
     std::{
         collections::HashMap,
         iter,
@@ -45,11 +45,12 @@ impl ComponentInput {
         Self { capabilities }
     }
 
-    pub fn insert_capability<'a, C>(&self, path: impl Iterator<Item = &'a str>, capability: C)
-    where
-        C: ErasedCapability + Capability,
-    {
-        self.capabilities.insert_capability(path, capability)
+    pub fn insert_capability<'a>(
+        &self,
+        path: impl Iterator<Item = &'a str>,
+        capability: Capability,
+    ) {
+        self.capabilities.insert_capability(path, capability.into())
     }
 }
 
@@ -131,11 +132,13 @@ pub fn build_component_sandbox(
                 _placeholder_dict = Some(
                     entries
                         .entry(name.to_string())
-                        .or_insert_with(|| Box::new(Dict::new()))
+                        .or_insert_with(|| Capability::Dictionary(Dict::new()))
                         .clone(),
                 );
-                let ref_: &mut Dict =
-                    _placeholder_dict.as_mut().unwrap().try_into().expect("wrong type in dict");
+                let ref_: &mut Dict = match _placeholder_dict.as_mut().unwrap() {
+                    Capability::Dictionary(d) => d,
+                    _ => panic!("wrong type in dict"),
+                };
                 ref_
             }
         };
@@ -187,7 +190,8 @@ fn extend_dict_with_capability(
                 },
                 component.policy_checker().clone(),
             );
-            program_output_dict.insert_capability(iter::once(capability.name().as_str()), router);
+            program_output_dict
+                .insert_capability(iter::once(capability.name().as_str()), router.into());
         }
         cm_rust::CapabilityDecl::Dictionary(d) => {
             extend_dict_with_dictionary(
@@ -252,8 +256,8 @@ fn extend_dict_with_dictionary(
     } else {
         Router::from_routable(dict.clone())
     };
-    declared_dictionaries.insert_capability(iter::once(decl.name.as_str()), dict);
-    program_output_dict.insert_capability(iter::once(decl.name.as_str()), router);
+    declared_dictionaries.insert_capability(iter::once(decl.name.as_str()), dict.into());
+    program_output_dict.insert_capability(iter::once(decl.name.as_str()), router.into());
 }
 
 /// Returns a [Router] that merges the contents of the [Dict] returned by
@@ -298,9 +302,11 @@ fn make_dict_extending_router(
                         availability: cm_types::Availability::Required,
                         target: component.as_weak(),
                     };
-                    let source_dict: Dict = router::route(&source_dict_router, source_request)
-                        .await
-                        .map(|d| d.try_into().expect("source_dict_router must return a Dict"))?;
+                    let source_dict =
+                        match router::route(&source_dict_router, source_request).await? {
+                            Capability::Dictionary(d) => d,
+                            _ => panic!("source_dict_router must return a Dict"),
+                        };
                     let mut entries = dict.lock_entries();
                     let source_entries = source_dict.lock_entries();
                     for source_key in source_entries.keys() {
@@ -449,7 +455,7 @@ fn extend_dict_with_use(
     };
     program_input_dict.insert_capability(
         use_protocol.target_path.iter_segments(),
-        router.with_availability(*use_.availability()),
+        router.with_availability(*use_.availability()).into(),
     );
 }
 
@@ -499,9 +505,9 @@ fn use_from_parent_router(
             let router = state
                 .incoming_dict
                 .as_ref()
-                .and_then(|dict| {
-                    dict.get_capability::<Open>(source_path.iter_segments())
-                        .map(Router::from_routable)
+                .and_then(|dict| match dict.get_capability(source_path.iter_segments()) {
+                    Some(Capability::Open(o)) => Some(Router::from_routable(o)),
+                    _ => None,
                 })
                 // Try to get the capability from the component input dict, created from static
                 // routes when the component was resolved.
@@ -600,7 +606,7 @@ fn extend_dict_with_offer(
     };
     target_dict.insert_capability(
         iter::once(target_name.as_str()),
-        router.with_availability(*offer.availability()),
+        router.with_availability(*offer.availability()).into(),
     );
 }
 
@@ -684,12 +690,12 @@ fn extend_dict_with_expose(
     };
     target_dict.insert_capability(
         iter::once(target_name.as_str()),
-        router.with_availability(*expose.availability()),
+        router.with_availability(*expose.availability()).into(),
     );
 }
 
 fn new_unit_router() -> Router {
-    Router::new(|_: Request, completer: Completer| completer.complete(Ok(Box::new(Unit {}))))
+    Router::new(|_: Request, completer: Completer| completer.complete(Ok(Unit {}.into())))
 }
 
 fn new_forwarding_router_to_child(

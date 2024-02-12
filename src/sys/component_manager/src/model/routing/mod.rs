@@ -25,7 +25,7 @@ use {
     fidl::epitaph::ChannelEpitaphExt,
     fuchsia_zircon as zx,
     moniker::MonikerBase,
-    sandbox::{AnyCapability, Open, Unit},
+    sandbox::{Capability, Open},
     std::{collections::BTreeMap, sync::Arc},
     tracing::{debug, info, warn},
 };
@@ -58,15 +58,14 @@ fn check_source_for_void(source: &CapabilitySource) -> Result<(), RouteOrOpenErr
     Ok(())
 }
 
-pub(super) fn capability_into_open(capability: AnyCapability) -> Result<Open, RouteOrOpenError> {
-    if let Ok(_) = Unit::try_from(capability.clone()) {
-        return Err(RoutingError::SourceCapabilityIsVoid.into());
-    };
-    let open: Open = capability
-        .try_into_open()
-        .map_err(crate::model::error::BedrockOpenError::from)
-        .map_err(crate::model::error::OpenError::from)?;
-    Ok(open)
+pub(super) fn capability_into_open(capability: Capability) -> Result<Open, RouteOrOpenError> {
+    match capability {
+        Capability::Unit(_) => Err(RoutingError::SourceCapabilityIsVoid.into()),
+        cap => Ok(cap
+            .try_into_open()
+            .map_err(crate::model::error::BedrockOpenError::from)
+            .map_err(crate::model::error::OpenError::from)?),
+    }
 }
 
 /// Routes a capability from `target` to its source. Opens the capability if routing succeeds.

@@ -24,15 +24,15 @@ use vfs::{
     path::Path,
 };
 
-use crate::{registry, AnyCapability, Capability, ConversionError, Open};
+use crate::{registry, Capability, CapabilityTrait, ConversionError, Open};
 
 pub type Key = String;
 
 /// A capability that represents a dictionary of capabilities.
-#[derive(Capability, Derivative)]
+#[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Dict {
-    entries: Arc<Mutex<BTreeMap<Key, AnyCapability>>>,
+    entries: Arc<Mutex<BTreeMap<Key, Capability>>>,
 
     /// When an external request tries to access a non-existent entry,
     /// this closure will be invoked with the name of the entry.
@@ -89,7 +89,7 @@ impl Dict {
         }
     }
 
-    pub fn lock_entries(&self) -> MutexGuard<'_, BTreeMap<Key, AnyCapability>> {
+    pub fn lock_entries(&self) -> MutexGuard<'_, BTreeMap<Key, Capability>> {
         self.entries.lock().unwrap()
     }
 
@@ -113,7 +113,7 @@ impl Dict {
                 fsandbox::DictionaryRequest::Insert { key, value, responder, .. } => {
                     let result = match self.lock_entries().entry(key) {
                         Entry::Occupied(_) => Err(fsandbox::DictionaryError::AlreadyExists),
-                        Entry::Vacant(entry) => match AnyCapability::try_from(value) {
+                        Entry::Vacant(entry) => match Capability::try_from(value) {
                             Ok(cap) => {
                                 entry.insert(cap);
                                 Ok(())
@@ -211,7 +211,7 @@ impl Dict {
 
         // Move this capability into the registry.
         let task = fasync::Task::spawn(fut);
-        registry::insert_with_task(Box::new(self), koid, task);
+        registry::insert_with_task(self.into(), koid, task);
     }
 
     /// Sets this Dict's client end to the provided one.
@@ -240,7 +240,7 @@ impl From<Dict> for fsandbox::Capability {
     }
 }
 
-impl Capability for Dict {
+impl CapabilityTrait for Dict {
     /// Convert this [Dict] capability into [Open] by recursively converting the entries
     /// to [Open], then building a VFS directory where each entry is a remote VFS node.
     /// The resulting [Open] capability will speak `fuchsia.io/Directory` when remoted.
@@ -277,12 +277,12 @@ impl Capability for Dict {
 
 /// Serves the `fuchsia.sandbox.DictionaryIterator` protocol, providing items from the given iterator.
 async fn serve_dict_iterator(
-    items: Vec<(Key, AnyCapability)>,
+    items: Vec<(Key, Capability)>,
     mut stream: fsandbox::DictionaryIteratorRequestStream,
 ) {
     let mut chunks = items
         .chunks(fsandbox::MAX_DICTIONARY_ITEMS_CHUNK as usize)
-        .map(|chunk: &[(Key, AnyCapability)]| chunk.to_vec())
+        .map(|chunk: &[(Key, Capability)]| chunk.to_vec())
         .collect::<Vec<_>>()
         .into_iter();
 
@@ -353,9 +353,9 @@ mod tests {
         assert_eq!(entries.len(), 1);
 
         // The entry that was inserted should now be in `entries`.
-        let any = entries.remove(CAP_KEY).expect("not in entries after insert");
-        let cap: Unit = any.try_into().unwrap();
-        assert_eq!(cap, Unit::default());
+        let cap = entries.remove(CAP_KEY).expect("not in entries after insert");
+        let Capability::Unit(unit) = cap else { panic!("Bad capability type: {:#?}", cap) };
+        assert_eq!(unit, Unit::default());
 
         Ok(())
     }
@@ -369,7 +369,7 @@ mod tests {
         // Insert a Unit into the Dict.
         {
             let mut entries = dict.lock_entries();
-            entries.insert(CAP_KEY.to_string(), Box::new(Unit::default()));
+            entries.insert(CAP_KEY.to_string(), Capability::Unit(Unit::default()));
             assert_eq!(entries.len(), 1);
         }
 
@@ -405,7 +405,7 @@ mod tests {
         // Insert a Unit into the Dict.
         {
             let mut entries = dict.lock_entries();
-            entries.insert(CAP_KEY.to_string(), Box::new(Unit::default()));
+            entries.insert(CAP_KEY.to_string(), Capability::Unit(Unit::default()));
             assert_eq!(entries.len(), 1);
         }
 
@@ -533,22 +533,22 @@ mod tests {
     async fn copy() -> Result<()> {
         // Create a Dict with a Unit inside, and copy the Dict.
         let dict = Dict::new();
-        dict.lock_entries().insert("unit1".to_string(), Box::new(Unit::default()));
+        dict.lock_entries().insert("unit1".to_string(), Capability::Unit(Unit::default()));
 
         let copy = dict.copy();
 
         // Insert a Unit into the copy.
-        copy.lock_entries().insert("unit2".to_string(), Box::new(Unit::default()));
+        copy.lock_entries().insert("unit2".to_string(), Capability::Unit(Unit::default()));
 
         // The copy should have two Units.
         let copy_entries = copy.lock_entries();
         assert_eq!(copy_entries.len(), 2);
-        assert!(copy_entries.values().all(|value| (**value).as_any().is::<Unit>()));
+        assert!(copy_entries.values().all(|value| matches!(value, Capability::Unit(_))));
 
         // The original Dict should have only one Unit.
         let entries = dict.lock_entries();
         assert_eq!(entries.len(), 1);
-        assert!(entries.values().all(|value| (**value).as_any().is::<Unit>()));
+        assert!(entries.values().all(|value| matches!(value, Capability::Unit(_))));
 
         Ok(())
     }
@@ -562,7 +562,7 @@ mod tests {
         // Add a Unit into the clone.
         {
             let mut clone_entries = dict_clone.lock_entries();
-            clone_entries.insert(CAP_KEY.to_string(), Box::new(Unit::default()));
+            clone_entries.insert(CAP_KEY.to_string(), Capability::Unit(Unit::default()));
             assert_eq!(clone_entries.len(), 1);
         }
 
@@ -577,7 +577,7 @@ mod tests {
     #[fuchsia::test]
     async fn fidl_clone() -> Result<()> {
         let dict = Dict::new();
-        dict.lock_entries().insert(CAP_KEY.to_string(), Box::new(Unit::default()));
+        dict.lock_entries().insert(CAP_KEY.to_string(), Capability::Unit(Unit::default()));
 
         let client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
         let dict_proxy = client_end.into_proxy().unwrap();
@@ -604,8 +604,8 @@ mod tests {
             fsandbox::Capability::Dictionary(ClientEnd::<fsandbox::DictionaryMarker>::new(
                 dict_proxy.into_channel().unwrap().into_zx_channel(),
             ));
-        let any: AnyCapability = fidl_capability.try_into().unwrap();
-        let dict: Dict = any.try_into().unwrap();
+        let any: Capability = fidl_capability.try_into().unwrap();
+        let dict = assert_matches!(any, Capability::Dictionary(c) => c);
 
         // The original dict should now have zero entries because the Unit was removed.
         let entries = dict.lock_entries();
@@ -631,7 +631,7 @@ mod tests {
         {
             let mut entries = dict.lock_entries();
             for i in 0..NUM_ENTRIES {
-                entries.insert(format!("{}", i), Box::new(Unit::default()));
+                entries.insert(format!("{}", i), Capability::Unit(Unit::default()));
             }
         }
 
@@ -668,7 +668,7 @@ mod tests {
     #[fuchsia::test]
     async fn try_into_open_error_not_supported() {
         let dict = Dict::new();
-        dict.lock_entries().insert(CAP_KEY.to_string(), Box::new(Unit::default()));
+        dict.lock_entries().insert(CAP_KEY.to_string(), Capability::Unit(Unit::default()));
         assert_matches!(dict.try_into_open(), Err(ConversionError::Nested { .. }));
     }
 
@@ -686,7 +686,7 @@ mod tests {
         let dict = Dict::new();
         // This string is too long to be a valid fuchsia.io name.
         let bad_name = "a".repeat(10000);
-        dict.lock_entries().insert(bad_name, Box::new(placeholder_open));
+        dict.lock_entries().insert(bad_name, Capability::Open(placeholder_open));
         assert_matches!(dict.try_into_open(), Err(ConversionError::ParseName(_)));
     }
 
@@ -709,7 +709,7 @@ mod tests {
             fio::DirentType::Directory,
         );
         let dict = Dict::new();
-        dict.lock_entries().insert(CAP_KEY.to_string(), Box::new(open));
+        dict.lock_entries().insert(CAP_KEY.to_string(), Capability::Open(open));
         let dict_open = dict.try_into_open().expect("convert dict into Open capability");
 
         let remote = dict_open.into_remote();
@@ -749,9 +749,9 @@ mod tests {
             fio::DirentType::Directory,
         );
         let inner_dict = Dict::new();
-        inner_dict.lock_entries().insert(CAP_KEY.to_string(), Box::new(open));
+        inner_dict.lock_entries().insert(CAP_KEY.to_string(), Capability::Open(open));
         let dict = Dict::new();
-        dict.lock_entries().insert(CAP_KEY.to_string(), Box::new(inner_dict));
+        dict.lock_entries().insert(CAP_KEY.to_string(), Capability::Dictionary(inner_dict));
 
         let dict_open = dict.try_into_open().expect("convert dict into Open capability");
 

@@ -4,10 +4,10 @@
 use fidl_fuchsia_component_sandbox as fsandbox;
 use std::fmt::Debug;
 
-use crate::{Capability, RemoteError};
+use crate::{CapabilityTrait, RemoteError};
 
 /// A capability that holds immutable data.
-#[derive(Capability, Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Data {
     Bytes(Vec<u8>),
     String(String),
@@ -15,7 +15,7 @@ pub enum Data {
     Uint64(u64),
 }
 
-impl Capability for Data {}
+impl CapabilityTrait for Data {}
 
 impl TryFrom<fsandbox::DataCapability> for Data {
     type Error = RemoteError;
@@ -51,28 +51,16 @@ impl From<Data> for fsandbox::Capability {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::AnyCapability;
-
-    #[test]
-    fn try_from_any_into_self() {
-        let data: Data = Data::Int64(1);
-        let any: AnyCapability = Box::new(data);
-        let data_back: Data = any.try_into().unwrap();
-        assert_eq!(data_back, Data::Int64(1));
-
-        let data: Data = Data::String("abc".to_string());
-        let any: AnyCapability = Box::new(data);
-        let data_back: Data = any.try_into().unwrap();
-        assert_eq!(data_back, Data::String("abc".to_string()));
-    }
+    use crate::Capability;
+    use assert_matches::assert_matches;
 
     #[test]
     fn clone() {
         let data: Data = Data::String("abc".to_string());
-        let any: AnyCapability = Box::new(data);
+        let any: Capability = data.into();
         let clone = any.clone();
-        let data_back: Data = any.try_into().unwrap();
-        let clone_data_back: Data = clone.try_into().unwrap();
+        let data_back = assert_matches!(any, Capability::Data(d) => d);
+        let clone_data_back = assert_matches!(clone, Capability::Data(d) => d);
         assert_eq!(data_back, clone_data_back);
     }
 }

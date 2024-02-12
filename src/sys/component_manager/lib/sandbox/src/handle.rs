@@ -10,10 +10,10 @@ use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::TryStreamExt;
 use std::sync::{Arc, Mutex};
 
-use crate::{registry, Capability, ConversionError, Open};
+use crate::{registry, CapabilityTrait, ConversionError, Open};
 
 /// A capability that vends a single Zircon handle.
-#[derive(Capability, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct OneShotHandle(Arc<Mutex<Option<zx::Handle>>>);
 
 impl OneShotHandle {
@@ -69,11 +69,11 @@ impl OneShotHandle {
 
         // Move this capability into the registry.
         let task = fasync::Task::spawn(fut);
-        registry::insert_with_task(Box::new(self), koid, task);
+        registry::insert_with_task(self.into(), koid, task);
     }
 }
 
-impl Capability for OneShotHandle {
+impl CapabilityTrait for OneShotHandle {
     /// Attempts to convert into an Open that calls `fuchsia.io.Openable/Open` on the handle.
     ///
     /// The handle must be a channel that speaks the `Openable` protocol.
@@ -127,7 +127,7 @@ impl From<OneShotHandle> for fsandbox::Capability {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::AnyCapability;
+    use crate::Capability;
     use anyhow::{Context, Result};
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, create_proxy_and_stream, Proxy};
@@ -201,9 +201,8 @@ mod tests {
         // Convert the OneShotHandle to FIDL and back.
         let fidl_capability: fsandbox::Capability = one_shot.into();
 
-        let any: AnyCapability =
-            fidl_capability.try_into().context("failed to convert from FIDL")?;
-        let one_shot: OneShotHandle = any.try_into().unwrap();
+        let any: Capability = fidl_capability.try_into().context("failed to convert from FIDL")?;
+        let one_shot = assert_matches!(any, Capability::OneShotHandle(h) => h);
 
         // Get the handle.
         let handle = one_shot.get_handle().unwrap();
@@ -245,8 +244,8 @@ mod tests {
             handle_cap_proxy.into_channel().unwrap().into_zx_channel(),
         );
         let fidl_capability = fsandbox::Capability::Handle(handle_cap_client_end);
-        let any: AnyCapability = fidl_capability.try_into().unwrap();
-        let one_shot: OneShotHandle = any.try_into().unwrap();
+        let any: Capability = fidl_capability.try_into().unwrap();
+        let one_shot = assert_matches!(any, Capability::OneShotHandle(h) => h);
 
         // The original OneShotHandle should now not have a handle because it was taken
         // out by the GetHandle call on the clone.

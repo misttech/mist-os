@@ -24,7 +24,7 @@ use {
     futures::future::BoxFuture,
     futures::FutureExt,
     lazy_static::lazy_static,
-    sandbox::{AnyCapability, Capability, Dict, ErasedCapability, Open},
+    sandbox::{Capability, Dict, Open},
     std::iter,
     std::sync::{self, Arc},
     tracing::warn,
@@ -88,18 +88,14 @@ pub trait DictExt {
     fn get_or_insert_sub_dict<'a>(&self, path: impl Iterator<Item = &'a str>) -> Dict;
 
     /// Returns the capability at the path, if it exists. Returns `None` if path is empty.
-    fn get_capability<'a, C>(&self, path: impl Iterator<Item = &'a str>) -> Option<C>
-    where
-        C: ErasedCapability + Capability;
+    fn get_capability<'a>(&self, path: impl Iterator<Item = &'a str>) -> Option<Capability>;
 
     /// Returns a [Router] configured to route at `path`, if one exists at `path.first()`. /
     /// Returns None otherwise.
     fn get_router<'a>(&self, path: impl DoubleEndedIterator<Item = &'a str>) -> Option<Router>;
 
     /// Inserts the capability at the path. Intermediary dictionaries are created as needed.
-    fn insert_capability<'a, C>(&self, path: impl Iterator<Item = &'a str>, capability: C)
-    where
-        C: ErasedCapability + Capability;
+    fn insert_capability<'a>(&self, path: impl Iterator<Item = &'a str>, capability: Capability);
 
     /// Removes the capability at the path, if it exists.
     fn remove_capability<'a>(&self, path: impl Iterator<Item = &'a str>);
@@ -111,17 +107,14 @@ impl DictExt for Dict {
         let sub_dict: Dict = self
             .lock_entries()
             .entry(next_name.to_string())
-            .or_insert(Box::new(Dict::new()))
+            .or_insert(Capability::Dictionary(Dict::new()))
             .clone()
-            .try_into()
+            .to_dictionary()
             .unwrap();
         sub_dict.get_or_insert_sub_dict(path)
     }
 
-    fn get_capability<'a, C>(&self, mut path: impl Iterator<Item = &'a str>) -> Option<C>
-    where
-        C: ErasedCapability + Capability,
-    {
+    fn get_capability<'a>(&self, mut path: impl Iterator<Item = &'a str>) -> Option<Capability> {
         let Some(mut current_name) = path.next() else { return None };
         let mut current_dict = self.clone();
         loop {
@@ -131,34 +124,29 @@ impl DictExt for Dict {
                     let sub_dict = current_dict
                         .lock_entries()
                         .get(&current_name.to_string())
-                        .and_then(|value| value.clone().try_into().ok())?;
+                        .and_then(|value| value.clone().to_dictionary())?;
                     current_dict = sub_dict;
 
                     current_name = next_name;
                 }
-                None => {
-                    return current_dict
-                        .lock_entries()
-                        .get(&current_name.to_string())
-                        .cloned()
-                        .and_then(|v| v.try_into().ok());
-                }
+                None => return current_dict.lock_entries().get(&current_name.to_string()).cloned(),
             }
         }
     }
 
     fn get_router<'a>(&self, mut path: impl DoubleEndedIterator<Item = &'a str>) -> Option<Router> {
         let first = path.next().unwrap();
-        let Some(router) = self.get_capability::<Router>(iter::once(first)) else {
-            return None;
-        };
-        Some(router.with_path(path))
+        match self.get_capability(iter::once(first)) {
+            Some(Capability::Router(r)) => Some(Router::from_any(r).with_path(path)),
+            _ => None,
+        }
     }
 
-    fn insert_capability<'a, C>(&self, mut path: impl Iterator<Item = &'a str>, capability: C)
-    where
-        C: ErasedCapability + Capability,
-    {
+    fn insert_capability<'a>(
+        &self,
+        mut path: impl Iterator<Item = &'a str>,
+        capability: Capability,
+    ) {
         let mut current_name = path.next().expect("path must be non-empty");
         let mut current_dict = self.clone();
         loop {
@@ -168,18 +156,16 @@ impl DictExt for Dict {
                     let sub_dict = current_dict
                         .lock_entries()
                         .entry(current_name.to_string())
-                        .or_insert(Box::new(Dict::new()))
+                        .or_insert(Capability::Dictionary(Dict::new()))
                         .clone()
-                        .try_into()
+                        .to_dictionary()
                         .unwrap();
                     current_dict = sub_dict;
 
                     current_name = next_name;
                 }
                 None => {
-                    current_dict
-                        .lock_entries()
-                        .insert(current_name.to_string(), Box::new(capability));
+                    current_dict.lock_entries().insert(current_name.to_string(), capability);
                     return;
                 }
             }
@@ -195,7 +181,7 @@ impl DictExt for Dict {
                     let sub_dict = current_dict
                         .lock_entries()
                         .get(&current_name.to_string())
-                        .and_then(|value| value.clone().try_into().ok());
+                        .and_then(|value| value.clone().to_dictionary());
                     if sub_dict.is_none() {
                         // The capability doesn't exist, there's nothing to remove.
                         return;
@@ -274,7 +260,7 @@ impl LaunchTaskOnReceive {
     pub fn into_router(self) -> Router {
         let me = Arc::new(self);
         Router::new(move |request: Request, completer: Completer| {
-            completer.complete(Ok(Box::new(me.clone().into_open(request.target)) as AnyCapability));
+            completer.complete(Ok(me.clone().into_open(request.target).into()));
         })
     }
 
@@ -424,45 +410,43 @@ pub mod tests {
     #[fuchsia::test]
     async fn get_capability() {
         let sub_dict = Dict::new();
-        sub_dict.lock_entries().insert("bar".to_string(), Box::new(Dict::new()));
+        sub_dict.lock_entries().insert("bar".to_string(), Capability::Dictionary(Dict::new()));
         let (receiver, _) = Receiver::new();
-        sub_dict.lock_entries().insert("baz".to_string(), Box::new(receiver));
+        sub_dict.lock_entries().insert("baz".to_string(), Capability::Receiver(receiver));
 
         let test_dict = Dict::new();
-        test_dict.lock_entries().insert("foo".to_string(), Box::new(sub_dict));
+        test_dict.lock_entries().insert("foo".to_string(), Capability::Dictionary(sub_dict));
 
-        assert!(test_dict.get_capability::<Dict>(iter::empty()).is_none());
-        assert!(test_dict.get_capability::<Dict>(iter::once("nonexistent")).is_none());
-        assert!(test_dict.get_capability::<Dict>(iter::once("foo")).is_some());
-        assert!(test_dict.get_capability::<Router>(iter::once("foo")).is_none());
-        assert!(test_dict.get_capability::<Dict>(["foo", "bar"].into_iter()).is_some());
-        assert!(test_dict.get_capability::<Dict>(["foo", "nonexistent"].into_iter()).is_none());
-        assert!(test_dict.get_capability::<Dict>(["foo", "baz"].into_iter()).is_none());
-        assert!(test_dict.get_capability::<Receiver>(["foo", "baz"].into_iter()).is_some());
+        assert!(test_dict.get_capability(iter::empty()).is_none());
+        assert!(test_dict.get_capability(iter::once("nonexistent")).is_none());
+        assert!(test_dict.get_capability(iter::once("foo")).is_some());
+        assert!(test_dict.get_capability(["foo", "bar"].into_iter()).is_some());
+        assert!(test_dict.get_capability(["foo", "nonexistent"].into_iter()).is_none());
+        assert!(test_dict.get_capability(["foo", "baz"].into_iter()).is_some());
     }
 
     #[fuchsia::test]
     async fn insert_capability() {
         let test_dict = Dict::new();
-        test_dict.insert_capability(["foo", "bar"].into_iter(), Dict::new());
-        assert!(test_dict.get_capability::<Dict>(["foo", "bar"].into_iter()).is_some());
+        test_dict.insert_capability(["foo", "bar"].into_iter(), Dict::new().into());
+        assert!(test_dict.get_capability(["foo", "bar"].into_iter()).is_some());
 
         let (receiver, _) = Receiver::new();
-        test_dict.insert_capability(["foo", "baz"].into_iter(), receiver);
-        assert!(test_dict.get_capability::<Receiver>(["foo", "baz"].into_iter()).is_some());
+        test_dict.insert_capability(["foo", "baz"].into_iter(), receiver.into());
+        assert!(test_dict.get_capability(["foo", "baz"].into_iter()).is_some());
     }
 
     #[fuchsia::test]
     async fn remove_capability() {
         let test_dict = Dict::new();
-        test_dict.insert_capability(["foo", "bar"].into_iter(), Dict::new());
-        assert!(test_dict.get_capability::<Dict>(["foo", "bar"].into_iter()).is_some());
+        test_dict.insert_capability(["foo", "bar"].into_iter(), Dict::new().into());
+        assert!(test_dict.get_capability(["foo", "bar"].into_iter()).is_some());
 
         test_dict.remove_capability(["foo", "bar"].into_iter());
-        assert!(test_dict.get_capability::<Dict>(["foo", "bar"].into_iter()).is_none());
-        assert!(test_dict.get_capability::<Dict>(["foo"].into_iter()).is_some());
+        assert!(test_dict.get_capability(["foo", "bar"].into_iter()).is_none());
+        assert!(test_dict.get_capability(["foo"].into_iter()).is_some());
 
         test_dict.remove_capability(iter::once("foo"));
-        assert!(test_dict.get_capability::<Dict>(["foo"].into_iter()).is_none());
+        assert!(test_dict.get_capability(["foo"].into_iter()).is_none());
     }
 }

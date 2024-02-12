@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{registry, Capability, Message, Sender};
+use crate::{registry, CapabilityTrait, Message, Sender};
 use derivative::Derivative;
 use fidl::endpoints::{create_proxy, Proxy, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
@@ -17,7 +17,7 @@ use std::pin::pin;
 use std::sync::Arc;
 
 /// A capability that transfers another capability to a [Sender].
-#[derive(Capability, Derivative)]
+#[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Receiver {
     /// `inner` uses an async mutex because it will be locked across an await point
@@ -82,7 +82,7 @@ impl Receiver {
 
         // Move this capability into the registry.
         let task = fasync::Task::spawn(fut);
-        registry::insert_with_task(Box::new(self), koid, task);
+        registry::insert_with_task(self.into(), koid, task);
     }
 
     /// Sets this Receiver's server end to the provided one.
@@ -94,7 +94,7 @@ impl Receiver {
     }
 }
 
-impl Capability for Receiver {}
+impl CapabilityTrait for Receiver {}
 
 impl From<Receiver> for ServerEnd<fsandbox::ReceiverMarker> {
     fn from(mut receiver: Receiver) -> Self {

@@ -16,7 +16,7 @@ use {
     fuchsia_zircon::AsHandleRef,
     futures::prelude::*,
     lazy_static::lazy_static,
-    sandbox::{AnyCapability, Dict, Open, Receiver},
+    sandbox::{Capability, Dict, Open, Receiver},
     std::sync::Arc,
     tracing::warn,
 };
@@ -128,7 +128,7 @@ impl FactoryCapabilityHost {
         let dict = Dict::new();
         let mut entries = dict.lock_entries();
         for item in items {
-            let cap = AnyCapability::try_from(item.value)
+            let cap = Capability::try_from(item.value)
                 .map_err(|_| fsandbox::DictionaryError::BadCapability)?;
             if entries.insert(item.key, cap).is_some() {
                 return Err(fsandbox::DictionaryError::AlreadyExists);

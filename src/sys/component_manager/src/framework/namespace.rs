@@ -18,7 +18,7 @@ use {
     },
     lazy_static::lazy_static,
     namespace::{self, NamespaceError},
-    sandbox::AnyCapability,
+    sandbox::Capability,
     serve_processargs::{BuildNamespaceError, NamespaceBuilder},
     std::sync::Arc,
     tracing::warn,
@@ -113,7 +113,7 @@ impl NamespaceCapabilityHost {
             let items: Vec<_> =
                 dict.read().await.map_err(|_| fcomponent::NamespaceError::DictionaryRead)?;
             for item in items {
-                let capability: AnyCapability = item.value.try_into().unwrap();
+                let capability: Capability = item.value.try_into().unwrap();
                 let path = namespace::Path::new(format!("{}/{}", path, item.key))
                     .map_err(|_| fcomponent::NamespaceError::BadEntry)?;
                 namespace_builder.add_object(capability, &path).map_err(Self::error_to_fidl)?;
@@ -175,7 +175,7 @@ mod tests {
         fuchsia_async as fasync,
         fuchsia_component::client,
         futures::TryStreamExt,
-        sandbox::{Dict, Receiver},
+        sandbox::{Capability, Dict, Receiver},
     };
 
     async fn handle_echo_request_stream(response: &str, mut stream: fecho::EchoRequestStream) {
@@ -218,7 +218,8 @@ mod tests {
 
             // Create a dictionary and add the Sender to it.
             let mut dict = Dict::new();
-            dict.lock_entries().insert(fecho::EchoMarker::DEBUG_NAME.to_string(), Box::new(sender));
+            dict.lock_entries()
+                .insert(fecho::EchoMarker::DEBUG_NAME.to_string(), Capability::Sender(sender));
 
             let (dict_proxy, stream) =
                 endpoints::create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
@@ -283,7 +284,8 @@ mod tests {
 
             // Create a dictionary and add the Sender to it.
             let mut dict = Dict::new();
-            dict.lock_entries().insert(fecho::EchoMarker::DEBUG_NAME.to_string(), Box::new(sender));
+            dict.lock_entries()
+                .insert(fecho::EchoMarker::DEBUG_NAME.to_string(), Capability::Sender(sender));
 
             let (dict_proxy, stream) =
                 endpoints::create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
