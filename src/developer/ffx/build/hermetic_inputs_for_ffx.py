@@ -9,7 +9,7 @@ import sys
 from typing import List
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Generate a hermetic inputs file for ffx_action by reading the sdk"
         "manifest and generating a list of all the files that are mentioned"
@@ -46,6 +46,7 @@ def main():
         inputs.extend(additional_inputs)
     for input in inputs:
         args.output.write(input + "\n")
+    return 0
 
 
 if __name__ == "__main__":

@@ -14,16 +14,16 @@ import tempfile
 from jinja2 import Environment, FileSystemLoader
 
 
-def to_camel_case(snake_str):
+def to_camel_case(snake_str: str) -> str:
     components = snake_str.split("_")
     return "".join(x.title() for x in components[0:])
 
 
-def wrap_deps(dep):
+def wrap_deps(dep: str) -> dict[str, str]:
     return {"enum": to_camel_case(dep), "lib": dep}
 
 
-def main(args_list=None):
+def main(args_list: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Generate FFX Plugin matcher")
 
     parser.add_argument(
@@ -93,6 +93,7 @@ def main(args_list=None):
             temp_file.name, args.out, shallow=False
         ):
             shutil.copyfile(temp_file.name, args.out)
+    return 0
 
 
 if __name__ == "__main__":

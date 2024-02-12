@@ -9,7 +9,7 @@ import sys
 from jinja2 import Environment, FileSystemLoader
 
 
-def main(args_list=None):
+def main(args_list: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Generate FFX Services Register Macro"
     )
@@ -35,8 +35,10 @@ def main(args_list=None):
         args = parser.parse_args()
 
     # Zip together deps with their full path.
-    deps = zip(args.deps.split(","), args.deps_full.split(","))
-    deps = list(map(lambda i: {"lib": i[0], "target": i[1]}, deps))
+    deps: list[dict[str, str]] = list(
+        dict(zip(("lib", "target"), i))
+        for i in zip(args.deps.split(","), args.deps_full.split(","))
+    )
 
     template_dir, template_name = os.path.split(args.template)
     env = Environment(
@@ -48,6 +50,7 @@ def main(args_list=None):
     with open(args.out, "w") as f:
         render = template.render(deps=deps)
         f.write(render)
+    return 0
 
 
 if __name__ == "__main__":
