@@ -658,6 +658,7 @@ pub(crate) mod testutil {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) trait FakeInstantRange: Debug {
         fn contains(&self, i: FakeInstant) -> bool;
 
@@ -1416,6 +1417,7 @@ pub(crate) mod testutil {
         ) -> O;
     }
 
+    #[allow(dead_code)]
     pub(crate) trait WithFakeFrameContext<SendMeta> {
         fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<SendMeta>) -> O>(
             &mut self,
@@ -1716,6 +1718,7 @@ pub(crate) mod testutil {
     }
 
     /// A context which can be used with a [`FakeNetwork`].
+    #[allow(dead_code)]
     pub(crate) trait FakeNetworkContext {
         /// The type of timer IDs installed by this context.
         type TimerId;
@@ -1744,6 +1747,7 @@ pub(crate) mod testutil {
     /// frame's sending metadata - including its context, local state, and
     /// `SendMeta` - to the set of appropriate receivers, each represented by
     /// a context ID, receive metadata, and latency.
+    #[allow(dead_code)]
     pub(crate) trait FakeNetworkLinks<SendMeta, RecvMeta, CtxId> {
         fn map_link(&self, ctx: CtxId, meta: SendMeta) -> Vec<(CtxId, RecvMeta, Option<Duration>)>;
     }
@@ -1794,6 +1798,7 @@ pub(crate) mod testutil {
     /// Error type that marks that one of the `run_until` family of functions
     /// reached a maximum number of iterations.
     #[derive(Debug)]
+    #[allow(dead_code)]
     pub(crate) struct LoopLimitReachedError;
 
     #[cfg(test)]

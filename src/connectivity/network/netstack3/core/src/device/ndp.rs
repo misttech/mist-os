@@ -1021,6 +1021,7 @@ mod tests {
         assert_eq!(ctx.trigger_next_timer(), None);
     }
 
+    #[allow(dead_code)]
     trait UnwrapNdp<B: ByteSlice> {
         fn unwrap_ndp(self) -> NdpPacket<B>;
     }

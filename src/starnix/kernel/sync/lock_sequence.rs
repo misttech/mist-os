@@ -532,6 +532,7 @@ mod test {
     }
 
     #[derive(Debug)]
+    #[allow(dead_code)]
     struct NotPresent;
 
     #[test]

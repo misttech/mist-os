@@ -48,6 +48,7 @@ const HERMETIC_NETWORK_V3_URL: &'static str = "#meta/hermetic_network_v3.cm";
 /// the metric only needs to be a sensible value.
 const DEFAULT_METRIC: u32 = 100;
 
+#[allow(dead_code)]
 trait ResultExt<T> {
     /// Converts from `Result<T, E>` to `Option<T>`.
     ///

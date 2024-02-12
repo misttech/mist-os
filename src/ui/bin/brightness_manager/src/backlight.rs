@@ -710,6 +710,7 @@ mod dual_state_tests {
 
     trait PollExt<T> {
         fn into_option(self) -> Option<T>;
+        #[allow(dead_code)]
         fn unwrap(self) -> T;
     }
 

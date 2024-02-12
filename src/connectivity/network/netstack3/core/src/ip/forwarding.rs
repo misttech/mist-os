@@ -487,6 +487,7 @@ mod tests {
             neg_prefix: u8,
         ) -> (SpecifiedAddr<Self::Addr>, Subnet<Self::Addr>);
 
+        #[allow(dead_code)]
         fn next_hop_addr() -> SpecifiedAddr<Self::Addr>;
     }
 
