@@ -102,9 +102,9 @@ type ImageFormat = table {
     /// bounds.
     //
     // See math.fidl for context.
-    @available(added=HEAD)
+    @available(added=18)
     6: display_rect fuchsia.math.RectU;
-    @available(replaced=HEAD)
+    @available(replaced=18)
     6: display_rect RectU;
 
     /// The size of a frame in terms of the number of pixels that have valid

@@ -18,7 +18,7 @@ library fuchsia.images2;
 // https://fxbug.dev/42085119. ImageFormat is one of those types and relies on
 // fuchsia.math.RectU which is only available at HEAD. For other API levels,
 // use the definition of RectU that existed before https://fxrev.dev/796842.
-@available(removed=HEAD)
+@available(removed=18)
 type RectU = struct {
     /// The location of the origin of the rectangle in the x-axis.
     x uint32;
