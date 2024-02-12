@@ -118,7 +118,7 @@ group("bit-set") {
 }
 
 group("bit-vec") {
-  public_deps = [ ":bit-vec-v0_5_0" ]
+  public_deps = [ ":bit-vec-v0_6_3" ]
 }
 
 group("bitfield") {
@@ -2386,13 +2386,46 @@ rust_library("bit-vec-v0_5_0") {
     "--edition=2015",
     "-Cmetadata=56024dde80975899",
     "-Cextra-filename=-56024dde80975899",
-    "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":bit-vec-v0_5_0.license" ]
+}
+
+license("bit-vec-v0_6_3.license") {
+  public_package_name = "bit_vec"
+  license_files = [
+    "//third_party/rust_crates/vendor/bit-vec-0.6.3/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/bit-vec-0.6.3/LICENSE-MIT",
+  ]
+}
+
+rust_library("bit-vec-v0_6_3") {
+  crate_name = "bit_vec"
+  crate_root = "//third_party/rust_crates/vendor/bit-vec-0.6.3/src/lib.rs"
+  output_name = "bit_vec-ef0910eab7e0b593"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":serde-v1_0_147" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=ef0910eab7e0b593",
+    "-Cextra-filename=-ef0910eab7e0b593",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"serde\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":bit-vec-v0_6_3.license" ]
 }
 
 license("bitfield-v0_14_0.license") {

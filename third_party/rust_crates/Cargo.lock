@@ -351,7 +351,7 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f1efcc46c18245a69c38fcc5cc650f16d3a59d034f3106e9ed63748f695730a"
 dependencies = [
- "bit-vec",
+ "bit-vec 0.5.0",
 ]
 
 [[package]]
@@ -359,6 +359,15 @@ name = "bit-vec"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4440d5cb623bb7390ae27fec0bb6c61111969860f8e3ae198bfa0663645e67cf"
+
+[[package]]
+name = "bit-vec"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "bitfield"
@@ -1307,7 +1316,7 @@ dependencies = [
  "base64 0.21.7",
  "bincode",
  "bit-set",
- "bit-vec",
+ "bit-vec 0.6.3",
  "bitfield",
  "bitflags 2.4.1",
  "blocking",
