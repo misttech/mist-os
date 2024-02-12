@@ -169,8 +169,6 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
 
   zx_status_t status = component_context_->outgoing()->AddPublicService(bindings_.GetHandler(this));
   FX_CHECK(status == ZX_OK);
-  status = component_context_->outgoing()->AddPublicService(deprecated_bindings_.GetHandler(this));
-  FX_CHECK(status == ZX_OK);
 
   if (command_line.HasOption("help")) {
     PrintHelp();

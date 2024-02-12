@@ -632,7 +632,6 @@
             protocol: [
                 "fuchsia.memory.debug.MemoryPressure",
                 "fuchsia.memory.inspection.Collector",
-                "fuchsia.memory.Monitor",
                 "fuchsia.memorypressure.Provider",
             ],
             from: "#memory_monitor",

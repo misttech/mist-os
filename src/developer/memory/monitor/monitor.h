@@ -6,7 +6,6 @@
 #define SRC_DEVELOPER_MEMORY_MONITOR_MONITOR_H_
 
 #include <fuchsia/hardware/ram/metrics/cpp/fidl.h>
-#include <fuchsia/memory/cpp/fidl.h>
 #include <fuchsia/memory/inspection/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/binding_set.h>
@@ -35,7 +34,7 @@ class MonitorUnitTest;
 class MemoryBandwidthInspectTest;
 }  // namespace test
 
-class Monitor : public fuchsia::memory::Monitor, public fuchsia::memory::inspection::Collector {
+class Monitor : public fuchsia::memory::inspection::Collector {
  public:
   Monitor(std::unique_ptr<sys::ComponentContext> context, const fxl::CommandLine& command_line,
           async_dispatcher_t* dispatcher, bool send_metrics, bool watch_memory_pressure,
@@ -90,7 +89,6 @@ class Monitor : public fuchsia::memory::Monitor, public fuchsia::memory::inspect
   std::unique_ptr<sys::ComponentContext> component_context_;
   fuchsia::metrics::MetricEventLoggerSyncPtr metric_event_logger_;
   fidl::BindingSet<fuchsia::memory::inspection::Collector> bindings_;
-  fidl::BindingSet<fuchsia::memory::Monitor> deprecated_bindings_;
   trace::TraceObserver trace_observer_;
   inspect::ComponentInspector inspector_;
   Logger logger_;

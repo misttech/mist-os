@@ -5,7 +5,6 @@
 #ifndef SRC_DEVELOPER_MEMORY_MONITOR_DEBUGGER_H_
 #define SRC_DEVELOPER_MEMORY_MONITOR_DEBUGGER_H_
 
-#include <fuchsia/memory/cpp/fidl.h>
 #include <fuchsia/memory/debug/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/component_context.h>

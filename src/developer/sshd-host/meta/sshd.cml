@@ -265,7 +265,6 @@
                 "fuchsia.mediacodec.CodecFactory",
                 "fuchsia.memory.debug.MemoryPressure",
                 "fuchsia.memory.inspection.Collector",
-                "fuchsia.memory.Monitor",
                 "fuchsia.memory.sampler.Sampler",
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.net.tun.Control",
