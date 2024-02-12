@@ -68,6 +68,31 @@
             // The Realm protocol is required to start components.
             protocol: "fuchsia.component.Realm",
         },
+        {
+            config: "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
+            config_key: "delay_fallback_until_base_drivers_indexed",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.driver.manager.UseDriverFrameworkV2",
+            config_key: "use_driver_framework_v2",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.driver.manager.DriverHostCrashPolicy",
+            config_key: "driver_host_crash_policy",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.driver.manager.RootDriver",
+            config_key: "root_driver",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.driver.manager.EnableTestShutdownDelays",
+            config_key: "enable_test_shutdown_delays",
+            availability: "optional",
+        },
     ],
     expose: [
         {

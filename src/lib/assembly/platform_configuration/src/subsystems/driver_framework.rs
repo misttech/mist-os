@@ -72,20 +72,31 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
             .as_ref()
             .unwrap_or(&DriverHostCrashPolicy::RestartDriverHost);
 
-        builder
-            .package("driver_manager")
-            .component("meta/driver_manager.cm")?
-            .field("set_root_driver_host_critical", true)?
-            .field("delay_fallback_until_base_drivers_indexed", delay_fallback)?
-            .field("suspend_timeout_fallback", true)?
-            .field("verbose", false)?
-            .field("use_driver_framework_v2", true)?
-            .field("driver_host_crash_policy", format!("{driver_host_crash_policy}"))?
-            .field("root_driver", "fuchsia-boot:///platform-bus#meta/platform-bus.cm")?
-            .field(
-                "enable_test_shutdown_delays",
-                test_fuzzing_config.enable_test_shutdown_delays,
-            )?;
+        builder.set_config_capability(
+            "fuchsia.driver.manager.UseDriverFrameworkV2",
+            Config::new(ConfigValueType::Bool, true.into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.driver.manager.DriverHostCrashPolicy",
+            Config::new(
+                ConfigValueType::String { max_size: 20 },
+                format!("{driver_host_crash_policy}").into(),
+            ),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.driver.manager.RootDriver",
+            Config::new(
+                ConfigValueType::String { max_size: 100 },
+                "fuchsia-boot:///platform-bus#meta/platform-bus.cm".into(),
+            ),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.driver.manager.EnableTestShutdownDelays",
+            Config::new(
+                ConfigValueType::Bool,
+                test_fuzzing_config.enable_test_shutdown_delays.into(),
+            ),
+        )?;
 
         Ok(())
     }

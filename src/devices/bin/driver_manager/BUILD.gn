@@ -29,6 +29,20 @@ fuchsia_structured_config_cpp_elf_lib("driver_manager_config") {
   cm_label = ":manifest"
 }
 
+fuchsia_structured_config_values("driver_manager_config_default") {
+  cm_label = ":manifest"
+  values = {
+    set_root_driver_host_critical = true
+    delay_fallback_until_base_drivers_indexed = true
+    suspend_timeout_fallback = true
+    verbose = false
+    use_driver_framework_v2 = true
+    driver_host_crash_policy = "restart-driver-host"
+    root_driver = "fuchsia-boot:///platform-bus#meta/platform-bus.cm"
+    enable_test_shutdown_delays = false
+  }
+}
+
 # TODO(https://fxbug.dev/42113849): Migrate to the new bind rules and delete the below
 source_set("binding") {
   sources = [
@@ -192,10 +206,10 @@ group("driver_shared_libraries") {
 }
 
 fuchsia_package("dfv2_package") {
-  validate_structured_config = false
   package_name = "driver_manager"
   deps = [
     ":component",
+    ":driver_manager_config_default",
     ":driver_shared_libraries",
   ]
 }

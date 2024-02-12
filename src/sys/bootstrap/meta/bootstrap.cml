@@ -180,6 +180,17 @@
         },
         {
             from: "parent",
+            to: "#driver_manager",
+            config: [
+                "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
+                "fuchsia.driver.manager.DriverHostCrashPolicy",
+                "fuchsia.driver.manager.EnableTestShutdownDelays",
+                "fuchsia.driver.manager.RootDriver",
+                "fuchsia.driver.manager.UseDriverFrameworkV2",
+            ],
+        },
+        {
+            from: "parent",
             to: "#svchost",
             config: [ "fuchsia.diagnostics.ExceptionHandlerAvailable" ],
         },

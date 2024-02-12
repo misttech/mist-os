@@ -89,6 +89,16 @@
             ],
         },
         {
+            from: "void",
+            to: "#driver_manager",
+            config: [
+                "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
+                "fuchsia.driver.manager.DriverHostCrashPolicy",
+                "fuchsia.driver.manager.EnableTestShutdownDelays",
+            ],
+            availability: "optional",
+        },
+        {
             protocol: [ "fuchsia.device.fs.lifecycle.Lifecycle" ],
             from: "#driver_manager",
             to: [ "#devfs" ],
