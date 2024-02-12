@@ -70,7 +70,7 @@ impl SizeDiff {
             self.blobs.iter().filter(|b| b.size_delta != 0 || b.psize_delta != 0).collect();
         if !changed_blobs.is_empty() {
             lines.push(BlobDiff::get_header());
-            lines.push(format!("{:-<117}", ""));
+            lines.push(format!("{:-<137}", ""));
             for blob in &changed_blobs {
                 lines.extend(blob.get_print_lines());
             }
@@ -109,7 +109,7 @@ impl PackageDiff {
     }
 
     fn get_header() -> String {
-        format!("{: <12}{: >10}", "PACKAGES", "SIZE")
+        format!("{: <32}{: >10}", "PACKAGES", "SIZE")
     }
 
     fn get_print_lines(&self) -> Vec<String> {
@@ -119,7 +119,7 @@ impl PackageDiff {
             PackageDiffMode::Removed => "--",
             _ => "  ",
         };
-        lines.push(format!("{}{: <10}{}", prefix, self.name, self.format_size()));
+        lines.push(format!("{}{: <30}{}", prefix, self.name, self.format_size()));
         lines
     }
 
@@ -308,7 +308,7 @@ impl BlobDiff {
 
     fn get_header() -> String {
         format!(
-            "{: <22} {: <20}{: <20}{: >10}{: >20}{: >20}",
+            "{: <22} {: <30}{: <30}{: >10}{: >20}{: >20}",
             "BLOB MERKLE", "PACKAGE", "PATH", "SIZE", "PSIZE", "SHARE"
         )
     }
@@ -360,7 +360,7 @@ impl BlobDiff {
             BlobDiffMode::Updated => " ",
             BlobDiffMode::Unchanged => " ",
         };
-        format!("{}{: <20}{: <20}", m, reference.name, reference.path)
+        format!("{}{: <30}{: <30}", m, reference.name, reference.path)
     }
 
     fn format_size(&self) -> String {
@@ -624,30 +624,30 @@ mod tests {
             "diff:          +80",
             "",
             "",
-            "PACKAGES          SIZE",
+            "PACKAGES                              SIZE",
             "---------------------------------------------------------------------------------------------------------------------",
-            "++pkg-two          +50          ",
-            "  pkg-one          +10(100)     ",
-            "--pkg-three        -60          ",
+            "++pkg-two                              +50          ",
+            "  pkg-one                              +10(100)     ",
+            "--pkg-three                            -60          ",
             "",
             "",
-            "BLOB MERKLE            PACKAGE             PATH                      SIZE               PSIZE               SHARE",
-            "---------------------------------------------------------------------------------------------------------------------",
-            "++234567              +pkg-one             lib/lib1.5                +100                +100                  +1          ",
-            "  321_me -> 123_me     pkg-one             lib/lib3                   +30(60)             +10(30)              +0(3)       ",
-            "                       pkg-three           lib/lib3            ",
-            "                       pkg-two             lib/lib3            ",
-            "++123456              +pkg-one             lib/lib1                   +10                 +10                  +4          ",
-            "                       pkg-three           lib/lib1            ",
-            "                       pkg-three           lib/lib2            ",
-            "                       pkg-two             lib/lib1            ",
-            "  654_me -> 456_me    -pkg-two             lib/lib4                    +0(10)             +10(20)              -1(1)       ",
-            "                       pkg-one             lib/lib4            ",
-            "  987_me -> 789_me     pkg-one             lib/lib5                   -30(30)             -10(30)              +0(3)       ",
-            "                       pkg-three           lib/lib5            ",
-            "                       pkg-two             lib/lib5            ",
-            "--098765              -pkg-one             lib/lib2                   -30                 -15                  -2          ",
-            "                      -pkg-two             lib/lib2            ",
+            "BLOB MERKLE            PACKAGE                       PATH                                SIZE               PSIZE               SHARE",
+            "-----------------------------------------------------------------------------------------------------------------------------------------",
+            "++234567              +pkg-one                       lib/lib1.5                          +100                +100                  +1          ",
+            "  321_me -> 123_me     pkg-one                       lib/lib3                             +30(60)             +10(30)              +0(3)       ",
+            "                       pkg-three                     lib/lib3                      ",
+            "                       pkg-two                       lib/lib3                      ",
+            "++123456              +pkg-one                       lib/lib1                             +10                 +10                  +4          ",
+            "                       pkg-three                     lib/lib1                      ",
+            "                       pkg-three                     lib/lib2                      ",
+            "                       pkg-two                       lib/lib1                      ",
+            "  654_me -> 456_me    -pkg-two                       lib/lib4                              +0(10)             +10(20)              -1(1)       ",
+            "                       pkg-one                       lib/lib4                      ",
+            "  987_me -> 789_me     pkg-one                       lib/lib5                             -30(30)             -10(30)              +0(3)       ",
+            "                       pkg-three                     lib/lib5                      ",
+            "                       pkg-two                       lib/lib5                      ",
+            "--098765              -pkg-one                       lib/lib2                             -30                 -15                  -2          ",
+            "                      -pkg-two                       lib/lib2                      ",
         ]
         .into_iter()
         .map(|s| s.to_string())

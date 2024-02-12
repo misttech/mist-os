@@ -127,3 +127,47 @@ fn process_path_str(input_path: String, column_width: usize, is_duplicate: bool)
         format!("   {0: <1$}", path_str, column_width - 3)
     }
 }
+
+pub fn wrap_text(indent: usize, length: usize, path: &String) -> String {
+    if path.len() <= length {
+        return path.clone();
+    }
+
+    let mut wrapped = String::new();
+
+    // Add the first line.
+    let first_length = length - 3;
+    wrapped += &format!("{}...\n", &path[..first_length]);
+
+    // Add the following lines.
+    let following_length = length - 6;
+    let following_chars = path[first_length..].chars().collect::<Vec<char>>();
+    let following = following_chars
+        .chunks(following_length)
+        .map(|c| c.iter().collect::<String>())
+        .map(|s| format!("{:indent$}   {}", "", s, indent = indent))
+        .collect::<Vec<String>>();
+    wrapped += &following.join("...\n");
+
+    // Add any remaining spaces to line back up to length.
+    let remaining = length + indent - following.last().map(|s| s.len()).unwrap_or(0);
+    wrapped += &format!("{:r$}", "", r = remaining);
+    wrapped
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_wrap_text() {
+        let path = "abcdefghijklmnopqrstuvwxyz".to_string();
+        let expected_path = r"abcdefg...
+      hijk...
+      lmno...
+      pqrs...
+      tuvw...
+      xyz    ";
+        assert_eq!(expected_path, wrap_text(3, 10, &path));
+    }
+}

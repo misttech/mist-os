@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::operations::size_check::common::wrap_text;
 use crate::operations::size_check::diff::{BlobDiff, PackageDiff, PackageReferenceDiff, SizeDiff};
 use assembly_manifest::BlobfsContents;
 use std::cmp::Ordering;
@@ -73,7 +74,7 @@ impl SizeBreakdown {
                 lines.push(format!(
                     "{: <3}{: <40}{: >10}{: >10}{: >10}{: >10}",
                     "",
-                    wrap_path(3, 40, &path),
+                    wrap_text(3, 40, &path),
                     &blob.hash[..6],
                     blob.size,
                     blob.psize,
@@ -83,33 +84,6 @@ impl SizeBreakdown {
         }
         lines
     }
-}
-
-fn wrap_path(indent: usize, length: usize, path: &String) -> String {
-    if path.len() <= length {
-        return path.clone();
-    }
-
-    let mut wrapped = String::new();
-
-    // Add the first line.
-    let first_length = length - 3;
-    wrapped += &format!("{}...\n", &path[..first_length]);
-
-    // Add the following lines.
-    let following_length = length - 6;
-    let following_chars = path[first_length..].chars().collect::<Vec<char>>();
-    let following = following_chars
-        .chunks(following_length)
-        .map(|c| c.iter().collect::<String>())
-        .map(|s| format!("{:indent$}   {}", "", s, indent = indent))
-        .collect::<Vec<String>>();
-    wrapped += &following.join("...\n");
-
-    // Add any remaining spaces to line back up to length.
-    let remaining = length + indent - following.last().map(|s| s.len()).unwrap_or(0);
-    wrapped += &format!("{:r$}", "", r = remaining);
-    wrapped
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -369,18 +343,6 @@ impl SizeBreakdown {
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
-
-    #[test]
-    fn test_wrap_path() {
-        let path = "abcdefghijklmnopqrstuvwxyz".to_string();
-        let expected_path = r"abcdefg...
-      hijk...
-      lmno...
-      pqrs...
-      tuvw...
-      xyz    ";
-        assert_eq!(expected_path, wrap_path(3, 10, &path));
-    }
 
     #[test]
     fn test_calculate_size() {
