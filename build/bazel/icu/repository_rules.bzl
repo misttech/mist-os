@@ -13,8 +13,6 @@ Defines a constant `icu_flavors` which is a struct containing these elements:
    `@//:third_party/icu_default`
 - `latest_git_commit`(string): the detected git commit ID for
    `@//:third_party/icu_latest`
-- `stable_git_commit`(string): the detected git commit ID for
-   `@//:third_party/icu_stable`
 
 This struct can be ingested by main build rules by using:
 
@@ -51,7 +49,6 @@ def _fuchsia_icu_config_impl(repo_ctx):
         str(script),
         "bzl",
         paths.join(workspace_root, "third_party/icu/default"),
-        paths.join(workspace_root, "third_party/icu/stable"),
         paths.join(workspace_root, "third_party/icu/latest"),
         ">",
         "constants.bzl",
