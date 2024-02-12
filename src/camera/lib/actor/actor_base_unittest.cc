@@ -80,6 +80,14 @@ class TestActorA : public actor::ActorBase {
     std::cout << "Actor A UpdateAfterDelay scheduled." << std::endl;
   }
 
+  void UpdateAtTime(zx::time time, int new_state) {
+    ScheduleAtTime(time, [this, new_state]() {
+      std::cout << "Actor A UpdateAtTime running." << std::endl;
+      state_ = new_state;
+    });
+    std::cout << "Actor A UpdateAtTime scheduled." << std::endl;
+  }
+
   // Used to test that an actor can schedule things on another actor and wait for the result, even
   // if the other actor is running on the same async loop.
   fpromise::promise<void> FetchAndSetBState() {
@@ -211,7 +219,25 @@ TEST(ActorBase, DelayedSchedulingTest) {
 
   EXPECT_EQ(0, actor.GetStateImmediateForTest());
 
-  EXPECT_EQ(ZX_ERR_TIMED_OUT, loop.Run(zx::deadline_after(zx::msec(600))));
+  EXPECT_EQ(ZX_ERR_TIMED_OUT, loop.Run(zx::deadline_after(zx::msec(1000))));
+
+  EXPECT_EQ(1337, actor.GetStateImmediateForTest());
+}
+
+TEST(ActorBase, ScheduleAtTimeTest) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+
+  TestActorA actor(loop.dispatcher());
+
+  actor.UpdateAtTime(zx::deadline_after(zx::msec(1000)), 1337);
+
+  EXPECT_EQ(0, actor.GetStateImmediateForTest());
+
+  EXPECT_EQ(ZX_ERR_TIMED_OUT, loop.Run(zx::deadline_after(zx::msec(500))));
+
+  EXPECT_EQ(0, actor.GetStateImmediateForTest());
+
+  EXPECT_EQ(ZX_ERR_TIMED_OUT, loop.Run(zx::deadline_after(zx::msec(1000))));
 
   EXPECT_EQ(1337, actor.GetStateImmediateForTest());
 }
