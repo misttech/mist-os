@@ -84,7 +84,7 @@ impl Sender {
         let fut = sender.serve_sender(stream);
 
         // Move this capability into the registry.
-        let task = fasync::Task::spawn(fut);
+        let task = fasync::Task::spawn(registry::remove_when_done(koid, fasync::Task::spawn(fut)));
         registry::insert_with_task(self.into(), koid, task);
     }
 
