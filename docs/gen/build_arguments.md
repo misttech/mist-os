@@ -7613,7 +7613,7 @@ Whether to use an alternate strategy for anonymous memory allocations.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/args.gni:29
+From //src/starnix/kernel/args.gni:27
 
 ### starnix_enable_trace_and_debug_logs_in_release
 
@@ -7652,12 +7652,10 @@ From //src/starnix/kernel/args.gni:21
 ### starnix_unified_aspace
 
 Whether or not unified address spaces are leveraged.
-TODO(https://fxbug.dev/42083004): Enable on other platforms once Zircon
-support is available.
 
 **Current value (from the default):** `true`
 
-From //src/starnix/kernel/args.gni:26
+From //src/starnix/kernel/args.gni:24
 
 ### storage_enable_tracing
 
