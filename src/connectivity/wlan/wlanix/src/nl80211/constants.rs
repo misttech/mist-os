@@ -563,6 +563,11 @@ pub const NL80211_FREQUENCY_ATTR_16MHZ: u16 = 25;
 pub const NL80211_FREQUENCY_ATTR_NO_320MHZ: u16 = 26;
 pub const NL80211_FREQUENCY_ATTR_NO_EHT: u16 = 27;
 
+// StaInfo attributes
+pub const NL80211_STA_INFO_SIGNAL: u16 = 7;
+pub const NL80211_STA_INFO_TX_PACKETS: u16 = 10;
+pub const NL80211_STA_INFO_TX_FAILED: u16 = 12;
+
 // DFS state values
 
 pub const NL80211_DFS_USABLE: u32 = 0;

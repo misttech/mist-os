@@ -9,7 +9,8 @@ use {
     fidl::endpoints::create_proxy,
     fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_device_service as fidl_device_service,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
+    fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_async::TimeoutExt,
     fuchsia_sync::Mutex,
     fuchsia_zircon as zx,
@@ -109,6 +110,10 @@ pub(crate) trait ClientIface: Sync + Send {
         requested_bssid: Option<Bssid>,
     ) -> Result<ConnectedResult, Error>;
     async fn disconnect(&self) -> Result<(), Error>;
+    fn get_connected_network_rssi(&self) -> Option<i8>;
+
+    fn on_disconnect(&self, info: &fidl_sme::DisconnectSource);
+    fn on_signal_report(&self, ind: fidl_internal::SignalReportIndication);
 }
 
 #[derive(Clone, Debug)]
@@ -116,6 +121,7 @@ pub(crate) struct SmeClientIface {
     sme_proxy: fidl_sme::ClientSmeProxy,
     last_scan_results: Arc<Mutex<Vec<fidl_sme::ScanResult>>>,
     scan_abort_signal: Arc<Mutex<Option<oneshot::Sender<()>>>>,
+    connected_network_rssi: Arc<Mutex<Option<i8>>>,
 }
 
 impl SmeClientIface {
@@ -124,6 +130,7 @@ impl SmeClientIface {
             sme_proxy,
             last_scan_results: Arc::new(Mutex::new(vec![])),
             scan_abort_signal: Arc::new(Mutex::new(None)),
+            connected_network_rssi: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -246,8 +253,23 @@ impl ClientIface for SmeClientIface {
     }
 
     async fn disconnect(&self) -> Result<(), Error> {
+        // Note: we are forwarding disconnect request to SME, but we are not clearing
+        //       any connected network state here because we expect this struct's `on_disconnect`
+        //       to be called later.
         self.sme_proxy.disconnect(fidl_sme::UserDisconnectReason::Unknown).await?;
         Ok(())
+    }
+
+    fn get_connected_network_rssi(&self) -> Option<i8> {
+        *self.connected_network_rssi.lock()
+    }
+
+    fn on_disconnect(&self, _info: &fidl_sme::DisconnectSource) {
+        self.connected_network_rssi.lock().take();
+    }
+
+    fn on_signal_report(&self, ind: fidl_internal::SignalReportIndication) {
+        let _prev = self.connected_network_rssi.lock().replace(ind.rssi_dbm);
     }
 }
 
@@ -330,6 +352,9 @@ pub mod test_utils {
         GetLastScanResults,
         ConnectToNetwork { ssid: Vec<u8>, passphrase: Option<Vec<u8>>, bssid: Option<Bssid> },
         Disconnect,
+        GetConnectedNetworkRssi,
+        OnDisconnect { info: fidl_sme::DisconnectSource },
+        OnSignalReport { ind: fidl_internal::SignalReportIndication },
     }
 
     pub struct TestClientIface {
@@ -393,6 +418,19 @@ pub mod test_utils {
         async fn disconnect(&self) -> Result<(), Error> {
             self.calls.lock().push(ClientIfaceCall::Disconnect);
             Ok(())
+        }
+
+        fn get_connected_network_rssi(&self) -> Option<i8> {
+            self.calls.lock().push(ClientIfaceCall::GetConnectedNetworkRssi);
+            Some(-30)
+        }
+
+        fn on_disconnect(&self, info: &fidl_sme::DisconnectSource) {
+            self.calls.lock().push(ClientIfaceCall::OnDisconnect { info: info.clone() });
+        }
+
+        fn on_signal_report(&self, ind: fidl_internal::SignalReportIndication) {
+            self.calls.lock().push(ClientIfaceCall::OnSignalReport { ind });
         }
     }
 
@@ -862,5 +900,36 @@ mod tests {
 
         assert_variant!(disconnect_responder.send(), Ok(()));
         assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
+    }
+
+    #[test]
+    fn test_on_disconnect() {
+        let (mut exec, _monitor_stream, manager) = setup_test();
+        let (sme_proxy, _sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
+            .expect("Failed to create device monitor service");
+        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
+        let mut client_fut = manager.get_client_iface(1);
+        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+
+        iface.on_signal_report(fidl_internal::SignalReportIndication { rssi_dbm: -40, snr_db: 20 });
+        assert_variant!(iface.get_connected_network_rssi(), Some(-40));
+        iface.on_disconnect(&fidl_sme::DisconnectSource::User(
+            fidl_sme::UserDisconnectReason::Unknown,
+        ));
+        assert_variant!(iface.get_connected_network_rssi(), None);
+    }
+
+    #[test]
+    fn test_on_signal_report() {
+        let (mut exec, _monitor_stream, manager) = setup_test();
+        let (sme_proxy, _sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
+            .expect("Failed to create device monitor service");
+        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
+        let mut client_fut = manager.get_client_iface(1);
+        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+
+        assert_variant!(iface.get_connected_network_rssi(), None);
+        iface.on_signal_report(fidl_internal::SignalReportIndication { rssi_dbm: -40, snr_db: 20 });
+        assert_variant!(iface.get_connected_network_rssi(), Some(-40));
     }
 }

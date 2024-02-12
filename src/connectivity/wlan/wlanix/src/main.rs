@@ -320,11 +320,12 @@ struct ConnectionContext {
     bssid: Bssid,
 }
 
-fn send_disconnect_event(
+fn send_disconnect_event<C: ClientIface>(
     source: &fidl_sme::DisconnectSource,
     ctx: &ConnectionContext,
     sta_iface_state: &SupplicantStaIfaceState,
     wifi_state: &WifiState,
+    iface: &C,
     iface_id: u16,
 ) {
     // We expect both an OnDisconnected and an OnStateChanged event.
@@ -376,12 +377,16 @@ fn send_disconnect_event(
             error!("Failed to notify nl80211 mlme group of disconnect: {}", e);
         }
     }
+
+    // Let iface know about disconnect so it clears any intermediate state
+    iface.on_disconnect(source);
 }
 
-async fn handle_client_connect_transactions(
+async fn handle_client_connect_transactions<C: ClientIface>(
     mut ctx: ConnectionContext,
     sta_iface_state: Arc<Mutex<SupplicantStaIfaceState>>,
     wifi_state: Arc<Mutex<WifiState>>,
+    iface: Arc<C>,
     iface_id: u16,
 ) {
     // If we receive a disconnect but attempt to reconnect, we will deliver the
@@ -406,6 +411,7 @@ async fn handle_client_connect_transactions(
                                 &ctx,
                                 &sta_iface_state.lock(),
                                 &wifi_state.lock(),
+                                &*iface,
                                 iface_id,
                             );
                         }
@@ -432,13 +438,14 @@ async fn handle_client_connect_transactions(
                         &ctx,
                         &sta_iface_state.lock(),
                         &wifi_state.lock(),
+                        &*iface,
                         iface_id,
                     );
                     disconnect_with_ongoing_reconnect = None;
                 }
             }
-            Ok(fidl_sme::ConnectTransactionEvent::OnSignalReport { ind: _ }) => {
-                // TODO(b/316374668): Surface these RSSI values.
+            Ok(fidl_sme::ConnectTransactionEvent::OnSignalReport { ind }) => {
+                iface.on_signal_report(ind);
             }
             Ok(fidl_sme::ConnectTransactionEvent::OnChannelSwitched { info }) => {
                 info!("Connection switching to channel {}", info.new_channel);
@@ -553,6 +560,7 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                     ctx,
                     Arc::clone(&sta_iface_state),
                     Arc::clone(&state),
+                    Arc::clone(&iface),
                     iface_id,
                 )
                 .await;
@@ -861,11 +869,38 @@ async fn handle_nl80211_message<I: IfaceManager>(
                 .context("Failed to send scan results")?;
         }
         Nl80211Cmd::GetStation => {
-            info!("Nl80211Cmd::GetStation (skipping)");
-            // TODO(b/316038082): Report packet counters and station info.
-            responder
-                .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
-                .context("Failed to send GetProtocolFeatures")?;
+            info!("Nl80211Cmd::GetStation");
+            use crate::nl80211::Nl80211StaInfoAttr;
+            // GetStation also has a MAC address attribute. We don't check whether it
+            // matches the connected network BSSID and simply assume that it does.
+            match find_iface_id(&message.payload.attrs[..]) {
+                Some(iface_id) => {
+                    let client_iface = iface_manager.get_client_iface(iface_id.try_into()?).await?;
+                    const INVALID_RSSI: i8 = -127;
+                    let rssi = client_iface.get_connected_network_rssi().unwrap_or(INVALID_RSSI);
+                    responder
+                        .send(Ok(nl80211_message_resp(vec![build_nl80211_message(
+                            Nl80211Cmd::NewStation,
+                            vec![Nl80211Attr::StaInfo(vec![
+                                // TX packet counters don't seem to be used, so just set
+                                // them to 0
+                                Nl80211StaInfoAttr::TxPackets(0),
+                                Nl80211StaInfoAttr::TxFailed(0),
+                                Nl80211StaInfoAttr::Signal(rssi),
+                                // NL80211_STA_INFO_TX_BITRATE and NL80211_STA_INFO_RX_BITRATE
+                                // can also be included. We don't have those information, so
+                                // we are not including them here.
+                            ])],
+                        )])))
+                        .context("Failed to send GetStation")?;
+                }
+                None => {
+                    responder
+                        .send(Err(zx::sys::ZX_ERR_INVALID_ARGS))
+                        .context("sending error status due to missing iface id on GetStation")?;
+                    bail!("GetStation did not include an iface id")
+                }
+            }
         }
         Nl80211Cmd::GetProtocolFeatures => {
             info!("Nl80211Cmd::GetProtocolFeatures");
@@ -1171,6 +1206,7 @@ mod tests {
     use {
         super::*,
         fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream, Proxy},
+        fidl_fuchsia_wlan_internal as fidl_internal,
         futures::{pin_mut, task::Poll, Future},
         ifaces::test_utils::{ClientIfaceCall, TestIfaceManager},
         std::pin::Pin,
@@ -1671,6 +1707,10 @@ mod tests {
 
         establish_open_connection(&mut test_helper, &mut test_fut, &mut mcast_stream);
 
+        let mocked_disconnect_source = fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
+            mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
+            reason_code: fidl_fuchsia_wlan_ieee80211::ReasonCode::ReasonInactivity,
+        });
         {
             let client_iface =
                 test_helper.iface_manager.client_iface.as_ref().expect("No client iface found");
@@ -1679,11 +1719,7 @@ mod tests {
             control_handle
                 .send_on_disconnect(&fidl_sme::DisconnectInfo {
                     is_sme_reconnecting: false,
-                    disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
-                        mlme_event_name:
-                            fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
-                        reason_code: fidl_fuchsia_wlan_ieee80211::ReasonCode::ReasonInactivity,
-                    }),
+                    disconnect_source: mocked_disconnect_source.clone(),
                 })
                 .expect("Failed to send OnDisconnect");
         }
@@ -1712,6 +1748,13 @@ mod tests {
         pin_mut!(next_mcast);
         let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
         assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Disconnect);
+
+        let iface_calls = test_helper.iface_manager.get_iface_call_history();
+        let disconnect_info = assert_variant!(
+            iface_calls.lock().pop().expect("iface call history should not be empty"),
+            ClientIfaceCall::OnDisconnect { info } => info
+        );
+        assert_eq!(disconnect_info, mocked_disconnect_source);
     }
 
     #[test_case(fidl_sme::ConnectResult {
@@ -1738,6 +1781,10 @@ mod tests {
 
         establish_open_connection(&mut test_helper, &mut test_fut, &mut mcast_stream);
 
+        let mocked_disconnect_source = fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
+            mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
+            reason_code: fidl_fuchsia_wlan_ieee80211::ReasonCode::ReasonInactivity,
+        });
         {
             let client_iface =
                 test_helper.iface_manager.client_iface.as_ref().expect("No client iface found");
@@ -1746,11 +1793,7 @@ mod tests {
             control_handle
                 .send_on_disconnect(&fidl_sme::DisconnectInfo {
                     is_sme_reconnecting: true,
-                    disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
-                        mlme_event_name:
-                            fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
-                        reason_code: fidl_fuchsia_wlan_ieee80211::ReasonCode::ReasonInactivity,
-                    }),
+                    disconnect_source: mocked_disconnect_source.clone(),
                 })
                 .expect("Failed to send OnDisconnect");
         }
@@ -1791,6 +1834,13 @@ mod tests {
 
             let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
             assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Disconnect);
+
+            let iface_calls = test_helper.iface_manager.get_iface_call_history();
+            let disconnect_info = assert_variant!(
+                iface_calls.lock().pop().expect("iface call history should not be empty"),
+                ClientIfaceCall::OnDisconnect { info } => info
+            );
+            assert_eq!(disconnect_info, mocked_disconnect_source);
         } else {
             // Still no messages, since the reconnect was successful.
             assert_variant!(
@@ -1799,6 +1849,35 @@ mod tests {
             );
             assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
         }
+    }
+
+    #[test]
+    fn test_supplicant_sta_signal_report() {
+        let (mut test_helper, mut test_fut) = setup_supplicant_test();
+        let mut mcast_stream = get_nl80211_mcast(&test_helper.nl80211_proxy, "mlme");
+
+        establish_open_connection(&mut test_helper, &mut test_fut, &mut mcast_stream);
+
+        let mocked_signal_report =
+            fidl_internal::SignalReportIndication { rssi_dbm: -35, snr_db: 20 };
+        {
+            let client_iface =
+                test_helper.iface_manager.client_iface.as_ref().expect("No client iface found");
+            let transaction_handle = client_iface.transaction_handle.lock();
+            let control_handle = transaction_handle.as_ref().expect("No control handle found");
+            control_handle
+                .send_on_signal_report(&mocked_signal_report)
+                .expect("Failed to send OnDisconnect");
+        }
+
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+
+        let iface_calls = test_helper.iface_manager.get_iface_call_history();
+        let signal_report_ind = assert_variant!(
+            iface_calls.lock().pop().expect("iface call history should not be empty"),
+            ClientIfaceCall::OnSignalReport { ind } => ind
+        );
+        assert_eq!(signal_report_ind, mocked_signal_report);
     }
 
     struct SupplicantTestHelper {
@@ -2059,6 +2138,34 @@ mod tests {
             |attr| *attr == Nl80211Attr::Mac(ifaces::test_utils::FAKE_IFACE_RESPONSE.sta_addr)
         ));
         assert_eq!(responses[1].message_type, Some(fidl_wlanix::Nl80211MessageType::Done));
+    }
+
+    #[test]
+    fn get_station() {
+        let mut exec = fasync::TestExecutor::new();
+        let (proxy, stream) =
+            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+
+        let state = Arc::new(Mutex::new(WifiState::default()));
+        let iface_manager = Arc::new(TestIfaceManager::new_with_client());
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        pin_mut!(nl80211_fut);
+
+        let get_station_message =
+            build_nl80211_message(Nl80211Cmd::GetStation, vec![Nl80211Attr::IfaceIndex(0)]);
+        let get_station_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
+            message: Some(get_station_message),
+            ..Default::default()
+        });
+
+        pin_mut!(get_station_fut);
+        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        let responses = assert_variant!(
+            exec.run_until_stalled(&mut get_station_fut),
+            Poll::Ready(Ok(Ok(fidl_wlanix::Nl80211MessageResponse{responses: Some(r), ..}))) => r,
+        );
+        assert_eq!(responses.len(), 1);
+        assert_eq!(responses[0].message_type, Some(fidl_wlanix::Nl80211MessageType::Message));
     }
 
     #[test]

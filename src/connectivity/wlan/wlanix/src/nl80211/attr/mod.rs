@@ -18,9 +18,11 @@ use crate::nl80211::{
 
 mod band;
 mod bss;
+mod sta_info;
 
 pub use band::*;
 pub use bss::*;
+pub use sta_info::*;
 
 // Note: variants are sorted in ascending order by `kind` value.
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -31,6 +33,7 @@ pub enum Nl80211Attr {
     IfaceName(String),
     IfaceType(u32),
     Mac([u8; 6]),
+    StaInfo(Vec<Nl80211StaInfoAttr>),
     WiphyBands(Vec<Vec<Nl80211BandAttr>>),
     MaxScanSsids(u8),
     Bss(Vec<Nl80211BssAttr>),
@@ -58,6 +61,7 @@ impl Nla for Nl80211Attr {
             IfaceName(name) => name.len() + 1,
             IfaceType(val) => size_of_val(val),
             Mac(val) => size_of_val(val),
+            StaInfo(val) => val.as_slice().buffer_len(),
             WiphyBands(bands) => to_nested_nlas(bands).as_slice().buffer_len(),
             MaxScanSsids(val) => size_of_val(val),
             ScanFrequencies(val) => to_nested_values(val).as_slice().buffer_len(),
@@ -85,6 +89,7 @@ impl Nla for Nl80211Attr {
             IfaceName(_) => NL80211_ATTR_IFNAME,
             IfaceType(_) => NL80211_ATTR_IFTYPE,
             Mac(_) => NL80211_ATTR_MAC,
+            StaInfo(_) => NL80211_ATTR_STA_INFO,
             WiphyBands(_) => NL80211_ATTR_WIPHY_BANDS,
             MaxScanSsids(_) => NL80211_ATTR_MAX_NUM_SCAN_SSIDS,
             ScanFrequencies(_) => NL80211_ATTR_SCAN_FREQUENCIES,
@@ -121,6 +126,7 @@ impl Nla for Nl80211Attr {
             }
             IfaceType(val) => NativeEndian::write_u32(buffer, *val),
             Mac(val) => buffer.copy_from_slice(&val[..]),
+            StaInfo(val) => val.as_slice().emit(buffer),
             WiphyBands(bands) => to_nested_nlas(bands).as_slice().emit(buffer),
             MaxScanSsids(val) => buffer[0] = *val,
             ScanFrequencies(val) => to_nested_values(val).as_slice().emit(buffer),
