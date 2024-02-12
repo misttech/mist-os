@@ -40,19 +40,6 @@ class Ring;
 
 class GpuDevice : public ddk::DisplayControllerImplProtocol<GpuDevice, ddk::base_protocol> {
  public:
-  // Exposed for testing. Production code must use the Create() factory method.
-  GpuDevice(zx_device_t* bus_device, fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_client,
-            std::unique_ptr<VirtioPciDevice> virtio_device);
-  ~GpuDevice();
-
-  static zx::result<std::unique_ptr<GpuDevice>> Create(zx_device_t* bus_device);
-
-  zx_status_t Init();
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
-  zx_status_t Start();
-
-  const virtio_abi::ScanoutInfo* pmode() const { return &pmode_; }
-
   struct BufferInfo {
     zx::vmo vmo = {};
     size_t offset = 0;
@@ -60,6 +47,20 @@ class GpuDevice : public ddk::DisplayControllerImplProtocol<GpuDevice, ddk::base
     uint32_t bytes_per_row = 0;
     fuchsia_images2::wire::PixelFormat pixel_format;
   };
+
+  static zx::result<std::unique_ptr<GpuDevice>> Create(zx_device_t* bus_device);
+
+  // Exposed for testing. Production code must use the Create() factory method.
+  GpuDevice(zx_device_t* bus_device, fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_client,
+            std::unique_ptr<VirtioPciDevice> virtio_device);
+  ~GpuDevice();
+
+  zx_status_t Init();
+  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
+  zx_status_t Start();
+
+  const virtio_abi::ScanoutInfo* pmode() const { return &pmode_; }
+
   zx::result<BufferInfo> GetAllocatedBufferInfoForImage(
       display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index,
       const image_t* image) const;
@@ -117,6 +118,12 @@ class GpuDevice : public ddk::DisplayControllerImplProtocol<GpuDevice, ddk::base
   bool DisplayControllerImplIsCaptureCompleted() { return false; }
 
  private:
+  // TODO(https://fxbug.dev/42073721): Support more formats.
+  static constexpr std::array<fuchsia_images2_pixel_format_enum_value_t, 1> kSupportedFormats = {
+      static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+          fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
+  };
+
   zx::result<display::DriverImageId> Import(zx::vmo vmo, const image_t* image, size_t offset,
                                             uint32_t pixel_size, uint32_t row_bytes,
                                             fuchsia_images2::wire::PixelFormat pixel_format);
@@ -199,12 +206,6 @@ class GpuDevice : public ddk::DisplayControllerImplProtocol<GpuDevice, ddk::base
   display::ConfigStamp displayed_config_stamp_ = display::kInvalidConfigStamp;
 
   std::unique_ptr<VirtioPciDevice> virtio_device_;
-
-  // TODO(https://fxbug.dev/42073721): Support more formats.
-  static constexpr std::array<fuchsia_images2_pixel_format_enum_value_t, 1> kSupportedFormats = {
-      static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-          fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
-  };
 };
 
 }  // namespace virtio_display
