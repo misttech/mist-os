@@ -154,7 +154,10 @@ async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> R
         .add_child("wlandevicemonitor", "#meta/wlandevicemonitor.cm", ChildOptions::new())
         .await?;
 
-    let wlancfg = builder.add_child("wlancfg", "#meta/wlancfg.cm", ChildOptions::new()).await?;
+    // Start wlancfg as eager so that it automatically starts up without requiring the user to
+    // connect to it.
+    let wlancfg =
+        builder.add_child("wlancfg", "#meta/wlancfg.cm", ChildOptions::new().eager()).await?;
 
     let stash = builder.add_child("stash", "#meta/stash_secure.cm", ChildOptions::new()).await?;
 

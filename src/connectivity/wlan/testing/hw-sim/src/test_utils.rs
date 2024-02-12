@@ -275,14 +275,6 @@ impl TestHelper {
     ) -> Self {
         let (tracing_controller, tracing_collector) =
             TestHelper::initialize_and_start_tracing(ctx.as_ref()).await;
-        // If injected, wlancfg does not start automatically in a test component.
-        // Connecting to the service to start wlancfg so that it can create new interfaces.
-        let _wlan_proxy = ctx
-            .test_realm_proxy
-            .connect_to_protocol::<fidl_policy::ClientProviderMarker>()
-            .await
-            .expect("starting wlancfg");
-
         // Trigger creation of wlantap serviced phy and iface for testing.
         let wlantap =
             Wlantap::open_from_devfs(&ctx.devfs).await.expect("Failed to open wlantapctl");
