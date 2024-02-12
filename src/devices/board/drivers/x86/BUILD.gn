@@ -40,17 +40,6 @@ driver_bind_rules("x64-bind") {
   ]
 }
 
-driver_bind_rules("goldfish_control_2_bind") {
-  rules = "bind/goldfish_control_2.bind"
-  header_output = "goldfish_control_2_bind.h"
-  bind_output = "goldfish_control_2_bind.bc"
-  deps = [
-    "//src/devices/bind/fuchsia.goldfish.platform",
-    "//src/devices/bind/fuchsia.google.platform",
-    "//src/devices/bind/fuchsia.sysmem",
-  ]
-}
-
 fuchsia_driver("platform-bus-x86-driver") {
   output_name = "platform-bus-x86"
   configs += [
@@ -81,7 +70,6 @@ fuchsia_driver("platform-bus-x86-driver") {
   }
   configs += [ ":config" ]
   deps = [
-    ":goldfish_control_2_bind_header",
     ":x64-bind",
     "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
@@ -92,6 +80,10 @@ fuchsia_driver("platform-bus-x86-driver") {
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.goldfish.platform:fuchsia.goldfish.platform_cpp",
+    "//src/devices/bind/fuchsia.google.platform:fuchsia.google.platform_cpp",
+    "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/board/lib/acpi",
     "//src/devices/board/lib/smbios",
     "//src/devices/lib/driver",

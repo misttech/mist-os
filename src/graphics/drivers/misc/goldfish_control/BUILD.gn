@@ -10,7 +10,11 @@ import("//build/test.gni")
 driver_bind_rules("goldfish_control_composite-bind") {
   rules = "goldfish_control_composite.bind"
   tests = "bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.google.platform" ]
+  deps = [
+    "//src/devices/bind/fuchsia.goldfish.platform",
+    "//src/devices/bind/fuchsia.google.platform",
+    "//src/devices/bind/fuchsia.sysmem",
+  ]
 }
 
 common_deps = [

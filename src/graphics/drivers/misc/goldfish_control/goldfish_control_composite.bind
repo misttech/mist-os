@@ -2,9 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.google.platform;
+composite goldfish_control_2;
 
-fuchsia.BIND_COMPOSITE == 1;
-fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE;
-fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.google.platform.BIND_PLATFORM_DEV_PID.GOLDFISH;
-fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.google.platform.BIND_PLATFORM_DEV_DID.GOLDFISH_CONTROL;
+using fuchsia.goldfish.platform;
+using fuchsia.google.platform;
+using fuchsia.sysmem;
+
+primary node "goldfish-pipe" {
+    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.goldfish.platform.BIND_FIDL_PROTOCOL.PIPE;
+    fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE;
+    fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.google.platform.BIND_PLATFORM_DEV_PID.GOLDFISH;
+    fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.google.platform.BIND_PLATFORM_DEV_DID.GOLDFISH_PIPE_CONTROL;
+}
+
+node "goldfish-address-space" {
+    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.goldfish.platform.BIND_FIDL_PROTOCOL.ADDRESS_SPACE;
+}
+
+node "goldfish-sync" {
+    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.goldfish.platform.BIND_FIDL_PROTOCOL.SYNC;
+}
+
+node "sysmem" {
+    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
+}
