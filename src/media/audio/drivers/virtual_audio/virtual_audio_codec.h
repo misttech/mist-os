@@ -70,6 +70,7 @@ class VirtualAudioCodec : public VirtualAudioCodecDeviceType,
   const std::weak_ptr<VirtualAudioDeviceImpl> parent_;
   static int instance_count_;
   char instance_name_[64];
+  bool connected_ = false;
   std::optional<fuchsia_hardware_audio::DaiFormat> dai_format_;
   fuchsia_virtualaudio::Configuration config_;
 

@@ -76,9 +76,15 @@ VirtualAudioCodec::VirtualAudioCodec(fuchsia_virtualaudio::Configuration config,
 void VirtualAudioCodec::ResetCodecState() {
   should_return_plug_state_ = true;
   watch_plug_state_completer_.reset();
+  connected_ = false;
 }
 
 void VirtualAudioCodec::Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) {
+  if (connected_) {
+    request->codec_protocol.Close(ZX_ERR_ALREADY_BOUND);
+    return;
+  }
+  connected_ = true;
   fidl::BindServer(
       dispatcher(), std::move(request->codec_protocol), this,
       [](VirtualAudioCodec* codec_instance, fidl::UnbindInfo,

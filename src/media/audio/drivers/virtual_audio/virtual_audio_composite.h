@@ -37,6 +37,7 @@ class VirtualAudioComposite
 
   VirtualAudioComposite(fuchsia_virtualaudio::Configuration config,
                         std::weak_ptr<VirtualAudioDeviceImpl> owner, zx_device_t* parent);
+  void ResetCompositeState();
   async_dispatcher_t* dispatcher() override {
     return fdf::Dispatcher::GetCurrent()->async_dispatcher();
   }
@@ -112,6 +113,7 @@ class VirtualAudioComposite
   const std::weak_ptr<VirtualAudioDeviceImpl> parent_;
   static int instance_count_;
   char instance_name_[64];
+  bool connected_ = false;
 
   // One ring buffer and one DAI interconnect only are supported by this driver.
   fzl::VmoMapper ring_buffer_mapper_;
