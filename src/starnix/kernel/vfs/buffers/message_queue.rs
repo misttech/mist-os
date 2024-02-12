@@ -248,12 +248,35 @@ impl MessageQueue {
         address: Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
+        self.write_stream_with_filter(data, address, ancillary_data, Some)
+    }
+
+    /// Writes the the contents of `InputBuffer` into this socket.
+    /// Will return EAGAIN if not enough capacity is available.
+    ///
+    /// # Parameters
+    /// - `task`: The task to read memory from.
+    /// - `data`: The `InputBuffer` to read the data from.
+    /// - `filter`: A filter to run on the message before inserting it into the queue. If it
+    ///             returns None, no message is enqueued.
+    ///
+    /// Returns the number of bytes that were written to the socket.
+    pub fn write_stream_with_filter(
+        &mut self,
+        data: &mut dyn InputBuffer,
+        address: Option<SocketAddress>,
+        ancillary_data: &mut Vec<AncillaryData>,
+        filter: impl FnOnce(Message) -> Option<Message>,
+    ) -> Result<usize, Errno> {
         let actual = std::cmp::min(self.available_capacity(), data.available());
         if actual == 0 && data.available() > 0 {
             return error!(EAGAIN);
         }
         let data = MessageData::copy_from_user(data, actual)?;
-        self.write_message(Message::new(data, address, std::mem::take(ancillary_data)));
+        let message = Message::new(data, address, std::mem::take(ancillary_data));
+        if let Some(message) = filter(message) {
+            self.write_message(message);
+        }
         Ok(actual)
     }
 
@@ -271,6 +294,26 @@ impl MessageQueue {
         address: Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
+        self.write_datagram_with_filter(data, address, ancillary_data, Some)
+    }
+
+    /// Writes the the contents of `InputBuffer` into this socket as
+    /// single message. Will return EAGAIN if not enough capacity is available.
+    ///
+    /// # Parameters
+    /// - `task`: The task to read memory from.
+    /// - `data`: The `InputBuffer` to read the data from.
+    /// - `filter`: A filter to run on the message before inserting it into the queue. If it
+    ///             returns None, no message is enqueued.
+    ///
+    /// Returns the number of bytes that were written to the socket.
+    pub fn write_datagram_with_filter(
+        &mut self,
+        data: &mut dyn InputBuffer,
+        address: Option<SocketAddress>,
+        ancillary_data: &mut Vec<AncillaryData>,
+        filter: impl FnOnce(Message) -> Option<Message>,
+    ) -> Result<usize, Errno> {
         let actual = data.available();
         if actual > self.capacity() {
             return error!(EMSGSIZE);
@@ -279,7 +322,10 @@ impl MessageQueue {
             return error!(EAGAIN);
         }
         let data = MessageData::copy_from_user(data, actual)?;
-        self.write_message(Message::new(data, address, std::mem::take(ancillary_data)));
+        let message = Message::new(data, address, std::mem::take(ancillary_data));
+        if let Some(message) = filter(message) {
+            self.write_message(message);
+        }
         Ok(actual)
     }
 

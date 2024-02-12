@@ -20,7 +20,7 @@ use crate::{
             SocketOps, SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType,
             DEFAULT_LISTEN_BACKLOG,
         },
-        FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr, LookupContext,
+        FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr, LookupContext, Message,
     },
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -905,10 +905,24 @@ impl UnixSocketInner {
         if self.is_shutdown {
             return error!(EPIPE);
         }
+        let filter = |mut message: Message| {
+            let Some(bpf_program) = self.bpf_program.as_ref() else {
+                return Some(message);
+            };
+            let Ok(s) = bpf_program.run(&mut ()) else {
+                return Some(message);
+            };
+            if s == 0 {
+                None
+            } else {
+                message.truncate(s as usize);
+                Some(message)
+            }
+        };
         let bytes_written = if socket_type == SocketType::Stream {
-            self.messages.write_stream(data, address, ancillary_data)?
+            self.messages.write_stream_with_filter(data, address, ancillary_data, filter)?
         } else {
-            self.messages.write_datagram(data, address, ancillary_data)?
+            self.messages.write_datagram_with_filter(data, address, ancillary_data, filter)?
         };
         if bytes_written > 0 {
             self.waiters.notify_fd_events(FdEvents::POLLIN);

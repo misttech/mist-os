@@ -63,6 +63,13 @@ impl Message {
             ancillary_data: self.ancillary_data.clone(),
         }
     }
+
+    /// Shortens the message data, keeping the first `limit` elements and dropping the rest.
+    ///
+    /// If `limit` is greater or equal to the current data length, this has no effect.
+    pub fn truncate(&mut self, limit: usize) {
+        self.data.bytes.truncate(limit);
+    }
 }
 
 impl From<MessageData> for Message {

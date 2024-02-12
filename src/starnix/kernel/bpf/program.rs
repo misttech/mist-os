@@ -11,12 +11,10 @@ use crate::{
     task::CurrentTask,
     vfs::FdNumber,
 };
-use starnix_logging::track_stub;
-use starnix_uapi::bpf_attr__bindgen_ty_4;
-
-use starnix_logging::log_error;
+use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_uapi::{
-    bpf_insn, bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER, errno, error, errors::Errno,
+    bpf_attr__bindgen_ty_4, bpf_insn, bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER, errno, error,
+    errors::Errno,
 };
 use ubpf::{
     error::UbpfError,
@@ -62,7 +60,7 @@ impl From<&bpf_attr__bindgen_ty_4> for ProgramInfo {
 
 pub struct Program {
     pub info: ProgramInfo,
-    _vm: Option<UbpfVm>,
+    vm: Option<UbpfVm>,
     _objects: Vec<BpfHandle>,
 }
 
@@ -89,11 +87,24 @@ impl Program {
             builder.load(code)
         })()
         .map_err(map_ubpf_error)?;
-        Ok(Program { info, _vm: Some(vm), _objects: objects })
+        Ok(Program { info, vm: Some(vm), _objects: objects })
     }
 
     pub fn new_stub(info: ProgramInfo) -> Program {
-        Program { info, _vm: None, _objects: vec![] }
+        Program { info, vm: None, _objects: vec![] }
+    }
+
+    pub fn run<T>(&self, data: &mut T) -> Result<u64, ()> {
+        if let Some(vm) = self.vm.as_ref() {
+            vm.run(data).map_err(|e| {
+                log_warn!("bpf program returned with an error: {e:?}");
+                ()
+            })
+        } else {
+            // vm is only None when bpf is faked. Return an error on execution, as random value
+            // might have stronger side effects.
+            Err(())
+        }
     }
 }
 
