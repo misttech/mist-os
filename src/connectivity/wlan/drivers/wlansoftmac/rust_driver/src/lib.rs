@@ -8,7 +8,7 @@ use {
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_async as fasync,
     fuchsia_inspect::{self, Inspector, Node as InspectNode},
     fuchsia_inspect_contrib::auto_persist,
-    fuchsia_trace as trace,
+    fuchsia_trace as ftrace,
     fuchsia_zircon::{self as zx, HandleBased},
     futures::{
         channel::{mpsc, oneshot},
@@ -25,6 +25,7 @@ use {
         DriverEvent,
     },
     wlan_sme::{self, serve::create_sme},
+    wlan_trace as wtrace,
 };
 
 const INSPECT_VMO_SIZE_BYTES: usize = 1000 * 1024;
@@ -39,6 +40,7 @@ impl std::fmt::Debug for WlanSoftmacHandle {
 
 impl WlanSoftmacHandle {
     pub fn stop(mut self, stop_completer: StopCompleter) {
+        wtrace::duration!(c"WlanSoftmacHandle::stop");
         let driver_event_sink = &mut self.0;
         if let Err(e) = driver_event_sink.unbounded_send(DriverEvent::Stop(stop_completer)) {
             error!("Failed to signal WlanSoftmac main loop thread to stop: {}", e);
@@ -54,8 +56,9 @@ impl WlanSoftmacHandle {
     pub fn queue_eth_frame_tx(
         &mut self,
         bytes: Vec<u8>,
-        async_id: trace::Id,
+        async_id: ftrace::Id,
     ) -> Result<(), zx::Status> {
+        wtrace::duration!(c"WlanSoftmacHandle::queue_eth_frame_tx");
         let driver_event_sink = &mut self.0;
         driver_event_sink.unbounded_send(DriverEvent::EthFrameTx { bytes, async_id }).map_err(|e| {
             error!("Failed to queue ethernet frame: {:?}", e);
@@ -97,6 +100,7 @@ pub async fn start_and_serve<D: DeviceOps + 'static>(
     device: D,
     buf_provider: BufferProvider,
 ) -> Result<(), zx::Status> {
+    wtrace::duration_begin_scope!(c"rust_driver::start_and_serve");
     let (driver_event_sink, driver_event_stream) = mpsc::unbounded();
     let softmac_handle_sink = driver_event_sink.clone();
     let init_completer = InitCompleter::new(move |result: Result<(), zx::Status>| {
@@ -144,6 +148,8 @@ async fn start<D: DeviceOps + 'static>(
     >,
     zx::Status,
 > {
+    wtrace::duration!(c"rust_driver::start");
+
     // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
     let mut mlme_sink = wlan_mlme::DriverEventSink(driver_event_sink);
     let softmac_ifc_ffi = WlanSoftmacIfcProtocol::new(&mut mlme_sink);
@@ -284,6 +290,8 @@ async fn serve<InitFn>(
 where
     InitFn: FnOnce(Result<(), zx::Status>) + Send,
 {
+    wtrace::duration_begin_scope!(c"rust_driver::serve");
+
     let mut mlme_fut = mlme_fut.fuse();
     let mut sme_fut = sme_fut.fuse();
 
@@ -294,52 +302,58 @@ where
     let mut mlme_init_receiver = mlme_init_receiver.fuse();
 
     // Run the MLME server and wait for the MLME to signal initialization completion.
-    futures::select! {
-        init_result = mlme_init_receiver => {
-            let init_result = match init_result {
-                Ok(x) => x,
-                Err(e) => {
-                    error!("mlme_init_receiver interrupted: {}", e);
-                    let status = zx::Status::INTERNAL;
-                    init_completer.complete(Err(status));
-                    return Err(status);
+    {
+        wtrace::duration_begin_scope!(c"initialize MLME");
+        futures::select! {
+            init_result = mlme_init_receiver => {
+                let init_result = match init_result {
+                    Ok(x) => x,
+                    Err(e) => {
+                        error!("mlme_init_receiver interrupted: {}", e);
+                        let status = zx::Status::INTERNAL;
+                        init_completer.complete(Err(status));
+                        return Err(status);
+                    }
+                };
+                match init_result {
+                    Ok(()) =>
+                        init_completer.complete(Ok(())),
+                    Err(status) => {
+                        error!("Failed to initialize MLME: {}", status);
+                        init_completer.complete(Err(status));
+                        return Err(status);
+                    }
                 }
-            };
-            match init_result {
-                Ok(()) =>
-                    init_completer.complete(Ok(())),
-                Err(status) => {
-                    error!("Failed to initialize MLME: {}", status);
-                    init_completer.complete(Err(status));
-                    return Err(status);
-                }
+            },
+            mlme_result = mlme_fut => {
+                error!("MLME future completed before signaling init_sender: {:?}", mlme_result);
+                let status = zx::Status::INTERNAL;
+                init_completer.complete(Err(status));
+                return Err(status);
             }
-        },
-        mlme_result = mlme_fut => {
-            error!("MLME future completed before signaling init_sender: {:?}", mlme_result);
-            let status = zx::Status::INTERNAL;
-            init_completer.complete(Err(status));
-            return Err(status);
         }
     }
 
     // Run the SME and MLME servers.
-    let server_shutdown_result = futures::select! {
-        mlme_result = mlme_fut => {
-            match mlme_result {
-                Ok(()) => {
-                    info!("MLME shut down gracefully.");
-                    Ok(())
-                },
-                Err(e) => {
-                    error!("MLME shut down with error: {}", e);
-                    Err(zx::Status::INTERNAL)
+    let server_shutdown_result = {
+        wtrace::duration_begin_scope!(c"run MLME and SME");
+        futures::select! {
+            mlme_result = mlme_fut => {
+                match mlme_result {
+                    Ok(()) => {
+                        info!("MLME shut down gracefully.");
+                        Ok(())
+                    },
+                    Err(e) => {
+                        error!("MLME shut down with error: {}", e);
+                        Err(zx::Status::INTERNAL)
+                    }
                 }
             }
-        }
-        sme_result = sme_fut => {
-            error!("SME shut down before MLME: {:?}", sme_result);
-            Err(zx::Status::INTERNAL)
+            sme_result = sme_fut => {
+                error!("SME shut down before MLME: {:?}", sme_result);
+                Err(zx::Status::INTERNAL)
+            }
         }
     };
 
@@ -349,12 +363,10 @@ where
 
     // Since the MLME server is shut down at this point, the SME server will shut down soon because the SME
     // server always shuts down when it loses connection with the MLME server.
-    let sme_result = sme_fut
-        .await
-        .map(|()| info!("SME shut down gracefully"))
-        .map_err(|e| error!("SME shut down with error: {}", e));
-
-    sme_result.map_err(|()| zx::Status::INTERNAL)
+    sme_fut.await.map(|()| info!("SME shut down gracefully")).map_err(|e| {
+        error!("SME shut down with error: {}", e);
+        zx::Status::INTERNAL
+    })
 }
 
 struct BootstrappedGenericSme {
@@ -372,6 +384,8 @@ async fn bootstrap_generic_sme<D: DeviceOps>(
     device: &mut D,
     softmac_ifc_ffi: &WlanSoftmacIfcProtocol<'_>,
 ) -> Result<BootstrappedGenericSme, zx::Status> {
+    wtrace::duration!(c"rust_driver::bootstrap_generic_sme");
+
     let (softmac_ifc_bridge_client, _softmac_ifc_bridge_server) =
         fidl::endpoints::create_endpoints::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
 
