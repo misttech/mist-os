@@ -30,13 +30,5 @@
             from: "parent",
             to: "#realm_builder",
         },
-        {
-            // Required for `fonts_provider` to provide fonts.
-            directory: "config-data",
-            from: "parent",
-            as: "config-data",
-            to: "#realm_builder",
-            availability: "required",
-        },
     ],
 }

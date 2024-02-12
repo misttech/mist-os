@@ -345,8 +345,7 @@ class WebEngineTest : public ui_testing::PortableUITest,
   // TODO(https://fxbug.dev/42136267): Improve synchronization when we move to Flatland.
   void TryInject() {
     InjectInput(TapLocation::kTopLeft);
-    async::PostDelayedTask(
-        dispatcher(), [this] { TryInject(); }, kTapRetryInterval);
+    async::PostDelayedTask(dispatcher(), [this] { TryInject(); }, kTapRetryInterval);
   }
 
   // Routes needed to setup Chromium client.
@@ -426,10 +425,17 @@ class WebEngineTest : public ui_testing::PortableUITest,
         {.capabilities = {Protocol{fuchsia::intl::PropertyProvider::Name_}},
          .source = ChildRef{kIntl},
          .targets = {target}},
-        {.capabilities = {Directory{
-             .name = "root-ssl-certificates",
-             .type = fuchsia::component::decl::DependencyType::STRONG,
-         }},
+        {.capabilities =
+             {
+                 Directory{
+                     .name = "root-ssl-certificates",
+                     .type = fuchsia::component::decl::DependencyType::STRONG,
+                 },
+                 Directory{
+                     .name = "tzdata-icu",
+                     .type = fuchsia::component::decl::DependencyType::STRONG,
+                 },
+             },
          .source = ParentRef(),
          .targets = {ChildRef{kWebContextProvider}}},
     };

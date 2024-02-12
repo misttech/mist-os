@@ -189,20 +189,23 @@ class ChromiumInputBase : public gtest::RealLoopFixture {
     config.use_scene_owner = true;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
     config.passthrough_capabilities = {
-        {// Uncomment the configuration below if you want to run Chrome remote
-         // devtools. See README.md for details.
-         // Protocol{fuchsia::posix::socket::Provider::Name_},
-         // Protocol{fuchsia::net::interfaces::State::Name_},
-         // TODO(https://fxbug.dev/42074480): Do the feedback protocols need to be here? Is
-         // including launch_context_provider.shard.cml sufficient?
-         Protocol{fuchsia::kernel::Stats::Name_}, Protocol{fuchsia::kernel::VmexResource::Name_},
-         Protocol{fuchsia::process::Launcher::Name_},
-         Protocol{fuchsia::feedback::ComponentDataRegister::Name_},
-         Protocol{fuchsia::feedback::CrashReportingProductRegister::Name_},
-         Directory{
-             .name = "root-ssl-certificates",
-             .type = fuchsia::component::decl::DependencyType::STRONG,
-         }},
+        {
+            // Uncomment the configuration below if you want to run Chrome remote
+            // devtools. See README.md for details.
+            // Protocol{fuchsia::posix::socket::Provider::Name_},
+            // Protocol{fuchsia::net::interfaces::State::Name_},
+            // TODO(https://fxbug.dev/42074480): Do the feedback protocols need to be here? Is
+            // including launch_context_provider.shard.cml sufficient?
+            Protocol{fuchsia::kernel::Stats::Name_},
+            Protocol{fuchsia::kernel::VmexResource::Name_},
+            Protocol{fuchsia::process::Launcher::Name_},
+            Protocol{fuchsia::feedback::ComponentDataRegister::Name_},
+            Protocol{fuchsia::feedback::CrashReportingProductRegister::Name_},
+            Directory{
+                .name = "root-ssl-certificates",
+                .type = fuchsia::component::decl::DependencyType::STRONG,
+            },
+        },
     };
     config.ui_to_client_services = {
         fuchsia::accessibility::semantics::SemanticsManager::Name_,
@@ -504,10 +507,17 @@ class ChromiumInputTest : public ChromiumInputBase {
         {.capabilities = {Protocol{fuchsia::buildinfo::Provider::Name_}},
          .source = ChildRef{kBuildInfoProvider},
          .targets = {target}},
-        {.capabilities = {Directory{
-             .name = "root-ssl-certificates",
-             .type = fuchsia::component::decl::DependencyType::STRONG,
-         }},
+        {.capabilities =
+             {
+                 Directory{
+                     .name = "root-ssl-certificates",
+                     .type = fuchsia::component::decl::DependencyType::STRONG,
+                 },
+                 Directory{
+                     .name = "tzdata-icu",
+                     .type = fuchsia::component::decl::DependencyType::STRONG,
+                 },
+             },
          .source = ParentRef(),
          .targets = {ChildRef{kWebContextProvider}}},
     };

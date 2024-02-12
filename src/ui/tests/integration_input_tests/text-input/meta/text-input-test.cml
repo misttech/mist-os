@@ -34,12 +34,6 @@
             from: "parent",
             to: "#realm_builder",
         },
-        {
-            directory: "config-data",
-            from: "parent",
-            to: "#realm_builder",
-            subdir: "text-input-test",
-        },
     ],
     facets: {
         "fuchsia.test": {

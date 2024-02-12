@@ -159,13 +159,14 @@ class VirtualKeyboardBase : public gtest::RealLoopFixture {
         fuchsia::ui::input::ImeService::Name_,
         fuchsia::ui::scenic::Scenic::Name_,
     };
-    config.passthrough_capabilities = {
-        {Protocol{fuchsia::kernel::VmexResource::Name_},
-         Protocol{fuchsia::process::Launcher::Name_},
-         Directory{
-             .name = "root-ssl-certificates",
-             .type = fuchsia::component::decl::DependencyType::STRONG,
-         }}};
+    config.passthrough_capabilities = {{
+        Protocol{fuchsia::kernel::VmexResource::Name_},
+        Protocol{fuchsia::process::Launcher::Name_},
+        Directory{
+            .name = "root-ssl-certificates",
+            .type = fuchsia::component::decl::DependencyType::STRONG,
+        },
+    }};
     ui_test_manager_.emplace(config);
 
     // Build realm.
@@ -237,9 +238,8 @@ class VirtualKeyboardBase : public gtest::RealLoopFixture {
     // Register the FakeInputDevice
     registry_->Register(std::move(input_device_ptr_));
     FX_LOGS(INFO) << "Registered touchscreen with x touch range = (" << x_axis.range.min << ", "
-                  << x_axis.range.max << ") "
-                  << "and y touch range = (" << y_axis.range.min << ", " << y_axis.range.max
-                  << ").";
+                  << x_axis.range.max << ") " << "and y touch range = (" << y_axis.range.min << ", "
+                  << y_axis.range.max << ").";
   }
 
   // Inject directly into Input Pipeline, using fuchsia.input.injection FIDLs.
@@ -445,10 +445,18 @@ class WebEngineTest : public VirtualKeyboardBase {
         {.capabilities = {Protocol{fuchsia::buildinfo::Provider::Name_}},
          .source = ChildRef{kBuildInfoProvider},
          .targets = {target}},
-        {.capabilities = {Directory{
-             .name = "root-ssl-certificates",
-             .type = fuchsia::component::decl::DependencyType::STRONG,
-         }},
+        {.capabilities =
+             {
+                 Directory{
+                     .name = "root-ssl-certificates",
+                     .type = fuchsia::component::decl::DependencyType::STRONG,
+                 },
+
+                 Directory{
+                     .name = "tzdata-icu",
+                     .type = fuchsia::component::decl::DependencyType::STRONG,
+                 },
+             },
          .source = ParentRef(),
          .targets = {ChildRef{kWebContextProvider}}},
     };

@@ -180,10 +180,17 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
              .source = ChildRef{kBuildInfoProvider},
              .targets = {target, ChildRef{kWebContextProvider}}},
             {
-                .capabilities = {Directory{
-                    .name = "root-ssl-certificates",
-                    .type = fuchsia::component::decl::DependencyType::STRONG,
-                }},
+                .capabilities =
+                    {
+                        Directory{
+                            .name = "root-ssl-certificates",
+                            .type = fuchsia::component::decl::DependencyType::STRONG,
+                        },
+                        Directory{
+                            .name = "tzdata-icu",
+                            .type = fuchsia::component::decl::DependencyType::STRONG,
+                        },
+                    },
                 .source = ParentRef{},
                 .targets = {ChildRef{kWebContextProvider}},
             },
@@ -193,6 +200,10 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
                         Protocol{fuchsia::kernel::VmexResource::Name_},
                         Protocol{fuchsia::process::Launcher::Name_},
                         Protocol{fuchsia::vulkan::loader::Loader::Name_},
+                        Directory{
+                            .name = "tzdata-icu",
+                            .type = fuchsia::component::decl::DependencyType::STRONG,
+                        },
                     },
                 .source = ParentRef{},
                 .targets = {ChildRef{kWebClient}},

@@ -39,10 +39,9 @@
             to: "#realm_builder",
         },
         {
-            directory: "config-data",
+            directory: "tzdata-icu",
             from: "parent",
             to: "#realm_builder",
-            subdir: "web_runner_pixel_test",
         },
     ],
     facets: {
