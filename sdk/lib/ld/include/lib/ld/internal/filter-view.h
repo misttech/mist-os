@@ -20,21 +20,38 @@ using std::ranges::filter_view;
 
 // only std::ranges::find_if will use std::invoke, so we just write this ourselves.
 template <class It, typename Pred>
-It find_if(It begin, It end, Pred pred) {
-  for (; begin != end; ++begin) {
-    if (std::invoke(pred, *begin)) {
-      return begin;
-    }
+It find_if(It begin, It end, Pred&& pred) {
+  while (begin != end && !std::invoke(pred, *begin)) {
+    ++begin;
   }
-  return end;
+  return begin;
 }
 
 template <class Range, typename Pred>
 class filter_view {
+ private:
+  // Forward declaration, see below.
+  template <class Iter>
+  class filter_iterator;
+
  public:
   using value_type = typename Range::value_type;
 
-  filter_view(Range range, Pred pred) : range_{std::move(range)}, filter_{pred} {}
+  constexpr filter_view(Range range, Pred pred) : range_{std::move(range)}, filter_{pred} {}
+
+  using iterator = filter_iterator<decltype(std::begin(std::declval<Range>()))>;
+  using const_iterator = filter_iterator<decltype(std::cbegin(std::declval<Range>()))>;
+
+  iterator begin() { return {*this, find_if(std::begin(range_), std::end(range_), filter_)}; }
+  const_iterator begin() const {
+    return {*this, find_if(std::cbegin(range_), std::cend(range_), filter_)};
+  }
+
+  iterator end() { return {*this, std::end(range_)}; }
+  const_iterator end() const { return {*this, std::cend(range_)}; }
+
+ private:
+  using RangeConstIterator = decltype(std::cbegin(std::declval<Range>()));
 
   template <class Iter>
   class filter_iterator : public std::iterator_traits<Iter> {
@@ -47,15 +64,16 @@ class filter_view {
                           typename std::iterator_traits<Iter>::iterator_category>,
         std::bidirectional_iterator_tag, std::forward_iterator_tag>;
 
-    filter_iterator(filter_view& parent, Iter iter) : iter_{iter}, parent_{parent} {}
-    filter_iterator(const filter_iterator&) = default;
+    constexpr filter_iterator() = default;
 
-    filter_iterator& operator++() {
-      iter_ = find_if(++iter_, parent_.range_.end(), parent_.filter_);
+    constexpr filter_iterator(const filter_iterator&) = default;
+
+    constexpr filter_iterator& operator++() {
+      iter_ = find_if(++iter_, end(), parent_->filter_);
       return *this;
     }
 
-    filter_iterator operator++(int) {
+    constexpr filter_iterator operator++(int) {
       filter_iterator old = *this;
       ++*this;
       return old;
@@ -63,40 +81,47 @@ class filter_view {
 
     template <bool BiDir = std::is_same_v<iterator_category, std::bidirectional_iterator_tag>,
               typename = std::enable_if_t<BiDir>>
-    filter_iterator& operator--() {
-      while (!std::invoke(parent_.filter_, *--iter_))
+    constexpr filter_iterator& operator--() {
+      while (!std::invoke(parent_->filter_, *--iter_))
         ;
       return *this;
     }
+
     template <bool BiDir = std::is_same_v<iterator_category, std::bidirectional_iterator_tag>,
               typename = std::enable_if_t<BiDir>>
-    filter_iterator operator--(int) {
+    constexpr filter_iterator operator--(int) {
       filter_iterator old = *this;
       --*this;
       return old;
     }
 
-    bool operator==(const filter_iterator& other) const { return iter_ == other.iter_; }
-    bool operator!=(const filter_iterator& other) const { return iter_ != other.iter_; }
+    constexpr bool operator==(const filter_iterator& other) const { return iter_ == other.iter_; }
 
-    auto& operator*() { return *iter_; }
-    auto* operator->() { return iter_.operator->(); }
+    constexpr bool operator!=(const filter_iterator& other) const { return iter_ != other.iter_; }
+
+    constexpr auto& operator*() { return *iter_; }
+
+    constexpr auto* operator->() { return iter_.operator->(); }
 
    private:
+    friend filter_view;
+
+    constexpr filter_iterator(const filter_view& parent, Iter iter)
+        : iter_{iter}, parent_{&parent} {}
+
+    constexpr auto end() const {
+      if constexpr (std::is_same_v<Iter, RangeConstIterator>) {
+        return std::cend(parent_->range_);
+      } else {
+        return std::end(parent_->range_);
+      }
+    }
+
     Iter iter_;
-    filter_view& parent_;
+    const filter_view* parent_ = nullptr;
   };
 
-  template <class Iter>
-  filter_iterator(const filter_view&, Iter) -> filter_iterator<Iter>;
-
-  using iterator = filter_iterator<typename Range::iterator>;
-
-  iterator begin() { return {*this, find_if(range_.begin(), range_.end(), filter_)}; }
-  iterator end() { return {*this, range_.end()}; }
-
- private:
-  Range range_;
+  [[no_unique_address]] Range range_;
   [[no_unique_address]] Pred filter_;
 };
 

@@ -12,6 +12,7 @@ has_fd = !is_kernel && toolchain_variant.tags + [ "standalone" ] -
 
 library_headers("headers") {
   public_deps = [
+    "//sdk/lib/fit",
     "//sdk/lib/stdcompat",
 
     # <lib/elfldltl/memory.h> has #include <fbl/alloc_checker.h>.

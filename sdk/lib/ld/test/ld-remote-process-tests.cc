@@ -26,6 +26,14 @@ class LdRemoteProcessTests::MockLoader {
         .WillOnce(::testing::Return(elfldltl::testing::GetTestLibVmo(path)));
   }
 
+  // This is used in LoadAndFail tests when a specific request is expected and
+  // the test scenario requires that it be refused.  Without such an
+  // expectation, the test would succeed if no request were ever made, and
+  // would fail when the expected request was made.
+  void ExpectLoadObjectFail(std::string_view name) {
+    EXPECT_CALL(*this, LoadObject(std::string{name})).WillOnce(::testing::Return(zx::vmo{}));
+  }
+
  private:
   ::testing::InSequence sequence_guard_;
 };
@@ -66,6 +74,19 @@ void LdRemoteProcessTests::Needed(std::initializer_list<std::string_view> names)
     ASSERT_TRUE(name != kLinkerName.str() && name != GetVdsoSoname().str())
         << std::string{name} + " should not be included in Needed list.";
     mock_loader_->ExpectLoadObject(name);
+  }
+}
+
+void LdRemoteProcessTests::Needed(
+    std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs) {
+  for (auto [name, found] : name_found_pairs) {
+    ASSERT_TRUE(name != kLinkerName.str() && name != GetVdsoSoname().str())
+        << std::string{name} + " should not be included in Needed list.";
+    if (found) {
+      mock_loader_->ExpectLoadObject(name);
+    } else {
+      mock_loader_->ExpectLoadObjectFail(name);
+    }
   }
 }
 

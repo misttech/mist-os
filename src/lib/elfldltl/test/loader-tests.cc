@@ -86,13 +86,14 @@ class ElfldltlLoaderTests : public elfldltl::testing::LoadTests<Traits> {
       ASSERT_TRUE(RelocateRelative(diag, mem, reloc_info, bias));
 
       auto resolve = [this, bias](const auto& ref,
-                                  elfldltl::RelocateTls tls_type) -> std::optional<Definition> {
+                                  elfldltl::RelocateTls tls_type) -> fit::result<bool, Definition> {
         EXPECT_EQ(tls_type, elfldltl::RelocateTls::kNone) << "Should not have any tls relocs";
         elfldltl::SymbolName name{sym_info_, ref};
         if (const Sym* sym = name.Lookup(sym_info_)) {
-          return Definition{sym, bias};
+          return fit::ok(Definition{sym, bias});
         }
-        return {};
+        ADD_FAILURE() << name << " not found!";
+        return fit::error{false};
       };
 
       ASSERT_TRUE(elfldltl::RelocateSymbolic(mem, diag, reloc_info, sym_info_, bias, resolve));
@@ -154,8 +155,8 @@ class ElfldltlLoaderTests : public elfldltl::testing::LoadTests<Traits> {
     constexpr size_type static_tls_bias() const { return 0; }
 
     template <class Diagnostics>
-    constexpr std::optional<typename Elf::TlsDescGot> tls_desc(Diagnostics& diag) const {
-      return std::nullopt;
+    constexpr fit::result<bool, typename Elf::TlsDescGot> tls_desc(Diagnostics& diag) const {
+      return fit::error{false};
     }
 
     constexpr typename Elf::TlsDescGot tls_desc_undefined_weak() const { return {}; }

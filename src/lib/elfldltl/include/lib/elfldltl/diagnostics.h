@@ -110,7 +110,7 @@ namespace elfldltl {
 //    context to the error encountered. Those two types are found in posix.h
 //    and zircon.h, and take either an errno value or zx_status_t respectively.
 //
-// * `bool extra_checking()`
+// * `bool extra_checking() const`
 //
 //   If this returns true, the processor may do some extra work that is not
 //   necessary for its correct operation but just offers an opportunity to
@@ -235,11 +235,11 @@ class Diagnostics {
   constexpr Diagnostics(Report report, Flags flags)
       : report_(std::move(report)), flags_(std::move(flags)) {}
 
+  constexpr Flags& flags() { return flags_; }
   constexpr const Flags& flags() const { return flags_; }
 
-  constexpr Flags& flags() { return flags_; }
-
   constexpr Report& report() { return report_; }
+  constexpr const Report& report() const { return report_; }
 
   constexpr unsigned int errors() const { return errors_; }
 

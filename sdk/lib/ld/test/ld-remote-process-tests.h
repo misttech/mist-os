@@ -40,17 +40,19 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
 
   void Needed(std::initializer_list<std::string_view> names);
 
+  void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs);
+
   void Load(std::string_view executable_name) {
     elfldltl::testing::ExpectOkDiagnostics diag;
-    ASSERT_NO_FATAL_FAILURE(Load(diag, executable_name));
+    ASSERT_NO_FATAL_FAILURE(Load(diag, executable_name, false));
   }
 
   int64_t Run();
 
   template <class... Reports>
-  void LoadAndFail(std::string_view name, Reports&&... reports) {
-    elfldltl::testing::ExpectedErrorList diag{std::forward<Reports>(reports)...};
-    ASSERT_NO_FATAL_FAILURE(Load(diag, name));
+  void LoadAndFail(std::string_view name, elfldltl::testing::ExpectedErrorList<Reports...> diag) {
+    ASSERT_NO_FATAL_FAILURE(Load(diag, name, true));
+    ASSERT_NO_FATAL_FAILURE(ExpectLog(""));
   }
 
  protected:
@@ -72,7 +74,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   zx::vmo GetDepVmo(const RemoteModule::Soname& soname);
 
   template <class Diagnostics>
-  void Load(Diagnostics& diag, std::string_view executable_name) {
+  void Load(Diagnostics& diag, std::string_view executable_name, bool should_fail) {
     const std::string executable_path = std::filesystem::path("test") / "bin" / executable_name;
 
     zx::vmo vmo;
@@ -180,12 +182,16 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
         }
         return "<none>";
       };
-      if (next_module != modules.end() && next_module->module().symbols_visible) {
+      if (next_module != modules.end() && next_module->HasModule() &&
+          next_module->module().symbols_visible) {
         // The second module must be a direct dependency of the executable.
         EXPECT_THAT(next_module->loaded_by_modid(), ::testing::Optional(0u))
             << " second module loaded by " << loaded_by_name();
       }
       for (; next_module != modules.end(); ++next_module) {
+        if (!next_module->HasModule()) {
+          continue;
+        }
         if (next_module->module().symbols_visible) {
           // This module wouldn't be here if it wasn't loaded by someone.
           EXPECT_NE(next_module->loaded_by_modid(), std::nullopt)
@@ -202,6 +208,28 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
 
     // Record any stack size request from the executable's PT_GNU_STACK.
     set_stack_size(exec_info.stack_size);
+
+    if (!loaded_stub.HasModule()) {
+      ASSERT_TRUE(this->HasFailure());
+      return;
+    }
+
+    // If not all modules could be decoded, don't bother with relocation to
+    // diagnose symbol resolution errors since many are likely without all the
+    // modules there and they are unlikely to add any helpful information
+    // beyond the diagnostic about decoding problems (e.g. missing modules).
+    // This is consistent with the startup dynamic linker, which reports all
+    // the decode / load problems it can before bailing out if there were any.
+    // In a general library implementation, it will be up to the caller of the
+    // library to decide whether to attempt later stages with an incomplete
+    // module list.  The library code endeavors to ensure it will be safe to
+    // make the attempt with missing or partially-decoded modules in the list.
+    if (!RemoteModule::AllModulesDecoded(modules)) {
+      // Whatever the failures were have already been diagnosed.
+      // This isn't a test failure in LoadAndFail tests.
+      EXPECT_EQ(this->HasFailure(), !should_fail);
+      return;
+    }
 
     // Now that the set of modules is known, initialize the remote ABI heap in
     // the loaded_stub module.  This can change that module's vaddr_size.
@@ -222,11 +250,29 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     // Apply relocations to segment VMOs.
     EXPECT_TRUE(RemoteModule::RelocateModules(diag, modules, tls_desc_resolver));
 
+    ASSERT_EQ(IsExpectOkDiagnostics(diag), !should_fail);
+    if (should_fail) {
+      // Whatever the failures were have already been diagnosed.  This isn't a
+      // test failure in LoadAndFail tests.  But don't really keep going past
+      // this point.  As the RelocateModules API comment suggests, it often
+      // makes sense to go this far despite prior errors just to maximize all
+      // the errors reported, e.g. all the undefined symbols and not just the
+      // first one.  For the library API, the caller is free to proceed further
+      // if they choose, but that's not consistent with the startup dynamic
+      // linker.  These tests expect the startup dynamic linker's behavior,
+      // which is to report all decoding / loading failures, then bail if there
+      // were any; then report all relocation failures, then bail if there were
+      // any.
+      EXPECT_FALSE(this->HasFailure());
+      return;
+    }
+
     // Now that load addresses have been chosen, populate the remote ABI data.
     abi_result = std::move(remote_abi).Finish(diag, abi_stub, loaded_stub, modules);
     EXPECT_TRUE(abi_result.is_ok()) << abi_result.status_string();
 
-    // Finally, all the VMO contents are in place to be mapped into the process.
+    // Finally, all the VMO contents are in place to be mapped into the
+    // process.
     EXPECT_TRUE(RemoteModule::LoadModules(diag, modules));
 
     // Use the executable's entry point at its loaded address.
@@ -237,12 +283,12 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
 
     RemoteModule::CommitModules(modules);
   }
+
   uintptr_t entry_ = 0;
   uintptr_t vdso_base_ = 0;
   std::optional<size_t> stack_size_;
   zx::vmar root_vmar_;
   zx::thread thread_;
-
   std::unique_ptr<MockLoader> mock_loader_;
 };
 }  // namespace ld::testing

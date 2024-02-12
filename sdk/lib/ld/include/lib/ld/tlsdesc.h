@@ -182,6 +182,7 @@ tlsdesc.value_offset = 8
 
 #include <lib/elfldltl/layout.h>
 #include <lib/elfldltl/symbol.h>
+#include <lib/fit/result.h>
 
 #include <cstddef>
 #include <optional>
@@ -295,16 +296,17 @@ class StaticTlsDescResolver {
   // applied the addend will be added to the value computed here from the
   // symbol's value and module's PT_TLS offset.
   template <class Diagnostics, class Definition>
-  constexpr std::optional<TlsDescGot> operator()(Diagnostics& diag, const Definition& defn) const {
+  constexpr fit::result<bool, TlsDescGot> operator()(Diagnostics& diag,
+                                                     const Definition& defn) const {
     assert(!defn.undefined_weak());
     // Note that defn.uses_static_tls() need not be true: this resolver is only
     // used at all when the module being relocated is in the Initial Exec set,
     // so anything its references resolve to will also be in the Initial Exec
     // set even if it wasn't marked with DF_STATIC_TLS at link time.
-    return TlsDescGot{
+    return fit::ok(TlsDescGot{
         .function = GetHook(TlsdescRuntime::kStatic),
         .value = defn.symbol().value + defn.static_tls_bias(),
-    };
+    });
   }
 
  private:

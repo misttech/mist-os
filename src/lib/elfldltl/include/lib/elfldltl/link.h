@@ -8,6 +8,8 @@
 // This file provides template APIs that do the central orchestration of
 // dynamic linking: resolving and applying relocations.
 
+#include <lib/fit/result.h>
+
 #include <type_traits>
 
 #include "diagnostics.h"
@@ -65,9 +67,13 @@ enum class RelocateTls {
 
 // Apply symbolic relocations as directed by Elf::RelocationInfo, referring to
 // Elf::SymbolInfo as adjusted by the load bias (as used in RelocateRelative).
-// The callback function is:
+// The callback function and methods on its returned Definition here use
+// `fit::result<bool, ...>` for cases where failure to deliver a result is an
+// option.  The error value is like the return value from a Diagnostics object,
+// indicating whether to continue applying more relocations or to bail out
+// after this failure.  The callback function is:
 //
-//  * std::optional<Definition> resolve(const Sym&, RelocateTls)
+//  * fit::result<bool, Definition> resolve(const Sym&, RelocateTls)
 //
 // where Definition is some type defined by the caller that supports methods:
 //
@@ -89,16 +95,25 @@ enum class RelocateTls {
 //  * TlsDescGot tls_desc_undefined_weak()
 //    This is only called if undefined_weak() returned true first.
 //    Returns the GOT contents for a TLSDESC resolution that was an
-//    undefined weak symbol.  The addend is always applied to the value.
+//    undefined weak symbol.  This overload does not require the addend
+//    up front.  Instead, the TlsDescGot::value field will have the
+//    addend applied implicitly.
 //
-//  * std::optional<TlsDescGot> tls_desc(Diagnostics&, Addend addend)
+//  * TlsDescGot tls_desc_undefined_weak(Addend addend)
+//    This is only called if undefined_weak() returned true first.
+//    Returns the GOT contents for a TLSDESC resolution that was an
+//    undefined weak.  This overload can use the relocation addend in
+//    choosing the TLSDESC implementation, but this requires an extra
+//    load in the DT_REL case.  The return value will be used as is.
+//
+//  * fit::result<bool, <TlsDescGot> tls_desc(Diagnostics&, Addend addend)
 //    Returns the GOT contents for a TLSDESC resolution, which can fail.
 //    If this overload is present, then it is always used and the second
 //    overload need not be defined.  This overload can use the relocation
 //    addend in choosing the TLSDESC implementation, but this requires an
 //    extra load in the DT_REL case.  The return value will be used as is.
 //
-//  * std::optional<TlsDescGot> tls_desc(Diagnostics&)
+//  * fit::result<bool, TlsDescGot> tls_desc(Diagnostics&)
 //    Returns the GOT contents for a TLSDESC resolution, which can fail.
 //    This overload does not require the addend up front.  Instead, the
 //    TlsDescGot::value field will have the addend applied implicitly.
@@ -166,10 +181,8 @@ constexpr bool RelocateSymbolic(Memory& memory, DiagnosticsType& diagnostics,
             symbol_info.string(sym.name));
       }
     }
-    if (auto defn = resolve(sym, tls)) {
-      return apply(reloc, *defn);
-    }
-    return false;
+    auto defn = resolve(sym, tls);
+    return defn.is_error() ? defn.error_value() : apply(reloc, *defn);
   };
 
   // The Definition for a non-TLS reloc is applied by passing the biased symbol
@@ -220,7 +233,7 @@ constexpr bool RelocateSymbolic(Memory& memory, DiagnosticsType& diagnostics,
   // dynamic), and the encoding of the value is between the resolver and its
   // hook function (except that it must be some sort of byte offset in a TLS
   // block such that applying the addend here makes sense).
-  auto tls_desc = [&](const auto& reloc, const auto& defn) {
+  auto tls_desc = [&](const auto& reloc, const auto& defn) -> bool {
     // reloc.offset points to the function slot but indicates filling both
     // slots.  value_reloc will point to the second slot, which is where
     // the addend is used.
@@ -228,15 +241,19 @@ constexpr bool RelocateSymbolic(Memory& memory, DiagnosticsType& diagnostics,
     value_reloc.offset = reloc.offset + sizeof(size_type);
 
     // Call either signature of the Definition::tls_desc_undefined_weak method.
+    // It cannot fail, so wrap it in an OK result.  The return type is always
+    // fit::result<bool, TlsDescGot>, which is what would be deduced.  But
+    // using explicit decltype on the call expression makes calls
+    // SFINAE-friendly so that std::is_invocable_v can be used below.
+    // Otherwise the lambda looks like it can be called with any arguments.
     auto weak_desc = [&defn](auto&&... args)
-        // This is the same return type that would be deduced for -> auto,
-        // but the explicit decltype makes calls SFINAE-friendly so that
-        // std::is_invocable_v can be used below.
-        -> decltype(defn.tls_desc_undefined_weak(std::forward<decltype(args)>(args)...)) {
-          return defn.tls_desc_undefined_weak(std::forward<decltype(args)>(args)...);
-        };
+        -> fit::result<  //
+            bool, decltype(defn.tls_desc_undefined_weak(std::forward<decltype(args)>(args)...))> {
+      return fit::ok(defn.tls_desc_undefined_weak(std::forward<decltype(args)>(args)...));
+    };
 
-    // Call either signature of the Definition::tls_desc method.
+    // Call either signature of the Definition::tls_desc method.  It already
+    // returns the result type, but the SFINAE dance is required here too.
     auto defn_desc = [&diagnostics, &defn](auto&&... args)
         -> decltype(defn.tls_desc(diagnostics, std::forward<decltype(args)>(args)...)) {
       return defn.tls_desc(diagnostics, std::forward<decltype(args)>(args)...);
@@ -258,26 +275,40 @@ constexpr bool RelocateSymbolic(Memory& memory, DiagnosticsType& diagnostics,
         }
       }();
 
-      std::optional<TlsDescGot> desc;
-      if constexpr (kAddend) {
+      auto get_addend = [&]() -> fit::result<bool, Addend> {
         if constexpr (std::is_same_v<Reloc, Rel>) {
           // The addend must be read out of the memory being relocated.
           auto read = memory.template ReadArray<Addend>(value_reloc.offset, 1);
-          if (read) {
-            desc = get_desc(read->front());
+          if (!read) {
+            return fit::error{false};
           }
+          return fit::ok(read->front());
         } else {
           static_assert(std::is_same_v<Reloc, Rela>);
           std::ignore = &memory;
-          desc = get_desc(value_reloc.addend);
+          return fit::ok(value_reloc.addend);
         }
-      } else {
-        std::ignore = &memory;
-        desc = get_desc();
-      }
+        __builtin_unreachable();
+      };
 
-      return desc && apply_no_addend(reloc, desc->function) &&
-             apply_value(value_reloc, desc->value);
+      auto resolve_desc = [&]() -> fit::result<bool, TlsDescGot> {
+        if constexpr (kAddend) {
+          // Definition::tls_get_desc(Addend) is available, so use it.
+          auto addend = get_addend();
+          return addend.is_error() ? addend.take_error() : get_desc(*addend);
+        } else {
+          // Just use Definition::tls_get_desc() without giving it the addend.
+          // The addend will be implicitly applied to the value slot.
+          return get_desc();
+        }
+        __builtin_unreachable();
+      };
+
+      fit::result<bool, TlsDescGot> desc = resolve_desc();
+
+      return desc.is_error() ? desc.error_value()
+                             : (apply_no_addend(reloc, desc->function) &&
+                                apply_value(value_reloc, desc->value));
     };
 
     return defn.undefined_weak() ? apply(weak_desc) : apply(defn_desc);

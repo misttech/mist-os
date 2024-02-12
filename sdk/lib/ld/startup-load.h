@@ -84,12 +84,12 @@ class TlsDescResolver {
   // applied the addend will be added to the value computed here from the
   // symbol's value and module's PT_TLS offset.
   template <class Definition>
-  std::optional<TlsDescGot> operator()(Diagnostics& diag, const Definition& defn) const {
+  fit::result<bool, TlsDescGot> operator()(Diagnostics& diag, const Definition& defn) const {
     assert(!defn.undefined_weak());
-    return TlsDescGot{
+    return fit::ok(TlsDescGot{
         .function = kRuntimeStatic,
         .value = defn.symbol().value + defn.static_tls_bias(),
-    };
+    });
   }
 
  private:

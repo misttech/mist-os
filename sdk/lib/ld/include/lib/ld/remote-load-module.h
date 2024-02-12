@@ -21,6 +21,8 @@
 #include <algorithm>
 #include <vector>
 
+#include "internal/filter-view.h"
+
 namespace ld {
 
 // RemoteLoadModule is the LoadModule type used in the remote dynamic linker.
@@ -277,11 +279,13 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
   // updating the module's runtime addr fields on success.
   template <class Diagnostics>
   bool Allocate(Diagnostics& diag, const zx::vmar& vmar) {
-    loader_ = Loader{vmar};
-    if (!loader_.Allocate(diag, load_info())) {
-      return false;
+    if (HasModule()) [[likely]] {
+      loader_ = Loader{vmar};
+      if (!loader_.Allocate(diag, load_info())) {
+        return false;
+      }
+      SetModuleVaddrBounds(module(), load_info(), loader_.load_bias());
     }
-    SetModuleVaddrBounds(module(), load_info(), loader_.load_bias());
     return true;
   }
 
@@ -291,8 +295,8 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
     return OnModules(modules, allocate);
   }
 
-  template <class Diagnostics, typename TlsDescResolver>
-  bool Relocate(Diagnostics& diag, const List& modules, const TlsDescResolver& tls_desc_resolver) {
+  template <class Diagnostics, class ModuleList, typename TlsDescResolver>
+  bool Relocate(Diagnostics& diag, ModuleList& modules, const TlsDescResolver& tls_desc_resolver) {
     auto mutable_memory = elfldltl::LoadInfoMutableMemory{
         diag, load_info(), elfldltl::SegmentWithVmo::GetMutableMemory<LoadInfo>{vmo_.borrow()}};
     if (!mutable_memory.Init()) {
@@ -306,13 +310,48 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
                                       load_bias(), resolver);
   }
 
+  // This returns an OK result only if all modules were fit to be relocated.
+  // If decoding failed earlier, this should only be called if Diagnostics said
+  // to keep going.  In that case, the error value will be true if every
+  // successfully-decoded module's Relocate pass also said to keep going.
   template <class Diagnostics, typename TlsDescResolver>
   static bool RelocateModules(Diagnostics& diag, List& modules,
                               TlsDescResolver&& tls_desc_resolver) {
     auto relocate = [&](auto& module) -> bool {
-      return module.Relocate(diag, modules, tls_desc_resolver);
+      if (!module.HasModule()) [[unlikely]] {
+        // This module wasn't decoded successfully.  Just skip it.  This
+        // doesn't cause a "failure" because the Diagnostics object must have
+        // reported the failures in decoding and decided to keep going anyway,
+        // so there is nothing new to report.  The caller may have decided to
+        // attempt relocation so as to diagnose all its specific errors, rather
+        // than bailing out immediately after decoding failed on some of the
+        // modules.  Probably callers will more often decide to bail out, since
+        // missing dependency modules is an obvious recipe for undefined symbol
+        // errors that aren't going to be more enlightening to the user.  But
+        // this class supports any policy.
+        return true;
+      }
+
+      // Resolve against the successfully decoded modules, ignoring the others.
+      ld::internal::filter_view valid_modules{
+          // The span provides a copyable view of the vector (List), which
+          // can't be (and shouldn't be) copied.
+          cpp20::span{modules},
+          &RemoteLoadModule::HasModule,
+      };
+
+      return module.Relocate(diag, valid_modules, tls_desc_resolver);
     };
     return OnModules(modules, relocate);
+  }
+
+  // This returns false if any module was not successfully decoded enough to
+  // attempt relocation on it.
+  static bool AllModulesDecoded(const List& modules) {
+    constexpr auto has_module = [](const RemoteLoadModule& module) -> bool {
+      return module.HasModule();
+    };
+    return std::all_of(modules.begin(), modules.end(), has_module);
   }
 
   // Load the module into its allocated vaddr region.
@@ -323,16 +362,23 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
 
   template <class Diagnostics>
   static bool LoadModules(Diagnostics& diag, List& modules) {
-    auto load = [&diag](auto& module) { return module.Load(diag); };
+    auto load = [&diag](auto& module) { return !module.HasModule() || module.Load(diag); };
     return OnModules(modules, load);
   }
 
   // This must be the last method called with the loader. Direct the loader to
   // preserve the load image before it is garbage collected.
-  void Commit() { std::move(loader_).Commit(); }
+  void Commit() {
+    assert(HasModule());
+    std::move(loader_).Commit();
+  }
 
   static void CommitModules(List& modules) {
-    std::for_each(modules.begin(), modules.end(), [](auto& module) { module.Commit(); });
+    std::for_each(modules.begin(), modules.end(), [](auto& module) {
+      if (module.HasModule()) [[likely]] {
+        module.Commit();
+      }
+    });
   }
 
  private:

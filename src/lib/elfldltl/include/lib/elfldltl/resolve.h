@@ -5,6 +5,8 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_RESOLVE_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_RESOLVE_H_
 
+#include <lib/fit/result.h>
+
 #include <type_traits>
 #include <utility>
 
@@ -37,8 +39,8 @@ namespace elfldltl {
 //  * size_type static_tls_bias() const
 //    Returns the static TLS layout bias for the defining module.
 //
-//  * std::optional<TlsDescGot> tls_desc(Diagnostics&, const Sym&, Addend addend)
-//  * std::optional<TlsDescGot> tls_desc(Diagnostics&)
+//  * fit::result<bool, TlsDescGot> tls_desc(Diagnostics&, const Sym&, Addend addend)
+//  * fit::result<bool, TlsDescGot> tls_desc(Diagnostics&)
 //    See elfldltl::RelocateSymbolic API comments about the two overloads.
 //    This implements that method but for some particular defined symbol in
 //    `.symbols_info().symtab()`.
@@ -114,42 +116,42 @@ enum class ResolverPolicy : bool {
 // resolved, this list is in order of precedence.  The ModuleList type is a
 // forward iterable range or container.  diag is a diagnostics object for
 // reporting errors.  The TlsDescResolver is a callable object that's called as
-// `std::optional<TlsDescGot>(Diagnostics&, const Definition&, Addend addend)`
-// or `std::optional<TlsDescGot>(Diagnostics&, const Definition&)` for a
+// `fit::result<bool, TlsDescGot>(Diagnostics&, const Definition&, Addend)` or
+// `fit::result<bool, TlsDescGot>(Diagnostics&, const Definition&)` for a
 // TLSDESDC relocation resolved to a defined symbol; and as `TlsDescGot()` or
-// `TlsDescGot(Addend addend)` for one resolved as an undefined weak reference.
+// `TlsDescGot(Addend)` for one resolved as an undefined weak reference.
 //
 // All references passed to elfldltl::MakeSymbolResolver should outlive the
 // returned object, which in turn must outlive its return values (Definition
 // objects).  The tlsdesc_resolver reference is saved in Definition objects so
 // it can be called from the RelocateSymbolic callbacks.
 template <class Module, class ModuleList, class Diagnostics, typename TlsDescResolver>
-constexpr auto MakeSymbolResolver(const Module& ref_module, const ModuleList& modules,
-                                  Diagnostics& diag, TlsDescResolver& tlsdesc_resolver,
+constexpr auto MakeSymbolResolver(const Module& ref_module, ModuleList& modules, Diagnostics& diag,
+                                  TlsDescResolver& tlsdesc_resolver,
                                   ResolverPolicy policy = ResolverPolicy::kStrictLinkOrder) {
   using Definition = ResolverDefinition<Module, TlsDescResolver>;
 
   return [&ref_module, &modules, &diag, &tlsdesc_resolver, policy](
-             const auto& ref, RelocateTls tls_type) -> std::optional<Definition> {
+             const auto& ref, RelocateTls tls_type) -> fit::result<bool, Definition> {
     if (ref.runtime_local()) {
       // The symbol just resolves to itself in the referring module.  Usually
       // this would have been replaced with an R_*_RELATIVE reloc (and then
       // folded into DT_RELR), but it doesn't have to be.  In practice, this
       // comes up for TLS relocations which still need to have their specific
       // reloc type but can be for purely module-local references.
-      return Definition{&ref, &ref_module};
+      return fit::ok(Definition{&ref, &ref_module});
     }
 
     SymbolName name{ref_module.symbol_info(), ref};
 
     // Return the chosen Definition after some checking.
     auto use = [&ref_module, tls_type, &diag, &tlsdesc_resolver,
-                &name](Definition def) -> std::optional<Definition> {
+                &name](Definition def) -> fit::result<bool, Definition> {
       switch (tls_type) {
         case RelocateTls::kNone:
           if (def.symbol_->type() == ElfSymType::kTls) [[unlikely]] {
-            diag.FormatError("non-TLS relocation resolves to STT_TLS symbol ", name);
-            return std::nullopt;
+            return fit::error{
+                diag.FormatError("non-TLS relocation resolves to STT_TLS symbol ", name)};
           }
           break;
         case RelocateTls::kStatic:
@@ -164,29 +166,27 @@ constexpr auto MakeSymbolResolver(const Module& ref_module, const ModuleList& mo
           // (including PIE), so we're really using uses_static_tls() here as a
           // proxy for "is in initial exec set".
           if (!ref_module.uses_static_tls() && !def.module_->uses_static_tls()) [[unlikely]] {
-            diag.FormatError(
+            return fit::error{diag.FormatError(
                 "TLS Initial Exec relocation resolves to STT_TLS symbol in module without DF_STATIC_TLS: ",
-                name);
-            return std::nullopt;
+                name)};
           }
           [[fallthrough]];
         case RelocateTls::kDynamic:
         case RelocateTls::kDesc:
           if (def.symbol_->type() != ElfSymType::kTls) [[unlikely]] {
-            diag.FormatError("TLS relocation resolves to non-STT_TLS symbol: ", name);
-            return std::nullopt;
+            return fit::error{
+                diag.FormatError("TLS relocation resolves to non-STT_TLS symbol: ", name)};
           }
           break;
       }
       if (tls_type == RelocateTls::kDesc) {
         def.tlsdesc_resolver_ = &tlsdesc_resolver;
       }
-      return def;
+      return fit::ok(def);
     };
 
     if (name.empty()) [[unlikely]] {
-      diag.FormatError("Symbol had invalid st_name");
-      return std::nullopt;
+      return fit::error{diag.FormatError("Symbol had invalid st_name")};
     }
 
     Definition weak_def = Definition::UndefinedWeak(&tlsdesc_resolver);
@@ -209,19 +209,27 @@ constexpr auto MakeSymbolResolver(const Module& ref_module, const ModuleList& mo
             return use(module_def);
           case ElfSymBind::kLocal:
             // Local symbols are never matched by name.
-            diag.FormatWarning("STB_LOCAL found in hash table");
+            if (!diag.FormatWarning("STB_LOCAL found in hash table")) {
+              return fit::error{false};
+            }
             continue;
           case ElfSymBind::kUnique:
-            diag.FormatError("STB_GNU_UNIQUE not supported");
+            if (!diag.FormatError("STB_GNU_UNIQUE not supported")) {
+              return fit::error{false};
+            }
             break;
           default:
-            diag.FormatError("Unknown symbol binding type", static_cast<unsigned>(sym->bind()));
+            if (!diag.FormatError("Unknown symbol binding type",
+                                  static_cast<unsigned>(sym->bind()))) {
+              return fit::error{false};
+            }
             break;
         }
 
         // That returned a definition or continued to look for another so this
-        // is only reached for the error cases.
-        [[unlikely]] return std::nullopt;
+        // is only reached for the error cases where the Diagnostics object
+        // said to keep going.
+        [[unlikely]] return fit::error{true};
       }
     }
 
@@ -232,11 +240,10 @@ constexpr auto MakeSymbolResolver(const Module& ref_module, const ModuleList& mo
 
     // Undefined weak is a valid return value for an STB_WEAK reference.
     if (ref.bind() == ElfSymBind::kWeak) [[likely]] {
-      return weak_def;
+      return fit::ok(weak_def);
     }
 
-    diag.UndefinedSymbol(name);
-    return std::nullopt;
+    return fit::error{diag.UndefinedSymbol(name)};
   };
 }
 

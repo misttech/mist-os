@@ -75,11 +75,15 @@ class ExpectReport {
   constexpr ExpectReport(const ExpectReport& other) = delete;
 
   constexpr ExpectReport(ExpectReport&& other) noexcept
-      : expected_{std::move(other.expected_)}, state_{std::exchange(other.state_, State::kMoved)} {
+      : expected_{std::move(other.expected_)},
+        location_{other.location_},
+        state_{std::exchange(other.state_, State::kMoved)} {
     EXPECT_NE(state_, State::kMoved);
   }
 
-  explicit constexpr ExpectReport(Args... args) : expected_{std::forward<Args>(args)...} {}
+  explicit constexpr ExpectReport(
+      Args... args, cpp20::source_location location = cpp20::source_location::current())
+      : expected_{std::forward<Args>(args)...}, location_{location} {}
 
   template <typename... Ts>
   constexpr bool operator()(Ts&&... args) {
@@ -110,8 +114,12 @@ class ExpectReport {
     }
   }
 
+  // This puts the report into "moved-from" state, where ExpectCalledOrMoved()
+  // will not trigger a gtest failure.
+  void Release() && { state_ = State::kMoved; }
+
   template <typename Report>
-  bool ReportTo(Report&& report) {
+  bool ReportTo(Report&& report) const {
     return std::apply(std::forward<Report>(report), expected_);
   }
 
@@ -171,23 +179,32 @@ class ExpectReport {
     switch (state_) {
       case State::kMoved:
         ADD_FAILURE() << "Diagnostics used after std::move'd from!"
-                      << "\nFor expected error: " << formatted_expected_arguments
+                      << "\nFor expected error: " << formatted_expected_arguments << "\n"
+                      << location_.file_name() << ":" << location_.line() << ":"
+                      << location_.column() << ": in " << location_.function_name()
                       << "\nCalled with: " << formatted_arguments;
         break;
       case State::kCalled:
         ADD_FAILURE() << "Expected only one error: " << formatted_expected_arguments
+                      << location_.file_name() << ":" << location_.line() << ":"
+                      << location_.column() << ": in " << location_.function_name()
                       << "\nBut also got: " << formatted_arguments;
         break;
       case State::kUncalled:
         EXPECT_NE(formatted_arguments, formatted_expected_arguments)
-            << "Diagnose with identical strings??";
+            << "Diagnose with identical strings??\n"
+            << location_.file_name() << ":" << location_.line() << ":" << location_.column()
+            << ": in " << location_.function_name();
         EXPECT_EQ(formatted_arguments, formatted_expected_arguments)
-            << "Expected different Diagnostics arguments";
+            << "Expected different Diagnostics arguments\n"
+            << location_.file_name() << ":" << location_.line() << ":" << location_.column()
+            << ": in " << location_.function_name();
         break;
     }
   }
 
   ExpectedArgs expected_;
+  cpp20::source_location location_;
   State state_ = State::kUncalled;
 };
 
@@ -227,6 +244,13 @@ struct ExpectOkDiagnostics : public Diagnostics<ExpectNoReport, TestingDiagnosti
   constexpr ExpectOkDiagnostics(const ExpectOkDiagnostics&) = default;
 };
 
+template <typename Diagnostics>
+constexpr bool IsExpectOkDiagnostics(Diagnostics& diag) {
+  static_assert(!std::is_const_v<Diagnostics>,
+                "Diagnostics reference should be propagated without adding qualifiers");
+  return std::is_same_v<Diagnostics, ExpectOkDiagnostics>;
+}
+
 // This collects a list of ExpectReport objects and applies consecutive calls
 // to each in turn.  If it doesn't get a matching sequence of calls in order
 // before it goes out of scope, it causes gtest failures.
@@ -242,24 +266,44 @@ class ExpectReportList {
   ExpectReportList(const ExpectReportList&) = delete;
 
   constexpr ExpectReportList(ExpectReportList&& other)
-      : reports_{std::move(other.reports_)}, next_{std::exchange(other.next_, kCount)} {}
+      : reports_{std::move(other.reports_)},
+        location_{other.location_},
+        next_{std::exchange(other.next_, kCount)} {}
 
   ExpectReportList& operator=(const ExpectReportList&) = delete;
 
-  explicit constexpr ExpectReportList(Reports... reports) : reports_{std::move(reports)...} {}
+  explicit constexpr ExpectReportList(
+      Reports... reports, cpp20::source_location location = cpp20::source_location::current())
+      : reports_{std::move(reports)...}, location_{location} {}
 
   template <typename... Args>
   constexpr bool operator()(Args&&... args) {
-    EXPECT_LT(next_, kCount) << "too many errors";
+    EXPECT_LT(next_, kCount) << location_.file_name() << ":" << location_.line() << ":"
+                             << location_.column() << ": in " << location_.function_name()
+                             << ": too many errors, next error unexpected...";
     return next_ < kCount  //
                ? ExpectError(kSeq, next_++, std::forward<Args>(args)...)
-               : ExpectNoReport{}(std::forward<Args>(args)...);
+               : ExpectNoReport{location_}(std::forward<Args>(args)...);
+  }
+
+  // This puts the report list into "moved-from" state where no gtest
+  // expectations will be asserted at destruction.
+  void Release() && {
+    auto release = [](auto&... report) { (std::move(report).Release(), ...); };
+    std::apply(release, reports_);
+    next_ = kCount;
   }
 
   ~ExpectReportList() {
     EXPECT_EQ(next_, kCount) << "wrong number of errors";
     auto expect_called = [](auto&... report) { (report.ExpectCalledOrMoved(), ...); };
     std::apply(expect_called, reports_);
+  }
+
+  template <typename Report>
+  bool ReportTo(Report&& report) const {
+    auto one_report = [&report](auto& one) { return one.ReportTo(report); };
+    return std::apply(one_report, reports_);
   }
 
  private:
@@ -272,6 +316,7 @@ class ExpectReportList {
   }
 
   std::tuple<Reports...> reports_;
+  cpp20::source_location location_;
   size_t next_ = 0;
 };
 
@@ -284,8 +329,12 @@ struct ExpectedErrorList
     : public Diagnostics<ExpectReportList<Reports...>, TestingDiagnosticsFlags> {
   using ReportList = ExpectReportList<Reports...>;
 
-  explicit constexpr ExpectedErrorList(Reports... reports)
-      : Diagnostics<ReportList, TestingDiagnosticsFlags>{ReportList{std::move(reports)...}} {}
+  explicit constexpr ExpectedErrorList(
+      Reports... reports, cpp20::source_location location = cpp20::source_location::current())
+      : Diagnostics<ReportList, TestingDiagnosticsFlags>{
+            ReportList{std::move(reports)..., location}} {}
+
+  void Release() && { std::move(this->report()).Release(); }
 };
 
 // Deduction guide.

@@ -213,6 +213,10 @@ class LoadModule {
   // .tls_module() and .static_tls_bias().
   template <elfldltl::ElfMachine Machine = elfldltl::ElfMachine::kNative, size_type RedZone = 0>
   constexpr std::optional<size_type> AssignStaticTls(elfldltl::TlsLayout<Elf>& tls_layout) {
+    if (!HasModule()) [[unlikely]] {
+      return std::nullopt;
+    }
+
     if (tls_module_id() == 0) {
       return std::nullopt;
     }

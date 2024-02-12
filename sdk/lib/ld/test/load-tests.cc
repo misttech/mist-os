@@ -26,6 +26,7 @@ namespace {
 
 using namespace std::literals;
 
+using elfldltl::testing::ExpectedErrorList;
 using elfldltl::testing::ExpectReport;
 
 template <class Fixture>
@@ -41,22 +42,15 @@ using TestTypes = ::testing::Types<
 // relocation so they can make the syscall to exit. The spawn-process
 // tests also need a loader service to get ld.so.1 itself.
 #ifdef __Fuchsia__
-    ld::testing::LdStartupCreateProcessTests<>,
+    ld::testing::LdStartupCreateProcessTests<>,  //
+    ld::testing::LdRemoteProcessTests,
 #else
     ld::testing::LdStartupSpawnProcessTests,
 #endif
     Tests...>;
 
 // This types are meaningul for the successful tests, LdLoadTests.
-using LoadTypes = TestTypes<
-// TODO(https://fxbug.dev/42084200): LdRemoteProcessTests::Run doesn't actually run the
-// test, instead it always returns 17. This isn't suitable for failure tests
-// which don't return 17. When remote loading is implemented and these tests
-// are actually run this can be moved into the default types in TestTypes.
-#ifdef __Fuchsia__
-    ld::testing::LdRemoteProcessTests,
-#endif
-    ld::testing::LdStartupInProcessTests>;
+using LoadTypes = TestTypes<ld::testing::LdStartupInProcessTests>;
 
 // These types are the types which are compatible with the failure tests, LdLoadFailureTests.
 using FailTypes = TestTypes<>;
@@ -526,7 +520,12 @@ TYPED_TEST(LdLoadFailureTests, MissingSymbol) {
   ASSERT_NO_FATAL_FAILURE(this->Needed({"libld-dep-a.so"}));
 
   ASSERT_NO_FATAL_FAILURE(  //
-      this->LoadAndFail("missing-sym", ExpectReport{"undefined symbol: ", "b"}));
+      this->LoadAndFail("missing-sym", ExpectedErrorList{
+                                           ExpectReport{
+                                               "undefined symbol: ",
+                                               "b",
+                                           },
+                                       }));
 }
 
 TYPED_TEST(LdLoadFailureTests, MissingDependency) {
@@ -535,9 +534,11 @@ TYPED_TEST(LdLoadFailureTests, MissingDependency) {
   ASSERT_NO_FATAL_FAILURE(this->Needed({std::pair{"libmissing-dep-dep.so", false}}));
 
   ASSERT_NO_FATAL_FAILURE(  //
-      this->LoadAndFail("missing-dep", ExpectReport{
-                                           "cannot open dependency: ",
-                                           "libmissing-dep-dep.so",
+      this->LoadAndFail("missing-dep", ExpectedErrorList{
+                                           ExpectReport{
+                                               "cannot open dependency: ",
+                                               "libmissing-dep-dep.so",
+                                           },
                                        }));
 }
 

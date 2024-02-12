@@ -5,6 +5,8 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_STATIC_PIE_WITH_VDSO_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_STATIC_PIE_WITH_VDSO_H_
 
+#include <lib/fit/result.h>
+
 #include <atomic>
 #include <tuple>
 #include <utility>
@@ -79,8 +81,9 @@ inline SymbolInfo<typename Self::Elf> LinkStaticPieWithVdso(
     // These will never actually be called.
     constexpr size_type tls_module_id() const { return 0; }
     constexpr size_type static_tls_bias() const { return 0; }
-    constexpr std::optional<typename Elf::TlsDescGot> tls_desc(DiagnosticsType& diagnostics) const {
-      return std::nullopt;
+    constexpr fit::result<bool, typename Elf::TlsDescGot> tls_desc(
+        DiagnosticsType& diagnostics) const {
+      return fit::error{false};
     }
     constexpr typename Elf::TlsDescGot tls_desc_undefined_weak() const { return {}; }
 
@@ -90,18 +93,16 @@ inline SymbolInfo<typename Self::Elf> LinkStaticPieWithVdso(
 
   // Symbol resolution is trivial: it's defined in the vDSO (or we crash).
   auto resolve = [&](const auto& ref, RelocateTls tls_type)  //
-      -> std::optional<Definition> {
+      -> fit::result<bool, Definition> {
     if (tls_type != RelocateTls::kNone) [[unlikely]] {
-      diagnostics.FormatError("TLS relocations not supported in vDSO"sv);
-      return std::nullopt;
+      return fit::error{diagnostics.FormatError("TLS relocations not supported in vDSO"sv)};
     }
     SymbolName name(symbol_info, ref);
     const Sym* vdso_sym = name.Lookup(vdso_symbols);
     if (!vdso_sym) [[unlikely]] {
-      diagnostics.FormatError("reference to symbol not defined in vDSO"sv, name);
-      return std::nullopt;
+      return fit::error{diagnostics.FormatError("reference to symbol not defined in vDSO"sv, name)};
     }
-    return Definition{*vdso_sym, vdso_bias};
+    return fit::ok(Definition{*vdso_sym, vdso_bias});
   };
 
   // Apply all the symbolic relocations, resolving each reference in the vDSO.

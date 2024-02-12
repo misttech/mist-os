@@ -151,7 +151,7 @@ TYPED_TEST(ElfldltlResolveTests, SingleModule) {
   cpp20::span modules{&module, 1};
   auto resolve = elfldltl::MakeSymbolResolver(module, modules, diag, kNoTlsdesc<Elf>);
   auto found = resolve(*a, elfldltl::RelocateTls::kNone);
-  ASSERT_TRUE(found);
+  ASSERT_TRUE(found.is_ok()) << found.error_value();
   ASSERT_FALSE(found->undefined_weak());
   EXPECT_EQ(&found->symbol(), a);
   EXPECT_EQ(found->symbol().value, 1ul);
@@ -179,7 +179,7 @@ TYPED_TEST(ElfldltlResolveTests, DefBothFoundFirst) {
 
   auto resolve = elfldltl::MakeSymbolResolver(modules[1], modules, diag, kNoTlsdesc<Elf>);
   auto found = resolve(*a2, elfldltl::RelocateTls::kNone);
-  ASSERT_TRUE(found);
+  ASSERT_TRUE(found.is_ok()) << found.error_value();
   ASSERT_FALSE(found->undefined_weak());
   EXPECT_EQ(&found->symbol(), a);
   EXPECT_EQ(found->symbol().value, 1ul);
@@ -207,7 +207,7 @@ TYPED_TEST(ElfldltlResolveTests, UndefFirstFoundSecond) {
 
   auto resolve = elfldltl::MakeSymbolResolver(lookup_module, modules, diag, kNoTlsdesc<Elf>);
   auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
-  ASSERT_TRUE(found);
+  ASSERT_TRUE(found.is_ok()) << found.error_value();
   ASSERT_FALSE(found->undefined_weak());
   EXPECT_EQ(&found->symbol(), b_def);
   EXPECT_EQ(found->symbol().value, 2ul);
@@ -228,7 +228,7 @@ TYPED_TEST(ElfldltlResolveTests, UndefinedWeak) {
                                               elfldltl::ElfSymBind::kWeak};
   auto check_resolver = [&](auto&& resolve, std::string_view identifier) {
     auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
-    ASSERT_TRUE(found) << identifier;
+    ASSERT_TRUE(found.is_ok()) << identifier;
     EXPECT_TRUE(found->undefined_weak()) << identifier;
   };
 
@@ -265,7 +265,7 @@ TYPED_TEST(ElfldltlResolveTests, DefaultWeakPolicy) {
 
   auto check_resolver = [&](auto&& resolve, std::string_view identifier) {
     auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
-    ASSERT_TRUE(found) << identifier;
+    ASSERT_TRUE(found.is_ok()) << identifier;
     ASSERT_FALSE(found->undefined_weak()) << identifier;
     EXPECT_EQ(&found->symbol(), c_weak) << identifier;
     EXPECT_EQ(found->symbol().value, 1ul) << identifier;
@@ -306,7 +306,7 @@ TYPED_TEST(ElfldltlResolveTests, DynamicWeakPolicy) {
     auto resolve = elfldltl::MakeSymbolResolver(lookup_module, modules, diag, kNoTlsdesc<Elf>,
                                                 elfldltl::ResolverPolicy::kStrongOverWeak);
     auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
-    ASSERT_TRUE(found);
+    ASSERT_TRUE(found.is_ok());
     ASSERT_FALSE(found->undefined_weak());
     EXPECT_EQ(&found->symbol(), c_strong);
     EXPECT_EQ(found->symbol().value, 2ul);
@@ -323,7 +323,7 @@ TYPED_TEST(ElfldltlResolveTests, DynamicWeakPolicy) {
     auto resolve = elfldltl::MakeSymbolResolver(lookup_module, modules, diag, kNoTlsdesc<Elf>,
                                                 elfldltl::ResolverPolicy::kStrongOverWeak);
     auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
-    ASSERT_TRUE(found);
+    ASSERT_TRUE(found.is_ok());
     ASSERT_FALSE(found->undefined_weak());
     EXPECT_EQ(&found->symbol(), weak_both1);
     EXPECT_EQ(found->symbol().value, 1ul);
@@ -350,7 +350,7 @@ TYPED_TEST(ElfldltlResolveTests, GnuUniqueError) {
   cpp20::span modules{&module, 1};
   auto resolve = elfldltl::MakeSymbolResolver(module, modules, expected, kNoTlsdesc<Elf>);
   auto found = resolve(*a, elfldltl::RelocateTls::kNone);
-  EXPECT_FALSE(found);
+  EXPECT_TRUE(found.is_error());
 }
 
 TYPED_TEST(ElfldltlResolveTests, Undefined) {
@@ -368,7 +368,7 @@ TYPED_TEST(ElfldltlResolveTests, Undefined) {
   TestModule lookup_module{si};
   auto resolve = elfldltl::MakeSymbolResolver(lookup_module, modules, expected, kNoTlsdesc<Elf>);
   auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
-  ASSERT_FALSE(found);
+  EXPECT_TRUE(found.is_error());
 }
 
 }  // namespace

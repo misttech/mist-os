@@ -6,6 +6,7 @@
 #define LIB_LD_TEST_LD_LOAD_TESTS_BASE_H_
 
 #include <lib/elfldltl/diagnostics-ostream.h>
+#include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/elfldltl/testing/test-pipe-reader.h>
 
 #include <memory>
@@ -49,20 +50,21 @@ class LdLoadTestsBase {
   static constexpr std::string_view kTestExecutableSuffix = {};
 
   template <class... Reports>
-  void ExpectLogErrors(Reports&&... reports) {
+  void ExpectLogErrors(const elfldltl::testing::ExpectedErrorList<Reports...>& diag) {
     std::stringstream os;
-    auto report = elfldltl::OstreamDiagnosticsReport(os);
-    (reports.ReportTo(report), ...);
+    diag.report().ReportTo(elfldltl::OstreamDiagnosticsReport(os));
     os << "startup dynamic linking failed with " << sizeof...(Reports)
        << " errors and 0 warnings\n";
     ExpectLog(std::move(os).str());
   }
 
   template <class Derived, class... Reports>
-  static void StartupLoadAndFail(Derived& self, std::string_view name, Reports&&... reports) {
+  static void StartupLoadAndFail(Derived& self, std::string_view name,
+                                 elfldltl::testing::ExpectedErrorList<Reports...> diag) {
     ASSERT_NO_FATAL_FAILURE(self.Load(name));
     EXPECT_EQ(self.Run(), Derived::kRunFailureForTrap);
-    self.ExpectLogErrors(std::forward<Reports>(reports)...);
+    self.ExpectLogErrors(diag);
+    std::move(diag).Release();
   }
 
  private:
