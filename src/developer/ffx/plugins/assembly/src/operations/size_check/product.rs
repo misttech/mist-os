@@ -74,7 +74,7 @@ pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> 
                 )
             })?;
         let other_breakdown = SizeBreakdown::from_contents(&other_blobfs_contents);
-        let diff = other_breakdown.diff(&breakdown);
+        let diff = breakdown.diff(&other_breakdown);
         diff.print();
     } else if args.verbose {
         breakdown.print();
