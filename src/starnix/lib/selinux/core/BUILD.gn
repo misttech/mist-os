@@ -31,7 +31,10 @@ rustc_library("core") {
     "security_server.rs",
     "seq_lock.rs",
   ]
-  inputs = [ "../testdata/policies/emulator" ]
+  inputs = [
+    "../testdata/policies/emulator",
+    "../testdata/policies/selinux_testsuite",
+  ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 

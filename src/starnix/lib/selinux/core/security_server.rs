@@ -51,6 +51,40 @@ struct LoadedPolicy {
 
 type SeLinuxStatus = SeqLock<SeLinuxStatusHeader, SeLinuxStatusValue>;
 
+#[derive(Default)]
+struct SeLinuxBooleans {
+    /// Active values for all of the booleans defined by the policy.
+    /// Entries are created at policy load for each policy-defined conditional.
+    active: HashMap<String, bool>,
+    /// Pending values for any booleans modified since the last commit.
+    pending: HashMap<String, bool>,
+}
+
+impl SeLinuxBooleans {
+    fn reset(&mut self, booleans: Vec<(String, bool)>) {
+        self.active = HashMap::from_iter(booleans);
+        self.pending.clear();
+    }
+    fn names(&mut self) -> Vec<String> {
+        self.active.keys().cloned().collect()
+    }
+    fn set_pending(&mut self, name: &str, value: bool) -> Result<(), ()> {
+        if !self.active.contains_key(name) {
+            return Err(());
+        }
+        self.pending.insert(name.into(), value);
+        Ok(())
+    }
+    fn get(&mut self, name: &str) -> Result<(bool, bool), ()> {
+        let active = self.active.get(name).ok_or(())?;
+        let pending = self.pending.get(name).unwrap_or(active);
+        Ok((*active, *pending))
+    }
+    fn commit_pending(&mut self) {
+        self.active.extend(self.pending.drain());
+    }
+}
+
 struct SecurityServerState {
     // TODO(http://b/308175643): reference count SIDs, so that when the last SELinux object
     // referencing a SID gets destroyed, the entry is removed from the map.
@@ -59,6 +93,9 @@ struct SecurityServerState {
     /// Describes the currently active policy.
     policy: Option<Arc<LoadedPolicy>>,
 
+    /// Holds active and pending states for each boolean defined by policy.
+    booleans: SeLinuxBooleans,
+
     /// Encapsulates the security server "status" fields, which are exposed to
     /// userspace as a C-layout structure, and updated with the SeqLock pattern.
     status: SeLinuxStatus,
@@ -66,8 +103,10 @@ struct SecurityServerState {
     /// True if hooks should enforce policy-based access decisions.
     enforcing: bool,
 
-    /// The number of times the selinux policy has been reloaded.
-    policy_load_count: u32,
+    /// Count of changes to the active policy.  Changes include both loads
+    /// of complete new policies, and modifications to a previously loaded
+    /// policy, e.g. by committing new values to conditional booleans in it.
+    policy_change_count: u32,
 }
 
 impl SecurityServerState {
@@ -101,9 +140,10 @@ impl SecurityServer {
         let state = Mutex::new(SecurityServerState {
             sids: HashMap::new(),
             policy: None,
+            booleans: SeLinuxBooleans::default(),
             status,
             enforcing: false,
-            policy_load_count: 0,
+            policy_change_count: 0,
         });
 
         let security_server = Arc::new(Self { mode, avc_manager, state });
@@ -158,8 +198,20 @@ impl SecurityServer {
 
         // Replace any existing policy and update the [`SeLinuxStatus`].
         self.with_state_and_update_status(|state| {
+            // TODO(b/324265752): Determine whether SELinux booleans need to be retained across
+            // policy (re)loads.
+            state.booleans.reset(
+                policy
+                    .parsed
+                    .conditional_booleans()
+                    .iter()
+                    // TODO(b/324392507): Relax the UTF8 requirement on policy strings.
+                    .map(|(name, value)| (String::from_utf8((*name).to_vec()).unwrap(), *value))
+                    .collect(),
+            );
+
             state.policy = Some(policy);
-            state.policy_load_count += 1;
+            state.policy_change_count += 1;
         });
 
         Ok(())
@@ -193,6 +245,31 @@ impl SecurityServer {
         } else {
             self.state.lock().reject_unknown()
         }
+    }
+
+    /// Returns the list of names of boolean conditionals defined by the
+    /// loaded policy.
+    pub fn conditional_booleans(&self) -> Vec<String> {
+        self.state.lock().booleans.names()
+    }
+
+    /// Returns the active and pending values of a policy boolean, if it exists.
+    pub fn get_boolean(&self, name: &str) -> Result<(bool, bool), ()> {
+        self.state.lock().booleans.get(name)
+    }
+
+    /// Sets the pending value of a boolean, if it is defined in the policy.
+    pub fn set_pending_boolean(&self, name: &str, value: bool) -> Result<(), ()> {
+        self.state.lock().booleans.set_pending(name, value)
+    }
+
+    /// Commits all pending changes to conditional booleans.
+    pub fn commit_pending_booleans(&self) {
+        // TODO(b/324264149): Commit values into the stored policy itself.
+        self.with_state_and_update_status(|state| {
+            state.booleans.commit_pending();
+            state.policy_change_count += 1;
+        });
     }
 
     /// Computes the precise access vector for `source_sid` targeting `target_sid` as class
@@ -258,7 +335,7 @@ impl SecurityServer {
         f(state.deref_mut());
         let new_value = SeLinuxStatusValue {
             enforcing: state.enforcing as u32,
-            policyload: state.policy_load_count,
+            policyload: state.policy_change_count,
             deny_unknown: if self.is_fake() { 0 } else { state.deny_unknown() as u32 },
         };
         state.status.set_value(new_value);
@@ -353,6 +430,7 @@ mod tests {
     use std::mem::size_of;
     use zerocopy::{FromBytes, FromZeroes};
 
+    const TESTSUITE_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/selinux_testsuite");
     const EMULATOR_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/emulator");
 
     #[fuchsia::test]
@@ -442,6 +520,55 @@ mod tests {
 
         security_server.set_enforcing(true);
         assert!(security_server.is_enforcing());
+    }
+
+    #[fuchsia::test]
+    fn without_policy_conditional_booleans_are_empty() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        assert!(security_server.conditional_booleans().is_empty());
+    }
+
+    #[fuchsia::test]
+    fn conditional_booleans_can_be_queried() {
+        let policy_bytes = TESTSUITE_BINARY_POLICY.to_vec();
+        let security_server = SecurityServer::new(Mode::Enable);
+        assert_eq!(
+            Ok(()),
+            security_server.load_policy(policy_bytes).map_err(|e| format!("{:?}", e))
+        );
+
+        let booleans = security_server.conditional_booleans();
+        assert!(!booleans.is_empty());
+        let boolean = booleans[0].as_str();
+
+        assert!(security_server.get_boolean("this_is_not_a_valid_boolean_name").is_err());
+        assert!(security_server.get_boolean(boolean).is_ok());
+    }
+
+    #[fuchsia::test]
+    fn conditional_booleans_can_be_changed() {
+        let policy_bytes = TESTSUITE_BINARY_POLICY.to_vec();
+        let security_server = SecurityServer::new(Mode::Enable);
+        assert_eq!(
+            Ok(()),
+            security_server.load_policy(policy_bytes).map_err(|e| format!("{:?}", e))
+        );
+
+        let booleans = security_server.conditional_booleans();
+        assert!(!booleans.is_empty());
+        let boolean = booleans[0].as_str();
+
+        let (active, pending) = security_server.get_boolean(boolean).unwrap();
+        assert_eq!(active, pending, "Initially active and pending values should match");
+
+        security_server.set_pending_boolean(boolean, !active).unwrap();
+        let (active, pending) = security_server.get_boolean(boolean).unwrap();
+        assert!(active != pending, "Before commit pending should differ from active");
+
+        security_server.commit_pending_booleans();
+        let (final_active, final_pending) = security_server.get_boolean(boolean).unwrap();
+        assert_eq!(final_active, pending, "Pending value should be active after commit");
+        assert_eq!(final_active, final_pending, "Active and pending are the same after commit");
     }
 
     #[fuchsia::test]

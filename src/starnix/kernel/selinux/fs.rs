@@ -6,10 +6,11 @@ use crate::{
     task::{CurrentTask, Task},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
-        parse_unsigned_file, BytesFile, BytesFileOps, CacheMode, DirectoryEntryType, FileObject,
-        FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode,
-        FsNodeHandle, FsNodeOps, FsStr, FsString, StaticDirectoryBuilder, VecDirectory,
+        emit_dotdot, fileops_impl_directory, fileops_impl_nonseekable, fs_node_impl_dir_readonly,
+        fs_node_impl_not_dir, parse_unsigned_file, unbounded_seek, BytesFile, BytesFileOps,
+        CacheMode, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem,
+        FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
+        FsNodeOps, FsStr, FsString, SeekTarget, StaticDirectoryBuilder, VecDirectory,
         VecDirectoryEntry, VmoFileNode,
     },
 };
@@ -24,6 +25,7 @@ use starnix_uapi::{
     errno, error,
     errors::Errno,
     file_mode::mode,
+    off_t,
     open_flags::OpenFlags,
     ownership::{TempRef, WeakRef},
     statfs,
@@ -126,8 +128,20 @@ impl SeLinuxFs {
             SeLoad::new_node(security_server.clone()),
             mode!(IFREG, 0o600),
         );
+        dir.entry(
+            current_task,
+            "commit_pending_bools",
+            SeLinuxCommitBooleans::new_node(security_server.clone()),
+            mode!(IFREG, 0o200),
+        );
 
-        // Allows the SELinux enforcing mode to be queried, or changed.
+        // Read/write files allowing values to be queried or changed.
+        dir.entry(
+            current_task,
+            "booleans",
+            SeLinuxBooleansDirectory::new(security_server.clone()),
+            mode!(IFDIR, 0o555),
+        );
         dir.entry(
             current_task,
             "enforce",
@@ -194,12 +208,8 @@ impl SeEnforce {
 
 impl BytesFileOps for SeEnforce {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        let enforce_data = parse_unsigned_file::<u32>(&data)?;
-        self.security_server.set_enforcing(match enforce_data {
-            0 => false,
-            1 => true,
-            _ => error!(EINVAL)?,
-        });
+        let enforce = parse_unsigned_file::<u32>(&data)? != 0;
+        self.security_server.set_enforcing(enforce);
         Ok(())
     }
 
@@ -270,7 +280,7 @@ impl SeCheckReqProt {
 
 impl BytesFileOps for SeCheckReqProt {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        let _checkreqprot = parse_unsigned_file::<u32>(&data)?;
+        let _checkreqprot = parse_unsigned_file::<u32>(&data)? != 0;
         track_stub!(TODO("https://fxbug.dev/322874766"), "selinux checkreqprot");
         Ok(())
     }
@@ -377,6 +387,135 @@ impl FsNodeOps for AccessFileNode {
             *writer
         };
         Ok(Box::new(AccessFile { seqno }))
+    }
+}
+
+struct SeLinuxBooleansDirectory {
+    security_server: Arc<SecurityServer>,
+}
+
+impl SeLinuxBooleansDirectory {
+    fn new(security_server: Arc<SecurityServer>) -> Arc<Self> {
+        Arc::new(Self { security_server })
+    }
+}
+
+impl FsNodeOps for Arc<SeLinuxBooleansDirectory> {
+    fs_node_impl_dir_readonly!();
+
+    fn create_file_ops(
+        &self,
+        _locked: &mut Locked<'_, ReadOps>,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        Ok(Box::new(self.clone()))
+    }
+
+    fn lookup(
+        &self,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<FsNodeHandle, Errno> {
+        let utf8_name = String::from_utf8(name.to_vec()).map_err(|_| errno!(ENOENT))?;
+        if self.security_server.conditional_booleans().contains(&utf8_name) {
+            Ok(node.fs().create_node(
+                current_task,
+                SeLinuxBoolean::new_node(self.security_server.clone(), utf8_name),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o644), current_task.as_fscred()),
+            ))
+        } else {
+            error!(ENOENT)
+        }
+    }
+}
+
+impl FileOps for Arc<SeLinuxBooleansDirectory> {
+    fileops_impl_directory!();
+
+    fn seek(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        current_offset: off_t,
+        target: SeekTarget,
+    ) -> Result<off_t, Errno> {
+        unbounded_seek(current_offset, target)
+    }
+
+    fn readdir(
+        &self,
+        file: &FileObject,
+        _current_task: &CurrentTask,
+        sink: &mut dyn DirentSink,
+    ) -> Result<(), Errno> {
+        emit_dotdot(file, sink)?;
+
+        // `emit_dotdot()` provides the first two directory entries, so that the entries for
+        // the conditional booleans start from offset 2.
+        let iter_offset = sink.offset() - 2;
+        for name in self.security_server.conditional_booleans().iter().skip(iter_offset as usize) {
+            sink.add(
+                file.fs.next_node_id(),
+                /* next offset = */ sink.offset() + 1,
+                DirectoryEntryType::REG,
+                FsString::from(name.as_bytes()).as_ref(),
+            )?;
+        }
+
+        Ok(())
+    }
+}
+
+struct SeLinuxBoolean {
+    security_server: Arc<SecurityServer>,
+    name: String,
+}
+
+impl SeLinuxBoolean {
+    fn new_node(security_server: Arc<SecurityServer>, name: String) -> impl FsNodeOps {
+        BytesFile::new_node(SeLinuxBoolean { security_server, name })
+    }
+}
+
+impl BytesFileOps for SeLinuxBoolean {
+    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        let value = parse_unsigned_file::<u32>(&data)? != 0;
+        self.security_server.set_pending_boolean(&self.name, value).map_err(|_| errno!(EIO))
+    }
+
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        // Each boolean has a current active value, and a pending value that
+        // will become active if "commit_pending_booleans" is written to.
+        // e.g. "1 0" will be read if a boolean is True but will become False.
+        let (active, pending) =
+            self.security_server.get_boolean(&self.name).map_err(|_| errno!(EIO))?;
+        Ok(format!("{} {}", active as u32, pending as u32).as_bytes().to_vec().into())
+    }
+}
+
+struct SeLinuxCommitBooleans {
+    security_server: Arc<SecurityServer>,
+}
+
+impl SeLinuxCommitBooleans {
+    fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
+        BytesFile::new_node(SeLinuxCommitBooleans { security_server })
+    }
+}
+
+impl BytesFileOps for SeLinuxCommitBooleans {
+    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        // "commit_pending_booleans" expects a numeric argument, which is
+        // interpreted as a boolean, with the pending booleans committed if the
+        // value is true (i.e. non-zero).
+        let commit = parse_unsigned_file::<u32>(&data)? != 0;
+        if commit {
+            self.security_server.commit_pending_booleans();
+        }
+        Ok(())
     }
 }
 

@@ -1273,8 +1273,16 @@ impl<PS: ParseStrategy> ValidateArray<ConditionalBooleanMetadata, u8> for Condit
 #[repr(C, packed)]
 pub(crate) struct ConditionalBooleanMetadata {
     value: le::U32,
-    state: le::U32,
+    /// Current active value of this conditional boolean.
+    active: le::U32,
     length: le::U32,
+}
+
+impl ConditionalBooleanMetadata {
+    /// Returns the active value for the boolean.
+    pub(crate) fn active(&self) -> bool {
+        self.active != le::U32::ZERO
+    }
 }
 
 impl Counted for ConditionalBooleanMetadata {

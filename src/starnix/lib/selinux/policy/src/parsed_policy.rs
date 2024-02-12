@@ -287,6 +287,10 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         &self.common_symbols.data
     }
 
+    pub(crate) fn conditional_booleans(&self) -> &Vec<ConditionalBoolean<PS>> {
+        &self.conditional_booleans.data
+    }
+
     #[cfg(feature = "selinux_policy_test_api")]
     pub fn validate(&self) -> Result<(), anyhow::Error> {
         Validate::validate(self)

@@ -173,6 +173,15 @@ impl<PS: ParseStrategy> Policy<PS> {
         self.0.parsed_policy().handle_unknown()
     }
 
+    pub fn conditional_booleans<'a>(&'a self) -> Vec<(&'a [u8], bool)> {
+        self.0
+            .parsed_policy()
+            .conditional_booleans()
+            .iter()
+            .map(|boolean| (PS::deref_slice(&boolean.data), PS::deref(&boolean.metadata).active()))
+            .collect()
+    }
+
     /// Returns the the security context that should be applied to a newly created file-like SELinux
     /// object according to `source` and `target` security contexts, as well as the new object's
     /// `class`. Returns an error if the security context for such an object is not well-defined
