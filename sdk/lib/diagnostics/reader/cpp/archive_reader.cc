@@ -1,7 +1,9 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+#include <fidl/fuchsia.diagnostics/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/diagnostics/reader/cpp/archive_reader.h>
 #include <lib/diagnostics/reader/cpp/constants.h>
 #include <lib/diagnostics/reader/cpp/inspect.h>
@@ -96,6 +98,7 @@ fpromise::promise<std::vector<InspectData>, std::string> ReadBatches(
 
 }  // namespace
 
+// TODO(b/303304683): This API must be removed
 ArchiveReader::ArchiveReader(fuchsia::diagnostics::ArchiveAccessorPtr archive,
                              std::vector<std::string> selectors)
 
@@ -103,6 +106,23 @@ ArchiveReader::ArchiveReader(fuchsia::diagnostics::ArchiveAccessorPtr archive,
       executor_(archive_.dispatcher()),
       selectors_(std::move(selectors)) {
   ZX_ASSERT(archive_.dispatcher() != nullptr);
+}
+
+// TODO(b/303304683): This must become the primary API. Currently it is delegating to the
+// deprecated FIDL system.
+ArchiveReader::ArchiveReader(async_dispatcher_t* dispatcher, std::vector<std::string> selectors)
+    : archive_(Bind(dispatcher)),
+      executor_(archive_.dispatcher()),
+      selectors_(std::move(selectors)) {
+  ZX_ASSERT(archive_.dispatcher() != nullptr);
+}
+
+fuchsia::diagnostics::ArchiveAccessorPtr ArchiveReader::Bind(async_dispatcher_t* dispatcher) {
+  auto archive = component::Connect<fuchsia_diagnostics::ArchiveAccessor>();
+  ZX_ASSERT(archive.is_ok());
+  fuchsia::diagnostics::ArchiveAccessorPtr old;
+  old.Bind(archive->TakeHandle(), dispatcher);
+  return old;
 }
 
 fpromise::promise<std::vector<InspectData>, std::string> ArchiveReader::GetInspectSnapshot() {

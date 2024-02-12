@@ -5,6 +5,7 @@
 #ifndef LIB_DIAGNOSTICS_READER_CPP_ARCHIVE_READER_H_
 #define LIB_DIAGNOSTICS_READER_CPP_ARCHIVE_READER_H_
 
+#include <fidl/fuchsia.diagnostics/cpp/markers.h>
 #include <fuchsia/diagnostics/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/diagnostics/reader/cpp/inspect.h>
@@ -25,7 +26,8 @@ namespace diagnostics::reader {
 // ArchiveReader supports reading Inspect data from an Archive.
 class ArchiveReader {
  public:
-  // Create a new ArchiveReader.
+  // Create a new ArchiveReader. This constructor uses HLCPP. Prefer the other one, which
+  // uses unified bindings.
   //
   // archive: A connected interface pointer to the Archive. Must be bound.
   // selectors: The selectors for data to be returned by this call. Empty means to return all data.
@@ -33,6 +35,9 @@ class ArchiveReader {
   // Note: This constructor asserts that archive is bound.
   ArchiveReader(fuchsia::diagnostics::ArchiveAccessorPtr archive,
                 std::vector<std::string> selectors);
+
+  // Create a new ArchiveReader.
+  ArchiveReader(async_dispatcher_t* dispatcher, std::vector<std::string> selectors);
 
   // Get a snapshot of the Inspect data at the current point in time.
   //
@@ -56,6 +61,8 @@ class ArchiveReader {
 
   fuchsia::diagnostics::BatchIteratorPtr GetBatchIterator(
       fuchsia::diagnostics::DataType data_type, fuchsia::diagnostics::StreamMode stream_mode);
+
+  fuchsia::diagnostics::ArchiveAccessorPtr Bind(async_dispatcher_t* dispatcher);
 
   // The pointer to the archive this object is connected to.
   fuchsia::diagnostics::ArchiveAccessorPtr archive_;

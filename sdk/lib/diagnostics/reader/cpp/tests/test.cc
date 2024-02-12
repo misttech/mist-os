@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.diagnostics/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/executor.h>
@@ -143,9 +144,30 @@ class ArchiveReaderTest : public gtest::RealLoopFixture {
 using InspectResult = fpromise::result<std::vector<diagnostics::reader::InspectData>, std::string>;
 using LogsResult = fpromise::result<std::optional<diagnostics::reader::LogsData>, std::string>;
 
-TEST_F(ArchiveReaderTest, ReadHierarchy) {
+TEST_F(ArchiveReaderTest, ReadHierarchyHLCPP) {
   std::cerr << "RUNNING TEST" << std::endl;
   diagnostics::reader::ArchiveReader reader(svc()->Connect<fuchsia::diagnostics::ArchiveAccessor>(),
+                                            {cm1_selector(), cm2_selector()});
+
+  InspectResult result;
+  executor().schedule_task(reader.SnapshotInspectUntilPresent({cm1_moniker(), cm2_moniker()})
+                               .then([&](InspectResult& r) { result = std::move(r); }));
+  RunLoopUntil([&] { return !!result; });
+
+  ASSERT_TRUE(result.is_ok()) << "Error: " << result.error();
+
+  auto value = result.take_value();
+  std::sort(value.begin(), value.end(), [](auto& a, auto& b) { return a.moniker() < b.moniker(); });
+
+  EXPECT_EQ(cm1_moniker(), value[0].moniker());
+  EXPECT_EQ(cm2_moniker(), value[1].moniker());
+
+  EXPECT_STREQ("v1", value[0].content()["root"]["version"].GetString());
+  EXPECT_STREQ("v1", value[1].content()["root"]["version"].GetString());
+}
+
+TEST_F(ArchiveReaderTest, ReadHierarchy) {
+  diagnostics::reader::ArchiveReader reader(executor().dispatcher(),
                                             {cm1_selector(), cm2_selector()});
 
   InspectResult result;

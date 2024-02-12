@@ -6,7 +6,7 @@ import("//build/components.gni")
 
 group("cpp") {
   testonly = true
-  deps = [ ":archive_reader" ]
+  public_deps = [ ":archive_reader" ]
 }
 
 group("tests") {
@@ -28,12 +28,14 @@ source_set("archive_reader") {
     "logs.h",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_cpp",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_hlcpp",
     "//third_party/rapidjson",
     "//zircon/system/ulib/inspect",
   ]
 
   deps = [
+    "//sdk/lib/component/incoming/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl",
   ]
