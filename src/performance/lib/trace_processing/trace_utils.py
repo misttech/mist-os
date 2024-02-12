@@ -221,14 +221,17 @@ def find_valid_vsync_start_index(vsyncs: List[trace_model.Event]) -> int:
       vsyncs: List of vsync events.
 
     Returns:
-      The first index where vsyncs are chronologically ordered.
+      The first index where vsyncs are chronologically ordered and the vsync[0]'s flows
+      aren't interfering.
     """
-    if len(vsyncs) > 1 and vsyncs[1].start < vsyncs[0].start:
-        i = 1
-        while i < len(vsyncs) and vsyncs[i].start < vsyncs[0].start:
-            i += 1
-        return i
-    return 0
+    if len(vsyncs) < 2 or vsyncs[0] is None:
+        return 0
+    i = 1
+    while i < len(vsyncs) and (
+        vsyncs[i] is None or vsyncs[i].start < vsyncs[0].start
+    ):
+        i += 1
+    return 0 if i == 1 else i
 
 
 def standard_metrics_set(
