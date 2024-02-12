@@ -109,6 +109,12 @@
             to: "#elements",
             availability: "same_as_target",
         },
+        {
+            directory: "dev-trippoint",
+            from: "parent",
+            to: "#elements",
+            availability: "same_as_target",
+        },
 
         // Dependencies for element_manager
         {

@@ -485,6 +485,7 @@
                 "dev-power-sensor",
                 "dev-temperature",
                 "dev-thermal",
+                "dev-trippoint",
             ],
             from: "parent",
             to: "#session",
