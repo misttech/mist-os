@@ -7,31 +7,19 @@
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
 #include <lib/magma/platform/zircon/zircon_platform_interrupt.h>
 #include <lib/magma/platform/zircon/zircon_platform_mmio.h>
+#include <lib/scheduler/role.h>
 #include <threads.h>
 #include <zircon/threads.h>
 
 ParentDeviceDFv2::ParentDeviceDFv2(
     std::shared_ptr<fdf::Namespace> incoming,
-    fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev,
-    fidl::WireSyncClient<fuchsia_scheduler::ProfileProvider> profile_provider)
-    : incoming_(std::move(incoming)),
-      pdev_(std::move(pdev)),
-      profile_provider_(std::move(profile_provider)) {}
+    fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev)
+    : incoming_(std::move(incoming)), pdev_(std::move(pdev)) {}
 
 bool ParentDeviceDFv2::SetThreadRole(const char* role_name) {
-  zx::unowned_thread original_thread{thrd_get_zx_handle(thrd_current())};
-  zx::thread duplicate_thread;
-  zx_status_t status = original_thread->duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate_thread);
+  zx_status_t status = fuchsia_scheduler::SetRoleForThisThread(role_name);
   if (status != ZX_OK) {
-    return DRETF(false, "Failed to duplicate thread handle: %s", zx_status_get_string(status));
-  }
-  auto result = profile_provider_->SetProfileByRole(std::move(duplicate_thread),
-                                                    fidl::StringView::FromExternal(role_name));
-  if (!result.ok()) {
-    return DRETF(false, "Failed profile provider request %s", result.status_string());
-  }
-  if (result->status != ZX_OK) {
-    return DRETF(false, "Failed profile provider status: %s", zx_status_get_string(result->status));
+    return DRETF(false, "Failed to set role, status: %s", zx_status_get_string(status));
   }
   return true;
 }
@@ -118,12 +106,6 @@ std::unique_ptr<ParentDeviceDFv2> ParentDeviceDFv2::Create(
     return DRETP(nullptr, "Error requesting platform device service: %s",
                  platform_device.status_string());
   }
-  auto profile_provider = incoming->Connect<fuchsia_scheduler::ProfileProvider>();
-  if (profile_provider.is_error()) {
-    return DRETP(nullptr, "Error requesting profile provider: %s",
-                 profile_provider.status_string());
-  }
   return std::make_unique<ParentDeviceDFv2>(std::move(incoming),
-                                            fidl::WireSyncClient(std::move(*platform_device)),
-                                            fidl::WireSyncClient(std::move(*profile_provider)));
+                                            fidl::WireSyncClient(std::move(*platform_device)));
 }

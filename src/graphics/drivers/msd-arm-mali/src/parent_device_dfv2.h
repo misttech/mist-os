@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_PARENT_DEVICE_DFV2_H_
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <fidl/fuchsia.scheduler/cpp/wire.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/fdf/cpp/channel.h>
 #include <lib/magma/platform/platform_interrupt.h>
@@ -22,10 +21,8 @@
 
 class ParentDeviceDFv2 : public ParentDevice {
  public:
-  explicit ParentDeviceDFv2(
-      std::shared_ptr<fdf::Namespace> incoming,
-      fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev,
-      fidl::WireSyncClient<fuchsia_scheduler::ProfileProvider> profile_provider);
+  explicit ParentDeviceDFv2(std::shared_ptr<fdf::Namespace> incoming,
+                            fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev);
 
   ~ParentDeviceDFv2() override { DLOG("ParentDevice dtor"); }
 
@@ -47,7 +44,6 @@ class ParentDeviceDFv2 : public ParentDevice {
  private:
   std::shared_ptr<fdf::Namespace> incoming_;
   fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;
-  fidl::WireSyncClient<fuchsia_scheduler::ProfileProvider> profile_provider_;
 };
 
 #endif  // SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_PARENT_DEVICE_DFV2_H_
