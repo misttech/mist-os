@@ -63,6 +63,7 @@
 //src/connectivity/wlan/drivers/wlanphy:wlanphy_driver-driver
 //src/connectivity/wlan/drivers/wlansoftmac:wlansoftmac_driver-driver
 //src/connectivity/wlan/testing/wlantap-driver:wlantap_driver-driver
+//src/connectivity/wlan/tests/helpers/testcontroller-driver:testcontroller_driver-driver
 //src/developer/adb/drivers/usb-adb-function:usb-adb-function-driver
 //src/devices/acpi/drivers/acpi-battery:driver
 //src/devices/acpi/drivers/intel-thermal:driver
