@@ -33,7 +33,10 @@ pub struct Program {
     controller: ComponentController,
 
     /// The outgoing directory of the program.
-    outgoing_dir: fio::DirectoryProxy,
+    ///
+    /// The framework only calls `Open` on the directory so that the directory
+    /// connection does not accrete state, such as a different seek pointer.
+    outgoing_dir: fio::OpenableProxy,
 
     /// The directory that presents runtime information about the component. The
     /// runner must either serve the server endpoint, or drop it to avoid
@@ -73,7 +76,7 @@ impl Program {
         let (controller, server_end) =
             endpoints::create_proxy::<fcrunner::ComponentControllerMarker>().unwrap();
         let (outgoing_dir, outgoing_server) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fio::OpenableMarker>().unwrap();
         let (runtime_dir, runtime_server) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let start_info = start_info.into_fidl(outgoing_server, runtime_server)?;
@@ -97,7 +100,7 @@ impl Program {
     }
 
     /// Gets the outgoing directory of the program.
-    pub fn outgoing(&self) -> &fio::DirectoryProxy {
+    pub fn outgoing(&self) -> &fio::OpenableProxy {
         &self.outgoing_dir
     }
 
@@ -212,7 +215,7 @@ impl Program {
     ) -> Program {
         let controller = ComponentController::new(controller.into_proxy().unwrap());
         let (outgoing_dir, _outgoing_server) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            fidl::endpoints::create_proxy::<fio::OpenableMarker>().unwrap();
         let (runtime_dir, _runtime_server) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let send_diagnostics = Task::spawn(async {});
@@ -351,7 +354,7 @@ pub struct StartInfo {
 impl StartInfo {
     pub fn into_fidl(
         self,
-        outgoing_server_end: ServerEnd<fio::DirectoryMarker>,
+        outgoing_server_end: ServerEnd<fio::OpenableMarker>,
         runtime_server_end: ServerEnd<fio::DirectoryMarker>,
     ) -> Result<fcrunner::ComponentStartInfo, StartError> {
         let ns = self.namespace.serve().map_err(StartError::ServeNamespace)?;
@@ -359,7 +362,7 @@ impl StartInfo {
             resolved_url: Some(self.resolved_url),
             program: Some(self.program),
             ns: Some(ns.into()),
-            outgoing_dir: Some(outgoing_server_end),
+            outgoing_dir: Some(outgoing_server_end.into_channel().into()),
             runtime_dir: Some(runtime_server_end),
             numbered_handles: Some(self.numbered_handles),
             encoded_config: self.encoded_config,

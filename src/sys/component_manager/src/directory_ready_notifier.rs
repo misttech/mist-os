@@ -56,7 +56,7 @@ impl DirectoryReadyNotifier {
     async fn on_component_started(
         self: &Arc<Self>,
         target_moniker: &Moniker,
-        outgoing_dir: &fio::DirectoryProxy,
+        outgoing_dir: &fio::OpenableProxy,
         decl: ComponentDecl,
     ) -> Result<(), ModelError> {
         // Don't block the handling on the event on the exposed capabilities being ready
@@ -91,7 +91,7 @@ impl DirectoryReadyNotifier {
     /// inside it that were exposed to the framework by the component.
     async fn dispatch_capabilities_ready(
         &self,
-        outgoing_dir: fio::DirectoryProxy,
+        outgoing_dir: fio::OpenableProxy,
         decl: &ComponentDecl,
         matching_exposes: Vec<&ExposeDecl>,
         target: &Arc<ComponentInstance>,
@@ -105,7 +105,7 @@ impl DirectoryReadyNotifier {
 
     async fn create_events(
         &self,
-        outgoing_dir: Option<fio::DirectoryProxy>,
+        outgoing_dir: Option<fio::OpenableProxy>,
         decl: &ComponentDecl,
         matching_exposes: Vec<&ExposeDecl>,
         target: &Arc<ComponentInstance>,
@@ -114,12 +114,17 @@ impl DirectoryReadyNotifier {
         // dispatch in order to propagate any potential errors as an event.
         let outgoing_dir_result = async move {
             let outgoing_dir = outgoing_dir?;
-            let outgoing_dir = fuchsia_fs::directory::clone_no_describe(
-                &outgoing_dir,
-                Some(fio::OpenFlags::CLONE_SAME_RIGHTS | fio::OpenFlags::DESCRIBE),
-            )
-            .ok()?;
-            let mut events = outgoing_dir.take_event_stream();
+
+            let (outgoing_dir_proxy, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().ok()?;
+            _ = outgoing_dir.open(
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
+                fio::ModeType::empty(),
+                ".",
+                server_end.into_channel().into(),
+            );
+            let mut events = outgoing_dir_proxy.take_event_stream();
+
             let () = match events.next().await {
                 Some(Ok(fio::DirectoryEvent::OnOpen_ { s: status, info: _ })) => {
                     zx::Status::ok(status).ok()
@@ -127,7 +132,7 @@ impl DirectoryReadyNotifier {
                 Some(Ok(fio::DirectoryEvent::OnRepresentation { .. })) => Some(()),
                 _ => None,
             }?;
-            Some(outgoing_dir)
+            Some(outgoing_dir_proxy)
         }
         .await
         .ok_or_else(|| ModelError::open_directory_error(target.moniker.clone(), "/"));
@@ -324,7 +329,7 @@ impl EventSynthesisProvider for DirectoryReadyNotifier {
         let outgoing_dir = {
             let execution = component.lock_execution().await;
             match execution.runtime.as_ref() {
-                Some(runtime) => runtime.outgoing_dir().map(Clone::clone),
+                Some(runtime) => runtime.outgoing_dir().cloned(),
                 None => return vec![],
             }
         };

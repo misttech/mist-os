@@ -11,7 +11,6 @@ use {
     async_trait::async_trait,
     cm_rust::ComponentDecl,
     cm_types::Name,
-    cm_util::io::clone_dir,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_diagnostics_types as fdiagnostics,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{channel::oneshot, lock::Mutex},
@@ -275,7 +274,7 @@ pub enum EventPayload {
 /// Information about a component's runtime provided to `Started`.
 #[derive(Clone)]
 pub struct RuntimeInfo {
-    pub outgoing_dir: Option<fio::DirectoryProxy>,
+    pub outgoing_dir: Option<fio::OpenableProxy>,
     pub diagnostics_receiver:
         Arc<Mutex<Option<oneshot::Receiver<fdiagnostics::ComponentDiagnostics>>>>,
     pub start_time: zx::Time,
@@ -288,7 +287,7 @@ impl RuntimeInfo {
     ) -> Self {
         let diagnostics_receiver = Arc::new(Mutex::new(Some(diagnostics_receiver)));
         Self {
-            outgoing_dir: clone_dir(runtime.outgoing_dir()),
+            outgoing_dir: runtime.outgoing_dir().cloned(),
             diagnostics_receiver,
             start_time: runtime.timestamp,
         }

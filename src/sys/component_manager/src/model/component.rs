@@ -2454,7 +2454,7 @@ impl ComponentRuntime {
 
     /// If this component is associated with a running [Program], obtain a capability
     /// representing its outgoing directory.
-    pub fn outgoing_dir(&self) -> Option<&fio::DirectoryProxy> {
+    pub fn outgoing_dir(&self) -> Option<&fio::OpenableProxy> {
         self.program.as_ref().map(|program_runtime| program_runtime.program.outgoing())
     }
 
