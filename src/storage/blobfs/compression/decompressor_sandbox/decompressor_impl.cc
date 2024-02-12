@@ -9,10 +9,10 @@
 #include "src/storage/blobfs/compression/decompressor_sandbox/decompressor_impl.h"
 
 #include <fidl/fuchsia.blobfs.internal/cpp/wire.h>
-#include <fidl/fuchsia.scheduler/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fzl/owned-vmo-mapper.h>
+#include <lib/scheduler/role.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 #include <lib/zx/thread.h>
@@ -165,30 +165,10 @@ int WatchFifoWrapper(void* data) {
 }
 
 void SetDeadlineProfile(thrd_t& thread) {
-  zx::result provider = component::Connect<fuchsia_scheduler::ProfileProvider>();
-  if (provider.is_error()) {
-    FX_PLOGS(WARNING, provider.error_value())
-        << "[decompressor]: Could not connect to scheduler profile provider";
-    return;
-  }
-
   const zx::unowned_thread borrowed_thread{thrd_get_zx_handle(thread)};
-  zx::thread dup_thread;
-  const zx_status_t status = borrowed_thread->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_thread);
-  if (status != ZX_OK) {
-    FX_PLOGS(WARNING, status) << "Failed to duplicate thread handle";
-    return;
-  }
-
   const char role_name[]{"fuchsia.storage.blobfs.compression.decompressor"};
-  const fidl::WireResult result =
-      fidl::WireCall(provider.value())->SetProfileByRole(std::move(dup_thread), role_name);
-  if (!result.ok()) {
-    FX_PLOGS(WARNING, result.status()) << "[decompressor]: Failed to set role";
-    return;
-  }
-  const auto& response = result.value();
-  if (zx_status_t status = response.status; status != ZX_OK) {
+  zx_status_t status = fuchsia_scheduler::SetRoleForThread(borrowed_thread->borrow(), role_name);
+  if (status != ZX_OK) {
     FX_PLOGS(WARNING, status) << "[decompressor]: Failed to set role";
     return;
   }

@@ -174,9 +174,9 @@ static_library("blobfs") {
     ]
     deps += [
       "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
-      "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
       "//sdk/lib/component/incoming/cpp",
       "//sdk/lib/fdio",
+      "//sdk/lib/scheduler/cpp",
       "//sdk/lib/syslog/cpp",
       "//src/lib/debug:backtrace-request",
       "//src/storage/lib/block_client/cpp",
@@ -234,9 +234,9 @@ source_set("decompressor_impl") {
   deps = [
     ":blobfs",
     ":fuchsia.blobfs.internal_hlcpp",
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl/cpp:cpp",
+    "//sdk/lib/scheduler/cpp",
     "//sdk/lib/sys/cpp:cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/chunked-compression",

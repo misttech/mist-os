@@ -4,11 +4,11 @@
 
 #include "src/storage/blobfs/page_loader.h"
 
-#include <fidl/fuchsia.scheduler/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/owned-vmo-mapper.h>
+#include <lib/scheduler/role.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 #include <lib/zx/thread.h>
@@ -92,25 +92,12 @@ ReadRange GetBlockAlignedExtendedRange(const LoaderInfo& info, uint64_t offset, 
 }
 
 void SetDeadlineProfile(const std::vector<zx::unowned_thread>& threads) {
-  zx::result provider = component::Connect<fuchsia_scheduler::ProfileProvider>();
-  if (provider.is_error()) {
-    FX_PLOGS(WARNING, provider.error_value()) << "Could not connect to scheduler profile provider";
-    return;
-  }
-
   // Apply role to each thread.
   const char role[]{"fuchsia.storage.blobfs.pager"};
   for (const auto& thread : threads) {
-    zx::thread dup_thread;
-    const zx_status_t status = thread->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_thread);
+    const zx_status_t status = fuchsia_scheduler::SetRoleForThread(thread->borrow(), role);
     if (status != ZX_OK) {
-      FX_PLOGS(WARNING, status) << "Failed to duplicate thread handle";
-      continue;
-    }
-    const fidl::WireResult result =
-        fidl::WireCall(provider.value())->SetProfileByRole(std::move(dup_thread), role);
-    if (!result.ok()) {
-      FX_PLOGS(WARNING, result.status()) << "Failed to set role " << role;
+      FX_PLOGS(WARNING, status) << "Failed to set role " << role;
       continue;
     }
   }
