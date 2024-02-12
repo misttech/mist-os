@@ -14,7 +14,7 @@ package_name = "package_with_structured_config_for_scrutiny_testing"
 expected_value_in_policy = "check this string!"
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Check that a 'bad' config is rejected."
     )

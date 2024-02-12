@@ -220,6 +220,7 @@ if (is_host) {
   }
 
   python_binary("check_extracted_config_bin") {
+    enable_pytype = true
     main_source = "check_extracted_structured_config.py"
   }
 
@@ -254,6 +255,7 @@ if (is_host) {
   }
 
   python_binary("check_failed_verifier_bin") {
+    enable_pytype = true
     main_source = "check_failed_verifier_policy.py"
   }
 

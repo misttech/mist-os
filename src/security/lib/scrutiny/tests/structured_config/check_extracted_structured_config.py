@@ -14,7 +14,7 @@ expected_value_in_policy = "check this string!"
 expected_value_for_dont_check = "don't check this string!"
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Check the report of configuration produced by scrutiny."
     )

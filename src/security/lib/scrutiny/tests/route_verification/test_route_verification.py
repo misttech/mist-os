@@ -9,7 +9,7 @@ import subprocess
 import unittest
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Check that a 'bad' capability route is rejected while a good one is not mentioned."
     )
