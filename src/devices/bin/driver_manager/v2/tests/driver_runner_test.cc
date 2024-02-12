@@ -20,6 +20,7 @@
 #include "src/devices/bin/driver_manager/testing/fake_driver_index.h"
 #include "src/devices/bin/driver_manager/v2/composite_node_spec_v2.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 namespace fdata = fuchsia_data;
 namespace fdfw = fuchsia_driver_framework;
@@ -2206,7 +2207,7 @@ TEST(CompositeServiceOfferTest, WorkingOfferPrimary) {
 
 TEST(NodeTest, ToCollection) {
   async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
-  InspectManager inspect(nullptr);
+  InspectManager inspect(loop.dispatcher());
   constexpr uint32_t kProtocolId = 0;
 
   constexpr char kGrandparentName[] = "grandparent";

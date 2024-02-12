@@ -388,14 +388,8 @@ zx::result<fidl::ClientEnd<fio::Directory>> Devfs::Connect(fs::FuchsiaVfs& vfs) 
   return zx::make_result(vfs.ServeDirectory(root_.node_, std::move(server)), std::move(client));
 }
 
-Devfs::Devfs(std::optional<Devnode>& root,
-             std::optional<fidl::ClientEnd<fio::Directory>> diagnostics)
-    : root_(root.emplace(*this)) {
+Devfs::Devfs(std::optional<Devnode>& root) : root_(root.emplace(*this)) {
   PseudoDir& pd = root_.children();
-  if (diagnostics.has_value()) {
-    MustAddEntry(pd, "diagnostics",
-                 fbl::MakeRefCounted<fs::RemoteDir>(std::move(diagnostics.value())));
-  }
   MustAddEntry(pd, "class", class_);
   MustAddEntry(pd, kNullDevName, fbl::MakeRefCounted<BuiltinDevVnode>(true));
   MustAddEntry(pd, kZeroDevName, fbl::MakeRefCounted<BuiltinDevVnode>(false));

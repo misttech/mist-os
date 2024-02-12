@@ -6,16 +6,16 @@
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_INSPECT_H_
 
 #include <lib/ddk/binding.h>
-#include <lib/inspect/cpp/inspect.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
+
+#include <atomic>
 
 #include <fbl/array.h>
 #include <fbl/ref_ptr.h>
 
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
-#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
-#include "src/storage/lib/vfs/cpp/vmo_file.h"
 
 struct ProtocolInfo {
   const char* name;
@@ -32,31 +32,17 @@ static const inline ProtocolInfo kProtoInfos[] = {
 
 class InspectDevfs {
  public:
-  static zx::result<InspectDevfs> Create(fbl::RefPtr<fs::PseudoDir> root_dir);
+  static zx::result<InspectDevfs> Create(async_dispatcher_t* dispatcher);
 
   // Publishes a device. Should be called when there's a new devices.
   // This returns a string, `link_name`, representing the device that was just published.
-  // This string should be passed to `Unpublish` to remove the device when it's being removed.
-  zx::result<std::string> Publish(uint32_t protocol_id, const char* name,
-                                  fbl::RefPtr<fs::VmoFile> file);
-
-  // Unpublishes a device. Should be called when a device is being removed.
-  void Unpublish(uint32_t protocol_id, fbl::RefPtr<fs::VmoFile> file, std::string_view link_name);
-
-  std::tuple<fbl::RefPtr<fs::PseudoDir>, uint32_t*> GetProtoDir(uint32_t id);
+  zx::result<std::string> Publish(const char* name, zx::vmo vmo);
 
  private:
-  explicit InspectDevfs(fbl::RefPtr<fs::PseudoDir> root_dir, fbl::RefPtr<fs::PseudoDir> class_dir);
+  explicit InspectDevfs(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
-  // Delete protocol |id| directory if no files are present.
-  void RemoveEmptyProtoDir(uint32_t id);
-
-  // Get protocol |id| directory if it exists, else create one.
-  std::tuple<fbl::RefPtr<fs::PseudoDir>, uint32_t*> GetOrCreateProtoDir(uint32_t id);
-
-  fbl::RefPtr<fs::PseudoDir> root_dir_;
-  fbl::RefPtr<fs::PseudoDir> class_dir_;
-  std::array<ProtocolInfo, std::size(kProtoInfos)> proto_infos_;
+  inline static std::atomic<uint64_t> inspect_dev_counter_{0};
+  async_dispatcher_t* dispatcher_ = nullptr;
 };
 
 class DeviceInspect;
@@ -84,23 +70,12 @@ class InspectManager {
   // Create a new device within inspect.
   DeviceInspect CreateDevice(std::string name, zx::vmo vmo, uint32_t protocol_id);
 
-  // Start serving the inspect directory.
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Connect();
-
   // Accessor methods.
-  fs::PseudoDir& diagnostics_dir() { return *diagnostics_dir_; }
-  fbl::RefPtr<fs::PseudoDir> driver_host_dir() { return driver_host_dir_; }
-  inspect::Node& root_node() { return inspector_.GetRoot(); }
-  inspect::Inspector& inspector() { return inspector_; }
+  inspect::Node& root_node() { return inspector_.root(); }
   InspectDevfs& devfs() { return info_->devfs; }
 
  private:
-  inspect::Inspector inspector_;
-
-  std::unique_ptr<fs::SynchronousVfs> diagnostics_vfs_;
-  fbl::RefPtr<fs::PseudoDir> diagnostics_dir_ = fbl::MakeRefCounted<fs::PseudoDir>();
-  fbl::RefPtr<fs::PseudoDir> driver_host_dir_ = fbl::MakeRefCounted<fs::PseudoDir>();
-
+  inspect::ComponentInspector inspector_;
   fbl::RefPtr<Info> info_;
 };
 
@@ -144,7 +119,7 @@ class DeviceInspect {
   inspect::UintProperty local_id_;
 
   // Inspect VMO returned via devfs's inspect nodes.
-  std::optional<fbl::RefPtr<fs::VmoFile>> vmo_file_;
+  std::optional<zx::vmo> dev_vmo_;
 
   uint32_t protocol_id_;
   std::string name_;

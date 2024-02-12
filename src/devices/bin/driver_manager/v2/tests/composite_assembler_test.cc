@@ -8,6 +8,7 @@
 #include <lib/inspect/testing/cpp/inspect.h>
 
 #include "src/devices/bin/driver_manager/v2/tests/driver_manager_test_base.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 constexpr uint32_t kPropId = 2;
 constexpr uint32_t kPropValue = 10;

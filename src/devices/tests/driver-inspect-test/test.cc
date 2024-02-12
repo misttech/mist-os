@@ -7,21 +7,25 @@
 #include <lib/async/cpp/executor.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/diagnostics/reader/cpp/archive_reader.h>
 #include <lib/driver-integration-test/fixture.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/io.h>
+#include <lib/fpromise/promise.h>
+#include <lib/inspect/cpp/hierarchy.h>
+#include <lib/syslog/cpp/macros.h>
 #include <zircon/processargs.h>
 #include <zircon/syscalls.h>
 
-#include <sdk/lib/inspect/testing/cpp/zxtest/inspect.h>
-#include <zxtest/zxtest.h>
+#include <string>
+
+#include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 
 namespace {
 using driver_integration_test::IsolatedDevmgr;
 using fuchsia_device_inspect_test::TestInspect;
-using inspect::InspectTestHelper;
 
-class InspectTestCase : public InspectTestHelper, public zxtest::Test {
+class InspectTestCase : public gtest::RealLoopFixture {
  public:
   ~InspectTestCase() override = default;
 
@@ -40,76 +44,104 @@ class InspectTestCase : public InspectTestHelper, public zxtest::Test {
         .did = 0,
     });
 
-    ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr_));
+    ASSERT_EQ(ZX_OK, IsolatedDevmgr::Create(&args, &devmgr_));
 
     static char path_buf[128];
     snprintf(path_buf, sizeof(path_buf), "sys/platform/%x:%x:0/inspect-test", PDEV_VID_TEST,
              PDEV_PID_INSPECT_TEST);
     zx::result channel = device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(), path_buf);
-    ASSERT_OK(channel.status_value());
+    ASSERT_EQ(ZX_OK, channel.status_value());
     client_ = fidl::ClientEnd<TestInspect>{std::move(channel.value())};
   }
 
   const IsolatedDevmgr& devmgr() { return devmgr_; }
   const fidl::ClientEnd<TestInspect>& client() { return client_; }
 
+  fpromise::promise<inspect::Hierarchy> ReadInspect() {
+    using diagnostics::reader::ArchiveReader;
+    using diagnostics::reader::SanitizeMonikerForSelectors;
+
+    const std::string moniker =
+        std::string{"realm_builder:"} + devmgr_.RealmChildName() +
+        "/driver_test_realm/realm_builder:0/boot-drivers:dev.sys.platform.11_13_0";
+
+    return fpromise::make_ok_promise(
+               std::unique_ptr<ArchiveReader>(new ArchiveReader(
+                   dispatcher(), {SanitizeMonikerForSelectors(moniker) + ":root"})))
+        .and_then([moniker = std::move(moniker)](std::unique_ptr<ArchiveReader>& reader) {
+          return reader->SnapshotInspectUntilPresent({moniker}).then(
+              [](fpromise::result<std::vector<diagnostics::reader::InspectData>, std::string>&
+                     wrapped) {
+                EXPECT_TRUE(wrapped.is_ok()) << wrapped.take_error();
+                auto data = wrapped.take_value();
+                EXPECT_EQ(1ul, data.size());
+                auto& inspect_data = data[0];
+                if (!inspect_data.payload().has_value()) {
+                  FX_LOGS(WARNING) << "inspect_data had nullopt payload";
+                }
+                if (inspect_data.payload().has_value() &&
+                    inspect_data.payload().value() == nullptr) {
+                  FX_LOGS(WARNING) << "inspect_data had nullptr for payload";
+                }
+                if (inspect_data.metadata().errors.has_value()) {
+                  for (const auto& e : inspect_data.metadata().errors.value()) {
+                    FX_LOGS(WARNING) << e.message;
+                  }
+                }
+
+                return fpromise::ok(inspect_data.TakePayload());
+              });
+        });
+  }
+
+  // Returns whether or not the property value matches the input.
+  bool CheckStringProperty(const inspect::NodeValue& node, const std::string& property_name,
+                           const std::string& expected_value) {
+    const auto* actual_value = node.get_property<inspect::StringPropertyValue>(property_name);
+    if (actual_value == nullptr) {
+      return false;
+    }
+    return expected_value == actual_value->value();
+  }
+
  private:
   IsolatedDevmgr devmgr_;
   fidl::ClientEnd<TestInspect> client_;
 };
 
-TEST_F(InspectTestCase, InspectDevfs) {
-  // Check if inspect-test device is hosted in diagnostics folder
-  ASSERT_OK(device_watcher::RecursiveWaitForFile(devmgr().devfs_root().get(), "diagnostics/class"));
-  ASSERT_OK(device_watcher::RecursiveWaitForFile(devmgr().devfs_root().get(),
-                                                 "diagnostics/class/test/000.inspect"));
-}
-
 TEST_F(InspectTestCase, ReadInspectData) {
-  constexpr char path[] = "dev-topological/diagnostics/class/test/000.inspect";
-
   // Use a new connection rather than using devfs_root because devfs_root has the empty set of
   // rights.
-  const fidl::ClientEnd svc = devmgr().fshost_svc_dir();
-
-  fbl::unique_fd fd;
   {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
-    ASSERT_OK(endpoints);
-    auto& [client_end, server_end] = endpoints.value();
-    ASSERT_OK(fdio_open_at(svc.channel().get(), path,
-                           static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable),
-                           server_end.TakeChannel().release()));
-    ASSERT_OK(fdio_fd_create(client_end.TakeChannel().release(), fd.reset_and_get_address()));
-  }
-  {
-    zx::vmo vmo;
-    ASSERT_OK(fdio_get_vmo_clone(fd.get(), vmo.reset_and_get_address()));
-
     // Check initial inspect data
-    ASSERT_NO_FATAL_FAILURE(ReadInspect(vmo));
+    std::optional<inspect::Hierarchy> hierarchy = std::nullopt;
+    async::Executor exec(dispatcher());
+    exec.schedule_task(
+        ReadInspect().and_then([&](inspect::Hierarchy& h) { hierarchy.emplace(std::move(h)); }));
+    RunLoopUntil([&] { return hierarchy.has_value(); });
+
     // testBeforeDdkAdd: "OK"
-    ASSERT_NO_FATAL_FAILURE(
-        CheckProperty(hierarchy().node(), "testBeforeDdkAdd", inspect::StringPropertyValue("OK")));
+    ASSERT_TRUE(CheckStringProperty(hierarchy->node(), "testBeforeDdkAdd", "OK"));
   }
 
   // Call test-driver to modify inspect data
   const fidl::WireResult result = fidl::WireCall(client())->ModifyInspect();
-  ASSERT_OK(result);
+  ASSERT_TRUE(result.ok());
   const fit::result response = result.value();
-  ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
+  ASSERT_TRUE(response.is_ok()) << zx_status_get_string(response.error_value());
 
   // Verify new inspect data is reflected
   {
-    zx::vmo vmo;
-    ASSERT_OK(fdio_get_vmo_clone(fd.get(), vmo.reset_and_get_address()));
-    ASSERT_NO_FATAL_FAILURE(ReadInspect(vmo));
+    std::optional<inspect::Hierarchy> hierarchy = std::nullopt;
+    async::Executor exec(dispatcher());
+    exec.schedule_task(
+        ReadInspect().and_then([&](inspect::Hierarchy& h) { hierarchy.emplace(std::move(h)); }));
+    RunLoopUntil([&] { return hierarchy.has_value(); });
+
     // Previous values
-    ASSERT_NO_FATAL_FAILURE(
-        CheckProperty(hierarchy().node(), "testBeforeDdkAdd", inspect::StringPropertyValue("OK")));
+    ASSERT_TRUE(CheckStringProperty(hierarchy->node(), "testBeforeDdkAdd", "OK"));
     // New addition - testModify: "OK"
-    ASSERT_NO_FATAL_FAILURE(
-        CheckProperty(hierarchy().node(), "testModify", inspect::StringPropertyValue("OK")));
+    ASSERT_TRUE(CheckStringProperty(hierarchy->node(), "testModify", "OK"));
   }
 }
 

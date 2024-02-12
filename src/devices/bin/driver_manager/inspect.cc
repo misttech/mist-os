@@ -5,6 +5,7 @@
 #include "src/devices/bin/driver_manager/inspect.h"
 
 #include <lib/ddk/driver.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/component/cpp/service.h>
 
 #include <utility>
@@ -72,138 +73,30 @@ const char* BindParamName(uint32_t param_num) {
 }
 }  // namespace
 
-void InspectDevfs::Unpublish(uint32_t protocol_id, fbl::RefPtr<fs::VmoFile> file,
-                             std::string_view link_name) {
-  // Remove reference in class directory if it exists
-  auto [dir, seqcount] = GetProtoDir(protocol_id);
-  if (dir == nullptr) {
-    // No class dir for this type, so ignore it
-    return;
-  }
-  dir->RemoveEntry(link_name, file.get());
-  // Keep only those protocol directories which are not empty to avoid clutter
-  RemoveEmptyProtoDir(protocol_id);
-}
-
-InspectDevfs::InspectDevfs(fbl::RefPtr<fs::PseudoDir> root_dir,
-                           fbl::RefPtr<fs::PseudoDir> class_dir)
-    : root_dir_(std::move(root_dir)), class_dir_(std::move(class_dir)) {
-  std::copy(std::begin(kProtoInfos), std::end(kProtoInfos), proto_infos_.begin());
-}
-
-zx::result<InspectDevfs> InspectDevfs::Create(fbl::RefPtr<fs::PseudoDir> root_dir) {
-  auto class_dir = fbl::MakeRefCounted<fs::PseudoDir>();
-  zx::result<> status = zx::make_result(root_dir->AddEntry("class", class_dir));
-  if (status.is_error()) {
-    return status.take_error();
-  }
-
-  InspectDevfs devfs(root_dir, class_dir);
+zx::result<InspectDevfs> InspectDevfs::Create(async_dispatcher_t* dispatcher) {
+  InspectDevfs devfs(dispatcher);
 
   return zx::ok(std::move(devfs));
 }
 
-std::tuple<fbl::RefPtr<fs::PseudoDir>, uint32_t*> InspectDevfs::GetProtoDir(uint32_t id) {
-  for (auto& info : proto_infos_) {
-    if (info.id == id) {
-      return {info.devnode, &info.seqcount};
-    }
+zx::result<std::string> InspectDevfs::Publish(const char* name, zx::vmo vmo) {
+  if (dispatcher_ == nullptr) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
-  return {nullptr, nullptr};
+
+  std::string inspect_name = "driver-" + std::to_string(InspectDevfs::inspect_dev_counter_++) +
+                             (name != nullptr ? "-" + std::string{name} : "");
+
+  // TODO(b/324637276): this is the export point for duplicated data from driver components.
+  inspect::PublishVmo(dispatcher_, std::move(vmo), {.tree_name = inspect_name});
+
+  return zx::ok(std::move(inspect_name));
 }
 
-std::tuple<fbl::RefPtr<fs::PseudoDir>, uint32_t*> InspectDevfs::GetOrCreateProtoDir(uint32_t id) {
-  for (auto& info : proto_infos_) {
-    if (info.id == id) {
-      // Create protocol directory if one doesn't exist
-      if (!info.devnode) {
-        auto node = fbl::MakeRefCounted<fs::PseudoDir>();
-        if (class_dir_->AddEntry(info.name, node) != ZX_OK) {
-          return {nullptr, nullptr};
-        }
-        info.devnode = std::move(node);
-      }
-      return {info.devnode, &info.seqcount};
-    }
-  }
-  return {nullptr, nullptr};
-}
-
-void InspectDevfs::RemoveEmptyProtoDir(uint32_t id) {
-  for (auto& info : proto_infos_) {
-    if (info.id == id && info.devnode && info.devnode->IsEmpty()) {
-      class_dir_->RemoveEntry(info.name, info.devnode.get());
-      info.devnode = nullptr;
-    }
-  }
-}
-zx::result<std::string> InspectDevfs::Publish(uint32_t protocol_id, const char* name,
-                                              fbl::RefPtr<fs::VmoFile> file) {
-  // Create link in /dev/class/... if this id has a published class
-  auto [dir, seqcount] = GetOrCreateProtoDir(protocol_id);
-  if (dir == nullptr) {
-    // No class dir for this type, so ignore it
-    return zx::ok("");
-  }
-
-  char tmp[32];
-  const char* inspect_name = nullptr;
-
-  if (protocol_id != ZX_PROTOCOL_CONSOLE) {
-    for (unsigned n = 0; n < 1000; n++) {
-      snprintf(tmp, sizeof(tmp), "%03u.inspect", ((*seqcount)++) % 1000);
-      fbl::RefPtr<fs::Vnode> node;
-      if (dir->Lookup(tmp, &node) == ZX_ERR_NOT_FOUND) {
-        inspect_name = tmp;
-        break;
-      }
-    }
-    if (inspect_name == nullptr) {
-      return zx::error(ZX_ERR_ALREADY_EXISTS);
-    }
-  } else {
-    snprintf(tmp, sizeof(tmp), "%s.inspect", name);
-    inspect_name = tmp;
-  }
-
-  zx::result<> status = zx::make_result(dir->AddEntry(inspect_name, file));
-  if (status.is_error()) {
-    return status.take_error();
-  }
-  return zx::ok(std::string(inspect_name));
-}
-
-InspectManager::InspectManager(async_dispatcher_t* dispatcher) {
-  auto driver_manager_dir = fbl::MakeRefCounted<fs::PseudoDir>();
-  driver_manager_dir->AddEntry("driver_host", driver_host_dir_);
-
-  auto tree_service = fbl::MakeRefCounted<fs::Service>([this, dispatcher](zx::channel request) {
-    inspect::TreeServer::StartSelfManagedServer(
-        inspector_, {}, dispatcher, fidl::ServerEnd<fuchsia_inspect::Tree>(std::move(request)));
-    return ZX_OK;
-  });
-  driver_manager_dir->AddEntry(fidl::DiscoverableProtocolName<fuchsia_inspect::Tree>,
-                               std::move(tree_service));
-
-  diagnostics_dir_->AddEntry("driver_manager", driver_manager_dir);
-
-  if (dispatcher) {
-    diagnostics_vfs_ = std::make_unique<fs::SynchronousVfs>(dispatcher);
-  }
-
-  zx::result devfs = InspectDevfs::Create(diagnostics_dir_);
+InspectManager::InspectManager(async_dispatcher_t* dispatcher) : inspector_(dispatcher, {}) {
+  zx::result devfs = InspectDevfs::Create(dispatcher);
   ZX_ASSERT(devfs.is_ok());
   info_ = fbl::MakeRefCounted<Info>(root_node(), std::move(devfs.value()));
-}
-
-zx::result<fidl::ClientEnd<fuchsia_io::Directory>> InspectManager::Connect() {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  auto& [client, server] = endpoints.value();
-  return zx::make_result(diagnostics_vfs_->ServeDirectory(diagnostics_dir_, std::move(server)),
-                         std::move(client));
 }
 
 DeviceInspect InspectManager::CreateDevice(std::string name, zx::vmo vmo, uint32_t protocol_id) {
@@ -215,10 +108,7 @@ DeviceInspect::DeviceInspect(fbl::RefPtr<InspectManager::Info> info, std::string
     : info_(std::move(info)), protocol_id_(protocol_id), name_(std::move(name)) {
   // Devices are sometimes passed bogus handles. Fun!
   if (vmo.is_valid()) {
-    uint64_t size;
-    zx_status_t status = vmo.get_size(&size);
-    ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
-    vmo_file_.emplace(fbl::MakeRefCounted<fs::VmoFile>(std::move(vmo), size));
+    dev_vmo_.emplace(std::move(vmo));
   }
   device_node_ = info_->devices.CreateChild(name_);
   // Increment device count.
@@ -234,9 +124,6 @@ DeviceInspect::~DeviceInspect() {
     // Decrement device count.
     info_->device_count.Subtract(1);
   }
-  if (vmo_file_.has_value() && !link_name_.empty()) {
-    info_->devfs.Unpublish(protocol_id_, vmo_file_.value(), link_name_);
-  }
 }
 
 DeviceInspect DeviceInspect::CreateChild(std::string name, zx::vmo vmo, uint32_t protocol_id) {
@@ -244,13 +131,16 @@ DeviceInspect DeviceInspect::CreateChild(std::string name, zx::vmo vmo, uint32_t
 }
 
 zx::result<> DeviceInspect::Publish() {
-  if (!vmo_file_.has_value()) {
+  if (!dev_vmo_.has_value()) {
     return zx::ok();
   }
-  zx::result link_name = info_->devfs.Publish(protocol_id_, name_.c_str(), vmo_file_.value());
+
+  zx::result link_name = info_->devfs.Publish(name_.c_str(), std::move(*dev_vmo_));
+  dev_vmo_.reset();
   if (link_name.is_error()) {
     return link_name.take_error();
   }
+
   link_name_ = link_name.value();
   return zx::ok();
 }

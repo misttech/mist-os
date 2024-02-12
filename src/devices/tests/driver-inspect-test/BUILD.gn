@@ -56,24 +56,28 @@ driver_compat_test("inspect-test") {
   deps = [
     ":fuchsia.device.inspect.test_cpp",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/lib/diagnostics/reader/cpp",
     "//sdk/lib/fdio",
-    "//sdk/lib/inspect/testing/cpp:zxtest",
+    "//sdk/lib/inspect/testing/cpp",
     "//src/devices/testing/driver-integration-test-shim",
     "//src/lib/ddk",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
   ]
   visibility = [ ":*" ]
 }
 
 fuchsia_unittest_component("inspect-test-dfv1") {
+  manifest = "meta/test-dfv1.cml"
   deps = [ ":inspect-test_dfv1" ]
 }
 
 fuchsia_unittest_component("inspect-test-dfv2") {
+  manifest = "meta/test-dfv2.cml"
   deps = [ ":inspect-test_dfv2" ]
 }
 

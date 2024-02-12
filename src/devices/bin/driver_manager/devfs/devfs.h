@@ -228,8 +228,7 @@ class DevfsDevice {
 class Devfs {
  public:
   // `root` must outlive `this`.
-  explicit Devfs(std::optional<Devnode>& root,
-                 std::optional<fidl::ClientEnd<fuchsia_io::Directory>> diagnostics = {});
+  explicit Devfs(std::optional<Devnode>& root);
 
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Connect(fs::FuchsiaVfs& vfs);
 

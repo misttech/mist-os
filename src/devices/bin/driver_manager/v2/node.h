@@ -204,10 +204,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   }
 
   // This should be used on the root node. Install the root node at the top of the devfs filesystem.
-  void SetupDevfsForRootNode(
-      std::optional<Devfs>& devfs,
-      std::optional<fidl::ClientEnd<fuchsia_io::Directory>> diagnostics = {}) {
-    devfs.emplace(devfs_device_.topological_node(), std::move(diagnostics));
+  void SetupDevfsForRootNode(std::optional<Devfs>& devfs) {
+    devfs.emplace(devfs_device_.topological_node());
   }
 
   // This is exposed for testing. Setup this node's devfs nodes.

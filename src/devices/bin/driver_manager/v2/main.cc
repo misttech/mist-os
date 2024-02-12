@@ -59,9 +59,6 @@ int RunDfv2(driver_manager_config::Config config) {
   auto outgoing = component::OutgoingDirectory(loop.dispatcher());
   InspectManager inspect_manager(loop.dispatcher());
 
-  zx::result diagnostics_client = inspect_manager.Connect();
-  ZX_ASSERT_MSG(diagnostics_client.is_ok(), "%s", diagnostics_client.status_string());
-
   // Launch DriverRunner for DFv2 drivers.
   auto realm_result = component::Connect<fuchsia_component::Realm>();
   if (realm_result.is_error()) {
@@ -112,7 +109,7 @@ int RunDfv2(driver_manager_config::Config config) {
 
   // Setup devfs.
   std::optional<Devfs> devfs;
-  driver_runner.root_node()->SetupDevfsForRootNode(devfs, std::move(diagnostics_client.value()));
+  driver_runner.root_node()->SetupDevfsForRootNode(devfs);
 
   driver_runner.PublishComponentRunner(outgoing);
 
@@ -140,15 +137,6 @@ int RunDfv2(driver_manager_config::Config config) {
     zx::result devfs_client = devfs.value().Connect(vfs);
     ZX_ASSERT_MSG(devfs_client.is_ok(), "%s", devfs_client.status_string());
     const zx::result result = outgoing.AddDirectory(std::move(devfs_client.value()), "dev");
-    ZX_ASSERT(result.is_ok());
-  }
-
-  // Add the diagnostics folder to the tree:
-  {
-    zx::result diagnostics_client = inspect_manager.Connect();
-    ZX_ASSERT_MSG(diagnostics_client.is_ok(), "%s", diagnostics_client.status_string());
-    const zx::result result =
-        outgoing.AddDirectory(std::move(diagnostics_client.value()), "diagnostics");
     ZX_ASSERT(result.is_ok());
   }
 

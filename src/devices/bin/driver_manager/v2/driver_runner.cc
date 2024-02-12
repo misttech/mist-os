@@ -251,8 +251,7 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
     shutdown_test_delay_rng_ = std::make_shared<std::mt19937>(static_cast<uint32_t>(seed));
   }
 
-  inspect.inspector().GetRoot().CreateLazyNode(
-      "driver_runner", [this] { return Inspect(); }, &inspect.inspector());
+  inspect.root_node().RecordLazyNode("driver_runner", [this] { return Inspect(); });
 
   // Pick a non-zero starting id so that folks cannot rely on the driver host process names being
   // stable.

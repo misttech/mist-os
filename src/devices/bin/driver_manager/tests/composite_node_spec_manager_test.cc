@@ -136,9 +136,9 @@ class CompositeNodeSpecManagerTest : public zxtest::Test {
   std::unique_ptr<CompositeNodeSpecManager> composite_node_spec_manager_;
 
   std::unordered_map<std::string, FakeCompositeNodeSpec*> specs_;
-  InspectManager inspect_ = InspectManager(nullptr);
   FakeDeviceManagerBridge bridge_;
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+  InspectManager inspect_ = InspectManager(loop_.dispatcher());
 };
 
 TEST_F(CompositeNodeSpecManagerTest, TestAddMatchCompositeNodeSpec) {
