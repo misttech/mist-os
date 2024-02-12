@@ -212,7 +212,8 @@ zx_status_t Device::StartFullmac(const rust_wlan_fullmac_ifc_protocol_copy_t* if
     return endpoints.status_value();
   }
 
-  fdf::BindServer(server_dispatcher_.get(), std::move(endpoints->server), this);
+  fdf::BindServer(server_dispatcher_.get(), std::move(endpoints->server), this,
+                  std::mem_fn(&Device::OnUnbound));
 
   auto start_result = client_.sync().buffer(*arena)->Start(std::move(endpoints->client));
 
@@ -228,6 +229,18 @@ zx_status_t Device::StartFullmac(const rust_wlan_fullmac_ifc_protocol_copy_t* if
 
   *out_sme_channel = std::move(start_result->value()->sme_channel);
   return ZX_OK;
+}
+
+void Device::OnUnbound(fidl::UnbindInfo info,
+                       fdf::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImplIfc>) {
+  if (!info.is_user_initiated()) {
+    linfo("Wlanif shutting down: %s", info.FormatDescription().c_str());
+  }
+}
+
+void Device::handle_unknown_event(
+    fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) {
+  lerror("Received unknown NodeController FIDL event with ordinal %u", metadata.event_ordinal);
 }
 
 void Device::StartScan(const wlan_fullmac_impl_base_start_scan_request_t* req) {

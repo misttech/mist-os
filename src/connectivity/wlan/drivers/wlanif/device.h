@@ -52,8 +52,9 @@ class Device final : public fdf::DriverBase,
   zx_status_t StartFullmac(const rust_wlan_fullmac_ifc_protocol_copy_t* ifc,
                            zx::channel* out_sme_channel);
 
+  void OnUnbound(fidl::UnbindInfo info, fdf::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImplIfc>);
   void handle_unknown_event(
-      fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override {}
+      fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override;
   void StartScan(const wlan_fullmac_impl_base_start_scan_request_t* req);
   void Connect(const wlan_fullmac_impl_base_connect_request_t* req);
   void Reconnect(const wlan_fullmac_impl_base_reconnect_request_t* req);
