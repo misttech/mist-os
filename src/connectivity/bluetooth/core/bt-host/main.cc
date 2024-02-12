@@ -10,6 +10,7 @@
 #include <zircon/processargs.h>
 
 #include "fidl/fuchsia.bluetooth.host/cpp/fidl.h"
+#include "fidl/fuchsia.hardware.bluetooth/cpp/fidl.h"
 #include "fuchsia/hardware/bluetooth/cpp/fidl.h"
 #include "host_component.h"
 #include "lib/component/incoming/cpp/protocol.h"
@@ -121,14 +122,14 @@ int main() {
     lifecycle_handler.Stop();
   };
 
-  fuchsia::hardware::bluetooth::HciHandle hci_handle =
-      bthost::CreateHciHandle(config.device_path());
-  if (!hci_handle) {
-    bt_log(ERROR, "bt-host", "Failed to create HciHandle; cannot initialize bt-host");
+  fuchsia::hardware::bluetooth::VendorHandle vendor_handle =
+      bthost::CreateVendorHandle(config.device_path());
+  if (!vendor_handle) {
+    bt_log(ERROR, "bt-host", "Failed to create VendorHandle; cannot initialize bt-host");
     return 1;
   }
 
-  bool initialize_res = host->Initialize(std::move(hci_handle), init_cb, error_cb);
+  bool initialize_res = host->Initialize(std::move(vendor_handle), init_cb, error_cb);
   if (!initialize_res) {
     bt_log(ERROR, "bt-host", "Error initializing bt-host; shutting down...");
     return 1;

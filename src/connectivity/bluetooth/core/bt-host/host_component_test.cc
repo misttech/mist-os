@@ -9,7 +9,7 @@
 #include <string>
 
 #include "src/connectivity/bluetooth/core/bt-host/fidl/fake_hci_server.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/slab_allocators.h"
+#include "src/connectivity/bluetooth/core/bt-host/fidl/fake_vendor_server.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace bthost::testing {
@@ -26,6 +26,8 @@ class HostComponentTest : public TestingBase {
     host_ = BtHostComponent::CreateForTesting(dispatcher(), DEFAULT_DEV_PATH);
 
     fake_hci_server_.emplace(hci_.NewRequest(), dispatcher());
+
+    fake_vendor_server_.emplace(vendor_.NewRequest(), dispatcher());
   }
 
   void TearDown() override {
@@ -38,6 +40,8 @@ class HostComponentTest : public TestingBase {
 
   fuchsia::hardware::bluetooth::HciHandle hci() { return std::move(hci_); }
 
+  fuchsia::hardware::bluetooth::VendorHandle vendor() { return std::move(vendor_); }
+
  protected:
   BtHostComponent* host() const { return host_.get(); }
 
@@ -48,7 +52,11 @@ class HostComponentTest : public TestingBase {
 
   fuchsia::hardware::bluetooth::HciHandle hci_;
 
+  fuchsia::hardware::bluetooth::VendorHandle vendor_;
+
   std::optional<bt::fidl::testing::FakeHciServer> fake_hci_server_;
+
+  std::optional<bt::fidl::testing::FakeVendorServer> fake_vendor_server_;
 
   BT_DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(HostComponentTest);
 };
@@ -57,7 +65,7 @@ TEST_F(HostComponentTest, InitializeFailsWhenCommandTimesOut) {
   std::optional<bool> init_cb_result;
   bool error_cb_called = false;
   bool init_result = host()->Initialize(
-      hci(),
+      vendor(),
       [&](bool success) {
         init_cb_result = success;
         if (!success) {

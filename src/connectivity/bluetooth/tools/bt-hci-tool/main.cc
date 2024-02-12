@@ -16,6 +16,7 @@
 #include <pw_async_fuchsia/dispatcher.h>
 
 #include "commands.h"
+#include "fidl/fuchsia.hardware.bluetooth/cpp/fidl.h"
 #include "lib/fit/defer.h"
 #include "src/connectivity/bluetooth/core/bt-host/controllers/fidl_controller.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
@@ -70,9 +71,11 @@ int main(int argc, char* argv[]) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   pw::async::fuchsia::FuchsiaDispatcher pw_dispatcher(loop.dispatcher());
 
-  fuchsia::hardware::bluetooth::HciHandle hci_handle(std::move(local));
-  auto controller =
-      std::make_unique<bt::controllers::FidlController>(std::move(hci_handle), loop.dispatcher());
+  // Create FIDL controller
+  fuchsia::hardware::bluetooth::VendorHandle vendor_handle =
+      fuchsia::hardware::bluetooth::VendorHandle(std::move(local));
+  auto controller = std::make_unique<bt::controllers::FidlController>(std::move(vendor_handle),
+                                                                      loop.dispatcher());
 
   auto transport = std::make_unique<bt::hci::Transport>(std::move(controller), pw_dispatcher);
   bool init_success = false;

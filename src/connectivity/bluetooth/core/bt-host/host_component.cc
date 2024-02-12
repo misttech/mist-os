@@ -8,6 +8,7 @@
 #include <lib/fdio/directory.h>
 
 #include "fidl/host_server.h"
+#include "fuchsia/hardware/bluetooth/cpp/fidl.h"
 #include "lib/async/default.h"
 #include "src/connectivity/bluetooth/core/bt-host/controllers/fidl_controller.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
@@ -48,10 +49,10 @@ std::unique_ptr<BtHostComponent> BtHostComponent::CreateForTesting(async_dispatc
   return host;
 }
 
-bool BtHostComponent::Initialize(fuchsia::hardware::bluetooth::HciHandle hci_handle,
+bool BtHostComponent::Initialize(fuchsia::hardware::bluetooth::VendorHandle vendor_handle,
                                  InitCallback init_cb, ErrorCallback error_cb) {
   std::unique_ptr<bt::controllers::FidlController> controller =
-      std::make_unique<bt::controllers::FidlController>(std::move(hci_handle),
+      std::make_unique<bt::controllers::FidlController>(std::move(vendor_handle),
                                                         async_get_default_dispatcher());
 
   bt_log(INFO, "bt-host", "Create HCI transport layer");

@@ -19,7 +19,7 @@ class FidlController final : public pw::bluetooth::Controller {
   using PwStatusCallback = pw::Callback<void(pw::Status)>;
 
   // |dispatcher| must outlive this object.
-  FidlController(fuchsia::hardware::bluetooth::HciHandle hci, async_dispatcher_t* dispatcher);
+  FidlController(fuchsia::hardware::bluetooth::VendorHandle vendor, async_dispatcher_t* dispatcher);
 
   ~FidlController() override;
 
@@ -44,9 +44,10 @@ class FidlController final : public pw::bluetooth::Controller {
   void GetFeatures(pw::Callback<void(FeaturesBits)> callback) override;
   void EncodeVendorCommand(
       pw::bluetooth::VendorCommandParameters parameters,
-      pw::Callback<void(pw::Result<pw::span<const std::byte>>)> callback) override {}
+      pw::Callback<void(pw::Result<pw::span<const std::byte>>)> callback) override;
 
  private:
+  // Cleanup and call |error_cb_| with |status|
   void OnError(zx_status_t status);
 
   void CleanUp();
@@ -63,9 +64,15 @@ class FidlController final : public pw::bluetooth::Controller {
   void OnCommandSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
                        const zx_packet_signal_t* signal);
 
-  // hci_handle_ holds the Hci channel until Initialize() is called, at which point hci_ is bound to
-  // the channel. This prevents errors from being lost before initialization.
-  fuchsia::hardware::bluetooth::HciHandle hci_handle_;
+  // Initializes HCI layer by binding |hci_handle| to |hci_| and opening two-way command channel and
+  // ACL data channel
+  void InitializeHci(fuchsia::hardware::bluetooth::HciHandle hci_handle);
+
+  // |vendor_handle_| holds the Vendor channel until Initialize() is called, at which point
+  // |vendor_| is bound to the channel. This prevents errors from being lost before initialization.
+  fuchsia::hardware::bluetooth::VendorHandle vendor_handle_;
+  fuchsia::hardware::bluetooth::VendorPtr vendor_;
+
   fuchsia::hardware::bluetooth::HciPtr hci_;
 
   async_dispatcher_t* dispatcher_;
@@ -75,6 +82,7 @@ class FidlController final : public pw::bluetooth::Controller {
 
   DataFunction event_cb_;
   DataFunction acl_cb_;
+  PwStatusCallback initialize_complete_cb_;
   PwStatusCallback error_cb_;
 
   async::WaitMethod<FidlController, &FidlController::OnAclSignal> acl_wait_{this};

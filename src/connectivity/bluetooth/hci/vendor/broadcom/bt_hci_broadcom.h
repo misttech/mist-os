@@ -23,11 +23,11 @@ class BtHciBroadcom;
 
 using BtHciBroadcomType =
     ddk::Device<BtHciBroadcom, ddk::GetProtocolable, ddk::Initializable, ddk::Unbindable,
-                ddk::Messageable<fuchsia_hardware_bluetooth::Hci>::Mixin>;
+                ddk::Messageable<fuchsia_hardware_bluetooth::Vendor>::Mixin>;
 
 class BtHciBroadcom : public BtHciBroadcomType,
                       public ddk::BtVendorProtocol<BtHciBroadcom>,
-                      public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor> {
+                      public fidl::WireServer<fuchsia_hardware_bluetooth::Hci> {
  public:
   // |dispatcher| will be used for the initialization thread if non-null.
   explicit BtHciBroadcom(zx_device_t* parent, async_dispatcher_t* dispatcher);
