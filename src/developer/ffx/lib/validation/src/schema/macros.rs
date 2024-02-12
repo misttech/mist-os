@@ -29,6 +29,8 @@ mod test {
     #[allow(dead_code)]
     struct ForeignType;
 
+    struct ForeignTypeMarker;
+
     struct Enum;
 
     // Schema macro syntax tests.
@@ -50,8 +52,7 @@ mod test {
 
         #[transparent] type Transparent = u32;
 
-        fn my_lone_function = Option<InlineStruct>;
-        #[foreign(ForeignType)] fn foreign_schema = (i32, i32, i32);
+        #[foreign(ForeignType)] type ForeignTypeMarker = (i32, i32, i32);
 
         type Enum = enum {
             A, B, C(String), D { field: u32, b: u32 },

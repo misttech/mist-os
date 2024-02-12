@@ -187,18 +187,18 @@ where
 }
 
 pub trait MaybeSchema {
-    const SCHEMA_FN: Option<schema::Walk>;
+    const SCHEMA_FN: Option<schema::StaticType>;
 }
 
 pub struct NoSchema;
 impl MaybeSchema for NoSchema {
-    const SCHEMA_FN: Option<schema::Walk> = None;
+    const SCHEMA_FN: Option<schema::StaticType> = None;
 }
 
 impl<T: Schema + ?Sized> MaybeSchema for T {
-    const SCHEMA_FN: Option<schema::Walk> = {
+    const SCHEMA_FN: Option<schema::StaticType> = {
         if cfg!(debug_assertions) {
-            Some(<T as Schema>::walk_schema)
+            Some(<T as Schema>::TYPE)
         } else {
             None
         }

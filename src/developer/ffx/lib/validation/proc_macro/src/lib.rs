@@ -3,13 +3,20 @@
 // found in the LICENSE file.
 
 use proc_macro2::Span;
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{
-    parse::Parse, parse_macro_input, punctuated::Punctuated, Attribute, Generics, Ident, Lit, Path,
-    Token, Type, WherePredicate,
+    parse::Parse, parse_macro_input, punctuated::Punctuated, spanned::Spanned, Attribute, Generics,
+    Ident, Lit, Path, Token, Type, WherePredicate,
 };
 
-// TODO(b/316034512): Derive macro for structs and enums
+// Reduces code duplication for these commonly-used token streams.
+
+static CRATE: LazyTokens = LazyTokens::new(|| quote!(::ffx_validation));
+static CRATE_SCHEMA: LazyTokens = LazyTokens::new(|| quote!(#CRATE::schema));
+static TYPE: LazyTokens = LazyTokens::new(|| quote!(#CRATE_SCHEMA::Type));
+static VALUE_TYPE: LazyTokens = LazyTokens::new(|| quote!(#CRATE_SCHEMA::ValueType));
+static INLINE_VALUE: LazyTokens = LazyTokens::new(|| quote!(#CRATE_SCHEMA::InlineValue));
+static SCHEMA: LazyTokens = LazyTokens::new(|| quote!(#CRATE::Schema));
 
 /// A macro to declare a schema via Rust-like schema syntax.
 ///
@@ -28,16 +35,12 @@ use syn::{
 /// * `type` and `impl` can use the `#[transparent]` attribute to emit the raw schema type instead
 ///   of wrapping it in a type alias.
 ///
-/// * `fn` declares a plain `[ffx_validation::schema::Walker]` function without an internal type
-///   alias.
-///
-///   Example: `fn reusable_schema = u32 | bool;`
-///
-/// * `fn` can use the `#[foreign(RealType)]` attribute to create a type alias for a type declared
+/// * The `#[foreign(RealType)]` attribute is used to create a type alias for a type declared
 ///   outside of the current crate.
 ///
-///   Example: `#[foreign(Point2D)] fn point2d = struct { x: f32, y: f32 };`
-///   `type Polygon = struct { points: [fn point2d], center: fn point2d };`
+///   Example: `struct Point2DM; /* Marker type */`
+///   `#[foreign(Point2D)] type Point2DM = struct { x: f32, y: f32 };`
+///   `type Polygon = struct { points: [Point2DM], center: Point2DM };`
 ///
 /// ## Types
 ///
@@ -76,10 +79,6 @@ use syn::{
 ///   Example: `const "hello-world"`
 ///   `const [1, 2, 3]`
 ///
-/// * Functions can be used as types using the `fn` prefix.
-///
-///   Example: `fn my_lone_function`
-///
 /// # Serde Compatibility
 ///
 /// By default, enums are compatible with _simple_ Serde enums. Serde attributes that heavily
@@ -101,8 +100,7 @@ pub fn schema_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 
     // TODO: Support for transparent schemas: #[schema(transparent)]
     // Type and lifetime parameters don't need static bounds for a transparent schema.
-    let schema_trait_bound: syn::TypeParamBound =
-        syn::parse(quote!(::ffx_validation::Schema).into()).unwrap();
+    let schema_trait_bound: syn::TypeParamBound = syn::parse2(SCHEMA.to_token_stream()).unwrap();
     let static_lifetime = syn::Lifetime::new("'static", Span::call_site());
 
     // Where predicates for the generated schema impl's where clause.
@@ -275,6 +273,7 @@ struct SchemaEnumVariant {
 #[derive(Default)]
 struct ImplItemAttr {
     transparent: bool,
+    foreign: Option<Type>,
 }
 
 struct SchemaImplItem {
@@ -284,21 +283,8 @@ struct SchemaImplItem {
     attr: ImplItemAttr,
 }
 
-#[derive(Default)]
-struct FnItemAttr {
-    foreign: Option<Type>,
-}
-
-struct SchemaFnItem {
-    name: Ident,
-    generics: Generics,
-    ty: SchemaType,
-    attr: FnItemAttr,
-}
-
 enum SchemaItem {
     Impl(SchemaImplItem),
-    Fn(SchemaFnItem),
 }
 
 struct SchemaItems {
@@ -327,7 +313,6 @@ enum SchemaType {
         // TODO: Support serde rename_all?
         variants: Punctuated<SchemaEnumVariant, Token![,]>,
     },
-    Fn(Path),
     Optional(Box<SchemaType>),
     // Tuples are not parsed by `SchemaType::parse`.
     // This is used to emit tuples for structs & enums
@@ -335,32 +320,38 @@ enum SchemaType {
 }
 
 impl ImplItemAttr {
-    fn from_attrs(attrs: &mut Vec<Attribute>) -> syn::Result<Self> {
-        let mut out = Self::default();
-        attrs.retain_mut(|attr| {
-            if attr.path.is_ident("transparent") {
-                out.transparent = true;
-                false
-            } else {
-                true
-            }
-        });
-        Ok(out)
+    fn duplicate_alias_attr_error(attr: &Attribute) -> syn::Error {
+        syn::Error::new(
+            attr.span(),
+            concat!(
+                "Conflicting alias attribute. ",
+                "Only one #[transparent] or #[foreign(...)] allowed."
+            ),
+        )
     }
-}
 
-impl FnItemAttr {
     fn from_attrs(attrs: &mut Vec<Attribute>) -> syn::Result<Self> {
         let mut out = Self::default();
         let mut errors = Vec::new();
         attrs.retain_mut(|attr| {
-            if attr.path.is_ident("foreign") {
+            if attr.path.is_ident("transparent") {
+                // #[transparent]
+                if out.foreign.is_some() {
+                    errors.push(Self::duplicate_alias_attr_error(attr));
+                }
+
+                out.transparent = true;
+                false
+            } else if attr.path.is_ident("foreign") {
+                // #[foreign(<Type>)]
+                if out.transparent {
+                    errors.push(Self::duplicate_alias_attr_error(attr));
+                }
+
                 let res =
                     attr.parse_args_with(|input: syn::parse::ParseStream<'_>| -> syn::Result<()> {
-                        let paren;
-                        syn::parenthesized!(paren in input);
-                        let ty = paren.parse()?;
-                        paren.parse::<syn::parse::Nothing>()?;
+                        let ty = input.parse()?;
+                        input.parse::<syn::parse::Nothing>()?;
                         out.foreign = Some(ty);
                         Ok(())
                     });
@@ -374,6 +365,15 @@ impl FnItemAttr {
                 true
             }
         });
+
+        if !errors.is_empty() {
+            // Combine all errors into one single error.
+            let mut iter = errors.drain(..);
+            let mut first = iter.next().unwrap();
+            first.extend(iter);
+            return Err(first);
+        }
+
         Ok(out)
     }
 }
@@ -381,7 +381,6 @@ impl FnItemAttr {
 // Parses:
 // `Attribute...` type Type<T> where T: Trait = `SchemaType`;
 // `Attribute...` impl<T> for module::ImplPath<T> where T: Trait = `SchemaType`;
-// `Attribute...` fn module::fn_path = `SchemaType`;
 impl Parse for SchemaItem {
     fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
         let mut attrs = Vec::new();
@@ -461,20 +460,6 @@ impl Parse for SchemaItem {
             })
         } else if lookahead.peek(Token![enum]) {
             return Err(input.error("inline enums not yet supported"));
-        } else if lookahead.peek(Token![fn]) {
-            input.parse::<Token![fn]>()?;
-
-            let name = input.parse()?;
-            let generics = if input.lookahead1().peek(Token![<]) {
-                input.parse::<Generics>()?
-            } else {
-                Default::default()
-            };
-
-            input.parse::<Token![=]>()?;
-            let ty = input.parse()?;
-
-            Self::Fn(SchemaFnItem { name, generics, ty, attr: FnItemAttr::from_attrs(&mut attrs)? })
         } else {
             return Err(lookahead.error());
         })
@@ -483,59 +468,44 @@ impl Parse for SchemaItem {
 
 fn maybe_wrap_alias(
     ty: Option<impl quote::ToTokens>,
-    walker: &proc_macro2::TokenStream,
     schema_ty: &SchemaType,
 ) -> proc_macro2::TokenStream {
     if let Some(ty) = ty {
-        let body = schema_ty.build_as_fn_expr(walker);
+        let body = schema_ty.build();
         quote! {
-            #walker
-                .add_alias(
-                    ::std::any::type_name::<#ty>(),
-                    ::std::any::TypeId::of::<#ty>(),
-                    #body
-                )?;
+            &#TYPE::Alias {
+                name: ::std::any::type_name::<#ty>,
+                id: ::std::any::TypeId::of::<#ty>,
+                ty: #body
+            }
         }
     } else {
-        schema_ty.build(walker)
+        schema_ty.build()
     }
 }
 
 impl SchemaImplItem {
     fn build(&self) -> proc_macro2::TokenStream {
         let SchemaImplItem { generics, impl_path, ty, attr } = self;
-        let walker = quote! { walker };
         let (impl_generics, _, where_clause) = generics.split_for_impl();
 
-        let fn_body = maybe_wrap_alias(
-            if attr.transparent { None } else { Some(<Token![Self]>::default()) },
-            &walker,
+        let body = maybe_wrap_alias(
+            if attr.transparent {
+                None
+            } else {
+                Some(
+                    attr.foreign
+                        .as_ref()
+                        .map(ToTokens::into_token_stream)
+                        .unwrap_or(quote! { Self }),
+                )
+            },
             ty,
         );
 
         quote! {
-            impl #impl_generics ::ffx_validation::schema::Schema for #impl_path #where_clause {
-                fn walk_schema(#walker: &mut dyn ::ffx_validation::schema::Walker) -> ::std::ops::ControlFlow<()> {
-                    #fn_body
-                    #walker.ok()
-                }
-            }
-        }
-    }
-}
-
-impl SchemaFnItem {
-    fn build(&self) -> proc_macro2::TokenStream {
-        let SchemaFnItem { name, generics, ty, attr } = self;
-        let walker = quote! { walker };
-        let (impl_generics, _, where_clause) = generics.split_for_impl();
-
-        let fn_body = maybe_wrap_alias(attr.foreign.as_ref(), &walker, ty);
-
-        quote! {
-            fn #name #impl_generics (#walker: &mut dyn ::ffx_validation::schema::Walker) -> ::std::ops::ControlFlow<()> #where_clause {
-                #fn_body
-                #walker.ok()
+            impl #impl_generics #SCHEMA for #impl_path #where_clause {
+                const TYPE: &'static #TYPE<'static> = #body;
             }
         }
     }
@@ -545,7 +515,6 @@ impl SchemaItem {
     fn build(&self) -> proc_macro2::TokenStream {
         match self {
             SchemaItem::Impl(item) => item.build(),
-            SchemaItem::Fn(item) => item.build(),
         }
     }
 }
@@ -669,9 +638,6 @@ impl Parse for SchemaType {
                 input.parse::<Token![const]>()?;
             }
             Self::Literal(input.parse()?)
-        } else if lookahead.peek(Token![fn]) {
-            input.parse::<Token![fn]>()?;
-            Self::Fn(input.parse()?)
         } else if let Ok(ty) = input.parse::<Type>() {
             Self::Alias(ty)
         } else {
@@ -697,47 +663,43 @@ impl Parse for SchemaType {
 }
 
 impl SchemaType {
-    // Returns the schema type as a function expression.
-    fn build_as_fn_expr(&self, walker: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-        match self {
-            Self::Alias(ty) => {
-                quote! {
-                    <#ty as ::ffx_validation::schema::Schema>::walk_schema
-                }
-            }
-            Self::Fn(path) => quote!(#path),
-            _ => {
-                let ty = self.build(walker);
-                quote! {
-                    |#walker| {
-                        #ty
-                        #walker.ok()
-                    }
-                }
-            }
-        }
-    }
-
-    fn build(&self, walker: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    fn build(&self) -> proc_macro2::TokenStream {
         match self {
             Self::Null => quote! {
-                #walker.add_type(::ffx_validation::schema::ValueType::Null)?;
+                &#TYPE::Type { ty: #VALUE_TYPE::Null }
             },
-            Self::Union(tys) => tys.iter().map(|ty| ty.build(walker)).collect(),
+            Self::Union(tys) => {
+                let tys = tys.iter().map(Self::build);
+                quote! {
+                    &#TYPE::Union(&[#(#tys),*])
+                }
+            }
             Self::Alias(ty) => {
                 quote! {
-                    <#ty as ::ffx_validation::schema::Schema>::walk_schema(#walker)?;
+                    <#ty as #SCHEMA>::TYPE
                 }
             }
             Self::Literal(lit) => {
                 let constant = match lit {
-                    // TODO(b/316036318): serde_json macro invocation
-                    SchemaLiteral::Simple(lit) => quote! { ::std::convert::Into::into(#lit) },
+                    // TODO(b/316036318): support array and object literals
+                    SchemaLiteral::Simple(lit) => match lit {
+                        Lit::Str(lit) => quote! { #INLINE_VALUE::String(#lit) },
+                        Lit::Int(lit) => {
+                            if lit.base10_parse::<u64>().is_ok() {
+                                quote! { #INLINE_VALUE::UInt(#lit as u64) }
+                            } else {
+                                quote! { #INLINE_VALUE::Int(#lit as i64) }
+                            }
+                        }
+                        Lit::Float(lit) => quote! { #INLINE_VALUE::Float(#lit as f64) },
+                        Lit::Bool(lit) => quote! { #INLINE_VALUE::Bool(#lit) },
+                        _ => unreachable!("Literals should be vetted by SchemaLiteral::parse"),
+                    },
                     _ => todo!("literals not yet supported"),
                 };
 
                 quote! {
-                    #walker.add_constant(#constant)?;
+                    &#TYPE::Constant { value: &#constant }
                 }
             }
             Self::Struct { fields } => {
@@ -746,23 +708,24 @@ impl SchemaType {
                     .map(|field| {
                         let SchemaField { key, value } = field;
                         let SchemaStructKey { name, optional } = key;
-                        let ty = value.build_as_fn_expr(walker);
+                        let ty = value.build();
                         let key_str = stringify_ident(name);
                         quote! {
-                            ::ffx_validation::schema::Field {
+                            #CRATE_SCHEMA::Field {
                                 key: #key_str,
                                 value: #ty,
-                                optional: #optional, ..::ffx_validation::schema::FIELD
+                                optional: #optional,
+                                ..#CRATE_SCHEMA::FIELD
                             },
                         }
                     })
                     .collect();
 
                 quote! {
-                    #walker.add_struct(
-                        &[#fields],
-                        None
-                    )?;
+                    &#TYPE::Struct {
+                        fields: &[#fields],
+                        extras: None,
+                    }
                 }
             }
             Self::Enum { variants } => {
@@ -771,8 +734,8 @@ impl SchemaType {
                     .map(|variant| {
                         let key_str = stringify_ident(&variant.name);
                         let ty = match &variant.ty {
-                            None => quote! { ::ffx_validation::schema::nothing },
-                            Some(ty) => ty.build_as_fn_expr(walker),
+                            None => quote! { &#TYPE::Void },
+                            Some(ty) => ty.build(),
                         };
                         quote! {
                             (#key_str, #ty),
@@ -780,35 +743,46 @@ impl SchemaType {
                     })
                     .collect();
                 quote! {
-                    #walker.add_enum(
-                        &[#variants],
-                    )?;
-                }
-            }
-            Self::Fn(path) => {
-                quote! {
-                    #path(#walker)?;
+                    &#TYPE::Enum {
+                        variants: &[#variants],
+                    }
                 }
             }
             Self::Optional(ty) => {
-                let ty = ty.build(walker);
-                quote! {
-                    #ty
-                    #walker.add_type(::ffx_validation::schema::ValueType::Null)?;
-                }
+                let ty = ty.build();
+                quote! { &#TYPE::Union(&[#ty, &#TYPE::Type { ty: #VALUE_TYPE::Null }]) }
             }
             Self::Tuple(tys) => {
                 let tys: proc_macro2::TokenStream = tys
                     .iter()
                     .map(|ty| {
-                        let ty = ty.build_as_fn_expr(walker);
+                        let ty = ty.build();
                         quote! { #ty, }
                     })
                     .collect();
-                quote! {
-                    #walker.add_tuple(&[#tys])?;
-                }
+                quote! { &#TYPE::Tuple { fields: &[#tys] } }
             }
         }
+    }
+}
+
+/// Procedural macro token streams are not const & thread safe so they
+/// cannot be used within a static.
+struct LazyTokens(fn() -> proc_macro2::TokenStream);
+
+impl LazyTokens {
+    const fn new(init: fn() -> proc_macro2::TokenStream) -> Self {
+        Self(init)
+    }
+}
+
+/// Allows the [`quote::quote!`] macro to interpolate these directly.
+impl quote::ToTokens for LazyTokens {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        (self.0)().to_tokens(tokens)
+    }
+
+    fn to_token_stream(&self) -> proc_macro2::TokenStream {
+        (self.0)()
     }
 }

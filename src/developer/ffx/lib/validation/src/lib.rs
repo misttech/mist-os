@@ -24,7 +24,7 @@ pub fn validation_test<
     for example in examples {
         println!("Example: {example}");
 
-        if let Err(_) = validate::validate(T::walk_schema, example) {
+        if let Err(_) = validate::validate(T::TYPE, example) {
             eprintln!("/!\\ Example failed schema validation");
             fail = true;
         }
@@ -45,7 +45,7 @@ pub fn validation_test<
                             fail = true;
                         }
 
-                        if let Err(_) = validate::validate(T::walk_schema, &serde_val) {
+                        if let Err(_) = validate::validate(T::TYPE, &serde_val) {
                             eprintln!("/!\\ Serialization output failed schema validation");
                             fail = true;
                         }
