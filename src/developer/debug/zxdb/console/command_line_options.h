@@ -25,6 +25,7 @@ struct CommandLineOptions {
   bool local = false;
   bool debug_mode = false;
   std::optional<std::string> console_mode;
+  std::optional<std::string> embedded_mode_context;
   std::optional<std::string> core;
   std::vector<std::string> attach;
   std::vector<std::string> script_files;

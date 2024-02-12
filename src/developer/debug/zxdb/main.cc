@@ -93,6 +93,9 @@ void SetupCommandLineOptions(const CommandLineOptions& options, Session* session
     system_settings.SetBool(ClientSettings::System::kDebugMode, true);
   if (options.console_mode)
     system_settings.SetString(ClientSettings::System::kConsoleMode, *options.console_mode);
+  if (options.embedded_mode_context)
+    system_settings.SetString(ClientSettings::System::kEmbeddedModeContext,
+                              *options.embedded_mode_context);
   if (options.auto_attach_limbo)
     system_settings.SetBool(ClientSettings::System::kAutoAttachLimbo, true);
   if (options.symbol_cache)

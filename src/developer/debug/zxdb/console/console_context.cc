@@ -11,6 +11,7 @@
 #include <chrono>
 #include <thread>
 
+#include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/zxdb/client/breakpoint.h"
 #include "src/developer/debug/zxdb/client/filter.h"
 #include "src/developer/debug/zxdb/client/frame.h"
@@ -451,6 +452,10 @@ std::string ConsoleContext::GetConsoleMode() {
   return session()->system().settings().GetString(ClientSettings::System::kConsoleMode);
 }
 
+std::string ConsoleContext::GetEmbeddedModeContext() {
+  return session()->system().settings().GetString(ClientSettings::System::kEmbeddedModeContext);
+}
+
 void ConsoleContext::SetConsoleMode(std::string mode) {
   session()->system().settings().SetString(ClientSettings::System::kConsoleMode, std::move(mode));
   // If the mode changes, we will get notified via SettingStoreObserver.
@@ -805,10 +810,25 @@ void ConsoleContext::OnThreadStopped(Thread* thread, const StopInfo& info) {
   SetActiveFrameIdForThread(thread, 0);
   SetActiveBreakpointForStop(info);
 
-  // We've hit a breakpoint. If we're in kConsoleMode_ShellAfterBreak, it's time to switch to
-  // kConsoleMode_Shell.
+  // We've hit a breakpoint. If we're in kConsoleMode_Embedded, it's time to switch to
+  // kConsoleMode_EmbeddedInteractive.
   if (GetConsoleMode() == ClientSettings::System::kConsoleMode_Embedded) {
     SetConsoleMode(ClientSettings::System::kConsoleMode_EmbeddedInteractive);
+
+    OutputBuffer out{Syntax::kHeading, "⚠️  zxdb caught"};
+    const OutputBuffer suffix{Syntax::kHeading,
+                              fxl::StringPrintf("in %s, type `frame` to get started.",
+                                                thread->GetProcess()->GetName().c_str())};
+    if (auto embedded_mode_context = GetEmbeddedModeContext(); !embedded_mode_context.empty()) {
+      out.Append(Syntax::kHeading, fxl::StringPrintf(" %s ", embedded_mode_context.c_str()));
+    } else {
+      // Default to printing the exception type if the context string isn't specified.
+      out.Append(Syntax::kHeading,
+                 fxl::StringPrintf(" %s ", debug_ipc::ExceptionTypeToString(info.exception_type)));
+    }
+    out.Append(suffix);
+
+    Console::get()->Output(out);
   }
 
   // Show the location information.

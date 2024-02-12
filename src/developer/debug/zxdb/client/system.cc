@@ -72,6 +72,12 @@ static const char* kConsoleModeDescription =
 const char* ClientSettings::System::kConsoleMode_Shell = "shell";
 const char* ClientSettings::System::kConsoleMode_Embedded = "embedded";
 const char* ClientSettings::System::kConsoleMode_EmbeddedInteractive = "embedded-interactive";
+const char* ClientSettings::System::kEmbeddedModeContext = "embedded-mode-context";
+static const char* kEmbeddedModeContextDescription =
+    R"(  A short contextual string shown to the user when zxdb breaks out of
+    Embedded mode. This should typically be something that the user would expect
+    to need to debug e.g. "test failure" or "crash". If unspecified, the
+    exception that caused the debugger to appear will be shown.)";
 
 const char* ClientSettings::System::kLanguage = "language";
 static const char* kLanguageDescription =
@@ -183,6 +189,8 @@ fxl::RefPtr<SettingSchema> CreateSchema() {
       ClientSettings::System::kConsoleMode_Shell,
       {ClientSettings::System::kConsoleMode_Shell, ClientSettings::System::kConsoleMode_Embedded,
        ClientSettings::System::kConsoleMode_EmbeddedInteractive});
+  schema->AddString(ClientSettings::System::kEmbeddedModeContext, kEmbeddedModeContextDescription,
+                    "");
   schema->AddString(ClientSettings::System::kLanguage, kLanguageDescription, "auto",
                     {"rust", "c++", "auto"});
   schema->AddList(ClientSettings::System::kSecondChanceExceptions,

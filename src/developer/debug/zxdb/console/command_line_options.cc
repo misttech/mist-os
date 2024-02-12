@@ -51,6 +51,12 @@ const char kConsoleModeHelp[] = R"(  --console-mode
       The style in which zxdb interacts with the console. Valid values are
       "shell" (default), "embedded", and "embedded-interactive".)";
 
+const char kEmbeddedModeContextHelp[] = R"(  --embedded-mode-context
+      A short contextual string shown to the user when zxdb breaks out of
+      Embedded mode. This is typically something that the user would expect
+      to need to debug e.g. "test failure" or "crash". If unspecified, the
+      exception that caused the debugger to appear will be shown.)";
+
 const char kHelpHelp[] = R"(  --help
   -h
       Prints all command-line switches.)";
@@ -151,6 +157,8 @@ cmdline::Status ParseCommandLine(int argc, const char* argv[], CommandLineOption
   parser.AddSwitch("core", 0, kCoreHelp, &CommandLineOptions::core);
   parser.AddSwitch("debug-mode", 'd', kDebugModeHelp, &CommandLineOptions::debug_mode);
   parser.AddSwitch("console-mode", 0, kConsoleModeHelp, &CommandLineOptions::console_mode);
+  parser.AddSwitch("embedded-mode-context", 0, kEmbeddedModeContextHelp,
+                   &CommandLineOptions::embedded_mode_context);
   parser.AddSwitch("attach", 'a', kAttachHelp, &CommandLineOptions::attach);
   parser.AddSwitch("script-file", 'S', kScriptFileHelp, &CommandLineOptions::script_files);
   parser.AddSwitch("execute", 'e', kExecuteCommandHelp, &CommandLineOptions::execute_commands);

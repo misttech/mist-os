@@ -132,6 +132,7 @@ class ConsoleContext : public ProcessObserver,
 
   void InitConsoleMode();
   std::string GetConsoleMode();
+  std::string GetEmbeddedModeContext();
   void SetConsoleMode(std::string mode);
 
   // SessionObserver implementation:
