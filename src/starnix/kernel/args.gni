@@ -21,9 +21,7 @@ declare_args() {
   starnix_syscall_stats = false
 
   # Whether or not unified address spaces are leveraged.
-  # TODO(https://fxbug.dev/42083004): Enable on other platforms once Zircon
-  # support is available.
-  starnix_unified_aspace = target_cpu == "x64" || target_cpu == "arm64"
+  starnix_unified_aspace = true
 
   # Whether to use an alternate strategy for anonymous memory allocations.
   starnix_enable_alternate_anon_allocs = false
