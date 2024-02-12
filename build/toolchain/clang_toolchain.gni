@@ -1005,7 +1005,7 @@ template("clang_toolchain") {
               "--local",
               "--check-determinism",
             ]
-          } else if (link_rbe_check == "determinism") {
+          } else if (link_rbe_check == "consistency") {
             _linker_prefix_list += [ "--compare" ]
           } else if (link_rbe_check == "none") {
             _concurrent_jobs = concurrent_jobs.remote
