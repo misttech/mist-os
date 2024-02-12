@@ -92,7 +92,6 @@ class FpsMetricsProcessor(trace_metrics.MetricsProcessor):
         for i in range(len(vsync_events) - 1):
             # Two renders may be squashed into one.
             if vsync_events[i + 1].start == vsync_events[i].start:
-                i += 1
                 continue
             fps_values.append(
                 trace_time.TimeDelta.from_seconds(1)
