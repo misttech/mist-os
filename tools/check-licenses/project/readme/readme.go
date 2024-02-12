@@ -95,6 +95,10 @@ type Readme struct {
 
 	OtherFields          []*Other `json:"otherFields"`
 	OtherMultiLineFields []*Other `json:"otherMultiLineFields"`
+
+	// Internal field used to note that this README.fuchsia file is located
+	// in a check-licenses "assets" directory.
+	IsAssetDirReadme bool `json:"isAssetDirReadme"`
 }
 
 // Several directives specify information about a given license file.
@@ -159,7 +163,12 @@ func NewReadmeFromFileCustomLocation(projectRoot, readmePath string) (*Readme, e
 	}
 	defer f.Close()
 
-	return NewReadme(f, projectRoot, readmePath)
+	r, err := NewReadme(f, projectRoot, readmePath)
+	if err != nil {
+		return nil, err
+	}
+	r.IsAssetDirReadme = true
+	return r, nil
 }
 
 // NewReadme creates a new Readme object from an io.Reader.

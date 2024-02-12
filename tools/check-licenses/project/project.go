@@ -88,6 +88,12 @@ func NewProject(r *readme.Readme, projectRootPath string) (*Project, error) {
 		path := filepath.Join(p.Root, l.LicenseFile)
 		f, err := file.LoadFile(path, file.FileType(l.LicenseFileFormat), r.Name)
 		if err != nil {
+			// Readmes in asset dirs may occasionally go out of sync with
+			// the project they describe. This is to prevent roll breakages.
+			if r.IsAssetDirReadme {
+				continue
+			}
+
 			return nil, fmt.Errorf("failed to load license file %s: %w\n", path, err)
 		}
 		f.SetURL(l.LicenseFileURL)

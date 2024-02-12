@@ -4,6 +4,7 @@
   "version": "123",
   "malformedLines": [],
   "description": "multi line directive\n\nwith empty spaces\n\n",
+  "isAssetDirReadme": true,
   "licenseInfo": [
     {
       "licenseFile": "license",
