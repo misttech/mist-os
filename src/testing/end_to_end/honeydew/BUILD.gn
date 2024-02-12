@@ -18,6 +18,7 @@ python_library("honeydew") {
     "affordances/ffx/ui/__init__.py",
     "affordances/ffx/ui/screenshot.py",
     "affordances/fuchsia_controller/__init__.py",
+    "affordances/fuchsia_controller/rtc.py",
     "affordances/fuchsia_controller/tracing.py",
     "affordances/sl4f/__init__.py",
     "affordances/sl4f/bluetooth/__init__.py",
@@ -45,6 +46,7 @@ python_library("honeydew") {
     "interfaces/affordances/bluetooth/bluetooth_common.py",
     "interfaces/affordances/bluetooth/profiles/bluetooth_avrcp.py",
     "interfaces/affordances/bluetooth/profiles/bluetooth_gap.py",
+    "interfaces/affordances/rtc.py",
     "interfaces/affordances/session.py",
     "interfaces/affordances/tracing.py",
     "interfaces/affordances/ui/__init__.py",
@@ -101,6 +103,7 @@ group("honeydew_fidl_ir_and_deps") {
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_host_test_data",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_host_test_data",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_host_test_data",
+    "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc_host_test_data",
     "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_host_test_data",
     "//sdk/fidl/fuchsia.io:fuchsia.io_host_test_data",
 

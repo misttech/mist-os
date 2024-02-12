@@ -87,6 +87,10 @@ class HoneydewTimeoutError(HoneydewError):
     """Exception for timeout based raised by Honeydew."""
 
 
+class HoneydewRtcError(HoneydewError):
+    """Raised by rtc.Rtc class."""
+
+
 class FuchsiaStateError(HoneydewError):
     """Exception for state errors."""
 

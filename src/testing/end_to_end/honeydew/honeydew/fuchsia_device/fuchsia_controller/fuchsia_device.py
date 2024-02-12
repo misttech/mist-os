@@ -18,9 +18,10 @@ import fidl.fuchsia_io as f_io
 import fuchsia_controller_py as fcp
 
 from honeydew import errors
+from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
 from honeydew.fuchsia_device import base_fuchsia_device
-from honeydew.interfaces.affordances import tracing
+from honeydew.interfaces.affordances import rtc, tracing
 from honeydew.interfaces.affordances.bluetooth.profiles import (
     bluetooth_avrcp as bluetooth_avrcp_interface,
 )
@@ -141,6 +142,18 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice):
             bluetooth_gap.BluetoothGap object
         """
         raise NotImplementedError
+
+    @properties.Affordance
+    def rtc(self) -> rtc.Rtc:
+        """Returns an Rtc affordance object.
+
+        Returns:
+            rtc.Rtc object
+        """
+        return rtc_fc.Rtc(
+            fuchsia_controller=self.fuchsia_controller,
+            reboot_affordance=self,
+        )
 
     @properties.Affordance
     def tracing(self) -> tracing.Tracing:

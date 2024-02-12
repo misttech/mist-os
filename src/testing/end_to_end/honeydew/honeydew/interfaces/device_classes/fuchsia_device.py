@@ -7,7 +7,7 @@
 import abc
 from collections.abc import Callable
 
-from honeydew.interfaces.affordances import session, tracing
+from honeydew.interfaces.affordances import rtc, session, tracing
 from honeydew.interfaces.affordances.bluetooth.profiles import (
     bluetooth_avrcp,
     bluetooth_gap,
@@ -185,6 +185,15 @@ class FuchsiaDevice(abc.ABC):
 
         Returns:
             bluetooth_gap.BluetoothGap object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def rtc(self) -> rtc.Rtc:
+        """Returns an RTC affordance object.
+
+        Returns:
+            rtc.Rtc object
         """
 
     @properties.Affordance

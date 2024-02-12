@@ -20,6 +20,7 @@ from honeydew.affordances.sl4f.ui import user_input as user_input_sl4f
 from honeydew.affordances.sl4f.wlan import wlan as wlan_sl4f
 from honeydew.affordances.sl4f.wlan import wlan_policy as wlan_policy_sl4f
 from honeydew.fuchsia_device import base_fuchsia_device
+from honeydew.interfaces.affordances import rtc as rtc_interface
 from honeydew.interfaces.affordances import tracing as tracing_interface
 from honeydew.interfaces.affordances.bluetooth.profiles import (
     bluetooth_avrcp as bluetooth_avrcp_interface,
@@ -127,6 +128,15 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice):
         return bluetooth_gap_sl4f.BluetoothGap(
             device_name=self.device_name, sl4f=self.sl4f, reboot_affordance=self
         )
+
+    @properties.Affordance
+    def rtc(self) -> rtc_interface.Rtc:
+        """Returns an Rtc affordance object.
+
+        Raises:
+            NotImplementedError: Unsupported on SL4F.
+        """
+        raise NotImplementedError("SL4F unsupported, use FuchsiaController")
 
     @properties.Affordance
     def tracing(self) -> tracing_interface.Tracing:
