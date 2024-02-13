@@ -224,8 +224,8 @@ int use_video_decoder_test(std::string input_file_path, int expected_frame_count
           (frame_index == test_params->frame_to_compare->ordinal)) {
         auto& frame_to_compare = *test_params->frame_to_compare;
         ZX_ASSERT(frame_index == frame_to_compare.ordinal);
-        ZX_ASSERT(width = frame_to_compare.width);
-        ZX_ASSERT(height = frame_to_compare.height);
+        ZX_ASSERT(width == frame_to_compare.width);
+        ZX_ASSERT(height == frame_to_compare.height);
         // If memcmp() returned 0, it'd mean the per-frame hash would have matched, which it
         // didn't.
         ZX_ASSERT(0 != memcmp(i420_data, frame_to_compare.data, width * height * 3 / 2));
