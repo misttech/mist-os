@@ -442,6 +442,8 @@ TEST(Snapshot, ReleaseCowParentPagesRightInHiddenNode) {
   EXPECT_EQ(*reinterpret_cast<uint64_t*>(half_clone->base_addr()), 0xc0ffee);
 }
 
+// Tests zeroing a range at the end of a parent VMO, which results in a call to ReleaseParentPages
+// in the hidden node.
 TEST(Snapshot, ZeroRangeFromEndOfParent) {
   UserPager pager;
   ASSERT_TRUE(pager.Init());
@@ -487,6 +489,276 @@ TEST(Snapshot, ZeroRangeFromEndOfParent) {
   EXPECT_EQ(*reinterpret_cast<uint64_t*>(vmo->base_addr() + zx_system_get_page_size()), 0xdead1eaf);
   EXPECT_EQ(*reinterpret_cast<uint64_t*>(vmo->base_addr() + 2 * zx_system_get_page_size()),
             0xdead1eaf);
+}
+
+// Tests that zeroing a range in a snapshot when there are no pages in the parent will not leak
+// pages from the root to the zeroed range.
+TEST(Snapshot, ZeroRangeLeftInSnapshotNoPagesInParent) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(2, &vmo));
+
+  std::vector<uint64_t> kZeroBuffer(zx_system_get_page_size(), 0);
+
+  auto clone = vmo->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(clone);
+
+  auto snapshot = clone->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(snapshot);
+
+  // Zero range in snapshot.
+  auto status = snapshot->vmo().op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), nullptr, 0);
+  ASSERT_OK(status, "zero failed");
+  ASSERT_TRUE(check_buffer_data(snapshot.get(), 0, 1, kZeroBuffer.data(), false));
+
+  // Supply pages to root & check snapshot doesn't see them.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 2));
+  ASSERT_TRUE(check_buffer_data(snapshot.get(), 0, 1, kZeroBuffer.data(), false));
+
+  // SupplyPages should have provided non-zero pages.
+  ASSERT_FALSE(check_buffer_data(vmo, 0, 1, kZeroBuffer.data(), false));
+
+  // Clone should see the pages of the root VMO.
+  ASSERT_TRUE(check_buffer_data(clone.get(), 0, 2, (const void*)vmo->base_addr(), false));
+
+  // Snapshot should see the second page of the root VMO
+  ASSERT_TRUE(check_buffer_data(
+      snapshot.get(), 1, 1, (const void*)(vmo->base_addr() + zx_system_get_page_size()), false));
+}
+
+// Tests that zeroing a range in a snapshot when there is a page in the parent at the time of the
+// zero will not leak pages from the root to the zeroed range.
+TEST(Snapshot, ZeroRangeLeftInSnapshotPageInParent) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(2, &vmo));
+
+  std::vector<uint64_t> kZeroBuffer(zx_system_get_page_size(), 0);
+
+  auto clone = vmo->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(clone);
+
+  auto snapshot = clone->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(snapshot);
+
+  // Supply pages to root before performing OP_ZERO.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 2));
+
+  // Zero range in snapshot.
+  auto status = snapshot->vmo().op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), nullptr, 0);
+  ASSERT_OK(status, "zero failed");
+  ASSERT_TRUE(check_buffer_data(snapshot.get(), 0, 1, kZeroBuffer.data(), false));
+
+  // Check that the page isn't leaked from the root VMO.
+  ASSERT_TRUE(check_buffer_data(snapshot.get(), 0, 1, kZeroBuffer.data(), false));
+
+  // SupplyPages should have provided non-zero pages.
+  ASSERT_FALSE(check_buffer_data(vmo, 0, 1, kZeroBuffer.data(), false));
+
+  // Clone should see the pages of the root VMO.
+  ASSERT_TRUE(check_buffer_data(clone.get(), 0, 2, (const void*)vmo->base_addr(), false));
+
+  // Snapshot should see the second page of the root VMO
+  ASSERT_TRUE(check_buffer_data(
+      snapshot.get(), 1, 1, (const void*)(vmo->base_addr() + zx_system_get_page_size()), false));
+}
+
+// Tests that zeroing a range in a snapshot when there are no pages in the parent, and there is a
+// chain of hidden parents, will not cause pages to leak from the root VMO.
+TEST(Snapshot, ZeroRangeLeftInSnapshotNoPagesInParentChain) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(2, &vmo));
+
+  std::vector<uint64_t> kZeroBuffer(zx_system_get_page_size(), 0);
+
+  // Make a chain of three clones.
+  auto clone1 = vmo->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(clone1);
+  auto clone2 = clone1->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(clone2);
+  auto clone3 = clone2->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(clone3);
+
+  // Snapshot will have three hidden parents
+  auto snapshot = clone3->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(snapshot);
+
+  // Zero range in snapshot & validate.
+  auto status = snapshot->vmo().op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), nullptr, 0);
+  ASSERT_OK(status, "zero failed");
+  ASSERT_TRUE(check_buffer_data(snapshot.get(), 0, 1, kZeroBuffer.data(), false));
+
+  // Supply pages to root & check snapshot doesn't see.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 2));
+  ASSERT_TRUE(check_buffer_data(snapshot.get(), 0, 1, kZeroBuffer.data(), false));
+
+  // SupplyPages should have provided non-zero pages.
+  ASSERT_FALSE(check_buffer_data(vmo, 0, 1, kZeroBuffer.data(), false));
+
+  // Clones should see the pages of the root VMO.
+  ASSERT_TRUE(check_buffer_data(clone1.get(), 0, 2, (const void*)vmo->base_addr(), false));
+  ASSERT_TRUE(check_buffer_data(clone2.get(), 0, 2, (const void*)vmo->base_addr(), false));
+  ASSERT_TRUE(check_buffer_data(clone3.get(), 0, 2, (const void*)vmo->base_addr(), false));
+
+  // Snapshot should see the second page of the root VMO
+  ASSERT_TRUE(check_buffer_data(
+      snapshot.get(), 1, 1, (const void*)(vmo->base_addr() + zx_system_get_page_size()), false));
+}
+
+// Tests that zeroing a range in a snapshot when there are no pages in the parent, and there is a
+// chain of hidden parents in which one was a page, will not cause any pages to leak to the zeroed
+// range.
+TEST(Snapshot, ZeroRangeLeftInSnapshotPagesInParentChain) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(2, &vmo));
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 2));
+
+  std::vector<uint64_t> kZeroBuffer(zx_system_get_page_size(), 0);
+
+  // SupplyPages should have provided non-zero pages.
+  ASSERT_FALSE(check_buffer_data(vmo, 0, 1, kZeroBuffer.data(), false));
+
+  // Make a chain of three clones & fork a page into clone2.
+  auto clone1 = vmo->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(clone1);
+  auto clone2 = clone1->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(clone2);
+  *reinterpret_cast<uint64_t*>(clone2->base_addr()) = 0xdead1eaf;
+  auto clone3 = clone2->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(clone3);
+
+  // Snapshot will have three hidden parents, with a page in one of them.
+  auto snapshot = clone3->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(snapshot);
+
+  // Zero range in snapshot & validate.
+  auto status = snapshot->vmo().op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), nullptr, 0);
+  ASSERT_OK(status, "zero failed");
+  ASSERT_TRUE(check_buffer_data(snapshot.get(), 0, 1, kZeroBuffer.data(), false));
+
+  // Write to clone3 & check snapshot doesn't see.
+  *reinterpret_cast<uint64_t*>(clone3->base_addr()) = 0xc0ffee;
+  ASSERT_TRUE(check_buffer_data(snapshot.get(), 0, 1, kZeroBuffer.data(), false));
+
+  // Clone1 should see the pages of the root VMO.
+  ASSERT_TRUE(check_buffer_data(clone1.get(), 0, 2, (const void*)vmo->base_addr(), false));
+  // Clones 2 & 3 should see their writes.
+  EXPECT_EQ(*reinterpret_cast<uint64_t*>(clone2->base_addr()), 0xdead1eaf);
+  EXPECT_EQ(*reinterpret_cast<uint64_t*>(clone3->base_addr()), 0xc0ffee);
+}
+
+// Tests that zeroing a range in a snapshot when there are no pages in the parent, and there is a
+// page committed in the snapshot, will not cause pages to leak from the root VMO.
+TEST(Snapshot, ZeroRangeLeftInSnapshotPageInSnapshot) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(2, &vmo));
+
+  std::vector<uint64_t> kZeroBuffer(zx_system_get_page_size(), 0);
+
+  auto clone = vmo->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(clone);
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 2));
+
+  auto snapshot = clone->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(snapshot);
+
+  // Write to snapshot
+  *reinterpret_cast<uint64_t*>(snapshot->base_addr()) = 0xdead1eaf;
+
+  // Verify snapshot write.
+  EXPECT_EQ(*reinterpret_cast<uint64_t*>(snapshot->base_addr()), 0xdead1eaf);
+  ASSERT_TRUE(snapshot->PollPopulatedBytes(zx_system_get_page_size()));
+
+  // Zero range in snapshot & validate.
+  auto status = snapshot->vmo().op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), nullptr, 0);
+  ASSERT_OK(status, "zero failed");
+  ASSERT_TRUE(check_buffer_data(snapshot.get(), 0, 1, kZeroBuffer.data(), false));
+
+  // Snapshot should see the second page of the root VMO
+  ASSERT_TRUE(check_buffer_data(
+      snapshot.get(), 1, 1, (const void*)(vmo->base_addr() + zx_system_get_page_size()), false));
+}
+
+// Tests that zeroing a range in a snapshot when there are no pages in the parent, and there is a
+// page committed in the clone, will not cause pages to leak from the root VMO.
+TEST(Snapshot, ZeroRangeLeftInSnapshotPageInClone) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(2, &vmo));
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 2));
+
+  std::vector<uint64_t> kZeroBuffer(zx_system_get_page_size(), 0);
+
+  auto clone = vmo->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(clone);
+
+  auto snapshot = clone->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(snapshot);
+
+  // Write to clone
+  *reinterpret_cast<uint64_t*>(clone->base_addr()) = 0xdead1eaf;
+
+  // Zero range in snapshot & validate.
+  auto status = snapshot->vmo().op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), nullptr, 0);
+  ASSERT_OK(status, "zero failed");
+  ASSERT_TRUE(check_buffer_data(snapshot.get(), 0, 1, kZeroBuffer.data(), false));
+
+  // Verify clone write.
+  EXPECT_EQ(*reinterpret_cast<uint64_t*>(clone->base_addr()), 0xdead1eaf);
+  ASSERT_TRUE(clone->PollPopulatedBytes(zx_system_get_page_size()));
+
+  // Snapshot should see the second page of the root VMO
+  ASSERT_TRUE(check_buffer_data(
+      snapshot.get(), 1, 1, (const void*)(vmo->base_addr() + zx_system_get_page_size()), false));
+}
+
+// Tests that zeroing a range in a snapshot when there are no pages in the parent, and there is a
+// page committed in the hidden parent, will not cause pages to leak from the hidden parent or root
+// VMO.
+TEST(Snapshot, ZeroRangeLeftInSnapshotPageInHiddenNode) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(2, &vmo));
+
+  std::vector<uint64_t> kZeroBuffer(zx_system_get_page_size(), 0);
+
+  auto clone = vmo->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(clone);
+
+  // Write to clone, which will commit a page in the hidden node.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 2));
+  *reinterpret_cast<uint64_t*>(clone->base_addr()) = 0xdead1eaf;
+  EXPECT_EQ(*reinterpret_cast<uint64_t*>(clone->base_addr()), 0xdead1eaf);
+  ASSERT_TRUE(clone->PollPopulatedBytes(zx_system_get_page_size()));
+
+  // Make snapshot & zero the first page.
+  auto snapshot = clone->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
+  ASSERT_NOT_NULL(snapshot);
+
+  auto status = snapshot->vmo().op_range(ZX_VMO_OP_ZERO, 0, zx_system_get_page_size(), nullptr, 0);
+  ASSERT_OK(status, "zero failed");
+  ASSERT_TRUE(check_buffer_data(snapshot.get(), 0, 1, kZeroBuffer.data(), false));
+
+  // Snapshot should see the second page of the root VMO
+  ASSERT_TRUE(check_buffer_data(
+      snapshot.get(), 1, 1, (const void*)(vmo->base_addr() + zx_system_get_page_size()), false));
 }
 
 // Try to snapshot a slice, which should only be allowed on the root VMO.
@@ -744,7 +1016,7 @@ TEST(Snapshot, CommitRangeInSnapshot) {
 
   auto status =
       snapshot->vmo().op_range(ZX_VMO_OP_COMMIT, 0, zx_system_get_page_size(), nullptr, 0);
-  ASSERT_OK(status, "committ failed");
+  ASSERT_OK(status, "commit failed");
 
   ASSERT_TRUE(snapshot->PollPopulatedBytes(zx_system_get_page_size()));
 }

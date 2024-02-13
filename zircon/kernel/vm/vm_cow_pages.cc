@@ -3586,9 +3586,10 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
       // RequirePage allocate a new page and zero it, but we want to avoid having to redundantly
       // zero a newly forked zero page.
       if (!slot && can_see_parent(offset) && !parent_has_content(offset)) {
-        // We could only have ended up here if the parent was mutable, otherwise we should have been
-        // able to treat an empty slot as zero (decommit a committed page) and return early above.
-        DEBUG_ASSERT(!parent_immutable(offset));
+        // We could only have ended up here if the parent was mutable or if there is a pager-backed
+        // root, otherwise we should have been able to treat an empty slot as zero (decommit a
+        // committed page) and return early above.
+        DEBUG_ASSERT(!parent_immutable(offset) || is_root_source_user_pager_backed_locked());
         // We will try to insert a new zero page below. Note that at this point we know that this is
         // not a contiguous VMO (which cannot have arbitrary zero pages inserted into it). We
         // checked for can_see_parent just now and contiguous VMOs do not support (non-slice)
@@ -3639,9 +3640,9 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
     AssertHeld(content.page_owner->lock_ref());
     if (!slot && content.page_owner->is_hidden_locked()) {
       free_any_pages();
-      // TODO(https://fxbug.dev/42138396): This could be more optimal since unlike a regular cow clone,
-      // we are not going to actually need to read the target page we are cloning, and hence it does
-      // not actually need to get converted.
+      // TODO(https://fxbug.dev/42138396): This could be more optimal since unlike a regular cow
+      // clone, we are not going to actually need to read the target page we are cloning, and hence
+      // it does not actually need to get converted.
       if (content.page_or_marker->IsReference()) {
         zx_status_t result = content.page_owner->ReplaceReferenceWithPageLocked(
             content.page_or_marker, content.owner_offset, page_request);
@@ -3700,11 +3701,11 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
         // allow decommitting a page at this offset when zeroing. Additionally, one of the following
         // conditions should hold w.r.t. to the parent:
         //  * This offset does not relate to our parent, or we don't have a parent.
-        //  * This offset does relate to our parent, but our parent is immutable and is currently
-        //  zero at this offset.
+        //  * This offset does relate to our parent, but our parent is immutable, currently
+        //  zero at this offset and there is no pager-backed root VMO.
         if (can_decommit_slot(slot, offset) &&
-            (!can_see_parent(offset) ||
-             (parent_immutable(offset) && !parent_has_content(offset)))) {
+            (!can_see_parent(offset) || (parent_immutable(offset) && !parent_has_content(offset) &&
+                                         !is_root_source_user_pager_backed_locked()))) {
           if (slot->IsPage()) {
             vm_page_t* page = slot->ReleasePage();
             PQRemoveLocked(page);
@@ -3769,11 +3770,12 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
           // should allow decommitting a page at this offset when zeroing. Additionally, one of the
           // following conditions should hold w.r.t. to the parent:
           //  * This offset does not relate to our parent, or we don't have a parent.
-          //  * This offset does relate to our parent, but our parent is immutable and is currently
-          //  zero at this offset.
+          //  * This offset does relate to our parent, but our parent is immutable, currently
+          //  zero at this offset and there is no pager-backed root VMO.
           if (can_decommit_slot(nullptr, offset) &&
               (!can_see_parent(offset) ||
-               (parent_immutable(offset) && !parent_has_content(offset)))) {
+               (parent_immutable(offset) && !parent_has_content(offset) &&
+                !is_root_source_user_pager_backed_locked()))) {
             continue;
           }
 
@@ -4887,9 +4889,9 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(uint64_t offset, uint64_t len,
   uint64_t new_pages_len = 0;
   while (position < end) {
     // Allocate a zero page to replace the content at position.
-    // TODO(https://fxbug.dev/42076904): Inserting a full zero page is inefficient. We should replace
-    // this logic with something a bit more efficient; this could mean using the same logic that
-    // `ZeroPages` uses and insert markers, or generalizing the concept of intervals and using
+    // TODO(https://fxbug.dev/42076904): Inserting a full zero page is inefficient. We should
+    // replace this logic with something a bit more efficient; this could mean using the same logic
+    // that `ZeroPages` uses and insert markers, or generalizing the concept of intervals and using
     // those instead.
     vm_page_t* p;
     status =
