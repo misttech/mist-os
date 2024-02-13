@@ -24,9 +24,7 @@ version = "0.1.0"
 [dependencies]
 # Keep this sorted alphabetically, please.
 aead = { version = "0.4.2", features = ["std"] }
-# Once aes is updated to 0.8.3 or beyond, remove --cfg=aes_armv8 below
-# (see for context: https://fuchsia-review.git.corp.google.com/c/fuchsia/+/711365/comment/f64fc21a_309bf0b8/)
-aes = { version = "0.8.2" }
+aes = "0.8.4"
 aes-gcm = "0.10.1"
 aes-gcm-siv = { version = "0.11.1", features = ["std"] }
 ahash = { version = "0.8.6", default-features = false, features = [ "runtime-rng" ] }
@@ -435,10 +433,6 @@ require_feature_reviews = [
   "bitflags",
   "bstr",
 ]
-
-[gn.package.aes."0.8.2"]
-configs = [ "//build/config/rust:allow_simd" ]
-rustflags = [ "--cfg=aes_armv8" ]
 
 [gn.package.ahash."0.8.6".platform."cfg(any(target_arch = \"x86_64\", target_arch = \"aarch64\", target_arch = \"mips64\", target_arch = \"powerpc64\", target_arch = \"riscv64gc\", target_arch = \"s390x\"))"]
 rustflags = [ "--cfg=feature=\\\"folded_multiply\\\"" ]

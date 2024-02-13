@@ -14,7 +14,7 @@ group("aead") {
 }
 
 group("aes") {
-  public_deps = [ ":aes-v0_8_2" ]
+  public_deps = [ ":aes-v0_8_4" ]
 }
 
 group("aes-gcm") {
@@ -1264,19 +1264,18 @@ rust_library("aead-v0_5_2") {
   applicable_licenses = [ ":aead-v0_5_2.license" ]
 }
 
-license("aes-v0_8_2.license") {
+license("aes-v0_8_4.license") {
   public_package_name = "aes"
   license_files = [
-    "//third_party/rust_crates/vendor/aes-0.8.2/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/aes-0.8.2/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/aes-0.8.4/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/aes-0.8.4/LICENSE-MIT",
   ]
 }
 
-rust_library("aes-v0_8_2") {
+rust_library("aes-v0_8_4") {
   crate_name = "aes"
-  crate_root = "//third_party/rust_crates/vendor/aes-0.8.2/src/lib.rs"
-  output_name = "aes-7f762d7f65d46e0e"
-  configs += [ "//build/config/rust:allow_simd" ]
+  crate_root = "//third_party/rust_crates/vendor/aes-0.8.4/src/lib.rs"
+  output_name = "aes-9f84688850b96a05"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -1291,14 +1290,13 @@ rust_library("aes-v0_8_2") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=7f762d7f65d46e0e",
-    "-Cextra-filename=-7f762d7f65d46e0e",
-    "--cfg=aes_armv8",
+    "-Cmetadata=9f84688850b96a05",
+    "-Cextra-filename=-9f84688850b96a05",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":aes-v0_8_2.license" ]
+  applicable_licenses = [ ":aes-v0_8_4.license" ]
 }
 
 license("aes-gcm-v0_10_2.license") {
@@ -1317,7 +1315,7 @@ rust_library("aes-gcm-v0_10_2") {
 
   deps = []
   deps += [ ":aead-v0_5_2" ]
-  deps += [ ":aes-v0_8_2" ]
+  deps += [ ":aes-v0_8_4" ]
   deps += [ ":cipher-v0_4_4" ]
   deps += [ ":ctr-v0_9_2" ]
   deps += [ ":ghash-v0_5_0" ]
@@ -1359,7 +1357,7 @@ rust_library("aes-gcm-siv-v0_11_1") {
   deps = []
   deps += [ ":zeroize-v1_6_0" ]
   deps += [ ":aead-v0_5_2" ]
-  deps += [ ":aes-v0_8_2" ]
+  deps += [ ":aes-v0_8_4" ]
   deps += [ ":cipher-v0_4_4" ]
   deps += [ ":ctr-v0_9_2" ]
   deps += [ ":polyval-v0_6_0" ]

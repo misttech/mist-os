@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.56"
 name = "aes"
-version = "0.8.2"
+version = "0.8.4"
 authors = ["RustCrypto Developers"]
 description = "Pure Rust implementation of the Advanced Encryption Standard (a.k.a. Rijndael)"
 documentation = "https://docs.rs/aes"
@@ -65,6 +65,6 @@ default_features = false
 version = "0.2"
 
 [target."cfg(not(all(aes_armv8, target_arch = \"aarch64\")))".dependencies.zeroize]
-version = "1.5.6"
+version = "1.6.0"
 optional = true
 default_features = false
