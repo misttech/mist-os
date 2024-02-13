@@ -15,7 +15,6 @@
         colocate: "true",
     },
     use: [
-        { protocol: "fuchsia.boot.RootResource" },
         { protocol: "fuchsia.kernel.MsiResource" },
         { protocol: "fuchsia.kernel.MmioResource" },
         { protocol: "fuchsia.kernel.IoportResource" },
