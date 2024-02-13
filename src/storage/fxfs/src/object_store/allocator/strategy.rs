@@ -59,3 +59,4 @@ pub trait AllocatorStrategy: Send + Sync + Debug {
 }
 
 pub mod best_fit;
+pub mod buddy;

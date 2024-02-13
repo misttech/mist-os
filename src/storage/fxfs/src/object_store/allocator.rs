@@ -664,8 +664,8 @@ impl Allocator {
             tracing::warn!("Device size is not block aligned. Rounding down.");
         }
         let max_extent_size_bytes = max_extent_size_for_block_size(filesystem.block_size());
-        // TODO(b/324949159): We will ship filesystems as system images in some cases.
-        // Such filesystems should not contain free space so as to minimize their image size.
+        // Note that we use BestFit strategy for new filesystems to favour dense packing of
+        // data and 'Buddy' for existing filesystems for better fragmentation.
         let mut strategy: Box<dyn strategy::AllocatorStrategy> =
             Box::new(strategy::best_fit::BestFit::default());
         strategy.free(0..filesystem.device().size());
@@ -746,8 +746,7 @@ impl Allocator {
     pub async fn open(&self) -> Result<(), Error> {
         let filesystem = self.filesystem.upgrade().unwrap();
         let root_store = filesystem.root_store();
-        let mut strategy: Box<dyn AllocatorStrategy> =
-            Box::new(strategy::best_fit::BestFit::default());
+        let mut strategy: Box<dyn AllocatorStrategy>;
 
         let handle =
             ObjectStore::open_object(&root_store, self.object_id, HandleOptions::default(), None)
@@ -824,6 +823,13 @@ impl Allocator {
                 self.object_id,
                 tree::reservation_amount_from_layer_size(total_size),
             );
+            // Use Buddy for existing filesystems to minimise fragmentation in the face of heavy
+            // filesystem churn.
+            strategy = Box::new(strategy::buddy::Buddy::default());
+        } else {
+            // Use BestFit for new filesystems so we pack files together without creating gaps.
+            // This can help us produce minimal sized filesystem images.
+            strategy = Box::new(strategy::best_fit::BestFit::default());
         }
         // Walk all allocations to generate the set of free regions between allocations.
         // This may take some time and consume a potentially large chunk of RAM on on very large,
