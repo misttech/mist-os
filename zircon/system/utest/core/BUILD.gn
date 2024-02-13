@@ -13,6 +13,7 @@ import("//zircon/kernel/params.gni")
 
 # Each subdirectory just provides an eponymous source_set().
 core_tests = [
+  "assert",
   "bad-segsel",
   "c11-condvar",
   "c11-mutex",
