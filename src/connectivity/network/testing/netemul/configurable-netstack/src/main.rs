@@ -244,7 +244,7 @@ async fn configure_interface(
         .await
         .context("wait for link-local address generation")?;
 
-        let mut interface_addr = match addresses.as_mut_slice() {
+        let interface_addr = match addresses.as_mut_slice() {
             [fnet_interfaces_ext::Address { addr, valid_until: _, assignment_state }] => {
                 assert_eq!(*assignment_state, fnet_interfaces::AddressAssignmentState::Assigned);
                 Ok(addr)
@@ -255,7 +255,7 @@ async fn configure_interface(
         }?;
 
         let _removed: bool = control
-            .remove_address(&mut interface_addr)
+            .remove_address(&interface_addr)
             .await
             .map_err(NetstackError::InterfaceControl)?
             .map_err(|error| NetstackError::RemoveAddress {
@@ -267,7 +267,7 @@ async fn configure_interface(
     }
 
     if let Some(static_ips) = static_ips {
-        for mut interface_address in static_ips {
+        for interface_address in static_ips {
             let address_state_provider = {
                 let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
                     fnet_interfaces_admin::AddressStateProviderMarker,
@@ -275,8 +275,8 @@ async fn configure_interface(
                 .context("create proxy")?;
                 control
                     .add_address(
-                        &mut interface_address,
-                        fnet_interfaces_admin::AddressParameters::default(),
+                        &interface_address,
+                        &fnet_interfaces_admin::AddressParameters::default(),
                         server_end,
                     )
                     .map_err(NetstackError::InterfaceControl)?;
@@ -348,7 +348,7 @@ async fn configure_interface(
     let ipv6 = enable_ipv6_forwarding.unwrap_or_default();
     if ipv4 || ipv6 {
         let _prev_config = control
-            .set_configuration(fnet_interfaces_admin::Configuration {
+            .set_configuration(&fnet_interfaces_admin::Configuration {
                 ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
                     forwarding: ipv4.then(|| true),
                     ..Default::default()

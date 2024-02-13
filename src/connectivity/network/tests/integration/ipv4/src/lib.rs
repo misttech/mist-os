@@ -182,7 +182,7 @@ async fn sends_igmp_reports<N: Netstack>(
         let old_config = gen_config(fnet_interfaces_admin::IgmpVersion::V3);
         assert_eq!(
             control
-                .set_configuration(new_config.clone())
+                .set_configuration(&new_config)
                 .await
                 .expect("set_configuration fidl error")
                 .expect("failed to set interface configuration"),
@@ -190,7 +190,7 @@ async fn sends_igmp_reports<N: Netstack>(
         );
         assert_eq!(
             control
-                .set_configuration(new_config.clone())
+                .set_configuration(&new_config)
                 .await
                 .expect("set_configuration fidl error")
                 .expect("failed to set interface configuration"),

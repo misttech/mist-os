@@ -216,7 +216,7 @@ impl Address {
     > {
         let Self { address, address_parameters, address_state_provider } = self;
         control
-            .add_address(&mut address.into_ext(), address_parameters, address_state_provider)
+            .add_address(&address.into_ext(), &address_parameters, address_state_provider)
             .map_err(|e| (address, e))
     }
 }

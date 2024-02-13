@@ -195,7 +195,7 @@ async fn enable_ipv6_forwarding(iface: &netemul::TestInterface<'_>) {
 
     let configuration = iface
         .control()
-        .set_configuration(config_with_ipv6_forwarding_set(true))
+        .set_configuration(&config_with_ipv6_forwarding_set(true))
         .await
         .expect("set_configuration FIDL error")
         .expect("error setting configuration");
@@ -1063,7 +1063,7 @@ async fn sends_mld_reports<N: Netstack>(
         let old_config = gen_config(fnet_interfaces_admin::MldVersion::V2);
         assert_eq!(
             control
-                .set_configuration(new_config.clone())
+                .set_configuration(&new_config)
                 .await
                 .expect("set_configuration fidl error")
                 .expect("failed to set interface configuration"),
@@ -1073,7 +1073,7 @@ async fn sends_mld_reports<N: Netstack>(
         // to show that nothing actually changed.
         assert_eq!(
             control
-                .set_configuration(new_config.clone())
+                .set_configuration(&new_config)
                 .await
                 .expect("set_configuration fidl error")
                 .expect("failed to set interface configuration"),

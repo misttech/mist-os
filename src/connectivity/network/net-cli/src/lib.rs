@@ -445,7 +445,7 @@ async fn do_if<C: NetCliDepsConnector>(
                 let id = interface.find_nicid(connector).await.context("find nicid")?;
                 let control = get_control(connector, id).await.context("get control")?;
                 let prev_config = control
-                    .set_configuration(finterfaces_admin::Configuration {
+                    .set_configuration(&finterfaces_admin::Configuration {
                         ipv4: Some(finterfaces_admin::Ipv4Configuration {
                             igmp: Some(finterfaces_admin::IgmpConfiguration {
                                 version,
@@ -497,7 +497,7 @@ async fn do_if<C: NetCliDepsConnector>(
                 let id = interface.find_nicid(connector).await.context("find nicid")?;
                 let control = get_control(connector, id).await.context("get control")?;
                 let prev_config = control
-                    .set_configuration(finterfaces_admin::Configuration {
+                    .set_configuration(&finterfaces_admin::Configuration {
                         ipv6: Some(finterfaces_admin::Ipv6Configuration {
                             mld: Some(finterfaces_admin::MldConfiguration {
                                 version,
@@ -551,7 +551,7 @@ async fn do_if<C: NetCliDepsConnector>(
                 let id = interface.find_nicid(connector).await.context("find nicid")?;
                 let control = get_control(connector, id).await.context("get control")?;
                 let prev_config = control
-                    .set_configuration(configuration_with_ip_forwarding_set(ip_version, enable))
+                    .set_configuration(&configuration_with_ip_forwarding_set(ip_version, enable))
                     .await
                     .map_err(anyhow::Error::new)
                     .and_then(|res| {
@@ -627,8 +627,8 @@ async fn do_if<C: NetCliDepsConnector>(
                 let () = address_state_provider.detach().context("detach address lifetime")?;
                 let () = control
                     .add_address(
-                        &mut subnet.into(),
-                        finterfaces_admin::AddressParameters::default(),
+                        &subnet.into(),
+                        &finterfaces_admin::AddressParameters::default(),
                         server_end,
                     )
                     .context("call add address")?;
@@ -678,7 +678,7 @@ async fn do_if<C: NetCliDepsConnector>(
                 let addr = fnet_ext::IpAddress::from_str(&addr)?;
                 let did_remove = {
                     let addr = addr.into();
-                    let mut subnet = fnet::Subnet {
+                    let subnet = fnet::Subnet {
                         addr,
                         prefix_len: prefix.unwrap_or_else(|| {
                             8 * u8::try_from(match addr {
@@ -689,7 +689,7 @@ async fn do_if<C: NetCliDepsConnector>(
                         }),
                     };
                     control
-                        .remove_address(&mut subnet)
+                        .remove_address(&subnet)
                         .await
                         .map_err(anyhow::Error::new)
                         .and_then(|res| {

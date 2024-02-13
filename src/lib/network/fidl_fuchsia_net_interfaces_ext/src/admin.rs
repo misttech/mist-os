@@ -195,15 +195,15 @@ impl Control {
     /// Calls `AddAddress` on the proxy.
     pub fn add_address(
         &self,
-        address: &mut fidl_fuchsia_net::Subnet,
-        parameters: fnet_interfaces_admin::AddressParameters,
+        address: &fidl_fuchsia_net::Subnet,
+        parameters: &fnet_interfaces_admin::AddressParameters,
         address_state_provider: fidl::endpoints::ServerEnd<
             fnet_interfaces_admin::AddressStateProviderMarker,
         >,
     ) -> Result<(), TerminalError<fnet_interfaces_admin::InterfaceRemovedReason>> {
         self.or_terminal_event_no_return(self.proxy.add_address(
             address,
-            &parameters,
+            parameters,
             address_state_provider,
         ))
     }
@@ -218,7 +218,7 @@ impl Control {
     /// Calls `RemoveAddress` on the proxy.
     pub async fn remove_address(
         &self,
-        address: &mut fidl_fuchsia_net::Subnet,
+        address: &fidl_fuchsia_net::Subnet,
     ) -> Result<
         fnet_interfaces_admin::ControlRemoveAddressResult,
         TerminalError<fnet_interfaces_admin::InterfaceRemovedReason>,
@@ -229,12 +229,12 @@ impl Control {
     /// Calls `SetConfiguration` on the proxy.
     pub async fn set_configuration(
         &self,
-        config: fnet_interfaces_admin::Configuration,
+        config: &fnet_interfaces_admin::Configuration,
     ) -> Result<
         fnet_interfaces_admin::ControlSetConfigurationResult,
         TerminalError<fnet_interfaces_admin::InterfaceRemovedReason>,
     > {
-        self.or_terminal_event(self.proxy.set_configuration(&config)).await
+        self.or_terminal_event(self.proxy.set_configuration(config)).await
     }
 
     /// Calls `GetConfiguration` on the proxy.

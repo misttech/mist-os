@@ -80,7 +80,7 @@ pub async fn wait_for_non_loopback_interface_up<
 /// Add an address, returning once the assignment state is `Assigned`.
 pub async fn add_address_wait_assigned(
     control: &fidl_fuchsia_net_interfaces_ext::admin::Control,
-    mut address: fidl_fuchsia_net::Subnet,
+    address: fidl_fuchsia_net::Subnet,
     address_parameters: fidl_fuchsia_net_interfaces_admin::AddressParameters,
 ) -> std::result::Result<
     fidl_fuchsia_net_interfaces_admin::AddressStateProviderProxy,
@@ -91,7 +91,7 @@ pub async fn add_address_wait_assigned(
     >()
     .expect("create proxy");
     let () = control
-        .add_address(&mut address, address_parameters, server)
+        .add_address(&address, &address_parameters, server)
         .expect("Control.AddAddress FIDL error");
 
     fidl_fuchsia_net_interfaces_ext::admin::wait_for_address_added_event(
@@ -134,15 +134,13 @@ pub async fn remove_subnet_address_and_route<'a>(
     subnet: fidl_fuchsia_net::Subnet,
 ) -> Result<bool> {
     let (did_remove, ()) = futures::future::try_join(
-        iface.control().remove_address(&mut subnet.clone()).map_err(anyhow::Error::new).and_then(
-            |res| {
-                futures::future::ready(res.map_err(
-                    |e: fidl_fuchsia_net_interfaces_admin::ControlRemoveAddressError| {
-                        anyhow::anyhow!("{:?}", e)
-                    },
-                ))
-            },
-        ),
+        iface.control().remove_address(&subnet).map_err(anyhow::Error::new).and_then(|res| {
+            futures::future::ready(res.map_err(
+                |e: fidl_fuchsia_net_interfaces_admin::ControlRemoveAddressError| {
+                    anyhow::anyhow!("{:?}", e)
+                },
+            ))
+        }),
         iface.del_subnet_route(subnet),
     )
     .await?;

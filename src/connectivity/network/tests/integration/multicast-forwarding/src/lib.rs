@@ -895,7 +895,7 @@ async fn set_multicast_forwarding(interface: &fnet_interfaces_ext::admin::Contro
     };
 
     let _prev_config: fnet_interfaces_admin::Configuration = interface
-        .set_configuration(config)
+        .set_configuration(&config)
         .await
         .expect("set_configuration failed")
         .expect("set_configuration error");

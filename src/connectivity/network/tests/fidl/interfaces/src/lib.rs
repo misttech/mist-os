@@ -420,8 +420,8 @@ async fn test_include_all_addresses<N: Netstack>(name: &str) {
         iface
             .control()
             .add_address(
-                &mut IPV6_ADDRESS.clone(),
-                fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+                &IPV6_ADDRESS,
+                &fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
                 server,
             )
             .expect("send add address request");
@@ -1785,8 +1785,8 @@ async fn test_lifetime_change_on_hidden_addr<N: Netstack>(
     let () = interface
         .control()
         .add_address(
-            &mut ADDR.clone(),
-            fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+            &ADDR,
+            &fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
             server,
         )
         .expect("Control.AddAddress FIDL error");

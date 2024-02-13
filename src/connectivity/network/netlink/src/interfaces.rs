@@ -875,8 +875,8 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 .expect("create ASP proxy");
         control
             .add_address(
-                &mut address.into_ext(),
-                fnet_interfaces_admin::AddressParameters {
+                &address.into_ext(),
+                &fnet_interfaces_admin::AddressParameters {
                     // TODO(https://fxbug.dev/42074223): Update how we add subnet
                     // routes for addresses.
                     add_subnet_route: Some(add_subnet_route),
@@ -974,7 +974,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             .get_interface_control(interface_id.into())
             .ok_or(RequestError::UnrecognizedInterface)?;
 
-        match control.remove_address(&mut address.into_ext()).await.map_err(|e| {
+        match control.remove_address(&address.into_ext()).await.map_err(|e| {
             log_warn!("error removing {address} from interface ({interface_id}): {e:?}");
             map_existing_interface_terminal_error(e, interface_id.into())
         })? {

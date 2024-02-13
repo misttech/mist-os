@@ -345,13 +345,13 @@ async fn removing_acquired_address_stops_dhcp<SERVER: Netstack, CLIENT: Netstack
     let TestDhcpRealmAndInterfaces { realm, client_ifaces, _server_ifaces } = &dhcp_objects[0];
     let client_iface = &client_ifaces[0];
     let client = client_iface.control();
-    let (mut remove_address, timeout) = if remove_dhcp_address {
+    let (remove_address, timeout) = if remove_dhcp_address {
         (expected_acquired, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT)
     } else {
         (STATIC_ADDRESS.into_ext(), ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT)
     };
     assert!(client
-        .remove_address(&mut remove_address)
+        .remove_address(&remove_address)
         .await
         .expect("send address removal request")
         .expect("remove DHCP acquired address"),);

@@ -611,8 +611,8 @@ mod helpers {
 
         let () = control
             .add_address(
-                &mut subnet.clone(),
-                fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+                &subnet,
+                &fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
                 server_end,
             )
             .expect("add_address failed");

@@ -357,7 +357,7 @@ async fn test_forwarding<I: IpExt + IcmpIpExt, N: Netstack>(
 
         let configuration = iface
             .control()
-            .set_configuration(config_with_ip_forwarding_set(ip_version, true))
+            .set_configuration(&config_with_ip_forwarding_set(ip_version, true))
             .await
             .expect("set_configuration FIDL error")
             .expect("error setting configuration");

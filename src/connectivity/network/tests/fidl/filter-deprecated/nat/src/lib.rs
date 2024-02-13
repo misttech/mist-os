@@ -127,7 +127,7 @@ pub async fn setup_masquerade_nat_network<'a, N: Netstack>(
         assert_eq!(
             router_ep
                 .control()
-                .set_configuration(gen_forwarding_config(true))
+                .set_configuration(&gen_forwarding_config(true))
                 .await
                 .expect("set_configuration FIDL error")
                 .expect("error setting configuration"),

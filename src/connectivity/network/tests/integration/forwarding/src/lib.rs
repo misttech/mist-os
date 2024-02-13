@@ -151,7 +151,7 @@ async fn forwarding<N: Netstack>(name: &str, setup: Setup) {
 
     async fn enable_forwarding(
         interface: &fnet_interfaces_ext::admin::Control,
-        config: fnet_interfaces_admin::Configuration,
+        config: &fnet_interfaces_admin::Configuration,
     ) {
         let _prev_config: fnet_interfaces_admin::Configuration = interface
             .set_configuration(config)
@@ -159,8 +159,8 @@ async fn forwarding<N: Netstack>(name: &str, setup: Setup) {
             .expect("call set configuration")
             .expect("set interface configuration");
     }
-    enable_forwarding(router_client_iface.control(), router_if_config.clone()).await;
-    enable_forwarding(router_server_iface.control(), router_if_config).await;
+    enable_forwarding(router_client_iface.control(), &router_if_config).await;
+    enable_forwarding(router_server_iface.control(), &router_if_config).await;
 
     let sockaddr = std::net::SocketAddr::from((server_ip, PORT));
 

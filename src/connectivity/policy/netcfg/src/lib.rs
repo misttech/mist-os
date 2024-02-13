@@ -2145,7 +2145,7 @@ impl<'a> NetCfg<'a> {
         let ipv4_forwarding = ipv4.contains(&class);
         let ipv6_forwarding = ipv6.contains(&class);
         let config: fnet_interfaces_admin::Configuration = control
-            .set_configuration(fnet_interfaces_admin::Configuration {
+            .set_configuration(&fnet_interfaces_admin::Configuration {
                 ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
                     forwarding: Some(ipv6_forwarding),
                     multicast_forwarding: Some(ipv6_forwarding),
@@ -2377,8 +2377,8 @@ impl<'a> NetCfg<'a> {
 
         let () = control
             .add_address(
-                &mut addr.clone(),
-                fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+                &addr,
+                &fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
                 server_end,
             )
             .map_err(map_control_error("error sending add address request"))?;

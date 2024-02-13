@@ -577,10 +577,10 @@ async fn udp_send_msg_preflight_fidl<
             assert_eq!(disabled, true);
         }
         UdpCacheInvalidationReason::AddressRemoved => {
-            let mut installed_subnet = I::INSTALLED_ADDR;
+            let installed_subnet = I::INSTALLED_ADDR;
             let removed = iface
                 .control()
-                .remove_address(&mut installed_subnet)
+                .remove_address(&installed_subnet)
                 .await
                 .expect("remove_address fidl error")
                 .expect("failed to remove address");
@@ -599,7 +599,7 @@ async fn udp_send_msg_preflight_fidl<
         UdpCacheInvalidationReason::SetConfigurationCalled => {
             let _prev_config = iface
                 .control()
-                .set_configuration(I::forwarding_config())
+                .set_configuration(&I::forwarding_config())
                 .await
                 .expect("set_configuration fidl error")
                 .expect("failed to set interface configuration");
@@ -1089,13 +1089,13 @@ async fn udp_send_msg_preflight_dad_failure<N: Netstack>(name: &str) {
     iface
         .control()
         .add_address(
-            &mut fnet::Subnet {
+            &fnet::Subnet {
                 addr: fnet::IpAddress::Ipv6(fnet::Ipv6Address {
                     addr: ipv6_consts::LINK_LOCAL_ADDR.ipv6_bytes(),
                 }),
                 prefix_len: ipv6_consts::LINK_LOCAL_SUBNET_PREFIX,
             },
-            fnet_interfaces_admin::AddressParameters::default(),
+            &fnet_interfaces_admin::AddressParameters::default(),
             server,
         )
         .expect("call add address");
@@ -1872,8 +1872,8 @@ async fn install_ip_device(
             let () = address_state_provider.detach().expect("detach");
             let () = control
                 .add_address(
-                    &mut subnet.clone(),
-                    fnet_interfaces_admin::AddressParameters::default(),
+                    &subnet,
+                    &fnet_interfaces_admin::AddressParameters::default(),
                     server_end,
                 )
                 .expect("add address");

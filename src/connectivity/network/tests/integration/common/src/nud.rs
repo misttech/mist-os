@@ -133,7 +133,7 @@ pub async fn apply_nud_flake_workaround(
     control: &fnet_interfaces_ext::admin::Control,
 ) -> crate::Result {
     control
-        .set_configuration(fnet_interfaces_admin::Configuration {
+        .set_configuration(&fnet_interfaces_admin::Configuration {
             ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
                 arp: Some(fnet_interfaces_admin::ArpConfiguration {
                     nud: Some(fnet_interfaces_admin::NudConfiguration {

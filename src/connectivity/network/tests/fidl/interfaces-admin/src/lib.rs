@@ -383,9 +383,9 @@ async fn add_address_errors<N: Netstack>(name: &str) {
 
     // Removing non-existent address.
     {
-        let mut address = fidl_subnet!("1.1.1.1/32");
+        let address = fidl_subnet!("1.1.1.1/32");
         let did_remove = control
-            .remove_address(&mut address)
+            .remove_address(&address)
             .await
             .expect("FIDL error calling fuchsia.net.interfaces.admin/Control.RemoveAddress")
             .expect("RemoveAddress failed");
@@ -633,7 +633,7 @@ async fn add_address_removal<N: Netstack>(
 
     // Adding a valid address and observing the address removal.
     {
-        let mut address = fidl_subnet!("3.3.3.3/32");
+        let address = fidl_subnet!("3.3.3.3/32");
 
         let address_state_provider = interfaces::add_address_wait_assigned(
             &control,
@@ -646,7 +646,7 @@ async fn add_address_removal<N: Netstack>(
         match removal_method {
             AddressRemovalMethod::InterfaceControl => {
                 let did_remove = control
-                    .remove_address(&mut address)
+                    .remove_address(&address)
                     .await
                     .expect("FIDL error calling Control.RemoveAddress")
                     .expect("error calling Control.RemoveAddress");
@@ -1039,10 +1039,7 @@ async fn add_address_and_remove<N: Netstack>(
             .expect("wait for address absence");
         }
         AddressRemoval::CallControlRemove => {
-            assert_eq!(
-                control.remove_address(&mut subnet.clone()).await.expect("fidl success"),
-                Ok(true)
-            );
+            assert_eq!(control.remove_address(&subnet).await.expect("fidl success"), Ok(true));
             let event = address_state_provider
                 .take_event_stream()
                 .try_next()
@@ -1256,11 +1253,11 @@ async fn add_remove_address_on_loopback<N: Netstack>(name: &str) {
     let () = root.get_admin(loopback_id.get(), server_end).expect("get admin");
 
     futures::stream::iter([IPV4_LOOPBACK, IPV6_LOOPBACK].into_iter())
-        .for_each_concurrent(None, |mut addr| {
+        .for_each_concurrent(None, |addr| {
             let control = &control;
             async move {
                 let did_remove = control
-                    .remove_address(&mut addr)
+                    .remove_address(&addr)
                     .await
                     .expect("remove_address")
                     .expect("remove address");
@@ -1291,7 +1288,7 @@ async fn remove_slaac_address<N: Netstack>(name: &str) {
     let iface = realm.join_network(&network, "testif1").await.expect("join network");
 
     // Wait for the SLAAC address to appear.
-    let mut slaac_addr = fnet_interfaces_ext::wait_interface_with_id(
+    let slaac_addr = fnet_interfaces_ext::wait_interface_with_id(
         iface.get_interface_event_stream().expect("get interface event stream"),
         &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
         |fnet_interfaces_ext::PropertiesAndState {
@@ -1329,7 +1326,7 @@ async fn remove_slaac_address<N: Netstack>(name: &str) {
 
     let remove_addr_result = iface
         .control()
-        .remove_address(&mut slaac_addr)
+        .remove_address(&slaac_addr)
         .await
         .expect("interface should not have been removed");
     assert_eq!(remove_addr_result, Ok(true));
@@ -2487,7 +2484,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
         .expect("connect to protocol");
 
     async fn add_address(
-        address: &mut fnet::Subnet,
+        address: &fnet::Subnet,
         valid_until: zx::Time,
         control: &fidl_fuchsia_net_interfaces_ext::admin::Control,
         id: u64,
@@ -2499,7 +2496,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
         control
             .add_address(
                 address,
-                fidl_fuchsia_net_interfaces_admin::AddressParameters {
+                &fidl_fuchsia_net_interfaces_admin::AddressParameters {
                     initial_properties: Some(
                         fidl_fuchsia_net_interfaces_admin::AddressProperties {
                             valid_lifetime_end: (valid_until != zx::Time::INFINITE)
@@ -2541,19 +2538,14 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
     }
 
     let addresses = [fidl_subnet!("1.1.1.1/32"), fidl_subnet!("3ffe::1/128")];
-    for mut address in addresses {
+    for address in addresses {
         // Add an address with infinite valid_until and explicitly remove it.
-        let _address_state_provider = add_address(
-            &mut address,
-            zx::Time::INFINITE,
-            &interface.control(),
-            id,
-            &interface_state,
-        )
-        .await;
+        let _address_state_provider =
+            add_address(&address, zx::Time::INFINITE, &interface.control(), id, &interface_state)
+                .await;
         let did_remove = interface
             .control()
-            .remove_address(&mut address)
+            .remove_address(&address)
             .await
             .expect("failed to send remove address request")
             .expect("failed to remove address");
@@ -2581,7 +2573,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
 
         // Add an address with finite valid_until and explicitly remove it.
         let _address_state_provider = add_address(
-            &mut address,
+            &address,
             zx::Time::from_nanos(1234),
             &interface.control(),
             id,
@@ -2590,7 +2582,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
         .await;
         let did_remove = interface
             .control()
-            .remove_address(&mut address)
+            .remove_address(&address)
             .await
             .expect("failed to send remove address request")
             .expect("failed to remove address");
@@ -2618,14 +2610,9 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
 
         // Add an address and drop the AddressStateProvider handle, verifying
         // the address was removed.
-        let address_state_provider = add_address(
-            &mut address,
-            zx::Time::INFINITE,
-            &interface.control(),
-            id,
-            &interface_state,
-        )
-        .await;
+        let address_state_provider =
+            add_address(&address, zx::Time::INFINITE, &interface.control(), id, &interface_state)
+                .await;
         std::mem::drop(address_state_provider);
         interfaces::wait_for_addresses(&interface_state, id, |addresses| {
             addresses
@@ -2938,7 +2925,7 @@ async fn get_set_forwarding_loopback<N: Netstack>(
 
     assert_eq!(
         loopback_control
-            .set_configuration(forwarding_config.as_configuration())
+            .set_configuration(&forwarding_config.as_configuration())
             .await
             .expect("set_configuration FIDL error"),
         expected_err.map_or_else(
@@ -2994,7 +2981,7 @@ async fn get_set_forwarding<N: Netstack>(name: &str, forwarding_config: IpForwar
     ) {
         let configuration = iface
             .control()
-            .set_configuration(enable.as_configuration())
+            .set_configuration(&enable.as_configuration())
             .await
             .expect("set_configuration FIDL error")
             .expect("error setting configuration");
@@ -3316,7 +3303,7 @@ async fn nud_max_multicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name
 
     // Setting a zero value should fail.
     assert_matches!(
-        iface.control().set_configuration(make_nud_config(0)).await,
+        iface.control().set_configuration(&make_nud_config(0)).await,
         Ok(Err(finterfaces_admin::ControlSetConfigurationError::IllegalZeroValue)),
         "can't set to zero"
     );
@@ -3327,7 +3314,7 @@ async fn nud_max_multicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name
     const WANT_SOLICITS: u16 = 4;
     let config = iface
         .control()
-        .set_configuration(make_nud_config(WANT_SOLICITS))
+        .set_configuration(&make_nud_config(WANT_SOLICITS))
         .await
         .expect("setting configuration")
         .expect("setting more solicitations");
@@ -3419,7 +3406,7 @@ async fn nud_config_not_supported_on_loopback<N: Netstack, I: net_types::ip::Ip>
 
     // Can't set.
     let err = loopback_control
-        .set_configuration(set_config)
+        .set_configuration(&set_config)
         .await
         .expect("set_configuration")
         .expect_err("set configuration should fail");
@@ -3475,7 +3462,7 @@ async fn nud_max_unicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name: 
 
     // Setting a zero value should fail.
     assert_matches!(
-        iface.control().set_configuration(make_nud_config(0)).await,
+        iface.control().set_configuration(&make_nud_config(0)).await,
         Ok(Err(finterfaces_admin::ControlSetConfigurationError::IllegalZeroValue)),
         "can't set to zero"
     );
@@ -3486,7 +3473,7 @@ async fn nud_max_unicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name: 
     const WANT_SOLICITS: u16 = 4;
     let config = iface
         .control()
-        .set_configuration(make_nud_config(WANT_SOLICITS))
+        .set_configuration(&make_nud_config(WANT_SOLICITS))
         .await
         .expect("setting configuration")
         .expect("setting more solicitations");
@@ -3561,7 +3548,7 @@ async fn dad_transmits<N: Netstack>(name: &str) {
     const WANT_TRANSMITS: u16 = 3;
     let update = iface
         .control()
-        .set_configuration(transmits_to_config(WANT_TRANSMITS))
+        .set_configuration(&transmits_to_config(WANT_TRANSMITS))
         .await
         .expect("set configuration failed")
         .expect("set configuration error");

@@ -1251,11 +1251,7 @@ impl<'a> TestInterface<'a> {
         let () = address_state_provider.detach().context("detach address lifetime")?;
         let () = self
             .control
-            .add_address(
-                &mut subnet.clone(),
-                fnet_interfaces_admin::AddressParameters::default(),
-                server,
-            )
+            .add_address(&subnet, &fnet_interfaces_admin::AddressParameters::default(), server)
             .context("FIDL error")?;
 
         let mut state_stream =
@@ -1277,11 +1273,7 @@ impl<'a> TestInterface<'a> {
         let () = address_state_provider.detach().context("detach address lifetime")?;
         let () = self
             .control
-            .add_address(
-                &mut subnet.clone(),
-                fnet_interfaces_admin::AddressParameters::default(),
-                server,
-            )
+            .add_address(&subnet, &fnet_interfaces_admin::AddressParameters::default(), server)
             .context("FIDL error")?;
 
         let state_stream =
@@ -1302,7 +1294,7 @@ impl<'a> TestInterface<'a> {
     /// Removes an address and a subnet route.
     pub async fn del_address_and_subnet_route(
         &self,
-        mut addr_with_prefix: fnet::Subnet,
+        addr_with_prefix: fnet::Subnet,
     ) -> Result<bool> {
         let subnet = fnet_ext::apply_subnet_mask(addr_with_prefix);
         let entry =
@@ -1319,13 +1311,11 @@ impl<'a> TestInterface<'a> {
                     entry, self.endpoint.name
                 )
             })?;
-        self.control.remove_address(&mut addr_with_prefix).await.context("FIDL error").and_then(
-            |res| {
-                res.map_err(|e: fnet_interfaces_admin::ControlRemoveAddressError| {
-                    anyhow::anyhow!("{:?}", e)
-                })
-            },
-        )
+        self.control.remove_address(&addr_with_prefix).await.context("FIDL error").and_then(|res| {
+            res.map_err(|e: fnet_interfaces_admin::ControlRemoveAddressError| {
+                anyhow::anyhow!("{:?}", e)
+            })
+        })
     }
 
     /// Removes all IPv6 LinkLocal addresses on the interface.
@@ -1374,7 +1364,7 @@ impl<'a> TestInterface<'a> {
             ipv4: previous_ipv4, ipv6: previous_ipv6, ..
         } = self
             .control()
-            .set_configuration(config.clone())
+            .set_configuration(&config.clone())
             .await
             .context("FIDL error")?
             .map_err(|e| anyhow!("set configuration error: {:?}", e))?;
