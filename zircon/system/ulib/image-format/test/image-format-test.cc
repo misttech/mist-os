@@ -196,6 +196,21 @@ TEST(ImageFormat, PassThroughColorSpace_V1_wire) {
   EXPECT_TRUE(ImageFormatIsSupportedColorSpaceForPixelFormat(color_space, linear_nv12));
 }
 
+TEST(ImageFormat, L8AndY8PermitRgbAndYuv) {
+  fuchsia_images2::ColorSpace color_space_rgb = fuchsia_images2::ColorSpace::kSrgb;
+  fuchsia_images2::ColorSpace color_space_yuv = fuchsia_images2::ColorSpace::kRec709;
+
+  auto pixel_format_L8 = PixelFormatAndModifier(fuchsia_images2::PixelFormat::kL8,
+                                                fuchsia_images2::kFormatModifierLinear);
+  EXPECT_TRUE(ImageFormatIsSupportedColorSpaceForPixelFormat(color_space_rgb, pixel_format_L8));
+  EXPECT_TRUE(ImageFormatIsSupportedColorSpaceForPixelFormat(color_space_yuv, pixel_format_L8));
+
+  auto pixel_format_R8 = PixelFormatAndModifier(fuchsia_images2::PixelFormat::kR8,
+                                                fuchsia_images2::kFormatModifierLinear);
+  EXPECT_TRUE(ImageFormatIsSupportedColorSpaceForPixelFormat(color_space_rgb, pixel_format_R8));
+  EXPECT_TRUE(ImageFormatIsSupportedColorSpaceForPixelFormat(color_space_yuv, pixel_format_R8));
+}
+
 TEST(ImageFormat, ZbiPixelFormatV2) {
   {
     fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =

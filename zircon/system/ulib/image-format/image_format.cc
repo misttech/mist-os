@@ -71,42 +71,44 @@ enum ColorType { kColorType_NONE, kColorType_RGB, kColorType_YUV };
 
 struct SamplingInfo {
   std::set<uint32_t> possible_bits_per_sample;
-  ColorType color_type;
+  std::set<ColorType> color_types;
 };
 
 const std::map<ColorSpaceWire, SamplingInfo> kColorSpaceSamplingInfo = {
-    {ColorSpace::kSrgb, {{8, 10, 12, 16}, kColorType_RGB}},
-    {ColorSpace::kRec601Ntsc, {{8, 10}, kColorType_YUV}},
-    {ColorSpace::kRec601NtscFullRange, {{8, 10}, kColorType_YUV}},
-    {ColorSpace::kRec601Pal, {{8, 10}, kColorType_YUV}},
-    {ColorSpace::kRec601PalFullRange, {{8, 10}, kColorType_YUV}},
-    {ColorSpace::kRec709, {{8, 10}, kColorType_YUV}},
-    {ColorSpace::kRec2020, {{10, 12}, kColorType_YUV}},
-    {ColorSpace::kRec2100, {{10, 12}, kColorType_YUV}},
+    {ColorSpace::kSrgb, {{8, 10, 12, 16}, {kColorType_RGB}}},
+    {ColorSpace::kRec601Ntsc, {{8, 10}, {kColorType_YUV}}},
+    {ColorSpace::kRec601NtscFullRange, {{8, 10}, {kColorType_YUV}}},
+    {ColorSpace::kRec601Pal, {{8, 10}, {kColorType_YUV}}},
+    {ColorSpace::kRec601PalFullRange, {{8, 10}, {kColorType_YUV}}},
+    {ColorSpace::kRec709, {{8, 10}, {kColorType_YUV}}},
+    {ColorSpace::kRec2020, {{10, 12}, {kColorType_YUV}}},
+    {ColorSpace::kRec2100, {{10, 12}, {kColorType_YUV}}},
 };
 const std::map<PixelFormatWire, SamplingInfo> kPixelFormatSamplingInfo = {
-    {PixelFormat::kR8G8B8A8, {{8}, kColorType_RGB}},
-    {PixelFormat::kB8G8R8A8, {{8}, kColorType_RGB}},
-    {PixelFormat::kI420, {{8}, kColorType_YUV}},
-    {PixelFormat::kM420, {{8}, kColorType_YUV}},
-    {PixelFormat::kNv12, {{8}, kColorType_YUV}},
-    {PixelFormat::kYuy2, {{8}, kColorType_YUV}},
+    {PixelFormat::kR8G8B8A8, {{8}, {kColorType_RGB}}},
+    {PixelFormat::kB8G8R8A8, {{8}, {kColorType_RGB}}},
+    {PixelFormat::kI420, {{8}, {kColorType_YUV}}},
+    {PixelFormat::kM420, {{8}, {kColorType_YUV}}},
+    {PixelFormat::kNv12, {{8}, {kColorType_YUV}}},
+    {PixelFormat::kYuy2, {{8}, {kColorType_YUV}}},
     // 8 bits RGB when uncompressed - in this context, MJPEG is essentially
     // pretending to be uncompressed.
-    {PixelFormat::kMjpeg, {{8}, kColorType_RGB}},
-    {PixelFormat::kYv12, {{8}, kColorType_YUV}},
-    {PixelFormat::kB8G8R8, {{8}, kColorType_RGB}},
+    {PixelFormat::kMjpeg, {{8}, {kColorType_RGB}}},
+    {PixelFormat::kYv12, {{8}, {kColorType_YUV}}},
+    {PixelFormat::kB8G8R8, {{8}, {kColorType_RGB}}},
 
     // These use the same colorspaces as regular 8-bit-per-component formats
-    {PixelFormat::kR5G6B5, {{8}, kColorType_RGB}},
-    {PixelFormat::kR3G3B2, {{8}, kColorType_RGB}},
-    {PixelFormat::kR2G2B2X2, {{8}, kColorType_RGB}},
-    // Expands to RGB
-    {PixelFormat::kL8, {{8}, kColorType_RGB}},
-    {PixelFormat::kR8, {{8}, kColorType_RGB}},
-    {PixelFormat::kR8G8, {{8}, kColorType_RGB}},
-    {PixelFormat::kA2B10G10R10, {{8}, kColorType_RGB}},
-    {PixelFormat::kA2R10G10B10, {{8}, kColorType_RGB}},
+    {PixelFormat::kR5G6B5, {{8}, {kColorType_RGB}}},
+    {PixelFormat::kR3G3B2, {{8}, {kColorType_RGB}}},
+    {PixelFormat::kR2G2B2X2, {{8}, {kColorType_RGB}}},
+
+    // Expands to RGB or YUV
+    {PixelFormat::kL8, {{8}, {kColorType_RGB, kColorType_YUV}}},
+    {PixelFormat::kR8, {{8}, {kColorType_RGB, kColorType_YUV}}},
+
+    {PixelFormat::kR8G8, {{8}, {kColorType_RGB}}},
+    {PixelFormat::kA2B10G10R10, {{8}, {kColorType_RGB}}},
+    {PixelFormat::kA2R10G10B10, {{8}, {kColorType_RGB}}},
 };
 #endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
@@ -987,7 +989,12 @@ bool ImageFormatIsSupportedColorSpaceForPixelFormat(const fuchsia_images2::Color
   }
   const SamplingInfo& color_space_sampling_info = color_space_sampling_info_iter->second;
   const SamplingInfo& pixel_format_sampling_info = pixel_format_sampling_info_iter->second;
-  if (color_space_sampling_info.color_type != pixel_format_sampling_info.color_type) {
+  std::vector<ColorType> color_type_intersection;
+  std::set_intersection(
+      color_space_sampling_info.color_types.begin(), color_space_sampling_info.color_types.end(),
+      pixel_format_sampling_info.color_types.begin(), pixel_format_sampling_info.color_types.end(),
+      std::back_inserter(color_type_intersection));
+  if (color_type_intersection.empty()) {
     return false;
   }
   bool is_bits_per_sample_match_found = false;
