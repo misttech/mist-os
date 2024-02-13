@@ -26,7 +26,7 @@ fn default_log_level() -> LevelFilter {
 }
 
 fn default_repository_port() -> u32 {
-    8082
+    8083
 }
 
 #[derive(FromArgs)]
