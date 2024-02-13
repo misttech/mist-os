@@ -159,7 +159,11 @@ pub mod ip {
             Ipv6DeviceConfigurationUpdate, UpdateIpConfigurationError,
         },
         slaac::{SlaacConfiguration, TemporarySlaacAddressConfiguration},
-        state::{Ipv4AddrConfig, Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Lifetime},
+        state::{
+            IpDeviceConfiguration, Ipv4AddrConfig, Ipv4DeviceConfigurationAndFlags,
+            Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
+            Lifetime,
+        },
         AddressRemovedReason, IpAddressState, IpDeviceEvent,
     };
     pub use socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError};

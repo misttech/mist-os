@@ -31,10 +31,7 @@ use net_types::{
     AddrAndZone, MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
 };
 use netstack3_core::{
-    device::{
-        ArpConfiguration, ArpConfigurationUpdate, DeviceId, NdpConfiguration,
-        NdpConfigurationUpdate, WeakDeviceId,
-    },
+    device::{ArpConfiguration, ArpConfigurationUpdate, DeviceId, WeakDeviceId},
     error::{ExistsError, NetstackError, NotFoundError},
     neighbor::{NudUserConfig, NudUserConfigUpdate},
     routes::{
@@ -1347,32 +1344,6 @@ impl IntoFidl<fnet_interfaces_admin::ArpConfiguration> for ArpConfiguration {
     fn into_fidl(self) -> fnet_interfaces_admin::ArpConfiguration {
         let ArpConfiguration { nud } = self;
         ArpConfigurationUpdate { nud: Some(nud_user_config_to_update(nud)) }.into_fidl()
-    }
-}
-
-impl TryFromFidl<fnet_interfaces_admin::NdpConfiguration> for NdpConfigurationUpdate {
-    type Error = IllegalZeroValueError;
-
-    fn try_from_fidl(fidl: fnet_interfaces_admin::NdpConfiguration) -> Result<Self, Self::Error> {
-        let fnet_interfaces_admin::NdpConfiguration { nud, __source_breaking } = fidl;
-        Ok(NdpConfigurationUpdate { nud: nud.map(TryFromFidl::try_from_fidl).transpose()? })
-    }
-}
-
-impl IntoFidl<fnet_interfaces_admin::NdpConfiguration> for NdpConfigurationUpdate {
-    fn into_fidl(self) -> fnet_interfaces_admin::NdpConfiguration {
-        let NdpConfigurationUpdate { nud } = self;
-        fnet_interfaces_admin::NdpConfiguration {
-            nud: nud.map(IntoFidl::into_fidl),
-            __source_breaking: fidl::marker::SourceBreaking,
-        }
-    }
-}
-
-impl IntoFidl<fnet_interfaces_admin::NdpConfiguration> for NdpConfiguration {
-    fn into_fidl(self) -> fnet_interfaces_admin::NdpConfiguration {
-        let NdpConfiguration { nud } = self;
-        NdpConfigurationUpdate { nud: Some(nud_user_config_to_update(nud)) }.into_fidl()
     }
 }
 

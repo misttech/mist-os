@@ -26,6 +26,15 @@ type NudConfiguration = table {
     2: max_unicast_solicitations uint16;
 };
 
+/// DAD (Duplicate Address Detection) configuration for an interface.
+type DadConfiguration = table {
+    /// Number of transmissions before an address is considered available for
+    /// use.
+    ///
+    /// A value of zero effectively disables DAD for the interface.
+    1: transmits uint16;
+};
+
 /// The configuration for an interface.
 type Configuration = table {
     /// The IPv4 configuration for an interface.
@@ -60,6 +69,8 @@ type Configuration = table {
         4: arp @generated_name("ArpConfiguration") table {
             /// Neighbor Unreachabilty Detection over ARP configuration.
             1: nud NudConfiguration;
+            // TODO(https://fxbug.dev/42077260): Add DAD configuration when DAD
+            // over IPv4 is supported.
         };
     };
 
@@ -93,6 +104,8 @@ type Configuration = table {
         4: ndp @generated_name("NdpConfiguration") table {
             /// Neighbor Unreachabilty Detection over NDP configuration.
             1: nud NudConfiguration;
+            /// Duplicate Address Detection over NDP configuration.
+            2: dad DadConfiguration;
         };
     };
 };

@@ -624,7 +624,10 @@ pub(crate) mod testutil {
 #[cfg(test)]
 mod tests {
     use alloc::vec::Vec;
-    use core::{num::NonZeroU8, time::Duration};
+    use core::{
+        num::{NonZeroU16, NonZeroU8},
+        time::Duration,
+    };
 
     use const_unwrap::const_unwrap_option;
     use net_declare::net_mac;
@@ -862,7 +865,7 @@ mod tests {
                 Ipv6DeviceConfigurationUpdate {
                     // Enable DAD so that the auto-generated address triggers a DAD
                     // message immediately on interface enable.
-                    dad_transmits: Some(Some(const_unwrap_option(NonZeroU8::new(1)))),
+                    dad_transmits: Some(Some(const_unwrap_option(NonZeroU16::new(1)))),
                     // Enable stable addresses so the link-local address is auto-
                     // generated.
                     slaac_config: Some(SlaacConfiguration {

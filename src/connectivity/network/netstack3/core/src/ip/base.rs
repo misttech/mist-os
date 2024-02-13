@@ -4618,7 +4618,7 @@ mod tests {
                 &device,
                 Ipv6DeviceConfigurationUpdate {
                     // Doesn't matter as long as DAD is enabled.
-                    dad_transmits: Some(NonZeroU8::new(1)),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     // Auto-generate a link-local address.
                     slaac_config: Some(SlaacConfiguration {
                         enable_stable_addresses: true,
@@ -4866,7 +4866,7 @@ mod tests {
                     &device,
                     Ipv6DeviceConfigurationUpdate {
                         // Doesn't matter as long as DAD is enabled.
-                        dad_transmits: Some(NonZeroU8::new(1)),
+                        dad_transmits: Some(NonZeroU16::new(1)),
                         // Auto-generate a link-local address.
                         slaac_config: Some(SlaacConfiguration {
                             enable_stable_addresses: true,

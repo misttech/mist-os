@@ -105,7 +105,7 @@ mod tests {
     use core::{
         convert::{TryFrom, TryInto as _},
         fmt::Debug,
-        num::NonZeroU8,
+        num::{NonZeroU16, NonZeroU8},
         time::Duration,
     };
 
@@ -458,7 +458,7 @@ mod tests {
         // Create the devices (will start DAD at the same time).
         let update = Ipv6DeviceConfigurationUpdate {
             // Doesn't matter as long as we perform DAD.
-            dad_transmits: Some(NonZeroU8::new(1)),
+            dad_transmits: Some(NonZeroU16::new(1)),
             slaac_config: Some(SlaacConfiguration {
                 enable_stable_addresses: true,
                 ..Default::default()
@@ -558,7 +558,7 @@ mod tests {
         // Enable DAD.
         let update = Ipv6DeviceConfigurationUpdate {
             // Doesn't matter as long as we perform DAD.
-            dad_transmits: Some(NonZeroU8::new(1)),
+            dad_transmits: Some(NonZeroU16::new(1)),
             ip_config: IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() },
             ..Default::default()
         };
@@ -668,7 +668,7 @@ mod tests {
             .update_configuration(
                 &dev_id,
                 Ipv6DeviceConfigurationUpdate {
-                    dad_transmits: Some(NonZeroU8::new(1)),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
@@ -717,7 +717,7 @@ mod tests {
             .update_configuration(
                 &dev_id,
                 Ipv6DeviceConfigurationUpdate {
-                    dad_transmits: Some(NonZeroU8::new(3)),
+                    dad_transmits: Some(NonZeroU16::new(3)),
                     ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
@@ -749,7 +749,7 @@ mod tests {
         let remote_device_id = remote_eth_device_id.into();
 
         let update = Ipv6DeviceConfigurationUpdate {
-            dad_transmits: Some(NonZeroU8::new(3)),
+            dad_transmits: Some(NonZeroU16::new(3)),
             ip_config: IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() },
             ..Default::default()
         };
@@ -874,7 +874,7 @@ mod tests {
             .update_configuration(
                 &dev_id,
                 Ipv6DeviceConfigurationUpdate {
-                    dad_transmits: Some(NonZeroU8::new(3)),
+                    dad_transmits: Some(NonZeroU16::new(3)),
                     max_router_solicitations: Some(None),
                     ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
@@ -954,7 +954,7 @@ mod tests {
             .update_configuration(
                 &dev_id,
                 Ipv6DeviceConfigurationUpdate {
-                    dad_transmits: Some(NonZeroU8::new(3)),
+                    dad_transmits: Some(NonZeroU16::new(3)),
                     max_router_solicitations: Some(None),
                     ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
@@ -1627,14 +1627,14 @@ mod tests {
         assert_empty(ctx.bindings_ctx.timer_ctx().timers());
 
         // Enable DAD for the device.
-        const DUP_ADDR_DETECT_TRANSMITS: u8 = 3;
+        const DUP_ADDR_DETECT_TRANSMITS: u16 = 3;
         let _: Ipv6DeviceConfigurationUpdate = ctx
             .core_api()
             .device_ip::<Ipv6>()
             .update_configuration(
                 &device,
                 Ipv6DeviceConfigurationUpdate {
-                    dad_transmits: Some(NonZeroU8::new(DUP_ADDR_DETECT_TRANSMITS)),
+                    dad_transmits: Some(NonZeroU16::new(DUP_ADDR_DETECT_TRANSMITS)),
                     ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
@@ -2270,7 +2270,7 @@ mod tests {
                 &device,
                 Ipv6DeviceConfigurationUpdate {
                     // Doesn't matter as long as we perform DAD.
-                    dad_transmits: Some(NonZeroU8::new(1)),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     slaac_config: Some(SlaacConfiguration {
                         enable_stable_addresses: true,
                         ..Default::default()
@@ -2623,7 +2623,7 @@ mod tests {
                 &device,
                 Ipv6DeviceConfigurationUpdate {
                     // Doesn't matter as long as we perform DAD.
-                    dad_transmits: Some(NonZeroU8::new(1)),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     slaac_config: Some(slaac_config),
                     ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
@@ -2767,7 +2767,7 @@ mod tests {
                 &device,
                 Ipv6DeviceConfigurationUpdate {
                     // Doesn't matter as long as we perform DAD.
-                    dad_transmits: Some(NonZeroU8::new(1)),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     slaac_config: Some(slaac_config),
                     ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
@@ -3089,7 +3089,7 @@ mod tests {
                 &device,
                 Ipv6DeviceConfigurationUpdate {
                     // Perform DAD for later addresses.
-                    dad_transmits: Some(NonZeroU8::new(1)),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     slaac_config: Some(slaac_config),
                     ..Default::default()
                 },

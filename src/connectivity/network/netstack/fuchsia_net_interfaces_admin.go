@@ -824,6 +824,10 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 				previousNdpConfig.SetNud(ci.applyNUDConfig(ipv6.ProtocolNumber, &ipv6Config.Ndp.Nud))
 			}
 
+			if ipv6Config.Ndp.HasDad() {
+				_ = syslog.WarnTf(controlName, "ignoring unsupported DAD configuration")
+			}
+
 			previousIpv6Config.SetNdp(previousNdpConfig)
 		}
 

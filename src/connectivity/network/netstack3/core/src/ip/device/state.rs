@@ -5,7 +5,12 @@
 //! State for an IP device.
 
 use alloc::vec::Vec;
-use core::{fmt::Debug, hash::Hash, num::NonZeroU8, time::Duration};
+use core::{
+    fmt::Debug,
+    hash::Hash,
+    num::{NonZeroU16, NonZeroU8},
+    time::Duration,
+};
 
 use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
@@ -497,7 +502,9 @@ pub struct Ipv6DeviceConfiguration {
     /// A value of `None` means DAD will not be performed on the interface.
     ///
     /// [RFC 4862 section 5.1]: https://datatracker.ietf.org/doc/html/rfc4862#section-5.1
-    pub dad_transmits: Option<NonZeroU8>,
+    // TODO(https://fxbug.dev/42077260): Move to a common place when IPv4
+    // supports DAD.
+    pub dad_transmits: Option<NonZeroU16>,
 
     /// Value for NDP's `MAX_RTR_SOLICITATIONS` parameter to configure how many
     /// router solicitation messages to send when solicing routers.
@@ -525,8 +532,8 @@ impl Ipv6DeviceConfiguration {
     /// The default `DupAddrDetectTransmits` value from [RFC 4862 Section 5.1]
     ///
     /// [RFC 4862 Section 5.1]: https://www.rfc-editor.org/rfc/rfc4862#section-5.1
-    pub const DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS: NonZeroU8 =
-        const_unwrap_option(NonZeroU8::new(1));
+    pub const DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS: NonZeroU16 =
+        const_unwrap_option(NonZeroU16::new(1));
 }
 
 impl AsRef<IpDeviceConfiguration> for Ipv6DeviceConfiguration {
@@ -685,7 +692,7 @@ pub enum Ipv6DadState {
     ///
     /// When `dad_transmits_remaining` is `None`, then no more DAD messages need
     /// to be sent and DAD may be resolved.
-    Tentative { dad_transmits_remaining: Option<NonZeroU8> },
+    Tentative { dad_transmits_remaining: Option<NonZeroU16> },
 
     /// The address has not yet been initialized.
     Uninitialized,

@@ -2387,7 +2387,7 @@ where
 mod tests {
     use alloc::collections::HashSet;
     use alloc::{vec, vec::Vec};
-    use core::num::{NonZeroU16, NonZeroU8, NonZeroUsize};
+    use core::num::{NonZeroU16, NonZeroUsize};
 
     use ip_test_macro::ip_test;
 
@@ -4909,10 +4909,10 @@ mod tests {
     const MULTICAST_IP: Ipv6Addr = net_ip_v6!("ff02::1234");
 
     #[test_case(LOCAL_IP, None, true; "targeting assigned address")]
-    #[test_case(LOCAL_IP, NonZeroU8::new(1), false; "targeting tentative address")]
+    #[test_case(LOCAL_IP, NonZeroU16::new(1), false; "targeting tentative address")]
     #[test_case(OTHER_IP, None, false; "targeting other host")]
     #[test_case(MULTICAST_IP, None, false; "targeting multicast address")]
-    fn ns_response(target_addr: Ipv6Addr, dad_transmits: Option<NonZeroU8>, expect_handle: bool) {
+    fn ns_response(target_addr: Ipv6Addr, dad_transmits: Option<NonZeroU16>, expect_handle: bool) {
         let FakeEventDispatcherConfig {
             local_mac,
             remote_mac,
@@ -4950,7 +4950,7 @@ mod tests {
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&device_id, AddrSubnet::new(LOCAL_IP, Ipv6Addr::BYTES * 8).unwrap())
             .unwrap();
-        if let Some(NonZeroU8 { .. }) = dad_transmits {
+        if let Some(NonZeroU16 { .. }) = dad_transmits {
             // Take DAD message.
             assert_matches!(
                 &ctx.bindings_ctx.take_frames()[..],

@@ -31,7 +31,7 @@
 //! ownership semantics (removing the interface closes the protocol; closing
 //! protocol does not remove the interface).
 
-use std::{collections::hash_map, ops::DerefMut as _};
+use std::{collections::hash_map, num::NonZeroU16, ops::DerefMut as _};
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{ProtocolMarker, ServerEnd};
@@ -53,10 +53,12 @@ use net_types::{
 use netstack3_core::{
     device::{
         DeviceConfiguration, DeviceConfigurationUpdate, DeviceConfigurationUpdateError, DeviceId,
+        NdpConfiguration, NdpConfigurationUpdate,
     },
     ip::{
-        AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, IpDeviceConfigurationUpdate,
-        Ipv4AddrConfig, Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig,
+        AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, IpDeviceConfiguration,
+        IpDeviceConfigurationUpdate, Ipv4AddrConfig, Ipv4DeviceConfigurationUpdate,
+        Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
         Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError,
         UpdateIpConfigurationError,
     },
@@ -890,19 +892,28 @@ fn set_configuration(
                 )
             }
 
+            let fnet_interfaces_admin::NdpConfiguration { nud, dad, __source_breaking } =
+                ndp.unwrap_or_default();
+
+            let fnet_interfaces_admin::DadConfiguration {
+                transmits: dad_transmits,
+                __source_breaking,
+            } = dad.unwrap_or_default();
+
             (
                 Some(Ipv6DeviceConfigurationUpdate {
                     ip_config: IpDeviceConfigurationUpdate {
                         forwarding_enabled: forwarding,
                         ..Default::default()
                     },
+                    dad_transmits: dad_transmits.map(|v| NonZeroU16::new(v)),
                     ..Default::default()
                 }),
-                ndp.map(TryIntoCore::try_into_core).transpose().map_err(
-                    |IllegalZeroValueError| {
+                nud.map(|nud| Ok(NdpConfigurationUpdate { nud: Some(nud.try_into_core()?) }))
+                    .transpose()
+                    .map_err(|IllegalZeroValueError| {
                         fnet_interfaces_admin::ControlSetConfigurationError::IllegalZeroValue
-                    },
-                )?,
+                    })?,
             )
         }
         None => (None, None),
@@ -943,6 +954,7 @@ fn set_configuration(
 
     let DeviceConfigurationUpdate { arp, ndp } =
         ctx.api().device_any().apply_configuration(device_update);
+    let nud = ndp.and_then(|NdpConfigurationUpdate { nud }| nud);
 
     // Apply both updates now that we have checked for errors and get the deltas
     // back. If we didn't apply updates, use the default struct to construct the
@@ -964,10 +976,22 @@ fn set_configuration(
     let ipv6 = ipv6_update.map(|u| {
         let Ipv6DeviceConfigurationUpdate {
             ip_config,
-            dad_transmits: _,
+            dad_transmits,
             max_router_solicitations: _,
             slaac_config: _,
         } = ctx.api().device_ip::<Ipv6>().apply_configuration(u);
+
+        let dad = dad_transmits.map(|transmits| fnet_interfaces_admin::DadConfiguration {
+            transmits: Some(transmits.map_or(0, NonZeroU16::get)),
+            __source_breaking: fidl::marker::SourceBreaking,
+        });
+
+        let ndp = fnet_interfaces_admin::NdpConfiguration {
+            nud: nud.map(IntoFidl::into_fidl),
+            dad,
+            __source_breaking: fidl::marker::SourceBreaking,
+        };
+        let ndp = (ndp != Default::default()).then_some(ndp);
 
         let IpDeviceConfigurationUpdate { forwarding_enabled, ip_enabled: _, gmp_enabled: _ } =
             ip_config;
@@ -975,7 +999,7 @@ fn set_configuration(
             forwarding: forwarding_enabled,
             multicast_forwarding: None,
             mld: None,
-            ndp: ndp.map(IntoFidl::into_fidl),
+            ndp,
             __source_breaking: fidl::marker::SourceBreaking,
         }
     });
@@ -996,43 +1020,62 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
 
     let DeviceConfiguration { arp, ndp } = ctx.api().device_any().get_configuration(&core_id);
 
+    let ipv4 = Some(fnet_interfaces_admin::Ipv4Configuration {
+        forwarding: Some(
+            ctx.api()
+                .device_ip::<Ipv4>()
+                .get_configuration(&core_id)
+                .config
+                .ip_config
+                .forwarding_enabled,
+        ),
+        // TODO(https://fxbug.dev/42071402): Support IGMP configuration
+        // changes.
+        igmp: None,
+        // TODO(https://fxbug.dev/42075111): Support multicast forwarding
+        // configuration changes.
+        multicast_forwarding: None,
+        arp: arp.map(IntoFidl::into_fidl),
+        __source_breaking: fidl::marker::SourceBreaking,
+    });
+
+    let Ipv6DeviceConfigurationAndFlags {
+        config:
+            Ipv6DeviceConfiguration {
+                dad_transmits,
+                max_router_solicitations: _,
+                slaac_config: _,
+                ip_config: IpDeviceConfiguration { gmp_enabled: _, forwarding_enabled },
+            },
+        flags: _,
+    } = ctx.api().device_ip::<Ipv6>().get_configuration(&core_id);
+
+    let nud = ndp.map(|NdpConfiguration { nud }| nud);
+
+    let ndp = Some(fnet_interfaces_admin::NdpConfiguration {
+        nud: nud.map(IntoFidl::into_fidl),
+        dad: Some(fnet_interfaces_admin::DadConfiguration {
+            transmits: Some(dad_transmits.map_or(0, NonZeroU16::get)),
+            __source_breaking: fidl::marker::SourceBreaking,
+        }),
+        __source_breaking: fidl::marker::SourceBreaking,
+    });
+
+    let ipv6 = Some(fnet_interfaces_admin::Ipv6Configuration {
+        forwarding: Some(forwarding_enabled),
+        // TODO(https://fxbug.dev/42071402): Support MLD configuration
+        // changes.
+        mld: None,
+        // TODO(https://fxbug.dev/42075111): Support multicast forwarding
+        // configuration changes.
+        multicast_forwarding: None,
+        ndp,
+        __source_breaking: fidl::marker::SourceBreaking,
+    });
+
     fnet_interfaces_admin::Configuration {
-        ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
-            forwarding: Some(
-                ctx.api()
-                    .device_ip::<Ipv4>()
-                    .get_configuration(&core_id)
-                    .config
-                    .ip_config
-                    .forwarding_enabled,
-            ),
-            // TODO(https://fxbug.dev/42071402): Support IGMP configuration
-            // changes.
-            igmp: None,
-            // TODO(https://fxbug.dev/42075111): Support multicast forwarding
-            // configuration changes.
-            multicast_forwarding: None,
-            arp: arp.map(IntoFidl::into_fidl),
-            __source_breaking: fidl::marker::SourceBreaking,
-        }),
-        ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-            forwarding: Some(
-                ctx.api()
-                    .device_ip::<Ipv6>()
-                    .get_configuration(&core_id)
-                    .config
-                    .ip_config
-                    .forwarding_enabled,
-            ),
-            // TODO(https://fxbug.dev/42071402): Support MLD configuration
-            // changes.
-            mld: None,
-            // TODO(https://fxbug.dev/42075111): Support multicast forwarding
-            // configuration changes.
-            multicast_forwarding: None,
-            ndp: ndp.map(IntoFidl::into_fidl),
-            __source_breaking: fidl::marker::SourceBreaking,
-        }),
+        ipv4,
+        ipv6,
         __source_breaking: fidl::marker::SourceBreaking,
     }
 }

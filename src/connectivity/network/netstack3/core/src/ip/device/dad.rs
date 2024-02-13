@@ -4,7 +4,7 @@
 
 //! Duplicate Address Detection.
 
-use core::num::NonZeroU8;
+use core::num::NonZeroU16;
 
 use net_types::{
     ip::{Ipv4, Ipv6, Ipv6Addr},
@@ -51,7 +51,7 @@ pub(super) struct DadStateRef<'a, CC> {
     /// The time between DAD message retransmissions.
     pub(super) retrans_timer: &'a NonZeroDuration,
     /// The maximum number of DAD messages to send.
-    pub(super) max_dad_transmits: &'a Option<NonZeroU8>,
+    pub(super) max_dad_transmits: &'a Option<NonZeroU16>,
 }
 
 /// The execution context while performing DAD.
@@ -236,7 +236,7 @@ fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadC
                     false
                 }
                 Some(non_zero_remaining) => {
-                    *remaining = NonZeroU8::new(non_zero_remaining.get() - 1);
+                    *remaining = NonZeroU16::new(non_zero_remaining.get() - 1);
 
                     // Per RFC 4862 section 5.1,
                     //
@@ -266,7 +266,7 @@ fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadC
                     debug!(
                         "performing DAD for {}; {} tries left",
                         addr.addr(),
-                        remaining.map_or(0, NonZeroU8::get)
+                        remaining.map_or(0, NonZeroU16::get)
                     );
                     true
                 }
@@ -499,7 +499,7 @@ mod tests {
     struct FakeDadContext {
         state: Ipv6DadState,
         retrans_timer: NonZeroDuration,
-        max_dad_transmits: Option<NonZeroU8>,
+        max_dad_transmits: Option<NonZeroU16>,
         address_ctx: FakeAddressCtxImpl,
     }
 
@@ -681,7 +681,7 @@ mod tests {
         core_ctx: &FakeCoreCtxImpl,
         bindings_ctx: &FakeBindingsCtxImpl,
         frames_len: usize,
-        dad_transmits_remaining: Option<NonZeroU8>,
+        dad_transmits_remaining: Option<NonZeroU16>,
         retrans_timer: NonZeroDuration,
     ) {
         let FakeDadContext { state, retrans_timer: _, max_dad_transmits: _, address_ctx } =
@@ -708,16 +708,16 @@ mod tests {
 
     #[test]
     fn perform_dad() {
-        const DAD_TRANSMITS_REQUIRED: u8 = 5;
+        const DAD_TRANSMITS_REQUIRED: u16 = 5;
         const RETRANS_TIMER: NonZeroDuration =
             unsafe { NonZeroDuration::new_unchecked(Duration::from_secs(1)) };
 
         let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
             state: Ipv6DadState::Tentative {
-                dad_transmits_remaining: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
+                dad_transmits_remaining: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
             },
             retrans_timer: RETRANS_TIMER,
-            max_dad_transmits: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
+            max_dad_transmits: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
             address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext {
                 addr: DAD_ADDRESS,
                 assigned: false,
@@ -738,7 +738,7 @@ mod tests {
                 core_ctx,
                 bindings_ctx,
                 usize::from(count + 1),
-                NonZeroU8::new(DAD_TRANSMITS_REQUIRED - count - 1),
+                NonZeroU16::new(DAD_TRANSMITS_REQUIRED - count - 1),
                 RETRANS_TIMER,
             );
             assert_eq!(bindings_ctx.trigger_next_timer(core_ctx), Some(DAD_TIMER_ID));
@@ -758,17 +758,17 @@ mod tests {
 
     #[test]
     fn stop_dad() {
-        const DAD_TRANSMITS_REQUIRED: u8 = 2;
+        const DAD_TRANSMITS_REQUIRED: u16 = 2;
         const RETRANS_TIMER: NonZeroDuration =
             unsafe { NonZeroDuration::new_unchecked(Duration::from_secs(2)) };
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
                 state: Ipv6DadState::Tentative {
-                    dad_transmits_remaining: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
+                    dad_transmits_remaining: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
                 },
                 retrans_timer: RETRANS_TIMER,
-                max_dad_transmits: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
+                max_dad_transmits: NonZeroU16::new(DAD_TRANSMITS_REQUIRED),
                 address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext {
                     addr: DAD_ADDRESS,
                     assigned: false,
@@ -786,7 +786,7 @@ mod tests {
             &core_ctx,
             &bindings_ctx,
             1,
-            NonZeroU8::new(DAD_TRANSMITS_REQUIRED - 1),
+            NonZeroU16::new(DAD_TRANSMITS_REQUIRED - 1),
             RETRANS_TIMER,
         );
 

@@ -4,7 +4,7 @@
 
 //! IP Device configuration.
 
-use core::num::NonZeroU8;
+use core::num::{NonZeroU16, NonZeroU8};
 
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 
@@ -186,7 +186,7 @@ where
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Ipv6DeviceConfigurationUpdate {
     /// A change in DAD transmits.
-    pub dad_transmits: Option<Option<NonZeroU8>>,
+    pub dad_transmits: Option<Option<NonZeroU16>>,
     /// A change in maximum router solicitations.
     pub max_router_solicitations: Option<Option<NonZeroU8>>,
     /// A change in SLAAC configuration.

@@ -3508,6 +3508,68 @@ async fn nud_max_unicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name: 
 }
 
 #[netstack_test]
+async fn dad_transmits<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+    let network = sandbox.create_network(name).await.expect("create network");
+    let iface = realm.join_network(&network, "client").await.expect("join network");
+
+    let transmits_from_config = |config: finterfaces_admin::Configuration| {
+        config.ipv6.and_then(|ipv6| ipv6.ndp).and_then(|ndp| ndp.dad).and_then(|dad| dad.transmits)
+    };
+
+    let transmits_to_config = |transmits: u16| finterfaces_admin::Configuration {
+        ipv6: Some(finterfaces_admin::Ipv6Configuration {
+            ndp: Some(finterfaces_admin::NdpConfiguration {
+                dad: Some(finterfaces_admin::DadConfiguration {
+                    transmits: Some(transmits),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let get_transmits = || async {
+        transmits_from_config(
+            iface
+                .control()
+                .get_configuration()
+                .await
+                .expect("get configuration failed")
+                .expect("get configuration error"),
+        )
+    };
+
+    let get_expectation = |want| {
+        match N::VERSION {
+            NetstackVersion::Netstack2 { .. } | NetstackVersion::ProdNetstack2 => {
+                // Netstack2 doesn't support DAD transmits, so always expect to
+                // see `None` in all returns.
+                None
+            }
+            NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => Some(want),
+        }
+    };
+
+    // Default number of transmits defined in RFC 4862.
+    const DEFAULT_DAD_TRANSMITS: u16 = 1;
+    assert_eq!(get_transmits().await, get_expectation(DEFAULT_DAD_TRANSMITS));
+
+    const WANT_TRANSMITS: u16 = 3;
+    let update = iface
+        .control()
+        .set_configuration(transmits_to_config(WANT_TRANSMITS))
+        .await
+        .expect("set configuration failed")
+        .expect("set configuration error");
+    assert_eq!(transmits_from_config(update), get_expectation(DEFAULT_DAD_TRANSMITS));
+    assert_eq!(get_transmits().await, get_expectation(WANT_TRANSMITS));
+}
+
+#[netstack_test]
 async fn interface_authorization<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");

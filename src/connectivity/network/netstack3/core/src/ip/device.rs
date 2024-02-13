@@ -1794,7 +1794,7 @@ mod tests {
     use super::*;
 
     use alloc::vec;
-    use core::time::Duration;
+    use core::{num::NonZeroU16, time::Duration};
 
     use assert_matches::assert_matches;
     use fakealloc::collections::HashSet;
@@ -2030,7 +2030,7 @@ mod tests {
                 Ipv6DeviceConfigurationUpdate {
                     // Doesn't matter as long as we perform DAD and router
                     // solicitation.
-                    dad_transmits: Some(NonZeroU8::new(1)),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     max_router_solicitations: Some(NonZeroU8::new(1)),
                     // Auto-generate a link-local address.
                     slaac_config: Some(SlaacConfiguration {
@@ -2333,7 +2333,7 @@ mod tests {
             .update_configuration(
                 &device_id,
                 Ipv6DeviceConfigurationUpdate {
-                    dad_transmits: Some(NonZeroU8::new(1)),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     max_router_solicitations: Some(NonZeroU8::new(1)),
                     // Auto-generate a link-local address.
                     slaac_config: Some(SlaacConfiguration {
@@ -2596,7 +2596,7 @@ mod tests {
             api.update_configuration(
                 &device_id,
                 Ipv6DeviceConfigurationUpdate {
-                    dad_transmits: Some(NonZeroU8::new(1)),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     max_router_solicitations: Some(NonZeroU8::new(2)),
                     slaac_config: Some(SlaacConfiguration {
                         enable_stable_addresses: true,
@@ -2692,7 +2692,7 @@ mod tests {
                 },
             ),
             Ok(Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(NonZeroU8::new(1)),
+                dad_transmits: Some(NonZeroU16::new(1)),
                 max_router_solicitations: Some(NonZeroU8::new(2)),
                 slaac_config: Some(SlaacConfiguration {
                     enable_stable_addresses: true,

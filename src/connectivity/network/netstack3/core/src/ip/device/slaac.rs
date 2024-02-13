@@ -10,7 +10,7 @@
 
 use alloc::{boxed::Box, vec::Vec};
 use core::{
-    convert::TryFrom, marker::PhantomData, num::NonZeroU8, ops::ControlFlow, time::Duration,
+    convert::TryFrom, marker::PhantomData, num::NonZeroU16, ops::ControlFlow, time::Duration,
 };
 
 use assert_matches::assert_matches;
@@ -157,7 +157,7 @@ pub(super) trait SlaacAddresses<BC: InstantContext> {
 pub(super) struct SlaacAddrsMutAndConfig<'a, BC: InstantContext, A: SlaacAddresses<BC>> {
     pub(super) addrs: &'a mut A,
     pub(super) config: SlaacConfiguration,
-    pub(super) dad_transmits: Option<NonZeroU8>,
+    pub(super) dad_transmits: Option<NonZeroU16>,
     pub(super) retrans_timer: Duration,
     pub(super) interface_identifier: [u8; 8],
     pub(super) _marker: PhantomData<BC>,
@@ -558,7 +558,7 @@ fn apply_slaac_update_to_addr<D: Id, BC: SlaacBindingsContext<D>>(
     config: &SlaacConfiguration,
     now: <BC as InstantBindingsTypes>::Instant,
     retrans_timer: Duration,
-    dad_transmits: Option<NonZeroU8>,
+    dad_transmits: Option<NonZeroU16>,
     bindings_ctx: &mut BC,
 ) -> ControlFlow<(), SlaacType> {
     let SlaacAddressEntryMut { addr_sub, config: slaac_config, deprecated } = address_entry;
@@ -684,7 +684,7 @@ fn apply_slaac_update_to_addr<D: Id, BC: SlaacBindingsContext<D>>(
                         let regen_advance = regen_advance(
                             temp_idgen_retries,
                             retrans_timer,
-                            dad_transmits.map_or(0, NonZeroU8::get),
+                            dad_transmits.map_or(0, NonZeroU16::get),
                         )
                         .get();
                         // Per RFC 8981 Section 3.6:
@@ -1039,7 +1039,7 @@ const MIN_REGEN_ADVANCE: NonZeroDuration =
 fn regen_advance(
     temp_idgen_retries: u8,
     retrans_timer: Duration,
-    dad_transmits: u8,
+    dad_transmits: u16,
 ) -> NonZeroDuration {
     // Per the RFC, REGEN_ADVANCE in seconds =
     //   2 + (TEMP_IDGEN_RETRIES * DupAddrDetectTransmits * RetransTimer / 1000)
@@ -1371,7 +1371,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
     prefix_preferred_for: Option<NonZeroNdpLifetime>,
     subnet: &Subnet<Ipv6Addr>,
     config: SlaacConfiguration,
-    dad_transmits: Option<NonZeroU8>,
+    dad_transmits: Option<NonZeroU16>,
     retrans_timer: Duration,
     iid: [u8; 8],
 ) {
@@ -1452,7 +1452,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
             let regen_advance = regen_advance(
                 temporary_address_config.temp_idgen_retries,
                 retrans_timer,
-                dad_transmits.map_or(0, NonZeroU8::get),
+                dad_transmits.map_or(0, NonZeroU16::get),
             );
 
             let secret_key = temporary_address_config.secret_key;
@@ -1700,7 +1700,7 @@ mod tests {
 
     struct FakeSlaacContext {
         config: SlaacConfiguration,
-        dad_transmits: Option<NonZeroU8>,
+        dad_transmits: Option<NonZeroU16>,
         retrans_timer: Duration,
         iid: [u8; 8],
         slaac_addrs: FakeSlaacAddrs,
@@ -2268,14 +2268,14 @@ mod tests {
         preferred_lifetime_secs: u32,
         valid_lifetime_secs: u32,
         temp_idgen_retries: u8,
-        dad_transmits: u8,
+        dad_transmits: u16,
         retrans_timer: Duration,
         enable: bool,
     }
 
     impl DontGenerateTemporaryAddressTest {
         fn with_pl_less_than_regen_advance(
-            dad_transmits: u8,
+            dad_transmits: u16,
             retrans_timer: Duration,
             temp_idgen_retries: u8,
         ) -> Self {
@@ -2391,7 +2391,7 @@ mod tests {
                     }),
                     ..Default::default()
                 },
-                dad_transmits: NonZeroU8::new(dad_transmits),
+                dad_transmits: NonZeroU16::new(dad_transmits),
                 retrans_timer,
                 iid: IID,
                 slaac_addrs: Default::default(),
@@ -2413,7 +2413,7 @@ mod tests {
     struct GenerateTemporaryAddressTest {
         pl_config: u32,
         vl_config: u32,
-        dad_transmits: u8,
+        dad_transmits: u16,
         retrans_timer: Duration,
         temp_idgen_retries: u8,
         pl_ra: u32,
@@ -2528,7 +2528,7 @@ mod tests {
                     }),
                     ..Default::default()
                 },
-                dad_transmits: NonZeroU8::new(dad_transmits),
+                dad_transmits: NonZeroU16::new(dad_transmits),
                 retrans_timer,
                 iid: IID,
                 slaac_addrs: Default::default(),
