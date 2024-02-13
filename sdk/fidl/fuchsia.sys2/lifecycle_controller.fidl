@@ -20,6 +20,9 @@ type ResolveError = flexible enum {
     PACKAGE_NOT_FOUND = 4;
     // The component manifest could not be found in the package.
     MANIFEST_NOT_FOUND = 5;
+    // The component failed a policy check.
+    @available(added=19)
+    POLICY_ERROR = 6;
 };
 
 // Errors that can occur from starting a component instance
@@ -35,6 +38,9 @@ type StartError = flexible enum {
     PACKAGE_NOT_FOUND = 4;
     // The component manifest could not be found in the package.
     MANIFEST_NOT_FOUND = 5;
+    // The component failed a policy check.
+    @available(added=19)
+    POLICY_ERROR = 6;
 };
 
 // Errors that can occur from stopping a component instance

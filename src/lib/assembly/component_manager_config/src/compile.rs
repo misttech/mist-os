@@ -388,10 +388,9 @@ impl CapabilityAllowlistEntry {
 #[derive(Deserialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DebugRegistrationAllowlistEntry {
-    source_moniker: Option<String>,
-    source_name: Option<String>,
+    name: Option<String>,
     debug: Option<DebugRegistrationTypeName>,
-    target_moniker: Option<String>,
+    moniker: Option<String>,
     environment_name: Option<String>,
 }
 
@@ -517,10 +516,9 @@ fn translate_debug_registration_policy(
     let allowlist = debug_registration_policy
         .iter()
         .map(|e| component_internal::DebugRegistrationAllowlistEntry {
-            source_moniker: e.source_moniker.clone(),
-            source_name: e.source_name.clone(),
+            name: e.name.clone(),
             debug: e.debug.clone().map_or_else(|| None, |t| Some(t.into())),
-            target_moniker: e.target_moniker.clone(),
+            moniker: e.moniker.clone(),
             environment_name: e.environment_name.clone(),
             ..Default::default()
         })
@@ -823,10 +821,9 @@ mod tests {
                 ],
                 debug_registration_policy: [
                     {
-                        source_moniker: "/foo/bar",
-                        source_name: "fuchsia.boot.RootResource",
+                        name: "fuchsia.boot.RootResource",
                         debug: "protocol",
-                        target_moniker: "/foo",
+                        moniker: "/foo",
                         environment_name: "my_env",
                     },
                 ],
@@ -911,14 +908,13 @@ mod tests {
                         component_internal::DebugRegistrationPolicyAllowlists {
                             allowlist: Some(vec![
                                 component_internal::DebugRegistrationAllowlistEntry {
-                                    source_moniker: Some("/foo/bar".to_string()),
-                                    source_name: Some("fuchsia.boot.RootResource".to_string()),
+                                    name: Some("fuchsia.boot.RootResource".to_string()),
                                     debug: Some(
                                         component_internal::AllowlistedDebugRegistration::Protocol(
                                             component_internal::AllowlistedProtocol::default()
                                         )
                                     ),
-                                    target_moniker: Some("/foo".to_string()),
+                                    moniker: Some("/foo".to_string()),
                                     environment_name: Some("my_env".to_string()),
                                     ..Default::default()
                                 }

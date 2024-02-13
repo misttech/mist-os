@@ -1641,6 +1641,27 @@ impl ResolvedInstanceState {
         let environments = Self::instantiate_environments(component, &resolved_component.decl);
         let decl = resolved_component.decl.clone();
 
+        // Perform the policy check for debug capabilities now, instead of during routing. All the info we
+        // need to perform this check is already available to us. This way, we don't have to propagate this
+        // info to sandbox capabilities just so they can enforce the policy.
+        for (env_name, env) in &environments {
+            for capability_name in env.debug_registry().debug_capabilities.keys() {
+                let parent = match env.parent() {
+                    WeakExtendedInstance::Component(p) => p,
+                    WeakExtendedInstance::AboveRoot(_) => unreachable!(
+                        "this environment was defined by the component, can't be \
+                        from component_manager"
+                    ),
+                };
+                component.policy_checker().can_register_debug_capability(
+                    CapabilityTypeName::Protocol,
+                    capability_name,
+                    &parent.moniker,
+                    &env_name,
+                )?;
+            }
+        }
+
         let mut state = Self {
             weak_component,
             instance_token_state,

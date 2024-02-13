@@ -178,14 +178,17 @@ mod tests {
             actions::resolve::sandbox_construction::ComponentInput,
             component::StartReason,
             context::ModelContext,
-            error::{ActionError, ModelError},
+            error::{ActionError, ModelError, ResolveActionError},
             model::{Model, ModelParams},
             testing::mocks::MockResolver,
             token::InstanceRegistry,
         },
-        ::routing::environment::DebugRegistration,
+        ::routing::{environment::DebugRegistration, policy::PolicyError},
         assert_matches::assert_matches,
-        cm_config::RuntimeConfig,
+        cm_config::{
+            AllowlistEntryBuilder, CapabilityAllowlistSource, DebugCapabilityAllowlistEntry,
+            DebugCapabilityKey, RuntimeConfig, SecurityPolicy,
+        },
         cm_rust::{RegistrationSource, RunnerRegistration},
         cm_rust_testing::{
             ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder,
@@ -194,7 +197,10 @@ mod tests {
         fidl_fuchsia_component as fcomponent,
         maplit::hashmap,
         moniker::{Moniker, MonikerBase},
-        std::{collections::HashMap, sync::Weak},
+        std::{
+            collections::{HashMap, HashSet},
+            sync::Weak,
+        },
     };
 
     #[fuchsia::test]
@@ -247,6 +253,79 @@ mod tests {
             }
         };
         assert_eq!(environment.debug_registry.debug_capabilities, expected_debug_capability);
+    }
+
+    #[fuchsia::test]
+    async fn test_debug_policy_error() {
+        for runtime_config in vec![
+            make_debug_allowlisting_config("source_name", "env_a", Moniker::root()),
+            make_debug_allowlisting_config("target_name", "env_b", Moniker::root()),
+            make_debug_allowlisting_config("target_name", "env_a", "a".try_into().unwrap()),
+        ] {
+            let mut resolver = MockResolver::new();
+            resolver.add_component(
+                "root",
+                ComponentDeclBuilder::new_empty_component()
+                    .add_child(
+                        ChildDeclBuilder::new().name("a").url("test:///a").environment("env_a"),
+                    )
+                    .add_environment(
+                        EnvironmentDeclBuilder::new()
+                            .name("env_a")
+                            .extends(fdecl::EnvironmentExtends::Realm)
+                            .add_debug_registration(cm_rust::DebugRegistration::Protocol(
+                                cm_rust::DebugProtocolRegistration {
+                                    source_name: "source_name".parse().unwrap(),
+                                    target_name: "target_name".parse().unwrap(),
+                                    source: RegistrationSource::Parent,
+                                },
+                            )),
+                    )
+                    .build(),
+            );
+            resolver.add_component(
+                "a",
+                ComponentDeclBuilder::new_empty_component()
+                    .add_environment(
+                        EnvironmentDeclBuilder::new()
+                            .name("env_b")
+                            .extends(fdecl::EnvironmentExtends::Realm),
+                    )
+                    .build(),
+            );
+            let resolvers = {
+                let mut registry = ResolverRegistry::new();
+                registry.register("test".to_string(), Box::new(resolver));
+                registry
+            };
+
+            let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
+            let model = Model::new(
+                ModelParams {
+                    runtime_config,
+                    root_component_url: "test:///root".to_string(),
+                    root_environment: Environment::new_root(
+                        &top_instance,
+                        RunnerRegistry::new(HashMap::new()),
+                        resolvers,
+                        DebugRegistry::default(),
+                    ),
+                    top_instance,
+                },
+                InstanceRegistry::new(),
+            )
+            .await
+            .unwrap();
+            model.discover_root_component(ComponentInput::empty()).await;
+            assert_matches!(
+                model.root().resolve().await,
+                Err(ActionError::ResolveError {
+                    err: ResolveActionError::Policy(
+                        PolicyError::DebugCapabilityUseDisallowed { .. }
+                    )
+                })
+            );
+        }
     }
 
     // Each component declares an environment for their child that inherits from the component's
@@ -406,9 +485,11 @@ mod tests {
         };
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
+        let runtime_config =
+            make_debug_allowlisting_config("target_name", "env_a", Moniker::root());
         let model = Model::new(
             ModelParams {
-                runtime_config: Arc::new(RuntimeConfig::default()),
+                runtime_config,
                 root_component_url: "test:///root".to_string(),
                 root_environment: Environment::new_root(
                     &top_instance,
@@ -447,6 +528,30 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    fn make_debug_allowlisting_config(
+        name: &str,
+        env_name: &str,
+        env_moniker: Moniker,
+    ) -> Arc<RuntimeConfig> {
+        let mut allowlist = HashSet::new();
+        allowlist.insert(DebugCapabilityAllowlistEntry::new(
+            AllowlistEntryBuilder::build_exact_from_moniker(&env_moniker),
+        ));
+        let mut debug_capability_policy = HashMap::new();
+        debug_capability_policy.insert(
+            DebugCapabilityKey {
+                name: name.parse().unwrap(),
+                source: CapabilityAllowlistSource::Self_,
+                capability: cm_rust::CapabilityTypeName::Protocol,
+                env_name: env_name.into(),
+            },
+            allowlist,
+        );
+        let security_policy =
+            Arc::new(SecurityPolicy { debug_capability_policy, ..Default::default() });
+        Arc::new(RuntimeConfig { security_policy, ..Default::default() })
     }
 
     // A component in a collection declares an environment that inherits from realm, and the
@@ -512,9 +617,12 @@ mod tests {
         };
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
+
+        let runtime_config =
+            make_debug_allowlisting_config("target_name", "env_a", Moniker::root());
         let model = Model::new(
             ModelParams {
-                runtime_config: Arc::new(RuntimeConfig::default()),
+                runtime_config,
                 root_component_url: "test:///root".to_string(),
                 root_environment: Environment::new_root(
                     &top_instance,

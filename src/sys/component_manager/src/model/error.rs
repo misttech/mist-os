@@ -527,6 +527,8 @@ pub enum ResolveActionError {
         #[source]
         err: AbiRevisionError,
     },
+    #[error(transparent)]
+    Policy(#[from] PolicyError),
 }
 
 impl ResolveActionError {
@@ -542,6 +544,7 @@ impl ResolveActionError {
             | ResolveActionError::StructuredConfigError { .. }
             | ResolveActionError::PackageDirProxyCreateError { .. } => zx::Status::INTERNAL,
             ResolveActionError::ResolverError { err, .. } => err.as_zx_status(),
+            ResolveActionError::Policy(err) => err.as_zx_status(),
         }
     }
 }
@@ -566,6 +569,7 @@ impl Into<fsys::ResolveError> for ResolveActionError {
             | ResolveActionError::DiscoverActionError { .. }
             | ResolveActionError::AbiCompatibilityError { .. }
             | ResolveActionError::PackageDirProxyCreateError { .. } => fsys::ResolveError::Internal,
+            ResolveActionError::Policy(_) => fsys::ResolveError::PolicyError,
         }
     }
 }
@@ -591,6 +595,7 @@ impl Into<fsys::StartError> for ResolveActionError {
             | ResolveActionError::DiscoverActionError { .. }
             | ResolveActionError::AbiCompatibilityError { .. }
             | ResolveActionError::PackageDirProxyCreateError { .. } => fsys::StartError::Internal,
+            ResolveActionError::Policy(_) => fsys::StartError::PolicyError,
         }
     }
 }

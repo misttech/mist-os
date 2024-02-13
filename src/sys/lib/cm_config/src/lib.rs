@@ -275,7 +275,7 @@ pub struct SecurityPolicy {
 /// This defines all portions of the allowlist that do not support globbing.
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct DebugCapabilityKey {
-    pub source_name: Name,
+    pub name: Name,
     pub source: CapabilityAllowlistSource,
     pub capability: CapabilityTypeName,
     pub env_name: String,
@@ -284,22 +284,16 @@ pub struct DebugCapabilityKey {
 /// Represents a single allowed route for a debug capability.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct DebugCapabilityAllowlistEntry {
-    source: AllowlistEntry,
     dest: AllowlistEntry,
 }
 
 impl DebugCapabilityAllowlistEntry {
-    pub fn new(source: AllowlistEntry, dest: AllowlistEntry) -> Self {
-        Self { source, dest }
+    pub fn new(dest: AllowlistEntry) -> Self {
+        Self { dest }
     }
 
-    pub fn matches(&self, source: &ExtendedMoniker, dest: &Moniker) -> bool {
-        let source_absolute = match source {
-            // Currently no debug capabilities are routed from cm.
-            ExtendedMoniker::ComponentManager => return false,
-            ExtendedMoniker::ComponentInstance(ref moniker) => moniker,
-        };
-        self.source.matches(source_absolute) && self.dest.matches(dest)
+    pub fn matches(&self, dest: &Moniker) -> bool {
+        self.dest.matches(dest)
     }
 }
 
@@ -727,13 +721,13 @@ fn parse_debug_capability_policy(
             let mut policies: HashMap<DebugCapabilityKey, HashSet<DebugCapabilityAllowlistEntry>> =
                 HashMap::new();
             for e in allowlist.into_iter() {
-                let source_moniker = parse_allowlist_entry(
-                    e.source_moniker
+                let moniker = parse_allowlist_entry(
+                    e.moniker
                         .as_deref()
                         .ok_or(Error::new(PolicyConfigError::EmptySourceMoniker))?,
                 )?;
-                let source_name = if let Some(source_name) = e.source_name.as_ref() {
-                    Ok(source_name
+                let name = if let Some(name) = e.name.as_ref() {
+                    Ok(name
                         .parse()
                         .map_err(|_| Error::new(PolicyConfigError::InvalidSourceCapability))?)
                 } else {
@@ -751,22 +745,17 @@ fn parse_debug_capability_policy(
                     Err(Error::new(PolicyConfigError::EmptyAllowlistedDebugRegistration))
                 }?;
 
-                let target_moniker = parse_allowlist_entry(
-                    e.target_moniker
-                        .as_deref()
-                        .ok_or(PolicyConfigError::EmptyTargetMonikerDebugRegistration)?,
-                )?;
                 let env_name = e
                     .environment_name
                     .ok_or(PolicyConfigError::EmptyEnvironmentNameDebugRegistration)?;
 
                 let key = DebugCapabilityKey {
-                    source_name,
+                    name,
                     source: CapabilityAllowlistSource::Self_,
                     capability,
                     env_name,
                 };
-                let value = DebugCapabilityAllowlistEntry::new(source_moniker, target_moniker);
+                let value = DebugCapabilityAllowlistEntry::new(moniker);
                 if let Some(h) = policies.get_mut(&key) {
                     h.insert(value);
                 } else {
@@ -935,34 +924,30 @@ mod tests {
                     debug_registration_policy: Some(component_internal::DebugRegistrationPolicyAllowlists{
                         allowlist: Some(vec![
                             component_internal::DebugRegistrationAllowlistEntry {
-                                source_moniker: Some("/foo/bar/baz".to_string()),
-                                source_name: Some("fuchsia.foo.bar".to_string()),
+                                name: Some("fuchsia.foo.bar".to_string()),
                                 debug: Some(component_internal::AllowlistedDebugRegistration::Protocol(component_internal::AllowlistedProtocol::default())),
-                                target_moniker: Some("/foo/bar".to_string()),
+                                moniker: Some("/foo/bar".to_string()),
                                 environment_name: Some("bar_env1".to_string()),
                                 ..Default::default()
                             },
                             component_internal::DebugRegistrationAllowlistEntry {
-                                source_moniker: Some("/foo/bar/baz".to_string()),
-                                source_name: Some("fuchsia.foo.bar".to_string()),
+                                name: Some("fuchsia.foo.bar".to_string()),
                                 debug: Some(component_internal::AllowlistedDebugRegistration::Protocol(component_internal::AllowlistedProtocol::default())),
-                                target_moniker: Some("/foo".to_string()),
+                                moniker: Some("/foo".to_string()),
                                 environment_name: Some("foo_env1".to_string()),
                                 ..Default::default()
                             },
                             component_internal::DebugRegistrationAllowlistEntry {
-                                source_moniker: Some("/foo/bar/**".to_string()),
-                                source_name: Some("fuchsia.foo.baz".to_string()),
+                                name: Some("fuchsia.foo.baz".to_string()),
                                 debug: Some(component_internal::AllowlistedDebugRegistration::Protocol(component_internal::AllowlistedProtocol::default())),
-                                target_moniker: Some("/foo/**".to_string()),
+                                moniker: Some("/foo/**".to_string()),
                                 environment_name: Some("foo_env2".to_string()),
                                 ..Default::default()
                             },
                             component_internal::DebugRegistrationAllowlistEntry {
-                                source_moniker: Some("/foo/bar/coll:**".to_string()),
-                                source_name: Some("fuchsia.foo.baz".to_string()),
+                                name: Some("fuchsia.foo.baz".to_string()),
                                 debug: Some(component_internal::AllowlistedDebugRegistration::Protocol(component_internal::AllowlistedProtocol::default())),
-                                target_moniker: Some("/root".to_string()),
+                                moniker: Some("/root".to_string()),
                                 environment_name: Some("root_env".to_string()),
                                 ..Default::default()
                             },
@@ -1041,56 +1026,52 @@ mod tests {
                     debug_capability_policy: HashMap::from_iter(vec![
                         (
                             DebugCapabilityKey {
-                                source_name: "fuchsia.foo.bar".parse().unwrap(),
+                                name: "fuchsia.foo.bar".parse().unwrap(),
                                 source: CapabilityAllowlistSource::Self_,
                                 capability: CapabilityTypeName::Protocol,
                                 env_name: "bar_env1".to_string(),
                             },
                             HashSet::from_iter(vec![
                                 DebugCapabilityAllowlistEntry::new(
-                                    AllowlistEntryBuilder::new().exact("foo").exact("bar").exact("baz").build(),
                                     AllowlistEntryBuilder::new().exact("foo").exact("bar").build(),
                                 )
                             ])
                         ),
                         (
                             DebugCapabilityKey {
-                                source_name: "fuchsia.foo.bar".parse().unwrap(),
+                                name: "fuchsia.foo.bar".parse().unwrap(),
                                 source: CapabilityAllowlistSource::Self_,
                                 capability: CapabilityTypeName::Protocol,
                                 env_name: "foo_env1".to_string(),
                             },
                             HashSet::from_iter(vec![
                                 DebugCapabilityAllowlistEntry::new(
-                                    AllowlistEntryBuilder::new().exact("foo").exact("bar").exact("baz").build(),
                                     AllowlistEntryBuilder::new().exact("foo").build(),
                                 )
                             ])
                         ),
                         (
                             DebugCapabilityKey {
-                                source_name: "fuchsia.foo.baz".parse().unwrap(),
+                                name: "fuchsia.foo.baz".parse().unwrap(),
                                 source: CapabilityAllowlistSource::Self_,
                                 capability: CapabilityTypeName::Protocol,
                                 env_name: "foo_env2".to_string(),
                             },
                             HashSet::from_iter(vec![
                                 DebugCapabilityAllowlistEntry::new(
-                                    AllowlistEntryBuilder::new().exact("foo").exact("bar").any_descendant(),
                                     AllowlistEntryBuilder::new().exact("foo").any_descendant(),
                                 )
                             ])
                         ),
                         (
                             DebugCapabilityKey {
-                                source_name: "fuchsia.foo.baz".parse().unwrap(),
+                                name: "fuchsia.foo.baz".parse().unwrap(),
                                 source: CapabilityAllowlistSource::Self_,
                                 capability: CapabilityTypeName::Protocol,
                                 env_name: "root_env".to_string(),
                             },
                             HashSet::from_iter(vec![
                                 DebugCapabilityAllowlistEntry::new(
-                                    AllowlistEntryBuilder::new().exact("foo").exact("bar").any_descendant_in_collection("coll"),
                                     AllowlistEntryBuilder::new().exact("root").build(),
                                 )
                             ])

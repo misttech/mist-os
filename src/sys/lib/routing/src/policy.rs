@@ -15,6 +15,7 @@ use {
     tracing::{error, warn},
 };
 
+use cm_rust::CapabilityTypeName;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -38,14 +39,11 @@ pub enum PolicyError {
         target_moniker: Moniker,
     },
 
-    #[error("debug security policy disallows \"{cap}\" from \"{source_moniker}\" being routed from environment \"{env_moniker}:{env_name}\" to \"{target_moniker}\"")]
-    DebugCapabilityUseDisallowed {
-        cap: String,
-        source_moniker: ExtendedMoniker,
-        env_moniker: Moniker,
-        env_name: String,
-        target_moniker: Moniker,
-    },
+    #[error(
+        "debug security policy disallows \"{cap}\" from being registered in \
+        environment \"{env_name}\" at \"{env_moniker}\""
+    )]
+    DebugCapabilityUseDisallowed { cap: String, env_moniker: Moniker, env_name: String },
 }
 
 impl PolicyError {
@@ -197,47 +195,35 @@ impl GlobalPolicyChecker {
 
     /// Returns Ok(()) if the provided debug capability source is allowed to be routed from given
     /// environment.
-    pub fn can_route_debug_capability<'a, C>(
+    pub fn can_register_debug_capability<'a>(
         &self,
-        capability_source: &'a CapabilitySource<C>,
+        capability_type: CapabilityTypeName,
+        name: &'a cm_types::Name,
         env_moniker: &'a Moniker,
         env_name: &'a str,
-        target_moniker: &'a Moniker,
-    ) -> Result<(), PolicyError>
-    where
-        C: ComponentInstanceInterface,
-    {
-        let CapabilityAllowlistKey { source_moniker, source_name, source, capability } =
-            Self::get_policy_key(capability_source).map_err(|e| {
-                error!(
-                    "Security policy could not generate a policy key for `{}`",
-                    capability_source
-                );
-                e
-            })?;
-        let debug_key =
-            DebugCapabilityKey { source_name, source, capability, env_name: env_name.to_string() };
-
+    ) -> Result<(), PolicyError> {
+        let debug_key = DebugCapabilityKey {
+            name: name.clone(),
+            source: CapabilityAllowlistSource::Self_,
+            capability: capability_type,
+            env_name: env_name.to_string(),
+        };
         let route_allowed = match self.policy.debug_capability_policy.get(&debug_key) {
             None => false,
-            Some(allowlist_set) => {
-                allowlist_set.iter().any(|entry| entry.matches(&source_moniker, env_moniker))
-            }
+            Some(allowlist_set) => allowlist_set.iter().any(|entry| entry.matches(env_moniker)),
         };
         if route_allowed {
             return Ok(());
         }
 
         warn!(
-            "Debug security policy prevented `{}` from `{}` being routed to `{}`.",
-            debug_key.source_name, source_moniker, target_moniker
+            "Debug security policy prevented `{}` from being registered to environment `{}` in `{}`.",
+            debug_key.name, env_name, env_moniker,
         );
         Err(PolicyError::DebugCapabilityUseDisallowed {
-            cap: debug_key.source_name.to_string(),
-            source_moniker: source_moniker.to_owned(),
+            cap: debug_key.name.to_string(),
             env_moniker: env_moniker.to_owned(),
             env_name: env_name.to_owned(),
-            target_moniker: target_moniker.to_owned(),
         })
     }
 

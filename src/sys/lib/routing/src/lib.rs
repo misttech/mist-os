@@ -593,7 +593,7 @@ where
     match use_decl.source {
         UseSource::Debug => {
             // Find the component instance in which the debug capability was registered with the environment.
-            let (env_component_instance, env_name, registration_decl) = match target
+            let (env_component_instance, registration_decl) = match target
                 .environment()
                 .get_debug_capability(&use_decl.source_name)
                 .map_err(|err| {
@@ -602,9 +602,9 @@ where
                 })? {
                 Some((
                     ExtendedInstanceInterface::Component(env_component_instance),
-                    env_name,
+                    _env_name,
                     reg,
-                )) => (env_component_instance, env_name, reg),
+                )) => (env_component_instance, reg),
                 Some((ExtendedInstanceInterface::AboveRoot(_), _, _)) => {
                     // Root environment.
                     return Err(RoutingError::UseFromRootEnvironmentNotAllowed {
@@ -623,15 +623,6 @@ where
                     .into());
                 }
             };
-            let env_name = env_name.unwrap_or_else(|| {
-                panic!(
-                    "Environment name in component `{}` not found when routing `{}`.",
-                    target.moniker(),
-                    use_decl.source_name
-                )
-            });
-
-            let env_moniker = env_component_instance.moniker();
 
             let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
             let source = legacy_router::route_from_registration(
@@ -647,13 +638,6 @@ where
                 err
             })?;
 
-            target
-                .policy_checker()
-                .can_route_debug_capability(&source, &env_moniker, &env_name, target.moniker())
-                .map_err(|err| {
-                    warn!(?use_decl, %err, "route_protocol error 4");
-                    err
-                })?;
             return Ok(RouteSource::new(source));
         }
         UseSource::Self_ => {
