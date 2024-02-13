@@ -12,12 +12,12 @@ use {
     },
     tracing::{error, info},
     vfs::{
-        attributes,
         directory::{
             entry::EntryInfo, immutable::connection::ImmutableConnection,
             traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
+        immutable_attributes,
         path::Path as VfsPath,
         ToObjectRequest,
     },
@@ -31,8 +31,11 @@ pub(crate) struct Validation {
 }
 
 impl Validation {
-    pub(crate) fn new(blobfs: blobfs::Client, base_blobs: HashSet<fuchsia_hash::Hash>) -> Self {
-        Self { blobfs, base_blobs }
+    pub(crate) fn new(
+        blobfs: blobfs::Client,
+        base_blobs: HashSet<fuchsia_hash::Hash>,
+    ) -> Arc<Self> {
+        Arc::new(Self { blobfs, base_blobs })
     }
 
     // The contents of the "missing" file. The hex-encoded hashes of all the base blobs missing
@@ -128,9 +131,8 @@ impl vfs::node::Node for Validation {
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, zx::Status> {
-        Ok(attributes!(
+        Ok(immutable_attributes!(
             requested_attributes,
-            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,
                 abilities: fio::Operations::GET_ATTRIBUTES
@@ -195,14 +197,14 @@ mod tests {
     }
 
     impl TestEnv {
-        async fn new() -> (Self, Validation) {
+        async fn new() -> (Self, Arc<Validation>) {
             Self::with_base_blobs_and_blobfs_contents(HashSet::new(), std::iter::empty()).await
         }
 
         async fn with_base_blobs_and_blobfs_contents(
             base_blobs: HashSet<fuchsia_hash::Hash>,
             blobfs_contents: impl IntoIterator<Item = (fuchsia_hash::Hash, Vec<u8>)>,
-        ) -> (Self, Validation) {
+        ) -> (Self, Arc<Validation>) {
             let blobfs = BlobfsRamdisk::start().await.unwrap();
             for (hash, contents) in blobfs_contents.into_iter() {
                 blobfs.add_blob_from(hash, contents.as_slice()).await.unwrap()
@@ -217,7 +219,7 @@ mod tests {
         let (_env, validation) = TestEnv::new().await;
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
-        Arc::new(validation).open(
+        validation.open(
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::POSIX_WRITABLE
@@ -234,7 +236,6 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_rejects_disallowed_flags() {
         let (_env, validation) = TestEnv::new().await;
-        let validation = Arc::new(validation);
 
         for forbidden_flag in [
             fio::OpenFlags::RIGHT_WRITABLE,
@@ -247,7 +248,7 @@ mod tests {
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
             DirectoryEntry::open(
-                Arc::clone(&validation),
+                validation.clone(),
                 ExecutionScope::new(),
                 fio::OpenFlags::DESCRIBE | forbidden_flag,
                 VfsPath::dot(),
@@ -267,7 +268,7 @@ mod tests {
         let (_env, validation) = TestEnv::new().await;
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
-        Arc::new(validation).open(
+        validation.open(
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE,
             VfsPath::dot(),
@@ -290,10 +291,9 @@ mod tests {
             std::iter::empty(),
         )
         .await;
-        let validation = Arc::new(validation);
 
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-        Arc::clone(&validation).open(
+        validation.clone().open(
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE,
             VfsPath::validate_and_split("missing").unwrap(),
@@ -311,7 +311,7 @@ mod tests {
         let (_env, validation) = TestEnv::new().await;
 
         assert_eq!(
-            DirectoryEntry::entry_info(&validation),
+            DirectoryEntry::entry_info(validation.as_ref()),
             EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
         );
     }
@@ -345,7 +345,7 @@ mod tests {
 
         assert_eq!(
             Directory::register_watcher(
-                Arc::new(validation),
+                validation,
                 ExecutionScope::new(),
                 fio::WatchMask::empty(),
                 server.try_into().unwrap(),
@@ -378,16 +378,8 @@ mod tests {
 
         assert_eq!(
             validation.get_attributes(fio::NodeAttributesQuery::all()).await.unwrap(),
-            attributes!(
+            immutable_attributes!(
                 fio::NodeAttributesQuery::all(),
-                Mutable {
-                    creation_time: 0,
-                    modification_time: 0,
-                    mode: 0,
-                    uid: 0,
-                    gid: 0,
-                    rdev: 0
-                },
                 Immutable {
                     protocols: fio::NodeProtocolKinds::DIRECTORY,
                     abilities: fio::Operations::GET_ATTRIBUTES

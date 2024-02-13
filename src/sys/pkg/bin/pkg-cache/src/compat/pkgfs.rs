@@ -103,15 +103,15 @@ pub fn make_dir(
     system_image: Option<system_image::SystemImage>,
 ) -> Result<Arc<dyn DirectoryEntry>, anyhow::Error> {
     let dir = vfs::pseudo_directory! {
-        "packages" => Arc::new(packages::PkgfsPackages::new(
-            Arc::clone(&base_packages),
+        "packages" => packages::PkgfsPackages::new(
+            base_packages.clone(),
             blobfs.clone(),
-        )),
+        ),
         "ctl" => vfs::pseudo_directory! {
-            "validation" => Arc::new(validation::Validation::new(
+            "validation" => validation::Validation::new(
                 blobfs,
                 base_packages.list_blobs().to_owned()
-            ))
+            )
         },
     };
 

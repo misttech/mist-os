@@ -16,7 +16,6 @@ use {
         sync::Arc,
     },
     vfs::{
-        attributes,
         directory::{
             dirents_sink,
             entry::{DirectoryEntry, EntryInfo},
@@ -25,6 +24,7 @@ use {
             traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
+        immutable_attributes,
         path::Path,
         ToObjectRequest,
     },
@@ -40,8 +40,8 @@ pub struct PkgfsPackages {
 }
 
 impl PkgfsPackages {
-    pub fn new(base_packages: Arc<BasePackages>, blobfs: blobfs::Client) -> Self {
-        Self { base_packages, blobfs }
+    pub fn new(base_packages: Arc<BasePackages>, blobfs: blobfs::Client) -> Arc<Self> {
+        Arc::new(Self { base_packages, blobfs })
     }
 
     async fn packages(&self) -> HashMap<PackageName, HashMap<PackageVariant, Hash>> {
@@ -99,8 +99,12 @@ impl DirectoryEntry for PkgfsPackages {
                     scope.clone().spawn(async move {
                         match self.package_variants(&package_name).await {
                             Some(variants) => {
-                                Arc::new(PkgfsPackagesVariants::new(variants, self.blobfs.clone()))
-                                    .open(scope, flags, path, object_request.into_server_end());
+                                PkgfsPackagesVariants::new(variants, self.blobfs.clone()).open(
+                                    scope,
+                                    flags,
+                                    path,
+                                    object_request.into_server_end(),
+                                );
                             }
                             None => object_request.shutdown(zx::Status::NOT_FOUND),
                         }
@@ -138,9 +142,8 @@ impl vfs::node::Node for PkgfsPackages {
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, zx::Status> {
-        Ok(attributes!(
+        Ok(immutable_attributes!(
             requested_attributes,
-            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,
                 abilities: fio::Operations::GET_ATTRIBUTES
@@ -196,7 +199,7 @@ mod tests {
         pub fn new_test(
             base_packages: impl IntoIterator<Item = (fuchsia_url::UnpinnedAbsolutePackageUrl, Hash)>,
         ) -> Arc<Self> {
-            Arc::new(PkgfsPackages::new(
+            PkgfsPackages::new(
                 Arc::new(BasePackages::new_test_only(
                     // PkgfsPackages only uses the path-hash mapping, so tests do not need to
                     // populate the blob hashes.
@@ -204,7 +207,7 @@ mod tests {
                     base_packages,
                 )),
                 blobfs::Client::new_mock().0,
-            ))
+            )
         }
 
         fn proxy(self: &Arc<Self>, flags: fio::OpenFlags) -> fio::DirectoryProxy {
@@ -386,13 +389,13 @@ mod tests {
             .expect("created pkg");
         let (metafar_blob, _) = package.contents();
         blobfs_fake.add_blob(metafar_blob.merkle, metafar_blob.contents);
-        let pkgfs_packages = Arc::new(PkgfsPackages::new(
+        let pkgfs_packages = PkgfsPackages::new(
             Arc::new(BasePackages::new_test_only(
                 HashSet::new(),
                 [("fuchsia-pkg://fuchsia.com/static".parse().unwrap(), *package.hash())],
             )),
             blobfs_client,
-        ));
+        );
         let proxy = pkgfs_packages.proxy(fio::OpenFlags::RIGHT_READABLE);
 
         let file = fuchsia_fs::directory::open_file(

@@ -37,8 +37,11 @@ pub struct PkgfsPackagesVariants {
 }
 
 impl PkgfsPackagesVariants {
-    pub(super) fn new(contents: HashMap<PackageVariant, Hash>, blobfs: blobfs::Client) -> Self {
-        Self { contents, blobfs }
+    pub(super) fn new(
+        contents: HashMap<PackageVariant, Hash>,
+        blobfs: blobfs::Client,
+    ) -> Arc<Self> {
+        Arc::new(Self { contents, blobfs })
     }
 
     fn variants(&self) -> BTreeSet<PackageVariant> {
@@ -225,7 +228,7 @@ mod tests {
         pub fn new_test(contents: HashMap<PackageVariant, Hash>) -> Arc<Self> {
             let (blobfs, _) = blobfs::Client::new_mock();
 
-            Arc::new(PkgfsPackagesVariants::new(contents, blobfs))
+            PkgfsPackagesVariants::new(contents, blobfs)
         }
 
         fn proxy(self: &Arc<Self>, flags: fio::OpenFlags) -> fio::DirectoryProxy {
@@ -449,12 +452,12 @@ mod tests {
         let (blobfs_fake, blobfs_client) = FakeBlobfs::new();
         blobfs_fake.add_blob(metafar_blob.merkle, metafar_blob.contents);
 
-        let pkgfs_packages_variants = Arc::new(PkgfsPackagesVariants::new(
+        let pkgfs_packages_variants = PkgfsPackagesVariants::new(
             package_variant_hashmap! {
                 "0" => metafar_blob.merkle,
             },
             blobfs_client,
-        ));
+        );
 
         let proxy = pkgfs_packages_variants
             .proxy(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE);
@@ -471,12 +474,12 @@ mod tests {
         let (blobfs_fake, blobfs_client) = FakeBlobfs::new();
         blobfs_fake.add_blob(metafar_blob.merkle, metafar_blob.contents);
 
-        let pkgfs_packages_variants = Arc::new(PkgfsPackagesVariants::new(
+        let pkgfs_packages_variants = PkgfsPackagesVariants::new(
             package_variant_hashmap! {
                 "0" => metafar_blob.merkle,
             },
             blobfs_client,
-        ));
+        );
 
         let proxy = pkgfs_packages_variants.proxy(fio::OpenFlags::RIGHT_READABLE);
 
@@ -498,12 +501,12 @@ mod tests {
         let (blobfs_fake, blobfs_client) = FakeBlobfs::new();
         blobfs_fake.add_blob(metafar_blob.merkle, metafar_blob.contents);
 
-        let pkgfs_packages_variants = Arc::new(PkgfsPackagesVariants::new(
+        let pkgfs_packages_variants = PkgfsPackagesVariants::new(
             package_variant_hashmap! {
                 "0" => metafar_blob.merkle,
             },
             blobfs_client,
-        ));
+        );
 
         let proxy = pkgfs_packages_variants.proxy(fio::OpenFlags::RIGHT_READABLE);
 
