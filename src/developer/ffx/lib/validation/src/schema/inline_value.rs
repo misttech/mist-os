@@ -16,6 +16,21 @@ pub enum InlineValue<'a> {
     Object(&'a [(&'a str, &'a InlineValue<'a>)]),
 }
 
+impl<'a> std::fmt::Debug for InlineValue<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Null => write!(f, "null"),
+            Self::Bool(arg0) => arg0.fmt(f),
+            Self::UInt(arg0) => arg0.fmt(f),
+            Self::Int(arg0) => arg0.fmt(f),
+            Self::Float(arg0) => arg0.fmt(f),
+            Self::String(arg0) => arg0.fmt(f),
+            Self::Array(arg0) => arg0.fmt(f),
+            Self::Object(arg0) => f.debug_map().entries(arg0.iter().copied()).finish(),
+        }
+    }
+}
+
 impl<'a> InlineValue<'a> {
     /// Compares this inline value to the given [serde_json::Value].
     pub fn matches_json(&self, json: &serde_json::Value) -> bool {

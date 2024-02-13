@@ -58,6 +58,39 @@ pub enum Type<'a> {
     Constant { value: &'a InlineValue<'a> },
 }
 
+// This custom Debug impl is needed to skip traversal into aliases, which are allowed to recurse.
+impl<'a> std::fmt::Debug for Type<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Void => write!(f, "Void"),
+            Self::Union(arg0) => f.debug_tuple("Union").field(arg0).finish(),
+            Self::Alias { name, id, ty: _ } => {
+                let name = name();
+                let id = id();
+                f.debug_struct("Alias")
+                    .field("name", &name)
+                    .field("id", &id)
+                    .field("ty", &"<omitted>")
+                    .finish()
+            }
+            Self::Struct { fields, extras } => {
+                f.debug_struct("Struct").field("fields", fields).field("extras", extras).finish()
+            }
+            Self::Enum { variants } => f.debug_struct("Enum").field("variants", variants).finish(),
+            Self::Tuple { fields } => f.debug_struct("Tuple").field("fields", fields).finish(),
+            Self::Array { size, ty } => {
+                f.debug_struct("Array").field("size", size).field("ty", ty).finish()
+            }
+            Self::Map { key, value } => {
+                f.debug_struct("Map").field("key", key).field("value", value).finish()
+            }
+            Self::Type { ty } => f.debug_struct("Type").field("ty", ty).finish(),
+            Self::Any => write!(f, "Any"),
+            Self::Constant { value } => f.debug_struct("Constant").field("value", value).finish(),
+        }
+    }
+}
+
 impl<'a> Type<'a> {
     /// Types are used in contexts where the drop handler cannot or should not run.
     ///
@@ -145,7 +178,7 @@ impl Display for ValueType {
 }
 
 /// Specifies the behavior of extra fields not declared by the struct.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum StructExtras<'a> {
     /// Extra, unknown, struct fields cause a deserialization error.
     Deny,
@@ -156,7 +189,7 @@ pub enum StructExtras<'a> {
 }
 
 /// Represents a singular field within a struct.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Field<'a, T = &'a Type<'a>> {
     pub key: &'a str,
     pub value: T,

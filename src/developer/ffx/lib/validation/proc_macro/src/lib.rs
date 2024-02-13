@@ -651,9 +651,18 @@ impl Parse for SchemaType {
         }
 
         if let Some(..) = input.parse::<Option<Token![|]>>()? {
-            let mut tys = vec![ty, input.parse()?];
-            while let Some(..) = input.parse::<Option<Token![|]>>()? {
-                tys.push(input.parse()?);
+            let mut tys = vec![ty];
+            loop {
+                let ty = input.parse()?;
+                if let SchemaType::Union(types) = ty {
+                    tys.extend(types);
+                } else {
+                    tys.push(ty);
+                }
+
+                if input.parse::<Option<Token![|]>>()?.is_none() {
+                    break;
+                }
             }
             ty = Self::Union(tys);
         }
