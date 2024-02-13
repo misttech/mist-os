@@ -46,7 +46,7 @@ _FFX_CONFIG_CMDS: dict[str, list[str]] = {
 
 _FFX_CMDS: dict[str, list[str]] = {
     "TARGET_ADD": ["target", "add"],
-    "TARGET_SHOW": ["target", "show", "--json"],
+    "TARGET_SHOW": ["--machine", "json", "target", "show"],
     "TARGET_SSH_ADDRESS": ["target", "get-ssh-address"],
     "TARGET_LIST": ["--machine", "json", "target", "list"],
     "TARGET_WAIT": ["target", "wait", "--timeout"],
