@@ -84,7 +84,7 @@ class GpuDevice : public fdf::WireServer<fuchsia_hardware_display_engine::Engine
                       ReleaseCaptureCompleter::Sync& completer) override {}
   void IsCaptureCompleted(fdf::Arena& arena,
                           IsCaptureCompletedCompleter::Sync& completer) override {}
-  void IsAvailable(fdf::Arena& arena, IsAvailableCompleter::Sync& completer) override {}
+  void IsAvailable(fdf::Arena& arena, IsAvailableCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_display_engine::Engine> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;

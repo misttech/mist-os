@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V2_GPU_DEVICE_DRIVER_H_
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
+#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/zx/vmo.h>
@@ -53,9 +54,11 @@ class GpuDeviceDriver : public fdf::DriverBase {
 
   zx_status_t Stage2Init();
 
+  static std::string name() { return "virtio-gpu-display"; }
   std::unique_ptr<GpuDevice> device_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+  compat::SyncInitializedDeviceServer compat_server_;
 
   // A saved copy of the display.
   virtio_abi::ScanoutInfo pmode_ = {};

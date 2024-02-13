@@ -97,6 +97,10 @@ zx::result<std::unique_ptr<GpuDevice>> GpuDevice::Create(
   return zx::ok(std::move(device));
 }
 
+void GpuDevice::IsAvailable(fdf::Arena& arena, IsAvailableCompleter::Sync& completer) {
+  completer.buffer(arena).Reply();
+}
+
 void GpuDevice::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_display_engine::Engine> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {

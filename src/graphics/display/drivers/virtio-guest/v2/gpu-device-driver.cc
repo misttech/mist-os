@@ -47,7 +47,7 @@ zx_status_t ResponseTypeToZxStatus(virtio_abi::ControlType type) {
 
 GpuDeviceDriver::GpuDeviceDriver(fdf::DriverStartArgs start_args,
                                  fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-    : DriverBase("virtio-gpu-display", std::move(start_args), std::move(driver_dispatcher)) {}
+    : DriverBase(name(), std::move(start_args), std::move(driver_dispatcher)) {}
 
 GpuDeviceDriver::~GpuDeviceDriver() {}
 
@@ -245,6 +245,27 @@ void GpuDeviceDriver::Start(fdf::StartCompleter completer) {
     return;
   }
 
+  // Create and initialize device.
+  {
+    auto result = GpuDevice::Create(std::move(pci_client_end.value()));
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to create device: %s", result.status_string());
+      completer(result.take_error());
+      return;
+    }
+
+    device_ = std::move(result.value());
+  }
+
+  // Initialize our compat server.
+  {
+    zx::result result = compat_server_.Initialize(incoming(), outgoing(), name(), name());
+    if (result.is_error()) {
+      completer(result.take_error());
+      return;
+    }
+  }
+
   // Provide fuchsia.hardware.display.engine.Engine by
   // serving fuchsia.hardware.display.engine.Service.
   auto protocol =
@@ -265,8 +286,8 @@ void GpuDeviceDriver::Start(fdf::StartCompleter completer) {
 
   // Allow adding a child node.
   fidl::Arena arena;
-  auto offers = std::vector{
-      fdf::MakeOffer2<fuchsia_hardware_display_engine::Service>(arena, "virtio-gpu-display")};
+  auto offers = compat_server_.CreateOffers2(arena);
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_display_engine::Service>(arena));
 
   // TODO(https://fxbug.dev/322365329): Remove this when the Display Coordinator is
   // migrated to DFv2.
@@ -274,7 +295,7 @@ void GpuDeviceDriver::Start(fdf::StartCompleter completer) {
   auto properties = std::vector{
       fdf::MakeProperty(arena, BIND_PROTOCOL, bind_fuchsia_display::BIND_PROTOCOL_CONTROLLER_IMPL)};
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-                  .name(arena, "virtio-gpu-display")
+                  .name(arena, name())
                   .offers2(offers)
                   .properties(properties)
                   .Build();
@@ -291,17 +312,6 @@ void GpuDeviceDriver::Start(fdf::StartCompleter completer) {
   controller_.Bind(std::move(controller_endpoints->client));
 
   auto defer_teardown = fit::defer([this]() { parent_node_ = {}; });
-
-  {
-    // Create and initialize device.
-    auto result = GpuDevice::Create(std::move(pci_client_end.value()));
-    if (result.is_error()) {
-      completer(result.take_error());
-      return;
-    }
-
-    device_ = std::move(result.value());
-  }
 
   defer_teardown.cancel();
   completer(zx::make_result(ZX_OK));
