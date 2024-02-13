@@ -1,3 +1,4 @@
 {
+  "pkg/virtgralloc_headers/include/lib/virtgralloc/shared_metadata.h": "17bd4a1e85c6fa4b432500c7f99cfaf0",
   "pkg/virtgralloc_headers/include/lib/virtgralloc/virtgralloc_ioctl.h": "a304f1612244e597d5890336af141aca"
 }
