@@ -172,7 +172,7 @@ group("chrono") {
 }
 
 group("chrono-english") {
-  public_deps = [ ":chrono-english-v0_1_4" ]
+  public_deps = [ ":chrono-english-v0_1_7" ]
 }
 
 group("clap") {
@@ -2995,7 +2995,7 @@ rust_library("chrono-v0_4_19") {
   deps += [ ":num-integer-v0_1_44" ]
   deps += [ ":num-traits-v0_2_14" ]
   deps += [ ":serde-v1_0_147" ]
-  deps += [ ":time-v0_1_43" ]
+  deps += [ ":time-v0_1_45" ]
   if (false) {
     deps += [ ":winapi-v0_3_9" ]
   }
@@ -3022,36 +3022,35 @@ rust_library("chrono-v0_4_19") {
   applicable_licenses = [ ":chrono-v0_4_19.license" ]
 }
 
-license("chrono-english-v0_1_4.license") {
+license("chrono-english-v0_1_7.license") {
   public_package_name = "chrono_english"
   license_files =
-      [ "//third_party/rust_crates/vendor/chrono-english-0.1.4/LICENSE.txt" ]
+      [ "//third_party/rust_crates/vendor/chrono-english-0.1.7/LICENSE.txt" ]
 }
 
-rust_library("chrono-english-v0_1_4") {
+rust_library("chrono-english-v0_1_7") {
   crate_name = "chrono_english"
   crate_root =
-      "//third_party/rust_crates/vendor/chrono-english-0.1.4/src/lib.rs"
-  output_name = "chrono_english-d51fdb87bc2739a0"
+      "//third_party/rust_crates/vendor/chrono-english-0.1.7/src/lib.rs"
+  output_name = "chrono_english-f3d6180781b6b606"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":chrono-v0_4_19" ]
   deps += [ ":scanlex-v0_1_4" ]
-  deps += [ ":time-v0_1_43" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=d51fdb87bc2739a0",
-    "-Cextra-filename=-d51fdb87bc2739a0",
+    "-Cmetadata=f3d6180781b6b606",
+    "-Cextra-filename=-f3d6180781b6b606",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":chrono-english-v0_1_4.license" ]
+  applicable_licenses = [ ":chrono-english-v0_1_7.license" ]
 }
 
 license("cipher-v0_4_4.license") {
@@ -15488,22 +15487,25 @@ rust_library("thread_local-v1_1_7") {
   applicable_licenses = [ ":thread_local-v1_1_7.license" ]
 }
 
-license("time-v0_1_43.license") {
+license("time-v0_1_45.license") {
   public_package_name = "time"
   license_files = [
-    "//third_party/rust_crates/vendor/time-0.1.43/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/time-0.1.43/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/time-0.1.45/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/time-0.1.45/LICENSE-MIT",
   ]
 }
 
-rust_library("time-v0_1_43") {
+rust_library("time-v0_1_45") {
   crate_name = "time"
-  crate_root = "//third_party/rust_crates/vendor/time-0.1.43/src/lib.rs"
-  output_name = "time-f3381b83c7164a8b"
+  crate_root = "//third_party/rust_crates/vendor/time-0.1.45/src/lib.rs"
+  output_name = "time-f522c386f3cdd455"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":libc-v0_2_149" ]
+  if (false) {
+    deps += [ ":wasi-v0_10_0+wasi-snapshot-preview1" ]
+  }
   if (false) {
     deps += [ ":winapi-v0_3_9" ]
   }
@@ -15513,13 +15515,13 @@ rust_library("time-v0_1_43") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=f3381b83c7164a8b",
-    "-Cextra-filename=-f3381b83c7164a8b",
+    "-Cmetadata=f522c386f3cdd455",
+    "-Cextra-filename=-f522c386f3cdd455",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":time-v0_1_43.license" ]
+  applicable_licenses = [ ":time-v0_1_45.license" ]
 }
 
 license("tinyjson-v2_5_0.license") {
@@ -17500,9 +17502,31 @@ rust_library("want-v0_3_0") {
   applicable_licenses = [ ":want-v0_3_0.license" ]
 }
 
+rust_library("wasi-v0_10_0+wasi-snapshot-preview1") {
+  crate_name = "wasi"
+  crate_root = "//third_party/rust_crates/empty/wasi-0.10.0+wasi-snapshot-preview1/src/lib.rs"
+  output_name = "wasi-d00fdc79325e5e1d"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=d00fdc79325e5e1d",
+    "-Cextra-filename=-d00fdc79325e5e1d",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
+}
+
 rust_library("wasi-v0_11_0+wasi-snapshot-preview1") {
   crate_name = "wasi"
-  crate_root = "//third_party/rust_crates/empty/wasi/src/lib.rs"
+  crate_root = "//third_party/rust_crates/empty/wasi-0.11.0+wasi-snapshot-preview1/src/lib.rs"
   output_name = "wasi-b8a75a95bc9b1a8a"
   configs -= [ "//build/config/rust:2018_idioms" ]
 

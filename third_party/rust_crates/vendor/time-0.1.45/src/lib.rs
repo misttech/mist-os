@@ -36,11 +36,12 @@
 #![allow(unknown_lints)]
 #![allow(ellipsis_inclusive_range_patterns)] // `..=` requires Rust 1.26
 #![allow(trivial_numeric_casts)]
-#![cfg_attr(test, deny(warnings))]
 
 #[cfg(unix)] extern crate libc;
 #[cfg(windows)] extern crate winapi;
 #[cfg(feature = "rustc-serialize")] extern crate rustc_serialize;
+
+#[cfg(target_os = "wasi")] extern crate wasi;
 
 #[cfg(test)] #[macro_use] extern crate log;
 
