@@ -680,6 +680,25 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                                         AttributeKey::Extent(ExtentKey { range }),
                                     ),
                             },
+                        value: ObjectValue::Extent(ExtentValue::Some { .. }),
+                        ..
+                    }) if *object_id == self.object_id()
+                        && *attribute_id == self.attribute_id()
+                        && range.end == offset =>
+                    {
+                        iter.advance().await?;
+                        continue;
+                    }
+                    Some(ItemRef {
+                        key:
+                            ObjectKey {
+                                object_id,
+                                data:
+                                    ObjectKeyData::Attribute(
+                                        attribute_id,
+                                        AttributeKey::Extent(ExtentKey { range }),
+                                    ),
+                            },
                         value,
                         ..
                     }) if *object_id == self.object_id()
@@ -2484,8 +2503,13 @@ mod tests {
         )
         .await
         .expect("create_object failed");
+
+        // As of writing, an empty filesystem has two 512kiB superblock extents and a little over
+        // 256kiB of additional allocations (journal, etc) so we start use a 'magic' starting point
+        // of 2MiB here.
+        const START_OFFSET: u64 = 2048 * 1024;
         handle
-            .extend(&mut transaction, 0..5 * fs.block_size() as u64)
+            .extend(&mut transaction, START_OFFSET..START_OFFSET + 5 * fs.block_size() as u64)
             .await
             .expect("extend failed");
         transaction.commit().await.expect("commit failed");

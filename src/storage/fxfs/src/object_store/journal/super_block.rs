@@ -857,9 +857,6 @@ mod tests {
             transaction.commit().await.expect("commit failed");
         }
 
-        // TODO(ripper): Bug! We somehow get existing objects remaining. My suspicion is that we've
-        // unlocked super-block writing so this code may induce out-of-order writes.
-
         assert_eq!(
             ObjectStore::open_object(
                 &fs.root_store(),

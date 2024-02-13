@@ -64,7 +64,9 @@
 //! regions. These operations are asynchronous and therefore these regions are unusable until
 //! the operation completes.
 //!
-//! These are tracked as "temporary allocations" in the current allocator implementation.
+//! We allocate these free ranges using a monotonically increasing
+//! `LocationHint::NextAvailable(range)` hint to allocate(). When the trim completes, we free the
+//! range, returning it to the pool of available storage.
 //!
 //! ## Volume deletion
 //!
@@ -86,6 +88,7 @@
 //! strategy should differ between image generation and "live" use cases.
 
 pub mod merge;
+pub mod strategy;
 
 use {
     crate::{
@@ -97,15 +100,15 @@ use {
         lsm_tree::{
             cache::NullCache,
             layers_from_handles,
-            skip_list_layer::SkipListLayer,
             types::{
-                Item, ItemRef, Layer, LayerIterator, LayerKey, MergeType, MutableLayer,
-                OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
+                Item, ItemRef, LayerIterator, LayerKey, MergeType, OrdLowerBound, OrdUpperBound,
+                RangeKey, SortByU64,
             },
-            LSMTree, LayerSet,
+            LSMTree,
         },
         object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID},
         object_store::{
+            allocator::strategy::{AllocatorStrategy, LocationHint},
             object_manager::ReservationUpdate,
             transaction::{
                 lock_keys, AllocatorMutation, AssocObj, LockKey, Mutation, Options, Transaction,
@@ -129,7 +132,6 @@ use {
     serde::{Deserialize, Serialize},
     std::{
         borrow::Borrow,
-        cmp::min,
         collections::{BTreeMap, HashSet, VecDeque},
         convert::TryInto,
         hash::Hash,
@@ -426,8 +428,6 @@ struct AllocatorCounters {
     persistent_layer_file_sizes: Vec<u64>,
 }
 
-// For now this just implements a simple strategy of returning the first gap it can find (no matter
-// the size).  This is a very naive implementation.
 pub struct Allocator {
     filesystem: Weak<FxFilesystem>,
     block_size: u64,
@@ -435,13 +435,6 @@ pub struct Allocator {
     object_id: u64,
     max_extent_size_bytes: u64,
     tree: LSMTree<AllocatorKey, AllocatorValue>,
-    // A list of allocations which are temporary; i.e. they are not actually stored in the LSM tree,
-    // but we still don't want to be able to allocate over them.  This layer is merged into the
-    // allocator's LSM tree whilst reading it, so the allocations appear to exist in the LSM tree.
-    // This is used in a few places, for example to hold back allocations that have been added to a
-    // transaction but are not yet committed yet, or to prevent the allocation of a deleted extent
-    // until the device is flushed.
-    temporary_allocations: Arc<SkipListLayer<AllocatorKey, AllocatorValue>>,
     inner: Mutex<Inner>,
     allocation_mutex: futures::lock::Mutex<()>,
     counters: Mutex<AllocatorCounters>,
@@ -489,6 +482,7 @@ impl ByteTracking {
     }
 }
 
+#[derive(Debug)]
 struct CommittedDeallocation {
     // The offset at which this deallocation was committed.
     log_file_offset: u64,
@@ -503,11 +497,6 @@ struct Inner {
     /// The allocator can only be opened if there have been no allocations and it has not already
     /// been opened or initialized.
     opened: bool,
-    /// When a transaction is dropped, we need to release the reservation, but that requires the use
-    /// of async methods which we can't use when called from drop.  To workaround that, we keep an
-    /// array of dropped_allocations and remove them from temporary_allocations the next time we
-    /// try to allocate.
-    dropped_allocations: Vec<AllocatorItem>,
     /// The per-owner counters for bytes at various stages of the data life-cycle. From initial
     /// reservation through until the bytes are unallocated and eventually uncommitted.
     owner_bytes: BTreeMap<u64, ByteTracking>,
@@ -516,12 +505,11 @@ struct Inner {
     unattributed_reserved_bytes: u64,
     /// Committed deallocations that we cannot use until they are flushed to the device.
     committed_deallocated: VecDeque<CommittedDeallocation>,
-    /// A map of of |owner_object_id| to log offset and bytes allocated which indicates the object
-    /// was deleted at that log offset.
+    /// Maps |owner_object_id| to log offset and bytes allocated to a deleted encryption volume.
     /// Once the journal has been flushed beyond 'log_offset', we replace entries here with
     /// an entry in AllocatorInfo to have all iterators ignore owner_object_id. That entry is
     /// then cleaned up at next (major) compaction time.
-    committed_marked_for_deletion: BTreeMap<u64, (/*log_offset:*/ u64, /*bytes:*/ u64)>,
+    committed_encrypted_volume_deletions: BTreeMap<u64, (/*log_offset:*/ u64, /*bytes:*/ u64)>,
     /// Bytes which are currently being trimmed.  These can still be allocated from, but the
     /// allocation will block until the current batch of trimming is finished.
     trim_reserved_bytes: u64,
@@ -529,6 +517,8 @@ struct Inner {
     /// being trimmed have been released (and trim_reserved_bytes is 0), this is signaled.
     /// This should only be listened to while the allocation_mutex is held.
     trim_listener: Option<EventListener>,
+    /// This controls how we allocate our free space to manage fragmentation.
+    strategy: Box<dyn strategy::AllocatorStrategy>,
 }
 
 impl Inner {
@@ -571,7 +561,7 @@ impl Inner {
     // reuse those bytes yet.
     fn unavailable_bytes(&self) -> u64 {
         self.owner_bytes.values().map(|x| x.unavailable_bytes()).sum::<u64>()
-            + self.committed_marked_for_deletion.values().map(|(_, x)| x).sum::<u64>()
+            + self.committed_encrypted_volume_deletions.values().map(|(_, x)| x).sum::<u64>()
     }
 
     // Returns the total number of bytes that are taken either from reservations, allocations or
@@ -628,7 +618,7 @@ impl Inner {
 }
 
 /// A container for a set of extents which are known to be free and can be trimmed.  Returned by
-/// `take_for_trimming`.  The extents will not be allocated while this object exists.
+/// `take_for_trimming`.
 pub struct TrimmableExtents<'a> {
     allocator: &'a Allocator,
     extents: Vec<Range<u64>>,
@@ -636,13 +626,6 @@ pub struct TrimmableExtents<'a> {
     // we don't fail an allocation attempt if blocks are tied up for trimming; rather, we just wait
     // until the batch is finished with and then proceed.
     _drop_event: DropEvent,
-}
-
-fn allocator_item(device_range: Range<u64>, owner_object_id: u64) -> AllocatorItem {
-    AllocatorItem::new(
-        AllocatorKey { device_range },
-        AllocatorValue::Abs { count: 1, owner_object_id },
-    )
 }
 
 impl<'a> TrimmableExtents<'a> {
@@ -657,24 +640,16 @@ impl<'a> TrimmableExtents<'a> {
         (Self { allocator, extents: vec![], _drop_event: drop_event }, listener)
     }
 
-    async fn add_extent(&mut self, device_range: Range<u64>) {
-        // The mutation will never be used in a transaction, so we can use a fake object ID.
-        let owner_object_id = INVALID_OBJECT_ID;
-        self.allocator
-            .temporary_allocations
-            .insert(allocator_item(device_range.clone(), owner_object_id))
-            .await
-            .expect("Reserved an in-use range.");
-        self.extents.push(device_range);
+    fn add_extent(&mut self, extent: Range<u64>) {
+        self.extents.push(extent);
     }
 }
 
 impl<'a> Drop for TrimmableExtents<'a> {
     fn drop(&mut self) {
         let mut inner = self.allocator.inner.lock().unwrap();
-        let owner_object_id = INVALID_OBJECT_ID;
-        for device_range in &self.extents {
-            inner.dropped_allocations.push(allocator_item(device_range.clone(), owner_object_id));
+        for device_range in std::mem::take(&mut self.extents) {
+            inner.strategy.free(device_range);
         }
         inner.trim_reserved_bytes = 0;
     }
@@ -689,6 +664,11 @@ impl Allocator {
             tracing::warn!("Device size is not block aligned. Rounding down.");
         }
         let max_extent_size_bytes = max_extent_size_for_block_size(filesystem.block_size());
+        // TODO(b/324949159): We will ship filesystems as system images in some cases.
+        // Such filesystems should not contain free space so as to minimize their image size.
+        let mut strategy: Box<dyn strategy::AllocatorStrategy> =
+            Box::new(strategy::best_fit::BestFit::default());
+        strategy.free(0..filesystem.device().size());
         Allocator {
             filesystem: Arc::downgrade(&filesystem),
             block_size,
@@ -696,17 +676,16 @@ impl Allocator {
             object_id,
             max_extent_size_bytes,
             tree: LSMTree::new(merge, Box::new(NullCache {})),
-            temporary_allocations: SkipListLayer::new(1024), // TODO(https://fxbug.dev/42178047): magic numbers
             inner: Mutex::new(Inner {
                 info: AllocatorInfo::default(),
                 opened: false,
-                dropped_allocations: Vec::new(),
                 owner_bytes: BTreeMap::new(),
                 unattributed_reserved_bytes: 0,
                 committed_deallocated: VecDeque::new(),
-                committed_marked_for_deletion: BTreeMap::new(),
+                committed_encrypted_volume_deletions: BTreeMap::new(),
                 trim_reserved_bytes: 0,
                 trim_listener: None,
+                strategy,
             }),
             allocation_mutex: futures::lock::Mutex::new(()),
             counters: Mutex::new(AllocatorCounters::default()),
@@ -716,23 +695,6 @@ impl Allocator {
 
     pub fn tree(&self) -> &LSMTree<AllocatorKey, AllocatorValue> {
         &self.tree
-    }
-
-    /// Returns the layer set for all layers, including temporary allocations (e.g. due to
-    /// uncommitted transactions).
-    pub async fn layer_set(&self) -> LayerSet<AllocatorKey, AllocatorValue> {
-        // Update temporary_allocations using dropped_allocations.
-        let dropped_allocations =
-            std::mem::take(&mut self.inner.lock().unwrap().dropped_allocations);
-        for item in dropped_allocations {
-            self.temporary_allocations.erase(&item.key).await;
-        }
-
-        let tree = &self.tree;
-        let mut layer_set = tree.empty_layer_set();
-        layer_set.layers.push((self.temporary_allocations.clone() as Arc<dyn Layer<_, _>>).into());
-        tree.add_all_layers_to_layer_set(&mut layer_set);
-        layer_set
     }
 
     /// Returns an iterator that yields all allocations, filtering out tombstones and any
@@ -748,7 +710,13 @@ impl Allocator {
     }
 
     pub fn objects_pending_deletion(&self) -> Vec<u64> {
-        self.inner.lock().unwrap().committed_marked_for_deletion.keys().cloned().collect::<Vec<_>>()
+        self.inner
+            .lock()
+            .unwrap()
+            .committed_encrypted_volume_deletions
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>()
     }
 
     /// Creates a new (empty) allocator.
@@ -773,10 +741,13 @@ impl Allocator {
 
     // Ensures the allocator is open.  If empty, create the object in the root object store,
     // otherwise load and initialise the LSM tree.  This is not thread-safe; this should be called
-    // after the journal has been replayed.
+    // after the journal has been replayed. Any entries in the LSMTree mutable layer
+    // that were written during replay will be preserved.
     pub async fn open(&self) -> Result<(), Error> {
         let filesystem = self.filesystem.upgrade().unwrap();
         let root_store = filesystem.root_store();
+        let mut strategy: Box<dyn AllocatorStrategy> =
+            Box::new(strategy::best_fit::BestFit::default());
 
         let handle =
             ObjectStore::open_object(&root_store, self.object_id, HandleOptions::default(), None)
@@ -854,6 +825,33 @@ impl Allocator {
                 tree::reservation_amount_from_layer_size(total_size),
             );
         }
+        // Walk all allocations to generate the set of free regions between allocations.
+        // This may take some time and consume a potentially large chunk of RAM on on very large,
+        // fragmented filesystems. We may circle back here to support caching of free space maps
+        // and/or tracking only partial free-space (if the chosen allocation strategy allows it).
+        {
+            let layer_set = self.tree.layer_set();
+            let mut merger = layer_set.merger();
+            let mut iter = self.filter(merger.seek(Bound::Unbounded).await?).await?;
+            let mut last_offset = 0;
+            loop {
+                match iter.get() {
+                    None => {
+                        ensure!(last_offset <= self.device_size, FxfsError::Inconsistent);
+                        strategy.free(last_offset..self.device_size);
+                        break;
+                    }
+                    Some(ItemRef { key: AllocatorKey { device_range, .. }, .. }) => {
+                        if device_range.start > last_offset {
+                            strategy.free(last_offset..device_range.start);
+                        }
+                        last_offset = device_range.end;
+                    }
+                }
+                iter.advance().await?;
+            }
+            self.inner.lock().unwrap().strategy = strategy;
+        }
 
         assert_eq!(std::mem::replace(&mut self.inner.lock().unwrap().opened, true), false);
         Ok(())
@@ -870,62 +868,28 @@ impl Allocator {
     ) -> Result<TrimmableExtents<'_>, Error> {
         let _guard = self.allocation_mutex.lock().await;
 
-        let mut free_extents = vec![];
+        let (mut result, listener) = TrimmableExtents::new(self);
         let mut bytes = 0;
         {
-            let layer_set = self.layer_set().await;
-            let mut merger = layer_set.merger();
-            let mut iter = self
-                .filter(
-                    merger
-                        .seek(Bound::Included(&AllocatorKey { device_range: offset..offset + 1 }))
-                        .await?,
-                )
-                .await?;
-            let mut last_offset = offset;
-            loop {
-                let next_extent = match iter.get() {
-                    None => self.device_size..self.device_size,
-                    Some(ItemRef { key: AllocatorKey { device_range, .. }, .. }) => {
-                        ensure!(
-                            device_range.is_aligned(self.block_size)
-                                && device_range.end <= self.device_size,
-                            FxfsError::Inconsistent
-                        );
-                        device_range.clone()
-                    }
-                };
-                let free_range = last_offset..next_extent.start;
-                if free_range.start < free_range.end {
-                    // Split the range up as needed.
-                    let mut range_offset = free_range.start;
-                    while free_extents.len() < extents_per_batch && range_offset < free_range.end {
-                        let sub_range = range_offset
-                            ..std::cmp::min(free_range.end, range_offset + max_extent_size as u64);
-                        range_offset = sub_range.end;
-                        bytes += sub_range.length()?;
-                        free_extents.push(sub_range);
-                    }
-                }
-                last_offset = next_extent.end;
-                if free_extents.len() == extents_per_batch || last_offset == self.device_size {
+            let mut inner = self.inner.lock().unwrap();
+            for _ in 0..extents_per_batch {
+                if let Some(range) = inner
+                    .strategy
+                    .allocate(max_extent_size as u64, LocationHint::NextAvailable(offset))
+                {
+                    result.add_extent(range.clone());
+                    bytes += range.length()?;
+                } else {
                     break;
                 }
-                iter.advance().await?;
             }
-        }
-        let (mut result, listener) = TrimmableExtents::new(self);
-        {
-            let mut inner = self.inner.lock().unwrap();
+
             assert!(inner.trim_reserved_bytes == 0, "Multiple trims ongoing");
             inner.trim_listener = Some(listener);
             inner.trim_reserved_bytes = bytes;
             debug_assert!(
                 inner.trim_reserved_bytes + inner.unavailable_bytes() <= self.device_size
             );
-        }
-        for extent in free_extents {
-            result.add_extent(extent).await;
         }
         Ok(result)
     }
@@ -1085,6 +1049,7 @@ impl Allocator {
     ///
     /// We also store the object store ID of the store that the allocation should be assigned to so
     /// that we have a means to delete encrypted stores without needing the encryption key.
+    #[trace]
     pub async fn allocate(
         &self,
         transaction: &mut Transaction<'_>,
@@ -1179,38 +1144,15 @@ impl Allocator {
             listener.await;
         }
 
-        let result = {
-            let layer_set = self.layer_set().await;
-            let mut merger = layer_set.merger();
-            let mut iter = self.filter(merger.seek(Bound::Unbounded).await?).await?;
-            let mut last_offset = 0;
-            loop {
-                match iter.get() {
-                    None => {
-                        let end = std::cmp::min(last_offset + len, self.device_size);
-                        if end <= last_offset {
-                            // This is unexpected since we reserved space above.  It would suggest
-                            // that our counters are confused somehow.
-                            bail!(anyhow!(FxfsError::NoSpace)
-                                .context("Unexpectedly found no space after search"));
-                        }
-                        break last_offset..end;
-                    }
-                    Some(ItemRef { key: AllocatorKey { device_range, .. }, .. }) => {
-                        ensure!(
-                            device_range.is_aligned(self.block_size)
-                                && device_range.end <= self.device_size,
-                            FxfsError::Inconsistent
-                        );
-                        if device_range.start > last_offset {
-                            break last_offset..min(last_offset + len, device_range.start);
-                        }
-                        last_offset = device_range.end;
-                    }
-                }
-                iter.advance().await?;
-            }
-        };
+        let result =
+            self.inner.lock().unwrap().strategy.allocate(len, LocationHint::None).ok_or_else(
+                || {
+                    let err = anyhow!(FxfsError::NoSpace)
+                        .context("Unexpectedly found no space after search");
+                    tracing::error!(%err, "Likely filesystem corruption.");
+                    err
+                },
+            )?;
 
         debug!(device_range = ?result, "allocate");
 
@@ -1236,13 +1178,8 @@ impl Allocator {
             inner.remove_reservation(reservation_owner, len);
         }
 
-        let item = AllocatorItem::new(
-            AllocatorKey { device_range: result.clone() },
-            AllocatorValue::Abs { count: 1, owner_object_id },
-        );
         let mutation =
             AllocatorMutation::Allocate { device_range: result.clone().into(), owner_object_id };
-        self.temporary_allocations.insert(item).await.expect("Allocated over an in-use range.");
         assert!(transaction.add(self.object_id(), Mutation::Allocator(mutation)).is_none());
 
         Ok(result)
@@ -1250,6 +1187,7 @@ impl Allocator {
 
     /// Marks the given device range as allocated.  The main use case for this at this time is for
     /// the super-block which needs to be at a fixed location on the device.
+    #[trace]
     pub async fn mark_allocated(
         &self,
         transaction: &mut Transaction<'_>,
@@ -1275,14 +1213,21 @@ impl Allocator {
                 reservation.reserve(len).ok_or(FxfsError::NoSpace)?.forget();
             }
             owner_entry.uncommitted_allocated_bytes += len;
+            // Done last to avoid leaking free list entries if we error out.
+            ensure!(
+                inner
+                    .strategy
+                    .allocate(
+                        device_range.end - device_range.start,
+                        LocationHint::Require(device_range.start),
+                    )
+                    .ok_or(FxfsError::NoSpace)?
+                    == device_range,
+                FxfsError::Inconsistent
+            );
         }
-        let item = AllocatorItem::new(
-            AllocatorKey { device_range: device_range.clone() },
-            AllocatorValue::Abs { count: 1, owner_object_id },
-        );
         let mutation =
             AllocatorMutation::Allocate { device_range: device_range.into(), owner_object_id };
-        self.temporary_allocations.insert(item).await.expect("Allocated over an in-use range.");
         transaction.add(self.object_id(), Mutation::Allocator(mutation));
         Ok(())
     }
@@ -1317,7 +1262,6 @@ impl Allocator {
         dealloc_range: Range<u64>,
     ) -> Result<u64, Error> {
         debug!(device_range = ?dealloc_range, "deallocate");
-
         ensure!(dealloc_range.is_valid(), FxfsError::InvalidArgs);
         // We don't currently support sharing of allocations (value.count always equals 1), so as
         // long as we can assume the deallocated range is actually allocated, we can avoid device
@@ -1331,8 +1275,6 @@ impl Allocator {
 
     /// Marks allocations associated with a given |owner_object_id| for deletion.
     ///
-    /// Note that the deletion does not necessarily occur straight away.
-    ///
     /// This is used as part of deleting encrypted volumes (ObjectStore) without having the keys.
     ///
     /// MarkForDeletion mutations eventually manipulates allocator metadata (AllocatorInfo) instead
@@ -1340,14 +1282,22 @@ impl Allocator {
     /// reuse of extents.
     ///
     /// Applying the mutation moves byte count for the owner_object_id from 'allocated_bytes' to
-    /// 'committed_marked_for_deletion'.
+    /// 'committed_encrypted_volume_deletions'.
     ///
     /// Replay is not guaranteed until the *device* gets flushed, so we cannot reuse the deleted
     /// extents until we receive a `did_flush_device` callback.
     ///
-    /// At this point, the mutation is guaranteed so the 'committed_marked_for_deletion' entry is
-    /// removed and the owner_object_id is added to the 'marked_for_deletion' set. This set
+    /// At this point, the mutation is guaranteed so the 'committed_encrypted_volume_deletions'
+    /// entry is removed and the owner_object_id is added to the 'marked_for_deletion' set. This set
     /// of owner_object_id are filtered out of all iterators used by the allocator.
+    ///
+    /// Since this was first written, an allocator free list has been introduced which muddies this
+    /// otherwise clean implementation. Because we now need to add all the extents that are filtered
+    /// out to the free list, we don't get away without at least a read over the LSMTree at this
+    /// point in order to add the newly freed extents.
+    ///
+    /// TODO(b/316827348): Consider removing the use of mark_for_deletion in AllocatorInfo and
+    /// just compacting?
     ///
     /// After an allocator.flush() (i.e. a major compaction), we know that there is no data left
     /// in the layer files for this owner_object_id and we are able to clear `marked_for_deletion`.
@@ -1379,16 +1329,53 @@ impl Allocator {
             }
             break std::mem::take(&mut inner.committed_deallocated);
         };
-        // Now we can erase those elements from temporary_allocations (whilst we're not holding the
-        // lock on inner).
+
+        // We also have to scan and add to this set any ranges that should be added to our free list
+        // (inner.strategy).
+        let committed_encrypted_volume_deletions =
+            std::mem::take(&mut self.inner.lock().unwrap().committed_encrypted_volume_deletions);
+        if committed_encrypted_volume_deletions.len() != 0 {
+            let mut ranges = Vec::new();
+            let layer_set = self.tree.layer_set();
+            let mut merger = layer_set.merger();
+            let mut iter = self.filter(merger.seek(Bound::Unbounded).await.unwrap()).await.unwrap();
+            loop {
+                match iter.get() {
+                    None => {
+                        break;
+                    }
+                    Some(ItemRef {
+                        key: AllocatorKey { device_range },
+                        value: AllocatorValue::Abs { owner_object_id, .. },
+                        ..
+                    }) => {
+                        if let Some((log_offset, _bytes)) =
+                            committed_encrypted_volume_deletions.get(&owner_object_id)
+                        {
+                            if *log_offset < flush_log_offset {
+                                ranges.push(device_range.clone());
+                            }
+                        }
+                    }
+                    _ => unreachable!(), // self.filter() should ensure we don't see this.
+                }
+                iter.advance().await.unwrap();
+            }
+            let mut inner = self.inner.lock().unwrap();
+            for range in ranges {
+                inner.strategy.free(range);
+            }
+        }
+
+        // Now we can free those elements.
+        let mut inner = self.inner.lock().unwrap();
         let mut totals = BTreeMap::<u64, u64>::new();
         for dealloc in deallocs {
             *(totals.entry(dealloc.owner_object_id).or_default()) +=
                 dealloc.range.length().unwrap();
-            self.temporary_allocations.erase(&AllocatorKey { device_range: dealloc.range }).await;
+            inner.strategy.free(dealloc.range);
         }
 
-        let mut inner = self.inner.lock().unwrap();
         // This *must* come after we've removed the records from reserved reservations because the
         // allocator uses this value to decide whether or not a device-flush is required and it must
         // be possible to find free space if it thinks no device-flush is required.
@@ -1400,11 +1387,11 @@ impl Allocator {
         }
 
         // We can now reuse any marked_for_deletion extents that have been committed to journal.
-        let committed_marked_for_deletion =
-            std::mem::take(&mut inner.committed_marked_for_deletion);
-        for (owner_object_id, (log_offset, bytes)) in committed_marked_for_deletion {
+        for (owner_object_id, (log_offset, bytes)) in committed_encrypted_volume_deletions {
             if log_offset >= flush_log_offset {
-                inner.committed_marked_for_deletion.insert(owner_object_id, (log_offset, bytes));
+                inner
+                    .committed_encrypted_volume_deletions
+                    .insert(owner_object_id, (log_offset, bytes));
             } else {
                 inner.info.marked_for_deletion.insert(owner_object_id);
             }
@@ -1514,7 +1501,7 @@ impl JournalingObject for Allocator {
                 let old_allocated_bytes =
                     inner.owner_bytes.remove(&owner_object_id).map(|v| v.allocated_bytes);
                 if let Some(old_bytes) = old_allocated_bytes {
-                    inner.committed_marked_for_deletion.insert(
+                    inner.committed_encrypted_volume_deletions.insert(
                         owner_object_id,
                         (context.checkpoint.file_offset, old_bytes as u64),
                     );
@@ -1524,19 +1511,13 @@ impl JournalingObject for Allocator {
             Mutation::Allocator(AllocatorMutation::Allocate { device_range, owner_object_id }) => {
                 self.maximum_offset.fetch_max(device_range.end, Ordering::Relaxed);
                 let item = AllocatorItem {
-                    key: AllocatorKey { device_range: device_range.into() },
+                    key: AllocatorKey { device_range: device_range.clone().into() },
                     value: AllocatorValue::Abs { count: 1, owner_object_id },
                     sequence: context.checkpoint.file_offset,
                 };
-                // We currently rely on barriers here between inserting/removing from reserved
-                // allocations and merging into the tree.  These barriers are present whilst we use
-                // skip_list_layer's commit_and_wait method, rather than just commit.
                 let len = item.key.device_range.length().unwrap();
                 let lower_bound = item.key.lower_bound_for_merge_into();
-                self.tree.merge_into(item.clone(), &lower_bound).await;
-                if context.mode.is_live() {
-                    self.temporary_allocations.erase(&item.key).await;
-                }
+                self.tree.merge_into(item, &lower_bound).await;
                 let mut inner = self.inner.lock().unwrap();
                 let entry = inner.owner_bytes.entry(owner_object_id).or_default();
                 entry.allocated_bytes = entry.allocated_bytes.saturating_add(len as i64);
@@ -1552,23 +1533,11 @@ impl JournalingObject for Allocator {
                 owner_object_id,
             }) => {
                 let item = AllocatorItem {
-                    key: AllocatorKey { device_range: device_range.into() },
+                    key: AllocatorKey { device_range: device_range.clone().into() },
                     value: AllocatorValue::None,
                     sequence: context.checkpoint.file_offset,
                 };
-                // We currently rely on barriers here between inserting/removing from reserved
-                // allocations and merging into the tree.  These barriers are present whilst we use
-                // skip_list_layer's commit_and_wait method, rather than just commit.
                 let len = item.key.device_range.length().unwrap();
-                if context.mode.is_live() {
-                    let mut item = item.clone();
-                    // Note that the point of this reservation is to avoid premature reuse.
-                    item.value = AllocatorValue::Abs { count: 1, owner_object_id };
-                    self.temporary_allocations
-                        .insert(item)
-                        .await
-                        .expect("Allocated over an in-use range.");
-                }
 
                 {
                     let mut inner = self.inner.lock().unwrap();
@@ -1658,11 +1627,7 @@ impl JournalingObject for Allocator {
                     inner.add_reservation(res_owner, len);
                     reservation.release_reservation(res_owner, len);
                 }
-                let item = AllocatorItem::new(
-                    AllocatorKey { device_range: device_range.into() },
-                    AllocatorValue::Abs { count: 1, owner_object_id },
-                );
-                inner.dropped_allocations.push(item);
+                inner.strategy.free(device_range.clone().into());
             }
             _ => {}
         }
@@ -2084,14 +2049,14 @@ mod tests {
                 .await
                 .expect("allocate failed"),
         );
-        assert_eq!(device_ranges.last().unwrap().length().expect("Invalid range"), fs.block_size());
+        assert_eq!(device_ranges.last().unwrap().length().expect("Invalid range"), fs.block_size(),);
         device_ranges.push(
             allocator
                 .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
                 .await
                 .expect("allocate failed"),
         );
-        assert_eq!(device_ranges.last().unwrap().length().expect("Invalid range"), fs.block_size());
+        assert_eq!(device_ranges.last().unwrap().length().expect("Invalid range"), fs.block_size(),);
         assert_eq!(overlap(&device_ranges[0], &device_ranges[1]), 0);
         transaction.commit().await.expect("commit failed");
         let mut transaction =
@@ -2174,7 +2139,7 @@ mod tests {
                 .allocate(&mut transaction, STORE_OBJECT_ID, 2 * fs.block_size())
                 .await
                 .expect("allocate failed")
-            // Let the transaction drop which should put the allocation in `dropped_allocations`.
+            // Let the transaction drop.
         };
 
         let mut transaction =
@@ -2568,6 +2533,30 @@ mod tests {
         }
     }
 
+    /// Given a sorted list of non-overlapping ranges, this will coalesce adjacent ranges.
+    /// This allows comparison of equivalent sets of ranges which may occur due to differences
+    /// across allocator strategies.
+    fn coalesce_ranges(ranges: Vec<Range<u64>>) -> Vec<Range<u64>> {
+        let mut coalesced = Vec::new();
+        let mut prev: Option<Range<u64>> = None;
+        for range in ranges {
+            if let Some(prev_range) = &mut prev {
+                if range.start == prev_range.end {
+                    prev_range.end = range.end;
+                } else {
+                    coalesced.push(prev_range.clone());
+                    prev = Some(range);
+                }
+            } else {
+                prev = Some(range);
+            }
+        }
+        if let Some(prev_range) = prev {
+            coalesced.push(prev_range);
+        }
+        coalesced
+    }
+
     #[fuchsia::test]
     async fn test_take_for_trimming() {
         const STORE_OBJECT_ID: u64 = 99;
@@ -2642,7 +2631,13 @@ mod tests {
             );
             offset = free.extents().last().expect("Unexpectedly hit the end of free extents").end;
         }
-        assert_eq!(free_ranges, expected_free_ranges);
+        // Coalesce adjacent free ranges because the buddy allocator will
+        // return smaller aligned chunks but the overall range will be
+        // equivalent.
+        let coalesced_free_ranges = coalesce_ranges(free_ranges);
+        let coalesced_expected_free_ranges = coalesce_ranges(expected_free_ranges);
+
+        assert_eq!(coalesced_free_ranges, coalesced_expected_free_ranges);
     }
 
     #[fuchsia::test]
