@@ -13,7 +13,7 @@ pub mod journal;
 mod key_manager;
 mod merge;
 pub mod object_manager;
-mod object_record;
+pub mod object_record;
 pub mod project_id;
 mod store_object_handle;
 pub mod transaction;
@@ -80,21 +80,13 @@ use {
     uuid::Uuid,
 };
 
-// Exposed for serialized_types.
-pub use allocator::{AllocatorInfo, AllocatorKey, AllocatorValue};
 pub use extent_record::{
     ExtentKey, ExtentValue, BLOB_MERKLE_ATTRIBUTE_ID, DEFAULT_DATA_ATTRIBUTE_ID,
     FSVERITY_MERKLE_ATTRIBUTE_ID,
 };
-pub use journal::{
-    JournalRecord, JournalRecordV20, JournalRecordV25, JournalRecordV29, JournalRecordV30,
-    JournalRecordV31, JournalRecordV32, SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV25,
-    SuperBlockRecordV29, SuperBlockRecordV30, SuperBlockRecordV31, SuperBlockRecordV5,
-};
 pub use object_record::{
     AttributeKey, EncryptionKeys, ExtendedAttributeValue, FsverityMetadata, ObjectAttributes,
-    ObjectKey, ObjectKeyData, ObjectKeyV25, ObjectKeyV5, ObjectKind, ObjectValue, ObjectValueV25,
-    ObjectValueV29, ObjectValueV30, ObjectValueV31, ObjectValueV5, ProjectProperty, RootDigest,
+    ObjectKey, ObjectKeyData, ObjectKind, ObjectValue, ProjectProperty, RootDigest,
 };
 pub use transaction::Mutation;
 

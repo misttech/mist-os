@@ -39,7 +39,7 @@ use {
                 bootstrap_handle::BootstrapObjectHandle,
                 checksum_list::ChecksumList,
                 reader::{JournalReader, ReadResult},
-                super_block::{SuperBlockInstance, SuperBlockManager},
+                super_block::{SuperBlockHeader, SuperBlockInstance, SuperBlockManager},
                 writer::JournalWriter,
             },
             object_manager::ObjectManager,
@@ -75,12 +75,6 @@ use {
         task::{Poll, Waker},
         vec::Vec,
     },
-};
-
-// Exposed for serialized_types.
-pub use super_block::{
-    SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV25, SuperBlockRecordV29,
-    SuperBlockRecordV30, SuperBlockRecordV31, SuperBlockRecordV5,
 };
 
 // The journal file is written to in blocks of this size.

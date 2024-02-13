@@ -7,7 +7,7 @@ use {
         drop_event::DropEvent,
         lsm_tree::merge,
         object_handle::ReadObjectHandle,
-        object_store::{
+        object_store::object_record::{
             ObjectKey, ObjectKeyV25, ObjectKeyV5, ObjectValue, ObjectValueV25, ObjectValueV29,
             ObjectValueV30, ObjectValueV31, ObjectValueV5,
         },
