@@ -220,7 +220,7 @@ void Client::ImportEvent(ImportEventRequestView request,
 void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
                                     ImportBufferCollectionCompleter::Sync& completer) {
   if (!sysmem_allocator_.is_valid()) {
-    completer.Reply(ZX_ERR_NOT_SUPPORTED);
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
 
@@ -228,7 +228,7 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
       ToBufferCollectionId(request->buffer_collection_id);
   // TODO: Switch to .contains() when C++20.
   if (collection_map_.count(buffer_collection_id)) {
-    completer.Reply(ZX_ERR_INVALID_ARGS);
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
 
@@ -239,13 +239,13 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
   if (import_status != ZX_OK) {
     zxlogf(WARNING, "Cannot import BufferCollection to display driver: %s",
            zx_status_get_string(import_status));
-    completer.Reply(ZX_ERR_INTERNAL);
+    completer.ReplyError(ZX_ERR_INTERNAL);
   }
 
   collection_map_[buffer_collection_id] = Collections{
       .driver_buffer_collection_id = driver_buffer_collection_id,
   };
-  completer.Reply(ZX_OK);
+  completer.ReplySuccess();
 }
 
 void Client::ReleaseBufferCollection(ReleaseBufferCollectionRequestView request,

@@ -367,11 +367,16 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
 
   const fuchsia_hardware_display::wire::BufferCollectionId fidl_display_collection_id =
       ToFidlBufferCollectionId(display_collection_id);
-  if (auto result = dc_->ImportBufferCollection(fidl_display_collection_id, std::move(client));
-      !result.ok() || result.value().res != ZX_OK) {
-    zxlogf(ERROR, "Failed to import buffer collection %lu (fidl=%d, res=%d)",
-           display_collection_id.value(), result.status(), result.value().res);
-    return zx::error(result.ok() ? result.value().res : result.status());
+  const auto result = dc_->ImportBufferCollection(fidl_display_collection_id, std::move(client));
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to call FIDL ImportBufferCollection %lu (%s)",
+           display_collection_id.value(), result.status_string());
+    return zx::error(result.status());
+  }
+  if (result.value().is_error()) {
+    zxlogf(ERROR, "Failed to import buffer collection %lu (%s)", display_collection_id.value(),
+           zx_status_get_string(result.value().error_value()));
+    return zx::error(result.value().error_value());
   }
 
   auto set_constraints_result =

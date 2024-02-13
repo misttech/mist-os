@@ -20,14 +20,18 @@ bool ImportBufferCollection(
     const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
     fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
     const fuchsia::hardware::display::types::ImageConfig& image_config) {
-  zx_status_t status;
-
   const fuchsia::hardware::display::BufferCollectionId display_buffer_collection_id =
       allocation::ToDisplayBufferCollectionId(buffer_collection_id);
-  if (display_coordinator->ImportBufferCollection(display_buffer_collection_id, std::move(token),
-                                                  &status) != ZX_OK ||
-      status != ZX_OK) {
-    FX_LOGS(ERROR) << "ImportBufferCollection failed - status: " << status;
+  fuchsia::hardware::display::Coordinator_ImportBufferCollection_Result result;
+  zx_status_t status = display_coordinator->ImportBufferCollection(display_buffer_collection_id,
+                                                                   std::move(token), &result);
+  if (status != ZX_OK) {
+    FX_LOGS(ERROR) << "Failed to call FIDL ImportBufferCollection: "
+                   << zx_status_get_string(status);
+    return false;
+  }
+  if (result.is_err()) {
+    FX_LOGS(ERROR) << "Failed to import BufferCollection: " << zx_status_get_string(result.err());
     return false;
   }
 

@@ -207,7 +207,9 @@ TEST_F(DisplayCompositorTest, ImportAndReleaseBufferCollectionTest) {
           testing::Invoke([](fuchsia::hardware::display::BufferCollectionId,
                              fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
                              MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
-            callback(ZX_OK);
+            callback(
+                fuchsia::hardware::display::Coordinator_ImportBufferCollection_Result::WithResponse(
+                    {}));
           }));
   EXPECT_CALL(*mock_display_coordinator_,
               SetBufferCollectionConstraints(FidlEquals(kDisplayBufferCollectionId), _, _))
@@ -303,7 +305,9 @@ TEST_F(DisplayCompositorTest,
                            fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
                            MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
             display_token = token.BindSync();
-            callback(ZX_OK);
+            callback(
+                fuchsia::hardware::display::Coordinator_ImportBufferCollection_Result::WithResponse(
+                    {}));
           }));
 
   // Set display constraints.
@@ -432,7 +436,9 @@ TEST_F(DisplayCompositorTest,
                            fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
                            MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
             display_token = token.BindSync();
-            callback(ZX_OK);
+            callback(
+                fuchsia::hardware::display::Coordinator_ImportBufferCollection_Result::WithResponse(
+                    {}));
           }));
 
   // Set display constraints.
@@ -644,7 +650,9 @@ TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
           testing::Invoke([](fuchsia::hardware::display::BufferCollectionId,
                              fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
                              MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
-            callback(ZX_OK);
+            callback(
+                fuchsia::hardware::display::Coordinator_ImportBufferCollection_Result::WithResponse(
+                    {}));
           }));
   EXPECT_CALL(*mock_display_coordinator_,
               SetBufferCollectionConstraints(FidlEquals(kDisplayBufferCollectionId), _, _))
@@ -729,7 +737,9 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
           testing::Invoke([](fuchsia::hardware::display::BufferCollectionId,
                              fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
                              MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
-            callback(ZX_OK);
+            callback(
+                fuchsia::hardware::display::Coordinator_ImportBufferCollection_Result::WithResponse(
+                    {}));
           }));
 
   EXPECT_CALL(*mock_display_coordinator_,
@@ -1037,7 +1047,9 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
           testing::Invoke([](fuchsia::hardware::display::BufferCollectionId,
                              fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
                              MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
-            callback(ZX_OK);
+            callback(
+                fuchsia::hardware::display::Coordinator_ImportBufferCollection_Result::WithResponse(
+                    {}));
           }));
   EXPECT_CALL(*mock_display_coordinator_,
               SetBufferCollectionConstraints(FidlEquals(kDisplayBufferCollectionId), _, _))
@@ -1250,7 +1262,9 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
           testing::Invoke([](fuchsia::hardware::display::BufferCollectionId,
                              fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
                              MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
-            callback(ZX_OK);
+            callback(
+                fuchsia::hardware::display::Coordinator_ImportBufferCollection_Result::WithResponse(
+                    {}));
           }));
   EXPECT_CALL(*mock_display_coordinator_,
               SetBufferCollectionConstraints(FidlEquals(kDisplayBufferCollectionId), _, _))
@@ -1585,7 +1599,9 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
           testing::Invoke([](fuchsia::hardware::display::BufferCollectionId,
                              fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>,
                              MockDisplayCoordinator::ImportBufferCollectionCallback callback) {
-            callback(ZX_OK);
+            callback(
+                fuchsia::hardware::display::Coordinator_ImportBufferCollection_Result::WithResponse(
+                    {}));
           }));
   EXPECT_CALL(*mock_display_coordinator_,
               SetBufferCollectionConstraints(FidlEquals(kDisplayBufferCollectionId), _, _))

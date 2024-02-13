@@ -327,7 +327,8 @@ impl DisplayDirectViewStrategy {
         display
             .coordinator
             .import_buffer_collection(&collection_id.into(), coordinator_token)
-            .await?;
+            .await?
+            .map_err(zx::Status::from_raw)?;
         display
             .coordinator
             .set_buffer_collection_constraints(&collection_id.into(), &image_config)

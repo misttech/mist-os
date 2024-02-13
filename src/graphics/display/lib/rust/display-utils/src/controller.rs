@@ -272,7 +272,7 @@ impl Coordinator {
         let proxy = self.proxy();
 
         // First import the token.
-        let _ = zx::Status::ok(proxy.import_buffer_collection(&id.into(), token).await?)?;
+        proxy.import_buffer_collection(&id.into(), token).await?.map_err(zx::Status::from_raw)?;
 
         // Tell the driver to assign any device-specific constraints.
         // TODO(https://fxbug.dev/42166207): These fields are effectively unused except for `type` in the case

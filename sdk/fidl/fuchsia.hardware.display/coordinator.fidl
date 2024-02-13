@@ -453,9 +453,7 @@ closed protocol Coordinator {
     strict ImportBufferCollection(resource struct {
         buffer_collection_id BufferCollectionId;
         buffer_collection_token client_end:fuchsia.sysmem.BufferCollectionToken;
-    }) -> (struct {
-        res zx.Status;
-    });
+    }) -> () error zx.Status;
 
     // Release an imported buffer collection.
     strict ReleaseBufferCollection(struct {

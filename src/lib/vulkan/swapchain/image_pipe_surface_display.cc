@@ -131,8 +131,8 @@ bool ImagePipeSurfaceDisplay::Init() {
               provider.error_value(), provider.status_string());
     }
 
-    // TODO(https://fxbug.dev/42064416): Use Component::Connect here when it's possible to use this without
-    // depending on libsvc.so
+    // TODO(https://fxbug.dev/42064416): Use Component::Connect here when it's possible to use this
+    // without depending on libsvc.so
     status = fdio_service_connect(filename.c_str(), provider->server.TakeChannel().release());
     if (status != ZX_OK) {
       fprintf(stderr, "%s: Could not open display coordinator: %s\n", kTag,
@@ -266,11 +266,13 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
 
   constexpr fuchsia::hardware::display::BufferCollectionId kBufferCollectionId = {.value = 1};
 
-  display_coordinator_->ImportBufferCollection(kBufferCollectionId, std::move(display_token),
-                                               [this, &status](zx_status_t import_status) {
-                                                 status = import_status;
-                                                 got_message_response_ = true;
-                                               });
+  display_coordinator_->ImportBufferCollection(
+      kBufferCollectionId, std::move(display_token),
+      [this,
+       &status](fuchsia::hardware::display::Coordinator_ImportBufferCollection_Result result) {
+        status = result.is_err() ? result.err() : ZX_OK;
+        got_message_response_ = true;
+      });
   if (!WaitForAsyncMessage()) {
     fprintf(stderr, "%s: Display Disconnected\n", kTag);
     return false;
