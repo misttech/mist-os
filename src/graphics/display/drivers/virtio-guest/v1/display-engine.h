@@ -22,14 +22,13 @@
 
 #include <cstdint>
 #include <memory>
-#include <optional>
 
 #include <ddktl/device.h>
 #include <fbl/condition_variable.h>
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-abi.h"
-#include "src/graphics/display/drivers/virtio-guest/v1/virtio-pci-device.h"
+#include "src/graphics/display/drivers/virtio-guest/v1/virtio-gpu-device.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
@@ -52,14 +51,19 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
 
   // Exposed for testing. Production code must use the Create() factory method.
   DisplayEngine(zx_device_t* bus_device, fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_client,
-                std::unique_ptr<VirtioPciDevice> virtio_device);
+                std::unique_ptr<VirtioGpuDevice> gpu_device);
   ~DisplayEngine();
 
   zx_status_t Init();
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
   zx_status_t Start();
 
-  const virtio_abi::ScanoutInfo* pmode() const { return &pmode_; }
+  // Finds the first display usable by this driver, in the `display_infos` list.
+  //
+  // Returns nullptr if the list does not contain a usable display.
+  const DisplayInfo* FirstValidDisplay(cpp20::span<const DisplayInfo> display_infos);
+
+  const virtio_abi::ScanoutInfo* pmode() const { return &current_display_.scanout_info; }
 
   zx::result<BufferInfo> GetAllocatedBufferInfoForImage(
       display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index,
@@ -128,46 +132,6 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
                                             uint32_t pixel_size, uint32_t row_bytes,
                                             fuchsia_images2::wire::PixelFormat pixel_format);
 
-  // Retrieves the current output configuration.
-  //
-  // virtio spec Section 5.7.6.8 "Device Operation: controlq", operation
-  // VIRTIO_GPU_CMD_GET_DISPLAY_INFO.
-  zx_status_t GetDisplayInfo();
-
-  // Creates a 2D resource on the virtio host.
-  //
-  // The resource ID is automatically allocated.
-  //
-  // virtio spec Section 5.7.6.8 "Device Operation: controlq", operation
-  // VIRTIO_GPU_CMD_RESOURCE_CREATE_2D.
-  zx_status_t Create2DResource(uint32_t* resource_id, uint32_t width, uint32_t height,
-                               fuchsia_images2::wire::PixelFormat pixel_format);
-
-  // Sets scanout parameters for one scanout.
-  //
-  // virtio spec Section 5.7.6.8 "Device Operation: controlq", operation
-  // VIRTIO_GPU_CMD_SET_SCANOUT.
-  zx_status_t SetScanoutProperties(uint32_t scanout_id, uint32_t resource_id, uint32_t width,
-                                   uint32_t height);
-
-  // Flushes any scanouts that use `resource_id` to the host screen.
-  //
-  // virtio spec Section 5.7.6.8 "Device Operation: controlq", operation
-  // VIRTIO_GPU_CMD_RESOURCE_FLUSH.
-  zx_status_t FlushResource(uint32_t resource_id, uint32_t width, uint32_t height);
-
-  // Transfers data from a guest resource to host memory.
-  //
-  // virtio spec Section 5.7.6.8 "Device Operation: controlq", operation
-  // VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D.
-  zx_status_t TransferToHost2D(uint32_t resource_id, uint32_t width, uint32_t height);
-
-  // Assigns an array of guest pages as the backing store for a resource.
-  //
-  // virtio spec Section 5.7.6.8 "Device Operation: controlq", operation
-  // VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING.
-  zx_status_t AttachResourceBacking(uint32_t resource_id, zx_paddr_t ptr, size_t buf_len);
-
   // Initializes the sysmem Allocator client used to import incoming buffer
   // collection tokens.
   //
@@ -178,11 +142,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
   // gpu op
   io_buffer_t gpu_req_ = {};
 
-  // A saved copy of the display
-  virtio_abi::ScanoutInfo pmode_ = {};
-  int pmode_id_ = -1;
-
-  uint32_t next_resource_id_ = 1;
+  DisplayInfo current_display_;
 
   // Flush thread
   void virtio_gpu_flusher();
@@ -205,7 +165,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
   display::ConfigStamp latest_config_stamp_ = display::kInvalidConfigStamp;
   display::ConfigStamp displayed_config_stamp_ = display::kInvalidConfigStamp;
 
-  std::unique_ptr<VirtioPciDevice> virtio_device_;
+  std::unique_ptr<VirtioGpuDevice> gpu_device_;
 };
 
 }  // namespace virtio_display

@@ -34,6 +34,8 @@ source_set("common_srcs") {
     "gpu-device-driver.h",
     "virtio-abi.cc",
     "virtio-abi.h",
+    "virtio-gpu-device.cc",
+    "virtio-gpu-device.h",
     "virtio-pci-device.cc",
     "virtio-pci-device.h",
   ]

@@ -198,6 +198,9 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
         VirtioPciDevice::Create(std::move(bti), std::move(backend));
     ASSERT_OK(virtio_device_result.status_value());
 
+    std::unique_ptr<VirtioGpuDevice> gpu_device =
+        std::make_unique<VirtioGpuDevice>(std::move(virtio_device_result).value());
+
     fake_sysmem_ = std::make_unique<MockAllocator>(dispatcher());
     zx::result<fidl::Endpoints<fuchsia_sysmem::Allocator>> sysmem_endpoints =
         fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
@@ -205,8 +208,8 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
     auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
     fidl::BindServer(dispatcher(), std::move(sysmem_server), fake_sysmem_.get());
 
-    device_ = std::make_unique<DisplayEngine>(nullptr, std::move(sysmem_client),
-                                              std::move(virtio_device_result).value());
+    device_ =
+        std::make_unique<DisplayEngine>(nullptr, std::move(sysmem_client), std::move(gpu_device));
 
     RunLoopUntilIdle();
   }

@@ -19,6 +19,7 @@
 #include <lib/zx/result.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
+#include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
@@ -29,7 +30,6 @@
 #include <cinttypes>
 #include <cstring>
 #include <memory>
-#include <optional>
 #include <utility>
 
 #include <fbl/alloc_checker.h>
@@ -37,6 +37,7 @@
 
 #include "src/graphics/display/drivers/virtio-guest/v1/gpu-device-driver.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-abi.h"
+#include "src/graphics/display/drivers/virtio-guest/v1/virtio-gpu-device.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-pci-device.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
@@ -51,15 +52,6 @@ namespace {
 
 constexpr uint32_t kRefreshRateHz = 30;
 constexpr display::DisplayId kDisplayId{1};
-
-zx_status_t ResponseTypeToZxStatus(virtio_abi::ControlType type) {
-  if (type != virtio_abi::ControlType::kEmptyResponse) {
-    zxlogf(ERROR, "Unexpected response type: %s (0x%04x)", ControlTypeToString(type),
-           static_cast<unsigned int>(type));
-    return ZX_ERR_NO_MEMORY;
-  }
-  return ZX_OK;
-}
 
 }  // namespace
 
@@ -87,8 +79,8 @@ void DisplayEngine::DisplayControllerImplSetDisplayControllerInterface(
     dc_intf_ = *intf;
   }
 
-  const uint32_t width = pmode_.geometry.width;
-  const uint32_t height = pmode_.geometry.height;
+  const uint32_t width = current_display_.scanout_info.geometry.width;
+  const uint32_t height = current_display_.scanout_info.geometry.height;
 
   const int64_t pixel_clock_hz = int64_t{width} * height * kRefreshRateHz;
   const int64_t pixel_clock_khz = (pixel_clock_hz + 500) / 1000;
@@ -286,21 +278,21 @@ zx::result<display::DriverImageId> DisplayEngine::Import(
 
   unsigned size = ZX_ROUNDUP(row_bytes * image->height, zx_system_get_page_size());
   zx_paddr_t paddr;
-  zx_status_t status = virtio_device_->bti().pin(ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, vmo, offset,
-                                                 size, &paddr, 1, &import_data->pmt);
+  zx_status_t status = gpu_device_->bti().pin(ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, vmo, offset,
+                                              size, &paddr, 1, &import_data->pmt);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to pin VMO: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
-  status = Create2DResource(&import_data->resource_id, row_bytes / pixel_size, image->height,
-                            pixel_format);
+  status = gpu_device_->Create2DResource(&import_data->resource_id, row_bytes / pixel_size,
+                                         image->height, pixel_format);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to allocate 2D resource: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
-  status = AttachResourceBacking(import_data->resource_id, paddr, size);
+  status = gpu_device_->AttachResourceBacking(import_data->resource_id, paddr, size);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to attach resource backing store: %s", zx_status_get_string(status));
     return zx::error(status);
@@ -344,13 +336,13 @@ config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
     frame_t frame = {
         .x_pos = 0,
         .y_pos = 0,
-        .width = pmode_.geometry.width,
-        .height = pmode_.geometry.height,
+        .width = current_display_.scanout_info.geometry.width,
+        .height = current_display_.scanout_info.geometry.height,
     };
     success = display_configs[0]->layer_list[0]->type == LAYER_TYPE_PRIMARY &&
               layer->transform_mode == FRAME_TRANSFORM_IDENTITY &&
-              layer->image.width == pmode_.geometry.width &&
-              layer->image.height == pmode_.geometry.height &&
+              layer->image.width == current_display_.scanout_info.geometry.width &&
+              layer->image.height == current_display_.scanout_info.geometry.height &&
               memcmp(&layer->dest_frame, &frame, sizeof(frame_t)) == 0 &&
               memcmp(&layer->src_frame, &frame, sizeof(frame_t)) == 0 &&
               display_configs[0]->cc_flags == 0 && layer->alpha_mode == ALPHA_DISABLE;
@@ -457,10 +449,12 @@ zx_status_t DisplayEngine::DisplayControllerImplSetDisplayPower(uint64_t display
 
 DisplayEngine::DisplayEngine(zx_device_t* bus_device,
                              fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_client,
-                             std::unique_ptr<VirtioPciDevice> virtio_device)
+                             std::unique_ptr<VirtioGpuDevice> gpu_device)
     : sysmem_(std::move(sysmem_client)),
       bus_device_(bus_device),
-      virtio_device_(std::move(virtio_device)) {}
+      gpu_device_(std::move(gpu_device)) {
+  ZX_DEBUG_ASSERT(gpu_device_);
+}
 
 DisplayEngine::~DisplayEngine() { io_buffer_release(&gpu_req_); }
 
@@ -490,9 +484,15 @@ zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(zx_device_t* bu
   }
 
   fbl::AllocChecker alloc_checker;
+  auto gpu_device = fbl::make_unique_checked<VirtioGpuDevice>(
+      &alloc_checker, std::move(virtio_device_result).value());
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "Failed to allocate memory for VirtioGpuDevice");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
   auto display_engine = fbl::make_unique_checked<DisplayEngine>(
-      &alloc_checker, bus_device, std::move(sysmem_client_result).value(),
-      std::move(virtio_device_result).value());
+      &alloc_checker, bus_device, std::move(sysmem_client_result).value(), std::move(gpu_device));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -505,167 +505,6 @@ zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(zx_device_t* bu
   }
 
   return zx::ok(std::move(display_engine));
-}
-
-zx_status_t DisplayEngine::GetDisplayInfo() {
-  const virtio_abi::GetDisplayInfoCommand command = {
-      .header = {.type = virtio_abi::ControlType::kGetDisplayInfoCommand},
-  };
-
-  const auto& response =
-      virtio_device_->ExchangeRequestResponse<virtio_abi::DisplayInfoResponse>(command);
-  if (response.header.type != virtio_abi::ControlType::kDisplayInfoResponse) {
-    zxlogf(ERROR, "Expected DisplayInfo response, got %s (0x%04x)",
-           ControlTypeToString(response.header.type),
-           static_cast<unsigned int>(response.header.type));
-    return ZX_ERR_NOT_FOUND;
-  }
-
-  for (int i = 0; i < virtio_abi::kMaxScanouts; i++) {
-    const virtio_abi::ScanoutInfo& scanout = response.scanouts[i];
-    if (!scanout.enabled) {
-      continue;
-    }
-
-    zxlogf(TRACE,
-           "Scanout %d: placement (%" PRIu32 ", %" PRIu32 "), resolution %" PRIu32 "x%" PRIu32
-           " flags 0x%08" PRIx32,
-           i, scanout.geometry.placement_x, scanout.geometry.placement_y, scanout.geometry.width,
-           scanout.geometry.height, scanout.flags);
-    if (pmode_id_ >= 0) {
-      continue;
-    }
-
-    // Save the first valid pmode we see
-    pmode_ = response.scanouts[i];
-    pmode_id_ = i;
-  }
-  return ZX_OK;
-}
-
-namespace {
-
-// Returns nullopt for an unsupported format.
-std::optional<virtio_abi::ResourceFormat> To2DResourceFormat(
-    fuchsia_images2::wire::PixelFormat pixel_format) {
-  // TODO(https://fxbug.dev/42073721): Support more formats.
-  switch (pixel_format) {
-    case fuchsia_images2::PixelFormat::kB8G8R8A8:
-      return virtio_abi::ResourceFormat::kBgra32;
-    default:
-      return std::nullopt;
-  }
-}
-
-}  // namespace
-
-zx_status_t DisplayEngine::Create2DResource(uint32_t* resource_id, uint32_t width, uint32_t height,
-                                            fuchsia_images2::wire::PixelFormat pixel_format) {
-  ZX_ASSERT(resource_id);
-
-  zxlogf(TRACE, "Allocate2DResource");
-
-  std::optional<virtio_abi::ResourceFormat> resource_format = To2DResourceFormat(pixel_format);
-  if (!resource_format.has_value()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  const virtio_abi::Create2DResourceCommand command = {
-      .header = {.type = virtio_abi::ControlType::kCreate2DResourceCommand},
-      .resource_id = next_resource_id_++,
-      .format = virtio_abi::ResourceFormat::kBgra32,
-      .width = width,
-      .height = height,
-  };
-  *resource_id = command.resource_id;
-
-  const auto& response =
-      virtio_device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
-  return ResponseTypeToZxStatus(response.header.type);
-}
-
-zx_status_t DisplayEngine::AttachResourceBacking(uint32_t resource_id, zx_paddr_t ptr,
-                                                 size_t buf_len) {
-  ZX_ASSERT(ptr);
-
-  zxlogf(TRACE,
-         "AttachResourceBacking - resource ID %" PRIu32 ", address 0x%" PRIx64 ", length %zu",
-         resource_id, ptr, buf_len);
-
-  const virtio_abi::AttachResourceBackingCommand<1> command = {
-      .header = {.type = virtio_abi::ControlType::kAttachResourceBackingCommand},
-      .resource_id = resource_id,
-      .entries =
-          {
-              {.address = ptr, .length = static_cast<uint32_t>(buf_len)},
-          },
-  };
-
-  const auto& response =
-      virtio_device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
-  return ResponseTypeToZxStatus(response.header.type);
-}
-
-zx_status_t DisplayEngine::SetScanoutProperties(uint32_t scanout_id, uint32_t resource_id,
-                                                uint32_t width, uint32_t height) {
-  zxlogf(TRACE,
-         "SetScanoutProperties - scanout ID %" PRIu32 ", resource ID %" PRIu32 ", size %" PRIu32
-         "x%" PRIu32,
-         scanout_id, resource_id, width, height);
-
-  const virtio_abi::SetScanoutCommand command = {
-      .header = {.type = virtio_abi::ControlType::kSetScanoutCommand},
-      .geometry =
-          {
-              .placement_x = 0,
-              .placement_y = 0,
-              .width = width,
-              .height = height,
-          },
-      .scanout_id = scanout_id,
-      .resource_id = resource_id,
-  };
-
-  const auto& response =
-      virtio_device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
-  return ResponseTypeToZxStatus(response.header.type);
-}
-
-zx_status_t DisplayEngine::FlushResource(uint32_t resource_id, uint32_t width, uint32_t height) {
-  zxlogf(TRACE, "FlushResource - resource ID %" PRIu32 ", size %" PRIu32 "x%" PRIu32, resource_id,
-         width, height);
-
-  virtio_abi::FlushResourceCommand command = {
-      .header = {.type = virtio_abi::ControlType::kFlushResourceCommand},
-      .geometry = {.placement_x = 0, .placement_y = 0, .width = width, .height = height},
-      .resource_id = resource_id,
-  };
-
-  const auto& response =
-      virtio_device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
-  return ResponseTypeToZxStatus(response.header.type);
-}
-
-zx_status_t DisplayEngine::TransferToHost2D(uint32_t resource_id, uint32_t width, uint32_t height) {
-  zxlogf(TRACE, "Transfer2DResourceToHost - resource ID %" PRIu32 ", size %" PRIu32 "x%" PRIu32,
-         resource_id, width, height);
-
-  virtio_abi::Transfer2DResourceToHostCommand command = {
-      .header = {.type = virtio_abi::ControlType::kTransfer2DResourceToHostCommand},
-      .geometry =
-          {
-              .placement_x = 0,
-              .placement_y = 0,
-              .width = width,
-              .height = height,
-          },
-      .destination_offset = 0,
-      .resource_id = resource_id,
-  };
-
-  const auto& response =
-      virtio_device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
-  return ResponseTypeToZxStatus(response.header.type);
 }
 
 void DisplayEngine::virtio_gpu_flusher() {
@@ -688,8 +527,9 @@ void DisplayEngine::virtio_gpu_flusher() {
 
     if (fb_change) {
       uint32_t res_id = displayed_fb_ ? displayed_fb_->resource_id : 0;
-      zx_status_t status =
-          SetScanoutProperties(pmode_id_, res_id, pmode_.geometry.width, pmode_.geometry.height);
+      zx_status_t status = gpu_device_->SetScanoutProperties(
+          current_display_.scanout_id, res_id, current_display_.scanout_info.geometry.width,
+          current_display_.scanout_info.geometry.height);
       if (status != ZX_OK) {
         zxlogf(ERROR, "Failed to set scanout: %s", zx_status_get_string(status));
         continue;
@@ -697,15 +537,17 @@ void DisplayEngine::virtio_gpu_flusher() {
     }
 
     if (displayed_fb_) {
-      zx_status_t status = TransferToHost2D(displayed_fb_->resource_id, pmode_.geometry.width,
-                                            pmode_.geometry.height);
+      zx_status_t status = gpu_device_->TransferToHost2D(
+          displayed_fb_->resource_id, current_display_.scanout_info.geometry.width,
+          current_display_.scanout_info.geometry.height);
       if (status != ZX_OK) {
         zxlogf(ERROR, "Failed to transfer resource: %s", zx_status_get_string(status));
         continue;
       }
 
-      status =
-          FlushResource(displayed_fb_->resource_id, pmode_.geometry.width, pmode_.geometry.height);
+      status = gpu_device_->FlushResource(displayed_fb_->resource_id,
+                                          current_display_.scanout_info.geometry.width,
+                                          current_display_.scanout_info.geometry.height);
       if (status != ZX_OK) {
         zxlogf(ERROR, "Failed to flush resource: %s", zx_status_get_string(status));
         continue;
@@ -730,22 +572,26 @@ zx_status_t DisplayEngine::Start() {
   zxlogf(TRACE, "Start()");
 
   // Get the display info and see if we find a valid pmode
-  zx_status_t status = GetDisplayInfo();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get display info: %s", zx_status_get_string(status));
-    return status;
+  zx::result<fbl::Vector<DisplayInfo>> display_infos_result = gpu_device_->GetDisplayInfo();
+  if (display_infos_result.is_error()) {
+    zxlogf(ERROR, "Failed to get display info: %s", display_infos_result.status_string());
+    return display_infos_result.error_value();
   }
 
-  if (pmode_id_ < 0) {
-    zxlogf(ERROR, "Failed to find a pmode");
+  const DisplayInfo* current_display = FirstValidDisplay(display_infos_result.value());
+  if (current_display == nullptr) {
+    zxlogf(ERROR, "Failed to find a usable display");
     return ZX_ERR_NOT_FOUND;
   }
+  current_display_ = *current_display;
 
   zxlogf(INFO,
          "Found display at (%" PRIu32 ", %" PRIu32 ") size %" PRIu32 "x%" PRIu32
          ", flags 0x%08" PRIx32,
-         pmode_.geometry.placement_x, pmode_.geometry.placement_y, pmode_.geometry.width,
-         pmode_.geometry.height, pmode_.flags);
+         current_display_.scanout_info.geometry.placement_x,
+         current_display_.scanout_info.geometry.placement_y,
+         current_display_.scanout_info.geometry.width,
+         current_display_.scanout_info.geometry.height, current_display_.scanout_info.flags);
 
   // Run a worker thread to shove in flush events
   auto virtio_gpu_flusher_entry = [](void* arg) {
@@ -757,6 +603,10 @@ zx_status_t DisplayEngine::Start() {
 
   zxlogf(TRACE, "Start() completed");
   return ZX_OK;
+}
+
+const DisplayInfo* DisplayEngine::FirstValidDisplay(cpp20::span<const DisplayInfo> display_infos) {
+  return display_infos.empty() ? nullptr : &display_infos.front();
 }
 
 zx_koid_t GetKoid(zx_handle_t handle) {
@@ -779,7 +629,7 @@ zx_status_t DisplayEngine::Init() {
   }
 
   // Allocate a GPU request
-  zx_status_t status = io_buffer_init(&gpu_req_, virtio_device_->bti().get(),
+  zx_status_t status = io_buffer_init(&gpu_req_, gpu_device_->bti().get(),
                                       zx_system_get_page_size(), IO_BUFFER_RW | IO_BUFFER_CONTIG);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to allocate command buffers: %s", zx_status_get_string(status));
