@@ -45,7 +45,12 @@ template("android_starnix_container") {
 
       _outdir = "${target_out_dir}/${target_name}"
       inputs = [ invoker.system ]
-      outputs = [ "${_outdir}/package_manifest.json" ]
+      outputs = [
+        # List the meta.far file as an output to avoid flaky incremental builds.
+        # See b/324512578 for details.
+        "${_outdir}/meta.far",
+        "${_outdir}/package_manifest.json",
+      ]
 
       args = [
         "--name",
