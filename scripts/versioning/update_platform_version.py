@@ -16,14 +16,10 @@ import sys
 
 from pathlib import Path
 
-# The length of the API compatibility window, in API levels. This is the number
-# of stable API levels that will be supported in addition to the one in development.
-_API_COMPATIBILITY_WINDOW_SIZE = 2
-
 
 def update_fidl_compatibility_doc(
-    fuchsia_api_level, fidl_compatiblity_doc_path
-):
+    fuchsia_api_level: int, fidl_compatiblity_doc_path: str
+) -> bool:
     """Updates fidl_api_compatibility_testing.md given the in-development API level."""
     try:
         with open(fidl_compatiblity_doc_path, "r+") as f:
@@ -48,15 +44,22 @@ Did you run this script from the root of the source tree?""".format(
         return False
 
 
-def generate_random_abi_revision():
-    """Generates a random ABI revision.
+def generate_random_abi_revision(already_used: set[int]) -> int:
+    """Generates a random 64-bit ABI revision, avoiding values in
+    `already_used` and other reserved ranges."""
+    while True:
+        # Reserve values in the top 1/256th of the space.
+        candidate = secrets.randbelow(0xF000_0000_0000_0000)
 
-    ABI revisions are hex encodings of 64-bit, unsigned integeres.
-    """
-    return "0x{abi_revision}".format(abi_revision=secrets.token_hex(8).upper())
+        # If the ABI revision has already been used, discard it and go buy a
+        # lottery ticket.
+        if candidate not in already_used:
+            return candidate
 
 
-def update_version_history(fuchsia_api_level, version_history_path):
+def update_version_history(
+    fuchsia_api_level: int, version_history_path: str
+) -> bool:
     """Updates version_history.json to include the given Fuchsia API level.
 
     The ABI revision for this API level is set to a new random value that has not
@@ -75,14 +78,18 @@ def update_version_history(fuchsia_api_level, version_history_path):
                 )
                 return False
 
-            # Transition to an unsupported status will be defined in a future RFC.
             for level, data in versions.items():
                 if data["status"] == "in-development":
                     data["status"] = "supported"
 
-            abi_revision = generate_random_abi_revision()
+            abi_revision = generate_random_abi_revision(
+                set(int(v["abi_revision"], 16) for v in versions.values())
+            )
             versions[str(fuchsia_api_level)] = dict(
-                abi_revision=abi_revision, status="in-development"
+                # Print `abi_revision` in hex, with a leading 0x, with capital
+                # letters, padded to 16 chars.
+                abi_revision=f"0x{abi_revision:016X}",
+                status="in-development",
             )
             f.seek(0)
             json.dump(version_history, f, indent=4)
@@ -99,16 +106,18 @@ Did you run this script from the root of the source tree?""".format(
         return False
 
 
-def move_owners_file(root_source_dir, root_build_dir, fuchsia_api_level):
+def move_owners_file(
+    root_source_dir: str, root_build_dir: str, fuchsia_api_level: int
+) -> bool:
     """Helper function for copying golden files. It accomplishes the following:
     1. Overrides //sdk/history/OWNERS in //sdk/history/N/ allowing a wider set of reviewers.
     2. Reverts //sdk/history/N-1/  back to using //sdk/history/OWNERS, now that N-1 is a
        supported API level.
 
     """
-    root = join_path(root_source_dir, "sdk", "history")
-    src = join_path(root, str(fuchsia_api_level - 1), "OWNERS")
-    dst = join_path(root, str(fuchsia_api_level))
+    root = _join_path(root_source_dir, "sdk", "history")
+    src = _join_path(root, str(fuchsia_api_level - 1), "OWNERS")
+    dst = _join_path(root, str(fuchsia_api_level))
 
     try:
         os.mkdir(dst)
@@ -125,8 +134,10 @@ def move_owners_file(root_source_dir, root_build_dir, fuchsia_api_level):
     return True
 
 
-def copy_compatibility_test_goldens(root_build_dir, fuchsia_api_level):
-    """Updates the golden files used for compatibility testing".
+def copy_compatibility_test_goldens(
+    root_build_dir: str, fuchsia_api_level: int
+) -> bool:
+    """Updates the golden files used for compatibility testing.
 
     This assumes a clean build with:
       fx set core.x64 --with //sdk:compatibility_testing_goldens
@@ -139,8 +150,8 @@ def copy_compatibility_test_goldens(root_build_dir, fuchsia_api_level):
 
     with open(goldens_manifest) as f:
         for entry in json.load(f):
-            src = join_path(root_build_dir, entry["src"])
-            dst = join_path(root_build_dir, entry["dst"])
+            src = _join_path(root_build_dir, entry["src"])
+            dst = _join_path(root_build_dir, entry["dst"])
             try:
                 print(f"copying {src} to {dst}")
                 shutil.copyfile(src, dst)
@@ -150,12 +161,12 @@ def copy_compatibility_test_goldens(root_build_dir, fuchsia_api_level):
     return True
 
 
-def join_path(root_dir, *paths):
+def _join_path(root_dir: str, *paths: str) -> str:
     """Returns absolute path"""
     return os.path.abspath(os.path.join(root_dir, *paths))
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fuchsia-api-level", type=int, required=True)
     parser.add_argument("--sdk-version-history", required=True)

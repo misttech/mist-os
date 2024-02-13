@@ -9,16 +9,17 @@ import os
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 import update_platform_version
 
 FAKE_VERSION_HISTORY_FILE_CONTENT = """{
-    \"data\": {
+    "data": {
         "name": "Platform version map",
         "type": "version_history",
         "api_levels": {
             "1" : {
-                "abi_revision": "0x1",
+                "abi_revision": "0x0000000000000001",
                 "status": "in-development"
             }
         }
@@ -48,7 +49,7 @@ EXPECTED_DST_FILE_CONTENT = "{ test }"
 
 
 class TestUpdatePlatformVersionMethods(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.test_dir = tempfile.mkdtemp()
 
         self.fake_version_history_file = os.path.join(
@@ -56,18 +57,12 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
         )
         with open(self.fake_version_history_file, "w") as f:
             f.write(FAKE_VERSION_HISTORY_FILE_CONTENT)
-        update_platform_version.VERSION_HISTORY_PATH = (
-            self.fake_version_history_file
-        )
 
         self.fake_fidl_compability_doc_file = os.path.join(
             self.test_dir, "fidl_api_compatibility_testing.md"
         )
         with open(self.fake_fidl_compability_doc_file, "w") as f:
             f.write(FAKE_FIDL_COMPATIBILITY_DOC_FILE_CONTENT)
-        update_platform_version.FIDL_COMPATIBILITY_DOC_PATH = (
-            self.fake_fidl_compability_doc_file
-        )
 
         self.test_src_dir = tempfile.mkdtemp()
         self.fake_src_file = os.path.join(
@@ -95,34 +90,84 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
         with open(self.fake_golden_file, "w") as f:
             json.dump(content, f)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         shutil.rmtree(self.test_dir)
 
-    def _version_history_contains_entry_for_api_level(self, api_level):
+    @mock.patch("secrets.randbelow")
+    def test_update_version_history(self, mock_secrets: mock.MagicMock) -> None:
+        mock_secrets.return_value = 0x1234ABC
+
+        self.assertTrue(
+            update_platform_version.update_version_history(
+                NEW_API_LEVEL, self.fake_version_history_file
+            )
+        )
+
         with open(self.fake_version_history_file, "r") as f:
-            version_history = json.load(f)
-            versions = version_history["data"]["api_levels"]
-            return str(api_level) in versions
+            updated = json.load(f)
+            self.assertEqual(
+                updated,
+                {
+                    "data": {
+                        "name": "Platform version map",
+                        "type": "version_history",
+                        "api_levels": {
+                            "1": {
+                                "abi_revision": "0x0000000000000001",
+                                "status": "supported",
+                            },
+                            "2": {
+                                "abi_revision": "0x0000000001234ABC",
+                                "status": "in-development",
+                            },
+                        },
+                    },
+                    "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json",
+                },
+            )
 
-    def test_update_version_history(self):
         self.assertFalse(
-            self._version_history_contains_entry_for_api_level(NEW_API_LEVEL)
-        )
-        self.assertTrue(
             update_platform_version.update_version_history(
-                NEW_API_LEVEL, update_platform_version.VERSION_HISTORY_PATH
+                NEW_API_LEVEL, self.fake_version_history_file
             )
         )
+
+    @mock.patch("secrets.randbelow")
+    def test_abi_collision(self, mock_secrets: mock.MagicMock) -> None:
+        # Return 0x1 the first time, and 0x4321 the second time. We expect the
+        # second one to be used.
+        mock_secrets.side_effect = [0x1, 0x4321CBA]
+
         self.assertTrue(
-            self._version_history_contains_entry_for_api_level(NEW_API_LEVEL)
-        )
-        self.assertFalse(
             update_platform_version.update_version_history(
-                NEW_API_LEVEL, update_platform_version.VERSION_HISTORY_PATH
+                NEW_API_LEVEL, self.fake_version_history_file
             )
         )
 
-    def test_update_fidl_compatibility_doc(self):
+        with open(self.fake_version_history_file, "r") as f:
+            updated = json.load(f)
+            self.assertEqual(
+                updated,
+                {
+                    "data": {
+                        "name": "Platform version map",
+                        "type": "version_history",
+                        "api_levels": {
+                            "1": {
+                                "abi_revision": "0x0000000000000001",
+                                "status": "supported",
+                            },
+                            "2": {
+                                "abi_revision": "0x0000000004321CBA",
+                                "status": "in-development",
+                            },
+                        },
+                    },
+                    "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json",
+                },
+            )
+
+    def test_update_fidl_compatibility_doc(self) -> None:
         with open(self.fake_fidl_compability_doc_file) as f:
             lines = f.readlines()
         self.assertIn(
@@ -134,8 +179,7 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
 
         self.assertTrue(
             update_platform_version.update_fidl_compatibility_doc(
-                NEW_API_LEVEL,
-                update_platform_version.FIDL_COMPATIBILITY_DOC_PATH,
+                NEW_API_LEVEL, self.fake_fidl_compability_doc_file
             )
         )
 
@@ -148,7 +192,7 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
             f"{{% set in_development_api_level = {NEW_API_LEVEL} %}}\n", lines
         )
 
-    def test_move_compatibility_test_goldens(self):
+    def test_move_compatibility_test_goldens(self) -> None:
         self.assertTrue(
             update_platform_version.copy_compatibility_test_goldens(
                 self.test_dir, NEW_API_LEVEL
