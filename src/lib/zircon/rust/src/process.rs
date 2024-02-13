@@ -8,7 +8,7 @@ use crate::ok;
 use crate::sys::{zx_handle_t, zx_rights_t};
 use crate::{
     object_get_info, object_get_info_vec, object_get_property, object_set_property, ObjectQuery,
-    Topic,
+    Topic, VmoInfo,
 };
 use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Koid, Status, Task, Thread};
 use crate::{Property, PropertyQuery};
@@ -154,6 +154,12 @@ impl Default for ProcessMapsInfo {
 unsafe impl ObjectQuery for ProcessMapsInfo {
     const TOPIC: Topic = Topic::PROCESS_MAPS;
     type InfoTy = ProcessMapsInfo;
+}
+
+struct ProcessVmoInfo;
+unsafe impl ObjectQuery for ProcessVmoInfo {
+    const TOPIC: Topic = Topic::PROCESS_VMOS;
+    type InfoTy = sys::zx_info_vmo_t;
 }
 
 sys::zx_info_process_handle_stats_t!(ProcessHandleStats);
@@ -321,6 +327,10 @@ impl Process {
         object_get_info::<ProcessMapsInfo>(self.as_handle_ref(), info_out)
     }
 
+    pub fn info_maps_vec(&self) -> Result<Vec<ProcessMapsInfo>, Status> {
+        object_get_info_vec::<ProcessMapsInfo>(self.as_handle_ref())
+    }
+
     /// Exit the current process with the given return code.
     ///
     /// Wraps the
@@ -359,6 +369,14 @@ impl Process {
         };
         ok(status)?;
         Ok(unsafe { Handle::from_raw(handle) })
+    }
+
+    /// Wraps the
+    /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
+    /// syscall for the ZX_INFO_PROCESS_VMO topic.
+    pub fn info_vmos_vec(&self) -> Result<Vec<VmoInfo>, Status> {
+        let raw_info = object_get_info_vec::<ProcessVmoInfo>(self.as_handle_ref())?;
+        Ok(raw_info.into_iter().map(|info| info.into()).collect())
     }
 }
 
@@ -538,6 +556,55 @@ mod tests {
             root_vmar.unmap(map1, system_get_page_size() as usize).unwrap();
             root_vmar.unmap(map2, system_get_page_size() as usize).unwrap();
         }
+    }
+
+    #[test]
+    fn info_maps_vec() {
+        let root_vmar = fuchsia_runtime::vmar_root_self();
+        let process = fuchsia_runtime::process_self();
+
+        // Create two mappings so we know what to expect from our test calls.
+        let vmo = Vmo::create(system_get_page_size() as u64).unwrap();
+        let vmo_koid = vmo.get_koid().unwrap();
+
+        let map1 = root_vmar
+            .map(0, &vmo, 0, system_get_page_size() as usize, VmarFlags::PERM_READ)
+            .unwrap();
+        let map2 = root_vmar
+            .map(0, &vmo, 0, system_get_page_size() as usize, VmarFlags::PERM_READ)
+            .unwrap();
+
+        let info = process.info_maps_vec().unwrap();
+
+        // We should find our two mappings in the info.
+        let count = info
+            .iter()
+            .filter_map(ProcessMapsInfo::into_mapping_info)
+            .filter(|map| map.vmo_koid == vmo_koid.raw_koid())
+            .count();
+        assert_eq!(count, 2);
+
+        // We created these mappings and are not letting any references to them escape so unmapping
+        // is safe to do.
+        unsafe {
+            root_vmar.unmap(map1, system_get_page_size() as usize).unwrap();
+            root_vmar.unmap(map2, system_get_page_size() as usize).unwrap();
+        }
+    }
+
+    #[test]
+    fn info_vmos_vec() {
+        let process = fuchsia_runtime::process_self();
+
+        // Create two mappings so we know what to expect from our test calls.
+        let vmo = Vmo::create(system_get_page_size() as u64).unwrap();
+        let vmo_koid = vmo.get_koid().unwrap();
+
+        let info = process.info_vmos_vec().unwrap();
+
+        // We should find our two mappings in the info.
+        let count = info.iter().filter(|map| map.koid == vmo_koid).count();
+        assert_eq!(count, 1);
     }
 
     #[test]
