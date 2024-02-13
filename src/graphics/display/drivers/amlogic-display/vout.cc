@@ -156,7 +156,7 @@ void Vout::PopulateAddedDisplayArgs(
     }
     case VoutType::kHdmi:
       args->display_id = display::ToBanjoDisplayId(display_id);
-      args->panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_EDID;
+      args->panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_EDID_I2C;
       args->panel.i2c.ops = &i2c_impl_protocol_ops_;
       args->panel.i2c.ctx = this;
       args->pixel_format_list = pixel_formats.data();

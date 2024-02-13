@@ -123,7 +123,7 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
     return zx::ok(std::move(out));
   }
 
-  ZX_DEBUG_ASSERT(info.panel_capabilities_source == PANEL_CAPABILITIES_SOURCE_EDID);
+  ZX_DEBUG_ASSERT(info.panel_capabilities_source == PANEL_CAPABILITIES_SOURCE_EDID_I2C);
   out->edid = DisplayInfo::Edid{};
   ddk::I2cImplProtocolClient i2c(&info.panel.i2c);
   if (!i2c.is_valid()) {

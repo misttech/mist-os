@@ -70,7 +70,7 @@ type Panel = strict resource union {
 type PanelCapabilitiesSource = strict enum {
     /// The panel uses Extended Display Identification Data (EDID) over the
     /// I2C bus to communicate its capabilities.
-    EDID = 1;
+    EDID_I2C = 1;
 
     /// The panel provides a DisplayMode struct to express its capabilities.
     DISPLAY_MODE = 2;
@@ -80,11 +80,8 @@ type PanelCapabilitiesSource = strict enum {
 type AddedDisplayArgs = resource struct {
     display_id uint64;
 
-    /// If `panel_capabilities_source` is `EDID`, `panel.i2c` must be a valid
-    /// I2c client. The rest fields in `panel` are ignored.
-    ///
-    /// If `panel_capabilities_source` is `DISPLAY_PARAMS`,
-    /// `panel.params` must be valid. The rest fields in `panel` are ignored.
+    /// If `panel_capabilities_source` is `EDID_I2C`, `panel.i2c` must be a
+    /// valid I2c client. The rest fields in `panel` are ignored.
     ///
     /// If `panel_capabilities_source` is `DISPLAY_MODE`, `panel.display_mode`
     /// must be valid. The rest fields in `panel` are ignored.
