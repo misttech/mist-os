@@ -104,6 +104,24 @@ impl FileOps for TraceMarkerFile {
             }
             Ok(bytes.len())
         } else {
+            // Ideally clearing should only be done once when we see tracing
+            // stop, but the trace observer thread is behind the perfetto_consumer
+            // feature, and with the way that filesystem creation is arranged it
+            // is difficult to route a reference to the stacks to the thread.
+            // In lieu of having a trace observer, we clear the stacks whenever
+            // an event is written and starnix:atrace category is disabled.
+            //
+            // Other than extreme circumstances where no trace events are written
+            // between the two trace sessions, this will prevent any events that
+            // were started in the first trace session from being matched with
+            // an end event in the second session. We don't expect such a
+            // situation to occur, as it would mean that we are telling applications
+            // to stop emitting atrace data before stopping the trace, where
+            // a typical use case would want atrace data for the entire duration
+            // of the trace.
+            if let Ok(mut event_stacks) = self.event_stacks.lock() {
+                event_stacks.clear();
+            }
             Ok(data.drain())
         }
     }
