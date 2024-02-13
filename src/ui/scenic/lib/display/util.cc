@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/hardware/display/types/cpp/fidl.h>
+#include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/event.h>
@@ -35,17 +36,28 @@ bool ImportBufferCollection(
     return false;
   }
 
-  if (display_coordinator->SetBufferCollectionConstraints(display_buffer_collection_id,
-                                                          image_config, &status) != ZX_OK ||
-      status != ZX_OK) {
-    FX_LOGS(ERROR) << "SetBufferCollectionConstraints failed.";
-
+  fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result
+      set_constraints_result;
+  status = display_coordinator->SetBufferCollectionConstraints(
+      display_buffer_collection_id, image_config, &set_constraints_result);
+  auto release_buffer_collection_on_failure = fit::defer([&] {
     if (display_coordinator->ReleaseBufferCollection(display_buffer_collection_id) != ZX_OK) {
       FX_LOGS(ERROR) << "ReleaseBufferCollection failed.";
     }
+  });
+
+  if (status != ZX_OK) {
+    FX_LOGS(ERROR) << "Failed to call FIDL SetBufferCollectionConstraints: "
+                   << zx_status_get_string(status);
+    return false;
+  }
+  if (set_constraints_result.is_err()) {
+    FX_LOGS(ERROR) << "Failed to set BufferCollection constraints: "
+                   << zx_status_get_string(set_constraints_result.err());
     return false;
   }
 
+  release_buffer_collection_on_failure.cancel();
   return true;
 }
 

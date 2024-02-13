@@ -469,9 +469,7 @@ closed protocol Coordinator {
     strict SetBufferCollectionConstraints(struct {
         buffer_collection_id BufferCollectionId;
         config fuchsia.hardware.display.types.ImageConfig;
-    }) -> (struct {
-        res zx.Status;
-    });
+    }) -> () error zx.Status;
 
     /// Returns true if Capture is supported on the platform.
     strict IsCaptureSupported() -> (struct {

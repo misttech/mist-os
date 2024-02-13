@@ -19,6 +19,7 @@
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
 #include "src/lib/testing/predicates/status.h"
+#include "zircon/status.h"
 
 namespace fhd = fuchsia_hardware_display;
 namespace fhdt = fuchsia_hardware_display_types;
@@ -379,14 +380,20 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
     return zx::error(result.value().error_value());
   }
 
-  auto set_constraints_result =
+  const auto set_constraints_result =
       dc_->SetBufferCollectionConstraints(fidl_display_collection_id, image_config);
-  if (!set_constraints_result.ok() || set_constraints_result.value().res != ZX_OK) {
-    zxlogf(ERROR, "Setting buffer (%dx%d) collection constraints failed: %s", image_config.width,
-           image_config.height, set_constraints_result.FormatDescription().c_str());
+
+  if (!set_constraints_result.ok()) {
+    zxlogf(ERROR, "Failed to call FIDL SetBufferCollectionConstraints %lu (%s)",
+           display_collection_id.value(), set_constraints_result.status_string());
     (void)dc_->ReleaseBufferCollection(fidl_display_collection_id);
-    return zx::error(set_constraints_result.ok() ? set_constraints_result.value().res
-                                                 : set_constraints_result.status());
+    return zx::error(set_constraints_result.status());
+  }
+  if (set_constraints_result.value().is_error()) {
+    zxlogf(ERROR, "Failed to set buffer (%dx%d) collection constraints (%s)", image_config.width,
+           image_config.height, zx_status_get_string(set_constraints_result.value().error_value()));
+    (void)dc_->ReleaseBufferCollection(fidl_display_collection_id);
+    return zx::error(set_constraints_result.value().error_value());
   }
 
   // Use the local collection so we can read out the error if allocation

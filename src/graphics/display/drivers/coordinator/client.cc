@@ -270,7 +270,7 @@ void Client::SetBufferCollectionConstraints(
       ToBufferCollectionId(request->buffer_collection_id);
   auto it = collection_map_.find(buffer_collection_id);
   if (it == collection_map_.end()) {
-    completer.Reply(ZX_ERR_INVALID_ARGS);
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
   auto& collections = it->second;
@@ -288,9 +288,9 @@ void Client::SetBufferCollectionConstraints(
     zxlogf(WARNING,
            "Cannot set BufferCollection constraints using imported buffer collection (id=%lu) %s.",
            buffer_collection_id.value(), zx_status_get_string(status));
-    completer.Reply(ZX_ERR_INTERNAL);
+    completer.ReplyError(ZX_ERR_INTERNAL);
   }
-  completer.Reply(status);
+  completer.ReplySuccess();
 }
 
 void Client::ReleaseEvent(ReleaseEventRequestView request,

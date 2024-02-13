@@ -332,7 +332,8 @@ impl DisplayDirectViewStrategy {
         display
             .coordinator
             .set_buffer_collection_constraints(&collection_id.into(), &image_config)
-            .await?;
+            .await?
+            .map_err(zx::Status::from_raw)?;
 
         let buffers = buffer_allocator
             .allocate_buffers(true)

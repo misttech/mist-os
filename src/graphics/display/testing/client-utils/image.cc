@@ -130,7 +130,7 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t 
   image_config.type = 0;  // 0 for any image type.
   auto set_constraints_result =
       dc->SetBufferCollectionConstraints(fidl_buffer_collection_id, image_config);
-  if (!set_constraints_result.ok() || set_constraints_result.value().res != ZX_OK) {
+  if (!set_constraints_result.ok() || set_constraints_result.value().is_error()) {
     fprintf(stderr, "Failed to set constraints\n");
     return nullptr;
   }

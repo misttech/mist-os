@@ -277,14 +277,13 @@ impl Coordinator {
         // Tell the driver to assign any device-specific constraints.
         // TODO(https://fxbug.dev/42166207): These fields are effectively unused except for `type` in the case
         // of IMAGE_TYPE_CAPTURE.
-        let _ = zx::Status::ok(
-            proxy
-                .set_buffer_collection_constraints(
-                    &id.into(),
-                    &display_types::ImageConfig { width: 0, height: 0, type_: 0 },
-                )
-                .await?,
-        )?;
+        proxy
+            .set_buffer_collection_constraints(
+                &id.into(),
+                &display_types::ImageConfig { width: 0, height: 0, type_: 0 },
+            )
+            .await?
+            .map_err(zx::Status::from_raw)?;
         Ok(id)
     }
 

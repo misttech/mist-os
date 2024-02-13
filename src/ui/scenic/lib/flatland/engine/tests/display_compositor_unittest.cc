@@ -217,7 +217,8 @@ TEST_F(DisplayCompositorTest, ImportAndReleaseBufferCollectionTest) {
           [](fuchsia::hardware::display::BufferCollectionId collection_id,
              fuchsia::hardware::display::types::ImageConfig config,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
-            callback(ZX_OK);
+            callback(fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result::
+                         WithResponse({}));
           }));
   // Save token to avoid early token failure.
   fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_ref;
@@ -325,7 +326,8 @@ TEST_F(DisplayCompositorTest,
                                        .min_buffer_count = 2,
                                        .max_buffer_count = 3,
                                    });
-            callback(ZX_OK);
+            callback(fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result::
+                         WithResponse({}));
           }));
   EXPECT_CALL(*mock_display_coordinator_,
               ImportImage(_, testing::FieldsAre(FidlEquals(kDisplayBufferCollectionId), 0), _, _))
@@ -457,7 +459,8 @@ TEST_F(DisplayCompositorTest,
                                        .min_buffer_count = 1,
                                        .max_buffer_count = 1,
                                    });
-            callback(ZX_OK);
+            callback(fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result::
+                         WithResponse({}));
           }));
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayCoordinator::CheckConfigCallback callback) {
@@ -660,7 +663,8 @@ TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
           [](fuchsia::hardware::display::BufferCollectionId collection_id,
              fuchsia::hardware::display::types::ImageConfig config,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
-            callback(ZX_OK);
+            callback(fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result::
+                         WithResponse({}));
           }));
   // Save token to avoid early token failure.
   fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_ref;
@@ -748,7 +752,8 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
           [](fuchsia::hardware::display::BufferCollectionId collection_id,
              fuchsia::hardware::display::types::ImageConfig config,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
-            callback(ZX_OK);
+            callback(fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result::
+                         WithResponse({}));
           }));
   // Save token to avoid early token failure.
   fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_ref;
@@ -1057,7 +1062,8 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
           [](fuchsia::hardware::display::BufferCollectionId collection_id,
              fuchsia::hardware::display::types::ImageConfig config,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
-            callback(ZX_OK);
+            callback(fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result::
+                         WithResponse({}));
           }));
   // Save token to avoid early token failure.
   fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_ref;
@@ -1272,7 +1278,8 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
           [](fuchsia::hardware::display::BufferCollectionId collection_id,
              fuchsia::hardware::display::types::ImageConfig config,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
-            callback(ZX_OK);
+            callback(fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result::
+                         WithResponse({}));
           }));
   // Save token to avoid early token failure.
   fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_ref;
@@ -1609,7 +1616,8 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
           [](fuchsia::hardware::display::BufferCollectionId collection_id,
              fuchsia::hardware::display::types::ImageConfig config,
              MockDisplayCoordinator::SetBufferCollectionConstraintsCallback callback) {
-            callback(ZX_OK);
+            callback(fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result::
+                         WithResponse({}));
           }));
   // Save token to avoid early token failure.
   fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_ref;

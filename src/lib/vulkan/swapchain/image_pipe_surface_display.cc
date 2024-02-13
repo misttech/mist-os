@@ -298,8 +298,10 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
 #endif
 
   display_coordinator_->SetBufferCollectionConstraints(
-      kBufferCollectionId, image_config, [this, &status](zx_status_t constraint_status) {
-        status = constraint_status;
+      kBufferCollectionId, image_config,
+      [this, &status](
+          fuchsia::hardware::display::Coordinator_SetBufferCollectionConstraints_Result result) {
+        status = result.is_err() ? result.err() : ZX_OK;
         got_message_response_ = true;
       });
   if (!WaitForAsyncMessage()) {
