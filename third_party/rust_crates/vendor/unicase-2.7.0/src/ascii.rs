@@ -1,11 +1,13 @@
+use alloc::string::String;
+#[cfg(__unicase__iter_cmp)]
+use core::cmp::Ordering;
+use core::fmt;
+use core::hash::{Hash, Hasher};
+use core::ops::{Deref, DerefMut};
+use core::str::FromStr;
+#[cfg(not(__unicase__core_and_alloc))]
 #[allow(deprecated, unused)]
 use std::ascii::AsciiExt;
-#[cfg(__unicase__iter_cmp)]
-use std::cmp::Ordering;
-use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::ops::{Deref, DerefMut};
-use std::str::FromStr;
 
 use super::{Ascii, Encoding, UniCase};
 
@@ -79,7 +81,6 @@ impl<S: AsRef<str>> AsRef<str> for Ascii<S> {
     fn as_ref(&self) -> &str {
         self.0.as_ref()
     }
-
 }
 
 impl<S: fmt::Display> fmt::Display for Ascii<S> {
@@ -130,12 +131,12 @@ impl<S: AsRef<str>> Hash for Ascii<S> {
 
 #[cfg(test)]
 mod tests {
-    use ::Ascii;
-    use std::hash::{Hash, Hasher};
-    #[cfg(not(__unicase__default_hasher))]
-    use std::hash::SipHasher as DefaultHasher;
     #[cfg(__unicase__default_hasher)]
     use std::collections::hash_map::DefaultHasher;
+    #[cfg(not(__unicase__default_hasher))]
+    use std::hash::SipHasher as DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    use Ascii;
 
     fn hash<T: Hash>(t: &T) -> u64 {
         let mut s = DefaultHasher::new();
