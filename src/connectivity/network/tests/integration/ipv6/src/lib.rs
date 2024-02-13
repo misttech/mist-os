@@ -29,7 +29,7 @@ use net_types::{
 use netemul::InterfaceConfig;
 use netstack_testing_common::{
     constants::{eth as eth_consts, ipv6 as ipv6_consts},
-    interfaces,
+    interfaces::{self, TestInterfaceExt as _},
     ndp::{
         self, assert_dad_failed, assert_dad_success, expect_dad_neighbor_solicitation,
         fail_dad_with_na, fail_dad_with_ns, send_ra, send_ra_with_router_lifetime, DadState,
@@ -449,13 +449,6 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
 /// an interface, DAD should succeed.
 #[netstack_test]
 async fn duplicate_address_detection<N: Netstack>(name: &str) {
-    // TODO(https://fxbug.dev/42182861): Unskip. This test is skipped
-    // because observing DAD failed is very flaky on RISCV builders.
-    #[cfg(target_arch = "riscv64")]
-    if N::VERSION == NetstackVersion::Netstack3 {
-        println!("Skipping this test due to flakes. See https://fxbug.dev/42182861");
-        return;
-    }
     /// Adds `ipv6_consts::LINK_LOCAL_ADDR` to the interface and makes sure a Neighbor Solicitation
     /// message is transmitted by the netstack for DAD.
     ///
@@ -469,7 +462,7 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
     >(
         iface: &'b netemul::TestInterface<'a>,
         fake_ep: &'b netemul::TestFakeEndpoint<'a>,
-        control: &'b fidl_fuchsia_net_interfaces_admin::ControlProxy,
+        control: &'b fnet_interfaces_ext::admin::Control,
         interface_up: bool,
         dad_fn: FN,
     ) -> impl futures::stream::Stream<Item = DadState> {
@@ -548,18 +541,16 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
     }
 
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let (_network, realm, iface, fake_ep) =
+    let (_network, _realm, iface, fake_ep) =
         setup_network::<N>(&sandbox, name, None).await.expect("error setting up network");
 
-    let root_control = realm
-        .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
-        .expect("failed to connect to fuchsia.net.root/Interfaces");
-    let (control, server) =
-        fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::ControlMarker>()
-            .expect("create proxy");
-    let () = root_control
-        .get_admin(iface.id(), server)
-        .expect("fuchsia.net.root/Interfaces.GetAdmin failed");
+    let control = iface.control();
+
+    // The next steps want to observe a DAD failure. To prevent flakes in CQ due
+    // to DAD retransmission time, set the number of DAD transmits very high and
+    // restore it later.
+    let previous_dad_transmits =
+        iface.set_dad_transmits(u16::MAX).await.expect("set dad transmits");
 
     // Add an address and expect it to fail DAD because we simulate another node
     // performing DAD at the same time.
@@ -574,6 +565,12 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
         let state_stream =
             add_address_for_dad(&iface, &fake_ep, &control, true, fail_dad_with_na).await;
         assert_dad_failed(state_stream).await;
+    }
+
+    // Restore the original DAD transmits value.
+    if let Some(previous) = previous_dad_transmits {
+        let _: Option<u16> =
+            iface.set_dad_transmits(previous).await.expect("restore dad transmits");
     }
 
     {

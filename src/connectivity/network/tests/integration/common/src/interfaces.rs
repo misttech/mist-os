@@ -10,6 +10,7 @@
 use super::Result;
 
 use anyhow::Context as _;
+use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_zircon as zx;
 use futures::future::{FusedFuture, Future, FutureExt as _, TryFutureExt as _};
@@ -284,11 +285,42 @@ pub async fn wait_for_online(
 pub trait TestInterfaceExt {
     /// Calls [`crate::nud::apply_nud_flake_workaround`] for this interface.
     async fn apply_nud_flake_workaround(&self) -> Result;
+
+    /// Sets the number of DAD transmits on this interface.
+    ///
+    /// Returns the previous configuration value, if reported by the API.
+    async fn set_dad_transmits(&self, dad_transmits: u16) -> Result<Option<u16>>;
 }
 
 #[async_trait::async_trait]
 impl<'a> TestInterfaceExt for netemul::TestInterface<'a> {
     async fn apply_nud_flake_workaround(&self) -> Result {
         crate::nud::apply_nud_flake_workaround(self.control()).await
+    }
+
+    async fn set_dad_transmits(&self, dad_transmits: u16) -> Result<Option<u16>> {
+        self.control()
+            .set_configuration(&fnet_interfaces_admin::Configuration {
+                ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
+                    ndp: Some(fnet_interfaces_admin::NdpConfiguration {
+                        dad: Some(fnet_interfaces_admin::DadConfiguration {
+                            transmits: Some(dad_transmits),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })
+            .await?
+            .map(|config| {
+                config
+                    .ipv6
+                    .and_then(|ipv6| ipv6.ndp)
+                    .and_then(|ndp| ndp.dad)
+                    .and_then(|dad| dad.transmits)
+            })
+            .map_err(|e| anyhow::anyhow!("set configuration error {e:?}"))
     }
 }
