@@ -712,7 +712,11 @@ impl ObjectStore {
     pub fn record_data(self: &Arc<Self>, root: &fuchsia_inspect::Node) {
         // TODO(https://fxbug.dev/42069513): Push-back or rate-limit to prevent DoS.
         let counters = self.counters.lock().unwrap();
-        root.record_string("guid", Uuid::from_bytes(self.store_info().guid).to_string());
+        if let Some(store_info) = self.store_info() {
+            root.record_string("guid", Uuid::from_bytes(store_info.guid).to_string());
+        } else {
+            warn!("Can't access store_info; store is locked.");
+        };
         root.record_uint("store_object_id", self.store_object_id);
         root.record_uint("mutations_applied", counters.mutations_applied);
         root.record_uint("mutations_dropped", counters.mutations_dropped);
@@ -1377,8 +1381,8 @@ impl ObjectStore {
         objects
     }
 
-    pub fn store_info(&self) -> StoreInfo {
-        self.store_info.lock().unwrap().info().unwrap().clone()
+    pub fn store_info(&self) -> Option<StoreInfo> {
+        self.store_info.lock().unwrap().info().cloned()
     }
 
     /// Returns None if called during journal replay.
@@ -2818,7 +2822,7 @@ mod tests {
                 .await
                 .expect("new_volume failed");
 
-            let store_info = store.store_info();
+            let store_info = store.store_info().unwrap();
 
             // Hack the last object ID to force a roll of the object ID cipher.
             {
@@ -2850,7 +2854,7 @@ mod tests {
             assert_eq!(object.object_id() & OBJECT_ID_HI_MASK, 2u64 << 32);
 
             // Check that the key has been changed.
-            assert_ne!(store.store_info().object_id_key, store_info.object_id_key);
+            assert_ne!(store.store_info().unwrap().object_id_key, store_info.object_id_key);
 
             assert_eq!(store.last_object_id.lock().unwrap().id, 2u64 << 32);
         };

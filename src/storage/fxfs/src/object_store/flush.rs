@@ -61,7 +61,9 @@ impl ObjectStore {
                 // If we're unlocking, only flush if there are encrypted mutations currently stored
                 // in a file.  We don't worry if they're in memory because a flush should get
                 // triggered when the journal gets full.
-                if self.store_info().encrypted_mutations_object_id == INVALID_OBJECT_ID {
+                // Safe to unwrap store_info here because this was invoked from ObjectStore::unlock,
+                // so store_info is already accessible.
+                if self.store_info().unwrap().encrypted_mutations_object_id == INVALID_OBJECT_ID {
                     // TODO(https://fxbug.dev/42179266): Add earliest_version support for encrypted mutations.
                     // Early exit, but still return the earliest version used by a struct in the
                     // tree.
@@ -136,7 +138,7 @@ impl ObjectStore {
                 _object_id: u64,
                 _manager: &ObjectManager,
             ) {
-                let mut store_info = self.store.store_info();
+                let mut store_info = self.store.store_info().unwrap();
 
                 // Capture the offset in the cipher stream.
                 let mutations_cipher = self.store.mutations_cipher.lock().unwrap();

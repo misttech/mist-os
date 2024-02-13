@@ -262,9 +262,13 @@ impl ObjectStoreDirectory {
     }
 
     fn update_from_store(&self, store: &ObjectStore) -> Result<(), Status> {
-        let store_info_txt = format!("{:?}", store.store_info());
+        // If the store is flushed by the journal while it's still locked, store_info won't be
+        // available yet.
         self.vfs_root.remove_entry("store_info.txt", false)?;
-        self.vfs_root.add_entry("store_info.txt", vfs::file::vmo::read_only(store_info_txt))?;
+        if let Some(store_info) = store.store_info() {
+            let store_info_txt = format!("{:?}", store_info);
+            self.vfs_root.add_entry("store_info.txt", vfs::file::vmo::read_only(store_info_txt))?;
+        }
 
         let (layers_dir, parent_store) = if let Some(layers) = self.layers.as_ref() {
             (layers, upgrade_weak(self.parent_store.as_ref().unwrap())?)
