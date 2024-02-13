@@ -143,6 +143,7 @@ void FidlController::SendCommand(pw::span<const std::byte> command) {
     bt_log(ERROR, "controllers", "failed to write command channel: %s",
            zx_status_get_string(status));
     OnError(status);
+    return;
   }
 }
 
@@ -153,6 +154,7 @@ void FidlController::SendAclData(pw::span<const std::byte> data) {
   if (status != ZX_OK) {
     bt_log(ERROR, "controllers", "failed to write ACL channel: %s", zx_status_get_string(status));
     OnError(status);
+    return;
   }
 }
 
@@ -272,6 +274,7 @@ void FidlController::OnChannelSignal(const char* chan_name, zx_status_t status,
   if (status != ZX_OK) {
     bt_log(ERROR, "controllers", "%s wait error: %s", chan_name, zx_status_get_string(status));
     OnError(status);
+    return;
   }
 }
 

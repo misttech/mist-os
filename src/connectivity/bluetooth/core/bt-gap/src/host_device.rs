@@ -70,6 +70,7 @@ impl Drop for HostDiscoverableSession {
 pub struct HostDevice(Arc<HostDeviceState>);
 
 pub struct HostDeviceState {
+    // TODO(https://fxbug.dev/324954255): Remove device_path
     device_path: String,
     proxy: HostProxy,
     info: RwLock<Inspectable<HostInfo>>,

@@ -939,15 +939,21 @@ impl HostDispatcher {
         self.add_host_device(&host_device).await?;
 
         // Start listening to Host interface events.
-        fasync::Task::spawn(host_device.watch_events(self.clone()).map(|r| {
-            r.unwrap_or_else(|err| {
-                warn!("Error handling host event: {:?}", err);
-                // TODO(https://fxbug.dev/42120566): This should probably remove the bt-host since
-                // termination of the `watch_events` task indicates that it no longer functions
-                // properly.
-            })
-        }))
+        fasync::Task::spawn({
+            let this = self.clone();
+            async move {
+                match host_device.watch_events(this.clone()).await {
+                    Ok(()) => (),
+                    Err(e) => {
+                        warn!("Error handling host event: {e:?}");
+                        let host_path = proxy_handle.as_str();
+                        this.rm_device(&host_path).await;
+                    }
+                }
+            }
+        })
         .detach();
+
         Ok(())
     }
 }
