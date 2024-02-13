@@ -130,6 +130,19 @@ impl<'a> Type<'a> {
             Type::Constant { value } => walker.add_constant(value),
         }
     }
+
+    pub(crate) fn is_leaf(&self) -> bool {
+        match self {
+            Type::Void | Type::Any | Type::Type { .. } | Type::Constant { .. } => true,
+            Type::Union(..)
+            | Type::Alias { .. }
+            | Type::Struct { .. }
+            | Type::Enum { .. }
+            | Type::Tuple { .. }
+            | Type::Array { .. }
+            | Type::Map { .. } => false,
+        }
+    }
 }
 
 /// Enum variants covering all JSON types.

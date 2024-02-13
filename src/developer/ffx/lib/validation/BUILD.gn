@@ -14,12 +14,14 @@ rustc_library("lib") {
     "src/schema.rs",
     "src/schema/inline_value.rs",
     "src/schema/macros.rs",
+    "src/simplify.rs",
     "src/validate.rs",
     "src/validate/compare.rs",
   ]
 
   deps = [
     "proc_macro",
+    "//third_party/rust_crates:bumpalo",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:thiserror",

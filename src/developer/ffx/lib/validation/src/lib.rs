@@ -8,6 +8,7 @@ extern crate self as ffx_validation;
 
 pub mod schema;
 pub use ffx_validation_proc_macro::schema;
+pub mod simplify;
 pub mod validate;
 
 pub use schema::Schema;
