@@ -244,6 +244,16 @@ declare_args() {
   link_rbe_check = "none"
 }
 
+RBE_EXEC_STRATEGY_MAP = {
+  remote = [ "--exec_strategy=remote" ]
+  remote_local_fallback = [ "--exec_strategy=remote_local_fallback" ]
+  local = [
+    "--exec_strategy=local",
+    "--remote_update_cache=false",
+  ]
+  racing = [ "--exec_strategy=racing" ]
+}
+
 # Dependencies for all RBE-enabled C++ actions.
 if (cxx_rbe_minimalist_wrapper) {
   cxx_rbe_deps =

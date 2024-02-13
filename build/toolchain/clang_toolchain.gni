@@ -150,18 +150,7 @@ template("clang_toolchain") {
         ]
         _cxx_concurrent_jobs = concurrent_jobs.local
       } else {
-        if (cxx_rbe_exec_strategy == "remote") {
-          compiler_prefix_list += [ "--exec_strategy=remote" ]
-        } else if (cxx_rbe_exec_strategy == "remote_local_fallback") {
-          compiler_prefix_list += [ "--exec_strategy=remote_local_fallback" ]
-        } else if (cxx_rbe_exec_strategy == "local") {
-          compiler_prefix_list += [
-            "--exec_strategy=local",
-            "--remote_update_cache=false",
-          ]
-        } else if (cxx_rbe_exec_strategy == "racing") {
-          compiler_prefix_list += [ "--exec_strategy=racing" ]
-        }
+        compiler_prefix_list += RBE_EXEC_STRATEGY_MAP[cxx_rbe_exec_strategy]
         if (!cxx_rbe_download_obj_files) {
           compiler_prefix_list += [ "--download_outputs=false" ]
         }
@@ -191,6 +180,11 @@ template("clang_toolchain") {
     prefix = rebased_clang_prefix
     if (defined(invoker.prefix)) {
       prefix = invoker.prefix
+    }
+
+    if (link_rbe_enable) {
+      _link_rbe_exec_strategy_flags =
+          RBE_EXEC_STRATEGY_MAP[link_rbe_exec_strategy]
     }
 
     # Configure builds to be restat-friendly by preserving timestamps of
@@ -281,18 +275,9 @@ template("clang_toolchain") {
           ]
           _rust_concurrent_jobs = concurrent_jobs.local
         } else {
-          if (rust_rbe_exec_strategy == "remote") {
-            _rewrapper_flags = [ "--exec_strategy=remote" ]
-          } else if (rust_rbe_exec_strategy == "remote_local_fallback") {
-            _rewrapper_flags = [ "--exec_strategy=remote_local_fallback" ]
-          } else if (rust_rbe_exec_strategy == "local") {
-            _rewrapper_flags = [
-              "--exec_strategy=local",
-              "--remote_update_cache=false",
-            ]
-          } else if (rust_rbe_exec_strategy == "racing") {
-            _rewrapper_flags = [ "--exec_strategy=racing" ]
-          }
+          _rust_rbe_exec_strategy_flags =
+              RBE_EXEC_STRATEGY_MAP[rust_rbe_exec_strategy]
+          _rewrapper_flags = _rust_rbe_exec_strategy_flags
         }
         if (restat_rust) {
           # re-client has built-in support for write-if-changed behavior
@@ -484,8 +469,8 @@ template("clang_toolchain") {
     #
     #   pool: Pool name (optional).
     #
-    #   remote_strip_prefix: The strip tool prefix to use when building
-    #       remotely with RBE.
+    #   cxx_link_remote_strip_prefix: The strip tool prefix to use when
+    #       building remotely with RBE.
     #
     #   unstripped_outfile: Path to unstripped output file.
     #
@@ -513,7 +498,8 @@ template("clang_toolchain") {
     #   host os and whether invoker.strip_cxx_bin_args is defined.
     #
     # - {{REMOTE_STRIP_PREFIX}}: Either an empty string, or the value of
-    #   `remote_strip_prefix` if the target type and RBE settings need it.
+    #   `rust_link_remote_strip_prefix` or `cxx_link_remote_strip_prefix`
+    #   if the target type and RBE settings need it.
     #
     # Note that the choice of GN-style source expansion parameters is
     # intentional: If by mistake the parameters are not properly expanded
@@ -549,22 +535,29 @@ template("clang_toolchain") {
         command_suffix += " && $gsymutil --convert=\"{{UNSTRIPPED_OUTFILE}}\" --out-file=\"$outfile.gsym\""
       }
       if (use_strip) {
-        remote_strip_prefix = ""
-
         if (rust_rbe_enable || _link_rbe_enable) {
-          remote_strip_prefix = string_join(
-                  " ",
-                  [
-                    rebase_path(python_exe_src, root_build_dir),
-                    "-S",
-                    rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
-                    "--inputs",
-                    "\"$unstripped_outfile\"",
-                    "--output_files",
-                    "\"$outfile\"",
-                    "--preserve_unchanged_output_mtime",
-                    "-- ",
-                  ])
+          _remote_strip_prefix_common = [
+            rebase_path(python_exe_src, root_build_dir),
+            "-S",
+            rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
+            "--inputs",
+            "\"$unstripped_outfile\"",
+            "--output_files",
+            "\"$outfile\"",
+            "--preserve_unchanged_output_mtime",
+          ]
+          if (rust_rbe_enable) {
+            rust_link_remote_strip_prefix =
+                string_join(" ",
+                            _remote_strip_prefix_common +
+                                _rust_rbe_exec_strategy_flags + [ "-- " ])
+          }
+          if (_link_rbe_enable) {
+            cxx_link_remote_strip_prefix =
+                string_join(" ",
+                            _remote_strip_prefix_common +
+                                _link_rbe_exec_strategy_flags + [ "-- " ])
+          }
         }
         if (invoker.toolchain_os == "mac") {
           command_suffix += " && {{REMOTE_STRIP_PREFIX}}$strip {{STRIP_ARGS}} \"{{UNSTRIPPED_OUTFILE}}\" -o \"$outfile\""
@@ -607,7 +600,12 @@ template("clang_toolchain") {
       #  {{REMOTE_STRIP_PREFIX}}
       #
       _rust_link_common = {
-        forward_variables_from(_link_common, "*", [ "remote_strip_prefix" ])
+        forward_variables_from(_link_common,
+                               "*",
+                               [
+                                 "cxx_link_remote_strip_prefix",
+                                 "rust_link_remote_strip_prefix",
+                               ])
         forward_variables_from(_rust_concurrent_jobs, "*")
 
         ld_location_env = ""
@@ -670,7 +668,7 @@ template("clang_toolchain") {
 
         _remote_strip_prefix = ""
         if (use_strip && rust_rbe_enable) {
-          _remote_strip_prefix = _link_common.remote_strip_prefix
+          _remote_strip_prefix = _link_common.rust_link_remote_strip_prefix
         }
         command = string_replace(command,
                                  "{{REMOTE_STRIP_PREFIX}}",
@@ -982,7 +980,7 @@ template("clang_toolchain") {
                              [
                                "command_suffix",
                                "depfile",
-                               "remote_strip_prefix",
+                               "cxx_link_remote_strip_prefix",
                              ])
       _concurrent_jobs = concurrent_jobs.local
       rspfile = "$outfile.rsp"
@@ -1009,6 +1007,7 @@ template("clang_toolchain") {
             _linker_prefix_list += [ "--compare" ]
           } else if (link_rbe_check == "none") {
             _concurrent_jobs = concurrent_jobs.remote
+            _linker_prefix_list += _link_rbe_exec_strategy_flags
           }
           _linker_prefix_list += [
             "--preserve_unchanged_output_mtime",
@@ -1035,8 +1034,10 @@ template("clang_toolchain") {
       # If remotely linking, also remotely strip.
       # TODO(https://fxbug.dev/42083070): disable remote stripping when
       # config includes //build/config:no_remote_link.
-      if (use_strip && _link_rbe_enable) {
-        _remote_strip_prefix = _link_common.remote_strip_prefix
+      if (use_strip) {
+        if (_link_rbe_enable) {
+          _remote_strip_prefix = _link_common.cxx_link_remote_strip_prefix
+        }
       }
       command_suffix = string_replace(_link_common.command_suffix,
                                       "{{REMOTE_STRIP_PREFIX}}",

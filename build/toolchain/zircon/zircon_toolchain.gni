@@ -185,6 +185,11 @@ template("zircon_toolchain") {
   }
   _restat_link = _link_rbe_enable
 
+  if (link_rbe_enable) {
+    _link_rbe_exec_strategy_flags =
+        RBE_EXEC_STRATEGY_MAP[link_rbe_exec_strategy]
+  }
+
   _restat_cc_prefix_list = []
   if (restat_cc) {
     if (!_cxx_rbe_enable) {
@@ -252,18 +257,7 @@ template("zircon_toolchain") {
       ]
       _cxx_concurrent_jobs = concurrent_jobs.local
     } else {
-      if (cxx_rbe_exec_strategy == "remote") {
-        compiler_prefix_list += [ "--exec_strategy=remote" ]
-      } else if (cxx_rbe_exec_strategy == "remote_local_fallback") {
-        compiler_prefix_list += [ "--exec_strategy=remote_local_fallback" ]
-      } else if (cxx_rbe_exec_strategy == "local") {
-        compiler_prefix_list += [
-          "--exec_strategy=local",
-          "--remote_update_cache=false",
-        ]
-      } else if (cxx_rbe_exec_strategy == "racing") {
-        compiler_prefix_list += [ "--exec_strategy=racing" ]
-      }
+      compiler_prefix_list += RBE_EXEC_STRATEGY_MAP[cxx_rbe_exec_strategy]
       if (!cxx_rbe_download_obj_files) {
         compiler_prefix_list += [ "--download_outputs=false" ]
       }
@@ -540,17 +534,20 @@ template("zircon_toolchain") {
         _remote_strip_list = []
         if (_link_rbe_enable) {
           # TODO(https://fxbug.dev/42083070): disable remote stripping when config includes //build/config:no_remote_link.
-          _remote_strip_list += [
-            rebase_path(python_exe_src, root_build_dir),
-            "-S",
-            rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
-            "--inputs",
-            "\"$unstripped_outfile\"",
-            "--output_files",
-            "\"$outfile\"",
-            "--preserve_unchanged_output_mtime",
-            "-- ",
-          ]
+          _remote_strip_list +=
+              [
+                rebase_path(python_exe_src, root_build_dir),
+                "-S",
+                rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
+              ] + _link_rbe_exec_strategy_flags +
+              [
+                "--inputs",
+                "\"$unstripped_outfile\"",
+                "--output_files",
+                "\"$outfile\"",
+                "--preserve_unchanged_output_mtime",
+                "-- ",
+              ]
         }
         strip_command += string_join(" ", _remote_strip_list)
         strip_command += "$strip_tool -o \"$outfile\" \"$unstripped_outfile\""
@@ -602,6 +599,7 @@ template("zircon_toolchain") {
         } else if (link_rbe_check == "consistency") {
           _linker_prefix_list += [ "--compare" ]
         } else if (link_rbe_check == "none") {
+          _linker_prefix_list += _link_rbe_exec_strategy_flags
           _link_concurrent_jobs = concurrent_jobs.remote
         }
         _linker_prefix_list += [
@@ -726,6 +724,7 @@ template("zircon_toolchain") {
         } else if (link_rbe_check == "consistency") {
           _linker_prefix_list += [ "--compare" ]
         } else if (link_rbe_check == "none") {
+          _linker_prefix_list += _link_rbe_exec_strategy_flags
           _link_concurrent_jobs = concurrent_jobs.remote
         }
         _linker_prefix_list += [
