@@ -17,7 +17,6 @@
 #endif
 
 __WEAK zx_handle_t mmio_resource_handle;
-__WEAK zx_handle_t root_resource_handle;
 __WEAK zx_handle_t irq_resource_handle;
 __WEAK zx_handle_t ioport_resource_handle;
 

@@ -33,7 +33,6 @@ using fuchsia_acpi_tables::wire::kMaxAcpiTableEntries;
 using fuchsia_acpi_tables::wire::TableInfo;
 
 zx_handle_t mmio_resource_handle;
-zx_handle_t root_resource_handle;
 zx_handle_t ioport_resource_handle;
 zx_handle_t irq_resource_handle;
 zx_handle_t power_resource_handle;
@@ -102,10 +101,6 @@ zx_status_t X86::Create(void* ctx, zx_device_t* parent, std::unique_ptr<X86>* ou
     zxlogf(ERROR, "Failed to connect to platform bus: %s", zx_status_get_string(status));
     return status;
   }
-
-  // Please do not use get_root_resource() in new code. See https://fxbug.dev/42106323.
-  ZX_ASSERT(zx_handle_duplicate(get_root_resource(parent), ZX_RIGHT_SAME_RIGHTS,
-                                &root_resource_handle) == ZX_OK);
 
   ZX_ASSERT(zx_handle_duplicate(get_ioport_resource(parent), ZX_RIGHT_SAME_RIGHTS,
                                 &ioport_resource_handle) == ZX_OK);

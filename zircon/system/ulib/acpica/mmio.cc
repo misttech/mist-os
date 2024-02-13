@@ -53,7 +53,7 @@ static zx_status_t mmap_physical(zx_paddr_t phys, size_t size, uint32_t cache_po
                                  zx_handle_t* out_vmo, zx_vaddr_t* out_vaddr) {
   zx_handle_t vmo;
   zx_vaddr_t vaddr;
-  zx_status_t st = zx_vmo_create_physical(root_resource_handle, phys, size, &vmo);
+  zx_status_t st = zx_vmo_create_physical(mmio_resource_handle, phys, size, &vmo);
   if (st != ZX_OK) {
     return st;
   }
