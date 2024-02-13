@@ -160,12 +160,18 @@ func (v sftpViewer) copyFile(remote, local string) error {
 }
 
 func (v sftpViewer) removeAll(remoteDir string) error {
-	walker := v.client.Walk(remoteDir)
-	for walker.Step() {
-		if walker.Stat() == nil || walker.Stat().IsDir() {
-			continue
+	entries, err := v.client.ReadDir(remoteDir)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		entryPath := filepath.Join(remoteDir, entry.Name())
+		if entry.IsDir() {
+			if err := v.removeAll(entryPath); err != nil {
+				return err
+			}
 		}
-		if err := v.client.Remove(walker.Path()); err != nil {
+		if err := v.client.Remove(entryPath); err != nil {
 			return err
 		}
 	}
