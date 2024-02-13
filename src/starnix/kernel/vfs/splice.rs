@@ -108,16 +108,19 @@ fn copy_data(
             let chunk_length = std::cmp::min(*PAGE_SIZE as usize, remaining);
             let mut buffer = VecOutputBuffer::new(chunk_length);
             let bytes_read = read(locked, transferred, &mut buffer)?;
+            operand_in.maybe_write_result_offset(current_task, transferred + bytes_read)?;
+            if bytes_read == 0 {
+                break;
+            }
             let mut buffer = Vec::from(buffer);
             buffer.truncate(bytes_read);
             let bytes_written = write(locked, transferred, &mut VecInputBuffer::from(buffer))?;
-            transferred += bytes_written;
-            remaining -= bytes_written;
-            operand_in.maybe_write_result_offset(current_task, transferred)?;
-            operand_out.maybe_write_result_offset(current_task, transferred)?;
-            if bytes_read < chunk_length || bytes_written < bytes_read {
+            operand_out.maybe_write_result_offset(current_task, transferred + bytes_written)?;
+            if bytes_written == 0 {
                 break;
             }
+            transferred += bytes_written;
+            remaining -= bytes_written;
         }
         Ok(())
     };

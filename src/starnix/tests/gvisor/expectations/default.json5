@@ -567,9 +567,6 @@
                 "RtSignalTest.InvalidCodes",
                 "RtSignalTest.SignoMatch",
 
-                // sendfile_test
-                "SendFileTest.SendFileToSelf",
-
                 // sigaltstack_test - https://fxbug.dev/42159586
                 "SigaltstackTest.ResetByExecve",
 
@@ -865,6 +862,11 @@
                 // Breaks tests that run after it.
                 "MountTest.MaxMounts",
                 "MountTest.MountFailsOnPseudoFilesystemMountpoint",
+
+                // We actually pass this test. It just takes a long time because the test
+                // is doing 10 million one-byte transfers. The test is designed to take a
+                // long time and trigger a watchdog mechanism in gVisor.
+                "SendFileTest.SendFileToSelf",
 
                 // Times out.
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyIdle",
