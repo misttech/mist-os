@@ -35,6 +35,7 @@ enum class Channel { ACL, COMMAND, SNOOP, EMULATOR };
 
 class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
                        public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
+                       public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor>,
                        public fidl::WireServer<fuchsia_hardware_bluetooth::Emulator> {
  public:
   explicit EmulatorDevice(zx_device_t* device);
@@ -46,6 +47,7 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
   zx_status_t GetProtocol(uint32_t proto_id, void* out_proto);
   zx_status_t OpenChan(Channel chan_type, zx_handle_t chan);
 
+  // fuchsia_hardware_bluetooth::Hci overrides:
   void OpenCommandChannel(OpenCommandChannelRequestView request,
                           OpenCommandChannelCompleter::Sync& completer) override;
   void OpenAclDataChannel(OpenAclDataChannelRequestView request,
@@ -59,10 +61,10 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
                           OpenIsoDataChannelCompleter::Sync& completer) override;
   void OpenSnoopChannel(OpenSnoopChannelRequestView request,
                         OpenSnoopChannelCompleter::Sync& completer) override;
-
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
+  // fuchsia_hardware_bluetooth::Emulator overrides:
   void Open(OpenRequestView request, OpenCompleter::Sync& completer) override;
 
   void ClearHciDev() { hci_dev_ = nullptr; }
@@ -82,6 +84,19 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
   void WatchControllerParameters(WatchControllerParametersCallback callback) override;
   void WatchLeScanStates(WatchLeScanStatesCallback callback) override;
   void WatchLegacyAdvertisingStates(WatchLegacyAdvertisingStatesCallback callback) override;
+
+  // fuchsia_hardware_bluetooth::Vendor overrides:
+  void GetFeatures(GetFeaturesCompleter::Sync& completer) override;
+  void EncodeCommand(EncodeCommandRequestView request,
+                     EncodeCommandCompleter::Sync& completer) override;
+  void OpenHci(OpenHciCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  // Helper function for Vendor EncodeCommand
+  void EncodeSetAclPriorityCommand(
+      fuchsia_hardware_bluetooth::wire::BtVendorSetAclPriorityParams params, void* out_buffer);
 
   // Helper function used to initialize BR/EDR and LE peers.
   void AddPeer(std::unique_ptr<EmulatedPeer> peer);

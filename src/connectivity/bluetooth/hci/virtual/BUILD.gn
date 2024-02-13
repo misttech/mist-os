@@ -16,6 +16,7 @@ source_set("common") {
   testonly = true
 
   sources = [
+    "//src/connectivity/bluetooth/hci/vendor/broadcom/packets.h",
     "controller.h",
     "driver.cc",
     "emulated_peer.cc",
@@ -40,6 +41,7 @@ source_set("common") {
     "//src/connectivity/bluetooth/core/bt-host/testing:fake_controller",
     "//src/connectivity/bluetooth/lib/fidl",
     "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//third_party/pigweed/backends/pw_async_fuchsia:dispatcher",
     "//third_party/pigweed/backends/pw_log:dfv1",

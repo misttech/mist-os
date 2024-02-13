@@ -7,6 +7,7 @@
 #include <fuchsia/hardware/bt/hci/cpp/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/sync/cpp/completion.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
@@ -17,6 +18,7 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/random.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_peer.h"
+#include "src/connectivity/bluetooth/hci/vendor/broadcom/packets.h"
 #include "src/connectivity/bluetooth/hci/virtual/log.h"
 
 namespace fbt = fuchsia::bluetooth;
@@ -100,8 +102,8 @@ constexpr zx_protocol_device_t bt_hci_device_ops = {
     .release = [](void* ctx) { DEV(ctx)->ClearHciDev(); },
     .message =
         [](void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
-          logf(TRACE, "HciMessage\n");
-          fidl::WireDispatch<fuchsia_hardware_bluetooth::Hci>(
+          logf(TRACE, "Vendor Message\n");
+          fidl::WireDispatch<fuchsia_hardware_bluetooth::Vendor>(
               DEV(ctx), fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
               ddk::FromDeviceFIDLTransaction(txn));
         },
@@ -362,6 +364,67 @@ void EmulatorDevice::WatchLeScanStates(WatchLeScanStatesCallback callback) {
 void EmulatorDevice::WatchLegacyAdvertisingStates(WatchLegacyAdvertisingStatesCallback callback) {
   logf(TRACE, "HciEmulator.WatchLegacyAdvertisingState\n");
   legacy_adv_state_getter_.Watch(std::move(callback));
+}
+
+void EmulatorDevice::GetFeatures(GetFeaturesCompleter::Sync& completer) {
+  completer.Reply(fuchsia_hardware_bluetooth::BtVendorFeatures::kSetAclPriorityCommand);
+}
+
+void EmulatorDevice::EncodeCommand(EncodeCommandRequestView request,
+                                   EncodeCommandCompleter::Sync& completer) {
+  uint8_t data_buffer[bt_hci_broadcom::kBcmSetAclPriorityCmdSize];
+  switch (request->command.Which()) {
+    case fuchsia_hardware_bluetooth::wire::BtVendorCommand::Tag::kSetAclPriority: {
+      EncodeSetAclPriorityCommand(request->command.set_acl_priority(), data_buffer);
+      auto encoded_cmd = fidl::VectorView<uint8_t>::FromExternal(
+          data_buffer, bt_hci_broadcom::kBcmSetAclPriorityCmdSize);
+      completer.ReplySuccess(encoded_cmd);
+      return;
+    }
+    default: {
+      completer.ReplyError(ZX_ERR_INVALID_ARGS);
+      return;
+    }
+  }
+}
+
+void EmulatorDevice::OpenHci(OpenHciCompleter::Sync& completer) {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Hci>();
+  if (endpoints.is_error()) {
+    logf(ERROR, "Failed to create endpoints: %s", zx_status_get_string(endpoints.error_value()));
+    completer.ReplyError(endpoints.error_value());
+    return;
+  }
+  fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(endpoints->server),
+                   this);
+  completer.ReplySuccess(std::move(endpoints->client));
+}
+
+void EmulatorDevice::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  ZX_PANIC("Unknown method in Vendor request");
+}
+
+void EmulatorDevice::EncodeSetAclPriorityCommand(
+    fuchsia_hardware_bluetooth::wire::BtVendorSetAclPriorityParams params, void* out_buffer) {
+  bt_hci_broadcom::BcmSetAclPriorityCmd command = {
+      .header =
+          {
+              .opcode = htole16(bt_hci_broadcom::kBcmSetAclPriorityCmdOpCode),
+              .parameter_total_size = sizeof(bt_hci_broadcom::BcmSetAclPriorityCmd) -
+                                      sizeof(bt_hci_broadcom::HciCommandHeader),
+          },
+      .connection_handle = htole16(params.connection_handle),
+      .priority = (params.priority == fuchsia_hardware_bluetooth::BtVendorAclPriority::kNormal)
+                      ? bt_hci_broadcom::kBcmAclPriorityNormal
+                      : bt_hci_broadcom::kBcmAclPriorityHigh,
+      .direction = (params.direction == fuchsia_hardware_bluetooth::BtVendorAclDirection::kSource)
+                       ? bt_hci_broadcom::kBcmAclDirectionSource
+                       : bt_hci_broadcom::kBcmAclDirectionSink,
+  };
+
+  memcpy(out_buffer, &command, sizeof(command));
 }
 
 void EmulatorDevice::AddPeer(std::unique_ptr<EmulatedPeer> peer) {
