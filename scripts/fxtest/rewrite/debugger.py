@@ -53,6 +53,16 @@ def spawn(
     for test in tests:
         attach_args.extend(["--attach", test.info.name])
 
+    # If only --breakpoint was specified on the command line (we won't get here if neither
+    # debug option was specified), we want to output a more general message than "test
+    # failure". Zxdb will default to filling in the type of exception in this slot if it's
+    # unspecified, so we don't need to specify any additional text. If both options are
+    # specified, it is impossible to know which one will happen first, so use the more specific
+    # text.
+    embedded_mode_context_args = []
+    if break_on_failure:
+        embedded_mode_context_args = ["--embedded-mode-context", "test failure"]
+
     zxdb_args = [
         "fx",
         "ffx",
@@ -63,6 +73,7 @@ def spawn(
         "--",
         "--console-mode",
         "embedded",
+        *embedded_mode_context_args,
         "--stream-file",
         fifo,
     ]
