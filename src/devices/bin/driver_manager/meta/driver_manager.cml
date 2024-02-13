@@ -19,7 +19,6 @@
             // These protocols may not be available in test environments, so they aren't included in
             // test
             protocol: [
-                "fuchsia.boot.RootResource",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.kernel.FramebufferResource",
                 "fuchsia.kernel.InfoResource",

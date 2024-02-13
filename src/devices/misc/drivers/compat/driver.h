@@ -43,8 +43,6 @@ class Driver : public fdf::DriverBase {
 
   zx::result<zx::vmo> LoadFirmware(Device* device, const char* filename, size_t* size);
 
-  zx_handle_t GetRootResource();
-
   zx_handle_t GetInfoResource();
 
   zx_handle_t GetIommuResource();

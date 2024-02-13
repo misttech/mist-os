@@ -49,10 +49,6 @@ __EXPORT zx_status_t device_get_protocol(const zx_device_t* dev, uint32_t proto_
 
 // LibDriver Misc Interfaces
 
-__EXPORT zx_handle_t get_root_resource(zx_device_t* device) {
-  return device->driver()->GetRootResource();
-}
-
 __EXPORT zx_handle_t get_mmio_resource(zx_device_t* device) {
   return device->driver()->GetMmioResource();
 }

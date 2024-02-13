@@ -89,10 +89,6 @@ __EXPORT __WEAK zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_devic
   return ZX_OK;
 }
 
-// Please do not use get_root_resource() in new code. See ZX-1467.
-__EXPORT
-zx_handle_t get_root_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
-
 __EXPORT
 zx_handle_t get_ioport_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
 

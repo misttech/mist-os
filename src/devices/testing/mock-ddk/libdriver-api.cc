@@ -246,9 +246,6 @@ __EXPORT zx_status_t device_get_variable(zx_device_t* device, const char* name, 
 }
 
 __EXPORT
-zx_handle_t get_root_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
-
-__EXPORT
 zx_handle_t get_mmio_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
 
 __EXPORT

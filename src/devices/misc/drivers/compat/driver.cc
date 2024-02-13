@@ -78,18 +78,6 @@ zx::result<zx::vmo> LoadVmo(fdf::Namespace& ns, const char* path,
   return zx::ok(std::move(result.value().value()->vmo));
 }
 
-zx::result<zx::resource> GetRootResource(fdf::Namespace& ns) {
-  zx::result resource = ns.Connect<fboot::RootResource>();
-  if (resource.is_error()) {
-    return resource.take_error();
-  }
-  fidl::WireResult result = fidl::WireCall(resource.value())->Get();
-  if (!result.ok()) {
-    return zx::error(result.status());
-  }
-  return zx::ok(std::move(result.value().resource));
-}
-
 zx::result<zx::resource> GetMmioResource(fdf::Namespace& ns) {
   zx::result resource = ns.Connect<fkernel::MmioResource>();
   if (resource.is_error()) {
@@ -426,18 +414,6 @@ void Driver::Start(fdf::StartCompleter completer) {
 }
 
 bool Driver::IsComposite() { return !parent_clients_.empty(); }
-
-zx_handle_t Driver::GetRootResource() {
-  if (!root_resource_.is_valid()) {
-    zx::result resource = ::GetRootResource(*incoming());
-    if (resource.is_ok()) {
-      root_resource_ = std::move(resource.value());
-    } else {
-      FDF_LOGL(WARNING, *logger_, "Failed to get root_resource '%s'", resource.status_string());
-    }
-  }
-  return root_resource_.get();
-}
 
 zx_handle_t Driver::GetMmioResource() {
   if (!mmio_resource_.is_valid()) {

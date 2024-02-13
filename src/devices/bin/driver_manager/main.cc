@@ -36,21 +36,6 @@ zx::result<zx::job> get_root_job() {
   return zx::ok(std::move(result.value().job));
 }
 
-// Get the root resource from the root resource service. Not receiving the
-// startup handle is logged, but not fatal.  In test environments, it would not
-// be present.
-zx::result<zx::resource> get_root_resource() {
-  zx::result client_end = component::Connect<fuchsia_boot::RootResource>();
-  if (client_end.is_error()) {
-    return client_end.take_error();
-  }
-  fidl::WireResult result = fidl::WireCall(client_end.value())->Get();
-  if (!result.ok()) {
-    return zx::error(result.status());
-  }
-  return zx::ok(std::move(result.value().resource));
-}
-
 // Get the mexec resource from the mexec resource service. Not receiving the
 // startup handle is logged, but not fatal.  In test environments, it would not
 // be present.

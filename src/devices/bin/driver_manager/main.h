@@ -13,11 +13,6 @@
 // Get the root job from the root job service.
 zx::result<zx::job> get_root_job();
 
-// Get the root resource from the root resource service. Not receiving the
-// startup handle is logged, but not fatal.  In test environments, it would not
-// be present.
-zx::result<zx::resource> get_root_resource();
-
 // Get the mexec resource from the mexec resource service. Not receiving the
 // startup handle is logged, but not fatal.  In test environments, it would not
 // be present.
