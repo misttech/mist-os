@@ -22,9 +22,6 @@
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/smc.h>
 
-#include <bind/fuchsia/arm/platform/cpp/bind.h>
-#include <bind/fuchsia/hardware/gpu/mali/cpp/bind.h>
-#include <bind/fuchsia/platform/cpp/bind.h>
 #include <soc/aml-common/aml-registers.h>
 
 #include "s905d2-gpu.h"
@@ -505,14 +502,10 @@ zx::result<> AmlGpu::Start() {
 
   fidl::Arena arena;
   node_ = fidl::WireSyncClient<fuchsia_driver_framework::Node>(std::move(node()));
-  auto properties = std::vector<fuchsia_driver_framework::NodeProperty>{
-      fdf::MakeProperty(bind_fuchsia_hardware_gpu_mali::SERVICE,
-                        bind_fuchsia_hardware_gpu_mali::SERVICE_DRIVERTRANSPORT)};
 
-  auto offers = std::vector{fdf::MakeOffer<fuchsia_hardware_gpu_mali::Service>("default")};
-
-  auto args = fuchsia_driver_framework::NodeAddArgs{
-      {.name = "aml-gpu", .offers = std::move(offers), .properties = std::move(properties)}};
+  auto offers = std::vector{fdf::MakeOffer2<fuchsia_hardware_gpu_mali::Service>("default")};
+  auto args =
+      fuchsia_driver_framework::NodeAddArgs{{.name = "aml-gpu", .offers2 = std::move(offers)}};
 
   zx::result controller_endpoints =
       fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();

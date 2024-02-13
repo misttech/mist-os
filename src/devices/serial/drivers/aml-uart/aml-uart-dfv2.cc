@@ -8,8 +8,6 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
-#include <bind/fuchsia/hardware/serialimpl/cpp/bind.h>
-
 namespace serial {
 
 namespace {
@@ -182,20 +180,18 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
     return;
   }
 
-  auto offers = device_server_.CreateOffers();
-  offers.push_back(fdf::MakeOffer<fuchsia_hardware_serialimpl::Service>(child_name));
+  auto offers = device_server_.CreateOffers2();
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_serialimpl::Service>(child_name));
 
   fuchsia_driver_framework::NodeAddArgs args{
       {
           .name = std::string(child_name),
-          .offers = std::move(offers),
           .properties = {{
               fdf::MakeProperty(0x0001 /*BIND_PROTOCOL*/, ZX_PROTOCOL_SERIAL_IMPL_ASYNC),
               fdf::MakeProperty(0x0600 /*BIND_SERIAL_CLASS*/,
                                 aml_uart_->serial_port_info().serial_class),
-              fdf::MakeProperty(bind_fuchsia_hardware_serialimpl::SERVICE,
-                                bind_fuchsia_hardware_serialimpl::SERVICE_DRIVERTRANSPORT),
           }},
+          .offers2 = std::move(offers),
       },
   };
 

@@ -6,8 +6,6 @@
 
 #include <lib/fdf/dispatcher.h>
 
-#include <bind/fuchsia/hardware/rpmb/cpp/bind.h>
-
 #include "sdmmc-block-device.h"
 #include "sdmmc-root-device.h"
 #include "sdmmc-types.h"
@@ -51,19 +49,12 @@ zx_status_t RpmbDevice::AddDevice() {
   controller_.Bind(std::move(controller_endpoints->client));
 
   fidl::Arena arena;
-
-  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
-  properties[0] = fdf::MakeProperty(arena, bind_fuchsia_hardware_rpmb::SERVICE,
-                                    bind_fuchsia_hardware_rpmb::SERVICE_ZIRCONTRANSPORT);
-
-  std::vector<fuchsia_component_decl::wire::Offer> offers = compat_server_.CreateOffers(arena);
-  offers.push_back(
-      fdf::MakeOffer<fuchsia_hardware_rpmb::Service>(arena, component::kDefaultInstance));
+  std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server_.CreateOffers2(arena);
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_rpmb::Service>(arena));
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, kDeviceName)
-                        .offers(arena, std::move(offers))
-                        .properties(properties)
+                        .offers2(arena, std::move(offers))
                         .Build();
 
   auto result =

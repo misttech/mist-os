@@ -11,8 +11,6 @@
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 
-#include <bind/fuchsia/examples/gizmo/cpp/bind.h>
-
 namespace zircon_transport {
 
 // Protocol served to child driver components over the Zircon transport.
@@ -78,17 +76,8 @@ class ParentZirconTransportDriver : public fdf::DriverBase {
   // Add a child device node and offer the service capabilities.
   zx::result<> AddChild(std::string_view node_name) {
     fidl::Arena arena;
-    std::vector<fuchsia_component_decl::wire::Offer> offers;
-    // Offer `fuchsia.examples.gizmo.Service` to the driver that binds to the node.
-    auto service_offer = fuchsia_component_decl::wire::OfferService::Builder(arena)
-                             .source_name(arena, fuchsia_examples_gizmo::Service::Name)
-                             .target_name(arena, fuchsia_examples_gizmo::Service::Name)
-                             .Build();
-    offers.push_back(fuchsia_component_decl::wire::Offer::WithService(arena, service_offer));
-
-    auto properties = fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>(arena, 1);
-    properties[0] = fdf::MakeProperty(arena, bind_fuchsia_examples_gizmo::DEVICE,
-                                      bind_fuchsia_examples_gizmo::DEVICE_ZIRCONTRANSPORT);
+    fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers(arena, 1);
+    offers[0] = fdf::MakeOffer2<fuchsia_examples_gizmo::Service>(arena);
 
     zx::result connector = devfs_connector_.Bind(dispatcher());
     if (connector.is_error()) {
@@ -100,8 +89,7 @@ class ParentZirconTransportDriver : public fdf::DriverBase {
 
     auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                     .name(arena, node_name)
-                    .offers(offers)
-                    .properties(properties)
+                    .offers2(offers)
                     .devfs_args(devfs.Build())
                     .Build();
 

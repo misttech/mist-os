@@ -24,7 +24,6 @@ fuchsia_driver("parent_driver") {
   deps = [
     ":parent_bind",
     "//examples/drivers/transport/banjo:fuchsia.examples.gizmo_banjo_cpp",
-    "//examples/drivers/transport/banjo:fuchsia.examples.gizmo_bindlib_cpp",
     "//src/devices/lib/driver",
     "//src/lib/ddktl",
   ]

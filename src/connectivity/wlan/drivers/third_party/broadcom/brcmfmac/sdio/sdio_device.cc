@@ -23,7 +23,6 @@
 #include <limits>
 #include <string>
 
-#include <bind/fuchsia/wlan/phyimpl/cpp/bind.h>
 #include <ddktl/device.h>
 #include <ddktl/init-txn.h>
 
@@ -83,17 +82,8 @@ zx_status_t SdioDevice::Create(zx_device_t* parent_device) {
       fuchsia_wlan_phyimpl::Service::Name,
   };
 
-  zx_device_str_prop_t props[] = {
-      {
-          .key = bind_fuchsia_wlan_phyimpl::WLANPHYIMPL.c_str(),
-          .property_value =
-              str_prop_str_val(bind_fuchsia_wlan_phyimpl::WLANPHYIMPL_DRIVERTRANSPORT.c_str()),
-      },
-  };
-
   if ((status = device->DdkAdd(
            ddk::DeviceAddArgs("brcmfmac-wlanphy")
-               .set_str_props(props)
                .set_inspect_vmo(device->inspect_->inspector().DuplicateVmo())
                .set_runtime_service_offers(offers)
                .set_outgoing_dir(endpoints->client.TakeChannel())

@@ -22,7 +22,6 @@ source_set("common") {
   sources = [ "aml-saradc.cc" ]
   public_deps = [
     ":aml_saradc_bind",
-    "//sdk/fidl/fuchsia.hardware.adcimpl:fuchsia.hardware.adcimpl_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.adcimpl:fuchsia.hardware.adcimpl_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",

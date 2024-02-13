@@ -545,12 +545,12 @@ do the following:
 
    ```cpp
    {{ '<strong>' }}auto offers =
-       std::vector{fdf::MakeOffer<fuchsia_example::Service>(arena, name)};{{ '</strong>' }}
+       std::vector{fdf::MakeOffer2<fuchsia_example::Service>(arena, name)};{{ '</strong>' }}
 
    fidl::WireSyncClient<fuchsia_driver_framework::Node> node(std::move(node()));
      auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                        .name(arena, “example_node”)
-                       {{ '<strong>' }}.offers(offers){{ '</strong>' }}
+                       {{ '<strong>' }}.offers2(offers){{ '</strong>' }}
                        .Build();
 
      zx::result controller_endpoints =
@@ -645,7 +645,7 @@ do the following:
      fit::result<fdf::NodeError> AddChild() {
        fidl::Arena arena;
 
-       auto offer = fdf::MakeOffer<ft::Service>(kChildName);
+       auto offer = fdf::MakeOffer2<ft::Service>(kChildName);
 
        // Set the properties of the node that a driver will bind to.
        auto property =
@@ -654,8 +654,8 @@ do the following:
        auto args = fdf::NodeAddArgs{
          {
            .name = std::string(kChildName),
-           .offers = std::vector{std::move(offer)},
            .properties = std::vector{std::move(property)},
+           .offers2 = std::vector{std::move(offer)},
          }
        };
 

@@ -27,6 +27,8 @@ fuchsia_component_decl::wire::Offer MakeOffer(
     fidl::AnyArena& arena, std::string_view service_name,
     std::string_view instance_name = component::kDefaultInstance);
 
+#if __Fuchsia_API_level__ <= 18
+
 template <typename Service>
 fuchsia_component_decl::Offer MakeOffer(
     std::string_view instance_name = component::kDefaultInstance) {
@@ -40,6 +42,8 @@ fuchsia_component_decl::wire::Offer MakeOffer(
   static_assert(fidl::IsServiceV<Service>, "Service must be a fidl Service");
   return MakeOffer(arena, Service::Name, instance_name);
 }
+
+#endif  // __Fuchsia_API_level__ <= 18
 
 #if __Fuchsia_API_level__ >= 18
 

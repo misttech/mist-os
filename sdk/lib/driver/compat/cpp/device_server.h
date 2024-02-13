@@ -124,8 +124,6 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
   zx_status_t Serve(async_dispatcher_t* dispatcher, fdf::OutgoingDirectory* outgoing);
 
   // Create offers to offer this interface to another component.
-  std::vector<fuchsia_component_decl::wire::Offer> CreateOffers(fidl::ArenaBase& arena);
-  std::vector<fuchsia_component_decl::Offer> CreateOffers();
   std::vector<fuchsia_driver_framework::wire::Offer> CreateOffers2(fidl::ArenaBase& arena);
   std::vector<fuchsia_driver_framework::Offer> CreateOffers2();
 
@@ -192,15 +190,6 @@ class SyncInitializedDeviceServer {
   // Provide CreateOffers as passthrough, and allow access to the inner device server.
 
   // Create offers to offer this interface to another component.
-  std::vector<fuchsia_component_decl::wire::Offer> CreateOffers(fidl::ArenaBase& arena) {
-    ZX_ASSERT(device_server_);
-    return device_server_->CreateOffers(arena);
-  }
-  std::vector<fuchsia_component_decl::Offer> CreateOffers() {
-    ZX_ASSERT(device_server_);
-    return device_server_->CreateOffers();
-  }
-
   std::vector<fuchsia_driver_framework::wire::Offer> CreateOffers2(fidl::ArenaBase& arena) {
     ZX_ASSERT(device_server_);
     return device_server_->CreateOffers2(arena);
@@ -284,15 +273,6 @@ class AsyncInitializedDeviceServer {
   // Provide CreateOffers as passthrough, and allow access to the inner device server.
 
   // Create offers to offer this interface to another component.
-  std::vector<fuchsia_component_decl::wire::Offer> CreateOffers(fidl::ArenaBase& arena) {
-    ZX_ASSERT(device_server_);
-    return device_server_->CreateOffers(arena);
-  }
-  std::vector<fuchsia_component_decl::Offer> CreateOffers() {
-    ZX_ASSERT(device_server_);
-    return device_server_->CreateOffers();
-  }
-
   std::vector<fuchsia_driver_framework::wire::Offer> CreateOffers2(fidl::ArenaBase& arena) {
     ZX_ASSERT(device_server_);
     return device_server_->CreateOffers2(arena);

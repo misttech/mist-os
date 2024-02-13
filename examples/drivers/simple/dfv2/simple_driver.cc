@@ -50,7 +50,7 @@ zx::result<> SimpleDriver::Start() {
   auto properties = std::vector{fdf::MakeProperty(arena, bind_fuchsia_test::TEST_CHILD, "simple")};
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                   .name(arena, child_name)
-                  .offers(compat_server_.CreateOffers(arena))
+                  .offers2(compat_server_.CreateOffers2(arena))
                   .properties(arena, std::move(properties))
                   .Build();
 

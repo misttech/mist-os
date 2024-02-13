@@ -220,32 +220,6 @@ zx_status_t DeviceServer::Serve(async_dispatcher_t* dispatcher, fdf::OutgoingDir
   return ZX_OK;
 }
 
-std::vector<fcd::wire::Offer> DeviceServer::CreateOffers(fidl::ArenaBase& arena) {
-  std::vector<fcd::wire::Offer> offers;
-  // Create the main fuchsia.driver.compat.Service offer.
-  offers.push_back(fdf::MakeOffer<fuchsia_driver_compat::Service>(arena, name()));
-
-  if (service_offers_) {
-    auto service_offers = service_offers_->CreateOffers(arena);
-    offers.reserve(offers.size() + service_offers.size());
-    offers.insert(offers.end(), service_offers.begin(), service_offers.end());
-  }
-  return offers;
-}
-
-std::vector<fcd::Offer> DeviceServer::CreateOffers() {
-  std::vector<fcd::Offer> offers;
-  // Create the main fuchsia.driver.compat.Service offer.
-  offers.push_back(fdf::MakeOffer<fuchsia_driver_compat::Service>(name()));
-
-  if (service_offers_) {
-    auto service_offers = service_offers_->CreateOffers();
-    offers.reserve(offers.size() + service_offers.size());
-    offers.insert(offers.end(), service_offers.begin(), service_offers.end());
-  }
-  return offers;
-}
-
 std::vector<fuchsia_driver_framework::wire::Offer> DeviceServer::CreateOffers2(
     fidl::ArenaBase& arena) {
   std::vector<fuchsia_driver_framework::wire::Offer> offers;

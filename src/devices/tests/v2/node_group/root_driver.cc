@@ -358,8 +358,8 @@ class RootDriver : public fdf::DriverBase {
     // Set the properties of the node that a driver will bind to.
     fdf::NodeProperty node_property = fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, property);
     fdf::NodeAddArgs args({.name = node_name,
-                           .offers = {{fdf::MakeOffer<ft::Service>(name)}},
-                           .properties = {{node_property}}});
+                           .properties = {{node_property}},
+                           .offers2 = {{fdf::MakeOffer2<ft::Service>(name)}}});
 
     // Create endpoints of the `NodeController` for the node.
     auto endpoints = fidl::CreateEndpoints<fdf::NodeController>();

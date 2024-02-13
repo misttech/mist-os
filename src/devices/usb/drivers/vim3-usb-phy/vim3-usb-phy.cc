@@ -11,7 +11,6 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
-#include <bind/fuchsia/hardware/usb/phy/cpp/bind.h>
 #include <fbl/auto_lock.h>
 #include <soc/aml-common/aml-registers.h>
 
@@ -702,19 +701,17 @@ zx::result<> Vim3UsbPhyDevice::AddDevice(ChildNode& node) {
   }
 
   fidl::Arena arena;
-  auto offers = node.compat_server_.CreateOffers(arena);
-  offers.push_back(fdf::MakeOffer<fuchsia_hardware_usb_phy::Service>(arena, node.name_));
+  auto offers = node.compat_server_.CreateOffers2(arena);
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_usb_phy::Service>(arena, node.name_));
   auto args =
       fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
           .name(arena, node.name_)
-          .offers(arena, std::move(offers))
+          .offers2(arena, std::move(offers))
           .properties(arena,
                       std::vector{
                           fdf::MakeProperty(arena, BIND_PLATFORM_DEV_VID, PDEV_VID_GENERIC),
                           fdf::MakeProperty(arena, BIND_PLATFORM_DEV_PID, PDEV_PID_GENERIC),
                           fdf::MakeProperty(arena, BIND_PLATFORM_DEV_DID, node.property_did_),
-                          fdf::MakeProperty(arena, bind_fuchsia_hardware_usb_phy::SERVICE,
-                                            bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
                       })
           .Build();
 

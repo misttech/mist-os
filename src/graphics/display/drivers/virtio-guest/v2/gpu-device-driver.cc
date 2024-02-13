@@ -266,7 +266,7 @@ void GpuDeviceDriver::Start(fdf::StartCompleter completer) {
   // Allow adding a child node.
   fidl::Arena arena;
   auto offers = std::vector{
-      fdf::MakeOffer<fuchsia_hardware_display_engine::Service>(arena, "virtio-gpu-display")};
+      fdf::MakeOffer2<fuchsia_hardware_display_engine::Service>(arena, "virtio-gpu-display")};
 
   // TODO(https://fxbug.dev/322365329): Remove this when the Display Coordinator is
   // migrated to DFv2.
@@ -275,7 +275,7 @@ void GpuDeviceDriver::Start(fdf::StartCompleter completer) {
       fdf::MakeProperty(arena, BIND_PROTOCOL, bind_fuchsia_display::BIND_PROTOCOL_CONTROLLER_IMPL)};
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                   .name(arena, "virtio-gpu-display")
-                  .offers(offers)
+                  .offers2(offers)
                   .properties(properties)
                   .Build();
 

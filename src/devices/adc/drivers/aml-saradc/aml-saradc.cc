@@ -8,7 +8,6 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
-#include <bind/fuchsia/hardware/adcimpl/cpp/bind.h>
 #include <fbl/auto_lock.h>
 
 #include "src/devices/adc/drivers/aml-saradc/registers.h"
@@ -142,17 +141,13 @@ void AmlSaradcDevice::HwInit() {
 
 zx::result<> AmlSaradc::CreateNode() {
   fidl::Arena arena;
-  auto offers = compat_server_.CreateOffers(arena);
+  auto offers = compat_server_.CreateOffers2(arena);
   offers.push_back(
-      fdf::MakeOffer<fuchsia_hardware_adcimpl::Service>(arena, component::kDefaultInstance));
-  auto properties =
-      std::vector{fdf::MakeProperty(arena, bind_fuchsia_hardware_adcimpl::SERVICE,
-                                    bind_fuchsia_hardware_adcimpl::SERVICE_DRIVERTRANSPORT)};
+      fdf::MakeOffer2<fuchsia_hardware_adcimpl::Service>(arena, component::kDefaultInstance));
 
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                   .name(arena, kDeviceName)
-                  .offers(arena, std::move(offers))
-                  .properties(arena, std::move(properties))
+                  .offers2(arena, std::move(offers))
                   .Build();
 
   zx::result controller_endpoints =

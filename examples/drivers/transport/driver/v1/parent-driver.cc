@@ -7,7 +7,6 @@
 #include <lib/ddk/device.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 
-#include <bind/fuchsia/examples/gizmo/cpp/bind.h>
 #include <ddktl/device.h>
 
 namespace driver_transport {

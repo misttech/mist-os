@@ -37,10 +37,10 @@ class RootDriver : public fdf::DriverBase, public fidl::WireServer<ft::Handshake
     }
 
     // Offer `fuchsia.test.Handshake` to the driver that binds to the node.
-    auto offer =
+    auto offer = fdf::Offer::WithZirconTransport(
         fcd::Offer::WithProtocol({{.source_name = fidl::DiscoverableProtocolName<ft::Handshake>,
                                    .target_name = fidl::DiscoverableProtocolName<ft::Handshake>,
-                                   .dependency_type = fcd::DependencyType::kStrong}});
+                                   .dependency_type = fcd::DependencyType::kStrong}}));
 
     // Set the properties of the node that a driver will bind to.
     auto property =
@@ -48,8 +48,8 @@ class RootDriver : public fdf::DriverBase, public fidl::WireServer<ft::Handshake
 
     auto args = fdf::NodeAddArgs{{
         .name = "leaf",
-        .offers = {{offer}},
         .properties = {{property}},
+        .offers2 = {{offer}},
     }};
 
     // Create endpoints of the `NodeController` for the node.

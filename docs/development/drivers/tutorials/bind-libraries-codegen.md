@@ -186,7 +186,7 @@ all separated by `.`s.
   {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bindlib_codegen/BUILD.gn" region_tag="example_rust_target" %}
   ```
 
-#### parent-driver
+#### composite-node-specification creator
 
 * {C++}
 

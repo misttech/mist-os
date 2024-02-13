@@ -47,7 +47,6 @@ source_set("aml-i2c-source") {
     "//zircon/system/ulib/hwreg",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",

@@ -191,9 +191,10 @@ transport method the parent uses to provide each one.
 ### The bind library
 
 There are three possible transport methods put in these bind libraries: `Banjo`, `ZirconTransport`,
-and `DriverTransport`. Currently it is safe to assume the value is `ZirconTransport`
-(which is just regular FIDL over Zircon channels). The bind library contains constants for
-protocols and these transport methods.
+and `DriverTransport`. Currently it is safe to assume the value is either `ZirconTransport`
+(which is just regular FIDL over Zircon channels), or `DriverTransport`
+(which is an in-process communication stack for co-located drivers).
+The bind library contains constants for protocols and these transport methods.
 
 Each service and discoverable protocol defined in the FIDL library gets an enum in the
 bind library with the values of the enum being the three transport methods.
@@ -260,10 +261,25 @@ and library name of `fuchsia.gizmo.protocol`. The generated source for the bind 
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/fidl_bindlib_codegen/child_driver.bind" exclude_regexp="// Copyright.*|// Use of.*|// found in.*" %}
 ```
 
-We can use the auto-generated code targets to access constants for this bind library from
-the parent driver code.
+When a driver is creating children nodes, they are automatically assigned a property for each of
+their `offers` in the `fuchsia_driver_framework::NodeAddArgs` table. Therefore parent drivers
+don't need to manually specify this property.
 
-#### Parent driver (BUILD.gn)
+For example if there is a driver transport based service capability offered to the node
+called `fuchsia_hardware_gizmo::Service`, there will be a property added with the key
+`fuchsia.hardware.gizmo.Service` and value of `fuchsia.hardware.gizmo.Service.DriverTransport`.
+These values will match their corresponding generated bind library variables that the child driver
+would use in its bind rules.
+
+This generated code is still useful when creating a composite node specification,
+which usually happens in the board driver. The specification's properties must be filled out
+manually with the offer information if the specification wants to match with nodes based on those
+offers.
+
+We can use the auto-generated code targets to access constants for this bind library from
+the composite node spec creation code.
+
+#### composite-node-specification creator (BUILD.gn)
 
 * {C++}
 
@@ -279,7 +295,7 @@ the parent driver code.
 
 
 
-#### Parent driver code
+#### composite-node-specification creator code
 
 * {C++}
 

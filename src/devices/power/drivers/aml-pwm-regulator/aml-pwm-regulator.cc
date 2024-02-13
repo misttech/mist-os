@@ -132,8 +132,8 @@ zx::result<std::unique_ptr<AmlPwmRegulator>> AmlPwmRegulator::Create(
   }
 
   fidl::Arena arena;
-  auto offers = device->compat_server_.CreateOffers(arena);
-  offers.push_back(fdf::MakeOffer<fuchsia_hardware_vreg::Service>(arena, device->name_));
+  auto offers = device->compat_server_.CreateOffers2(arena);
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_vreg::Service>(arena, device->name_));
 
   fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 2);
   properties[0] =
@@ -142,7 +142,7 @@ zx::result<std::unique_ptr<AmlPwmRegulator>> AmlPwmRegulator::Create(
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, name)
-                        .offers(arena, std::move(offers))
+                        .offers2(arena, std::move(offers))
                         .properties(properties)
                         .Build();
 

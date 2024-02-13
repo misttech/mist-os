@@ -14,7 +14,6 @@
 #include <zircon/errors.h>
 #include <zircon/threads.h>
 
-#include <bind/fuchsia/hardware/i2cimpl/cpp/bind.h>
 #include <soc/aml-common/aml-i2c.h>
 
 #include "aml-i2c-regs.h"
@@ -473,19 +472,13 @@ zx_status_t AmlI2c::CreateChildNode() {
   }
 
   fidl::Arena arena;
-
-  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
-  properties[0] = fdf::MakeProperty(arena, bind_fuchsia_hardware_i2cimpl::SERVICE,
-                                    bind_fuchsia_hardware_i2cimpl::SERVICE_DRIVERTRANSPORT);
-
-  std::vector<fuchsia_component_decl::wire::Offer> offers = device_server_.CreateOffers(arena);
+  std::vector<fuchsia_driver_framework::wire::Offer> offers = device_server_.CreateOffers2(arena);
   offers.push_back(
-      fdf::MakeOffer<fuchsia_hardware_i2cimpl::Service>(arena, component::kDefaultInstance));
+      fdf::MakeOffer2<fuchsia_hardware_i2cimpl::Service>(arena, component::kDefaultInstance));
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, kChildNodeName)
-                        .offers(offers)
-                        .properties(properties)
+                        .offers2(offers)
                         .Build();
   fidl::WireResult result =
       fidl::WireCall(node())->AddChild(args, std::move(controller_endpoints->server), {});

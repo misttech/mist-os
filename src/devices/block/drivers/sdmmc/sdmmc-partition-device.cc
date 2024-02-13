@@ -76,11 +76,11 @@ zx_status_t PartitionDevice::AddDevice() {
   fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
   properties[0] = fdf::MakeProperty(arena, BIND_PROTOCOL, ZX_PROTOCOL_BLOCK_IMPL);
 
-  std::vector<fuchsia_component_decl::wire::Offer> offers = compat_server_.CreateOffers(arena);
+  std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server_.CreateOffers2(arena);
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, partition_name_)
-                        .offers(arena, std::move(offers))
+                        .offers2(arena, std::move(offers))
                         .properties(properties)
                         .Build();
 

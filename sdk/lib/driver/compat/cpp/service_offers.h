@@ -32,8 +32,6 @@ class ServiceOffersV1 {
   zx_status_t Serve(async_dispatcher_t* dispatcher, fdf::OutgoingDirectory* outgoing);
 
   // Create offers to offer these services to another component.
-  std::vector<fuchsia_component_decl::wire::Offer> CreateOffers(fidl::ArenaBase& arena);
-  std::vector<fuchsia_component_decl::Offer> CreateOffers();
   std::vector<fuchsia_driver_framework::wire::Offer> CreateOffers2(fidl::ArenaBase& arena);
   std::vector<fuchsia_driver_framework::Offer> CreateOffers2();
 

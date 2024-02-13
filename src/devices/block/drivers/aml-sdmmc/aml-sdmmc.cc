@@ -27,7 +27,6 @@
 #include <algorithm>
 #include <string>
 
-#include <bind/fuchsia/hardware/sdmmc/cpp/bind.h>
 #include <bits/limits.h>
 #include <fbl/algorithm.h>
 #include <soc/aml-common/aml-power-domain.h>
@@ -215,19 +214,12 @@ zx::result<> AmlSdmmc::Start() {
   controller_.Bind(std::move(controller_endpoints->client));
 
   fidl::Arena arena;
-
-  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
-  properties[0] = fdf::MakeProperty(arena, bind_fuchsia_hardware_sdmmc::SDMMCSERVICE,
-                                    bind_fuchsia_hardware_sdmmc::SDMMCSERVICE_DRIVERTRANSPORT);
-
-  std::vector<fuchsia_component_decl::wire::Offer> offers = compat_server_.CreateOffers(arena);
-  offers.push_back(
-      fdf::MakeOffer<fuchsia_hardware_sdmmc::SdmmcService>(arena, component::kDefaultInstance));
+  std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server_.CreateOffers2(arena);
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_sdmmc::SdmmcService>(arena));
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, name())
-                        .offers(arena, std::move(offers))
-                        .properties(properties)
+                        .offers2(arena, std::move(offers))
                         .Build();
 
   auto result = parent_->AddChild(args, std::move(controller_endpoints->server), {});

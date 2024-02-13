@@ -9,8 +9,6 @@
 #include <lib/ddk/driver.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
-#include <bind/fuchsia/wlan/phyimpl/cpp/bind.h>
-
 #include "wlantap-phy.h"
 
 namespace wlan {
@@ -55,16 +53,10 @@ zx_status_t WlantapCtlServer::AddWlanPhyImplChild(
     std::string_view name, fidl::ServerEnd<fuchsia_driver_framework::NodeController> server) {
   fidl::Arena arena;
 
-  auto offers = std::vector{fdf::MakeOffer<fuchsia_wlan_phyimpl::Service>(arena, name)};
-
-  auto properties = fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>(arena, 1);
-  properties[0] = fdf::MakeProperty(arena, bind_fuchsia_wlan_phyimpl::WLANPHYIMPL,
-                                    bind_fuchsia_wlan_phyimpl::WLANPHYIMPL_DRIVERTRANSPORT);
-
+  auto offers = std::vector{fdf::MakeOffer2<fuchsia_wlan_phyimpl::Service>(arena, name)};
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                   .name(name)
-                  .properties(properties)
-                  .offers(offers)
+                  .offers2(offers)
                   .Build();
 
   auto res = driver_context_->node_client()->AddChild(args, std::move(server), {});

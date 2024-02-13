@@ -16,7 +16,6 @@ fuchsia_driver("parent_driver") {
   deps = [
     ":parent_bind",
     "//examples/drivers/transport/tests:fuchsia.gizmo.protocol_cpp",
-    "//examples/drivers/transport/zircon:fuchsia.examples.gizmo_bindlib_cpp",
     "//examples/drivers/transport/zircon:fuchsia.examples.gizmo_cpp",
     "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",

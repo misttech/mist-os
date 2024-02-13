@@ -12,7 +12,6 @@
 
 #include <utility>
 
-#include <bind/fuchsia/wlan/softmac/cpp/bind.h>
 #include <wlan/common/phy.h>
 
 #include "utils.h"
@@ -290,17 +289,11 @@ zx_status_t WlanPhyImplDevice::AddWlanSoftmacChild(
     std::string_view name, fidl::ServerEnd<fuchsia_driver_framework::NodeController> server) {
   fidl::Arena arena;
 
-  auto offers = std::vector{fdf::MakeOffer<fuchsia_wlan_softmac::Service>(arena, name)};
-
+  auto offers = std::vector{fdf::MakeOffer2<fuchsia_wlan_softmac::Service>(arena, name)};
   FDF_LOG(INFO, "%s: Creating Child node", name_.c_str());
-  auto properties = fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>(arena, 1);
-  properties[0] = fdf::MakeProperty(arena, bind_fuchsia_wlan_softmac::WLANSOFTMAC,
-                                    bind_fuchsia_wlan_softmac::WLANSOFTMAC_DRIVERTRANSPORT);
-
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                   .name(name)
-                  .properties(properties)
-                  .offers(offers)
+                  .offers2(offers)
                   .Build();
 
   auto res = driver_context_->node_client()->AddChild(args, std::move(server), {});

@@ -10,7 +10,6 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 
 #include <bind/fuchsia/adc/cpp/bind.h>
-#include <bind/fuchsia/hardware/adc/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 
 namespace adc {
@@ -116,17 +115,15 @@ zx::result<std::unique_ptr<AdcDevice>> AdcDevice::Create(
                    .connector(std::move(connector.value()))
                    .class_name("adc");
 
-  auto offers = dev->compat_server_.CreateOffers(arena);
-  offers.push_back(fdf::MakeOffer<fuchsia_hardware_adc::Service>(arena, dev->name_));
+  auto offers = dev->compat_server_.CreateOffers2(arena);
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_adc::Service>(arena, dev->name_));
   auto properties = std::vector{
-      fdf::MakeProperty(arena, bind_fuchsia_hardware_adc::SERVICE,
-                        bind_fuchsia_hardware_adc::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeProperty(arena, bind_fuchsia_adc::CHANNEL, dev->channel_),
   };
 
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                   .name(arena, dev->name_)
-                  .offers(arena, std::move(offers))
+                  .offers2(arena, std::move(offers))
                   .properties(arena, std::move(properties))
                   .devfs_args(devfs.Build())
                   .Build();

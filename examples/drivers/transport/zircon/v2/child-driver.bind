@@ -4,4 +4,4 @@
 
 using fuchsia.examples.gizmo;
 
-fuchsia.examples.gizmo.Device == fuchsia.examples.gizmo.Device.ZirconTransport;
+fuchsia.examples.gizmo.Service == fuchsia.examples.gizmo.Service.ZirconTransport;

@@ -20,7 +20,6 @@ source_set("common") {
   public_deps = [
     ":adc_bind",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
-    "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_cpp",
     "//sdk/fidl/fuchsia.hardware.adcimpl:fuchsia.hardware.adcimpl_cpp",
     "//sdk/lib/driver/compat/cpp",

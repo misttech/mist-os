@@ -9,8 +9,6 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
-#include <bind/fuchsia/hardware/gpioimpl/cpp/bind.h>
-
 namespace {
 
 // Arbitrary values for I2C retries.
@@ -74,17 +72,13 @@ void TiTca6408aDevice::Stop() {
 
 zx::result<> TiTca6408aDevice::CreateNode() {
   fidl::Arena arena;
-  auto offers = compat_server_.CreateOffers(arena);
+  auto offers = compat_server_.CreateOffers2(arena);
   offers.push_back(
-      fdf::MakeOffer<fuchsia_hardware_gpioimpl::Service>(arena, component::kDefaultInstance));
-  auto properties =
-      std::vector{fdf::MakeProperty(arena, bind_fuchsia_hardware_gpioimpl::SERVICE,
-                                    bind_fuchsia_hardware_gpioimpl::SERVICE_DRIVERTRANSPORT)};
+      fdf::MakeOffer2<fuchsia_hardware_gpioimpl::Service>(arena, component::kDefaultInstance));
 
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                   .name(arena, kDeviceName)
-                  .offers(arena, std::move(offers))
-                  .properties(arena, std::move(properties))
+                  .offers2(arena, std::move(offers))
                   .Build();
 
   zx::result controller_endpoints =

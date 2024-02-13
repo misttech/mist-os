@@ -63,7 +63,7 @@ class RootDriver : public fdf::DriverBase, public fdf::Server<ft::Root> {
   fit::result<fdf::NodeError> AddChild() {
     fidl::Arena arena;
 
-    auto offer = fdf::MakeOffer<ft::Service>(kChildName);
+    auto offer = fdf::MakeOffer2<ft::Service>(kChildName);
 
     // Set the properties of the node that a driver will bind to.
     auto property =
@@ -71,8 +71,8 @@ class RootDriver : public fdf::DriverBase, public fdf::Server<ft::Root> {
 
     auto args = fdf::NodeAddArgs{{
         .name = std::string(kChildName),
-        .offers = std::vector{std::move(offer)},
         .properties = std::vector{std::move(property)},
+        .offers2 = std::vector{std::move(offer)},
     }};
 
     // Create endpoints of the `NodeController` for the node.

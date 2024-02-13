@@ -7,7 +7,6 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/driver/compat/cpp/compat.h>
 
-#include <bind/fuchsia/hardware/sdio/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 
 #include "sdio-controller-device.h"
@@ -70,20 +69,18 @@ zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info) {
 
   fidl::Arena arena;
 
-  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 5);
+  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 4);
   properties[0] = fdf::MakeProperty(arena, BIND_PROTOCOL, ZX_PROTOCOL_SDIO);
   properties[1] = fdf::MakeProperty(arena, BIND_SDIO_VID, hw_info.manufacturer_id);
   properties[2] = fdf::MakeProperty(arena, BIND_SDIO_PID, hw_info.product_id);
   properties[3] = fdf::MakeProperty(arena, BIND_SDIO_FUNCTION, function_);
-  properties[4] = fdf::MakeProperty(arena, bind_fuchsia_hardware_sdio::SERVICE,
-                                    bind_fuchsia_hardware_sdio::SERVICE_ZIRCONTRANSPORT);
 
-  std::vector<fuchsia_component_decl::wire::Offer> offers = compat_server_.CreateOffers(arena);
-  offers.push_back(fdf::MakeOffer<fuchsia_hardware_sdio::Service>(arena, sdio_function_name_));
+  std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server_.CreateOffers2(arena);
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_sdio::Service>(arena, sdio_function_name_));
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, sdio_function_name_)
-                        .offers(arena, std::move(offers))
+                        .offers2(arena, std::move(offers))
                         .properties(properties)
                         .Build();
 

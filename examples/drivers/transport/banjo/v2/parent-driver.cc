@@ -35,8 +35,8 @@ class ParentBanjoTransportDriver : public fdf::DriverBase,
     // Offer `fuchsia.examples.gizmo.Service` to the driver that binds to the node.
     auto args = fuchsia_driver_framework::NodeAddArgs({
         .name = std::string(name()),
-        .offers = child_.CreateOffers(),
         .properties = {{banjo_server_.property()}},
+        .offers2 = child_.CreateOffers2(),
     });
 
     // Create endpoints of the `NodeController` for the node.
