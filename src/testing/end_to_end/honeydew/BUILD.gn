@@ -50,7 +50,6 @@ python_library("honeydew") {
     "interfaces/affordances/session.py",
     "interfaces/affordances/tracing.py",
     "interfaces/affordances/ui/__init__.py",
-    "interfaces/affordances/ui/custom_types.py",
     "interfaces/affordances/ui/screenshot.py",
     "interfaces/affordances/ui/user_input.py",
     "interfaces/affordances/wlan/wlan.py",
