@@ -60,10 +60,6 @@ class RestrictPlatformBus : public fdf::WireServer<fuchsia_hardware_platform_bus
   void AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, fdf::Arena& arena,
                             AddCompositeNodeSpecCompleter::Sync& completer) override;
 
-  void AddCompositeImplicitPbusFragment(
-      AddCompositeImplicitPbusFragmentRequestView request, fdf::Arena& arena,
-      AddCompositeImplicitPbusFragmentCompleter::Sync& completer) override;
-
  private:
   PlatformBus* upstream_;
 };

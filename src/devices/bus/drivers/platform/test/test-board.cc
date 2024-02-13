@@ -87,8 +87,6 @@ zx_status_t TestBoard::Create(zx_device_t* parent) {
   }
 
   auto board = std::make_unique<TestBoard>(parent, std::move(endpoints->client));
-  auto& pbus = board->pbus_;
-
   status = board->DdkAdd("test-board", DEVICE_ADD_NON_BINDABLE);
   if (status != ZX_OK) {
     zxlogf(ERROR, "TestBoard::Create: DdkAdd failed: %d", status);
@@ -100,105 +98,6 @@ zx_status_t TestBoard::Create(zx_device_t* parent) {
     // devmgr is now in charge of the device.
     [[maybe_unused]] auto* dummy = board.release();
   }
-
-  // Add a composite device
-  const zx_bind_inst_t gpio_match[] = {
-      BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_GPIO),
-      BI_MATCH_IF(EQ, BIND_GPIO_PIN, 3),
-  };
-  const zx_bind_inst_t spi_match[] = {
-      BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_SPI),
-      BI_ABORT_IF(NE, BIND_SPI_BUS_ID, 0),
-      BI_MATCH_IF(EQ, BIND_SPI_CHIP_SELECT, 0),
-  };
-  device_fragment_part_t gpio_fragment[] = {
-      {std::size(gpio_match), gpio_match},
-  };
-  device_fragment_part_t spi_fragment[] = {
-      {std::size(spi_match), spi_match},
-  };
-  device_fragment_t composite[] = {
-      {"gpio", std::size(gpio_fragment), gpio_fragment},
-  };
-
-  struct composite_test_metadata metadata_1 = {
-      .composite_device_id = PDEV_DID_TEST_COMPOSITE_1,
-      .metadata_value = 12345,
-  };
-
-  struct composite_test_metadata metadata_2 = {
-      .composite_device_id = PDEV_DID_TEST_COMPOSITE_2,
-      .metadata_value = 12345,
-  };
-
-  const std::vector<fuchsia_hardware_platform_bus::Metadata> test_metadata_1{
-      [&]() {
-        fuchsia_hardware_platform_bus::Metadata ret;
-        ret.type() = DEVICE_METADATA_PRIVATE;
-        ret.data() = std::vector(reinterpret_cast<uint8_t*>(&metadata_1),
-                                 reinterpret_cast<uint8_t*>(&metadata_1) + sizeof(metadata_1));
-        return ret;
-      }(),
-  };
-
-  const std::vector<fuchsia_hardware_platform_bus::Metadata> test_metadata_2{
-      [&]() {
-        fuchsia_hardware_platform_bus::Metadata ret;
-        ret.type() = DEVICE_METADATA_PRIVATE;
-        ret.data() = std::vector(reinterpret_cast<uint8_t*>(&metadata_2),
-                                 reinterpret_cast<uint8_t*>(&metadata_2) + sizeof(metadata_2));
-        return ret;
-      }(),
-  };
-
-  fuchsia_hardware_platform_bus::Node pdev = {};
-  pdev.name() = "composite-dev";
-  pdev.vid() = PDEV_VID_TEST;
-  pdev.pid() = PDEV_PID_PBUS_TEST;
-  pdev.did() = PDEV_DID_TEST_COMPOSITE_1;
-  pdev.metadata() = std::move(test_metadata_1);
-
-  fidl::Arena<> fidl_arena;
-  fdf::Arena arena('TEST');
-  auto result = pbus.buffer(arena)->AddCompositeImplicitPbusFragment(
-      fidl::ToWire(fidl_arena, std::move(pdev)),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, composite, std::size(composite)), {});
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
-  }
-
-  device_fragment_t composite2[] = {
-      {"spi", std::size(spi_fragment), spi_fragment},
-  };
-
-  fuchsia_hardware_platform_bus::Node pdev2 = {};
-  pdev2.name() = "composite-dev-2";
-  pdev2.vid() = PDEV_VID_TEST;
-  pdev2.pid() = PDEV_PID_PBUS_TEST;
-  pdev2.did() = PDEV_DID_TEST_COMPOSITE_2;
-  pdev2.metadata() = std::move(test_metadata_2);
-
-  result = pbus.buffer(arena)->AddCompositeImplicitPbusFragment(
-      fidl::ToWire(fidl_arena, std::move(pdev2)),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, composite2, std::size(composite2)), {});
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
-  }
-
   return status;
 }
 

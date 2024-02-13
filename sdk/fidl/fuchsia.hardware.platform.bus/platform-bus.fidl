@@ -228,19 +228,6 @@ closed protocol PlatformBus {
         node Node;
         spec fuchsia.driver.framework.CompositeNodeSpec;
     }) -> () error zx.Status;
-
-    /// Super deprecated, use AddComposite() instead.
-    /// Adds a composite platform device to the bus. The platform device specified by |dev|
-    /// is the zeroth fragment and the |fragments| array specifies fragments 1 through n.
-    /// The composite device is started in a the driver host of the
-    /// |primary_fragment| if it is specified, or a new driver host if it is is
-    /// NULL. It is not possible to set the primary fragment to "pdev" as that
-    /// would cause the driver to spawn in the platform bus's driver host.
-    strict AddCompositeImplicitPbusFragment(struct {
-        node Node;
-        fragments vector<fuchsia.device.manager.DeviceFragment>:MAX;
-        primary_fragment string:<MAX, optional>;
-    }) -> () error zx.Status;
 };
 
 service Service {

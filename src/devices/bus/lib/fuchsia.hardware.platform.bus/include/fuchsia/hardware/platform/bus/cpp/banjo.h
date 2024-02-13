@@ -247,41 +247,6 @@ class PBusProtocolClient {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  // Deprecated, use AddComposite() instead.
-  // Adds a composite platform device to the bus. The platform device specified by |dev|
-  // is the zeroth fragment and the |fragments| array specifies fragments 1 through n.
-  // The composite device is started in a the driver host of the
-  // |primary_fragment| if it is specified, or a new driver host if it is is
-  // NULL. It is not possible to set the primary fragment to "pdev" as that
-  // would cause the driver to spawn in the platform bus's driver host.
-  zx_status_t CompositeDeviceAdd(const pbus_dev_t* dev, uint64_t fragments,
-                                 uint64_t fragments_count, const char* primary_fragment) const {
-    if (!primary_fragment) {
-      zxlogf(ERROR, "%s: primary_fragment cannot be null", __func__);
-      return ZX_ERR_INVALID_ARGS;
-    }
-
-    fidl::Arena<> fidl_arena;
-    auto result =
-        client_.buffer(fdf::Arena('PBCD'))
-            ->AddCompositeImplicitPbusFragment(
-                DevToNode(dev, fidl_arena),
-                platform_bus_composite::MakeFidlFragment(
-                    fidl_arena, reinterpret_cast<device_fragment_t*>(fragments), fragments_count),
-                fidl::StringView::FromExternal(primary_fragment));
-    if (!result.ok()) {
-      zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment request failed: %s", __func__,
-             result.FormatDescription().data());
-      return result.status();
-    }
-    if (result->is_error()) {
-      zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment failed: %s", __func__,
-             zx_status_get_string(result->error_value()));
-      return result->error_value();
-    }
-    return ZX_OK;
-  }
-
   // Adds a composite platform device to the bus.
   zx_status_t AddComposite(const pbus_dev_t* dev, uint64_t fragments, uint64_t fragment_count,
                            const char* primary_fragment) const {

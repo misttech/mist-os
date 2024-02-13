@@ -126,12 +126,6 @@ void RestrictPlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView r
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-void RestrictPlatformBus::AddCompositeImplicitPbusFragment(
-    AddCompositeImplicitPbusFragmentRequestView request, fdf::Arena& arena,
-    AddCompositeImplicitPbusFragmentCompleter::Sync& completer) {
-  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
 zx_status_t PlatformDevice::Create(fpbus::Node node, zx_device_t* parent, PlatformBus* bus,
                                    Type type, std::unique_ptr<platform_bus::PlatformDevice>* out) {
   fbl::AllocChecker ac;

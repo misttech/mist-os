@@ -81,9 +81,6 @@ class PlatformBus : public PlatformBusType,
                     AddCompositeCompleter::Sync& completer) override;
   void AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, fdf::Arena& arena,
                             AddCompositeNodeSpecCompleter::Sync& completer) override;
-  void AddCompositeImplicitPbusFragment(
-      AddCompositeImplicitPbusFragmentRequestView request, fdf::Arena& arena,
-      AddCompositeImplicitPbusFragmentCompleter::Sync& completer) override;
 
   // SysInfo protocol implementation.
   void GetBoardName(GetBoardNameCompleter::Sync& completer) override;
