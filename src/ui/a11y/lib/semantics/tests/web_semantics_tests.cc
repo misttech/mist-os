@@ -194,10 +194,17 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
                        .source = ChildRef{kBuildInfoProvider},
                        .targets = {ChildRef{kWebView}, ChildRef{kWebContextProvider}}});
 
-    realm()->AddRoute({.capabilities = {Directory{
-                           .name = "root-ssl-certificates",
-                           .type = fuchsia::component::decl::DependencyType::STRONG,
-                       }},
+    realm()->AddRoute({.capabilities =
+                           {
+                               Directory{
+                                   .name = "root-ssl-certificates",
+                                   .type = fuchsia::component::decl::DependencyType::STRONG,
+                               },
+                               Directory{
+                                   .name = "tzdata-icu",
+                                   .type = fuchsia::component::decl::DependencyType::STRONG,
+                               },
+                           },
                        .source = ParentRef(),
                        .targets = {ChildRef{kWebContextProvider}}});
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::process::Launcher::Name_}},

@@ -37,10 +37,9 @@
             to: "#realm_builder",
         },
         {
-            directory: "config-data",
+            directory: "tzdata-icu",
             from: "parent",
             to: "#realm_builder",
-            subdir: "web-semantics-test",
         },
     ],
     facets: {
