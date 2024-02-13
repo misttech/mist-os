@@ -263,6 +263,9 @@ fidl_translations_symmetrical_enums!(
 
 pub trait SourcePath {
     fn source_path(&self) -> BorrowedSeparatedPath<'_>;
+    fn is_from_dictionary(&self) -> bool {
+        self.source_path().dirname.is_some()
+    }
 }
 
 #[cfg_attr(

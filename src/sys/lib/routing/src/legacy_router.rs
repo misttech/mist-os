@@ -36,7 +36,7 @@ use {
     cm_rust::{
         Availability, CapabilityDecl, CapabilityTypeName, ExposeDecl, ExposeDeclCommon,
         ExposeSource, ExposeTarget, OfferDecl, OfferDeclCommon, OfferServiceDecl, OfferSource,
-        OfferTarget, RegistrationDeclCommon, RegistrationSource, SourceName, UseDecl,
+        OfferTarget, RegistrationDeclCommon, RegistrationSource, SourceName, SourcePath, UseDecl,
         UseDeclCommon, UseSource,
     },
     cm_types::Name,
@@ -67,6 +67,10 @@ where
     V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
 {
+    let cap_type = CapabilityTypeName::from(&use_decl);
+    if use_decl.source_path().dirname.is_some() {
+        return Err(RoutingError::DictionariesNotSupported { cap_type });
+    }
     match Use::route(use_decl, use_target.clone(), &sources, visitor, mapper).await? {
         UseResult::Source(source) => return Ok(source),
         UseResult::OfferFromParent(offer, component) => {
@@ -74,8 +78,6 @@ where
         }
         UseResult::ExposeFromChild(use_decl, child_component) => {
             let child_exposes = child_component.lock_resolved_state().await?.exposes();
-            let use_decl_full: UseDecl = use_decl.clone().into();
-            let cap_type = CapabilityTypeName::from(&use_decl_full);
             let child_exposes =
                 find_matching_exposes(cap_type, use_decl.source_name(), &child_exposes)
                     .ok_or_else(|| {
@@ -151,6 +153,12 @@ where
     V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
 {
+    let cap_type = CapabilityTypeName::from(offer.iter().next().unwrap());
+    for offer in offer.iter() {
+        if offer.source_path().dirname.is_some() {
+            return Err(RoutingError::DictionariesNotSupported { cap_type });
+        }
+    }
     match Offer::route(offer, offer_target, &sources, visitor, mapper).await? {
         OfferResult::Source(source) => return Ok(source),
         OfferResult::OfferFromChild(offer, component) => {
@@ -302,6 +310,12 @@ where
     V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
 {
+    let cap_type = CapabilityTypeName::from(expose.iter().next().unwrap());
+    for expose in expose.iter() {
+        if expose.source_path().dirname.is_some() {
+            return Err(RoutingError::DictionariesNotSupported { cap_type });
+        }
+    }
     match Expose::route(expose, expose_target, &sources, visitor, mapper).await? {
         ExposeResult::Source(source) => Ok(source),
         ExposeResult::ExposeFromAnonymizedAggregate(expose, aggregation_component) => {
@@ -359,6 +373,10 @@ where
     V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
 {
+    let cap_type = CapabilityTypeName::from(&use_decl);
+    if use_decl.source_path().dirname.is_some() {
+        return Err(RoutingError::DictionariesNotSupported { cap_type });
+    }
     mapper.add_use(target.moniker().clone(), &use_decl.clone().into());
     route_from_self_by_name(use_decl.source_name(), target, sources, visitor, mapper).await
 }

@@ -260,6 +260,9 @@ pub enum RoutingError {
     #[error("Routing a capability of an unsupported type: {}", type_name)]
     UnsupportedCapabilityType { type_name: CapabilityTypeName },
 
+    #[error("Dictionaries are not yet supported for {cap_type} capabilities")]
+    DictionariesNotSupported { cap_type: CapabilityTypeName },
+
     #[error("The capability does not support routing")]
     BedrockUnsupportedCapability,
 
@@ -350,7 +353,8 @@ impl RoutingError {
             | RoutingError::BedrockSourceDictionaryCollision { .. }
             | RoutingError::BedrockRoutingRequestCanceled { .. }
             | RoutingError::AvailabilityRoutingError(_) => zx::Status::NOT_FOUND,
-            RoutingError::BedrockUnsupportedCapability { .. } => zx::Status::NOT_SUPPORTED,
+            RoutingError::BedrockUnsupportedCapability { .. }
+            | RoutingError::DictionariesNotSupported { .. } => zx::Status::NOT_SUPPORTED,
             RoutingError::MonikerError(_) => zx::Status::INTERNAL,
             RoutingError::ComponentInstanceError(err) => err.as_zx_status(),
             RoutingError::RightsRoutingError(err) => err.as_zx_status(),

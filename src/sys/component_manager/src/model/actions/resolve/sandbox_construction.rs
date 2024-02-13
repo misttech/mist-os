@@ -423,7 +423,7 @@ fn extend_dict_with_use(
             )
         }
         cm_rust::UseSource::Framework => {
-            if source_path.dirname.is_some() {
+            if use_.is_from_dictionary() {
                 warn!(
                     "routing from framework with dictionary path is not supported: {source_path}"
                 );
@@ -573,7 +573,7 @@ fn extend_dict_with_offer(
             )
         }
         cm_rust::OfferSource::Framework => {
-            if source_path.dirname.is_some() {
+            if offer.is_from_dictionary() {
                 warn!(
                     "routing from framework with dictionary path is not supported: {source_path}"
                 );
@@ -657,7 +657,7 @@ fn extend_dict_with_expose(
             }
         }
         cm_rust::ExposeSource::Framework => {
-            if source_path.dirname.is_some() {
+            if expose.is_from_dictionary() {
                 warn!(
                     "routing from framework with dictionary path is not supported: {source_path}"
                 );

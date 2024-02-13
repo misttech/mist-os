@@ -4,7 +4,8 @@
 
 use {
     crate::model::testing::routing_test_helpers::*, cm_rust::*, cm_rust_testing::*,
-    routing_test_helpers::RoutingTestModel,
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx, routing_test_helpers::RoutingTestModel,
+    std::path::PathBuf,
 };
 
 #[fuchsia::test]
@@ -112,6 +113,217 @@ async fn use_protocol_from_dictionary() {
         )
         .await;
     }
+}
+
+#[fuchsia::test]
+async fn use_directory_from_dictionary_not_supported() {
+    // Routing a directory into a dictionary isn't supported yet, it should fail.
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .directory(DirectoryDeclBuilder::new("bar_data").path("/data/bar").build())
+                .dictionary(DictionaryDeclBuilder::new("parent_dict").build())
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "parent_dict".parse().unwrap(),
+                    source_dictionary: None,
+                    target: OfferTarget::static_child("leaf".into()),
+                    target_name: "parent_dict".parse().unwrap(),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Directory(OfferDirectoryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "bar_data".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "B".parse().unwrap(),
+                    target: OfferTarget::Capability("parent_dict".parse().unwrap()),
+                    rights: Some(fio::R_STAR_DIR),
+                    subdir: None,
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
+                .dictionary(DictionaryDeclBuilder::new("self_dict").build())
+                .offer(OfferDecl::Directory(OfferDirectoryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "foo_data".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "A".parse().unwrap(),
+                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
+                    rights: Some(fio::R_STAR_DIR),
+                    subdir: None,
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .use_(UseDecl::Directory(UseDirectoryDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Self_,
+                    source_name: "A".parse().unwrap(),
+                    source_dictionary: Some("self_dict".parse().unwrap()),
+                    target_path: "/A".parse().unwrap(),
+                    rights: fio::R_STAR_DIR,
+                    subdir: None,
+                    availability: Availability::Required,
+                }))
+                .use_(UseDecl::Directory(UseDirectoryDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Parent,
+                    source_name: "B".parse().unwrap(),
+                    source_dictionary: Some("parent_dict".parse().unwrap()),
+                    target_path: "/B".parse().unwrap(),
+                    rights: fio::R_STAR_DIR,
+                    subdir: None,
+                    availability: Availability::Required,
+                }))
+                .build(),
+        ),
+    ];
+
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    test.check_use(
+        "leaf".try_into().unwrap(),
+        CheckUse::Directory {
+            path: "/A".parse().unwrap(),
+            file: PathBuf::from("hippo"),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+        },
+    )
+    .await;
+    test.check_use(
+        "leaf".try_into().unwrap(),
+        CheckUse::Directory {
+            path: "/B".parse().unwrap(),
+            file: PathBuf::from("hippo"),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+        },
+    )
+    .await;
+}
+
+#[fuchsia::test]
+async fn expose_directory_from_dictionary_not_supported() {
+    // Routing a directory into a dictionary isn't supported yet, it should fail.
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .use_(UseDecl::Directory(UseDirectoryDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Child("mid".into()),
+                    source_name: "A".parse().unwrap(),
+                    source_dictionary: None,
+                    target_path: "/A".parse().unwrap(),
+                    rights: fio::R_STAR_DIR,
+                    subdir: None,
+                    availability: Availability::Required,
+                }))
+                .use_(UseDecl::Directory(UseDirectoryDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Child("mid".into()),
+                    source_name: "B".parse().unwrap(),
+                    source_dictionary: None,
+                    target_path: "/B".parse().unwrap(),
+                    rights: fio::R_STAR_DIR,
+                    subdir: None,
+                    availability: Availability::Required,
+                }))
+                .add_child(ChildDeclBuilder::new_lazy_child("mid".into()))
+                .build(),
+        ),
+        (
+            "mid",
+            ComponentDeclBuilder::new()
+                .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
+                .dictionary(DictionaryDeclBuilder::new("self_dict").build())
+                .offer(OfferDecl::Directory(OfferDirectoryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "foo_data".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "A".parse().unwrap(),
+                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
+                    rights: Some(fio::R_STAR_DIR),
+                    subdir: None,
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "A".parse().unwrap(),
+                    source_dictionary: Some("self_dict".parse().unwrap()),
+                    target_name: "A".parse().unwrap(),
+                    rights: None,
+                    subdir: None,
+                    target: ExposeTarget::Parent,
+                    availability: Availability::Required,
+                }))
+                .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
+                    source: ExposeSource::Child("leaf".into()),
+                    source_name: "B".parse().unwrap(),
+                    source_dictionary: Some("child_dict".parse().unwrap()),
+                    target_name: "B".parse().unwrap(),
+                    rights: None,
+                    subdir: None,
+                    target: ExposeTarget::Parent,
+                    availability: Availability::Required,
+                }))
+                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .directory(DirectoryDeclBuilder::new("bar_data").path("/data/bar").build())
+                .dictionary(DictionaryDeclBuilder::new("child_dict").build())
+                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "child_dict".parse().unwrap(),
+                    source_dictionary: None,
+                    target: ExposeTarget::Parent,
+                    target_name: "child_dict".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Directory(OfferDirectoryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "bar_data".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "B".parse().unwrap(),
+                    target: OfferTarget::Capability("child_dict".parse().unwrap()),
+                    rights: Some(fio::R_STAR_DIR),
+                    subdir: None,
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .build(),
+        ),
+    ];
+
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    test.check_use(
+        ".".try_into().unwrap(),
+        CheckUse::Directory {
+            path: "/A".parse().unwrap(),
+            file: PathBuf::from("hippo"),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+        },
+    )
+    .await;
+    test.check_use(
+        ".".try_into().unwrap(),
+        CheckUse::Directory {
+            path: "/B".parse().unwrap(),
+            file: PathBuf::from("hippo"),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+        },
+    )
+    .await;
 }
 
 #[fuchsia::test]
