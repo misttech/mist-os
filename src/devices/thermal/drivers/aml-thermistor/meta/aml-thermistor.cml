@@ -9,9 +9,9 @@
     ],
     program: {
         runner: "driver",
-        bind: "meta/bind/astro-thermistor.bindbc",
+        bind: "meta/bind/aml-thermistor.bindbc",
         colocate: "false",
-        compat: "driver/astro-thermistor.so",
+        compat: "driver/aml-thermistor.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },

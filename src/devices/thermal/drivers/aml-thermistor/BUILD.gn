@@ -7,7 +7,7 @@ import("//build/drivers.gni")
 
 driver_bind_rules("aml-thermistor-bind") {
   rules = "thermistor.bind"
-  bind_output = "astro-thermistor.bindbc"
+  bind_output = "aml-thermistor.bindbc"
   tests = "bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_bindlib",
@@ -19,7 +19,7 @@ driver_bind_rules("aml-thermistor-bind") {
 }
 
 fuchsia_driver("aml-thermistor-driver") {
-  output_name = "astro-thermistor"
+  output_name = "aml-thermistor"
   defines = [ "_ALL_SOURCE" ]
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
   sources = [
@@ -44,13 +44,13 @@ fuchsia_driver("aml-thermistor-driver") {
 
 fuchsia_driver_component("aml-thermistor") {
   info = "aml-thermistor-info.json"
-  component_name = "astro-thermistor"
+  component_name = "aml-thermistor"
   deps = [ ":aml-thermistor-driver" ]
   manifest = "meta/aml-thermistor.cml"
 }
 
 fuchsia_driver_package("package") {
-  package_name = "astro-thermistor"
+  package_name = "aml-thermistor"
   driver_components = [ ":aml-thermistor" ]
 }
 
@@ -63,7 +63,7 @@ fuchsia_driver_component("aml-thermistor-v2") {
 
 fuchsia_driver_package("package-v2") {
   package_name = "aml-thermistor"
-  driver_components = [ ":aml-thermistor-v2" ]
+  driver_components = [ ":aml-thermistor" ]
 }
 
 group("tests") {
