@@ -130,9 +130,9 @@ func NewFFXInstance(
 		// Set these fields in the global config for tests that don't use this library
 		// and don't set their own isolated env config.
 		{"config", "env", "set", filepath.Join(outputDir, "global_config.json"), "-l", "global"},
-		{"config", "set", "fastboot.usb.disabled", "true", "-l", "global"},
-		{"config", "set", "ffx.analytics.disabled", "true", "-l", "global"},
-		{"config", "set", "proactive_log.enabled", "false", "-l", "global"},
+		// This is a config "alias" for various other config values -- disabling
+		// metrics, device discvery, device autoconnection, etc.
+		{"config", "set", "ffx.isolated", "true", "-l", "global"},
 	}
 	if sshKey != "" {
 		sshKey, err = filepath.Abs(sshKey)
