@@ -294,6 +294,13 @@ enum class ResourceFormat : uint32_t {
   kRgbx32 = 134,
 };
 
+// Resource ID that has a special meaning in at least one operation.
+//
+// virtio12 5.7.6.8 "Device Operation: controlq", the
+// VIRTIO_GPU_CMD_SET_SCANOUT command description states that using a resource
+// ID with this value disables the scanout.
+constexpr uint32_t kInvalidResourceId = 0;
+
 // struct virtio_gpu_resource_create_2d in virtio12 5.7.6.8 "Device Operation:
 // controlq", under the VIRTIO_GPU_CMD_RESOURCE_CREATE_2D command description
 struct Create2DResourceCommand {
@@ -318,6 +325,8 @@ struct SetScanoutCommand {
 
   ScanoutGeometry geometry;
   uint32_t scanout_id;
+
+  // kInvalidResourceId means that the scanout is disabled.
   uint32_t resource_id;
 };
 

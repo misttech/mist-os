@@ -528,7 +528,8 @@ void DisplayEngine::virtio_gpu_flusher() {
     zxlogf(TRACE, "flushing");
 
     if (fb_change) {
-      uint32_t resource_id = displayed_fb_ ? displayed_fb_->resource_id : 0;
+      uint32_t resource_id =
+          displayed_fb_ ? displayed_fb_->resource_id : virtio_abi::kInvalidResourceId;
       zx::result<> set_scanout_result = gpu_device_->SetScanoutProperties(
           current_display_.scanout_id, resource_id, current_display_.scanout_info.geometry.width,
           current_display_.scanout_info.geometry.height);

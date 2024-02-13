@@ -60,6 +60,8 @@ class VirtioGpuDevice {
 
   // Sets scanout parameters for one scanout.
   //
+  // Setting `resource_id` to kInvalidResourceId disables the scanout.
+  //
   // virtio spec Section 5.7.6.8 "Device Operation: controlq", operation
   // VIRTIO_GPU_CMD_SET_SCANOUT.
   zx::result<> SetScanoutProperties(uint32_t scanout_id, uint32_t resource_id, uint32_t width,
