@@ -17,7 +17,6 @@ use errors::ffx_bail;
 use ffx_assembly_args::PackageSizeCheckArgs;
 use fuchsia_hash::Hash;
 use fuchsia_pkg::PackageManifest;
-use num::bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::{BTreeMap, HashSet};
@@ -38,19 +37,6 @@ pub struct BudgetConfig {
     /// Apply a size budget to packages.
     #[serde(default)]
     pub package_set_budgets: Vec<PackageSetBudget>,
-    /// Apply a size budget to blobs identified by file name.
-    /// Matched blobs are excluded from the package accounting.
-    /// This takes apart the widely shared resource in their own budget.
-    #[serde(default)]
-    pub resource_budgets: Vec<ResourceBudget>,
-    /// The total amount of bytes equal to the sum of all individual budgets.
-    #[serde(default)]
-    pub total_budget_bytes: Option<u64>,
-    /// Whether blobs should be de-duped across the product when calculating
-    /// the proportional size of the blob. If this is false, blobs are only
-    /// de-duped within a budget.
-    #[serde(default)]
-    pub dedup_blobs: bool,
 }
 
 /// Size budget for a set of packages.
@@ -66,20 +52,6 @@ pub struct PackageSetBudget {
     pub creep_budget_bytes: u64,
     /// List of paths to `package_manifest.json` files for each package of the set of the group.
     pub packages: Vec<Utf8PathBuf>,
-}
-
-/// Size budget for a set of files matched by path.
-/// Part of JSON configuration.
-#[derive(Debug, Clone, Deserialize, PartialEq)]
-pub struct ResourceBudget {
-    /// Human readable name of the package set.
-    pub name: String,
-    /// Number of bytes allotted for the packages of this group.
-    pub budget_bytes: u64,
-    /// Allowed usage increase allowed for a given commit.
-    pub creep_budget_bytes: u64,
-    /// File path used to match blobs covered but this budget.
-    pub paths: HashSet<String>,
 }
 
 /// Intermediate data structure indexed by blob hash used to count how many times a blob is used.
@@ -140,59 +112,16 @@ fn verify_budgets_with_tools(
 
     // List blobs hashes for each package manifest of each package budget.
     let package_budget_blobs = load_manifests_blobs_match_budgets(&config.package_set_budgets)?;
-    let resource_budget_blobs =
-        compute_resources_budget_blobs(&config.resource_budgets, &package_budget_blobs);
 
     // Read blob json file if any, and collect sizes on target.
     let blobs = load_blob_info(&args.blob_sizes, &package_budget_blobs, &blob_size_calculator)?;
-    // Count how many times blobs are used.
-    let blob_count_by_hash = count_blobs(&blobs, &package_budget_blobs)?;
 
-    // Find blobs to be charged on the resource budget, and compute each budget usage.
-    let mut results =
-        compute_budget_results(&resource_budget_blobs, &blob_count_by_hash, &HashSet::new())?;
-
-    // Compute the total size of the packages for each budget, excluding blobs charged on
-    // resources budget.
-    if config.dedup_blobs {
-        let resource_hashes: HashSet<&Hash> =
-            resource_budget_blobs.iter().flat_map(|b| &b.blobs).map(|b| &b.hash).collect();
-        results.append(&mut compute_budget_results(
-            &package_budget_blobs,
-            &blob_count_by_hash,
-            &resource_hashes,
-        )?);
-    } else {
-        results.append(&mut compute_non_dedup_budget_results(&package_budget_blobs, &blobs)?);
-    }
+    // Calculate the budget results.
+    let mut results = compute_budget_results(&package_budget_blobs, &blobs)?;
 
     // Write the output result if requested by the command line.
     if let Some(out_path) = &args.gerrit_output {
         write_json_file(out_path, &to_json_output(&results)?)?;
-    }
-
-    if config.dedup_blobs {
-        // Ensure that the sum of all the budgets equals total budget bytes.
-        if let Some(total) = config.total_budget_bytes {
-            let mut sum_of_budgets = 0u64;
-            for budget in &config.package_set_budgets {
-                sum_of_budgets += budget.budget_bytes;
-            }
-            for budget in &config.resource_budgets {
-                sum_of_budgets += budget.budget_bytes;
-            }
-
-            // `BigInt` is used as subtraction is not closed in `u64`.
-            let diff = BigInt::from(sum_of_budgets) - BigInt::from(total);
-            if sum_of_budgets != total {
-                anyhow::bail!(
-                    "Sum of budgets doesn't match total budget bytes: sum={}, total={}, diff=sum-total={}",
-                    sum_of_budgets,
-                    total,
-                    diff,
-                );
-            }
-        }
     }
 
     if let Some(verbose_json_output) = args.verbose_json_output {
@@ -391,45 +320,9 @@ fn count_blobs(
     Ok(blob_count_by_hash)
 }
 
-/// Computes the total size of each resource budget.
+// Computes the total size of each component taking into account blob sharing.
 #[allow(clippy::ptr_arg)]
-fn compute_resources_budget_blobs(
-    budgets: &Vec<ResourceBudget>,
-    package_budget_blobs: &Vec<BudgetBlobs>,
-) -> Vec<BudgetBlobs> {
-    let mut result = vec![];
-    for budget in budgets.iter() {
-        // Selects all file hashes matching the path..
-        let hashes: HashSet<_> = package_budget_blobs
-            .iter()
-            .flat_map(|budget| &budget.blobs)
-            .filter(|blob| budget.paths.contains(&blob.path))
-            .map(|blob| blob.hash)
-            .collect();
-
-        // Collect occurrence based on the hash.
-        // This finds files with the same content but a different name
-        // which should belong to the resource budget.
-        result.push(BudgetBlobs {
-            budget: BudgetResult {
-                name: budget.name.clone(),
-                budget_bytes: budget.budget_bytes,
-                creep_budget_bytes: budget.creep_budget_bytes,
-                used_bytes: 0,
-                package_breakdown: BTreeMap::new(),
-            },
-            blobs: package_budget_blobs
-                .iter()
-                .flat_map(|budget| &budget.blobs)
-                .filter(|blob| hashes.contains(&blob.hash))
-                .cloned()
-                .collect(),
-        })
-    }
-    result
-}
-
-fn compute_non_dedup_budget_results(
+fn compute_budget_results(
     budget_usages: &Vec<BudgetBlobs>,
     blob_sizes: &Vec<BlobJsonEntry>,
 ) -> Result<Vec<BudgetResult>> {
@@ -437,28 +330,9 @@ fn compute_non_dedup_budget_results(
     for budget_usage in budget_usages.iter() {
         let single_budget_usage = vec![budget_usage.clone()];
         let blob_count_by_hash = count_blobs(&blob_sizes, &single_budget_usage)?;
-        let mut budget_result =
-            compute_budget_results(&single_budget_usage, &blob_count_by_hash, &HashSet::new())?;
-        result.append(&mut budget_result);
-    }
-    Ok(result)
-}
 
-// Computes the total size of each component taking into account blob sharing.
-#[allow(clippy::ptr_arg)]
-fn compute_budget_results(
-    budget_usages: &Vec<BudgetBlobs>,
-    blob_count_by_hash: &BTreeMap<Hash, BlobSizeAndCount>,
-    ignore_hashes: &HashSet<&Hash>,
-) -> Result<Vec<BudgetResult>> {
-    let mut result = vec![];
-    for budget_usage in budget_usages.iter() {
         let mut used_bytes = budget_usage.budget.used_bytes;
-        let filtered_blobs = budget_usage
-            .blobs
-            .iter()
-            .filter(|blob| !ignore_hashes.contains(&blob.hash))
-            .collect::<Vec<&BlobInstance>>();
+        let filtered_blobs = budget_usage.blobs.iter().collect::<Vec<&BlobInstance>>();
 
         used_bytes += filtered_blobs
             .iter()
@@ -530,7 +404,7 @@ fn to_json_output(
 #[allow(clippy::box_default)]
 mod tests {
     use crate::operations::size_check::package::{
-        compute_budget_results, verify_budgets_with_tools, BlobInstance, BlobSizeAndCount,
+        compute_budget_results, verify_budgets_with_tools, BlobInstance, BlobJsonEntry,
         BudgetBlobs, BudgetConfig, BudgetResult, PackageBlobSizeInfo, PackageSizeInfo,
     };
     use anyhow::Result;
@@ -544,7 +418,7 @@ mod tests {
     use fuchsia_hash::Hash;
     use pretty_assertions::assert_eq;
     use serde_json::json;
-    use std::collections::{BTreeMap, HashSet};
+    use std::collections::BTreeMap;
     use std::fs;
     use std::path::Path;
     use std::str::FromStr;
@@ -644,106 +518,6 @@ mod tests {
     }
 
     #[test]
-    fn fails_because_exceeds_maximum_budget() {
-        let test_fs = TestFs::new();
-        test_fs.write(
-            "size_budgets.json",
-            json!({
-            "package_set_budgets":[
-                {
-                    "name": "Software Delivery",
-                    "budget_bytes": 27,
-                    "creep_budget_bytes": 2i32,
-                    "packages": [],
-                },
-                {
-                    "name": "Component Framework",
-                    "budget_bytes": 51i32,
-                    "creep_budget_bytes": 2i32,
-                    "packages": [],
-                }
-            ],
-            "resource_budgets":[
-                {
-                    "name": "Misc",
-                    "budget_bytes": 23,
-                    "creep_budget_bytes": 2i32,
-                    "paths": [],
-                },
-            ],
-            "total_budget_bytes": 100,
-            "dedup_blobs": true}),
-        );
-        test_fs.write("blobs.json", json!([]));
-        let err = verify_budgets_with_tools(
-            PackageSizeCheckArgs {
-                blobfs_layout: BlobfsLayout::Compact,
-                budgets: test_fs.path("size_budgets.json"),
-                blob_sizes: [test_fs.path("blobs.json")].to_vec(),
-                gerrit_output: None,
-                verbose: false,
-                verbose_json_output: None,
-            },
-            Box::new(FakeToolProvider::default()),
-        );
-        assert_eq!(err.exit_code(), 1);
-        assert_failed(
-            err,
-            "Sum of budgets doesn't match total budget bytes: sum=101, total=100, diff=sum-total=1",
-        );
-    }
-
-    #[test]
-    fn fails_because_falls_short_of_maximum_budget() {
-        let test_fs = TestFs::new();
-        test_fs.write(
-            "size_budgets.json",
-            json!({
-            "package_set_budgets":[
-                {
-                    "name": "Software Delivery",
-                    "budget_bytes": 27,
-                    "creep_budget_bytes": 2i32,
-                    "packages": [],
-                },
-                {
-                    "name": "Component Framework",
-                    "budget_bytes": 51i32,
-                    "creep_budget_bytes": 2i32,
-                    "packages": [],
-                }
-            ],
-            "resource_budgets":[
-                {
-                    "name": "Misc",
-                    "budget_bytes": 20,
-                    "creep_budget_bytes": 2i32,
-                    "paths": [],
-                },
-            ],
-            "total_budget_bytes": 100,
-            "dedup_blobs": true}),
-        );
-        test_fs.write("blobs.json", json!([]));
-        let err = verify_budgets_with_tools(
-            PackageSizeCheckArgs {
-                blobfs_layout: BlobfsLayout::Compact,
-                budgets: test_fs.path("size_budgets.json"),
-                blob_sizes: [test_fs.path("blobs.json")].to_vec(),
-                gerrit_output: None,
-                verbose: false,
-                verbose_json_output: None,
-            },
-            Box::new(FakeToolProvider::default()),
-        );
-        assert_eq!(err.exit_code(), 1);
-        assert_failed(
-            err,
-            "Sum of budgets doesn't match total budget bytes: sum=98, total=100, diff=sum-total=-2",
-        );
-    }
-
-    #[test]
     fn succeeds_because_equals_maximum_budget() {
         let test_fs = TestFs::new();
         test_fs.write(
@@ -762,17 +536,7 @@ mod tests {
                     "creep_budget_bytes": 2i32,
                     "packages": [],
                 }
-            ],
-            "resource_budgets":[
-                {
-                    "name": "Misc",
-                    "budget_bytes": 23,
-                    "creep_budget_bytes": 2i32,
-                    "paths": [],
-                },
-            ],
-            "total_budget_bytes": 101,
-            "dedup_blobs": true}),
+            ]}),
         );
         test_fs.write("blobs.json", json!([]));
         verify_budgets_with_tools(
@@ -799,7 +563,7 @@ mod tests {
                 "budget_bytes": 1i32,
                 "creep_budget_bytes": 2i32,
                 "packages": [],
-            }], "dedup_blobs": true}),
+            }]}),
         );
 
         test_fs.write(
@@ -836,7 +600,7 @@ mod tests {
                 "budget_bytes": 1i32,
                 "creep_budget_bytes": 1i32,
                 "packages": [],
-            }], "dedup_blobs": true}),
+            }]}),
         );
 
         test_fs.write(
@@ -875,7 +639,7 @@ mod tests {
                 "packages": [
                     test_fs.path("obj/src/sys/pkg/bin/pkg-cache/pkg-cache/package_manifest.json"),
                 ]
-            }], "dedup_blobs": true}),
+            }]}),
         );
         test_fs.write(
             "obj/src/sys/pkg/bin/pkg-cache/pkg-cache/package_manifest.json",
@@ -937,7 +701,7 @@ mod tests {
     }
 
     #[test]
-    fn blob_shared_by_two_budgets_no_dedup_test() {
+    fn blob_shared_by_two_budgets_test() {
         let test_fs = TestFs::new();
         test_fs.write(
             "size_budgets.json",
@@ -1108,177 +872,6 @@ mod tests {
     }
 
     #[test]
-    fn blob_shared_by_two_budgets_test() {
-        let test_fs = TestFs::new();
-        test_fs.write(
-            "size_budgets.json",
-            json!({"package_set_budgets":[{
-            "name": "Software Deliver",
-                "creep_budget_bytes": 1i32,
-                "budget_bytes": 7497932i32,
-                "packages": [
-                    test_fs.path("obj/src/sys/pkg/bin/pkg-cache/pkg-cache/package_manifest.json"),
-                    test_fs.path("obj/src/sys/pkg/bin/pkgfs/pkgfs/package_manifest.json"),
-                ]
-            },{
-                "name": "Connectivity",
-                "creep_budget_bytes": 1i32,
-                "budget_bytes": 10884219,
-                "packages": [
-                    test_fs.path( "obj/src/connectivity/bluetooth/core/bt-gap/bt-gap/package_manifest.json"),]
-            }], "dedup_blobs": true}),
-        );
-        test_fs.write(
-            "obj/src/sys/pkg/bin/pkg-cache/pkg-cache/package_manifest.json",
-            json!({
-                "version": "1",
-                "repository": "testrepository.com",
-                "package": {
-                    "name": "pkg-cache",
-                    "version": "0"
-                },
-                "blobs" : [{
-                    "source_path": "first_blob",
-                    "path": "path/in/pkg-cache",
-                    "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
-                    "size": 4i32
-                }]
-            }),
-        );
-        test_fs.write(
-            "obj/src/sys/pkg/bin/pkgfs/pkgfs/package_manifest.json",
-            json!({
-                "version": "1",
-                "repository": "testrepository.com",
-                "package": {
-                    "name": "pkgfs",
-                    "version": "0"
-                },
-                "blobs" : [{
-                    "source_path": "first_blob",
-                    "path": "path/in/pkgfs",
-                    "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
-                    "size": 8i32
-                }]
-            }),
-        );
-        test_fs.write(
-            "obj/src/connectivity/bluetooth/core/bt-gap/bt-gap/package_manifest.json",
-            json!({
-                "version": "1",
-                "repository": "testrepository.com",
-                "package": {
-                    "name": "bt-gap",
-                    "version": "0"
-                },
-                "blobs" : [{
-                    "source_path": "first_blob",
-                    "path": "path/in/bt-gap",
-                    "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
-                    "size": 16i32
-                }]
-            }),
-        );
-        test_fs.write(
-            "blobs.json",
-            json!([{
-              "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
-              "size": 159i32
-            }]),
-        );
-        verify_budgets_with_tools(
-            PackageSizeCheckArgs {
-                blobfs_layout: BlobfsLayout::Compact,
-                budgets: test_fs.path("size_budgets.json"),
-                blob_sizes: [test_fs.path("blobs.json")].to_vec(),
-                gerrit_output: Some(test_fs.path("output.json")),
-                verbose: false,
-                verbose_json_output: Some(test_fs.path("verbose-output.json")),
-            },
-            Box::new(FakeToolProvider::default()),
-        )
-        .unwrap();
-
-        test_fs.assert_eq(
-            "output.json",
-            json!({
-                "Connectivity": 53i32,
-                "Connectivity.creepBudget": 1i32,
-                "Connectivity.budget": 10884219i32,
-                "Connectivity.owner": "http://go/fuchsia-size-stats/single_component/?f=component%3Ain%3AConnectivity",
-                "Software Deliver": 106i32,
-                "Software Deliver.creepBudget": 1i32,
-                "Software Deliver.budget": 7497932i32,
-                "Software Deliver.owner": "http://go/fuchsia-size-stats/single_component/?f=component%3Ain%3ASoftware+Deliver"
-            }),
-        );
-        test_fs.assert_eq(
-            "verbose-output.json",
-            json!({
-                "Software Deliver": {
-                  "name": "Software Deliver",
-                  "budget_bytes": 7497932,
-                  "creep_budget_bytes": 1,
-                  "used_bytes": 106,
-                  "package_breakdown": {
-                    test_fs.path("obj/src/sys/pkg/bin/pkg-cache/pkg-cache/package_manifest.json").to_string(): {
-                      "proportional_size": 53,
-                      "used_space_in_blobfs": 159,
-                      "name": "pkg-cache",
-                      "blobs": [
-                        {
-                            "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
-                            "path_in_package": "path/in/pkg-cache",
-                            "used_space_in_blobfs": 159,
-                            "share_count": 3,
-                            "absolute_share_count": 3,
-                        }
-                      ]
-                    },
-                    test_fs.path("obj/src/sys/pkg/bin/pkgfs/pkgfs/package_manifest.json").to_string(): {
-                      "proportional_size": 53,
-                      "used_space_in_blobfs": 159,
-                      "name": "pkgfs",
-                      "blobs": [
-                        {
-                            "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
-                            "path_in_package": "path/in/pkgfs",
-                            "used_space_in_blobfs": 159,
-                            "share_count": 3,
-                            "absolute_share_count": 3,
-                        }
-                      ]
-                    }
-                  }
-                },
-                "Connectivity": {
-                  "name": "Connectivity",
-                  "budget_bytes": 10884219,
-                  "creep_budget_bytes": 1,
-                  "used_bytes": 53,
-                  "package_breakdown": {
-                    test_fs.path("obj/src/connectivity/bluetooth/core/bt-gap/bt-gap/package_manifest.json").to_string(): {
-                      "proportional_size": 53,
-                      "used_space_in_blobfs": 159,
-                      "name": "bt-gap",
-                      "blobs": [
-                        {
-                            "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
-                            "path_in_package": "path/in/bt-gap",
-                            "used_space_in_blobfs": 159,
-                            "share_count": 3,
-                            "absolute_share_count": 3,
-                        }
-                      ]
-                    }
-                  }
-                }
-              }
-              )
-        );
-    }
-
-    #[test]
     fn blob_hash_not_found_test() {
         let test_fs = TestFs::new();
         test_fs.write(
@@ -1290,7 +883,7 @@ mod tests {
                 "packages": [
                     test_fs.path("obj/src/sys/pkg/bin/pkg-cache/pkg-cache/package_manifest.json"),
                 ]
-            }], "dedup_blobs": true}),
+            }]}),
         );
         test_fs.write(
             "obj/src/sys/pkg/bin/pkg-cache/pkg-cache/package_manifest.json",
@@ -1327,99 +920,6 @@ mod tests {
     }
 
     #[test]
-    fn blobs_matched_by_resource_budget() {
-        let test_fs = TestFs::new();
-        test_fs.write(
-            "size_budgets.json",
-            json!({
-                "resource_budgets": [{
-                    "name": "libs",
-                    "creep_budget_bytes": 1i32,
-                    "budget_bytes": 32i32,
-                    "paths": [
-                        "a/lib_a"
-                    ]
-                }],
-                "package_set_budgets":[{
-                    "name": "Software Deliver",
-                    "creep_budget_bytes": 2i32,
-                    "budget_bytes": 64i32,
-                    "packages": [
-                        test_fs.path("obj/src/sys/pkg/bin/pkg-cache/pkg-cache/package_manifest.json"),
-                        test_fs.path("obj/src/sys/pkg/bin/pkgfs/pkgfs/package_manifest.json"),
-                    ]
-                }],
-                "dedup_blobs": true
-            }),
-        );
-        test_fs.write(
-            "obj/src/sys/pkg/bin/pkg-cache/pkg-cache/package_manifest.json",
-            json!({
-                "version": "1",
-                "package": {
-                    "name": "pkg-cache",
-                    "version": "0"
-                },
-                "blobs" : [{
-                    "source_path": "first_blob",
-                    "path": "a/lib_a",
-                    "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
-                    "size": 4i32
-                }]
-            }),
-        );
-        test_fs.write(
-            "obj/src/sys/pkg/bin/pkgfs/pkgfs/package_manifest.json",
-            json!({
-                "version": "1",
-                "package": {
-                    "name": "pkg-cache",
-                    "version": "0"
-                },
-                "blobs" : [{
-                    "source_path": "first_blob",
-                    "path": "b/lib_a",
-                    "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
-                    "size": 8i32
-                }]
-            }),
-        );
-        test_fs.write(
-            "blobs.json",
-            json!([{
-                "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
-                "size": 9i32
-            }]),
-        );
-        verify_budgets_with_tools(
-            PackageSizeCheckArgs {
-                blobfs_layout: BlobfsLayout::Compact,
-                budgets: test_fs.path("size_budgets.json"),
-                blob_sizes: [test_fs.path("blobs.json")].to_vec(),
-                gerrit_output: Some(test_fs.path("output.json")),
-                verbose: false,
-                verbose_json_output: None,
-            },
-            Box::new(FakeToolProvider::default()),
-        )
-        .unwrap();
-
-        test_fs.assert_eq(
-            "output.json",
-            json!({
-                "libs": 8i32, // Rounding error from 9 to 8 is expected.
-                "libs.creepBudget": 1i32,
-                "libs.budget": 32i32,
-                "libs.owner": "http://go/fuchsia-size-stats/single_component/?f=component%3Ain%3Alibs",
-                "Software Deliver": 0i32,
-                "Software Deliver.creepBudget": 2i32,
-                "Software Deliver.budget": 64i32,
-                "Software Deliver.owner": "http://go/fuchsia-size-stats/single_component/?f=component%3Ain%3ASoftware+Deliver"
-            }),
-        );
-    }
-
-    #[test]
     fn generating_blobfs_for_a_missing_file() {
         let test_fs = TestFs::new();
         test_fs.write(
@@ -1432,8 +932,7 @@ mod tests {
                     "packages": [
                         test_fs.path("obj/src/my_program/package_manifest.json"),
                     ]
-                }],
-                "dedup_blobs": true
+                }]
             }),
         );
         test_fs.write(
@@ -1510,17 +1009,13 @@ mod tests {
         let blob2_hash: Hash =
             Hash::from_str("b62ee413090825c2ae70fe143b34cbd851f055932cfd5e7ca4ef0efbb802da2a")
                 .unwrap();
-        let blob3_hash: Hash =
-            Hash::from_str("b61ee413090825c2ae70fe143b34cbd851f055932cfd5e7ca4ef0efbb802da2a")
-                .unwrap();
         let blob1_path: &str = "/a/x/blob1";
         let blob2_path: &str = "/a/x/blob2";
-        let blob3_path: &str = "/a/x/blob3";
         let package1_path = Utf8PathBuf::from("x/a/s/package1");
         let package2_path = Utf8PathBuf::from("x/a/s/package2");
         let package3_path = Utf8PathBuf::from("x/a/s/package3");
 
-        let resource_budget_blobs: Vec<BudgetBlobs> = vec![
+        let budget_blobs: Vec<BudgetBlobs> = vec![
             BudgetBlobs {
                 budget: BudgetResult {
                     name: "Component1".to_string(),
@@ -1535,12 +1030,6 @@ mod tests {
                         package_path: package1_path.clone(),
                         package_name: "package1".into(),
                         path: blob1_path.to_string(),
-                    },
-                    BlobInstance {
-                        hash: blob3_hash,
-                        package_path: package1_path.clone(),
-                        package_name: "package1".into(),
-                        path: blob3_path.to_string(),
                     },
                     BlobInstance {
                         hash: blob2_hash,
@@ -1572,33 +1061,30 @@ mod tests {
                 }],
             },
         ];
-        let blob_count_by_hash: BTreeMap<Hash, BlobSizeAndCount> = BTreeMap::from([
-            (blob1_hash, BlobSizeAndCount { size: 90, share_count: 2 }),
-            (blob2_hash, BlobSizeAndCount { size: 50, share_count: 2 }),
-            (blob3_hash, BlobSizeAndCount { size: 1000, share_count: 1 }),
-        ]);
-        let ignored_hashes: HashSet<&Hash> = HashSet::from([&blob3_hash]);
-        let results =
-            compute_budget_results(&resource_budget_blobs, &blob_count_by_hash, &ignored_hashes)?;
+        let blobs = vec![
+            BlobJsonEntry { merkle: blob1_hash, size: 90 },
+            BlobJsonEntry { merkle: blob2_hash, size: 50 },
+        ];
+        let results = compute_budget_results(&budget_blobs, &blobs)?;
         let expected_result = vec![
             BudgetResult {
                 name: "Component1".to_string(),
                 budget_bytes: 123,
                 creep_budget_bytes: 3245,
-                used_bytes: 115,
+                used_bytes: 140,
                 package_breakdown: BTreeMap::from([
                     (
                         package2_path,
                         PackageSizeInfo {
                             name: "package2".into(),
-                            proportional_size: 70, /* 90/2 + 50/2 */
+                            proportional_size: 95, /* 90/2 + 50 */
                             used_space_in_blobfs: 140,
                             blobs: vec![
                                 PackageBlobSizeInfo {
                                     merkle: blob2_hash,
                                     used_space_in_blobfs: 50,
-                                    share_count: 2,
-                                    absolute_share_count: 2,
+                                    share_count: 1,
+                                    absolute_share_count: 1,
                                     path_in_package: blob2_path.to_string(),
                                 },
                                 PackageBlobSizeInfo {
@@ -1632,19 +1118,19 @@ mod tests {
                 name: "Component2".to_string(),
                 budget_bytes: 456,
                 creep_budget_bytes: 111,
-                used_bytes: 31, /* 25 + 6 */
+                used_bytes: 56, /* 50 + 6 */
                 package_breakdown: BTreeMap::from([(
                     package3_path,
                     PackageSizeInfo {
                         name: "package3".into(),
-                        proportional_size: 25, /* 50/2 */
+                        proportional_size: 50,
                         used_space_in_blobfs: 50,
                         blobs: vec![PackageBlobSizeInfo {
                             merkle: blob2_hash,
                             path_in_package: blob2_path.to_string(),
                             used_space_in_blobfs: 50,
-                            share_count: 2,
-                            absolute_share_count: 2,
+                            share_count: 1,
+                            absolute_share_count: 1,
                         }],
                     },
                 )]),
