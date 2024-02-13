@@ -2558,6 +2558,19 @@ pub fn sys_vmsplice(
     splice::vmsplice(locked, current_task, fd, iovec_addr, iovec_count, flags)
 }
 
+pub fn sys_copy_file_range(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    fd_in: FdNumber,
+    off_in: UserRef<off_t>,
+    fd_out: FdNumber,
+    off_out: UserRef<off_t>,
+    len: usize,
+    flags: u32,
+) -> Result<usize, Errno> {
+    splice::copy_file_range(locked, current_task, fd_in, off_in, fd_out, off_out, len, flags)
+}
+
 pub fn sys_tee(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,

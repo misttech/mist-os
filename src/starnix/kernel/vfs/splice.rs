@@ -14,7 +14,7 @@ use crate::{
     },
 };
 use starnix_logging::track_stub;
-use starnix_sync::{LockBefore, Locked, ReadOps, Unlocked, WriteOps};
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::{
     errno, error,
     errors::Errno,
@@ -24,131 +24,37 @@ use starnix_uapi::{
     user_address::{UserAddress, UserRef},
     user_buffer::MAX_RW_COUNT,
 };
+use std::sync::Arc;
 
-pub fn sendfile<L>(
-    locked: &mut Locked<'_, L>,
+fn maybe_read_offset(
     current_task: &CurrentTask,
-    out_fd: FdNumber,
-    in_fd: FdNumber,
     user_offset: UserRef<off_t>,
-    count: i32,
-) -> Result<usize, Errno>
-where
-    L: LockBefore<ReadOps>,
-    L: LockBefore<WriteOps>,
-{
-    let out_file = current_task.files.get(out_fd)?;
-    let in_file = current_task.files.get(in_fd)?;
-
-    let maybe_offset =
-        if user_offset.is_null() { None } else { Some(current_task.read_object(user_offset)?) };
-
-    if count < 0 {
+) -> Result<Option<usize>, Errno> {
+    if user_offset.is_null() {
+        return Ok(None);
+    }
+    let offset = current_task.read_object(user_offset)?;
+    if offset < 0 {
         return error!(EINVAL);
     }
-
-    if !in_file.flags().can_read() || !out_file.flags().can_write() {
-        return error!(EBADF);
-    }
-
-    // We need the in file to be seekable because we use read_at below, but this is also a proxy for
-    // checking that the file supports mmap-like operations.
-    if !in_file.is_seekable() {
-        return error!(EINVAL);
-    }
-
-    // out_fd has the O_APPEND flag set.  This is not currently supported by sendfile().
-    // See https://man7.org/linux/man-pages/man2/sendfile.2.html#ERRORS
-    if out_file.flags().contains(OpenFlags::APPEND) {
-        return error!(EINVAL);
-    }
-
-    let count = count as usize;
-    let mut count = std::cmp::min(count, *MAX_RW_COUNT);
-
-    let (mut offset, mut update_offset): (usize, Box<dyn FnMut(off_t) -> Result<(), Errno>>) =
-        if let Some(offset) = maybe_offset {
-            (
-                offset.try_into().map_err(|_| errno!(EINVAL))?,
-                Box::new(|updated_offset| -> Result<(), Errno> {
-                    current_task.write_object(user_offset, &updated_offset)?;
-                    Ok(())
-                }),
-            )
-        } else {
-            // Lock the in_file offset for the entire operation.
-            let mut in_offset = in_file.offset.lock();
-            let offset = *in_offset;
-            (
-                offset as usize,
-                Box::new(move |updated_offset| -> Result<(), Errno> {
-                    *in_offset = updated_offset;
-                    Ok(())
-                }),
-            )
-        };
-    let mut total_written = 0;
-
-    match (|| -> Result<(), Errno> {
-        while count > 0 {
-            let limit = std::cmp::min(*PAGE_SIZE as usize, count);
-            let mut buffer = VecOutputBuffer::new(limit);
-            let read = { in_file.read_at(locked, current_task, offset, &mut buffer)? };
-            let mut buffer = Vec::from(buffer);
-            buffer.truncate(read);
-            let written =
-                out_file.write(locked, current_task, &mut VecInputBuffer::from(buffer))?;
-            offset += written;
-            total_written += written;
-            update_offset(offset as off_t)?;
-            if read < limit || written < read {
-                break;
-            }
-            count -= written;
-        }
-        Ok(())
-    })() {
-        Ok(()) => Ok(total_written),
-        Err(e) => {
-            if total_written > 0 {
-                Ok(total_written)
-            } else {
-                match e.code.error_code() {
-                    uapi::EISDIR => error!(EINVAL),
-                    _ => Err(e),
-                }
-            }
-        }
-    }
+    Ok(Some(offset as usize))
 }
 
 #[derive(Debug)]
-struct SplicedOperand {
+struct CopyOperand {
     file: FileHandle,
     user_offset: UserRef<off_t>,
     maybe_offset: Option<usize>,
 }
 
-impl SplicedOperand {
+impl CopyOperand {
     fn new(
         current_task: &CurrentTask,
         fd: FdNumber,
         user_offset: UserRef<off_t>,
     ) -> Result<Self, Errno> {
         let file = current_task.files.get(fd)?;
-        let maybe_offset = if user_offset.is_null() {
-            None
-        } else {
-            if !file.is_seekable() {
-                return error!(ESPIPE);
-            }
-            let offset = current_task.read_object(user_offset)?;
-            if offset < 0 {
-                return error!(EINVAL);
-            } else {
-                Some(offset as usize)
-            }
-        };
+        let maybe_offset = maybe_read_offset(current_task, user_offset)?;
         Ok(Self { file, user_offset, maybe_offset })
     }
 
@@ -159,18 +65,116 @@ impl SplicedOperand {
     fn maybe_write_result_offset(
         &self,
         current_task: &CurrentTask,
-        spliced: usize,
+        progress: usize,
     ) -> Result<(), Errno> {
         if let Some(offset) = self.maybe_offset {
-            let new_offset = (offset + spliced) as off_t;
+            let new_offset = (offset + progress) as off_t;
             current_task.write_object(self.user_offset, &new_offset)?;
         }
         Ok(())
     }
 }
 
-pub fn splice<L>(
-    locked: &mut Locked<'_, L>,
+fn copy_data(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    operand_in: CopyOperand,
+    operand_out: CopyOperand,
+    length: usize,
+) -> Result<usize, Errno> {
+    let mut remaining = length;
+    let mut transferred = 0;
+
+    let read = |locked: &mut Locked<'_, Unlocked>, progress: usize, data: &mut VecOutputBuffer| {
+        if let Some(offset) = operand_in.maybe_offset {
+            operand_in.file.read_at(locked, current_task, offset + progress, data)
+        } else {
+            operand_in.file.read(locked, current_task, data)
+        }
+    };
+
+    let write = |locked: &mut Locked<'_, Unlocked>, progress: usize, data: &mut VecInputBuffer| {
+        if let Some(offset) = operand_out.maybe_offset {
+            operand_out.file.write_at(locked, current_task, offset + progress, data)
+        } else {
+            operand_out.file.write(locked, current_task, data)
+        }
+    };
+
+    let mut copy = || -> Result<(), Errno> {
+        while remaining > 0 {
+            // The max chunk size is fairly arbitrary. Consider using a larger chunk size or
+            // perhaps using asynchronous IO for better performance.
+            let chunk_length = std::cmp::min(*PAGE_SIZE as usize, remaining);
+            let mut buffer = VecOutputBuffer::new(chunk_length);
+            let bytes_read = read(locked, transferred, &mut buffer)?;
+            let mut buffer = Vec::from(buffer);
+            buffer.truncate(bytes_read);
+            let bytes_written = write(locked, transferred, &mut VecInputBuffer::from(buffer))?;
+            transferred += bytes_written;
+            remaining -= bytes_written;
+            operand_in.maybe_write_result_offset(current_task, transferred)?;
+            operand_out.maybe_write_result_offset(current_task, transferred)?;
+            if bytes_read < chunk_length || bytes_written < bytes_read {
+                break;
+            }
+        }
+        Ok(())
+    };
+
+    match copy() {
+        Ok(()) => Ok(transferred),
+        Err(e) => {
+            if transferred > 0 {
+                Ok(transferred)
+            } else {
+                Err(e)
+            }
+        }
+    }
+}
+
+pub fn sendfile(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    fd_out: FdNumber,
+    fd_in: FdNumber,
+    user_offset_in: UserRef<off_t>,
+    count: i32,
+) -> Result<usize, Errno> {
+    let operand_out = CopyOperand::new(current_task, fd_out, Default::default())?;
+    let operand_in = CopyOperand::new(current_task, fd_in, user_offset_in)?;
+
+    if count < 0 {
+        return error!(EINVAL);
+    }
+
+    if !operand_in.file.flags().can_read() || !operand_out.file.flags().can_write() {
+        return error!(EBADF);
+    }
+
+    if operand_in.file.node().is_dir() || operand_out.file.node().is_dir() {
+        return error!(EINVAL);
+    }
+
+    // We need the in file to be seekable because we use read_at below, but this is also a proxy for
+    // checking that the file supports mmap-like operations.
+    if !operand_in.file.is_seekable() {
+        return error!(EINVAL);
+    }
+
+    // fd_out has the O_APPEND flag set.  This is not currently supported by sendfile().
+    // See https://man7.org/linux/man-pages/man2/sendfile.2.html#ERRORS
+    if operand_out.file.flags().contains(OpenFlags::APPEND) {
+        return error!(EINVAL);
+    }
+
+    let length = std::cmp::min(count as usize, *MAX_RW_COUNT);
+    copy_data(locked, current_task, operand_in, operand_out, length)
+}
+
+pub fn splice(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd_in: FdNumber,
     off_in: UserRef<off_t>,
@@ -178,11 +182,7 @@ pub fn splice<L>(
     off_out: UserRef<off_t>,
     len: usize,
     flags: u32,
-) -> Result<usize, Errno>
-where
-    L: LockBefore<ReadOps>,
-    L: LockBefore<WriteOps>,
-{
+) -> Result<usize, Errno> {
     const KNOWN_FLAGS: u32 =
         uapi::SPLICE_F_MOVE | uapi::SPLICE_F_NONBLOCK | uapi::SPLICE_F_MORE | uapi::SPLICE_F_GIFT;
     if flags & !KNOWN_FLAGS != 0 {
@@ -192,10 +192,18 @@ where
 
     let non_blocking = flags & uapi::SPLICE_F_NONBLOCK != 0;
 
-    let operand_in = SplicedOperand::new(current_task, fd_in, off_in)?;
-    let operand_out = SplicedOperand::new(current_task, fd_out, off_out)?;
+    let operand_in = CopyOperand::new(current_task, fd_in, off_in)?;
+    let operand_out = CopyOperand::new(current_task, fd_out, off_out)?;
 
-    // out_fd has the O_APPEND flag set. This is not supported by splice().
+    if operand_in.maybe_offset.is_some() && !operand_in.file.is_seekable() {
+        return error!(ESPIPE);
+    }
+
+    if operand_out.maybe_offset.is_some() && !operand_out.file.is_seekable() {
+        return error!(ESPIPE);
+    }
+
+    // fd_out has the O_APPEND flag set. This is not supported by splice().
     if operand_out.file.flags().contains(OpenFlags::APPEND) {
         return error!(EINVAL);
     }
@@ -281,6 +289,61 @@ pub fn vmsplice(
     }
 
     Ok(bytes_transferred)
+}
+
+pub fn copy_file_range(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    fd_in: FdNumber,
+    user_offset_in: UserRef<off_t>,
+    fd_out: FdNumber,
+    user_offset_out: UserRef<off_t>,
+    length: usize,
+    flags: u32,
+) -> Result<usize, Errno> {
+    if flags != 0 {
+        return error!(EINVAL);
+    }
+
+    let operand_in = CopyOperand::new(current_task, fd_in, user_offset_in)?;
+    let operand_out = CopyOperand::new(current_task, fd_out, user_offset_out)?;
+
+    if !operand_in.file.flags().can_read() || !operand_out.file.flags().can_write() {
+        return error!(EBADF);
+    }
+
+    // fd_out has the O_APPEND flag set. This is not supported by copy_file_range().
+    if operand_out.file.flags().contains(OpenFlags::APPEND) {
+        return error!(EBADF);
+    }
+
+    if operand_in.file.node().is_dir() || operand_out.file.node().is_dir() {
+        return error!(EISDIR);
+    }
+
+    if !operand_in.file.node().is_reg() || !operand_out.file.node().is_reg() {
+        return error!(EINVAL);
+    }
+
+    let length = std::cmp::min(length, *MAX_RW_COUNT);
+
+    if Arc::ptr_eq(operand_in.file.node(), &operand_out.file.node()) {
+        // If the input and output files are the same, we need to return EINVAL if the input and
+        // output range overlap.
+        if let (Some(offset_in), Some(offset_out)) =
+            (operand_in.maybe_offset, operand_out.maybe_offset)
+        {
+            let range_in = offset_in..length;
+            let range_out = offset_out..length;
+            if range_in.contains(&range_out.start) || range_out.contains(&range_in.start) {
+                return error!(EINVAL);
+            }
+        } else {
+            return error!(EINVAL);
+        }
+    }
+
+    copy_data(locked, current_task, operand_in, operand_out, length)
 }
 
 pub fn tee(
