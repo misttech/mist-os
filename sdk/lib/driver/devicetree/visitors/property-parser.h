@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <optional>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace fdf_devicetree {
@@ -84,14 +85,14 @@ class StringListProperty : public Property {
 
 class ReferenceProperty : public Property {
  public:
-  explicit ReferenceProperty(PropertyName name, PropertyName cell_specifier)
+  explicit ReferenceProperty(PropertyName name, std::variant<PropertyName, uint32_t> cell_specifier)
       : Property(std::move(name)), cell_specifier_(std::move(cell_specifier)) {}
 
   zx::result<std::vector<PropertyValue>> Parse(Node& node,
                                                devicetree::ByteView bytes) const override;
 
  private:
-  PropertyName cell_specifier_;
+  std::variant<PropertyName, uint32_t> cell_specifier_;
 };
 
 // Class to hold the property value and provide utility functions to access the value appropriately.

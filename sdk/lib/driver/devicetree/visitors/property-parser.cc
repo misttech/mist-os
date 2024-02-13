@@ -84,30 +84,36 @@ zx::result<std::vector<PropertyValue>> ReferenceProperty::Parse(Node& node,
 
     // Advance past phandle.
     cell_offset++;
+    uint32_t cell_count = 0;
+    if (std::holds_alternative<PropertyName>(cell_specifier_)) {
+      auto cells_prop_name = std::get<PropertyName>(cell_specifier_);
+      auto cell_specifier = reference->properties().find(cells_prop_name);
+      if (cell_specifier == reference->properties().end()) {
+        FDF_LOG(ERROR, "Reference node '%s' does not have '%s' property.",
+                reference->name().c_str(), cells_prop_name.c_str());
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+      auto cell_specifier_value = cell_specifier->second.AsUint32();
+      if (!cell_specifier_value) {
+        FDF_LOG(ERROR, "Reference node '%s' has invalid '%s' property.", reference->name().c_str(),
+                cells_prop_name.c_str());
 
-    auto cell_specifier = reference->properties().find(cell_specifier_);
-    if (cell_specifier == reference->properties().end()) {
-      FDF_LOG(ERROR, "Reference node '%s' does not have '%s' property.", reference->name().c_str(),
-              cell_specifier_.c_str());
-      return zx::error(ZX_ERR_INVALID_ARGS);
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+      cell_count = *cell_specifier_value;
+    } else {
+      cell_count = std::get<uint32_t>(cell_specifier_);
     }
-    auto cell_width = cell_specifier->second.AsUint32();
-    if (!cell_width) {
-      FDF_LOG(ERROR, "Reference node '%s' has invalid '%s' property.", reference->name().c_str(),
-              cell_specifier_.c_str());
 
-      return zx::error(ZX_ERR_INVALID_ARGS);
-    }
-    size_t width_in_bytes = (*cell_width) * sizeof(uint32_t);
+    size_t width_in_bytes = cell_count * sizeof(uint32_t);
     size_t byteview_offset = cell_offset * sizeof(uint32_t);
-    cell_offset += (*cell_width);
+    cell_offset += cell_count;
 
     if (byteview_offset > bytes.size() || (width_in_bytes > bytes.size() - byteview_offset)) {
       FDF_LOG(
           ERROR,
-          "Reference node '%s' has less data than expected '%s' property. Expected %zu bytes, remaining %zu bytes",
-          reference->name().c_str(), cell_specifier_.c_str(), width_in_bytes,
-          bytes.size() - byteview_offset);
+          "Reference node '%s' has less data than expected. Expected %zu bytes, remaining %zu bytes",
+          reference->name().c_str(), width_in_bytes, bytes.size() - byteview_offset);
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
 
