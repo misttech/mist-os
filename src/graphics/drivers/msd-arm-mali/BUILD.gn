@@ -17,6 +17,16 @@ driver_bind_rules("msd_arm_bind") {
   ]
 }
 
+driver_bind_rules("msd_arm_rebind_bind") {
+  rules = "msd_arm_rebind.bind"
+}
+
+driver_bind_rules("msd_arm_test_bind") {
+  rules = "msd_arm_test.bind"
+  disable_autobind = true
+  disable_fragment_gen = true
+}
+
 entry_deps = [
   "src",
   "src:parent_device_dfv2",
@@ -78,6 +88,20 @@ fuchsia_driver_component("msd_arm") {
   manifest = "meta/msd_arm.cml"
 }
 
+# The driver framework can't use the initial composite bind rules when rebinding a driver, so the
+# "rebind" driver has different bind rules so it can be bound the second time.
+# TODO(https://fxbug.dev/42075799): Unify rebind and production drivers.
+fuchsia_driver_component("msd_arm_rebind") {
+  testonly = true
+  component_name = "msd_arm_rebind"
+  deps = [
+    ":msd_arm-driver",
+    ":msd_arm_rebind_bind",
+  ]
+  info = "msd_arm-info.json"
+  manifest = "meta/msd_arm_rebind.cml"
+}
+
 fuchsia_driver("msd_arm_test-driver") {
   testonly = true
   output_name = "msd_arm_test"
@@ -92,8 +116,8 @@ fuchsia_driver_component("msd_arm_test") {
   testonly = true
   component_name = "msd_arm_test"
   deps = [
-    ":msd_arm_bind",
     ":msd_arm_test-driver",
+    ":msd_arm_test_bind",
   ]
   info = "msd_arm_test-info.json"
   manifest = "meta/msd_arm_test.cml"

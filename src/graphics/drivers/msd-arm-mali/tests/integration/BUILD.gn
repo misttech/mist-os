@@ -13,11 +13,6 @@ group("integration") {
 executable("msd_arm_mali_integration_tests") {
   testonly = true
 
-  defines = [
-    "MALI_TEST_DRIVER_PACKAGE=\"fuchsia.com/msd-arm-mali-integration-tests\"",
-    "MALI_PRODUCTION_DRIVER_PACKAGE=\"fuchsia.com/msd-arm-mali\"",
-  ]
-
   sources = [
     "driver_registry.h",
     "mali_utils.cc",
@@ -30,6 +25,7 @@ executable("msd_arm_mali_integration_tests") {
   ]
 
   public_deps = [
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
     "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar_cpp",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp",

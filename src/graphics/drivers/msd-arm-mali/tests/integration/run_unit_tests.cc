@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.driver.development/cpp/wire.h>
+#include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/fit/defer.h>
 #include <lib/magma/magma.h>
@@ -18,54 +18,32 @@
 #include "driver_registry.h"
 #include "magma_vendor_queries.h"
 
-namespace {
-const std::string kProductionDriver =
-    "fuchsia-pkg://" MALI_PRODUCTION_DRIVER_PACKAGE "#meta/msd_arm.cm";
-const std::string kTestDriver = "fuchsia-pkg://" MALI_TEST_DRIVER_PACKAGE "#meta/msd_arm_test.cm";
-}  // namespace
-
 // The test build of the MSD runs a bunch of unit tests automatically when it loads. We need to
 // unload the normal MSD to replace it with the test MSD so we can run those tests and query the
 // test results.
 TEST(UnitTests, UnitTests) {
-  auto manager = component::Connect<fuchsia_driver_development::Manager>();
+  RegisteredTestDriver test_driver;
+  ASSERT_NO_FATAL_FAILURE(test_driver.Init());
+  std::optional<fidl::ClientEnd<fuchsia_device::Controller>> parent_device;
+  auto parent_topological_path = test_driver.GetParentTopologicalPath();
+  ASSERT_TRUE(parent_topological_path);
+  auto parent_device_result = component::Connect<fuchsia_device::Controller>(
+      *parent_topological_path + "/device_controller");
 
-  fidl::WireSyncClient manager_client(*std::move(manager));
-  // May fail if the production driver hasn't been enabled before, so ignore error.
-  (void)manager_client->DisableDriver(fidl::StringView::FromExternal(kProductionDriver),
-                                      fidl::StringView());
-
-  auto registrar = component::Connect<fuchsia_driver_registrar::DriverRegistrar>();
-
-  ASSERT_TRUE(registrar.is_ok());
-
-  auto registrar_client = fidl::WireSyncClient(std::move(*registrar));
-
-  {
-    auto result = registrar_client->Register(fidl::StringView::FromExternal(kTestDriver));
-
-    ASSERT_TRUE(result.ok()) << result.status_string();
-    ASSERT_FALSE(result->is_error()) << result->error_value();
-  }
-
-  RestartAndWait(kProductionDriver);
-
+  EXPECT_EQ(ZX_OK, parent_device_result.status_value());
+  parent_device = std::move(*parent_device_result);
+  // The test driver will run unit tests on startup.
+  magma::TestDeviceBase::RebindDevice(*parent_device, test_driver.GetTestDriverSuffix());
+  // Reload the production driver so later tests shouldn't be affected.
   auto cleanup = fit::defer([&]() {
-    // Ignore errors when trying to get the existing driver back to a working state.
-    (void)manager_client->EnableDriver(fidl::StringView::FromExternal(kProductionDriver),
-                                       fidl::StringView());
-    (void)manager_client->DisableDriver(fidl::StringView::FromExternal(kTestDriver),
-                                        fidl::StringView());
-    RestartAndWait(kTestDriver);
+    magma::TestDeviceBase::RebindDevice(*parent_device, test_driver.GetRebindDriverSuffix());
   });
 
-  {
-    magma::TestDeviceBase test_base(MAGMA_VENDOR_ID_MALI);
+  magma::TestDeviceBase test_base(MAGMA_VENDOR_ID_MALI);
 
-    fidl::UnownedClientEnd<fuchsia_gpu_magma::TestDevice> channel{test_base.magma_channel()};
-    const fidl::WireResult result = fidl::WireCall(channel)->GetUnitTestStatus();
-    ASSERT_TRUE(result.ok()) << result.FormatDescription();
-    const fidl::WireResponse response = result.value();
-    ASSERT_EQ(response.status, ZX_OK) << zx_status_get_string(response.status);
-  }
+  fidl::UnownedClientEnd<fuchsia_gpu_magma::TestDevice> channel{test_base.magma_channel()};
+  const fidl::WireResult result = fidl::WireCall(channel)->GetUnitTestStatus();
+  ASSERT_TRUE(result.ok()) << result.FormatDescription();
+  const fidl::WireResponse response = result.value();
+  ASSERT_EQ(response.status, ZX_OK) << zx_status_get_string(response.status);
 }
