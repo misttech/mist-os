@@ -22,7 +22,6 @@ executable("unittests") {
   ]
   deps = [
     "//sdk/lib/fit-promise",
-    "//sdk/lib/inspect/service/cpp",
     "//sdk/lib/inspect/testing/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture:gtest",

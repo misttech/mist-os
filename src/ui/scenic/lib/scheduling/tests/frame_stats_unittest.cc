@@ -17,8 +17,6 @@
 
 #include "lib/inspect/cpp/inspect.h"
 #include "lib/inspect/cpp/reader.h"
-#include "lib/inspect/service/cpp/reader.h"
-#include "lib/inspect/service/cpp/service.h"
 #include "lib/inspect/testing/cpp/inspect.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
@@ -39,27 +37,20 @@ constexpr char kFrameStatsNodeName[] = "FrameStatsTest";
 // to trigger execution of a LazyStringProperty.
 class FrameStatsTest : public gtest::RealLoopFixture {
  public:
-  static constexpr char kObjectsName[] = "diagnostics";
-
-  FrameStatsTest() : inspector_(), executor_(dispatcher()) {
-    handler_ = inspect::MakeTreeHandler(&inspector_, dispatcher());
-  }
+  FrameStatsTest() : inspector_(), executor_(dispatcher()) {}
 
   void SchedulePromise(fpromise::pending_task promise) {
     executor_.schedule_task(std::move(promise));
   }
 
   // Helper function for test boiler plate.
-  fpromise::result<Hierarchy> ReadInspectVmo() {
-    fuchsia::inspect::TreePtr ptr;
-    handler_(ptr.NewRequest());
+  fpromise::result<Hierarchy> ReadInspect() {
     fpromise::result<Hierarchy> ret;
     SchedulePromise(
-        inspect::ReadFromTree(std::move(ptr)).then([&](fpromise::result<Hierarchy>& val) {
+        inspect::ReadFromInspector(inspector_).then([&](fpromise::result<inspect::Hierarchy>& val) {
           ret = std::move(val);
         }));
     RunLoopUntil([&] { return ret.is_ok() || ret.is_error(); });
-
     return ret;
   }
 
@@ -68,7 +59,6 @@ class FrameStatsTest : public gtest::RealLoopFixture {
 
  private:
   async::Executor executor_;
-  fidl::InterfaceRequestHandler<fuchsia::inspect::Tree> handler_;
 };
 
 namespace {
@@ -195,7 +185,7 @@ class MockMetrics final : public metrics::Metrics {
 TEST_F(FrameStatsTest, SmokeTest_TriggerLazyStringProperties) {
   FrameStats stats(inspector_.GetRoot().CreateChild(kFrameStatsNodeName), nullptr);
 
-  auto root = ReadInspectVmo().take_value();
+  auto root = ReadInspect().take_value();
 
   auto pointers = GetFrameStatsHierarchyPointers(&root);
   ASSERT_TRUE(pointers.AllPointersPopulated());
@@ -254,7 +244,7 @@ TEST_F(FrameStatsTest, SmokeTest_DummyTimestamps) {
     delayed_times.actual_presentation_time += zx::msec(32);
   }
 
-  auto root = ReadInspectVmo().take_value();
+  auto root = ReadInspect().take_value();
   auto pointers = GetFrameStatsHierarchyPointers(&root);
   ASSERT_TRUE(pointers.AllPointersPopulated());
   EXPECT_EQ(250U, pointers.entire_history_props.total_frame_count->value());
@@ -310,7 +300,7 @@ TEST_F(FrameStatsTest, HistoryPopulatedOverTime) {
   stats.RecordFrame(timestamps, vsync_interval);
 
   {
-    auto root = ReadInspectVmo().take_value();
+    auto root = ReadInspect().take_value();
     auto pointers = GetFrameStatsHierarchyPointers(&root);
     ASSERT_TRUE(pointers.AllPointersPopulated());
 
@@ -340,7 +330,7 @@ TEST_F(FrameStatsTest, HistoryPopulatedOverTime) {
   stats.RecordFrame(timestamps, vsync_interval);
 
   {
-    auto root = ReadInspectVmo().take_value();
+    auto root = ReadInspect().take_value();
     auto pointers = GetFrameStatsHierarchyPointers(&root);
     ASSERT_TRUE(pointers.AllPointersPopulated());
 
@@ -384,7 +374,7 @@ TEST_F(FrameStatsTest, HistoryPopulatedOverTime) {
   }
 
   {
-    auto root = ReadInspectVmo().take_value();
+    auto root = ReadInspect().take_value();
     auto pointers = GetFrameStatsHierarchyPointers(&root);
     ASSERT_TRUE(pointers.AllPointersPopulated());
 
