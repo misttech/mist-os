@@ -31,6 +31,12 @@ zx_library("devicetree") {
   # build migration. They seem currently required in order to export the host
   # compilation of this library to the fuchsia build.
 
-  sdk = "source"
-  sdk_headers = []
+  sdk = "static"
+  sdk_headers = [
+    "lib/devicetree/devicetree.h",
+    "lib/devicetree/matcher.h",
+    "lib/devicetree/internal/devicetree.h",
+    "lib/devicetree/internal/matcher.h",
+  ]
+  sdk_publishable = "internal"
 }

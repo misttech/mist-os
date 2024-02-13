@@ -2,14 +2,22 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-source_set("bind-property") {
+import("//build/cpp/sdk_source_set.gni")
+
+sdk_source_set("bind-property") {
+  sdk_name = "devicetree-bind-property"
+  category = "internal"
+  include_base = "//sdk"
   sources = [
     "bind-property.cc",
     "bind-property.h",
   ]
+  non_sdk_local_deps =
+      [ "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_cpp" ]
+
   deps = [
     "//sdk/lib/driver/logging/cpp",
-    "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_cpp",
+    "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree",
   ]
 
   public_deps = [

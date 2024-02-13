@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "node.h"
+#include "lib/driver/devicetree/manager/node.h"
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/legacy-bind-constants/legacy-bind-constants.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <zircon/errors.h>
 
@@ -15,8 +17,6 @@
 #include <vector>
 
 #include <bind/fuchsia/platform/cpp/bind.h>
-#include <sdk/lib/driver/component/cpp/composite_node_spec.h>
-#include <sdk/lib/driver/legacy-bind-constants/legacy-bind-constants.h>
 
 namespace fdf {
 using namespace fuchsia_driver_framework;

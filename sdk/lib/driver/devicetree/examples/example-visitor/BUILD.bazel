@@ -1,0 +1,15 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+cc_library(
+    name = "example-visitor",
+    srcs = [
+        "example-visitor.cc",
+    ],
+    hdrs = ["example-visitor.h"],
+    deps = [
+        "@internal_sdk//pkg/devicetree-driver-visitors",
+        "@internal_sdk//pkg/devicetree-registration",
+    ],
+)

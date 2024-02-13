@@ -15,19 +15,25 @@ group("tests") {
 sdk_source_set("default") {
   sdk_name = "devicetree-default"
   category = "internal"
-  public = [ "default.h" ]
 
-  non_sdk_local_deps = [
+  public = [ "default.h" ]
+  include_base = "//sdk"
+
+  non_sdk_local_deps =
+      [ "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_cpp" ]
+
+  deps = [
     "bind-property",
     "bti",
     "mmio",
     "//sdk/lib/driver/logging/cpp",
-    "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_cpp",
+    "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree",
   ]
 
-  non_sdk_public_deps = [
+  public_deps = [
     "//sdk/lib/driver/devicetree/manager:headers",
     "//sdk/lib/driver/devicetree/visitors:multivisitor",
+    "//sdk/lib/driver/devicetree/visitors:property-parser",
     "//zircon/system/ulib/zx",
   ]
 }

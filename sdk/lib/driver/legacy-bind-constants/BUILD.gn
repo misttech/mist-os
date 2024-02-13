@@ -4,7 +4,7 @@
 import("//build/cpp/sdk_source_set.gni")
 
 sdk_source_set("legacy-bind-constants") {
-  category = "experimental"
+  category = "internal"
   sdk_name = "legacy-bind-constants"
 
   include_base = "//sdk"

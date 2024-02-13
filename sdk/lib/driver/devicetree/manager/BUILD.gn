@@ -11,7 +11,10 @@ group("tests") {
   deps = [ ":devicetree-manager-test-package" ]
 }
 
-source_set("headers") {
+sdk_source_set("headers") {
+  sdk_name = "devicetree-manager-headers"
+  category = "internal"
+  include_base = "//sdk"
   public = [
     "manager.h",
     "node.h",
@@ -30,6 +33,7 @@ source_set("headers") {
 sdk_source_set("manager") {
   sdk_name = "devicetree-manager"
   category = "internal"
+  include_base = "//sdk"
   sources = [
     "manager.cc",
     "node.cc",
@@ -40,15 +44,19 @@ sdk_source_set("manager") {
     "visitor.h",
   ]
 
-  non_sdk_local_deps = [
+  non_sdk_local_deps =
+      [ "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp" ]
+
+  deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/legacy-bind-constants",
     "//sdk/lib/zbi-format",
-    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform",
   ]
 
-  non_sdk_public_deps = [ ":headers" ]
+  public_deps = [ ":headers" ]
 }
 
 source_set("manager-test-helper") {

@@ -14,6 +14,13 @@
                     },
                     "type": "array"
                 },
+                "bind_deps": {
+                    "description": "List of Bind libraries this library depends on",
+                    "items": {
+                        "$ref": "common.json#/definitions/bind_library_name"
+                    },
+                    "type": "array"
+                },
                 "deps": {
                     "description": "List of C/C++ libraries this library depends on",
                     "items": {
@@ -92,6 +99,7 @@
             },
             "required": [
                 "banjo_deps",
+                "bind_deps",
                 "deps",
                 "fidl_deps",
                 "headers",

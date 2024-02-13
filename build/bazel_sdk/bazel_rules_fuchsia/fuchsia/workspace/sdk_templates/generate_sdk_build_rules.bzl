@@ -418,19 +418,24 @@ def _generate_cc_source_library_build_rules(ctx, meta, relative_dir, build_file,
         for deps_per_type in meta["fidl_binding_deps"]:
             binding_type = deps_per_type["binding_type"]
             if binding_type == "hlcpp":
-                suffix = "cc"
+                suffixes = ["cc"]
             else:
-                suffix = binding_type
+                suffixes = ["cpp", "cpp_driver", "cpp_driver_wire", "cpp_wire"]
             for fidl in deps_per_type["deps"]:
                 dep_path = _find_dep_path(fidl, "fidl/", ctx.attr.parent_sdk, parent_sdk_contents)
-                fidl_deps.append(dep_path + ":" + fidl + "_" + suffix)
+                fidl_deps.extend([dep_path + ":" + fidl + "_" + suffix for suffix in suffixes])
     elif "fidl_deps" in meta:
         for fidl in meta["fidl_deps"]:
             dep_path = _find_dep_path(fidl, "fidl/", ctx.attr.parent_sdk, parent_sdk_contents)
             fidl_deps.append(dep_path + ":" + fidl + "_cc")
             fidl_llcpp_deps.append(dep_path + ":" + fidl + "_llcpp_cc")
 
-    deps = _find_dep_paths(meta["deps"], "pkg/", ctx.attr.parent_sdk, parent_sdk_contents)
+    deps = []
+    for bind in meta.get("bind_deps", []):
+        dep_path = _find_dep_path(bind, "bind/", ctx.attr.parent_sdk, parent_sdk_contents)
+        deps.append(dep_path + ":" + bind + "_cc")
+
+    deps += _find_dep_paths(meta["deps"], "pkg/", ctx.attr.parent_sdk, parent_sdk_contents)
     target_name = _get_target_name(meta["name"])
     copts = _CC_LIBRARY_COPTS_OVERRIDES.get(target_name, [])
     alwayslink = target_name in _ALWAYSLINK_LIBS

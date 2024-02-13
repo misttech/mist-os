@@ -12,7 +12,11 @@ group("tests") {
   testonly = true
 }
 
-source_set("registry") {
+sdk_source_set("registry") {
+  sdk_name = "devicetree-registry"
+  category = "internal"
+  include_base = "//sdk"
+
   public = [ "registry.h" ]
   public_deps = [ "//sdk/lib/driver/devicetree/manager:headers" ]
 }
@@ -23,23 +27,26 @@ sdk_source_set("load-visitors") {
   sources = [ "load-visitors.cc" ]
 
   public = [ "load-visitors.h" ]
+  include_base = "//sdk"
 
-  non_sdk_local_deps = [
+  deps = [
     ":registration",
     "default:default",
+    "//sdk/lib/driver/incoming/cpp",
     "//sdk/lib/driver/logging/cpp",
   ]
 
-  non_sdk_public_deps = [
-    ":registry",
-    "//sdk/lib/driver/incoming/cpp",
-  ]
+  public_deps = [ ":registry" ]
 }
 
-source_set("driver-visitor") {
+sdk_source_set("driver-visitor") {
+  sdk_name = "devicetree-driver-visitors"
+  category = "internal"
   sources = [ "driver-visitor.cc" ]
   public = [ "driver-visitor.h" ]
+  include_base = "//sdk"
   deps = [ "//sdk/lib/driver/logging/cpp" ]
+
   public_deps = [
     ":property-parser",
     "//sdk/lib/driver/devicetree/manager:headers",
@@ -47,20 +54,29 @@ source_set("driver-visitor") {
   ]
 }
 
-source_set("multivisitor") {
+sdk_source_set("multivisitor") {
+  sdk_name = "devicetree-multivisitor"
+  category = "internal"
+  include_base = "//sdk"
   public = [ "multivisitor.h" ]
   public_deps = [ "//sdk/lib/driver/devicetree/manager:headers" ]
 }
 
-source_set("registration") {
+sdk_source_set("registration") {
+  sdk_name = "devicetree-registration"
+  category = "internal"
   public = [ "registration.h" ]
+  include_base = "//sdk"
   public_deps = [
     "//sdk/lib/driver/devicetree/manager:headers",
     "//sdk/lib/driver/logging/cpp",
   ]
 }
 
-source_set("property-parser") {
+sdk_source_set("property-parser") {
+  sdk_name = "devicetree-property-parser"
+  category = "internal"
+  include_base = "//sdk"
   sources = [ "property-parser.cc" ]
   public = [ "property-parser.h" ]
   deps = [
@@ -80,7 +96,11 @@ source_set("interrupt-parser") {
   public_deps = [ ":property-parser" ]
 }
 
-source_set("common-types") {
+sdk_source_set("common-types") {
+  sdk_name = "devicetree-common-types"
+  category = "internal"
+  include_base = "//sdk"
+
   public = [ "common-types.h" ]
   public_deps = [ "//zircon/kernel/lib/devicetree" ]
 }

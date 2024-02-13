@@ -1,0 +1,69 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_driver",
+    "fuchsia_component_manifest",
+    "fuchsia_driver_bind_bytecode",
+    "fuchsia_driver_component",
+    "fuchsia_package",
+    "fuchsia_platforms",
+)
+
+fuchsia_driver_bind_bytecode(
+    name = "example-board-bind",
+    output = "example-board-bind.bindbc",
+    rules = "example-board.bind",
+    deps = [
+        "@fuchsia_sdk//bind/fuchsia.devicetree",
+        "@fuchsia_sdk//bind/fuchsia.platform",
+        "@fuchsia_sdk//bind/fuchsia.test.platform",
+    ],
+)
+
+fuchsia_cc_driver(
+    name = "example-board-driver",
+    srcs = [
+        "example-board.cc",
+        "example-board.h",
+    ],
+    linkshared = True,
+    output_name = "example-board",
+    deps = [
+        "@fuchsia_sdk//bind/fuchsia.platform:fuchsia.platform_cc",
+        "@fuchsia_sdk//fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+        "@fuchsia_sdk//fidl/fuchsia.io:fuchsia.io_cpp",
+        "@fuchsia_sdk//pkg/driver_component_cpp",
+        "@fuchsia_sdk//pkg/driver_runtime",
+        "@fuchsia_sdk//pkg/driver_runtime_cpp",
+        "@internal_sdk//fidl/fuchsia.boot:fuchsia.boot_cpp",
+        "@internal_sdk//fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
+        "@internal_sdk//pkg/devicetree-default",
+        "@internal_sdk//pkg/devicetree-load-visitors",
+        "@internal_sdk//pkg/devicetree-manager",
+    ],
+)
+
+fuchsia_component_manifest(
+    name = "manifest",
+    src = "meta/example-board.cml",
+)
+
+fuchsia_driver_component(
+    name = "component",
+    bind_bytecode = ":example-board-bind",
+    driver_lib = ":example-board-driver",
+    manifest = ":manifest",
+)
+
+fuchsia_package(
+    name = "example-board",
+    package_name = "example-board",
+    components = [":component"],
+    fuchsia_api_level = "HEAD",
+    package_repository_name = "fuchsia.com",
+    platform = fuchsia_platforms.arm64,
+    visibility = ["//visibility:public"],
+)

@@ -4,7 +4,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::common::{BanjoLibraryName, CcLibraryName, ElementType, FidlLibraryName, File};
+use crate::common::{
+    BanjoLibraryName, BindLibraryName, CcLibraryName, ElementType, FidlLibraryName, File,
+};
 use crate::json::JsonObject;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -20,6 +22,7 @@ pub struct CcSourceLibrary {
     pub deps: Vec<CcLibraryName>,
     pub fidl_deps: Vec<FidlLibraryName>,
     pub banjo_deps: Vec<BanjoLibraryName>,
+    pub bind_deps: Vec<BindLibraryName>,
 }
 
 impl JsonObject for CcSourceLibrary {
@@ -52,6 +55,7 @@ mod tests {
             ],
             "include_dir": "pkg/foobar/include",
             "banjo_deps": [],
+            "bind_deps": [],
             "fidl_deps": [
                 "foo.bar"
             ]
@@ -78,6 +82,7 @@ mod tests {
             "headers": [],
             "include_dir": "pkg/foobar/include",
             "banjo_deps": [],
+            "bind_deps": [],
             "fidl_deps": [
                 "foo.bar"
             ]

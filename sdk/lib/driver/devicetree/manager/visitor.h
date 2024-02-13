@@ -10,7 +10,7 @@
 
 #include <string_view>
 
-#include "node.h"
+#include "lib/driver/devicetree/manager/node.h"
 
 namespace fdf_devicetree {
 

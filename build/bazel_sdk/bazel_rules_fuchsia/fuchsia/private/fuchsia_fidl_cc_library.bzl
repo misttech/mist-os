@@ -97,6 +97,7 @@ def _codegen_impl(ctx):
         "driver/wire_messaging.h",
         "driver/wire.h",
         "driver/wire.h",
+        "driver/fidl.h",
         "fidl.h",
         "hlcpp_conversion.h",
         "markers.h",

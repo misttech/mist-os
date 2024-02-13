@@ -129,6 +129,7 @@ group("non_hermetic_deps") {
     "//build/bazel/bazel_sdk/tests:*",
     "//build/bazel/examples/*",
     "//build/bazel/tests/*",
+    "//sdk/lib/driver/devicetree/*",
   ]
 
   # Products which use Bazel-based assembly have non-hermetic outputs

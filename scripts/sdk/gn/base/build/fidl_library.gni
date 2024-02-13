@@ -594,7 +594,10 @@ template("fidl_library") {
 
     {
       layer = "cpp_driver"  # AKA: driver_messaging
-      headers = [ "fidl/${library_name}/cpp/driver/natural_messaging.h" ]
+      headers = [
+        "fidl/${library_name}/cpp/driver/natural_messaging.h",
+        "fidl/${library_name}/cpp/driver/fidl.h",
+      ]
       sources = [ "fidl/${library_name}/cpp/driver/natural_messaging.cc" ]
       public_deps = [ "${fuchsia_sdk}/pkg/fidl_driver_natural" ]
       layer_deps = [

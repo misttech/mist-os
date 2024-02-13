@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#include "bind-property.h"
+#include "lib/driver/devicetree/visitors/default/bind-property/bind-property.h"
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <lib/driver/logging/cpp/logger.h>

@@ -78,6 +78,7 @@ def main():
     banjo_deps = []
     fidl_deps = []
     banjo_deps = []
+    bind_deps = []
     fidl_layers = defaultdict(list)
     for idx, spec in enumerate(args.deps):
         with open(spec, "r") as spec_file:
@@ -103,11 +104,14 @@ def main():
                     # this covers both of those bases.
                     fidl_deps.append(name)
                     fidl_layers["hlcpp"].append(name)
+        elif type == "bind_library":
+            bind_deps.append(name.replace("_cpp", ""))
         else:
             raise Exception("Unsupported dependency type: %s" % type)
 
     metadata["deps"] = sorted(set(deps))
     metadata["banjo_deps"] = sorted(set(banjo_deps))
+    metadata["bind_deps"] = sorted(set(bind_deps))
     metadata["fidl_deps"] = sorted(set(fidl_deps))
     metadata["plasa"] = resolve_plasa_files(args.plasa)
     metadata["fidl_binding_deps"] = [

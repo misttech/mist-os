@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "manager.h"
+#include "lib/driver/devicetree/manager/manager.h"
 
 #include <fidl/fuchsia.boot/cpp/fidl.h>
 #include <lib/devicetree/devicetree.h>
@@ -122,19 +122,18 @@ zx::result<> Manager::Walk(Visitor& visitor) {
   });
 
   zx::result<> visit_status = zx::ok();
-  tree_.Walk(
-      [&, this](const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
-        FDF_LOG(DEBUG, "Visit node - %.*s", static_cast<int>(path.back().length()),
-                path.back().data());
-        auto node = nodes_by_path_[GetPath(path)];
-        visit_status = visitor.Visit(*node, decoder);
-        if (visit_status.is_error()) {
-          FDF_SLOG(ERROR, "Node visit failed.", KV("node_name", node->name()),
-                   KV("status_str", visit_status.status_string()));
-          return false;
-        }
-        return true;
-      });
+  tree_.Walk([&, this](const devicetree::NodePath& path,
+                       const devicetree::PropertyDecoder& decoder) {
+    FDF_LOG(DEBUG, "Visit node - %.*s", static_cast<int>(path.back().length()), path.back().data());
+    auto node = nodes_by_path_[GetPath(path)];
+    visit_status = visitor.Visit(*node, decoder);
+    if (visit_status.is_error()) {
+      FDF_SLOG(ERROR, "Node visit failed.", KV("node_name", node->name()),
+               KV("status_str", visit_status.status_string()));
+      return false;
+    }
+    return true;
+  });
   if (visit_status.is_error()) {
     return visit_status;
   }

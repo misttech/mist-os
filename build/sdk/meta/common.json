@@ -5,6 +5,10 @@
             "description": "Name of a BANJO library",
             "type": "string"
         },
+        "bind_library_name": {
+            "description": "Name of a bind library",
+            "type": "string"
+        },
         "cc_library_name": {
             "description": "Name of a C/C++ library",
             "type": "string"

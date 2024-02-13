@@ -15,7 +15,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "visitor.h"
+#include "lib/driver/devicetree/manager/visitor.h"
 
 namespace fdf_devicetree {
 
