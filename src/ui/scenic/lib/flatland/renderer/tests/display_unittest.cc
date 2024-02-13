@@ -201,15 +201,15 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
 
   // Try to import the image into the display coordinator API and make sure it succeeds.
   allocation::GlobalImageId display_image_id = allocation::GenerateUniqueImageId();
-  zx_status_t import_image_status = ZX_OK;
+  fuchsia::hardware::display::Coordinator_ImportImage_Result import_image_result;
   (*display_coordinator.get())
       ->ImportImage(image_config, /*buffer_id=*/
                     {
                         .buffer_collection_id = display_collection_id,
                         .buffer_index = 0,
                     },
-                    allocation::ToFidlImageId(display_image_id), &import_image_status);
-  EXPECT_EQ(import_image_status, ZX_OK);
+                    allocation::ToFidlImageId(display_image_id), &import_image_result);
+  EXPECT_TRUE(import_image_result.is_response());
 }
 
 // Test out event signaling on the Display Coordinator by importing a buffer collection and its 2
@@ -260,7 +260,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   allocation::GlobalImageId image_ids[kNumVmos];
   for (uint32_t i = 0; i < kNumVmos; i++) {
     image_ids[i] = allocation::GenerateUniqueImageId();
-    zx_status_t import_image_status = ZX_OK;
+    fuchsia::hardware::display::Coordinator_ImportImage_Result import_image_result;
     auto transport_status =
         (*display_coordinator.get())
             ->ImportImage(image_config, /*buffer_id=*/
@@ -268,9 +268,9 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
                               .buffer_collection_id = display_collection_id,
                               .buffer_index = i,
                           },
-                          allocation::ToFidlImageId(image_ids[i]), &import_image_status);
+                          allocation::ToFidlImageId(image_ids[i]), &import_image_result);
     ASSERT_EQ(transport_status, ZX_OK);
-    ASSERT_EQ(import_image_status, ZX_OK);
+    ASSERT_TRUE(import_image_result.is_response());
     ASSERT_NE(image_ids[i], fuchsia::hardware::display::types::INVALID_DISP_ID);
   }
 

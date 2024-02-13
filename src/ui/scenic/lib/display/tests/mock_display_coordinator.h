@@ -124,7 +124,7 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
                    fuchsia::hardware::display::BufferId buffer_id,
                    fuchsia::hardware::display::types::ImageId image_id,
                    ImportImageCallback callback) override {
-    callback(ZX_OK);
+    callback(fuchsia::hardware::display::Coordinator_ImportImage_Result::WithResponse({}));
   }
 
   void SetLayerPrimaryPosition(fuchsia::hardware::display::types::LayerId layer_id,

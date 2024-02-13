@@ -446,16 +446,22 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
 
   const ImageId image_id = next_image_id_++;
   const fhdt::wire::ImageId fidl_image_id = ToFidlImageId(image_id);
-  auto import_result = dc_->ImportImage(image_config,
-                                        fhd::wire::BufferId{
-                                            .buffer_collection_id = fidl_display_collection_id,
-                                            .buffer_index = 0,
-                                        },
-                                        fidl_image_id);
-  if (!import_result.ok() || import_result.value().res != ZX_OK) {
-    zxlogf(ERROR, "Importing image failed (fidl=%d, res=%d)", import_result.status(),
-           import_result.value().res);
-    return zx::error(import_result.ok() ? import_result.value().res : import_result.status());
+  const auto import_result =
+      dc_->ImportImage(image_config,
+                       fhd::wire::BufferId{
+                           .buffer_collection_id = fidl_display_collection_id,
+                           .buffer_index = 0,
+                       },
+                       fidl_image_id);
+  if (!import_result.ok()) {
+    zxlogf(ERROR, "Failed to call FIDL ImportImage %" PRIu64 " (%s)", fidl_image_id.value,
+           import_result.status_string());
+    return zx::error(import_result.status());
+  }
+  if (import_result.value().is_error()) {
+    zxlogf(ERROR, "Failed to import image %" PRIu64 " (%s)", fidl_image_id.value,
+           zx_status_get_string(import_result.value().error_value()));
+    return zx::error(import_result.value().error_value());
   }
 
   // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.

@@ -570,7 +570,7 @@ TEST_F(IntegrationTest, ImportImageWithInvalidImageId) {
           },
           ToFidlImageId(image_id));
   ASSERT_OK(import_image_reply.status());
-  EXPECT_NE(ZX_OK, import_image_reply.value().res);
+  EXPECT_TRUE(import_image_reply.value().is_error());
 }
 
 TEST_F(IntegrationTest, ImportImageWithNonExistentBufferCollectionId) {
@@ -590,7 +590,7 @@ TEST_F(IntegrationTest, ImportImageWithNonExistentBufferCollectionId) {
           },
           ToFidlImageId(image_id));
   ASSERT_OK(import_image_reply.status());
-  EXPECT_NE(ZX_OK, import_image_reply.value().res);
+  EXPECT_TRUE(import_image_reply.value().is_error());
 }
 
 TEST_F(IntegrationTest, ClampRgb) {

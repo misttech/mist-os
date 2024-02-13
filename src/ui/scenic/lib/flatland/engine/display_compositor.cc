@@ -404,7 +404,7 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
   }
 
   const fuchsia::hardware::display::types::ImageConfig image_config = CreateImageConfig(metadata);
-  zx_status_t import_image_status = ZX_OK;
+  fuchsia::hardware::display::Coordinator_ImportImage_Result import_image_result;
   {
     const fuchsia::hardware::display::types::ImageId fidl_image_id =
         allocation::ToFidlImageId(metadata.identifier);
@@ -414,12 +414,13 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
                                               .buffer_collection_id = display_collection_id,
                                               .buffer_index = metadata.vmo_index,
                                           },
-                                          fidl_image_id, &import_image_status);
+                                          fidl_image_id, &import_image_result);
     FX_DCHECK(status == ZX_OK);
   }
 
-  if (import_image_status != ZX_OK) {
-    FX_LOGS(ERROR) << "Display coordinator could not import the image.";
+  if (import_image_result.is_err()) {
+    FX_LOGS(ERROR) << "Display coordinator could not import the image: "
+                   << zx_status_get_string(import_image_result.err());
     return false;
   }
 

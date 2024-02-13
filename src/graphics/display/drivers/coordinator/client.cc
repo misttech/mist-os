@@ -114,27 +114,38 @@ void DisplayConfig::DiscardNonLayerPendingConfig() {
 void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& completer) {
   const ImageId image_id = ToImageId(request->image_id);
   if (image_id == kInvalidImageId) {
-    completer.Reply(ZX_ERR_INVALID_ARGS);
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
   auto images_it = images_.find(image_id);
   if (images_it.IsValid()) {
-    completer.Reply(ZX_ERR_ALREADY_EXISTS);
+    completer.ReplyError(ZX_ERR_ALREADY_EXISTS);
     return;
   }
   auto capture_image_it = capture_images_.find(image_id);
   if (capture_image_it.IsValid()) {
-    completer.Reply(ZX_ERR_ALREADY_EXISTS);
+    completer.ReplyError(ZX_ERR_ALREADY_EXISTS);
     return;
   }
 
   if (request->image_config.type == fuchsia_hardware_display_types::wire::kTypeCapture) {
-    completer.Reply(
-        ImportImageForCapture(request->image_config, ToBufferId(request->buffer_id), image_id));
+    zx_status_t import_status =
+        ImportImageForCapture(request->image_config, ToBufferId(request->buffer_id), image_id);
+    if (import_status == ZX_OK) {
+      completer.ReplySuccess();
+    } else {
+      completer.ReplyError(import_status);
+    }
     return;
   }
-  completer.Reply(
-      ImportImageForDisplay(request->image_config, ToBufferId(request->buffer_id), image_id));
+
+  zx_status_t import_status =
+      ImportImageForDisplay(request->image_config, ToBufferId(request->buffer_id), image_id);
+  if (import_status == ZX_OK) {
+    completer.ReplySuccess();
+  } else {
+    completer.ReplyError(import_status);
+  }
 }
 
 zx_status_t Client::ImportImageForDisplay(

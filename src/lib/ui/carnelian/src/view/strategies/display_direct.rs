@@ -367,7 +367,7 @@ impl DisplayDirectViewStrategy {
             let uindex = index as u32;
             let image_id = next_image_id();
             let display_image_id = DisplayImageId(image_id);
-            let status = display
+            display
                 .coordinator
                 .import_image(
                     &image_config,
@@ -375,8 +375,9 @@ impl DisplayDirectViewStrategy {
                     &display_image_id.into(),
                 )
                 .await
-                .context("coordinator import_image")?;
-            ensure!(status == 0, "import_image error {} ({})", Status::from_raw(status), status);
+                .context("FIDL coordinator import_image")?
+                .map_err(zx::Status::from_raw)
+                .context("import image error")?;
 
             image_ids.insert(image_id as u64);
             image_indexes.insert(image_id as u64, uindex);

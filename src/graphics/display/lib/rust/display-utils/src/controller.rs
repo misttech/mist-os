@@ -299,11 +299,10 @@ impl Coordinator {
         image_id: ImageId,
         config: display_types::ImageConfig,
     ) -> Result<()> {
-        let result = self
-            .proxy()
+        self.proxy()
             .import_image(&config, &BufferId::new(collection_id, 0).into(), &image_id.into())
-            .await?;
-        zx::Status::ok(result)?;
+            .await?
+            .map_err(zx::Status::from_raw)?;
         Ok(())
     }
 }

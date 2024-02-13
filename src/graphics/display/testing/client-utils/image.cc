@@ -515,9 +515,9 @@ bool Image::Import(const fidl::WireSyncClient<fhd::Coordinator>& dc, display::Im
     printf("Failed to import image: %s\n", import_result.FormatDescription().c_str());
     return false;
   }
-  const fidl::WireResponse import_response = import_result.value();
-  if (zx_status_t status = import_response.res; status != ZX_OK) {
-    printf("Failed to import image: %s\n", zx_status_get_string(status));
+  if (import_result.value().is_error()) {
+    printf("Failed to import image: %s\n",
+           zx_status_get_string(import_result.value().error_value()));
     return false;
   }
   info_out->id = image_id;
