@@ -49,7 +49,7 @@
 //          |             v      v          |        |
 //  +-------+--+        +-----------+       +-+------+
 //  | object   |        | Port      |         ^
-//  |          | <--rc--+ Observer  |         |
+//  |          | <--p---+ Observer  |         |
 //  +----------+        |           +---rc----+
 //                      |           |
 //                      +-----------+
@@ -81,6 +81,10 @@
 //
 //   The |o| pointer is used to destroy the port observer only
 //   when cancellation happens and the port still owns the packet.
+//
+//   The PortObserver's raw pointer to the Dispatcher is a weak reference
+//   guarded by the port's lock. It is cleared either in MaybeReap or
+//   in PortDispatcher::on_zero_handles.
 //
 // Locking
 //
@@ -145,9 +149,11 @@ class PortObserver final : public SignalObserver {
   ~PortObserver() final = default;
 
   // May only be called while holding PortDispatcher lock.
-  fbl::RefPtr<Dispatcher> UnlinkDispatcherLocked() {
+  Dispatcher* UnlinkDispatcherLocked() {
     DEBUG_ASSERT(port_lock_->lock().IsHeld());
-    return ktl::move(dispatcher_);
+    Dispatcher* dispatcher = dispatcher_;
+    dispatcher_ = nullptr;
+    return dispatcher;
   }
 
  private:
@@ -169,7 +175,8 @@ class PortObserver final : public SignalObserver {
   ListNodeState observer_list_node_state_;
 
   // Guarded by port_lock_;
-  fbl::RefPtr<Dispatcher> dispatcher_;
+  // This is a raw pointer as the PortObserver does not have an ownership stake in the dispatcher.
+  Dispatcher* dispatcher_;
 };
 
 // The PortDispatcher implements the port kernel object which is the cornerstone

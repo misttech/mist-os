@@ -111,7 +111,7 @@ PortObserver::PortObserver(uint32_t options, const Handle* handle, fbl::RefPtr<P
       packet_(handle, nullptr),
       port_(ktl::move(port)),
       port_lock_(port_lock),
-      dispatcher_(handle->dispatcher()) {
+      dispatcher_(handle->dispatcher().get()) {
   DEBUG_ASSERT(port_lock_ != nullptr);
   DEBUG_ASSERT(handle != nullptr);
   DEBUG_ASSERT(dispatcher_ != nullptr);
@@ -210,7 +210,9 @@ void PortDispatcher::on_zero_handles() {
   // dispatcher.
   while (!observers_.is_empty()) {
     PortObserver* observer = observers_.pop_front();
-    fbl::RefPtr<Dispatcher> dispatcher = observer->UnlinkDispatcherLocked();
+    // Acquire a reference to the Dispatcher while we're holding our lock to
+    // ensure that it is still alive when we call RemoveObserver below.
+    auto dispatcher = fbl::RefPtr(observer->UnlinkDispatcherLocked());
     DEBUG_ASSERT(dispatcher != nullptr);
 
     // Don't hold the lock while calling RemoveObserver because we don't want to create a
@@ -372,17 +374,16 @@ zx_status_t PortDispatcher::Dequeue(const Deadline& deadline, zx_port_packet_t* 
 void PortDispatcher::MaybeReap(PortObserver* observer, PortPacket* port_packet) {
   canary_.Assert();
 
-  // These pointers are declared before the guard because we want the destructors to execute
-  // outside the critical section below (if they end up being the last/only references).
+  // This pointer is declared before the guard because we want the destructor to execute
+  // outside the critical section below (if it ends up being the last/only references).
   object_cache::UniquePtr<PortObserver> destroyer;
-  fbl::RefPtr<Dispatcher> dispatcher;
 
   {
     Guard<CriticalMutex> guard{get_lock()};
 
     // We may be racing with on_zero_handles. Whichever one of us unlinks the dispatcher will be
     // responsible for ensuring the observer is cleaned up.
-    dispatcher = observer->UnlinkDispatcherLocked();
+    Dispatcher* dispatcher = observer->UnlinkDispatcherLocked();
     if (dispatcher != nullptr) {
       observers_.erase(*observer);
 
