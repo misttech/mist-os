@@ -94,27 +94,24 @@ std::optional<virtio_abi::ResourceFormat> To2DResourceFormat(
   }
 }
 
-zx_status_t ResponseTypeToZxStatus(virtio_abi::ControlType type) {
+zx::result<> ResponseTypeToResult(virtio_abi::ControlType type) {
   if (type != virtio_abi::ControlType::kEmptyResponse) {
     zxlogf(ERROR, "Unexpected response type: %s (0x%04x)", ControlTypeToString(type),
            static_cast<unsigned int>(type));
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
-  return ZX_OK;
+  return zx::ok();
 }
 
 }  // namespace
 
-zx_status_t VirtioGpuDevice::Create2DResource(uint32_t* resource_id, uint32_t width,
-                                              uint32_t height,
-                                              fuchsia_images2::wire::PixelFormat pixel_format) {
-  ZX_ASSERT(resource_id);
-
+zx::result<uint32_t> VirtioGpuDevice::Create2DResource(
+    uint32_t width, uint32_t height, fuchsia_images2::wire::PixelFormat pixel_format) {
   zxlogf(TRACE, "Allocate2DResource");
 
   std::optional<virtio_abi::ResourceFormat> resource_format = To2DResourceFormat(pixel_format);
   if (!resource_format.has_value()) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   const virtio_abi::Create2DResourceCommand command = {
@@ -124,15 +121,18 @@ zx_status_t VirtioGpuDevice::Create2DResource(uint32_t* resource_id, uint32_t wi
       .width = width,
       .height = height,
   };
-  *resource_id = command.resource_id;
 
   const auto& response =
       virtio_device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
-  return ResponseTypeToZxStatus(response.header.type);
+  zx::result<> virtio_result = ResponseTypeToResult(response.header.type);
+  if (virtio_result.is_error()) {
+    return virtio_result.take_error();
+  }
+  return zx::ok(command.resource_id);
 }
 
-zx_status_t VirtioGpuDevice::AttachResourceBacking(uint32_t resource_id, zx_paddr_t ptr,
-                                                   size_t buf_len) {
+zx::result<> VirtioGpuDevice::AttachResourceBacking(uint32_t resource_id, zx_paddr_t ptr,
+                                                    size_t buf_len) {
   ZX_ASSERT(ptr);
 
   zxlogf(TRACE,
@@ -150,11 +150,11 @@ zx_status_t VirtioGpuDevice::AttachResourceBacking(uint32_t resource_id, zx_padd
 
   const auto& response =
       virtio_device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
-  return ResponseTypeToZxStatus(response.header.type);
+  return ResponseTypeToResult(response.header.type);
 }
 
-zx_status_t VirtioGpuDevice::SetScanoutProperties(uint32_t scanout_id, uint32_t resource_id,
-                                                  uint32_t width, uint32_t height) {
+zx::result<> VirtioGpuDevice::SetScanoutProperties(uint32_t scanout_id, uint32_t resource_id,
+                                                   uint32_t width, uint32_t height) {
   zxlogf(TRACE,
          "SetScanoutProperties - scanout ID %" PRIu32 ", resource ID %" PRIu32 ", size %" PRIu32
          "x%" PRIu32,
@@ -175,10 +175,10 @@ zx_status_t VirtioGpuDevice::SetScanoutProperties(uint32_t scanout_id, uint32_t 
 
   const auto& response =
       virtio_device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
-  return ResponseTypeToZxStatus(response.header.type);
+  return ResponseTypeToResult(response.header.type);
 }
 
-zx_status_t VirtioGpuDevice::FlushResource(uint32_t resource_id, uint32_t width, uint32_t height) {
+zx::result<> VirtioGpuDevice::FlushResource(uint32_t resource_id, uint32_t width, uint32_t height) {
   zxlogf(TRACE, "FlushResource - resource ID %" PRIu32 ", size %" PRIu32 "x%" PRIu32, resource_id,
          width, height);
 
@@ -190,11 +190,11 @@ zx_status_t VirtioGpuDevice::FlushResource(uint32_t resource_id, uint32_t width,
 
   const auto& response =
       virtio_device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
-  return ResponseTypeToZxStatus(response.header.type);
+  return ResponseTypeToResult(response.header.type);
 }
 
-zx_status_t VirtioGpuDevice::TransferToHost2D(uint32_t resource_id, uint32_t width,
-                                              uint32_t height) {
+zx::result<> VirtioGpuDevice::TransferToHost2D(uint32_t resource_id, uint32_t width,
+                                               uint32_t height) {
   zxlogf(TRACE, "Transfer2DResourceToHost - resource ID %" PRIu32 ", size %" PRIu32 "x%" PRIu32,
          resource_id, width, height);
 
@@ -213,7 +213,7 @@ zx_status_t VirtioGpuDevice::TransferToHost2D(uint32_t resource_id, uint32_t wid
 
   const auto& response =
       virtio_device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
-  return ResponseTypeToZxStatus(response.header.type);
+  return ResponseTypeToResult(response.header.type);
 }
 
 }  // namespace virtio_display

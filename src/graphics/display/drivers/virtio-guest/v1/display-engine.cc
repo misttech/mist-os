@@ -285,17 +285,19 @@ zx::result<display::DriverImageId> DisplayEngine::Import(
     return zx::error(status);
   }
 
-  status = gpu_device_->Create2DResource(&import_data->resource_id, row_bytes / pixel_size,
-                                         image->height, pixel_format);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate 2D resource: %s", zx_status_get_string(status));
-    return zx::error(status);
+  zx::result<uint32_t> create_resource_result =
+      gpu_device_->Create2DResource(row_bytes / pixel_size, image->height, pixel_format);
+  if (create_resource_result.is_error()) {
+    zxlogf(ERROR, "Failed to allocate 2D resource: %s", create_resource_result.status_string());
+    return create_resource_result.take_error();
   }
+  import_data->resource_id = create_resource_result.value();
 
-  status = gpu_device_->AttachResourceBacking(import_data->resource_id, paddr, size);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to attach resource backing store: %s", zx_status_get_string(status));
-    return zx::error(status);
+  zx::result<> attach_result =
+      gpu_device_->AttachResourceBacking(import_data->resource_id, paddr, size);
+  if (attach_result.is_error()) {
+    zxlogf(ERROR, "Failed to attach resource backing store: %s", attach_result.status_string());
+    return attach_result.take_error();
   }
 
   display::DriverImageId image_id(reinterpret_cast<uint64_t>(import_data.release()));
@@ -526,30 +528,30 @@ void DisplayEngine::virtio_gpu_flusher() {
     zxlogf(TRACE, "flushing");
 
     if (fb_change) {
-      uint32_t res_id = displayed_fb_ ? displayed_fb_->resource_id : 0;
-      zx_status_t status = gpu_device_->SetScanoutProperties(
-          current_display_.scanout_id, res_id, current_display_.scanout_info.geometry.width,
+      uint32_t resource_id = displayed_fb_ ? displayed_fb_->resource_id : 0;
+      zx::result<> set_scanout_result = gpu_device_->SetScanoutProperties(
+          current_display_.scanout_id, resource_id, current_display_.scanout_info.geometry.width,
           current_display_.scanout_info.geometry.height);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "Failed to set scanout: %s", zx_status_get_string(status));
+      if (set_scanout_result.is_error()) {
+        zxlogf(ERROR, "Failed to set scanout: %s", set_scanout_result.status_string());
         continue;
       }
     }
 
     if (displayed_fb_) {
-      zx_status_t status = gpu_device_->TransferToHost2D(
+      zx::result<> transfer_result = gpu_device_->TransferToHost2D(
           displayed_fb_->resource_id, current_display_.scanout_info.geometry.width,
           current_display_.scanout_info.geometry.height);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "Failed to transfer resource: %s", zx_status_get_string(status));
+      if (transfer_result.is_error()) {
+        zxlogf(ERROR, "Failed to transfer resource: %s", transfer_result.status_string());
         continue;
       }
 
-      status = gpu_device_->FlushResource(displayed_fb_->resource_id,
-                                          current_display_.scanout_info.geometry.width,
-                                          current_display_.scanout_info.geometry.height);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "Failed to flush resource: %s", zx_status_get_string(status));
+      zx::result<> flush_result = gpu_device_->FlushResource(
+          displayed_fb_->resource_id, current_display_.scanout_info.geometry.width,
+          current_display_.scanout_info.geometry.height);
+      if (flush_result.is_error()) {
+        zxlogf(ERROR, "Failed to flush resource: %s", flush_result.status_string());
         continue;
       }
     }
