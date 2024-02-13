@@ -12,10 +12,10 @@
     },
     use: [
         {
-            // For /dev/class/gpu, /dev/class/gpu-performance-counters, and /dev/mali/aml-gpu.
-            directory: "dev-topological",
+            // For /dev/class/gpu, /dev/class/gpu-performance-counters.
+            directory: "dev-class",
             rights: [ "r*" ],
-            path: "/dev",
+            path: "/dev/class",
         },
         { protocol: "fuchsia.tracing.provider.Registry" },
         {
