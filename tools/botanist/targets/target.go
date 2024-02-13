@@ -402,7 +402,7 @@ func (t *genericFuchsiaTarget) AddPackageRepository(client *sshutil.Client, repo
 // blocks until the target is stopped.
 func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, repoURL, blobURL string) error {
 	var syslogger *syslog.Syslogger
-	if t.UseFFXExperimental(2) {
+	if t.UseFFXExperimental(1) {
 		syslogger = syslog.NewFFXSyslogger(t.ffx.FFXInstance)
 	} else {
 		syslogger = syslog.NewSyslogger(client)
