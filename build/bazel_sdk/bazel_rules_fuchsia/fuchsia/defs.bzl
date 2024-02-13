@@ -77,6 +77,10 @@ load(
     _fuchsia_fidl_library = "fuchsia_fidl_library",
 )
 load(
+    "//fuchsia/private:fuchsia_board_driver.bzl",
+    _fuchsia_board_driver = "fuchsia_board_driver",
+)
+load(
     "//fuchsia/private:fuchsia_package.bzl",
     _fuchsia_package = "fuchsia_package",
     _fuchsia_test_package = "fuchsia_test_package",
@@ -159,6 +163,7 @@ get_driver_component_manifests = _get_driver_component_manifests
 if_fuchsia = _if_fuchsia
 clangd_compilation_database = _clangd_compilation_database
 fuchsia_toolchain_info = _fuchsia_toolchain_info
+fuchsia_board_driver = _fuchsia_board_driver
 
 # Platform definitions
 fuchsia_platforms = _fuchsia_platforms

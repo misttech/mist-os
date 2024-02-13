@@ -8,6 +8,7 @@ cc_library(
         "example-visitor.cc",
     ],
     hdrs = ["example-visitor.h"],
+    visibility = ["//visibility:public"],
     deps = [
         "@internal_sdk//pkg/devicetree-driver-visitors",
         "@internal_sdk//pkg/devicetree-registration",

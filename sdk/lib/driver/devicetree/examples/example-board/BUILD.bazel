@@ -4,11 +4,11 @@
 
 load(
     "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_board_driver",
     "fuchsia_cc_driver",
     "fuchsia_component_manifest",
     "fuchsia_driver_bind_bytecode",
     "fuchsia_driver_component",
-    "fuchsia_package",
     "fuchsia_platforms",
 )
 
@@ -58,7 +58,7 @@ fuchsia_driver_component(
     manifest = ":manifest",
 )
 
-fuchsia_package(
+fuchsia_board_driver(
     name = "example-board",
     package_name = "example-board",
     components = [":component"],
@@ -66,4 +66,5 @@ fuchsia_package(
     package_repository_name = "fuchsia.com",
     platform = fuchsia_platforms.arm64,
     visibility = ["//visibility:public"],
+    visitors = ["//sdk/lib/driver/devicetree/examples/example-visitor"],
 )
