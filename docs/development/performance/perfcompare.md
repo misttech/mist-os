@@ -143,5 +143,53 @@ performance tests locally (that is, not using Fuchsia Infra) and
 compare their results. See the
 [documentation](/src/testing/perfcompare/README.md).
 
+## How to download the raw performance results
+
+<!-- Allow lines to be wrapped in the code blocks below. For single
+     shell commands, wrapping can be more convenient for
+     copy-and-pasting than using backslashes for splitting up
+     lines. -->
+<style>
+pre.wrapped {
+  white-space: pre-wrap;
+}
+</style>
+
+It is possible to download the raw performance test results produced
+by a perfcompare try builder run. This is useful if you want to modify
+the analysis that `perfcompare.py` performs. To do that, use the
+following steps:
+
+1.  Find the values of the `cas_instance` and
+    `perfcompare_dataset_digest` fields from the output properties of
+    the perfcompare build. These can be found on the build page for
+    the build (which is reachable from the "Checks" tab in the Gerrit
+    code review). Examples of typical values are:
+
+    *   `cas_instance="projects/chromium-swarm/instances/default_instance"`
+    *   `perfcompare_dataset_digest="3ff389154e02490f29e379564f7e70b3df66f74c3116ed50172cceec1e9d9888/165"`
+
+    For downloading results data from non-perfcompare builds, the
+    field name to use is `perf_dataset_digest` rather than
+    `perfcompare_dataset_digest`.
+
+2.  Download the dataset by running the following command (using the
+    prebuilt `cas` tool from the Fuchsia checkout):
+
+    ```shell {:.wrapped}
+    ./prebuilt/tools/cas/cas download -cas-instance $CAS_INSTANCE -digest $DIGEST -dir $DEST_DIR
+    ```
+
+3.  Run `perfcompare.py` on the downloaded dataset:
+
+    ```shell {:.wrapped}
+    python3 src/testing/perfcompare/perfcompare.py compare_perf $DEST_DIR/without_cl/ $DEST_DIR/with_cl/
+    ```
+
+Note that the RBE-CAS system keeps the data for only about 2-3 months,
+so the download command will fail if the build was not run
+recently. (The current default for the time-to-live (TTL) in
+RBE-CAS is 90 days.)
+
 
 [internal-doc]: <https://goto.google.com/fuchsia-perfcompare-internal>
