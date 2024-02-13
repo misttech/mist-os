@@ -21,7 +21,7 @@
 #include <ddktl/init-txn.h>
 #include <fbl/alloc_checker.h>
 
-#include "src/graphics/display/drivers/virtio-guest/v1/gpu.h"
+#include "src/graphics/display/drivers/virtio-guest/v1/display-engine.h"
 
 namespace virtio_display {
 
