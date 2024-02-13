@@ -1027,6 +1027,11 @@ type U64BoolStruct = struct {
 type BoolOverlayStruct = struct {
     bo BoolOverlay;
 };
+
+type BoolOverlayAndUint8Struct = struct {
+    bo BoolOverlay;
+    x uint8;
+};
 )FIDL");
   test_library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
 
@@ -1067,7 +1072,15 @@ type BoolOverlayStruct = struct {
                                      }));
 
   auto bool_overlay_struct = test_library.LookupStruct("BoolOverlayStruct");
+  // TODO(https://fxbug.dev/323940291): Padding should be 0. The 7 bytes are part of BoolOverlay.
   EXPECT_FIELD_SHAPE(bool_overlay_struct->members[0], (ExpectedField{.offset = 0, .padding = 7}));
+
+  auto bool_overlay_and_uint8_struct = test_library.LookupStruct("BoolOverlayAndUint8Struct");
+  EXPECT_FIELD_SHAPE(bool_overlay_and_uint8_struct->members[0],
+                     (ExpectedField{.offset = 0, .padding = 0}));
+  // TODO(https://fxbug.dev/323940291): Should be offset = 16, padding = 7.
+  EXPECT_FIELD_SHAPE(bool_overlay_and_uint8_struct->members[1],
+                     (ExpectedField{.offset = 9, .padding = 6}));
 }
 
 TEST(TypeshapeTests, GoodVectors) {
@@ -2324,6 +2337,182 @@ type Bar = struct {
                                     .max_handles = 0,
                                     .depth = std::numeric_limits<uint32_t>::max(),
                                 }));
+}
+
+TEST(TypeshapeTests, GoodRecursiveUnionAndStruct) {
+  TestLibrary library(R"FIDL(
+library example;
+
+type Foo = union {
+    1: bar struct { f Foo:optional; };
+};
+)FIDL");
+  ASSERT_COMPILED(library);
+
+  auto union_foo = library.LookupUnion("Foo");
+  ASSERT_NE(union_foo, nullptr);
+  EXPECT_TYPE_SHAPE(union_foo, (Expected{
+                                   .inline_size = 16,
+                                   .alignment = 8,
+                                   .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                   .max_handles = 0,
+                                   .depth = std::numeric_limits<uint32_t>::max(),
+                                   .has_padding = true,
+                                   .has_flexible_envelope = true,
+                               }));
+
+  auto struct_bar = library.LookupStruct("Bar");
+  ASSERT_NE(struct_bar, nullptr);
+  EXPECT_TYPE_SHAPE(struct_bar, (Expected{
+                                    .inline_size = 16,
+                                    .alignment = 8,
+                                    .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                    .max_handles = 0,
+                                    .depth = std::numeric_limits<uint32_t>::max(),
+                                    .has_padding = true,
+                                    .has_flexible_envelope = true,
+                                }));
+}
+
+TEST(TypeshapeTests, GoodRecursiveUnionAndVector) {
+  TestLibrary library(R"FIDL(
+library example;
+
+type Foo = union {
+    1: bar vector<Foo:optional>;
+};
+)FIDL");
+  ASSERT_COMPILED(library);
+
+  auto union_foo = library.LookupUnion("Foo");
+  ASSERT_NE(union_foo, nullptr);
+  EXPECT_TYPE_SHAPE(union_foo, (Expected{
+                                   .inline_size = 16,
+                                   .alignment = 8,
+                                   .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                   .max_handles = 0,
+                                   // TODO(https://fxbug.dev/323940291): depth should be max().
+                                   .depth = 4,
+                                   .has_padding = true,
+                                   .has_flexible_envelope = true,
+                               }));
+}
+
+TEST(TypeshapeTests, GoodRecursionHandlesBounded) {
+  TestLibrary library(R"FIDL(
+library example;
+using zx;
+
+type Foo = resource union {
+    1: bar array<Foo:optional, 1>;
+    2: h zx.Handle;
+};
+)FIDL");
+  library.UseLibraryZx();
+  ASSERT_COMPILED(library);
+
+  auto union_foo = library.LookupUnion("Foo");
+  ASSERT_NE(union_foo, nullptr);
+  EXPECT_TYPE_SHAPE(union_foo, (Expected{
+                                   .inline_size = 16,
+                                   .alignment = 8,
+                                   .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                   .max_handles = 1,
+                                   // TODO(https://fxbug.dev/323940291): depth should be max().
+                                   .depth = 2,
+                                   .has_padding = true,
+                                   .has_flexible_envelope = true,
+                               }));
+}
+
+TEST(TypeshapeTests, GoodRecursionHandlesUnboundedBranching) {
+  TestLibrary library(R"FIDL(
+library example;
+using zx;
+
+type Foo = resource union {
+    1: bar array<Foo:optional, 2>;
+    2: h zx.Handle;
+};
+)FIDL");
+  library.UseLibraryZx();
+  ASSERT_COMPILED(library);
+
+  auto union_foo = library.LookupUnion("Foo");
+  ASSERT_NE(union_foo, nullptr);
+  EXPECT_TYPE_SHAPE(union_foo,
+                    (Expected{
+                        .inline_size = 16,
+                        .alignment = 8,
+                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                        // TODO(https://fxbug.dev/323940291): max_handles should be max().
+                        .max_handles = 2,
+                        // TODO(https://fxbug.dev/323940291): depth should be max().
+                        .depth = 2,
+                        .has_padding = true,
+                        .has_flexible_envelope = true,
+                    }));
+}
+
+TEST(TypeshapeTests, GoodRecursionHandlesUnboundedInCycle) {
+  TestLibrary library(R"FIDL(
+library example;
+using zx;
+
+type Foo = resource union {
+    1: bar resource table {
+        1: baz resource struct { f Foo:optional; };
+        2: h zx.Handle;
+    };
+};
+)FIDL");
+  library.UseLibraryZx();
+  ASSERT_COMPILED(library);
+
+  auto union_foo = library.LookupUnion("Foo");
+  ASSERT_NE(union_foo, nullptr);
+  EXPECT_TYPE_SHAPE(union_foo,
+                    (Expected{
+                        .inline_size = 16,
+                        .alignment = 8,
+                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                        // TODO(https://fxbug.dev/323940291): max_handles should be max().
+                        .max_handles = 1,
+                        // TODO(https://fxbug.dev/323940291): depth should be max().
+                        .depth = 4,
+                        .has_padding = true,
+                        .has_flexible_envelope = true,
+                    }));
+
+  auto table_bar = library.LookupTable("Bar");
+  ASSERT_NE(table_bar, nullptr);
+  EXPECT_TYPE_SHAPE(table_bar,
+                    (Expected{
+                        .inline_size = 16,
+                        .alignment = 8,
+                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                        // TODO(https://fxbug.dev/323940291): max_handles should be max().
+                        .max_handles = 2,
+                        // TODO(https://fxbug.dev/323940291): depth should be max().
+                        .depth = 5,
+                        .has_padding = true,
+                        .has_flexible_envelope = true,
+                    }));
+
+  auto struct_baz = library.LookupStruct("Baz");
+  ASSERT_NE(struct_baz, nullptr);
+  EXPECT_TYPE_SHAPE(struct_baz,
+                    (Expected{
+                        .inline_size = 16,
+                        .alignment = 8,
+                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                        // TODO(https://fxbug.dev/323940291): max_handles should be max().
+                        .max_handles = 1,
+                        // TODO(https://fxbug.dev/323940291): depth should be max().
+                        .depth = 3,
+                        .has_padding = true,
+                        .has_flexible_envelope = true,
+                    }));
 }
 
 TEST(TypeshapeTests, GoodStructTwoDeep) {
