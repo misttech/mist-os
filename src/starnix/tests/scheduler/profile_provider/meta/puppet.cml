@@ -6,16 +6,4 @@
         runner: "starnix_container",
         binary: "data/tests/linux_scheduler_puppet",
     },
-    capabilities: [
-        {
-            protocol: "fuchsia.component.Binder",
-            from: "self",
-        },
-    ],
-    expose: [
-        {
-            protocol: "fuchsia.component.Binder",
-            from: "self",
-        },
-    ],
 }

@@ -14,16 +14,12 @@
             startup: "eager",
             environment: "#starnix_kernel_env",
         },
-        {
-            name: "puppet",
-            url: "#meta/puppet.cm",
-            environment: "#debian_container_env",
-        },
     ],
-    capabilities: [
+    collections: [
         {
-            protocol: "PuppetBinder",
-            from: "#puppet",
+            name: "puppets",
+            environment: "#debian_container_env",
+            durability: "single_run",
         },
     ],
     offer: [
@@ -35,11 +31,8 @@
     ],
     expose: [
         {
-            protocol: "fuchsia.component.Binder",
-            from: "#puppet",
-
-            // NB: RealmBuilder includes its own capability for this, need a different name.
-            as: "PuppetBinder",
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
         },
     ],
     environments: [

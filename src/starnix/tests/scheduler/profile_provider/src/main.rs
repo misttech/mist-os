@@ -2,15 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use component_events::{
+    events::{EventStream, ExitStatus, Stopped},
+    matcher::EventMatcher,
+};
 use fidl::endpoints::DiscoverableProtocolMarker;
-use fidl_fuchsia_component::BinderMarker;
+use fidl_fuchsia_component::{CreateChildArgs, RealmMarker};
+use fidl_fuchsia_component_decl::{Child, CollectionRef, StartupMode};
+use fidl_fuchsia_process as fprocess;
 use fidl_fuchsia_scheduler::{
     ProfileProviderMarker, ProfileProviderRequest, ProfileProviderRequestStream,
     ProfileProviderSetProfileByRoleResponder,
 };
+use fuchsia_async::Task;
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmBuilderParams, Ref, Route,
 };
+use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
@@ -22,6 +30,8 @@ use tracing::info;
 
 #[fuchsia::main]
 async fn main() {
+    let mut events = EventStream::open().await.unwrap();
+
     info!("reading package profile config");
     let profiles_config = std::fs::read_to_string("/pkg/config/profiles/starnix.profiles").unwrap();
     let profiles_config: ProfilesConfig = serde_json5::from_str(&profiles_config).unwrap();
@@ -61,29 +71,70 @@ async fn main() {
     // init process' initial thread gets default (nice 0, zircon 16) when it starts
     requests.with_next(|_, role| assert_eq!(role, "fuchsia.starnix.fair.16")).await;
 
-    info!("kernel and container init have requested thread roles, manually starting puppet");
-    let _binder = realm
-        .root
-        .connect_to_named_protocol_at_exposed_dir::<BinderMarker>("PuppetBinder")
+    // The puppet binary expects to receive line-delimited commands over its stdin before proceeding
+    // with the different steps of the test. This synchronization limits the concurrency in the
+    // test environment to produce more predictable and debuggable failures.
+    let (stdin_recv, stdin_send) = zx::Socket::create_stream();
+
+    info!("kernel and container init have requested thread roles, starting puppet");
+    let test_realm = realm.root.connect_to_protocol_at_exposed_dir::<RealmMarker>().unwrap();
+    test_realm
+        .create_child(
+            &CollectionRef { name: "puppets".to_string() },
+            &Child {
+                name: Some("puppet".to_string()),
+                url: Some("#meta/puppet.cm".to_string()),
+                startup: Some(StartupMode::Lazy),
+                ..Default::default()
+            },
+            CreateChildArgs {
+                numbered_handles: Some(vec![fprocess::HandleInfo {
+                    id: HandleInfo::new(HandleType::FileDescriptor, 0).as_raw(),
+                    handle: stdin_recv.into(),
+                }]),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap()
         .unwrap();
+    let wait_for_puppet_exit = Task::spawn(async move {
+        let puppet_stopped = EventMatcher::ok()
+            .moniker_regex("realm_builder:.+/puppets:puppet")
+            .wait::<Stopped>(&mut events)
+            .await
+            .unwrap();
+        assert_eq!(
+            puppet_stopped.result().unwrap().status,
+            ExitStatus::Clean,
+            "puppet must exit cleanly"
+        );
+    });
 
     // * puppet main process
-    //   * thread one gets default (nice 0, zircon 16) when it starts
+    //   * thread one gets default (nice 0, zircon 16) when it starts, waits for control message
     //     * this thread requests an update (nice 10, zircon 11)
     //   * thread two in this process starts, inherits (nice 10, zircon 11)
     //     * this thread requests an update (nice 12, zircon 10)
+    info!("waiting for initial puppet thread's creation");
     let puppet_thread_one_koid = requests
         .with_next(|koid, role| {
             assert_eq!(role, "fuchsia.starnix.fair.16");
             koid
         })
         .await;
+
+    stdin_send.write(b"10\n").unwrap();
+    info!("waiting for initial puppet thread's update");
     requests
         .with_next(|koid, role| {
             assert_eq!(koid, puppet_thread_one_koid);
             assert_eq!(role, "fuchsia.starnix.fair.11");
         })
         .await;
+
+    stdin_send.write(b"thread\n").unwrap();
+    info!("waiting for second puppet thread's creation");
     let puppet_thread_two_koid = requests
         .with_next(|koid, role| {
             assert_ne!(koid, puppet_thread_one_koid, "request must come from a different thread");
@@ -91,6 +142,9 @@ async fn main() {
             koid
         })
         .await;
+
+    stdin_send.write(b"12\n").unwrap();
+    info!("waiting for second puppet thread's update");
     requests
         .with_next(|koid, role| {
             assert_eq!(koid, puppet_thread_two_koid);
@@ -103,12 +157,17 @@ async fn main() {
     //     * this thread requests an update (nice 14, zircon 9)
     //   * second thread inherit's main thread's value (nice 14, zircon 9)
     //     * this thread requests an update (nice 16, zircon 8)
+    stdin_send.write(b"fork\n").unwrap();
+    info!("waiting for child process initial thread creation");
     let puppet_child_thread_one_koid = requests
         .with_next(|koid, role| {
             assert_eq!(role, "fuchsia.starnix.fair.11");
             koid
         })
         .await;
+
+    stdin_send.write(b"14\n").unwrap();
+    info!("waiting for child process' initial thread update");
     requests
         .with_next(|koid, role| {
             assert_eq!(koid, puppet_child_thread_one_koid);
@@ -116,12 +175,17 @@ async fn main() {
         })
         .await;
 
+    stdin_send.write(b"thread\n").unwrap();
+    info!("waiting for child process' second thread creation");
     let puppet_child_thread_two_koid = requests
         .with_next(|koid, role| {
             assert_eq!(role, "fuchsia.starnix.fair.9");
             koid
         })
         .await;
+
+    stdin_send.write(b"16\n").unwrap();
+    info!("waiting for child process' second thread update");
     requests
         .with_next(|koid, role| {
             assert_eq!(koid, puppet_child_thread_two_koid);
@@ -129,6 +193,8 @@ async fn main() {
         })
         .await;
 
+    info!("waiting for puppet to exit");
+    wait_for_puppet_exit.await;
     realm.destroy().await.unwrap();
 }
 
