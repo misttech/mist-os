@@ -56,8 +56,8 @@ class VirtioPciDevice : public virtio::Device {
 
   // Synchronous request/response exchange on the main virtqueue.
   //
-  // The returned reference points to data owned by the GpuDevice instance, and
-  // is only valid until the method is called again.
+  // The returned reference points to data owned by the VirtioPciDevice
+  // instance, and is only valid until the method is called again.
   //
   // Call sites are expected to rely on partial template type inference. The
   // argument type should not be specified twice.

@@ -77,7 +77,7 @@ zx::result<std::unique_ptr<VirtioPciDevice>> VirtioPciDevice::Create(
       std::move(virtio_queue_buffer_pool_pin), virtio_queue_buffer_pool_physical_address,
       virtio_queue_buffer_pool);
   if (!alloc_checker.check()) {
-    zxlogf(ERROR, "Failed to allocate memory for GpuDevice");
+    zxlogf(ERROR, "Failed to allocate memory for VirtioPciDevice");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 

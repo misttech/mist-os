@@ -70,7 +70,7 @@ using imported_image_t = struct imported_image {
   zx::pmt pmt;
 };
 
-zx_status_t GpuDevice::DdkGetProtocol(uint32_t proto_id, void* out) {
+zx_status_t DisplayEngine::DdkGetProtocol(uint32_t proto_id, void* out) {
   auto* proto = static_cast<ddk::AnyProtocol*>(out);
   proto->ctx = this;
   if (proto_id == ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL) {
@@ -80,7 +80,7 @@ zx_status_t GpuDevice::DdkGetProtocol(uint32_t proto_id, void* out) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-void GpuDevice::DisplayControllerImplSetDisplayControllerInterface(
+void DisplayEngine::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* intf) {
   {
     fbl::AutoLock al(&flush_lock_);
@@ -125,7 +125,7 @@ void GpuDevice::DisplayControllerImplSetDisplayControllerInterface(
   display_controller_interface_on_displays_changed(intf, &args, 1, nullptr, 0);
 }
 
-zx::result<GpuDevice::BufferInfo> GpuDevice::GetAllocatedBufferInfoForImage(
+zx::result<DisplayEngine::BufferInfo> DisplayEngine::GetAllocatedBufferInfoForImage(
     display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index,
     const image_t* image) const {
   const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& client =
@@ -198,7 +198,7 @@ zx::result<GpuDevice::BufferInfo> GpuDevice::GetAllocatedBufferInfoForImage(
   });
 }
 
-zx_status_t GpuDevice::DisplayControllerImplImportBufferCollection(
+zx_status_t DisplayEngine::DisplayControllerImplImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -230,7 +230,7 @@ zx_status_t GpuDevice::DisplayControllerImplImportBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t GpuDevice::DisplayControllerImplReleaseBufferCollection(
+zx_status_t DisplayEngine::DisplayControllerImplReleaseBufferCollection(
     uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -243,10 +243,9 @@ zx_status_t GpuDevice::DisplayControllerImplReleaseBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t GpuDevice::DisplayControllerImplImportImage(const image_t* image,
-                                                        uint64_t banjo_driver_buffer_collection_id,
-                                                        uint32_t index,
-                                                        uint64_t* out_image_handle) {
+zx_status_t DisplayEngine::DisplayControllerImplImportImage(
+    const image_t* image, uint64_t banjo_driver_buffer_collection_id, uint32_t index,
+    uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
@@ -272,7 +271,7 @@ zx_status_t GpuDevice::DisplayControllerImplImportImage(const image_t* image,
   return import_result.error_value();
 }
 
-zx::result<display::DriverImageId> GpuDevice::Import(
+zx::result<display::DriverImageId> DisplayEngine::Import(
     zx::vmo vmo, const image_t* image, size_t offset, uint32_t pixel_size, uint32_t row_bytes,
     fuchsia_images2::wire::PixelFormat pixel_format) {
   if (image->type != IMAGE_TYPE_SIMPLE) {
@@ -311,11 +310,11 @@ zx::result<display::DriverImageId> GpuDevice::Import(
   return zx::ok(image_id);
 }
 
-void GpuDevice::DisplayControllerImplReleaseImage(uint64_t image_handle) {
+void DisplayEngine::DisplayControllerImplReleaseImage(uint64_t image_handle) {
   delete reinterpret_cast<imported_image_t*>(image_handle);
 }
 
-config_check_result_t GpuDevice::DisplayControllerImplCheckConfiguration(
+config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
     const display_config_t** display_configs, size_t display_count,
     client_composition_opcode_t* out_client_composition_opcodes_list,
     size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
@@ -365,9 +364,9 @@ config_check_result_t GpuDevice::DisplayControllerImplCheckConfiguration(
   return CONFIG_CHECK_RESULT_OK;
 }
 
-void GpuDevice::DisplayControllerImplApplyConfiguration(const display_config_t** display_configs,
-                                                        size_t display_count,
-                                                        const config_stamp_t* banjo_config_stamp) {
+void DisplayEngine::DisplayControllerImplApplyConfiguration(
+    const display_config_t** display_configs, size_t display_count,
+    const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(banjo_config_stamp);
   display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
   uint64_t handle = display_count == 0 || display_configs[0]->layer_count == 0
@@ -381,7 +380,7 @@ void GpuDevice::DisplayControllerImplApplyConfiguration(const display_config_t**
   }
 }
 
-zx_status_t GpuDevice::DisplayControllerImplGetSysmemConnection(zx::channel sysmem_handle) {
+zx_status_t DisplayEngine::DisplayControllerImplGetSysmemConnection(zx::channel sysmem_handle) {
   // We can't use DdkConnectFragmentFidlProtocol here because it wants to create the endpoints but
   // we only have the server_end here.
   using ServiceMember = fuchsia_hardware_sysmem::Service::AllocatorV1;
@@ -394,7 +393,7 @@ zx_status_t GpuDevice::DisplayControllerImplGetSysmemConnection(zx::channel sysm
   return ZX_OK;
 }
 
-zx_status_t GpuDevice::DisplayControllerImplSetBufferCollectionConstraints(
+zx_status_t DisplayEngine::DisplayControllerImplSetBufferCollectionConstraints(
     const image_t* config, uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -444,28 +443,29 @@ zx_status_t GpuDevice::DisplayControllerImplSetBufferCollectionConstraints(
   zx_status_t status = it->second->SetConstraints(true, constraints).status();
 
   if (status != ZX_OK) {
-    zxlogf(ERROR, "virtio::GpuDevice: Failed to set constraints");
+    zxlogf(ERROR, "virtio::DisplayEngine: Failed to set constraints");
     return status;
   }
 
   return ZX_OK;
 }
 
-zx_status_t GpuDevice::DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on) {
+zx_status_t DisplayEngine::DisplayControllerImplSetDisplayPower(uint64_t display_id,
+                                                                bool power_on) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-GpuDevice::GpuDevice(zx_device_t* bus_device,
-                     fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_client,
-                     std::unique_ptr<VirtioPciDevice> virtio_device)
+DisplayEngine::DisplayEngine(zx_device_t* bus_device,
+                             fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_client,
+                             std::unique_ptr<VirtioPciDevice> virtio_device)
     : sysmem_(std::move(sysmem_client)),
       bus_device_(bus_device),
       virtio_device_(std::move(virtio_device)) {}
 
-GpuDevice::~GpuDevice() { io_buffer_release(&gpu_req_); }
+DisplayEngine::~DisplayEngine() { io_buffer_release(&gpu_req_); }
 
 // static
-zx::result<std::unique_ptr<GpuDevice>> GpuDevice::Create(zx_device_t* bus_device) {
+zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(zx_device_t* bus_device) {
   zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> sysmem_client_result =
       DdkDeviceType::DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1>(
           bus_device, "sysmem");
@@ -490,24 +490,24 @@ zx::result<std::unique_ptr<GpuDevice>> GpuDevice::Create(zx_device_t* bus_device
   }
 
   fbl::AllocChecker alloc_checker;
-  auto device = fbl::make_unique_checked<GpuDevice>(&alloc_checker, bus_device,
-                                                    std::move(sysmem_client_result).value(),
-                                                    std::move(virtio_device_result).value());
+  auto display_engine = fbl::make_unique_checked<DisplayEngine>(
+      &alloc_checker, bus_device, std::move(sysmem_client_result).value(),
+      std::move(virtio_device_result).value());
   if (!alloc_checker.check()) {
-    zxlogf(ERROR, "Failed to allocate memory for GpuDevice");
+    zxlogf(ERROR, "Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  zx_status_t status = device->Init();
+  zx_status_t status = display_engine->Init();
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to initialize device");
     return zx::error(status);
   }
 
-  return zx::ok(std::move(device));
+  return zx::ok(std::move(display_engine));
 }
 
-zx_status_t GpuDevice::GetDisplayInfo() {
+zx_status_t DisplayEngine::GetDisplayInfo() {
   const virtio_abi::GetDisplayInfoCommand command = {
       .header = {.type = virtio_abi::ControlType::kGetDisplayInfoCommand},
   };
@@ -559,8 +559,8 @@ std::optional<virtio_abi::ResourceFormat> To2DResourceFormat(
 
 }  // namespace
 
-zx_status_t GpuDevice::Create2DResource(uint32_t* resource_id, uint32_t width, uint32_t height,
-                                        fuchsia_images2::wire::PixelFormat pixel_format) {
+zx_status_t DisplayEngine::Create2DResource(uint32_t* resource_id, uint32_t width, uint32_t height,
+                                            fuchsia_images2::wire::PixelFormat pixel_format) {
   ZX_ASSERT(resource_id);
 
   zxlogf(TRACE, "Allocate2DResource");
@@ -584,7 +584,8 @@ zx_status_t GpuDevice::Create2DResource(uint32_t* resource_id, uint32_t width, u
   return ResponseTypeToZxStatus(response.header.type);
 }
 
-zx_status_t GpuDevice::AttachResourceBacking(uint32_t resource_id, zx_paddr_t ptr, size_t buf_len) {
+zx_status_t DisplayEngine::AttachResourceBacking(uint32_t resource_id, zx_paddr_t ptr,
+                                                 size_t buf_len) {
   ZX_ASSERT(ptr);
 
   zxlogf(TRACE,
@@ -605,8 +606,8 @@ zx_status_t GpuDevice::AttachResourceBacking(uint32_t resource_id, zx_paddr_t pt
   return ResponseTypeToZxStatus(response.header.type);
 }
 
-zx_status_t GpuDevice::SetScanoutProperties(uint32_t scanout_id, uint32_t resource_id,
-                                            uint32_t width, uint32_t height) {
+zx_status_t DisplayEngine::SetScanoutProperties(uint32_t scanout_id, uint32_t resource_id,
+                                                uint32_t width, uint32_t height) {
   zxlogf(TRACE,
          "SetScanoutProperties - scanout ID %" PRIu32 ", resource ID %" PRIu32 ", size %" PRIu32
          "x%" PRIu32,
@@ -630,7 +631,7 @@ zx_status_t GpuDevice::SetScanoutProperties(uint32_t scanout_id, uint32_t resour
   return ResponseTypeToZxStatus(response.header.type);
 }
 
-zx_status_t GpuDevice::FlushResource(uint32_t resource_id, uint32_t width, uint32_t height) {
+zx_status_t DisplayEngine::FlushResource(uint32_t resource_id, uint32_t width, uint32_t height) {
   zxlogf(TRACE, "FlushResource - resource ID %" PRIu32 ", size %" PRIu32 "x%" PRIu32, resource_id,
          width, height);
 
@@ -645,7 +646,7 @@ zx_status_t GpuDevice::FlushResource(uint32_t resource_id, uint32_t width, uint3
   return ResponseTypeToZxStatus(response.header.type);
 }
 
-zx_status_t GpuDevice::TransferToHost2D(uint32_t resource_id, uint32_t width, uint32_t height) {
+zx_status_t DisplayEngine::TransferToHost2D(uint32_t resource_id, uint32_t width, uint32_t height) {
   zxlogf(TRACE, "Transfer2DResourceToHost - resource ID %" PRIu32 ", size %" PRIu32 "x%" PRIu32,
          resource_id, width, height);
 
@@ -667,7 +668,7 @@ zx_status_t GpuDevice::TransferToHost2D(uint32_t resource_id, uint32_t width, ui
   return ResponseTypeToZxStatus(response.header.type);
 }
 
-void GpuDevice::virtio_gpu_flusher() {
+void DisplayEngine::virtio_gpu_flusher() {
   zxlogf(TRACE, "Entering VirtioGpuFlusher()");
 
   zx_time_t next_deadline = zx_clock_get_monotonic();
@@ -725,7 +726,7 @@ void GpuDevice::virtio_gpu_flusher() {
   }
 }
 
-zx_status_t GpuDevice::Start() {
+zx_status_t DisplayEngine::Start() {
   zxlogf(TRACE, "Start()");
 
   // Get the display info and see if we find a valid pmode
@@ -748,7 +749,7 @@ zx_status_t GpuDevice::Start() {
 
   // Run a worker thread to shove in flush events
   auto virtio_gpu_flusher_entry = [](void* arg) {
-    static_cast<GpuDevice*>(arg)->virtio_gpu_flusher();
+    static_cast<DisplayEngine*>(arg)->virtio_gpu_flusher();
     return 0;
   };
   thrd_create_with_name(&flush_thread_, virtio_gpu_flusher_entry, this, "virtio-gpu-flusher");
@@ -765,7 +766,7 @@ zx_koid_t GetKoid(zx_handle_t handle) {
   return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
 }
 
-zx_status_t GpuDevice::Init() {
+zx_status_t DisplayEngine::Init() {
   zxlogf(TRACE, "Init()");
 
   auto pid = GetKoid(zx_process_self());

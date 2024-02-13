@@ -29,7 +29,7 @@ class GpuDeviceDriver : public DdkDeviceType {
   static zx_status_t Create(zx_device_t* parent);
 
   // Exposed for testing. Production code must use the Create() factory method.
-  explicit GpuDeviceDriver(zx_device_t* bus_device, std::unique_ptr<GpuDevice> gpu_device);
+  explicit GpuDeviceDriver(zx_device_t* bus_device, std::unique_ptr<DisplayEngine> display_engine);
 
   GpuDeviceDriver(const GpuDeviceDriver&) = delete;
   GpuDeviceDriver& operator=(const GpuDeviceDriver&) = delete;
@@ -49,7 +49,7 @@ class GpuDeviceDriver : public DdkDeviceType {
   void DdkRelease();
 
  private:
-  std::unique_ptr<GpuDevice> gpu_device_;
+  std::unique_ptr<DisplayEngine> display_engine_;
 
   // Used by DdkInit() for deferred initialization.
   //

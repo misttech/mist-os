@@ -37,15 +37,15 @@ zx_status_t GpuDeviceDriver::Create(zx_device_t* parent) {
     return ZX_ERR_NOT_FOUND;
   }
 
-  zx::result<std::unique_ptr<GpuDevice>> gpu_device_result = GpuDevice::Create(parent);
-  if (gpu_device_result.is_error()) {
-    // GpuDevice::Create() logs on error.
-    return gpu_device_result.error_value();
+  zx::result<std::unique_ptr<DisplayEngine>> display_engine_result = DisplayEngine::Create(parent);
+  if (display_engine_result.is_error()) {
+    // DisplayEngine::Create() logs on error.
+    return display_engine_result.error_value();
   }
 
   fbl::AllocChecker alloc_checker;
   auto driver = fbl::make_unique_checked<GpuDeviceDriver>(&alloc_checker, parent,
-                                                          std::move(gpu_device_result).value());
+                                                          std::move(display_engine_result).value());
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for GpuDeviceDriver");
     return ZX_ERR_NO_MEMORY;
@@ -53,7 +53,7 @@ zx_status_t GpuDeviceDriver::Create(zx_device_t* parent) {
 
   zx::result<> init_result = driver->Init();
   if (init_result.is_error()) {
-    // GpuDevice::Init() logs on error.
+    // DisplayEngine::Init() logs on error.
     return init_result.error_value();
   }
 
@@ -62,9 +62,10 @@ zx_status_t GpuDeviceDriver::Create(zx_device_t* parent) {
   return ZX_OK;
 }
 
-GpuDeviceDriver::GpuDeviceDriver(zx_device_t* bus_device, std::unique_ptr<GpuDevice> gpu_device)
-    : DdkDeviceType(bus_device), gpu_device_(std::move(gpu_device)) {
-  ZX_DEBUG_ASSERT(gpu_device_);
+GpuDeviceDriver::GpuDeviceDriver(zx_device_t* bus_device,
+                                 std::unique_ptr<DisplayEngine> display_engine)
+    : DdkDeviceType(bus_device), display_engine_(std::move(display_engine)) {
+  ZX_DEBUG_ASSERT(display_engine_);
 }
 
 GpuDeviceDriver::~GpuDeviceDriver() {
@@ -85,12 +86,12 @@ zx::result<> GpuDeviceDriver::Init() {
 }
 
 zx_status_t GpuDeviceDriver::DdkGetProtocol(uint32_t proto_id, void* out) {
-  return gpu_device_->DdkGetProtocol(proto_id, out);
+  return display_engine_->DdkGetProtocol(proto_id, out);
 }
 
 void GpuDeviceDriver::DdkInit(ddk::InitTxn txn) {
   start_thread_ = std::thread([this, init_txn = std::move(txn)]() mutable {
-    zx_status_t status = gpu_device_->Start();
+    zx_status_t status = display_engine_->Start();
     init_txn.Reply(status);
   });
 }

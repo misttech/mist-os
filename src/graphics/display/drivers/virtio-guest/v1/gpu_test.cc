@@ -205,8 +205,8 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
     auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
     fidl::BindServer(dispatcher(), std::move(sysmem_server), fake_sysmem_.get());
 
-    device_ = std::make_unique<GpuDevice>(nullptr, std::move(sysmem_client),
-                                          std::move(virtio_device_result).value());
+    device_ = std::make_unique<DisplayEngine>(nullptr, std::move(sysmem_client),
+                                              std::move(virtio_device_result).value());
 
     RunLoopUntilIdle();
   }
@@ -227,7 +227,7 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
  protected:
   std::vector<uint8_t> virtio_queue_buffer_pool_;
   std::unique_ptr<MockAllocator> fake_sysmem_;
-  std::unique_ptr<GpuDevice> device_;
+  std::unique_ptr<DisplayEngine> device_;
 };
 
 TEST_F(VirtioGpuTest, ImportVmo) {
@@ -253,7 +253,7 @@ TEST_F(VirtioGpuTest, ImportVmo) {
   RunLoopUntilIdle();
 
   PerformBlockingWork([&] {
-    zx::result<GpuDevice::BufferInfo> buffer_info_result =
+    zx::result<DisplayEngine::BufferInfo> buffer_info_result =
         device_->GetAllocatedBufferInfoForImage(kBufferCollectionId, /*index=*/0, &kDefaultImage);
     ASSERT_OK(buffer_info_result.status_value());
 

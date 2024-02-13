@@ -38,7 +38,7 @@ namespace virtio_display {
 
 class Ring;
 
-class GpuDevice : public ddk::DisplayControllerImplProtocol<GpuDevice, ddk::base_protocol> {
+class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, ddk::base_protocol> {
  public:
   struct BufferInfo {
     zx::vmo vmo = {};
@@ -48,12 +48,12 @@ class GpuDevice : public ddk::DisplayControllerImplProtocol<GpuDevice, ddk::base
     fuchsia_images2::wire::PixelFormat pixel_format;
   };
 
-  static zx::result<std::unique_ptr<GpuDevice>> Create(zx_device_t* bus_device);
+  static zx::result<std::unique_ptr<DisplayEngine>> Create(zx_device_t* bus_device);
 
   // Exposed for testing. Production code must use the Create() factory method.
-  GpuDevice(zx_device_t* bus_device, fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_client,
-            std::unique_ptr<VirtioPciDevice> virtio_device);
-  ~GpuDevice();
+  DisplayEngine(zx_device_t* bus_device, fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_client,
+                std::unique_ptr<VirtioPciDevice> virtio_device);
+  ~DisplayEngine();
 
   zx_status_t Init();
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
