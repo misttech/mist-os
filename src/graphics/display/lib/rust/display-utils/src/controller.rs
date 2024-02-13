@@ -192,9 +192,7 @@ impl Coordinator {
     /// Allocates a new virtual hardware layer that is not associated with any display and has no
     /// configuration.
     pub async fn create_layer(&self) -> Result<LayerId> {
-        let (result, id) = self.proxy().create_layer().await?;
-        let _ = zx::Status::ok(result)?;
-        Ok(id.into())
+        Ok(self.proxy().create_layer().await?.map_err(zx::Status::from_raw)?.into())
     }
 
     /// Creates and registers a zircon event with the display driver. The returned event can be

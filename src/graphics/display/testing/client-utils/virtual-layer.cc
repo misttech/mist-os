@@ -108,11 +108,11 @@ custom_layer_t* VirtualLayer::CreateLayer(const fidl::WireSyncClient<fhd::Coordi
   layers_[layers_.size() - 1].active = false;
 
   auto result = dc->CreateLayer();
-  if (!result.ok() || result.value().res != ZX_OK) {
+  if (!result.ok() || result.value().is_error() != ZX_OK) {
     printf("Creating layer failed\n");
     return nullptr;
   }
-  layers_[layers_.size() - 1].id = display::ToLayerId(result.value().layer_id);
+  layers_[layers_.size() - 1].id = display::ToLayerId(result.value()->layer_id);
 
   return &layers_[layers_.size() - 1];
 }

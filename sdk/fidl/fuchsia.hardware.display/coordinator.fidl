@@ -109,9 +109,8 @@ closed protocol Coordinator {
     // configuration is applied which does not include the layer or until its
     // display is removed.
     strict CreateLayer() -> (struct {
-        res zx.Status;
         layer_id fuchsia.hardware.display.types.LayerId;
-    });
+    }) error zx.Status;
 
     // Destroys the given layer.
     //

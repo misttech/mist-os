@@ -305,7 +305,7 @@ void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
   // TODO(https://fxbug.dev/42079482): Layer IDs should be client-managed.
 
   if (layers_.size() == kMaxLayers) {
-    completer.Reply(ZX_ERR_NO_RESOURCES, ToFidlLayerId(kInvalidLayerId));
+    completer.ReplyError(ZX_ERR_NO_RESOURCES);
     return;
   }
 
@@ -314,7 +314,7 @@ void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
   auto new_layer = fbl::make_unique_checked<Layer>(&alloc_checker, driver_layer_id);
   if (!alloc_checker.check()) {
     --driver_layer_id;
-    completer.Reply(ZX_ERR_NO_MEMORY, ToFidlLayerId(kInvalidLayerId));
+    completer.ReplyError(ZX_ERR_NO_MEMORY);
     return;
   }
 
@@ -325,7 +325,7 @@ void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
   // happens, Client instances will be responsible for translating between
   // driver-side and client-side IDs.
   LayerId layer_id(driver_layer_id.value());
-  completer.Reply(ZX_OK, ToFidlLayerId(layer_id));
+  completer.ReplySuccess(ToFidlLayerId(layer_id));
 }
 
 void Client::DestroyLayer(DestroyLayerRequestView request,

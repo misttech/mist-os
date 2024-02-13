@@ -1096,7 +1096,10 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
   uint64_t layer_id_value = 1;
   EXPECT_CALL(*mock_display_coordinator_, CreateLayer(_))
       .WillRepeatedly(testing::Invoke([&](MockDisplayCoordinator::CreateLayerCallback callback) {
-        callback(ZX_OK, {.value = layer_id_value++});
+        auto result = fuchsia::hardware::display::Coordinator_CreateLayer_Result::WithResponse(
+            fuchsia::hardware::display::Coordinator_CreateLayer_Response(
+                {.value = layer_id_value++}));
+        callback(std::move(result));
       }));
 
   std::vector<fuchsia::hardware::display::types::LayerId> layers = {{.value = 1}, {.value = 2}};
@@ -1294,7 +1297,10 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
   uint64_t layer_id_value = 1;
   EXPECT_CALL(*mock_display_coordinator_, CreateLayer(_))
       .WillRepeatedly(testing::Invoke([&](MockDisplayCoordinator::CreateLayerCallback callback) {
-        callback(ZX_OK, {.value = layer_id_value++});
+        auto result = fuchsia::hardware::display::Coordinator_CreateLayer_Result::WithResponse(
+            fuchsia::hardware::display::Coordinator_CreateLayer_Response(
+                {.value = layer_id_value++}));
+        callback(std::move(result));
       }));
 
   // However, we only set one display layer for the image.
@@ -1630,7 +1636,10 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
   EXPECT_CALL(*mock_display_coordinator_, CreateLayer(_))
       .Times(2)
       .WillRepeatedly(testing::Invoke([&](MockDisplayCoordinator::CreateLayerCallback callback) {
-        callback(ZX_OK, {.value = layer_id_value++});
+        auto result = fuchsia::hardware::display::Coordinator_CreateLayer_Result::WithResponse(
+            fuchsia::hardware::display::Coordinator_CreateLayer_Response(
+                {.value = layer_id_value++}));
+        callback(std::move(result));
       }));
   EXPECT_CALL(*renderer_, ChoosePreferredPixelFormat(_));
 

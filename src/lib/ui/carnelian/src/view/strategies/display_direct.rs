@@ -132,14 +132,16 @@ impl Display {
     }
 
     pub async fn create_layer(&mut self) -> Result<(), Error> {
-        let (status, layer_id) = self.coordinator.create_layer().await?;
-        ensure!(
-            status == zx::sys::ZX_OK,
-            "Display::new(): failed to create layer {}",
-            Status::from_raw(status)
-        );
-        self.layer_id = layer_id.into();
-        Ok(())
+        let result = self.coordinator.create_layer().await?;
+        match result {
+            Ok(layer_id) => {
+                self.layer_id = layer_id.into();
+                Ok(())
+            }
+            Err(status) => {
+                bail!("Display::new(): failed to create layer {}", Status::from_raw(status))
+            }
+        }
     }
 
     pub fn size(&self) -> IntSize {

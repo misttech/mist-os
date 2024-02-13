@@ -519,10 +519,12 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
   display_coordinator_->ReleaseBufferCollection(kBufferCollectionId);
 
   display_coordinator_->CreateLayer(
-      [this, &status](zx_status_t layer_status,
-                      fuchsia::hardware::display::types::LayerId layer_id) {
-        status = layer_status;
-        layer_id_ = layer_id;
+      [this, &status](fuchsia::hardware::display::Coordinator_CreateLayer_Result result) {
+        status = result.is_err() ? result.err() : ZX_OK;
+        layer_id_ = result.is_response()
+                        ? result.response().layer_id
+                        : fuchsia::hardware::display::types::LayerId{
+                              .value = fuchsia::hardware::display::types::INVALID_DISP_ID};
         got_message_response_ = true;
       });
   if (!WaitForAsyncMessage()) {

@@ -77,21 +77,25 @@ class DisplayTest : public gtest::RealLoopFixture {
   fuchsia::hardware::display::types::LayerId InitializeDisplayLayer(
       fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
       scenic_impl::display::Display* display) {
-    fuchsia::hardware::display::types::LayerId layer_id;
-    zx_status_t create_layer_status;
-    zx_status_t transport_status =
-        display_coordinator->CreateLayer(&create_layer_status, &layer_id);
-    if (create_layer_status != ZX_OK || transport_status != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to create layer, " << create_layer_status;
+    fuchsia::hardware::display::Coordinator_CreateLayer_Result result;
+    const zx_status_t transport_status = display_coordinator->CreateLayer(&result);
+    if (transport_status != ZX_OK) {
+      FX_LOGS(ERROR) << "Failed to call FIDL CreateLayer: "
+                     << zx_status_get_string(transport_status);
       return {.value = fuchsia::hardware::display::types::INVALID_DISP_ID};
     }
-
-    zx_status_t status = display_coordinator->SetDisplayLayers(display->display_id(), {layer_id});
-    if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to configure display layers. Error code: " << status;
+    if (result.is_err()) {
+      FX_LOGS(ERROR) << "Failed to create layer: " << zx_status_get_string(result.err());
       return {.value = fuchsia::hardware::display::types::INVALID_DISP_ID};
     }
+    const fuchsia::hardware::display::types::LayerId layer_id = result.response().layer_id;
 
+    const zx_status_t set_display_layers_status =
+        display_coordinator->SetDisplayLayers(display->display_id(), {layer_id});
+    if (set_display_layers_status != ZX_OK) {
+      FX_LOGS(ERROR) << "Failed to configure display layers: "
+                     << zx_status_get_string(set_display_layers_status);
+    }
     return layer_id;
   }
 
@@ -213,9 +217,9 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
 // then setting the second image on the layer which has a wait event. When the wait event is
 // signaled, this will cause the second layer image to go up, which in turn will cause the first
 // layer image's event to be signaled.
-// TODO(https://fxbug.dev/42132767): Check to see if there is a more appropriate place to test display
-// coordinator events and/or if there already exist adequate tests that cover all of the use cases
-// being covered by this test.
+// TODO(https://fxbug.dev/42132767): Check to see if there is a more appropriate place to test
+// display coordinator events and/or if there already exist adequate tests that cover all of the use
+// cases being covered by this test.
 VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   // Grab the display coordinator.
   auto display_coordinator = display_manager_->default_display_coordinator();

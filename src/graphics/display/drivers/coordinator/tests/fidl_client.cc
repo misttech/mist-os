@@ -97,13 +97,14 @@ zx::result<LayerId> TestFidlClient::CreateLayerLocked() {
   if (!reply.ok()) {
     zxlogf(ERROR, "Failed to create layer (fidl=%d)", reply.status());
     return zx::error(reply.status());
-  } else if (reply.value().res != ZX_OK) {
-    zxlogf(ERROR, "Failed to create layer (res=%d)", reply.value().res);
-    return zx::error(reply.value().res);
+  } else if (reply.value().is_error() != ZX_OK) {
+    zxlogf(ERROR, "Failed to create layer: %s", zx_status_get_string(reply.value().error_value()));
+    return zx::error(reply.value().error_value());
   }
-  EXPECT_EQ(dc_->SetLayerPrimaryConfig(reply.value().layer_id, displays_[0].image_config_).status(),
-            ZX_OK);
-  return zx::ok(ToLayerId(reply.value().layer_id));
+  EXPECT_EQ(
+      dc_->SetLayerPrimaryConfig(reply.value()->layer_id, displays_[0].image_config_).status(),
+      ZX_OK);
+  return zx::ok(ToLayerId(reply.value()->layer_id));
 }
 
 zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEventLocked() {

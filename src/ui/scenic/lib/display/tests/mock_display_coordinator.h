@@ -106,7 +106,9 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
 
   void CreateLayer(CreateLayerCallback callback) override {
     static uint64_t layer_id_value = 1;
-    callback(ZX_OK, {.value = layer_id_value++});
+    auto result = fuchsia::hardware::display::Coordinator_CreateLayer_Result::WithResponse(
+        fuchsia::hardware::display::Coordinator_CreateLayer_Response({.value = layer_id_value++}));
+    callback(std::move(result));
   }
 
   void SetDisplayLayers(

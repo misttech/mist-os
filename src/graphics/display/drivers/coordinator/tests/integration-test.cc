@@ -550,7 +550,7 @@ TEST_F(IntegrationTest, CreateLayer) {
   fbl::AutoLock lock(client.mtx());
   auto create_layer_reply = client.dc_->CreateLayer();
   ASSERT_EQ(ZX_OK, create_layer_reply.status());
-  EXPECT_OK(create_layer_reply.value().res);
+  EXPECT_TRUE(create_layer_reply.value().is_ok());
 }
 
 TEST_F(IntegrationTest, ImportImageWithInvalidImageId) {
