@@ -39,11 +39,9 @@ zx::result<fbl::Vector<DisplayInfo>> VirtioGpuDevice::GetDisplayInfo() {
   const auto& response =
       virtio_device_->ExchangeRequestResponse<virtio_abi::DisplayInfoResponse>(command);
   if (response.header.type != virtio_abi::ControlType::kDisplayInfoResponse) {
-    zxlogf(ERROR, "Expected DisplayInfo response, got %s (0x%04x)",
-           ControlTypeToString(response.header.type),
-           static_cast<unsigned int>(response.header.type));
-    // TODO(costan): Change the error code to a communication error.
-    return zx::error(ZX_ERR_NOT_FOUND);
+    zxlogf(ERROR, "Unexpected response type: %s (0x%04" PRIx32 ")",
+           ControlTypeToString(response.header.type), static_cast<uint32_t>(response.header.type));
+    return zx::error(ZX_ERR_IO);
   }
 
   size_t enabled_scanout_count = 0;
@@ -94,15 +92,6 @@ std::optional<virtio_abi::ResourceFormat> To2DResourceFormat(
   }
 }
 
-zx::result<> ResponseTypeToResult(virtio_abi::ControlType type) {
-  if (type != virtio_abi::ControlType::kEmptyResponse) {
-    zxlogf(ERROR, "Unexpected response type: %s (0x%04x)", ControlTypeToString(type),
-           static_cast<unsigned int>(type));
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-  return zx::ok();
-}
-
 }  // namespace
 
 zx::result<uint32_t> VirtioGpuDevice::Create2DResource(
@@ -124,9 +113,10 @@ zx::result<uint32_t> VirtioGpuDevice::Create2DResource(
 
   const auto& response =
       virtio_device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
-  zx::result<> virtio_result = ResponseTypeToResult(response.header.type);
-  if (virtio_result.is_error()) {
-    return virtio_result.take_error();
+  if (response.header.type != virtio_abi::ControlType::kEmptyResponse) {
+    zxlogf(ERROR, "Unexpected response type: %s (0x%04" PRIx32 ")",
+           ControlTypeToString(response.header.type), static_cast<uint32_t>(response.header.type));
+    return zx::error(ZX_ERR_IO);
   }
   return zx::ok(command.resource_id);
 }
@@ -150,7 +140,12 @@ zx::result<> VirtioGpuDevice::AttachResourceBacking(uint32_t resource_id, zx_pad
 
   const auto& response =
       virtio_device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
-  return ResponseTypeToResult(response.header.type);
+  if (response.header.type != virtio_abi::ControlType::kEmptyResponse) {
+    zxlogf(ERROR, "Unexpected response type: %s (0x%04" PRIx32 ")",
+           ControlTypeToString(response.header.type), static_cast<uint32_t>(response.header.type));
+    return zx::error(ZX_ERR_IO);
+  }
+  return zx::ok();
 }
 
 zx::result<> VirtioGpuDevice::SetScanoutProperties(uint32_t scanout_id, uint32_t resource_id,
@@ -175,7 +170,12 @@ zx::result<> VirtioGpuDevice::SetScanoutProperties(uint32_t scanout_id, uint32_t
 
   const auto& response =
       virtio_device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
-  return ResponseTypeToResult(response.header.type);
+  if (response.header.type != virtio_abi::ControlType::kEmptyResponse) {
+    zxlogf(ERROR, "Unexpected response type: %s (0x%04" PRIx32 ")",
+           ControlTypeToString(response.header.type), static_cast<uint32_t>(response.header.type));
+    return zx::error(ZX_ERR_IO);
+  }
+  return zx::ok();
 }
 
 zx::result<> VirtioGpuDevice::FlushResource(uint32_t resource_id, uint32_t width, uint32_t height) {
@@ -190,7 +190,12 @@ zx::result<> VirtioGpuDevice::FlushResource(uint32_t resource_id, uint32_t width
 
   const auto& response =
       virtio_device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
-  return ResponseTypeToResult(response.header.type);
+  if (response.header.type != virtio_abi::ControlType::kEmptyResponse) {
+    zxlogf(ERROR, "Unexpected response type: %s (0x%04" PRIx32 ")",
+           ControlTypeToString(response.header.type), static_cast<uint32_t>(response.header.type));
+    return zx::error(ZX_ERR_IO);
+  }
+  return zx::ok();
 }
 
 zx::result<> VirtioGpuDevice::TransferToHost2D(uint32_t resource_id, uint32_t width,
@@ -213,7 +218,12 @@ zx::result<> VirtioGpuDevice::TransferToHost2D(uint32_t resource_id, uint32_t wi
 
   const auto& response =
       virtio_device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
-  return ResponseTypeToResult(response.header.type);
+  if (response.header.type != virtio_abi::ControlType::kEmptyResponse) {
+    zxlogf(ERROR, "Unexpected response type: %s (0x%04" PRIx32 ")",
+           ControlTypeToString(response.header.type), static_cast<uint32_t>(response.header.type));
+    return zx::error(ZX_ERR_IO);
+  }
+  return zx::ok();
 }
 
 }  // namespace virtio_display
