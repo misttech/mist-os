@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Context as _;
 use component_events::{
     events::{EventStream, Stopped},
     matcher::EventMatcher,
@@ -75,13 +76,14 @@ async fn main() {
 // hierarchy at points where the node exists but none of its children, where nodes exist but not
 // one of their properties, etc. Return an Option here for cases where we couldn't actually read the
 // coredump report so the caller can try again..
-async fn get_coredumps_from_inspect() -> Option<Vec<CoredumpReport>> {
+async fn get_coredumps_from_inspect() -> anyhow::Result<Vec<CoredumpReport>> {
     let kernel_inspect = ArchiveReader::new()
         .select_all_for_moniker("kernel")
+        .with_batch_retrieval_timeout_seconds(std::i64::MAX)
         .with_minimum_schema_count(1)
         .snapshot::<Inspect>()
-        .await
-        .ok()?;
+        .await?;
     assert_eq!(kernel_inspect.len(), 1);
     CoredumpReport::extract_from_snapshot(&kernel_inspect[0])
+        .context("extracting coredump from snapshot")
 }
