@@ -69,16 +69,8 @@ impl WlanSoftmacHandle {
 
 /// Run the Rust portion of wlansoftmac which includes the following three futures:
 ///
-///   - WlanSoftmacIfcBridge server
 ///   - MLME server
 ///   - SME server
-///
-/// The WlanSoftmacIfcBridge server future executes on a parallel thread because otherwise synchronous calls
-/// from the MLME server into the vendor driver could deadlock if the vendor driver calls a
-/// WlanSoftmacIfcBridge method before returning from a synchronous call. For example, when the MLME server
-/// synchronously calls WlanSoftmac.StartActiveScan(), the vendor driver may call
-/// WlanSoftmacIfc.NotifyScanComplete() before returning from WlanSoftmac.StartActiveScan(). This can occur
-/// when the scan request results in immediate cancellation despite the request having valid arguments.
 ///
 /// This function calls init_completer() when either MLME initialization completes successfully or an error
 /// occurs before MLME initialization completes. The Ok() value passed by init_completer() is a
@@ -271,16 +263,11 @@ async fn start<D: DeviceOps + 'static>(
 
 /// Await on futures hosting the following three servers:
 ///
-///   - WlanSoftmacIfcBridge server
 ///   - MLME server
 ///   - SME server
 ///
-/// The WlanSoftmacIfcBridge server runs on a parallel thread but will be shut down before this function
-/// returns. This is true even if this function exits with an error.
-///
 /// Upon receiving a DriverEvent::Stop, the MLME server will shut down first. Then this function will await
-/// the completion of WlanSoftmacIfcBridge server and SME server. Both will shut down as a consequence of
-/// MLME server shut down.
+/// the completion of the SME server. Both will shut down as a consequence of MLME server shut down.
 async fn serve<InitFn>(
     init_completer: InitCompleter<InitFn>,
     mlme_init_receiver: oneshot::Receiver<Result<(), zx::Status>>,
