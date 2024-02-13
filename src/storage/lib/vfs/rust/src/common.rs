@@ -227,14 +227,14 @@ pub(crate) mod io2_conversions {
     }
 }
 
-/// Helper for building fio::NodeAttributes2 given requested attributes.  Code will only run for
-/// requested attributes.
+/// Helper for building [`fio::NodeAttributes2`]` given `requested` attributes. Code will only run
+/// for `requested` attributes.
 ///
 /// Example:
 ///
 ///   attributes!(
 ///       requested,
-///       Mutable { creation_time: 123, modification_time, 456 },
+///       Mutable { creation_time: 123, modification_time: 456 },
 ///       Immutable { content_size: 789 }
 ///   );
 ///
@@ -262,6 +262,37 @@ macro_rules! attributes {
                     }),*,
                     ..Default::default()
                 }
+            }
+        }
+    )
+}
+
+/// Helper for building [`fio::NodeAttributes2`]` given immutable attributes in `requested`
+/// Code will only run for `requested` attributes. Mutable attributes in `requested` are ignored.
+///
+/// Example:
+///
+///   immutable_attributes!(
+///       requested,
+///       Immutable { content_size: 789 }
+///   );
+///
+#[macro_export]
+macro_rules! immutable_attributes {
+    ($requested:expr,
+     Immutable {$($immut_a:ident: $immut_v:expr),* $(,)?}) => (
+        {
+            use $crate::common::attribute_query;
+            fio::NodeAttributes2 {
+                mutable_attributes: Default::default(),
+                immutable_attributes: fio::ImmutableNodeAttributes {
+                    $($immut_a: if $requested.contains(attribute_query!($immut_a)) {
+                        Option::from($immut_v)
+                    } else {
+                        None
+                    }),*,
+                    ..Default::default()
+                },
             }
         }
     )

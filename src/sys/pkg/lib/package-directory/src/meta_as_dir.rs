@@ -9,17 +9,20 @@ use {
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::sync::Arc,
     vfs::{
-        attributes,
         common::send_on_open_with_error,
         directory::{
             entry::EntryInfo, immutable::connection::ImmutableConnection,
             traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
+        immutable_attributes,
         path::Path as VfsPath,
-        ObjectRequestRef, ProtocolsExt as _, ToObjectRequest,
+        ToObjectRequest,
     },
 };
+
+#[cfg(feature = "supports_open2")]
+use vfs::{ObjectRequestRef, ProtocolsExt as _};
 
 pub(crate) struct MetaAsDir<S: crate::NonMetaStorage> {
     root_dir: Arc<RootDir<S>>,
@@ -102,6 +105,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaAsD
         let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
     }
 
+    #[cfg(feature = "supports_open2")]
     fn open2(
         self: Arc<Self>,
         scope: ExecutionScope,
@@ -206,14 +210,12 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for MetaAsDir<S> {
         })
     }
 
-    // TODO(b/293947862): include new io2 attributes, e.g. change_time and access_time
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, zx::Status> {
-        Ok(attributes!(
+        Ok(immutable_attributes!(
             requested_attributes,
-            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,
                 abilities: fio::Operations::GET_ATTRIBUTES
@@ -266,7 +268,7 @@ mod tests {
         assert_matches::assert_matches,
         fuchsia_fs::directory::{DirEntry, DirentKind},
         fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
-        futures::{stream::StreamExt as _, TryStreamExt as _},
+        futures::prelude::*,
         std::convert::TryInto as _,
         vfs::{
             directory::{entry::DirectoryEntry, entry_container::Directory},
@@ -481,16 +483,8 @@ mod tests {
             Node::get_attributes(meta_as_dir.as_ref(), fio::NodeAttributesQuery::all())
                 .await
                 .unwrap(),
-            attributes!(
+            immutable_attributes!(
                 fio::NodeAttributesQuery::all(),
-                Mutable {
-                    creation_time: 0,
-                    modification_time: 0,
-                    mode: 0,
-                    uid: 0,
-                    gid: 0,
-                    rdev: 0
-                },
                 Immutable {
                     protocols: fio::NodeProtocolKinds::DIRECTORY,
                     abilities: fio::Operations::GET_ATTRIBUTES
@@ -505,6 +499,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_self() {
         let (_env, meta_as_dir) = TestEnv::new().await;
@@ -529,6 +524,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_file() {
         let (_env, meta_as_dir) = TestEnv::new().await;
@@ -549,6 +545,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_directory() {
         let (_env, meta_as_dir) = TestEnv::new().await;
@@ -573,6 +570,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_open_modes() {
         let (_env, meta_as_dir) = TestEnv::new().await;
@@ -596,6 +594,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_rights() {
         let (_env, meta_as_dir) = TestEnv::new().await;
@@ -618,6 +617,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_file_protocols() {
         let (_env, meta_as_dir) = TestEnv::new().await;

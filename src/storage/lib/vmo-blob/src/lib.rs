@@ -10,13 +10,13 @@ use {
     std::sync::{Arc, OnceLock},
     tracing::error,
     vfs::{
-        attributes,
         common::rights_to_posix_mode_bits,
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
         file::{File, FileOptions, GetVmo, StreamIoConnection, SyncMode},
+        immutable_attributes,
         path::Path,
-        ToObjectRequest,
+        ObjectRequestRef, ToObjectRequest,
     },
 };
 
@@ -37,8 +37,8 @@ pub struct VmoBlob {
 }
 
 impl VmoBlob {
-    pub fn new(vmo: zx::Vmo) -> Self {
-        Self { vmo }
+    pub fn new(vmo: zx::Vmo) -> Arc<Self> {
+        Arc::new(Self { vmo })
     }
 }
 
@@ -65,6 +65,19 @@ impl DirectoryEntry for VmoBlob {
                 object_request.create_connection(scope, self, flags, StreamIoConnection::create)
             })
         });
+    }
+
+    fn open2(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: Path,
+        protocols: fio::ConnectionProtocols,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        if !path.is_empty() {
+            return Err(zx::Status::NOT_DIR);
+        }
+        object_request.spawn_connection(scope, self, protocols, StreamIoConnection::create)
     }
 
     fn entry_info(&self) -> EntryInfo {
@@ -94,9 +107,8 @@ impl vfs::node::Node for VmoBlob {
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, zx::Status> {
         let content_size = self.get_size().await?;
-        Ok(attributes!(
+        Ok(immutable_attributes!(
             requested_attributes,
-            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
             Immutable {
                 protocols: fio::NodeProtocolKinds::FILE,
                 abilities: fio::Operations::GET_ATTRIBUTES

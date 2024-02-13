@@ -23,17 +23,20 @@ use {
     std::{collections::HashMap, sync::Arc},
     tracing::error,
     vfs::{
-        attributes,
         common::send_on_open_with_error,
         directory::{
             entry::EntryInfo, immutable::connection::ImmutableConnection,
             traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
+        immutable_attributes,
         path::Path as VfsPath,
         ToObjectRequest,
     },
 };
+
+#[cfg(feature = "supports_open2")]
+use vfs::{ObjectRequestRef, ProtocolsExt as _};
 
 /// The root directory of Fuchsia package.
 #[derive(Debug)]
@@ -320,6 +323,99 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
         let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
     }
 
+    #[cfg(feature = "supports_open2")]
+    fn open2(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: VfsPath,
+        protocols: fio::ConnectionProtocols,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        if path.is_empty() {
+            match protocols.open_mode() {
+                fio::OpenMode::OpenExisting => {}
+                fio::OpenMode::AlwaysCreate | fio::OpenMode::MaybeCreate => {
+                    return Err(zx::Status::NOT_SUPPORTED);
+                }
+            }
+
+            if let Some(rights) = protocols.rights() {
+                if rights.intersects(fio::Operations::WRITE_BYTES) {
+                    return Err(zx::Status::NOT_SUPPORTED);
+                }
+            }
+
+            // `ImmutableConnection::create` checks that only directory protocols are specified.
+            return object_request.spawn_connection(
+                scope,
+                self,
+                protocols,
+                ImmutableConnection::create,
+            );
+        }
+
+        // vfs::path::Path::as_str() is an object relative path expression [1], except that it may:
+        //   1. have a trailing "/"
+        //   2. be exactly "."
+        //   3. be longer than 4,095 bytes
+        // The .is_empty() check above rules out "." and the following line removes the possible
+        // trailing "/".
+        // [1] https://fuchsia.dev/fuchsia-src/concepts/process/namespaces?hl=en#object_relative_path_expressions
+        let canonical_path = path.as_ref().strip_suffix('/').unwrap_or_else(|| path.as_ref());
+
+        if canonical_path == "meta" {
+            // This branch is done here instead of in MetaAsDir so that Clone'ing MetaAsDir yields
+            // MetaAsDir. See the MetaAsDir::open impl for more.
+            return if !protocols.is_dir_allowed() {
+                MetaAsFile::new(self).open2(scope, VfsPath::dot(), protocols, object_request)
+            } else {
+                MetaAsDir::new(self).open2(scope, VfsPath::dot(), protocols, object_request)
+            };
+        }
+
+        if canonical_path.starts_with("meta/") {
+            if let Some(meta_file) = self.meta_files.get(canonical_path).copied() {
+                return MetaFile::new(self, meta_file).open2(
+                    scope,
+                    VfsPath::dot(),
+                    protocols,
+                    object_request,
+                );
+            }
+
+            let subdir_prefix = canonical_path.to_string() + "/";
+            for k in self.meta_files.keys() {
+                if k.starts_with(&subdir_prefix) {
+                    return MetaSubdir::new(self, subdir_prefix).open2(
+                        scope,
+                        VfsPath::dot(),
+                        protocols,
+                        object_request,
+                    );
+                }
+            }
+            return Err(zx::Status::NOT_FOUND);
+        }
+
+        if let Some(blob) = self.non_meta_files.get(canonical_path) {
+            return self.non_meta_storage.open2(blob, protocols, scope, object_request);
+        }
+
+        let subdir_prefix = canonical_path.to_string() + "/";
+        for k in self.non_meta_files.keys() {
+            if k.starts_with(&subdir_prefix) {
+                return NonMetaSubdir::new(self, subdir_prefix).open2(
+                    scope,
+                    VfsPath::dot(),
+                    protocols,
+                    object_request,
+                );
+            }
+        }
+
+        Err(zx::Status::NOT_FOUND)
+    }
+
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
     }
@@ -348,9 +444,8 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for RootDir<S> {
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, zx::Status> {
-        Ok(attributes!(
+        Ok(immutable_attributes!(
             requested_attributes,
-            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,
                 abilities: fio::Operations::GET_ATTRIBUTES
@@ -440,6 +535,9 @@ mod tests {
             node::Node,
         },
     };
+
+    #[cfg(feature = "supports_open2")]
+    use futures::TryStreamExt as _;
 
     struct TestEnv {
         _blobfs_fake: FakeBlobfs,
@@ -684,16 +782,8 @@ mod tests {
 
         assert_eq!(
             Node::get_attributes(root_dir.as_ref(), fio::NodeAttributesQuery::all()).await.unwrap(),
-            attributes!(
+            immutable_attributes!(
                 fio::NodeAttributesQuery::all(),
-                Mutable {
-                    creation_time: 0,
-                    modification_time: 0,
-                    mode: 0,
-                    uid: 0,
-                    gid: 0,
-                    rdev: 0
-                },
                 Immutable {
                     protocols: fio::NodeProtocolKinds::DIRECTORY,
                     abilities: fio::Operations::GET_ATTRIBUTES
@@ -1035,6 +1125,278 @@ mod tests {
         fn open_meta_as_file_file_fallback(flags in arb_open_flags()) {
             let flags = flags & !(fio::OpenFlags::DIRECTORY | fio::OpenFlags::NODE_REFERENCE);
             proptest::prop_assert!(open_meta_as_file(flags));
+        }
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_self() {
+        let (_env, root_dir) = TestEnv::new().await;
+        let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let scope = ExecutionScope::new();
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            rights: Some(fio::Operations::READ_BYTES),
+            ..Default::default()
+        });
+        protocols
+            .to_object_request(server_end)
+            .handle(|req| DirectoryEntry::open2(root_dir, scope, VfsPath::dot(), protocols, req));
+        assert_eq!(
+            fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
+            vec![
+                DirEntry { name: "dir".to_string(), kind: DirentKind::Directory },
+                DirEntry { name: "meta".to_string(), kind: DirentKind::Directory },
+                DirEntry { name: "resource".to_string(), kind: DirentKind::File }
+            ]
+        );
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_non_meta_file() {
+        let (_env, root_dir) = TestEnv::new().await;
+
+        for path in ["resource", "resource/"] {
+            let (proxy, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
+            let scope = ExecutionScope::new();
+            let path = VfsPath::validate_and_split(path).unwrap();
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                rights: Some(fio::Operations::READ_BYTES),
+                ..Default::default()
+            });
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| DirectoryEntry::open2(root_dir.clone(), scope, path, protocols, req));
+            // TODO(b/293947862): FakeBlobfs is backed by memfs, which currently does not support
+            // Open2. Once memfs supports Open2, this test case will need to be updated.
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+            );
+        }
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_meta_as_file() {
+        let (_env, root_dir) = TestEnv::new().await;
+
+        for path in ["meta", "meta/"] {
+            let (proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
+            let scope = ExecutionScope::new();
+            let path = VfsPath::validate_and_split(path).unwrap();
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(fio::FileProtocolFlags::default()),
+                    ..Default::default()
+                }),
+                rights: Some(fio::Operations::READ_BYTES),
+                ..Default::default()
+            });
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| DirectoryEntry::open2(root_dir.clone(), scope, path, protocols, req));
+            assert_eq!(
+                fuchsia_fs::file::read(&proxy).await.unwrap(),
+                root_dir.hash.to_string().as_bytes()
+            );
+            // Cloning meta_as_file yields meta_as_file
+            let (cloned_proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
+            let () = proxy
+                .clone(fio::OpenFlags::RIGHT_READABLE, server_end.into_channel().into())
+                .unwrap();
+            assert_eq!(
+                fuchsia_fs::file::read(&cloned_proxy).await.unwrap(),
+                root_dir.hash.to_string().as_bytes()
+            );
+        }
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_meta_as_dir() {
+        let (_env, root_dir) = TestEnv::new().await;
+
+        for path in ["meta", "meta/"] {
+            let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let scope = ExecutionScope::new();
+            let path = VfsPath::validate_and_split(path).unwrap();
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    directory: Some(fio::DirectoryProtocolOptions::default()),
+                    ..Default::default()
+                }),
+                rights: Some(fio::Operations::READ_BYTES),
+                ..Default::default()
+            });
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| DirectoryEntry::open2(root_dir.clone(), scope, path, protocols, req));
+            assert_eq!(
+                fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
+                vec![
+                    DirEntry { name: "contents".to_string(), kind: DirentKind::File },
+                    DirEntry { name: "dir".to_string(), kind: DirentKind::Directory },
+                    DirEntry { name: "file".to_string(), kind: DirentKind::File },
+                    DirEntry { name: "fuchsia.abi".to_string(), kind: DirentKind::Directory },
+                    DirEntry { name: "package".to_string(), kind: DirentKind::File },
+                ]
+            );
+            // Cloning meta_as_dir yields meta_as_dir
+            let (cloned_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let () =
+                proxy.clone(fio::OpenFlags::empty(), server_end.into_channel().into()).unwrap();
+            assert_eq!(
+                fuchsia_fs::directory::readdir(&cloned_proxy).await.unwrap(),
+                vec![
+                    DirEntry { name: "contents".to_string(), kind: DirentKind::File },
+                    DirEntry { name: "dir".to_string(), kind: DirentKind::Directory },
+                    DirEntry { name: "file".to_string(), kind: DirentKind::File },
+                    DirEntry { name: "fuchsia.abi".to_string(), kind: DirentKind::Directory },
+                    DirEntry { name: "package".to_string(), kind: DirentKind::File },
+                ]
+            );
+        }
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_meta_file() {
+        let (_env, root_dir) = TestEnv::new().await;
+
+        for path in ["meta/file", "meta/file/"] {
+            let (proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
+            let scope = ExecutionScope::new();
+            let path = VfsPath::validate_and_split(path).unwrap();
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                rights: Some(fio::Operations::READ_BYTES),
+                ..Default::default()
+            });
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| DirectoryEntry::open2(root_dir.clone(), scope, path, protocols, req));
+            assert_eq!(fuchsia_fs::file::read(&proxy).await.unwrap(), b"meta-contents0".to_vec());
+        }
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_meta_subdir() {
+        let (_env, root_dir) = TestEnv::new().await;
+
+        for path in ["meta/dir", "meta/dir/"] {
+            let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let scope = ExecutionScope::new();
+            let path = VfsPath::validate_and_split(path).unwrap();
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                rights: Some(fio::Operations::READ_BYTES),
+                ..Default::default()
+            });
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| DirectoryEntry::open2(root_dir.clone(), scope, path, protocols, req));
+            assert_eq!(
+                fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
+                vec![DirEntry { name: "file".to_string(), kind: DirentKind::File }]
+            );
+        }
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_non_meta_subdir() {
+        let (_env, root_dir) = TestEnv::new().await;
+
+        for path in ["dir", "dir/"] {
+            let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let scope = ExecutionScope::new();
+            let path = VfsPath::validate_and_split(path).unwrap();
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                rights: Some(fio::Operations::READ_BYTES),
+                ..Default::default()
+            });
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| DirectoryEntry::open2(root_dir.clone(), scope, path, protocols, req));
+            assert_eq!(
+                fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
+                vec![DirEntry { name: "file".to_string(), kind: DirentKind::File }]
+            );
+        }
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_rejects_forbidden_open_modes() {
+        let (_env, sub_dir) = TestEnv::new().await;
+
+        for forbidden_open_mode in [fio::OpenMode::AlwaysCreate, fio::OpenMode::MaybeCreate] {
+            let (proxy, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let scope = ExecutionScope::new();
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                mode: Some(forbidden_open_mode),
+                rights: Some(fio::Operations::READ_BYTES),
+                ..Default::default()
+            });
+            protocols.to_object_request(server_end).handle(|req| {
+                DirectoryEntry::open2(sub_dir.clone(), scope, VfsPath::dot(), protocols, req)
+            });
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+            );
+        }
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_rejects_forbidden_rights() {
+        let (_env, root_dir) = TestEnv::new().await;
+
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let scope = ExecutionScope::new();
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            rights: Some(fio::Operations::WRITE_BYTES),
+            ..Default::default()
+        });
+        protocols.to_object_request(server_end).handle(|req| {
+            DirectoryEntry::open2(root_dir.clone(), scope, VfsPath::dot(), protocols, req)
+        });
+        assert_matches!(
+            proxy.take_event_stream().try_next().await,
+            Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+        );
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_rejects_file_protocols() {
+        let (_env, root_dir) = TestEnv::new().await;
+
+        for file_protocols in [
+            fio::FileProtocolFlags::default(),
+            fio::FileProtocolFlags::APPEND,
+            fio::FileProtocolFlags::TRUNCATE,
+        ] {
+            let (proxy, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let scope = ExecutionScope::new();
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                rights: Some(fio::Operations::READ_BYTES),
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(file_protocols),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+            protocols.to_object_request(server_end).handle(|req| {
+                DirectoryEntry::open2(root_dir.clone(), scope, VfsPath::dot(), protocols, req)
+            });
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FILE, .. })
+            );
         }
     }
 }

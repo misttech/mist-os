@@ -12,12 +12,12 @@ use {
     fuchsia_hash::{Hash, ParseHashError},
     fuchsia_zircon::{self as zx, AsHandleRef as _, Status},
     futures::{stream, StreamExt as _},
-    std::{collections::HashSet, sync::Arc},
+    std::collections::HashSet,
     thiserror::Error,
     tracing::{error, info, warn},
     vfs::{
-        common::send_on_open_with_error, directory::entry::DirectoryEntry,
-        execution_scope::ExecutionScope, path::Path,
+        common::send_on_open_with_error, execution_scope::ExecutionScope, file::StreamIoConnection,
+        ObjectRequest, ObjectRequestRef, ProtocolsExt, ToObjectRequest as _,
     },
 };
 
@@ -266,40 +266,53 @@ impl Client {
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), fidl::Error> {
         let describe = flags.contains(fio::OpenFlags::DESCRIBE);
+        // Reject requests that attempt to open blobs as writable.
         if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
             send_on_open_with_error(describe, server_end, zx::Status::ACCESS_DENIED);
             return Ok(());
         }
-        if let Some(reader) = &self.reader {
-            let hash = blob.clone();
-            let scope_clone = scope.clone();
-            let reader = reader.clone();
-
-            scope.spawn(async move {
-                let vmo = match reader.get_vmo(&hash.into()).await {
-                    Err(e) => {
-                        error!("Transport error on get_vmo: {:?}", e);
-                        return send_on_open_with_error(describe, server_end, zx::Status::INTERNAL);
-                    }
-                    Ok(Err(s)) => {
-                        warn!(
-                            error = ?zx::Status::from_raw(s),
-                            blob = %hash,
-                            "Failed to get vmo from reader"
-                        );
-                        return send_on_open_with_error(
-                            describe,
-                            server_end,
-                            zx::Status::from_raw(s),
-                        );
-                    }
-                    Ok(Ok(vmo)) => vmo,
-                };
-                let blob = Arc::new(vmo_blob::VmoBlob::new(vmo));
-                let () = blob.open(scope_clone, flags, Path::dot(), server_end);
-            });
+        // Reject requests that attempt to create new blobs.
+        if flags.intersects(fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT) {
+            send_on_open_with_error(describe, server_end, zx::Status::NOT_SUPPORTED);
+            return Ok(());
+        }
+        // Use blob reader protocol if available, otherwise fallback to fuchsia.io/Directory.Open.
+        return if let Some(reader) = &self.reader {
+            let object_request = flags.to_object_request(server_end);
+            let () = open_blob_with_reader(reader.clone(), *blob, scope, flags, object_request);
+            Ok(())
         } else {
-            return self.dir.open(flags, fio::ModeType::empty(), &blob.to_string(), server_end);
+            self.dir.open(flags, fio::ModeType::empty(), &blob.to_string(), server_end)
+        };
+    }
+
+    /// Open a blob for read using open2. `scope` will only be used if the client was configured to
+    /// use fuchsia.fxfs.BlobReader.
+    pub fn open2_blob_for_read(
+        &self,
+        blob: &Hash,
+        protocols: fio::ConnectionProtocols,
+        scope: ExecutionScope,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        // Reject requests that attempt to open blobs as writable.
+        if protocols.rights().is_some_and(|rights| rights.contains(fio::Operations::WRITE_BYTES)) {
+            return Err(zx::Status::ACCESS_DENIED);
+        }
+        // Reject requests that attempt to create new blobs.
+        if let fio::OpenMode::AlwaysCreate | fio::OpenMode::MaybeCreate = protocols.open_mode() {
+            return Err(zx::Status::NOT_SUPPORTED);
+        }
+        // Errors below will be communicated via the `object_request` channel.
+        let object_request = object_request.take();
+        // Use blob reader protocol if available, otherwise fallback to fuchsia.io/Directory.Open2.
+        if let Some(reader) = &self.reader {
+            let () = open_blob_with_reader(reader.clone(), *blob, scope, protocols, object_request);
+        } else {
+            let _: Result<(), ()> = self
+                .dir
+                .open2(&blob.to_string(), &protocols, object_request.into_channel())
+                .map_err(|fidl_error| warn!("Failed to open blob {:?}: {:?}", blob, fidl_error));
         }
         Ok(())
     }
@@ -416,6 +429,7 @@ impl Client {
                         fio::FileEvent::OnRepresentation { payload } => match payload {
                             fio::Representation::File(fio::FileInfo {
                                 observer: Some(event),
+                                stream: _, // TODO(https://fxbug.dev/293606235): Use stream
                                 ..
                             }) => event,
                             _ => return false,
@@ -507,6 +521,40 @@ impl Client {
     }
 }
 
+/// Spawns a task on `scope` to attempt opening `blob` via `reader`. Creates a file connection to
+/// the blob using [`vmo_blob::VmoBlob`]. Errors will be sent via `object_request` asynchronously.
+fn open_blob_with_reader<P: ProtocolsExt + Send>(
+    reader: ffxfs::BlobReaderProxy,
+    blob_hash: Hash,
+    scope: ExecutionScope,
+    protocols: P,
+    object_request: ObjectRequest,
+) {
+    object_request.spawn(&scope.clone(), move |object_request| {
+        Box::pin(async move {
+            // Try to get the blob vmo from `reader`, handling FIDL errors.
+            let get_vmo_result = reader.get_vmo(&blob_hash.into()).await.map_err(|fidl_error| {
+                if let fidl::Error::ClientChannelClosed { status, .. } = fidl_error {
+                    error!("Blob reader channel closed: {:?}", status);
+                    status
+                } else {
+                    error!("Transport error on get_vmo: {:?}", fidl_error);
+                    zx::Status::INTERNAL
+                }
+            })?;
+            // Handle errors in the get_vmo response.
+            let vmo = get_vmo_result.map_err(|status| {
+                let status = zx::Status::from_raw(status);
+                warn!(%status, %blob_hash, "Failed to get vmo from reader");
+                status
+            })?;
+            // Create a VmoBlob file from the result and use it for the object_request connection.
+            let vmo_blob = vmo_blob::VmoBlob::new(vmo);
+            object_request.create_connection(scope, vmo_blob, protocols, StreamIoConnection::create)
+        })
+    });
+}
+
 #[cfg(test)]
 impl Client {
     /// Constructs a new [`Client`] connected to the provided [`BlobfsRamdisk`]. Tests in this
@@ -536,7 +584,7 @@ mod tests {
     use {
         super::*, assert_matches::assert_matches, blobfs_ramdisk::BlobfsRamdisk,
         fuchsia_async as fasync, fuchsia_merkle::MerkleTree, futures::stream::TryStreamExt,
-        maplit::hashset, std::io::Write as _,
+        maplit::hashset, std::io::Write as _, std::sync::Arc,
     };
 
     #[fasync::run_singlethreaded(test)]

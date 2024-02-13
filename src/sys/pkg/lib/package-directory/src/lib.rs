@@ -15,6 +15,9 @@ use {
     },
 };
 
+#[cfg(feature = "supports_open2")]
+use vfs::ObjectRequestRef;
+
 mod meta_as_dir;
 mod meta_as_file;
 mod meta_file;
@@ -80,6 +83,16 @@ pub trait NonMetaStorage: Send + Sync + 'static {
         scope: ExecutionScope,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), fuchsia_fs::node::OpenError>;
+
+    #[cfg(feature = "supports_open2")]
+    // TODO(https://fxbug.dev/324112857): Remove feature gate when Blobfs supports `open2`.
+    fn open2(
+        &self,
+        _blob: &fuchsia_hash::Hash,
+        _protocols: fio::ConnectionProtocols,
+        _scope: ExecutionScope,
+        _object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status>;
 }
 
 impl NonMetaStorage for blobfs::Client {
@@ -92,6 +105,17 @@ impl NonMetaStorage for blobfs::Client {
     ) -> Result<(), fuchsia_fs::node::OpenError> {
         self.open_blob_for_read(blob, flags, scope, server_end)
             .map_err(fuchsia_fs::node::OpenError::SendOpenRequest)
+    }
+
+    #[cfg(feature = "supports_open2")]
+    fn open2(
+        &self,
+        blob: &fuchsia_hash::Hash,
+        protocols: fio::ConnectionProtocols,
+        scope: ExecutionScope,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        self.open2_blob_for_read(blob, protocols, scope, object_request)
     }
 }
 
@@ -106,6 +130,19 @@ impl NonMetaStorage for fio::DirectoryProxy {
     ) -> Result<(), fuchsia_fs::node::OpenError> {
         self.open(flags, fio::ModeType::empty(), blob.to_string().as_str(), server_end)
             .map_err(fuchsia_fs::node::OpenError::SendOpenRequest)
+    }
+
+    #[cfg(feature = "supports_open2")]
+    fn open2(
+        &self,
+        blob: &fuchsia_hash::Hash,
+        protocols: fio::ConnectionProtocols,
+        _scope: ExecutionScope,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        // If the FIDL call passes, errors will be communicated via the `object_request` channel.
+        self.open2(blob.to_string().as_str(), &protocols, object_request.take().into_channel())
+            .map_err(|_fidl_error| zx::Status::PEER_CLOSED)
     }
 }
 

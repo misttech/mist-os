@@ -9,17 +9,20 @@ use {
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::sync::Arc,
     vfs::{
-        attributes,
         common::send_on_open_with_error,
         directory::{
             entry::EntryInfo, immutable::connection::ImmutableConnection,
             traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
+        immutable_attributes,
         path::Path as VfsPath,
-        ObjectRequestRef, ProtocolsExt as _, ToObjectRequest,
+        ToObjectRequest,
     },
 };
+
+#[cfg(feature = "supports_open2")]
+use vfs::{ObjectRequestRef, ProtocolsExt as _};
 
 pub(crate) struct MetaSubdir<S: crate::NonMetaStorage> {
     root_dir: Arc<RootDir<S>>,
@@ -103,6 +106,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaSub
         let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
     }
 
+    #[cfg(feature = "supports_open2")]
     fn open2(
         self: Arc<Self>,
         scope: ExecutionScope,
@@ -125,7 +129,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaSub
                     return Err(zx::Status::NOT_SUPPORTED);
                 }
             }
-
             // Note that `ImmutableConnection::create` will check that protocols contain
             // directory-only protocols.
             return object_request.spawn_connection(
@@ -151,29 +154,23 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaSub
         );
 
         if let Some(location) = self.root_dir.meta_files.get(&file_path).copied() {
-            object_request.take().handle(|object_request| {
-                MetaFile::new(self.root_dir.clone(), location).open2(
-                    scope,
-                    VfsPath::dot(),
-                    protocols,
-                    object_request,
-                )
-            });
-            return Ok(());
+            return MetaFile::new(self.root_dir.clone(), location).open2(
+                scope,
+                VfsPath::dot(),
+                protocols,
+                object_request,
+            );
         }
 
         let directory_path = file_path + "/";
         for k in self.root_dir.meta_files.keys() {
             if k.starts_with(&directory_path) {
-                object_request.take().handle(|object_request| {
-                    MetaSubdir::new(self.root_dir.clone(), directory_path).open2(
-                        scope,
-                        VfsPath::dot(),
-                        protocols,
-                        object_request,
-                    )
-                });
-                return Ok(());
+                return MetaSubdir::new(self.root_dir.clone(), directory_path).open2(
+                    scope,
+                    VfsPath::dot(),
+                    protocols,
+                    object_request,
+                );
             }
         }
 
@@ -205,15 +202,13 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for MetaSubdir<S> {
         })
     }
 
-    // TODO(b/293947862): include new io2 attributes, e.g. change_time and access_time
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, zx::Status> {
         let size = crate::usize_to_u64_safe(self.root_dir.meta_files.len());
-        Ok(attributes!(
+        Ok(immutable_attributes!(
             requested_attributes,
-            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,
                 abilities: fio::Operations::GET_ATTRIBUTES
@@ -268,7 +263,7 @@ mod tests {
         super::*,
         assert_matches::assert_matches,
         fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
-        futures::{stream::StreamExt as _, TryStreamExt as _},
+        futures::prelude::*,
         std::convert::TryInto as _,
         vfs::{
             directory::{entry::DirectoryEntry, entry_container::Directory},
@@ -477,16 +472,8 @@ mod tests {
 
         assert_eq!(
             Node::get_attributes(sub_dir.as_ref(), fio::NodeAttributesQuery::all()).await.unwrap(),
-            attributes!(
+            immutable_attributes!(
                 fio::NodeAttributesQuery::all(),
-                Mutable {
-                    creation_time: 0,
-                    modification_time: 0,
-                    mode: 0,
-                    uid: 0,
-                    gid: 0,
-                    rdev: 0
-                },
                 Immutable {
                     protocols: fio::NodeProtocolKinds::DIRECTORY,
                     abilities: fio::Operations::GET_ATTRIBUTES
@@ -501,6 +488,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_self() {
         let (_env, sub_dir) = TestEnv::new().await;
@@ -524,6 +512,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_file() {
         let (_env, sub_dir) = TestEnv::new().await;
@@ -544,6 +533,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_directory() {
         let (_env, sub_dir) = TestEnv::new().await;
@@ -571,6 +561,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_open_modes() {
         let (_env, sub_dir) = TestEnv::new().await;
@@ -594,6 +585,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_rights() {
         let (_env, sub_dir) = TestEnv::new().await;
@@ -616,6 +608,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_file_protocols() {
         let (_env, sub_dir) = TestEnv::new().await;
