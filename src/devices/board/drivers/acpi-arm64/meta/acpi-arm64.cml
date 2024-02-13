@@ -21,6 +21,7 @@
                 "fuchsia.kernel.IoportResource",
                 "fuchsia.kernel.IrqResource",
                 "fuchsia.kernel.MmioResource",
+                "fuchsia.kernel.MsiResource",
             ],
         },
         { service: "fuchsia.hardware.platform.bus.Service" },

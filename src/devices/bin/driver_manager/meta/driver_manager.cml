@@ -28,6 +28,7 @@
                 "fuchsia.kernel.IrqResource",
                 "fuchsia.kernel.MexecResource",
                 "fuchsia.kernel.MmioResource",
+                "fuchsia.kernel.MsiResource",
                 "fuchsia.kernel.PowerResource",
                 "fuchsia.kernel.SmcResource",
                 "fuchsia.scheduler.ProfileProvider",

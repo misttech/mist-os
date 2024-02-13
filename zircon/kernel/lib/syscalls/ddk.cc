@@ -321,9 +321,10 @@ zx_status_t sys_ioports_release(zx_handle_t hrsrc, uint16_t io_addr, uint32_t le
 #endif
 
 // zx_status_t zx_msi_allocate
-zx_status_t sys_msi_allocate(zx_handle_t root, uint32_t count, zx_handle_t* out) {
+zx_status_t sys_msi_allocate(zx_handle_t msi, uint32_t count, zx_handle_t* out) {
   zx_status_t status;
-  if ((status = validate_resource(root, ZX_RSRC_KIND_ROOT)) != ZX_OK) {
+  if ((status = validate_resource_kind_base(msi, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_MSI_BASE)) !=
+      ZX_OK) {
     return status;
   }
 

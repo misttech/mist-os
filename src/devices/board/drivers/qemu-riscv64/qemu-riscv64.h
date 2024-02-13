@@ -30,7 +30,7 @@ class QemuRiscv64 : public QemuRiscv64Type {
   QemuRiscv64(zx_device_t* parent, fdf::ClientEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus)
       : QemuRiscv64Type(parent),
         pbus_(std::move(pbus)),
-        pci_root_host_(zx::unowned_resource(get_root_resource(parent)),
+        pci_root_host_(zx::unowned_resource(get_msi_resource(parent)),
                        zx::unowned_resource(get_mmio_resource(parent)),
                        zx::unowned_resource(get_ioport_resource(parent)),
                        PCI_ADDRESS_SPACE_MEMORY) {}

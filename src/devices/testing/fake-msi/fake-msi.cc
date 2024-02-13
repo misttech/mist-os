@@ -49,13 +49,13 @@ zx_status_t Msi::get_info(zx_handle_t /*handle*/, uint32_t topic, void* buffer, 
 
 }  // namespace fake_object
 
-// TODO(https://fxbug.dev/42108122): Pull some of these structures out of their parent headers so that
-// both the tests and the real implementations can use the same information.
+// TODO(https://fxbug.dev/42108122): Pull some of these structures out of their parent headers so
+// that both the tests and the real implementations can use the same information.
 constexpr size_t MsiCapabilitySize = 24u;
 
 // Fake syscall implementations
 __EXPORT
-zx_status_t zx_msi_allocate(zx_handle_t /*root*/, uint32_t count, zx_handle_t* msi_out) {
+zx_status_t zx_msi_allocate(zx_handle_t, uint32_t count, zx_handle_t* msi_out) {
   if (!count || !msi_out || !cpp20::has_single_bit(count)) {
     return ZX_ERR_INVALID_ARGS;
   }

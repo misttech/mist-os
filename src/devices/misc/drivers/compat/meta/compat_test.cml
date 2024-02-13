@@ -20,6 +20,7 @@
                 "fuchsia.kernel.IoportResource",
                 "fuchsia.kernel.IrqResource",
                 "fuchsia.kernel.MmioResource",
+                "fuchsia.kernel.MsiResource",
                 "fuchsia.kernel.PowerResource",
                 "fuchsia.kernel.SmcResource",
             ],

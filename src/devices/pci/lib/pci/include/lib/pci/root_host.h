@@ -63,9 +63,9 @@ class PciRootHost {
   RegionAllocator& Io() { return io_alloc_; }
   std::vector<McfgAllocation>& mcfgs() { return mcfgs_; }
 
-  PciRootHost(zx::unowned_resource unowned_root, zx::unowned_resource unowned_mmio,
+  PciRootHost(zx::unowned_resource unowned_msi, zx::unowned_resource unowned_mmio,
               zx::unowned_resource unowned_ioport, pci_address_space_t io_type)
-      : root_resource_(std::move(unowned_root)),
+      : msi_resource_(std::move(unowned_msi)),
         mmio_resource_(std::move(unowned_mmio)),
         ioport_resource_(std::move(unowned_ioport)),
         io_type_(io_type) {
@@ -73,7 +73,7 @@ class PciRootHost {
   }
 
   zx_status_t AllocateMsi(uint32_t count, zx::msi* msi) {
-    return zx::msi::allocate(*root_resource_, count, msi);
+    return zx::msi::allocate(*msi_resource_, count, msi);
   }
 
   zx::result<zx_paddr_t> AllocateMmio32Window(zx_paddr_t base, size_t size,
@@ -171,7 +171,7 @@ class PciRootHost {
 
   fbl::Mutex lock_;
   zx::port eventpair_port_ __TA_GUARDED(lock_);
-  const zx::unowned_resource root_resource_;
+  const zx::unowned_resource msi_resource_;
   const zx::unowned_resource mmio_resource_;
   const zx::unowned_resource ioport_resource_;
   // Depending on platform 'IO' in PCI can be either memory mapped, or something more akin to PIO.
