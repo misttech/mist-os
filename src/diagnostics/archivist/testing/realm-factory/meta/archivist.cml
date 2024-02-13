@@ -4,9 +4,30 @@
 {
     include: [
         "//src/diagnostics/archivist/meta/common.shard.cml",
+        "//src/diagnostics/archivist/meta/config_capabilities.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         binary: "bin/archivist",
     },
+    use: [
+        {
+            protocol: [ "fuchsia.boot.ReadOnlyLog" ],
+        },
+        {
+            config: "fuchsia.diagnostics.EnableKlog",
+            config_key: "enable_klog",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.diagnostics.LogToDebuglog",
+            config_key: "log_to_debuglog",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.diagnostics.PipelinesPath",
+            config_key: "pipelines_path",
+            availability: "optional",
+        },
+    ],
 }

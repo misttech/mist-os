@@ -14,7 +14,6 @@ use fuchsia_component_test::{
 };
 
 const ARCHIVIST_URL: &str = "#meta/archivist.cm";
-const ARCHIVIST_WITH_KERNEL_LOG_URL: &str = "#meta/archivist-with-kernel-log.cm";
 const PUPPET_URL: &str = "#meta/puppet.cm";
 
 #[derive(Default)]
@@ -27,15 +26,81 @@ impl ArchivistRealmFactory {
             params = params.realm_name(realm_name);
         }
         let builder = RealmBuilder::with_params(params).await?;
+        let config = options.archivist_config.unwrap_or(ArchivistConfig::Default);
+
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.diagnostics.BindServices".parse()?,
+                value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::StringVector(
+                    vec![],
+                )),
+            }))
+            .await?;
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.diagnostics.LogsMaxCachedOriginalBytes".parse()?,
+                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Uint64(4194304)),
+            }))
+            .await?;
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader".parse()?,
+                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Uint64(4)),
+            }))
+            .await?;
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.diagnostics.NumThreads".parse()?,
+                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Uint64(1)),
+            }))
+            .await?;
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.diagnostics.AllowSerialLogs".parse()?,
+                value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::StringVector(
+                    vec![],
+                )),
+            }))
+            .await?;
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.diagnostics.DenySerialLogs".parse()?,
+                value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::StringVector(
+                    vec![],
+                )),
+            }))
+            .await?;
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.diagnostics.LogToDebuglog".parse()?,
+                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(false)),
+            }))
+            .await?;
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.diagnostics.EnableKlog".parse()?,
+                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(matches!(
+                    config,
+                    ArchivistConfig::WithKernelLog
+                ))),
+            }))
+            .await?;
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.diagnostics.PipelinesPath".parse()?,
+                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::String(
+                    "/pkg/data/config".to_string(),
+                )),
+            }))
+            .await?;
+
         // This child test realm allows us to downscope the event stream offered
         // to archivist to the #test subtree. We need this because it's not possible
         // to downscope an event stream to the ref "self". See
         // https://fxbug.dev/42082439 for more information.
         let test_realm = builder.add_child_realm("test", ChildOptions::new()).await?;
-        let archivist_url =
-            options.archivist_config.unwrap_or(ArchivistConfig::Default).component_url();
         let archivist =
-            test_realm.add_child("archivist", archivist_url, ChildOptions::new()).await?;
+            test_realm.add_child("archivist", ARCHIVIST_URL, ChildOptions::new()).await?;
         // LINT.IfChange
         let parent_to_archivist = Route::new()
             .capability(Capability::protocol::<flogger::LogSinkMarker>())
@@ -48,30 +113,24 @@ impl ArchivistRealmFactory {
             .capability(Capability::protocol::<flogger::LogSinkMarker>())
             .capability(Capability::protocol::<finspect::InspectSinkMarker>())
             .capability(Capability::protocol::<flogger::LogMarker>());
+        let self_to_archivist = Route::new()
+            .capability(Capability::configuration("fuchsia.diagnostics.BindServices"))
+            .capability(Capability::configuration("fuchsia.diagnostics.LogsMaxCachedOriginalBytes"))
+            .capability(Capability::configuration(
+                "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
+            ))
+            .capability(Capability::configuration("fuchsia.diagnostics.NumThreads"))
+            .capability(Capability::configuration("fuchsia.diagnostics.AllowSerialLogs"))
+            .capability(Capability::configuration("fuchsia.diagnostics.DenySerialLogs"))
+            .capability(Capability::configuration("fuchsia.diagnostics.LogToDebuglog"))
+            .capability(Capability::configuration("fuchsia.diagnostics.EnableKlog"))
+            .capability(Capability::configuration("fuchsia.diagnostics.PipelinesPath"));
         builder.add_route(parent_to_archivist.clone().from(Ref::parent()).to(&test_realm)).await?;
-        test_realm
-            .add_route(parent_to_archivist.clone().from(Ref::parent()).to(&archivist))
-            .await?;
+        builder.add_route(self_to_archivist.clone().from(Ref::self_()).to(&test_realm)).await?;
+        test_realm.add_route(parent_to_archivist.from(Ref::parent()).to(&archivist)).await?;
+        test_realm.add_route(self_to_archivist.from(Ref::parent()).to(&archivist)).await?;
         test_realm
             .add_route(archivist_to_parent.clone().from(&archivist).to(Ref::parent()))
-            .await?;
-        // Route archivist's configuration from void so the values come from the package.
-        test_realm
-            .add_route(
-                Route::new()
-                    .capability(Capability::configuration("fuchsia.diagnostics.BindServices"))
-                    .capability(Capability::configuration(
-                        "fuchsia.diagnostics.LogsMaxCachedOriginalBytes",
-                    ))
-                    .capability(Capability::configuration(
-                        "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
-                    ))
-                    .capability(Capability::configuration("fuchsia.diagnostics.NumThreads"))
-                    .capability(Capability::configuration("fuchsia.diagnostics.AllowSerialLogs"))
-                    .capability(Capability::configuration("fuchsia.diagnostics.DenySerialLogs"))
-                    .from(Ref::void())
-                    .to(&archivist),
-            )
             .await?;
         builder.add_route(archivist_to_parent.from(&test_realm).to(Ref::parent())).await?;
         builder
@@ -121,21 +180,6 @@ impl ArchivistRealmFactory {
             }
         }
         Ok(builder.build().await?)
-    }
-}
-
-trait ArchivistConfigExt {
-    fn component_url(&self) -> String;
-}
-
-impl ArchivistConfigExt for ArchivistConfig {
-    fn component_url(&self) -> String {
-        match self {
-            ArchivistConfig::Default => ARCHIVIST_URL,
-            ArchivistConfig::WithKernelLog => ARCHIVIST_WITH_KERNEL_LOG_URL,
-            ArchivistConfigUnknown!() => unreachable!(),
-        }
-        .to_string()
     }
 }
 

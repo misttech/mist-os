@@ -4,8 +4,10 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//src/diagnostics/archivist/testing/realm-factory/configs.gni")
+import(
+    "//src/diagnostics/archivist/testing/realm-factory/fuchsia_configured_component.gni")
 import("//src/diagnostics/archivist/tests/integration/configs.gni")
-import("fuchsia_configured_component.gni")
 
 rustc_binary("bin") {
   testonly = true
@@ -27,6 +29,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
+    "//src/sys/lib/cm_rust",
     "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
@@ -49,21 +52,12 @@ fuchsia_configured_component("archivist-component") {
   deps = [ "//src/diagnostics/archivist:bin" ]
 }
 
-fuchsia_configured_component("archivist-with-kernel-log-component") {
-  testonly = true
-  component_name = "archivist-with-kernel-log"
-  manifest = "meta/archivist-with-kernel-log.cml"
-  config_values = with_klog_config
-  deps = [ "//src/diagnostics/archivist:bin" ]
-}
-
 fuchsia_package("realm-factory") {
   package_name = "archivist-realm-factory"
   testonly = true
   deps = [
     ":archivist-component",
     ":archivist-realm-factory-component",
-    ":archivist-with-kernel-log-component",
     "//src/diagnostics/archivist/testing/puppet:puppet-component",
   ]
 }

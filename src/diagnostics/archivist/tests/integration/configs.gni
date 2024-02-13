@@ -2,21 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//src/diagnostics/archivist/configs.gni")
-
-archivist_for_integration_config = {
-  forward_variables_from(embedded_config, "*")
-  pipelines_path = "/pkg/data/config/pipelines"
-}
+import("//src/diagnostics/archivist/testing/realm-factory/configs.gni")
 
 small_caches_config = {
   forward_variables_from(archivist_for_integration_config, "*")
   logs_max_cached_original_bytes = 3000
-}
-
-with_klog_config = {
-  forward_variables_from(archivist_for_integration_config, "*")
-  enable_klog = true
 }
 
 with_feedback_filtering = {
