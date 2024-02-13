@@ -1,68 +1,42 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.ETH",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S912",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC"
-        },
-        "expected": "match",
-        "name": "S912"
+        "node": "pdev",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC",
+                    "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D",
+                    "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.ETH",
+                    "fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID": "0"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.ETH",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC"
-        },
-        "expected": "match",
-        "name": "A311D"
+        "node": "gpio-init",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_INIT_STEP": "fuchsia.gpio.BIND_INIT_STEP.GPIO"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.ETH",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A5",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC"
-        },
-        "expected": "match",
-        "name": "A5"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.ETH",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S912",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC"
-        },
-        "expected": "abort",
-        "name": "Missing Protocol"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.ETH",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S912"
-        },
-        "expected": "abort",
-        "name": "Missing Platform Device VID"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S912",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC"
-        },
-        "expected": "abort",
-        "name": "Missing Platform Device DID"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.ETH",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC"
-        },
-        "expected": "abort",
-        "name": "Missing Platform Device DID"
+        "node": "gpio-int",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.hardware.gpio.Service": "fuchsia.hardware.gpio.Service.ZirconTransport"
+                }
+            }
+        ]
     }
 ]

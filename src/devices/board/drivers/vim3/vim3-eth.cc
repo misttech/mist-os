@@ -14,17 +14,22 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <limits.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/designware/platform/cpp/bind.h>
 #include <bind/fuchsia/ethernet/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
 
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "vim3-gpios.h"
 #include "vim3.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace vim3 {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -98,17 +103,6 @@ static const std::vector<fpbus::Metadata> eth_board_metadata{
     }},
 };
 
-static const fpbus::Node eth_board_dev = []() {
-  fpbus::Node dev = {};
-  dev.name() = "ethernet_mac";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_A311D;
-  dev.did() = PDEV_DID_AMLOGIC_ETH;
-  dev.mmio() = eth_board_mmios;
-  dev.metadata() = eth_board_metadata;
-  return dev;
-}();
-
 static const fpbus::Node dwmac_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "dwmac";
@@ -122,30 +116,7 @@ static const fpbus::Node dwmac_dev = []() {
   return dev;
 }();
 
-// Composite binding rules for ethernet board driver.
-static const zx_bind_inst_t gpio_int_match[] = {
-    BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_GPIO),
-    BI_MATCH_IF(EQ, BIND_GPIO_PIN, VIM3_ETH_MAC_INTR),
-};
-
-static const device_fragment_part_t gpio_int_fragment[] = {
-    {std::size(gpio_int_match), gpio_int_match},
-};
-
-static const zx_bind_inst_t gpio_init_match[] = {
-    BI_MATCH_IF(EQ, BIND_INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
-};
-
-static const device_fragment_part_t gpio_init_fragment[] = {
-    {std::size(gpio_init_match), gpio_init_match},
-};
-
-static const device_fragment_t eth_fragments[] = {
-    {"gpio-int", std::size(gpio_int_fragment), gpio_int_fragment},
-    {"gpio-init", std::size(gpio_init_fragment), gpio_init_fragment},
-};
-
-const std::vector<fuchsia_driver_framework::BindRule> kEthBoardRules = {
+const std::vector<fdf::BindRule> kEthBoardRules = {
     fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_ethernet::BIND_FIDL_PROTOCOL_BOARD_SERVICE),
     fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
@@ -154,14 +125,70 @@ const std::vector<fuchsia_driver_framework::BindRule> kEthBoardRules = {
                             bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_DID_ETH_MAC),
 };
 
-const std::vector<fuchsia_driver_framework::NodeProperty> kEthBoardProperties = {
+const std::vector<fdf::NodeProperty> kEthBoardProperties = {
     fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
                       bind_fuchsia_ethernet::BIND_FIDL_PROTOCOL_BOARD_SERVICE),
 };
 
-const std::vector<fuchsia_driver_framework::ParentSpec> kEthBoardParents = {
-    fuchsia_driver_framework::ParentSpec{
-        {.bind_rules = kEthBoardRules, .properties = kEthBoardProperties}}};
+const std::vector<fdf::ParentSpec> kEthBoardParents = {
+    fdf::ParentSpec{{.bind_rules = kEthBoardRules, .properties = kEthBoardProperties}}};
+
+zx_status_t AddEthComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
+                            fidl::AnyArena& fidl_arena, fdf::Arena& arena) {
+  const std::vector<fdf::BindRule> kGpioIntRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_ETH_MAC_INTR)),
+  };
+
+  const std::vector<fdf::NodeProperty> kGpioIntProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
+                        bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+  };
+
+  const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+
+  fpbus::Node eth_board_dev;
+  eth_board_dev.name() = "ethernet_mac";
+  eth_board_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  eth_board_dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_A311D;
+  eth_board_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_ETH;
+  eth_board_dev.mmio() = eth_board_mmios;
+  eth_board_dev.metadata() = eth_board_metadata;
+
+  const std::vector<fdf::ParentSpec> kEthParents = {
+      fdf::ParentSpec{{
+          .bind_rules = kGpioIntRules,
+          .properties = kGpioIntProperties,
+      }},
+      fdf::ParentSpec{{
+          .bind_rules = kGpioInitRules,
+          .properties = kGpioInitProperties,
+      }},
+  };
+
+  auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, eth_board_dev),
+      fidl::ToWire(fidl_arena,
+                   fdf::CompositeNodeSpec{{.name = "ethernet_mac", .parents = kEthParents}}));
+  if (!result.ok()) {
+    zxlogf(ERROR, "AddCompositeNodeSpec Eth(eth_board_dev) request failed: %s",
+           result.FormatDescription().data());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "AddCompositeNodeSpec Eth(eth_board_dev) failed: %s",
+           zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+
+  return ZX_OK;
+}
 
 zx_status_t Vim3::EthInit() {
   // setup pinmux for RGMII connections
@@ -200,24 +227,13 @@ zx_status_t Vim3::EthInit() {
   // Add a composite device for ethernet board in a new devhost.
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('ETH_');
-  auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
-      fidl::ToWire(fidl_arena, eth_board_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, eth_fragments, std::size(eth_fragments)),
-      {});
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Eth(eth_board_dev) request failed: %s",
-           __func__, result.FormatDescription().data());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Eth(eth_board_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+  auto status = AddEthComposite(pbus_, fidl_arena, arena);
+  if (status != ZX_OK) {
+    return status;
   }
 
   // Add a composite device for dwmac driver in the ethernet board driver's driver host.
-  auto spec =
-      fuchsia_driver_framework::CompositeNodeSpec{{.name = "dwmac", .parents = kEthBoardParents}};
+  auto spec = fdf::CompositeNodeSpec{{.name = "dwmac", .parents = kEthBoardParents}};
   fdf::WireUnownedResult dwmac_result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(arena, dwmac_dev), fidl::ToWire(arena, spec));
   if (!dwmac_result.ok()) {

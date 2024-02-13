@@ -78,6 +78,7 @@ fuchsia_driver("vim3-driver") {
     "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
     "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",

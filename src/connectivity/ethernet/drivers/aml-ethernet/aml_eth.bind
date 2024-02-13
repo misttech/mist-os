@@ -2,13 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.amlogic.platform;
+composite aml_eth;
 
-fuchsia.BIND_COMPOSITE == 1;
-fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
-fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.ETH;
-accept fuchsia.BIND_PLATFORM_DEV_PID {
-  fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S912,
-  fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D,
-  fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A5,
+using fuchsia.amlogic.platform;
+using fuchsia.gpio;
+using fuchsia.hardware.gpio;
+using fuchsia.platform;
+
+primary node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
+  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.ETH;
+}
+
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+}
+
+node "gpio-int" {
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
 }
