@@ -413,6 +413,52 @@ TEST(GpioTest, Init) {
   EXPECT_NO_FAILURES(gpio.VerifyAndClear());
 }
 
+TEST(GpioTest, InitWithoutPins) {
+  namespace fhgpio = fuchsia_hardware_gpio::wire;
+  namespace fhgpioimpl = fuchsia_hardware_gpioimpl::wire;
+
+  std::shared_ptr<zx_device> fake_root = MockDevice::FakeRootParent();
+  std::shared_ptr<fdf_testing::DriverRuntime> runtime = mock_ddk::GetDriverRuntime();
+
+  ddk::MockGpioImpl gpio;
+
+  fake_root->AddProtocol(ZX_PROTOCOL_GPIO_IMPL, gpio.GetProto()->ops, gpio.GetProto()->ctx);
+
+  fidl::Arena arena;
+
+  fhgpioimpl::InitMetadata metadata;
+  metadata.steps = fidl::VectorView<fhgpioimpl::InitStep>(arena, 1);
+
+  metadata.steps[0].index = 1;
+  metadata.steps[0].call = fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullDown);
+
+  gpio.ExpectConfigIn(ZX_OK, 1, GPIO_PULL_DOWN);
+
+  fit::result encoded = fidl::Persist(metadata);
+  ASSERT_TRUE(encoded.is_ok(), "%s", encoded.error_value().FormatDescription().c_str());
+
+  std::vector<uint8_t>& message = encoded.value();
+  fake_root->SetMetadata(DEVICE_METADATA_GPIO_INIT, message.data(), message.size());
+
+  EXPECT_OK(GpioRootDevice::Create(nullptr, fake_root.get()));
+
+  // GPIO init and root devices.
+  EXPECT_EQ(fake_root->child_count(), 2);
+  for (auto& child : fake_root->children()) {
+    device_async_remove(child.get());
+  }
+
+  // ReleaseFlaggedDevices blocks, so it must be run on another thread while the foreground
+  // dispatcher runs on this one. Pass the foreground dispatcher to it so that the unbind hooks run
+  // on a foreground dispatcher thread as the driver expects.
+  runtime->PerformBlockingWork(
+      [&, dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher()]() {
+        EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(fake_root.get(), dispatcher));
+      });
+
+  EXPECT_NO_FAILURES(gpio.VerifyAndClear());
+}
+
 TEST(GpioTest, InitErrorHandling) {
   namespace fhgpio = fuchsia_hardware_gpio::wire;
   namespace fhgpioimpl = fuchsia_hardware_gpioimpl::wire;

@@ -9,6 +9,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
+#include <lib/fit/defer.h>
 #include <zircon/types.h>
 
 #include <memory>
@@ -429,22 +430,6 @@ zx_status_t GpioRootDevice::Create(void* ctx, zx_device_t* parent) {
     zxlogf(INFO, "Using Banjo gpioimpl protocol");
   }
 
-  auto pins = ddk::GetMetadataArray<gpio_pin_t>(parent, DEVICE_METADATA_GPIO_PINS);
-  if (!pins.is_ok()) {
-    zxlogf(ERROR, "Failed to get metadata array: %s", pins.status_string());
-    return pins.error_value();
-  }
-
-  // Make sure that the list of GPIO pins has no duplicates.
-  auto gpio_cmp_lt = [](gpio_pin_t& lhs, gpio_pin_t& rhs) { return lhs.pin < rhs.pin; };
-  auto gpio_cmp_eq = [](gpio_pin_t& lhs, gpio_pin_t& rhs) { return lhs.pin == rhs.pin; };
-  std::sort(pins.value().begin(), pins.value().end(), gpio_cmp_lt);
-  auto result = std::adjacent_find(pins.value().begin(), pins.value().end(), gpio_cmp_eq);
-  if (result != pins.value().end()) {
-    zxlogf(ERROR, "gpio pin '%d' was published more than once", result->pin);
-    return ZX_ERR_INVALID_ARGS;
-  }
-
   uint32_t controller_id = 0;
   {
     fdf::WireSyncClient<fuchsia_hardware_gpioimpl::GpioImpl> gpio_fidl;
@@ -504,20 +489,39 @@ zx_status_t GpioRootDevice::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  if (root->fidl_dispatcher_) {
-    // Pin devices must be created on the FIDL dispatcher if it exists.
-    async::PostTask(root->fidl_dispatcher_->async_dispatcher(),
-                    [=, root = root.get(), pins = *std::move(pins)]() {
-                      root->AddPinDevices(controller_id, gpio_banjo, pins);
-                    });
-    status = ZX_OK;
+  auto root_release = fit::defer([&root]() { [[maybe_unused]] auto ptr = root.release(); });
+
+  auto pins = ddk::GetMetadataArray<gpio_pin_t>(parent, DEVICE_METADATA_GPIO_PINS);
+  if (pins.is_error()) {
+    if (pins.status_value() == ZX_ERR_NOT_FOUND) {
+      zxlogf(INFO, "No pins metadata provided");
+    } else {
+      zxlogf(ERROR, "Failed to get metadata array: %s", pins.status_string());
+      return pins.status_value();
+    }
   } else {
-    status = root->AddPinDevices(controller_id, gpio_banjo, *pins);
+    // Make sure that the list of GPIO pins has no duplicates.
+    auto gpio_cmp_lt = [](gpio_pin_t& lhs, gpio_pin_t& rhs) { return lhs.pin < rhs.pin; };
+    auto gpio_cmp_eq = [](gpio_pin_t& lhs, gpio_pin_t& rhs) { return lhs.pin == rhs.pin; };
+    std::sort(pins.value().begin(), pins.value().end(), gpio_cmp_lt);
+    auto result = std::adjacent_find(pins.value().begin(), pins.value().end(), gpio_cmp_eq);
+    if (result != pins.value().end()) {
+      zxlogf(ERROR, "gpio pin '%d' was published more than once", result->pin);
+      return ZX_ERR_INVALID_ARGS;
+    }
+
+    if (root->fidl_dispatcher_) {
+      // Pin devices must be created on the FIDL dispatcher if it exists.
+      async::PostTask(root->fidl_dispatcher_->async_dispatcher(),
+                      [=, root = root.get(), pins = *std::move(pins)]() {
+                        root->AddPinDevices(controller_id, gpio_banjo, pins);
+                      });
+    } else {
+      return root->AddPinDevices(controller_id, gpio_banjo, *pins);
+    }
   }
 
-  [[maybe_unused]] auto ptr = root.release();
-
-  return status;
+  return ZX_OK;
 }
 
 void GpioRootDevice::DdkUnbind(ddk::UnbindTxn txn) {
