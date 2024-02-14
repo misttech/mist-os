@@ -36,4 +36,6 @@ fuchsia_test_package("bt-bonding-integration-tests") {
   }
   test_components = [ ":bt-bonding-integration-tests-component" ]
   deps = [ "//src/connectivity/bluetooth/hci/virtual" ]
+  subpackages =
+      [ "//src/connectivity/bluetooth/core/bt-host:bt-host-component" ]
 }

@@ -46,12 +46,11 @@ mod constants {
 }
 
 /// The CoreRealm represents a hermetic, fully-functional instance of the Fuchsia Bluetooth core
-/// stack, complete with all components (bt-init, bt-gap, bt-rfcomm), the bt-host driver responsible
-/// for the majority of the Bluetooth Host Subsystem, and a bt-hci emulator. Clients should use the
-/// `create` method to construct an instance, and the `instance` method to access the various
-/// production capabilities and test interfaces (e.g. from the bt-hci emulator) exposed from the
-/// core stack. Clients of the CoreRealm must route the `tmp` storage capability from the test
-/// manager to the "#realm_builder" underlying the RealmInstance.
+/// stack, complete with all components (bt-init, bt-gap, bt-host, bt-rfcomm) and a bt-hci
+/// emulator. Clients should use the `create` method to construct an instance, and the `instance`
+/// method to access the various production capabilities and test interfaces (e.g. from the bt-hci
+/// emulator) exposed from the core stack. Clients of the CoreRealm must offer the `tmp` storage
+/// capability from the test manager to the "#realm_builder" underlying the RealmInstance.
 pub struct CoreRealm {
     realm: RealmInstance,
 }
@@ -60,8 +59,14 @@ impl CoreRealm {
     pub async fn create() -> Result<Self, Error> {
         let builder = RealmBuilder::new().await?;
         let _ = builder.driver_test_realm_setup().await?;
+
+        // Create the components within CoreRealm
         let bt_init = builder
-            .add_child(constants::bt_init::MONIKER, constants::bt_init::URL, ChildOptions::new())
+            .add_child(
+                constants::bt_init::MONIKER,
+                constants::bt_init::URL,
+                ChildOptions::new().eager(),
+            )
             .await?;
         let secure_stash = builder
             .add_child(
@@ -99,6 +104,8 @@ impl CoreRealm {
                 ChildOptions::new(),
             )
             .await?;
+
+        // Add capability routing between components within CoreRealm
         builder
             .add_route(
                 Route::new()
@@ -116,7 +123,6 @@ impl CoreRealm {
                     .to(&secure_stash),
             )
             .await?;
-        // Route bt-init/bt-gap requirements to bt-init.
         builder
             .add_route(
                 Route::new()
@@ -141,19 +147,6 @@ impl CoreRealm {
                     .to(&bt_init),
             )
             .await?;
-
-        builder
-            .add_route(
-                Route::new()
-                    .capability(
-                        Capability::directory("dev-class").subdir("bt-host").as_("dev-bt-host"),
-                    )
-                    .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
-                    .to(&bt_init),
-            )
-            .await?;
-
-        // Route capabilities used by test code AboveRoot.
         builder
             .add_route(
                 Route::new()
@@ -166,6 +159,28 @@ impl CoreRealm {
                     .capability(Capability::protocol::<fbsys::BootstrapMarker>())
                     .from(&bt_init)
                     .to(Ref::parent()),
+            )
+            .await?;
+
+        // Add directory routing between components within CoreRealm
+        builder
+            .add_route(
+                Route::new()
+                    .capability(
+                        Capability::directory("dev-class").subdir("bt-host").as_("dev-bt-host"),
+                    )
+                    .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
+                    .to(&bt_init),
+            )
+            .await?;
+        builder
+            .add_route(
+                Route::new()
+                    .capability(
+                        Capability::directory("dev-class").subdir("bt-hci").as_("dev-bt-hci"),
+                    )
+                    .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
+                    .to(&bt_init),
             )
             .await?;
 

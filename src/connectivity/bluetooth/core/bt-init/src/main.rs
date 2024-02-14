@@ -16,7 +16,9 @@ use fidl_fuchsia_component_decl::{
 };
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
-use fuchsia_bluetooth::constants::{DEV_DIR, HCI_DEVICE_DIR};
+use fuchsia_bluetooth::constants::{
+    BT_HOST, BT_HOST_COLLECTION, BT_HOST_URL, DEV_DIR, HCI_DEVICE_DIR,
+};
 use fuchsia_component::{client, server};
 use futures::{future, StreamExt, TryStreamExt};
 use tracing::{error, info, warn};
@@ -24,11 +26,6 @@ use tracing::{error, info, warn};
 const BT_GAP_CHILD_NAME: &str = "bt-gap";
 const BT_RFCOMM_CHILD_NAME: &str = "bt-rfcomm";
 const BT_FASTPAIR_PROVIDER_CHILD_NAME: &str = "bt-fastpair-provider";
-
-const BT_HOST_COLLECTION: &str = "bt-host-collection";
-const BT_HOST: &str = "bt-host";
-// TODO(https://fxbug.dev/42085245): Eventually change to fuchsia-pkg://fuchsia.com/bt-host#meta/bt-host.cm
-const BT_HOST_URL: &str = "fuchsia-pkg://fuchsia.com/bt-host-component#meta/bt-host.cm";
 
 // TODO(https://fxbug.dev/42085245): Remove flag once bt-host is successfully migrated to component
 const IS_BT_HOST_COMPONENT: bool = false;

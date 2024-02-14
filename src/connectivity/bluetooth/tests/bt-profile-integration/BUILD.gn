@@ -38,4 +38,6 @@ fuchsia_test_package("bt-profile-integration-tests") {
     # control the parallelism
     parallel = 1
   }
+  subpackages =
+      [ "//src/connectivity/bluetooth/core/bt-host:bt-host-component" ]
 }
