@@ -14,7 +14,9 @@ driver_bind_rules("e1000_bind") {
   tests = "bind-tests.json"
   deps = [
     ":fuchsia.intel.e1000",
+    "//src/devices/bind/fuchsia.acpi",
     "//src/devices/bind/fuchsia.pci",
+    "//src/devices/bind/fuchsia.sysmem",
   ]
 }
 
