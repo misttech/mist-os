@@ -119,10 +119,11 @@ static const fpbus::Node video_enc_dev = []() {
 // to composite node specs.
 static const fpbus::Node video_enc_dev_old = []() {
   fpbus::Node dev = {};
-  dev.name() = "aml-video-enc";
+  dev.name() = "aml-video-enc-old";
   dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
   dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_T931;
   dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_VIDEO_ENC;
+  dev.instance_id() = 1;
   dev.mmio() = sherlock_video_enc_mmios;
   dev.bti() = sherlock_video_enc_btis;
   dev.irq() = sherlock_video_enc_irqs;

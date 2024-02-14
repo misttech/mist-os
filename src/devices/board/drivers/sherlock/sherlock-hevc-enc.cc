@@ -93,6 +93,7 @@ static const fpbus::Node hevc_enc_dev = []() {
   dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
   dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_T931;
   dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_HEVC_ENC;
+  dev.instance_id() = 1;
   dev.mmio() = sherlock_hevc_enc_mmios;
   dev.bti() = sherlock_hevc_enc_btis;
   dev.irq() = sherlock_hevc_enc_irqs;
