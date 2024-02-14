@@ -7,6 +7,7 @@ package main
 import (
 	"archive/tar"
 	"bufio"
+	"compress/gzip"
 	"flag"
 	"fmt"
 	"io"
@@ -19,6 +20,8 @@ import (
 
 var output = flag.String("output", "", "Path to the generated tarball")
 var manifest = flag.String("manifest", "", "Path to the file containing a description of the tarball's contents")
+var useParallelGzip = flag.Bool("use-parallel-gzip", true,
+	"If true, use the parallelized gzip compressor. Otherwise, use the standard one.")
 
 func archiveFile(tw *tar.Writer, src, dest string) error {
 	file, err := os.Open(src)
@@ -65,7 +68,12 @@ func createTar(archive string, mappings map[string]string) error {
 	}
 	defer file.Close()
 
-	w := NewWriter(file)
+	var w io.WriteCloser
+	if *useParallelGzip {
+		w = NewWriter(file)
+	} else {
+		w = gzip.NewWriter(file)
+	}
 	defer w.Close()
 	tw := tar.NewWriter(w)
 	defer tw.Close()
