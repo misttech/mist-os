@@ -6,7 +6,7 @@ use crate::{
     device::{kobject::DeviceMetadata, DeviceMode},
     fs::tmpfs::TmpFs,
     task::CurrentTask,
-    vfs::{path, DirEntryHandle, FileSystemHandle, FsStr, MountInfo},
+    vfs::{path, DirEntryHandle, FileSystemHandle, FsStr, LookupContext, MountInfo, NamespaceNode},
 };
 use starnix_uapi::{auth::FsCred, device_type::DeviceType, errors::Errno, file_mode::mode};
 
@@ -128,8 +128,12 @@ pub fn devtmpfs_mkdir(current_task: &CurrentTask, name: &FsStr) -> Result<DirEnt
     )
 }
 
-pub fn devtmpfs_remove_child(current_task: &CurrentTask, name: &FsStr) {
-    dev_tmp_fs(current_task).root().remove_child(name);
+pub fn devtmpfs_remove_node(current_task: &CurrentTask, path: &FsStr) -> Result<(), Errno> {
+    let root_node = NamespaceNode::new_anonymous(dev_tmp_fs(current_task).root().clone());
+    let mut context = LookupContext::default();
+    let (parent_node, device_name) = current_task.lookup_parent(&mut context, &root_node, path)?;
+    parent_node.entry.remove_child(device_name.into());
+    Ok(())
 }
 
 pub fn devtmpfs_create_symlink(

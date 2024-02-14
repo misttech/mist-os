@@ -8,7 +8,7 @@ use crate::{
         UEventContext,
     },
     fs::{
-        devtmpfs::{devtmpfs_create_device, devtmpfs_remove_child},
+        devtmpfs::{devtmpfs_create_device, devtmpfs_remove_node},
         sysfs::{
             BusCollectionDirectory, ClassCollectionDirectory, DeviceSysfsOps, SysfsDirectory,
             SYSFS_BLOCK, SYSFS_BUS, SYSFS_CLASS, SYSFS_DEVICES,
@@ -320,7 +320,9 @@ impl DeviceRegistry {
         device.kobject().remove();
         self.dispatch_uevent(UEventAction::Remove, device.clone());
 
-        devtmpfs_remove_child(current_task, device.metadata.name.as_ref());
+        if let Err(err) = devtmpfs_remove_node(current_task, device.metadata.name.as_ref()) {
+            log_error!("Cannot remove device {:?} ({:?})", device, err);
+        }
     }
 
     fn major_devices(&self, mode: DeviceMode) -> MappedMutexGuard<'_, MajorDevices> {
