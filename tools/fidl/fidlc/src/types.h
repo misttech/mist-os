@@ -48,9 +48,8 @@ struct Type {
   const Kind kind;
 
   // Set during the TypeShapeStep.
-  // TODO(https://fxbug.dev/323940291): Remove mutable.
-  mutable std::optional<TypeShape> type_shape;
-  mutable bool type_shape_compiling = false;
+  std::optional<TypeShape> type_shape;
+  bool type_shape_compiling = false;
 
   virtual bool IsNullable() const { return false; }
 
@@ -126,16 +125,16 @@ struct ArrayConstraints : public Constraints<ConstraintKind::kUtf8> {
 struct ArrayType final : public Type, public ArrayConstraints {
   using Constraints = ArrayConstraints;
 
-  ArrayType(const Name& name, const Type* element_type, const SizeValue* element_count)
+  ArrayType(const Name& name, Type* element_type, const SizeValue* element_count)
       : Type(name, Kind::kArray), element_type(element_type), element_count(element_count) {}
-  ArrayType(const Name& name, const Type* element_type, const SizeValue* element_count,
+  ArrayType(const Name& name, Type* element_type, const SizeValue* element_count,
             Constraints constraints)
       : Type(name, Kind::kArray),
         Constraints(std::move(constraints)),
         element_type(element_type),
         element_count(element_count) {}
 
-  const Type* element_type;
+  Type* element_type;
   const SizeValue* element_count;
 
   Comparison Compare(const Type& other) const override {
@@ -165,14 +164,14 @@ struct VectorConstraints : public Constraints<ConstraintKind::kSize, ConstraintK
 struct VectorType final : public Type, public VectorConstraints {
   using Constraints = VectorConstraints;
 
-  VectorType(const Name& name, const Type* element_type)
+  VectorType(const Name& name, Type* element_type)
       : Type(name, Kind::kVector), element_type(element_type) {}
-  VectorType(const Name& name, const Type* element_type, Constraints constraints)
+  VectorType(const Name& name, Type* element_type, Constraints constraints)
       : Type(name, Kind::kVector),
         Constraints(std::move(constraints)),
         element_type(element_type) {}
 
-  const Type* element_type;
+  Type* element_type;
 
   uint32_t ElementCount() const { return size ? size->value : SizeValue::Max().value; }
 
@@ -379,10 +378,9 @@ struct BoxConstraints : public Constraints<> {
 struct BoxType final : public Type, public BoxConstraints {
   using Constraints = BoxConstraints;
 
-  BoxType(const Name& name, const Type* boxed_type)
-      : Type(name, Kind::kBox), boxed_type(boxed_type) {}
+  BoxType(const Name& name, Type* boxed_type) : Type(name, Kind::kBox), boxed_type(boxed_type) {}
 
-  const Type* boxed_type;
+  Type* boxed_type;
 
   // All boxes are implicitly nullable.
   bool IsNullable() const override { return true; }
@@ -411,10 +409,10 @@ struct UntypedNumericType final : public Type, public Constraints<> {
 struct ZxExperimentalPointerType final : public Type, public Constraints<> {
   using Constraints = Constraints<>;
 
-  ZxExperimentalPointerType(const Name& name, const Type* pointee_type)
+  ZxExperimentalPointerType(const Name& name, Type* pointee_type)
       : Type(name, Kind::kZxExperimentalPointer), pointee_type(pointee_type) {}
 
-  const Type* pointee_type;
+  Type* pointee_type;
 
   Comparison Compare(const Type& other) const override {
     const auto& o = static_cast<const ZxExperimentalPointerType&>(other);

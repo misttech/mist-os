@@ -317,7 +317,7 @@ struct TypeConstructor final {
   std::unique_ptr<TypeConstraints> constraints;
 
   // Set during compilation.
-  const Type* type = nullptr;
+  Type* type = nullptr;
   LayoutInvocation resolved_params;
 };
 

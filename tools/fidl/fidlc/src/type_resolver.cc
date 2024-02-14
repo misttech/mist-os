@@ -13,7 +13,7 @@ namespace fidlc {
 
 bool TypeResolver::ResolveParamAsType(const Reference& layout,
                                       const std::unique_ptr<LayoutParameter>& param,
-                                      const Type** out_type) {
+                                      Type** out_type) {
   auto type_ctor = param->AsTypeCtor();
   auto check = reporter()->Checkpoint();
   if (!type_ctor || !ResolveType(type_ctor)) {

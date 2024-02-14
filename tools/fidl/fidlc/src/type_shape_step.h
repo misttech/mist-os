@@ -20,9 +20,9 @@ class TypeShapeStep : public Compiler::Step {
   // Compile and Calculate are mutually recursive. Compile calculates and (usually) stores
   // the type shape, while Calculate just returns it (but calls Compile recursively).
   TypeShape Compile(TypeDecl* decl, bool is_recursive_call = true);
-  TypeShape Compile(const Type* type, bool is_recursive_call = true);
+  TypeShape Compile(Type* type, bool is_recursive_call = true);
   TypeShape Calculate(TypeDecl* decl);
-  TypeShape Calculate(const Type* type);
+  TypeShape Calculate(Type* type);
 
   template <typename TypeDeclOrType>
   TypeShape CompileImpl(TypeDeclOrType* target, bool is_recursive_call);

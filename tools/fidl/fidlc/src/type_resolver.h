@@ -25,7 +25,7 @@ class TypeResolver {
   // Top level methods for resolving layout parameters. These are used by
   // TypeTemplates.
   bool ResolveParamAsType(const Reference& layout, const std::unique_ptr<LayoutParameter>& param,
-                          const Type** out_type);
+                          Type** out_type);
   bool ResolveParamAsSize(const Reference& layout, const std::unique_ptr<LayoutParameter>& param,
                           const SizeValue** out_size);
 

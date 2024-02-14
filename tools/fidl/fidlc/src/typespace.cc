@@ -77,17 +77,17 @@ Typespace::Typespace(const Library* root_library, Reporter* reporter) : reporter
       std::make_unique<UntypedNumericType>(Name::CreateIntrinsic(nullptr, "untyped numeric"));
 }
 
-const PrimitiveType* Typespace::GetPrimitiveType(PrimitiveSubtype subtype) {
+PrimitiveType* Typespace::GetPrimitiveType(PrimitiveSubtype subtype) {
   return primitive_types_.at(subtype).get();
 }
 
-const InternalType* Typespace::GetInternalType(InternalSubtype subtype) {
+InternalType* Typespace::GetInternalType(InternalSubtype subtype) {
   return internal_types_.at(subtype).get();
 }
 
-const Type* Typespace::GetUnboundedStringType() { return unbounded_string_type_.get(); }
+Type* Typespace::GetUnboundedStringType() { return unbounded_string_type_.get(); }
 
-const Type* Typespace::GetStringType(size_t max_size) {
+Type* Typespace::GetStringType(size_t max_size) {
   auto name = unbounded_string_type_->name;
   sizes_.push_back(std::make_unique<SizeValue>(max_size));
   auto size = sizes_.back().get();
@@ -96,9 +96,9 @@ const Type* Typespace::GetStringType(size_t max_size) {
   return types_.back().get();
 }
 
-const Type* Typespace::GetUntypedNumericType() { return untyped_numeric_type_.get(); }
+Type* Typespace::GetUntypedNumericType() { return untyped_numeric_type_.get(); }
 
-const Type* Typespace::Intern(std::unique_ptr<Type> type) {
+Type* Typespace::Intern(std::unique_ptr<Type> type) {
   types_.push_back(std::move(type));
   return types_.back().get();
 }
@@ -115,27 +115,27 @@ class Typespace::Creator {
         constraints_(constraints),
         out_params_(out_params) {}
 
-  const Type* Create();
+  Type* Create();
 
  private:
   Reporter* reporter() { return typespace_->reporter(); }
 
   bool EnsureNumberOfLayoutParams(size_t expected_params);
 
-  const Type* CreatePrimitiveType(PrimitiveSubtype subtype);
-  const Type* CreateInternalType(InternalSubtype subtype);
-  const Type* CreateStringType();
-  const Type* CreateArrayType();
-  const Type* CreateStringArrayType();
-  const Type* CreateVectorType();
-  const Type* CreateBytesType();
-  const Type* CreateFrameworkErrType();
-  const Type* CreateBoxType();
-  const Type* CreateHandleType(Resource* resource);
-  const Type* CreateTransportSideType(TransportSide end);
-  const Type* CreateIdentifierType(TypeDecl* type_decl);
-  const Type* CreateAliasType(Alias* alias);
-  const Type* CreateZxExperimentalPointerType();
+  Type* CreatePrimitiveType(PrimitiveSubtype subtype);
+  Type* CreateInternalType(InternalSubtype subtype);
+  Type* CreateStringType();
+  Type* CreateArrayType();
+  Type* CreateStringArrayType();
+  Type* CreateVectorType();
+  Type* CreateBytesType();
+  Type* CreateFrameworkErrType();
+  Type* CreateBoxType();
+  Type* CreateHandleType(Resource* resource);
+  Type* CreateTransportSideType(TransportSide end);
+  Type* CreateIdentifierType(TypeDecl* type_decl);
+  Type* CreateAliasType(Alias* alias);
+  Type* CreateZxExperimentalPointerType();
 
   Typespace* typespace_;
   TypeResolver* resolver_;
@@ -145,16 +145,16 @@ class Typespace::Creator {
   LayoutInvocation* out_params_;
 };
 
-const Type* Typespace::Create(TypeResolver* resolver, const Reference& layout,
-                              const LayoutParameterList& parameters,
-                              const TypeConstraints& constraints, LayoutInvocation* out_params) {
+Type* Typespace::Create(TypeResolver* resolver, const Reference& layout,
+                        const LayoutParameterList& parameters, const TypeConstraints& constraints,
+                        LayoutInvocation* out_params) {
   // TODO(https://fxbug.dev/42156099): lookup whether we've already created the type, and
   // return it rather than create a new one. Lookup must be by name, arg_type,
   // size, and nullability.
   return Creator(this, resolver, layout, parameters, constraints, out_params).Create();
 }
 
-const Type* Typespace::Creator::Create() {
+Type* Typespace::Creator::Create() {
   Decl* target = layout_.resolved().element()->AsDecl();
 
   switch (target->kind) {
@@ -235,7 +235,7 @@ bool Typespace::Creator::EnsureNumberOfLayoutParams(size_t expected_params) {
                           expected_params, num_params);
 }
 
-const Type* Typespace::Creator::CreatePrimitiveType(PrimitiveSubtype subtype) {
+Type* Typespace::Creator::CreatePrimitiveType(PrimitiveSubtype subtype) {
   if (!EnsureNumberOfLayoutParams(0)) {
     return nullptr;
   }
@@ -245,7 +245,7 @@ const Type* Typespace::Creator::CreatePrimitiveType(PrimitiveSubtype subtype) {
   return typespace_->Intern(std::move(constrained_type));
 }
 
-const Type* Typespace::Creator::CreateInternalType(InternalSubtype subtype) {
+Type* Typespace::Creator::CreateInternalType(InternalSubtype subtype) {
   if (!EnsureNumberOfLayoutParams(0)) {
     return nullptr;
   }
@@ -255,11 +255,11 @@ const Type* Typespace::Creator::CreateInternalType(InternalSubtype subtype) {
   return typespace_->Intern(std::move(constrained_type));
 }
 
-const Type* Typespace::Creator::CreateArrayType() {
+Type* Typespace::Creator::CreateArrayType() {
   if (!EnsureNumberOfLayoutParams(2))
     return nullptr;
 
-  const Type* element_type = nullptr;
+  Type* element_type = nullptr;
   if (!resolver_->ResolveParamAsType(layout_, parameters_.items[0], &element_type))
     return nullptr;
   out_params_->element_type_resolved = element_type;
@@ -278,12 +278,12 @@ const Type* Typespace::Creator::CreateArrayType() {
   return typespace_->Intern(std::move(constrained_type));
 }
 
-const Type* Typespace::Creator::CreateStringArrayType() {
+Type* Typespace::Creator::CreateStringArrayType() {
   if (!EnsureNumberOfLayoutParams(1)) {
     return nullptr;
   }
 
-  const Type* uint8_type = typespace_->GetPrimitiveType(PrimitiveSubtype::kUint8);
+  Type* uint8_type = typespace_->GetPrimitiveType(PrimitiveSubtype::kUint8);
 
   const SizeValue* size = nullptr;
   if (!resolver_->ResolveParamAsSize(layout_, parameters_.items[0], &size))
@@ -299,11 +299,11 @@ const Type* Typespace::Creator::CreateStringArrayType() {
   return typespace_->Intern(std::move(constrained_type));
 }
 
-const Type* Typespace::Creator::CreateVectorType() {
+Type* Typespace::Creator::CreateVectorType() {
   if (!EnsureNumberOfLayoutParams(1))
     return nullptr;
 
-  const Type* element_type = nullptr;
+  Type* element_type = nullptr;
   if (!resolver_->ResolveParamAsType(layout_, parameters_.items[0], &element_type))
     return nullptr;
   out_params_->element_type_resolved = element_type;
@@ -316,11 +316,11 @@ const Type* Typespace::Creator::CreateVectorType() {
   return typespace_->Intern(std::move(constrained_type));
 }
 
-const Type* Typespace::Creator::CreateZxExperimentalPointerType() {
+Type* Typespace::Creator::CreateZxExperimentalPointerType() {
   if (!EnsureNumberOfLayoutParams(1))
     return nullptr;
 
-  const Type* element_type = nullptr;
+  Type* element_type = nullptr;
   if (!resolver_->ResolveParamAsType(layout_, parameters_.items[0], &element_type))
     return nullptr;
   out_params_->element_type_resolved = element_type;
@@ -333,7 +333,7 @@ const Type* Typespace::Creator::CreateZxExperimentalPointerType() {
   return typespace_->Intern(std::move(constrained_type));
 }
 
-const Type* Typespace::Creator::CreateStringType() {
+Type* Typespace::Creator::CreateStringType() {
   if (!EnsureNumberOfLayoutParams(0))
     return nullptr;
 
@@ -344,7 +344,7 @@ const Type* Typespace::Creator::CreateStringType() {
   return typespace_->Intern(std::move(constrained_type));
 }
 
-const Type* Typespace::Creator::CreateHandleType(Resource* resource) {
+Type* Typespace::Creator::CreateHandleType(Resource* resource) {
   if (!EnsureNumberOfLayoutParams(0))
     return nullptr;
   if (auto cycle = resolver_->GetDeclCycle(resource); cycle) {
@@ -363,7 +363,7 @@ const Type* Typespace::Creator::CreateHandleType(Resource* resource) {
 // TODO(https://fxbug.dev/42134495): Support more transports.
 static constexpr std::string_view kChannelTransport = "Channel";
 
-const Type* Typespace::Creator::CreateTransportSideType(TransportSide end) {
+Type* Typespace::Creator::CreateTransportSideType(TransportSide end) {
   if (!EnsureNumberOfLayoutParams(0))
     return nullptr;
 
@@ -374,7 +374,7 @@ const Type* Typespace::Creator::CreateTransportSideType(TransportSide end) {
   return typespace_->Intern(std::move(constrained_type));
 }
 
-const Type* Typespace::Creator::CreateIdentifierType(TypeDecl* type_decl) {
+Type* Typespace::Creator::CreateIdentifierType(TypeDecl* type_decl) {
   if (!type_decl->compiled && type_decl->kind != Decl::Kind::kProtocol) {
     if (!type_decl->compiling) {
       resolver_->CompileDecl(type_decl);
@@ -391,7 +391,7 @@ const Type* Typespace::Creator::CreateIdentifierType(TypeDecl* type_decl) {
   return typespace_->Intern(std::move(constrained_type));
 }
 
-const Type* Typespace::Creator::CreateAliasType(Alias* alias) {
+Type* Typespace::Creator::CreateAliasType(Alias* alias) {
   if (auto cycle = resolver_->GetDeclCycle(alias); cycle) {
     reporter()->Fail(ErrIncludeCycle, alias->name.span().value(), cycle.value());
     return nullptr;
@@ -435,11 +435,11 @@ static bool CannotBeBoxedNorOptional(const Type* type) {
   return false;
 }
 
-const Type* Typespace::Creator::CreateBoxType() {
+Type* Typespace::Creator::CreateBoxType() {
   if (!EnsureNumberOfLayoutParams(1))
     return nullptr;
 
-  const Type* boxed_type = nullptr;
+  Type* boxed_type = nullptr;
   if (!resolver_->ResolveParamAsType(layout_, parameters_.items[0], &boxed_type))
     return nullptr;
   if (!IsStruct(boxed_type)) {

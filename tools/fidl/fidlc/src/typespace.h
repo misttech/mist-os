@@ -36,20 +36,20 @@ class Typespace final {
   Reporter* reporter() { return reporter_; }
   const std::vector<std::unique_ptr<Type>>& types() { return types_; }
 
-  const Type* Create(TypeResolver* resolver, const Reference& layout,
-                     const LayoutParameterList& parameters, const TypeConstraints& constraints,
-                     LayoutInvocation* out_params);
+  Type* Create(TypeResolver* resolver, const Reference& layout,
+               const LayoutParameterList& parameters, const TypeConstraints& constraints,
+               LayoutInvocation* out_params);
 
-  const PrimitiveType* GetPrimitiveType(PrimitiveSubtype subtype);
-  const InternalType* GetInternalType(InternalSubtype subtype);
-  const Type* GetUnboundedStringType();
-  const Type* GetStringType(size_t max_size);
-  const Type* GetUntypedNumericType();
+  PrimitiveType* GetPrimitiveType(PrimitiveSubtype subtype);
+  InternalType* GetInternalType(InternalSubtype subtype);
+  Type* GetUnboundedStringType();
+  Type* GetStringType(size_t max_size);
+  Type* GetUntypedNumericType();
 
  private:
   class Creator;
 
-  const Type* Intern(std::unique_ptr<Type> type);
+  Type* Intern(std::unique_ptr<Type> type);
 
   Reporter* reporter_;
 

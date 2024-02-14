@@ -32,7 +32,7 @@ class CheckedMath {
 
  private:
   uint32_t Fail(uint32_t a, char op, uint32_t b) {
-    // TODO(https://fxbug.dev/323940291): Remove this. See Calculate(const Type*).
+    // TODO(https://fxbug.dev/323940291): Remove this. See Calculate(Type*).
     ZX_ASSERT_MSG(
         span_.has_value(),
         "TypeShapeStep had integer overflow, but can't report it because there is no source span");
@@ -209,7 +209,7 @@ TypeShape TypeShapeStep::Calculate(TypeDecl* decl) {
   }
 }
 
-TypeShape TypeShapeStep::Calculate(const Type* type) {
+TypeShape TypeShapeStep::Calculate(Type* type) {
   // TODO(https://fxbug.dev/323940291): This doesn't work for most types because
   // type->name is a builtin whose span is null, and Reporter::Fail asserts the
   // span is not null. We need to get access to the TypeConstructor's span.
@@ -319,14 +319,13 @@ TypeShape TypeShapeStep::Compile(TypeDecl* decl, bool is_recursive_call) {
   return CompileImpl(decl, is_recursive_call);
 }
 
-TypeShape TypeShapeStep::Compile(const Type* type, bool is_recursive_call) {
+TypeShape TypeShapeStep::Compile(Type* type, bool is_recursive_call) {
   return CompileImpl(type, is_recursive_call);
 }
 
 template <typename TypeDeclOrType>
 TypeShape TypeShapeStep::CompileImpl(TypeDeclOrType* target, bool is_recursive_call) {
-  static_assert(std::is_same_v<TypeDeclOrType, TypeDecl> ||
-                std::is_same_v<TypeDeclOrType, const Type>);
+  static_assert(std::is_same_v<TypeDeclOrType, TypeDecl> || std::is_same_v<TypeDeclOrType, Type>);
   if (target->type_shape.has_value())
     return target->type_shape.value();
   // If we're in a cycle, make depth and max_out_of_line unbounded. Leave the
