@@ -65,7 +65,4 @@ type Image = struct {
     /// the driver and buffer producer to agree on the meaning of the value
     /// through some mechanism outside the scope of this API.
     type uint32;
-
-    /// A driver-defined ImageId. Each id must be unique.
-    id ImageId;
 };
