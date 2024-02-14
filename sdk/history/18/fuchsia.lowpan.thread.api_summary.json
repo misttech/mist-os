@@ -1,5 +1,52 @@
 [
     {
+        "kind": "table/member",
+        "name": "fuchsia.lowpan.thread/Capabilities.dhcpv6_pd",
+        "ordinal": "2",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.lowpan.thread/Capabilities.nat64",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.lowpan.thread/Capabilities"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.lowpan.thread/CapabilitiesConnector.Connect",
+        "strictness": "strict",
+        "ordinal": "133662496619416965",
+        "direction": "one_way",
+        "request": "fuchsia.lowpan.thread/CapabilitiesConnectorConnectRequest"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.lowpan.thread/CapabilitiesConnector",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.thread/CapabilitiesConnectorConnectRequest.name",
+        "ordinal": "1",
+        "type": "string:32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.thread/CapabilitiesConnectorConnectRequest.server_end",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.lowpan.thread/ThreadCapabilities"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.thread/CapabilitiesConnectorConnectRequest",
+        "resourceness": "resource"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.lowpan.thread/Dataset.AttachAllNodesTo",
         "strictness": "strict",
@@ -319,6 +366,30 @@
     {
         "kind": "struct",
         "name": "fuchsia.lowpan.thread/MeshcopUpdateTxtEntriesRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.lowpan.thread/ThreadCapabilities.GetCapabilities",
+        "strictness": "strict",
+        "ordinal": "6487474485773653029",
+        "direction": "two_way",
+        "response": "fuchsia.lowpan.thread/ThreadCapabilitiesGetCapabilitiesResponse"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.lowpan.thread/ThreadCapabilities",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.lowpan.thread/ThreadCapabilitiesGetCapabilitiesResponse.capabilities",
+        "ordinal": "1",
+        "type": "fuchsia.lowpan.thread/Capabilities"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.lowpan.thread/ThreadCapabilitiesGetCapabilitiesResponse"
     },
     {
         "kind": "struct/member",
