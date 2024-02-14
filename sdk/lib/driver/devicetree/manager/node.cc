@@ -198,4 +198,6 @@ std::vector<ChildNode> Node::children() {
   return children;
 }
 
+ParentNode ReferenceNode::parent() const { return node_->parent(); }
+
 }  // namespace fdf_devicetree

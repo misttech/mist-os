@@ -8,17 +8,17 @@
 #include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/devicetree/visitors/common-types.h>
 #include <lib/driver/devicetree/visitors/registration.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <string_view>
-#include <utility>
-#include <vector>
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
@@ -40,8 +40,6 @@ class GpioCells {
   uint32_t pin() { return static_cast<uint32_t>(*gpio_cells_[0][0]); }
 
   // 2nd cell represents GpioFlags. This is only used in gpio init hog nodes and ignored elsewhere.
-  // TODO(b/314693127): The 2nd field definition is not yet finalized. Update this once the design
-  // is complete.
   zx::result<GpioFlags> flags() {
     switch (static_cast<uint32_t>(*gpio_cells_[0][1])) {
       case 0:
@@ -62,13 +60,19 @@ class GpioCells {
 
 }  // namespace
 
-// TODO(b/314693127): Name of the reference property can be *-gpios.
+// TODO(b/325077980): Name of the reference property can be *-gpios.
 GpioImplVisitor::GpioImplVisitor() {
-  fdf_devicetree::Properties properties = {};
-  properties.emplace_back(
+  fdf_devicetree::Properties gpio_properties = {};
+  gpio_properties.emplace_back(
       std::make_unique<fdf_devicetree::ReferenceProperty>(kGpioReference, kGpioCells));
-  properties.emplace_back(std::make_unique<fdf_devicetree::StringListProperty>(kGpioNames));
-  gpio_parser_ = std::make_unique<fdf_devicetree::PropertyParser>(std::move(properties));
+  gpio_properties.emplace_back(std::make_unique<fdf_devicetree::StringListProperty>(kGpioNames));
+  gpio_parser_ = std::make_unique<fdf_devicetree::PropertyParser>(std::move(gpio_properties));
+
+  fdf_devicetree::Properties pinctrl_state_properties = {};
+  pinctrl_state_properties.emplace_back(
+      std::make_unique<fdf_devicetree::ReferenceProperty>(kPinCtrl0, 0u));
+  pinctrl_state_parser_ =
+      std::make_unique<fdf_devicetree::PropertyParser>(std::move(pinctrl_state_properties));
 }
 
 bool GpioImplVisitor::is_match(
@@ -84,33 +88,61 @@ zx::result<> GpioImplVisitor::Visit(fdf_devicetree::Node& node,
   if (gpio_hog != node.properties().end()) {
     // Node containing gpio-hog property are to be parsed differently. They will be used to
     // construct gpio init step metadata.
-    auto result = ParseInitChild(node);
+    auto result = ParseGpioHogChild(node);
     if (result.is_error()) {
       FDF_LOG(ERROR, "Gpio visitor failed for node '%s' : %s", node.name().c_str(),
               result.status_string());
     }
   } else {
-    auto parser_output = gpio_parser_->Parse(node);
+    auto gpio_props = gpio_parser_->Parse(node);
 
-    if (parser_output->find(kGpioReference) == parser_output->end()) {
-      return zx::ok();
+    if (gpio_props->find(kGpioReference) != gpio_props->end()) {
+      if (gpio_props->find(kGpioNames) == gpio_props->end() ||
+          (*gpio_props)[kGpioNames].size() != (*gpio_props)[kGpioReference].size()) {
+        // We need a gpio names to generate bind rules.
+        FDF_LOG(ERROR, "Gpio reference '%s' does not have valid gpio names field.",
+                node.name().c_str());
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+
+      for (uint32_t index = 0; index < (*gpio_props)[kGpioReference].size(); index++) {
+        auto reference = (*gpio_props)[kGpioReference][index].AsReference();
+        if (reference && is_match(reference->first.properties())) {
+          auto result = ParseReferenceChild(node, reference->first, reference->second,
+                                            (*gpio_props)[kGpioNames][index].AsString());
+          if (result.is_error()) {
+            return result.take_error();
+          }
+        }
+      }
     }
 
-    if (parser_output->find(kGpioNames) == parser_output->end() ||
-        (*parser_output)[kGpioNames].size() != (*parser_output)[kGpioReference].size()) {
-      // We need a clock names to generate bind rules.
-      FDF_LOG(ERROR, "Gpio reference '%s' does not have valid gpio names field.",
-              node.name().c_str());
-      return zx::error(ZX_ERR_INVALID_ARGS);
-    }
+    auto pinctrl_props = pinctrl_state_parser_->Parse(node);
+    if (pinctrl_props->find(kPinCtrl0) != pinctrl_props->end()) {
+      // Names of gpio controllers used in this pin control state. This is used to add gpio init
+      // bind rule only once per controller.
+      std::vector<uint32_t> controllers;
 
-    for (uint32_t index = 0; index < (*parser_output)[kGpioReference].size(); index++) {
-      auto reference = (*parser_output)[kGpioReference][index].AsReference();
-      if (reference && is_match(reference->first.properties())) {
-        auto result = ParseReferenceChild(node, reference->first, reference->second,
-                                          (*parser_output)[kGpioNames][index].AsString());
+      for (auto& pinctrl_cfg : (*pinctrl_props)[kPinCtrl0]) {
+        auto reference = pinctrl_cfg.AsReference();
+
+        auto gpio_node = GetGpioNodeForPinConfig(reference->first);
+        if (gpio_node.is_error()) {
+          return gpio_node.take_error();
+        }
+
+        auto result = ParsePinCtrlCfg(node, reference->first, *gpio_node);
         if (result.is_error()) {
           return result.take_error();
+        }
+
+        if (std::find(controllers.begin(), controllers.end(), gpio_node->id()) ==
+            controllers.end()) {
+          result = AddInitNodeSpec(node);
+          if (result.is_error()) {
+            return result.take_error();
+          }
+          controllers.push_back(gpio_node->id());
         }
       }
     }
@@ -139,14 +171,119 @@ zx::result<> GpioImplVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint
   return zx::ok();
 }
 
-zx::result<> GpioImplVisitor::ParseInitChild(fdf_devicetree::Node& child) {
+zx::result<> GpioImplVisitor::AddInitNodeSpec(fdf_devicetree::Node& child) {
+  auto gpio_init_node = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
+                                             bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)},
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+          },
+  }};
+  child.AddNodeSpec(gpio_init_node);
+  return zx::ok();
+}
+
+zx::result<fdf_devicetree::ParentNode> GpioImplVisitor::GetGpioNodeForPinConfig(
+    fdf_devicetree::ReferenceNode& cfg_node) {
+  // TODO(b/325077980): Add gpio-ranges based mapping in case the pinctrl cfg is not a direct
+  // child of gpio-controller.
+  return zx::ok(cfg_node.parent());
+}
+
+zx::result<> GpioImplVisitor::ParsePinCtrlCfg(fdf_devicetree::Node& child,
+                                              fdf_devicetree::ReferenceNode& cfg_node,
+                                              fdf_devicetree::ParentNode& gpio_node) {
+  // Check that the parent is indeed a gpio-controller that we support.
+  if (!is_match(gpio_node.properties())) {
+    return zx::ok();
+  }
+
+  auto& controller = GetController(gpio_node.id());
+  auto pins_property = cfg_node.properties().find(kPins);
+  if (pins_property == cfg_node.properties().end()) {
+    FDF_LOG(ERROR, "Pin controller config '%s' does not have pins property",
+            cfg_node.name().c_str());
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  auto pins = fdf_devicetree::Uint32Array(pins_property->second.AsBytes());
+  if (pins.size() == 0) {
+    FDF_LOG(ERROR, "No pins found in pin controller config '%s'", cfg_node.name().c_str());
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  std::vector<InitCall> init_calls;
+
+  if (cfg_node.properties().find(kPinInputEnable) != cfg_node.properties().end()) {
+    if (cfg_node.properties().find(kPinBiasPullDown) != cfg_node.properties().end()) {
+      init_calls.emplace_back(InitCall::WithInputFlags(GpioFlags::kPullDown));
+    } else if (cfg_node.properties().find(kPinBiasPullUp) != cfg_node.properties().end()) {
+      init_calls.emplace_back(InitCall::WithInputFlags(GpioFlags::kPullUp));
+    } else if (cfg_node.properties().find(kPinBiasDisable) != cfg_node.properties().end()) {
+      init_calls.emplace_back(InitCall::WithInputFlags(GpioFlags::kNoPull));
+    } else {
+      FDF_LOG(ERROR, "Pin controller config '%s' has unsupported input config.",
+              cfg_node.name().c_str());
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+    }
+  }
+
+  if (cfg_node.properties().find(kPinOutputLow) != cfg_node.properties().end()) {
+    init_calls.emplace_back(InitCall::WithOutputValue(0));
+  }
+
+  if (cfg_node.properties().find(kPinOutputHigh) != cfg_node.properties().end()) {
+    init_calls.emplace_back(InitCall::WithOutputValue(1));
+  }
+
+  if (cfg_node.properties().find(kPinFunction) != cfg_node.properties().end()) {
+    auto function = cfg_node.properties().at(kPinFunction).AsUint64();
+    if (!function) {
+      FDF_LOG(ERROR, "Pin controller config '%s' has invalid function.", cfg_node.name().c_str());
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    init_calls.emplace_back(InitCall::WithAltFunction(*function));
+  }
+
+  if (cfg_node.properties().find(kPinDriveStrengthUa) != cfg_node.properties().end()) {
+    auto drive_strength_ua = cfg_node.properties().at(kPinDriveStrengthUa).AsUint64();
+    if (!drive_strength_ua) {
+      FDF_LOG(ERROR, "Pin controller config '%s' has invalid drive strength.",
+              cfg_node.name().c_str());
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    init_calls.emplace_back(InitCall::WithDriveStrengthUa(*drive_strength_ua));
+  }
+
+  if (init_calls.empty()) {
+    FDF_LOG(ERROR, "Pin controller config '%s' does not have a valid config.",
+            cfg_node.name().c_str());
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  // Add the init steps for all the pins in the config.
+  for (size_t i = 0; i < pins.size(); i++) {
+    FDF_LOG(DEBUG,
+            "Gpio init steps (count: %zu) for child '%s' (pin 0x%x) added to controller '%s'",
+            init_calls.size(), child.name().c_str(), pins[i], gpio_node.name().c_str());
+    for (auto& init_call : init_calls) {
+      fuchsia_hardware_gpioimpl::InitStep step = {{pins[i], init_call}};
+      controller.init_steps.steps().emplace_back(step);
+    }
+  }
+
+  return zx::ok();
+}
+
+zx::result<> GpioImplVisitor::ParseGpioHogChild(fdf_devicetree::Node& child) {
   auto parent = child.parent().MakeReferenceNode();
   // Check that the parent is indeed a gpio-controller that we support.
   if (!is_match(parent.properties())) {
     return zx::ok();
   }
 
-  auto& controller = GetController(*parent.phandle());
+  auto& controller = GetController(parent.id());
   auto gpios = child.properties().find("gpios");
   if (gpios == child.properties().end()) {
     FDF_LOG(ERROR, "Gpio init hog '%s' does not have gpios property", child.name().c_str());
@@ -180,9 +317,6 @@ zx::result<> GpioImplVisitor::ParseInitChild(fdf_devicetree::Node& child) {
     }
     init_call = InitCall::WithOutputValue(1);
   }
-
-  // TODO(b/314693127): Provide a way to express alternate function and drive strength in
-  // devicetree. One option is to consider pinctrl.
 
   if (!init_call) {
     FDF_LOG(ERROR, "Gpio init hog '%s' does not have a init call", child.name().c_str());
@@ -238,12 +372,12 @@ zx::result<> GpioImplVisitor::ParseInitChild(fdf_devicetree::Node& child) {
   return zx::ok();
 }
 
-GpioImplVisitor::GpioController& GpioImplVisitor::GetController(fdf_devicetree::Phandle phandle) {
-  auto controller_iter = gpio_controllers_.find(phandle);
+GpioImplVisitor::GpioController& GpioImplVisitor::GetController(uint32_t node_id) {
+  auto controller_iter = gpio_controllers_.find(node_id);
   if (controller_iter == gpio_controllers_.end()) {
-    gpio_controllers_[phandle] = GpioController();
+    gpio_controllers_[node_id] = GpioController();
   }
-  return gpio_controllers_[phandle];
+  return gpio_controllers_[node_id];
 }
 
 zx::result<> GpioImplVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
@@ -255,8 +389,7 @@ zx::result<> GpioImplVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   auto reference_name = std::string(*gpio_name);
-
-  auto& controller = GetController(*parent.phandle());
+  auto& controller = GetController(parent.id());
 
   if (specifiers.size_bytes() != 2 * sizeof(uint32_t)) {
     FDF_LOG(ERROR,
@@ -286,55 +419,53 @@ zx::result<> GpioImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
     return zx::ok();
   }
 
-  if (node.phandle()) {
-    auto controller = gpio_controllers_.find(*node.phandle());
-    if (controller == gpio_controllers_.end()) {
-      FDF_LOG(INFO, "Gpio controller '%s' is not being used. Not adding any metadata for it.",
-              node.name().c_str());
-      return zx::ok();
+  auto controller = gpio_controllers_.find(node.id());
+  if (controller == gpio_controllers_.end()) {
+    FDF_LOG(INFO, "Gpio controller '%s' is not being used. Not adding any metadata for it.",
+            node.name().c_str());
+    return zx::ok();
+  }
+
+  {
+    fuchsia_hardware_gpioimpl::ControllerMetadata metadata = {{.id = controller->first}};
+    const fit::result encoded_controller_metadata = fidl::Persist(metadata);
+    if (!encoded_controller_metadata.is_ok()) {
+      FDF_LOG(ERROR, "Failed to encode GPIO controller metadata for node %s: %s",
+              node.name().c_str(),
+              encoded_controller_metadata.error_value().FormatDescription().c_str());
+      return zx::error(encoded_controller_metadata.error_value().status());
+    }
+    fuchsia_hardware_platform_bus::Metadata controller_metadata = {{
+        .type = DEVICE_METADATA_GPIO_CONTROLLER,
+        .data = encoded_controller_metadata.value(),
+    }};
+    node.AddMetadata(std::move(controller_metadata));
+    FDF_LOG(DEBUG, "Gpio controller metadata added to node '%s'", node.name().c_str());
+  }
+
+  if (!controller->second.init_steps.steps().empty()) {
+    const fit::result encoded_init_steps = fidl::Persist(controller->second.init_steps);
+    if (!encoded_init_steps.is_ok()) {
+      FDF_LOG(ERROR, "Failed to encode GPIO init metadata for node %s: %s", node.name().c_str(),
+              encoded_init_steps.error_value().FormatDescription().c_str());
+      return zx::error(encoded_init_steps.error_value().status());
     }
 
-    {
-      fuchsia_hardware_gpioimpl::ControllerMetadata metadata = {{.id = *node.phandle()}};
-      const fit::result encoded_controller_metadata = fidl::Persist(metadata);
-      if (!encoded_controller_metadata.is_ok()) {
-        FDF_LOG(ERROR, "Failed to encode GPIO controller metadata for node %s: %s",
-                node.name().c_str(),
-                encoded_controller_metadata.error_value().FormatDescription().c_str());
-        return zx::error(encoded_controller_metadata.error_value().status());
-      }
-      fuchsia_hardware_platform_bus::Metadata controller_metadata = {{
-          .type = DEVICE_METADATA_GPIO_CONTROLLER,
-          .data = encoded_controller_metadata.value(),
-      }};
-      node.AddMetadata(std::move(controller_metadata));
-      FDF_LOG(DEBUG, "Gpio controller metadata added to node '%s'", node.name().c_str());
-    }
+    fuchsia_hardware_platform_bus::Metadata init_metadata = {{
+        .type = DEVICE_METADATA_GPIO_INIT,
+        .data = encoded_init_steps.value(),
+    }};
+    node.AddMetadata(std::move(init_metadata));
+    FDF_LOG(DEBUG, "Gpio init steps metadata added to node '%s'", node.name().c_str());
+  }
 
-    if (!controller->second.init_steps.steps().empty()) {
-      const fit::result encoded_init_steps = fidl::Persist(controller->second.init_steps);
-      if (!encoded_init_steps.is_ok()) {
-        FDF_LOG(ERROR, "Failed to encode GPIO init metadata for node %s: %s", node.name().c_str(),
-                encoded_init_steps.error_value().FormatDescription().c_str());
-        return zx::error(encoded_init_steps.error_value().status());
-      }
-
-      fuchsia_hardware_platform_bus::Metadata init_metadata = {{
-          .type = DEVICE_METADATA_GPIO_INIT,
-          .data = encoded_init_steps.value(),
-      }};
-      node.AddMetadata(std::move(init_metadata));
-      FDF_LOG(DEBUG, "Gpio init steps metadata added to node '%s'", node.name().c_str());
-    }
-
-    if (!controller->second.gpio_pins_metadata.empty()) {
-      fuchsia_hardware_platform_bus::Metadata pin_metadata = {{
-          .type = DEVICE_METADATA_GPIO_PINS,
-          .data = controller->second.gpio_pins_metadata,
-      }};
-      node.AddMetadata(std::move(pin_metadata));
-      FDF_LOG(DEBUG, "Gpio pins metadata added to node '%s'", node.name().c_str());
-    }
+  if (!controller->second.gpio_pins_metadata.empty()) {
+    fuchsia_hardware_platform_bus::Metadata pin_metadata = {{
+        .type = DEVICE_METADATA_GPIO_PINS,
+        .data = controller->second.gpio_pins_metadata,
+    }};
+    node.AddMetadata(std::move(pin_metadata));
+    FDF_LOG(DEBUG, "Gpio pins metadata added to node '%s'", node.name().c_str());
   }
 
   return zx::ok();

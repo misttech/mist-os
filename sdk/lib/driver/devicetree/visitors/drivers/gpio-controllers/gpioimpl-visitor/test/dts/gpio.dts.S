@@ -16,7 +16,6 @@
       reg = <0x0 0xffffa000 0x0 0x1000>;
       #gpio-cells = <2>;
       gpio-controller;
-      phandle = <TEST_PHANDLE>;
 
       init-HOG_PIN1 {
         gpio-hog;
@@ -29,13 +28,50 @@
         gpios = <HOG_PIN2 HOG_PIN2_FLAG HOG_PIN3 HOG_PIN3_FLAG>;
         input;
       };
+
+      group1: group1 {
+        pins = <GROUP1_PIN1 GROUP1_PIN2>;
+        function = <0x0 GROUP1_FUNCTION>;
+        drive-strength-microamp = <0x0 GROUP1_DRIVE_STRENGTH>;
+      };
+
+      group2: group2 {
+        pins = <GROUP2_PIN1 GROUP2_PIN2>;
+        output-low;
+      };
+
+      group3: group3 {
+        pins = <GROUP3_PIN1>;
+        input-enable;
+        bias-disable;
+      };
+
     };
 
-    audio@0 {
-      reg = <0x0 0x0 0x0 0x100>;
-      compatible = "usb-peripheral";
+    gpio-controller@ffffb000 {
+      compatible = "fuchsia,gpio";
+      reg = <0x0 0xffffb000 0x0 0x1000>;
+      #gpio-cells = <2>;
+      gpio-controller;
+
+      group4: group4 {
+        pins = <GROUP4_PIN1>;
+        input-enable;
+        bias-pull-up;
+      };
+
+    };
+
+    audio {
+      compatible = "test,audio";
       gpios = <&gpioA PIN1 0 &gpioA PIN2 0>;
       gpio-names = PIN1_NAME, PIN2_NAME;
+      pinctrl-0 = <&group1 &group3>;
+    };
+
+    video {
+      compatible = "test,video";
+      pinctrl-0 = <&group2 &group4>;
     };
 
 };

@@ -71,6 +71,8 @@ class Node {
 
   std::optional<Phandle> phandle() const { return phandle_; }
 
+  uint32_t id() const { return id_; }
+
  private:
   Node* parent_;
   std::string name_;
@@ -109,7 +111,11 @@ class ReferenceNode {
 
   const std::string& name() const { return node_->name(); }
 
+  uint32_t id() const { return node_->id(); }
+
   std::optional<Phandle> phandle() const { return node_->phandle(); }
+
+  ParentNode parent() const;
 
   explicit operator bool() const { return (node_ != nullptr); }
 
@@ -122,6 +128,8 @@ class ParentNode {
   explicit ParentNode(Node* node) : node_(node) {}
 
   const std::string& name() const { return node_->name(); }
+
+  uint32_t id() const { return node_->id(); }
 
   explicit operator bool() const { return (node_ != nullptr); }
 
@@ -142,6 +150,8 @@ class ChildNode {
   explicit ChildNode(Node* node) : node_(node) {}
 
   const std::string& name() const { return node_->name(); }
+
+  uint32_t id() const { return node_->id(); }
 
   explicit operator bool() const { return (node_ != nullptr); }
 
