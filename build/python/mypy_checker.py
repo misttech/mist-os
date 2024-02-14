@@ -2,7 +2,9 @@
 # Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-
+""" This script checks python type checking for the input sources.
+"""
+import argparse
 import subprocess
 import sys
 import os
@@ -18,6 +20,25 @@ _EXCLUDE_PATTERNS = [
     "__pycache__",
     ".jiri_root",
 ]
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--sources",
+        help="Sources of this target, including main source",
+        nargs="*",
+    )
+    parser.add_argument(
+        "--output",
+        help="Path to output file",
+    )
+    args = parser.parse_args()
+
+    # To satisfy GN action requirements, creating a necessary empty output file
+    Path(args.output).touch()
+
+    return run_mypy_checks(args.sources)
 
 
 def run_mypy_checks(files: list[str]) -> int:
@@ -95,3 +116,7 @@ def exclude_files(file_list: list[str]) -> set[str]:
             if not any(pattern in file for pattern in _EXCLUDE_PATTERNS)
         )
     )
+
+
+if __name__ == "__main__":
+    sys.exit(main())

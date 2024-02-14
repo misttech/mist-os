@@ -1,7 +1,6 @@
 # Copyright 2021 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-
 import("//build/group_with_inputs.gni")
 
 # Defines a python library
@@ -11,6 +10,7 @@ import("//build/group_with_inputs.gni")
 # ```
 # python_library("lib") {
 #   library_name = "lib"
+#   enable_pytype = true
 #   sources = [
 #     "__init__.py",
 #     "lib.py",
@@ -38,6 +38,11 @@ import("//build/group_with_inputs.gni")
 #    List of targets for other python_library()s that this library depends on
 #    Type: list(target)
 #
+#   enable_pytype(optional)
+#     If true, enable pytype checking on the target and respective deps.
+#     Type: boolean
+#     Default: False
+#
 # Metadata
 #
 #   library_info
@@ -54,6 +59,18 @@ template("python_library") {
     library_deps = invoker.library_deps
   }
 
+  # Add the sources from the invoker
+  if (defined(invoker.source_root)) {
+    _source_root = invoker.source_root
+  } else {
+    _source_root = get_label_info(":$target_name", "dir")
+  }
+  _full_source_paths = []
+  foreach(source, invoker.sources) {
+    _full_source_paths += [ _source_root + "/" + source ]
+  }
+
+  _enable_pytype = defined(invoker.enable_pytype) && invoker.enable_pytype
   group_with_inputs(target_name) {
     forward_variables_from(invoker,
                            [
@@ -72,11 +89,7 @@ template("python_library") {
       deps += invoker.deps
     }
 
-    source_root = "."
-    if (defined(invoker.source_root)) {
-      source_root = invoker.source_root
-    }
-
+    source_root = _source_root
     metadata = {
       library_info = [
         {
@@ -89,19 +102,26 @@ template("python_library") {
       # Collect library_info from any libraries that are needed.
       library_info_barrier = library_deps
     }
+    sources = _full_source_paths
 
-    # Add the sources from the invoker
-    if (defined(invoker.sources)) {
-      if (source_root == ".") {
-        # use the directory of the current target to locate the files
-        _source_root = get_label_info(":$target_name", "dir")
-      } else {
-        _source_root = source_root
-      }
-      sources = []
-      foreach(source, invoker.sources) {
-        sources += [ _source_root + "/" + source ]
-      }
+    # Run python type checks using Mypy if enable_pytype flag is set
+    if (_enable_pytype) {
+      deps += [ ":${target_name}_mypy_checker" ]
+    }
+  }
+
+  if (_enable_pytype) {
+    action(target_name + "_mypy_checker") {
+      inputs = [ "//pyproject.toml" ]
+      script = "//build/python/mypy_checker.py"
+      outputs = [ "${target_out_dir}/${target_name}.mypy_checked" ]
+      args =
+          # This source list includes only direct library sources, excluding
+          # any dependencies.
+          [ "--sources" ] + rebase_path(_full_source_paths, root_build_dir) + [
+            "--output",
+            rebase_path(outputs[0], root_build_dir),
+          ]
     }
   }
 }
