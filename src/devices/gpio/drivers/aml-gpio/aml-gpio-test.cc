@@ -4,7 +4,6 @@
 
 #include "aml-gpio.h"
 
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
@@ -42,18 +41,25 @@ class TestAmlGpioDriver : public AmlGpioDriver {
   ddk_mock::MockMmioRegRegion& interrupt_mmio() { return mock_mmio_interrupt_; }
 
  protected:
-  zx::result<fdf::MmioBuffer> MapMmio(
-      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev,
-      uint32_t mmio_id) override {
+  fpromise::promise<fdf::MmioBuffer, zx_status_t> MapMmio(
+      fidl::WireClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t mmio_id) override {
     switch (mmio_id) {
       case 0:
-        return zx::ok(mock_mmio_gpio_.GetMmioBuffer());
+        return fpromise::make_promise([&]() -> fpromise::result<fdf::MmioBuffer, zx_status_t> {
+          return fpromise::ok(mock_mmio_gpio_.GetMmioBuffer());
+        });
       case 1:
-        return zx::ok(mock_mmio_gpio_ao_.GetMmioBuffer());
+        return fpromise::make_promise([&]() -> fpromise::result<fdf::MmioBuffer, zx_status_t> {
+          return fpromise::ok(mock_mmio_gpio_ao_.GetMmioBuffer());
+        });
       case 2:
-        return zx::ok(mock_mmio_interrupt_.GetMmioBuffer());
+        return fpromise::make_promise([&]() -> fpromise::result<fdf::MmioBuffer, zx_status_t> {
+          return fpromise::ok(mock_mmio_interrupt_.GetMmioBuffer());
+        });
       default:
-        return zx::error(ZX_ERR_BAD_STATE);
+        return fpromise::make_promise([&]() -> fpromise::result<fdf::MmioBuffer, zx_status_t> {
+          return fpromise::error(ZX_ERR_BAD_STATE);
+        });
     }
   }
 
@@ -71,52 +77,39 @@ struct IncomingNamespace {
 template <uint32_t kPid>
 class AmlGpioTest : public zxtest::Test {
  public:
-  AmlGpioTest()
-      : background_dispatcher_(runtime_.StartBackgroundDispatcher()),
-        incoming_(background_dispatcher_->async_dispatcher(), std::in_place),
-        node_server_(background_dispatcher_->async_dispatcher(), std::in_place,
-                     std::string("root")),
-        test_environment_(background_dispatcher_->async_dispatcher(), std::in_place),
-        dut_(TestAmlGpioDriver::GetDriverRegistration()) {}
+  AmlGpioTest() : node_server_("root"), dut_(TestAmlGpioDriver::GetDriverRegistration()) {}
 
   void SetUp() override {
-    zx::result start_args = node_server_.SyncCall(&fdf_testing::TestNode::CreateStartArgsAndServe);
+    zx::result start_args = node_server_.CreateStartArgsAndServe();
     ASSERT_TRUE(start_args.is_ok());
 
     driver_outgoing_ = std::move(start_args->outgoing_directory_client);
 
     {
       zx::result result =
-          test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
-                                     std::move(start_args->incoming_directory_server));
+          test_environment_.Initialize(std::move(start_args->incoming_directory_server));
       ASSERT_TRUE(result.is_ok());
     }
 
     {
-      auto instance_handler = incoming_.SyncCall([&](IncomingNamespace* incoming) {
-        incoming->pdev_server.SetConfig(fake_pdev::FakePDevFidl::Config{
-            .use_fake_irq = true,
-            // make-up info, pid and irq_count needed for Create
-            .device_info = pdev_device_info_t{0, kPid, 0, 2, 3, 0, 0, 0, {0}, "fake_info"},
-        });
-        return incoming->pdev_server.GetInstanceHandler(
-            fdf::Dispatcher::GetCurrent()->async_dispatcher());
+      incoming_.pdev_server.SetConfig(fake_pdev::FakePDevFidl::Config{
+          .use_fake_irq = true,
+          // make-up info, pid and irq_count needed for Create
+          .device_info = pdev_device_info_t{0, kPid, 0, 2, 3, 0, 0, 0, {0}, "fake_info"},
       });
-      test_environment_.SyncCall([&](fdf_testing::TestEnvironment* env) {
-        zx::result result =
-            env->incoming_directory().AddService<fuchsia_hardware_platform_device::Service>(
-                std::move(instance_handler));
-        ASSERT_TRUE(result.is_ok());
-      });
+      auto instance_handler = incoming_.pdev_server.GetInstanceHandler(
+          fdf::Dispatcher::GetCurrent()->async_dispatcher());
+      zx::result result =
+          test_environment_.incoming_directory()
+              .AddService<fuchsia_hardware_platform_device::Service>(std::move(instance_handler));
+      ASSERT_TRUE(result.is_ok());
     }
 
     zx::result start_result =
         runtime_.RunToCompletion(dut_.Start(std::move(start_args->start_args)));
     ASSERT_TRUE(start_result.is_ok());
 
-    node_server_.SyncCall([](fdf_testing::TestNode* node) {
-      ASSERT_NE(node->children().find("aml-gpio"), node->children().cend());
-    });
+    ASSERT_NE(node_server_.children().find("aml-gpio"), node_server_.children().cend());
 
     // Connect to the driver through its outgoing directory and get a gpioimpl client.
     zx::result svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -151,9 +144,9 @@ class AmlGpioTest : public zxtest::Test {
  private:
   fidl::ClientEnd<fuchsia_io::Directory> driver_outgoing_;
   fdf::UnownedSynchronizedDispatcher background_dispatcher_;
-  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
-  async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_;
-  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_;
+  IncomingNamespace incoming_;
+  fdf_testing::TestNode node_server_;
+  fdf_testing::TestEnvironment test_environment_;
   fdf_testing::DriverUnderTest<TestAmlGpioDriver> dut_;
 };
 
@@ -543,11 +536,12 @@ TEST_F(A113AmlGpioTest, A113ReleaseInterrupt) {
   client_.buffer(arena)->GetInterrupt(0x0B, ZX_INTERRUPT_MODE_EDGE_LOW).Then([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
-  });
-  client_.buffer(arena)->ReleaseInterrupt(0x0B).Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    EXPECT_TRUE(result->is_ok());
-    runtime_.Quit();
+
+    client_.buffer(arena)->ReleaseInterrupt(0x0B).Then([&](auto& result) {
+      ASSERT_TRUE(result.ok());
+      EXPECT_TRUE(result->is_ok());
+      runtime_.Quit();
+    });
   });
 
   runtime_.Run();
@@ -573,14 +567,15 @@ TEST_F(A113AmlGpioTest, A113InterruptSetPolarityEdge) {
   client_.buffer(arena)->GetInterrupt(0x0B, ZX_INTERRUPT_MODE_EDGE_LOW).Then([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
+
+    client_.buffer(arena)
+        ->SetPolarity(0x0B, fuchsia_hardware_gpio::GpioPolarity::kHigh)
+        .Then([&](auto& result) {
+          ASSERT_TRUE(result.ok());
+          EXPECT_TRUE(result->is_ok());
+          runtime_.Quit();
+        });
   });
-  client_.buffer(arena)
-      ->SetPolarity(0x0B, fuchsia_hardware_gpio::GpioPolarity::kHigh)
-      .Then([&](auto& result) {
-        ASSERT_TRUE(result.ok());
-        EXPECT_TRUE(result->is_ok());
-        runtime_.Quit();
-      });
 
   runtime_.Run();
 

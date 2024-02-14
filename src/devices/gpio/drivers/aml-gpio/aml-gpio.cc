@@ -8,6 +8,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/fpromise/bridge.h>
 
 #include <algorithm>
 #include <cstdint>
@@ -54,110 +55,150 @@ enum {
   MMIO_GPIO = 0,
   MMIO_GPIO_AO = 1,
   MMIO_GPIO_INTERRUPTS = 2,
+  MMIO_COUNT,
 };
 
-zx::result<> AmlGpioDriver::Start() {
-  parent_.Bind(std::move(node()));
+void AmlGpioDriver::Start(fdf::StartCompleter completer) {
+  parent_.Bind(std::move(node()), dispatcher());
 
-  {
-    zx::result result = compat_server_.Initialize(
-        incoming(), outgoing(), node_name(), name(),
-        compat::ForwardMetadata::Some({DEVICE_METADATA_GPIO_PINS, DEVICE_METADATA_GPIO_INIT,
-                                       DEVICE_METADATA_SCHEDULER_ROLE_NAME}));
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to initialize compat server: %s", result.status_string());
-      return result.take_error();
-    }
-  }
+  compat_server_.Begin(
+      incoming(), outgoing(), node_name(), name(),
+      [this, completer = std::move(completer)](zx::result<> result) mutable {
+        if (result.is_error()) {
+          FDF_LOG(ERROR, "Failed to initialize compat server: %s", result.status_string());
+          return completer(result.take_error());
+        }
 
+        OnCompatServerInitialized(std::move(completer));
+      },
+      compat::ForwardMetadata::Some({DEVICE_METADATA_GPIO_PINS, DEVICE_METADATA_GPIO_INIT,
+                                     DEVICE_METADATA_SCHEDULER_ROLE_NAME}));
+}
+
+void AmlGpioDriver::OnCompatServerInitialized(fdf::StartCompleter completer) {
   zx::result pdev_client = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
   if (pdev_client.is_error()) {
     FDF_LOG(ERROR, "Failed to connect to platform device: %s", pdev_client.status_string());
-    return pdev_client.take_error();
+    return completer(pdev_client.take_error());
   }
 
-  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev(*std::move(pdev_client));
+  pdev_.Bind(*std::move(pdev_client), dispatcher());
 
-  zx::result<fdf::MmioBuffer> mmio_gpio = MapMmio(pdev, MMIO_GPIO);
-  if (mmio_gpio.is_error()) {
-    return mmio_gpio.take_error();
-  }
+  pdev_->GetNodeDeviceInfo().Then([this, completer = std::move(completer)](auto& info) mutable {
+    if (!info.ok()) {
+      FDF_LOG(ERROR, "Call to get device info failed: %s", info.status_string());
+      return completer(zx::error(info.status()));
+    }
+    if (info->is_error()) {
+      FDF_LOG(ERROR, "Failed to get device info: %s", zx_status_get_string(info.status()));
+      return completer(info->take_error());
+    }
+    if (!info->value()->has_pid() || !info->value()->has_irq_count()) {
+      FDF_LOG(ERROR, "No pid or irq_count entry in device info");
+      return completer(zx::error(ZX_ERR_BAD_STATE));
+    }
 
-  zx::result<fdf::MmioBuffer> mmio_gpio_ao = MapMmio(pdev, MMIO_GPIO_AO);
-  if (mmio_gpio_ao.is_error()) {
-    return mmio_gpio_ao.take_error();
-  }
+    OnGetNodeDeviceInfo(*info->value(), std::move(completer));
+  });
+}
 
-  zx::result<fdf::MmioBuffer> mmio_interrupt = MapMmio(pdev, MMIO_GPIO_INTERRUPTS);
-  if (mmio_interrupt.is_error()) {
-    return mmio_interrupt.take_error();
-  }
-
-  auto info = pdev->GetNodeDeviceInfo();
-  if (!info.ok()) {
-    FDF_LOG(ERROR, "Call to get device info failed: %s", info.status_string());
-    return zx::error(info.status());
-  }
-  if (info->is_error()) {
-    FDF_LOG(ERROR, "Failed to get device info: %s", zx_status_get_string(info.status()));
-    return info->take_error();
-  }
-  if (!info->value()->has_pid() || !info->value()->has_irq_count()) {
-    FDF_LOG(ERROR, "No pid or irq_count entry in device info");
-    return zx::error(ZX_ERR_BAD_STATE);
-  }
-
-  uint32_t pid = info->value()->pid();
-
-  if (pid == 0) {
+void AmlGpioDriver::OnGetNodeDeviceInfo(
+    const fuchsia_hardware_platform_device::wire::NodeDeviceInfo& info,
+    fdf::StartCompleter completer) {
+  if (info.pid() == 0) {
     // TODO(https://fxbug.dev/318736574) : Remove and rely only on GetDeviceInfo.
-    auto board_info = pdev->GetBoardInfo();
-    if (!board_info.ok()) {
-      FDF_LOG(ERROR, "Call to get board info failed: %s", board_info.status_string());
-      return zx::error(board_info.status());
-    }
-    if (board_info->is_error()) {
-      FDF_LOG(ERROR, "Failed to get board info: %s", zx_status_get_string(board_info.status()));
-      return board_info->take_error();
-    }
-    if (!board_info->value()->has_vid() || !board_info->value()->has_pid()) {
-      FDF_LOG(ERROR, "No vid or pid entry in board info");
-      return zx::error(ZX_ERR_BAD_STATE);
-    }
+    pdev_->GetBoardInfo().Then([this, irq_count = info.irq_count(),
+                                completer = std::move(completer)](auto& board_info) mutable {
+      if (!board_info.ok()) {
+        FDF_LOG(ERROR, "Call to get board info failed: %s", board_info.status_string());
+        return completer(zx::error(board_info.status()));
+      }
+      if (board_info->is_error()) {
+        FDF_LOG(ERROR, "Failed to get board info: %s", zx_status_get_string(board_info.status()));
+        return completer(board_info->take_error());
+      }
+      if (!board_info->value()->has_vid() || !board_info->value()->has_pid()) {
+        FDF_LOG(ERROR, "No vid or pid entry in board info");
+        return completer(zx::error(ZX_ERR_BAD_STATE));
+      }
 
-    if (board_info->value()->vid() == PDEV_VID_AMLOGIC) {
-      pid = board_info->value()->pid();
-    } else if (board_info->value()->vid() == PDEV_VID_GOOGLE) {
-      switch (board_info->value()->pid()) {
-        case PDEV_PID_ASTRO:
-          pid = PDEV_PID_AMLOGIC_S905D2;
-          break;
-        case PDEV_PID_SHERLOCK:
-          pid = PDEV_PID_AMLOGIC_T931;
-          break;
-        case PDEV_PID_NELSON:
-          pid = PDEV_PID_AMLOGIC_S905D3;
-          break;
-        default:
-          FDF_LOG(ERROR, "Unsupported PID 0x%x for VID 0x%x", board_info->value()->pid(),
-                  board_info->value()->vid());
-          return zx::error(ZX_ERR_INVALID_ARGS);
-      }
-    } else if (board_info->value()->vid() == PDEV_VID_KHADAS) {
-      switch (board_info->value()->pid()) {
-        case PDEV_PID_VIM3:
-          pid = PDEV_PID_AMLOGIC_A311D;
-          break;
-        default:
-          FDF_LOG(ERROR, "Unsupported PID 0x%x for VID 0x%x", board_info->value()->pid(),
-                  board_info->value()->vid());
-          return zx::error(ZX_ERR_INVALID_ARGS);
-      }
-    } else {
-      FDF_LOG(ERROR, "Unsupported VID 0x%x", board_info->value()->vid());
-      return zx::error(ZX_ERR_INVALID_ARGS);
-    }
+      OnGetBoardInfo(*board_info->value(), irq_count, std::move(completer));
+    });
+  } else {
+    MapMmios(info.pid(), info.irq_count(), std::move(completer));
   }
+}
+
+void AmlGpioDriver::OnGetBoardInfo(
+    const fuchsia_hardware_platform_device::wire::BoardInfo& board_info, uint32_t irq_count,
+    fdf::StartCompleter completer) {
+  uint32_t pid = 0;
+  if (board_info.vid() == PDEV_VID_AMLOGIC) {
+    pid = board_info.pid();
+  } else if (board_info.vid() == PDEV_VID_GOOGLE) {
+    switch (board_info.pid()) {
+      case PDEV_PID_ASTRO:
+        pid = PDEV_PID_AMLOGIC_S905D2;
+        break;
+      case PDEV_PID_SHERLOCK:
+        pid = PDEV_PID_AMLOGIC_T931;
+        break;
+      case PDEV_PID_NELSON:
+        pid = PDEV_PID_AMLOGIC_S905D3;
+        break;
+      default:
+        FDF_LOG(ERROR, "Unsupported PID 0x%x for VID 0x%x", board_info.pid(), board_info.vid());
+        return completer(zx::error(ZX_ERR_INVALID_ARGS));
+    }
+  } else if (board_info.vid() == PDEV_VID_KHADAS) {
+    switch (board_info.pid()) {
+      case PDEV_PID_VIM3:
+        pid = PDEV_PID_AMLOGIC_A311D;
+        break;
+      default:
+        FDF_LOG(ERROR, "Unsupported PID 0x%x for VID 0x%x", board_info.pid(), board_info.vid());
+        return completer(zx::error(ZX_ERR_INVALID_ARGS));
+    }
+  } else {
+    FDF_LOG(ERROR, "Unsupported VID 0x%x", board_info.vid());
+    return completer(zx::error(ZX_ERR_INVALID_ARGS));
+  }
+
+  MapMmios(pid, irq_count, std::move(completer));
+}
+
+void AmlGpioDriver::MapMmios(uint32_t pid, uint32_t irq_count, fdf::StartCompleter completer) {
+  constexpr int kMmioIds[] = {MMIO_GPIO, MMIO_GPIO_AO, MMIO_GPIO_INTERRUPTS};
+  static_assert(std::size(kMmioIds) == MMIO_COUNT);
+
+  std::vector<fpromise::promise<fdf::MmioBuffer, zx_status_t>> promises;
+  for (const int mmio_id : kMmioIds) {
+    promises.push_back(MapMmio(pdev_, mmio_id));
+  }
+
+  auto task =
+      fpromise::join_promise_vector(std::move(promises))
+          .then([this, pid, irq_count, completer = std::move(completer)](
+                    fpromise::result<std::vector<fpromise::result<fdf::MmioBuffer, zx_status_t>>>&
+                        results) mutable {
+            ZX_DEBUG_ASSERT(results.is_ok());
+
+            std::vector<fdf::MmioBuffer> mmios;
+            for (auto& result : results.value()) {
+              if (result.is_error()) {
+                return completer(zx::error(result.error()));
+              }
+              mmios.push_back(std::move(result.value()));
+            }
+
+            AddNode(pid, irq_count, std::move(mmios), std::move(completer));
+          });
+  executor_.schedule_task(std::move(task));
+}
+
+void AmlGpioDriver::AddNode(uint32_t pid, uint32_t irq_count, std::vector<fdf::MmioBuffer> mmios,
+                            fdf::StartCompleter completer) {
+  ZX_DEBUG_ASSERT(mmios.size() == MMIO_COUNT);
 
   cpp20::span<const AmlGpioBlock> gpio_blocks;
   const AmlGpioInterrupt* gpio_interrupt;
@@ -185,25 +226,31 @@ zx::result<> AmlGpioDriver::Start() {
       break;
     default:
       FDF_LOG(ERROR, "Unsupported SOC PID %u", pid);
-      return zx::error(ZX_ERR_INVALID_ARGS);
+      return completer(zx::error(ZX_ERR_INVALID_ARGS));
   }
 
   fbl::AllocChecker ac;
 
-  const uint32_t irq_count = info->value()->irq_count();
   fbl::Array<uint16_t> irq_info(new (&ac) uint16_t[irq_count], irq_count);
   if (!ac.check()) {
     FDF_LOG(ERROR, "irq_info alloc failed");
-    return zx::error(ZX_ERR_NO_MEMORY);
+    return completer(zx::error(ZX_ERR_NO_MEMORY));
   }
   std::fill(irq_info.begin(), irq_info.end(), kMaxGpioIndex + 1);  // initialize irq_info
 
-  device_.reset(new (&ac) AmlGpio(pdev.TakeClientEnd(), *std::move(mmio_gpio),
-                                  *std::move(mmio_gpio_ao), *std::move(mmio_interrupt), gpio_blocks,
-                                  gpio_interrupt, pid, std::move(irq_info)));
+  zx::result pdev_client = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
+  if (pdev_client.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to platform device: %s", pdev_client.status_string());
+    return completer(pdev_client.take_error());
+  }
+
+  device_.reset(new (&ac)
+                    AmlGpio(*std::move(pdev_client), std::move(mmios[MMIO_GPIO]),
+                            std::move(mmios[MMIO_GPIO_AO]), std::move(mmios[MMIO_GPIO_INTERRUPTS]),
+                            gpio_blocks, gpio_interrupt, pid, std::move(irq_info)));
   if (!ac.check()) {
     FDF_LOG(ERROR, "Device object alloc failed");
-    return zx::error(ZX_ERR_NO_MEMORY);
+    return completer(zx::error(ZX_ERR_NO_MEMORY));
   }
 
   {
@@ -213,7 +260,7 @@ zx::result<> AmlGpioDriver::Start() {
     auto result = outgoing()->AddService<fuchsia_hardware_gpioimpl::Service>(std::move(handler));
     if (result.is_error()) {
       FDF_LOG(ERROR, "AddService failed: %s", result.status_string());
-      return zx::error(result.error_value());
+      return completer(zx::error(result.error_value()));
     }
   }
 
@@ -222,10 +269,10 @@ zx::result<> AmlGpioDriver::Start() {
   if (!controller_endpoints.is_ok()) {
     FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
             controller_endpoints.status_string());
-    return controller_endpoints.take_error();
+    return completer(controller_endpoints.take_error());
   }
 
-  controller_.Bind(std::move(controller_endpoints->client));
+  controller_.Bind(std::move(controller_endpoints->client), dispatcher());
 
   fidl::Arena arena;
 
@@ -243,13 +290,19 @@ zx::result<> AmlGpioDriver::Start() {
                         .properties(properties)
                         .Build();
 
-  auto result = parent_->AddChild(args, std::move(controller_endpoints->server), {});
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
-    return zx::error(result.status());
-  }
+  parent_->AddChild(args, std::move(controller_endpoints->server), {})
+      .Then([completer = std::move(completer)](auto& result) mutable {
+        if (!result.ok()) {
+          FDF_LOG(ERROR, "Call to add child failed: %s", result.status_string());
+          return completer(zx::error(result.status()));
+        }
+        if (result->is_error()) {
+          FDF_LOG(ERROR, "Failed to add child");
+          return completer(zx::error(ZX_ERR_INTERNAL));
+        }
 
-  return zx::ok();
+        completer(zx::ok());
+      });
 }
 
 zx_status_t AmlGpio::AmlPinToBlock(const uint32_t pin, const AmlGpioBlock** out_block,
@@ -486,21 +539,39 @@ void AmlGpio::GetInterrupt(fuchsia_hardware_gpioimpl::wire::GpioImplGetInterrupt
                                pin_select_index, kBitsPerGpioInterrupt,
                                pin_select_offset * sizeof(uint32_t));
 
-  // Create Interrupt Object
-  auto out_irq = pdev_->GetInterruptById(index, flags_);
-  if (!out_irq.ok()) {
-    FDF_LOG(ERROR, "Call to pdev_get_interrupt failed: %s", out_irq.status_string());
-    return completer.buffer(arena).ReplyError(out_irq.status());
-  }
-  if (out_irq->is_error()) {
-    FDF_LOG(ERROR, "pdev_get_interrupt failed: %s", out_irq.status_string());
-    return completer.buffer(arena).Reply(out_irq->take_error());
-  }
-
+  // Hold this IRQ index while the GetInterrupt call is pending.
   irq_status_ |= static_cast<uint8_t>(1 << index);
   irq_info_[index] = static_cast<uint16_t>(request->index);
 
-  completer.buffer(arena).ReplySuccess(std::move(out_irq->value()->irq));
+  // Create Interrupt Object
+  pdev_->GetInterruptById(index, flags_)
+      .Then([this, index, irq_index = request->index,
+             completer = completer.ToAsync()](auto& out_irq) mutable {
+        fdf::Arena arena('GPIO');
+        // ReleaseInterrupt was called before we got the interrupt from platform bus.
+        if (irq_info_[index] != irq_index) {
+          FDF_LOG(WARNING, "Pin %u interrupt released before it could be returned to the client",
+                  irq_index);
+          return completer.buffer(arena).ReplyError(ZX_ERR_CANCELED);
+        }
+
+        // The call failed, release this IRQ index.
+        if (!out_irq.ok() || out_irq->is_error()) {
+          irq_status_ &= static_cast<uint8_t>(~(1 << index));
+          irq_info_[index] = kMaxGpioIndex + 1;
+        }
+
+        if (!out_irq.ok()) {
+          FDF_LOG(ERROR, "Call to pdev_get_interrupt failed: %s", out_irq.status_string());
+          return completer.buffer(arena).ReplyError(out_irq.status());
+        }
+        if (out_irq->is_error()) {
+          FDF_LOG(ERROR, "pdev_get_interrupt failed: %s", out_irq.status_string());
+          return completer.buffer(arena).Reply(out_irq->take_error());
+        }
+
+        completer.buffer(arena).ReplySuccess(std::move(out_irq->value()->irq));
+      });
 }
 
 void AmlGpio::ReleaseInterrupt(
@@ -652,27 +723,40 @@ void AmlGpio::GetControllerId(fdf::Arena& arena, GetControllerIdCompleter::Sync&
   completer.buffer(arena).Reply(0);
 }
 
-zx::result<fdf::MmioBuffer> AmlGpioDriver::MapMmio(
-    const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t mmio_id) {
-  auto result = pdev->GetMmioById(mmio_id);
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "Call to get MMIO %u failed: %s", mmio_id, result.status_string());
-    return zx::error(result.status());
-  }
-  if (result->is_error()) {
-    FDF_LOG(ERROR, "Failed to get MMIO %u: %s", mmio_id,
-            zx_status_get_string(result->error_value()));
-    return result->take_error();
-  }
+fpromise::promise<fdf::MmioBuffer, zx_status_t> AmlGpioDriver::MapMmio(
+    fidl::WireClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t mmio_id) {
+  fpromise::bridge<fdf::MmioBuffer, zx_status_t> bridge;
 
-  auto& mmio = *result->value();
-  if (!mmio.has_offset() || !mmio.has_size() || !mmio.has_vmo()) {
-    FDF_LOG(ERROR, "Invalid MMIO returned for ID %u", mmio_id);
-    return zx::error(ZX_ERR_BAD_STATE);
-  }
+  pdev->GetMmioById(mmio_id).Then(
+      [mmio_id, completer = std::move(bridge.completer)](auto& result) mutable {
+        if (!result.ok()) {
+          FDF_LOG(ERROR, "Call to get MMIO %u failed: %s", mmio_id, result.status_string());
+          return completer.complete_error(result.status());
+        }
+        if (result->is_error()) {
+          FDF_LOG(ERROR, "Failed to get MMIO %u: %s", mmio_id,
+                  zx_status_get_string(result->error_value()));
+          return completer.complete_error(result->error_value());
+        }
 
-  return fdf::MmioBuffer::Create(mmio.offset(), mmio.size(), std::move(mmio.vmo()),
-                                 ZX_CACHE_POLICY_UNCACHED_DEVICE);
+        auto& mmio = *result->value();
+        if (!mmio.has_offset() || !mmio.has_size() || !mmio.has_vmo()) {
+          FDF_LOG(ERROR, "Invalid MMIO returned for ID %u", mmio_id);
+          return completer.complete_error(ZX_ERR_BAD_STATE);
+        }
+
+        zx::result mmio_buffer = fdf::MmioBuffer::Create(
+            mmio.offset(), mmio.size(), std::move(mmio.vmo()), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+        if (mmio_buffer.is_error()) {
+          FDF_LOG(ERROR, "Failed to map MMIO %u: %s", mmio_id,
+                  zx_status_get_string(mmio_buffer.error_value()));
+          return completer.complete_error(mmio_buffer.error_value());
+        }
+
+        completer.complete_ok(*std::move(mmio_buffer));
+      });
+
+  return bridge.consumer.promise_or(fpromise::error(ZX_ERR_BAD_STATE));
 }
 
 }  // namespace gpio

@@ -7,7 +7,9 @@
 
 #include <fidl/fuchsia.hardware.gpioimpl/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
+#include <lib/async/cpp/executor.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/fpromise/promise.h>
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
 
@@ -48,7 +50,7 @@ class AmlGpio : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl> {
           fdf::MmioBuffer mmio_gpio_ao, fdf::MmioBuffer mmio_interrupt,
           cpp20::span<const AmlGpioBlock> gpio_blocks, const AmlGpioInterrupt* gpio_interrupt,
           uint32_t pid, fbl::Array<uint16_t> irq_info)
-      : pdev_(std::move(pdev)),
+      : pdev_(std::move(pdev), fdf::Dispatcher::GetCurrent()->async_dispatcher()),
         mmios_{std::move(mmio_gpio), std::move(mmio_gpio_ao)},
         mmio_interrupt_(std::move(mmio_interrupt)),
         gpio_blocks_(gpio_blocks),
@@ -97,7 +99,7 @@ class AmlGpio : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl> {
   zx_status_t AmlPinToBlock(uint32_t pin, const AmlGpioBlock** out_block,
                             uint32_t* out_pin_index) const;
 
-  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;
+  fidl::WireClient<fuchsia_hardware_platform_device::Device> pdev_;
   std::array<fdf::MmioBuffer, 2> mmios_;  // separate MMIO for AO domain
   fdf::MmioBuffer mmio_interrupt_;
   const cpp20::span<const AmlGpioBlock> gpio_blocks_;
@@ -111,20 +113,32 @@ class AmlGpio : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl> {
 class AmlGpioDriver : public fdf::DriverBase {
  public:
   AmlGpioDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
-      : fdf::DriverBase("aml-gpio", std::move(start_args), std::move(dispatcher)) {}
+      : fdf::DriverBase("aml-gpio", std::move(start_args), std::move(dispatcher)),
+        executor_(fdf::DriverBase::dispatcher()) {}
 
-  zx::result<> Start() override;
+  void Start(fdf::StartCompleter completer) override;
 
  protected:
   // MapMmio can be overridden by a test in order to provide an fdf::MmioBuffer backed by a fake.
-  virtual zx::result<fdf::MmioBuffer> MapMmio(
-      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t mmio_id);
+  virtual fpromise::promise<fdf::MmioBuffer, zx_status_t> MapMmio(
+      fidl::WireClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t mmio_id);
 
  private:
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_;
-  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
-  compat::SyncInitializedDeviceServer compat_server_;
+  void OnCompatServerInitialized(fdf::StartCompleter completer);
+  void OnGetNodeDeviceInfo(const fuchsia_hardware_platform_device::wire::NodeDeviceInfo& info,
+                           fdf::StartCompleter completer);
+  void OnGetBoardInfo(const fuchsia_hardware_platform_device::wire::BoardInfo& board_info,
+                      uint32_t irq_count, fdf::StartCompleter completer);
+  void MapMmios(uint32_t pid, uint32_t irq_count, fdf::StartCompleter completer);
+  void AddNode(uint32_t pid, uint32_t irq_count, std::vector<fdf::MmioBuffer> mmios,
+               fdf::StartCompleter completer);
+
+  fidl::WireClient<fuchsia_driver_framework::Node> parent_;
+  fidl::WireClient<fuchsia_driver_framework::NodeController> controller_;
+  fidl::WireClient<fuchsia_hardware_platform_device::Device> pdev_;
+  compat::AsyncInitializedDeviceServer compat_server_;
   std::unique_ptr<AmlGpio> device_;
+  async::Executor executor_;
 };
 
 }  // namespace gpio
