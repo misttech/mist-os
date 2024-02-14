@@ -16,6 +16,7 @@ async fn start_nested_cm_and_wait_for_clean_stop(root_url: &str, moniker_to_wait
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
                 .capability(Capability::event_stream("started").with_scope(&root))
                 .capability(Capability::event_stream("stopped").with_scope(&root))
                 .capability(Capability::event_stream("destroyed").with_scope(&root))

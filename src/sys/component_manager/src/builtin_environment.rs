@@ -202,17 +202,10 @@ impl BuiltinEnvironmentBuilder {
             .as_ref()
             .ok_or(format_err!("Runtime config should be set to add builtin runner."))?;
 
-        let launcher_connector: fn() -> elf_runner::process_launcher::Connector =
-            if runtime_config.use_builtin_process_launcher {
-                || Box::new(elf_runner::process_launcher::BuiltInConnector {})
-            } else {
-                || Box::new(elf_runner::process_launcher::NamespaceConnector {})
-            };
         let runner = Arc::new(BuiltinRunner::new(
             self.top_instance.clone().unwrap().task_group(),
             ElfRunnerResources {
                 security_policy: runtime_config.security_policy.clone(),
-                launcher_connector,
                 utc_clock: self.utc_clock.clone(),
                 crash_records: self.crash_records.clone(),
                 instance_registry: self.instance_registry.clone(),

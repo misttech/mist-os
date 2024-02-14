@@ -64,6 +64,11 @@
             ],
         },
         {
+            protocol: "fuchsia.process.Launcher",
+            from: "parent",
+            to: "#elf_runner",
+        },
+        {
             protocol: "fuchsia.component.Binder",
             from: "#core",
             as: "fuchsia.component.CoreBinder",

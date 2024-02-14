@@ -23,6 +23,11 @@
                 "#elf_runner",
             ],
         },
+        {
+            protocol: "fuchsia.process.Launcher",
+            from: "parent",
+            to: "#elf_runner",
+        },
     ],
     expose: [
         {

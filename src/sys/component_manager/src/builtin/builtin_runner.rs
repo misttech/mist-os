@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use cm_config::SecurityPolicy;
 use cm_util::TaskGroup;
-use elf_runner::crash_info::CrashRecords;
+use elf_runner::{crash_info::CrashRecords, process_launcher::NamespaceConnector};
 use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_runner as fcrunner;
@@ -14,6 +14,7 @@ use fidl_fuchsia_memory_report as freport;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, Clock};
 use futures::{future::BoxFuture, Future, FutureExt, TryStreamExt};
+use namespace::{Namespace, NamespaceError};
 use routing::policy::ScopedPolicyChecker;
 use runner::component::{ChannelEpitaph, Controllable, Controller};
 use sandbox::{Capability, CapabilityTrait, Dict};
@@ -57,7 +58,6 @@ pub struct ElfRunnerResources {
     /// Job policy requests in the program block of ELF components will be checked against
     /// the provided security policy.
     pub security_policy: Arc<SecurityPolicy>,
-    pub launcher_connector: fn() -> elf_runner::process_launcher::Connector,
     pub utc_clock: Option<Arc<Clock>>,
     pub crash_records: CrashRecords,
     pub instance_registry: Arc<InstanceRegistry>,
@@ -67,6 +67,12 @@ pub struct ElfRunnerResources {
 enum BuiltinRunnerError {
     #[error("missing outgoing_dir in StartInfo")]
     MissingOutgoingDir,
+
+    #[error("missing ns in StartInfo")]
+    MissingNamespace,
+
+    #[error("namespace error: {0}")]
+    NamespaceError(#[from] NamespaceError),
 
     #[error("\"program.type\" must be specified")]
     MissingProgramType,
@@ -82,6 +88,8 @@ impl From<BuiltinRunnerError> for zx::Status {
     fn from(value: BuiltinRunnerError) -> Self {
         match value {
             BuiltinRunnerError::MissingOutgoingDir
+            | BuiltinRunnerError::MissingNamespace
+            | BuiltinRunnerError::NamespaceError(_)
             | BuiltinRunnerError::MissingProgramType
             | BuiltinRunnerError::UnsupportedProgramType(_) => {
                 zx::Status::from_raw(fcomponent::Error::InvalidArguments.into_primitive() as i32)
@@ -107,6 +115,8 @@ impl BuiltinRunner {
     {
         let outgoing_dir =
             start_info.outgoing_dir.take().ok_or(BuiltinRunnerError::MissingOutgoingDir)?;
+        let namespace: Namespace =
+            start_info.ns.take().ok_or(BuiltinRunnerError::MissingNamespace)?.try_into()?;
         let program_type = runner::get_program_string(&start_info, TYPE)
             .ok_or(BuiltinRunnerError::MissingProgramType)?;
 
@@ -116,6 +126,7 @@ impl BuiltinRunner {
                     self.root_job.create_child_job().map_err(BuiltinRunnerError::JobCreation)?;
                 let program = ElfRunnerProgram::new(
                     job.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+                    namespace,
                     self.elf_runner_resources.clone(),
                 );
                 program.serve_outgoing(outgoing_dir);
@@ -201,10 +212,12 @@ impl ElfRunnerProgram {
     /// Creates an ELF runner program.
     /// - `job`: Each ELF component run by this runner will live inside a job that is a
     ///   child of the provided job.
-    fn new(job: zx::Job, resources: Arc<ElfRunnerResources>) -> Self {
+    fn new(job: zx::Job, namespace: Namespace, resources: Arc<ElfRunnerResources>) -> Self {
+        let namespace = Arc::new(namespace);
+        let connector = NamespaceConnector { namespace: namespace.clone() };
         let elf_runner = elf_runner::ElfRunner::new(
             job.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
-            (resources.launcher_connector)(),
+            Box::new(connector),
             resources.utc_clock.clone(),
             resources.crash_records.clone(),
         );
@@ -334,7 +347,8 @@ impl Controllable for ElfRunnerProgram {
 #[cfg(test)]
 mod tests {
     use assert_matches::assert_matches;
-    use fcrunner::ComponentStartInfo;
+    use fcrunner::{ComponentNamespaceEntry, ComponentStartInfo};
+    use fidl::endpoints::ClientEnd;
     use fidl_fuchsia_data::{Dictionary, DictionaryEntry, DictionaryValue};
     use fidl_fuchsia_io::DirectoryProxy;
     use fidl_fuchsia_process as fprocess;
@@ -364,13 +378,10 @@ mod tests {
     fn make_builtin_runner() -> Arc<BuiltinRunner> {
         let task_group = TaskGroup::new();
         let security_policy = make_security_policy();
-        let launcher_connector: fn() -> elf_runner::process_launcher::Connector =
-            || Box::new(elf_runner::process_launcher::NamespaceConnector {});
         let crash_records = CrashRecords::new();
         let instance_registry = InstanceRegistry::new();
         let elf_runner_resources = ElfRunnerResources {
             security_policy,
-            launcher_connector,
             utc_clock: None,
             crash_records,
             instance_registry,
@@ -378,7 +389,10 @@ mod tests {
         Arc::new(BuiltinRunner::new(task_group, elf_runner_resources))
     }
 
-    fn make_start_info(program_type: &str) -> (ComponentStartInfo, DirectoryProxy) {
+    fn make_start_info(
+        program_type: &str,
+        svc_dir: ClientEnd<fio::DirectoryMarker>,
+    ) -> (ComponentStartInfo, DirectoryProxy) {
         let (outgoing_dir, outgoing_server_end) = fidl::endpoints::create_proxy().unwrap();
         let start_info = ComponentStartInfo {
             resolved_url: Some("fuchsia-builtin://elf_runner.cm".to_string()),
@@ -389,7 +403,11 @@ mod tests {
                 }]),
                 ..Default::default()
             }),
-            ns: Some(vec![]),
+            ns: Some(vec![ComponentNamespaceEntry {
+                path: Some("/svc".to_string()),
+                directory: Some(svc_dir),
+                ..Default::default()
+            }]),
             outgoing_dir: Some(outgoing_server_end),
             runtime_dir: None,
             numbered_handles: None,
@@ -413,7 +431,9 @@ mod tests {
         let (elf_runner_controller, server_end) = fidl::endpoints::create_proxy().unwrap();
 
         // Start the ELF runner.
-        let (start_info, outgoing_dir) = make_start_info("elf_runner");
+        let (svc, svc_server_end) = fidl::endpoints::create_endpoints();
+        open_channel_in_namespace("/svc", fio::OpenFlags::RIGHT_READABLE, svc_server_end).unwrap();
+        let (start_info, outgoing_dir) = make_start_info("elf_runner", svc);
         client.start(start_info, server_end).unwrap();
 
         // Use the ComponentRunner FIDL in the outgoing directory of the ELF runner to run
@@ -505,7 +525,9 @@ mod tests {
         let (client, server_end) = fidl::endpoints::create_proxy().unwrap();
         builtin_runner.get_scoped_runner(make_scoped_policy_checker(), server_end);
         let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
-        let (start_info, _outgoing_dir) = make_start_info("foobar");
+        let (svc, svc_server_end) = fidl::endpoints::create_endpoints();
+        open_channel_in_namespace("/svc", fio::OpenFlags::RIGHT_READABLE, svc_server_end).unwrap();
+        let (start_info, _outgoing_dir) = make_start_info("foobar", svc);
         client.start(start_info, server_end).unwrap();
         let event = controller.take_event_stream().try_next().await;
         let invalid_arguments =

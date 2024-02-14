@@ -4,13 +4,23 @@
 
 use component_events::{events::*, matcher::*, sequence::*};
 use fidl_fuchsia_component as fcomponent;
-use fuchsia_component_test::{ChildOptions, RealmBuilder};
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
 
 /// An integration test that runs a simple ELF component that uses a runner from
 /// an ELF runner component instantiated as a child.
 async fn run_test(url: &str) {
     let builder = RealmBuilder::new().await.unwrap();
-    builder.add_child("simple_elf_program", url, ChildOptions::new().eager()).await.unwrap();
+    let program =
+        builder.add_child("simple_elf_program", url, ChildOptions::new().eager()).await.unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
+                .from(Ref::parent())
+                .to(&program),
+        )
+        .await
+        .unwrap();
     let instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
     let proxy = instance

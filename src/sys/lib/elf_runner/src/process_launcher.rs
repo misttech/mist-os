@@ -10,10 +10,11 @@ use {
     fuchsia_runtime::{HandleInfo, HandleInfoError},
     fuchsia_zircon::{self as zx, AsHandleRef},
     futures::prelude::*,
+    lazy_static::lazy_static,
     process_builder::{
         BuiltProcess, NamespaceEntry, ProcessBuilder, ProcessBuilderError, StartupHandle,
     },
-    std::{convert::TryFrom, ffi::CString, sync::Arc},
+    std::{convert::TryFrom, ffi::CString, fmt::Debug, sync::Arc},
     thiserror::Error,
     tracing::{error, warn},
 };
@@ -315,15 +316,29 @@ impl Connect for BuiltInConnector {
     }
 }
 
-/// A protocol connector for `fuchsia.process.Launcher` that connects to the protocol from the
-/// process namespace.
-pub struct NamespaceConnector {}
+/// A protocol connector for `fuchsia.process.Launcher` that connects to the protocol from a
+/// namespace object.
+pub struct NamespaceConnector {
+    pub namespace: Arc<namespace::Namespace>,
+}
+
+#[derive(Error, Debug)]
+enum NamespaceConnectorError {
+    #[error("Missing /svc in namespace: {0:?}")]
+    MissingSvcInNamespace(Vec<namespace::Path>),
+}
 
 impl Connect for NamespaceConnector {
     type Proxy = fproc::LauncherProxy;
 
     fn connect(&self) -> Result<Self::Proxy, anyhow::Error> {
-        fuchsia_component::client::connect_to_protocol::<fproc::LauncherMarker>()
+        lazy_static! {
+            static ref PATH: namespace::Path = "/svc".try_into().unwrap();
+        };
+        let svc = self.namespace.get(&PATH).ok_or_else(|| {
+            NamespaceConnectorError::MissingSvcInNamespace(self.namespace.paths())
+        })?;
+        fuchsia_component::client::connect_to_protocol_at_dir_root::<fproc::LauncherMarker>(svc)
             .context("failed to connect to external launcher service")
     }
 }

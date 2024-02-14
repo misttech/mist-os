@@ -19,6 +19,7 @@ async fn run_test(url: &str, expected_result: &str) {
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
                 .from(Ref::parent())
                 .to(&realm),
         )
@@ -158,9 +159,17 @@ async fn alias_offer_dir_rights() {
 #[fasync::run_singlethreaded(test)]
 async fn route_directories_from_component_manager_namespace() {
     // Define the realm inside component manager.
-    let builder = RealmBuilder::new().await.unwrap();
+    let builder = RealmBuilder::with_params(
+        RealmBuilderParams::new().from_relative_url("#meta/elf_runner_and_environment.cm"),
+    )
+    .await
+    .unwrap();
     let realm = builder
-        .add_child("realm", "#meta/use_dir_rights.cm", ChildOptions::new().eager())
+        .add_child(
+            "realm",
+            "#meta/use_dir_rights.cm",
+            ChildOptions::new().eager().environment("elf-env"),
+        )
         .await
         .unwrap();
     builder

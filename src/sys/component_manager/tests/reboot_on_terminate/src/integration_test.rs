@@ -50,32 +50,9 @@ async fn build_reboot_on_terminate_realm(
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .from(Ref::parent())
-                .to(&realm),
-        )
-        .await
-        .unwrap();
-    builder
-        .add_route(
-            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
                 .capability(Capability::protocol_by_name("fuchsia.sys2.SystemController"))
-                .from(Ref::parent())
-                .to(&realm),
-        )
-        .await
-        .unwrap();
-    builder
-        .add_route(
-            Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.boot.WriteOnlyLog"))
-                .from(Ref::parent())
-                .to(&realm),
-        )
-        .await
-        .unwrap();
-    builder
-        .add_route(
-            Route::new()
                 .capability(Capability::protocol_by_name("fidl.test.components.Trigger"))
                 .from(Ref::parent())
                 .to(&realm),

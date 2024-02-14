@@ -26,6 +26,7 @@ pub async fn start_policy_test(
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
                 .from(Ref::parent())
                 .to(&root_child),
         )

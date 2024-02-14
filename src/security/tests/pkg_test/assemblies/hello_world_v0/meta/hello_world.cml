@@ -2,20 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "syslog/client.shard.cml" ],
+    include: [
+        "//src/sys/component_manager/tests/meta/use_elf_runner.shard.cml",
+        "syslog/client.shard.cml",
+    ],
     program: {
         binary: "bin/hello_world_v0",
     },
-    children: [
-        {
-            name: "elf_runner",
-            url: "fuchsia-builtin://#elf_runner.cm",
-        },
-    ],
-    use: [
-        {
-            runner: "elf",
-            from: "#elf_runner",
-        },
-    ],
 }

@@ -19,6 +19,7 @@ async fn shutdown_test() {
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
                 .capability(Capability::protocol_by_name("fuchsia.sys2.SystemController"))
                 .from(Ref::parent())
                 .to(&root),

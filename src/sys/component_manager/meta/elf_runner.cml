@@ -14,6 +14,9 @@
             path: "/svc/fuchsia.component.runner.ComponentRunner",
         },
     ],
+    use: [
+        { protocol: "fuchsia.process.Launcher" },
+    ],
     expose: [
         {
             protocol: "fuchsia.component.runner.ComponentRunner",

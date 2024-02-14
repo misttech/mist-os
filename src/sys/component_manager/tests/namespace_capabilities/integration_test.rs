@@ -20,23 +20,8 @@ async fn component_manager_namespace() {
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .from(Ref::parent())
-                .to(&realm),
-        )
-        .await
-        .unwrap();
-    builder
-        .add_route(
-            Route::new()
                 .capability(Capability::protocol_by_name("fidl.examples.routing.echo.Echo"))
-                .from(Ref::parent())
-                .to(&realm),
-        )
-        .await
-        .unwrap();
-    builder
-        .add_route(
-            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
                 .capability(Capability::directory("test-pkg"))
                 .from(Ref::parent())
                 .to(&realm),

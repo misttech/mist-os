@@ -18,4 +18,11 @@
             from: "#elf_runner",
         },
     ],
+    offer: [
+        {
+            protocol: "fuchsia.process.Launcher",
+            from: "parent",
+            to: "#elf_runner",
+        },
+    ],
 }

@@ -47,7 +47,16 @@ fuchsia_component("echo_client_empty_component") {
   testonly = true
   manifest = "meta/echo_client_empty.cml"
   component_name = "echo_client_empty"
-  deps = [ "//src/sys/component_manager/testing/echo_client" ]
+  deps =
+      [ "//src/sys/component_manager/testing/echo_client:echo_client_testing" ]
+}
+
+fuchsia_component("echo_client_with_elf_runner") {
+  testonly = true
+  manifest = "meta/echo_client_with_elf_runner.cml"
+  component_name = "echo_client_with_elf_runner"
+  deps =
+      [ "//src/sys/component_manager/testing/echo_client:echo_client_testing" ]
 }
 
 fuchsia_component("echo_server_empty_component") {
@@ -153,6 +162,7 @@ fuchsia_test_package("fuchsia-component-test-tests") {
   deps = [
     ":child_realm_with_realmbuilder",
     ":echo_client_empty_component",
+    ":echo_client_with_elf_runner",
     ":echo_realm_component",
     ":echo_server_empty_component",
     ":fuchsia_component_test_tests_component",

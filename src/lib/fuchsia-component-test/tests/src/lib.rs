@@ -29,6 +29,8 @@ use {
 const V2_ECHO_CLIENT_ABSOLUTE_URL: &'static str =
     "fuchsia-pkg://fuchsia.com/fuchsia-component-test-tests#meta/echo_client.cm";
 const V2_ECHO_CLIENT_FRAGMENT_URL: &'static str = "#meta/echo_client.cm";
+const V2_ECHO_CLIENT_WITH_ELF_RUNNER_FRAGMENT_URL: &'static str =
+    "#meta/echo_client_with_elf_runner.cm";
 const V2_ECHO_CLIENT_STRUCTURED_CONFIG_FRAGMENT_URL: &'static str = "#meta/echo_client_sc.cm";
 
 const COLLECTION_STRUCTURED_CONFIG_FRAGMENT_URL: &'static str = "#meta/collection_sc.cm";
@@ -1132,8 +1134,20 @@ async fn echo_clients_in_nested_component_manager() -> Result<(), Error> {
 
     {
         let builder = RealmBuilder::new().await?;
+        let echo_client = builder
+            .add_child(
+                "echo-client",
+                V2_ECHO_CLIENT_WITH_ELF_RUNNER_FRAGMENT_URL,
+                ChildOptions::new().eager(),
+            )
+            .await?;
         builder
-            .add_child("echo-client", V2_ECHO_CLIENT_FRAGMENT_URL, ChildOptions::new().eager())
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
+                    .from(Ref::parent())
+                    .to(&echo_client),
+            )
             .await?;
         let mut receive_echo_server_called = setup_echo_client_realm(&builder).await?;
         let realm_instance =

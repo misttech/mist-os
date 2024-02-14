@@ -65,6 +65,7 @@ async fn builtin_time_service_and_clock_routed() {
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
                 .from(Ref::parent())
                 .to(&realm),
         )

@@ -5,7 +5,7 @@
 use {
     component_events::{events::*, matcher::*},
     fidl_fuchsia_component as fcomponent, fuchsia_async as fasync,
-    fuchsia_component_test::{ChildOptions, RealmBuilder},
+    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
 };
 
 #[fasync::run_singlethreaded(test)]
@@ -20,7 +20,16 @@ async fn echo_without_args() {
 
 async fn run_single_test(url: &str) {
     let builder = RealmBuilder::new().await.unwrap();
-    builder.add_child("reporter", url, ChildOptions::new().eager()).await.unwrap();
+    let reporter = builder.add_child("reporter", url, ChildOptions::new().eager()).await.unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
+                .from(Ref::parent())
+                .to(&reporter),
+        )
+        .await
+        .unwrap();
     let instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
     let proxy = instance

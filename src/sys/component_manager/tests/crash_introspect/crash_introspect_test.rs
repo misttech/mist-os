@@ -103,6 +103,14 @@ async fn crashed_component_generates_a_record() -> Result<(), Error> {
     builder
         .add_route(
             Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
+                .from(Ref::parent())
+                .to(&report_then_panic_on_start),
+        )
+        .await?;
+    builder
+        .add_route(
+            Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.sys2.CrashIntrospect"))
                 .from(Ref::parent())
                 .to(&crash_receiver),

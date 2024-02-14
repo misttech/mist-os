@@ -23,6 +23,7 @@ async fn destroy() {
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
                 .from(Ref::parent())
                 .to(&collection_realm),
         )
@@ -82,6 +83,7 @@ async fn destroy_and_recreate() {
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
                 .from(Ref::parent())
                 .to(&destroy_and_recreate),
         )

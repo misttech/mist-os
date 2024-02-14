@@ -17,6 +17,7 @@ async fn start_nested_cm(cm_url: &str, root_url: &str) -> RealmInstance {
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
                 .capability(Capability::event_stream("destroyed").with_scope(&root))
                 .capability(Capability::event_stream("stopped").with_scope(&root))
                 .from(Ref::parent())
