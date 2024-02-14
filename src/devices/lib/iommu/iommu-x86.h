@@ -33,9 +33,9 @@ class IommuDesc {
   zx_status_t CreateWholeSegmentDesc(const ACPI_TABLE_DMAR* table,
                                      const ACPI_DMAR_HARDWARE_UNIT* unit);
 
-  // Creates the zircon iommu object using the supplied root resource. Only valid to be called after
-  // one of the Create*Desc initializers has returned with ZX_OK.
-  zx_status_t CreateIommu(const zx::unowned_resource& root_resource);
+  // Creates the zircon iommu object using the supplied iommu resource. Only valid to be called
+  // after one of the Create*Desc initializers has returned with ZX_OK.
+  zx_status_t CreateIommu(const zx::unowned_resource& iommu_resource);
 
   // Retrieves the zircon iommu object. Only valid to be called after CreateIommu has returned with
   // ZX_OK.
@@ -95,7 +95,7 @@ class IommuManager : public iommu::IommuManagerInterface {
   // Initializes the iommu_manager using the ACPI DMAR table. If this fails,
   // the IOMMU manager will be left in a well-defined empty state, and
   // IommuForBdf() can still succeed (yielding dummy IOMMU handles).
-  zx_status_t Init(zx::unowned_resource root_resource, bool use_hardware_iommu);
+  zx_status_t Init(zx::unowned_resource iommu_resource, bool use_hardware_iommu);
 
   // Returns a handle to the IOMMU that is responsible for the given BDF.
   zx::unowned_iommu IommuForPciDevice(uint32_t bdf) override;

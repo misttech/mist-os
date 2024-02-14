@@ -8,10 +8,10 @@
 
 namespace iommu {
 
-zx_status_t ArmIommuManager::Init(zx::unowned_resource root_resource) {
+zx_status_t ArmIommuManager::Init(zx::unowned_resource iommu_resource) {
   zx_iommu_desc_dummy_t dummy;
   zx_status_t status =
-      zx::iommu::create(*root_resource, ZX_IOMMU_TYPE_DUMMY, &dummy, sizeof(dummy), &dummy_iommu_);
+      zx::iommu::create(*iommu_resource, ZX_IOMMU_TYPE_DUMMY, &dummy, sizeof(dummy), &dummy_iommu_);
   if (status != ZX_OK) {
     return status;
   }

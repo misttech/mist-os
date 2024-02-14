@@ -359,8 +359,8 @@ zx_status_t IommuDesc::CreatePartialSegmentDesc(const ACPI_TABLE_DMAR* table,
   return CreateDesc(table, unit->Address, unit->Segment, false, scope_gen);
 }
 
-zx_status_t IommuDesc::CreateIommu(const zx::unowned_resource& root_resource) {
-  return zx::iommu::create(*root_resource, ZX_IOMMU_TYPE_INTEL, &Desc(), desc_.size(), &iommu_);
+zx_status_t IommuDesc::CreateIommu(const zx::unowned_resource& iommu_resource) {
+  return zx::iommu::create(*iommu_resource, ZX_IOMMU_TYPE_INTEL, &Desc(), desc_.size(), &iommu_);
 }
 
 IommuManager::IommuManager(IommuLogger logger) : logger_(std::move(logger)) {}
@@ -371,14 +371,14 @@ IommuManager::~IommuManager() {
   }
 }
 
-zx_status_t IommuManager::Init(zx::unowned_resource root_resource, bool use_hardware_iommu) {
+zx_status_t IommuManager::Init(zx::unowned_resource iommu_resource, bool use_hardware_iommu) {
   // Prevent double initialization.
   ZX_DEBUG_ASSERT(!iommu_mgr);
   iommu_mgr = this;
 
   zx_iommu_desc_dummy_t dummy;
   zx_status_t status =
-      zx::iommu::create(*root_resource, ZX_IOMMU_TYPE_DUMMY, &dummy, sizeof(dummy), &dummy_iommu_);
+      zx::iommu::create(*iommu_resource, ZX_IOMMU_TYPE_DUMMY, &dummy, sizeof(dummy), &dummy_iommu_);
   if (status != ZX_OK) {
     logf(ERROR, "error in zx::iommu::create: %s", zx_status_get_string(status));
     return status;
@@ -401,7 +401,7 @@ zx_status_t IommuManager::Init(zx::unowned_resource root_resource, bool use_hard
     return status;
   }
   for (auto& iommu : iommus_) {
-    status = iommu.CreateIommu(root_resource);
+    status = iommu.CreateIommu(iommu_resource);
     if (status != ZX_OK) {
       logf(ERROR, "acpi-bus: Failed to create iommu object: %s", zx_status_get_string(status));
       // Reset the iommus_ so that IommuForBdf doesn't try and use them.

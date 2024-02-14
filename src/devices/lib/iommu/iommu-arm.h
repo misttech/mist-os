@@ -14,7 +14,7 @@ namespace iommu {
 // information.
 class ArmIommuManager : public iommu::IommuManagerInterface {
  public:
-  zx_status_t Init(zx::unowned_resource root_resource);
+  zx_status_t Init(zx::unowned_resource iommu_resource);
 
   zx::unowned_iommu IommuForPciDevice(uint32_t bdf) override { return dummy_iommu_.borrow(); }
   zx::unowned_iommu IommuForAcpiDevice(std::string_view path) override {
@@ -27,4 +27,4 @@ class ArmIommuManager : public iommu::IommuManagerInterface {
 
 }  // namespace iommu
 
-#endif
+#endif  // SRC_DEVICES_LIB_IOMMU_IOMMU_ARM_H_
