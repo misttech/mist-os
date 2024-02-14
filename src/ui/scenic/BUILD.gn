@@ -32,7 +32,6 @@ group("tests") {
     ":geometry_provider_unittests",
     ":input_unittests",
     ":scenic_unittests",
-    ":scenic_util_tests",
     ":scenic_utils_unittests",
     ":scheduling_unittests",
     ":screen_capture2_unittests",
@@ -205,12 +204,6 @@ fuchsia_unittest_package("scenic_unittests") {
       max_severity = "ERROR"
     }
   }
-}
-
-fuchsia_unittest_package("scenic_util_tests") {
-  manifest = "meta/scenic_util_tests.cml"
-  deps = [ "lib/scenic/util/tests:unittests" ]
-  test_type = "system"
 }
 
 fuchsia_unittest_package("scenic_utils_unittests") {

@@ -5,6 +5,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/inspect/component/cpp/component.h>
+#include <lib/scheduler/role.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/provider.h>
@@ -17,7 +18,6 @@
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
 #include "src/ui/scenic/bin/app.h"
-#include "src/ui/scenic/lib/scenic/util/scheduler_profile.h"
 
 int main(int argc, const char** argv) {
   auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
@@ -40,7 +40,7 @@ int main(int argc, const char** argv) {
                        std::move(display_coordinator_promise), [&loop] { loop.Quit(); });
 
   // Apply the scheduler role defined for Scenic.
-  const zx_status_t status = util::SetSchedulerRole(zx::thread::self(), "fuchsia.scenic.main");
+  const zx_status_t status = fuchsia_scheduler::SetRoleForThisThread("fuchsia.scenic.main");
   if (status != ZX_OK) {
     FX_LOGS(WARNING) << "Failed to apply profile to main thread: " << status;
   }
