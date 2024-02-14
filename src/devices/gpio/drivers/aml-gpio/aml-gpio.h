@@ -6,16 +6,17 @@
 #define SRC_DEVICES_GPIO_DRIVERS_AML_GPIO_AML_GPIO_H_
 
 #include <fidl/fuchsia.hardware.gpioimpl/cpp/driver/fidl.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/mmio/mmio.h>
+#include <lib/stdcompat/span.h>
 
 #include <array>
 #include <cstdint>
 
-#include <ddktl/device.h>
 #include <fbl/array.h>
 
-#include "sdk/lib/driver/outgoing/cpp/outgoing_directory.h"
+#include "sdk/lib/driver/compat/cpp/device_server.h"
 
 namespace gpio {
 
@@ -41,55 +42,32 @@ struct AmlGpioInterrupt {
   uint32_t filter_select_offset;
 };
 
-class AmlGpio;
-using DeviceType = ddk::Device<AmlGpio>;
-
-class AmlGpio : public DeviceType, public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl> {
+class AmlGpio : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl> {
  public:
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
-
-  void DdkRelease() { delete this; }
-
- protected:
-  // for AmlGpioTest
-  explicit AmlGpio(ddk::PDevFidl pdev, fdf::MmioBuffer mmio_gpio, fdf::MmioBuffer mmio_gpio_a0,
-                   fdf::MmioBuffer mmio_interrupt, const AmlGpioBlock* gpio_blocks,
-                   const AmlGpioInterrupt* gpio_interrupt, size_t block_count,
-                   pdev_device_info_t info, fbl::Array<uint16_t> irq_info,
-                   fdf_dispatcher_t* dispatcher)
-      : DeviceType(nullptr),
-        pdev_(std::move(pdev)),
-        mmios_{std::move(mmio_gpio), std::move(mmio_gpio_a0)},
+  AmlGpio(fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev, fdf::MmioBuffer mmio_gpio,
+          fdf::MmioBuffer mmio_gpio_ao, fdf::MmioBuffer mmio_interrupt,
+          cpp20::span<const AmlGpioBlock> gpio_blocks, const AmlGpioInterrupt* gpio_interrupt,
+          uint32_t pid, fbl::Array<uint16_t> irq_info)
+      : pdev_(std::move(pdev)),
+        mmios_{std::move(mmio_gpio), std::move(mmio_gpio_ao)},
         mmio_interrupt_(std::move(mmio_interrupt)),
         gpio_blocks_(gpio_blocks),
         gpio_interrupt_(gpio_interrupt),
-        block_count_(block_count),
-        info_(std::move(info)),
-        irq_info_(std::move(irq_info)),
-        irq_status_(0),
-        outgoing_(dispatcher) {}
+        pid_(pid),
+        irq_info_(std::move(irq_info)) {}
 
  private:
-  explicit AmlGpio(zx_device_t* parent, fdf::MmioBuffer mmio_gpio, fdf::MmioBuffer mmio_gpio_a0,
-                   fdf::MmioBuffer mmio_interrupt, const AmlGpioBlock* gpio_blocks,
-                   const AmlGpioInterrupt* gpio_interrupt, size_t block_count,
-                   pdev_device_info_t info, fbl::Array<uint16_t> irq_info)
-      : DeviceType(parent),
-        pdev_(parent),
-        mmios_{std::move(mmio_gpio), std::move(mmio_gpio_a0)},
-        mmio_interrupt_(std::move(mmio_interrupt)),
-        gpio_blocks_(gpio_blocks),
-        gpio_interrupt_(gpio_interrupt),
-        block_count_(block_count),
-        info_(std::move(info)),
-        irq_info_(std::move(irq_info)),
-        irq_status_(0),
-        outgoing_(fdf::Dispatcher::GetCurrent()->get()) {}
+  friend class AmlGpioDriver;
+
+  fidl::ProtocolHandler<fuchsia_hardware_gpioimpl::GpioImpl> CreateHandler() {
+    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
+                                   fidl::kIgnoreBindingClosure);
+  }
 
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_gpioimpl::GpioImpl> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override {
-    zxlogf(ERROR, "Unexpected gpioimpl FIDL call: 0x%lx", metadata.method_ordinal);
+    FDF_LOG(ERROR, "Unexpected gpioimpl FIDL call: 0x%lx", metadata.method_ordinal);
   }
 
   void ConfigIn(fuchsia_hardware_gpioimpl::wire::GpioImplConfigInRequest* request,
@@ -119,17 +97,34 @@ class AmlGpio : public DeviceType, public fdf::WireServer<fuchsia_hardware_gpioi
   zx_status_t AmlPinToBlock(uint32_t pin, const AmlGpioBlock** out_block,
                             uint32_t* out_pin_index) const;
 
-  ddk::PDevFidl pdev_;
+  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;
   std::array<fdf::MmioBuffer, 2> mmios_;  // separate MMIO for AO domain
   fdf::MmioBuffer mmio_interrupt_;
-  const AmlGpioBlock* gpio_blocks_;
+  const cpp20::span<const AmlGpioBlock> gpio_blocks_;
   const AmlGpioInterrupt* gpio_interrupt_;
-  size_t block_count_;
-  const pdev_device_info_t info_;
+  const uint32_t pid_;
   fbl::Array<uint16_t> irq_info_;
-  uint8_t irq_status_;
+  uint8_t irq_status_{};
   fdf::ServerBindingGroup<fuchsia_hardware_gpioimpl::GpioImpl> bindings_;
-  fdf::OutgoingDirectory outgoing_;
+};
+
+class AmlGpioDriver : public fdf::DriverBase {
+ public:
+  AmlGpioDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : fdf::DriverBase("aml-gpio", std::move(start_args), std::move(dispatcher)) {}
+
+  zx::result<> Start() override;
+
+ protected:
+  // MapMmio can be overridden by a test in order to provide an fdf::MmioBuffer backed by a fake.
+  virtual zx::result<fdf::MmioBuffer> MapMmio(
+      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t mmio_id);
+
+ private:
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+  compat::SyncInitializedDeviceServer compat_server_;
+  std::unique_ptr<AmlGpio> device_;
 };
 
 }  // namespace gpio

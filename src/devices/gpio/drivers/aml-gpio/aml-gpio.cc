@@ -4,14 +4,16 @@
 
 #include "aml-gpio.h"
 
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 
+#include <bind/fuchsia/hardware/gpioimpl/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 
 #include "a1-blocks.h"
@@ -54,79 +56,115 @@ enum {
   MMIO_GPIO_INTERRUPTS = 2,
 };
 
-zx_status_t AmlGpio::Create(void* ctx, zx_device_t* parent) {
-  zx_status_t status;
+zx::result<> AmlGpioDriver::Start() {
+  parent_.Bind(std::move(node()));
 
-  ddk::PDevFidl pdev(parent);
-  std::optional<fdf::MmioBuffer> mmio_gpio, mmio_gpio_a0, mmio_interrupt;
-  if ((status = pdev.MapMmio(MMIO_GPIO, &mmio_gpio)) != ZX_OK) {
-    zxlogf(ERROR, "AmlGpio::Create: MapMmio failed");
-    return status;
-  }
-
-  if ((status = pdev.MapMmio(MMIO_GPIO_AO, &mmio_gpio_a0)) != ZX_OK) {
-    zxlogf(ERROR, "AmlGpio::Create: MapMmio failed");
-    return status;
-  }
-
-  if ((status = pdev.MapMmio(MMIO_GPIO_INTERRUPTS, &mmio_interrupt)) != ZX_OK) {
-    zxlogf(ERROR, "AmlGpio::Create: MapMmio failed");
-    return status;
-  }
-
-  pdev_device_info_t info;
-  if ((status = pdev.GetDeviceInfo(&info)) != ZX_OK) {
-    zxlogf(ERROR, "AmlGpio::Create: GetDeviceInfo failed");
-    return status;
-  }
-
-  if (info.pid == 0) {
-    // TODO(https://fxbug.dev/318736574) : Remove and rely only on GetDeviceInfo.
-    pdev_board_info_t board_info;
-    if ((status = pdev.GetBoardInfo(&board_info)) != ZX_OK) {
-      zxlogf(ERROR, "AmlGpio::Create: GetBoardInfo failed");
-      return status;
+  {
+    zx::result result = compat_server_.Initialize(
+        incoming(), outgoing(), node_name(), name(),
+        compat::ForwardMetadata::Some({DEVICE_METADATA_GPIO_PINS, DEVICE_METADATA_GPIO_INIT,
+                                       DEVICE_METADATA_SCHEDULER_ROLE_NAME}));
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to initialize compat server: %s", result.status_string());
+      return result.take_error();
     }
-    if (board_info.vid == PDEV_VID_AMLOGIC) {
-      info.pid = board_info.pid;
-    } else if (board_info.vid == PDEV_VID_GOOGLE) {
-      switch (board_info.pid) {
+  }
+
+  zx::result pdev_client = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
+  if (pdev_client.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to platform device: %s", pdev_client.status_string());
+    return pdev_client.take_error();
+  }
+
+  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev(*std::move(pdev_client));
+
+  zx::result<fdf::MmioBuffer> mmio_gpio = MapMmio(pdev, MMIO_GPIO);
+  if (mmio_gpio.is_error()) {
+    return mmio_gpio.take_error();
+  }
+
+  zx::result<fdf::MmioBuffer> mmio_gpio_ao = MapMmio(pdev, MMIO_GPIO_AO);
+  if (mmio_gpio_ao.is_error()) {
+    return mmio_gpio_ao.take_error();
+  }
+
+  zx::result<fdf::MmioBuffer> mmio_interrupt = MapMmio(pdev, MMIO_GPIO_INTERRUPTS);
+  if (mmio_interrupt.is_error()) {
+    return mmio_interrupt.take_error();
+  }
+
+  auto info = pdev->GetNodeDeviceInfo();
+  if (!info.ok()) {
+    FDF_LOG(ERROR, "Call to get device info failed: %s", info.status_string());
+    return zx::error(info.status());
+  }
+  if (info->is_error()) {
+    FDF_LOG(ERROR, "Failed to get device info: %s", zx_status_get_string(info.status()));
+    return info->take_error();
+  }
+  if (!info->value()->has_pid() || !info->value()->has_irq_count()) {
+    FDF_LOG(ERROR, "No pid or irq_count entry in device info");
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  uint32_t pid = info->value()->pid();
+
+  if (pid == 0) {
+    // TODO(https://fxbug.dev/318736574) : Remove and rely only on GetDeviceInfo.
+    auto board_info = pdev->GetBoardInfo();
+    if (!board_info.ok()) {
+      FDF_LOG(ERROR, "Call to get board info failed: %s", board_info.status_string());
+      return zx::error(board_info.status());
+    }
+    if (board_info->is_error()) {
+      FDF_LOG(ERROR, "Failed to get board info: %s", zx_status_get_string(board_info.status()));
+      return board_info->take_error();
+    }
+    if (!board_info->value()->has_vid() || !board_info->value()->has_pid()) {
+      FDF_LOG(ERROR, "No vid or pid entry in board info");
+      return zx::error(ZX_ERR_BAD_STATE);
+    }
+
+    if (board_info->value()->vid() == PDEV_VID_AMLOGIC) {
+      pid = board_info->value()->pid();
+    } else if (board_info->value()->vid() == PDEV_VID_GOOGLE) {
+      switch (board_info->value()->pid()) {
         case PDEV_PID_ASTRO:
-          info.pid = PDEV_PID_AMLOGIC_S905D2;
+          pid = PDEV_PID_AMLOGIC_S905D2;
           break;
         case PDEV_PID_SHERLOCK:
-          info.pid = PDEV_PID_AMLOGIC_T931;
+          pid = PDEV_PID_AMLOGIC_T931;
           break;
         case PDEV_PID_NELSON:
-          info.pid = PDEV_PID_AMLOGIC_S905D3;
+          pid = PDEV_PID_AMLOGIC_S905D3;
           break;
         default:
-          zxlogf(ERROR, "Unsupported PID 0x%x for VID 0x%x", board_info.pid, board_info.vid);
-          return ZX_ERR_INVALID_ARGS;
+          FDF_LOG(ERROR, "Unsupported PID 0x%x for VID 0x%x", board_info->value()->pid(),
+                  board_info->value()->vid());
+          return zx::error(ZX_ERR_INVALID_ARGS);
       }
-    } else if (board_info.vid == PDEV_VID_KHADAS) {
-      switch (board_info.pid) {
+    } else if (board_info->value()->vid() == PDEV_VID_KHADAS) {
+      switch (board_info->value()->pid()) {
         case PDEV_PID_VIM3:
-          info.pid = PDEV_PID_AMLOGIC_A311D;
+          pid = PDEV_PID_AMLOGIC_A311D;
           break;
         default:
-          zxlogf(ERROR, "Unsupported PID 0x%x for VID 0x%x", board_info.pid, board_info.vid);
-          return ZX_ERR_INVALID_ARGS;
+          FDF_LOG(ERROR, "Unsupported PID 0x%x for VID 0x%x", board_info->value()->pid(),
+                  board_info->value()->vid());
+          return zx::error(ZX_ERR_INVALID_ARGS);
       }
     } else {
-      zxlogf(ERROR, "Unsupported VID 0x%x", board_info.vid);
-      return ZX_ERR_INVALID_ARGS;
+      FDF_LOG(ERROR, "Unsupported VID 0x%x", board_info->value()->vid());
+      return zx::error(ZX_ERR_INVALID_ARGS);
     }
   }
 
-  const AmlGpioBlock* gpio_blocks;
+  cpp20::span<const AmlGpioBlock> gpio_blocks;
   const AmlGpioInterrupt* gpio_interrupt;
-  size_t block_count;
 
-  switch (info.pid) {
+  switch (pid) {
     case PDEV_PID_AMLOGIC_A113:
-      gpio_blocks = a113_gpio_blocks;
-      block_count = std::size(a113_gpio_blocks);
+      gpio_blocks = {a113_gpio_blocks, std::size(a113_gpio_blocks)};
       gpio_interrupt = &a113_interrupt_block;
       break;
     case PDEV_PID_AMLOGIC_S905D2:
@@ -134,95 +172,91 @@ zx_status_t AmlGpio::Create(void* ctx, zx_device_t* parent) {
     case PDEV_PID_AMLOGIC_A311D:
     case PDEV_PID_AMLOGIC_S905D3:
       // S905D2, T931, A311D, S905D3 are identical.
-      gpio_blocks = s905d2_gpio_blocks;
-      block_count = std::size(s905d2_gpio_blocks);
+      gpio_blocks = {s905d2_gpio_blocks, std::size(s905d2_gpio_blocks)};
       gpio_interrupt = &s905d2_interrupt_block;
       break;
     case PDEV_PID_AMLOGIC_A5:
-      gpio_blocks = a5_gpio_blocks;
-      block_count = std::size(a5_gpio_blocks);
+      gpio_blocks = {a5_gpio_blocks, std::size(a5_gpio_blocks)};
       gpio_interrupt = &a5_interrupt_block;
       break;
     case PDEV_PID_AMLOGIC_A1:
-      gpio_blocks = a1_gpio_blocks;
-      block_count = std::size(a1_gpio_blocks);
+      gpio_blocks = {a1_gpio_blocks, std::size(a1_gpio_blocks)};
       gpio_interrupt = &a1_interrupt_block;
       break;
     default:
-      zxlogf(ERROR, "AmlGpio::Create: unsupported SOC PID %u", info.pid);
-      return ZX_ERR_INVALID_ARGS;
+      FDF_LOG(ERROR, "Unsupported SOC PID %u", pid);
+      return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   fbl::AllocChecker ac;
 
-  fbl::Array<uint16_t> irq_info(new (&ac) uint16_t[info.irq_count], info.irq_count);
+  const uint32_t irq_count = info->value()->irq_count();
+  fbl::Array<uint16_t> irq_info(new (&ac) uint16_t[irq_count], irq_count);
   if (!ac.check()) {
-    zxlogf(ERROR, "AmlGpio::Create: irq_info alloc failed");
-    return ZX_ERR_NO_MEMORY;
+    FDF_LOG(ERROR, "irq_info alloc failed");
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
-  for (uint32_t i = 0; i < info.irq_count; i++) {
-    irq_info[i] = kMaxGpioIndex + 1;
-  }  // initialize irq_info
+  std::fill(irq_info.begin(), irq_info.end(), kMaxGpioIndex + 1);  // initialize irq_info
 
-  std::unique_ptr<AmlGpio> device(new (&ac) AmlGpio(
-      parent, *std::move(mmio_gpio), *std::move(mmio_gpio_a0), *std::move(mmio_interrupt),
-      gpio_blocks, gpio_interrupt, block_count, std::move(info), std::move(irq_info)));
+  device_.reset(new (&ac) AmlGpio(pdev.TakeClientEnd(), *std::move(mmio_gpio),
+                                  *std::move(mmio_gpio_ao), *std::move(mmio_interrupt), gpio_blocks,
+                                  gpio_interrupt, pid, std::move(irq_info)));
   if (!ac.check()) {
-    zxlogf(ERROR, "AmlGpio::Create: device object alloc failed");
-    return ZX_ERR_NO_MEMORY;
+    FDF_LOG(ERROR, "Device object alloc failed");
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   {
     fuchsia_hardware_gpioimpl::Service::InstanceHandler handler({
-        .device = device->bindings_.CreateHandler(
-            device.get(), fdf::Dispatcher::GetCurrent()->get(), fidl::kIgnoreBindingClosure),
+        .device = device_->CreateHandler(),
     });
-    auto result =
-        device->outgoing_.AddService<fuchsia_hardware_gpioimpl::Service>(std::move(handler));
+    auto result = outgoing()->AddService<fuchsia_hardware_gpioimpl::Service>(std::move(handler));
     if (result.is_error()) {
-      zxlogf(ERROR, "AddService failed: %s", result.status_string());
-      return result.error_value();
+      FDF_LOG(ERROR, "AddService failed: %s", result.status_string());
+      return zx::error(result.error_value());
     }
   }
 
-  auto directory_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (directory_endpoints.is_error()) {
-    return directory_endpoints.status_value();
+  zx::result controller_endpoints =
+      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  if (!controller_endpoints.is_ok()) {
+    FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
+            controller_endpoints.status_string());
+    return controller_endpoints.take_error();
   }
 
-  {
-    auto result = device->outgoing_.Serve(std::move(directory_endpoints->server));
-    if (result.is_error()) {
-      zxlogf(ERROR, "Failed to serve the outgoing directory: %s", result.status_string());
-      return result.error_value();
-    }
+  controller_.Bind(std::move(controller_endpoints->client));
+
+  fidl::Arena arena;
+
+  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
+  properties[0] = fdf::MakeProperty(arena, bind_fuchsia_hardware_gpioimpl::SERVICE,
+                                    bind_fuchsia_hardware_gpioimpl::SERVICE_DRIVERTRANSPORT);
+
+  std::vector offers = compat_server_.CreateOffers2(arena);
+  offers.push_back(
+      fdf::MakeOffer2<fuchsia_hardware_gpioimpl::Service>(arena, component::kDefaultInstance));
+
+  const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                        .name(arena, name())
+                        .offers2(arena, std::move(offers))
+                        .properties(properties)
+                        .Build();
+
+  auto result = parent_->AddChild(args, std::move(controller_endpoints->server), {});
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
+    return zx::error(result.status());
   }
 
-  std::array<const char*, 1> service_offers{fuchsia_hardware_gpioimpl::Service::Name};
-  if (auto status =
-          device->DdkAdd(ddk::DeviceAddArgs("aml-gpio")
-                             .set_proto_id(ZX_PROTOCOL_GPIO_IMPL)
-                             .set_runtime_service_offers(service_offers)
-                             .set_outgoing_dir(directory_endpoints->client.TakeChannel())
-                             .forward_metadata(parent, DEVICE_METADATA_GPIO_PINS)
-                             .forward_metadata(parent, DEVICE_METADATA_GPIO_INIT)
-                             .forward_metadata(parent, DEVICE_METADATA_SCHEDULER_ROLE_NAME));
-      status != ZX_OK) {
-    zxlogf(ERROR, "AmlGpio::Create: DdkAdd failed");
-    return status;
-  }
-
-  [[maybe_unused]] auto* unused = device.release();
-
-  return ZX_OK;
+  return zx::ok();
 }
 
 zx_status_t AmlGpio::AmlPinToBlock(const uint32_t pin, const AmlGpioBlock** out_block,
                                    uint32_t* out_pin_index) const {
   ZX_DEBUG_ASSERT(out_block && out_pin_index);
 
-  for (size_t i = 0; i < block_count_; i++) {
-    const AmlGpioBlock& gpio_block = gpio_blocks_[i];
+  for (const AmlGpioBlock& gpio_block : gpio_blocks_) {
     const uint32_t end_pin = gpio_block.start_pin + gpio_block.pin_count;
     if (pin >= gpio_block.start_pin && pin < end_pin) {
       *out_block = &gpio_block;
@@ -241,7 +275,7 @@ void AmlGpio::ConfigIn(fuchsia_hardware_gpioimpl::wire::GpioImplConfigInRequest*
   const AmlGpioBlock* block;
   uint32_t pinindex;
   if ((status = AmlPinToBlock(request->index, &block, &pinindex)) != ZX_OK) {
-    zxlogf(ERROR, "AmlGpio::GpioImplConfigIn: pin not found %u", request->index);
+    FDF_LOG(ERROR, "Pin not found %u", request->index);
     return completer.buffer(arena).ReplyError(status);
   }
 
@@ -279,7 +313,7 @@ void AmlGpio::ConfigOut(fuchsia_hardware_gpioimpl::wire::GpioImplConfigOutReques
   const AmlGpioBlock* block;
   uint32_t pinindex;
   if ((status = AmlPinToBlock(request->index, &block, &pinindex)) != ZX_OK) {
-    zxlogf(ERROR, "AmlGpio::GpioImplConfigOut: pin not found %u", request->index);
+    FDF_LOG(ERROR, "Pin not found %u", request->index);
     return completer.buffer(arena).ReplyError(status);
   }
 
@@ -306,8 +340,7 @@ void AmlGpio::SetAltFunction(
     fuchsia_hardware_gpioimpl::wire::GpioImplSetAltFunctionRequest* request, fdf::Arena& arena,
     SetAltFunctionCompleter::Sync& completer) {
   if (request->function > kAltFnMax) {
-    zxlogf(ERROR, "AmlGpio::GpioImplSetAltFunction: pin mux alt config out of range %lu",
-           request->function);
+    FDF_LOG(ERROR, "Pin mux alt config out of range %lu", request->function);
     return completer.buffer(arena).ReplyError(ZX_ERR_OUT_OF_RANGE);
   }
 
@@ -316,7 +349,7 @@ void AmlGpio::SetAltFunction(
   const AmlGpioBlock* block;
   uint32_t pinindex;
   if ((status = AmlPinToBlock(request->index, &block, &pinindex)) != ZX_OK) {
-    zxlogf(ERROR, "AmlGpio::GpioImplSetAltFunction: pin not found %u", request->index);
+    FDF_LOG(ERROR, "Pin not found %u", request->index);
     return completer.buffer(arena).ReplyError(status);
   }
 
@@ -347,7 +380,7 @@ void AmlGpio::Read(fuchsia_hardware_gpioimpl::wire::GpioImplReadRequest* request
   const AmlGpioBlock* block;
   uint32_t pinindex;
   if ((status = AmlPinToBlock(request->index, &block, &pinindex)) != ZX_OK) {
-    zxlogf(ERROR, "AmlGpio::GpioImplRead: pin not found %u", request->index);
+    FDF_LOG(ERROR, "Pin not found %u", request->index);
     return completer.buffer(arena).ReplyError(status);
   }
 
@@ -364,7 +397,7 @@ void AmlGpio::Write(fuchsia_hardware_gpioimpl::wire::GpioImplWriteRequest* reque
   const AmlGpioBlock* block;
   uint32_t pinindex;
   if ((status = AmlPinToBlock(request->index, &block, &pinindex)) != ZX_OK) {
-    zxlogf(ERROR, "AmlGpio::GpioImplWrite: pin not found %u", request->index);
+    FDF_LOG(ERROR, "Pin not found %u", request->index);
     return completer.buffer(arena).ReplyError(status);
   }
 
@@ -388,22 +421,22 @@ void AmlGpio::GetInterrupt(fuchsia_hardware_gpioimpl::wire::GpioImplGetInterrupt
   }
 
   uint32_t index = GetUnusedIrqIndex(irq_status_);
-  if (index > info_.irq_count) {
-    zxlogf(ERROR, "No free IRQ indicies %u, irq_count = %u", (int)index, (int)info_.irq_count);
+  if (index > irq_info_.size()) {
+    FDF_LOG(ERROR, "No free IRQ indicies %u, irq_count = %zu", (int)index, irq_info_.size());
     return completer.buffer(arena).ReplyError(ZX_ERR_NO_RESOURCES);
   }
 
-  for (uint32_t i = 0; i < info_.irq_count; i++) {
-    if (irq_info_[i] == request->index) {
-      zxlogf(ERROR, "GPIO Interrupt already configured for this pin %u", (int)index);
+  for (uint16_t irq : irq_info_) {
+    if (irq == request->index) {
+      FDF_LOG(ERROR, "GPIO Interrupt already configured for this pin %u", (int)index);
       return completer.buffer(arena).ReplyError(ZX_ERR_ALREADY_EXISTS);
     }
   }
-  zxlogf(DEBUG, "GPIO Interrupt index %d allocated", (int)index);
+  FDF_LOG(DEBUG, "GPIO Interrupt index %d allocated", (int)index);
   const AmlGpioBlock* block;
   uint32_t pinindex;
   if ((status = AmlPinToBlock(request->index, &block, &pinindex)) != ZX_OK) {
-    zxlogf(ERROR, "AmlGpio::GpioImplGetInterrupt: pin not found %u", request->index);
+    FDF_LOG(ERROR, "Pin not found %u", request->index);
     return completer.buffer(arena).ReplyError(status);
   }
   uint32_t flags_ = request->flags;
@@ -454,22 +487,26 @@ void AmlGpio::GetInterrupt(fuchsia_hardware_gpioimpl::wire::GpioImplGetInterrupt
                                pin_select_offset * sizeof(uint32_t));
 
   // Create Interrupt Object
-  zx::interrupt out_irq;
-  if ((status = pdev_.GetInterrupt(index, flags_, &out_irq)) != ZX_OK) {
-    zxlogf(ERROR, "AmlGpio::GpioImplGetInterrupt: pdev_get_interrupt failed %d", status);
-    return completer.buffer(arena).ReplyError(status);
+  auto out_irq = pdev_->GetInterruptById(index, flags_);
+  if (!out_irq.ok()) {
+    FDF_LOG(ERROR, "Call to pdev_get_interrupt failed: %s", out_irq.status_string());
+    return completer.buffer(arena).ReplyError(out_irq.status());
+  }
+  if (out_irq->is_error()) {
+    FDF_LOG(ERROR, "pdev_get_interrupt failed: %s", out_irq.status_string());
+    return completer.buffer(arena).Reply(out_irq->take_error());
   }
 
   irq_status_ |= static_cast<uint8_t>(1 << index);
   irq_info_[index] = static_cast<uint16_t>(request->index);
 
-  completer.buffer(arena).ReplySuccess(std::move(out_irq));
+  completer.buffer(arena).ReplySuccess(std::move(out_irq->value()->irq));
 }
 
 void AmlGpio::ReleaseInterrupt(
     fuchsia_hardware_gpioimpl::wire::GpioImplReleaseInterruptRequest* request, fdf::Arena& arena,
     ReleaseInterruptCompleter::Sync& completer) {
-  for (uint32_t i = 0; i < info_.irq_count; i++) {
+  for (uint32_t i = 0; i < irq_info_.size(); i++) {
     if (irq_info_[i] == request->index) {
       irq_status_ &= static_cast<uint8_t>(~(1 << i));
       irq_info_[i] = kMaxGpioIndex + 1;
@@ -486,7 +523,7 @@ void AmlGpio::SetPolarity(fuchsia_hardware_gpioimpl::wire::GpioImplSetPolarityRe
     return completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
   }
 
-  for (uint32_t i = 0; i < info_.irq_count; i++) {
+  for (uint32_t i = 0; i < irq_info_.size(); i++) {
     if (irq_info_[i] == request->index) {
       irq_index = i;
       break;
@@ -512,7 +549,7 @@ void AmlGpio::GetDriveStrength(
     GetDriveStrengthCompleter::Sync& completer) {
   zx_status_t st;
 
-  if (info_.pid == PDEV_PID_AMLOGIC_A113) {
+  if (pid_ == PDEV_PID_AMLOGIC_A113) {
     return completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -520,7 +557,7 @@ void AmlGpio::GetDriveStrength(
   uint32_t pinindex;
 
   if ((st = AmlPinToBlock(request->index, &block, &pinindex)) != ZX_OK) {
-    zxlogf(ERROR, "AmlGpio::GpioImplGetDriveStrength: pin not found %u", request->index);
+    FDF_LOG(ERROR, "Pin not found %u", request->index);
     return completer.buffer(arena).ReplyError(st);
   }
 
@@ -549,8 +586,7 @@ void AmlGpio::GetDriveStrength(
       out = 4000;
       break;
     default:
-      zxlogf(ERROR, "AmlGpio::GpioImplGetDriveStrength: Unexpected drive strength value: %u",
-             value);
+      FDF_LOG(ERROR, "Unexpected drive strength value: %u", value);
       return completer.buffer(arena).ReplyError(ZX_ERR_INTERNAL);
   }
 
@@ -562,14 +598,14 @@ void AmlGpio::SetDriveStrength(
     SetDriveStrengthCompleter::Sync& completer) {
   zx_status_t status;
 
-  if (info_.pid == PDEV_PID_AMLOGIC_A113) {
+  if (pid_ == PDEV_PID_AMLOGIC_A113) {
     return completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
   const AmlGpioBlock* block;
   uint32_t pinindex;
   if ((status = AmlPinToBlock(request->index, &block, &pinindex)) != ZX_OK) {
-    zxlogf(ERROR, "AmlGpio::GpioImplSetDriveStrength: pin not found %u", request->index);
+    FDF_LOG(ERROR, "Pin not found %u", request->index);
     return completer.buffer(arena).ReplyError(status);
   }
 
@@ -588,9 +624,7 @@ void AmlGpio::SetDriveStrength(
     ds_val = DRV_4000UA;
     ua = 4000;
   } else {
-    zxlogf(ERROR,
-           "AmlGpio::GpioImplSetDriveStrength: invalid drive strength %lu, default to 4000 uA\n",
-           ua);
+    FDF_LOG(ERROR, "Invalid drive strength %lu, default to 4000 uA", ua);
     ds_val = DRV_4000UA;
     ua = 4000;
   }
@@ -618,13 +652,29 @@ void AmlGpio::GetControllerId(fdf::Arena& arena, GetControllerIdCompleter::Sync&
   completer.buffer(arena).Reply(0);
 }
 
-static constexpr zx_driver_ops_t driver_ops = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = AmlGpio::Create;
-  return ops;
-}();
+zx::result<fdf::MmioBuffer> AmlGpioDriver::MapMmio(
+    const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t mmio_id) {
+  auto result = pdev->GetMmioById(mmio_id);
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Call to get MMIO %u failed: %s", mmio_id, result.status_string());
+    return zx::error(result.status());
+  }
+  if (result->is_error()) {
+    FDF_LOG(ERROR, "Failed to get MMIO %u: %s", mmio_id,
+            zx_status_get_string(result->error_value()));
+    return result->take_error();
+  }
+
+  auto& mmio = *result->value();
+  if (!mmio.has_offset() || !mmio.has_size() || !mmio.has_vmo()) {
+    FDF_LOG(ERROR, "Invalid MMIO returned for ID %u", mmio_id);
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  return fdf::MmioBuffer::Create(mmio.offset(), mmio.size(), std::move(mmio.vmo()),
+                                 ZX_CACHE_POLICY_UNCACHED_DEVICE);
+}
 
 }  // namespace gpio
 
-ZIRCON_DRIVER(aml_gpio, gpio::driver_ops, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(gpio::AmlGpioDriver);

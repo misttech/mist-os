@@ -207,7 +207,6 @@ sdk_static_library("ddk") {
     "//src/devices/cpu/drivers/aml-cpu:*",
     "//src/devices/cpu/drivers/aml-cpu-legacy:*",
     "//src/devices/gpio/bin/gpioutil:*",
-    "//src/devices/gpio/drivers/aml-gpio:*",
     "//src/devices/gpio/drivers/gpio:*",
     "//src/devices/gpio/drivers/ti-tca6408a:*",
     "//src/devices/gpio/lib/fuchsia.hardware.gpio:*",
