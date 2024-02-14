@@ -639,24 +639,21 @@ Service::Member Service::Member::Clone() const {
 }
 
 Struct::Member Struct::Member::Clone() const {
-  return StructMember(type_ctor->Clone(), name,
-                      maybe_default_value ? maybe_default_value->Clone() : nullptr,
-                      attributes->Clone());
+  return Struct::Member(type_ctor->Clone(), name,
+                        maybe_default_value ? maybe_default_value->Clone() : nullptr,
+                        attributes->Clone());
 }
 
 Table::Member Table::Member::Clone() const {
-  return TableMember(ordinal, span, maybe_used ? maybe_used->Clone() : nullptr,
-                     attributes->Clone());
+  return Member(ordinal, span, maybe_used ? maybe_used->Clone() : nullptr, attributes->Clone());
 }
 
 Union::Member Union::Member::Clone() const {
-  return UnionMember(ordinal, span, maybe_used ? maybe_used->Clone() : nullptr,
-                     attributes->Clone());
+  return Member(ordinal, span, maybe_used ? maybe_used->Clone() : nullptr, attributes->Clone());
 }
 
 Overlay::Member Overlay::Member::Clone() const {
-  return OverlayMember(ordinal, span, maybe_used ? maybe_used->Clone() : nullptr,
-                       attributes->Clone());
+  return Member(ordinal, span, maybe_used ? maybe_used->Clone() : nullptr, attributes->Clone());
 }
 
 Protocol::Method Protocol::Method::Clone() const {

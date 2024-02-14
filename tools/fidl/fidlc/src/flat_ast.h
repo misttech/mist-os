@@ -515,33 +515,23 @@ struct Service final : public Decl {
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
 };
 
-struct Struct;
-
-// Historically, StructMember was a nested class inside Struct named Struct::Member. However,
-// this was made a top-level class since it's not possible to forward-declare nested classes in
-// C++. For backward-compatibility, Struct::Member is now an alias for this top-level
-// StructMember.
-// TODO(https://fxbug.dev/42113185): Move this to a nested class inside Struct.
-struct StructMember : public Element {
-  StructMember(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name,
-               std::unique_ptr<Constant> maybe_default_value,
-               std::unique_ptr<AttributeList> attributes)
-      : Element(Element::Kind::kStructMember, std::move(attributes)),
-        type_ctor(std::move(type_ctor)),
-        name(name),
-        maybe_default_value(std::move(maybe_default_value)) {}
-  StructMember Clone() const;
-
-  std::unique_ptr<TypeConstructor> type_ctor;
-  SourceSpan name;
-  std::unique_ptr<Constant> maybe_default_value;
-
-  // Set during the TypeShapeStep.
-  FieldShape field_shape;
-};
-
 struct Struct final : public TypeDecl {
-  using Member = StructMember;
+  struct Member : public Element {
+    Member(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name,
+           std::unique_ptr<Constant> maybe_default_value, std::unique_ptr<AttributeList> attributes)
+        : Element(Element::Kind::kStructMember, std::move(attributes)),
+          type_ctor(std::move(type_ctor)),
+          name(name),
+          maybe_default_value(std::move(maybe_default_value)) {}
+    Member Clone() const;
+
+    std::unique_ptr<TypeConstructor> type_ctor;
+    SourceSpan name;
+    std::unique_ptr<Constant> maybe_default_value;
+
+    // Set during the TypeShapeStep.
+    FieldShape field_shape;
+  };
 
   Struct(std::unique_ptr<AttributeList> attributes, Name name, std::vector<Member> members,
          std::optional<Resourceness> resourceness)
@@ -560,56 +550,46 @@ struct Struct final : public TypeDecl {
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
 };
 
-struct Table;
-
-// See the comment on the StructMember class for why this is a top-level class.
-// TODO(https://fxbug.dev/42113185): Move this to a nested class inside Table::Member.
-struct TableMemberUsed {
-  TableMemberUsed(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name)
-      : type_ctor(std::move(type_ctor)), name(name) {}
-  std::unique_ptr<TypeConstructor> type_ctor;
-  SourceSpan name;
-
-  std::unique_ptr<TableMemberUsed> Clone() const {
-    return std::make_unique<TableMemberUsed>(type_ctor->Clone(), name);
-  }
-};
-
-// See the comment on the StructMember class for why this is a top-level class.
-// TODO(https://fxbug.dev/42113185): Move this to a nested class inside Table.
-struct TableMember : public Element {
-  using Used = TableMemberUsed;
-
-  TableMember(const RawOrdinal64* ordinal, std::unique_ptr<TypeConstructor> type, SourceSpan name,
-              std::unique_ptr<AttributeList> attributes)
-      : Element(Element::Kind::kTableMember, std::move(attributes)),
-        ordinal(ordinal),
-        maybe_used(std::make_unique<Used>(std::move(type), name)) {}
-
-  static TableMember Reserved(const RawOrdinal64* ordinal, SourceSpan span,
-                              std::unique_ptr<AttributeList> attributes) {
-    return TableMember(ordinal, span, nullptr, std::move(attributes));
-  }
-
-  TableMember Clone() const;
-
-  // Owned by Library::raw_ordinals.
-  const RawOrdinal64* ordinal;
-  // The span for reserved table members.
-  std::optional<SourceSpan> span;
-  std::unique_ptr<Used> maybe_used;
-
- private:
-  TableMember(const RawOrdinal64* ordinal, std::optional<SourceSpan> span,
-              std::unique_ptr<Used> maybe_used, std::unique_ptr<AttributeList> attributes)
-      : Element(Element::Kind::kTableMember, std::move(attributes)),
-        ordinal(ordinal),
-        span(span),
-        maybe_used(std::move(maybe_used)) {}
-};
-
 struct Table final : public TypeDecl {
-  using Member = TableMember;
+  struct Member : public Element {
+    struct Used {
+      Used(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name)
+          : type_ctor(std::move(type_ctor)), name(name) {}
+      std::unique_ptr<TypeConstructor> type_ctor;
+      SourceSpan name;
+
+      std::unique_ptr<Used> Clone() const {
+        return std::make_unique<Used>(type_ctor->Clone(), name);
+      }
+    };
+
+    Member(const RawOrdinal64* ordinal, std::unique_ptr<TypeConstructor> type, SourceSpan name,
+           std::unique_ptr<AttributeList> attributes)
+        : Element(Element::Kind::kTableMember, std::move(attributes)),
+          ordinal(ordinal),
+          maybe_used(std::make_unique<Used>(std::move(type), name)) {}
+
+    static Member Reserved(const RawOrdinal64* ordinal, SourceSpan span,
+                           std::unique_ptr<AttributeList> attributes) {
+      return Member(ordinal, span, nullptr, std::move(attributes));
+    }
+
+    Member Clone() const;
+
+    // Owned by Library::raw_ordinals.
+    const RawOrdinal64* ordinal;
+    // The span for reserved table members.
+    std::optional<SourceSpan> span;
+    std::unique_ptr<Used> maybe_used;
+
+   private:
+    Member(const RawOrdinal64* ordinal, std::optional<SourceSpan> span,
+           std::unique_ptr<Used> maybe_used, std::unique_ptr<AttributeList> attributes)
+        : Element(Element::Kind::kTableMember, std::move(attributes)),
+          ordinal(ordinal),
+          span(span),
+          maybe_used(std::move(maybe_used)) {}
+  };
 
   Table(std::unique_ptr<AttributeList> attributes, Name name, std::vector<Member> members,
         Strictness strictness, Resourceness resourceness)
@@ -630,56 +610,46 @@ struct Table final : public TypeDecl {
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
 };
 
-struct Union;
-
-// See the comment on the StructMember class for why this is a top-level class.
-// TODO(https://fxbug.dev/42113185): Move this to a nested class inside Union.
-struct UnionMemberUsed {
-  UnionMemberUsed(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name)
-      : type_ctor(std::move(type_ctor)), name(name) {}
-  std::unique_ptr<TypeConstructor> type_ctor;
-  SourceSpan name;
-
-  std::unique_ptr<UnionMemberUsed> Clone() const {
-    return std::make_unique<UnionMemberUsed>(type_ctor->Clone(), name);
-  }
-};
-
-// See the comment on the StructMember class for why this is a top-level class.
-// TODO(https://fxbug.dev/42113185): Move this to a nested class inside Union.
-struct UnionMember : public Element {
-  using Used = UnionMemberUsed;
-
-  UnionMember(const RawOrdinal64* ordinal, std::unique_ptr<TypeConstructor> type_ctor,
-              SourceSpan name, std::unique_ptr<AttributeList> attributes)
-      : Element(Element::Kind::kUnionMember, std::move(attributes)),
-        ordinal(ordinal),
-        maybe_used(std::make_unique<Used>(std::move(type_ctor), name)) {}
-
-  static UnionMember Reserved(const RawOrdinal64* ordinal, SourceSpan span,
-                              std::unique_ptr<AttributeList> attributes) {
-    return UnionMember(ordinal, span, nullptr, std::move(attributes));
-  }
-
-  UnionMember Clone() const;
-
-  // Owned by Library::raw_ordinals.
-  const RawOrdinal64* ordinal;
-  // The span for reserved members.
-  std::optional<SourceSpan> span;
-  std::unique_ptr<Used> maybe_used;
-
- private:
-  UnionMember(const RawOrdinal64* ordinal, std::optional<SourceSpan> span,
-              std::unique_ptr<Used> maybe_used, std::unique_ptr<AttributeList> attributes)
-      : Element(Element::Kind::kUnionMember, std::move(attributes)),
-        ordinal(ordinal),
-        span(span),
-        maybe_used(std::move(maybe_used)) {}
-};
-
 struct Union final : public TypeDecl {
-  using Member = UnionMember;
+  struct Member : public Element {
+    struct Used {
+      Used(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name)
+          : type_ctor(std::move(type_ctor)), name(name) {}
+      std::unique_ptr<TypeConstructor> type_ctor;
+      SourceSpan name;
+
+      std::unique_ptr<Used> Clone() const {
+        return std::make_unique<Used>(type_ctor->Clone(), name);
+      }
+    };
+
+    Member(const RawOrdinal64* ordinal, std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name,
+           std::unique_ptr<AttributeList> attributes)
+        : Element(Element::Kind::kUnionMember, std::move(attributes)),
+          ordinal(ordinal),
+          maybe_used(std::make_unique<Used>(std::move(type_ctor), name)) {}
+
+    static Member Reserved(const RawOrdinal64* ordinal, SourceSpan span,
+                           std::unique_ptr<AttributeList> attributes) {
+      return Member(ordinal, span, nullptr, std::move(attributes));
+    }
+
+    Member Clone() const;
+
+    // Owned by Library::raw_ordinals.
+    const RawOrdinal64* ordinal;
+    // The span for reserved members.
+    std::optional<SourceSpan> span;
+    std::unique_ptr<Used> maybe_used;
+
+   private:
+    Member(const RawOrdinal64* ordinal, std::optional<SourceSpan> span,
+           std::unique_ptr<Used> maybe_used, std::unique_ptr<AttributeList> attributes)
+        : Element(Element::Kind::kUnionMember, std::move(attributes)),
+          ordinal(ordinal),
+          span(span),
+          maybe_used(std::move(maybe_used)) {}
+  };
 
   Union(std::unique_ptr<AttributeList> attributes, Name name, std::vector<Member> embers,
         Strictness strictness, std::optional<Resourceness> resourceness)
@@ -702,52 +672,47 @@ struct Union final : public TypeDecl {
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
 };
 
-struct Overlay;
-
-struct OverlayMemberUsed {
-  OverlayMemberUsed(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name)
-      : type_ctor(std::move(type_ctor)), name(name) {}
-  std::unique_ptr<TypeConstructor> type_ctor;
-  SourceSpan name;
-
-  std::unique_ptr<OverlayMemberUsed> Clone() const {
-    return std::make_unique<OverlayMemberUsed>(type_ctor->Clone(), name);
-  }
-};
-
-struct OverlayMember final : public Element {
-  using Used = OverlayMemberUsed;
-  OverlayMember(const RawOrdinal64* ordinal, std::unique_ptr<TypeConstructor> type_ctor,
-                SourceSpan name, std::unique_ptr<AttributeList> attributes)
-      : Element(Element::Kind::kOverlayMember, std::move(attributes)),
-        ordinal(ordinal),
-        maybe_used(std::make_unique<Used>(std::move(type_ctor), name)) {}
-
-  static OverlayMember Reserved(const RawOrdinal64* ordinal, SourceSpan span,
-                                std::unique_ptr<AttributeList> attributes) {
-    return OverlayMember(ordinal, span, nullptr, std::move(attributes));
-  }
-
-  OverlayMember Clone() const;
-
-  // Owned by Library::raw_ordinals.
-  const RawOrdinal64* ordinal;
-
-  // The span for reserved members.
-  std::optional<SourceSpan> span;
-  std::unique_ptr<Used> maybe_used;
-
- private:
-  OverlayMember(const RawOrdinal64* ordinal, std::optional<SourceSpan> span,
-                std::unique_ptr<Used> maybe_used, std::unique_ptr<AttributeList> attributes)
-      : Element(Element::Kind::kOverlayMember, std::move(attributes)),
-        ordinal(ordinal),
-        span(span),
-        maybe_used(std::move(maybe_used)) {}
-};
-
 struct Overlay final : public TypeDecl {
-  using Member = OverlayMember;
+  struct Member final : public Element {
+    struct Used {
+      Used(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name)
+          : type_ctor(std::move(type_ctor)), name(name) {}
+      std::unique_ptr<TypeConstructor> type_ctor;
+      SourceSpan name;
+
+      std::unique_ptr<Used> Clone() const {
+        return std::make_unique<Used>(type_ctor->Clone(), name);
+      }
+    };
+
+    Member(const RawOrdinal64* ordinal, std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name,
+           std::unique_ptr<AttributeList> attributes)
+        : Element(Element::Kind::kOverlayMember, std::move(attributes)),
+          ordinal(ordinal),
+          maybe_used(std::make_unique<Used>(std::move(type_ctor), name)) {}
+
+    static Member Reserved(const RawOrdinal64* ordinal, SourceSpan span,
+                           std::unique_ptr<AttributeList> attributes) {
+      return Member(ordinal, span, nullptr, std::move(attributes));
+    }
+
+    Member Clone() const;
+
+    // Owned by Library::raw_ordinals.
+    const RawOrdinal64* ordinal;
+
+    // The span for reserved members.
+    std::optional<SourceSpan> span;
+    std::unique_ptr<Used> maybe_used;
+
+   private:
+    Member(const RawOrdinal64* ordinal, std::optional<SourceSpan> span,
+           std::unique_ptr<Used> maybe_used, std::unique_ptr<AttributeList> attributes)
+        : Element(Element::Kind::kOverlayMember, std::move(attributes)),
+          ordinal(ordinal),
+          span(span),
+          maybe_used(std::move(maybe_used)) {}
+  };
 
   Overlay(std::unique_ptr<AttributeList> attributes, Name name, std::vector<Member> members,
           Strictness strictness, Resourceness resourceness)
