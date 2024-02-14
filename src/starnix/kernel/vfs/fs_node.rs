@@ -22,6 +22,7 @@ use crate::{
 use bitflags::bitflags;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
+use selinux::SecurityId;
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{
     LockBefore, LockEqualOrBefore, Locked, Mutex, ReadOps, RwLock, RwLockReadGuard,
@@ -153,6 +154,7 @@ pub struct FsNodeInfo {
     pub time_status_change: zx::Time,
     pub time_access: zx::Time,
     pub time_modify: zx::Time,
+    pub sid: Option<SecurityId>,
 }
 
 impl FsNodeInfo {
