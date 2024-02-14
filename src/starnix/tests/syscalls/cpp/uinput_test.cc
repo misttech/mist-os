@@ -159,7 +159,7 @@ TEST_F(UinputTest, UiDevCreateTouchscreen) {
   EXPECT_EQ(res, 0);
 }
 
-TEST_F(UinputTest, UiDevCreateTouchscreenEvIoGid) {
+TEST_F(UinputTest, UiDevCreateDestroyTouchscreenEvIoGid) {
   GTEST_SKIP() << "b/302172833 does not support touchscreen creation yet";
   auto ls_before = lsDir("/dev/input");
 
@@ -181,18 +181,28 @@ TEST_F(UinputTest, UiDevCreateTouchscreenEvIoGid) {
   auto new_device_name = diff[0];
   EXPECT_EQ(new_device_name.substr(0, std::string("event").length()), "event");
 
-  auto new_device_fd =
-      test_helper::ScopedFD(open(("/dev/input/" + new_device_name).c_str(), O_RDWR));
-  ASSERT_TRUE(new_device_fd.is_valid());
-  input_id got_input_id;
-  res = ioctl(new_device_fd.get(), EVIOCGID, &got_input_id);
-  EXPECT_EQ(res, 0);
-  EXPECT_EQ(got_input_id.bustype, BUS_USB);
-  EXPECT_EQ(got_input_id.vendor, GOOGLE_VENDOR_ID);
-  EXPECT_EQ(got_input_id.product, usetup.id.product);
+  {
+    auto new_device_fd =
+        test_helper::ScopedFD(open(("/dev/input/" + new_device_name).c_str(), O_RDWR));
+    ASSERT_TRUE(new_device_fd.is_valid());
+    input_id got_input_id;
+    res = ioctl(new_device_fd.get(), EVIOCGID, &got_input_id);
+    EXPECT_EQ(res, 0);
+    EXPECT_EQ(got_input_id.bustype, BUS_USB);
+    EXPECT_EQ(got_input_id.vendor, GOOGLE_VENDOR_ID);
+    EXPECT_EQ(got_input_id.product, usetup.id.product);
+  }
+
+  res = ioctl(uinput_fd_.get(), UI_DEV_DESTROY);
+  ASSERT_EQ(res, 0);
+
+  // Check that the device file no longer exits. Open should fail.
+  int fd = open(("/dev/input/" + new_device_name).c_str(), O_RDWR);
+  EXPECT_EQ(fd, -1);
+  EXPECT_EQ(errno, ENOENT);
 }
 
-TEST_F(UinputTest, UiDevCreateKeyboardEvIoGid) {
+TEST_F(UinputTest, UiDevCreateDestroyKeyboardEvIoGid) {
   auto ls_before = lsDir("/dev/input");
   uinput_setup usetup{.id = {.bustype = BUS_USB, .vendor = GOOGLE_VENDOR_ID, .product = 5}};
   strcpy(usetup.name, "Example device");
@@ -209,19 +219,37 @@ TEST_F(UinputTest, UiDevCreateKeyboardEvIoGid) {
   auto new_device_name = diff[0];
   EXPECT_EQ(new_device_name.substr(0, std::string("event").length()), "event");
 
-  auto new_device_fd =
-      test_helper::ScopedFD(open(("/dev/input/" + new_device_name).c_str(), O_RDWR));
-  ASSERT_TRUE(new_device_fd.is_valid());
-  input_id got_input_id;
-  res = ioctl(new_device_fd.get(), EVIOCGID, &got_input_id);
-  EXPECT_EQ(res, 0);
-  EXPECT_EQ(got_input_id.bustype, BUS_USB);
-  EXPECT_EQ(got_input_id.vendor, GOOGLE_VENDOR_ID);
-  EXPECT_EQ(got_input_id.product, usetup.id.product);
+  {
+    auto new_device_fd =
+        test_helper::ScopedFD(open(("/dev/input/" + new_device_name).c_str(), O_RDWR));
+    ASSERT_TRUE(new_device_fd.is_valid());
+    input_id got_input_id;
+    res = ioctl(new_device_fd.get(), EVIOCGID, &got_input_id);
+    EXPECT_EQ(res, 0);
+    EXPECT_EQ(got_input_id.bustype, BUS_USB);
+    EXPECT_EQ(got_input_id.vendor, GOOGLE_VENDOR_ID);
+    EXPECT_EQ(got_input_id.product, usetup.id.product);
+  }
+
+  res = ioctl(uinput_fd_.get(), UI_DEV_DESTROY);
+  ASSERT_EQ(res, 0);
+
+  // Check that the device file no longer exits. Open should fail.
+  int fd = open(("/dev/input/" + new_device_name).c_str(), O_RDWR);
+  EXPECT_EQ(fd, -1);
+  EXPECT_EQ(errno, ENOENT);
 }
 
 TEST_F(UinputTest, UiDevDestroy) {
-  int res = ioctl(uinput_fd_.get(), UI_DEV_DESTROY);
+  uinput_setup usetup{.id = {.bustype = BUS_USB, .vendor = GOOGLE_VENDOR_ID, .product = 5}};
+  strcpy(usetup.name, "Example device");
+  int res = ioctl(uinput_fd_.get(), UI_DEV_SETUP, &usetup);
+  ASSERT_EQ(res, 0);
+
+  res = ioctl(uinput_fd_.get(), UI_DEV_CREATE);
+  ASSERT_EQ(res, 0);
+
+  res = ioctl(uinput_fd_.get(), UI_DEV_DESTROY);
   EXPECT_EQ(res, 0);
 }
 

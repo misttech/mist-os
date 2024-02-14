@@ -6,6 +6,7 @@ use crate::{
     device::{
         input::{add_and_register_input_device, InputFile},
         input_event_conversion::LinuxKeyboardEventParser,
+        kobject::Device,
         DeviceOps,
     },
     mm::MemoryAccessorExt,
@@ -63,6 +64,7 @@ struct UinputDeviceMutableState {
     enabled_evbits: BitVec,
     input_id: Option<uapi::input_id>,
     created_device: CreatedDevice,
+    k_device: Option<Device>,
 }
 
 impl UinputDeviceMutableState {
@@ -94,6 +96,7 @@ impl UinputDevice {
                 enabled_evbits: BitVec::from_elem(uapi::EV_CNT as usize, false),
                 input_id: None,
                 created_device: CreatedDevice::None,
+                k_device: None,
             }),
         })
     }
@@ -218,10 +221,12 @@ impl UinputDevice {
                     }
                 }
 
-                add_and_register_input_device(
+                let device = add_and_register_input_device(
                     current_task,
                     VirtualDevice { input_id, device_type },
                 );
+                inner.k_device = Some(device);
+
                 new_device();
 
                 Ok(SUCCESS)
@@ -233,8 +238,20 @@ impl UinputDevice {
         }
     }
 
-    fn ui_dev_destroy(&self) -> Result<SyscallResult, Errno> {
-        track_stub!(TODO("https://fxbug.dev/302174354"), "ui_dev_destroy()");
+    fn ui_dev_destroy(&self, current_task: &CurrentTask) -> Result<SyscallResult, Errno> {
+        let mut inner = self.inner.lock();
+        match inner.k_device.clone() {
+            Some(device) => {
+                let kernel = current_task.kernel();
+                kernel.device_registry.remove_device(current_task, device);
+            }
+            None => {
+                log_warn!("UI_DEV_DESTROY kHandle not found");
+                return error!(EPERM);
+            }
+        }
+        inner.k_device = None;
+        inner.created_device = CreatedDevice::None;
 
         destroy_device();
 
@@ -280,7 +297,7 @@ impl FileOps for Arc<UinputDevice> {
             | uapi::UI_SET_PROPBIT => Ok(SUCCESS),
             uapi::UI_DEV_SETUP => self.ui_dev_setup(current_task, arg),
             uapi::UI_DEV_CREATE => self.ui_dev_create(current_task),
-            uapi::UI_DEV_DESTROY => self.ui_dev_destroy(),
+            uapi::UI_DEV_DESTROY => self.ui_dev_destroy(current_task),
             // default_ioctl() handles file system related requests and reject
             // others.
             _ => {

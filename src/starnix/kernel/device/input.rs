@@ -6,7 +6,9 @@ use crate::{
     device::{
         framebuffer::Framebuffer,
         input_event_conversion::parse_fidl_keyboard_event_to_linux_input_event,
-        kobject::DeviceMetadata, registry::DeviceOps, DeviceMode,
+        kobject::{Device, DeviceMetadata},
+        registry::DeviceOps,
+        DeviceMode,
     },
     fs::sysfs::DeviceDirectory,
     mm::MemoryAccessorExt,
@@ -862,7 +864,7 @@ fn get_next_device_id() -> u32 {
 /// # Parameters:
 /// - `system_task`: current task.
 /// - `dev_ops`: the open op handler of the device.
-pub fn add_and_register_input_device(system_task: &CurrentTask, dev_ops: impl DeviceOps) {
+pub fn add_and_register_input_device(system_task: &CurrentTask, dev_ops: impl DeviceOps) -> Device {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
@@ -880,7 +882,7 @@ pub fn add_and_register_input_device(system_task: &CurrentTask, dev_ops: impl De
         input_class,
         DeviceDirectory::new,
         dev_ops,
-    );
+    )
 }
 
 /// add and register 1 touch device and 1 keyboard device to kernel.
