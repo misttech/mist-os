@@ -1,82 +1,125 @@
-# ffx audio
+# `ffx audio`
 
 ## Usage
 
-### Generating audio signals:
- sine, square, triangle,  sawtooth, pink noise and white noise. Output can be redirected to a file
- or piped directly into commands like ffx audio play or ffx audio device play.
+### Generate audio signals
 
-`ffx audio gen [signal-type] --duration 5ms --frequency 440 --amplitude 0.5 --format 48000,int16,2ch`
+Use `ffx audio gen <signal-type>` to generate an audio signal of a given type:
+`sine`, `square`, `triangle`, `sawtooth`, `pink-noise`, or `white-noise`.
 
-### Using audio_core components:
-AudioRenderer and AudioCapturer. Can specify usage, gain, mute, clock, and buffer size for
-the shared VMO between the AudioDaemon on target and the AudioRenderer/AudioCapturer. Can use the
-ultrasound renderer and capturer by specifying usage to ultrasound.
+This command outputs audio in WAV format to standard out. This can be redirected
+to a file or piped directly into commands like `ffx audio play` or `ffx audio
+device play`.
 
-`ffx audio play`
+```posix-terminal
+ffx audio gen <signal-type> --duration 5ms --frequency 440 --amplitude 0.5 --format 48000,int16,2ch
+```
 
-`ffx audio play --file ~/path/to/file.wav`
+### Interact with `audio_core`
 
-`ffx audio record`
+The `ffx audio play` and `ffx audio record` commands render and capture audio
+from the `audio_core` `AudioRenderer` and `AudioCapturer` APIs, respectively.
 
-`ffx audio play --usage ultrasound`
+These commands accept options to set usage, gain, mute, clock, and buffer size
+for the shared VMO between the `audio_ffx_daemon` on target and the
+`AudioRenderer`/`AudioCapturer`. See `ffx audio play --help` and
+`ffx audio record --help` for details.
 
-`ffx audio record --usage ultrasound`
+Tip: To use the ultrasound renderer and capturer, use the option `--usage
+ultrasound`.
 
-### Interacting with attached devices:
-See what devices are connected. The device ID field is used for other device commands.
+```posix-terminal
+ffx audio play
+ffx audio play --file ~/path/to/file.wav
+ffx audio record
+ffx audio play --usage ultrasound
+ffx audio record --usage ultrasound
+```
 
-`ffx audio list-devices`
-`ffx --machine json audio list-devices`
+### Interact with attached devices
 
-Print additional information about a specific device.
+Use `ffx audio list-devices` to see which devices are connected. The device ID
+field is used to specify a device for other `ffx audio device` commands.
 
-`ffx audio device --id {} --direction {input/output} info`
+```posix-terminal
+ffx audio list-devices
+```
 
-Play or record audio signal from hardware ring buffer. Note: core build required (audio_core
-must not be present)
+Use `ffx audio device info` to print additional information about a specific
+device.
 
-`ffx audio device --id {} record`
+```posix-terminal
+ffx audio device --id <id> --direction {input/output} info
+```
 
-`ffx audio device --id {} play`
+Use `ffx audio device play` and `ffx audio device record` to play or record an
+audio signal. from the hardware ring buffer.
 
-`ffx audio device --id {} play --file ~/path/to/file.wav`
+Note: These commands communicate directly with the device. To avoid conflicts,
+the target build should not have `audio_core` present.
+
+```posix-terminal
+ffx audio device --id <id> record
+```
+
+```posix-terminal
+ffx audio device --id <id> play
+```
+
+```posix-terminal
+ffx audio device --id <id> play --file ~/path/to/file.wav
+```
 
 ### Other Tips
-* One can check the input/output of the signal by running a play and record command at the same
-time from separate prompts and verify that the output of the record command matches what is
-expected from the play command.
 
-* Loop a file to pipe an ongoing audio signal to ffx audio play command:
-ffmpeg -stream_loop <N> -i <filename> -c copy -f wav -
+* Run play and record commands at the same time to verify that a signal is
+  rendered and captured correctly.
 
-    Note that:
-    <N> is the number of times to loop, or -1 to loop infinitely
-    <filename> is the input wav file
-    the file `-` outputs to stdout
-    The following command continuously sends the file's wav contents to the device ring buffer.
+  Verify that the output of the record command matches what is expected from
+  the play command.
 
-`ffmpeg -stream_loop -1 -i <filename> -c copy -f wav - | ffx audio device play`
+* Play a looped WAV file:
+
+  Use `ffmpeg` to output a looped audio signal for a given WAV file to standard
+  out, then pipe it to `ffx audio device play`:
+
+  ```posix-terminal
+  ffmpeg -stream_loop <N> -i <filename> -c copy -f wav -
+  ```
+
+  Where:
+
+  * `<N>` is the number of times to loop, or -1 to loop infinitely
+  * `<filename>` is the input WAV file
+  * The file `-` outputs to stdout
+
+  The following command infinitely loops a WAV file and sends it to the device
+  ring buffer:
+
+  ```posix-terminal
+  ffmpeg -stream_loop -1 -i <filename> -c copy -f wav - | ffx audio device play
+  ```
 
 ## Architecture
 
-### ffxdaemon
-Since interacting with the audio_core API’s and device ring buffers requires access to zircon
-objects (VMO’s) and low latency writes to device ring buffers, we use a proxy component running
-on target device to execute the audio commands on behalf of the ffx client. Daemon code can
-be found at `/src/media/audio/services/ffxdaemon`.
+### `ffx audio`
 
-The ffx host communicates with AudioDaemon through FIDL messages and sockets (passed via FIDL
-messages), which are in `/sdk/fidl/fuchsia.audio.controller/audio_proxy.fidl`,
-`/sdk/fidl/fuchsia.audio.controller/play.fidl` and `/sdk/fidl/fuchsia.audio.controller/record.fidl`.
-To add a new command, one can add a high level subcommand on ffx audio or extend the existing
-subcommands like play, record, etc. If the command needs to interact with the target device,
-one can add a new FIDL method to the appropriate protocol or add fields to existing messages.
+`ffx audio` commands, except for `gen`, interact with the target through the
+[fuchsia.audio.controller][fidl-fuchsia-audio-controller] FIDL protocols, served
+by the `audio_ffx_daemon` component.
 
-Audio data is transferred between host and target via `fidl::Socket` as bytestreams. Summary
-information and results of commands are returned when the daemon component completed the request.
-The ffx plugin then writes this information to the plugin writer in either machine or human
-readable format.
+### `audio_ffx_daemon`
 
-Except for the gen subtool, all audio subtools interact with the ffxdaemon. The `audio_dev_support`
-assembly input bundle contains the daemon and is enabled only for `eng` build types.
+[`audio_ffx_daemon`][ffxdaemon] is a Fuchsia component that proxies audio
+commands and data from `ffx audio` commands to audio devices and `audio_core`.
+
+The `audio_core` APIs and device ring buffers use Zircon virtual memory objects
+(VMOs) that are not accessible to ffx plugins. `audio_ffx_daemon` provides
+a Zircon socket interface to transfer audio data between the host and target,
+and executes audio commands on behalf of the ffx client.
+
+The `audio_dev_support` assembly input bundle contains the daemon and is enabled
+only for `eng` build types.
+
+[fidl-fuchsia-audio-controller]: //sdk/fidl/fuchsia.audio.controller
+[ffxdaemon]: //src/media/audio/services/ffxdaemon
