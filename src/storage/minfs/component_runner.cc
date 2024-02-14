@@ -5,7 +5,6 @@
 #include "src/storage/minfs/component_runner.h"
 
 #include <fidl/fuchsia.fs.startup/cpp/wire.h>
-#include <lib/inspect/service/cpp/service.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/storage/lib/vfs/cpp/remote_dir.h"
@@ -91,27 +90,6 @@ zx::result<> ComponentRunner::Configure(std::unique_ptr<Bcache> bcache,
                    << zx_status_get_string(status);
     return zx::error(status);
   }
-
-  // Specify to fall back to DeepCopy mode instead of Live mode (the default) on failures to send
-  // a Frozen copy of the tree (e.g. if we could not create a child copy of the backing VMO).
-  // This helps prevent any issues with querying the inspect tree while the filesystem is under
-  // load, since snapshots at the receiving end must be consistent. See https://fxbug.dev/42135165 for
-  // details.
-  inspect::TreeHandlerSettings settings{.snapshot_behavior =
-                                            inspect::TreeServerSendPreference::Frozen(
-                                                inspect::TreeServerSendPreference::Type::DeepCopy)};
-
-  auto inspect_tree = fbl::MakeRefCounted<fs::Service>(
-      [connector = inspect::MakeTreeHandler(&minfs_->InspectTree()->Inspector(), dispatcher_,
-                                            settings)](zx::channel chan) mutable {
-        connector(fidl::InterfaceRequest<fuchsia::inspect::Tree>(std::move(chan)));
-        return ZX_OK;
-      });
-  // Add the diagnostics directory straight to the outgoing directory. Nothing should be relying on
-  // the diagnostics directory queuing incoming requests.
-  auto diagnostics_dir = fbl::MakeRefCounted<fs::PseudoDir>();
-  outgoing_->AddEntry("diagnostics", diagnostics_dir);
-  diagnostics_dir->AddEntry(fuchsia::inspect::Tree::Name_, inspect_tree);
 
   auto svc_dir = fbl::MakeRefCounted<fs::PseudoDir>();
   svc_dir->AddEntry(

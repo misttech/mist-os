@@ -5,6 +5,7 @@
 #ifndef SRC_STORAGE_MINFS_MINFS_INSPECT_TREE_H_
 #define SRC_STORAGE_MINFS_MINFS_INSPECT_TREE_H_
 
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/zx/time.h>
 #include <zircon/system/public/zircon/compiler.h>
 
@@ -22,7 +23,8 @@ fs_inspect::UsageData CalculateSpaceUsage(const Superblock& superblock, uint64_t
 // Encapsulates the state required to make a filesystem inspect tree for Minfs.
 class MinfsInspectTree final {
  public:
-  explicit MinfsInspectTree(const block_client::BlockDevice* device);
+  explicit MinfsInspectTree(async_dispatcher_t* dispatcher,
+                            const block_client::BlockDevice* device);
   ~MinfsInspectTree() = default;
 
   // Initialize the Minfs inspect tree, creating all required nodes. Once called, the inspect
@@ -47,7 +49,7 @@ class MinfsInspectTree final {
   void SubtractDirtyBytes(uint64_t bytes) __TA_EXCLUDES(fvm_mutex_);
 
   // Reference to the Inspector this object owns.
-  const inspect::Inspector& Inspector() { return inspector_; }
+  const inspect::Inspector& Inspector() { return component_inspector_.inspector(); }
 
   // Obtain node-level operation trackers.
   fs_inspect::NodeOperations* GetNodeOperations() { return &node_operations_; }
@@ -90,7 +92,8 @@ class MinfsInspectTree final {
   //   4. When a device does run out of space, does it recover after a certain period of time?
   //      This may allow us to identify patterns over time, e.g. if something temporarily uses a
   //      large amount of space, we might see periodic spikes which then recover for long periods.
-  //   5. Has the mitigation added in https://fxbug.dev/42169588 been successful at preventing at least some
+  //   5. Has the mitigation added in https://fxbug.dev/42169588 been successful at preventing at
+  //   least some
   //      out of space issues?
   //
   // These properties may be simplified once we know the answers to #1 and #2 and have more data.
@@ -105,7 +108,7 @@ class MinfsInspectTree final {
   inspect::LazyNodeCallbackFn CreateDetailNode() const;
 
   // The Inspector to which the tree is attached.
-  inspect::Inspector inspector_;
+  inspect::ComponentInspector component_inspector_;
 
   // Node to which operational statistics (latency/error counters) are added.
   inspect::Node opstats_node_;

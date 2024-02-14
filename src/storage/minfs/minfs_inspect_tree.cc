@@ -20,12 +20,27 @@ fs_inspect::UsageData CalculateSpaceUsage(const Superblock& superblock, uint64_t
   };
 }
 
-MinfsInspectTree::MinfsInspectTree(const block_client::BlockDevice* device)
+MinfsInspectTree::MinfsInspectTree(async_dispatcher_t* dispatcher,
+                                   const block_client::BlockDevice* device)
     : device_(device),
-      opstats_node_(inspector_.GetRoot().CreateChild("fs.opstats")),
+      component_inspector_(inspect::ComponentInspector(
+          dispatcher,
+          inspect::PublishOptions{
+              .tree_handler_settings =
+                  inspect::TreeHandlerSettings{
+                      // Specify to fall back to DeepCopy mode instead of Live mode (the default
+                      // on failures to send a Frozen copy of the tree (e.g. if we could not
+                      // create a child copy of the backing VMO). This helps prevent any issues
+                      // with querying the inspect tree while the filesystem is under load,
+                      // since snapshots at the receiving end must be consistent.
+                      // See https://fxbug.dev/42135165 for details.
+                      .snapshot_behavior = inspect::TreeServerSendPreference::Frozen(
+                          inspect::TreeServerSendPreference::Type::DeepCopy)},
+          })),
+      opstats_node_(component_inspector_.root().CreateChild("fs.opstats")),
       node_operations_(opstats_node_) {
   ZX_ASSERT(device_);
-  inspector_.CreateStatsNode();
+  component_inspector_.inspector().CreateStatsNode();
 }
 
 void MinfsInspectTree::Initialize(const fs::FilesystemInfo& fs_info, const Superblock& superblock,
@@ -46,7 +61,7 @@ void MinfsInspectTree::Initialize(const fs::FilesystemInfo& fs_info, const Super
     };
   }
   UpdateSpaceUsage(superblock, reserved_blocks);
-  fs_inspect_nodes_ = fs_inspect::CreateTree(inspector_.GetRoot(), CreateCallbacks());
+  fs_inspect_nodes_ = fs_inspect::CreateTree(component_inspector_.root(), CreateCallbacks());
 }
 
 void MinfsInspectTree::UpdateSpaceUsage(const Superblock& superblock, uint64_t reserved_blocks) {

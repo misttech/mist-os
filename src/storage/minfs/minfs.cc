@@ -37,7 +37,6 @@
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/fit/defer.h>
-#include <lib/inspect/service/cpp/service.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/event.h>
 
@@ -735,7 +734,7 @@ Minfs::Minfs(async_dispatcher_t* dispatcher, std::unique_ptr<Bcache> bc,
       block_allocator_(std::move(block_allocator)),
       inodes_(std::move(inodes)),
       journal_sync_task_([this]() { Sync(); }),
-      inspect_tree_(bc_->device()),
+      inspect_tree_(dispatcher, bc_->device()),
       limits_(sb_->Info()),
       mount_options_(mount_options),
       dispatcher_(dispatcher),
