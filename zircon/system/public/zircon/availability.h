@@ -13,7 +13,9 @@
 // unsigned 64-bit value (that is, the equivalent of `UINT64_MAX - 1`), this is
 // the largest possible unsigned 32-bit value (`UINT32_MAX`).
 // TODO(https://fxbug.dev/321269965): Resolve this FIDL-Clang discrepancy.
+// LINT.IfChange(fuchsia_head_c_value)
 #define FUCHSIA_HEAD 4294967295
+// LINT.ThenChange(//build/config/fuchsia/platform_version.gni:fuchsia_head_c_value)
 
 #if defined(__Fuchsia_API_level__) && defined(__clang__)
 

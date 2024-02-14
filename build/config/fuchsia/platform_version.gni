@@ -33,7 +33,10 @@ if (override_target_api_level == -1) {
   # Due to limitations in Clang, we use `UINT32_MAX` to represent the HEAD API
   # level. See zircon/availability.h.
   # TODO(https://fxbug.dev/321269965): Resolve this FIDL-Clang discrepancy.
+  # LINT.IfChange(fuchsia_head_c_value)
   platform_version.clang_fuchsia_api_level = 4294967295
+
+  # LINT.ThenChange(//zircon/system/public/zircon/availability.h:fuchsia_head_c_value)
 
   # By default the FIDL APIs are compiled at the "LEGACY" level. This level is
   # only meant to be used in the platform itself, SDK users aren't expected to
