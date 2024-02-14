@@ -9,7 +9,8 @@ on threads and vmars.
 The tests in the `tests` directory use a test realm
 [factory](https://fuchsia.dev/fuchsia-src/development/testing/components/test_realm_factory?hl=en)
 to spawn a `RoleManager` instance inside the test realm and then send requests
-to it.
+to it. This test realm factory can be found in the `testing/realm-factory`
+directory.
 
 Here's what the test realm looks like:
 
