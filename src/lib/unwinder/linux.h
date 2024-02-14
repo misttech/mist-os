@@ -9,6 +9,7 @@
 #ifndef SRC_LIB_UNWINDER_LINUX_H_
 #define SRC_LIB_UNWINDER_LINUX_H_
 
+#include <stdlib.h>
 #include <sys/user.h>
 
 #include "src/lib/unwinder/memory.h"
