@@ -889,9 +889,6 @@ common --enable_bzlmod=false
             os.path.join(fuchsia_dir, "third_party", "icu", "default")
         ),
         get_git_head_path(
-            os.path.join(fuchsia_dir, "third_party", "icu", "stable")
-        ),
-        get_git_head_path(
             os.path.join(fuchsia_dir, "third_party", "icu", "latest")
         ),
     ]
