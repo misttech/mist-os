@@ -36,10 +36,10 @@ use starnix_uapi::{
     PTRACE_EVENT_VFORK, PTRACE_EVENT_VFORK_DONE, PTRACE_GETEVENTMSG, PTRACE_GETREGSET,
     PTRACE_GETSIGINFO, PTRACE_GETSIGMASK, PTRACE_GET_SYSCALL_INFO, PTRACE_INTERRUPT, PTRACE_KILL,
     PTRACE_LISTEN, PTRACE_O_TRACECLONE, PTRACE_O_TRACEEXEC, PTRACE_O_TRACEEXIT, PTRACE_O_TRACEFORK,
-    PTRACE_O_TRACESYSGOOD, PTRACE_O_TRACEVFORK, PTRACE_PEEKDATA, PTRACE_PEEKTEXT, PTRACE_PEEKUSR,
-    PTRACE_POKEDATA, PTRACE_POKETEXT, PTRACE_SETOPTIONS, PTRACE_SETSIGINFO, PTRACE_SETSIGMASK,
-    PTRACE_SYSCALL, PTRACE_SYSCALL_INFO_ENTRY, PTRACE_SYSCALL_INFO_EXIT, PTRACE_SYSCALL_INFO_NONE,
-    SI_MAX_SIZE,
+    PTRACE_O_TRACESYSGOOD, PTRACE_O_TRACEVFORK, PTRACE_O_TRACEVFORKDONE, PTRACE_PEEKDATA,
+    PTRACE_PEEKTEXT, PTRACE_PEEKUSR, PTRACE_POKEDATA, PTRACE_POKETEXT, PTRACE_SETOPTIONS,
+    PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, PTRACE_SYSCALL, PTRACE_SYSCALL_INFO_ENTRY,
+    PTRACE_SYSCALL_INFO_EXIT, PTRACE_SYSCALL_INFO_NONE, SI_MAX_SIZE,
 };
 
 use std::sync::{atomic::Ordering, Arc};
@@ -114,18 +114,9 @@ pub enum PtraceEvent {
     Seccomp = PTRACE_EVENT_SECCOMP,
 }
 
-/// Information about what caused a ptrace-event-stop.
-pub struct PtraceEventData {
-    /// The event that caused the task to stop (e.g., PTRACE_EVENT_TRACEFORK or PTRACE_EVENT_EXIT).
-    pub event: PtraceEvent,
-
-    /// The message associated with the event (e.g., tid, exit status)..
-    pub msg: u32,
-}
-
-impl PtraceEventData {
-    pub fn new(option: PtraceOptions, msg: u32) -> Self {
-        let event = match option {
+impl PtraceEvent {
+    pub fn from_option(option: &PtraceOptions) -> Self {
+        match *option {
             PtraceOptions::TRACECLONE => PtraceEvent::Clone,
             PtraceOptions::TRACEFORK => PtraceEvent::Fork,
             PtraceOptions::TRACEVFORK => PtraceEvent::Vfork,
@@ -134,10 +125,24 @@ impl PtraceEventData {
             PtraceOptions::TRACEEXIT => PtraceEvent::Exit,
             PtraceOptions::TRACESECCOMP => PtraceEvent::Seccomp,
             _ => unreachable!("Bad ptrace event specified"),
-        };
-        Self { event, msg }
+        }
     }
-    pub fn new_from_event(event: PtraceEvent, msg: u32) -> Self {
+}
+
+/// Information about what caused a ptrace-event-stop.
+pub struct PtraceEventData {
+    /// The event that caused the task to stop (e.g., PTRACE_EVENT_TRACEFORK or PTRACE_EVENT_EXIT).
+    pub event: PtraceEvent,
+
+    /// The message associated with the event (e.g., tid, exit status)..
+    pub msg: u64,
+}
+
+impl PtraceEventData {
+    pub fn new(option: PtraceOptions, msg: u64) -> Self {
+        Self { event: PtraceEvent::from_option(&option), msg }
+    }
+    pub fn new_from_event(event: PtraceEvent, msg: u64) -> Self {
         Self { event, msg }
     }
 }
@@ -487,7 +492,7 @@ fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Er
     }
 
     if let Some(siginfo) = siginfo {
-        // This will wake up the task for us.
+        // This will wake up the task for us, and also release state
         send_signal_first(&tracee, state, siginfo);
     } else {
         state.set_stopped(StopState::Waking, None, None, None);
@@ -776,6 +781,7 @@ pub fn ptrace_dispatch(
                         | PTRACE_O_TRACECLONE
                         | PTRACE_O_TRACEFORK
                         | PTRACE_O_TRACEVFORK
+                        | PTRACE_O_TRACEVFORKDONE
                         | PTRACE_O_TRACEEXEC
                         | PTRACE_O_TRACEEXIT)
                     != 0)
@@ -790,7 +796,7 @@ pub fn ptrace_dispatch(
         PTRACE_GETEVENTMSG => {
             if let Some(ptrace) = &state.ptrace {
                 if let Some(event_data) = &ptrace.event_data {
-                    let dst: UserRef<u32> = UserRef::from(data);
+                    let dst: UserRef<u64> = UserRef::from(data);
                     current_task.write_object(dst, &event_data.msg)?;
                     return Ok(starnix_syscalls::SUCCESS);
                 }
@@ -1047,6 +1053,7 @@ pub fn ptrace_syscall_enter(current_task: &mut CurrentTask) {
         if state.ptrace.is_some() {
             current_task.trace_syscalls.store(false, Ordering::Relaxed);
             let mut sig = SignalInfo::default(SIGTRAP);
+            sig.code = (linux_uapi::SIGTRAP | 0x80) as i32;
             if state
                 .ptrace
                 .as_ref()
@@ -1072,6 +1079,7 @@ pub fn ptrace_syscall_exit(current_task: &mut CurrentTask, is_error: bool) {
         current_task.trace_syscalls.store(false, Ordering::Relaxed);
         if state.ptrace.is_some() {
             let mut sig = SignalInfo::default(SIGTRAP);
+            sig.code = (linux_uapi::SIGTRAP | 0x80) as i32;
             if state
                 .ptrace
                 .as_ref()

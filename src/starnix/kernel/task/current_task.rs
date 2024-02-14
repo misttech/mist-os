@@ -730,7 +730,7 @@ impl CurrentTask {
             return Err(err);
         }
 
-        self.ptrace_event(PtraceOptions::TRACEEXEC, self.task.id as u32);
+        self.ptrace_event(PtraceOptions::TRACEEXEC, self.task.id as u64);
         self.signal_vfork();
 
         Ok(())
@@ -1671,7 +1671,7 @@ impl CurrentTask {
     /// Note that the Linux kernel has a documented bug where, if TRACEEXIT is
     /// enabled, SIGKILL will trigger an event.  We do not exhibit this
     /// behavior.
-    pub fn ptrace_event(&mut self, trace_kind: PtraceOptions, msg: u32) {
+    pub fn ptrace_event(&mut self, trace_kind: PtraceOptions, msg: u64) {
         if !trace_kind.is_empty() {
             {
                 let mut state = self.write();
@@ -1686,9 +1686,12 @@ impl CurrentTask {
 
                         return;
                     }
+                    let mut siginfo = SignalInfo::default(starnix_uapi::signals::SIGTRAP);
+                    siginfo.code = (((PtraceEvent::from_option(&trace_kind) as u32) << 8)
+                        | linux_uapi::SIGTRAP) as i32;
                     state.set_stopped(
                         StopState::PtraceEventStopping,
-                        Some(SignalInfo::default(starnix_uapi::signals::SIGTRAP)),
+                        Some(siginfo),
                         None,
                         Some(PtraceEventData::new(trace_kind, msg)),
                     );
@@ -1703,7 +1706,7 @@ impl CurrentTask {
     /// Causes the current thread's thread group to exit, notifying any ptracer
     /// of this task first.
     pub fn thread_group_exit(&mut self, exit_status: ExitStatus) {
-        self.ptrace_event(PtraceOptions::TRACEEXIT, exit_status.signal_info_status() as u32);
+        self.ptrace_event(PtraceOptions::TRACEEXIT, exit_status.signal_info_status() as u64);
         self.thread_group.exit(exit_status, None);
     }
 

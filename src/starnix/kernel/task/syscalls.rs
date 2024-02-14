@@ -16,7 +16,7 @@ use crate::{
     task::{
         max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach,
         ptrace_dispatch, ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers,
-        PtraceAttachType, SchedulerPolicy, SeccompAction, SeccompStateValue, Task,
+        PtraceAttachType, PtraceOptions, SchedulerPolicy, SeccompAction, SeccompStateValue, Task,
         PR_SET_PTRACER_ANY,
     },
     vfs::{
@@ -109,10 +109,11 @@ where
     let task_ref = WeakRef::from(&new_task.task);
     execute_task(new_task, |_, _| Ok(()), |_| {}, ptrace_state);
 
-    current_task.ptrace_event(trace_kind, tid as u32);
+    current_task.ptrace_event(trace_kind, tid as u64);
 
     if args.flags & (CLONE_VFORK as u64) != 0 {
         current_task.wait_for_execve(task_ref)?;
+        current_task.ptrace_event(PtraceOptions::TRACEVFORKDONE, tid as u64);
     }
     Ok(tid)
 }

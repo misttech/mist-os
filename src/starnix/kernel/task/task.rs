@@ -260,6 +260,19 @@ impl StopState {
     pub fn is_force(&self) -> bool {
         *self == StopState::ForceAwake || *self == StopState::ForceWaking
     }
+
+    pub fn as_in_progress(&self) -> Result<StopState, ()> {
+        match *self {
+            StopState::GroupStopped => Ok(StopState::GroupStopping),
+            StopState::SignalDeliveryStopped => Ok(StopState::SignalDeliveryStopping),
+            StopState::PtraceEventStopped => Ok(StopState::PtraceEventStopping),
+            StopState::Awake => Ok(StopState::Waking),
+            StopState::ForceAwake => Ok(StopState::ForceWaking),
+            StopState::SyscallEnterStopped => Ok(StopState::SyscallEnterStopping),
+            StopState::SyscallExitStopped => Ok(StopState::SyscallExitStopping),
+            _ => Ok(*self),
+        }
+    }
 }
 
 bitflags! {
@@ -385,14 +398,6 @@ impl TaskMutableState {
         }
     }
 
-    pub fn set_ptrace(&mut self, tracer: Option<PtraceState>) -> Result<(), Errno> {
-        if tracer.is_some() && self.ptrace.is_some() {
-            return Err(errno!(EPERM));
-        }
-        self.ptrace = tracer;
-        Ok(())
-    }
-
     pub fn is_ptraced(&self) -> bool {
         self.ptrace.is_some()
     }
@@ -469,6 +474,20 @@ impl TaskMutableState<Base = Task> {
         if !stopped.is_in_progress() {
             self.notify_ptracers();
         }
+    }
+
+    pub fn set_ptrace(&mut self, tracer: Option<PtraceState>) -> Result<(), Errno> {
+        if tracer.is_some() && self.ptrace.is_some() {
+            return Err(errno!(EPERM));
+        }
+
+        if tracer.is_none() {
+            if let Ok(tg_stop_state) = self.base.thread_group.load_stopped().as_in_progress() {
+                self.set_stopped(tg_stop_state, None, None, None);
+            }
+        }
+        self.ptrace = tracer;
+        Ok(())
     }
 
     pub fn can_accept_ptrace_commands(&mut self) -> bool {
@@ -1226,8 +1245,7 @@ impl Releasable for Task {
         let (thread_state, locked) = context;
         self.thread_group.remove(locked, &self);
         // Disconnect from tracer, if one is present.
-        let ptracer_pid =
-            self.mutable_state.get_mut().ptrace.as_ref().map(|ptrace| ptrace.get_pid());
+        let ptracer_pid = self.read().ptrace.as_ref().map(|ptrace| ptrace.get_pid());
         if let Some(ptracer_pid) = ptracer_pid {
             if let Some(ProcessEntryRef::Process(tg)) =
                 self.kernel().pids.read().get_process(ptracer_pid)
@@ -1235,7 +1253,7 @@ impl Releasable for Task {
                 let pid = self.get_pid();
                 tg.ptracees.lock().remove(&pid);
             }
-            let _ = self.mutable_state.get_mut().set_ptrace(None);
+            let _ = self.write().set_ptrace(None);
         }
 
         // Release the fd table.

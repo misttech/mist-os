@@ -330,13 +330,23 @@ pub fn sys_pause(
 ) -> Result<(), Errno> {
     let event = InterruptibleEvent::new();
     let guard = event.begin_wait();
-    current_task.run_in_state(RunState::Event(event.clone()), || {
+    let result = current_task.run_in_state(RunState::Event(event.clone()), || {
         match guard.block_until(zx::Time::INFINITE) {
             Err(WakeReason::Interrupted) => error!(ERESTARTNOHAND),
             Err(WakeReason::DeadlineExpired) => panic!("blocking forever cannot time out"),
             Ok(()) => Ok(()),
         }
-    })
+    });
+    match result {
+        Err(ref errno) => {
+            if errno.code == starnix_uapi::errors::EINTR {
+                error!(ERESTARTNOHAND)
+            } else {
+                result
+            }
+        }
+        _ => result,
+    }
 }
 
 pub fn sys_pipe(

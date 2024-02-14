@@ -217,6 +217,23 @@ pub enum ProcessSelector {
     Pgid(pid_t),
 }
 
+impl ProcessSelector {
+    pub fn do_match(&self, pid: pid_t, pid_table: &PidTable) -> bool {
+        match *self {
+            ProcessSelector::Pid(p) => pid == p,
+            ProcessSelector::Any => true,
+            ProcessSelector::Pgid(pgid) => {
+                if let Some(task_ref) = pid_table.get_task(pid).upgrade() {
+                    pid_table.get_process_group(pgid).as_ref()
+                        == Some(&task_ref.thread_group.read().process_group)
+                } else {
+                    false
+                }
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProcessExitInfo {
     pub status: ExitStatus,
@@ -386,8 +403,9 @@ impl ThreadGroup {
     ) {
         if let Some(ref mut current_task) = current_task {
             current_task
-                .ptrace_event(PtraceOptions::TRACEEXIT, exit_status.signal_info_status() as u32);
+                .ptrace_event(PtraceOptions::TRACEEXIT, exit_status.signal_info_status() as u64);
         }
+        let mut pids = self.kernel.pids.write();
         let mut state = self.write();
         if state.terminating {
             // The thread group is already terminating and all threads in the thread group have
@@ -395,6 +413,11 @@ impl ThreadGroup {
             return;
         }
         state.terminating = true;
+
+        // Drop ptrace zombies
+        for zombie in state.zombie_ptracees.drain(..) {
+            zombie.release(&mut pids);
+        }
 
         // Interrupt each task. Unlock the group because send_signal will lock the group in order
         // to call set_stopped.
@@ -406,7 +429,7 @@ impl ThreadGroup {
         // Detach from any ptraced tasks.
         let tracees = self.ptracees.lock().keys().cloned().collect::<Vec<_>>();
         for tracee in tracees {
-            if let Some(task_ref) = self.kernel.pids.read().get_task(tracee).clone().upgrade() {
+            if let Some(task_ref) = pids.get_task(tracee).clone().upgrade() {
                 let _ = ptrace_detach(self.clone(), task_ref.as_ref(), &UserAddress::NULL);
             }
         }
@@ -974,18 +997,7 @@ impl ThreadGroup {
             .ptracees
             .lock()
             .keys()
-            .filter(|tracee_pid| match selector {
-                ProcessSelector::Pid(pid) => pid == **tracee_pid,
-                ProcessSelector::Any => true,
-                ProcessSelector::Pgid(pgid) => {
-                    if let Some(task_ref) = pids.get_task(**tracee_pid).upgrade() {
-                        pids.get_process_group(pgid).as_ref()
-                            == Some(&task_ref.thread_group.read().process_group)
-                    } else {
-                        false
-                    }
-                }
-            })
+            .filter(|tracee_pid| selector.do_match(**tracee_pid, &pids))
             .map(|tracee_pid| pids.get_task(*tracee_pid).clone())
         {
             if let Some(task_ref) = tracee.clone().upgrade() {
