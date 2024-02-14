@@ -286,7 +286,11 @@ pub fn deliver_signal(
             }
             DeliveryAction::CoreDump => {
                 if task.kernel().features.log_dump_on_exit {
-                    log_error!("DUMP_ON_EXIT from signal {:?}", siginfo.signal);
+                    log_error!(
+                        "DUMP_ON_EXIT from signal (siginfo: {:?}) (registers: {:?})",
+                        siginfo,
+                        registers
+                    );
                     debug::backtrace_request_current_thread();
                 }
                 task_state.set_flags(TaskFlags::DUMP_ON_EXIT, true);
