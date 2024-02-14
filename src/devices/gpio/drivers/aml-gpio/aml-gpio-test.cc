@@ -16,6 +16,7 @@
 #include "lib/device-protocol/pdev-fidl.h"
 #include "s905d2-blocks.h"
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
 
@@ -36,7 +37,8 @@ class FakeAmlGpio : public AmlGpio {
   static std::unique_ptr<FakeAmlGpio> Create(ddk::PDevFidl pdev, pdev_device_info info,
                                              ddk_mock::MockMmioRegRegion *mock_mmio_gpio,
                                              ddk_mock::MockMmioRegRegion *mock_mmio_gpio_a0,
-                                             ddk_mock::MockMmioRegRegion *mock_mmio_interrupt) {
+                                             ddk_mock::MockMmioRegRegion *mock_mmio_interrupt,
+                                             fdf_dispatcher_t *const dispatcher) {
     const AmlGpioBlock *gpio_blocks;
     const AmlGpioInterrupt *gpio_interrupt;
     size_t block_count;
@@ -74,9 +76,10 @@ class FakeAmlGpio : public AmlGpio {
     fdf::MmioBuffer mmio_gpio_a0(mock_mmio_gpio_a0->GetMmioBuffer());
     fdf::MmioBuffer mmio_interrupt(mock_mmio_interrupt->GetMmioBuffer());
 
-    FakeAmlGpio *device(new (&ac) FakeAmlGpio(
-        std::move(pdev), std::move(mmio_gpio), std::move(mmio_gpio_a0), std::move(mmio_interrupt),
-        gpio_blocks, gpio_interrupt, block_count, std::move(info), std::move(irq_info)));
+    FakeAmlGpio *device(new (&ac) FakeAmlGpio(std::move(pdev), std::move(mmio_gpio),
+                                              std::move(mmio_gpio_a0), std::move(mmio_interrupt),
+                                              gpio_blocks, gpio_interrupt, block_count,
+                                              std::move(info), std::move(irq_info), dispatcher));
     if (!ac.check()) {
       zxlogf(ERROR, "FakeAmlGpio::Create: device object alloc failed");
       return nullptr;
@@ -89,10 +92,11 @@ class FakeAmlGpio : public AmlGpio {
   explicit FakeAmlGpio(ddk::PDevFidl pdev, fdf::MmioBuffer mock_mmio_gpio,
                        fdf::MmioBuffer mock_mmio_gpio_a0, fdf::MmioBuffer mock_mmio_interrupt,
                        const AmlGpioBlock *gpio_blocks, const AmlGpioInterrupt *gpio_interrupt,
-                       size_t block_count, pdev_device_info_t info, fbl::Array<uint16_t> irq_info)
+                       size_t block_count, pdev_device_info_t info, fbl::Array<uint16_t> irq_info,
+                       fdf_dispatcher_t *dispatcher)
       : AmlGpio(std::move(pdev), std::move(mock_mmio_gpio), std::move(mock_mmio_gpio_a0),
                 std::move(mock_mmio_interrupt), gpio_blocks, gpio_interrupt, block_count,
-                std::move(info), std::move(irq_info)) {}
+                std::move(info), std::move(irq_info), dispatcher) {}
 };
 
 zx::result<ddk::PDevFidl> StartPDev(
@@ -118,14 +122,33 @@ zx::result<ddk::PDevFidl> StartPDev(
 
 class A113AmlGpioTest : public zxtest::Test {
  public:
+  A113AmlGpioTest() : runtime_(mock_ddk::GetDriverRuntime()) {}
+
   void SetUp() override {
     // make-up info, pid and irq_count needed for Create
     auto info = pdev_device_info{0, PDEV_PID_AMLOGIC_A113, 0, 2, 3, 0, 0, 0, {0}, "fake_info"};
 
     zx::result pdev_result = StartPDev(incoming_loop_, incoming_);
     ASSERT_OK(pdev_result);
-    gpio_ = FakeAmlGpio::Create(std::move(pdev_result.value()), info, &mock_mmio_gpio_,
-                                &mock_mmio_gpio_a0_, &mock_mmio_interrupt_);
+
+    auto endpoints = fdf::CreateEndpoints<fuchsia_hardware_gpioimpl::GpioImpl>();
+    ASSERT_TRUE(endpoints.is_ok());
+    async::PostTask(fdf::Dispatcher::GetCurrent()->async_dispatcher(), [&]() {
+      gpio_ = FakeAmlGpio::Create(std::move(pdev_result.value()), info, &mock_mmio_gpio_,
+                                  &mock_mmio_gpio_a0_, &mock_mmio_interrupt_,
+                                  fdf::Dispatcher::GetCurrent()->get());
+      fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(endpoints->server),
+                      gpio_.get());
+    });
+    runtime_->RunUntilIdle();
+
+    client_.Bind(std::move(endpoints->client), fdf::Dispatcher::GetCurrent()->get());
+  }
+
+  void TearDown() override {
+    runtime_->ResetQuit();
+    async::PostTask(fdf::Dispatcher::GetCurrent()->async_dispatcher(), [&]() { gpio_.reset(); });
+    runtime_->RunUntilIdle();
   }
 
  protected:
@@ -137,17 +160,38 @@ class A113AmlGpioTest : public zxtest::Test {
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
                                                                    std::in_place};
+  std::shared_ptr<fdf_testing::DriverRuntime> runtime_;
+  fdf::WireClient<fuchsia_hardware_gpioimpl::GpioImpl> client_;
 };
 
 class S905d2AmlGpioTest : public zxtest::Test {
  public:
+  S905d2AmlGpioTest() : runtime_(mock_ddk::GetDriverRuntime()) {}
+
   void SetUp() override {
     // make-up info, pid and irq_count needed for Create
     auto info = pdev_device_info{0, PDEV_PID_AMLOGIC_S905D2, 0, 2, 3, 0, 0, 0, {0}, "fake_info"};
     zx::result pdev_result = StartPDev(incoming_loop_, incoming_);
     ASSERT_OK(pdev_result);
-    gpio_ = FakeAmlGpio::Create(std::move(pdev_result.value()), info, &mock_mmio_gpio_,
-                                &mock_mmio_gpio_a0_, &mock_mmio_interrupt_);
+
+    auto endpoints = fdf::CreateEndpoints<fuchsia_hardware_gpioimpl::GpioImpl>();
+    ASSERT_TRUE(endpoints.is_ok());
+    async::PostTask(fdf::Dispatcher::GetCurrent()->async_dispatcher(), [&]() {
+      gpio_ = FakeAmlGpio::Create(std::move(pdev_result.value()), info, &mock_mmio_gpio_,
+                                  &mock_mmio_gpio_a0_, &mock_mmio_interrupt_,
+                                  fdf::Dispatcher::GetCurrent()->get());
+      fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(endpoints->server),
+                      gpio_.get());
+    });
+    runtime_->RunUntilIdle();
+
+    client_.Bind(std::move(endpoints->client), fdf::Dispatcher::GetCurrent()->get());
+  }
+
+  void TearDown() override {
+    runtime_->ResetQuit();
+    async::PostTask(fdf::Dispatcher::GetCurrent()->async_dispatcher(), [&]() { gpio_.reset(); });
+    runtime_->RunUntilIdle();
   }
 
  protected:
@@ -160,12 +204,22 @@ class S905d2AmlGpioTest : public zxtest::Test {
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
                                                                    std::in_place};
+  std::shared_ptr<fdf_testing::DriverRuntime> runtime_;
+  fdf::WireClient<fuchsia_hardware_gpioimpl::GpioImpl> client_;
 };
 
 // GpioImplSetAltFunction Tests
 TEST_F(A113AmlGpioTest, A113AltMode1) {
   mock_mmio_gpio_[0x24 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000001);
-  EXPECT_OK(gpio_->GpioImplSetAltFunction(0x00, 1));
+
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)->SetAltFunction(0x00, 1).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    runtime_->Quit();
+  });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -173,7 +227,15 @@ TEST_F(A113AmlGpioTest, A113AltMode1) {
 
 TEST_F(A113AmlGpioTest, A113AltMode2) {
   mock_mmio_gpio_[0x26 * sizeof(uint32_t)].ExpectRead(0x00000009 << 8).ExpectWrite(0x00000005 << 8);
-  EXPECT_OK(gpio_->GpioImplSetAltFunction(0x12, 5));
+
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)->SetAltFunction(0x12, 5).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    runtime_->Quit();
+  });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -181,7 +243,15 @@ TEST_F(A113AmlGpioTest, A113AltMode2) {
 
 TEST_F(A113AmlGpioTest, A113AltMode3) {
   mock_mmio_gpio_a0_[0x05 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000005 << 16);
-  EXPECT_OK(gpio_->GpioImplSetAltFunction(0x56, 5));
+
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)->SetAltFunction(0x56, 5).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    runtime_->Quit();
+  });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -189,21 +259,43 @@ TEST_F(A113AmlGpioTest, A113AltMode3) {
 
 TEST_F(S905d2AmlGpioTest, S905d2AltMode) {
   mock_mmio_gpio_[0xb6 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000001);
-  EXPECT_OK(gpio_->GpioImplSetAltFunction(0x00, 1));
+
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)->SetAltFunction(0x00, 1).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    runtime_->Quit();
+  });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
 }
 
 TEST_F(A113AmlGpioTest, AltModeFail1) {
-  EXPECT_NOT_OK(gpio_->GpioImplSetAltFunction(0x00, 16));
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)->SetAltFunction(0x00, 16).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_FALSE(result->is_ok());
+    runtime_->Quit();
+  });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
 }
 
 TEST_F(A113AmlGpioTest, AltModeFail2) {
-  EXPECT_NOT_OK(gpio_->GpioImplSetAltFunction(0xFFFF, 1));
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)->SetAltFunction(0xFFFF, 1).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_FALSE(result->is_ok());
+    runtime_->Quit();
+  });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -216,7 +308,17 @@ TEST_F(A113AmlGpioTest, A113NoPull0) {
   mock_mmio_gpio_[0x4a * sizeof(uint32_t)]
       .ExpectRead(0xFFFFFFFF)
       .ExpectWrite(0xFFFFFFFE);  // pull_en
-  EXPECT_OK(gpio_->GpioImplConfigIn(0, GPIO_NO_PULL));
+                                 //
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)
+      ->ConfigIn(0, fuchsia_hardware_gpio::GpioFlags::kNoPull)
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+        runtime_->Quit();
+      });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -228,7 +330,17 @@ TEST_F(A113AmlGpioTest, A113NoPullMid) {
   mock_mmio_gpio_[0x4a * sizeof(uint32_t)]
       .ExpectRead(0xFFFFFFFF)
       .ExpectWrite(0xFFFBFFFF);  // pull_en
-  EXPECT_OK(gpio_->GpioImplConfigIn(0x12, GPIO_NO_PULL));
+
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)
+      ->ConfigIn(0x12, fuchsia_hardware_gpio::GpioFlags::kNoPull)
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+        runtime_->Quit();
+      });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -244,7 +356,17 @@ TEST_F(A113AmlGpioTest, A113NoPullHigh) {
   mock_mmio_gpio_a0_[0x0b * sizeof(uint32_t)]
       .ExpectRead(0xFFFFFFFF)
       .ExpectWrite(0xFFFEFFFF);  // pull_en
-  EXPECT_OK(gpio_->GpioImplConfigIn(0x56, GPIO_NO_PULL));
+
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)
+      ->ConfigIn(0x56, fuchsia_hardware_gpio::GpioFlags::kNoPull)
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+        runtime_->Quit();
+      });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -256,7 +378,17 @@ TEST_F(S905d2AmlGpioTest, S905d2NoPull0) {
   mock_mmio_gpio_[0x4c * sizeof(uint32_t)]
       .ExpectRead(0xFFFFFFFF)
       .ExpectWrite(0xFFFFFFFE);  // pull_en
-  EXPECT_OK(gpio_->GpioImplConfigIn(0, GPIO_NO_PULL));
+
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)
+      ->ConfigIn(0x0, fuchsia_hardware_gpio::GpioFlags::kNoPull)
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+        runtime_->Quit();
+      });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -268,7 +400,17 @@ TEST_F(S905d2AmlGpioTest, S905d2PullUp) {
   mock_mmio_gpio_[0x48 * sizeof(uint32_t)]
       .ExpectRead(0xFFFFFFFF)
       .ExpectWrite(0xFFFFFFFF);  // pull_en
-  EXPECT_OK(gpio_->GpioImplConfigIn(0x21, GPIO_PULL_UP));
+
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)
+      ->ConfigIn(0x21, fuchsia_hardware_gpio::GpioFlags::kPullUp)
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+        runtime_->Quit();
+      });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -280,14 +422,33 @@ TEST_F(S905d2AmlGpioTest, S905d2PullDown) {
   mock_mmio_gpio_[0x48 * sizeof(uint32_t)]
       .ExpectRead(0xFFFFFFFF)
       .ExpectWrite(0xFFFFFFFF);  // pull_en
-  EXPECT_OK(gpio_->GpioImplConfigIn(0x20, GPIO_PULL_DOWN));
+
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)
+      ->ConfigIn(0x20, fuchsia_hardware_gpio::GpioFlags::kPullDown)
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+        runtime_->Quit();
+      });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
 }
 
 TEST_F(A113AmlGpioTest, A113NoPullFail) {
-  EXPECT_NOT_OK(gpio_->GpioImplConfigIn(0xFFFF, GPIO_NO_PULL));
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)
+      ->ConfigIn(0xFFFF, fuchsia_hardware_gpio::GpioFlags::kNoPull)
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_FALSE(result->is_ok());
+        runtime_->Quit();
+      });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -299,7 +460,15 @@ TEST_F(A113AmlGpioTest, A113Out) {
       .ExpectRead(0xFFFFFFFF)
       .ExpectWrite(0xFFFFFFFF);  // output
   mock_mmio_gpio_[0x0c * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFB);  // oen
-  EXPECT_OK(gpio_->GpioImplConfigOut(0x19, 1));
+
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)->ConfigOut(0x19, 1).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    runtime_->Quit();
+  });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -312,17 +481,39 @@ TEST_F(A113AmlGpioTest, A113Read) {
   mock_mmio_gpio_[0x4a * sizeof(uint32_t)]
       .ExpectRead(0xFFFFFFFF)
       .ExpectWrite(0xFFFFFFDF);  // pull_en
-  EXPECT_OK(gpio_->GpioImplConfigIn(5, GPIO_NO_PULL));
+
   mock_mmio_gpio_[0x14 * sizeof(uint32_t)].ExpectRead(0x00000020);  // read 0x01.
   mock_mmio_gpio_[0x14 * sizeof(uint32_t)].ExpectRead(0x00000000);  // read 0x00.
   mock_mmio_gpio_[0x14 * sizeof(uint32_t)].ExpectRead(0x00000020);  // read 0x01.
-  uint8_t out_value = 0;
-  EXPECT_OK(gpio_->GpioImplRead(5, &out_value));
-  EXPECT_EQ(out_value, 0x01);
-  EXPECT_OK(gpio_->GpioImplRead(5, &out_value));
-  EXPECT_EQ(out_value, 0x00);
-  EXPECT_OK(gpio_->GpioImplRead(5, &out_value));
-  EXPECT_EQ(out_value, 0x01);
+
+  fdf::Arena arena('GPIO');
+
+  client_.buffer(arena)
+      ->ConfigIn(5, fuchsia_hardware_gpio::GpioFlags::kNoPull)
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+      });
+
+  client_.buffer(arena)->Read(5).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    EXPECT_EQ(result->value()->value, 0x01);
+  });
+  client_.buffer(arena)->Read(5).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    EXPECT_EQ(result->value()->value, 0x00);
+  });
+  client_.buffer(arena)->Read(5).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    EXPECT_EQ(result->value()->value, 0x01);
+    runtime_->Quit();
+  });
+
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -333,9 +524,25 @@ TEST_F(A113AmlGpioTest, A113Write) {
   mock_mmio_gpio_[0x13 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // write
   mock_mmio_gpio_[0x13 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFBFFF);  // write
   mock_mmio_gpio_[0x13 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // write
-  EXPECT_OK(gpio_->GpioImplWrite(14, 200));
-  EXPECT_OK(gpio_->GpioImplWrite(14, 0));
-  EXPECT_OK(gpio_->GpioImplWrite(14, 92));
+
+  fdf::Arena arena('GPIO');
+
+  client_.buffer(arena)->Write(14, 200).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+  client_.buffer(arena)->Write(14, 0).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+  client_.buffer(arena)->Write(14, 92).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    runtime_->Quit();
+  });
+
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -343,8 +550,14 @@ TEST_F(A113AmlGpioTest, A113Write) {
 
 // GpioImplGetInterrupt Tests
 TEST_F(A113AmlGpioTest, A113GetInterruptFail) {
-  zx::interrupt out_int;
-  EXPECT_NOT_OK(gpio_->GpioImplGetInterrupt(0xFFFF, ZX_INTERRUPT_MODE_EDGE_LOW, &out_int));
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)->GetInterrupt(0xFFFF, ZX_INTERRUPT_MODE_EDGE_LOW).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_FALSE(result->is_ok());
+    runtime_->Quit();
+  });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -357,7 +570,15 @@ TEST_F(A113AmlGpioTest, A113GetInterrupt) {
   mock_mmio_interrupt_[0x3c20 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00010001);
   mock_mmio_interrupt_[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
   zx::interrupt out_int;
-  EXPECT_OK(gpio_->GpioImplGetInterrupt(0x0B, ZX_INTERRUPT_MODE_EDGE_LOW, &out_int));
+
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)->GetInterrupt(0x0B, ZX_INTERRUPT_MODE_EDGE_LOW).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    runtime_->Quit();
+  });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -365,7 +586,14 @@ TEST_F(A113AmlGpioTest, A113GetInterrupt) {
 
 // GpioImplReleaseInterrupt Tests
 TEST_F(A113AmlGpioTest, A113ReleaseInterruptFail) {
-  EXPECT_NOT_OK(gpio_->GpioImplReleaseInterrupt(0x66));
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)->ReleaseInterrupt(0x66).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_FALSE(result->is_ok());
+    runtime_->Quit();
+  });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -377,9 +605,21 @@ TEST_F(A113AmlGpioTest, A113ReleaseInterrupt) {
       .ExpectWrite(0x00000048);  // modify
   mock_mmio_interrupt_[0x3c20 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00010001);
   mock_mmio_interrupt_[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
-  zx::interrupt out_int;
-  EXPECT_OK(gpio_->GpioImplGetInterrupt(0x0B, ZX_INTERRUPT_MODE_EDGE_LOW, &out_int));
-  EXPECT_OK(gpio_->GpioImplReleaseInterrupt(0x0B));
+
+  fdf::Arena arena('GPIO');
+
+  client_.buffer(arena)->GetInterrupt(0x0B, ZX_INTERRUPT_MODE_EDGE_LOW).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+  client_.buffer(arena)->ReleaseInterrupt(0x0B).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    runtime_->Quit();
+  });
+
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -392,13 +632,26 @@ TEST_F(A113AmlGpioTest, A113InterruptSetPolarityEdge) {
       .ExpectWrite(0x00000048);  // modify
   mock_mmio_interrupt_[0x3c20 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00010001);
   mock_mmio_interrupt_[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
-  zx::interrupt out_int;
-  EXPECT_OK(gpio_->GpioImplGetInterrupt(0x0B, ZX_INTERRUPT_MODE_EDGE_LOW, &out_int));
-
   mock_mmio_interrupt_[0x3c20 * sizeof(uint32_t)]
       .ExpectRead(0x00010001)
       .ExpectWrite(0x00000001);  // polarity + for any edge.
-  EXPECT_OK(gpio_->GpioImplSetPolarity(0x0B, true));
+
+  fdf::Arena arena('GPIO');
+
+  client_.buffer(arena)->GetInterrupt(0x0B, ZX_INTERRUPT_MODE_EDGE_LOW).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+  client_.buffer(arena)
+      ->SetPolarity(0x0B, fuchsia_hardware_gpio::GpioPolarity::kHigh)
+      .Then([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+        runtime_->Quit();
+      });
+
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -406,7 +659,14 @@ TEST_F(A113AmlGpioTest, A113InterruptSetPolarityEdge) {
 
 // GpioImplSetDriveStrength Tests
 TEST_F(A113AmlGpioTest, A113SetDriveStrength) {
-  EXPECT_NOT_OK(gpio_->GpioImplSetDriveStrength(0x87, 2, nullptr));
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)->SetDriveStrength(0x87, 2).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_FALSE(result->is_ok());
+    runtime_->Quit();
+  });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -414,9 +674,16 @@ TEST_F(A113AmlGpioTest, A113SetDriveStrength) {
 
 TEST_F(S905d2AmlGpioTest, S905d2SetDriveStrength) {
   mock_mmio_gpio_a0_[0x08 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFB);
-  uint64_t actual = 0;
-  EXPECT_OK(gpio_->GpioImplSetDriveStrength(0x62, 3000, &actual));
-  EXPECT_EQ(actual, 3000);
+
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)->SetDriveStrength(0x62, 3000).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    EXPECT_EQ(result->value()->actual_ds_ua, 3000);
+    runtime_->Quit();
+  });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
@@ -424,9 +691,16 @@ TEST_F(S905d2AmlGpioTest, S905d2SetDriveStrength) {
 
 TEST_F(S905d2AmlGpioTest, S905d2GetDriveStrength) {
   mock_mmio_gpio_a0_[0x08 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFB);
-  uint64_t result = 0;
-  EXPECT_OK(gpio_->GpioImplGetDriveStrength(0x62, &result));
-  EXPECT_EQ(result, 3000);
+
+  fdf::Arena arena('GPIO');
+  client_.buffer(arena)->GetDriveStrength(0x62).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    EXPECT_EQ(result->value()->result_ua, 3000);
+    runtime_->Quit();
+  });
+  runtime_->Run();
+
   mock_mmio_gpio_.VerifyAll();
   mock_mmio_gpio_a0_.VerifyAll();
   mock_mmio_interrupt_.VerifyAll();
