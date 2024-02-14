@@ -16,9 +16,9 @@ use {
     crate::wire_convert::*,
     anyhow::{anyhow, Context, Error},
     fidl::endpoints::RequestStream,
-    fidl_fuchsia_media, fidl_fuchsia_scheduler,
+    fidl_fuchsia_media,
     fidl_fuchsia_virtualization_hardware::{VirtioSoundRequest, VirtioSoundRequestStream},
-    fuchsia_runtime,
+    fuchsia_scheduler,
     fuchsia_zircon::{self as zx, DurationNum},
     futures::{StreamExt, TryFutureExt, TryStreamExt},
     once_cell::sync::Lazy,
@@ -29,17 +29,15 @@ use {
     virtio_device::chain::ReadableChain,
 };
 
-/// Deadline profile configuration.
+// TODO(https://fxbug.dev/323262398): Remove this hardcoded profile once we've switched to
+// RoleManager, which supports output parameters.
 pub(crate) struct DeadlineProfileConfig {
-    capacity: zx::Duration,
-    deadline: zx::Duration,
     period: zx::Duration,
 }
 
 // Currently requesting 0.5ms of CPU every 5ms.
-pub(crate) static DEADLINE_PROFILE: Lazy<DeadlineProfileConfig> = Lazy::new(|| {
-    DeadlineProfileConfig { capacity: 500.micros(), deadline: 5.millis(), period: 5.millis() }
-});
+pub(crate) static DEADLINE_PROFILE: Lazy<DeadlineProfileConfig> =
+    Lazy::new(|| DeadlineProfileConfig { period: 5.millis() });
 
 // There are no defined features. See: 5.14.3 Feature Bits
 // https://www.kraxel.org/virtio/virtio-v1.1-cs01-sound-v8.html#x1-4980003
@@ -255,40 +253,6 @@ async fn run_virtio_sound(
     return Ok(());
 }
 
-async fn apply_deadline_profile() -> Result<(), Error> {
-    let profile_provider = fuchsia_component::client::connect_to_protocol::<
-        fidl_fuchsia_scheduler::ProfileProviderMarker,
-    >()
-    .context("Failed to connect to fuchsia.scheduler.ProfileProvider")?;
-
-    // Obtain a deadline profile for our (only) thread.
-    // TODO(https://fxbug.dev/42171438): tune this profile
-    let (status, profile) = profile_provider
-        .get_deadline_profile(
-            DEADLINE_PROFILE.capacity.into_nanos() as u64,
-            DEADLINE_PROFILE.deadline.into_nanos() as u64,
-            DEADLINE_PROFILE.period.into_nanos() as u64,
-            "virtio-sound",
-        )
-        .await
-        .context("fuchsia.scheduler.ProfileProvider.GetDeadlineProfile failed")?;
-
-    let status = zx::Status::from_raw(status);
-    if status != zx::Status::OK {
-        return Err(anyhow!(
-            "fuchsia.scheduler.ProfileProvider.GetDeadlineProfile returned status {}",
-            status
-        ));
-    }
-
-    match profile {
-        Some(profile) => fuchsia_runtime::thread_self()
-            .set_profile(profile, 0)
-            .context("zx_object_set_profile failed"),
-        None => Err(anyhow!("fuchsia.scheduler.ProfileProvider.GetDeadlineProfile returned invalid profile with OK status")),
-    }
-}
-
 #[fuchsia::main(logging = true, threads = 1)]
 async fn main() -> Result<(), Error> {
     let audio = fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_media::AudioMarker>()
@@ -296,7 +260,7 @@ async fn main() -> Result<(), Error> {
 
     // Failing to apply a deadline profile is not fatal (e.g., it may happen in tests),
     // but warn because performance may suffer.
-    match apply_deadline_profile().await {
+    match fuchsia_scheduler::set_role_for_this_thread("fuchsia.virtualization.virtio_sound").await {
         Ok(_) => tracing::info!("Applied deadline profile"),
         Err(err) => tracing::warn!("Failed to apply deadline profile: {}", err),
     };

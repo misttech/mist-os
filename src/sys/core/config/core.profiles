@@ -20,6 +20,9 @@
     "fuchsia.graphics.drivers.msd-arm-mali.device": { "capacity": "500us", "deadline": "1ms", "period": "1ms" },
     "fuchsia.graphics.drivers.msd-vsi-vip.device": { "priority": 25 },
     "fuchsia.graphics.drivers.msd-vsi-vip.vsi-interrupt": { "priority": 25 },
+
+    // Virtualization profiles.
+    "fuchsia.virtualization.virtio_sound": { "capacity": "500us", "deadline": "5ms", "period": "5ms" }
   },
   "memory": {
     "fuchsia.media.audio.core": { "priority": 24 },
