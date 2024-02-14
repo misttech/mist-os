@@ -57,6 +57,7 @@ source_set("sources") {
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",
+    "//src/devices/tee/drivers/optee:tee_smc",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/sync:sync-cpp",
