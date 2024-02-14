@@ -45,7 +45,10 @@ exports_files(
     ["prebuilt/third_party/firmware/vim3/u-boot.bin.unsigned"] +
 
     # zoneinfo resources
-    glob(["prebuilt/third_party/zoneinfo/**"]),
+    glob(["prebuilt/third_party/zoneinfo/**"]) +
+
+    # prebuilt drivers
+    glob(["prebuilt/vendor/google/drivers/**/*.far"]),
 )
 
 linux_sysroot(
