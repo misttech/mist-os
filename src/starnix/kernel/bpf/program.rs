@@ -17,8 +17,8 @@ use starnix_uapi::{
     errors::Errno,
 };
 use ubpf::{
-    error::UbpfError,
-    program::{UbpfVm, UbpfVmBuilder},
+    error::EbpfError,
+    program::{EbpfProgram, EbpfProgramBuilder},
     ubpf::EBPF_OP_LDDW,
 };
 
@@ -60,11 +60,11 @@ impl From<&bpf_attr__bindgen_ty_4> for ProgramInfo {
 
 pub struct Program {
     pub info: ProgramInfo,
-    vm: Option<UbpfVm>,
+    vm: Option<EbpfProgram>,
     _objects: Vec<BpfHandle>,
 }
 
-fn map_ubpf_error(e: UbpfError) -> Errno {
+fn map_ubpf_error(e: EbpfError) -> Errno {
     log_error!("Failed to load BPF program: {:?}", e);
     errno!(EINVAL)
 }
@@ -75,7 +75,7 @@ impl Program {
         info: ProgramInfo,
         mut code: Vec<bpf_insn>,
     ) -> Result<Program, Errno> {
-        let mut builder = UbpfVmBuilder::new().map_err(map_ubpf_error)?;
+        let mut builder = EbpfProgramBuilder::new().map_err(map_ubpf_error)?;
         let objects = link(current_task, &mut code, &mut builder)?;
 
         let vm = (|| {
@@ -115,7 +115,7 @@ const BPF_PSEUDO_MAP_FD: u8 = 1;
 fn link(
     current_task: &CurrentTask,
     code: &mut Vec<bpf_insn>,
-    builder: &mut UbpfVmBuilder,
+    builder: &mut EbpfProgramBuilder,
 ) -> Result<Vec<BpfHandle>, Errno> {
     let mut objects = vec![];
     let code_len = code.len();

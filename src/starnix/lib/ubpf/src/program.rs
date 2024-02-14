@@ -5,14 +5,22 @@
 use crate::{
     converter::cbpf_to_ebpf,
     ubpf::{ubpf_create, ubpf_destroy, ubpf_exec, ubpf_load, ubpf_register, ubpf_vm},
-    verifier::verify,
-    CallingContext, FunctionSignature, MapSchema, UbpfError,
+    verifier::{verify, CallingContext, FunctionSignature},
+    MapSchema, UbpfError,
     UbpfError::*,
 };
 use linux_uapi::{bpf_insn, c_void, sock_filter};
 
 // This file contains wrapper logic to build programs and execute
 // them in the ubpf VM.
+
+/// An alias for the UbpfVm. This allows not to reference the actual implementation in external
+/// code.
+pub type EbpfProgram = UbpfVm;
+
+/// An alias for the UbpfVmBuilder. This allows not to reference the actual implementation in
+/// external code.
+pub type EbpfProgramBuilder = UbpfVmBuilder;
 
 #[derive(Debug)]
 pub struct UbpfVmBuilder {
@@ -101,8 +109,7 @@ impl UbpfVmBuilder {
     }
 }
 
-/// An abstraction over the ubpf VM.  Users will generally not need to
-/// access this: they should use EbpfProgram below.
+/// An abstraction over the ubpf VM.
 #[derive(Debug)]
 pub struct UbpfVm {
     // The bpf vm used to run the program.  ubpf enforces that there is one program per vm.
@@ -135,35 +142,13 @@ impl UbpfVm {
 
         Ok(bpf_return_value)
     }
-}
 
-/// An EbpfProgram represents a program loaded in a ubpf VM.
-#[derive(Debug)]
-pub struct EbpfProgram {
-    // The program is stored by this UbpfVm
-    vm: UbpfVm,
-}
-
-impl EbpfProgram {
-    /// This method instantiates an EbpfProgram given ebpf instructions.
-    pub fn new(code: Vec<bpf_insn>) -> Result<Self, UbpfError> {
-        let builder = UbpfVmBuilder::new()?;
-        Ok(EbpfProgram { vm: builder.load(code)? })
-    }
-
-    /// This method instantiates an EbpfProgram given a cbpf original.
+    /// This method instantiates an UbpfVm given a cbpf original.
     pub fn from_cbpf(bpf_code: &[sock_filter]) -> Result<Self, UbpfError> {
         // Convert the sock_filter to ebpf
-        Self::new(cbpf_to_ebpf(bpf_code)?)
-    }
-
-    /// Executes the given program on the provided data.  Warning: If
-    /// this program was a cbpf program, and it uses BPF_MEM, the
-    /// scratch memory must be provided by the caller to this
-    /// function.  The translated CBPF program will use the last 16
-    /// words of |data|.
-    pub fn run<T>(&self, data: &mut T) -> Result<u64, i32> {
-        self.vm.run(data)
+        let code = cbpf_to_ebpf(bpf_code)?;
+        let builder = UbpfVmBuilder::new()?;
+        builder.load(code)
     }
 }
 
@@ -205,11 +190,8 @@ mod test {
     const BPF_MISC_TAX: u16 = (BPF_MISC | BPF_TAX) as u16;
 
     fn with_prg_assert_result(prg: &EbpfProgram, mut data: seccomp_data, result: u32, msg: &str) {
-        let res1 = prg.run(&mut data);
-        match res1 {
-            Ok(x) => assert!(x == result as u64, "{}: filter return value is {}", msg, x),
-            Err(x) => assert!(false, "Error \"{}\" when executing program", x),
-        }
+        let return_value = prg.run(&mut data).expect("Error executing the program");
+        assert_eq!(return_value, result as u64, "{}: filter return value is {}", msg, return_value);
     }
 
     #[test]
@@ -247,12 +229,7 @@ mod test {
             sock_filter { code: BPF_RET_K, jt: 0, jf: 0, k: SECCOMP_RET_ALLOW },
         ];
 
-        let prg_result = EbpfProgram::from_cbpf(&test_prg);
-        match &prg_result {
-            Ok(_) => (),
-            Err(x) => assert!(false, "Error \"{}\" from parsing program", x),
-        };
-        let prg = prg_result.unwrap();
+        let prg = EbpfProgram::from_cbpf(&test_prg).expect("Error parsing program");
 
         with_prg_assert_result(
             &prg,
@@ -326,12 +303,7 @@ mod test {
                 sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
             ];
 
-            let prg_result = EbpfProgram::from_cbpf(&test_prg);
-            match &prg_result {
-                Ok(_) => (),
-                Err(x) => assert!(false, "Error \"{}\" from parsing program", x),
-            };
-            let prg = prg_result.unwrap();
+            let prg = EbpfProgram::from_cbpf(&test_prg).expect("Error parsing program");
 
             with_prg_assert_result(
                 &prg,
@@ -357,12 +329,7 @@ mod test {
                 sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
             ];
 
-            let prg_result = EbpfProgram::from_cbpf(&test_prg);
-            match &prg_result {
-                Ok(_) => (),
-                Err(x) => assert!(false, "Error \"{}\" from parsing program", x),
-            };
-            let prg = prg_result.unwrap();
+            let prg = EbpfProgram::from_cbpf(&test_prg).expect("Error parsing program");
 
             with_prg_assert_result(
                 &prg,
