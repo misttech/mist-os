@@ -6,6 +6,7 @@
 #define TOOLS_FIDL_FIDLC_SRC_COMPILER_H_
 
 #include <lib/fit/function.h>
+#include <lib/stdcompat/span.h>
 
 #include <memory>
 
@@ -59,6 +60,9 @@ class Compiler final {
     const MethodHasher& method_hasher() { return compiler_->method_hasher_; }
     const ExperimentalFlags& experimental_flags() { return compiler_->experimental_flags_; }
 
+    // Returns types that were created in the typespace while compiling this library.
+    cpp20::span<const std::unique_ptr<Type>> created_types();
+
    private:
     // Implementations must report errors via reporter(). If no errors are
     // reported, the step is considered successful.
@@ -74,6 +78,7 @@ class Compiler final {
   const VersionSelection* version_selection;
   MethodHasher method_hasher_;
   const ExperimentalFlags experimental_flags_;
+  size_t typespace_start_index_;
 };
 
 struct Compilation;

@@ -15,6 +15,7 @@
 #include "tools/fidl/fidlc/src/experimental_flags.h"
 #include "tools/fidl/fidlc/src/flat_ast.h"
 #include "tools/fidl/fidlc/src/json_writer.h"
+#include "tools/fidl/fidlc/src/type_shape.h"
 
 namespace fidlc {
 
@@ -148,8 +149,6 @@ class JSONGenerator : public JsonWriter<JSONGenerator> {
                                          std::optional<Resourceness> maybe_resourceness);
   void GenerateExternalDeclarationsMember(const Compilation::Declarations& declarations,
                                           Position position = Position::kSubsequent);
-  void GenerateTypeShapes(const Object& object);
-  void GenerateFieldShapes(const Struct::Member& struct_member);
 
   const Compilation* compilation_;
   const ExperimentalFlags experimental_flags_;

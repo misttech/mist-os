@@ -162,15 +162,18 @@ void JSONGenerator::Generate(const Constant& value) {
 }
 
 void JSONGenerator::Generate(const Type* value) {
-  if (value->kind == Type::Kind::kBox)
-    return Generate(static_cast<const BoxType*>(value)->boxed_type);
-
   GenerateObject([&]() {
     GenerateObjectMember("kind", NameFlatTypeKind(value), Position::kFirst);
 
     switch (value->kind) {
-      case Type::Kind::kBox:
-        ZX_PANIC("should be caught above");
+      case Type::Kind::kBox: {
+        const auto* type = static_cast<const BoxType*>(value)->boxed_type;
+        ZX_ASSERT(type->kind == Type::Kind::kIdentifier);
+        const auto* id_type = static_cast<const IdentifierType*>(type);
+        GenerateObjectMember("identifier", id_type->name);
+        GenerateObjectMember("nullable", id_type->nullability);
+        break;
+      }
       case Type::Kind::kVector: {
         // This code path should only be exercised if the type is "bytes." All
         // other handling of kVector is handled in GenerateParameterizedType.
@@ -241,7 +244,7 @@ void JSONGenerator::Generate(const Type* value) {
         ZX_PANIC("unexpected kind");
     }
 
-    GenerateTypeShapes(*value);
+    GenerateObjectMember("type_shape_v2", value->type_shape.value());
   });
 }
 
@@ -542,7 +545,7 @@ void JSONGenerator::GenerateParameterizedType(TypeKind parent_type_kind, const T
         }
       }
     }
-    GenerateTypeShapes(*type);
+    GenerateObjectMember("type_shape_v2", type->type_shape.value());
   });
 }
 
@@ -599,7 +602,7 @@ void JSONGenerator::Generate(const Struct& value) {
     bool is_empty_success_struct =
         anon && anon->provenance == Name::Provenance::kGeneratedEmptySuccessStruct;
     GenerateObjectMember("is_empty_success_struct", is_empty_success_struct);
-    GenerateTypeShapes(value);
+    GenerateObjectMember("type_shape_v2", value.type_shape.value());
   });
 }
 
@@ -612,7 +615,7 @@ void JSONGenerator::Generate(const Struct::Member& value) {
       GenerateObjectMember("maybe_attributes", value.attributes);
     if (value.maybe_default_value)
       GenerateObjectMember("maybe_default_value", value.maybe_default_value);
-    GenerateFieldShapes(value);
+    GenerateObjectMember("field_shape_v2", value.field_shape);
   });
 }
 
@@ -625,7 +628,7 @@ void JSONGenerator::Generate(const Table& value) {
     GenerateObjectMember("members", value.members);
     GenerateObjectMember("strict", value.strictness);
     GenerateObjectMember("resource", value.resourceness == Resourceness::kResource);
-    GenerateTypeShapes(value);
+    GenerateObjectMember("type_shape_v2", value.type_shape.value());
   });
 }
 
@@ -681,7 +684,7 @@ void JSONGenerator::Generate(const Union& value) {
     auto anon = value.name.as_anonymous();
     bool is_result = anon && anon->provenance == Name::Provenance::kGeneratedResultUnion;
     GenerateObjectMember("is_result", is_result);
-    GenerateTypeShapes(value);
+    GenerateObjectMember("type_shape_v2", value.type_shape.value());
   });
 }
 
@@ -716,7 +719,7 @@ void JSONGenerator::Generate(const Overlay& value) {
     GenerateObjectMember("strict", value.strictness);
     ZX_ASSERT(value.resourceness == Resourceness::kValue);
     GenerateObjectMember("resource", value.resourceness == Resourceness::kResource);
-    GenerateTypeShapes(value);
+    GenerateObjectMember("type_shape_v2", value.type_shape.value());
   });
 }
 
@@ -868,15 +871,6 @@ void JSONGenerator::Generate(const Compilation::Dependency& dependency) {
     GenerateObjectMember("name", library_name, Position::kFirst);
     GenerateExternalDeclarationsMember(dependency.declarations);
   });
-}
-
-void JSONGenerator::GenerateTypeShapes(const Object& object) {
-  GenerateObjectMember("type_shape_v2", TypeShape(object, WireFormat::kV2));
-}
-
-void JSONGenerator::GenerateFieldShapes(const Struct::Member& struct_member) {
-  auto v2 = FieldShape(struct_member, WireFormat::kV2);
-  GenerateObjectMember("field_shape_v2", v2);
 }
 
 void JSONGenerator::GenerateDeclarationsEntry(int count, const Name& name,

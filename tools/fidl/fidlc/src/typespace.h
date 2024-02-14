@@ -34,6 +34,7 @@ class Typespace final {
   Typespace(Typespace&&) = default;
 
   Reporter* reporter() { return reporter_; }
+  const std::vector<std::unique_ptr<Type>>& types() { return types_; }
 
   const Type* Create(TypeResolver* resolver, const Reference& layout,
                      const LayoutParameterList& parameters, const TypeConstraints& constraints,

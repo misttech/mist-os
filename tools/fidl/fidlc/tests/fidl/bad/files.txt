@@ -195,3 +195,4 @@ fi-0203.test.fidl
 fi-0204.test.fidl
 fi-0205.test.fidl
 fi-0206.test.fidl
+fi-0207.test.fidl

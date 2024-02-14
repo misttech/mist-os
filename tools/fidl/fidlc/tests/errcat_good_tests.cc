@@ -1404,5 +1404,11 @@ TEST(ErrcatGoodTests, Good0206b) {
   ASSERT_COMPILED(library);
 }
 
+TEST(ErrcatGoodTests, Good0207) {
+  TestLibrary library;
+  library.AddFile("good/fi-0207.test.fidl");
+  ASSERT_COMPILED(library);
+}
+
 }  // namespace
 }  // namespace fidlc

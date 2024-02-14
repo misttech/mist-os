@@ -418,6 +418,8 @@ constexpr ErrorDef<205, std::string_view, Version, SourceSpan> ErrRemovedWithRep
 constexpr ErrorDef<206, std::string_view, Version> ErrReplacedWithoutReplacement(
     "element '{0}' is marked replaced={1}, but there is no replacement marked "
     "added={1}; change the replaced={1} to removed={1}");
+constexpr ErrorDef<207, uint32_t, char, uint32_t> ErrTypeShapeIntegerOverflow(
+    "cannot calculate type shape because of integer overflow in {0} {1} {2}");
 
 // To add a new error:
 //
@@ -637,6 +639,7 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0204 */ &ErrLibraryReplaced,
     /* fi-0205 */ &ErrRemovedWithReplacement,
     /* fi-0206 */ &ErrReplacedWithoutReplacement,
+    /* fi-0207 */ &ErrTypeShapeIntegerOverflow,
 };
 
 // In reporter.h we assert that reported error IDs are <= kNumDiagnosticDefs.

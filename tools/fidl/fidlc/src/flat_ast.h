@@ -23,7 +23,6 @@
 
 #include "tools/fidl/fidlc/src/attributes.h"
 #include "tools/fidl/fidlc/src/name.h"
-#include "tools/fidl/fidlc/src/object.h"
 #include "tools/fidl/fidlc/src/properties.h"
 #include "tools/fidl/fidlc/src/type_shape.h"
 #include "tools/fidl/fidlc/src/types.h"
@@ -225,11 +224,13 @@ struct Builtin : public Decl {
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
 };
 
-struct TypeDecl : public Decl, public Object {
-  TypeDecl(Kind kind, std::unique_ptr<AttributeList> attributes, Name name)
-      : Decl(kind, std::move(attributes), std::move(name)) {}
+// A decl that defines a data type.
+struct TypeDecl : public Decl {
+  using Decl::Decl;
 
-  bool recursive = false;
+  // Set during the TypeShapeStep.
+  std::optional<TypeShape> type_shape;
+  bool type_shape_compiling = false;
 };
 
 struct TypeConstructor;
@@ -448,8 +449,6 @@ struct Enum final : public TypeDecl {
   std::vector<Member> members;
   const Strictness strictness;
 
-  std::any AcceptAny(VisitorAny* visitor) const override;
-
   // Set during compilation.
   const PrimitiveType* type = nullptr;
   // Set only for flexible enums, and either is set depending on signedness of
@@ -487,8 +486,6 @@ struct Bits final : public TypeDecl {
   std::vector<Member> members;
   const Strictness strictness;
 
-  std::any AcceptAny(VisitorAny* visitor) const override;
-
   // Set during compilation.
   uint64_t mask = 0;
 
@@ -496,7 +493,7 @@ struct Bits final : public TypeDecl {
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
 };
 
-struct Service final : public TypeDecl {
+struct Service final : public Decl {
   struct Member : public Element {
     Member(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name,
            std::unique_ptr<AttributeList> attributes)
@@ -510,10 +507,7 @@ struct Service final : public TypeDecl {
   };
 
   Service(std::unique_ptr<AttributeList> attributes, Name name, std::vector<Member> members)
-      : TypeDecl(Kind::kService, std::move(attributes), std::move(name)),
-        members(std::move(members)) {}
-
-  std::any AcceptAny(VisitorAny* visitor) const override;
+      : Decl(Kind::kService, std::move(attributes), std::move(name)), members(std::move(members)) {}
 
   std::vector<Member> members;
 
@@ -528,7 +522,7 @@ struct Struct;
 // C++. For backward-compatibility, Struct::Member is now an alias for this top-level
 // StructMember.
 // TODO(https://fxbug.dev/42113185): Move this to a nested class inside Struct.
-struct StructMember : public Element, public Object {
+struct StructMember : public Element {
   StructMember(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name,
                std::unique_ptr<Constant> maybe_default_value,
                std::unique_ptr<AttributeList> attributes)
@@ -537,27 +531,23 @@ struct StructMember : public Element, public Object {
         name(name),
         maybe_default_value(std::move(maybe_default_value)) {}
   StructMember Clone() const;
-  std::any AcceptAny(VisitorAny* visitor) const override;
-  FieldShape fieldshape(WireFormat wire_format) const;
 
   std::unique_ptr<TypeConstructor> type_ctor;
   SourceSpan name;
   std::unique_ptr<Constant> maybe_default_value;
-  const Struct* parent = nullptr;
+
+  // Set during the TypeShapeStep.
+  FieldShape field_shape;
 };
 
 struct Struct final : public TypeDecl {
   using Member = StructMember;
 
-  Struct(std::unique_ptr<AttributeList> attributes, Name name,
-         std::vector<Member> unparented_members, std::optional<Resourceness> resourceness)
+  Struct(std::unique_ptr<AttributeList> attributes, Name name, std::vector<Member> members,
+         std::optional<Resourceness> resourceness)
       : TypeDecl(Kind::kStruct, std::move(attributes), std::move(name)),
-        members(std::move(unparented_members)),
-        resourceness(resourceness) {
-    for (auto& member : members) {
-      member.parent = this;
-    }
-  }
+        members(std::move(members)),
+        resourceness(resourceness) {}
 
   std::vector<Member> members;
 
@@ -565,7 +555,6 @@ struct Struct final : public TypeDecl {
   // structs (requests/responses, error result success payload) it is set during
   // compilation based on the struct's members.
   std::optional<Resourceness> resourceness;
-  std::any AcceptAny(VisitorAny* visitor) const override;
 
  private:
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
@@ -575,15 +564,11 @@ struct Table;
 
 // See the comment on the StructMember class for why this is a top-level class.
 // TODO(https://fxbug.dev/42113185): Move this to a nested class inside Table::Member.
-struct TableMemberUsed : public Object {
+struct TableMemberUsed {
   TableMemberUsed(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name)
       : type_ctor(std::move(type_ctor)), name(name) {}
   std::unique_ptr<TypeConstructor> type_ctor;
   SourceSpan name;
-
-  std::any AcceptAny(VisitorAny* visitor) const override;
-
-  FieldShape fieldshape(WireFormat wire_format) const;
 
   std::unique_ptr<TableMemberUsed> Clone() const {
     return std::make_unique<TableMemberUsed>(type_ctor->Clone(), name);
@@ -592,7 +577,7 @@ struct TableMemberUsed : public Object {
 
 // See the comment on the StructMember class for why this is a top-level class.
 // TODO(https://fxbug.dev/42113185): Move this to a nested class inside Table.
-struct TableMember : public Element, public Object {
+struct TableMember : public Element {
   using Used = TableMemberUsed;
 
   TableMember(const RawOrdinal64* ordinal, std::unique_ptr<TypeConstructor> type, SourceSpan name,
@@ -607,7 +592,6 @@ struct TableMember : public Element, public Object {
   }
 
   TableMember Clone() const;
-  std::any AcceptAny(VisitorAny* visitor) const override;
 
   // Owned by Library::raw_ordinals.
   const RawOrdinal64* ordinal;
@@ -632,13 +616,15 @@ struct Table final : public TypeDecl {
       : TypeDecl(Kind::kTable, std::move(attributes), std::move(name)),
         members(std::move(members)),
         strictness(strictness),
-        resourceness(resourceness) {}
+        resourceness(resourceness) {
+    ZX_ASSERT_MSG(strictness == Strictness::kFlexible, "tables cannot be strict");
+  }
 
   std::vector<Member> members;
+  // Tables are always flexible, but it simplifies generic code to also store
+  // strictness on it (and we could implement strict tables in the future).
   const Strictness strictness;
   const Resourceness resourceness;
-
-  std::any AcceptAny(VisitorAny* visitor) const override;
 
  private:
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
@@ -648,26 +634,20 @@ struct Union;
 
 // See the comment on the StructMember class for why this is a top-level class.
 // TODO(https://fxbug.dev/42113185): Move this to a nested class inside Union.
-struct UnionMemberUsed : public Object {
+struct UnionMemberUsed {
   UnionMemberUsed(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name)
       : type_ctor(std::move(type_ctor)), name(name) {}
   std::unique_ptr<TypeConstructor> type_ctor;
   SourceSpan name;
 
-  std::any AcceptAny(VisitorAny* visitor) const override;
-
-  FieldShape fieldshape(WireFormat wire_format) const;
-
   std::unique_ptr<UnionMemberUsed> Clone() const {
     return std::make_unique<UnionMemberUsed>(type_ctor->Clone(), name);
   }
-
-  const Union* parent = nullptr;
 };
 
 // See the comment on the StructMember class for why this is a top-level class.
 // TODO(https://fxbug.dev/42113185): Move this to a nested class inside Union.
-struct UnionMember : public Element, public Object {
+struct UnionMember : public Element {
   using Used = UnionMemberUsed;
 
   UnionMember(const RawOrdinal64* ordinal, std::unique_ptr<TypeConstructor> type_ctor,
@@ -682,7 +662,6 @@ struct UnionMember : public Element, public Object {
   }
 
   UnionMember Clone() const;
-  std::any AcceptAny(VisitorAny* visitor) const override;
 
   // Owned by Library::raw_ordinals.
   const RawOrdinal64* ordinal;
@@ -702,19 +681,12 @@ struct UnionMember : public Element, public Object {
 struct Union final : public TypeDecl {
   using Member = UnionMember;
 
-  Union(std::unique_ptr<AttributeList> attributes, Name name,
-        std::vector<Member> unparented_members, Strictness strictness,
-        std::optional<Resourceness> resourceness)
+  Union(std::unique_ptr<AttributeList> attributes, Name name, std::vector<Member> embers,
+        Strictness strictness, std::optional<Resourceness> resourceness)
       : TypeDecl(Kind::kUnion, std::move(attributes), std::move(name)),
-        members(std::move(unparented_members)),
+        members(std::move(embers)),
         strictness(strictness),
-        resourceness(resourceness) {
-    for (auto& member : members) {
-      if (member.maybe_used) {
-        member.maybe_used->parent = this;
-      }
-    }
-  }
+        resourceness(resourceness) {}
 
   std::vector<Member> members;
   const Strictness strictness;
@@ -726,32 +698,24 @@ struct Union final : public TypeDecl {
 
   std::vector<std::reference_wrapper<const Member>> MembersSortedByUnionOrdinal() const;
 
-  std::any AcceptAny(VisitorAny* visitor) const override;
-
  private:
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
 };
 
 struct Overlay;
 
-struct OverlayMemberUsed : public Object {
+struct OverlayMemberUsed {
   OverlayMemberUsed(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name)
       : type_ctor(std::move(type_ctor)), name(name) {}
   std::unique_ptr<TypeConstructor> type_ctor;
   SourceSpan name;
 
-  std::any AcceptAny(VisitorAny* visitor) const override;
-
-  FieldShape fieldshape(WireFormat wire_format) const;
-
   std::unique_ptr<OverlayMemberUsed> Clone() const {
     return std::make_unique<OverlayMemberUsed>(type_ctor->Clone(), name);
   }
-
-  const Overlay* parent = nullptr;
 };
 
-struct OverlayMember final : public Element, public Object {
+struct OverlayMember final : public Element {
   using Used = OverlayMemberUsed;
   OverlayMember(const RawOrdinal64* ordinal, std::unique_ptr<TypeConstructor> type_ctor,
                 SourceSpan name, std::unique_ptr<AttributeList> attributes)
@@ -765,7 +729,6 @@ struct OverlayMember final : public Element, public Object {
   }
 
   OverlayMember Clone() const;
-  std::any AcceptAny(VisitorAny* visitor) const override;
 
   // Owned by Library::raw_ordinals.
   const RawOrdinal64* ordinal;
@@ -786,30 +749,22 @@ struct OverlayMember final : public Element, public Object {
 struct Overlay final : public TypeDecl {
   using Member = OverlayMember;
 
-  Overlay(std::unique_ptr<AttributeList> attributes, Name name,
-          std::vector<Member> unparented_members, Strictness strictness, Resourceness resourceness)
+  Overlay(std::unique_ptr<AttributeList> attributes, Name name, std::vector<Member> members,
+          Strictness strictness, Resourceness resourceness)
       : TypeDecl(Kind::kOverlay, std::move(attributes), std::move(name)),
-        members(std::move(unparented_members)),
+        members(std::move(members)),
         strictness(strictness),
-        resourceness(resourceness) {
-    for (auto& member : members) {
-      if (member.maybe_used) {
-        member.maybe_used->parent = this;
-      }
-    }
-  }
+        resourceness(resourceness) {}
 
   std::vector<Member> members;
   const Strictness strictness;
   Resourceness resourceness;
 
-  std::any AcceptAny(VisitorAny* visitor) const override;
-
  private:
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
 };
 
-struct Protocol final : public TypeDecl {
+struct Protocol final : public Decl {
   struct Method : public Element {
     Method(std::unique_ptr<AttributeList> attributes, Strictness strictness,
            const RawIdentifier* identifier, SourceSpan name, bool has_request,
@@ -874,7 +829,7 @@ struct Protocol final : public TypeDecl {
 
   Protocol(std::unique_ptr<AttributeList> attributes, Openness openness, Name name,
            std::vector<ComposedProtocol> composed_protocols, std::vector<Method> methods)
-      : TypeDecl(Kind::kProtocol, std::move(attributes), std::move(name)),
+      : Decl(Kind::kProtocol, std::move(attributes), std::move(name)),
         openness(openness),
         composed_protocols(std::move(composed_protocols)),
         methods(std::move(methods)) {
@@ -889,8 +844,6 @@ struct Protocol final : public TypeDecl {
 
   // Set during compilation.
   std::vector<MethodWithInfo> all_methods;
-
-  std::any AcceptAny(VisitorAny* visitor) const override;
 
  private:
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
@@ -957,8 +910,6 @@ struct NewType final : public TypeDecl {
   // not all the constraints for this type are applied is irrelevant to us down the line - all
   // we care is that we have a type constructor to define a type.
   std::unique_ptr<TypeConstructor> type_ctor;
-
-  std::any AcceptAny(VisitorAny* visitor) const override;
 
  private:
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;

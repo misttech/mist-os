@@ -44,7 +44,7 @@ source_set("lib") {
     "src/transport.cc",
     "src/tree_visitor.cc",
     "src/type_resolver.cc",
-    "src/type_shape.cc",
+    "src/type_shape_step.cc",
     "src/types.cc",
     "src/typespace.cc",
     "src/utils.cc",
@@ -58,7 +58,6 @@ source_set("lib") {
     "//src/lib/fxl",
     "//third_party/re2",
     "//zircon/system/ulib/cmdline",
-    "//zircon/third_party/ulib/safemath",
   ]
   deps = [ ":json_schema" ]
   deps += [ "//third_party/boringssl" ]

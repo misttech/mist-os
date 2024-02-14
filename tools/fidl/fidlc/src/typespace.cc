@@ -376,9 +376,7 @@ const Type* Typespace::Creator::CreateTransportSideType(TransportSide end) {
 
 const Type* Typespace::Creator::CreateIdentifierType(TypeDecl* type_decl) {
   if (!type_decl->compiled && type_decl->kind != Decl::Kind::kProtocol) {
-    if (type_decl->compiling) {
-      type_decl->recursive = true;
-    } else {
+    if (!type_decl->compiling) {
       resolver_->CompileDecl(type_decl);
     }
   }

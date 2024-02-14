@@ -31,6 +31,7 @@ resource_definition handle : uint32 {
 };
 )FIDL");
 
+// TODO(https://fxbug.dev/323940291): Remove, use TypeShape instead.
 struct Expected {
   uint32_t inline_size = 0;
   uint32_t alignment = 0;
@@ -41,14 +42,17 @@ struct Expected {
   bool has_flexible_envelope = false;
 };
 
-#define EXPECT_TYPE_SHAPE(object, expected)   \
+// TODO(https://fxbug.dev/323940291): Remove, use FieldShape directly.
+using ExpectedField = FieldShape;
+
+#define EXPECT_TYPE_SHAPE(decl, expected)     \
   {                                           \
     SCOPED_TRACE("EXPECT_TYPE_SHAPE failed"); \
-    ExpectTypeShape((object), (expected));    \
+    ExpectTypeShape((decl), (expected));      \
   }
 
-void ExpectTypeShape(const Object* object, Expected expected) {
-  auto actual = TypeShape(object, WireFormat::kV2);
+void ExpectTypeShape(const TypeDecl* decl, Expected expected) {
+  auto& actual = decl->type_shape.value();
   EXPECT_EQ(expected.inline_size, actual.inline_size);
   EXPECT_EQ(expected.alignment, actual.alignment);
   EXPECT_EQ(expected.max_out_of_line, actual.max_out_of_line);
@@ -58,20 +62,14 @@ void ExpectTypeShape(const Object* object, Expected expected) {
   EXPECT_EQ(expected.has_flexible_envelope, actual.has_flexible_envelope);
 }
 
-struct ExpectedField {
-  uint32_t offset = 0;
-  uint32_t padding = 0;
-};
-
 #define EXPECT_FIELD_SHAPE(field, expected)    \
   {                                            \
     SCOPED_TRACE("EXPECT_FIELD_SHAPE failed"); \
     ExpectFieldShape((field), (expected));     \
   }
 
-template <typename T>
-void ExpectFieldShape(const T& field, ExpectedField expected) {
-  auto actual = FieldShape(field, WireFormat::kV2);
+void ExpectFieldShape(const Struct::Member& field, FieldShape expected) {
+  auto& actual = field.field_shape;
   EXPECT_EQ(expected.offset, actual.offset);
   EXPECT_EQ(expected.padding, actual.padding);
 }
@@ -904,14 +902,6 @@ type TableWithOptionalUnion = table {
                                  .depth = 1,
                                  .has_padding = true,
                              }));
-  ASSERT_EQ(a_union->members.size(), 2u);
-  ASSERT_NE(a_union->members[0].maybe_used, nullptr);
-  EXPECT_FIELD_SHAPE(*a_union->members[0].maybe_used, (ExpectedField{
-                                                          .offset = 0,
-                                                          .padding = 7,
-                                                      }));
-  ASSERT_NE(a_union->members[1].maybe_used, nullptr);
-  EXPECT_FIELD_SHAPE(*a_union->members[1].maybe_used, (ExpectedField{}));
 
   auto optional_union = test_library.LookupStruct("OptionalUnion");
   ASSERT_NE(optional_union, nullptr);
@@ -966,22 +956,6 @@ type ManyHandleUnion = strict resource union {
                                           .depth = 1,
                                           .has_padding = true,
                                       }));
-  ASSERT_EQ(one_handle_union->members.size(), 3u);
-  ASSERT_NE(one_handle_union->members[0].maybe_used, nullptr);
-  EXPECT_FIELD_SHAPE(*one_handle_union->members[0].maybe_used, (ExpectedField{
-                                                                   .offset = 0,
-                                                                   .padding = 4,
-                                                               }));
-  ASSERT_NE(one_handle_union->members[1].maybe_used, nullptr);
-  EXPECT_FIELD_SHAPE(*one_handle_union->members[1].maybe_used, (ExpectedField{
-                                                                   .offset = 0,
-                                                                   .padding = 7,
-                                                               }));
-  ASSERT_NE(one_handle_union->members[2].maybe_used, nullptr);
-  EXPECT_FIELD_SHAPE(*one_handle_union->members[2].maybe_used, (ExpectedField{
-                                                                   .offset = 0,
-                                                                   .padding = 4,
-                                                               }));
 
   auto many_handle_union = test_library.LookupUnion("ManyHandleUnion");
   ASSERT_NE(many_handle_union, nullptr);
@@ -993,16 +967,6 @@ type ManyHandleUnion = strict resource union {
                                            .depth = 2,
                                            .has_padding = true,
                                        }));
-  ASSERT_EQ(many_handle_union->members.size(), 3u);
-  ASSERT_NE(many_handle_union->members[1].maybe_used, nullptr);
-  EXPECT_FIELD_SHAPE(*many_handle_union->members[0].maybe_used, (ExpectedField{
-                                                                    .offset = 0,
-                                                                    .padding = 4,
-                                                                }));
-  ASSERT_NE(many_handle_union->members[1].maybe_used, nullptr);
-  EXPECT_FIELD_SHAPE(*many_handle_union->members[1].maybe_used, (ExpectedField{}));
-  ASSERT_NE(many_handle_union->members[2].maybe_used, nullptr);
-  EXPECT_FIELD_SHAPE(*many_handle_union->members[2].maybe_used, (ExpectedField{}));
 }
 
 TEST(TypeshapeTests, GoodOverlays) {
@@ -1044,12 +1008,6 @@ type BoolOverlayAndUint8Struct = struct {
                                                .depth = 1,
                                                .has_padding = true,
                                            }));
-  EXPECT_FIELD_SHAPE(*bool_or_string_or_u64->members[0].maybe_used,
-                     (ExpectedField{.offset = 8, .padding = 15}));
-  EXPECT_FIELD_SHAPE(*bool_or_string_or_u64->members[1].maybe_used,
-                     (ExpectedField{.offset = 8, .padding = 0}));
-  EXPECT_FIELD_SHAPE(*bool_or_string_or_u64->members[2].maybe_used,
-                     (ExpectedField{.offset = 8, .padding = 8}));
 
   // BoolOverlay and U64BoolStruct should have basically the same typeshape.
   auto bool_overlay = test_library.LookupOverlay("BoolOverlay");
@@ -1061,8 +1019,6 @@ type BoolOverlayAndUint8Struct = struct {
                                       .depth = 0,
                                       .has_padding = true,
                                   }));
-  EXPECT_FIELD_SHAPE(*bool_overlay->members[0].maybe_used,
-                     (ExpectedField{.offset = 8, .padding = 7}));
   EXPECT_TYPE_SHAPE(u64_bool_struct, (Expected{
                                          .inline_size = 16,
                                          .alignment = 8,
@@ -1072,15 +1028,13 @@ type BoolOverlayAndUint8Struct = struct {
                                      }));
 
   auto bool_overlay_struct = test_library.LookupStruct("BoolOverlayStruct");
-  // TODO(https://fxbug.dev/323940291): Padding should be 0. The 7 bytes are part of BoolOverlay.
-  EXPECT_FIELD_SHAPE(bool_overlay_struct->members[0], (ExpectedField{.offset = 0, .padding = 7}));
+  EXPECT_FIELD_SHAPE(bool_overlay_struct->members[0], (ExpectedField{.offset = 0, .padding = 0}));
 
   auto bool_overlay_and_uint8_struct = test_library.LookupStruct("BoolOverlayAndUint8Struct");
   EXPECT_FIELD_SHAPE(bool_overlay_and_uint8_struct->members[0],
                      (ExpectedField{.offset = 0, .padding = 0}));
-  // TODO(https://fxbug.dev/323940291): Should be offset = 16, padding = 7.
   EXPECT_FIELD_SHAPE(bool_overlay_and_uint8_struct->members[1],
-                     (ExpectedField{.offset = 9, .padding = 6}));
+                     (ExpectedField{.offset = 16, .padding = 7}));
 }
 
 TEST(TypeshapeTests, GoodVectors) {
@@ -1603,9 +1557,6 @@ type PaddingCheck = flexible union {
                                   .has_padding = true,
                                   .has_flexible_envelope = true,
                               }));
-  ASSERT_EQ(one_bool->members.size(), 1u);
-  ASSERT_NE(one_bool->members[0].maybe_used, nullptr);
-  EXPECT_FIELD_SHAPE(*one_bool->members[0].maybe_used, (ExpectedField{.padding = 7}));
 
   auto opt_one_bool = test_library.LookupStruct("StructWithOptionalUnionWithOneBool");
   ASSERT_NE(opt_one_bool, nullptr);
@@ -1664,10 +1615,6 @@ type PaddingCheck = flexible union {
                                        .has_padding = true,
                                        .has_flexible_envelope = true,
                                    }));
-  ASSERT_EQ(padding_check->members.size(), 2u);
-  ASSERT_NE(padding_check->members[0].maybe_used, nullptr);
-  EXPECT_FIELD_SHAPE(*padding_check->members[0].maybe_used, (ExpectedField{.padding = 5}));
-  EXPECT_FIELD_SHAPE(*padding_check->members[1].maybe_used, (ExpectedField{.padding = 3}));
 }
 
 TEST(TypeshapeTests, GoodEnvelopeStrictness) {
@@ -2391,8 +2338,7 @@ type Foo = union {
                                    .alignment = 8,
                                    .max_out_of_line = std::numeric_limits<uint32_t>::max(),
                                    .max_handles = 0,
-                                   // TODO(https://fxbug.dev/323940291): depth should be max().
-                                   .depth = 4,
+                                   .depth = std::numeric_limits<uint32_t>::max(),
                                    .has_padding = true,
                                    .has_flexible_envelope = true,
                                }));
@@ -2417,9 +2363,9 @@ type Foo = resource union {
                                    .inline_size = 16,
                                    .alignment = 8,
                                    .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                                   .max_handles = 1,
-                                   // TODO(https://fxbug.dev/323940291): depth should be max().
-                                   .depth = 2,
+                                   // TODO(https://fxbug.dev/323940291): max_handles should be 1.
+                                   .max_handles = std::numeric_limits<uint32_t>::max(),
+                                   .depth = std::numeric_limits<uint32_t>::max(),
                                    .has_padding = true,
                                    .has_flexible_envelope = true,
                                }));
@@ -2440,18 +2386,15 @@ type Foo = resource union {
 
   auto union_foo = library.LookupUnion("Foo");
   ASSERT_NE(union_foo, nullptr);
-  EXPECT_TYPE_SHAPE(union_foo,
-                    (Expected{
-                        .inline_size = 16,
-                        .alignment = 8,
-                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                        // TODO(https://fxbug.dev/323940291): max_handles should be max().
-                        .max_handles = 2,
-                        // TODO(https://fxbug.dev/323940291): depth should be max().
-                        .depth = 2,
-                        .has_padding = true,
-                        .has_flexible_envelope = true,
-                    }));
+  EXPECT_TYPE_SHAPE(union_foo, (Expected{
+                                   .inline_size = 16,
+                                   .alignment = 8,
+                                   .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                   .max_handles = std::numeric_limits<uint32_t>::max(),
+                                   .depth = std::numeric_limits<uint32_t>::max(),
+                                   .has_padding = true,
+                                   .has_flexible_envelope = true,
+                               }));
 }
 
 TEST(TypeshapeTests, GoodRecursionHandlesUnboundedInCycle) {
@@ -2471,48 +2414,39 @@ type Foo = resource union {
 
   auto union_foo = library.LookupUnion("Foo");
   ASSERT_NE(union_foo, nullptr);
-  EXPECT_TYPE_SHAPE(union_foo,
-                    (Expected{
-                        .inline_size = 16,
-                        .alignment = 8,
-                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                        // TODO(https://fxbug.dev/323940291): max_handles should be max().
-                        .max_handles = 1,
-                        // TODO(https://fxbug.dev/323940291): depth should be max().
-                        .depth = 4,
-                        .has_padding = true,
-                        .has_flexible_envelope = true,
-                    }));
+  EXPECT_TYPE_SHAPE(union_foo, (Expected{
+                                   .inline_size = 16,
+                                   .alignment = 8,
+                                   .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                   .max_handles = std::numeric_limits<uint32_t>::max(),
+                                   .depth = std::numeric_limits<uint32_t>::max(),
+                                   .has_padding = true,
+                                   .has_flexible_envelope = true,
+                               }));
 
   auto table_bar = library.LookupTable("Bar");
   ASSERT_NE(table_bar, nullptr);
-  EXPECT_TYPE_SHAPE(table_bar,
-                    (Expected{
-                        .inline_size = 16,
-                        .alignment = 8,
-                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                        // TODO(https://fxbug.dev/323940291): max_handles should be max().
-                        .max_handles = 2,
-                        // TODO(https://fxbug.dev/323940291): depth should be max().
-                        .depth = 5,
-                        .has_padding = true,
-                        .has_flexible_envelope = true,
-                    }));
+  EXPECT_TYPE_SHAPE(table_bar, (Expected{
+                                   .inline_size = 16,
+                                   .alignment = 8,
+                                   .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                   .max_handles = std::numeric_limits<uint32_t>::max(),
+                                   .depth = std::numeric_limits<uint32_t>::max(),
+                                   .has_padding = true,
+                                   .has_flexible_envelope = true,
+                               }));
 
   auto struct_baz = library.LookupStruct("Baz");
   ASSERT_NE(struct_baz, nullptr);
-  EXPECT_TYPE_SHAPE(struct_baz,
-                    (Expected{
-                        .inline_size = 16,
-                        .alignment = 8,
-                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                        // TODO(https://fxbug.dev/323940291): max_handles should be max().
-                        .max_handles = 1,
-                        // TODO(https://fxbug.dev/323940291): depth should be max().
-                        .depth = 3,
-                        .has_padding = true,
-                        .has_flexible_envelope = true,
-                    }));
+  EXPECT_TYPE_SHAPE(struct_baz, (Expected{
+                                    .inline_size = 16,
+                                    .alignment = 8,
+                                    .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                    .max_handles = std::numeric_limits<uint32_t>::max(),
+                                    .depth = std::numeric_limits<uint32_t>::max(),
+                                    .has_padding = true,
+                                    .has_flexible_envelope = true,
+                                }));
 }
 
 TEST(TypeshapeTests, GoodStructTwoDeep) {
@@ -2809,6 +2743,30 @@ type A = resource struct {
                                   .depth = 1,
                                   .has_padding = true,
                               }));
+}
+
+// TODO(https://fxbug.dev/323940291): Enable this. Currently can't report the
+// error because there is no SourceSpan to use.
+TEST(TypeShapeTests, DISABLED_BadIntegerOverflowArray) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0207.test.fidl");
+  library.ExpectFail(ErrTypeShapeIntegerOverflow, 536870912, '*', 8);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(TypeShapeTests, BadIntegerOverflowStruct) {
+  TestLibrary library(R"FIDL(
+library example;
+type Foo = struct {
+    big array<uint8, 2147483648>; // 2^31
+};
+type Bar = struct {
+    f1 Foo;
+    f2 Foo;
+};
+)FIDL");
+  library.ExpectFail(ErrTypeShapeIntegerOverflow, 2147483648, '+', 2147483648);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace

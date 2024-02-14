@@ -929,7 +929,7 @@ struct IsFidlType<::test_anonymous::OverrideTest> : public std::true_type {};
 template <>
 struct TypeTraits<::test_anonymous::OverrideTest> {
   static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 6;
+  static constexpr uint32_t kMaxDepth = 4294967295;
   static constexpr uint32_t kPrimarySize = 40;
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
   static constexpr bool kHasPointer = true;
@@ -1005,7 +1005,7 @@ struct IsFidlType<::test_anonymous::FunctionApplication> : public std::true_type
 template <>
 struct TypeTraits<::test_anonymous::FunctionApplication> {
   static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 8;
+  static constexpr uint32_t kMaxDepth = 4294967295;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
   static constexpr bool kHasPointer = true;
@@ -1041,7 +1041,7 @@ struct IsFidlType<::test_anonymous::Expression> : public std::true_type {};
 template <>
 struct TypeTraits<::test_anonymous::Expression> {
   static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 6;
+  static constexpr uint32_t kMaxDepth = 4294967295;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
   static constexpr bool kHasPointer = true;

@@ -963,7 +963,7 @@ struct internal::WireCodingTraits<::test_anonymous::wire::SomeProtocolSomeMethod
 template <>
 struct TypeTraits<::test_anonymous::wire::OverrideTest> {
   static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 6;
+  static constexpr uint32_t kMaxDepth = 4294967295;
   static constexpr uint32_t kPrimarySize = 40;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
@@ -1161,7 +1161,7 @@ struct ::fidl::internal::WireCodingTraits<::test_anonymous::wire::SomeProtocolSo
 template <>
 struct TypeTraits<::test_anonymous::wire::FunctionApplication> {
   static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 8;
+  static constexpr uint32_t kMaxDepth = 4294967295;
   static constexpr uint32_t kPrimarySize = 16;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
@@ -1359,7 +1359,7 @@ struct ::fidl::internal::WireCodingTraits<::test_anonymous::wire::TableMember, :
 template <>
 struct TypeTraits<::test_anonymous::wire::Expression> {
   static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 6;
+  static constexpr uint32_t kMaxDepth = 4294967295;
   static constexpr uint32_t kPrimarySize = 16;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 4294967295;

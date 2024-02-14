@@ -17,6 +17,7 @@
 #include "tools/fidl/fidlc/src/names.h"
 #include "tools/fidl/fidlc/src/resolve_step.h"
 #include "tools/fidl/fidlc/src/sort_step.h"
+#include "tools/fidl/fidlc/src/type_shape_step.h"
 #include "tools/fidl/fidlc/src/verify_steps.h"
 
 namespace fidlc {
@@ -28,7 +29,8 @@ Compiler::Compiler(Libraries* all_libraries, const VersionSelection* version_sel
       all_libraries_(all_libraries),
       version_selection(version_selection),
       method_hasher_(std::move(method_hasher)),
-      experimental_flags_(experimental_flags) {}
+      experimental_flags_(experimental_flags),
+      typespace_start_index_(all_libraries->typespace()->types().size()) {}
 
 bool Compiler::ConsumeFile(std::unique_ptr<File> file) {
   return ConsumeStep(this, std::move(file)).Run();
@@ -44,6 +46,8 @@ bool Compiler::Compile() {
   if (!CompileStep(this).Run())
     return false;
   if (!SortStep(this).Run())
+    return false;
+  if (!TypeShapeStep(this).Run())
     return false;
   if (!VerifyResourcenessStep(this).Run())
     return false;
@@ -72,6 +76,12 @@ bool Compiler::Step::Run() {
 }
 
 Typespace* Compiler::Step::typespace() { return compiler_->all_libraries_->typespace(); }
+
+cpp20::span<const std::unique_ptr<Type>> Compiler::Step::created_types() {
+  auto& types = typespace()->types();
+  auto start = static_cast<ssize_t>(compiler_->typespace_start_index_);
+  return cpp20::span(types.begin() + start, types.end());
+}
 
 VirtualSourceFile* Compiler::Step::generated_source_file() {
   return compiler_->all_libraries_->generated_source_file();

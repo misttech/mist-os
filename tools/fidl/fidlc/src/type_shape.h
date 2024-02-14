@@ -9,76 +9,36 @@
 
 namespace fidlc {
 
-struct Object;
-struct StructMember;
-struct TableMemberUsed;
-struct UnionMemberUsed;
-struct OverlayMemberUsed;
-
-enum class WireFormat : uint8_t {
-  kV2,  // The v2 wire format, using efficient envelopes. Request and response structs do not
-        // receive any special treatment (e.g. having their size increased by 16 for the
-        // transactional header).
-};
-
+// A type shape describes the wire layout of a type.
+// Apart from has_flexible_envelope, it does not take unknown envelopes into account.
+// For example, an empty table has max_handles=0 even though unknown envelopes can have handles.
 struct TypeShape {
-  TypeShape(const Object& object, WireFormat wire_format);
-  TypeShape(const Object* object, WireFormat wire_format);
-
-  // The inline size of this type, including padding for the type's minimum alignment. For example,
-  // "struct S { uint32 a; uint16 b; };" will have an inline_size of 8, not 6: the "packed" size of
-  // the struct is 6, but the alignment of its largest member is 4, so 6 is rounded up to 8.
-  uint32_t inline_size;
-
-  // The minimum alignment required by this type.
-  uint32_t alignment;
-
-  // These values are calculated incorporating both the current TypeShape, and recursively over
-  // all child fields. A value of std::numeric_limits<uint32_t>::max() means that the value is
-  // potentially unbounded, which can happen for self-recursive aggregate objects. For flexible
-  // types, these values is calculated based on the currently-defined members, and does _not_ take
-  // potential future members into account.
-  uint32_t depth;
-  uint32_t max_handles;
-  uint32_t max_out_of_line;
-
-  // |has_padding| is true if this type has _either_ inline or out-of-line padding. For flexible
-  // types, |has_padding| is calculated based on the currently-defined members, and does _not_ take
-  // potential future members into account. (If it did, |has_padding| would have to be true for all
-  // flexible types, which doesn't make it very useful.)
-  bool has_padding;
-
-  bool has_flexible_envelope;
-
-  // This is a named constructor for the specific case of generating a type
-  // shape to represent a method interaction kind (that is, request or response)
-  // with no payload body.
-  static TypeShape ForEmptyPayload();
-
- private:
-  TypeShape(uint32_t inline_size, uint32_t alignment)
-      : inline_size(inline_size),
-        alignment(alignment),
-        depth(0),
-        max_handles(0),
-        max_out_of_line(0),
-        has_padding(false),
-        has_flexible_envelope(false) {}
+  // Inline size of the type in bytes. Always a multiple of the alignment.
+  uint32_t inline_size = 0;
+  // Alignment of the type in bytes.
+  uint32_t alignment = 1;
+  // Maximum depth, or UINT32_MAX if unbounded.
+  // Each pointer or envelope (even if inline) increments the depth.
+  uint32_t depth = 0;
+  // Maximum number of handles, or UINT32_MAX if unbounded.
+  uint32_t max_handles = 0;
+  // Maximum out-of-line size in bytes (always a multiple of 8), or UINT32_MAX if unbounded.
+  uint32_t max_out_of_line = 0;
+  // True if the type has inline or out-of-line padding.
+  bool has_padding = false;
+  // True if the type may contain an unknown envelope, i.e. contains a table or flexible union.
+  bool has_flexible_envelope = false;
 };
 
-// |FieldShape| describes the offset and padding information for members that are contained within
-// an aggregate type (e.g. struct/union).
+// A field shape describes the wire layout of a field within a struct.
+// The struct's inline_size is equal to its last field's offset + inline_size + padding.
 struct FieldShape {
-  FieldShape(const StructMember&, WireFormat wire_format);
-  FieldShape(const TableMemberUsed&, WireFormat wire_format);
-  FieldShape(const UnionMemberUsed&, WireFormat wire_format);
-  FieldShape(const OverlayMemberUsed&, WireFormat wire_format);
-
+  // Offset from the start of the struct in bytes.
   uint32_t offset = 0;
+  // Padding after the field's inline size in bytes, to align the next field.
+  // For the last field, this pads the struct to be a multiple of its alignment.
   uint32_t padding = 0;
 };
-
-constexpr uint32_t kMessageAlign = 8u;
 
 }  // namespace fidlc
 

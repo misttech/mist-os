@@ -7,13 +7,12 @@
 
 #include <zircon/assert.h>
 
-#include <any>
 #include <utility>
 
 #include "tools/fidl/fidlc/src/constraints.h"
 #include "tools/fidl/fidlc/src/name.h"
-#include "tools/fidl/fidlc/src/object.h"
 #include "tools/fidl/fidlc/src/properties.h"
+#include "tools/fidl/fidlc/src/type_shape.h"
 #include "tools/fidl/fidlc/src/values.h"
 
 namespace fidlc {
@@ -27,7 +26,7 @@ struct Struct;
 struct TypeConstraints;
 struct TypeDecl;
 
-struct Type : public Object {
+struct Type {
   enum class Kind : uint8_t {
     kArray,
     kBox,
@@ -43,9 +42,15 @@ struct Type : public Object {
   };
 
   Type(Name name, Kind kind) : name(std::move(name)), kind(kind) {}
+  virtual ~Type() = default;
 
   const Name name;
   const Kind kind;
+
+  // Set during the TypeShapeStep.
+  // TODO(https://fxbug.dev/323940291): Remove mutable.
+  mutable std::optional<TypeShape> type_shape;
+  mutable bool type_shape_compiling = false;
 
   virtual bool IsNullable() const { return false; }
 
@@ -133,8 +138,6 @@ struct ArrayType final : public Type, public ArrayConstraints {
   const Type* element_type;
   const SizeValue* element_count;
 
-  std::any AcceptAny(VisitorAny* visitor) const override;
-
   Comparison Compare(const Type& other) const override {
     const auto& o = static_cast<const ArrayType&>(other);
     return Type::Compare(o)
@@ -175,8 +178,6 @@ struct VectorType final : public Type, public VectorConstraints {
 
   bool IsNullable() const override { return nullability == Nullability::kNullable; }
 
-  std::any AcceptAny(VisitorAny* visitor) const override;
-
   Comparison Compare(const Type& other) const override {
     const auto& o = static_cast<const VectorType&>(other);
     return Type::Compare(o)
@@ -200,8 +201,6 @@ struct StringType final : public Type, public VectorConstraints {
   uint32_t MaxSize() const { return size ? size->value : SizeValue::Max().value; }
 
   bool IsNullable() const override { return nullability == Nullability::kNullable; }
-
-  std::any AcceptAny(VisitorAny* visitor) const override;
 
   Comparison Compare(const Type& other) const override {
     const auto& o = static_cast<const StringType&>(other);
@@ -233,8 +232,6 @@ struct HandleType final : public Type, HandleConstraints {
 
   bool IsNullable() const override { return nullability == Nullability::kNullable; }
 
-  std::any AcceptAny(VisitorAny* visitor) const override;
-
   Comparison Compare(const Type& other) const override {
     const auto& other_handle_type = *static_cast<const HandleType*>(&other);
     auto rights_val = static_cast<const NumericConstantValue<RightsWrappedType>*>(rights);
@@ -264,8 +261,6 @@ struct PrimitiveType final : public Type, public RejectOptionalConstraints {
 
   PrimitiveSubtype subtype;
 
-  std::any AcceptAny(VisitorAny* visitor) const override;
-
   Comparison Compare(const Type& other) const override {
     const auto& o = static_cast<const PrimitiveType&>(other);
     return Type::Compare(o).Compare(subtype, o.subtype);
@@ -276,7 +271,6 @@ struct PrimitiveType final : public Type, public RejectOptionalConstraints {
                         std::unique_ptr<Type>* out_type,
                         LayoutInvocation* out_params) const override;
 
- private:
   static uint32_t SubtypeSize(PrimitiveSubtype subtype);
 };
 
@@ -289,8 +283,6 @@ struct InternalType final : public Type, public Constraints<> {
       : Type(name, Kind::kInternal), subtype(subtype) {}
 
   InternalSubtype subtype;
-
-  std::any AcceptAny(VisitorAny* visitor) const override;
 
   Comparison Compare(const Type& other) const override {
     const auto& o = static_cast<const InternalType&>(other);
@@ -315,8 +307,6 @@ struct IdentifierType final : public Type, public Constraints<ConstraintKind::kN
   TypeDecl* type_decl;
 
   bool IsNullable() const override { return nullability == Nullability::kNullable; }
-
-  std::any AcceptAny(VisitorAny* visitor) const override;
 
   Comparison Compare(const Type& other) const override {
     const auto& o = static_cast<const IdentifierType&>(other);
@@ -359,10 +349,9 @@ struct TransportSideType final : public Type, public TransportSideConstraints {
   bool IsNullable() const override { return nullability == Nullability::kNullable; }
 
   const TransportSide end;
-  // TODO(https://fxbug.dev/42134495): Eventually, this will need to point to a transport declaration.
+  // TODO(https://fxbug.dev/42134495): Eventually, this will need to point to a transport
+  // declaration.
   const std::string_view protocol_transport;
-
-  std::any AcceptAny(VisitorAny* visitor) const override;
 
   Comparison Compare(const Type& other) const override {
     const auto& o = static_cast<const TransportSideType&>(other);
@@ -398,8 +387,6 @@ struct BoxType final : public Type, public BoxConstraints {
   // All boxes are implicitly nullable.
   bool IsNullable() const override { return true; }
 
-  std::any AcceptAny(VisitorAny* visitor) const override;
-
   Comparison Compare(const Type& other) const override {
     const auto& o = static_cast<const BoxType&>(other);
     return Type::Compare(o).Compare(name, o.name).Compare(boxed_type, o.boxed_type);
@@ -415,7 +402,6 @@ struct UntypedNumericType final : public Type, public Constraints<> {
   using Constraints = Constraints<>;
 
   explicit UntypedNumericType(const Name& name) : Type(name, Kind::kUntypedNumeric) {}
-  std::any AcceptAny(VisitorAny* visitor) const override;
   bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
                         const TypeConstraints& constraints, const Reference& layout,
                         std::unique_ptr<Type>* out_type,
@@ -429,8 +415,6 @@ struct ZxExperimentalPointerType final : public Type, public Constraints<> {
       : Type(name, Kind::kZxExperimentalPointer), pointee_type(pointee_type) {}
 
   const Type* pointee_type;
-
-  std::any AcceptAny(VisitorAny* visitor) const override;
 
   Comparison Compare(const Type& other) const override {
     const auto& o = static_cast<const ZxExperimentalPointerType&>(other);

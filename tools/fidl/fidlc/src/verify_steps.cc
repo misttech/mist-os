@@ -367,7 +367,7 @@ void VerifyInlineSizeStep::RunImpl() {
   // This limit exists so that coding tables can use uint16_t for sizes.
   auto limit = std::numeric_limits<uint16_t>::max();
   for (auto& struct_decl : library()->declarations.structs) {
-    auto inline_size = struct_decl->typeshape(WireFormat::kV2).inline_size;
+    auto inline_size = struct_decl->type_shape.value().inline_size;
     if (inline_size > limit) {
       reporter()->Fail(ErrInlineSizeExceedsLimit, struct_decl->name.span().value(),
                        struct_decl->name, inline_size, limit);

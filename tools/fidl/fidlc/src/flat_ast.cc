@@ -8,7 +8,6 @@
 
 #include "tools/fidl/fidlc/src/diagnostics.h"
 #include "tools/fidl/fidlc/src/reporter.h"
-#include "tools/fidl/fidlc/src/visitor.h"
 
 namespace fidlc {
 
@@ -194,22 +193,6 @@ bool Builtin::IsInternal() const {
     case Identity::kFrameworkErr:
       return true;
   }
-}
-
-FieldShape Struct::Member::fieldshape(WireFormat wire_format) const {
-  return FieldShape(*this, wire_format);
-}
-
-FieldShape Table::Member::Used::fieldshape(WireFormat wire_format) const {
-  return FieldShape(*this, wire_format);
-}
-
-FieldShape Union::Member::Used::fieldshape(WireFormat wire_format) const {
-  return FieldShape(*this, wire_format);
-}
-
-FieldShape Overlay::Member::Used::fieldshape(WireFormat wire_format) const {
-  return FieldShape(*this, wire_format);
 }
 
 std::vector<std::reference_wrapper<const Union::Member>> Union::MembersSortedByUnionOrdinal()
@@ -688,25 +671,6 @@ Protocol::ComposedProtocol Protocol::ComposedProtocol::Clone() const {
 
 Resource::Property Resource::Property::Clone() const {
   return Property(type_ctor->Clone(), name, attributes->Clone());
-}
-
-std::any Bits::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any Enum::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any NewType::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any Protocol::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any Service::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any Struct::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any Struct::Member::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any Table::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any Table::Member::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any Table::Member::Used::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any Union::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any Union::Member::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any Union::Member::Used::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any Overlay::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any Overlay::Member::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any Overlay::Member::Used::AcceptAny(VisitorAny* visitor) const {
-  return visitor->Visit(*this);
 }
 
 }  // namespace fidlc

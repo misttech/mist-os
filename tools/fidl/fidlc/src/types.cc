@@ -9,7 +9,6 @@
 #include "tools/fidl/fidlc/src/diagnostics.h"
 #include "tools/fidl/fidlc/src/flat_ast.h"
 #include "tools/fidl/fidlc/src/type_resolver.h"
-#include "tools/fidl/fidlc/src/visitor.h"
 
 namespace fidlc {
 
@@ -389,23 +388,6 @@ Resourceness Type::Resourceness() const {
     case Decl::Kind::kAlias:
       ZX_PANIC("unexpected kind");
   }
-}
-
-std::any ArrayType::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any BoxType::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any HandleType::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any IdentifierType::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any PrimitiveType::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any InternalType::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any StringType::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any TransportSideType::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any VectorType::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
-std::any ZxExperimentalPointerType::AcceptAny(VisitorAny* visitor) const {
-  return visitor->Visit(*this);
-}
-
-std::any UntypedNumericType::AcceptAny(VisitorAny* visitor) const {
-  ZX_PANIC("should not have untyped numeric here");
 }
 
 }  // namespace fidlc

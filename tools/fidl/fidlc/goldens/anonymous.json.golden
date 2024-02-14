@@ -450,7 +450,7 @@
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
-              "depth": 6,
+              "depth": 4294967295,
               "max_handles": 0,
               "max_out_of_line": 4294967295,
               "has_padding": true,
@@ -477,7 +477,7 @@
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
-              "depth": 6,
+              "depth": 4294967295,
               "max_handles": 0,
               "max_out_of_line": 4294967295,
               "has_padding": true,
@@ -502,7 +502,7 @@
       "type_shape_v2": {
         "inline_size": 40,
         "alignment": 8,
-        "depth": 6,
+        "depth": 4294967295,
         "max_handles": 0,
         "max_out_of_line": 4294967295,
         "has_padding": true,
@@ -775,7 +775,7 @@
               "type_shape_v2": {
                 "inline_size": 16,
                 "alignment": 8,
-                "depth": 5,
+                "depth": 4294967295,
                 "max_handles": 0,
                 "max_out_of_line": 4294967295,
                 "has_padding": true,
@@ -787,7 +787,7 @@
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
-              "depth": 6,
+              "depth": 4294967295,
               "max_handles": 0,
               "max_out_of_line": 4294967295,
               "has_padding": true,
@@ -833,7 +833,7 @@
       "type_shape_v2": {
         "inline_size": 16,
         "alignment": 8,
-        "depth": 8,
+        "depth": 4294967295,
         "max_handles": 0,
         "max_out_of_line": 4294967295,
         "has_padding": true,
@@ -978,7 +978,7 @@
             "type_shape_v2": {
               "inline_size": 40,
               "alignment": 8,
-              "depth": 5,
+              "depth": 4294967295,
               "max_handles": 0,
               "max_out_of_line": 4294967295,
               "has_padding": true,
@@ -1003,7 +1003,7 @@
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
-              "depth": 5,
+              "depth": 4294967295,
               "max_handles": 0,
               "max_out_of_line": 4294967295,
               "has_padding": true,
@@ -1024,7 +1024,7 @@
       "type_shape_v2": {
         "inline_size": 16,
         "alignment": 8,
-        "depth": 6,
+        "depth": 4294967295,
         "max_handles": 0,
         "max_out_of_line": 4294967295,
         "has_padding": true,
