@@ -494,6 +494,33 @@ impl FileOps for DevPtsFile {
     }
 }
 
+fn into_termios(value: uapi::termio) -> uapi::termios {
+    let mut cc = [0; 19];
+    cc[0..8].copy_from_slice(&value.c_cc[0..8]);
+    uapi::termios {
+        c_iflag: value.c_iflag as uapi::tcflag_t,
+        c_oflag: value.c_oflag as uapi::tcflag_t,
+        c_cflag: value.c_cflag as uapi::tcflag_t,
+        c_lflag: value.c_lflag as uapi::tcflag_t,
+        c_line: value.c_line as uapi::cc_t,
+        c_cc: cc,
+    }
+}
+
+fn into_termio(value: uapi::termios) -> uapi::termio {
+    let mut cc = [0; 8];
+    cc.copy_from_slice(&value.c_cc[0..8]);
+    uapi::termio {
+        c_iflag: value.c_iflag as u16,
+        c_oflag: value.c_oflag as u16,
+        c_cflag: value.c_cflag as u16,
+        c_lflag: value.c_lflag as u16,
+        c_line: value.c_line,
+        c_cc: cc,
+        ..Default::default()
+    }
+}
+
 /// The ioctl behaviour common to main and replica terminal file descriptors.
 fn shared_ioctl<L>(
     locked: &mut Locked<'_, L>,
@@ -580,21 +607,7 @@ where
             Ok(SUCCESS)
         }
         TCGETA => {
-            let termio = {
-                let terminal_state = terminal.read();
-                let termios = terminal_state.termios();
-                let mut cc = [0; 8];
-                cc.copy_from_slice(&termios.c_cc[0..8]);
-                uapi::termio {
-                    c_iflag: termios.c_iflag as u16,
-                    c_oflag: termios.c_oflag as u16,
-                    c_cflag: termios.c_cflag as u16,
-                    c_lflag: termios.c_lflag as u16,
-                    c_line: termios.c_line,
-                    c_cc: cc,
-                    __bindgen_padding_0: 0,
-                }
-            };
+            let termio = into_termio(*terminal.read().termios());
             current_task.write_object(UserRef::<uapi::termio>::new(user_addr), &termio)?;
             Ok(SUCCESS)
         }
@@ -607,6 +620,11 @@ where
             )?;
             Ok(SUCCESS)
         }
+        TCSETA => {
+            let termio = current_task.read_object(UserRef::<uapi::termio>::new(user_addr))?;
+            terminal.set_termios(locked, into_termios(termio));
+            Ok(SUCCESS)
+        }
         TCSETS => {
             // N.B. TCSETS on the main terminal actually affects the configuration of the replica
             // end.
@@ -614,10 +632,22 @@ where
             terminal.set_termios(locked, termios);
             Ok(SUCCESS)
         }
+        TCSETAF => {
+            // This should drain the output queue and discard the pending input first.
+            let termio = current_task.read_object(UserRef::<uapi::termio>::new(user_addr))?;
+            terminal.set_termios(locked, into_termios(termio));
+            Ok(SUCCESS)
+        }
         TCSETSF => {
             // This should drain the output queue and discard the pending input first.
             let termios = current_task.read_object(UserRef::<uapi::termios>::new(user_addr))?;
             terminal.set_termios(locked, termios);
+            Ok(SUCCESS)
+        }
+        TCSETAW => {
+            track_stub!(TODO("https://fxbug.dev/322873281"), "TCSETAW drain output queue first");
+            let termio = current_task.read_object(UserRef::<uapi::termio>::new(user_addr))?;
+            terminal.set_termios(locked, into_termios(termio));
             Ok(SUCCESS)
         }
         TCSETSW => {
@@ -633,18 +663,6 @@ where
                 is_main
             );
             error!(EINVAL)
-        }
-        TCSETA => {
-            track_stub!(TODO("https://fxbug.dev/322893186"), "devpts ioctl TCSETA", is_main);
-            error!(ENOSYS)
-        }
-        TCSETAW => {
-            track_stub!(TODO("https://fxbug.dev/322893291"), "devpts ioctl TCSETAW", is_main);
-            error!(ENOSYS)
-        }
-        TCSETAF => {
-            track_stub!(TODO("https://fxbug.dev/322893468"), "devpts ioctl TCSETAF", is_main);
-            error!(ENOSYS)
         }
         TCSBRK => {
             track_stub!(TODO("https://fxbug.dev/322893658"), "devpts ioctl TCSBRK", is_main);
