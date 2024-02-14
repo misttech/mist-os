@@ -731,9 +731,7 @@ fn wait_on_pid(
                         }
                     },
                 );
-                if has_waitable_tracee
-                    || thread_group.zombie_ptracees.iter().any(|p| selector.do_match(p.pid, &pids))
-                {
+                if has_waitable_tracee || thread_group.zombie_ptracees.has_match(&selector, &pids) {
                     continue;
                 }
                 match thread_group.get_waitable_child(selector, options, &mut pids) {

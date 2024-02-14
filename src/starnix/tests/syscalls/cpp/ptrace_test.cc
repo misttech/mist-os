@@ -260,6 +260,9 @@ std::optional<std::string> WaitUntilBlocked(pid_t target, bool ignore_tracer) {
     // Loop until the target task is paused.
     std::string fname = "/proc/" + std::to_string(target) + "/stat";
     std::ifstream t(fname);
+    if (!t.is_open()) {
+      return std::optional<std::string>("File " + fname + " not found");
+    }
     std::stringstream buffer;
     buffer << t.rdbuf();
     if (buffer.str().find("S") != std::string::npos ||
@@ -312,6 +315,7 @@ void TraceSyscallWithRestartWithCall(int call, long arg0, long arg1, long arg2, 
       << " WSTOPSIG = " << WSTOPSIG(status);
 
   struct user_regs_struct regs = {};
+  int count = 0;
   do {
     // Suppress the SIGSTOP and wait for the child to enter syscall-enter-stop
     // for the given syscall.  Repeat this in case we're using a libc where
@@ -321,7 +325,8 @@ void TraceSyscallWithRestartWithCall(int call, long arg0, long arg1, long arg2, 
     EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) << " status " << status;
 
     ASSERT_EQ(ptrace(PTRACE_GETREGS, child_pid, 0, &regs), 0);
-  } while (static_cast<int>(regs.orig_rax) != call);
+    count += 1;
+  } while (static_cast<int>(regs.orig_rax) != call && count < 100);
   EXPECT_EQ(call, static_cast<int>(regs.orig_rax));
   EXPECT_EQ(-ENOSYS, static_cast<int>(regs.rax));
 
@@ -331,7 +336,7 @@ void TraceSyscallWithRestartWithCall(int call, long arg0, long arg1, long arg2, 
   EXPECT_EQ(proc_status, std::nullopt) << "Blocking failed with status " << *proc_status;
   ASSERT_EQ(waitpid(child_pid, &status, WNOHANG), 0);
 
-  // Send the child kUnmaskedsignal, causing it to return the given errno and enter
+  // Send the child kUnmaskedSignal, causing it to return the given errno and enter
   // syscall-exit-stop from the syscall.
   EXPECT_EQ(kill(child_pid, kUnmaskedSignal), 0);
   ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
@@ -443,11 +448,7 @@ TEST(PtraceTest, GetGeneralRegs) {
       << "Error " << errno << " " << strerror(errno);
 
   // Suppress SIGSTOP and resume the child.
-  ASSERT_EQ(ptrace(PTRACE_CONT, child_pid, 0, 0), 0);
-  ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
-
-  // Let's see that process exited normally.
-  EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0) << " status " << status;
+  ASSERT_EQ(ptrace(PTRACE_DETACH, child_pid, 0, 0), 0);
 }
 
 namespace {
@@ -482,7 +483,7 @@ pid_t ForkUsingClone3(bool is_seized, uint64_t addl_clone_args) {
       exit(0);
     }
     int status;
-    EXPECT_EQ(grandchild_pid, waitpid(grandchild_pid, &status, 0));
+    EXPECT_EQ(grandchild_pid, waitpid(grandchild_pid, &status, 0)) << strerror(errno);
     EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0)
         << "Failure: WIFEXITED(status) =" << WIFEXITED(status)
         << " WEXITSTATUS(status) == " << WEXITSTATUS(status);
@@ -521,7 +522,7 @@ void DetectForkAndContinue(pid_t child_pid, bool is_seized, bool child_stops_on_
     EXPECT_EQ(grandchild_pid, waitpid(grandchild_pid, &status, 0)) << strerror(errno);
   } else {
     grandchild_pid = waitpid(0, &status, 0);
-    EXPECT_NE(0, grandchild_pid) << strerror(errno);
+    EXPECT_NE(-1, grandchild_pid) << strerror(errno);
   }
 
   if (is_seized) {

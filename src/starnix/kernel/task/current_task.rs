@@ -168,6 +168,12 @@ impl Releasable for CurrentTask {
     fn release<'a>(self, locked: &'a mut Locked<'a, TaskRelease>) {
         self.notify_robust_list();
         let _ignored = self.clear_child_tid_if_needed();
+
+        // We remove from the thread group here because the WeakRef in the pid
+        // table to this task must be valid until this task is removed from the
+        // thread group, but self.task.release() below invalidates it.
+        self.thread_group.remove(locked, &self);
+
         let context = (self.thread_state, locked);
         self.task.release(context);
     }

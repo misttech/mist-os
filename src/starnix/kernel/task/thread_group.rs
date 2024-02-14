@@ -15,7 +15,7 @@ use crate::{
         ControllingTerminal, CurrentTask, ExitStatus, Kernel, PidTable, ProcessGroup,
         PtraceAllowedPtracers, PtraceEvent, PtraceOptions, PtraceStatus, Session, StopState, Task,
         TaskMutableState, TaskPersistentInfo, TaskPersistentInfoState, TimerId, TimerTable,
-        WaitQueue,
+        WaitQueue, ZombiePtraces,
     },
     time::utc,
 };
@@ -76,8 +76,14 @@ pub struct ThreadGroupMutableState {
     /// Child tasks that have exited, but not yet been waited for.
     pub zombie_children: Vec<OwnedRef<ZombieProcess>>,
 
-    /// ptracees that have exited, but not yet been waited for.
-    pub zombie_ptracees: Vec<OwnedRef<ZombieProcess>>,
+    /// ptracees of this process that have exited, but not yet been waited for.
+    pub zombie_ptracees: ZombiePtraces,
+
+    // Child tasks that have exited, but the zombie ptrace needs to be consumed
+    // before they can be waited for.  (pid_t, pid_t) is the original tracer and
+    // tracee, so the tracer can be updated with a reaper if this thread group
+    // exits.
+    pub deferred_zombie_ptracers: Vec<(pid_t, pid_t)>,
 
     /// WaitQueue for updates to the WaitResults of tasks in this group.
     pub child_status_waiters: WaitQueue,
@@ -282,6 +288,31 @@ pub struct ZombieProcess {
     pub is_canonical: bool,
 }
 
+impl PartialEq for ZombieProcess {
+    fn eq(&self, other: &Self) -> bool {
+        // We assume only one set of ZombieProcess data per process, so this should cover it.
+        self.pid == other.pid
+            && self.pgid == other.pgid
+            && self.uid == other.uid
+            && self.is_canonical == other.is_canonical
+    }
+}
+
+impl Eq for ZombieProcess {}
+
+impl PartialOrd for ZombieProcess {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        // pid by itself seems good enough.
+        self.pid.partial_cmp(&other.pid)
+    }
+}
+
+impl Ord for ZombieProcess {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.pid.cmp(&other.pid)
+    }
+}
+
 impl ZombieProcess {
     pub fn new(
         thread_group: ThreadGroupStateRef<'_>,
@@ -305,6 +336,17 @@ impl ZombieProcess {
             uid: self.uid,
             exit_info: self.exit_info.clone(),
             time_stats: self.time_stats,
+        }
+    }
+
+    pub fn copy_for_key(&self) -> Self {
+        ZombieProcess {
+            pid: self.pid,
+            pgid: self.pgid,
+            uid: self.uid,
+            exit_info: self.exit_info.clone(),
+            time_stats: self.time_stats,
+            is_canonical: false,
         }
     }
 }
@@ -357,7 +399,8 @@ impl ThreadGroup {
                 tasks: BTreeMap::new(),
                 children: BTreeMap::new(),
                 zombie_children: vec![],
-                zombie_ptracees: vec![],
+                zombie_ptracees: ZombiePtraces::new(),
+                deferred_zombie_ptracers: vec![],
                 child_status_waiters: WaitQueue::default(),
                 is_child_subreaper: false,
                 process_group: Arc::clone(&process_group),
@@ -415,9 +458,7 @@ impl ThreadGroup {
         state.terminating = true;
 
         // Drop ptrace zombies
-        for zombie in state.zombie_ptracees.drain(..) {
-            zombie.release(&mut pids);
-        }
+        state.zombie_ptracees.release(&mut pids);
 
         // Interrupt each task. Unlock the group because send_signal will lock the group in order
         // to call set_stopped.
@@ -456,7 +497,6 @@ impl ThreadGroup {
         let mut pids = self.kernel.pids.write();
         let mut state = self.write();
 
-        pids.remove_task(task.id);
         let persistent_info: TaskPersistentInfo =
             if let Some(container) = state.tasks.remove(&task.id) {
                 container.into()
@@ -508,8 +548,8 @@ impl ThreadGroup {
 
             {
                 // Reparent the children.
-                if let Some(reaper) = reaper {
-                    let mut reaper = reaper.write();
+                if let Some(reaper_ref) = reaper {
+                    let mut reaper = reaper_ref.write();
                     let mut state = self.write();
                     for (_pid, child) in std::mem::take(&mut state.children) {
                         if let Some(child) = child.upgrade() {
@@ -518,6 +558,9 @@ impl ThreadGroup {
                         }
                     }
                     reaper.zombie_children.append(&mut state.zombie_children);
+                    drop(state);
+                    drop(reaper);
+                    ZombiePtraces::reparent(&pids, self, &reaper_ref);
                 } else {
                     // If we don't have a reaper then just drop the zombies.
                     let mut state = self.write();
@@ -528,22 +571,25 @@ impl ThreadGroup {
             }
 
             if let Some(ref parent) = parent {
-                let mut parent = parent.write();
+                let mut tracer_pid = None;
+                if let Some(ref ptrace) = &task.read().ptrace {
+                    tracer_pid = Some(ptrace.get_pid());
+                }
 
-                parent.children.remove(&self.leader);
-
-                // Send signals
-                if let Some(exit_signal) = zombie.exit_info.exit_signal {
-                    if let Some(signal_target) = parent.get_signal_target(exit_signal.into()) {
-                        let mut signal_info = zombie.to_wait_result().as_signal_info();
-                        signal_info.signal = exit_signal;
-                        send_signal(&signal_target, signal_info).unwrap_or_else(|e| {
-                            log_warn!("Failed to send exit signal: {}", e);
-                        });
+                let mut maybe_zombie = Some(zombie);
+                if let Some(tracer_pid) = tracer_pid {
+                    if let Some(ref tracer) = pids.get_task(tracer_pid).upgrade() {
+                        maybe_zombie = tracer.thread_group.maybe_notify_tracer(
+                            task,
+                            &mut pids,
+                            parent,
+                            maybe_zombie.unwrap(),
+                        );
                     }
                 }
-                parent.zombie_children.push(zombie);
-                parent.child_status_waiters.notify_all();
+                if let Some(zombie) = maybe_zombie {
+                    parent.do_zombie_notifications(zombie);
+                }
             } else {
                 zombie.release(&mut pids);
             }
@@ -557,6 +603,70 @@ impl ThreadGroup {
                 parent.check_orphans(locked);
             }
         }
+    }
+
+    pub fn do_zombie_notifications(self: &Arc<Self>, zombie: OwnedRef<ZombieProcess>) {
+        let mut state = self.write();
+
+        state.children.remove(&zombie.pid);
+        state.deferred_zombie_ptracers.retain(|&(_, tracee)| tracee != zombie.pid);
+
+        // Send signals
+        if let Some(exit_signal) = zombie.exit_info.exit_signal {
+            if let Some(signal_target) = state.get_signal_target(exit_signal.into()) {
+                let mut signal_info = zombie.to_wait_result().as_signal_info();
+                signal_info.signal = exit_signal;
+                send_signal(&signal_target, signal_info).unwrap_or_else(|e| {
+                    log_warn!("Failed to send exit signal: {}", e);
+                });
+            }
+        }
+        state.zombie_children.push(zombie);
+        state.child_status_waiters.notify_all();
+    }
+
+    /// Notifies the tracer if appropriate.  Returns Some(zombie) if caller
+    /// needs to notify the parent, None otherwise.  The caller should probably
+    /// invoke parent.do_zombie_notifications(zombie) on the result.
+    fn maybe_notify_tracer(
+        self: &Arc<Self>,
+        tracee: &Task,
+        mut pids: &mut PidTable,
+        parent: &Arc<ThreadGroup>,
+        zombie: OwnedRef<ZombieProcess>,
+    ) -> Option<OwnedRef<ZombieProcess>> {
+        if self.read().zombie_ptracees.has_match(&ProcessSelector::Pid(tracee.id), &pids) {
+            if *self == *parent {
+                // The tracer is the parent and has not consumed the
+                // notification.  Don't bother with the ptracee stuff, and just
+                // notify the parent.
+                self.write().zombie_ptracees.retain(&mut |z: &ZombieProcess| z.pid != tracee.id);
+                return Some(zombie);
+            } else {
+                // The tracer is not the parent and the tracer has not consumed
+                // the notification.
+                {
+                    // Tell the parent to expect a notification later.
+                    let mut parent_state = parent.write();
+                    parent_state.deferred_zombie_ptracers.push((self.leader, tracee.id));
+                    parent_state.children.remove(&tracee.thread_group.leader);
+                }
+                // Tell the tracer that there is a notification pending.
+                let mut state = self.write();
+                state.zombie_ptracees.set_parent_of(tracee.id, Some(zombie), parent.clone());
+                tracee.write().notify_ptracers();
+                return None;
+            }
+        } else if *self == *parent {
+            // The tracer is the parent and has already consumed the parent
+            // notification.  No further action required.
+            parent.write().children.remove(&tracee.id);
+            zombie.release(&mut pids);
+            return None;
+        }
+        // The tracer is not the parent and has already consumed the parent
+        // notification.  Notify the parent.
+        Some(zombie)
     }
 
     /// Find the task which will adopt our children after we die.
@@ -1019,21 +1129,31 @@ impl ThreadGroup {
         options: &WaitingOptions,
         pids: &mut PidTable,
     ) -> Option<WaitResult> {
-        let mut tasks = vec![];
+        // This checks to see if the target is a zombie ptracee.
+        let waitable_entry =
+            self.write().zombie_ptracees.get_waitable_entry(selector, options, pids);
+        match waitable_entry {
+            None => (),
+            Some((zombie, None)) => return Some(zombie.to_wait_result()),
+            Some((zombie, Some((tg, z)))) => {
+                if tg != *self {
+                    tg.do_zombie_notifications(z);
+                } else {
+                    {
+                        let mut state = tg.write();
+                        state.children.remove(&z.pid);
+                        state.deferred_zombie_ptracers.retain(|&(_, tracee)| tracee != z.pid);
+                    }
 
-        {
-            let mut state = self.write();
-            let waitable_zombie = state.get_waitable_zombie(
-                &|state: &mut ThreadGroupMutableState| &mut state.zombie_ptracees,
-                selector,
-                options,
-                pids,
-            );
-            if waitable_zombie.is_some() {
-                return waitable_zombie;
+                    z.release(pids);
+                };
+                return Some(zombie.to_wait_result());
             }
         }
 
+        let mut tasks = vec![];
+
+        // This checks to see if the target is a living ptracee
         self.get_ptracees_and(selector, pids, &mut |task: WeakRef<Task>, _| {
             tasks.push(task);
         });
@@ -1304,7 +1424,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
         })
     }
 
-    fn is_correct_exit_signal(for_clone: bool, exit_code: Option<Signal>) -> bool {
+    pub fn is_correct_exit_signal(for_clone: bool, exit_code: Option<Signal>) -> bool {
         for_clone == (exit_code != Some(SIGCHLD))
     }
 
@@ -1358,6 +1478,17 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
             .filter(filter_children_by_waiting_options)
             .peekable();
         if selected_children.peek().is_none() {
+            // There still might be a process that ptrace hasn't looked at yet.
+            if self.deferred_zombie_ptracers.iter().any(|&(_, tracee)| match selector {
+                ProcessSelector::Any => true,
+                ProcessSelector::Pid(pid) => tracee == pid,
+                ProcessSelector::Pgid(pgid) => {
+                    pids.get_process_group(pgid).as_ref() == pids.get_process_group(tracee).as_ref()
+                }
+            }) {
+                return Ok(None);
+            }
+
             return error!(ECHILD);
         }
         for child in selected_children {

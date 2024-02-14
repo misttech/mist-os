@@ -11,8 +11,8 @@ use crate::{
         SignalInfo, SignalInfoHeader, SI_HEADER_SIZE,
     },
     task::{
-        waiter::WaitQueue, CurrentTask, Kernel, StopState, Task, TaskMutableState, ThreadGroup,
-        ThreadState,
+        waiter::WaitQueue, CurrentTask, Kernel, PidTable, ProcessSelector, StopState, Task,
+        TaskMutableState, ThreadGroup, ThreadState, ZombieProcess,
     },
     vfs::parse_unsigned_file,
 };
@@ -27,9 +27,9 @@ use starnix_uapi::{
     errno, error,
     errors::Errno,
     iovec,
-    ownership::{OwnedRef, WeakRef},
+    ownership::{OwnedRef, Releasable, WeakRef},
     pid_t, ptrace_syscall_info,
-    signals::{SigSet, Signal, UncheckedSignal, SIGKILL, SIGSTOP, SIGTRAP},
+    signals::{SigSet, Signal, UncheckedSignal, SIGCHLD, SIGKILL, SIGSTOP, SIGTRAP},
     user_address::{UserAddress, UserRef},
     user_regs_struct, PTRACE_CONT, PTRACE_DETACH, PTRACE_EVENT_CLONE, PTRACE_EVENT_EXEC,
     PTRACE_EVENT_EXIT, PTRACE_EVENT_FORK, PTRACE_EVENT_SECCOMP, PTRACE_EVENT_STOP,
@@ -42,6 +42,7 @@ use starnix_uapi::{
     PTRACE_SYSCALL_INFO_EXIT, PTRACE_SYSCALL_INFO_NONE, SI_MAX_SIZE,
 };
 
+use std::collections::BTreeMap;
 use std::sync::{atomic::Ordering, Arc};
 use zerocopy::FromBytes;
 
@@ -418,6 +419,163 @@ impl PtraceState {
     }
 }
 
+/// A list of zombie processes that were traced by a given tracer, but which
+/// have not yet notified that tracer of their exit.  Once the tracer is
+/// notified, the original parent will be notified.
+pub struct ZombiePtraces {
+    /// A list of zombies that have to be delivered to the ptracer.  The key is
+    /// the zombie.  The value is a (threadgroup, zombie) pair, where the zombie
+    /// has to be delivered to the threadgroup when we have delivered the zombie
+    /// to the ptracer.
+    zombies: BTreeMap<ZombieProcess, Option<(Arc<ThreadGroup>, OwnedRef<ZombieProcess>)>>,
+}
+
+impl ZombiePtraces {
+    pub fn new() -> Self {
+        Self { zombies: BTreeMap::new() }
+    }
+
+    /// Adds a zombie tracee to the list, but does not provide a parent task to
+    /// notify when the tracer is done.
+    pub fn add(&mut self, zombie: ZombieProcess) {
+        if self.zombies.contains_key(&zombie) {
+            return;
+        }
+        self.zombies.insert(zombie, None);
+    }
+
+    /// Delete any zombie ptracees that do not match the predicate given.
+    pub fn retain(&mut self, f: &mut dyn FnMut(&ZombieProcess) -> bool) {
+        self.zombies.retain(|z, _| f(&z))
+    }
+
+    /// Provide a parent task and a zombie to notify when the tracer has been
+    /// notified.
+    pub fn set_parent_of(
+        &mut self,
+        tracee: pid_t,
+        new_zombie: Option<OwnedRef<ZombieProcess>>,
+        new_parent: Arc<ThreadGroup>,
+    ) {
+        let mut zombie = None;
+        for (z, _) in &self.zombies {
+            if z.pid == tracee {
+                zombie = Some(z.copy_for_key());
+                break;
+            }
+        }
+
+        let Some(zombie) = zombie else {
+            if let Some(new_zombie) = new_zombie {
+                self.zombies.insert(new_zombie.copy_for_key(), Some((new_parent, new_zombie)));
+            }
+            return;
+        };
+
+        let Some((zombie, deferred)) = self.zombies.remove_entry(&zombie) else {
+            return;
+        };
+
+        if let Some(new_zombie) = new_zombie {
+            self.zombies.insert(zombie, Some((new_parent, new_zombie)));
+            return;
+        }
+
+        if let Some((_, real_zombie)) = deferred {
+            self.zombies.insert(zombie, Some((new_parent, real_zombie)));
+        }
+        return;
+    }
+
+    /// When a parent dies without having been notified, replace it with a given
+    /// new parent.
+    pub fn reparent(pids: &PidTable, old_parent: &Arc<ThreadGroup>, new_parent: &Arc<ThreadGroup>) {
+        let mut lockless_list = vec![];
+        old_parent.read().deferred_zombie_ptracers.iter().for_each(|z| lockless_list.push(*z));
+
+        for (ptracer, tracee) in &lockless_list {
+            let task_ref = pids.get_task(*ptracer);
+            let Some(task) = task_ref.upgrade() else {
+                continue;
+            };
+            task.thread_group.write().zombie_ptracees.set_parent_of(
+                *tracee,
+                None,
+                new_parent.clone(),
+            );
+        }
+        let mut new_state = new_parent.write();
+        new_state.deferred_zombie_ptracers.append(&mut lockless_list);
+    }
+
+    /// Empty the table and notify all of the remaining parents.  Used if the
+    /// tracer terminates or detaches without acknowledging all pending tracees.
+    pub fn release(&mut self, pids: &mut PidTable) {
+        let mut entry = self.zombies.pop_first();
+        while let Some((zombie, deferred)) = entry {
+            if let Some((tg, z)) = deferred {
+                tg.do_zombie_notifications(z);
+            }
+            zombie.release(pids);
+
+            entry = self.zombies.pop_first();
+        }
+    }
+
+    /// Returns true iff there is a zombie matching the given selector.
+    pub fn has_match(&self, selector: &ProcessSelector, pids: &PidTable) -> bool {
+        self.zombies.keys().any(|p| selector.do_match(p.pid, pids))
+    }
+
+    /// Returns a zombie matching the given selector and options, and
+    /// (optionally) a thread group to notify after the caller has consumed that
+    /// zombie.
+    pub fn get_waitable_entry(
+        &mut self,
+        selector: ProcessSelector,
+        options: &WaitingOptions,
+        _pids: &mut PidTable, // TODO: Remember to delete me if unnecessary
+    ) -> Option<(ZombieProcess, Option<(Arc<ThreadGroup>, OwnedRef<ZombieProcess>)>)> {
+        // The zombies whose pid matches the pid selector queried.
+        let zombie_matches_pid_selector = |zombie: &ZombieProcess| match selector {
+            ProcessSelector::Any => true,
+            ProcessSelector::Pid(pid) => zombie.pid == pid,
+            ProcessSelector::Pgid(pgid) => zombie.pgid == pgid,
+        };
+
+        // The zombies whose exit signal matches the waiting options queried.
+        let zombie_matches_wait_options: Box<dyn Fn(&ZombieProcess) -> bool> =
+            if options.wait_for_all {
+                Box::new(|_zombie: &ZombieProcess| true)
+            } else {
+                // A "clone" zombie is one which has delivered no signal, or a
+                // signal other than SIGCHLD to its parent upon termination.
+                Box::new(|zombie: &ZombieProcess| {
+                    options.wait_for_clone == (zombie.exit_info.exit_signal != Some(SIGCHLD))
+                })
+            };
+
+        // We look for the last zombie in the vector that matches pid
+        // selector and waiting options
+        let Some(found_zombie) = self.zombies.keys().rfind(|zombie: &&ZombieProcess| {
+            zombie_matches_wait_options(*zombie) && zombie_matches_pid_selector(*zombie)
+        }) else {
+            return None;
+        };
+        let zombie = found_zombie.copy_for_key();
+
+        let result;
+        if !options.keep_waitable_state {
+            // Maybe notify child waiters.
+            result = self.zombies.remove_entry(&zombie.copy_for_key());
+        } else {
+            result = Some((zombie, None));
+        }
+
+        result
+    }
+}
+
 /// Scope definitions for Yama.  For full details, see ptrace(2).
 /// 1 means tracer needs to have CAP_SYS_PTRACE or be a parent / child
 /// process. This is the default.
@@ -561,7 +719,7 @@ pub fn ptrace_detach(
     }
     let tid = tracee.get_tid();
     thread_group.ptracees.lock().remove(&tid);
-    thread_group.write().zombie_ptracees.retain(|zombie| zombie.pid != tid);
+    thread_group.write().zombie_ptracees.retain(&mut |zombie: &ZombieProcess| zombie.pid != tid);
     Ok(())
 }
 

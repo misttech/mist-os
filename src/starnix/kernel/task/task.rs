@@ -744,24 +744,13 @@ impl Task {
     /// to a ptracer, make sure it will propagate.
     pub fn set_ptrace_zombie(&self) {
         let pids = self.thread_group.kernel.pids.write();
-        let (pgid, ppid) = {
-            let group_state = self.thread_group.read();
-            (
-                group_state.process_group.leader,
-                group_state.parent.as_ref().map_or(0, |parent| parent.leader),
-            )
-        };
+        let pgid = self.thread_group.read().process_group.leader;
         let mut state = self.write();
         state.set_stopped(StopState::ForceAwake, None, None, None);
         if let Some(ref mut ptrace) = &mut state.ptrace {
             // Add a zombie that the ptracer will notice.
             ptrace.last_signal_waitable = true;
             let tracer_pid = ptrace.get_pid();
-            if tracer_pid == ppid {
-                // The tracer is the parent, and will get notified of this
-                // task's exit without this extra work.
-                return;
-            }
             let weak_init = pids.get_task(tracer_pid);
             if let Some(tracer_task) = weak_init.upgrade() {
                 drop(state);
@@ -776,7 +765,7 @@ impl Task {
                     (persistent_state.creds().uid, persistent_state.exit_signal().clone())
                 };
                 let exit_info = ProcessExitInfo { status: exit_status, exit_signal };
-                let zombie = OwnedRef::new(ZombieProcess {
+                let zombie = ZombieProcess {
                     pid: self.id,
                     pgid,
                     uid,
@@ -784,9 +773,25 @@ impl Task {
                     // ptrace doesn't need this.
                     time_stats: TaskTimeStats::default(),
                     is_canonical: false,
-                });
-                tracer_state.zombie_ptracees.push(zombie);
+                };
+
+                tracer_state.zombie_ptracees.add(zombie);
             };
+        }
+    }
+
+    /// Disconnects this task from the tracer, if the tracer is still running.
+    pub fn ptrace_disconnect(&mut self) {
+        let pids = self.thread_group.kernel.pids.read();
+        let mut state = self.write();
+        let ptracer_pid = state.ptrace.as_ref().map(|ptrace| ptrace.get_pid());
+        if let Some(ptracer_pid) = ptracer_pid {
+            let _ = state.set_ptrace(None);
+            if let Some(ProcessEntryRef::Process(tg)) = pids.get_process(ptracer_pid) {
+                let pid = self.get_pid();
+                drop(state);
+                tg.ptracees.lock().remove(&pid);
+            }
         }
     }
 
@@ -1242,19 +1247,11 @@ impl Releasable for Task {
     type Context<'a> = (ThreadState, &'a mut Locked<'a, TaskRelease>);
 
     fn release(mut self, context: (ThreadState, &mut Locked<'_, TaskRelease>)) {
-        let (thread_state, locked) = context;
-        self.thread_group.remove(locked, &self);
-        // Disconnect from tracer, if one is present.
-        let ptracer_pid = self.read().ptrace.as_ref().map(|ptrace| ptrace.get_pid());
-        if let Some(ptracer_pid) = ptracer_pid {
-            if let Some(ProcessEntryRef::Process(tg)) =
-                self.kernel().pids.read().get_process(ptracer_pid)
-            {
-                let pid = self.get_pid();
-                tg.ptracees.lock().remove(&pid);
-            }
-            let _ = self.write().set_ptrace(None);
-        }
+        let (thread_state, _) = context;
+
+        self.ptrace_disconnect();
+
+        self.kernel().pids.write().remove_task(self.id);
 
         // Release the fd table.
         self.files.release(());
