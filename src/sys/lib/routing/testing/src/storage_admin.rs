@@ -391,7 +391,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                             .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
-                    .protocol(ProtocolDeclBuilder::new("unrelated.protocol").build())
+                    .protocol(
+                        ProtocolDeclBuilder::new("unrelated.protocol").path("/svc/foo").build(),
+                    )
                     .storage(StorageDecl {
                         name: "data".parse().unwrap(),
                         backing_dir: "tmpfs".parse().unwrap(),
@@ -462,7 +464,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                             .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
-                    .protocol(ProtocolDeclBuilder::new("unrelated.protocol").build())
+                    .protocol(
+                        ProtocolDeclBuilder::new("unrelated.protocol").path("/svc/foo").build(),
+                    )
                     .storage(StorageDecl {
                         name: "data".parse().unwrap(),
                         backing_dir: "tmpfs".parse().unwrap(),
@@ -572,7 +576,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         subdir: None,
                         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
                     })
-                    .protocol(ProtocolDeclBuilder::new("unrelated.protocol").build())
+                    .protocol(
+                        ProtocolDeclBuilder::new("unrelated.protocol").path("/svc/foo").build(),
+                    )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("d".to_string()),
@@ -635,7 +641,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                             .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
-                    .protocol(ProtocolDeclBuilder::new("unrelated.protocol").build())
+                    .protocol(
+                        ProtocolDeclBuilder::new("unrelated.protocol").path("/svc/foo").build(),
+                    )
                     .storage(StorageDecl {
                         name: "data".parse().unwrap(),
                         backing_dir: "tmpfs".parse().unwrap(),

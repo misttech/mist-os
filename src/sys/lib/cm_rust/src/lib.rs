@@ -573,7 +573,7 @@ pub struct OfferResolverDecl {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, OfferDeclCommonNoAvailability, Debug, Clone, PartialEq, Eq)]
+#[derive(FidlDecl, OfferDeclCommon, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::OfferDictionary", source_path = "dictionary")]
 pub struct OfferDictionaryDecl {
     pub source: OfferSource,
@@ -907,7 +907,7 @@ pub struct ExposeResolverDecl {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, ExposeDeclCommonAlwaysRequired, Debug, Clone, PartialEq, Eq)]
+#[derive(FidlDecl, ExposeDeclCommon, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::ExposeDictionary", source_path = "dictionary")]
 pub struct ExposeDictionaryDecl {
     pub source: ExposeSource,

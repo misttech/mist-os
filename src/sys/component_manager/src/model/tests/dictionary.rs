@@ -1461,3 +1461,775 @@ async fn extend_from_child() {
         }
     }
 }
+
+#[fuchsia::test]
+async fn use_from_dictionary_availability_attenuated() {
+    // required -> optional downgrade allowed, of:
+    // - a capability in a dictionary
+    // - a capability in a dictionary in a dictionary
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .protocol(ProtocolDeclBuilder::new("bar_svc").path("/svc/bar").build())
+                .dictionary(DictionaryDeclBuilder::new("nested").build())
+                .dictionary(DictionaryDeclBuilder::new("dict").build())
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "A".parse().unwrap(),
+                    target: OfferTarget::Capability("dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "bar_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "B".parse().unwrap(),
+                    target: OfferTarget::Capability("nested".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "nested".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "nested".parse().unwrap(),
+                    target: OfferTarget::Capability("dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "dict".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "dict".parse().unwrap(),
+                    target: OfferTarget::static_child("leaf".into()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Parent,
+                    source_name: "A".parse().unwrap(),
+                    source_dictionary: Some("dict".parse().unwrap()),
+                    target_path: "/svc/A".parse().unwrap(),
+                    availability: Availability::Optional,
+                }))
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Parent,
+                    source_name: "B".parse().unwrap(),
+                    source_dictionary: Some("dict/nested".parse().unwrap()),
+                    target_path: "/svc/B".parse().unwrap(),
+                    availability: Availability::Optional,
+                }))
+                .build(),
+        ),
+    ];
+
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    test.check_use(
+        "leaf".try_into().unwrap(),
+        CheckUse::Protocol { path: "/svc/A".parse().unwrap(), expected_res: ExpectedResult::Ok },
+    )
+    .await;
+    test.check_use(
+        "leaf".try_into().unwrap(),
+        CheckUse::Protocol { path: "/svc/B".parse().unwrap(), expected_res: ExpectedResult::Ok },
+    )
+    .await;
+}
+
+#[fuchsia::test]
+async fn use_from_dictionary_availability_invalid() {
+    // attempted optional -> required upgrade, disallowed, of:
+    // - an optional capability in a dictionary.
+    // - a capability in an optional dictionary.
+    // - a capability in a dictionary in an optional dictionary.
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .protocol(ProtocolDeclBuilder::new("bar_svc").path("/svc/bar").build())
+                .protocol(ProtocolDeclBuilder::new("qux_svc").path("/svc/qux").build())
+                .dictionary(DictionaryDeclBuilder::new("required_dict").build())
+                .dictionary(DictionaryDeclBuilder::new("optional_dict").build())
+                .dictionary(DictionaryDeclBuilder::new("nested").build())
+                .dictionary(DictionaryDeclBuilder::new("dict_with_optional_nested").build())
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "A".parse().unwrap(),
+                    target: OfferTarget::Capability("dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Optional,
+                }))
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "bar_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "B".parse().unwrap(),
+                    target: OfferTarget::Capability("optional_dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "qux_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "C".parse().unwrap(),
+                    target: OfferTarget::Capability("nested".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "nested".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "nested".parse().unwrap(),
+                    target: OfferTarget::Capability("dict_with_optional_nested".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Optional,
+                }))
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "required_dict".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "required_dict".parse().unwrap(),
+                    target: OfferTarget::static_child("leaf".into()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "optional_dict".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "optional_dict".parse().unwrap(),
+                    target: OfferTarget::static_child("leaf".into()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Optional,
+                }))
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "dict_with_optional_nested".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "dict_with_optional_nested".parse().unwrap(),
+                    target: OfferTarget::static_child("leaf".into()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Parent,
+                    source_name: "A".parse().unwrap(),
+                    source_dictionary: Some("required_dict".parse().unwrap()),
+                    target_path: "/svc/A".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Parent,
+                    source_name: "B".parse().unwrap(),
+                    source_dictionary: Some("optional_dict".parse().unwrap()),
+                    target_path: "/svc/B".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Parent,
+                    source_name: "C".parse().unwrap(),
+                    source_dictionary: Some("dict_with_optional_nested/nested".parse().unwrap()),
+                    target_path: "/svc/C".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .build(),
+        ),
+    ];
+
+    // TODO(fxbug.dev/319546081): This returns NOT_SUPPORTED due to the fallback to legacy routing.
+    // It should return NOT_FOUND. For this to happen, bedrock routing needs to return the error
+    // instead of falling back.
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    test.check_use(
+        "leaf".try_into().unwrap(),
+        CheckUse::Protocol {
+            path: "/svc/A".parse().unwrap(),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+        },
+    )
+    .await;
+    test.check_use(
+        "leaf".try_into().unwrap(),
+        CheckUse::Protocol {
+            path: "/svc/B".parse().unwrap(),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+        },
+    )
+    .await;
+    test.check_use(
+        "leaf".try_into().unwrap(),
+        CheckUse::Protocol {
+            path: "/svc/C".parse().unwrap(),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+        },
+    )
+    .await;
+}
+
+#[fuchsia::test]
+async fn offer_from_dictionary_availability_attenuated() {
+    // required -> optional downgrade allowed, of:
+    // - a capability in a dictionary
+    // - a capability in a dictionary in a dictionary
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .protocol(ProtocolDeclBuilder::new("bar_svc").path("/svc/bar").build())
+                .dictionary(DictionaryDeclBuilder::new("nested").build())
+                .dictionary(DictionaryDeclBuilder::new("dict").build())
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "A".parse().unwrap(),
+                    target: OfferTarget::Capability("dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "bar_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "B".parse().unwrap(),
+                    target: OfferTarget::Capability("nested".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "nested".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "nested".parse().unwrap(),
+                    target: OfferTarget::Capability("dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "A".parse().unwrap(),
+                    source_dictionary: Some("dict".parse().unwrap()),
+                    target_name: "A".parse().unwrap(),
+                    target: OfferTarget::static_child("leaf".into()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "B".parse().unwrap(),
+                    source_dictionary: Some("dict/nested".parse().unwrap()),
+                    target_name: "B".parse().unwrap(),
+                    target: OfferTarget::static_child("leaf".into()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Parent,
+                    source_name: "A".parse().unwrap(),
+                    source_dictionary: None,
+                    target_path: "/svc/A".parse().unwrap(),
+                    availability: Availability::Optional,
+                }))
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Parent,
+                    source_name: "B".parse().unwrap(),
+                    source_dictionary: None,
+                    target_path: "/svc/B".parse().unwrap(),
+                    availability: Availability::Optional,
+                }))
+                .build(),
+        ),
+    ];
+
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    test.check_use(
+        "leaf".try_into().unwrap(),
+        CheckUse::Protocol { path: "/svc/A".parse().unwrap(), expected_res: ExpectedResult::Ok },
+    )
+    .await;
+    test.check_use(
+        "leaf".try_into().unwrap(),
+        CheckUse::Protocol { path: "/svc/B".parse().unwrap(), expected_res: ExpectedResult::Ok },
+    )
+    .await;
+}
+
+#[fuchsia::test]
+async fn offer_from_dictionary_availability_invalid() {
+    // attempted optional -> required upgrade, disallowed, of:
+    // - an optional capability in a dictionary.
+    // - a capability in an optional dictionary.
+    // - a capability in a dictionary in an optional dictionary.
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .protocol(ProtocolDeclBuilder::new("bar_svc").path("/svc/bar").build())
+                .protocol(ProtocolDeclBuilder::new("qux_svc").path("/svc/qux").build())
+                .dictionary(DictionaryDeclBuilder::new("required_dict").build())
+                .dictionary(DictionaryDeclBuilder::new("optional_dict").build())
+                .dictionary(DictionaryDeclBuilder::new("nested").build())
+                .dictionary(DictionaryDeclBuilder::new("dict_with_optional_nested").build())
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "A".parse().unwrap(),
+                    target: OfferTarget::Capability("dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Optional,
+                }))
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "bar_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "B".parse().unwrap(),
+                    target: OfferTarget::Capability("optional_dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "qux_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "C".parse().unwrap(),
+                    target: OfferTarget::Capability("nested".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "nested".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "nested".parse().unwrap(),
+                    target: OfferTarget::Capability("dict_with_optional_nested".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Optional,
+                }))
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "required_dict".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "required_dict".parse().unwrap(),
+                    target: OfferTarget::static_child("mid".into()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "optional_dict".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "optional_dict".parse().unwrap(),
+                    target: OfferTarget::static_child("mid".into()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Optional,
+                }))
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "dict_with_optional_nested".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "dict_with_optional_nested".parse().unwrap(),
+                    target: OfferTarget::static_child("mid".into()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .add_child(ChildDeclBuilder::new_lazy_child("mid".into()))
+                .build(),
+        ),
+        (
+            "mid",
+            ComponentDeclBuilder::new()
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: OfferSource::Parent,
+                    source_name: "A".parse().unwrap(),
+                    source_dictionary: Some("required_dict".parse().unwrap()),
+                    target_name: "A".parse().unwrap(),
+                    target: OfferTarget::static_child("leaf".into()),
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: OfferSource::Parent,
+                    source_name: "B".parse().unwrap(),
+                    source_dictionary: Some("optional_dict".parse().unwrap()),
+                    target_name: "B".parse().unwrap(),
+                    target: OfferTarget::static_child("leaf".into()),
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: OfferSource::Parent,
+                    source_name: "C".parse().unwrap(),
+                    source_dictionary: Some("dict_with_optional_nested/nested".parse().unwrap()),
+                    target_name: "C".parse().unwrap(),
+                    target: OfferTarget::static_child("leaf".into()),
+                    availability: Availability::Required,
+                }))
+                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Parent,
+                    source_name: "A".parse().unwrap(),
+                    source_dictionary: None,
+                    target_path: "/svc/A".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Parent,
+                    source_name: "B".parse().unwrap(),
+                    source_dictionary: None,
+                    target_path: "/svc/B".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Parent,
+                    source_name: "C".parse().unwrap(),
+                    source_dictionary: None,
+                    target_path: "/svc/C".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .build(),
+        ),
+    ];
+
+    // TODO(fxbug.dev/319546081): This returns NOT_SUPPORTED due to the fallback to legacy routing.
+    // It should return NOT_FOUND. For this to happen, bedrock routing needs to return the error
+    // instead of falling back.
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    test.check_use(
+        "mid/leaf".try_into().unwrap(),
+        CheckUse::Protocol {
+            path: "/svc/A".parse().unwrap(),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+        },
+    )
+    .await;
+    test.check_use(
+        "mid/leaf".try_into().unwrap(),
+        CheckUse::Protocol {
+            path: "/svc/B".parse().unwrap(),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+        },
+    )
+    .await;
+    test.check_use(
+        "mid/leaf".try_into().unwrap(),
+        CheckUse::Protocol {
+            path: "/svc/C".parse().unwrap(),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+        },
+    )
+    .await;
+}
+
+#[fuchsia::test]
+async fn expose_from_dictionary_availability_attenuated() {
+    // required -> optional downgrade allowed, of:
+    // - a capability in a dictionary
+    // - a capability in a dictionary in a dictionary
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Child("leaf".into()),
+                    source_name: "A".parse().unwrap(),
+                    source_dictionary: None,
+                    target_path: "/svc/A".parse().unwrap(),
+                    availability: Availability::Optional,
+                }))
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Child("leaf".into()),
+                    source_name: "B".parse().unwrap(),
+                    source_dictionary: None,
+                    target_path: "/svc/B".parse().unwrap(),
+                    availability: Availability::Optional,
+                }))
+                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .protocol(ProtocolDeclBuilder::new("bar_svc").path("/svc/bar").build())
+                .dictionary(DictionaryDeclBuilder::new("nested").build())
+                .dictionary(DictionaryDeclBuilder::new("dict").build())
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "A".parse().unwrap(),
+                    target: OfferTarget::Capability("dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "bar_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "B".parse().unwrap(),
+                    target: OfferTarget::Capability("nested".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "nested".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "nested".parse().unwrap(),
+                    target: OfferTarget::Capability("dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "A".parse().unwrap(),
+                    source_dictionary: Some("dict".parse().unwrap()),
+                    target_name: "A".parse().unwrap(),
+                    target: ExposeTarget::Parent,
+                    availability: Availability::Required,
+                }))
+                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "B".parse().unwrap(),
+                    source_dictionary: Some("dict/nested".parse().unwrap()),
+                    target_name: "B".parse().unwrap(),
+                    target: ExposeTarget::Parent,
+                    availability: Availability::Required,
+                }))
+                .build(),
+        ),
+    ];
+
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    test.check_use(
+        ".".try_into().unwrap(),
+        CheckUse::Protocol { path: "/svc/A".parse().unwrap(), expected_res: ExpectedResult::Ok },
+    )
+    .await;
+    test.check_use(
+        ".".try_into().unwrap(),
+        CheckUse::Protocol { path: "/svc/B".parse().unwrap(), expected_res: ExpectedResult::Ok },
+    )
+    .await;
+}
+
+#[fuchsia::test]
+async fn expose_from_dictionary_availability_invalid() {
+    // attempted optional -> required upgrade, disallowed, of:
+    // - an optional capability in a dictionary.
+    // - a capability in an optional dictionary.
+    // - a capability in a dictionary in an optional dictionary.
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Child("mid".into()),
+                    source_name: "A".parse().unwrap(),
+                    source_dictionary: None,
+                    target_path: "/svc/A".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Child("mid".into()),
+                    source_name: "B".parse().unwrap(),
+                    source_dictionary: None,
+                    target_path: "/svc/B".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Child("mid".into()),
+                    source_name: "C".parse().unwrap(),
+                    source_dictionary: None,
+                    target_path: "/svc/C".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .add_child(ChildDeclBuilder::new_lazy_child("mid".into()))
+                .build(),
+        ),
+        (
+            "mid",
+            ComponentDeclBuilder::new()
+                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
+                    source: ExposeSource::Child("leaf".into()),
+                    source_name: "A".parse().unwrap(),
+                    source_dictionary: Some("required_dict".parse().unwrap()),
+                    target_name: "A".parse().unwrap(),
+                    target: ExposeTarget::Parent,
+                    availability: Availability::Required,
+                }))
+                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
+                    source: ExposeSource::Child("leaf".into()),
+                    source_name: "B".parse().unwrap(),
+                    source_dictionary: Some("optional_dict".parse().unwrap()),
+                    target_name: "B".parse().unwrap(),
+                    target: ExposeTarget::Parent,
+                    availability: Availability::Required,
+                }))
+                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
+                    source: ExposeSource::Child("leaf".into()),
+                    source_name: "C".parse().unwrap(),
+                    source_dictionary: Some("dict_with_optional_nested/nested".parse().unwrap()),
+                    target_name: "C".parse().unwrap(),
+                    target: ExposeTarget::Parent,
+                    availability: Availability::Required,
+                }))
+                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .protocol(ProtocolDeclBuilder::new("bar_svc").path("/svc/bar").build())
+                .protocol(ProtocolDeclBuilder::new("qux_svc").path("/svc/qux").build())
+                .dictionary(DictionaryDeclBuilder::new("required_dict").build())
+                .dictionary(DictionaryDeclBuilder::new("optional_dict").build())
+                .dictionary(DictionaryDeclBuilder::new("nested").build())
+                .dictionary(DictionaryDeclBuilder::new("dict_with_optional_nested").build())
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "A".parse().unwrap(),
+                    target: OfferTarget::Capability("dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Optional,
+                }))
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "bar_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "B".parse().unwrap(),
+                    target: OfferTarget::Capability("optional_dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "qux_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "C".parse().unwrap(),
+                    target: OfferTarget::Capability("nested".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "nested".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "nested".parse().unwrap(),
+                    target: OfferTarget::Capability("dict_with_optional_nested".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Optional,
+                }))
+                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "required_dict".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "required_dict".parse().unwrap(),
+                    target: ExposeTarget::Parent,
+                    availability: Availability::Required,
+                }))
+                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "optional_dict".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "optional_dict".parse().unwrap(),
+                    target: ExposeTarget::Parent,
+                    availability: Availability::Optional,
+                }))
+                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "dict_with_optional_nested".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "dict_with_optional_nested".parse().unwrap(),
+                    target: ExposeTarget::Parent,
+                    availability: Availability::Required,
+                }))
+                .build(),
+        ),
+    ];
+
+    // TODO(fxbug.dev/319546081): This returns NOT_SUPPORTED due to the fallback to legacy routing.
+    // It should return NOT_FOUND. For this to happen, bedrock routing needs to return the error
+    // instead of falling back.
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    test.check_use(
+        ".".try_into().unwrap(),
+        CheckUse::Protocol {
+            path: "/svc/A".parse().unwrap(),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+        },
+    )
+    .await;
+    test.check_use(
+        ".".try_into().unwrap(),
+        CheckUse::Protocol {
+            path: "/svc/B".parse().unwrap(),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+        },
+    )
+    .await;
+    test.check_use(
+        ".".try_into().unwrap(),
+        CheckUse::Protocol {
+            path: "/svc/C".parse().unwrap(),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+        },
+    )
+    .await;
+}

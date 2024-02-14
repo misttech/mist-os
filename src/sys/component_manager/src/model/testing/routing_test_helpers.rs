@@ -335,11 +335,11 @@ impl RoutingTest {
 
     /// Set up the given OutDir, installing a set of files assumed to exist by
     /// many tests:
-    ///   - A file `/svc/foo` implementing `fidl.examples.routing.echo.Echo`.
+    ///   - A file implementing `fidl.examples.routing.echo.Echo`, at `path`.
     ///   - A static file `/svc/file`, containing the string "hippos" encoded as UTF-8.
-    pub fn install_default_out_files(dir: &mut OutDir) {
-        // Add "/svc/foo", providing an echo server.
-        dir.add_echo_protocol(cm_types::Path::from_str("/svc/foo").unwrap());
+    pub fn install_default_out_files(path: cm_types::Path, dir: &mut OutDir) {
+        // Add an echo server at `protocol`'s path.
+        dir.add_echo_protocol(path);
 
         // Add "/svc/file", providing a read-only file.
         dir.add_static_file(cm_types::Path::from_str("/svc/file").unwrap(), "hippos");
@@ -524,8 +524,11 @@ impl RoutingTest {
                 }
             }
             match capability {
-                CapabilityDecl::Protocol(_) => {
-                    Self::install_default_out_files(&mut out_dir);
+                CapabilityDecl::Protocol(p) => {
+                    Self::install_default_out_files(
+                        p.source_path.as_ref().unwrap().clone(),
+                        &mut out_dir,
+                    );
                 }
                 CapabilityDecl::Service(_) => {
                     out_dir.add_echo_protocol(
@@ -913,7 +916,7 @@ impl RoutingTestModel for RoutingTest {
         let ns = fdio::Namespace::installed().expect("Failed to get installed namespace");
         ns.bind(path, client).unwrap_or_else(|e| panic!("Failed to bind dir {}: {:?}", path, e));
         let mut out_dir = OutDir::new();
-        Self::install_default_out_files(&mut out_dir);
+        Self::install_default_out_files("/svc/foo".parse().unwrap(), &mut out_dir);
         out_dir.add_directory_proxy(&self.test_dir_proxy);
         out_dir.host_fn()(server);
     }

@@ -663,7 +663,6 @@ async fn reboot_shutdown_does_not_trigger_reboot() {
                           closed: NOT_FOUND")]
 async fn on_terminate_with_missing_reboot_protocol_panics() {
     // Create a topology with a reboot-on-terminate component but no reboot protocol routed to root.
-    let reboot_protocol_path = format!("/svc/{}", REBOOT_PROTOCOL);
     let components = vec![
         (
             "root",
@@ -673,17 +672,6 @@ async fn on_terminate_with_missing_reboot_protocol_panics() {
                         .on_terminate(fdecl::OnTerminate::Reboot)
                         .build(),
                 )
-                .protocol(
-                    ProtocolDeclBuilder::new(REBOOT_PROTOCOL).path(&reboot_protocol_path).build(),
-                )
-                .expose(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
-                    source: cm_rust::ExposeSource::Self_,
-                    source_name: REBOOT_PROTOCOL.parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: REBOOT_PROTOCOL.parse().unwrap(),
-                    target: cm_rust::ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
                 .build(),
         ),
         ("system", ComponentDeclBuilder::new().build()),
