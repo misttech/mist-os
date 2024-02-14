@@ -6,7 +6,7 @@ import("//build/components.gni")
 
 resource("thermal-client-service-integration-test-resources") {
   sources = [
-    "config_files/thermal_client_service_test/node_config.json5",
+    "config_files/thermal_client_service_test/power_manager_node_config.json5",
     "config_files/thermal_client_service_test/thermal_config.json5",
   ]
 
@@ -14,18 +14,25 @@ resource("thermal-client-service-integration-test-resources") {
 }
 
 resource("shutdown-integration-test-resources") {
-  sources = [ "config_files/shutdown_test/node_config.json5" ]
+  sources = [ "config_files/shutdown_test/power_manager_node_config.json5" ]
   outputs = [ "shutdown_test/{{source_file_part}}" ]
 }
 
 resource("cpu-thermal-model-integration-test-resources") {
-  sources = [ "config_files/cpu_thermal_model_test/node_config.json5" ]
+  sources = [
+    "config_files/cpu_thermal_model_test/cpu_manager_node_config.json5",
+    "config_files/cpu_thermal_model_test/power_manager_node_config.json5",
+    "config_files/cpu_thermal_model_test/thermal_config.json5",
+  ]
   outputs = [ "cpu_thermal_model_test/{{source_file_part}}" ]
 }
 
 resource("cpu-thermal-model-no-jitter-integration-test-resources") {
-  sources =
-      [ "config_files/cpu_thermal_model_no_jitter_test/node_config.json5" ]
+  sources = [
+    "config_files/cpu_thermal_model_no_jitter_test/cpu_manager_node_config.json5",
+    "config_files/cpu_thermal_model_no_jitter_test/power_manager_node_config.json5",
+    "config_files/cpu_thermal_model_no_jitter_test/thermal_config.json5",
+  ]
   outputs = [ "cpu_thermal_model_no_jitter_test/{{source_file_part}}" ]
 }
 
@@ -76,6 +83,14 @@ fuchsia_unittest_package("power-manager-integration-test") {
     "//src/power/power-manager/testing/fake_driver:fake-cpu-ctrl-component",
     "//src/power/power-manager/testing/fake_root",
   ]
+  test_specs = {
+    environments = basic_envs
+
+    # CpuManager emits "Expected positive total_time_delta" error message
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 group("test") {

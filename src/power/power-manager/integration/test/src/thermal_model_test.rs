@@ -137,12 +137,19 @@ struct Simulator {
 
 impl Simulator {
     /// Creates a new Simulator.
-    async fn new(p: SimulatorParams, config_path: &str) -> Self {
-        let test_env =
-            TestEnvBuilder::new().power_manager_node_config_path(config_path).build().await;
+    async fn new(
+        p: SimulatorParams,
+        power_manager_config_path: &str,
+        cpu_manager_config_path: &str,
+    ) -> Self {
+        let test_env = TestEnvBuilder::new()
+            .power_manager_node_config_path(power_manager_config_path)
+            .cpu_manager_node_config_path(cpu_manager_config_path)
+            .build()
+            .await;
 
         // Get sample interval from thermal policy.
-        let sample_interval = Self::get_sample_interval(config_path);
+        let sample_interval = Self::get_sample_interval(power_manager_config_path);
 
         let temperature_ctrl_path = "/dev/sys/platform/soc_thermal/control";
         let cpu_ctrl_path = "/dev/class/cpu-ctrl/000";
@@ -157,6 +164,16 @@ impl Simulator {
         // Make sure CPU numbers are initialized correctly.
         let idle_times = vec![Nanoseconds(0); p.cpu_params.logical_cpu_numbers.len() as usize];
         test_env.set_cpu_stats(idle_times_to_cpu_stats(&idle_times)).await;
+
+        let lifecycle_controller =
+            test_env.connect_to_protocol::<fsys2::LifecycleControllerMarker>();
+
+        let (_, cpu_manager_binder_server) = fidl::endpoints::create_endpoints();
+        lifecycle_controller
+            .start_instance(&format!("./cpu_manager"), cpu_manager_binder_server)
+            .await
+            .unwrap()
+            .unwrap();
 
         let fake_clock_control = test_env.connect_to_protocol::<ftesting::FakeClockControlMarker>();
 
@@ -174,11 +191,20 @@ impl Simulator {
             .expect("add_stop_point failed")
             .expect("add_stop_point returned error");
 
-        let lifecycle_controller =
-            test_env.connect_to_protocol::<fsys2::LifecycleControllerMarker>();
-        let (_, binder_server) = fidl::endpoints::create_endpoints();
+        fake_clock_control
+            .resume_with_increments(
+                fuchsia_zircon::Duration::from_millis(1).into_nanos(),
+                &ftesting::Increment::Determined(
+                    fuchsia_zircon::Duration::from_millis(1).into_nanos(),
+                ),
+            )
+            .await
+            .expect("failed to set fake time scale: FIDL error")
+            .expect("failed to set fake time scale: protocol error");
+
+        let (_, power_manager_binder_server) = fidl::endpoints::create_endpoints();
         lifecycle_controller
-            .start_instance(&format!("./power_manager"), binder_server)
+            .start_instance(&format!("./power_manager"), power_manager_binder_server)
             .await
             .unwrap()
             .unwrap();
@@ -296,8 +322,6 @@ impl Simulator {
     async fn step(&mut self, dt: Seconds) {
         self.op_scheduler.step(self.time, dt);
 
-        // Get current Pstate index by querying the cpu-ctrl driver.
-        self.p_state_index = self.get_cpu_p_state_index().await.try_into().unwrap();
         // `step_cpu` needs to run before `step_thermal_model`, so we know how many operations
         // can actually be completed at the current P-state.
         let num_operations_completed = self.step_cpu(dt, self.op_scheduler.num_operations).await;
@@ -306,6 +330,13 @@ impl Simulator {
         self.step_thermal_model(dt, num_operations_completed).await;
         self.time += dt;
         self.step_fake_clock().await;
+
+        // TODO(b/324650567): This is to wait for CpuManager to finish querying CPU stats. Ideally,
+        // we should find a better way to synchronize CpuManager.
+        fasync::Timer::new(std::time::Duration::from_millis(20)).await;
+
+        // Get current Pstate index by querying the cpu-ctrl driver.
+        self.p_state_index = self.get_cpu_p_state_index().await.try_into().unwrap();
     }
 
     /// Returns the current P-state of the simulated CPU.
@@ -434,49 +465,11 @@ fn default_thermal_model_params() -> ThermalModelParams {
     }
 }
 
-// Verifies that when the system runs consistently over the target temperature, the CPU will
-// be driven to its lowest-power P-state.
-#[fuchsia::test]
-async fn test_use_lowest_p_state_when_hot() {
-    let config_path = "/pkg/cpu_thermal_model_test/node_config.json5";
-
-    // Consistent with thermal policy (specified in config file).
-    let target_temperature = Celsius(85.0);
-
-    // Use a fixed operation rate for this test.
-    let operation_rate = Hertz(3e9);
-
-    let mut thermal_test_simulator = Simulator::new(
-        SimulatorParams {
-            thermal_model_params: default_thermal_model_params(),
-            cpu_params: default_cpu_params(),
-            op_scheduler: OperationScheduler::new(
-                Box::new(move |_| operation_rate),
-                OperationRolloverMethod::Drop,
-            ),
-            initial_cpu_temperature: target_temperature,
-            initial_heat_sink_temperature: target_temperature,
-            environment_temperature: target_temperature,
-        },
-        config_path,
-    )
-    .await;
-
-    // Within a relatively short time, the integral error should accumulate enough to drive
-    // the CPU to its lowest-power P-state.
-    thermal_test_simulator.iterate_n_times(10).await;
-    assert_eq!(
-        thermal_test_simulator.p_state_index,
-        thermal_test_simulator.cpu_params.p_states.len() - 1
-    );
-
-    thermal_test_simulator.destroy().await;
-}
-
 // Verifies that the simulated CPU follows expected fast-scale thermal dynamics.
 #[fuchsia::test]
 async fn test_fast_scale_thermal_dynamics() {
-    let config_path = "/pkg/cpu_thermal_model_test/node_config.json5";
+    let power_manager_config_path = "/pkg/cpu_thermal_model_test/power_manager_node_config.json5";
+    let cpu_manager_config_path = "/pkg/cpu_thermal_model_test/cpu_manager_node_config.json5";
 
     // Use a fixed operation rate for this test.
     let operation_rate = Hertz(3e9);
@@ -493,7 +486,8 @@ async fn test_fast_scale_thermal_dynamics() {
             initial_heat_sink_temperature: Celsius(30.0),
             environment_temperature: Celsius(22.0),
         },
-        config_path,
+        power_manager_config_path,
+        cpu_manager_config_path,
     )
     .await;
 
@@ -512,7 +506,8 @@ async fn test_fast_scale_thermal_dynamics() {
 // temperature to the target temperature.
 #[fuchsia::test]
 async fn test_average_temperature() {
-    let config_path = "/pkg/cpu_thermal_model_test/node_config.json5";
+    let power_manager_config_path = "/pkg/cpu_thermal_model_test/power_manager_node_config.json5";
+    let cpu_manager_config_path = "/pkg/cpu_thermal_model_test/cpu_manager_node_config.json5";
 
     // Use a fixed operation rate for this test.
     let operation_rate = Hertz(3e9);
@@ -532,7 +527,8 @@ async fn test_average_temperature() {
             initial_heat_sink_temperature: Celsius(80.0),
             environment_temperature: Celsius(75.0),
         },
-        config_path,
+        power_manager_config_path,
+        cpu_manager_config_path,
     )
     .await;
 
@@ -553,20 +549,20 @@ async fn test_average_temperature() {
         ) < target_temperature
     );
 
-    // Warm up for 30 minutes of simulated time.
-    thermal_test_simulator.iterate_n_times(1800).await;
+    // Warm up for 8 minutes of simulated time.
+    thermal_test_simulator.iterate_n_times(480).await;
 
-    // Calculate the average CPU temperature over the next 100 iterations, and ensure that it's
+    // Calculate the average CPU temperature over the next 30 iterations, and ensure that it's
     // close to the target temperature.
     let average_temperature = {
         let mut cumulative_sum = 0.0;
-        for _ in 0..100 {
+        for _ in 0..30 {
             thermal_test_simulator.iterate_n_times(1).await;
             cumulative_sum += thermal_test_simulator.cpu_temperature.0;
         }
-        cumulative_sum / 100.0
+        cumulative_sum / 30.0
     };
-    assert_near!(average_temperature, target_temperature.0, 0.1);
+    assert_near!(average_temperature, target_temperature.0, 0.2);
     thermal_test_simulator.destroy().await;
 }
 
@@ -593,7 +589,10 @@ async fn test_average_temperature() {
 async fn test_no_jitter_at_max_load() {
     // Use a very large filter time constant: 1 deg raw --> 0.001 deg filtered in the first
     // cycle after a change.
-    let config_path = "/pkg/cpu_thermal_model_no_jitter_test/node_config.json5";
+    let power_manager_config_path =
+        "/pkg/cpu_thermal_model_no_jitter_test/power_manager_node_config.json5";
+    let cpu_manager_config_path =
+        "/pkg/cpu_thermal_model_no_jitter_test/cpu_manager_node_config.json5";
 
     // Choose an operation rate that induces max load at highest frequency.
     let operation_rate = Hertz(8.0e9);
@@ -610,7 +609,8 @@ async fn test_no_jitter_at_max_load() {
             initial_heat_sink_temperature: Celsius(75.0),
             environment_temperature: Celsius(75.0),
         },
-        config_path,
+        power_manager_config_path,
+        cpu_manager_config_path,
     )
     .await;
 

@@ -62,15 +62,22 @@ rustc_library("lib") {
   ]
 }
 
-fuchsia_component_manifest("integration-manifest") {
+fuchsia_component_manifest("integration-power-manager-manifest") {
   testonly = true
   manifest = "meta/power-manager-for-integration.cml"
   component_name = "power-manager"
 }
 
-fuchsia_structured_config_values("integration-structured-config") {
+fuchsia_component_manifest("integration-cpu-manager-manifest") {
   testonly = true
-  cm_label = ":integration-manifest"
+  manifest = "meta/cpu-manager-for-integration.cml"
+  component_name = "cpu-manager"
+}
+
+fuchsia_structured_config_values(
+    "integration-power-manager-structured-config") {
+  testonly = true
+  cm_label = ":integration-power-manager-manifest"
   values = {
     enable_debug_service = false
     node_config_path = ""
@@ -78,12 +85,23 @@ fuchsia_structured_config_values("integration-structured-config") {
   }
 }
 
+fuchsia_structured_config_values("integration-cpu-manager-structured-config") {
+  testonly = true
+  cm_label = ":integration-cpu-manager-manifest"
+  values = {
+    node_config_path = ""
+  }
+}
+
 fuchsia_component("integration-component") {
-  cm_label = ":integration-manifest"
+  cm_label = ":integration-power-manager-manifest"
   testonly = true
   deps = [
-    ":integration-manifest",
-    ":integration-structured-config",
+    ":integration-cpu-manager-manifest",
+    ":integration-cpu-manager-structured-config",
+    ":integration-power-manager-manifest",
+    ":integration-power-manager-structured-config",
+    "//src/power/cpu-manager:bin_with_fake_time",
     "//src/power/power-manager:bin_with_fake_time",
   ]
 }

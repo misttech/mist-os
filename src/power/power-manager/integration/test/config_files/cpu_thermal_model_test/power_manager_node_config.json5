@@ -18,38 +18,6 @@
         name: "crash_handler",
     },
     {
-        type: "CpuStatsHandler",
-        name: "cpu_stats",
-    },
-    {
-        type: "DeviceControlHandler",
-        name: "cpu_dev",
-        config: {
-            driver_path: "/dev/class/cpu-ctrl/000",
-        },
-    },
-    {
-        type: "CpuControlHandler",
-        name: "cpu_control",
-        config: {
-            sustainable_power: 1.3,
-            power_gain: 0.04,
-            driver_path: "/dev/class/cpu-ctrl/000",
-            capacitance: 150E-12,
-            logical_cpu_numbers: [
-                0,
-                1,
-                2,
-                3,
-            ],
-            min_cpu_clock_speed: 0,
-        },
-        dependencies: {
-            cpu_stats_handler_node: "cpu_stats",
-            cpu_dev_handler_node: "cpu_dev",
-        },
-    },
-    {
         type: "TemperatureHandler",
         name: "temperature_soc_pll",
         config: {
@@ -70,20 +38,31 @@
         },
     },
     {
+        type: "ThermalStateHandler",
+        name: "thermal_state_handler",
+        config: {
+            thermal_config_path: "/pkg/cpu_thermal_model_test/thermal_config.json5",
+            enable_cpu_thermal_state_connector: true,
+            enable_client_state_connector: true,
+        },
+        dependencies: {
+            platform_metrics_node: "platform_metrics",
+        },
+    },
+    {
         type: "ThermalPolicy",
         name: "thermal_policy",
         dependencies: {
             temperature_handler_node: "temperature_soc_pll",
             system_power_handler_node: "sys_shutdown",
-            thermal_load_notify_nodes: [
-                "cpu_control",
-            ],
+            thermal_load_notify_nodes: [],
+            cpu_thermal_load_notify_node: "thermal_state_handler",
             platform_metrics_node: "platform_metrics",
         },
         config: {
             controller_params: {
                 sample_interval: 1.0,
-                filter_time_constant: 1000.0,
+                filter_time_constant: 10.0,
                 target_temperature: 85.0,
                 e_integral_min: -20.0,
                 e_integral_max: 0.0,

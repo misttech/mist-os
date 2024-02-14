@@ -26,6 +26,7 @@ use {
 };
 
 const POWER_MANAGER_URL: &str = "#meta/power-manager.cm";
+const CPU_MANAGER_URL: &str = "#meta/cpu-manager.cm";
 const MOCK_COBALT_URL: &str = "#meta/mock_cobalt.cm";
 const FAKE_CLOCK_URL: &str = "#meta/fake_clock.cm";
 
@@ -37,16 +38,23 @@ static UNIQUE_REALM_NUMBER: AtomicU64 = AtomicU64::new(0);
 
 pub struct TestEnvBuilder {
     power_manager_node_config_path: Option<String>,
+    cpu_manager_node_config_path: Option<String>,
 }
 
 impl TestEnvBuilder {
     pub fn new() -> Self {
-        Self { power_manager_node_config_path: None }
+        Self { power_manager_node_config_path: None, cpu_manager_node_config_path: None }
     }
 
     /// Sets the node config path that Power Manager will be configured with.
     pub fn power_manager_node_config_path(mut self, path: &str) -> Self {
         self.power_manager_node_config_path = Some(path.into());
+        self
+    }
+
+    /// Sets the node config path that CPU Manager will be configured with.
+    pub fn cpu_manager_node_config_path(mut self, path: &str) -> Self {
+        self.cpu_manager_node_config_path = Some(path.into());
         self
     }
 
@@ -70,6 +78,11 @@ impl TestEnvBuilder {
             .add_child("power_manager", POWER_MANAGER_URL, ChildOptions::new())
             .await
             .expect("Failed to add child: power_manager");
+
+        let cpu_manager = realm_builder
+            .add_child("cpu_manager", CPU_MANAGER_URL, ChildOptions::new())
+            .await
+            .expect("Failed to add child: cpu_manager");
 
         let mock_cobalt = realm_builder
             .add_child("mock_cobalt", MOCK_COBALT_URL, ChildOptions::new())
@@ -156,6 +169,13 @@ impl TestEnvBuilder {
             .await
             .unwrap();
 
+        let fake_clock_to_cpu_manager_routes =
+            Route::new().capability(Capability::protocol_by_name("fuchsia.testing.FakeClock"));
+        realm_builder
+            .add_route(fake_clock_to_cpu_manager_routes.from(&fake_clock).to(&cpu_manager))
+            .await
+            .unwrap();
+
         let fake_clock_to_parent_routes = Route::new()
             .capability(Capability::protocol_by_name("fuchsia.testing.FakeClockControl"));
         realm_builder
@@ -203,13 +223,11 @@ impl TestEnvBuilder {
             .await
             .unwrap();
 
-        let kernel_service_to_power_manager_routes =
+        let kernel_service_to_cpu_manager_routes =
             Route::new().capability(Capability::protocol_by_name("fuchsia.kernel.Stats"));
         realm_builder
             .add_route(
-                kernel_service_to_power_manager_routes
-                    .from(&kernel_service_child)
-                    .to(&power_manager),
+                kernel_service_to_cpu_manager_routes.from(&kernel_service_child).to(&cpu_manager),
             )
             .await
             .unwrap();
@@ -226,6 +244,22 @@ impl TestEnvBuilder {
                     )
                     .from(Ref::framework())
                     .to(&power_manager),
+            )
+            .await
+            .unwrap();
+
+        realm_builder
+            .add_route(
+                Route::new()
+                    .capability(
+                        Capability::directory("pkg")
+                            .subdir("config/cpu_manager")
+                            .as_("config")
+                            .path("/config")
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .from(Ref::framework())
+                    .to(&cpu_manager),
             )
             .await
             .unwrap();
@@ -253,12 +287,44 @@ impl TestEnvBuilder {
             .await
             .unwrap();
 
+        // Set up CPU Manager's required routes
+        let parent_to_cpu_manager_routes = Route::new()
+            .capability(Capability::protocol_by_name("fuchsia.tracing.provider.Registry"));
+        realm_builder
+            .add_route(parent_to_cpu_manager_routes.from(Ref::parent()).to(&cpu_manager))
+            .await
+            .unwrap();
+
+        let power_manager_to_cpu_manager_routes = Route::new()
+            .capability(Capability::protocol_by_name("fuchsia.thermal.ClientStateConnector"));
+        realm_builder
+            .add_route(power_manager_to_cpu_manager_routes.from(&power_manager).to(&cpu_manager))
+            .await
+            .unwrap();
+
+        let cpu_manager_to_power_manager_routes = Route::new()
+            .capability(Capability::protocol_by_name("fuchsia.component.Binder").weak());
+        realm_builder
+            .add_route(cpu_manager_to_power_manager_routes.from(&cpu_manager).to(&power_manager))
+            .await
+            .unwrap();
+
         realm_builder
             .add_route(
                 Route::new()
                     .capability(Capability::directory("dev-topological"))
                     .from(Ref::child("driver_test_realm"))
                     .to(&power_manager),
+            )
+            .await
+            .unwrap();
+
+        realm_builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::directory("dev-topological"))
+                    .from(Ref::child("driver_test_realm"))
+                    .to(&cpu_manager),
             )
             .await
             .unwrap();
@@ -275,6 +341,21 @@ impl TestEnvBuilder {
             )
             .await
             .unwrap();
+
+        // Update CPU Manager's structured config values
+        if self.cpu_manager_node_config_path.is_some() {
+            realm_builder.init_mutable_config_from_package(&cpu_manager).await.unwrap();
+            realm_builder
+                .set_config_value(
+                    &cpu_manager,
+                    "node_config_path",
+                    self.cpu_manager_node_config_path
+                        .expect("cpu_manager_node_config_path not set")
+                        .into(),
+                )
+                .await
+                .unwrap();
+        }
 
         // Finally, build it
         let realm_instance = realm_builder.build().await.expect("Failed to build RealmInstance");

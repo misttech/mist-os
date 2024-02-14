@@ -72,6 +72,17 @@ rustc_binary("bin") {
   ]
 }
 
+rustc_binary("bin_with_fake_time") {
+  testonly = true
+  name = "cpu_manager_fake_time"
+  edition = "2021"
+  with_unit_tests = true
+  configs += [ "//build/config/rust:bootfs" ]
+  deps = cpu_manager_deps
+  sources = cpu_manager_sources
+  non_rust_deps = [ "//src/lib/fake-clock/lib" ]
+}
+
 fuchsia_component_manifest("manifest") {
   manifest = "meta/cpu-manager.cml"
   component_name = "cpu-manager"

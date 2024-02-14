@@ -14,7 +14,9 @@ use {
 #[fuchsia::test]
 async fn thermal_client_service_test() {
     let mut env = TestEnvBuilder::new()
-        .power_manager_node_config_path(&"/pkg/thermal_client_service_test/node_config.json5")
+        .power_manager_node_config_path(
+            &"/pkg/thermal_client_service_test/power_manager_node_config.json5",
+        )
         .build()
         .await;
 
@@ -29,8 +31,8 @@ async fn thermal_client_service_test() {
     assert_eq!(client0.get_thermal_state().await.unwrap(), 0);
 
     // Set temperature to 80 which is above the configured "onset" temperature of 50 (see the
-    // `temperature_input_configs` section in ../config_files/node_config.json5), causing thermal
-    // load to be nonzero
+    // `temperature_input_configs` section in ../config_files/power_manager_node_config.json5),
+    // causing thermal load to be nonzero
     env.set_temperature("/dev/sys/platform/soc_thermal", 80.0).await;
 
     // Verify thermal state for client0 is now 1
@@ -52,7 +54,7 @@ async fn thermal_client_service_test() {
 #[fuchsia::test]
 async fn shutdown_test() {
     let mut env = TestEnvBuilder::new()
-        .power_manager_node_config_path(&"/pkg/shutdown_test/node_config.json5")
+        .power_manager_node_config_path(&"/pkg/shutdown_test/power_manager_node_config.json5")
         .build()
         .await;
 
