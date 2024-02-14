@@ -1003,8 +1003,10 @@ template("clang_toolchain") {
               "--local",
               "--check-determinism",
             ]
+            not_needed([ "_link_rbe_exec_strategy_flags" ])
           } else if (link_rbe_check == "consistency") {
             _linker_prefix_list += [ "--compare" ]
+            not_needed([ "_link_rbe_exec_strategy_flags" ])
           } else if (link_rbe_check == "none") {
             _concurrent_jobs = concurrent_jobs.remote
             _linker_prefix_list += _link_rbe_exec_strategy_flags
