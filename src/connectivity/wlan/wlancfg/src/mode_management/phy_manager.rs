@@ -22,9 +22,9 @@ use {
     tracing::{error, info, warn},
 };
 
-// Number of seconds that recoverable event histories should be stored.  Since thresholds have not
-// yet been established, zero this out so that memory does not increase unnecessarily.
-const DEFECT_RETENTION_SECONDS: u32 = 0;
+// Number of seconds that recoverable event histories should be stored.  Store past events for 24
+// hours (86400s).
+const DEFECT_RETENTION_SECONDS: u32 = 86400;
 
 /// Errors raised while attempting to query information about or configure PHYs and ifaces.
 #[derive(Debug, Error)]
