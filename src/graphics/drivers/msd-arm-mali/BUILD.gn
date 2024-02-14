@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
@@ -140,4 +141,8 @@ group("msd-config") {
 
 fuchsia_driver_package("msd-arm-mali") {
   driver_components = [ ":msd_arm" ]
+}
+
+export_fuchsia_package_to_bazel("msd-arm-mali_for_bazel") {
+  package = ":msd-arm-mali"
 }
