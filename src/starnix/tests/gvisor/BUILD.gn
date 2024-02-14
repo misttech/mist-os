@@ -245,23 +245,33 @@ gvisor_tests_run_as_root = [
 gvisor_tests_custom_manifest = [
   {
     test_name = "cgroup_test"
+    capabilities = [ "SYS_ADMIN" ]
   },
   {
     test_name = "exec_test"
+    args = [ "--runfile_workspace_root=runfiles" ]
   },
   {
     test_name = "futex_test"
+    capabilities = [ "SYS_PTRACE" ]
   },
   {
     test_name = "setgid_test"
+    capabilities = [
+      "SETGID",
+      "CHOWN",
+    ]
+    environ = [ "TEST_ON_GVISOR=1" ]
   },
   {
     test_name = "syslog_cap_syslog_test"
     binary = "syslog_test"
+    capabilities = [ "SYS_ADMIN" ]
   },
   {
     test_name = "syslog_cap_sys_admin_test"
     binary = "syslog_test"
+    capabilities = [ "SYSLOG" ]
   },
 ]
 
@@ -339,63 +349,81 @@ group("container_resources") {
 # Creates a fuchsia_test_component for a gVisor binary.
 #
 # Parameters
-#
-#   use_gen_manifest (optional)
-#     If true, uses the generated manifest at `$target_gen_dir/${test_name}_manifest.cml.
-#     Use with `gvisor_generate_manifest()`.
-#     If false, uses the component manifest at `meta/test_name.cml`.
-#     Default: true
+#   binary (optional)
+#     Test binary name.
 #   use_persistent_storage (optional)
 #     If true, includes dependencies for persistent storage.
 #     Default: false
-#   use_expectations (optional)
-#     If true, includes dependencies for gVisor tests with expectations.
+#   is_benchmark (optional)
+#     True if the test is a benchmark.
 #     Default: false
 #   run_as_root (optional)
 #     If true, sets `uid` to `0` in manifest.
 #     Default: false
+#   program_extra (optional)
+#     Extra parameters to add to the `program` section of the manifest.
 template("gvisor_test_component") {
   test_name = target_name
 
+  _is_benchmark = defined(invoker.is_benchmark) && invoker.is_benchmark
+  if (_is_benchmark) {
+    _base_shard = "//src/starnix/tests/gvisor/meta/gvisor_benchmark.shard.cml"
+  } else {
+    _base_shard =
+        "//src/starnix/tests/gvisor/meta/gvisor_with_expectations.shard.cml"
+  }
   _storage_shard = "meta/gvisor_use_tmp_storage.shard.cml"
   _manifest_label = "${test_name}.cml"
 
-  deps = []
-  use_gen_manifest = true
-  _manifest_path = "$target_gen_dir/${test_name}_manifest.cml"
-  if (defined(invoker.use_gen_manifest) && !invoker.use_gen_manifest) {
-    use_gen_manifest = false
-    _manifest_path = "meta/${test_name}.cml"
-  }
-
   component_name = target_name
-  if (defined(invoker.use_persistent_storage) &&
-      invoker.use_persistent_storage) {
+  _use_persistent_storage =
+      defined(invoker.use_persistent_storage) && invoker.use_persistent_storage
+  if (_use_persistent_storage) {
     _storage_shard = "meta/gvisor_use_persistent_storage.shard.cml"
     _manifest_label = "${test_name}_use_persistent_storage.cml"
     component_name = "${target_name}_use_persistent_storage"
   }
 
-  use_expectations = false
-  if (defined(invoker.use_expectations)) {
-    use_expectations = invoker.use_expectations
+  _binary = test_name
+  if (defined(invoker.binary)) {
+    _binary = invoker.binary
+  }
+  _binary_path = "data/tests/${_binary}"
+
+  # We don't need the binary target for the persistent storage tests - it's
+  # already defined for the tmpfs version of this component.
+  if (!_use_persistent_storage) {
+    resource("${test_name}_bin") {
+      sources = [ "${gvisor_prebuilt_directory}/stripped/${_binary}" ]
+      outputs = [ _binary_path ]
+    }
   }
 
-  cmc_merge(_manifest_label) {
-    sources = [
-      _manifest_path,
-      _storage_shard,
-    ]
+  _manifest_file = "$target_gen_dir/${_manifest_label}"
+
+  generated_file(_manifest_label) {
+    outputs = [ _manifest_file ]
+    output_conversion = "json"
+
+    _program = {
+      binary = _binary_path
+      if (defined(invoker.program_extra)) {
+        forward_variables_from(invoker.program_extra, "*")
+      }
+    }
 
     if (defined(invoker.run_as_root) && invoker.run_as_root) {
-      sources += [ "//src/starnix/tests/run_as_root.shard.cml" ]
+      _program.uid = "0"
     }
-    if (use_gen_manifest) {
-      deps = [ ":${test_name}_manifest" ]
+
+    contents = {
+      include = [
+        rebase_path(_base_shard, root_build_dir),
+        rebase_path(_storage_shard, root_build_dir),
+      ]
+      program = _program
     }
   }
-  _outputs = get_target_outputs(":${_manifest_label}")
-  _manifest_file = _outputs[0]
 
   fuchsia_test_component(component_name) {
     forward_variables_from(invoker, "*")
@@ -405,55 +433,16 @@ template("gvisor_test_component") {
 
     manifest = _manifest_file
 
-    if (use_expectations) {
-      deps = [ ":gvisor_test_with_expectations" ]
-    } else {
+    if (_is_benchmark) {
       deps = [ ":gvisor_benchmark" ]
+    } else {
+      deps = [ ":gvisor_test_with_expectations" ]
     }
 
     deps += [
       ":${_manifest_label}",
       ":${test_name}_bin",
     ]
-  }
-}
-
-# Generates a manifest for
-#   use_expectations (optional)
-#     If true, includes runner shard for gVisor tests with expectations.
-#     Default: false
-template("gvisor_generate_manifest") {
-  test_name = target_name
-
-  use_expectations = false
-  if (defined(invoker.use_expectations) && invoker.use_expectations) {
-    use_expectations = true
-  }
-
-  _includes = []
-  if (use_expectations) {
-    _includes +=
-        [ "//src/starnix/tests/gvisor/meta/gvisor_with_expectations.shard.cml" ]
-  } else {
-    _includes +=
-        [ "//src/starnix/tests/gvisor/meta/gvisor_benchmark.shard.cml" ]
-  }
-
-  resource("${test_name}_bin") {
-    sources = [ "${gvisor_prebuilt_directory}/stripped/${test_name}" ]
-    outputs = [ "data/tests/${test_name}" ]
-  }
-
-  generated_file("${test_name}_manifest") {
-    outputs = [ "$target_gen_dir/${test_name}_manifest.cml" ]
-    output_conversion = "json"
-
-    contents = {
-      include = _includes
-      program = {
-        binary = "data/tests/$test_name"
-      }
-    }
   }
 }
 
@@ -471,42 +460,32 @@ template("gvisor_tmpfs_and_fxfs_components") {
 }
 
 foreach(test_name, gvisor_tests) {
-  gvisor_generate_manifest(test_name) {
-    use_expectations = true
-  }
   gvisor_tmpfs_and_fxfs_components(test_name) {
-    use_gen_manifest = true
-    use_expectations = true
     run_as_root = false
     test_type = "starnix"
   }
 }
 
 foreach(test_name, gvisor_tests_run_as_root) {
-  gvisor_generate_manifest(test_name) {
-    use_expectations = true
-  }
   gvisor_tmpfs_and_fxfs_components(test_name) {
-    use_gen_manifest = true
-    use_expectations = true
     run_as_root = true
     test_type = "starnix"
   }
 }
 
 foreach(test, gvisor_tests_custom_manifest) {
-  test_name = test.test_name
-  binary_name = test_name
-  if (defined(test.binary)) {
-    binary_name = test.binary
-  }
-  resource("${test_name}_bin") {
-    sources = [ "${gvisor_prebuilt_directory}/stripped/${binary_name}" ]
-    outputs = [ "data/tests/${binary_name}" ]
-  }
-  gvisor_tmpfs_and_fxfs_components(test_name) {
-    use_gen_manifest = false
-    use_expectations = true
+  gvisor_tmpfs_and_fxfs_components(test.test_name) {
+    if (defined(test.binary)) {
+      binary = test.binary
+    }
+    program_extra = {
+      forward_variables_from(test,
+                             [
+                               "args",
+                               "capabilities",
+                               "environ",
+                             ])
+    }
     run_as_root = false
     test_type = "starnix"
   }
@@ -514,12 +493,8 @@ foreach(test, gvisor_tests_custom_manifest) {
 
 foreach(benchmark_name, gvisor_benchmarks) {
   name = "${benchmark_name}_benchmark"
-  gvisor_generate_manifest(name) {
-    use_expectations = false
-  }
   gvisor_test_component(name) {
-    use_gen_manifest = true
-    use_expectations = false
+    is_benchmark = true
     run_as_root = false
     test_type = "starnix"
   }
