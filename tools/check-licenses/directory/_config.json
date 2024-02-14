@@ -4,6 +4,14 @@
         "skips": [
             {
                 "notes": [
+                    "Temporary skip, to allow removal of icu stable library."
+                ],
+                "paths": [
+                    "third_party/icu/stable"
+                ]
+            },
+            {
+                "notes": [
                     "Temporary skip, to allow Vulkan-Utility-Libraries to land."
                 ],
                 "paths": [
