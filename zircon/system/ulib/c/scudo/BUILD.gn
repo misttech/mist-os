@@ -16,15 +16,14 @@ group("scudo") {
 }
 
 scudo_common_vars = {
-  dir = "//third_party/scudo/src"
+  dir = scudo
   include_dirs = [
     ".",
     dir,
     "$dir/include",
 
-    # The gwp_asan code uses #include "gwp_asan/..." so gwp_asan is at
-    # //third_party/scudo/gwp_asan and this makes those includes work.
-    "//third_party/scudo",
+    # The gwp_asan code uses #include "gwp_asan/...".
+    "${gwp_asan}/..",
   ]
 
   configs = [ ":common.config" ]
@@ -175,7 +174,7 @@ config("testonly.config") {
 
 gwp_asan_common_vars = {
   forward_variables_from(scudo_common_vars, "*")
-  dir = "//third_party/scudo/gwp_asan"
+  dir = gwp_asan
 }
 
 libc_source_set("gwp_asan") {
@@ -223,21 +222,21 @@ libc_source_set("gwp-asan-info") {
 source_set("gwp-asan-common") {
   public_configs = [ ":gwp-asan-common-config" ]
   sources = [
-    "//third_party/scudo/gwp_asan/common.cpp",
-    "//third_party/scudo/gwp_asan/common.h",
-    "//third_party/scudo/gwp_asan/crash_handler.cpp",
-    "//third_party/scudo/gwp_asan/crash_handler.h",
-    "//third_party/scudo/gwp_asan/definitions.h",
-    "//third_party/scudo/gwp_asan/options.h",
-    "//third_party/scudo/gwp_asan/platform_specific/common_fuchsia.cpp",
-    "//third_party/scudo/gwp_asan/stack_trace_compressor.cpp",
-    "//third_party/scudo/gwp_asan/stack_trace_compressor.h",
+    "${gwp_asan}/common.cpp",
+    "${gwp_asan}/common.h",
+    "${gwp_asan}/crash_handler.cpp",
+    "${gwp_asan}/crash_handler.h",
+    "${gwp_asan}/definitions.h",
+    "${gwp_asan}/options.h",
+    "${gwp_asan}/platform_specific/common_fuchsia.cpp",
+    "${gwp_asan}/stack_trace_compressor.cpp",
+    "${gwp_asan}/stack_trace_compressor.h",
     "gwp_asan_info.h",
   ]
 }
 
 config("gwp-asan-common-config") {
-  include_dirs = [ "//third_party/scudo" ]
+  include_dirs = [ "${gwp_asan}/.." ]
 }
 
 # This is included in libc-unittests and standalone core-tests.
@@ -334,7 +333,7 @@ libc_test("gwp_asan-unittests") {
 
 source_set("gwp_asan_test_printf") {
   testonly = true
-  include_dirs = [ "//third_party/scudo" ]
+  include_dirs = [ "${gwp_asan}/.." ]
   deps = [ ":gwp_asan.testonly" ]
   sources = [ "gwp_asan_test_printf.cc" ]
 }

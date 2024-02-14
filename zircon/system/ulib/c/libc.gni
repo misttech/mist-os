@@ -8,8 +8,10 @@ import("//build/toolchain/zircon/user_basic_redirect.gni")
 # Source directory for Fucshia libc.
 libc = "//zircon/system/ulib/c"
 
-# Root source directory for llvm-libc.
+# Root source directory for llvm-libc, scudo and GWP-ASan.
 llvm_libc = "//third_party/llvm-libc/src"
+scudo = "//third_party/scudo/src"
+gwp_asan = "//third_party/scudo/gwp_asan"
 
 declare_args() {
   # **NOTE: Experimental** Use the llvm-libc implementations of string functions.
