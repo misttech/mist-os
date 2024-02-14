@@ -1,7 +1,0 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
-
-// This driver is manually bound to the composite node after the original driver is unbound.
-fuchsia.BIND_AUTOBIND == 0;
