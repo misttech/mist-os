@@ -32,6 +32,15 @@ rustc_library("core") {
     "seq_lock.rs",
   ]
   inputs = [
+    "../testdata/micro_policies/file_no_defaults_policy.pp",
+    "../testdata/micro_policies/file_range_source_high_policy.pp",
+    "../testdata/micro_policies/file_range_source_low_high_policy.pp",
+    "../testdata/micro_policies/file_range_source_low_policy.pp",
+    "../testdata/micro_policies/file_range_target_high_policy.pp",
+    "../testdata/micro_policies/file_range_target_low_high_policy.pp",
+    "../testdata/micro_policies/file_range_target_low_policy.pp",
+    "../testdata/micro_policies/file_source_defaults_policy.pp",
+    "../testdata/micro_policies/file_target_defaults_policy.pp",
     "../testdata/policies/emulator",
     "../testdata/policies/selinux_testsuite",
   ]

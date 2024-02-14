@@ -9,10 +9,10 @@ use crate::{
     SecurityId,
 };
 
-use anyhow;
+use anyhow::Context as _;
 use fuchsia_zircon::{self as zx};
 use selinux_common::{
-    security_context::SecurityContext, AbstractObjectClass, ClassPermission, Permission,
+    security_context::SecurityContext, AbstractObjectClass, ClassPermission, FileClass, Permission,
 };
 use selinux_policy::{
     metadata::HandleUnknown, parse_policy_by_value, parser::ByValue, AccessVector,
@@ -309,6 +309,43 @@ impl SecurityServer {
         } else {
             // No meaningful policy can be determined without source and target types.
             AccessVector::NONE
+        }
+    }
+
+    /// Computes the appropriate security identifier (SID) for the security context of a file-like
+    /// object of class `file_class` created by `source_sid` targeting `target_sid`.
+    pub fn compute_new_file_sid(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+    ) -> Result<SecurityId, anyhow::Error> {
+        let policy = match self.state.lock().policy.as_ref().map(Clone::clone) {
+            Some(policy) => policy,
+            None => {
+                return Err(anyhow::anyhow!("no policy loaded")).context("computing new file sid")
+            }
+        };
+
+        if let (Some(source_security_context), Some(target_security_context)) =
+            (self.sid_to_security_context(&source_sid), self.sid_to_security_context(&target_sid))
+        {
+            policy
+                .parsed
+                .new_file_security_context(
+                    &source_security_context,
+                    &target_security_context,
+                    &file_class,
+                )
+                .map(|security_context| self.security_context_to_sid(&security_context))
+                .map_err(anyhow::Error::from)
+                .context("computing new file security context from policy")
+        } else {
+            anyhow::bail!(
+                "at least one security id, {:?} and/or {:?}, not recognized by security server",
+                source_sid,
+                target_sid
+            )
         }
     }
 
@@ -644,5 +681,284 @@ mod tests {
             seq_no = status.sequence;
             assert_eq!(seq_no % 2, 0);
         });
+    }
+
+    #[fuchsia::test]
+    fn compute_new_file_sid_no_policy() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        let source_context = SecurityContext::try_from("u:unconfined_r:unconfined_t:s0")
+            .expect("creating source security context should succeed");
+        let target_context = SecurityContext::try_from("u:object_r:file_t:s0")
+            .expect("creating target security context should succeed");
+        let source_sid = security_server.security_context_to_sid(&source_context);
+        let target_sid = security_server.security_context_to_sid(&target_context);
+
+        let error = security_server
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .expect_err("expected error");
+        let error_string = format!("{:?}", error);
+        assert!(error_string.contains("no policy"));
+    }
+
+    #[fuchsia::test]
+    fn compute_new_file_sid_unknown_sids() {
+        let temporary_security_server = SecurityServer::new(Mode::Enable);
+        let source_context = SecurityContext::try_from("u:unconfined_r:unconfined_t:s0")
+            .expect("creating source security context should succeed");
+        let target_context = SecurityContext::try_from("u:object_r:file_t:s0")
+            .expect("creating target security context should succeed");
+        let source_sid = temporary_security_server.security_context_to_sid(&source_context);
+        let target_sid = temporary_security_server.security_context_to_sid(&target_context);
+
+        // Setup `security_server` with a valid policy, but no notion of `source_sid` and
+        // `target_sid`.
+        let security_server = SecurityServer::new(Mode::Enable);
+        let policy_bytes = EMULATOR_BINARY_POLICY.to_vec();
+        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+
+        let error = security_server
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .expect_err("expected error");
+        let error_string = format!("{:?}", error);
+        assert!(error_string.contains("security id"));
+        assert!(error_string.contains("not recognized"));
+    }
+
+    #[fuchsia::test]
+    fn compute_new_file_sid_no_defaults() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        let policy_bytes =
+            include_bytes!("../testdata/micro_policies/file_no_defaults_policy.pp").to_vec();
+        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+
+        let source_context = SecurityContext::try_from("user_u:unconfined_r:unconfined_t:s0-s1")
+            .expect("creating source security context should succeed");
+        let target_context = SecurityContext::try_from("file_u:object_r:file_t:s0")
+            .expect("creating target security context should succeed");
+        let source_sid = security_server.security_context_to_sid(&source_context);
+        let target_sid = security_server.security_context_to_sid(&target_context);
+
+        let computed_sid = security_server
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .expect("new sid computed");
+        let computed_context = security_server
+            .sid_to_security_context(&computed_sid)
+            .expect("computed sid associated with context");
+
+        assert_eq!("user_u", computed_context.user()); // Default: copy from source.
+        assert_eq!("object_r", computed_context.role()); // Default: "object_r".
+        assert_eq!("file_t", computed_context.type_()); // Default: copied from target.
+        assert_eq!("s0", format!("{}", computed_context.low_level()).as_str()); // Default: source low.
+        assert_eq!(None, computed_context.high_level());
+    }
+
+    #[fuchsia::test]
+    fn compute_new_file_sid_source_defaults() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        let policy_bytes =
+            include_bytes!("../testdata/micro_policies/file_source_defaults_policy.pp").to_vec();
+        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+
+        let source_context = SecurityContext::try_from("user_u:unconfined_r:unconfined_t:s0-s1:c0")
+            .expect("creating source security context should succeed");
+        let target_context = SecurityContext::try_from("file_u:object_r:file_t:s0")
+            .expect("creating target security context should succeed");
+        let source_sid = security_server.security_context_to_sid(&source_context);
+        let target_sid = security_server.security_context_to_sid(&target_context);
+
+        let computed_sid = security_server
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .expect("new sid computed");
+        let computed_context = security_server
+            .sid_to_security_context(&computed_sid)
+            .expect("computed sid associated with context");
+
+        assert_eq!("user_u", computed_context.user()); // Copy from source.
+        assert_eq!("unconfined_r", computed_context.role()); // Copy from source.
+        assert_eq!("unconfined_t", computed_context.type_()); // Copy from source.
+    }
+
+    #[fuchsia::test]
+    fn compute_new_file_sid_target_defaults() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        let policy_bytes =
+            include_bytes!("../testdata/micro_policies/file_target_defaults_policy.pp").to_vec();
+        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+
+        let source_context = SecurityContext::try_from("user_u:unconfined_r:unconfined_t:s0-s1:c0")
+            .expect("creating source security context should succeed");
+        let target_context = SecurityContext::try_from("file_u:object_r:file_t:s0-s1:c0")
+            .expect("creating target security context should succeed");
+        let source_sid = security_server.security_context_to_sid(&source_context);
+        let target_sid = security_server.security_context_to_sid(&target_context);
+
+        let computed_sid = security_server
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .expect("new sid computed");
+        let computed_context = security_server
+            .sid_to_security_context(&computed_sid)
+            .expect("computed sid associated with context");
+
+        assert_eq!("file_u", computed_context.user()); // Copy from target.
+        assert_eq!("object_r", computed_context.role()); // Copy from target.
+        assert_eq!("file_t", computed_context.type_()); // Copy from target.
+    }
+
+    #[fuchsia::test]
+    fn compute_new_file_sid_range_source_low_default() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        let policy_bytes =
+            include_bytes!("../testdata/micro_policies/file_range_source_low_policy.pp").to_vec();
+        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+
+        let source_context = SecurityContext::try_from("user_u:unconfined_r:unconfined_t:s0-s1:c0")
+            .expect("creating source security context should succeed");
+        let target_context = SecurityContext::try_from("file_u:object_r:file_t:s1")
+            .expect("creating target security context should succeed");
+        let source_sid = security_server.security_context_to_sid(&source_context);
+        let target_sid = security_server.security_context_to_sid(&target_context);
+
+        let computed_sid = security_server
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .expect("new sid computed");
+        let computed_context = security_server
+            .sid_to_security_context(&computed_sid)
+            .expect("computed sid associated with context");
+
+        assert_eq!("s0", format!("{}", computed_context.low_level()).as_str());
+        assert_eq!(None, computed_context.high_level());
+    }
+
+    #[fuchsia::test]
+    fn compute_new_file_sid_range_source_low_high_default() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        let policy_bytes =
+            include_bytes!("../testdata/micro_policies/file_range_source_low_high_policy.pp")
+                .to_vec();
+        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+
+        let source_context = SecurityContext::try_from("user_u:unconfined_r:unconfined_t:s0-s1:c0")
+            .expect("creating source security context should succeed");
+        let target_context = SecurityContext::try_from("file_u:object_r:file_t:s1")
+            .expect("creating target security context should succeed");
+        let source_sid = security_server.security_context_to_sid(&source_context);
+        let target_sid = security_server.security_context_to_sid(&target_context);
+
+        let computed_sid = security_server
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .expect("new sid computed");
+        let computed_context = security_server
+            .sid_to_security_context(&computed_sid)
+            .expect("computed sid associated with context");
+
+        assert_eq!("s0", format!("{}", computed_context.low_level()).as_str());
+        assert_eq!(
+            "s1:c0",
+            format!("{}", computed_context.high_level().expect("high level")).as_str()
+        );
+    }
+
+    #[fuchsia::test]
+    fn compute_new_file_sid_range_source_high_default() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        let policy_bytes =
+            include_bytes!("../testdata/micro_policies/file_range_source_high_policy.pp").to_vec();
+        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+
+        let source_context = SecurityContext::try_from("user_u:unconfined_r:unconfined_t:s0-s1:c0")
+            .expect("creating source security context should succeed");
+        let target_context = SecurityContext::try_from("file_u:object_r:file_t:s0")
+            .expect("creating target security context should succeed");
+        let source_sid = security_server.security_context_to_sid(&source_context);
+        let target_sid = security_server.security_context_to_sid(&target_context);
+
+        let computed_sid = security_server
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .expect("new sid computed");
+        let computed_context = security_server
+            .sid_to_security_context(&computed_sid)
+            .expect("computed sid associated with context");
+
+        assert_eq!("s1:c0", format!("{}", computed_context.low_level()).as_str());
+        assert_eq!(None, computed_context.high_level());
+    }
+
+    #[fuchsia::test]
+    fn compute_new_file_sid_range_target_low_default() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        let policy_bytes =
+            include_bytes!("../testdata/micro_policies/file_range_target_low_policy.pp").to_vec();
+        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+
+        let source_context = SecurityContext::try_from("user_u:unconfined_r:unconfined_t:s1")
+            .expect("creating source security context should succeed");
+        let target_context = SecurityContext::try_from("file_u:object_r:file_t:s0-s1:c0")
+            .expect("creating target security context should succeed");
+        let source_sid = security_server.security_context_to_sid(&source_context);
+        let target_sid = security_server.security_context_to_sid(&target_context);
+
+        let computed_sid = security_server
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .expect("new sid computed");
+        let computed_context = security_server
+            .sid_to_security_context(&computed_sid)
+            .expect("computed sid associated with context");
+
+        assert_eq!("s0", format!("{}", computed_context.low_level()).as_str());
+        assert_eq!(None, computed_context.high_level());
+    }
+
+    #[fuchsia::test]
+    fn compute_new_file_sid_range_target_low_high_default() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        let policy_bytes =
+            include_bytes!("../testdata/micro_policies/file_range_target_low_high_policy.pp")
+                .to_vec();
+        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+
+        let source_context = SecurityContext::try_from("user_u:unconfined_r:unconfined_t:s1")
+            .expect("creating source security context should succeed");
+        let target_context = SecurityContext::try_from("file_u:object_r:file_t:s0-s1:c0")
+            .expect("creating target security context should succeed");
+        let source_sid = security_server.security_context_to_sid(&source_context);
+        let target_sid = security_server.security_context_to_sid(&target_context);
+
+        let computed_sid = security_server
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .expect("new sid computed");
+        let computed_context = security_server
+            .sid_to_security_context(&computed_sid)
+            .expect("computed sid associated with context");
+
+        assert_eq!("s0", format!("{}", computed_context.low_level()).as_str());
+        assert_eq!(
+            "s1:c0",
+            format!("{}", computed_context.high_level().expect("high level")).as_str()
+        );
+    }
+
+    #[fuchsia::test]
+    fn compute_new_file_sid_range_target_high_default() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        let policy_bytes =
+            include_bytes!("../testdata/micro_policies/file_range_target_high_policy.pp").to_vec();
+        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+
+        let source_context = SecurityContext::try_from("user_u:unconfined_r:unconfined_t:s0")
+            .expect("creating source security context should succeed");
+        let target_context = SecurityContext::try_from("file_u:object_r:file_t:s0-s1:c0")
+            .expect("creating target security context should succeed");
+        let source_sid = security_server.security_context_to_sid(&source_context);
+        let target_sid = security_server.security_context_to_sid(&target_context);
+
+        let computed_sid = security_server
+            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
+            .expect("new sid computed");
+        let computed_context = security_server
+            .sid_to_security_context(&computed_sid)
+            .expect("computed sid associated with context");
+
+        assert_eq!("s1:c0", format!("{}", computed_context.low_level()).as_str());
+        assert_eq!(None, computed_context.high_level());
     }
 }
