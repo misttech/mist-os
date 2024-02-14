@@ -15,7 +15,7 @@ use lowpan_driver_common::spinel::Subnet;
 
 use packet::ParsablePacket;
 use packet_formats::icmp::mld::MldPacket;
-use packet_formats::icmp::{IcmpParseArgs, Icmpv6Packet};
+use packet_formats::icmp::{ndp::NdpPacket, IcmpParseArgs, Icmpv6Packet};
 use packet_formats::ip::{IpPacket, IpProto, Ipv6Proto};
 use packet_formats::ipv6::Ipv6Packet;
 
@@ -342,6 +342,26 @@ where
 
                             // Drop the packet
                             return false;
+                        }
+                        Ok(Icmpv6Packet::Ndp(NdpPacket::RouterAdvertisement(ra)))
+                            if packet.dst_ip().segments()[0] == 0xFF02 =>
+                        {
+                            info!("Received ICMPv6 RA: {ra:?}");
+
+                            let driver_state = self.driver_state.lock();
+
+                            if let Err(ot::WrongSize) = driver_state
+                                .ot_instance
+                                .border_routing_process_icmp6_ra(packet.body())
+                            {
+                                warn!("ICMPv6 RA way too large")
+                            }
+
+                            // Drop the packet
+                            return false;
+                        }
+                        Ok(Icmpv6Packet::Ndp(NdpPacket::RouterAdvertisement(ra))) => {
+                            info!("Ignoring suspicious non-ll-multicast RA: {ra:?}");
                         }
                         Ok(_) => {}
                         Err(err) => {
