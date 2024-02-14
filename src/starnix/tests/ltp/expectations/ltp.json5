@@ -162,7 +162,6 @@
                 "prctl07",
                 "prctl08",
                 "prctl10",
-                "ptem01",
                 "ptrace10",
                 "pwritev03",
                 "pwritev03_64",

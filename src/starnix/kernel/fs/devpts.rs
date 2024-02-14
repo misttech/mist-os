@@ -664,10 +664,7 @@ where
             );
             error!(EINVAL)
         }
-        TCSBRK => {
-            track_stub!(TODO("https://fxbug.dev/322893658"), "devpts ioctl TCSBRK", is_main);
-            error!(ENOSYS)
-        }
+        TCSBRK => Ok(SUCCESS),
         TCXONC => {
             track_stub!(TODO("https://fxbug.dev/322892912"), "devpts ioctl TCXONC", is_main);
             error!(ENOSYS)
@@ -744,10 +741,7 @@ where
             track_stub!(TODO("https://fxbug.dev/322893974"), "devpts ioctl TIOCGETD", is_main);
             error!(ENOSYS)
         }
-        TCSBRKP => {
-            track_stub!(TODO("https://fxbug.dev/322894075"), "devpts ioctl TCSBRKP", is_main);
-            error!(ENOSYS)
-        }
+        TCSBRKP => Ok(SUCCESS),
         TIOCSBRK => {
             track_stub!(TODO("https://fxbug.dev/322893936"), "devpts ioctl TIOCSBRK", is_main);
             error!(ENOSYS)
