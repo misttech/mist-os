@@ -193,17 +193,24 @@ pub async fn open_interface_with_serial(serial: &str) -> Result<Interface> {
 }
 
 #[allow(async_fn_in_trait)]
+pub trait FastbootUsbLiveTester: Send + 'static {
+    /// Checks if the interface with the given serial number is Ready to accept
+    /// fastboot commands
+    async fn is_fastboot_usb_live(&mut self, serial: &str) -> bool;
+}
+
+pub struct GetVarFastbootUsbLiveTester;
+
+impl FastbootUsbLiveTester for GetVarFastbootUsbLiveTester {
+    async fn is_fastboot_usb_live(&mut self, serial: &str) -> bool {
+        open_interface_with_serial(serial).await.is_ok()
+    }
+}
+
+#[allow(async_fn_in_trait)]
 pub trait FastbootUsbTester: Send + 'static {
     /// Checks if the interface with the given serial number is in Fastboot
     async fn is_fastboot_usb(&mut self, serial: &str) -> bool;
-}
-
-struct OpenInterfaceFastbootUsbTester;
-
-impl FastbootUsbTester for OpenInterfaceFastbootUsbTester {
-    async fn is_fastboot_usb(&mut self, serial: &str) -> bool {
-        open_interface_with_serial(serial).await.is_ok()
-    }
 }
 
 /// Checks if the USB Interface for the given serial is live and a fastboot match
@@ -220,8 +227,8 @@ pub struct UnversionedFastbootUsbTester;
 impl FastbootUsbTester for UnversionedFastbootUsbTester {
     async fn is_fastboot_usb(&mut self, serial: &str) -> bool {
         let mut open_cb = |info: &InterfaceInfo| -> bool {
-            if is_fastboot_match(info) {
-                extract_serial_number(info) == *serial
+            if extract_serial_number(info) == *serial {
+                is_fastboot_match(info)
             } else {
                 // Do not open.
                 false
@@ -279,38 +286,49 @@ where
     Ok(FastbootUsbWatcher::new(
         event_handler,
         find_serial_numbers,
-        OpenInterfaceFastbootUsbTester {},
+        UnversionedFastbootUsbTester {},
+        GetVarFastbootUsbLiveTester {},
         Duration::from_secs(1),
     ))
 }
 
 impl FastbootUsbWatcher {
-    pub fn new<F, W, O>(event_handler: F, finder: W, opener: O, interval: Duration) -> Self
+    pub fn new<F, W, O, L>(
+        event_handler: F,
+        finder: W,
+        opener: O,
+        tester: L,
+        interval: Duration,
+    ) -> Self
     where
         F: FastbootEventHandler,
         W: SerialNumberFinder,
         O: FastbootUsbTester,
+        L: FastbootUsbLiveTester,
     {
         let mut res = Self { discovery_task: None, drain_task: None };
 
         let (sender, receiver) = async_channel::bounded::<FastbootEvent>(1);
 
-        res.discovery_task.replace(Task::local(discovery_loop(sender, finder, opener, interval)));
+        res.discovery_task
+            .replace(Task::local(discovery_loop(sender, finder, opener, tester, interval)));
         res.drain_task.replace(Task::local(handle_events_loop(receiver, event_handler)));
 
         res
     }
 }
 
-async fn discovery_loop<F, O>(
+async fn discovery_loop<F, O, L>(
     events_out: async_channel::Sender<FastbootEvent>,
     mut finder: F,
     mut opener: O,
+    mut tester: L,
     discovery_interval: Duration,
 ) -> ()
 where
     F: SerialNumberFinder,
     O: FastbootUsbTester,
+    L: FastbootUsbLiveTester,
 {
     let mut serials = BTreeSet::<String>::new();
     loop {
@@ -322,6 +340,13 @@ where
         for serial in &new_serials {
             // Just because the serial is found doesnt mean that the target is ready
             if !opener.is_fastboot_usb(serial.as_str()).await {
+                tracing::debug!(
+                    "Skipping adding serial number: {serial} as it is not a Fastboot interface"
+                );
+                continue;
+            }
+
+            if !tester.is_fastboot_usb_live(serial.as_str()).await {
                 tracing::debug!("Skipping adding serial number: {serial} as although it appears to be a fastboot device it is not readily accepting connections");
                 continue;
             }
@@ -370,6 +395,16 @@ mod test {
         sync::{Arc, Mutex},
     };
 
+    struct TestFastbootUsbLiveTester {
+        serial_to_is_live: HashMap<String, bool>,
+    }
+
+    impl FastbootUsbLiveTester for TestFastbootUsbLiveTester {
+        async fn is_fastboot_usb_live(&mut self, _serial: &str) -> bool {
+            *self.serial_to_is_live.get(_serial).unwrap()
+        }
+    }
+
     struct TestFastbootUsbTester {
         serial_to_is_fastboot: HashMap<String, bool>,
     }
@@ -416,6 +451,12 @@ mod test {
         serial_to_is_fastboot.insert("ABCD".to_string(), false);
         let fastboot_tester = TestFastbootUsbTester { serial_to_is_fastboot };
 
+        let mut serial_to_is_live = HashMap::new();
+        serial_to_is_live.insert("1234".to_string(), true);
+        serial_to_is_live.insert("2345".to_string(), true);
+        serial_to_is_live.insert("5678".to_string(), true);
+        let fastboot_live_tester = TestFastbootUsbLiveTester { serial_to_is_live };
+
         let (sender, mut queue) = unbounded();
         let watcher = FastbootUsbWatcher::new(
             move |res: Result<FastbootEvent>| {
@@ -423,6 +464,7 @@ mod test {
             },
             serial_finder,
             fastboot_tester,
+            fastboot_live_tester,
             Duration::from_millis(1),
         );
 
