@@ -295,8 +295,11 @@ template("bazel_product_bundle") {
     }
   }
 
+  _size_targets = []
+
   if (defined(invoker.bazel_size_report_aggregator_target)) {
     _size_report_target = "${target_name}_size_report"
+    _size_targets += [ ":${_size_report_target}" ]
     bazel_action(_size_report_target) {
       forward_variables_from(invoker,
                              [
@@ -347,6 +350,7 @@ template("bazel_product_bundle") {
 
   if (defined(invoker.bazel_product_size_check_target)) {
     _product_size_checker_target = "${target_name}_product_size_checker"
+    _size_targets += [ ":${_product_size_checker_target}" ]
     bazel_action(_product_size_checker_target) {
       forward_variables_from(invoker,
                              [
@@ -391,6 +395,7 @@ template("bazel_product_bundle") {
 
   if (defined(invoker.bazel_size_checker_target)) {
     _product_size_checker_target = "${target_name}_product_size_checker"
+    _size_targets += [ ":${_product_size_checker_target}" ]
     bazel_action(_product_size_checker_target) {
       forward_variables_from(invoker,
                              [
@@ -433,6 +438,7 @@ template("bazel_product_bundle") {
     }
 
     _size_report_target = "${target_name}_size_report"
+    _size_targets += [ ":${_size_report_target}" ]
     bazel_action(_size_report_target) {
       forward_variables_from(invoker,
                              [
@@ -479,6 +485,15 @@ template("bazel_product_bundle") {
         ]
       }
     }
+  }
+
+  group("${target_name}_size_targets") {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    deps = _size_targets
   }
 
   if (defined(invoker.bazel_elf_sizes_target)) {

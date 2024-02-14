@@ -292,14 +292,11 @@ group("default-images") {
     "//build/images/tools:fastboot($host_toolchain)",
   ]
 
-  if (size_checker_input != {
-      }) {
-    if (use_bazel_images_only) {
-      deps += [
-        "${bazel_product_bundle_target}_product_size_checker",
-        "${bazel_product_bundle_target}_size_report",
-      ]
-    } else {
+  if (use_bazel_images_only) {
+    deps += [ "${bazel_product_bundle_target}_size_targets" ]
+  } else {
+    if (size_checker_input != {
+        }) {
       # Size checks only make sense when use_bringup_assembly is false, since
       # they require system images in addition to the ZBI.
       deps += [
