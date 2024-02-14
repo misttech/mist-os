@@ -112,9 +112,9 @@ executable("app") {
 
   deps = [
     ":lib",
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_hlcpp",
     "//sdk/fidl/fuchsia.time:fuchsia.time_hlcpp",
+    "//sdk/lib/scheduler/cpp",
     "//sdk/lib/zbi-format",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-provider",

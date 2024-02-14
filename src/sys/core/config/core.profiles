@@ -8,6 +8,9 @@
     "fuchsia.media.audio.core.mixer": { "capacity": "4400us", "deadline": "10ms", "period": "10ms" },
     "fuchsia.netstack.go-worker": { "priority": 25 },
 
+    // Fuchsia cobalt profiles.
+    "fuchsia.cobalt.main": { "priority": 0 },
+
     // Fuchsia driver profiles.
     "fuchsia.devices.wlan.drivers.brcmf.sdio.oob-interrupt": { "capacity": "400us", "deadline": "1ms", "period": "1ms" },
     "fuchsia.devices.wlan.drivers.brcmf.workqueue.runner": { "capacity": "400us", "deadline": "1ms", "period": "1ms" },

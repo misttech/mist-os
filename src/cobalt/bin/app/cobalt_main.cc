@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <fuchsia/buildinfo/cpp/fidl.h>
-#include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/sysinfo/cpp/fidl.h>
 #include <fuchsia/time/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -13,6 +12,7 @@
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
 #include <lib/inspect/component/cpp/component.h>
+#include <lib/scheduler/role.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/provider.h>
 #include <lib/zbi-format/zbi.h>
@@ -256,9 +256,8 @@ int main(int argc, const char** argv) {
 
   bool test_dont_backfill_empty_reports = command_line.HasOption(kTestDontBackfillEmptyReports);
 
-  FX_LOGS(INFO) << "Cobalt is starting with the following parameters: "
-                << "schedule_interval=" << schedule_interval.count()
-                << " seconds, min_interval=" << min_interval.count()
+  FX_LOGS(INFO) << "Cobalt is starting with the following parameters: " << "schedule_interval="
+                << schedule_interval.count() << " seconds, min_interval=" << min_interval.count()
                 << " seconds, initial_interval=" << initial_interval.count()
                 << " seconds, upload_jitter=" << (upload_jitter * 100) << "%"
                 << ", max_bytes_per_observation_store=" << max_bytes_per_observation_store
@@ -287,24 +286,11 @@ int main(int argc, const char** argv) {
   inspector.Health().StartingUp();
 
   // Lower the priority of the main thread.
-  fuchsia::scheduler::ProfileProviderSyncPtr provider;
-  context->svc()->Connect<fuchsia::scheduler::ProfileProvider>(provider.NewRequest());
-  zx_status_t fidl_status;
-  zx::profile profile;
-  auto status =
-      provider->GetProfile(0 /* LOWEST_PRIORITY */, "src/cobalt/bin/app", &fidl_status, &profile);
-  if (status == ZX_OK) {
-    FX_CHECK(fidl_status == ZX_OK) << "Recieved error while acquiring profile";
-    FX_LOGS(INFO) << "Fetched profile!";
-    status = zx_object_set_profile(zx_thread_self(), profile.get(), 0);
-    FX_CHECK(status == ZX_OK) << "Unable to set current thread priority";
-    FX_LOGS(INFO) << "Profile aplied to current thread";
+  zx_status_t status = fuchsia_scheduler::SetRoleForThisThread("fuchsia.cobalt.main");
+  if (status != ZX_OK) {
+    FX_LOGS(INFO) << "Unable to set scheduler role.";
   } else {
-    // If we fail with ZX_ERR_PEER_CLOSED, then the ProfileProvider is down, and we should continue
-    // anyway.
-    FX_CHECK(status == ZX_ERR_PEER_CLOSED)
-        << "Unable to connect to ProfileProvider, received unexpected error (" << status << ")";
-    FX_LOGS(INFO) << "Unable to lower current thread provider. ProfileProvider is down.";
+    FX_LOGS(INFO) << "Scheduler role aplied to current thread";
   }
 
   std::string product = "<product read failed>";
