@@ -8,8 +8,10 @@ use super::{
         CONFIG_HANDLE_UNKNOWN_MASK, CONFIG_MLS_FLAG, POLICYDB_SIGNATURE,
         POLICYDB_STRING_MAX_LENGTH, POLICYDB_VERSION_MAX, POLICYDB_VERSION_MIN, SELINUX_MAGIC,
     },
+    symbols::{ClassDefault, ClassDefaultRange},
 };
 
+use selinux_common::security_context::{SecurityContext, SecurityContextParseError};
 use thiserror::Error;
 
 /// Structured errors that may be encountered parsing a binary policy.
@@ -61,6 +63,25 @@ pub enum ValidateError {
     OutOfOrderExtensibleBitmapItems { found_start_bit: u32, min_start: u32 },
     #[error("expected extensible bitmap items to refer to bits in range [0, {found_high_bit}), but found item that ends at {found_items_end}")]
     ExtensibleBitmapItemOverflow { found_items_end: u32, found_high_bit: u32 },
+    #[error(
+        "expected class default binary value to be one of {}, {}, or {}, but found {value}",
+        ClassDefault::DEFAULT_UNSPECIFIED,
+        ClassDefault::DEFAULT_SOURCE,
+        ClassDefault::DEFAULT_TARGET
+    )]
+    InvalidClassDefault { value: u32 },
+    #[error(
+        "expected class default binary value to be one of {:?}, but found {value}",
+        [ClassDefaultRange::DEFAULT_UNSPECIFIED,
+        ClassDefaultRange::DEFAULT_SOURCE_LOW,
+        ClassDefaultRange::DEFAULT_SOURCE_HIGH,
+        ClassDefaultRange::DEFAULT_SOURCE_LOW_HIGH,
+        ClassDefaultRange::DEFAULT_TARGET_LOW,
+        ClassDefaultRange::DEFAULT_TARGET_HIGH,
+        ClassDefaultRange::DEFAULT_TARGET_LOW_HIGH,
+        ClassDefaultRange::DEFAULT_UNKNOWN_USED_VALUE]
+    )]
+    InvalidClassDefaultRange { value: u32 },
     #[error("required validation routine not implemented")]
     NotImplemented,
 }
@@ -81,4 +102,26 @@ pub enum QueryError {
 /// Structured errors that may be encountered computing new security contexts based on a binary
 /// policy.
 #[derive(Debug, Error, PartialEq)]
-pub enum NewSecurityContextError {}
+pub enum NewSecurityContextError {
+    #[error(
+        r#"failed to parse security context computed for new object:
+source security context: {source_security_context:#?}
+target security context: {target_security_context:#?}
+computed user: {computed_user:?}
+computed role: {computed_role:?}
+computed user: {computed_type:?}
+computed low level: {computed_low_level:?}
+computed high level: {computed_high_level:?}
+parsing error: {error:?}"#
+    )]
+    MalformedComputedSecurityContext {
+        source_security_context: SecurityContext,
+        target_security_context: SecurityContext,
+        computed_user: String,
+        computed_role: String,
+        computed_type: String,
+        computed_low_level: String,
+        computed_high_level: Option<String>,
+        error: SecurityContextParseError,
+    },
+}

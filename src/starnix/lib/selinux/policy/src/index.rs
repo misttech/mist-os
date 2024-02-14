@@ -3,12 +3,15 @@
 // found in the LICENSE file.
 
 use super::{
+    error::NewSecurityContextError,
     parser::ParseStrategy,
-    symbols::{Class, Classes, CommonSymbol, CommonSymbols, Permission},
+    symbols::{
+        Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, Permission,
+    },
     ParsedPolicy,
 };
 
-use selinux_common::{self as sc, ClassPermission};
+use selinux_common::{self as sc, security_context::SecurityContext, ClassPermission as _};
 use std::collections::HashMap;
 
 /// An index for facilitating fast lookup of common abstractions inside parsed binary policy data
@@ -112,6 +115,97 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
                 &common_symbol.permissions()[permission_index]
             }
         }
+    }
+
+    pub fn new_file_security_context(
+        &self,
+        source: &SecurityContext,
+        target: &SecurityContext,
+        class: &sc::FileClass,
+    ) -> Result<SecurityContext, NewSecurityContextError> {
+        let object_class = sc::ObjectClass::from(class.clone());
+        let policy_class = self.class(&object_class);
+        let class_defaults = policy_class.defaults();
+
+        // The SELinux notebook states:
+        //
+        // The user component is inherited from the creating process (policy version 27 allows a
+        // default_user of source or target to be defined for each object class).
+        let user = match class_defaults.user() {
+            ClassDefault::Source => source.user(),
+            ClassDefault::Target => target.user(),
+            _ => source.user(),
+        };
+
+        // The SELinux notebook states:
+        //
+        // The role component generally defaults to the object_r role (policy version 26 allows a
+        // role_transition and version 27 allows a default_role of source or target to be defined
+        // for each object class).
+        let role = match class_defaults.role() {
+            ClassDefault::Source => source.role(),
+            ClassDefault::Target => target.role(),
+            _ => "object_r",
+        };
+
+        // The SELinux notebook states:
+        //
+        // The type component defaults to the type of the parent directory if no matching
+        // type_transition rule was specified in the policy (policy version 25 allows a filename
+        // type_transition rule and version 28 allows a default_type of source or target to be
+        // defined for each object class).
+        let type_ = match class_defaults.type_() {
+            ClassDefault::Source => source.type_(),
+            ClassDefault::Target => target.type_(),
+            // The "parent directory" in this context is the target. (The source is the process
+            // creating the file-like object.)
+            _ => target.type_(),
+        };
+
+        // The SELinux notebook states:
+        //
+        // The range/level component defaults to the low/current level of the creating process if no
+        // matching range_transition rule was specified in the policy (policy version 27 allows a
+        // default_range of source or target with the selected range being low, high or low-high to
+        // be defined for each object class).
+        let (low_level, high_level) = match class_defaults.range() {
+            ClassDefaultRange::SourceLow => (source.low_level().clone(), None),
+            ClassDefaultRange::SourceHigh => {
+                (source.high_level().unwrap_or(source.low_level()).clone(), None)
+            }
+            ClassDefaultRange::SourceLowHigh => {
+                (source.low_level().clone(), source.high_level().map(Clone::clone))
+            }
+            ClassDefaultRange::TargetLow => (target.low_level().clone(), None),
+            ClassDefaultRange::TargetHigh => {
+                (target.high_level().unwrap_or(target.low_level()).clone(), None)
+            }
+            ClassDefaultRange::TargetLowHigh => {
+                (target.low_level().clone(), target.high_level().map(Clone::clone))
+            }
+            _ => (source.low_level().clone(), None),
+        };
+
+        // TODO(b/322353836): Implement transitions for `*_transition` rules based on initial
+        // `user`, `role`, `type_`, `range` values.
+
+        let security_context_string = match &high_level {
+            Some(high_level) => format!("{}:{}:{}:{}-{}", user, role, type_, low_level, high_level),
+            None => format!("{}:{}:{}:{}", user, role, type_, low_level),
+        };
+
+        SecurityContext::try_from(security_context_string.as_str()).map_err(|error| {
+            NewSecurityContextError::MalformedComputedSecurityContext {
+                source_security_context: source.clone(),
+                target_security_context: target.clone(),
+                computed_user: user.to_string(),
+                computed_role: role.to_string(),
+                computed_type: type_.to_string(),
+                computed_low_level: low_level.to_string(),
+                computed_high_level: high_level.map(|high_level| high_level.to_string()),
+                error,
+            }
+        })
     }
 
     pub(crate) fn parsed_policy(&self) -> &ParsedPolicy<PS> {

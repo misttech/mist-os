@@ -182,17 +182,17 @@ impl<PS: ParseStrategy> Policy<PS> {
             .collect()
     }
 
-    /// Returns the the security context that should be applied to a newly created file-like SELinux
+    /// Returns the security context that should be applied to a newly created file-like SELinux
     /// object according to `source` and `target` security contexts, as well as the new object's
     /// `class`. Returns an error if the security context for such an object is not well-defined
     /// by this [`Policy`].
     pub fn new_file_security_context(
         &self,
-        _source: &SecurityContext,
-        _target: &SecurityContext,
-        _class: &FileClass,
+        source: &SecurityContext,
+        target: &SecurityContext,
+        class: &FileClass,
     ) -> Result<SecurityContext, NewSecurityContextError> {
-        todo!("Implement computing security contexts for newly created file-like objects");
+        self.0.new_file_security_context(source, target, class)
     }
 
     /// Returns whether the input types are explicitly granted `permission` via an `allow [...];`

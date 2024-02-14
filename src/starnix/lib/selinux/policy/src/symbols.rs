@@ -5,8 +5,10 @@
 use super::{
     array_type, array_type_validate_deref_both, array_type_validate_deref_data,
     array_type_validate_deref_metadata_data_vec, array_type_validate_deref_none_data_vec,
-    error::ParseError, extensible_bitmap::ExtensibleBitmap, parser::ParseStrategy, Array, Counted,
-    Parse, ParseSlice, Validate, ValidateArray,
+    error::{ParseError, ValidateError},
+    extensible_bitmap::ExtensibleBitmap,
+    parser::ParseStrategy,
+    Array, Counted, Parse, ParseSlice, Validate, ValidateArray,
 };
 
 use anyhow::Context as _;
@@ -573,8 +575,12 @@ fn find_own_permission_by_name_bytes<'a, PS: ParseStrategy>(
 impl<PS: ParseStrategy> Validate for [Class<PS>] {
     type Error = anyhow::Error;
 
-    /// TODO: Validate internal consistency between consecutive [`Class`] instances.
     fn validate(&self) -> Result<(), Self::Error> {
+        // TODO: Validate internal consistency between consecutive [`Class`] instances.
+        for class in self {
+            // TODO: Validate `self.constraints` and `self.validate_transitions`.
+            class.defaults().validate().context("class defaults")?;
+        }
         Ok(())
     }
 }
@@ -638,6 +644,10 @@ impl<PS: ParseStrategy> Class<PS> {
     pub fn permissions(&self) -> &Permissions<PS> {
         &self.constraints.metadata.data
     }
+
+    pub fn defaults(&self) -> &ClassDefaults {
+        PS::deref(&self.defaults)
+    }
 }
 
 impl<PS: ParseStrategy> Parse<PS> for Class<PS>
@@ -672,6 +682,137 @@ pub(crate) struct ClassDefaults {
     default_role: le::U32,
     default_range: le::U32,
     default_type: le::U32,
+}
+
+impl ClassDefaults {
+    pub fn user(&self) -> ClassDefault {
+        self.default_user.get().into()
+    }
+
+    pub fn role(&self) -> ClassDefault {
+        self.default_role.get().into()
+    }
+
+    pub fn range(&self) -> ClassDefaultRange {
+        self.default_range.get().into()
+    }
+
+    pub fn type_(&self) -> ClassDefault {
+        self.default_type.get().into()
+    }
+}
+
+impl Validate for ClassDefaults {
+    type Error = anyhow::Error;
+
+    fn validate(&self) -> Result<(), Self::Error> {
+        ClassDefault::validate(self.default_user.get()).context("default user")?;
+        ClassDefault::validate(self.default_role.get()).context("default role")?;
+        ClassDefault::validate(self.default_type.get()).context("default type")?;
+        ClassDefaultRange::validate(self.default_range.get()).context("default range")?;
+        Ok(())
+    }
+}
+
+#[derive(PartialEq)]
+pub(crate) enum ClassDefault {
+    Unspecified,
+    Source,
+    Target,
+}
+
+impl ClassDefault {
+    pub(crate) const DEFAULT_UNSPECIFIED: u32 = 0;
+    pub(crate) const DEFAULT_SOURCE: u32 = 1;
+    pub(crate) const DEFAULT_TARGET: u32 = 2;
+
+    fn validate(value: u32) -> Result<(), ValidateError> {
+        match value {
+            Self::DEFAULT_UNSPECIFIED | Self::DEFAULT_SOURCE | Self::DEFAULT_TARGET => Ok(()),
+            value => Err(ValidateError::InvalidClassDefault { value }),
+        }
+    }
+}
+
+impl From<u32> for ClassDefault {
+    fn from(value: u32) -> Self {
+        match value {
+            Self::DEFAULT_UNSPECIFIED => Self::Unspecified,
+            Self::DEFAULT_SOURCE => Self::Source,
+            Self::DEFAULT_TARGET => Self::Target,
+            v => panic!(
+                "invalid SELinux class default; expected {}, {}, or {}, but got {}",
+                Self::DEFAULT_UNSPECIFIED,
+                Self::DEFAULT_SOURCE,
+                Self::DEFAULT_TARGET,
+                v
+            ),
+        }
+    }
+}
+
+#[derive(PartialEq)]
+pub(crate) enum ClassDefaultRange {
+    Unspecified,
+    SourceLow,
+    SourceHigh,
+    SourceLowHigh,
+    TargetLow,
+    TargetHigh,
+    TargetLowHigh,
+}
+
+impl ClassDefaultRange {
+    pub(crate) const DEFAULT_UNSPECIFIED: u32 = 0;
+    pub(crate) const DEFAULT_SOURCE_LOW: u32 = 1;
+    pub(crate) const DEFAULT_SOURCE_HIGH: u32 = 2;
+    pub(crate) const DEFAULT_SOURCE_LOW_HIGH: u32 = 3;
+    pub(crate) const DEFAULT_TARGET_LOW: u32 = 4;
+    pub(crate) const DEFAULT_TARGET_HIGH: u32 = 5;
+    pub(crate) const DEFAULT_TARGET_LOW_HIGH: u32 = 6;
+    // TODO: Determine what this value means.
+    pub(crate) const DEFAULT_UNKNOWN_USED_VALUE: u32 = 7;
+
+    fn validate(value: u32) -> Result<(), ValidateError> {
+        match value {
+            Self::DEFAULT_UNSPECIFIED
+            | Self::DEFAULT_SOURCE_LOW
+            | Self::DEFAULT_SOURCE_HIGH
+            | Self::DEFAULT_SOURCE_LOW_HIGH
+            | Self::DEFAULT_TARGET_LOW
+            | Self::DEFAULT_TARGET_HIGH
+            | Self::DEFAULT_TARGET_LOW_HIGH
+            | Self::DEFAULT_UNKNOWN_USED_VALUE => Ok(()),
+            value => Err(ValidateError::InvalidClassDefaultRange { value }),
+        }
+    }
+}
+
+impl From<u32> for ClassDefaultRange {
+    fn from(value: u32) -> Self {
+        match value {
+            Self::DEFAULT_UNSPECIFIED => Self::Unspecified,
+            Self::DEFAULT_SOURCE_LOW => Self::SourceLow,
+            Self::DEFAULT_SOURCE_HIGH => Self::SourceHigh,
+            Self::DEFAULT_SOURCE_LOW_HIGH => Self::SourceLowHigh,
+            Self::DEFAULT_TARGET_LOW => Self::TargetLow,
+            Self::DEFAULT_TARGET_HIGH => Self::TargetHigh,
+            Self::DEFAULT_TARGET_LOW_HIGH => Self::TargetLowHigh,
+            v => panic!(
+                "invalid SELinux MLS range default; expected one of {:?}, but got {}",
+                [
+                    Self::DEFAULT_UNSPECIFIED,
+                    Self::DEFAULT_SOURCE_LOW,
+                    Self::DEFAULT_SOURCE_HIGH,
+                    Self::DEFAULT_SOURCE_LOW_HIGH,
+                    Self::DEFAULT_TARGET_LOW,
+                    Self::DEFAULT_TARGET_HIGH,
+                    Self::DEFAULT_TARGET_LOW_HIGH,
+                ],
+                v
+            ),
+        }
+    }
 }
 
 array_type!(

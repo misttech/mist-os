@@ -25,8 +25,29 @@ pub struct SecurityContext {
 }
 
 impl SecurityContext {
+    /// Returns the user component of the security context.
+    pub fn user(&self) -> &str {
+        &self.user
+    }
+
+    /// Returns the role component of the security context.
+    pub fn role(&self) -> &str {
+        &self.role
+    }
+
+    /// Returns the type component of the security context.
     pub fn type_(&self) -> &str {
         &self.type_
+    }
+
+    /// Returns the [lowest] security level of the context.
+    pub fn low_level(&self) -> &SecurityLevel {
+        &self.low_level
+    }
+
+    /// Returns the highest security level, if it allows a range.
+    pub fn high_level(&self) -> Option<&SecurityLevel> {
+        self.high_level.as_ref()
     }
 }
 
