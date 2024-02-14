@@ -160,6 +160,11 @@ py_binary(
 )
 
 py_binary(
+    name = "construct_budgets_file",
+    srcs = ["construct_budgets_file.py"],
+)
+
+py_binary(
     name = "work_on_runner",
     srcs = ["work_on_runner.py"],
 )
