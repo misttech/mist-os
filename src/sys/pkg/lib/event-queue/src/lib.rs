@@ -50,7 +50,12 @@
 
 use {
     fuchsia_async::TimeoutExt,
-    futures::{channel::mpsc, future::select_all, prelude::*, select},
+    futures::{
+        channel::{mpsc, oneshot},
+        future::select_all,
+        prelude::*,
+        select,
+    },
     std::{collections::VecDeque, time::Duration},
     thiserror::Error,
 };
@@ -108,6 +113,7 @@ where
     Clear,
     QueueEvent(N::Event),
     TryFlush(BarrierBlock),
+    Ping(oneshot::Sender<()>),
 }
 
 /// A control handle that can control the event queue.
@@ -172,6 +178,15 @@ where
 
         Ok(barrier.map(Ok).on_timeout(timeout, || Err(TimedOut)))
     }
+
+    /// Pings the event queue.  When this returns, you can be sure that all previous actions via
+    /// this control handle have been processed (but not necessarily forwarded to all clients yet).
+    pub async fn ping(&mut self) -> Result<(), EventQueueDropped> {
+        let (sender, receiver) = oneshot::channel();
+        self.sender.send(Command::Ping(sender)).await.map_err(|_| EventQueueDropped)?;
+        let _ = receiver.await;
+        Ok(())
+    }
 }
 
 /// An event queue for broadcasting events to multiple clients.
@@ -235,6 +250,7 @@ where
                         Some(Command::Clear) => self.clear(),
                         Some(Command::QueueEvent(event)) => self.queue_event(event),
                         Some(Command::TryFlush(block)) => self.try_flush(block),
+                        Some(Command::Ping(pong)) => { let _ = pong.send(()); }
                         None => break,
                     }
                 },
@@ -811,6 +827,7 @@ mod tests {
         handle.queue_event("event2".into()).await.unwrap();
         handle.queue_event("event2".into()).await.unwrap();
         handle.queue_event("event2".into()).await.unwrap();
+        handle.ping().await.unwrap();
         assert_events(&mut stream, &["event1", "event2"]).await;
         drop(handle);
         assert_matches!(stream.next().await, None);
