@@ -5,7 +5,7 @@
 use crate::{
     converter::cbpf_to_ebpf,
     ubpf::{ubpf_create, ubpf_destroy, ubpf_exec, ubpf_load, ubpf_register, ubpf_vm},
-    verifier::{verify, CallingContext, FunctionSignature},
+    verifier::{verify, CallingContext, FunctionSignature, NullVerifierLogger, VerifierLogger},
     MapSchema, UbpfError,
     UbpfError::*,
 };
@@ -79,8 +79,12 @@ impl UbpfVmBuilder {
         Ok(())
     }
 
-    pub fn load(self, mut code: Vec<bpf_insn>) -> Result<UbpfVm, UbpfError> {
-        verify(&code, self.calling_context)?;
+    pub fn load(
+        self,
+        mut code: Vec<bpf_insn>,
+        logger: &mut dyn VerifierLogger,
+    ) -> Result<UbpfVm, UbpfError> {
+        verify(&code, self.calling_context, logger)?;
         unsafe {
             let mut errmsg = std::ptr::null_mut();
             let success = ubpf_load(
@@ -148,7 +152,7 @@ impl UbpfVm {
         // Convert the sock_filter to ebpf
         let code = cbpf_to_ebpf(bpf_code)?;
         let builder = UbpfVmBuilder::new()?;
-        builder.load(code)
+        builder.load(code, &mut NullVerifierLogger)
     }
 }
 

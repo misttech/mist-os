@@ -9,7 +9,7 @@ use crate::{
         map::Map,
     },
     task::CurrentTask,
-    vfs::FdNumber,
+    vfs::{FdNumber, OutputBuffer},
 };
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_uapi::{
@@ -20,6 +20,7 @@ use ubpf::{
     error::EbpfError,
     program::{EbpfProgram, EbpfProgramBuilder},
     ubpf::EBPF_OP_LDDW,
+    VerifierLogger,
 };
 
 /// The different type of BPF programs.
@@ -73,6 +74,7 @@ impl Program {
     pub fn new(
         current_task: &CurrentTask,
         info: ProgramInfo,
+        logger: &mut dyn OutputBuffer,
         mut code: Vec<bpf_insn>,
     ) -> Result<Program, Errno> {
         let mut builder = EbpfProgramBuilder::new().map_err(map_ubpf_error)?;
@@ -84,7 +86,8 @@ impl Program {
             for helper in BPF_HELPERS {
                 builder.register(helper)?;
             }
-            builder.load(code)
+            let mut logger = BufferVeriferLogger::new(logger);
+            builder.load(code, &mut logger)
         })()
         .map_err(map_ubpf_error)?;
         Ok(Program { info, vm: Some(vm), _objects: objects })
@@ -147,4 +150,37 @@ fn link(
         }
     }
     Ok(objects)
+}
+
+struct BufferVeriferLogger<'a> {
+    buffer: &'a mut dyn OutputBuffer,
+    full: bool,
+}
+
+impl BufferVeriferLogger<'_> {
+    fn new<'a>(buffer: &'a mut dyn OutputBuffer) -> BufferVeriferLogger<'a> {
+        BufferVeriferLogger { buffer, full: false }
+    }
+}
+
+impl VerifierLogger for BufferVeriferLogger<'_> {
+    fn log(&mut self, line: &[u8]) {
+        debug_assert!(line.is_ascii());
+        debug_assert!(line[line.len() - 1] == b'\n');
+
+        if self.full {
+            return;
+        }
+        if line.len() > self.buffer.available() {
+            self.full = true;
+            return;
+        }
+        match self.buffer.write(line) {
+            Err(e) => {
+                log_warn!("Unable to write verifier log: {e:?}");
+                self.full = true;
+            }
+            _ => {}
+        }
+    }
 }

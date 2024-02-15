@@ -8,6 +8,22 @@ use std::collections::HashMap;
 
 pub type ProgramCounter = usize;
 
+/// A trait to receive the log from the verifier.
+pub trait VerifierLogger {
+    /// Log a line. The line is always a correct encoded ASCII string ending with '\n'.
+    fn log(&mut self, line: &[u8]);
+}
+
+/// A `VerifierLogger` that drops all its content.
+pub struct NullVerifierLogger;
+
+impl VerifierLogger for NullVerifierLogger {
+    fn log(&mut self, line: &[u8]) {
+        debug_assert!(line.is_ascii());
+        debug_assert!(line[line.len() - 1] == b'\n');
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub enum Type {
     #[default]
@@ -50,6 +66,11 @@ impl CallingContext {
     }
 }
 
-pub fn verify(_code: &Vec<bpf_insn>, _calling_context: CallingContext) -> Result<(), UbpfError> {
+pub fn verify(
+    _code: &Vec<bpf_insn>,
+    _calling_context: CallingContext,
+    logger: &mut dyn VerifierLogger,
+) -> Result<(), UbpfError> {
+    logger.log("0: (95) exit\n".as_bytes());
     Ok(())
 }

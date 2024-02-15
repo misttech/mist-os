@@ -13,8 +13,9 @@ use crate::{
     },
     mm::{MemoryAccessor, MemoryAccessorExt},
     task::CurrentTask,
-    vfs::{Anon, FdFlags, FdNumber, LookupContext},
+    vfs::{Anon, FdFlags, FdNumber, LookupContext, OutputBuffer, UserBuffersOutputBuffer},
 };
+use smallvec::smallvec;
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::{SyscallResult, SUCCESS};
@@ -39,6 +40,7 @@ use starnix_uapi::{
     errors::Errno,
     open_flags::OpenFlags,
     user_address::{UserAddress, UserCString, UserRef},
+    user_buffer::UserBuffer,
     BPF_F_RDONLY_PROG, PATH_MAX,
 };
 use ubpf::MapSchema;
@@ -223,7 +225,21 @@ pub fn sys_bpf(
             let code = current_task.read_objects_to_vec(user_code, prog_attr.insn_cnt as usize)?;
 
             let program = if current_task.kernel().features.bpf_v2 {
-                Program::new(current_task, info, code)?
+                let mut log_buffer = if prog_attr.log_buf != 0 && prog_attr.log_size > 1 {
+                    UserBuffersOutputBuffer::unified_new(
+                        current_task,
+                        smallvec![UserBuffer {
+                            address: prog_attr.log_buf.into(),
+                            length: (prog_attr.log_size - 1) as usize
+                        }],
+                    )?
+                } else {
+                    UserBuffersOutputBuffer::unified_new(current_task, smallvec![])?
+                };
+                let result = Program::new(current_task, info, &mut log_buffer, code)?;
+                // Ensures the log buffer ends with a 0.
+                log_buffer.write(b"\0")?;
+                result
             } else {
                 // We pretend to succeed at loading the program in the basic version of bpf.
                 // Eventually we'll be able to remove this stub when we can load bpf programs
