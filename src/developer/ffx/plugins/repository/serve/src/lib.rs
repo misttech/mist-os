@@ -5,15 +5,12 @@
 use {
     anyhow::anyhow,
     async_trait::async_trait,
-    camino::Utf8Path,
     ffx_config::EnvironmentContext,
     ffx_repository_serve_args::ServeCommand,
     ffx_target::get_default_target,
     fho::{AvailabilityFlag, FfxContext, FfxMain, FfxTool, Result, SimpleWriter},
     fidl_fuchsia_developer_ffx::{
-        RepositoryError as FfxCliRepositoryError,
-        RepositoryStorageType as FfxCliRepositoryStorageType,
-        RepositoryTarget as FfxCliRepositoryTarget,
+        RepositoryError as FfxCliRepositoryError, RepositoryTarget as FfxCliRepositoryTarget,
     },
     fidl_fuchsia_developer_ffx::{TargetInfo, TargetProxy},
     fidl_fuchsia_developer_ffx_ext::RepositoryTarget as FfxDaemonRepositoryTarget,
@@ -26,7 +23,7 @@ use {
         server::RepositoryServer,
     },
     pkg::repo::register_target_with_fidl_proxies,
-    std::{fs, io::Write, sync::Arc, time::Duration},
+    std::{fs, io::Write, path::Path, sync::Arc, time::Duration},
     timeout::timeout,
 };
 
@@ -41,8 +38,8 @@ pub struct ServeTool {
     #[command]
     cmd: ServeCommand,
     context: EnvironmentContext,
-    target_proxy: TargetProxy,
-    rcs_proxy: RemoteControlProxy,
+    target_proxy: fho::Deferred<TargetProxy>,
+    rcs_proxy: fho::Deferred<RemoteControlProxy>,
 }
 
 fho::embedded_plugin!(ServeTool);
@@ -52,11 +49,6 @@ impl FfxMain for ServeTool {
     type Writer = SimpleWriter;
 
     async fn main(self, mut writer: SimpleWriter) -> Result<()> {
-        let target: TargetInfo = timeout(Duration::from_secs(1), self.target_proxy.identity())
-            .await
-            .user_message("Timed out getting target identity")?
-            .user_message("Failed to get target identity")?;
-
         let repo_name = self.cmd.repository;
         let repo_server_listen_addr = self.cmd.address;
 
@@ -64,36 +56,13 @@ impl FfxMain for ServeTool {
             repo_path
         } else {
             // Default to "FUCHSIA_BUILD_DIR/amber-files"
-            let fuchsia_build_dir = self
-                .context
-                .build_dir()
-                .map(Utf8Path::from_path)
-                .flatten()
-                .unwrap_or(Utf8Path::new(""));
-            let repo_path = format!("{}/amber-files", fuchsia_build_dir);
+            let fuchsia_build_dir = self.context.build_dir().unwrap_or(&Path::new(""));
 
-            repo_path
+            fuchsia_build_dir.join("amber-files")
         };
 
-        let target_identifier: Option<String> = get_default_target(&self.context)
-            .await
-            .map_err(|e| anyhow!("Failed to get target_identifier: {:?}", e))?;
-        let target_identifier: Result<String> =
-            target_identifier.ok_or(anyhow!("no default target value").into());
-        let target_identifier: String = target_identifier?;
-
-        // Construct RepositoryTarget from same args as `ffx target repository register`
-        let repo_target_info = FfxDaemonRepositoryTarget::try_from(FfxCliRepositoryTarget {
-            repo_name: Some(repo_name.clone()),
-            target_identifier: Some(target_identifier.clone()),
-            aliases: Some(self.cmd.alias),
-            storage_type: Some(FfxCliRepositoryStorageType::Ephemeral),
-            ..Default::default()
-        })
-        .map_err(|e| anyhow!("Failed to build RepositoryTarget: {:?}", e))?;
-
         // Create PmRepository and RepoClient
-        let repo_path = fs::canonicalize(repo_path.as_str())
+        let repo_path = fs::canonicalize(repo_path)
             .map_err(|e| anyhow!("Failed to canonicalize repo_path: {:?}", e))?;
         let pm_backend = PmRepository::new(
             repo_path
@@ -109,7 +78,7 @@ impl FfxMain for ServeTool {
         let repo_manager: Arc<RepositoryManager> = RepositoryManager::new();
         repo_manager.add(repo_name.clone(), pm_repo_client);
         let repo = repo_manager
-            .get(&repo_target_info.repo_name)
+            .get(&repo_name)
             .ok_or_else(|| FfxCliRepositoryError::NoMatchingRepository)
             .map_err(|e| anyhow!("Failed to fetch repository: {:?}", e))?;
 
@@ -129,33 +98,65 @@ impl FfxMain for ServeTool {
         };
         let task = fasync::Task::local(server_fut);
 
-        let repo_proxy = rcs::connect_to_protocol::<RepositoryManagerMarker>(
-            TIMEOUT,
-            REPOSITORY_MANAGER_MONIKER,
-            &self.rcs_proxy,
-        )
-        .await
-        .map_err(|e| anyhow!("Failed to bind RepositoryManager to stream: {:?}", e))?;
+        if !self.cmd.no_device {
+            let target: TargetInfo =
+                timeout(Duration::from_secs(1), self.target_proxy.await?.identity())
+                    .await
+                    .user_message("Timed out getting target identity")?
+                    .user_message("Failed to get target identity")?;
 
-        let engine_proxy =
-            rcs::connect_to_protocol::<EngineMarker>(TIMEOUT, ENGINE_MONIKER, &self.rcs_proxy)
+            let target_identifier = get_default_target(&self.context)
                 .await
-                .map_err(|e| anyhow!("Failed to bind Engine to stream: {:?}", e))?;
+                .map_err(|e| anyhow!("Failed to get target_identifier: {:?}", e))?
+                .ok_or(anyhow!("no default target value"))?;
 
-        register_target_with_fidl_proxies(
-            repo_proxy,
-            engine_proxy,
-            &repo_target_info,
-            &target,
-            repo_server_listen_addr,
-            &repo,
-            self.cmd.alias_conflict_mode.into(),
-        )
-        .await
-        .map_err(|e| anyhow!("Failed to register repository: {:?}", e))?;
+            // Construct RepositoryTarget from same args as `ffx target repository register`
+            let repo_target_info = FfxDaemonRepositoryTarget::try_from(FfxCliRepositoryTarget {
+                repo_name: Some(repo_name),
+                target_identifier: Some(target_identifier.clone()),
+                aliases: Some(self.cmd.alias),
+                storage_type: self.cmd.storage_type,
+                ..Default::default()
+            })
+            .map_err(|e| anyhow!("Failed to build RepositoryTarget: {:?}", e))?;
 
-        writeln!(writer, "Serving repository '{}' to target '{target_identifier}' over address '{repo_server_listen_addr}'.", repo_path.display())
+            let rcs_proxy = self.rcs_proxy.await?;
+
+            let repo_proxy = rcs::connect_to_protocol::<RepositoryManagerMarker>(
+                TIMEOUT,
+                REPOSITORY_MANAGER_MONIKER,
+                &rcs_proxy,
+            )
+            .await
+            .map_err(|e| anyhow!("Failed to bind RepositoryManager to stream: {:?}", e))?;
+
+            let engine_proxy =
+                rcs::connect_to_protocol::<EngineMarker>(TIMEOUT, ENGINE_MONIKER, &rcs_proxy)
+                    .await
+                    .map_err(|e| anyhow!("Failed to bind Engine to stream: {:?}", e))?;
+
+            register_target_with_fidl_proxies(
+                repo_proxy,
+                engine_proxy,
+                &repo_target_info,
+                &target,
+                repo_server_listen_addr,
+                &repo,
+                self.cmd.alias_conflict_mode.into(),
+            )
+            .await
+            .map_err(|e| anyhow!("Failed to register repository: {:?}", e))?;
+
+            writeln!(writer, "Serving repository '{}' to target '{target_identifier}' over address '{repo_server_listen_addr}'.", repo_path.display())
+                .map_err(|e| anyhow!("Failed to write to output: {:?}", e))?;
+        } else {
+            writeln!(
+                writer,
+                "Serving repository '{}' over address '{repo_server_listen_addr}'.",
+                repo_path.display()
+            )
             .map_err(|e| anyhow!("Failed to write to output: {:?}", e))?;
+        }
 
         // Wait for the server to shut down.
         task.await;
@@ -219,7 +220,10 @@ mod test {
     struct FakeRcs;
 
     impl FakeRcs {
-        fn new(repo_manager: FakeRepositoryManager, engine: FakeEngine) -> RemoteControlProxy {
+        fn new(
+            repo_manager: FakeRepositoryManager,
+            engine: FakeEngine,
+        ) -> fho::Deferred<RemoteControlProxy> {
             let fake_rcs_proxy: RemoteControlProxy =
                 fho::testing::fake_proxy(move |req| match req {
                     frcs::RemoteControlRequest::OpenCapability {
@@ -252,7 +256,7 @@ mod test {
                     _ => panic!("unexpected request: {:?}", req),
                 });
 
-            fake_rcs_proxy
+            fho::Deferred::from_output(Ok(fake_rcs_proxy))
         }
     }
 
@@ -266,7 +270,7 @@ mod test {
     }
 
     impl FakeTarget {
-        fn new() -> (Self, TargetProxy, mpsc::Receiver<()>) {
+        fn new() -> (Self, fho::Deferred<TargetProxy>, mpsc::Receiver<()>) {
             let (sender, target_rx) = mpsc::channel::<()>(1);
             let events = Arc::new(Mutex::new(Vec::new()));
             let events_closure = Arc::clone(&events);
@@ -301,7 +305,7 @@ mod test {
                 }
                 _ => panic!("unexpected request: {:?}", req),
             });
-            (Self { events }, target_proxy, target_rx)
+            (Self { events }, fho::Deferred::from_output(Ok(target_proxy)), target_rx)
         }
 
         fn take_events(&self) -> Vec<TargetEvent> {
@@ -506,11 +510,12 @@ mod test {
             cmd: ServeCommand {
                 repository: REPO_NAME.to_string(),
                 address: (REPO_IPV4_ADDR, REPO_PORT).into(),
-                repo_path: Some(EMPTY_REPO_PATH.to_string()),
+                repo_path: Some(EMPTY_REPO_PATH.into()),
                 alias: vec!["example.com".into(), "fuchsia.com".into()],
                 storage_type: Some(RepositoryStorageType::Ephemeral),
                 alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
-                port_path: Some(tmp_port_file.path().to_string_lossy().into()),
+                port_path: Some(tmp_port_file.path().to_owned()),
+                no_device: false,
             },
             context: test_env.context.clone(),
             rcs_proxy: fake_rcs_proxy,
@@ -575,6 +580,64 @@ mod test {
                 RewriteEngineEvent::EditTransactionCommit,
             ],
         );
+
+        // Get dynamic port
+        let dynamic_repo_port =
+            fs::read_to_string(tmp_port_file.path()).unwrap().parse::<u16>().unwrap();
+        tmp_port_file.close().unwrap();
+
+        // Check repository state.
+        let http_repo = HttpRepository::new(
+            fuchsia_hyper::new_client(),
+            Url::parse(&format!("http://{REPO_ADDR}:{dynamic_repo_port}/{REPO_NAME}")).unwrap(),
+            Url::parse(&format!("http://{REPO_ADDR}:{dynamic_repo_port}/{REPO_NAME}/blobs"))
+                .unwrap(),
+            BTreeSet::new(),
+        );
+        let mut repo_client = RepoClient::from_trusted_remote(http_repo).await.unwrap();
+
+        assert_matches!(repo_client.update().await, Ok(true));
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_no_device() {
+        let test_env = get_test_env().await;
+
+        let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
+
+        let serve_tool = ServeTool {
+            cmd: ServeCommand {
+                repository: REPO_NAME.to_string(),
+                address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                repo_path: Some(EMPTY_REPO_PATH.into()),
+                alias: vec![],
+                storage_type: None,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                port_path: Some(tmp_port_file.path().to_owned()),
+                no_device: true,
+            },
+            context: test_env.context.clone(),
+            rcs_proxy: fho::Deferred::from_output(Err(fho::Error::Unexpected(anyhow!(
+                "should not use RCS"
+            )))),
+            target_proxy: fho::Deferred::from_output(Err(fho::Error::Unexpected(anyhow!(
+                "should not use target"
+            )))),
+        };
+
+        let test_stdout = TestBuffer::default();
+        let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
+
+        // Run main in background
+        let _task = fasync::Task::local(serve_tool.main(writer));
+
+        // Wait for the "Serving repository ..." output
+        for _ in 0..10 {
+            if !test_stdout.clone().into_string().is_empty() {
+                break;
+            }
+            fasync::Timer::new(time::Duration::from_millis(100)).await;
+        }
 
         // Get dynamic port
         let dynamic_repo_port =

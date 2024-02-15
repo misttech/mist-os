@@ -94,6 +94,14 @@
       "short": null,
       "description": "location to write server port information to, in case port dynamically instantiated.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--no-device",
+      "short": null,
+      "description": "if true, will not register repositories to device. Default is `false`.",
+      "hidden": false
     }
   ],
   "notes": [],

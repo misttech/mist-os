@@ -5,7 +5,10 @@
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 use fidl_fuchsia_developer_ffx::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
-use std::net::{Ipv6Addr, SocketAddr};
+use std::{
+    net::{Ipv6Addr, SocketAddr},
+    path::PathBuf,
+};
 
 // TODO(b/295560556): Expand to handle multiple repositories.
 #[ffx_command()]
@@ -31,7 +34,7 @@ pub struct ServeCommand {
     /// location of pm-built repo.
     /// Default is "FUCHSIA_BUILD_DIR/amber-files"
     #[argh(option)]
-    pub repo_path: Option<String>,
+    pub repo_path: Option<PathBuf>,
 
     /// set up a rewrite rule mapping each `alias` host to
     /// the repository identified by `name`.
@@ -56,7 +59,12 @@ pub struct ServeCommand {
     /// location to write server port information to, in case port dynamically
     /// instantiated.
     #[argh(option)]
-    pub port_path: Option<String>,
+    pub port_path: Option<PathBuf>,
+
+    /// if true, will not register repositories to device.
+    /// Default is `false`.
+    #[argh(switch)]
+    pub no_device: bool,
 }
 
 fn default_repository() -> String {
