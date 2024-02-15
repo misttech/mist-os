@@ -156,7 +156,7 @@ $ fx set workbench_eng.qemu-x64 \
     --with-host //src/testing/end_to_end/examples/my_test_dir:my_test_target
 
 # 1.b - If SL4F transport.
-$ fx set workbench_eng.qemu-x64 \
+$ fx set core.qemu-x64 \
     --with-host //src/testing/end_to_end/examples/my_test_dir:my_test_target \
     --with //src/testing/sl4f \
     --with //src/sys/bin/start_sl4f \
