@@ -30,6 +30,14 @@
             },
             {
                 "notes": [
+                    "Zircon prebuilt dir is empty, but it can cause licensing issues on developer workstations. fxr/735867"
+                ],
+                "paths": [
+                    "zircon/prebuilt"
+                ]
+            },
+            {
+                "notes": [
                     "Legacy GN license checker does not know how to process SPDX files.",
                     "This is a temporary skip until either the old system is updated to read spdx,",
                     "or the new bazel-based GN metadata solution is enabled across the tree.",
