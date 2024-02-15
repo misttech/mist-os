@@ -4,10 +4,9 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/diagnostics/archivist/testing/realm-factory/configs.gni")
+import("//src/diagnostics/archivist/configs.gni")
 import(
     "//src/diagnostics/archivist/testing/realm-factory/fuchsia_configured_component.gni")
-import("//src/diagnostics/archivist/tests/integration/configs.gni")
 
 rustc_binary("bin") {
   testonly = true
@@ -48,7 +47,7 @@ fuchsia_configured_component("archivist-component") {
   testonly = true
   component_name = "archivist"
   manifest = "meta/archivist.cml"
-  config_values = archivist_for_integration_config
+  config_values = embedded_config
   deps = [ "//src/diagnostics/archivist:bin" ]
 }
 

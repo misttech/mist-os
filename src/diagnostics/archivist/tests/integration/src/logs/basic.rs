@@ -65,7 +65,10 @@ async fn listen_for_syslog() {
 #[fuchsia::test]
 async fn listen_for_klog() {
     let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
-        archivist_config: Some(ftest::ArchivistConfig::WithKernelLog),
+        archivist_config: Some(ftest::ArchivistConfig {
+            enable_klog: Some(true),
+            ..Default::default()
+        }),
         ..Default::default()
     })
     .await

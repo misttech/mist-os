@@ -10,6 +10,14 @@
     program: {
         binary: "bin/archivist",
     },
+    capabilities: [
+        {
+            protocol: [
+                "fuchsia.diagnostics.FeedbackArchiveAccessor",
+                "fuchsia.diagnostics.LoWPANArchiveAccessor",
+            ],
+        },
+    ],
     use: [
         {
             protocol: [ "fuchsia.boot.ReadOnlyLog" ],
@@ -28,6 +36,15 @@
             config: "fuchsia.diagnostics.PipelinesPath",
             config_key: "pipelines_path",
             availability: "optional",
+        },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.diagnostics.FeedbackArchiveAccessor",
+                "fuchsia.diagnostics.LoWPANArchiveAccessor",
+            ],
+            from: "self",
         },
     ],
 }

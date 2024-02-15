@@ -17,16 +17,10 @@ use fuchsia_component_test::{
 use realm_proxy_client::RealmProxyClient;
 
 /// Options for creating a test topology.
+#[derive(Default)]
 pub struct Options {
-    /// The URL of the archivist to be used in the test.
-    pub archivist_url: &'static str,
+    pub archivist_config: ftest::ArchivistConfig,
     pub realm_name: Option<&'static str>,
-}
-
-impl Default for Options {
-    fn default() -> Self {
-        Self { archivist_url: constants::INTEGRATION_ARCHIVIST_URL, realm_name: None }
-    }
 }
 
 /// Creates a new test realm with an archivist inside.
@@ -62,13 +56,39 @@ pub async fn create(opts: Options) -> Result<(RealmBuilder, SubRealmBuilder), Er
     }
     let builder = RealmBuilder::with_params(params).await?;
     let test_realm = builder.add_child_realm("test", ChildOptions::new().eager()).await?;
-    let archivist =
-        test_realm.add_child("archivist", opts.archivist_url, ChildOptions::new().eager()).await?;
+    let archivist = test_realm
+        .add_child("archivist", constants::INTEGRATION_ARCHIVIST_URL, ChildOptions::new().eager())
+        .await?;
 
-    let parent_to_archivist = Route::new()
-        .capability(Capability::protocol_by_name("fuchsia.boot.ReadOnlyLog"))
-        .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-        .capability(Capability::protocol_by_name("fuchsia.tracing.provider.Registry").optional());
+    // The following configurations are tweakable.
+    builder
+        .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+            name: "fuchsia.diagnostics.EnableKlog".parse()?,
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(
+                opts.archivist_config.enable_klog.unwrap_or(false),
+            )),
+        }))
+        .await?;
+    if let Some(logs_max_cached_original_bytes) =
+        opts.archivist_config.logs_max_cached_original_bytes
+    {
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.diagnostics.LogsMaxCachedOriginalBytes".parse()?,
+                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Uint64(
+                    logs_max_cached_original_bytes,
+                )),
+            }))
+            .await?;
+    }
+    builder
+        .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+            name: "fuchsia.diagnostics.PipelinesPath".parse()?,
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::String(
+                opts.archivist_config.pipelines_path.unwrap_or("/pkg/data/config".to_string()),
+            )),
+        }))
+        .await?;
 
     builder
         .add_route(
@@ -91,6 +111,41 @@ pub async fn create(opts: Options) -> Result<(RealmBuilder, SubRealmBuilder), Er
                 .to(&archivist),
         )
         .await?;
+
+    let mut self_to_archivist = Route::new()
+        .capability(Capability::configuration("fuchsia.diagnostics.EnableKlog"))
+        .capability(Capability::configuration("fuchsia.diagnostics.PipelinesPath"));
+
+    // The following config capabilities are routed from "void" to archivist since we use the
+    // package default config values for them.
+    let mut void_to_archivist = Route::new()
+        .capability(Capability::configuration("fuchsia.diagnostics.BindServices"))
+        .capability(Capability::configuration(
+            "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
+        ))
+        .capability(Capability::configuration("fuchsia.diagnostics.NumThreads"))
+        .capability(Capability::configuration("fuchsia.diagnostics.AllowSerialLogs"))
+        .capability(Capability::configuration("fuchsia.diagnostics.DenySerialLogs"))
+        .capability(Capability::configuration("fuchsia.diagnostics.LogToDebuglog"));
+
+    let logs_max_cached_original_bytes_config_capability =
+        Capability::configuration("fuchsia.diagnostics.LogsMaxCachedOriginalBytes");
+    if opts.archivist_config.logs_max_cached_original_bytes.is_none() {
+        void_to_archivist =
+            void_to_archivist.capability(logs_max_cached_original_bytes_config_capability);
+    } else {
+        self_to_archivist =
+            self_to_archivist.capability(logs_max_cached_original_bytes_config_capability);
+    }
+
+    builder.add_route(self_to_archivist.clone().from(Ref::self_()).to(&test_realm)).await?;
+    test_realm.add_route(self_to_archivist.from(Ref::parent()).to(&archivist)).await?;
+    test_realm.add_route(void_to_archivist.from(Ref::void()).to(&archivist)).await?;
+
+    let parent_to_archivist = Route::new()
+        .capability(Capability::protocol_by_name("fuchsia.boot.ReadOnlyLog"))
+        .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+        .capability(Capability::protocol_by_name("fuchsia.tracing.provider.Registry").optional());
 
     builder.add_route(parent_to_archivist.clone().from(Ref::parent()).to(&test_realm)).await?;
     test_realm.add_route(parent_to_archivist.from(Ref::parent()).to(&archivist)).await?;

@@ -7,9 +7,17 @@ library fuchsia.archivist.test;
 using fuchsia.testing.harness;
 using fuchsia.component;
 
-type ArchivistConfig = enum {
-    DEFAULT = 0;
-    WITH_KERNEL_LOG = 1;
+/// Subset of Archivist configuration relevant to some test cases.
+type ArchivistConfig = table {
+    /// Whether Archivist will be reading the Klog and forwarding it to Syslog
+    /// or not.
+    1: enable_klog bool;
+
+    /// The size of the log buffer that Archivist stores.
+    2: logs_max_cached_original_bytes uint64;
+
+    /// The path to the Pipelines configuration in Archivist namespace.
+    3: pipelines_path string:256;
 };
 
 type PuppetDecl = struct {

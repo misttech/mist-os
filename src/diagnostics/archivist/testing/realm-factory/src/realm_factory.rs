@@ -26,70 +26,32 @@ impl ArchivistRealmFactory {
             params = params.realm_name(realm_name);
         }
         let builder = RealmBuilder::with_params(params).await?;
-        let config = options.archivist_config.unwrap_or(ArchivistConfig::Default);
+        let config = options.archivist_config.unwrap_or(ArchivistConfig::default());
 
-        builder
-            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-                name: "fuchsia.diagnostics.BindServices".parse()?,
-                value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::StringVector(
-                    vec![],
-                )),
-            }))
-            .await?;
-        builder
-            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-                name: "fuchsia.diagnostics.LogsMaxCachedOriginalBytes".parse()?,
-                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Uint64(4194304)),
-            }))
-            .await?;
-        builder
-            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-                name: "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader".parse()?,
-                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Uint64(4)),
-            }))
-            .await?;
-        builder
-            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-                name: "fuchsia.diagnostics.NumThreads".parse()?,
-                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Uint64(1)),
-            }))
-            .await?;
-        builder
-            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-                name: "fuchsia.diagnostics.AllowSerialLogs".parse()?,
-                value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::StringVector(
-                    vec![],
-                )),
-            }))
-            .await?;
-        builder
-            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-                name: "fuchsia.diagnostics.DenySerialLogs".parse()?,
-                value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::StringVector(
-                    vec![],
-                )),
-            }))
-            .await?;
-        builder
-            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-                name: "fuchsia.diagnostics.LogToDebuglog".parse()?,
-                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(false)),
-            }))
-            .await?;
+        // The following configurations are tweakble.
         builder
             .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
                 name: "fuchsia.diagnostics.EnableKlog".parse()?,
-                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(matches!(
-                    config,
-                    ArchivistConfig::WithKernelLog
-                ))),
+                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(
+                    config.enable_klog.unwrap_or(false),
+                )),
             }))
             .await?;
+        if let Some(logs_max_cached_original_bytes) = config.logs_max_cached_original_bytes {
+            builder
+                .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                    name: "fuchsia.diagnostics.LogsMaxCachedOriginalBytes".parse()?,
+                    value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Uint64(
+                        logs_max_cached_original_bytes,
+                    )),
+                }))
+                .await?;
+        }
         builder
             .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
                 name: "fuchsia.diagnostics.PipelinesPath".parse()?,
                 value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::String(
-                    "/pkg/data/config".to_string(),
+                    config.pipelines_path.unwrap_or("/pkg/data/config".to_string()),
                 )),
             }))
             .await?;
@@ -113,22 +75,39 @@ impl ArchivistRealmFactory {
             .capability(Capability::protocol::<flogger::LogSinkMarker>())
             .capability(Capability::protocol::<finspect::InspectSinkMarker>())
             .capability(Capability::protocol::<flogger::LogMarker>());
-        let self_to_archivist = Route::new()
+        let mut self_to_archivist = Route::new()
+            .capability(Capability::configuration("fuchsia.diagnostics.EnableKlog"))
+            .capability(Capability::configuration("fuchsia.diagnostics.PipelinesPath"));
+
+        // The following config capabilities are routed from "void" to archivist since we use the
+        // package default config values for them.
+        let mut void_to_archivist = Route::new()
             .capability(Capability::configuration("fuchsia.diagnostics.BindServices"))
-            .capability(Capability::configuration("fuchsia.diagnostics.LogsMaxCachedOriginalBytes"))
             .capability(Capability::configuration(
                 "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
             ))
             .capability(Capability::configuration("fuchsia.diagnostics.NumThreads"))
             .capability(Capability::configuration("fuchsia.diagnostics.AllowSerialLogs"))
             .capability(Capability::configuration("fuchsia.diagnostics.DenySerialLogs"))
-            .capability(Capability::configuration("fuchsia.diagnostics.LogToDebuglog"))
-            .capability(Capability::configuration("fuchsia.diagnostics.EnableKlog"))
-            .capability(Capability::configuration("fuchsia.diagnostics.PipelinesPath"));
+            .capability(Capability::configuration("fuchsia.diagnostics.LogToDebuglog"));
+
+        let logs_max_cached_original_bytes_config_capability =
+            Capability::configuration("fuchsia.diagnostics.LogsMaxCachedOriginalBytes");
+        if config.logs_max_cached_original_bytes.is_none() {
+            void_to_archivist =
+                void_to_archivist.capability(logs_max_cached_original_bytes_config_capability);
+        } else {
+            self_to_archivist =
+                self_to_archivist.capability(logs_max_cached_original_bytes_config_capability);
+        }
+
+        test_realm.add_route(void_to_archivist.from(Ref::void()).to(&archivist)).await?;
+
         builder.add_route(parent_to_archivist.clone().from(Ref::parent()).to(&test_realm)).await?;
         builder.add_route(self_to_archivist.clone().from(Ref::self_()).to(&test_realm)).await?;
         test_realm.add_route(parent_to_archivist.from(Ref::parent()).to(&archivist)).await?;
         test_realm.add_route(self_to_archivist.from(Ref::parent()).to(&archivist)).await?;
+
         test_realm
             .add_route(archivist_to_parent.clone().from(&archivist).to(Ref::parent()))
             .await?;

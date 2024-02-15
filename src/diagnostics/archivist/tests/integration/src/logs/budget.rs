@@ -8,6 +8,7 @@ use diagnostics_data::{Data, Logs};
 use diagnostics_message::{fx_log_packet_t, METADATA_SIZE};
 use diagnostics_reader::{ArchiveReader, RetryConfig};
 use fidl::prelude::*;
+use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_archivist_tests::{
     SocketPuppetControllerRequest, SocketPuppetControllerRequestStream, SocketPuppetProxy,
 };
@@ -83,7 +84,10 @@ impl PuppetEnv {
     async fn create(max_puppets: usize) -> Self {
         let (sender, controllers) = mpsc::channel(1);
         let (builder, test_realm) = test_topology::create(test_topology::Options {
-            archivist_url: ARCHIVIST_WITH_SMALL_CACHES,
+            archivist_config: ftest::ArchivistConfig {
+                logs_max_cached_original_bytes: Some(3000),
+                ..Default::default()
+            },
             realm_name: None,
         })
         .await

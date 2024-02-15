@@ -193,7 +193,10 @@ async fn unified_reader() -> Result<(), Error> {
 #[fuchsia::test]
 async fn feedback_canonical_reader_test() -> Result<(), Error> {
     let (builder, test_realm) = test_topology::create(test_topology::Options {
-        archivist_url: ARCHIVIST_WITH_FEEDBACK_FILTERING,
+        archivist_config: ftest::ArchivistConfig {
+            pipelines_path: Some("/pkg/data/config/pipelines/feedback_filtered".to_string()),
+            ..Default::default()
+        },
         realm_name: None,
     })
     .await
@@ -243,8 +246,13 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
 #[fuchsia::test]
 async fn feedback_disabled_pipeline() -> Result<(), Error> {
     let (builder, test_realm) = test_topology::create(test_topology::Options {
-        archivist_url: ARCHIVIST_WITH_FEEDBACK_FILTERING_DISABLED,
         realm_name: None,
+        archivist_config: ftest::ArchivistConfig {
+            pipelines_path: Some(
+                "/pkg/data/config/pipelines/feedback_filtering_disabled".to_string(),
+            ),
+            ..Default::default()
+        },
     })
     .await
     .expect("create base topology");
@@ -277,7 +285,10 @@ async fn feedback_pipeline_missing_selectors() -> Result<(), Error> {
 #[fuchsia::test]
 async fn lowpan_canonical_reader_test() -> Result<(), Error> {
     let (builder, test_realm) = test_topology::create(test_topology::Options {
-        archivist_url: ARCHIVIST_WITH_LOWPAN_FILTERING,
+        archivist_config: ftest::ArchivistConfig {
+            pipelines_path: Some("/pkg/data/config/pipelines/lowpan_filtered".to_string()),
+            ..Default::default()
+        },
         realm_name: None,
     })
     .await
