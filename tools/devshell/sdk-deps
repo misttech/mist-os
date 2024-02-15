@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -17,6 +17,37 @@ set -o errexit
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh
 fx-config-read
 
+readonly TEMPDIR="tmp"
+mkdir "${TEMPDIR}"
+trap 'rm -rf "$TEMPDIR"' EXIT
+
+dep_list_file="${TEMPDIR}/dep_list"
+partner_sdk_deps_file="${TEMPDIR}/partner_sdk_deps_list"
+internal_sdk_deps_file="${TEMPDIR}/internal_sdk_deps_list"
+non_sdk_deps_file="${TEMPDIR}/non_sdk_deps_list"
+
+touch ${dep_list_file}
+touch ${partner_sdk_deps_file}
+touch ${internal_sdk_deps_file}
+touch ${non_sdk_deps_file}
+
+collect_deps() {
+    local target=$1
+    local prefix=$(echo ${target} | cut -d ":" -f1)
+    local deps=($(fx-command-run gn desc "${build_dir}" "${target}" deps || continue))
+    for dep in ${deps[@]}; do
+        # We skip some deps
+        if [[ "${dep}" == *"shlib-allowlist-check"* || "${dep}" == *"static-libc++-deps"* ]]; then
+            continue
+        fi
+        if [[ "${dep}" == ${prefix}* ]]; then
+            collect_deps $dep
+        else
+            echo "${dep}" | xargs >> ${dep_list_file}
+        fi
+    done
+}
+
 main() {
     local build_dir=$(fx-command-run get-build-dir)
     fx-info "Using build dir: ${build_dir}"
@@ -31,30 +62,42 @@ main() {
         shift
     done
 
-
     if [[ -z "${target}" ]]; then
-        echo "-t is required to pass in a target"
+        echo "-t is required to pass in a target."
         exit 1
     fi
 
-    local dep_list=( $(fx-command-run gn desc "${build_dir}" "${target}" deps) )
+    # Use `gn meta` to walk the metadata and select all items with
+    # `driver_package_component_files`. This is mandatory all driver.
+    local distribution_manifests=( $(fx-command-run gn meta "${build_dir}" --data=driver_package_component_files "${target}" | grep "distribution_manifest = " | cut -d "\"" -f2 | sed -e "s|.*|${build_dir}/&|") )
+
+    # Collect all the drivers from the distribution
+    local drivers=($(fx-command-run jq -r '.[] | select((.destination|startswith("driver"))) | .label' "${distribution_manifests[@]}" | sort -u))
+
+    # Collect all the deps
+    fx-info "Listing all drivers and collect deps..."
+    for driver in "${drivers[@]}"; do
+        echo $driver
+        collect_deps $driver &
+    done
 
     local core_deps=()
     local platform_deps=()
     local non_sdk=()
 
-    mkdir tmp
-    local public_sdk_deps="tmp/public_sdk_deps"
-    local internal_sdk_deps="tmp/internal_sdk_deps"
+    local partner_sdk_deps="${TEMPDIR}/partner_sdk_all_deps"
+    local internal_sdk_deps="${TEMPDIR}/internal_sdk_all_deps"
 
     fx-info "Collecting Core SDK dependencies..."
-    fx-command-run gn desc "${build_dir}" "//sdk:core" deps --all > ${public_sdk_deps}
+    fx-command-run gn desc "${build_dir}" "//sdk:core" deps --all > ${partner_sdk_deps} &
     fx-info "Collecting Driver SDK dependencies..."
-    fx-command-run gn desc "${build_dir}" "//sdk:driver" deps --all >> ${public_sdk_deps}
+    fx-command-run gn desc "${build_dir}" "//sdk:driver" deps --all >> ${partner_sdk_deps} &
     fx-info "Collecting Platform SDK dependencies..."
-    fx-command-run gn desc "${build_dir}" "//sdk:platform" deps --all > ${internal_sdk_deps}
+    fx-command-run gn desc "${build_dir}" "//sdk:platform" deps --all > ${internal_sdk_deps} &
 
-    for dep in "${dep_list[@]}"; do
+    wait $(jobs -rp)
+
+    for dep in $(cat ${dep_list_file} | sort -u); do
         if [[ "${dep}" == *"sdk/fidl"* ]]; then
             fidl="$(echo $dep | cut -d ":" -f1 | cut -d "/" -f5)"
             dep_sdk="//sdk/fidl/${fidl}:${fidl}_sdk"
@@ -62,36 +105,35 @@ main() {
             dep_sdk="$(echo ${dep} | cut -d "(" -f1)_sdk"
         fi
 
-        if [[ $(grep ${dep_sdk} ${public_sdk_deps} | wc -l) -gt 0 ]]; then
-            core_deps+=( "${dep_sdk}" )
+        if [[ $(grep ${dep_sdk} ${partner_sdk_deps} | wc -l) -gt 0 ]]; then
+            echo "${dep}" >> "${partner_sdk_deps_file}"
             continue
         fi
 
         if [[ $(grep ${dep_sdk} ${internal_sdk_deps} | wc -l) -gt 0 ]]; then
-            platform_deps+=( "${dep_sdk}" )
+            echo "${dep}" >> "${internal_sdk_deps_file}"
             continue
         fi
 
-        non_sdk+=( "${dep}" )
+        echo "${dep}" >> "${non_sdk_deps_file}"
     done
 
     fx-info "Result:"
     echo
     echo "    Partner (Including //sdk:core and //sdk:driver):"
-    for dep in "${core_deps[@]}"; do
-        echo "      ${dep}"
-    done
-
+    sed -i -e 's/^/      /' ${partner_sdk_deps_file}
+    echo "      Total items:" $(cat ${partner_sdk_deps_file} | wc -l)
+    cat ${partner_sdk_deps_file}
+    echo
     echo "    Internal (Including //sdk:platform):"
-    for dep in "${platform_deps[@]}"; do
-        echo "      ${dep}"
-    done
-
+    sed -i -e 's/^/      /' ${internal_sdk_deps_file}
+    echo "      Total items:" $(cat ${internal_sdk_deps_file} | wc -l)
+    cat ${internal_sdk_deps_file}
+    echo
     echo "    Not in SDK:"
-    for dep in "${non_sdk[@]}"; do
-        echo "      ${dep}"
-    done
-    rm -rf tmp
+    sed -i -e 's/^/      /' ${non_sdk_deps_file}
+    echo "      Total items:" $(cat ${non_sdk_deps_file} | wc -l)
+    cat ${non_sdk_deps_file}
 }
 
 main "$@"
