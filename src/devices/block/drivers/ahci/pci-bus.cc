@@ -80,15 +80,17 @@ zx_status_t PciBus::Configure(zx_device_t* parent) {
   return ZX_OK;
 }
 
-zx_status_t PciBus::IoBufferInit(ddk::IoBuffer* buffer_, size_t size, uint32_t flags,
-                                 zx_paddr_t* phys_out, void** virt_out) {
+zx_status_t PciBus::DmaBufferInit(std::unique_ptr<dma_buffer::ContiguousBuffer>* buffer_out,
+                                  size_t size, zx_paddr_t* phys_out, void** virt_out) {
   // Allocate memory for the command list, FIS receive area, command table and PRDT.
-  zx_status_t status = buffer_->Init(bti_.get(), size, flags);
+  const size_t buffer_size = fbl::round_up(size, zx_system_get_page_size());
+  auto buffer_factory = dma_buffer::CreateBufferFactory();
+  zx_status_t status = buffer_factory->CreateContiguous(bti_, buffer_size, 0, buffer_out);
   if (status != ZX_OK) {
     return status;
   }
-  *phys_out = buffer_->phys();
-  *virt_out = buffer_->virt();
+  *phys_out = (*buffer_out)->phys();
+  *virt_out = (*buffer_out)->virt();
   return ZX_OK;
 }
 

@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_AHCI_PORT_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_AHCI_PORT_H_
 
-#include <lib/ddk/io-buffer.h>
+#include <lib/dma-buffer/buffer.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <threads.h>
 #include <zircon/types.h>
@@ -113,7 +113,7 @@ class Port {
   uint32_t running_ = 0;    // bitmask of running commands
   uint32_t completed_ = 0;  // bitmask of completed commands
 
-  ddk::IoBuffer buffer_{};
+  std::unique_ptr<dma_buffer::ContiguousBuffer> buffer_;
   size_t reg_base_ = 0;
   ahci_port_mem_t* mem_ = nullptr;
 

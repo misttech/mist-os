@@ -72,8 +72,8 @@ zx_status_t Port::Configure(uint32_t num, Bus* bus, size_t reg_base, uint32_t ma
   // Allocate memory for the command list, FIS receive area, command table and PRDT.
   zx_paddr_t phys_base;
   void* virt_base;
-  zx_status_t status = bus_->IoBufferInit(&buffer_, sizeof(ahci_port_mem_t),
-                                          IO_BUFFER_RW | IO_BUFFER_CONTIG, &phys_base, &virt_base);
+  zx_status_t status =
+      bus_->DmaBufferInit(&buffer_, sizeof(ahci_port_mem_t), &phys_base, &virt_base);
   if (status != ZX_OK) {
     zxlogf(ERROR, "ahci.%u: error allocating dma memory: %s", num_, zx_status_get_string(status));
     return status;

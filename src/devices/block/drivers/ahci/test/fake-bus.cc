@@ -26,8 +26,8 @@ zx_status_t FakeBus::Configure(zx_device_t* parent) {
   return ZX_OK;
 }
 
-zx_status_t FakeBus::IoBufferInit(ddk::IoBuffer* buffer_, size_t size, uint32_t flags,
-                                  zx_paddr_t* phys_out, void** virt_out) {
+zx_status_t FakeBus::DmaBufferInit(std::unique_ptr<dma_buffer::ContiguousBuffer>* buffer_out,
+                                   size_t size, zx_paddr_t* phys_out, void** virt_out) {
   ZX_DEBUG_ASSERT(size == sizeof(ahci_port_mem_t));
 
   fbl::AllocChecker ac;

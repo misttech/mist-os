@@ -6,7 +6,7 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_AHCI_BUS_H_
 
 #include <lib/ddk/device.h>
-#include <lib/ddk/io-buffer.h>
+#include <lib/dma-buffer/buffer.h>
 #include <lib/zx/pmt.h>
 #include <lib/zx/vmo.h>
 #include <zircon/types.h>
@@ -24,10 +24,10 @@ class Bus {
   // Configure the bus for use. Registers should be accessible after this call.
   virtual zx_status_t Configure(zx_device_t* parent) = 0;
 
-  // Initialize io_buffer, returning the mapped physical and virtual addresses.
-  // In parameters are the same as those of io_buffer_init().
-  virtual zx_status_t IoBufferInit(ddk::IoBuffer* buffer_, size_t size, uint32_t flags,
-                                   zx_paddr_t* phys_out, void** virt_out) = 0;
+  // Initialize dma buffer, returning the mapped physical and virtual addresses
+  // in |phys_out| and |virt_out|.
+  virtual zx_status_t DmaBufferInit(std::unique_ptr<dma_buffer::ContiguousBuffer>* buffer_out,
+                                    size_t size, zx_paddr_t* phys_out, void** virt_out) = 0;
 
   // Pin a set of pages for bus transaction initiators (if supported).
   // Parameters the same as zx_bti_pin();
