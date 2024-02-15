@@ -4,6 +4,20 @@ The Role Manager is a service that allows clients to
 [set profiles](https://fuchsia.dev/reference/syscalls/object_set_profile?hl=en)
 on threads and vmars.
 
+## Fake Role Manager
+
+If your component uses the `fuchsia.scheduler.RoleManager` protocol and you need
+to test it without using the system's actual `RoleManager` component, consider
+using the `FakeRoleManager` component in the `testing/fake` directory.
+
+`fake_role_manager.cm` is a drop-in replacement for `role_manager.cm` that
+implements the `fuchsia.scheduler.RoleManager` protocol but does not actually
+set scheduler profiles on the given handle in a `SetRole` call.
+
+Note that users of this fake should provide there own profiles file that
+contains the roles their component uses. This profiles file should be placed in
+the `/pkg/profiles` directory.
+
 ## Test Details
 
 The tests in the `tests` directory use a test realm
