@@ -1292,6 +1292,7 @@ rust_library("aes-v0_8_4") {
     "--edition=2021",
     "-Cmetadata=9f84688850b96a05",
     "-Cextra-filename=-9f84688850b96a05",
+    "--cfg=aes_armv8",
   ]
 
   visibility = [ ":*" ]

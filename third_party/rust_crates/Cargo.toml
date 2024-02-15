@@ -435,6 +435,9 @@ require_feature_reviews = [
   "bstr",
 ]
 
+[gn.package.aes."0.8.4"]
+rustflags = [ "--cfg=aes_armv8" ]
+
 [gn.package.ahash."0.8.6".platform."cfg(any(target_arch = \"x86_64\", target_arch = \"aarch64\", target_arch = \"mips64\", target_arch = \"powerpc64\", target_arch = \"riscv64gc\", target_arch = \"s390x\"))"]
 rustflags = [ "--cfg=feature=\\\"folded_multiply\\\"" ]
 
