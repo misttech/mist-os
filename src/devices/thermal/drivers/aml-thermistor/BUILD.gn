@@ -54,18 +54,6 @@ fuchsia_driver_package("package") {
   driver_components = [ ":aml-thermistor" ]
 }
 
-fuchsia_driver_component("aml-thermistor-v2") {
-  info = "aml-thermistor-info.json"
-  component_name = "aml-thermistor"
-  deps = [ ":aml-thermistor-driver" ]
-  manifest = "meta/aml-thermistor.cml"
-}
-
-fuchsia_driver_package("package-v2") {
-  package_name = "aml-thermistor"
-  driver_components = [ ":aml-thermistor" ]
-}
-
 group("tests") {
   testonly = true
   deps = [
