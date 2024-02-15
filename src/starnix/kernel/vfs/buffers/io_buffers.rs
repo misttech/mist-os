@@ -328,7 +328,7 @@ pub trait InputBufferExt: InputBuffer {
     fn read_to_array<const N: usize>(&mut self) -> Result<[u8; N], Errno> {
         // SAFETY: `data.read_exact` returns `N` bytes on success.
         unsafe {
-            read_to_array::<_, N>(|buf| {
+            read_to_array::<_, _, N>(|buf| {
                 self.read_exact(buf).map(|bytes_read| debug_assert_eq!(bytes_read, buf.len()))
             })
         }

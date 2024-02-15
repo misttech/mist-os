@@ -18,7 +18,6 @@ use std::{
     mem::size_of,
     sync::{atomic::Ordering, Arc},
 };
-use zerocopy::AsBytes;
 
 static VVAR_SIZE: Lazy<usize> = Lazy::new(|| *PAGE_SIZE as usize);
 
@@ -208,9 +207,8 @@ fn get_sigreturn_offset(vdso_vmo: &zx::Vmo, sigreturn_name: &str) -> Result<u64,
         dyn_section.dynamic_entry_with_tag(elf_parse::Elf64DynTag::Strsz).ok_or(errno!(EINVAL))?;
 
     // Find the name of the signal trampoline in the string table and store the index.
-    let mut strtab_bytes = vec![0u8; strsz.value as usize];
-    vdso_vmo
-        .read(&mut strtab_bytes, strtab.value)
+    let strtab_bytes = vdso_vmo
+        .read_to_vec(strtab.value, strsz.value)
         .map_err(|status| from_status_like_fdio!(status))?;
     let mut strtab_items = strtab_bytes.split(|c: &u8| *c == 0u8);
     let strtab_idx = strtab_items
@@ -222,9 +220,8 @@ fn get_sigreturn_offset(vdso_vmo: &zx::Vmo, sigreturn_name: &str) -> Result<u64,
     // In the symbolic table, find a symbol with a name index pointing to the name we're looking for.
     let mut symtab_offset = symtab.value;
     loop {
-        let mut sym_entry = elf_parse::Elf64Sym::default();
-        vdso_vmo
-            .read(sym_entry.as_bytes_mut(), symtab_offset)
+        let sym_entry = vdso_vmo
+            .read_to_object::<elf_parse::Elf64Sym>(symtab_offset)
             .map_err(|status| from_status_like_fdio!(status))?;
         if sym_entry.st_name as usize == strtab_idx {
             return Ok(sym_entry.st_value);

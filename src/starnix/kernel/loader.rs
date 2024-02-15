@@ -265,7 +265,8 @@ pub struct ResolvedInterpElf {
 }
 
 // The magic bytes of a script file.
-const HASH_BANG: &[u8; 2] = b"#!";
+const HASH_BANG_SIZE: usize = 2;
+const HASH_BANG: &[u8; HASH_BANG_SIZE] = b"#!";
 const MAX_RECURSION_DEPTH: usize = 5;
 
 /// Resolves a file into a validated executable ELF, following script interpreters to a fixed
@@ -304,15 +305,14 @@ where
         return error!(ELOOP);
     }
     let vmo = file.get_vmo(current_task, None, ProtectionFlags::READ | ProtectionFlags::EXEC)?;
-    let mut header = [0u8; 2];
-    match vmo.read(&mut header, 0) {
-        Ok(()) => {}
+    let header = match vmo.read_to_array::<u8, HASH_BANG_SIZE>(0) {
+        Ok(header) => Ok(header),
         Err(zx::Status::OUT_OF_RANGE) => {
             // The file is empty, or it would have at least one page allocated to it.
             return error!(ENOEXEC);
         }
         Err(_) => return error!(EINVAL),
-    }
+    }?;
     if &header == HASH_BANG {
         resolve_script(
             locked,
@@ -347,8 +347,10 @@ where
     // less, we should never read past the end of the VMO.
     // Since Linux 5.1, the max length of the interpreter following the #! is 255.
     const HEADER_BUFFER_CAP: usize = 255 + HASH_BANG.len();
-    let mut buffer = [0u8; HEADER_BUFFER_CAP];
-    vmo.read(&mut buffer, 0).map_err(|_| errno!(EINVAL))?;
+    let buffer = match vmo.read_to_array::<u8, HEADER_BUFFER_CAP>(0) {
+        Ok(b) => b,
+        Err(_) => return error!(EINVAL),
+    };
 
     let mut args = parse_interpreter_line(&buffer)?;
     let interpreter =
@@ -431,8 +433,8 @@ where
     {
         // The ELF header specified an ELF interpreter.
         // Read the path and load this ELF as well.
-        let mut interp = vec![0; interp_hdr.filesz as usize];
-        vmo.read(&mut interp, interp_hdr.offset as u64)
+        let interp = vmo
+            .read_to_vec(interp_hdr.offset as u64, interp_hdr.filesz)
             .map_err(|status| from_status_like_fdio!(status))?;
         let interp = CStr::from_bytes_until_nul(&interp).map_err(|_| errno!(EINVAL))?;
         let interp_file =

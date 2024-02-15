@@ -212,8 +212,8 @@ impl VmoFileObject {
             if offset < file_length {
                 let to_read =
                     if file_length < offset + want_read { file_length - offset } else { want_read };
-                let mut buf = vec![0u8; to_read];
-                vmo.read(&mut buf[..], offset as u64).map_err(|_| errno!(EIO))?;
+                let buf =
+                    vmo.read_to_vec(offset as u64, to_read as u64).map_err(|_| errno!(EIO))?;
                 drop(info);
                 data.write_all(&buf[..])?;
                 to_read

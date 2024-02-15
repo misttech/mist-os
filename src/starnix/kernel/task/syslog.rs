@@ -282,8 +282,7 @@ impl LogIterator {
             while let Some(formatted_content) = self.pending_formatted_contents.pop_front() {
                 let output: OneOrMany<Data<Logs>> = match formatted_content {
                     fdiagnostics::FormattedContent::Json(data) => {
-                        let mut buf = vec![0; data.size as usize];
-                        data.vmo.read(&mut buf, 0).map_err(|err| {
+                        let buf = data.vmo.read_to_vec(0, data.size).map_err(|err| {
                             errno!(EIO, format!("failed to read logs vmo: {err}"))
                         })?;
                         serde_json::from_slice(&buf)

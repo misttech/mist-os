@@ -1980,10 +1980,10 @@ fn slice_as_mut_bytes<T: FromBytes + Sized>(
 /// and `n` holds the number of bytes read starting from the beginning of the
 /// slice.
 #[inline]
-pub unsafe fn read_to_vec<T: FromBytes>(
+pub unsafe fn read_to_vec<T: FromBytes, E>(
     max_len: usize,
-    read_fn: impl FnOnce(&mut [MaybeUninit<T>]) -> Result<usize, Errno>,
-) -> Result<Vec<T>, Errno> {
+    read_fn: impl FnOnce(&mut [MaybeUninit<T>]) -> Result<usize, E>,
+) -> Result<Vec<T>, E> {
     let mut buffer = Vec::with_capacity(max_len);
     // We can't just pass `spare_capacity_mut` because `Vec::with_capacity`
     // returns a `Vec` with _at least_ the requested capacity.
@@ -2003,10 +2003,10 @@ pub unsafe fn read_to_vec<T: FromBytes>(
 ///
 /// The read function must only return `Ok(())` if all the bytes were read to.
 #[inline]
-pub unsafe fn read_to_array<T: FromBytes, const N: usize>(
-    read_fn: impl FnOnce(&mut [MaybeUninit<T>]) -> Result<(), Errno>,
-) -> Result<[T; N], Errno> {
-    // TODO(https://fxbug.dev/42079731): replace with MaybeUninit::uninit_array.
+pub unsafe fn read_to_array<T: FromBytes, E, const N: usize>(
+    read_fn: impl FnOnce(&mut [MaybeUninit<T>]) -> Result<(), E>,
+) -> Result<[T; N], E> {
+    // TODO(https://fxbug.dev/129314): replace with MaybeUninit::uninit_array.
     let buffer: MaybeUninit<[MaybeUninit<T>; N]> = MaybeUninit::uninit();
     // SAFETY: We are converting from an uninitialized array to an array
     // of uninitialized elements which is the same. See
@@ -2029,9 +2029,9 @@ pub unsafe fn read_to_array<T: FromBytes, const N: usize>(
 ///
 /// THe read function must only return `Ok(())` if all the bytes were read to.
 #[inline]
-pub unsafe fn read_to_object_as_bytes<T: FromBytes>(
-    read_fn: impl FnOnce(&mut [MaybeUninit<u8>]) -> Result<(), Errno>,
-) -> Result<T, Errno> {
+pub unsafe fn read_to_object_as_bytes<T: FromBytes, E>(
+    read_fn: impl FnOnce(&mut [MaybeUninit<u8>]) -> Result<(), E>,
+) -> Result<T, E> {
     let mut object = MaybeUninit::uninit();
     read_fn(object_as_mut_bytes(&mut object))?;
     // SAFETY: The call to `read_fn` succeeded so we know that `object`
