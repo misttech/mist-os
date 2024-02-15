@@ -726,7 +726,8 @@
                 "SempahoreTest.*",
 
                 // sync_file_range_test
-                "SyncFileRangeTest.BadArgs",
+                // We actually pass this test, but the test expects ENOSYS because gVisor doesn't support
+                // one of the flags we do support.
                 "SyncFileRangeTest.CannotSyncFileRangeWithWaitBefore",
 
                 // sysret_test

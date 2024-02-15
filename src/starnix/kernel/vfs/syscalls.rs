@@ -18,7 +18,7 @@ use crate::{
         FileHandle, FileSystemOptions, FlockOperation, FsStr, FsString, LookupContext,
         NamespaceNode, PathWithReachability, RecordLockCommand, RenameFlags, SeekTarget,
         StatxFlags, SymlinkMode, SymlinkTarget, TargetFdNumber, TimeUpdateType, UnlinkKind,
-        ValueOrSize, WdNumber, WhatToMount, XattrOp,
+        ValueOrSize, WdNumber, WhatToMount, XattrOp, MAX_LFS_FILESIZE,
     },
 };
 use fuchsia_zircon as zx;
@@ -2399,7 +2399,7 @@ pub fn sys_sync_file_range(
 
     let file = current_task.files.get(fd)?;
 
-    if offset < 0 || len < 0 {
+    if offset < 0 || len < 0 || (len as usize).saturating_add(offset as usize) > MAX_LFS_FILESIZE {
         return error!(EINVAL);
     }
 
