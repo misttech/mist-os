@@ -16,7 +16,7 @@ use {
     },
     fidl_fuchsia_net_routes as fnet_routes, fuchsia_async as fasync,
     fuchsia_component::server::{ServiceFs, ServiceFsDir},
-    fuchsia_inspect, fuchsia_runtime,
+    fuchsia_inspect, fuchsia_scheduler,
     fuchsia_sync::RwLock,
     fuchsia_zircon as zx,
     futures::{
@@ -1119,30 +1119,6 @@ fn add_query_stats_inspect(
     })
 }
 
-// Apply the Fuchsia DNS resolver scheduling role to the calling thread to
-// improve latency under load.
-async fn apply_scheduling_role() -> Result<(), Error> {
-    let profile_provider = fuchsia_component::client::connect_to_protocol::<
-        fidl_fuchsia_scheduler::ProfileProviderMarker,
-    >()
-    .context("Failed to connect to fuchsia.scheduler.ProfileProvider")?;
-
-    let thread = fuchsia_runtime::thread_self()
-        .duplicate(zx::Rights::SAME_RIGHTS)
-        .context("Failed to duplicate thread handle")?
-        .into();
-
-    profile_provider
-        .set_profile_by_role(thread, "fuchsia.networking.dns.resolver.main")
-        .await
-        .context("fuchsia.scheduler.ProfileProvider.SetProfileByRole failed")
-        .and_then(|status| {
-            zx::Status::ok(status)
-                .context("fuchsia.scheduler.ProfileProvider.SetProfileByRole returned error")
-        })?;
-    return Ok(());
-}
-
 // NB: We manually set tags so logs from trust-dns crates also get the same
 // tags as opposed to only the crate path.
 #[fuchsia::main(logging_tags = ["dns"])]
@@ -1199,7 +1175,8 @@ pub async fn main() -> Result<(), Error> {
     // Failing to apply a scheduling role is not fatal. Issue a warning in case
     // DNS latency is important to a product and running at default priority is
     // insufficient.
-    match apply_scheduling_role().await {
+    match fuchsia_scheduler::set_role_for_this_thread("fuchsia.networking.dns.resolver.main").await
+    {
         Ok(_) => info!("Applied scheduling role"),
         Err(err) => warn!("Failed to apply scheduling role: {}", err),
     };
