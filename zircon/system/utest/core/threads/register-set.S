@@ -13,9 +13,6 @@
 #elif defined(__riscv)
 
 // If vector instructions are not already enabled, do so at the assembler level.
-//
-// TODO(https://fxbug.dev/42075221): Remove once V is universally enabled at the
-// compiler level.
 #ifndef __riscv_v
 .option arch, +v
 #endif

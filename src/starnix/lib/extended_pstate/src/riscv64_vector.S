@@ -11,6 +11,10 @@
 #define FUNCTION(x) .global x; .hidden x; .type x,STT_FUNC; x: .cfi_startproc
 #define END_FUNCTION(x) .cfi_endproc; .size x, . - x
 
+// If vector instructions are not already enabled, do so at the assembler level.
+#ifndef __riscv_v
+.option arch, +v
+#endif
 
 // size_t get_riscv64_vlenb()
 FUNCTION(get_riscv64_vlenb)
