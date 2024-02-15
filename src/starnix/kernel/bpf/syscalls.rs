@@ -21,10 +21,19 @@ use starnix_syscalls::{SyscallResult, SUCCESS};
 use starnix_uapi::{
     bpf_attr__bindgen_ty_1, bpf_attr__bindgen_ty_10, bpf_attr__bindgen_ty_12,
     bpf_attr__bindgen_ty_2, bpf_attr__bindgen_ty_4, bpf_attr__bindgen_ty_5, bpf_attr__bindgen_ty_9,
-    bpf_cmd, bpf_cmd_BPF_BTF_LOAD, bpf_cmd_BPF_MAP_CREATE, bpf_cmd_BPF_MAP_DELETE_ELEM,
-    bpf_cmd_BPF_MAP_GET_NEXT_KEY, bpf_cmd_BPF_MAP_LOOKUP_ELEM, bpf_cmd_BPF_MAP_UPDATE_ELEM,
-    bpf_cmd_BPF_OBJ_GET, bpf_cmd_BPF_OBJ_GET_INFO_BY_FD, bpf_cmd_BPF_OBJ_PIN,
-    bpf_cmd_BPF_PROG_ATTACH, bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY, bpf_insn, bpf_map_info,
+    bpf_cmd, bpf_cmd_BPF_BTF_GET_FD_BY_ID, bpf_cmd_BPF_BTF_GET_NEXT_ID, bpf_cmd_BPF_BTF_LOAD,
+    bpf_cmd_BPF_ENABLE_STATS, bpf_cmd_BPF_ITER_CREATE, bpf_cmd_BPF_LINK_CREATE,
+    bpf_cmd_BPF_LINK_DETACH, bpf_cmd_BPF_LINK_GET_FD_BY_ID, bpf_cmd_BPF_LINK_GET_NEXT_ID,
+    bpf_cmd_BPF_LINK_UPDATE, bpf_cmd_BPF_MAP_CREATE, bpf_cmd_BPF_MAP_DELETE_BATCH,
+    bpf_cmd_BPF_MAP_DELETE_ELEM, bpf_cmd_BPF_MAP_FREEZE, bpf_cmd_BPF_MAP_GET_FD_BY_ID,
+    bpf_cmd_BPF_MAP_GET_NEXT_ID, bpf_cmd_BPF_MAP_GET_NEXT_KEY,
+    bpf_cmd_BPF_MAP_LOOKUP_AND_DELETE_BATCH, bpf_cmd_BPF_MAP_LOOKUP_AND_DELETE_ELEM,
+    bpf_cmd_BPF_MAP_LOOKUP_BATCH, bpf_cmd_BPF_MAP_LOOKUP_ELEM, bpf_cmd_BPF_MAP_UPDATE_BATCH,
+    bpf_cmd_BPF_MAP_UPDATE_ELEM, bpf_cmd_BPF_OBJ_GET, bpf_cmd_BPF_OBJ_GET_INFO_BY_FD,
+    bpf_cmd_BPF_OBJ_PIN, bpf_cmd_BPF_PROG_ATTACH, bpf_cmd_BPF_PROG_BIND_MAP,
+    bpf_cmd_BPF_PROG_DETACH, bpf_cmd_BPF_PROG_GET_FD_BY_ID, bpf_cmd_BPF_PROG_GET_NEXT_ID,
+    bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY, bpf_cmd_BPF_PROG_RUN,
+    bpf_cmd_BPF_RAW_TRACEPOINT_OPEN, bpf_cmd_BPF_TASK_FD_QUERY, bpf_insn, bpf_map_info,
     bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH, bpf_prog_info, errno,
     error,
     errors::Errno,
@@ -341,7 +350,102 @@ pub fn sys_bpf(
                 .read_memory_to_vec(UserAddress::from(btf_attr.btf), btf_attr.btf_size as usize)?;
             install_bpf_fd(current_task, BpfTypeFormat { data })
         }
-
+        bpf_cmd_BPF_PROG_DETACH => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_PROG_DETACH");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_PROG_RUN => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_PROG_RUN");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_PROG_GET_NEXT_ID => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_PROG_GET_NEXT_ID");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_MAP_GET_NEXT_ID => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_MAP_GET_NEXT_ID");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_PROG_GET_FD_BY_ID => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_PROG_GET_FD_BY_ID");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_MAP_GET_FD_BY_ID => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_MAP_GET_FD_BY_ID");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_RAW_TRACEPOINT_OPEN => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_RAW_TRACEPOINT_OPEN");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_BTF_GET_FD_BY_ID => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_BTF_GET_FD_BY_ID");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_TASK_FD_QUERY => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_TASK_FD_QUERY");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_MAP_LOOKUP_AND_DELETE_ELEM => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_MAP_LOOKUP_AND_DELETE_ELEM");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_MAP_FREEZE => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_MAP_FREEZE");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_BTF_GET_NEXT_ID => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_BTF_GET_NEXT_ID");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_MAP_LOOKUP_BATCH => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_MAP_LOOKUP_BATCH");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_MAP_LOOKUP_AND_DELETE_BATCH => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_MAP_LOOKUP_AND_DELETE_BATCH");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_MAP_UPDATE_BATCH => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_MAP_UPDATE_BATCH");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_MAP_DELETE_BATCH => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_MAP_DELETE_BATCH");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_LINK_CREATE => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_LINK_CREATE");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_LINK_UPDATE => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_LINK_UPDATE");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_LINK_GET_FD_BY_ID => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_LINK_GET_FD_BY_ID");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_LINK_GET_NEXT_ID => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_LINK_GET_NEXT_ID");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_ENABLE_STATS => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_ENABLE_STATS");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_ITER_CREATE => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_ITER_CREATE");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_LINK_DETACH => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_LINK_DETACH");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_PROG_BIND_MAP => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_PROG_BIND_MAP");
+            error!(EINVAL)
+        }
         _ => {
             track_stub!(TODO("https://fxbug.dev/322874055"), "bpf", cmd);
             error!(EINVAL)
