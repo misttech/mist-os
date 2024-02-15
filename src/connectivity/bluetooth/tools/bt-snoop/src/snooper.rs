@@ -5,7 +5,7 @@
 use anyhow::{format_err, Context as _, Error};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_bluetooth_snoop::{PacketType, SnoopPacket as FidlSnoopPacket, Timestamp};
-use fidl_fuchsia_hardware_bluetooth::HciMarker as HardwareHciMarker;
+use fidl_fuchsia_hardware_bluetooth::VendorMarker as HardwareVendorMarker;
 use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, Channel, DurationNum, MessageBuf};
@@ -122,13 +122,17 @@ impl Snooper {
     /// Create a new snooper from a device path. This opens a new snoop channel, returning an error
     /// if the devices doesn't exist or the channel cannot be created.
     pub fn new(dir: &DirectoryProxy, path: &str) -> Result<Snooper, Error> {
-        let hci = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
-            HardwareHciMarker,
+        let vendor = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+            HardwareVendorMarker,
         >(dir, path)
         .context("failed to open bt-hci device")?;
 
-        let client_end =
-            hci.into_client_end().map_err(|_proxy| format_err!("failed to make sync proxy"))?;
+        let client_end_vendor = vendor.into_client_end().unwrap();
+        let vendor_sync = client_end_vendor.into_sync_proxy();
+
+        let client_end = vendor_sync
+            .open_hci(fasync::Time::after(3.seconds()).into())?
+            .map_err(|e| format_err!("Failed opening the HCI with {e:?}"))?;
         let sync_hci = client_end.into_sync_proxy();
 
         let (ours, theirs) = Channel::create();
