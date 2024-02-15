@@ -4,7 +4,12 @@
 
 use crate::{ConfigMap, Environment, EnvironmentContext};
 use anyhow::{Context, Result};
-use std::{cell::Cell, collections::HashMap, sync::Arc};
+use std::{
+    cell::Cell,
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use tempfile::{NamedTempFile, TempDir};
 use tracing::level_filters::LevelFilter;
 
@@ -25,15 +30,10 @@ pub struct TestEnv {
 }
 
 impl TestEnv {
-    async fn new(_guard: async_lock::MutexGuardArc<()>) -> Result<Self> {
+    async fn new(guard: async_lock::MutexGuardArc<()>) -> Result<Self> {
         let env_file = NamedTempFile::new().context("tmp access failed")?;
-        let user_file = NamedTempFile::new().context("tmp access failed")?;
-        let global_file = NamedTempFile::new().context("tmp access failed")?;
         let isolate_root = tempfile::tempdir()?;
 
-        // Point the configs at temporary files.
-        let user_file_path = user_file.path().to_owned();
-        let global_file_path = global_file.path().to_owned();
         let context = EnvironmentContext::isolated(
             ExecutableKind::Test,
             isolate_root.path().to_owned(),
@@ -42,6 +42,34 @@ impl TestEnv {
             Some(env_file.path().to_owned()),
             None,
         )?;
+        Self::build_test_env(context, env_file, isolate_root, guard).await
+    }
+
+    async fn new_intree(build_dir: &Path, guard: async_lock::MutexGuardArc<()>) -> Result<Self> {
+        let env_file = NamedTempFile::new().context("tmp access failed")?;
+        let isolate_root = tempfile::tempdir()?;
+
+        let context = EnvironmentContext::in_tree(
+            ExecutableKind::Test,
+            isolate_root.path().to_owned(),
+            Some(PathBuf::from(build_dir)),
+            ConfigMap::default(),
+            Some(env_file.path().to_owned()),
+        );
+        Self::build_test_env(context, env_file, isolate_root, guard).await
+    }
+
+    async fn build_test_env(
+        context: EnvironmentContext,
+        env_file: NamedTempFile,
+        isolate_root: TempDir,
+        guard: async_lock::MutexGuardArc<()>,
+    ) -> Result<Self> {
+        let global_file = NamedTempFile::new().context("tmp access failed")?;
+        let global_file_path = global_file.path().to_owned();
+        let user_file = NamedTempFile::new().context("tmp access failed")?;
+        let user_file_path = user_file.path().to_owned();
+
         let log_subscriber: Arc<dyn tracing::Subscriber + Send + Sync> = Arc::new(
             crate::logging::configure_subscribers(
                 &context,
@@ -72,10 +100,11 @@ impl TestEnv {
             global_file,
             isolate_root,
             log_subscriber,
-            _guard,
+            _guard: guard,
         };
 
         let mut env = Environment::new_empty(test_env.context.clone());
+
         env.set_user(Some(&user_file_path));
         env.set_global(Some(&global_file_path));
         env.save().await.context("saving env file")?;
@@ -118,6 +147,19 @@ lazy_static::lazy_static! {
 /// will result in strange behaviour.
 pub async fn test_init() -> Result<TestEnv> {
     let env = TestEnv::new(TEST_LOCK.lock_arc().await).await?;
+
+    // force an overwrite of the configuration setup
+    crate::init(&env.context).await?;
+
+    Ok(env)
+}
+
+/// Creates a blank slate configuration which models the context when running in-tree. Specifically, it exposes
+/// the build_dir() property.
+/// You must hold the returned object object for the duration of the test, not doing so
+/// will result in strange behaviour.
+pub async fn test_init_in_tree(build_dir: &Path) -> Result<TestEnv> {
+    let env = TestEnv::new_intree(build_dir, TEST_LOCK.lock_arc().await).await?;
 
     // force an overwrite of the configuration setup
     crate::init(&env.context).await?;
