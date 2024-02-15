@@ -7,14 +7,17 @@ use fidl_fuchsia_io as fio;
 use fidl_fuchsia_process as fprocess;
 #[cfg(feature = "syscall_stats")]
 use fuchsia_inspect::NumericProperty;
+use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx};
 use starnix_sync::{Locked, Unlocked};
 use std::{convert::TryFrom, sync::Arc};
 
 use crate::{
-    arch::execution::new_syscall,
+    arch::execution::{new_syscall, restore_cfi_directives},
+    execution::get_core_dump_info,
     fs::fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile},
+    generate_cfi_directives,
     mm::MemoryManager,
     signals::{dequeue_signal, prepare_to_restart_syscall},
     syscalls::table::dispatch_syscall,
@@ -24,7 +27,7 @@ use crate::{
     },
     vfs::{FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions, FsStr},
 };
-use starnix_logging::log_trace;
+use starnix_logging::{log_trace, trace_instant, TraceScope, CATEGORY_STARNIX};
 use starnix_sync::{LockBefore, ReadOps};
 use starnix_syscalls::{
     decls::{Syscall, SyscallDecl},
@@ -119,7 +122,9 @@ pub fn execute_syscall(
 pub fn process_completed_restricted_exit(
     current_task: &mut CurrentTask,
     error_context: &Option<ErrorContext>,
+    state: &zx::sys::zx_restricted_state_t,
 ) -> Result<Option<ExitStatus>, Errno> {
+    let result;
     loop {
         // Checking for a signal might cause the task to exit, so check before processing exit
         {
@@ -155,7 +160,8 @@ pub fn process_completed_restricted_exit(
                 };
             }
 
-            return Ok(Some(exit_status));
+            result = Some(exit_status);
+            break;
         } else {
             // Block a stopped process after it's had a chance to handle signals, since a signal might
             // cause it to stop.
@@ -173,9 +179,29 @@ pub fn process_completed_restricted_exit(
             {
                 continue;
             }
-            return Ok(None);
+            result = None;
+            break;
         }
     }
+
+    if result.is_some() {
+        if current_task.flags().contains(TaskFlags::DUMP_ON_EXIT) {
+            // Make diagnostics tooling aware of the crash.
+            profile_duration!("RecordCoreDump");
+            trace_instant!(CATEGORY_STARNIX, c"RecordCoreDump", TraceScope::Process);
+            current_task
+                .kernel()
+                .core_dumps
+                .record_core_dump(get_core_dump_info(&current_task.task));
+
+            // (Re)-generate CFI directives so that stack unwinders will
+            // trace into the Linux state.
+            generate_cfi_directives!(state);
+            debug::backtrace_request_current_thread();
+            restore_cfi_directives!();
+        }
+    }
+    return Ok(result);
 }
 
 /// Creates a `StartupHandles` from the provided handles.

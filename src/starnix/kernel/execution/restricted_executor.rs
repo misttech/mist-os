@@ -11,8 +11,7 @@ use crate::{
     signals::{deliver_signal, SignalActions, SignalInfo},
     task::{
         ptrace_attach_from_state, CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup,
-        PtraceCoreState, StopState, Task, TaskBuilder, TaskFlags, ThreadGroup,
-        ThreadGroupWriteGuard,
+        PtraceCoreState, StopState, Task, TaskBuilder, ThreadGroup, ThreadGroupWriteGuard,
     },
 };
 use anyhow::{format_err, Error};
@@ -22,10 +21,9 @@ use fuchsia_zircon::{
 };
 use starnix_logging::{
     firehose_trace_duration, firehose_trace_duration_begin, firehose_trace_duration_end,
-    firehose_trace_instant, log_error, log_warn, set_zx_name, trace_instant, CoreDumpInfo,
-    TraceScope, ARG_NAME, CATEGORY_STARNIX, MAX_ARGV_LENGTH, NAME_CHECK_TASK_EXIT,
-    NAME_EXECUTE_SYSCALL, NAME_HANDLE_EXCEPTION, NAME_READ_RESTRICTED_STATE, NAME_RESTRICTED_KICK,
-    NAME_RUN_TASK, NAME_WRITE_RESTRICTED_STATE,
+    firehose_trace_instant, log_error, log_warn, set_zx_name, CoreDumpInfo, ARG_NAME,
+    CATEGORY_STARNIX, MAX_ARGV_LENGTH, NAME_EXECUTE_SYSCALL, NAME_HANDLE_EXCEPTION,
+    NAME_READ_RESTRICTED_STATE, NAME_RESTRICTED_KICK, NAME_RUN_TASK, NAME_WRITE_RESTRICTED_STATE,
 };
 use starnix_sync::{LockBefore, Locked, ProcessGroupState, Unlocked};
 use starnix_syscalls::decls::SyscallDecl;
@@ -229,46 +227,16 @@ fn run_task(
     // Map the restricted state VMO and arrange for it to be unmapped later.
     let mut restricted_state = RestrictedState::from_vmo(state_vmo)?;
 
-    // This variable contains the latest restricted register state, which is
-    // inherited from the cloned parent when we start the task, and then is
-    // updated after every restricted mode exit thereafter.  It is declared
-    // outside the loop because it needs to propagate from the restricted mode
-    // exit at the end of the loop to the processing of that exit at the
-    // beginning of the loop.
-    let mut state = zx::sys::zx_restricted_state_t::from(&*current_task.thread_state.registers);
+    // We need to check for exit once, before the task starts executing, in case
+    // the task has already been sent a signal that will cause it to exit.
+    let state = zx::sys::zx_restricted_state_t::from(&*current_task.thread_state.registers);
+    if let Some(exit_status) =
+        process_completed_restricted_exit(current_task, &error_context, &state)?
+    {
+        return Ok(exit_status);
+    }
     loop {
-        // This check for task exit needs to happen any time there may be an
-        // exit pending.  This is typically when the task exits restricted mode
-        // (which happens at the end of this loop body), but can also be when
-        // the task starts (if the task was killed before it was able to start).
-        // Its placement at the top of the loop body accounts for the case when
-        // the task is killed before it starts.
-        {
-            firehose_trace_duration!(CATEGORY_STARNIX, NAME_CHECK_TASK_EXIT);
-            profile_duration!("CheckTaskExit");
-            if let Some(exit_status) =
-                process_completed_restricted_exit(current_task, &error_context)?
-            {
-                if current_task.flags().contains(TaskFlags::DUMP_ON_EXIT) {
-                    // Make diagnostics tooling aware of the crash.
-                    profile_duration!("RecordCoreDump");
-                    trace_instant!(CATEGORY_STARNIX, c"RecordCoreDump", TraceScope::Process);
-                    current_task
-                        .kernel()
-                        .core_dumps
-                        .record_core_dump(get_core_dump_info(&current_task.task));
-
-                    // (Re)-generate CFI directives so that stack unwinders will
-                    // trace into the Linux state.
-                    generate_cfi_directives!(state);
-                    debug::backtrace_request_current_thread();
-                    restore_cfi_directives!();
-                }
-                return Ok(exit_status);
-            }
-        }
-
-        state = zx::sys::zx_restricted_state_t::from(&*current_task.thread_state.registers);
+        let mut state = zx::sys::zx_restricted_state_t::from(&*current_task.thread_state.registers);
         // Copy the register state into the mapped VMO.
         restricted_state.write_state(&state);
 
@@ -368,10 +336,15 @@ fn run_task(
                 ));
             }
         }
+        if let Some(exit_status) =
+            process_completed_restricted_exit(current_task, &error_context, &state)?
+        {
+            return Ok(exit_status);
+        }
     }
 }
 
-fn get_core_dump_info(task: &Task) -> CoreDumpInfo {
+pub fn get_core_dump_info(task: &Task) -> CoreDumpInfo {
     let process_koid = task
         .thread_group
         .process
