@@ -71,8 +71,8 @@ void asan_remap_shadow_internal(volatile pt_entry_t* pdp, uintptr_t start, size_
   const size_t pt_map_start = VADDR_TO_PT_INDEX(start_shadow);
   const size_t pt_map_end = VADDR_TO_PT_INDEX(end_shadow);
 
-  // TODO(https://fxbug.dev/42127444): When pmm_alloc_page allows getting high memory, use high pages where
-  // possible for page tables and asan shadow pages.
+  // TODO(https://fxbug.dev/42127444): When pmm_alloc_page allows getting high memory, use high
+  // pages where possible for page tables and asan shadow pages.
   for (size_t i = pdp_map_start; i <= pdp_map_end; i++) {
     paddr_t new_pdp_entry = get_or_allocate_page_table(pdp, i, kasan_shadow_pd);
     pt_entry_t* pd = reinterpret_cast<pt_entry_t*>(paddr_to_physmap(new_pdp_entry));

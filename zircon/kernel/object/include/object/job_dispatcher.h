@@ -28,8 +28,8 @@ class JobNode;
 // Job signal that is active when a job has no children (i.e., no child jobs and no child
 // processes).
 //
-// TODO(https://fxbug.dev/42131457): This is a temporary signal that we don't want userspace using (yet?).
-// Either expose this signal to userspace in "zircon/types.h", or remove this signal.
+// TODO(https://fxbug.dev/42131457): This is a temporary signal that we don't want userspace using
+// (yet?). Either expose this signal to userspace in "zircon/types.h", or remove this signal.
 #define ZX_JOB_NO_CHILDREN __ZX_OBJECT_SIGNAL_6
 
 // Assume the typical set-policy call has 8 items or less.

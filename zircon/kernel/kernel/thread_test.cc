@@ -581,7 +581,8 @@ bool migrate_stress_test() {
   BEGIN_TEST;
 
   if (true) {
-    // TODO(https://fxbug.dev/42158849): Disabled until root cause of hangs on some hardware can be determined.
+    // TODO(https://fxbug.dev/42158849): Disabled until root cause of hangs on some hardware can be
+    // determined.
     printf("Test disabled due to https://fxbug.dev/42158849\n");
     END_TEST;
   }
@@ -606,7 +607,8 @@ bool migrate_stress_test() {
 
     // Prevent reporting lock violations inside the migration function to avoid reentering the
     // scheduler and interfering with the migration function state.
-    // TODO(https://fxbug.dev/42157332): Figure out how to support violation reporting in sensitive code paths.
+    // TODO(https://fxbug.dev/42157332): Figure out how to support violation reporting in sensitive
+    // code paths.
     DECLARE_SPINLOCK(ThreadState, lockdep::LockFlagsReportingDisabled) lock;
 
     cpu_num_t allowed_cpu TA_GUARDED(lock) = 0;

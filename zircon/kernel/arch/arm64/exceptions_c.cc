@@ -358,11 +358,11 @@ static void arm64_data_abort_handler(iframe_t* iframe, uint exception_flags, uin
     // address) and fill it in.
     DEBUG_ASSERT(BIT_SET(dfr, ARM64_DFR_RUN_FAULT_HANDLER_BIT - 1));
     iframe->elr = dfr | (1ull << ARM64_DFR_RUN_FAULT_HANDLER_BIT);
-    // TODO(https://fxbug.dev/42175395): x1 is relayed back to user_copy where it will be stored in page fault
-    // info. Currently, the only users of this page fault info is VmAspace::SoftFault, but the
-    // kernel page fault handler shouldn't accept/work with tags. To avoid architecture-specific
-    // tags reaching the VM layer at all, we can strip it here so it never reaches user_copy page
-    // fault results.
+    // TODO(https://fxbug.dev/42175395): x1 is relayed back to user_copy where it will be stored in
+    // page fault info. Currently, the only users of this page fault info is VmAspace::SoftFault,
+    // but the kernel page fault handler shouldn't accept/work with tags. To avoid
+    // architecture-specific tags reaching the VM layer at all, we can strip it here so it never
+    // reaches user_copy page fault results.
     iframe->r[1] = arch_detag_ptr(far);
     iframe->r[2] = pf_flags;
     return;
@@ -614,8 +614,8 @@ zx_status_t arch_dispatch_user_policy_exception(uint32_t policy_exception_code,
 
 bool arch_install_exception_context(Thread* thread, const arch_exception_context_t* context) {
   if (!context->frame) {
-    // TODO(https://fxbug.dev/42105394): Must be a synthetic exception as they don't (yet) provide the
-    // registers.
+    // TODO(https://fxbug.dev/42105394): Must be a synthetic exception as they don't (yet) provide
+    // the registers.
     return false;
   }
 

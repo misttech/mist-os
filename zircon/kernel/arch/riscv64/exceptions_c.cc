@@ -400,8 +400,8 @@ zx_status_t arch_dispatch_user_policy_exception(uint32_t policy_exception_code,
 
 bool arch_install_exception_context(Thread* thread, const arch_exception_context_t* context) {
   if (!context->frame) {
-    // TODO(https://fxbug.dev/42105394): Must be a synthetic exception as they don't (yet) provide the
-    // registers.
+    // TODO(https://fxbug.dev/42105394): Must be a synthetic exception as they don't (yet) provide
+    // the registers.
     return false;
   }
 

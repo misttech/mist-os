@@ -61,8 +61,9 @@ bool ReadWrite() {
 }
 
 // This test verifies that a thread repeatedly calling ReadChar concurrently with another thread
-// calling WriteChar can be cleanly killed.  This is a regression test for https://fxbug.dev/42156534.  It has
-// no false positives (i.e. it should never spuriously fail), but it can have false negatives.
+// calling WriteChar can be cleanly killed.  This is a regression test for
+// https://fxbug.dev/42156534.  It has no false positives (i.e. it should never spuriously fail),
+// but it can have false negatives.
 bool ReadWriteRace() {
   BEGIN_TEST;
 

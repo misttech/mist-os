@@ -372,7 +372,8 @@ int first_used_page_table_entry(const volatile pte_t* page_table, uint page_size
       // so this is really just checking for scenarios where the low type bits got set to INVALID,
       // but the rest of the entry did not.
       //
-      // TODO(https://fxbug.dev/42159319): Once https://fxbug.dev/42159319 is resolved this can be removed.
+      // TODO(https://fxbug.dev/42159319): Once https://fxbug.dev/42159319 is resolved this can be
+      // removed.
       ASSERT_MSG(is_pte_valid(pte),
                  "page_table at %p has malformed invalid entry %#" PRIx64 " at %u\n", page_table,
                  pte, i);
@@ -1989,8 +1990,8 @@ void ArmArchVmAspace::AssertEmptyLocked() const {
     // Attempt to walk the page table and find the first leaf most mapping that we can. This
     // represents (at least one of) the entries that is holding this page table alive.
     //
-    // TODO(https://fxbug.dev/42159319): Once https://fxbug.dev/42159319 is resolved this call, and the entire called
-    // method, can be removed.
+    // TODO(https://fxbug.dev/42159319): Once https://fxbug.dev/42159319 is resolved this call, and
+    // the entire called method, can be removed.
     zx_status_t status = DebugFindFirstLeafMapping(&pt_addr, &entry_vaddr, &pte);
     panic(
         "top level page table still in use! aspace %p pt_pages_ %zu tt_virt %p index %d entry "

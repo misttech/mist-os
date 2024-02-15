@@ -188,8 +188,8 @@ zx::result<VmAddressRegionDispatcher::MapResult> VmAddressRegionDispatcher::Map(
   if (vmar_flags & VMAR_FLAG_ALLOW_FAULTS) {
     vmar_flags &= ~VMAR_FLAG_ALLOW_FAULTS;
   } else {
-    // TODO(https://fxbug.dev/42109795): Add additional checks once all clients (resizable and pager-backed
-    // VMOs) start using the VMAR_FLAG_ALLOW_FAULTS flag.
+    // TODO(https://fxbug.dev/42109795): Add additional checks once all clients (resizable and
+    // pager-backed VMOs) start using the VMAR_FLAG_ALLOW_FAULTS flag.
     if (vmo->is_discardable()) {
       return zx::error{ZX_ERR_NOT_SUPPORTED};
     }

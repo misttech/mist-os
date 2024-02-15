@@ -412,8 +412,8 @@ static bool test_gdt_mapping() {
   END_TEST;
 }
 
-// TODO(https://fxbug.dev/42169592): Unconditionally re-enable this test when https://fxbug.dev/42169592 has been
-// resolved.
+// TODO(https://fxbug.dev/42169592): Unconditionally re-enable this test when
+// https://fxbug.dev/42169592 has been resolved.
 //
 // Spam all the CPUs with NMIs, see that nothing bad happens.
 bool test_nmi_spam() {

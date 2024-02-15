@@ -31,7 +31,8 @@ namespace {
 
 unsigned char global_buffer[8];
 
-// TODO(https://fxbug.dev/42104852): Enable for x86_64 once it can add shadow mappings after early init.
+// TODO(https://fxbug.dev/42104852): Enable for x86_64 once it can add shadow mappings after early
+// init.
 #if !defined(__x86_64__)
 inline uint8_t* test_addr2shadow(uintptr_t address) {
   uint8_t* const kasan_shadow_map = reinterpret_cast<uint8_t*>(KASAN_SHADOW_OFFSET);
@@ -259,7 +260,8 @@ bool kasan_test_walk_shadow() {
 NO_ASAN bool kasan_test_map_shadow_for() {
   BEGIN_TEST;
 
-// TODO(https://fxbug.dev/42104852): Enable for x86_64 once it can add shadow mappings after early init.
+// TODO(https://fxbug.dev/42104852): Enable for x86_64 once it can add shadow mappings after early
+// init.
 #if !defined(__x86_64__)
   auto kernel_vmar = VmAspace::kernel_aspace()->RootVmar()->as_vm_address_region();
   fbl::RefPtr<VmAddressRegion> test_vmar;

@@ -173,8 +173,8 @@ zx_status_t VmObjectDispatcher::SetSize(uint64_t size) {
 
   uint64_t remaining = size_aligned - size;
   if (remaining > 0) {
-    // TODO(https://fxbug.dev/42053728): Determine whether failure to ZeroRange here should undo this
-    // operation.
+    // TODO(https://fxbug.dev/42053728): Determine whether failure to ZeroRange here should undo
+    // this operation.
     //
     // Dropping the lock here is fine, as an `Operation` only needs to be locked when initializing,
     // committing, or cancelling.
@@ -257,8 +257,8 @@ zx_status_t VmObjectDispatcher::SetContentSize(uint64_t content_size) {
 
   uint64_t vmo_size = vmo_->size();
   if (content_size < vmo_size) {
-    // TODO(https://fxbug.dev/42053728): Determine whether failure to ZeroRange here should undo this
-    // operation.
+    // TODO(https://fxbug.dev/42053728): Determine whether failure to ZeroRange here should undo
+    // this operation.
     //
     // Dropping the lock here is fine, as an `Operation` only needs to be locked when initializing,
     // committing, or cancelling.

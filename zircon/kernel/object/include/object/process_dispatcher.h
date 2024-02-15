@@ -310,7 +310,8 @@ class ProcessDispatcher final
   // For non-shared processes (regular ones), the normal aspace is the one and only aspace
   // belonging to the process (`ShareableProcessState::aspace()`).
   //
-  // TODO(https://fxbug.dev/42083004): Update this comment once all architectures support unified aspaces.
+  // TODO(https://fxbug.dev/42083004): Update this comment once all architectures support unified
+  // aspaces.
   VmAspace* normal_aspace() {
     if (unified_aspace_) {
       return unified_aspace_.get();

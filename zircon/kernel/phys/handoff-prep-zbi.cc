@@ -120,7 +120,8 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
           extra_mem_config_ranges++;
         }
 
-        // TODO(https://fxbug.dev/42085637): Clean up when zircon initializes in virtual address mode.
+        // TODO(https://fxbug.dev/42085637): Clean up when zircon initializes in virtual address
+        // mode.
         //
         // Peripheral ranges are only meaningful in ARM64 where accesses cannot be performed
         // through the physmap at the time of writing.

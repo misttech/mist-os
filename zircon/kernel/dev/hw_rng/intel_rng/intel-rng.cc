@@ -35,8 +35,8 @@ static ssize_t get_entropy_from_rdrand(void* buf, size_t len);
  * and a negative value on error.
  */
 static ssize_t get_entropy_from_cpu(void* buf, size_t len) {
-  /* TODO(security, https://fxbug.dev/42105848): Move this to a shared kernel/user lib, so we can write
-   * usermode tests against this code */
+  /* TODO(security, https://fxbug.dev/42105848): Move this to a shared kernel/user lib, so we can
+   * write usermode tests against this code */
 
   if (len >= SSIZE_MAX) {
     static_assert(ZX_ERR_INVALID_ARGS < 0, "");
@@ -87,12 +87,11 @@ static ssize_t get_entropy_from_rdseed(void* buf, size_t len) {
 }
 
 static ssize_t get_entropy_from_rdrand(void* buf, size_t len) {
-  // TODO(security, https://fxbug.dev/42105846): This method is not compliant with Intel's "Digital Random
-  // Number Generator (DRNG) Software Implementation Guide".  We are using
-  // rdrand in a way that is explicitly against their recommendations.  This
-  // needs to be corrected, but this fallback is a compromise to allow our
-  // development platforms that don't support RDSEED to get some degree of
-  // hardware-based randomization.
+  // TODO(security, https://fxbug.dev/42105846): This method is not compliant with Intel's "Digital
+  // Random Number Generator (DRNG) Software Implementation Guide".  We are using rdrand in a way
+  // that is explicitly against their recommendations.  This needs to be corrected, but this
+  // fallback is a compromise to allow our development platforms that don't support RDSEED to get
+  // some degree of hardware-based randomization.
   return get_entropy_from_instruction(buf, len, ENTROPY_INSTR_RDRAND);
 }
 

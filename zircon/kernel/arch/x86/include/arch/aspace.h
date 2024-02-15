@@ -97,7 +97,8 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
                           ArchVmAspaceInterface& restricted) override;
 
   void DisableUpdates() final {
-    // This method is no-op on x86 as the feature is only needed on arm64.  See https://fxbug.dev/42159319.
+    // This method is no-op on x86 as the feature is only needed on arm64.  See
+    // https://fxbug.dev/42159319.
   }
 
   zx_status_t Destroy() override;

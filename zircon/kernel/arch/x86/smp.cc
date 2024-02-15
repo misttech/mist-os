@@ -84,8 +84,8 @@ zx_status_t x86_bringup_aps(uint32_t* apic_ids, uint32_t count) {
   memset(&bootstrap_data->per_cpu, 0, sizeof(bootstrap_data->per_cpu));
   // Allocate kstacks and threads for all processors
   for (unsigned int i = 0; i < count; ++i) {
-    // TODO(johngro): Clean this up when we fix https://fxbug.dev/42108673.  Users should not be directly
-    // calloc'ing and initializing thread structures.
+    // TODO(johngro): Clean this up when we fix https://fxbug.dev/42108673.  Users should not be
+    // directly calloc'ing and initializing thread structures.
     Thread* thread = static_cast<Thread*>(memalign(alignof(Thread), sizeof(Thread)));
     if (!thread) {
       status = ZX_ERR_NO_MEMORY;

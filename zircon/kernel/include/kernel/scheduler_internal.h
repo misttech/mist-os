@@ -127,8 +127,8 @@ inline void Scheduler::RescheduleMask(cpu_mask_t cpus_to_reschedule_mask) {
 
     // Can we do it here and now?
     if (preempt_enabled) {
-      // TODO(https://fxbug.dev/42143537): Once spinlocks imply preempt disable, this if-else can be replaced
-      // with a call to Preempt().
+      // TODO(https://fxbug.dev/42143537): Once spinlocks imply preempt disable, this if-else can be
+      // replaced with a call to Preempt().
       if (arch_num_spinlocks_held() < 2 && !arch_blocking_disallowed()) {
         // Yes, do it.
         Preempt();

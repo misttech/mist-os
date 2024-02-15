@@ -1643,10 +1643,10 @@ zx_status_t sys_object_get_child(zx_handle_t handle, uint64_t koid, zx_rights_t 
     return ZX_ERR_ACCESS_DENIED;
   }
 
-  // TODO(https://fxbug.dev/42175105): Constructing the handles below may cause the handle count to go
-  // from 0->1, resulting in multiple on_zero_handles invocations. Presently this is benign, except
-  // for one scenario with processes in the initial state. Such processes are filtered out by the
-  // SimpleJobEnumerator and should not be able to be learned about. Further protection against
+  // TODO(https://fxbug.dev/42175105): Constructing the handles below may cause the handle count to
+  // go from 0->1, resulting in multiple on_zero_handles invocations. Presently this is benign,
+  // except for one scenario with processes in the initial state. Such processes are filtered out by
+  // the SimpleJobEnumerator and should not be able to be learned about. Further protection against
   // guessing is not performed here since the worst case scenario is a misbehaving privileged
   // process guessing a koid and destroying a process that was in construction.
   auto process = DownCastDispatcher<ProcessDispatcher>(&dispatcher);

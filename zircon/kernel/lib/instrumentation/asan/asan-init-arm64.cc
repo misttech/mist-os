@@ -95,9 +95,9 @@ void asan_map_shadow_for(uintptr_t start, size_t size) {
 }
 
 void arch_asan_early_init() {
-  // TODO(https://fxbug.dev/42104852): We are constructing the kasan shadow 'late' here; this is not viable
-  // as a long-term solution, but will help us build out kasan support. The shadow needs to cover
-  // the entire physmap.
+  // TODO(https://fxbug.dev/42104852): We are constructing the kasan shadow 'late' here; this is not
+  // viable as a long-term solution, but will help us build out kasan support. The shadow needs to
+  // cover the entire physmap.
   uintptr_t shadow_begin = reinterpret_cast<uintptr_t>(addr2shadow(KERNEL_ASPACE_BASE));
   uintptr_t shadow_end =
       reinterpret_cast<uintptr_t>(addr2shadow(KERNEL_ASPACE_BASE + KERNEL_ASPACE_SIZE - 1));

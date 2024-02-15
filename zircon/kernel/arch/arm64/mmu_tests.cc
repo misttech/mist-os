@@ -66,10 +66,10 @@ bool arm64_test_perms() {
   map_query_test(ARCH_MMU_FLAG_PERM_USER | ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE |
                  ARCH_MMU_FLAG_PERM_EXECUTE);
 
-  // TODO: https://fxbug.dev/42169684 Add a more comprehensive test that reads back the page table entries
-  // and all the translation tables leading up to it to make sure the permission bits are set
-  // properly. Requires plumbing through some code to the ArmArchVmAspace to return a copy of all
-  // the levels of the translation tables and terminal entry.
+  // TODO: https://fxbug.dev/42169684 Add a more comprehensive test that reads back the page table
+  // entries and all the translation tables leading up to it to make sure the permission bits are
+  // set properly. Requires plumbing through some code to the ArmArchVmAspace to return a copy of
+  // all the levels of the translation tables and terminal entry.
 
   EXPECT_EQ(ZX_OK, aspace.Destroy());
 

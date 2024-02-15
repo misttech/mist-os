@@ -439,8 +439,8 @@ ssize_t KTraceState::ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len) 
       // the entire purpose of lock_ is to serialize these operations and so is safe to be held for
       // this copy.
       //
-      // TOOD(https://fxbug.dev/42052646): Determine if this should be changed to capture faults and resolve them
-      // outside the lock.
+      // TOOD(https://fxbug.dev/42052646): Determine if this should be changed to capture faults and
+      // resolve them outside the lock.
       guard.CallUntracked([&] { copy_result = CopyToUser(ptr8.byte_offset(done), r.ptr, r.len); });
       if (copy_result != ZX_OK) {
         return ZX_ERR_INVALID_ARGS;

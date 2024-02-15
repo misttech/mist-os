@@ -17,7 +17,8 @@
 // In order to use a new uart implementation:
 // - gBootOptions->experimental_serial_migration must be true.
 //
-// TODO(https://fxbug.dev/42170495): These calls and related code, will be deleted once migration is finalized.
+// TODO(https://fxbug.dev/42170495): These calls and related code, will be deleted once migration is
+// finalized.
 void legacy_platform_dputs_thread(const char *str, size_t len);
 void legacy_platform_dputs_irq(const char *str, size_t len);
 int legacy_platform_dgetc(char *c, bool wait);

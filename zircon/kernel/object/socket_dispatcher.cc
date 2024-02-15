@@ -217,11 +217,11 @@ zx_status_t SocketDispatcher::WriteSelfLocked(user_in_ptr<const char> src, size_
   size_t st = 0u;
   zx_status_t status;
 
-  // TODO(https://fxbug.dev/42182048): Perform user copying while holding the dispatcher lock is generally not
-  // not allowed, but is exempted here while a fix for sockets is developed. Performing the
-  // MBufChain operations (which do the actual user copy) with tracking disabled will allow the
-  // user copy to go through, with side effect of reducing the effectiveness of any other lockdep
-  // detections that might involve this lock for the duration of the operation..
+  // TODO(https://fxbug.dev/42182048): Perform user copying while holding the dispatcher lock is
+  // generally not not allowed, but is exempted here while a fix for sockets is developed.
+  // Performing the MBufChain operations (which do the actual user copy) with tracking disabled will
+  // allow the user copy to go through, with side effect of reducing the effectiveness of any other
+  // lockdep detections that might involve this lock for the duration of the operation..
   guard.CallUntracked([&] {
     AssertHeld(*get_lock());
     if (flags_ & ZX_SOCKET_DATAGRAM) {

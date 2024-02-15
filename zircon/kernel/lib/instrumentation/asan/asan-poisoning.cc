@@ -56,7 +56,8 @@ void print_error_shadow(uintptr_t address, size_t bytes, bool is_write, void* ca
           "\nKASAN detected a %s error: ptr={{{data:%#lx}}}, size=%#zx, caller: {{{pc:%p}}}\n",
           !is_write ? "read" : "write", address, bytes, caller);
 
-  // TODO(https://fxbug.dev/42104852): Decode the shadow value into 'use-after-free'/redzone/page free/etc.
+  // TODO(https://fxbug.dev/42104852): Decode the shadow value into 'use-after-free'/redzone/page
+  // free/etc.
   printf("Shadow memory state around the buggy address %#lx:\n", shadow);
   // Print at least 16 bytes of the shadow map before and after the invalid access.
   uintptr_t start_addr = (shadow & ~0x07) - 0x10;
@@ -90,8 +91,8 @@ void print_error_shadow(uintptr_t address, size_t bytes, bool is_write, void* ca
     start_addr += 8;
   }
   // Dump additional VM Page state - this is useful to debug use-after-state-change bugs.
-  // TODO(https://fxbug.dev/42104852): This is disabled because we could panic while holding one of the
-  // aspace locks, causing an error. Figure out how to dump vm_page_t info from here.
+  // TODO(https://fxbug.dev/42104852): This is disabled because we could panic while holding one of
+  // the aspace locks, causing an error. Figure out how to dump vm_page_t info from here.
   // paddr_to_vm_page(vaddr_to_paddr(reinterpret_cast<void*>(address)))->dump();
 }
 

@@ -59,12 +59,13 @@ class VmCompressedStorage : public fbl::RefCounted<VmCompressedStorage> {
   //
   // The return address remains valid as long as this specific reference is not freed, and otherwise
   // any other calls to |Store| or |Free| do not invalidate.
-  // TODO(https://fxbug.dev/42138396): Restrict this if de-fragmentation of the compressed storage becomes
-  // necessary.
+  // TODO(https://fxbug.dev/42138396): Restrict this if de-fragmentation of the compressed storage
+  // becomes necessary.
   //
   // No guarantee on alignment of the data is provided, and callers must tolerate arbitrary byte
   // alignment.
-  // TODO(https://fxbug.dev/42138396): Consider providing an alignment guarantee if needed by decompressors.
+  // TODO(https://fxbug.dev/42138396): Consider providing an alignment guarantee if needed by
+  // decompressors.
   virtual ktl::pair<const void*, size_t> CompressedData(CompressedRef ref) const = 0;
 
   // Perform an information dump of the internal state to the debuglog.

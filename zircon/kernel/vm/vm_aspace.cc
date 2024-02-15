@@ -322,8 +322,8 @@ zx_status_t VmAspace::Destroy() {
 
   // Now that we've removed all mappings we can put the arch aspace into a sort of read-only mode.
   //
-  // TODO(https://fxbug.dev/42159319): Once https://fxbug.dev/42159319 is resolved, this call (and the
-  // DisableUpdates feature) can be removed.
+  // TODO(https://fxbug.dev/42159319): Once https://fxbug.dev/42159319 is resolved, this call (and
+  // the DisableUpdates feature) can be removed.
   arch_aspace_.DisableUpdates();
 
   return ZX_OK;
