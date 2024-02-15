@@ -64,18 +64,6 @@ DsiDw::DsiDw(zx_device_t* parent, fdf::MmioBuffer mmio)
 
 DsiDw::~DsiDw() = default;
 
-zx_status_t DsiDw::DsiImplWriteReg(uint32_t reg, uint32_t val) {
-  // TODO(payamm): Verify register offset is valid
-  dsi_mmio_.Write32(val, reg);
-  return ZX_OK;
-}
-
-zx_status_t DsiDw::DsiImplReadReg(uint32_t reg, uint32_t* val) {
-  // TODO(payamm): Verify register offset is valid
-  *val = dsi_mmio_.Read32(reg);
-  return ZX_OK;
-}
-
 zx_status_t DsiDw::GetColorCode(color_code_t c, bool& packed, uint8_t& code) {
   zx_status_t status = ZX_OK;
   switch (c) {
@@ -128,17 +116,6 @@ void DsiDw::DsiImplPowerDown() {
   DsiDwPwrUpReg::Get().ReadFrom(&dsi_mmio_).set_shutdown(kPowerReset).WriteTo(&dsi_mmio_);
 }
 
-bool DsiDw::DsiImplIsPoweredUp() {
-  return (DsiDwPwrUpReg::Get().ReadFrom(&dsi_mmio_).shutdown() == kPowerOn);
-}
-
-zx_status_t DsiDw::DsiImplEnableBist(uint32_t pattern) {
-  // enable video mode
-  DsiImplSetMode(DSI_MODE_VIDEO);
-
-  DsiDwVidModeCfgReg::Get().ReadFrom(&dsi_mmio_).set_vpg_mode(1).set_vpg_en(1).WriteTo(&dsi_mmio_);
-  return ZX_OK;
-}
 void DsiDw::DsiImplPhySendCode(uint32_t code, uint32_t parameter) {
   // Write code
   DsiDwPhyTstCtrl1Reg::Get().FromValue(0).set_reg_value(code).WriteTo(&dsi_mmio_);
@@ -205,7 +182,7 @@ zx_status_t DsiDw::DsiImplSendCmd(const mipi_dsi_cmd_t* cmd_list, size_t cmd_cou
 void DsiDw::DsiImplSetMode(dsi_mode_t mode) {
   // Configure the operation mode (cmd or vid)
   DsiDwModeCfgReg::Get().ReadFrom(&dsi_mmio_).set_cmd_video_mode(mode).WriteTo(&dsi_mmio_);
-  DsiImplWriteReg(DW_DSI_VID_MODE_CFG, last_vidmode_);
+  dsi_mmio_.Write32(last_vidmode_, DW_DSI_VID_MODE_CFG);
 }
 
 zx_status_t DsiDw::DsiImplConfig(const dsi_config_t* dsi_config) {
@@ -380,95 +357,6 @@ zx_status_t DsiDw::DsiImplConfig(const dsi_config_t* dsi_config) {
       .WriteTo(&dsi_mmio_);
 
   return ZX_OK;
-}
-
-void DsiDw::DsiImplPrintDsiRegisters() {
-  zxlogf(INFO, "Dumping DW_DSI_* (DWC DSI host) registers");
-  zxlogf(INFO, "VERSION = 0x%" PRIx32, DsiDwVersionReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "PWR_UP = 0x%" PRIx32, DsiDwPwrUpReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "CLKMGR_CFG = 0x%" PRIx32,
-         DsiDwClkmgrCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "DPI_VCID = 0x%" PRIx32, DsiDwDpiVcidReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "DPI_COLOR_CODING = 0x%" PRIx32,
-         DsiDwDpiColorCodingReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "DPI_CFG_POL = 0x%" PRIx32,
-         DsiDwDpiCfgPolReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "DPI_LP_CMD_TIM = 0x%" PRIx32,
-         DsiDwDpiLpCmdTimReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "DBI_VCID = 0x%" PRIx32, DsiDwDbiVcidReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "DBI_CFG = 0x%" PRIx32, DsiDwDbiCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "DBI_PARTITIONING_EN = 0x%" PRIx32,
-         DsiDwDbiPartitioningEnReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "DBI_CMDSIZE = 0x%" PRIx32,
-         DsiDwDbiCmdsizeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "PCKHDL_CFG = 0x%" PRIx32,
-         DsiDwPckhdlCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "GEN_VCID = 0x%" PRIx32, DsiDwGenVcidReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "MODE_CFG = 0x%" PRIx32, DsiDwModeCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "VID_MODE_CFG = 0x%" PRIx32,
-         DsiDwVidModeCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "VID_PKT_SIZE = 0x%" PRIx32,
-         DsiDwVidPktSizeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "VID_NUM_CHUNKS = 0x%" PRIx32,
-         DsiDwVidNumChunksReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "VID_NULL_SIZE = 0x%" PRIx32,
-         DsiDwVidNullSizeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "VID_HSA_TIME = 0x%" PRIx32,
-         DsiDwVidHsaTimeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "VID_HBP_TIME = 0x%" PRIx32,
-         DsiDwVidHbpTimeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "VID_HLINE_TIME = 0x%" PRIx32,
-         DsiDwVidHlineTimeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "VID_VSA_LINES = 0x%" PRIx32,
-         DsiDwVidVsaLinesReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "VID_VBP_LINES = 0x%" PRIx32,
-         DsiDwVidVbpLinesReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "VID_VFP_LINES = 0x%" PRIx32,
-         DsiDwVidVfpLinesReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "VID_VACTIVE_LINES = 0x%" PRIx32,
-         DsiDwVidVactiveLinesReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "EDPI_CMD_SIZE = 0x%" PRIx32,
-         DsiDwEdpiCmdSizeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "CMD_MODE_CFG = 0x%" PRIx32,
-         DsiDwCmdModeCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "GEN_HDR = 0x%" PRIx32, DsiDwGenHdrReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "GEN_PLD_DATA = 0x%" PRIx32,
-         DsiDwGenPldDataReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "CMD_PKT_STATUS = 0x%" PRIx32,
-         DsiDwCmdPktStatusReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "TO_CNT_CFG = 0x%" PRIx32, DsiDwToCntCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "HS_RD_TO_CNT = 0x%" PRIx32,
-         DsiDwHsRdToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "LP_RD_TO_CNT = 0x%" PRIx32,
-         DsiDwLpRdToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "HS_WR_TO_CNT = 0x%" PRIx32,
-         DsiDwHsWrToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "LP_WR_TO_CNT = 0x%" PRIx32,
-         DsiDwLpWrToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "BTA_TO_CNT = 0x%" PRIx32, DsiDwBtaToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "SDF_3D = 0x%" PRIx32, DsiDwSdf3dReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "LPCLK_CTRL = 0x%" PRIx32,
-         DsiDwLpclkCtrlReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "PHY_TMR_LPCLK_CFG = 0x%" PRIx32,
-         DsiDwPhyTmrLpclkCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "PHY_TMR_CFG = 0x%" PRIx32,
-         DsiDwPhyTmrCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "PHY_RSTZ = 0x%" PRIx32, DsiDwPhyRstzReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "PHY_IF_CFG = 0x%" PRIx32, DsiDwPhyIfCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "PHY_ULPS_CTRL = 0x%" PRIx32,
-         DsiDwPhyUlpsCtrlReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "PHY_TX_TRIGGERS = 0x%" PRIx32,
-         DsiDwPhyTxTriggersReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "PHY_STATUS = 0x%" PRIx32,
-         DsiDwPhyStatusReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "PHY_TST_CTRL0 = 0x%" PRIx32,
-         DsiDwPhyTstCtrl0Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "PHY_TST_CTRL1 = 0x%" PRIx32,
-         DsiDwPhyTstCtrl1Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "INT_ST0 = 0x%" PRIx32, DsiDwIntSt0Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "INT_ST1 = 0x%" PRIx32, DsiDwIntSt1Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "INT_MSK0 = 0x%" PRIx32, DsiDwIntMsk0Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  zxlogf(INFO, "INT_MSK1 = 0x%" PRIx32, DsiDwIntMsk1Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
 }
 
 inline bool DsiDw::IsPldREmpty() {

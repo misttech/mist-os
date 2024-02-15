@@ -62,17 +62,10 @@ class DsiDw : public DeviceType, public ddk::DsiImplProtocol<DsiDw, ddk::base_pr
   void DsiImplPowerDown();
   void DsiImplSetMode(dsi_mode_t mode);
   zx_status_t DsiImplSendCmd(const mipi_dsi_cmd_t* cmd_list, size_t cmd_count);
-  bool DsiImplIsPoweredUp();
-  void DsiImplReset() { DsiImplPowerDown(); }
-  zx_status_t DsiImplPhyConfig(const dsi_config_t* dsi_config) { return ZX_OK; }
   void DsiImplPhyPowerUp();
   void DsiImplPhyPowerDown();
   void DsiImplPhySendCode(uint32_t code, uint32_t parameter);
   zx_status_t DsiImplPhyWaitForReady();
-  void DsiImplPrintDsiRegisters();
-  zx_status_t DsiImplWriteReg(uint32_t reg, uint32_t val);
-  zx_status_t DsiImplReadReg(uint32_t reg, uint32_t* val);
-  zx_status_t DsiImplEnableBist(uint32_t pattern);
 
   // ddk::Device implementation:
   void DdkRelease();
