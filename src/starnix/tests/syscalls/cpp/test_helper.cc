@@ -27,14 +27,6 @@
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
 
-namespace {
-
-inline int MemFdCreate(const char *name, unsigned int flags) {
-  return static_cast<int>(syscall(SYS_memfd_create, name, flags));
-}
-
-}  // namespace
-
 namespace test_helper {
 
 ::testing::AssertionResult ForkHelper::WaitForChildrenInternal(int death_signum) {
@@ -312,6 +304,10 @@ void RecursiveUnmountAndRemove(const std::string &path) {
   }
 
   EXPECT_THAT(rmdir(path.c_str()), SyscallSucceeds());
+}
+
+int MemFdCreate(const char *name, unsigned int flags) {
+  return static_cast<int>(syscall(SYS_memfd_create, name, flags));
 }
 
 // Attempts to read a byte from the given memory address.

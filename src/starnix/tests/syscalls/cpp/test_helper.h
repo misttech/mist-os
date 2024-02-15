@@ -231,6 +231,9 @@ bool TryRead(uintptr_t addr);
 // Returns whether the write succeeded or not.
 bool TryWrite(uintptr_t addr);
 
+// Wrapper for the memfd_create system call.
+int MemFdCreate(const char *name, unsigned int flags);
+
 }  // namespace test_helper
 
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_CPP_TEST_HELPER_H_

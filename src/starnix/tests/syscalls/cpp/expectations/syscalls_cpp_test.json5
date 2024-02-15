@@ -35,6 +35,13 @@
                 "TmpfsFaultTest/FaultFileTest.ReadV/0",
                 "SocketFault/SocketFault.ReadV/2",
                 "SocketFault/SocketFault.WriteV/2",
+
+                // TODO(https://g-issues.fuchsia.dev/issues/325315302)
+                "SetRLimitTest.ZeroFSizeOnMemFd",
+                "SetRLimitTest.ZeroFSizeOnRegularFiles",
+                "SetRLimitTest.ZeroFSizeOnPipe",
+                "SetRLimitTest.ZeroFSizeOnFIFO",
+                "SetRLimitTest.OneFSize",
             ],
         },
     ],
