@@ -240,6 +240,7 @@ impl vfs::node::Node for FatFile {
         })
     }
 
+    // TODO(https://fxbug.dev/324112547): add new io2 attributes, e.g. change time, access time.
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -417,6 +418,21 @@ impl DirectoryEntry for FatFile {
         });
     }
 
+    fn open2(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: Path,
+        protocols: fio::ConnectionProtocols,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        if !path.is_empty() {
+            return Err(Status::NOT_DIR);
+        }
+
+        self.open_ref(&self.filesystem.lock().unwrap())?;
+        object_request.spawn_connection(scope, self, protocols, FidlIoConnection::create)
+    }
+
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
     }
@@ -431,6 +447,8 @@ mod tests {
             node::{Closer, FatNode},
             tests::{TestDiskContents, TestFatDisk},
         },
+        assert_matches::assert_matches,
+        futures::TryStreamExt,
     };
 
     const TEST_DISK_SIZE: u64 = 2048 << 10; // 2048K
@@ -498,5 +516,58 @@ mod tests {
         assert_eq!(attrs.content_size, TEST_FILE_CONTENT.len() as u64);
         assert!(attrs.storage_size > TEST_FILE_CONTENT.len() as u64);
         assert_eq!(attrs.link_count, 1);
+    }
+
+    #[fuchsia::test]
+    async fn test_open2_fails_with_path() {
+        let file = TestFile::new();
+        let scope = ExecutionScope::new();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            rights: Some(fio::Operations::READ_BYTES),
+            flags: Some(fio::NodeFlags::GET_REPRESENTATION),
+            ..Default::default()
+        });
+        protocols.to_object_request(server_end).handle(|request| {
+            file.clone().open2(
+                scope.clone(),
+                Path::validate_and_split("foo").expect("validate_and_split failed"),
+                protocols,
+                request,
+            )
+        });
+
+        let event =
+            proxy.take_event_stream().try_next().await.expect_err("open2 passed unexpectedly");
+        assert_matches!(
+            event,
+            fidl::Error::ClientChannelClosed { status: zx::Status::NOT_DIR, .. }
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_open2() {
+        let file = TestFile::new();
+        let scope = ExecutionScope::new();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            rights: Some(fio::Operations::READ_BYTES),
+            flags: Some(fio::NodeFlags::GET_REPRESENTATION),
+            ..Default::default()
+        });
+        protocols
+            .to_object_request(server_end)
+            .handle(|request| file.clone().open2(scope.clone(), Path::dot(), protocols, request));
+
+        assert_matches!(
+            proxy
+                .take_event_stream()
+                .try_next()
+                .await
+                .expect("expected OnRepresentation event")
+                .expect("missing OnRepresentation event")
+                .into_on_representation(),
+            Some(fio::Representation::File(_))
+        );
     }
 }
