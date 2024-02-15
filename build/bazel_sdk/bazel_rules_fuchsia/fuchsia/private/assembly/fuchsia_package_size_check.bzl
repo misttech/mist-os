@@ -1,42 +1,42 @@
-# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
 """Rule for running size checker on blobfs package."""
 
+load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load(":providers.bzl", "FuchsiaProductImageInfo", "FuchsiaSizeCheckerInfo")
 
 def _fuchsia_package_size_check_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
-    images_out = ctx.attr.product_image[FuchsiaProductImageInfo].images_out
+    manifests = ",".join([pkg[FuchsiaPackageInfo].package_manifest.path for pkg in ctx.attr.packages])
 
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
-    size_report = ctx.actions.declare_file(ctx.label.name + "_size_report.json")
+    size_report = ctx.actions.declare_file(ctx.label.name + ".json")
     verbose_output = ctx.actions.declare_file(ctx.label.name + "_verbose_output.json")
     budgets_file = ctx.actions.declare_file(ctx.label.name + "_size_budgets.json")
-    size_checker_file = ctx.file.size_checker_file
-    product_assembly_out = ctx.attr.product_image[FuchsiaProductImageInfo].product_assembly_out
 
-    # Convert size_checker.json to size_budgets.json
+    # Construct the size budgets file from the manifests.
     ctx.actions.run(
         outputs = [budgets_file],
-        inputs = [size_checker_file, product_assembly_out],
-        executable = ctx.executable._convert_size_limits,
+        executable = ctx.executable._construct_budgets_file,
         arguments = [
-            "--size-limits",
-            size_checker_file.path,
-            "--image-assembly-config",
-            product_assembly_out.path + "/image_assembly.json",
+            "--name",
+            ctx.attr.size_report_name,
+            "--budget",
+            str(ctx.attr.budget),
+            "--creep-budget",
+            str(ctx.attr.creep_budget),
+            "--packages",
+            manifests,
             "--output",
             budgets_file.path,
-            "--max-blob-contents-size",
-            str(ctx.attr.max_blob_contents_size),
         ],
     )
 
     # Size checker execution
-    inputs = get_ffx_assembly_inputs(fuchsia_toolchain) + [budgets_file] + ctx.files.product_image
+    inputs = get_ffx_assembly_inputs(fuchsia_toolchain) + [budgets_file] + ctx.files.packages
     outputs = [size_report, verbose_output, ffx_isolate_dir]
 
     # Gather all the arguments to pass to ffx.
@@ -56,8 +56,6 @@ def _fuchsia_package_size_check_impl(ctx):
         size_report.path,
         "--verbose-json-output",
         verbose_output.path,
-        "--blob-sizes",
-        images_out.path + "/blobs.json",
     ]
 
     script_lines = [
@@ -84,29 +82,30 @@ def _fuchsia_package_size_check_impl(ctx):
     ]
 
 fuchsia_package_size_check = rule(
-    doc = """Create a size summary for blobfs packages.""",
+    doc = """Create a size report for a set of fuchsia packages.""",
     implementation = _fuchsia_package_size_check_impl,
     provides = [FuchsiaSizeCheckerInfo],
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
-        "size_checker_file": attr.label(
-            doc = "Blobfs size budget file. It will later be converted to size_budgets.json file",
-            allow_single_file = True,
+        "size_report_name": attr.string(
+            doc = "The name to add to the size report for viewing in gerrit",
             mandatory = True,
         ),
-        "product_image": attr.label(
-            doc = "fuchsia_product_image target to check size",
-            providers = [FuchsiaProductImageInfo],
+        "packages": attr.label_list(
+            doc = "fuchsia_package targets to cover in the report",
+            providers = [FuchsiaPackageInfo],
+            allow_empty = False,
         ),
-        "blobfs_capacity": attr.int(
-            doc = "Total Capacity of BlobFS. Deprecated!",
-        ),
-        "max_blob_contents_size": attr.int(
-            doc = "Total size of BlobFS Contents",
+        "budget": attr.int(
+            doc = "Maximum number of bytes the packages can consume",
             mandatory = True,
         ),
-        "_convert_size_limits": attr.label(
-            default = "//fuchsia/tools:convert_size_limits",
+        "creep_budget": attr.int(
+            doc = "Maximum number of bytes the packages can grow without a warning",
+            mandatory = True,
+        ),
+        "_construct_budgets_file": attr.label(
+            default = "//fuchsia/tools:construct_budgets_file",
             executable = True,
             cfg = "exec",
         ),

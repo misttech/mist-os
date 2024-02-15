@@ -79,16 +79,12 @@ load(
     _fuchsia_scrutiny_config = "fuchsia_scrutiny_config",
 )
 load(
-    "//fuchsia/private/assembly:fuchsia_size_checker.bzl",
-    _fuchsia_size_checker = "fuchsia_size_checker",
-)
-load(
     "//fuchsia/private/assembly:fuchsia_product_size_check.bzl",
     _fuchsia_product_size_check = "fuchsia_product_size_check",
 )
 load(
-    "//fuchsia/private/assembly:fuchsia_package_size_check2.bzl",
-    _fuchsia_package_size_check = "fuchsia_package_size_check2",
+    "//fuchsia/private/assembly:fuchsia_package_size_check.bzl",
+    _fuchsia_package_size_check = "fuchsia_package_size_check",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_size_report_aggregator.bzl",
@@ -130,7 +126,6 @@ fuchsia_product_create_system = _fuchsia_product_create_system
 fuchsia_product_assembly = _fuchsia_product_assembly
 fuchsia_partitions_configuration = _fuchsia_partitions_configuration
 fuchsia_product_bundle = _fuchsia_product_bundle
-fuchsia_size_checker = _fuchsia_size_checker
 fuchsia_product_size_check = _fuchsia_product_size_check
 fuchsia_package_size_check = _fuchsia_package_size_check
 fuchsia_size_report_aggregator = _fuchsia_size_report_aggregator
