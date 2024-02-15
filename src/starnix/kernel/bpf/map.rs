@@ -175,9 +175,11 @@ impl MapStore {
                 if schema.key_size != 4 {
                     return error!(EINVAL);
                 }
-                Ok(MapStore::Array(new_pinned_buffer(
-                    (schema.value_size * schema.max_entries) as usize,
-                )))
+                let buffer_size = schema
+                    .value_size
+                    .checked_mul(schema.max_entries)
+                    .ok_or_else(|| errno!(EINVAL))?;
+                Ok(MapStore::Array(new_pinned_buffer(buffer_size as usize)))
             }
             bpf_map_type_BPF_MAP_TYPE_HASH => Ok(MapStore::Hash(HashStorage::new(&schema))),
 
