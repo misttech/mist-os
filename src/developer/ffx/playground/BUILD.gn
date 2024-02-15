@@ -13,11 +13,44 @@ rustc_library("playground") {
     "src/error.rs",
     "src/lib.rs",
     "src/parser.rs",
+    "src/value.rs",
   ]
   deps = [
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fidl_codec/rust:fidl_codec",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:nom",
     "//third_party/rust_crates:nom_locate",
+    "//third_party/rust_crates:num",
+  ]
+  test_deps = [ ":test_fidl" ]
+}
+
+_test_fidl = get_label_info("//src/lib/fidl_codec:fidl($fidl_toolchain)",
+                            "target_gen_dir")
+_test_fidl_gen_dir = get_label_info(":test_fidl", "target_gen_dir")
+
+copy("test_fidl_json") {
+  sources = [ "${_test_fidl}/fidl.fidl.json" ]
+  outputs = [ "${_test_fidl_gen_dir}/fidl.fidl.json" ]
+  deps = [ "//src/lib/fidl_codec:fidl($fidl_toolchain)" ]
+}
+
+copy("test_fidl_src") {
+  sources = [ "src/test_fidl_lib.rs" ]
+  outputs = [ "${_test_fidl_gen_dir}/test_fidl_lib.rs" ]
+}
+
+rustc_library("test_fidl") {
+  version = "0.1.0"
+  edition = "2021"
+  source_root = "${_test_fidl_gen_dir}/test_fidl_lib.rs"
+
+  sources = [ "${_test_fidl_gen_dir}/test_fidl_lib.rs" ]
+  inputs = [ "${_test_fidl_gen_dir}/fidl.fidl.json" ]
+  deps = [
+    ":test_fidl_json",
+    ":test_fidl_src",
   ]
 }
 
