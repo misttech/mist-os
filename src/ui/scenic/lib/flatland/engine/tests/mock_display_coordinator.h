@@ -8,22 +8,32 @@
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl_test_base.h>
 #include <fuchsia/hardware/display/types/cpp/fidl.h>
+#include <lib/fidl/cpp/binding.h>
+#include <lib/syslog/cpp/macros.h>
+#include <zircon/status.h>
+
+#include <atomic>
+
+#include <gmock/gmock.h>
 
 namespace flatland {
 
 class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coordinator_TestBase {
  public:
-  explicit MockDisplayCoordinator() : binding_(this) {}
-
-  void WaitForMessage() { binding_.WaitForMessage(); }
-
-  void Bind(zx::channel device_channel, zx::channel coordinator_channel,
-            async_dispatcher_t* dispatcher = nullptr) {
-    device_channel_ = std::move(device_channel);
-    binding_.Bind(fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator>(
-                      std::move(coordinator_channel)),
-                  dispatcher);
+  explicit MockDisplayCoordinator(zx::channel coordinator_channel, async_dispatcher_t* dispatcher)
+      : binding_(this, std::move(coordinator_channel), dispatcher) {
+    binding_.set_error_handler([this](zx_status_t status) {
+      if (status != ZX_ERR_PEER_CLOSED) {
+        FX_LOGS(ERROR) << "FIDL binding is closed due to error " << zx_status_get_string(status);
+      }
+      is_bound_.store(false, std::memory_order_relaxed);
+    });
   }
+
+  bool IsBound() const { return is_bound_.load(std::memory_order_relaxed); }
+
+  // TODO(https://fxbug.dev/324689624): Do not use gMock to generate mocking
+  // methods.
 
   MOCK_METHOD(void, ImportEvent, (zx::event, fuchsia::hardware::display::EventId));
 
@@ -89,7 +99,7 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   void NotImplemented_(const std::string& name) final {}
 
   fidl::Binding<fuchsia::hardware::display::Coordinator> binding_;
-  zx::channel device_channel_;
+  std::atomic<bool> is_bound_ = true;
 };
 
 }  // namespace flatland
