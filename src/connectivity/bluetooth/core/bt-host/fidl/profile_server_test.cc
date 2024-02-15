@@ -1375,6 +1375,67 @@ TEST_F(ProfileServerTestFakeAdapter, AudioDirectionExtRequestParametersClosedOnC
   RunLoopUntilIdle();
 }
 
+TEST_F(ProfileServerTestFakeAdapter, AudioOffloadExtRequestParametersClosedOnChannelClosed) {
+  const bt::PeerId kPeerId;
+  const fuchsia::bluetooth::PeerId kFidlPeerId{kPeerId.value()};
+
+  FakeChannel::WeakPtr last_channel;
+  adapter()->fake_bredr()->set_l2cap_channel_callback(
+      [&](FakeChannel::WeakPtr chan) { last_channel = std::move(chan); });
+
+  // Support Android Vendor Extensions to enable Audio Offload Extension
+  adapter()->mutable_state().controller_features |= FeaturesBits::kAndroidVendorExtensions;
+  bt::StaticPacket<
+      pw::bluetooth::vendor::android_hci::LEGetVendorCapabilitiesCommandCompleteEventWriter>
+      params;
+  params.SetToZeros();
+  params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
+  params.view().a2dp_source_offload_capability_mask().BackingStorage().UncheckedWriteUInt(
+      static_cast<uint32_t>(hci_android::A2dpCodecType::kAac));
+  adapter()->mutable_state().android_vendor_capabilities.Initialize(params.view());
+
+  // Set L2CAP channel parameters
+  fidlbredr::L2capParameters l2cap_params;
+  fidlbredr::ConnectParameters conn_params;
+  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
+  conn_params.set_l2cap(std::move(l2cap_params));
+
+  std::optional<fidlbredr::Channel> response_channel;
+  client()->Connect(kFidlPeerId, std::move(conn_params),
+                    [&](fidlbredr::Profile_Connect_Result result) {
+                      ASSERT_TRUE(result.is_response());
+                      response_channel = std::move(result.response().channel);
+                    });
+  RunLoopUntilIdle();
+  ASSERT_TRUE(last_channel.is_alive());
+  ASSERT_TRUE(response_channel.has_value());
+  ASSERT_TRUE(response_channel->has_ext_audio_offload());
+
+  fidlbredr::AudioOffloadExtPtr audio_client =
+      response_channel->mutable_ext_audio_offload()->Bind();
+  bool audio_client_closed = false;
+  audio_client.set_error_handler([&](zx_status_t /*status*/) { audio_client_closed = true; });
+
+  // Closing the channel should close |audio_client| (after running the loop).
+  last_channel->Close();
+  // Destroy the channel (like the real LogicalLink would) to verify that ProfileServer doesn't try
+  // to use channel pointers.
+  EXPECT_TRUE(adapter()->fake_bredr()->DestroyChannel(last_channel->id()));
+
+  // Any request for the closed channel should be ignored.
+  std::optional<fidlbredr::AudioOffloadExtGetSupportedFeaturesResponse> result_features;
+  audio_client->GetSupportedFeatures(
+      [&result_features](fidlbredr::AudioOffloadExtGetSupportedFeaturesResponse features) {
+        result_features = std::move(features);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(audio_client_closed);
+  EXPECT_FALSE(result_features.has_value());
+  audio_client.Unbind();
+  RunLoopUntilIdle();
+}
+
 class AndroidSupportedFeaturesTest
     : public ProfileServerTestFakeAdapter,
       public ::testing::WithParamInterface<

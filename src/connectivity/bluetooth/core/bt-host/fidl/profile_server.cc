@@ -884,7 +884,7 @@ fidl::InterfaceHandle<fidlbredr::L2capParametersExt> ProfileServer::BindL2capPar
 void ProfileServer::OnAudioOffloadExtError(AudioOffloadExt* ext_server, zx_status_t status) {
   bt_log(DEBUG, "fidl", "audio offload ext server closed (reason: %s)",
          zx_status_get_string(status));
-  auto handle = audio_offload_ext_servers_.extract(ext_server);
+  auto handle = audio_offload_ext_servers_.extract(ext_server->unique_id());
   if (handle.empty()) {
     bt_log(WARN, "fidl", "could not find ext server in audio offload ext error callback");
   }
@@ -894,6 +894,8 @@ fidl::InterfaceHandle<fidlbredr::AudioOffloadExt> ProfileServer::BindAudioOffloa
     bt::l2cap::Channel::WeakPtr channel) {
   fidl::InterfaceHandle<fidlbredr::AudioOffloadExt> client;
 
+  bt::l2cap::Channel::UniqueId unique_id = channel->unique_id();
+
   std::unique_ptr<bthost::ProfileServer::AudioOffloadExt> audio_offload_ext_server =
       std::make_unique<AudioOffloadExt>(*this, client.NewRequest(), std::move(channel), adapter_);
   AudioOffloadExt* server_ptr = audio_offload_ext_server.get();
@@ -901,8 +903,8 @@ fidl::InterfaceHandle<fidlbredr::AudioOffloadExt> ProfileServer::BindAudioOffloa
   audio_offload_ext_server->set_error_handler(
       [this, server_ptr](zx_status_t status) { OnAudioOffloadExtError(server_ptr, status); });
 
-  // TODO(https://fxbug.dev/42077295): Use unique channel id instead of server_ptr
-  audio_offload_ext_servers_[server_ptr] = std::move(audio_offload_ext_server);
+  audio_offload_ext_servers_[unique_id] = std::move(audio_offload_ext_server);
+
   return client;
 }
 
@@ -930,8 +932,8 @@ fuchsia::bluetooth::bredr::Channel ProfileServer::ChannelToFidl(
   auto closed_cb = [this, unique_id = channel->unique_id()]() {
     l2cap_parameters_ext_servers_.erase(unique_id);
     audio_direction_ext_servers_.erase(unique_id);
+    audio_offload_ext_servers_.erase(unique_id);
     audio_offload_controller_server_ = nullptr;
-    // TODO(https://fxbug.dev/42064683): Erase other channel extension servers.
   };
 
   auto sock = l2cap_socket_factory_.MakeSocketForChannel(std::move(channel), std::move(closed_cb));
