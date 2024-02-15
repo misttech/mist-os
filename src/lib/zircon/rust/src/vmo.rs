@@ -11,6 +11,7 @@ use crate::{Property, PropertyQuery};
 use bitflags::bitflags;
 use fuchsia_zircon_sys as sys;
 use std::{mem::MaybeUninit, ptr};
+use zerocopy::FromBytes;
 
 /// An object representing a Zircon
 /// [virtual memory object](https://fuchsia.dev/fuchsia-src/concepts/objects/vm_object.md).
@@ -164,6 +165,61 @@ impl Vmo {
             buffer.set_len(len);
         }
         Ok(buffer)
+    }
+
+    /// Same as read, but returns an array.
+    pub fn read_to_array<T: FromBytes, const N: usize>(
+        &self,
+        offset: u64,
+    ) -> Result<[T; N], Status> {
+        // TODO(https://fxbug.dev/42079731): replace with MaybeUninit::uninit_array.
+        let array: MaybeUninit<[MaybeUninit<T>; N]> = MaybeUninit::uninit();
+        // SAFETY: We are converting from an uninitialized array to an array
+        // of uninitialized elements which is the same. See
+        // https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#initializing-an-array-element-by-element.
+        let mut array = unsafe { array.assume_init() };
+
+        // SAFETY: T is FromBytes, which means that any bit pattern is valid. Interpreting
+        // [MaybeUninit<T>] as [MaybeUninit<u8>] is safe because T's alignment requirements
+        // are larger than u8.
+        //
+        // TODO(https://fxbug.dev/42079727): Use MaybeUninit::slice_as_bytes_mut once stable.
+        let buffer = unsafe {
+            std::slice::from_raw_parts_mut(
+                array.as_mut_ptr() as *mut MaybeUninit<u8>,
+                N * std::mem::size_of::<T>(),
+            )
+        };
+
+        self.read_uninit(buffer, offset)?;
+        // SAFETY: This is safe because we have initialized all the elements in
+        // the array (since `read_uninit` returned successfully).
+        //
+        // TODO(https://fxbug.dev/42079725): replace with MaybeUninit::array_assume_init.
+        let buffer = array.map(|a| unsafe { a.assume_init() });
+        Ok(buffer)
+    }
+
+    /// Same as read, but returns a `T`.
+    pub fn read_to_object<T: FromBytes>(&self, offset: u64) -> Result<T, Status> {
+        let mut object = MaybeUninit::uninit();
+        // SAFETY: T is FromBytes, which means that any bit pattern is valid. Interpreting
+        // MaybeUninit<T> as [MaybeUninit<u8>] is safe because T's alignment requirements
+        // are larger than, or equal to, u8's.
+        //
+        // TODO(https://fxbug.dev/42079727): Use MaybeUninit::as_bytes_mut once stable.
+        let buffer = unsafe {
+            std::slice::from_raw_parts_mut(
+                object.as_mut_ptr() as *mut MaybeUninit<u8>,
+                std::mem::size_of::<T>(),
+            )
+        };
+        self.read_uninit(buffer, offset)?;
+
+        // SAFETY: The call to `read_uninit` succeeded so we know that `object`
+        // has been initialized.
+        let object = unsafe { object.assume_init() };
+        Ok(object)
     }
 
     /// Write to a virtual memory object.
@@ -386,6 +442,8 @@ mod tests {
     use fidl_fuchsia_boot as fboot;
     use fidl_fuchsia_kernel as fkernel;
     use fuchsia_component::client::connect_channel_to_protocol;
+    use test_case::test_case;
+    use zerocopy::FromZeroes;
 
     #[test]
     fn vmo_create_contiguous_invalid_handle() {
@@ -472,6 +530,54 @@ mod tests {
         let new_size = 8192;
         assert_eq!(Err(Status::UNAVAILABLE), vmo.set_size(new_size));
         assert_eq!(size, vmo.get_size().unwrap());
+    }
+
+    #[test_case(0)]
+    #[test_case(1)]
+    fn vmo_read_to_array(read_offset: usize) {
+        const ACTUAL_SIZE: usize = 5;
+        const ACTUAL: [u8; ACTUAL_SIZE] = [1, 2, 3, 4, 5];
+        let vmo = Vmo::create(ACTUAL.len() as u64).unwrap();
+        vmo.write(&ACTUAL, 0).unwrap();
+        let read_len = ACTUAL_SIZE - read_offset;
+        assert_eq!(
+            &vmo.read_to_array::<u8, ACTUAL_SIZE>(read_offset as u64).unwrap()[..read_len],
+            &ACTUAL[read_offset..]
+        );
+    }
+
+    #[test_case(0)]
+    #[test_case(1)]
+    fn vmo_read_to_vec(read_offset: usize) {
+        const ACTUAL_SIZE: usize = 4;
+        const ACTUAL: [u8; ACTUAL_SIZE] = [6, 7, 8, 9];
+        let vmo = Vmo::create(ACTUAL.len() as u64).unwrap();
+        vmo.write(&ACTUAL, 0).unwrap();
+        let read_len = ACTUAL_SIZE - read_offset;
+        assert_eq!(
+            &vmo.read_to_vec(read_offset as u64, read_len as u64).unwrap(),
+            &ACTUAL[read_offset..]
+        );
+    }
+
+    #[test_case(0)]
+    #[test_case(1)]
+    fn vmo_read_to_object(read_offset: usize) {
+        #[repr(C)]
+        #[derive(Debug, Eq, FromBytes, FromZeroes, PartialEq)]
+        struct Object {
+            a: u8,
+            b: u8,
+        }
+
+        const ACTUAL_SIZE: usize = std::mem::size_of::<Object>();
+        const ACTUAL: [u8; ACTUAL_SIZE + 1] = [10, 11, 12];
+        let vmo = Vmo::create(ACTUAL.len() as u64).unwrap();
+        vmo.write(&ACTUAL, 0).unwrap();
+        assert_eq!(
+            vmo.read_to_object::<Object>(read_offset as u64).unwrap(),
+            Object { a: ACTUAL[read_offset], b: ACTUAL[1 + read_offset] }
+        );
     }
 
     #[test]
