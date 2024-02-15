@@ -90,6 +90,7 @@ const std::map<PixelFormatWire, SamplingInfo> kPixelFormatSamplingInfo = {
     {PixelFormat::kI420, {{8}, {kColorType_YUV}}},
     {PixelFormat::kM420, {{8}, {kColorType_YUV}}},
     {PixelFormat::kNv12, {{8}, {kColorType_YUV}}},
+    {PixelFormat::kP010, {{10}, {kColorType_YUV}}},
     {PixelFormat::kYuy2, {{8}, {kColorType_YUV}}},
     // 8 bits RGB when uncompressed - in this context, MJPEG is essentially
     // pretending to be uncompressed.
@@ -629,6 +630,8 @@ uint64_t linear_size(uint32_t surface_height, uint32_t bytes_per_row, PixelForma
       return surface_height * bytes_per_row * 3 / 2;
     case PixelFormat::kNv12:
       return surface_height * bytes_per_row * 3 / 2;
+    case PixelFormat::kP010:
+      return surface_height * bytes_per_row * 3 / 2;
     case PixelFormat::kYuy2:
       return surface_height * bytes_per_row;
     case PixelFormat::kYv12:
@@ -696,6 +699,7 @@ class LinearFormats : public ImageFormatSet {
       case PixelFormat::kI420:
       case PixelFormat::kM420:
       case PixelFormat::kNv12:
+      case PixelFormat::kP010:
       case PixelFormat::kYuy2:
       case PixelFormat::kYv12:
       case PixelFormat::kR5G6B5:
@@ -733,6 +737,7 @@ class LinearFormats : public ImageFormatSet {
     }
     if (plane == 1) {
       switch (image_format.pixel_format().value()) {
+        case PixelFormat::kP010:
         case PixelFormat::kNv12:
         case PixelFormat::kI420:
         case PixelFormat::kYv12: {
@@ -776,6 +781,7 @@ class LinearFormats : public ImageFormatSet {
     if (plane == 1) {
       switch (pixel_format_and_modifier.pixel_format) {
         case PixelFormat::kNv12:
+        case PixelFormat::kP010:
           *row_bytes_out = image_format.bytes_per_row().value();
           return true;
         case PixelFormat::kI420:
@@ -1058,6 +1064,8 @@ uint32_t ImageFormatBitsPerPixel(const PixelFormatAndModifier& pixel_format) {
       return 12u;
     case PixelFormat::kNv12:
       return 12u;
+    case PixelFormat::kP010:
+      return 15u;
     case PixelFormat::kYuy2:
       return 2u * 8u;
     case PixelFormat::kYv12:
@@ -1109,6 +1117,8 @@ uint32_t ImageFormatStrideBytesPerWidthPixel(const PixelFormatAndModifier& pixel
       return 1u;
     case PixelFormat::kNv12:
       return 1u;
+    case PixelFormat::kP010:
+      return 2u;
     case PixelFormat::kYuy2:
       return 2u;
     case PixelFormat::kYv12:
@@ -1187,6 +1197,8 @@ uint32_t ImageFormatSurfaceWidthMinDivisor(const PixelFormatAndModifier& pixel_f
       return 2u;
     case PixelFormat::kNv12:
       return 2u;
+    case PixelFormat::kP010:
+      return 2u;
     case PixelFormat::kYuy2:
       return 2u;
     case PixelFormat::kYv12:
@@ -1239,6 +1251,8 @@ uint32_t ImageFormatSurfaceHeightMinDivisor(const PixelFormatAndModifier& pixel_
     case PixelFormat::kM420:
       return 2u;
     case PixelFormat::kNv12:
+      return 2u;
+    case PixelFormat::kP010:
       return 2u;
     case PixelFormat::kYuy2:
       return 2u;
@@ -1293,6 +1307,8 @@ uint32_t ImageFormatSampleAlignment(const PixelFormatAndModifier& pixel_format) 
       return 2u;
     case PixelFormat::kNv12:
       return 2u;
+    case PixelFormat::kP010:
+      return 4u;
     case PixelFormat::kYuy2:
       return 2u;
     case PixelFormat::kYv12:

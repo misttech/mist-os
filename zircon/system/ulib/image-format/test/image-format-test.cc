@@ -603,6 +603,16 @@ TEST(ImageFormat, BasicSizes_V2) {
   EXPECT_EQ(2, ImageFormatSurfaceWidthMinDivisor(pixel_format_and_modifier_nv12));
   EXPECT_EQ(2, ImageFormatSurfaceHeightMinDivisor(pixel_format_and_modifier_nv12));
   EXPECT_EQ(2, ImageFormatSampleAlignment(pixel_format_and_modifier_nv12));
+
+  fuchsia_images2::ImageFormat image_format_p010;
+  image_format_p010.pixel_format() = fuchsia_images2::PixelFormat::kP010;
+  image_format_p010.size() = {kWidth, kHeight};
+  image_format_p010.bytes_per_row() = kStride;
+  EXPECT_EQ(kHeight * kStride * 3 / 2, ImageFormatImageSize(image_format_p010));
+  auto pixel_format_and_modifier_p010 = PixelFormatAndModifierFromImageFormat(image_format_p010);
+  EXPECT_EQ(2, ImageFormatSurfaceWidthMinDivisor(pixel_format_and_modifier_p010));
+  EXPECT_EQ(2, ImageFormatSurfaceHeightMinDivisor(pixel_format_and_modifier_p010));
+  EXPECT_EQ(4, ImageFormatSampleAlignment(pixel_format_and_modifier_p010));
 }
 
 TEST(ImageFormat, BasicSizes_V2_wire) {
