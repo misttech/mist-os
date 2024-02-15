@@ -134,6 +134,7 @@ open protocol Device {
     }) error zx.Status;
 
     /// Returns power configuration for the device the driver has bound to.
+    @available(added=HEAD)
     flexible GetPowerConfiguration() -> (struct {
         config vector<fuchsia.hardware.power.PowerElementConfiguration>:32;
     }) error zx.Status;

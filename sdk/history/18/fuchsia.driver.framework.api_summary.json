@@ -407,6 +407,12 @@
     },
     {
         "kind": "const",
+        "name": "fuchsia.driver.framework/MAX_RESOURCE_NAME_LENGTH",
+        "type": "uint8",
+        "value": "128"
+    },
+    {
+        "kind": "const",
         "name": "fuchsia.driver.framework/MAX_SYMBOL_COUNT",
         "type": "uint8",
         "value": "64"
