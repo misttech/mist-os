@@ -1220,7 +1220,7 @@
         "depth": 2,
         "max_handles": 0,
         "max_out_of_line": 8,
-        "has_padding": true,
+        "has_padding": false,
         "has_flexible_envelope": true
       }
     }
@@ -1441,7 +1441,7 @@
         "depth": 1,
         "max_handles": 0,
         "max_out_of_line": 0,
-        "has_padding": true,
+        "has_padding": false,
         "has_flexible_envelope": true
       }
     }

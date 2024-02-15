@@ -246,7 +246,7 @@
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
-              "depth": 1,
+              "depth": 0,
               "max_handles": 0,
               "max_out_of_line": 0,
               "has_padding": false,
@@ -286,7 +286,7 @@
               "type_shape_v2": {
                 "inline_size": 8,
                 "alignment": 8,
-                "depth": 1,
+                "depth": 0,
                 "max_handles": 0,
                 "max_out_of_line": 0,
                 "has_padding": false,
@@ -296,7 +296,7 @@
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
-              "depth": 2,
+              "depth": 0,
               "max_handles": 0,
               "max_out_of_line": 0,
               "has_padding": false,
@@ -335,7 +335,7 @@
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
-              "depth": 1,
+              "depth": 0,
               "max_handles": 0,
               "max_out_of_line": 0,
               "has_padding": false,
@@ -360,7 +360,7 @@
       "type_shape_v2": {
         "inline_size": 48,
         "alignment": 8,
-        "depth": 2,
+        "depth": 0,
         "max_handles": 0,
         "max_out_of_line": 0,
         "has_padding": true,
@@ -437,7 +437,7 @@
         "type_shape_v2": {
           "inline_size": 8,
           "alignment": 8,
-          "depth": 1,
+          "depth": 0,
           "max_handles": 0,
           "max_out_of_line": 0,
           "has_padding": false,

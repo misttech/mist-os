@@ -659,10 +659,10 @@ struct IsFidlType<::test_handlesintypes::EmptyResourceUnion> : public std::true_
 template <>
 struct TypeTraits<::test_handlesintypes::EmptyResourceUnion> {
   static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
+  static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasPointer = true;
+  static constexpr bool kHasPointer = false;
 };
 
 template <>

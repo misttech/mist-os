@@ -3817,9 +3817,6 @@ struct CodingTraits<::test::protocols::MethodWithUnionUnionMethodRequest>
     : public EncodableCodingTraits<::test::protocols::MethodWithUnionUnionMethodRequest, 16> {};
 
 
-template<>
-struct HasPadding<::test::protocols::MethodWithUnionUnionMethodRequest> : public std::true_type {};
-
 
 
 template<>
@@ -3846,9 +3843,6 @@ template <>
 struct CodingTraits<::test::protocols::MethodWithUnionUnionMethodResponse>
     : public EncodableCodingTraits<::test::protocols::MethodWithUnionUnionMethodResponse, 16> {};
 
-
-template<>
-struct HasPadding<::test::protocols::MethodWithUnionUnionMethodResponse> : public std::true_type {};
 
 
 

@@ -680,9 +680,6 @@ struct CodingTraits<::test::nullable::StructWithNullableUnion>
     : public EncodableCodingTraits<::test::nullable::StructWithNullableUnion, 16> {};
 
 template <>
-struct HasPadding<::test::nullable::StructWithNullableUnion> : public std::true_type {};
-
-template <>
 struct IsMemcpyCompatible<::test::nullable::StructWithNullableUnion> : public internal::BoolConstant<
                                                                            !HasPadding<::test::nullable::StructWithNullableUnion>::value && IsMemcpyCompatible<::std::unique_ptr<::test::nullable::SimpleUnion>>::value> {};
 

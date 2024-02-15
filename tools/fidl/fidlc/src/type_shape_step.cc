@@ -76,10 +76,7 @@ TypeShape Envelope(TypeShape inner) {
       .max_handles = inner.max_handles,
       .max_out_of_line =
           AddSat(inner.max_out_of_line, inlined ? 0 : AddSat(inner.inline_size, padding)),
-      // TODO(https://fxbug.dev/323940291): Should use this instead, so that
-      // an inlined envelope with 4-byte content gets has_padding=false.
-      // .has_padding = inner.has_padding || padding != 0,
-      .has_padding = inner.has_padding || padding != 0 || inlined,
+      .has_padding = inner.has_padding || padding != 0,
       .has_flexible_envelope = inner.has_flexible_envelope,
   };
 }
@@ -165,14 +162,10 @@ TypeShape TypeShapeStep::Calculate(TypeDecl* decl) {
       return TypeShape{
           .inline_size = 16,
           .alignment = 8,
-          // TODO(https://fxbug.dev/323940291): depth should be 0 for empty union.
-          // .depth = acc.depth,
-          .depth = std::max(acc.depth, 1u),
+          .depth = acc.depth,
           .max_handles = acc.max_handles,
           .max_out_of_line = acc.max_out_of_line,
-          // TODO(https://fxbug.dev/323940291): has_padding shouldn't always be true.
-          // .has_padding = acc.has_padding,
-          .has_padding = true,
+          .has_padding = acc.has_padding,
           .has_flexible_envelope =
               acc.has_flexible_envelope || union_decl->strictness == Strictness::kFlexible,
       };
@@ -275,20 +268,10 @@ TypeShape TypeShapeStep::Calculate(Type* type) {
       };
     }
     case Type::Kind::kZxExperimentalPointer: {
-      auto pointer = static_cast<const ZxExperimentalPointerType*>(type);
-      auto pointee = Compile(pointer->pointee_type);
-      return TypeShape{
-          .inline_size = 8,
-          .alignment = 8,
-          // TODO(https://fxbug.dev/323940291): Should either take into account
-          // pointee's has_padding and has_flexible_envelope, or just treat the
-          // pointer like an integer and zero out all these fields.
-          .depth = AddSat(pointee.depth, 1),
-          .max_handles = pointee.max_handles,
-          .max_out_of_line = pointee.max_out_of_line,
-          .has_padding = false,
-          .has_flexible_envelope = false,
-      };
+      // Treat experimental_pointer<T> like uintptr_t. We could instead treat it
+      // like box<T>, but that would be meaningless because syscalls do not use
+      // the FIDL wire format and there is no concept of "out of line".
+      return TypeShape{.inline_size = 8, .alignment = 8};
     }
     case Type::Kind::kHandle:
     case Type::Kind::kTransportSide: {

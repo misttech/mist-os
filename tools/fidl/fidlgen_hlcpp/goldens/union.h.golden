@@ -3829,9 +3829,6 @@ struct CodingTraits<::test::union_::TestProtocolFlexibleUnionHenceResponseMustBe
     : public EncodableCodingTraits<::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, 16> {};
 
 
-template<>
-struct HasPadding<::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> : public std::true_type {};
-
 
 
 template<>
@@ -3858,9 +3855,6 @@ template <>
 struct CodingTraits<::test::union_::StructWithNullableUnion>
     : public EncodableCodingTraits<::test::union_::StructWithNullableUnion, 16> {};
 
-
-template<>
-struct HasPadding<::test::union_::StructWithNullableUnion> : public std::true_type {};
 
 
 

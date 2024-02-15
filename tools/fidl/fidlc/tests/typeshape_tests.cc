@@ -511,7 +511,6 @@ type TableWithOneHandle = resource table {
                                     .depth = 2,
                                     .max_handles = 1,
                                     .max_out_of_line = 8,
-                                    .has_padding = true,
                                     .has_flexible_envelope = true,
                                 }));
 }
@@ -1138,7 +1137,6 @@ type TableWithHandleStructVector = resource table {
                                              .depth = 3,
                                              .max_handles = 8,
                                              .max_out_of_line = 192,
-                                             .has_padding = true,
                                              .has_flexible_envelope = true,
                                          }));
 
@@ -1437,17 +1435,13 @@ type PaddingCheck = flexible union {
                                }));
 
   auto xu_no_payload_padding = library.LookupUnion("UnionWithoutPayloadPadding");
-  EXPECT_TYPE_SHAPE(xu_no_payload_padding,
-                    (TypeShape{
-                        .inline_size = 16,
-                        .alignment = 8,
-                        .depth = 1,
-                        .max_out_of_line = 56,
-                        // TODO(https://fxbug.dev/42111849): Unions currently return true for
-                        // has_padding in all cases, which should be fixed.
-                        .has_padding = true,
-                        .has_flexible_envelope = true,
-                    }));
+  EXPECT_TYPE_SHAPE(xu_no_payload_padding, (TypeShape{
+                                               .inline_size = 16,
+                                               .alignment = 8,
+                                               .depth = 1,
+                                               .max_out_of_line = 56,
+                                               .has_flexible_envelope = true,
+                                           }));
 
   auto padding_check = library.LookupUnion("PaddingCheck");
   EXPECT_TYPE_SHAPE(padding_check, (TypeShape{
@@ -1502,7 +1496,6 @@ type StrictUnionOfFlexibleTable = strict union {
                                       .alignment = 8,
                                       .depth = 1,
                                       .max_out_of_line = 8,
-                                      .has_padding = true,
                                   }));
 
   auto flexible_union = library.LookupUnion("FlexibleLeafUnion");
@@ -1511,7 +1504,6 @@ type StrictUnionOfFlexibleTable = strict union {
                                         .alignment = 8,
                                         .depth = 1,
                                         .max_out_of_line = 8,
-                                        .has_padding = true,
                                         .has_flexible_envelope = true,
                                     }));
 
@@ -1521,7 +1513,6 @@ type StrictUnionOfFlexibleTable = strict union {
                                             .alignment = 8,
                                             .depth = 2,
                                             .max_out_of_line = 24,
-                                            .has_padding = true,
                                             .has_flexible_envelope = true,
                                         }));
 
@@ -1531,7 +1522,6 @@ type StrictUnionOfFlexibleTable = strict union {
                                               .alignment = 8,
                                               .depth = 2,
                                               .max_out_of_line = 24,
-                                              .has_padding = true,
                                               .has_flexible_envelope = true,
                                           }));
 
@@ -1541,7 +1531,6 @@ type StrictUnionOfFlexibleTable = strict union {
                                           .alignment = 8,
                                           .depth = 2,
                                           .max_out_of_line = 24,
-                                          .has_padding = true,
                                       }));
 
   auto strict_of_flexible = library.LookupUnion("StrictUnionOfFlexibleUnion");
@@ -1550,7 +1539,6 @@ type StrictUnionOfFlexibleTable = strict union {
                                             .alignment = 8,
                                             .depth = 2,
                                             .max_out_of_line = 24,
-                                            .has_padding = true,
                                             .has_flexible_envelope = true,
                                         }));
 
@@ -1568,7 +1556,6 @@ type StrictUnionOfFlexibleTable = strict union {
                                                         .alignment = 8,
                                                         .depth = 2,
                                                         .max_out_of_line = 16,
-                                                        .has_padding = true,
                                                         .has_flexible_envelope = true,
                                                     }));
 }
@@ -2086,7 +2073,6 @@ type Foo = union {
                                    .alignment = 8,
                                    .depth = UINT32_MAX,
                                    .max_out_of_line = UINT32_MAX,
-                                   .has_padding = true,
                                    .has_flexible_envelope = true,
                                }));
 
@@ -2096,7 +2082,6 @@ type Foo = union {
                                     .alignment = 8,
                                     .depth = UINT32_MAX,
                                     .max_out_of_line = UINT32_MAX,
-                                    .has_padding = true,
                                     .has_flexible_envelope = true,
                                 }));
 }
@@ -2117,7 +2102,6 @@ type Foo = union {
                                    .alignment = 8,
                                    .depth = UINT32_MAX,
                                    .max_out_of_line = UINT32_MAX,
-                                   .has_padding = true,
                                    .has_flexible_envelope = true,
                                }));
 }
@@ -2143,7 +2127,6 @@ type Foo = resource union {
                                    // TODO(https://fxbug.dev/323940291): max_handles should be 1.
                                    .max_handles = UINT32_MAX,
                                    .max_out_of_line = UINT32_MAX,
-                                   .has_padding = true,
                                    .has_flexible_envelope = true,
                                }));
 }
@@ -2168,7 +2151,6 @@ type Foo = resource union {
                                    .depth = UINT32_MAX,
                                    .max_handles = UINT32_MAX,
                                    .max_out_of_line = UINT32_MAX,
-                                   .has_padding = true,
                                    .has_flexible_envelope = true,
                                }));
 }
@@ -2195,7 +2177,6 @@ type Foo = resource union {
                                    .depth = UINT32_MAX,
                                    .max_handles = UINT32_MAX,
                                    .max_out_of_line = UINT32_MAX,
-                                   .has_padding = true,
                                    .has_flexible_envelope = true,
                                }));
 
@@ -2206,7 +2187,6 @@ type Foo = resource union {
                                    .depth = UINT32_MAX,
                                    .max_handles = UINT32_MAX,
                                    .max_out_of_line = UINT32_MAX,
-                                   .has_padding = true,
                                    .has_flexible_envelope = true,
                                }));
 
@@ -2217,7 +2197,6 @@ type Foo = resource union {
                                     .depth = UINT32_MAX,
                                     .max_handles = UINT32_MAX,
                                     .max_out_of_line = UINT32_MAX,
-                                    .has_padding = true,
                                     .has_flexible_envelope = true,
                                 }));
 }

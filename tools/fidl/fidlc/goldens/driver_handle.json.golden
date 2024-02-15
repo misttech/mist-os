@@ -220,7 +220,7 @@
               "depth": 2,
               "max_handles": 2,
               "max_out_of_line": 16,
-              "has_padding": true,
+              "has_padding": false,
               "has_flexible_envelope": true
             }
           },
@@ -344,7 +344,7 @@
               "depth": 2,
               "max_handles": 2,
               "max_out_of_line": 16,
-              "has_padding": true,
+              "has_padding": false,
               "has_flexible_envelope": true
             }
           },
@@ -369,7 +369,7 @@
         "depth": 2,
         "max_handles": 2,
         "max_out_of_line": 16,
-        "has_padding": true,
+        "has_padding": false,
         "has_flexible_envelope": true
       }
     },
@@ -540,7 +540,7 @@
         "depth": 2,
         "max_handles": 2,
         "max_out_of_line": 16,
-        "has_padding": true,
+        "has_padding": false,
         "has_flexible_envelope": true
       }
     }

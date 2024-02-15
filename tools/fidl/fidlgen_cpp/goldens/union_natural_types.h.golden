@@ -4644,10 +4644,10 @@ namespace fidl {
   template<>
   struct TypeTraits<::test_union::EmptyFlexibleUnion> {
     static constexpr uint32_t kMaxNumHandles = 0;
-    static constexpr uint32_t kMaxDepth = 1;
+    static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasPointer = true;
+    static constexpr bool kHasPointer = false;
   };
 
   template <>
@@ -4667,10 +4667,10 @@ namespace fidl {
   template<>
   struct TypeTraits<::test_union::OnlyReservedFlexibleUnion> {
     static constexpr uint32_t kMaxNumHandles = 0;
-    static constexpr uint32_t kMaxDepth = 1;
+    static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasPointer = true;
+    static constexpr bool kHasPointer = false;
   };
 
   template <>
