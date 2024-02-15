@@ -5,6 +5,7 @@
 
 set -euo pipefail
 
-${FUCHSIA_DIR}/prebuilt/third_party/go/linux-x64/bin/go run \
-  ${FUCHSIA_DIR}/src/tests/benchmarks/fidl/fidlc/gen_benchmarks.go \
-  ${FUCHSIA_DIR}/src/tests/benchmarks/fidl/fidlc/benchmarks.h
+"$FUCHSIA_DIR/prebuilt/third_party/go/linux-x64/bin/go" run \
+  "$FUCHSIA_DIR/src/tests/benchmarks/fidl/fidlc/gen_benchmarks.go" \
+  "$FUCHSIA_DIR/src/tests/benchmarks/fidl/fidlc/benchmarks.h"
+fx format-code --files="$FUCHSIA_DIR/src/tests/benchmarks/fidl/fidlc/benchmarks.h"

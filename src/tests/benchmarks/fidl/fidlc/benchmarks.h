@@ -5,6 +5,9 @@
 // Generated. To regenerate, run:
 // $FUCHSIA_DIR/src/tests/benchmarks/fidl/fidlc/regen.sh
 
+#ifndef SRC_TESTS_BENCHMARKS_FIDL_FIDLC_BENCHMARKS_H_
+#define SRC_TESTS_BENCHMARKS_FIDL_FIDLC_BENCHMARKS_H_
+
 struct Benchmark {
   const char* name;
   const char* fidl;
@@ -86,7 +89,7 @@ f64 int8;
 )FIDL",
     },
     Benchmark{
-        .name = "StructDeep/8",
+        .name = "StructDeep/64",
         .fidl = R"FIDL(
 
 library example;
@@ -125,6 +128,230 @@ type TestStruct7 = struct {
 
 type TestStruct8 = struct {
 	val TestStruct7;
+};
+
+type TestStruct9 = struct {
+	val TestStruct8;
+};
+
+type TestStruct10 = struct {
+	val TestStruct9;
+};
+
+type TestStruct11 = struct {
+	val TestStruct10;
+};
+
+type TestStruct12 = struct {
+	val TestStruct11;
+};
+
+type TestStruct13 = struct {
+	val TestStruct12;
+};
+
+type TestStruct14 = struct {
+	val TestStruct13;
+};
+
+type TestStruct15 = struct {
+	val TestStruct14;
+};
+
+type TestStruct16 = struct {
+	val TestStruct15;
+};
+
+type TestStruct17 = struct {
+	val TestStruct16;
+};
+
+type TestStruct18 = struct {
+	val TestStruct17;
+};
+
+type TestStruct19 = struct {
+	val TestStruct18;
+};
+
+type TestStruct20 = struct {
+	val TestStruct19;
+};
+
+type TestStruct21 = struct {
+	val TestStruct20;
+};
+
+type TestStruct22 = struct {
+	val TestStruct21;
+};
+
+type TestStruct23 = struct {
+	val TestStruct22;
+};
+
+type TestStruct24 = struct {
+	val TestStruct23;
+};
+
+type TestStruct25 = struct {
+	val TestStruct24;
+};
+
+type TestStruct26 = struct {
+	val TestStruct25;
+};
+
+type TestStruct27 = struct {
+	val TestStruct26;
+};
+
+type TestStruct28 = struct {
+	val TestStruct27;
+};
+
+type TestStruct29 = struct {
+	val TestStruct28;
+};
+
+type TestStruct30 = struct {
+	val TestStruct29;
+};
+
+type TestStruct31 = struct {
+	val TestStruct30;
+};
+
+type TestStruct32 = struct {
+	val TestStruct31;
+};
+
+type TestStruct33 = struct {
+	val TestStruct32;
+};
+
+type TestStruct34 = struct {
+	val TestStruct33;
+};
+
+type TestStruct35 = struct {
+	val TestStruct34;
+};
+
+type TestStruct36 = struct {
+	val TestStruct35;
+};
+
+type TestStruct37 = struct {
+	val TestStruct36;
+};
+
+type TestStruct38 = struct {
+	val TestStruct37;
+};
+
+type TestStruct39 = struct {
+	val TestStruct38;
+};
+
+type TestStruct40 = struct {
+	val TestStruct39;
+};
+
+type TestStruct41 = struct {
+	val TestStruct40;
+};
+
+type TestStruct42 = struct {
+	val TestStruct41;
+};
+
+type TestStruct43 = struct {
+	val TestStruct42;
+};
+
+type TestStruct44 = struct {
+	val TestStruct43;
+};
+
+type TestStruct45 = struct {
+	val TestStruct44;
+};
+
+type TestStruct46 = struct {
+	val TestStruct45;
+};
+
+type TestStruct47 = struct {
+	val TestStruct46;
+};
+
+type TestStruct48 = struct {
+	val TestStruct47;
+};
+
+type TestStruct49 = struct {
+	val TestStruct48;
+};
+
+type TestStruct50 = struct {
+	val TestStruct49;
+};
+
+type TestStruct51 = struct {
+	val TestStruct50;
+};
+
+type TestStruct52 = struct {
+	val TestStruct51;
+};
+
+type TestStruct53 = struct {
+	val TestStruct52;
+};
+
+type TestStruct54 = struct {
+	val TestStruct53;
+};
+
+type TestStruct55 = struct {
+	val TestStruct54;
+};
+
+type TestStruct56 = struct {
+	val TestStruct55;
+};
+
+type TestStruct57 = struct {
+	val TestStruct56;
+};
+
+type TestStruct58 = struct {
+	val TestStruct57;
+};
+
+type TestStruct59 = struct {
+	val TestStruct58;
+};
+
+type TestStruct60 = struct {
+	val TestStruct59;
+};
+
+type TestStruct61 = struct {
+	val TestStruct60;
+};
+
+type TestStruct62 = struct {
+	val TestStruct61;
+};
+
+type TestStruct63 = struct {
+	val TestStruct62;
+};
+
+type TestStruct64 = struct {
+	val TestStruct63;
 };
 
 )FIDL",
@@ -809,3 +1036,5 @@ type TestUnion64 = union {
 )FIDL",
     },
 };
+
+#endif  // SRC_TESTS_BENCHMARKS_FIDL_FIDLC_BENCHMARKS_H_

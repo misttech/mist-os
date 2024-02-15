@@ -1,4 +1,4 @@
-fuchsia.fidlc_microbenchmarks: StructDeep/8
+fuchsia.fidlc_microbenchmarks: StructDeep/64
 fuchsia.fidlc_microbenchmarks: StructField/64
 fuchsia.fidlc_microbenchmarks: TableDeep/63
 fuchsia.fidlc_microbenchmarks: TableField/63

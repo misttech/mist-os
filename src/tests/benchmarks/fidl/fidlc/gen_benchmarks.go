@@ -23,6 +23,9 @@ var fileTmpl = template.Must(template.New("fileTmpl").Parse(
 // Generated. To regenerate, run:
 // $FUCHSIA_DIR/src/tests/benchmarks/fidl/fidlc/regen.sh
 
+#ifndef SRC_TESTS_BENCHMARKS_FIDL_FIDLC_BENCHMARKS_H_
+#define SRC_TESTS_BENCHMARKS_FIDL_FIDLC_BENCHMARKS_H_
+
 struct Benchmark {
 	const char* name;
 	const char* fidl;
@@ -38,6 +41,8 @@ constexpr Benchmark benchmarks[] = {
   },
   {{- end }}
 };
+
+#endif  // SRC_TESTS_BENCHMARKS_FIDL_FIDLC_BENCHMARKS_H_
 `))
 
 // file is the input to the file template.
@@ -155,13 +160,9 @@ var benchmarks = []benchmark{
 		Template: structFieldBenchmarkTemplate,
 		Size:     64,
 	},
-	// NOTE: it would be preferable to test larger sizes for StructDeep
-	// because it can have poor scaling, but unfortunately larger sizes
-	// are too slow to build now. Consider increasing the size when
-	// build performance improves.
 	{
 		Template: structDeepBenchmarkTemplate,
-		Size:     8,
+		Size:     64,
 	},
 	{
 		Template: tableFieldBenchmarkTemplate,
