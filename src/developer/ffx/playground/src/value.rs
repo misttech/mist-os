@@ -12,6 +12,10 @@ use std::sync::Arc;
 
 use crate::error::{Error, Result};
 
+mod iterator;
+
+pub use iterator::{RangeCursor, ReplayableIterator, ReplayableIteratorCursor};
+
 macro_rules! error {
     ($($data:tt)*) => { Error::from(anyhow!($($data)*)) };
 }
@@ -440,6 +444,8 @@ pub enum PlaygroundValue {
     Invocable(Invocable),
     /// A number with no precision limits.
     Num(BigInt),
+    /// An iterator.
+    Iterator(ReplayableIterator),
     /// A value with a type hint associated with it.
     TypeHinted(String, Box<Value>),
 }
@@ -504,6 +510,9 @@ impl PlaygroundValue {
             (LookupResultOrType::Type(ty), PlaygroundValue::Num(_)) => {
                 Err(error!("Cannot convert number to {ty:?}"))
             }
+            (LookupResultOrType::Type(ty), PlaygroundValue::Iterator(_)) => {
+                Err(error!("Cannot convert iterator to {ty:?}"))
+            }
             _ => Err(error!("Cannot convert to FIDL type")),
         }
     }
@@ -519,6 +528,7 @@ impl PlaygroundValue {
         match self {
             PlaygroundValue::Invocable(a) => PlaygroundValue::Invocable(a.clone()),
             PlaygroundValue::Num(a) => PlaygroundValue::Num(a.clone()),
+            PlaygroundValue::Iterator(a) => PlaygroundValue::Iterator(a.clone()),
             PlaygroundValue::TypeHinted(a, b) => {
                 PlaygroundValue::TypeHinted(a.clone(), Box::new(b.duplicate()))
             }
@@ -633,6 +643,7 @@ impl std::fmt::Display for PlaygroundValue {
         match self {
             PlaygroundValue::Invocable(Invocable(a)) => write!(f, "<function@{:p}>", a),
             PlaygroundValue::Num(x) => std::fmt::Display::fmt(x, f),
+            PlaygroundValue::Iterator(_) => write!(f, "<iterator>"),
             PlaygroundValue::TypeHinted(hint, v) => write!(f, "@{hint} {v}"),
         }
     }

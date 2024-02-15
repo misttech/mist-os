@@ -14,11 +14,13 @@ rustc_library("playground") {
     "src/lib.rs",
     "src/parser.rs",
     "src/value.rs",
+    "src/value/iterator.rs",
   ]
   deps = [
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fidl_codec/rust:fidl_codec",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:nom",
     "//third_party/rust_crates:nom_locate",
