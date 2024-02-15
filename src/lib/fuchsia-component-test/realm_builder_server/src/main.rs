@@ -2215,7 +2215,13 @@ mod tests {
         );
 
         let (runner_client_end, runner_server_end) = create_endpoints();
-        drop(runner_server_end);
+        // Park the server end.  We don't want to close it here because the client end is monitored
+        // and clean-up tasks run when it gets peer closed.
+        fasync::Task::spawn(async move {
+            let _runner_server_end = runner_server_end;
+            let () = futures::future::pending().await;
+        })
+        .detach();
         let res =
             builder_proxy.build(runner_client_end).await.expect("failed to send build command");
         match res {
