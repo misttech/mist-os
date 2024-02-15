@@ -240,6 +240,30 @@ fdf::async_helpers::AsyncTask GetMetadataAsync(
       std::move(callback));
 }
 
+// Attempts to talk to a parent to acquire an array of metadata with |type| and
+// stores it in a `std::vector<ReturnType>`.
+template <typename ReturnType, typename = std::enable_if_t<!fidl::IsFidlObject<ReturnType>::value>,
+          typename = std::enable_if_t<std::is_trivial_v<ReturnType>>>
+zx::result<std::vector<ReturnType>> GetMetadataArray(
+    const std::shared_ptr<fdf::Namespace>& incoming, uint32_t type,
+    std::string_view instance = "default") {
+  return internal::GetMetadata<std::vector<ReturnType>>(
+      incoming, type, instance,
+      [](const zx::vmo& vmo, size_t size) -> zx::result<std::vector<ReturnType>> {
+        if (size % sizeof(ReturnType) != 0) {
+          return zx::error(ZX_ERR_INTERNAL);
+        }
+        auto count = size / sizeof(ReturnType);
+        auto ret = std::vector<ReturnType>();
+        ret.resize(count);
+        zx_status_t status = vmo.read(ret.data(), 0, size);
+        if (status != ZX_OK) {
+          return zx::error(status);
+        }
+        return zx::ok(std::move(ret));
+      });
+}
+
 }  // namespace compat
 
 #endif  // LIB_DRIVER_COMPAT_CPP_METADATA_H_
