@@ -65,18 +65,6 @@ Realm& Realm::AddChild(const std::string& child_name, const std::string& url,
   return *this;
 }
 
-#if __Fuchsia_API_level__ <= 11
-Realm& Realm::AddLegacyChild(const std::string& child_name, const std::string& url,
-                             const ChildOptions& options) {
-  fuchsia::component::test::Realm_AddLegacyChild_Result result;
-  ZX_COMPONENT_ASSERT_STATUS_AND_RESULT_OK(
-      "Realm/AddLegacyChild",
-      realm_proxy_->AddLegacyChild(child_name, url, internal::ConvertToFidl(options), &result),
-      result);
-  return *this;
-}
-#endif
-
 #if __Fuchsia_API_level__ < 17
 Realm& Realm::AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
                             const ChildOptions& options) {
@@ -295,17 +283,6 @@ RealmBuilder& RealmBuilder::AddChild(const std::string& child_name, const std::s
   root_.AddChild(child_name, url, options);
   return *this;
 }
-
-#if __Fuchsia_API_level__ <= 11
-RealmBuilder& RealmBuilder::AddLegacyChild(const std::string& child_name, const std::string& url,
-                                           const ChildOptions& options) {
-  ZX_ASSERT_MSG(!child_name.empty(), "child_name can't be empty");
-  ZX_ASSERT_MSG(!url.empty(), "url can't be empty");
-
-  root_.AddLegacyChild(child_name, url, options);
-  return *this;
-}
-#endif
 
 #if __Fuchsia_API_level__ < 17
 RealmBuilder& RealmBuilder::AddLocalChild(const std::string& child_name, LocalComponent* local_impl,

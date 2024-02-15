@@ -167,13 +167,6 @@ class Realm final {
   Realm& AddChild(const std::string& child_name, const std::string& url,
                   const ChildOptions& options = kDefaultChildOptions);
 
-  // Add a v1 component (.cmx) to this Realm.
-  // Names must be unique. Duplicate names will result in a panic.
-#if __Fuchsia_API_level__ <= 11
-  Realm& AddLegacyChild(const std::string& child_name, const std::string& url,
-                        const ChildOptions& options = kDefaultChildOptions);
-#endif
-
   // This method signature is DEPRECATED.
   //
   // Add a component instance implementation by raw pointer to a
@@ -320,13 +313,6 @@ class RealmBuilder final {
   // See |Realm.AddChild| for more details.
   RealmBuilder& AddChild(const std::string& child_name, const std::string& url,
                          const ChildOptions& options = kDefaultChildOptions);
-
-  // Add a v1 component (.cmx) to the root realm being constructed.
-  // See |Realm.AddLegacyChild| for more details.
-#if __Fuchsia_API_level__ <= 11
-  RealmBuilder& AddLegacyChild(const std::string& child_name, const std::string& url,
-                               const ChildOptions& options = kDefaultChildOptions);
-#endif
 
   // This method signature is DEPRECATED. Use the LocalComponentFactory
   // implementation of AddLocalChild instead.
