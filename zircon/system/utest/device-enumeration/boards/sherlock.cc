@@ -105,6 +105,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/ge2d",
 
       "sys/platform/05:04:e/aml_video",
+      "sys/platform/05:04:23/aml-video-enc",
 
       "sys/platform/05:04:1:1/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0/nrf52840_radio/ot-radio",
 
@@ -118,13 +119,6 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
-
-  static const char* kVideoEncDevicePaths[] = {
-      "sys/platform/05:04:23/aml-video-enc",
-      "sys/platform/05:04:23/aml-video-enc-old",
-  };
-  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(
-      cpp20::span(kVideoEncDevicePaths, std::size(kVideoEncDevicePaths))));
 }
 
 }  // namespace

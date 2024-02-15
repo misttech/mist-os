@@ -21,7 +21,6 @@
 #include <soc/aml-t931/t931-hw.h>
 
 #include "sherlock.h"
-#include "src/devices/board/drivers/sherlock/sherlock-hevc-enc-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace fdf {
@@ -100,20 +99,6 @@ static const fpbus::Node hevc_enc_dev = []() {
   return dev;
 }();
 
-// TODO(b/42072838): Remove this duplicate pbus node once we finished migrating
-// to composite node specs.
-static const fpbus::Node hevc_enc_dev_old = []() {
-  fpbus::Node dev = {};
-  dev.name() = "aml-hevc-enc-old";
-  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
-  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_T931;
-  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_HEVC_ENC;
-  dev.mmio() = sherlock_hevc_enc_mmios;
-  dev.bti() = sherlock_hevc_enc_btis;
-  dev.irq() = sherlock_hevc_enc_irqs;
-  return dev;
-}();
-
 zx_status_t Sherlock::HevcEncInit() {
   fidl::Arena<> fidl_arena;
 
@@ -134,24 +119,6 @@ zx_status_t Sherlock::HevcEncInit() {
     zxlogf(ERROR, "AddCompositeNodeSpec HevcEnc(hevc_enc_dev) failed: %s",
            zx_status_get_string(composite_result->error_value()));
     return composite_result->error_value();
-  }
-
-  // TODO(b/42072838): Remove this legacy composite once we migrate the driver to specs.
-  fdf::Arena arena_old('HEVO');
-  auto result = pbus_.buffer(arena_old)->AddComposite(
-      fidl::ToWire(fidl_arena, hevc_enc_dev_old),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, aml_hevc_enc_fragments,
-                                               std::size(aml_hevc_enc_fragments)),
-      "pdev");
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite HevcEnc(hevc_enc_dev_old) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite HevcEnc(hevc_enc_dev_old) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
   }
   return ZX_OK;
 }

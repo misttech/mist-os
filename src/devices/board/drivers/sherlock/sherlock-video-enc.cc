@@ -22,7 +22,6 @@
 #include <soc/aml-t931/t931-hw.h>
 
 #include "sherlock.h"
-#include "src/devices/board/drivers/sherlock/sherlock-video-enc-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace fdf {
@@ -156,23 +155,6 @@ zx_status_t Sherlock::VideoEncInit() {
     return composite_result->error_value();
   }
 
-  // TODO(b/42072838): Remove this legacy composite once we migrate the driver to specs.
-  fdf::Arena arena_old('VIDO');
-  auto result = pbus_.buffer(arena_old)->AddComposite(
-      fidl::ToWire(fidl_arena, video_enc_dev_old),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, aml_video_enc_fragments,
-                                               std::size(aml_video_enc_fragments)),
-      "pdev");
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite VideoEnc(video_enc_dev_old) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite VideoEnc(video_enc_dev_old) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
-  }
   return ZX_OK;
 }
 
