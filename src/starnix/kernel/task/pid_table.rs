@@ -13,7 +13,7 @@ use std::{
     sync::{Arc, Weak},
 };
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 enum ProcessEntry {
     #[default]
     None,
@@ -35,7 +35,7 @@ impl ProcessEntry {
 }
 
 /// Entities identified by a pid.
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct PidEntry {
     task: Option<WeakRef<Task>>,
     process: ProcessEntry,
@@ -47,7 +47,7 @@ pub enum ProcessEntryRef<'a> {
     Zombie(TempRef<'a, ZombieProcess>),
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct PidTable {
     /// The most-recently allocated pid in this table.
     last_pid: pid_t,
