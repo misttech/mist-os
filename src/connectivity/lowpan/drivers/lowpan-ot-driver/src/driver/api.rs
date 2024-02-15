@@ -1017,4 +1017,15 @@ where
 
         Ok(())
     }
+
+    #[tracing::instrument(skip_all)]
+    async fn get_capabilities(&self) -> ZxResult<Capabilities> {
+        // The values are hardcoded here intentionally as we currently have
+        // conflicts with configs defined in openthread. Once we resolve that
+        // and figure out a long term plan we will use variables tied to the
+        // openthread config. Also the config values in openthread are defined at
+        // compile time, so they never change for a given software version.
+
+        Ok(Capabilities { nat64: Some(true), dhcpv6_pd: Some(true), ..Default::default() })
+    }
 }

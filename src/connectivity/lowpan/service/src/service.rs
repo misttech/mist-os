@@ -17,9 +17,10 @@ use fuchsia_sync::Mutex;
 use futures::prelude::*;
 use futures::task::{Spawn, SpawnExt};
 use lowpan_driver_common::lowpan_fidl::{
-    CountersConnectorRequest, CountersConnectorRequestStream, DatasetConnectorRequest,
-    DatasetConnectorRequestStream, DeviceConnectorRequest, DeviceConnectorRequestStream,
-    DeviceExtraConnectorRequest, DeviceExtraConnectorRequestStream, DeviceRouteConnectorRequest,
+    CapabilitiesConnectorRequest, CapabilitiesConnectorRequestStream, CountersConnectorRequest,
+    CountersConnectorRequestStream, DatasetConnectorRequest, DatasetConnectorRequestStream,
+    DeviceConnectorRequest, DeviceConnectorRequestStream, DeviceExtraConnectorRequest,
+    DeviceExtraConnectorRequestStream, DeviceRouteConnectorRequest,
     DeviceRouteConnectorRequestStream, DeviceRouteExtraConnectorRequest,
     DeviceRouteExtraConnectorRequestStream, DeviceTestConnectorRequest,
     DeviceTestConnectorRequestStream, DeviceWatcherRequest, DeviceWatcherRequestStream,
@@ -201,6 +202,11 @@ impl_serve_to_driver!(
     telemetry_provider
 );
 impl_serve_to_driver!(FeatureConnectorRequestStream, FeatureConnectorRequest, thread_feature);
+impl_serve_to_driver!(
+    CapabilitiesConnectorRequestStream,
+    CapabilitiesConnectorRequest,
+    capabilities
+);
 
 #[async_trait::async_trait()]
 impl<S: Sync> ServeTo<DeviceWatcherRequestStream> for LowpanService<S> {

@@ -344,6 +344,9 @@ pub trait Driver: Send + Sync {
     ///
     /// Any field left blank in `config` will leave that field unchanged.
     async fn update_feature_config(&self, _config: FeatureConfig) -> ZxResult<()>;
+
+    /// Returns the current OpenThread capabilities for this interface.
+    async fn get_capabilities(&self) -> ZxResult<Capabilities>;
 }
 
 /// Wraps around a FIDL responder to prevent a drop from causing a shutdown.
@@ -1328,6 +1331,42 @@ impl<T: Driver> ServeTo<MeshcopRequestStream> for T {
         request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
             |err| {
                 error!("Error serving MeshcopRequestStream: {:?}", err);
+
+                if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
+                    request_control_handle.shutdown_with_epitaph(*epitaph);
+                }
+
+                err
+            },
+        )
+    }
+}
+
+#[async_trait()]
+impl<T: Driver> ServeTo<ThreadCapabilitiesRequestStream> for T {
+    async fn serve_to(
+        &self,
+        request_stream: ThreadCapabilitiesRequestStream,
+    ) -> anyhow::Result<()> {
+        let request_control_handle = request_stream.control_handle();
+
+        let closure = |command| async {
+            match command {
+                ThreadCapabilitiesRequest::GetCapabilities { responder, .. } => {
+                    let responder = ResponderNoShutdown::wrap(responder);
+                    self.get_capabilities()
+                        .err_into::<Error>()
+                        .and_then(|x| ready(responder.unwrap().send(&x).map_err(Error::from)))
+                        .await
+                        .context("error in GetCapabilities request")?;
+                }
+            }
+            Result::<(), Error>::Ok(())
+        };
+
+        request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
+            |err| {
+                error!("Error serving ThreadCapabilitiesRequestStream: {:?}", err);
 
                 if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
                     request_control_handle.shutdown_with_epitaph(*epitaph);

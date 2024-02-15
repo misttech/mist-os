@@ -483,4 +483,8 @@ impl Driver for DummyDevice {
     async fn update_feature_config(&self, _config: FeatureConfig) -> ZxResult<()> {
         Ok(())
     }
+
+    async fn get_capabilities(&self) -> ZxResult<Capabilities> {
+        Ok(Capabilities::default())
+    }
 }

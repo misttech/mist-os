@@ -59,6 +59,7 @@ impl<T: Driver> ServeTo<DriverRequestStream> for T {
 
                         let mut futures = vec![];
 
+                        handle_protocol!(futures, protocols.capabilities);
                         handle_protocol!(futures, protocols.device);
                         handle_protocol!(futures, protocols.device_extra);
                         handle_protocol!(futures, protocols.experimental_device);

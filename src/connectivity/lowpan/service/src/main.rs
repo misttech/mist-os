@@ -43,6 +43,7 @@ enum IncomingService {
     ExperimentalDeviceExtraConnector(ExperimentalDeviceExtraConnectorRequestStream),
     TelemetryProviderConnector(TelemetryProviderConnectorRequestStream),
     FeatureConnector(FeatureConnectorRequestStream),
+    CapabilitiesConnector(CapabilitiesConnectorRequestStream),
 }
 
 const MAX_CONCURRENT: usize = 100;
@@ -93,7 +94,8 @@ async fn main() -> Result<(), Error> {
         .add_fidl_service(IncomingService::TelemetryProviderConnector)
         .add_fidl_service(IncomingService::MeshcopConnector)
         .add_fidl_service(IncomingService::FeatureConnector)
-        .add_fidl_service(IncomingService::EnergyScanConnector);
+        .add_fidl_service(IncomingService::EnergyScanConnector)
+        .add_fidl_service(IncomingService::CapabilitiesConnector);
 
     fs.take_and_serve_directory_handle()?;
 
@@ -119,6 +121,7 @@ async fn main() -> Result<(), Error> {
             }
             IncomingService::TelemetryProviderConnector(stream) => service.serve_to(stream).await,
             IncomingService::FeatureConnector(stream) => service.serve_to(stream).await,
+            IncomingService::CapabilitiesConnector(stream) => service.serve_to(stream).await,
         } {
             error!("{:?}", err);
         }
