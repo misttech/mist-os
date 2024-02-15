@@ -23,6 +23,7 @@
 #include <zircon/types.h>
 
 #include <limits>  // std::numeric_limits
+#include <numeric>
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
@@ -95,8 +96,8 @@ bool IsNonZeroPowerOf2(T value) {
   return true;
 }
 
-// TODO(https://fxbug.dev/42127687): It'd be nice if this could be a function template over FIDL scalar
-// field types.
+// TODO(https://fxbug.dev/42127687): It'd be nice if this could be a function template over FIDL
+// scalar field types.
 #define FIELD_DEFAULT_1(table_ref_name, field_name)                                         \
   do {                                                                                      \
     auto& table_ref = (table_ref_name);                                                     \
@@ -109,8 +110,8 @@ bool IsNonZeroPowerOf2(T value) {
     ZX_DEBUG_ASSERT(table_ref.field_name().has_value());                                    \
   } while (false)
 
-// TODO(https://fxbug.dev/42127687): It'd be nice if this could be a function template over FIDL scalar
-// field types.
+// TODO(https://fxbug.dev/42127687): It'd be nice if this could be a function template over FIDL
+// scalar field types.
 #define FIELD_DEFAULT_MAX(table_ref_name, field_name)                                           \
   do {                                                                                          \
     auto& table_ref = (table_ref_name);                                                         \
@@ -123,8 +124,8 @@ bool IsNonZeroPowerOf2(T value) {
     ZX_DEBUG_ASSERT(table_ref.field_name().has_value());                                        \
   } while (false)
 
-// TODO(https://fxbug.dev/42127687): It'd be nice if this could be a function template over FIDL scalar
-// field types.
+// TODO(https://fxbug.dev/42127687): It'd be nice if this could be a function template over FIDL
+// scalar field types.
 #define FIELD_DEFAULT_ZERO(table_ref_name, field_name)                                      \
   do {                                                                                      \
     auto& table_ref = (table_ref_name);                                                     \
@@ -138,8 +139,8 @@ bool IsNonZeroPowerOf2(T value) {
     ZX_DEBUG_ASSERT(table_ref.field_name().has_value());                                    \
   } while (false)
 
-// TODO(https://fxbug.dev/42127687): It'd be nice if this could be a function template over FIDL scalar
-// field types.
+// TODO(https://fxbug.dev/42127687): It'd be nice if this could be a function template over FIDL
+// scalar field types.
 #define FIELD_DEFAULT_ZERO_64_BIT(table_ref_name, field_name)                               \
   do {                                                                                      \
     auto& table_ref = (table_ref_name);                                                     \
@@ -289,6 +290,25 @@ fit::result<zx_status_t, bool> IsColorSpaceArrayDoNotCare(
     result.pixel_format_modifier = b.pixel_format_modifier;
   }
   return result;
+}
+
+[[nodiscard]] fit::result<std::monostate, uint32_t> LeastCommonMultiple(uint32_t a, uint32_t b) {
+  ZX_DEBUG_ASSERT(a != 0);
+  ZX_DEBUG_ASSERT(b != 0);
+  // this computes the least common multiple without factoring the numbers; by doing this with
+  // uint64_t, we avoid undefined behavior of std::lcm given that a and b are uint32_t, but then we
+  // need to check whether the result fits in uint32_t
+  uint64_t lcm = std::lcm<uint64_t, uint64_t>(a, b);
+  auto result = safemath::CheckedNumeric<uint64_t>(lcm).Cast<uint32_t>();
+  if (!result.IsValid()) {
+    return fit::error(std::monostate{});
+  }
+  return fit::ok(result.ValueOrDie());
+}
+
+[[nodiscard]] fit::result<std::monostate, uint32_t> CombineBytesPerRowDivisor(uint32_t a,
+                                                                              uint32_t b) {
+  return LeastCommonMultiple(a, b);
 }
 
 [[nodiscard]] bool IsPixelFormatAndModifierCombineable(const PixelFormatAndModifier& a,
@@ -2325,8 +2345,8 @@ static bool IsHeapPermitted(const fuchsia_sysmem2::BufferMemoryConstraints& cons
 }
 
 static bool IsSecurePermitted(const fuchsia_sysmem2::BufferMemoryConstraints& constraints) {
-  // TODO(https://fxbug.dev/42113093): Generalize this by finding if there's a heap that maps to secure
-  // MemoryAllocator in the permitted heaps.
+  // TODO(https://fxbug.dev/42113093): Generalize this by finding if there's a heap that maps to
+  // secure MemoryAllocator in the permitted heaps.
   return constraints.inaccessible_domain_supported().value() &&
          (IsHeapPermitted(constraints, fuchsia_sysmem2::HeapType::kAmlogicSecure) ||
           IsHeapPermitted(constraints, fuchsia_sysmem2::HeapType::kAmlogicSecureVdec));
@@ -2738,6 +2758,7 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
   // next row of pixels' offset from start of buffer and memory address of the start of the next row
   // is odd).
   FIELD_DEFAULT_1(constraints, bytes_per_row_divisor);
+  FIELD_DEFAULT_FALSE(constraints, require_bytes_per_row_at_pixel_boundary);
 
   FIELD_DEFAULT_1(constraints, start_offset_divisor);
 
@@ -2762,6 +2783,36 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
             std::max(constraints.min_bytes_per_row().value(), minimum_row_bytes);
       }
     }
+
+    constraints.size_alignment()->width() =
+        std::max(constraints.size_alignment()->width(),
+                 ImageFormatSurfaceWidthMinDivisor(pixel_format_and_modifier));
+    constraints.size_alignment()->height() =
+        std::max(constraints.size_alignment()->height(),
+                 ImageFormatSurfaceHeightMinDivisor(pixel_format_and_modifier));
+
+    auto combine_bytes_per_row_divisor_result =
+        CombineBytesPerRowDivisor(*constraints.bytes_per_row_divisor(),
+                                  ImageFormatSampleAlignment(pixel_format_and_modifier));
+    if (!combine_bytes_per_row_divisor_result.is_ok()) {
+      LogError(FROM_HERE, "!combine_bytes_per_row_divisor_result.is_ok()");
+      return false;
+    }
+    constraints.bytes_per_row_divisor() = *combine_bytes_per_row_divisor_result;
+
+    if (*constraints.require_bytes_per_row_at_pixel_boundary()) {
+      auto combine_bytes_per_row_divisor_result =
+          CombineBytesPerRowDivisor(*constraints.bytes_per_row_divisor(),
+                                    ImageFormatStrideBytesPerWidthPixel(pixel_format_and_modifier));
+      if (!combine_bytes_per_row_divisor_result.is_ok()) {
+        LogError(FROM_HERE, "!combine_bytes_per_row_divisor_result.is_ok()");
+        return false;
+      }
+      constraints.bytes_per_row_divisor() = *combine_bytes_per_row_divisor_result;
+    }
+
+    constraints.start_offset_divisor() = std::max(
+        *constraints.start_offset_divisor(), ImageFormatSampleAlignment(pixel_format_and_modifier));
   }
 
   if (!constraints.color_spaces().has_value()) {
@@ -2816,8 +2867,9 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
     return false;
   }
 
-  if (!IsNonZeroPowerOf2(*constraints.bytes_per_row_divisor())) {
-    LogError(FROM_HERE, "non-power-of-2 bytes_per_row_divisor not supported");
+  if (*constraints.bytes_per_row_divisor() == 0) {
+    // instead, leave field un-set or set to a value >= 1
+    LogError(FROM_HERE, "bytes_per_row_divisor set to 0 not permitted");
     return false;
   }
 
@@ -3126,10 +3178,6 @@ bool LogicalBufferCollection::AccumulateConstraintImageFormat(
     fuchsia_sysmem2::ImageFormatConstraints* acc, fuchsia_sysmem2::ImageFormatConstraints c) {
   ZX_DEBUG_ASSERT(ImageFormatIsPixelFormatEqual(PixelFormatAndModifierFromConstraints(*acc),
                                                 PixelFormatAndModifierFromConstraints(c)));
-  auto pixel_format_and_modifier = PixelFormatAndModifierFromConstraints(*acc);
-  auto is_format_do_not_care =
-      IsPixelFormatAndModifierAtLeastPartlyDoNotCare(pixel_format_and_modifier);
-
   // Checked previously.
   ZX_DEBUG_ASSERT(acc->color_spaces().has_value());
   ZX_DEBUG_ASSERT(!acc->color_spaces()->empty());
@@ -3170,31 +3218,20 @@ bool LogicalBufferCollection::AccumulateConstraintImageFormat(
   acc->size_alignment()->height() =
       std::max(acc->size_alignment()->height(), c.size_alignment()->height());
 
-  acc->bytes_per_row_divisor() =
-      std::max(*acc->bytes_per_row_divisor(), *c.bytes_per_row_divisor());
+  auto combine_bytes_per_row_divisor_result =
+      CombineBytesPerRowDivisor(*acc->bytes_per_row_divisor(), *c.bytes_per_row_divisor());
+  if (!combine_bytes_per_row_divisor_result.is_ok()) {
+    LogError(FROM_HERE, "!combine_bytes_per_row_divisor_result.is_ok()");
+    return false;
+  }
+  acc->bytes_per_row_divisor() = *combine_bytes_per_row_divisor_result;
+  acc->require_bytes_per_row_at_pixel_boundary() =
+      *acc->require_bytes_per_row_at_pixel_boundary() ||
+      *c.require_bytes_per_row_at_pixel_boundary();
 
   ZX_DEBUG_ASSERT(acc->start_offset_divisor().has_value());
   ZX_DEBUG_ASSERT(c.start_offset_divisor().has_value());
   acc->start_offset_divisor() = std::max(*acc->start_offset_divisor(), *c.start_offset_divisor());
-
-  // When acc still has DoNotCare (when is_format_do_not_care is true), we're guaranteed to either
-  // end up here again later in aggregation with the condition true, or to fail the overall
-  // aggregation if acc still has DoNotCare (in either PixelFormatAndModifier field) at the end of
-  // aggregation. This way, we know that we'll take the format's contribution to these values into
-  // consideration before the end of aggregation, or we'll fail the aggregation anyway.
-  if (!is_format_do_not_care) {
-    auto acc_pixel_format_and_modifier = PixelFormatAndModifierFromConstraints(*acc);
-    acc->size_alignment()->width() =
-        std::max(acc->size_alignment()->width(),
-                 ImageFormatSurfaceWidthMinDivisor(acc_pixel_format_and_modifier));
-    acc->size_alignment()->height() =
-        std::max(acc->size_alignment()->height(),
-                 ImageFormatSurfaceHeightMinDivisor(acc_pixel_format_and_modifier));
-    acc->bytes_per_row_divisor() = std::max(
-        *acc->bytes_per_row_divisor(), ImageFormatSampleAlignment(acc_pixel_format_and_modifier));
-    acc->start_offset_divisor() = std::max(
-        *acc->start_offset_divisor(), ImageFormatSampleAlignment(acc_pixel_format_and_modifier));
-  }
 
   ZX_DEBUG_ASSERT(acc->display_rect_alignment().has_value());
   ZX_DEBUG_ASSERT(c.display_rect_alignment().has_value());

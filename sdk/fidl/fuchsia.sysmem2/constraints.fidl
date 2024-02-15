@@ -560,7 +560,11 @@ type ImageFormatConstraints = table {
    12: required_max_size fuchsia.math.SizeU;
 
     /// `fuchsia_images2.ImageFormat.bytes_per_row % bytes_per_row_divisor` must
-    /// be 0. Un-set is treated as 1. When set, this must be a power of 2.
+    /// be 0. Un-set is treated as 1.
+    ///
+    /// Prefer to use `require_bytes_per_row_at_pixel_boundary` when the intent
+    /// is to ensure that `bytes_per_row' will be a multiple of the pixel size
+    /// in bytes.
     ///
     /// Prefer to use `size_alignment.width` when the intent is to ensure that
     /// the width in pixels is aligned. In contrast, this field can specify that
@@ -590,4 +594,17 @@ type ImageFormatConstraints = table {
     /// offset (from the buffer base) unless actually required, as not all
     /// participants correctly handle non-zero image start offset.
    14: start_offset_divisor uint32;
+
+    /// Iff set and true, bytes_per_row_divisor in the resulting
+    /// ImageFormatConstraints is guaranteed to be a value which requires
+    /// bytes_per_row to be an integral number of pixels. This can result in
+    /// more padding at the end of each row than when this field is not set to
+    /// true, but ensures that the stride can be expressed as an integral number
+    /// of pixels.
+    ///
+    /// For example, if the chosen `PixelFormat` is `B8G8R8`, if this field is
+    /// set to true, the resulting bytes_per_row_divisor will be a multiple of
+    /// 3. In this example, if another participant sets `bytes_per_row_divisor`
+    /// to 4, the resulting `bytes_per_row_divisor` will be a multiple of 12.
+   16: require_bytes_per_row_at_pixel_boundary bool;
 };

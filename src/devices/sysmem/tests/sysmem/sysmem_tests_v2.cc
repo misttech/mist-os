@@ -1818,8 +1818,8 @@ TEST(Sysmem, MultipleParticipantsV2) {
   // to re-alloc all the server's held FIDL tables 4 times before we continue.  These are
   // synchronous calls, so the 4 re-allocs are done by the time this loop completes.
   //
-  // TODO(https://fxbug.dev/42108892): Switch to creating real churn instead, once we have new messages that
-  // can create real churn.
+  // TODO(https://fxbug.dev/42108892): Switch to creating real churn instead, once we have new
+  // messages that can create real churn.
   constexpr uint32_t kChurnCount = 256 * 2;  // 256 * 4;
   for (uint32_t i = 0; i < kChurnCount; ++i) {
     ASSERT_TRUE(collection_1->Sync().is_ok());
@@ -2208,8 +2208,8 @@ TEST(Sysmem, MultipleParticipantsColorspaceRankingV2) {
 //    client going first in the first couple iterations.
 TEST(Sysmem,
      MultipleParticipants_TwoImageFormatConstraintsSamePixelFormat_CompatibleColorspacesV2) {
-  // Multiple iterations to try to repro https://fxbug.dev/42139125, in case it comes back.  This should be
-  // at least 2 to check both orderings with two clients.
+  // Multiple iterations to try to repro https://fxbug.dev/42139125, in case it comes back.  This
+  // should be at least 2 to check both orderings with two clients.
   std::atomic<uint32_t> clean_failure_seen_count = 0;
   const uint32_t kCleanFailureSeenGoal = 15;
   const uint32_t kMaxIterations = 50;
@@ -7029,6 +7029,69 @@ TEST(Sysmem, HeapConflictMovesToNextGroupChild) {
   ASSERT_TRUE(wait_result.is_ok());
   auto& info = wait_result->buffer_collection_info().value();
   ASSERT_EQ(info.settings()->buffer_settings()->heap().value(), v2::HeapType::kSystemRam);
+}
+
+TEST(Sysmem, RequireBytesPerRowAtPixelBoundary) {
+  {
+    auto parent = create_initial_token_v2();
+    auto parent_collection = convert_token_to_collection_v2(std::move(parent));
+
+    fuchsia_sysmem2::BufferCollectionConstraints constraints;
+    constraints.usage().emplace();
+    constraints.usage()->cpu() = fuchsia_sysmem2::kCpuUsageWriteOften;
+    constraints.min_buffer_count() = 1;
+    constraints.image_format_constraints().emplace(1);
+    auto& ifc = constraints.image_format_constraints()->at(0);
+    ifc.pixel_format() = fuchsia_images2::PixelFormat::kB8G8R8;
+    ifc.min_size() = {64, 64};
+    ifc.color_spaces() = {fuchsia_images2::ColorSpace::kSrgb};
+    ifc.bytes_per_row_divisor() = 4;
+    fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+    set_constraints_request.constraints() = std::move(constraints);
+    auto set_constraints_result =
+        parent_collection->SetConstraints(std::move(set_constraints_request));
+    ASSERT_TRUE(set_constraints_result.is_ok());
+
+    auto wait_result = parent_collection->WaitForAllBuffersAllocated();
+    ASSERT_TRUE(wait_result.is_ok());
+    auto& info = wait_result->buffer_collection_info().value();
+    ASSERT_EQ(false, info.settings()
+                         ->image_format_constraints()
+                         ->require_bytes_per_row_at_pixel_boundary()
+                         .value());
+    ASSERT_EQ(4, info.settings()->image_format_constraints()->bytes_per_row_divisor().value());
+  }
+
+  {
+    auto parent = create_initial_token_v2();
+    auto parent_collection = convert_token_to_collection_v2(std::move(parent));
+
+    fuchsia_sysmem2::BufferCollectionConstraints constraints;
+    constraints.usage().emplace();
+    constraints.usage()->cpu() = fuchsia_sysmem2::kCpuUsageWriteOften;
+    constraints.min_buffer_count() = 1;
+    constraints.image_format_constraints().emplace(1);
+    auto& ifc = constraints.image_format_constraints()->at(0);
+    ifc.pixel_format() = fuchsia_images2::PixelFormat::kB8G8R8;
+    ifc.min_size() = {64, 64};
+    ifc.color_spaces() = {fuchsia_images2::ColorSpace::kSrgb};
+    ifc.bytes_per_row_divisor() = 4;
+    ifc.require_bytes_per_row_at_pixel_boundary() = true;
+    fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+    set_constraints_request.constraints() = std::move(constraints);
+    auto set_constraints_result =
+        parent_collection->SetConstraints(std::move(set_constraints_request));
+    ASSERT_TRUE(set_constraints_result.is_ok());
+
+    auto wait_result = parent_collection->WaitForAllBuffersAllocated();
+    ASSERT_TRUE(wait_result.is_ok());
+    auto& info = wait_result->buffer_collection_info().value();
+    ASSERT_EQ(true, info.settings()
+                        ->image_format_constraints()
+                        ->require_bytes_per_row_at_pixel_boundary()
+                        .value());
+    ASSERT_EQ(12, info.settings()->image_format_constraints()->bytes_per_row_divisor().value());
+  }
 }
 
 // This test is too likely to cause an OOM which would be treated as a flake. For now we can enable
