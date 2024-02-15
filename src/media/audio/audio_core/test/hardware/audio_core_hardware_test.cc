@@ -8,11 +8,12 @@
 #include <zircon/status.h>
 
 #include <cmath>
+#include <iomanip>
 #include <optional>
 #include <sstream>
 
-// TODO(https://fxbug.dev/42126816): This test should automatically fail if underflows are detected. That
-// functionality should be ported from HermeticAudioTest to here.
+// TODO(https://fxbug.dev/42126816): This test should automatically fail if underflows are detected.
+// That functionality should be ported from HermeticAudioTest to here.
 
 namespace media::audio::test {
 

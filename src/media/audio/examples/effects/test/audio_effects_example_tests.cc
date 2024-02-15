@@ -5,6 +5,7 @@
 #include <dlfcn.h>
 
 #include <cmath>
+#include <iomanip>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>

@@ -6,6 +6,7 @@
 
 #include <zircon/status.h>
 
+#include <iomanip>
 #include <ostream>
 
 #include "src/lib/fxl/strings/string_printf.h"

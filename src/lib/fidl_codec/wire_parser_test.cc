@@ -8,6 +8,7 @@
 #include <lib/async-loop/default.h>
 #include <zircon/rights.h>
 
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <string>
