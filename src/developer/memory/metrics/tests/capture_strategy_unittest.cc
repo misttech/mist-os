@@ -128,18 +128,42 @@ const static GetInfoResponse vmo_2_info = {
     handle_process_2, ZX_INFO_PROCESS_VMOS, _vmo_2, sizeof(zx_info_vmo_t), 3, ZX_OK};
 
 const static zx_info_maps_t _mappings_2[] = {{
-    .base = addr_vmo_2,
-    .type = ZX_INFO_MAPS_TYPE_MAPPING,
-    .u = {.mapping = {.vmo_koid = koid_vmo_2}},
-}};
+                                                 .base = 0,
+                                                 .size = 0x400000000000,
+                                                 .depth = 1,
+                                                 .type = ZX_INFO_MAPS_TYPE_VMAR,
+                                             },
+                                             {
+                                                 .base = 0x400000000000,
+                                                 .size = 0x400000000000,
+                                                 .depth = 1,
+                                                 .type = ZX_INFO_MAPS_TYPE_VMAR,
+                                             },
+                                             {
+                                                 .base = addr_vmo_2,
+                                                 .type = ZX_INFO_MAPS_TYPE_MAPPING,
+                                                 .u = {.mapping = {.vmo_koid = koid_vmo_2}},
+                                             }};
 const static GetInfoResponse maps_2_info = {
-    handle_process_2, ZX_INFO_PROCESS_MAPS, _mappings_2, sizeof(zx_info_maps_t), 1, ZX_OK};
+    handle_process_2, ZX_INFO_PROCESS_MAPS, _mappings_2, sizeof(zx_info_maps_t), 3, ZX_OK};
 
 // |vmo_3_info| should contain the same VMOs as vmo_2_info per the shared handle table of shared
 // processes used by Starnix.
 const static GetInfoResponse vmo_3_info = {
     handle_process_3, ZX_INFO_PROCESS_VMOS, _vmo_2, sizeof(zx_info_vmo_t), 3, ZX_OK};
 const static zx_info_maps_t _mappings_3[] = {{
+                                                 .base = 0,
+                                                 .size = 0x400000000000,
+                                                 .depth = 1,
+                                                 .type = ZX_INFO_MAPS_TYPE_VMAR,
+                                             },
+                                             {
+                                                 .base = 0x400000000000,
+                                                 .size = 0x400000000000,
+                                                 .depth = 1,
+                                                 .type = ZX_INFO_MAPS_TYPE_VMAR,
+                                             },
+                                             {
                                                  .base = addr_vmo_2,
                                                  .type = ZX_INFO_MAPS_TYPE_MAPPING,
                                                  .u = {.mapping = {.vmo_koid = koid_vmo_2}},
@@ -150,7 +174,7 @@ const static zx_info_maps_t _mappings_3[] = {{
                                                  .u = {.mapping = {.vmo_koid = koid_vmo_3}},
                                              }};
 const static GetInfoResponse maps_3_info = {
-    handle_process_3, ZX_INFO_PROCESS_MAPS, _mappings_3, sizeof(zx_info_maps_t), 2, ZX_OK};
+    handle_process_3, ZX_INFO_PROCESS_MAPS, _mappings_3, sizeof(zx_info_maps_t), 4, ZX_OK};
 
 Matcher<Process> MakeProcessMatcher(zx_koid_t process, zx_koid_t job, std::string name,
                                     std::vector<zx_koid_t> vmos) {

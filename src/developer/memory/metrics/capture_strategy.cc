@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <optional>
 #include <tuple>
 
 #include "src/developer/memory/metrics/capture.h"
@@ -74,6 +75,11 @@ StarnixCaptureStrategy::Finalize(OS& os) {
 
   BaseCaptureStrategy base;
 
+  // The cutoff address between the restricted space and the Starnix kernel depends on the
+  // architecture. We rely on the fact that shared processes, as used by Starnix, have two root
+  // VMARs, one for the restricted space and one for the Starnix kernel, to determine this cutoff at
+  // runtime, instead of having it hardcoded.
+  std::optional<zx_vaddr_t> starnix_kernel_cutoff = std::nullopt;
   // Capture the data for each process.
   for (auto& [_, process] : koid_to_process_) {
     auto starnix_proc = starnix_jobs_.find(process.job);
@@ -127,13 +133,19 @@ StarnixCaptureStrategy::Finalize(OS& os) {
     size_t num_mappings = result.value();
     for (size_t i = 0; i < num_mappings; i++) {
       const auto& mapping = mappings_[i];
+      if (!starnix_kernel_cutoff.has_value() && mapping.type == ZX_INFO_MAPS_TYPE_VMAR &&
+          mapping.depth == 1) {
+        starnix_kernel_cutoff = mapping.base + mapping.size;
+      }
       if (mapping.type == ZX_INFO_MAPS_TYPE_MAPPING) {
         if (koid_to_vmo_.find(mapping.u.mapping.vmo_koid) == koid_to_vmo_.end()) {
           // It is a new VMO that we haven't captured. This can happen if the list of VMOs change
           // while we do the data collection.
           continue;
         }
-        if (mapping.base >= 0x400000100000) {
+        FX_DCHECK(starnix_kernel_cutoff.has_value())
+            << "starnix_kernel_cutoff should have been set";
+        if (mapping.base >= starnix_kernel_cutoff) {
           // This is a Starnix kernel mapping.
           starnix_proc->second.kernel_mapped_vmos.insert(mapping.u.mapping.vmo_koid);
         } else {
