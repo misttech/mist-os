@@ -27,79 +27,9 @@
 #define DEBUG_ASSERT_IMPLEMENTED 0
 #endif
 
-// Notes about the C++ and C versions of the assert macros.
+// See comments in //zircon/system/public/zircon/assert.h for details about the
+// differences between the C and C++ versions of these ASSERT macros.
 //
-// The C++ versions of these macros follow a very specific form for testing the
-// assert predicate `x`.  Specifically, the test of the predicate is _always_
-// written simply as `if (x)`.  Not:
-//
-// 1) `if (!x)`                                     // or
-// 2) `if ((x))`                                    // or
-// 3) `if (unlikely(!(x)))                          // or
-// 4) `if (DEBUG_ASSERT_ENABLED && unlikely(!(x)))  // or, anything else.
-//
-// It is *always* just `if (x)`.  There is a method to this madness.  The
-// primary reason for this is to catch mistakes of the following form:
-//
-// DEBUG_ASSERT(my_bool_variable = false);
-// ASSERT(my_int_variable = 5);
-//
-// Both of these are examples of a pattern where a code author mean to use
-// comparison (`==`), but accidentally used assignment (`=`), meaning that the
-// first of these examples is always going to fire, while the second will never
-// fire.  Both of them will have a side effect of mutating their variable, but a
-// DEBUG_ASSERT's mutation will drop out of a release build.
-//
-// :: Accidental Assignment Protection ::
-//
-// This is all very bad, and _should_ be caught by the -Wparentheses warning
-// enabled in all kernel builds.  Unfortunately, surrounding an assignment
-// operation in a set of `()` will suppress the warning.  Pretty much any other
-// form of the predicate test ends up requiring that we add in an extra pair of
-// `()`.  This also includes wrapping the predicate in things like `unlikely(x)`
-// and `likely(x)`.  So, we have to restrict ourselves strictly to testing with
-// `if (x)` in order to get the accidental assignment protection we desire.
-//
-// :: Temporary Variable Latching ::
-//
-// A surprise advantage to taking this approach is that it allows us (in C++) to
-// more easily write predicates which involve latching to a temporary variable.
-// Consider a case where we want to debug assert something about a value
-// returned by a function which is expensive to call.  We could write:
-//
-// DEBUG_ASSERT_MSG(Expensive() == 5,
-//                  "Expensive() returned a non-five value (%u)",
-//                  Expensive());
-//
-// But now we are calling the expensive function twice.  We could also say:
-//
-// [[maybe_unused]] const uint32_t e = Expensive();
-// DEBUG_ASSERT_MSG(e, "Expensive() returned a non-five value (%u)", e);
-//
-// but it takes a couple of lines, we have to add in a [[maybe_unused]]
-// annotation, and we may still be forced to evaluate Expensive if the compiler
-// cannot tell that it is guaranteed to have no side effects.
-//
-// With the new only-`if (x)` form of testing the predicate, however, we can do
-// better.  Now, we can write:
-//
-// DEBUG_ASSERT_MSG(uint32_t e = Expensive(); e == 5,
-//                  "Expensive() returned a non-five value (%u)", e);
-//
-// We still get our protection against accidental assignment, we are guaranteed
-// to evaluate Expensive exactly once in a debug build, and zero times in a
-// release build.
-//
-// :: WARNING - C code does not get these benefits ::
-//
-// To write in this style, but also preserve the likely/unlikely hinting
-// benefits, we are forced to use C++'s standardized attributes `[[likely]]` and
-// `[[unlikely]]``.  This are not available in C, which has to use the old
-// compiler attribute macros, which always end up introducing `()`, and
-// suppressing the accidental assignment protection.  Right now, there is no
-// good way around this, and as long as we are building C code using this
-// header, we will need to maintain a version of these macros which do not offer
-// the same level of protection.
 //
 #ifdef __cplusplus
 
