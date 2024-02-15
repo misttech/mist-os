@@ -18,7 +18,6 @@ use futures::{
     TryStreamExt as _,
 };
 use itertools::Itertools as _;
-use net_types::ip::{Ipv4, Ipv6};
 use thiserror::Error;
 use tracing::{error, warn};
 
@@ -95,6 +94,7 @@ impl UpdateDispatcherInner {
         controller_id: &fnet_filter_ext::ControllerId,
         changes: Vec<fnet_filter_ext::Change>,
         idempotent: bool,
+        ctx: &mut crate::bindings::Ctx,
     ) -> Result<(), CommitError> {
         let Self { resources, clients } = self;
 
@@ -111,21 +111,24 @@ impl UpdateDispatcherInner {
         // from all the other controllers. Note that this is an infallible
         // operation because the Core state has already been validated for each
         // controller.
-        let (v4, v6) = resources.iter().filter(|(id, _)| *id != controller_id).fold(
-            (core_state_v4.clone(), core_state_v6.clone()),
-            |(mut v4, mut v6), (_id, controller)| {
-                v4.merge(&controller.core_state_v4);
-                v6.merge(&controller.core_state_v6);
-                (v4, v6)
-            },
-        );
+        let (v4, v6) = resources
+            .iter()
+            .filter_map(|(id, controller)| (id != controller_id).then_some(controller))
+            .fold(
+                (core_state_v4.clone(), core_state_v6.clone()),
+                |(mut v4, mut v6), controller| {
+                    v4.merge(&controller.core_state_v4);
+                    v6.merge(&controller.core_state_v6);
+                    (v4, v6)
+                },
+            );
 
-        // TODO(https://fxbug.dev/318738286): propagate changes to Netstack3
-        // Core once the API exists.
-        let (_new_core_state_v4, _new_core_state_v6): (
-            netstack3_core::filter::State<Ipv4, fnet_filter::DeviceClass>,
-            netstack3_core::filter::State<Ipv6, fnet_filter::DeviceClass>,
-        ) = (v4.into(), v6.into());
+        // Attempt to install the new filtering state in Netstack3 Core.
+        ctx.api().filter().set_filter_state(v4.into(), v6.into()).map_err(|error| match error {
+            netstack3_core::filter::ValidationError::RuleWithInvalidMatcher(rule_id) => {
+                CommitError::RuleWithInvalidMatcher(rule_id)
+            }
+        })?;
 
         // Only if validation was successful do we actually commit the changes.
         // This ensures that the state will never be only partially updated.
@@ -331,6 +334,7 @@ async fn serve_watcher(
 pub(crate) async fn serve_control(
     stream: fnet_filter::ControlRequestStream,
     dispatcher: &UpdateDispatcher,
+    ctx: &crate::bindings::Ctx,
 ) -> Result<(), fidl::Error> {
     use fnet_filter::ControlRequest;
 
@@ -344,7 +348,7 @@ pub(crate) async fn serve_control(
 
                     let (stream, control_handle) = request.into_stream_and_control_handle()?;
 
-                    serve_controller(&final_id, stream, control_handle, dispatcher)
+                    serve_controller(&final_id, stream, control_handle, dispatcher, ctx.clone())
                         .await
                         .unwrap_or_else(|e| warn!("error serving namespace controller: {e:?}"));
 
@@ -365,6 +369,7 @@ async fn serve_controller(
     mut stream: fnet_filter::NamespaceControllerRequestStream,
     control_handle: fnet_filter::NamespaceControllerControlHandle,
     UpdateDispatcher(dispatcher): &UpdateDispatcher,
+    mut ctx: crate::bindings::Ctx,
 ) -> Result<(), fidl::Error> {
     use fnet_filter::NamespaceControllerRequest;
 
@@ -467,7 +472,8 @@ async fn serve_controller(
                 let idempotent = idempotent.unwrap_or(false);
                 let changes = std::mem::take(&mut pending_changes);
                 let num_changes = changes.len();
-                let result = dispatcher.lock().await.commit_changes(id, changes, idempotent);
+                let result =
+                    dispatcher.lock().await.commit_changes(id, changes, idempotent, &mut ctx);
                 let result = match result {
                     Ok(()) => fnet_filter::CommitResult::Ok(fnet_filter::Empty {}),
                     Err(error) => match error {

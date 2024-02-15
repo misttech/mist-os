@@ -4,10 +4,7 @@
 
 mod matchers;
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::collections::{BTreeMap, HashMap};
 
 use assert_matches::assert_matches;
 use fidl_fuchsia_net_filter as fnet_filter;
@@ -27,30 +24,49 @@ struct RoutinePriority {
     installation_order: usize,
 }
 
+type CoreRule<I> = netstack3_core::filter::Rule<
+    I,
+    fnet_filter::DeviceClass,
+    netstack3_core::filter::ValidationInfo<fnet_filter_ext::RuleId>,
+>;
+type CoreRoutine<I> = netstack3_core::filter::Routine<
+    I,
+    fnet_filter::DeviceClass,
+    netstack3_core::filter::ValidationInfo<fnet_filter_ext::RuleId>,
+>;
+type CoreUninstalledRoutine<I> = netstack3_core::filter::UninstalledRoutine<
+    I,
+    fnet_filter::DeviceClass,
+    netstack3_core::filter::ValidationInfo<fnet_filter_ext::RuleId>,
+>;
+type CoreHook<I> = netstack3_core::filter::Hook<
+    I,
+    fnet_filter::DeviceClass,
+    netstack3_core::filter::ValidationInfo<fnet_filter_ext::RuleId>,
+>;
+type CoreState<I> = netstack3_core::filter::State<
+    I,
+    fnet_filter::DeviceClass,
+    netstack3_core::filter::ValidationInfo<fnet_filter_ext::RuleId>,
+>;
+
 #[derive(Clone, Debug, Default, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 struct IpRoutines<I: IpExt> {
-    ingress:
-        BTreeMap<RoutinePriority, netstack3_core::filter::Routine<I, fnet_filter::DeviceClass>>,
-    local_ingress:
-        BTreeMap<RoutinePriority, netstack3_core::filter::Routine<I, fnet_filter::DeviceClass>>,
-    forwarding:
-        BTreeMap<RoutinePriority, netstack3_core::filter::Routine<I, fnet_filter::DeviceClass>>,
-    local_egress:
-        BTreeMap<RoutinePriority, netstack3_core::filter::Routine<I, fnet_filter::DeviceClass>>,
-    egress: BTreeMap<RoutinePriority, netstack3_core::filter::Routine<I, fnet_filter::DeviceClass>>,
+    ingress: BTreeMap<RoutinePriority, CoreRoutine<I>>,
+    local_ingress: BTreeMap<RoutinePriority, CoreRoutine<I>>,
+    forwarding: BTreeMap<RoutinePriority, CoreRoutine<I>>,
+    local_egress: BTreeMap<RoutinePriority, CoreRoutine<I>>,
+    egress: BTreeMap<RoutinePriority, CoreRoutine<I>>,
 }
 
 #[derive(Clone, Debug, Default, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 struct NatRoutines<I: IpExt> {
-    ingress:
-        BTreeMap<RoutinePriority, netstack3_core::filter::Routine<I, fnet_filter::DeviceClass>>,
-    local_ingress:
-        BTreeMap<RoutinePriority, netstack3_core::filter::Routine<I, fnet_filter::DeviceClass>>,
-    local_egress:
-        BTreeMap<RoutinePriority, netstack3_core::filter::Routine<I, fnet_filter::DeviceClass>>,
-    egress: BTreeMap<RoutinePriority, netstack3_core::filter::Routine<I, fnet_filter::DeviceClass>>,
+    ingress: BTreeMap<RoutinePriority, CoreRoutine<I>>,
+    local_ingress: BTreeMap<RoutinePriority, CoreRoutine<I>>,
+    local_egress: BTreeMap<RoutinePriority, CoreRoutine<I>>,
+    egress: BTreeMap<RoutinePriority, CoreRoutine<I>>,
 }
 
 /// This is state that has almost entirely been converted to
@@ -82,14 +98,8 @@ enum IpVersionStrictness {
 impl<I: IpExt> State<I> {
     pub fn merge(&mut self, other: &Self) {
         fn merge_hook<I: IpExt>(
-            dst: &mut BTreeMap<
-                RoutinePriority,
-                netstack3_core::filter::Routine<I, fnet_filter::DeviceClass>,
-            >,
-            src: &BTreeMap<
-                RoutinePriority,
-                netstack3_core::filter::Routine<I, fnet_filter::DeviceClass>,
-            >,
+            dst: &mut BTreeMap<RoutinePriority, CoreRoutine<I>>,
+            src: &BTreeMap<RoutinePriority, CoreRoutine<I>>,
         ) {
             for (priority, routine) in src {
                 assert_matches!(dst.insert(priority.clone(), routine.clone()), None);
@@ -176,28 +186,20 @@ impl<I: IpExt> State<I> {
                 },
             )?;
 
-            assert_matches!(
-                hook.insert(routine_priority, netstack3_core::filter::Routine { rules }),
-                None
-            );
+            assert_matches!(hook.insert(routine_priority, CoreRoutine { rules }), None);
         }
         Ok(())
     }
 }
 
-impl<I: IpExt> From<State<I>> for netstack3_core::filter::State<I, fnet_filter::DeviceClass> {
+impl<I: IpExt> From<State<I>> for CoreState<I> {
     fn from(state: State<I>) -> Self {
-        fn core_hook<I: IpExt>(
-            routines: BTreeMap<
-                RoutinePriority,
-                netstack3_core::filter::Routine<I, fnet_filter::DeviceClass>,
-            >,
-        ) -> netstack3_core::filter::Hook<I, fnet_filter::DeviceClass> {
-            netstack3_core::filter::Hook { routines: routines.into_values().collect() }
+        fn core_hook<I: IpExt>(routines: BTreeMap<RoutinePriority, CoreRoutine<I>>) -> CoreHook<I> {
+            CoreHook { routines: routines.into_values().collect() }
         }
 
         let State { ip_routines, nat_routines } = state;
-        netstack3_core::filter::State {
+        CoreState {
             ip_routines: netstack3_core::filter::IpRoutines {
                 ingress: core_hook(ip_routines.ingress),
                 local_ingress: core_hook(ip_routines.local_ingress),
@@ -221,16 +223,10 @@ fn convert_rules<I, F>(
     rules: BTreeMap<u32, Rule>,
     ip_version_strictness: IpVersionStrictness,
     mut resolve_jump_target: F,
-) -> Result<Vec<netstack3_core::filter::Rule<I, fnet_filter::DeviceClass>>, CommitError>
+) -> Result<Vec<CoreRule<I>>, CommitError>
 where
     I: IpExt,
-    F: FnMut(
-        String,
-        fnet_filter_ext::RuleId,
-    ) -> Result<
-        netstack3_core::filter::UninstalledRoutine<I, fnet_filter::DeviceClass>,
-        CommitError,
-    >,
+    F: FnMut(String, fnet_filter_ext::RuleId) -> Result<CoreUninstalledRoutine<I>, CommitError>,
 {
     rules
         .into_iter()
@@ -256,7 +252,7 @@ where
                 fnet_filter_ext::Action::Drop => netstack3_core::filter::Action::Drop,
                 fnet_filter_ext::Action::Return => netstack3_core::filter::Action::Return,
                 fnet_filter_ext::Action::Jump(name) => {
-                    let target = match resolve_jump_target(name, rule_id) {
+                    let target = match resolve_jump_target(name, rule_id.clone()) {
                         Ok(target) => target,
                         Err(e) => return Some(Err(e)),
                     };
@@ -264,7 +260,7 @@ where
                 }
             };
 
-            Some(Ok(netstack3_core::filter::Rule { matcher, action }))
+            Some(Ok(CoreRule { matcher, action, validation_info: rule_id }))
         })
         .collect::<Result<Vec<_>, _>>()
 }
@@ -282,8 +278,8 @@ where
 /// [`netstack3_core::filter::UninstalledRoutine`] alive.
 #[derive(Default)]
 struct CoreUninstalledRoutines<I: IpExt> {
-    ip: HashMap<String, netstack3_core::filter::UninstalledRoutine<I, fnet_filter::DeviceClass>>,
-    nat: HashMap<String, netstack3_core::filter::UninstalledRoutine<I, fnet_filter::DeviceClass>>,
+    ip: HashMap<String, CoreUninstalledRoutine<I>>,
+    nat: HashMap<String, CoreUninstalledRoutine<I>>,
     routine_types: HashMap<String, RoutineType>,
 }
 
@@ -324,8 +320,7 @@ impl<I: IpExt> CoreUninstalledRoutines<I> {
         name: &str,
         uninstalled_routines: &mut HashMap<String, UninstalledRoutine>,
         ip_version_strictness: IpVersionStrictness,
-    ) -> Result<netstack3_core::filter::UninstalledRoutine<I, fnet_filter::DeviceClass>, CommitError>
-    {
+    ) -> Result<CoreUninstalledRoutine<I>, CommitError> {
         // Because we remove a routine from `uninstalled_routines` whenever we begin
         // converting it to its Core representation, failing to remove a routine
         // here means that we have encountered it twice in the same callstack, which
@@ -365,10 +360,7 @@ impl<I: IpExt> CoreUninstalledRoutines<I> {
         )?;
 
         // Insert the resulting converted routine in the `core_uninstalled` state.
-        let target =
-            netstack3_core::filter::UninstalledRoutine(Arc::new(netstack3_core::filter::Routine {
-                rules,
-            }));
+        let target = CoreUninstalledRoutine::new(rules);
         let uninstalled = match routine_type {
             RoutineType::Ip => &mut self.ip,
             RoutineType::Nat => &mut self.nat,
@@ -389,8 +381,7 @@ impl<I: IpExt> CoreUninstalledRoutines<I> {
         name: &str,
         calling_routine_type: RoutineType,
         rule_id: fnet_filter_ext::RuleId,
-    ) -> Result<netstack3_core::filter::UninstalledRoutine<I, fnet_filter::DeviceClass>, CommitError>
-    {
+    ) -> Result<CoreUninstalledRoutine<I>, CommitError> {
         let Self { ip, nat, routine_types } = self;
 
         // Rules can only jump to target routines that are the same type as the calling

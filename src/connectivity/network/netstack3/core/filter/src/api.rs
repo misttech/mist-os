@@ -5,7 +5,9 @@
 use net_types::ip::{Ipv4, Ipv6};
 use netstack3_base::ContextPair;
 
-use crate::{FilterBindingsTypes, FilterContext, FilterIpContext, State};
+use crate::{
+    FilterBindingsTypes, FilterContext, State, ValidState, ValidationError, ValidationInfo,
+};
 
 /// The filtering API.
 pub struct FilterApi<C>(C);
@@ -20,9 +22,7 @@ impl<C> FilterApi<C> {
 impl<C> FilterApi<C>
 where
     C: ContextPair,
-    C::CoreContext: FilterContext<C::BindingsContext>
-        + FilterIpContext<Ipv4, C::BindingsContext>
-        + FilterIpContext<Ipv6, C::BindingsContext>,
+    C::CoreContext: FilterContext<C::BindingsContext>,
     C::BindingsContext: FilterBindingsTypes,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
@@ -31,15 +31,38 @@ where
     }
 
     /// Sets the filtering state for the provided IP version.
-    pub fn set_filter_state(
+    ///
+    /// The provided state must not contain any cyclical routine graphs (formed by
+    /// rules with jump actions). The behavior in this case is unspecified but could
+    /// be a deadlock or a panic, for example.
+    ///
+    /// TODO(https://fxbug.dev/325492760): replace usage of
+    /// [`once_cell::sync::OnceCell`] with `std::sync::OnceLock`, which always
+    /// panics when called reentrantly.
+    pub fn set_filter_state<RuleInfo: Clone>(
         &mut self,
-        v4: State<Ipv4, <C::BindingsContext as FilterBindingsTypes>::DeviceClass>,
-        v6: State<Ipv6, <C::BindingsContext as FilterBindingsTypes>::DeviceClass>,
-    ) {
-        // TODO(https://fxbug.dev/318738286): Perform validation before setting.
+        v4: State<
+            Ipv4,
+            <C::BindingsContext as FilterBindingsTypes>::DeviceClass,
+            ValidationInfo<RuleInfo>,
+        >,
+        v6: State<
+            Ipv6,
+            <C::BindingsContext as FilterBindingsTypes>::DeviceClass,
+            ValidationInfo<RuleInfo>,
+        >,
+    ) -> Result<(), ValidationError<RuleInfo>>
+    where
+        <C::BindingsContext as FilterBindingsTypes>::DeviceClass: Clone,
+    {
+        let v4 = ValidState::new(v4)?;
+        let v6 = ValidState::new(v6)?;
+
         self.core_ctx().with_all_filter_state_mut(|state_v4, state_v6| {
             *state_v4 = v4;
             *state_v6 = v6;
         });
+
+        Ok(())
     }
 }

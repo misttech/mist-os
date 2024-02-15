@@ -18,6 +18,7 @@ rustc_library_with_features("netstack3-filter") {
     "src/matchers.rs",
     "src/packets.rs",
     "src/state.rs",
+    "src/state/validation.rs",
   ]
   deps = [
     "//src/connectivity/lib/net-types",
@@ -25,11 +26,13 @@ rustc_library_with_features("netstack3-filter") {
     "//src/connectivity/network/netstack3/core/base:netstack3-base",
     "//src/lib/fakealloc",
     "//third_party/rust_crates:derivative",
+    "//third_party/rust_crates:once_cell",
   ]
   test_deps = [
     "//src/connectivity/lib/ip-test-macro",
     "//src/connectivity/lib/net-declare",
     "//src/lib/const-unwrap",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:test-case",
   ]
 

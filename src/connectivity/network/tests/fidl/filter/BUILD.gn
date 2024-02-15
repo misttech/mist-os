@@ -8,6 +8,7 @@ rustc_test("filter") {
   edition = "2021"
   output_name = "netstack_filter_fidl_test"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
     "//src/connectivity/lib/net-declare",

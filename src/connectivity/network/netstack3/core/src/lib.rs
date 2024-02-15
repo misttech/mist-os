@@ -110,9 +110,12 @@ pub mod filter {
     pub use netstack3_filter::{
         Action, AddressMatcher, AddressMatcherType, FilterApi, FilterBindingsTypes, Hook,
         InterfaceMatcher, InterfaceProperties, IpRoutines, NatRoutines, PacketMatcher, PortMatcher,
-        Routine, Rule, State, TransportProtocolMatcher, UninstalledRoutine,
+        Routine, Rule, State, TransportProtocolMatcher, UninstalledRoutine, ValidationError,
+        ValidationInfo,
     };
-    pub(crate) use netstack3_filter::{FilterContext, FilterHandler, FilterImpl, FilterIpContext};
+    pub(crate) use netstack3_filter::{
+        FilterContext, FilterHandler, FilterImpl, FilterIpContext, ValidState,
+    };
 }
 
 /// Facilities for inspecting stack state for debugging.

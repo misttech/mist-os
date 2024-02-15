@@ -1119,7 +1119,7 @@ impl Ipv4StateBuilder {
             inner: Default::default(),
             icmp: icmp.build(),
             next_packet_id: Default::default(),
-            filter: RwLock::new(crate::filter::State::default()),
+            filter: RwLock::new(crate::filter::ValidState::default()),
         }
     }
 }
@@ -1140,7 +1140,7 @@ impl Ipv6StateBuilder {
             inner: Default::default(),
             icmp: icmp.build(),
             slaac_counters: Default::default(),
-            filter: RwLock::new(crate::filter::State::default()),
+            filter: RwLock::new(crate::filter::ValidState::default()),
         }
     }
 }
@@ -1149,7 +1149,7 @@ pub struct Ipv4State<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceCl
     pub(super) inner: IpStateInner<Ipv4, Instant, StrongDeviceId>,
     pub(super) icmp: Icmpv4State<Instant, StrongDeviceId::Weak>,
     pub(super) next_packet_id: AtomicU16,
-    pub(super) filter: RwLock<crate::filter::State<Ipv4, DeviceClass>>,
+    pub(super) filter: RwLock<crate::filter::ValidState<Ipv4, DeviceClass>>,
 }
 
 impl<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass>
@@ -1163,7 +1163,7 @@ impl<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass>
         &self.icmp.inner.rx_counters
     }
 
-    pub fn filter(&self) -> &RwLock<crate::filter::State<Ipv4, DeviceClass>> {
+    pub fn filter(&self) -> &RwLock<crate::filter::ValidState<Ipv4, DeviceClass>> {
         &self.filter
     }
 }
@@ -1186,7 +1186,7 @@ pub struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceCl
     pub(super) inner: IpStateInner<Ipv6, Instant, StrongDeviceId>,
     pub(super) icmp: Icmpv6State<Instant, StrongDeviceId::Weak>,
     pub(super) slaac_counters: SlaacCounters,
-    pub(super) filter: RwLock<crate::filter::State<Ipv6, DeviceClass>>,
+    pub(super) filter: RwLock<crate::filter::ValidState<Ipv6, DeviceClass>>,
 }
 
 impl<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass>
@@ -1208,7 +1208,7 @@ impl<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass>
         &self.slaac_counters
     }
 
-    pub fn filter(&self) -> &RwLock<crate::filter::State<Ipv6, DeviceClass>> {
+    pub fn filter(&self) -> &RwLock<crate::filter::ValidState<Ipv6, DeviceClass>> {
         &self.filter
     }
 }

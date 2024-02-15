@@ -1390,7 +1390,11 @@ impl NetstackSeed {
                         Service::FilterControl(filter) => {
                             filter
                                 .serve_with(|rs| {
-                                    filter::serve_control(rs, &filter_update_dispatcher)
+                                    filter::serve_control(
+                                        rs,
+                                        &filter_update_dispatcher,
+                                        &netstack.ctx,
+                                    )
                                 })
                                 .await
                         }

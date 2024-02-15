@@ -26,7 +26,7 @@ pub(crate) struct Interfaces<'a, D> {
 }
 
 fn check_routines_for_hook<B, I, P, D, DeviceClass>(
-    hook: &Hook<I, DeviceClass>,
+    hook: &Hook<I, DeviceClass, ()>,
     packet: &mut P,
     interfaces: Interfaces<'_, D>,
 ) -> Verdict
@@ -37,7 +37,7 @@ where
 {
     let Hook { routines } = hook;
     for Routine { rules } in routines {
-        for Rule { matcher, action } in rules {
+        for Rule { matcher, action, validation_info: () } in rules {
             if matcher.matches(packet, &interfaces) {
                 match action {
                     Action::Accept => break,
@@ -113,7 +113,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
         let Self(this) = self;
         this.with_filter_state(|state| {
             check_routines_for_hook(
-                &state.ip_routines.ingress,
+                &state.get().ip_routines.ingress,
                 packet,
                 Interfaces { ingress: Some(interface), egress: None },
             )
@@ -128,7 +128,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
         let Self(this) = self;
         this.with_filter_state(|state| {
             check_routines_for_hook(
-                &state.ip_routines.local_ingress,
+                &state.get().ip_routines.local_ingress,
                 packet,
                 Interfaces { ingress: Some(interface), egress: None },
             )
@@ -148,7 +148,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
         let Self(this) = self;
         this.with_filter_state(|state| {
             check_routines_for_hook(
-                &state.ip_routines.forwarding,
+                &state.get().ip_routines.forwarding,
                 packet,
                 Interfaces { ingress: Some(in_interface), egress: Some(out_interface) },
             )
@@ -163,7 +163,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
         let Self(this) = self;
         this.with_filter_state(|state| {
             check_routines_for_hook(
-                &state.ip_routines.local_egress,
+                &state.get().ip_routines.local_egress,
                 packet,
                 Interfaces { ingress: None, egress: Some(interface) },
             )
@@ -178,7 +178,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, CC: FilterIpContext<I, BT>> FilterHandle
         let Self(this) = self;
         this.with_filter_state(|state| {
             check_routines_for_hook(
-                &state.ip_routines.egress,
+                &state.get().ip_routines.egress,
                 packet,
                 Interfaces { ingress: None, egress: Some(interface) },
             )
@@ -204,6 +204,7 @@ mod tests {
             ArbitraryValue, FakeIpPacket, FakeTcpSegment, TestIpExt, TransportPacketExt,
         },
         state::IpRoutines,
+        ValidationInfo,
     };
 
     #[test]
@@ -224,9 +225,17 @@ mod tests {
             routines: vec![Routine {
                 rules: vec![
                     // Accept all traffic.
-                    Rule { matcher: PacketMatcher::default(), action: Action::Accept },
+                    Rule {
+                        matcher: PacketMatcher::default(),
+                        action: Action::Accept,
+                        validation_info: (),
+                    },
                     // Drop all traffic.
-                    Rule { matcher: PacketMatcher::default(), action: Action::Drop },
+                    Rule {
+                        matcher: PacketMatcher::default(),
+                        action: Action::Drop,
+                        validation_info: (),
+                    },
                 ],
             }],
         };
@@ -248,13 +257,21 @@ mod tests {
                 Routine {
                     rules: vec![
                         // Accept all traffic.
-                        Rule { matcher: PacketMatcher::default(), action: Action::Accept },
+                        Rule {
+                            matcher: PacketMatcher::default(),
+                            action: Action::Accept,
+                            validation_info: (),
+                        },
                     ],
                 },
                 Routine {
                     rules: vec![
                         // Drop all traffic.
-                        Rule { matcher: PacketMatcher::default(), action: Action::Drop },
+                        Rule {
+                            matcher: PacketMatcher::default(),
+                            action: Action::Drop,
+                            validation_info: (),
+                        },
                     ],
                 },
             ],
@@ -274,8 +291,12 @@ mod tests {
     fn filter_handler_implements_ip_hooks_correctly<I: Ip + TestIpExt>() {
         fn drop_all_traffic<I: TestIpExt>(
             matcher: PacketMatcher<I, FakeDeviceClass>,
-        ) -> Hook<I, FakeDeviceClass> {
-            Hook { routines: vec![Routine { rules: vec![Rule { matcher, action: Action::Drop }] }] }
+        ) -> Hook<I, FakeDeviceClass, ValidationInfo<()>> {
+            Hook {
+                routines: vec![Routine {
+                    rules: vec![Rule { matcher, action: Action::Drop, validation_info: () }],
+                }],
+            }
         }
 
         // Ingress hook should use ingress routines and check the input
@@ -377,8 +398,8 @@ mod tests {
         fn tcp_port_rule<I: IpExt>(
             src_port: Option<PortMatcher>,
             dst_port: Option<PortMatcher>,
-            action: Action<I, FakeDeviceClass>,
-        ) -> Rule<I, FakeDeviceClass> {
+            action: Action<I, FakeDeviceClass, ValidationInfo<()>>,
+        ) -> Rule<I, FakeDeviceClass, ValidationInfo<()>> {
             Rule {
                 matcher: PacketMatcher {
                     transport_protocol: Some(TransportProtocolMatcher {
@@ -389,10 +410,11 @@ mod tests {
                     ..Default::default()
                 },
                 action,
+                validation_info: (),
             }
         }
 
-        fn default_filter_rules<I: IpExt>() -> Routine<I, FakeDeviceClass> {
+        fn default_filter_rules<I: IpExt>() -> Routine<I, FakeDeviceClass, ValidationInfo<()>> {
             Routine {
                 rules: vec![
                     // pass in proto tcp to port 22;
@@ -444,7 +466,7 @@ mod tests {
     )]
     #[test_case(wlan_interface() => Verdict::Drop; "drop incoming traffic on wlan interface")]
     fn filter_on_wlan_only<I: Ip + TestIpExt>(interface: FakeDeviceId) -> Verdict {
-        fn drop_wlan_traffic<I: IpExt>() -> Routine<I, FakeDeviceClass> {
+        fn drop_wlan_traffic<I: IpExt>() -> Routine<I, FakeDeviceClass, ValidationInfo<()>> {
             Routine {
                 rules: vec![Rule {
                     matcher: PacketMatcher {
@@ -452,6 +474,7 @@ mod tests {
                         ..Default::default()
                     },
                     action: Action::Drop,
+                    validation_info: (),
                 }],
             }
         }

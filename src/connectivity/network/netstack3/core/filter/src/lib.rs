@@ -24,4 +24,7 @@ pub use matchers::{
     PortMatcher, TransportProtocolMatcher,
 };
 pub use packets::{IpPacket, TransportPacket};
-pub use state::{Action, Hook, IpRoutines, NatRoutines, Routine, Rule, State, UninstalledRoutine};
+pub use state::{
+    validation::{ValidState, ValidationError, ValidationInfo},
+    Action, Hook, IpRoutines, NatRoutines, Routine, Rule, State, UninstalledRoutine,
+};

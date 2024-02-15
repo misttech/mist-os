@@ -6,14 +6,15 @@
 
 use assert_matches::assert_matches;
 use fidl::endpoints::Proxy as _;
+use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_filter as fnet_filter;
 use fidl_fuchsia_net_filter_ext::{
     self as fnet_filter_ext, Action, AddressMatcher, AddressMatcherType, AddressRange, Change,
-    ChangeCommitError, CommitError, Controller, ControllerId, Domain, Event, InstalledIpRoutine,
-    InstalledNatRoutine, IpHook, Matchers, Namespace, NamespaceId, NatHook, PortMatcher,
-    PushChangesError, Resource, ResourceId, Routine, RoutineId, RoutineType, Rule, RuleId, Subnet,
-    TransportProtocolMatcher,
+    ChangeCommitError, CommitError, Controller, ControllerId, DeviceClass, Domain, Event,
+    InstalledIpRoutine, InstalledNatRoutine, InterfaceMatcher, IpHook, Matchers, Namespace,
+    NamespaceId, NatHook, PortMatcher, PushChangesError, Resource, ResourceId, Routine, RoutineId,
+    RoutineType, Rule, RuleId, Subnet, TransportProtocolMatcher,
 };
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use futures::{FutureExt as _, StreamExt as _};
@@ -1595,6 +1596,161 @@ async fn uninstalled_routine_validated_even_if_unreachable<I: net_types::ip::Ip>
         .await
         .expect("push changes");
 
+    let result = controller.commit().await;
+    let invalid_rule = assert_matches!(
+        result,
+        Err(CommitError::RuleWithInvalidMatcher(rule_id)) => rule_id
+    );
+    assert_eq!(invalid_rule, rule_id);
+}
+
+enum WhichInterface {
+    In,
+    Out,
+}
+
+#[netstack_test]
+#[test_case(
+    RoutineType::Ip(None),
+    RoutineType::Ip(Some(InstalledIpRoutine {
+        hook: IpHook::Ingress,
+        priority: 0,
+    })),
+    WhichInterface::Out;
+    "match on out interface in IP ingress"
+)]
+#[test_case(
+    RoutineType::Ip(None),
+    RoutineType::Ip(Some(InstalledIpRoutine {
+        hook: IpHook::LocalIngress,
+        priority: 0,
+    })),
+    WhichInterface::Out;
+    "match on out interface in IP local ingress"
+)]
+#[test_case(
+    RoutineType::Ip(None),
+    RoutineType::Ip(Some(InstalledIpRoutine {
+        hook: IpHook::Egress,
+        priority: 0,
+    })),
+    WhichInterface::In;
+    "match on in interface in IP egress"
+)]
+#[test_case(
+    RoutineType::Ip(None),
+    RoutineType::Ip(Some(InstalledIpRoutine {
+        hook: IpHook::LocalEgress,
+        priority: 0,
+    })),
+    WhichInterface::In;
+    "match on in interface in IP local egress"
+)]
+#[test_case(
+    RoutineType::Nat(None),
+    RoutineType::Nat(Some(InstalledNatRoutine {
+        hook: NatHook::Ingress,
+        priority: 0,
+    })),
+    WhichInterface::Out;
+    "match on out interface in NAT ingress"
+)]
+#[test_case(
+    RoutineType::Nat(None),
+    RoutineType::Nat(Some(InstalledNatRoutine {
+        hook: NatHook::LocalIngress,
+        priority: 0,
+    })),
+    WhichInterface::Out;
+    "match on out interface in NAT local ingress"
+)]
+#[test_case(
+    RoutineType::Nat(None),
+    RoutineType::Nat(Some(InstalledNatRoutine {
+        hook: NatHook::Egress,
+        priority: 0,
+    })),
+    WhichInterface::In;
+    "match on in interface in NAT egress"
+)]
+#[test_case(
+    RoutineType::Nat(None),
+    RoutineType::Nat(Some(InstalledNatRoutine {
+        hook: NatHook::LocalEgress,
+        priority: 0,
+    })),
+    WhichInterface::In;
+    "match on in interface in NAT local egress"
+)]
+async fn invalid_matcher_for_hook(
+    name: &str,
+    uninstalled_routine: RoutineType,
+    installed_routine: RoutineType,
+    interface_matcher: WhichInterface,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller =
+        Controller::new(&control, &ControllerId(name.to_owned())).await.expect("create controller");
+
+    let namespace_id = NamespaceId(String::from("namespace"));
+    const TARGET_ROUTINE: &str = "target-routine";
+    let target_routine_id =
+        RoutineId { namespace: namespace_id.clone(), name: TARGET_ROUTINE.to_owned() };
+    let rule_id = RuleId { routine: target_routine_id.clone(), index: 0 };
+    let resources = [
+        Resource::Namespace(Namespace { id: namespace_id.clone(), domain: Domain::AllIp }),
+        // Uninstalled routine includes a rule with a matcher that is only valid in
+        // particular hooks.
+        Resource::Routine(Routine { id: target_routine_id, routine_type: uninstalled_routine }),
+        Resource::Rule(Rule {
+            id: rule_id.clone(),
+            matchers: match interface_matcher {
+                WhichInterface::In => Matchers {
+                    in_interface: Some(InterfaceMatcher::DeviceClass(DeviceClass::Device(
+                        fhardware_network::DeviceClass::Wlan,
+                    ))),
+                    ..Default::default()
+                },
+                WhichInterface::Out => Matchers {
+                    out_interface: Some(InterfaceMatcher::DeviceClass(DeviceClass::Device(
+                        fhardware_network::DeviceClass::Wlan,
+                    ))),
+                    ..Default::default()
+                },
+            },
+            action: Action::Drop,
+        }),
+    ];
+    // Adding the uninstalled routine should succeed since it is not reachable from
+    // any hook yet.
+    controller
+        .push_changes(resources.iter().cloned().map(Change::Create).collect())
+        .await
+        .expect("push changes");
+    controller.commit().await.expect("commit pending changes");
+
+    let installed_routine_id =
+        RoutineId { namespace: namespace_id, name: String::from("installed") };
+    let resources = [
+        // Routine is installed in a hook, and it jumps to a routine with a rule that
+        // matches on a property that is unavailable in that hook.
+        Resource::Routine(Routine {
+            id: installed_routine_id.clone(),
+            routine_type: installed_routine,
+        }),
+        Resource::Rule(Rule {
+            id: RuleId { routine: installed_routine_id, index: 0 },
+            matchers: Matchers::default(),
+            action: Action::Jump(TARGET_ROUTINE.to_owned()),
+        }),
+    ];
+    controller
+        .push_changes(resources.iter().cloned().map(Change::Create).collect())
+        .await
+        .expect("push changes");
     let result = controller.commit().await;
     let invalid_rule = assert_matches!(
         result,
