@@ -51,25 +51,28 @@ collect_deps() {
 main() {
     local build_dir=$(fx-command-run get-build-dir)
     fx-info "Using build dir: ${build_dir}"
-    local target=
+    local targets=()
     while [[ $# -ge 1 ]]; do
         case "$1" in
         -t)
             shift
-            target="$1"
+            targets+=( "$1" )
             ;;
         esac
         shift
     done
 
-    if [[ -z "${target}" ]]; then
+    if [[ "${#targets[@]}" -eq 0 ]]; then
         echo "-t is required to pass in a target."
         exit 1
     fi
 
     # Use `gn meta` to walk the metadata and select all items with
     # `driver_package_component_files`. This is mandatory all driver.
-    local distribution_manifests=( $(fx-command-run gn meta "${build_dir}" --data=driver_package_component_files "${target}" | grep "distribution_manifest = " | cut -d "\"" -f2 | sed -e "s|.*|${build_dir}/&|") )
+    local distribution_manifests=()
+    for target in ${targets[@]}; do
+        distribution_manifests+=( $(fx-command-run gn meta "${build_dir}" --data=driver_package_component_files "${target}" | grep "distribution_manifest = " | cut -d "\"" -f2 | sed -e "s|.*|${build_dir}/&|") )
+    done
 
     # Collect all the drivers from the distribution
     local drivers=($(fx-command-run jq -r '.[] | select((.destination|startswith("driver"))) | .label' "${distribution_manifests[@]}" | sort -u))
