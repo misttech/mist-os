@@ -271,6 +271,8 @@ class_permission_enum! {
     FilePermission {
         /// Permission to create a file.
         Create,
+        /// Permission to open a file.
+        Open,
     }
 }
 
@@ -278,6 +280,7 @@ impl FilePermission {
     pub fn name(&self) -> &'static str {
         match self {
             FilePermission::Create => "create",
+            FilePermission::Open => "open",
         }
     }
 }
