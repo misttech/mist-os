@@ -7,8 +7,11 @@
 load(":providers.bzl", "FuchsiaSizeCheckerInfo")
 
 def _fuchsia_size_report_aggregator_impl(ctx):
-    size_budgets_input = [report[FuchsiaSizeCheckerInfo].size_budgets for report in ctx.attr.size_reports if hasattr(report[FuchsiaSizeCheckerInfo], "size_budgets")]
-    size_budgets_input = size_budgets_input[0] if len(size_budgets_input) > 0 else None
+    size_budgets = ",".join([
+        report[FuchsiaSizeCheckerInfo].size_budgets.path
+        for report in ctx.attr.size_reports
+        if hasattr(report[FuchsiaSizeCheckerInfo], "size_budgets")
+    ])
     size_reports = ",".join([
         report[FuchsiaSizeCheckerInfo].size_report.path
         for report in ctx.attr.size_reports
@@ -20,43 +23,46 @@ def _fuchsia_size_report_aggregator_impl(ctx):
         if hasattr(report[FuchsiaSizeCheckerInfo], "verbose_output")
     ])
 
-    size_budgets_file = ctx.actions.declare_file(ctx.label.name + "_size_budgets.json") if size_budgets_input else None
+    size_budgets_file = ctx.actions.declare_file(ctx.label.name + "_size_budgets.json")
     size_report_file = ctx.actions.declare_file(ctx.label.name + "_size_report.json")
     verbose_output_file = ctx.actions.declare_file(ctx.label.name + "_verbose_output.json")
 
     # Merge size reports and verbose outputs
-    ctx.actions.run(
-        outputs = [size_report_file, verbose_output_file],
-        inputs = ctx.files.size_reports,
-        executable = ctx.executable._size_report_merger,
-        arguments = [
+    _merge_arguments = [
+        "--merged-size-budgets",
+        size_budgets_file.path,
+        "--merged-size-reports",
+        size_report_file.path,
+        "--merged-verbose-outputs",
+        verbose_output_file.path,
+    ]
+    if size_budgets:
+        _merge_arguments += [
+            "--size-budgets",
+            size_budgets,
+        ]
+    if size_reports:
+        _merge_arguments += [
             "--size-reports",
             size_reports,
+        ]
+    if verbose_outputs:
+        _merge_arguments += [
             "--verbose-outputs",
             verbose_outputs,
-            "--merged-size-reports",
-            size_report_file.path,
-            "--merged-verbose-outputs",
-            verbose_output_file.path,
-        ],
+        ]
+
+    ctx.actions.run(
+        outputs = [size_budgets_file, size_report_file, verbose_output_file],
+        inputs = ctx.files.size_reports,
+        executable = ctx.executable._size_report_merger,
+        arguments = _merge_arguments,
     )
 
-    deps = [size_report_file, verbose_output_file]
-
-    if size_budgets_input:
-        # Copy the size budgets file
-        ctx.actions.run_shell(
-            outputs = [size_budgets_file],
-            inputs = [size_budgets_input],
-            command = "cp -L {} {}".format(size_budgets_input.path, size_budgets_file.path),
-        )
-        deps.append(size_budgets_file)
+    deps = [size_budgets_file, size_report_file, verbose_output_file]
 
     fuchsia_size_checker_info = FuchsiaSizeCheckerInfo(
         size_budgets = size_budgets_file,
-        size_report = size_report_file,
-        verbose_output = verbose_output_file,
-    ) if size_budgets_file else FuchsiaSizeCheckerInfo(
         size_report = size_report_file,
         verbose_output = verbose_output_file,
     )

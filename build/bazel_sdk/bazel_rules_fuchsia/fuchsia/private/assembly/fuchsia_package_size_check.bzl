@@ -73,7 +73,7 @@ def _fuchsia_package_size_check_impl(ctx):
     )
 
     return [
-        DefaultInfo(files = depset(direct = outputs)),
+        DefaultInfo(files = depset(direct = outputs + [budgets_file])),
         FuchsiaSizeCheckerInfo(
             size_budgets = budgets_file,
             size_report = size_report,
