@@ -418,9 +418,6 @@ constexpr uint8_t lcd_init_sequence_TV070WSM_FT_9365[] = {
     // The 3rd parameter identifies the LCD module and driver.
     kDsiOpReadReg, 2, 4, 3,
 
-    // Sleeps for 10 milliseconds.
-    kDsiOpSleep, 10,
-
     // SET_PAGE - 0xe0 on all pages
     //
     // JD9365 user guide Section 2.6.4, page 22
@@ -2540,7 +2537,6 @@ constexpr uint8_t lcd_init_sequence_KD070D82_FT[] = {
     0xf0, 3, 0, 0, 10,
     0xf0, 3, 0, 1, 30,
     0xfc, 2, 4, 3,
-    0xff, 10,
 
     0x23, 2, 0xe0, 0x00,
     0x23, 2, 0xe1, 0x93,
@@ -2778,9 +2774,7 @@ constexpr uint8_t lcd_init_sequence_KD070D82_FT_9365[] = {
     0xf0, 3, 0, 0, 10,
     0xf0, 3, 0, 1, 30,
     0xfc, 2, 4, 3,
-    0xff, 10,
 
-    0xff, 120,
     0x23, 2, 0xe0, 0x00,
     0x23, 2, 0xe1, 0x93,
     0x23, 2, 0xe2, 0x65,
@@ -3562,15 +3556,12 @@ constexpr uint8_t lcd_init_sequence_MTF050FHDI_03[] = {
     0xff, 0,
 };
 
-// TODO(https://fxbug.dev/322701164): Update the initialization sequence to
-// match the initialization sequence provided by the panel / DDIC provider.
 constexpr uint8_t lcd_init_sequence_TV070WSM_FT_NELSON[] = {
     0xff, 10,
     0xf0, 3, 0, 1, 30,
     0xf0, 3, 0, 0, 10,
     0xf0, 3, 0, 1, 30,
     0xfc, 2, 4, 3,
-    0xff, 10,
 
     0x23, 2, 0xe0, 0x00,
     0x23, 2, 0xe1, 0x93,
