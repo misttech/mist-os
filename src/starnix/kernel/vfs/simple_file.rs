@@ -120,7 +120,11 @@ impl<Ops: BytesFileOps> FileOps for BytesFile<Ops> {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        data.write(&self.0.read(current_task)?[offset..])
+        let content = self.0.read(current_task)?;
+        if offset >= content.len() {
+            return Ok(0);
+        }
+        data.write(&content[offset..])
     }
 
     fn write(
