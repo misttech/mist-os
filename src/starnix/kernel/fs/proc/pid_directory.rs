@@ -1020,14 +1020,16 @@ impl DynamicFileSource for StatusFile {
 
         writeln!(sink, "Tgid:\t{}", info.pid())?;
         writeln!(sink, "Pid:\t{}", info.tid())?;
-        let (ppid, threads) = if let Some(task) = task {
+        let (ppid, threads, tracer_pid) = if let Some(task) = task {
+            let tracer_pid = task.read().ptrace.as_ref().map_or(0, |p| p.get_pid());
             let task_group = task.thread_group.read();
-            (task_group.get_ppid(), task_group.tasks_count())
+            (task_group.get_ppid(), task_group.tasks_count(), tracer_pid)
         } else {
             track_stub!(TODO("https://fxbug.dev/297440106"), "/proc/pid/status zombies");
-            (1, 1)
+            (1, 1, 0)
         };
         writeln!(sink, "PPid:\t{}", ppid)?;
+        writeln!(sink, "TracerPid:\t{}", tracer_pid)?;
 
         let creds = info.creds();
         writeln!(sink, "Uid:\t{}\t{}\t{}\t{}", creds.uid, creds.euid, creds.saved_uid, creds.euid)?;
