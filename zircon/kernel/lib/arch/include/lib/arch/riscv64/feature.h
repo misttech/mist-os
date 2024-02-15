@@ -32,6 +32,9 @@ enum class RiscvFeature {
   // Cache-Block Zero Operations
   kZicboz,
 
+  // Counter CSRs are accessible
+  kZicntr,
+
   // Not a real feature, but a bookend that allows us to calculate the largest
   // underlying enum value.
   kMax,

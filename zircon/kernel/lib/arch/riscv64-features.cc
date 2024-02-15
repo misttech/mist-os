@@ -38,6 +38,8 @@ RiscvFeatures& RiscvFeatures::SetMany(std::string_view isa_string) {
       Set(RiscvFeature::kZicbom);
     } else if (ext == "zicboz"sv) {
       Set(RiscvFeature::kZicboz);
+    } else if (ext == "zicntr"sv) {
+      Set(RiscvFeature::kZicntr);
     }
   }
   return *this;

@@ -6,6 +6,7 @@
 
 #include <platform.h>
 
+#include <arch/riscv64/feature.h>
 #include <dev/timer.h>
 #include <platform/timer.h>
 
@@ -42,7 +43,11 @@ void platform_stop_timer() { timer_stop(); }
 
 void platform_shutdown_timer() { timer_shutdown(); }
 
-bool platform_usermode_can_access_tick_registers() { return false; }
+bool platform_usermode_can_access_tick_registers() {
+  // If the cpu claims to have Zicntr support, then it's relatively cheap for user
+  // space to access the time CSR via rdtime instruction.
+  return gRiscvFeatures[arch::RiscvFeature::kZicntr];
+}
 
 zx_ticks_t platform_current_ticks() {
   return internal::platform_current_ticks<GetTicksSyncFlag::kNone>();

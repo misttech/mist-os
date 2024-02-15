@@ -45,6 +45,9 @@ void riscv64_feature_early_init() {
 }
 
 void riscv64_feature_init() {
+  if (gRiscvFeatures[arch::RiscvFeature::kZicntr]) {
+    dprintf(INFO, "RISCV: feature zicntr\n");
+  }
   if (gRiscvFeatures[arch::RiscvFeature::kZicbom]) {
     dprintf(INFO, "RISCV: feature cbom, size %#x\n", riscv_cbom_size);
 
