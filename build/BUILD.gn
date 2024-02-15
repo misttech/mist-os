@@ -54,7 +54,7 @@ group("non_hermetic_deps") {
     "//third_party/crashpad/src/*",
     "//third_party/pylibs/mypy/*",
     "//tools/gn_desc:gn_desc.json",
-    "//vendor/google/*",
+    "//vendor/*",
     "//zircon/kernel/lib/version/*",
   ]
 
