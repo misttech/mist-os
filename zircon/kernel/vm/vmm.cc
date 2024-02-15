@@ -62,6 +62,18 @@ zx_status_t vmm_accessed_fault_handler(vaddr_t addr) {
   return status;
 }
 
+class FlagsString {
+ public:
+  explicit FlagsString(uint flags) { vmm_pf_flags_to_string(flags, string_); }
+
+  operator fxt::StringRef<fxt::RefType::kInline>() const {
+    return fxt::StringRef{string_, sizeof(string_)};
+  }
+
+ private:
+  char string_[5];
+};
+
 zx_status_t vmm_page_fault_handler(vaddr_t addr, uint flags) {
   // hardware fault, mark it as such
   flags |= VMM_PF_FLAG_HW_FAULT;
@@ -95,7 +107,7 @@ zx_status_t vmm_page_fault_handler(vaddr_t addr, uint flags) {
   }
 
   KTRACE_COMPLETE("kernel:vm", "page_fault", start_time, ("vaddr", ktrace::Pointer{addr}),
-                  ("flags", flags));
+                  ("flags", FlagsString{flags}));
 
   return status;
 }
