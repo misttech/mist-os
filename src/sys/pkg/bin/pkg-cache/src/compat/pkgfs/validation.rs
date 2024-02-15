@@ -23,6 +23,9 @@ use {
     },
 };
 
+#[cfg(feature = "supports_open2")]
+use vfs::{ObjectRequestRef, ProtocolsExt as _};
+
 /// The pkgfs /ctl/validation directory, except it contains only the "missing" file (e.g. does not
 /// have the "present" file).
 pub(crate) struct Validation {
@@ -108,6 +111,59 @@ impl vfs::directory::entry::DirectoryEntry for Validation {
         object_request.shutdown(zx::Status::NOT_FOUND);
     }
 
+    #[cfg(feature = "supports_open2")]
+    fn open2(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: VfsPath,
+        protocols: fio::ConnectionProtocols,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        if path.is_empty() {
+            match protocols.open_mode() {
+                fio::OpenMode::OpenExisting => {}
+                fio::OpenMode::AlwaysCreate | fio::OpenMode::MaybeCreate => {
+                    return Err(zx::Status::NOT_SUPPORTED);
+                }
+            }
+
+            if let Some(rights) = protocols.rights() {
+                if rights.intersects(fio::Operations::WRITE_BYTES)
+                    | rights.intersects(fio::Operations::EXECUTE)
+                {
+                    return Err(zx::Status::NOT_SUPPORTED);
+                }
+            }
+
+            // Note that `ImmutableConnection::create` will check that protocols contain
+            // directory-only protocols.
+            return object_request.spawn_connection(
+                scope,
+                self,
+                protocols,
+                ImmutableConnection::create,
+            );
+        }
+
+        if path.as_ref() == "missing" {
+            let object_request = object_request.take();
+            scope.clone().spawn(async move {
+                let missing_contents = self.make_missing_contents().await;
+                object_request.handle(|object_request| {
+                    vfs::file::vmo::read_only(missing_contents).open2(
+                        scope,
+                        VfsPath::dot(),
+                        protocols,
+                        object_request,
+                    )
+                });
+            });
+            return Ok(());
+        }
+
+        Err(zx::Status::NOT_FOUND)
+    }
+
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
     }
@@ -184,7 +240,7 @@ mod tests {
         super::*,
         assert_matches::assert_matches,
         blobfs_ramdisk::BlobfsRamdisk,
-        futures::stream::StreamExt as _,
+        futures::prelude::*,
         std::convert::TryInto as _,
         vfs::{
             directory::{entry::DirectoryEntry, entry_container::Directory},
@@ -469,6 +525,136 @@ mod tests {
         assert_eq!(
             validation.make_missing_contents().await,
             format!("{missing_hash}\n").into_bytes()
+        );
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_self() {
+        let (_env, validation) = TestEnv::new().await;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            rights: Some(fio::Operations::READ_BYTES),
+            ..Default::default()
+        });
+        protocols
+            .to_object_request(server_end)
+            .handle(|req| validation.open2(ExecutionScope::new(), VfsPath::dot(), protocols, req));
+
+        assert_eq!(
+            fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
+            vec![fuchsia_fs::directory::DirEntry {
+                name: "missing".to_string(),
+                kind: fuchsia_fs::directory::DirentKind::File
+            }]
+        );
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_rejects_forbidden_open_modes() {
+        let (_env, validation) = TestEnv::new().await;
+
+        for forbidden_open_mode in [fio::OpenMode::AlwaysCreate, fio::OpenMode::MaybeCreate] {
+            let (proxy, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let scope = ExecutionScope::new();
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                mode: Some(forbidden_open_mode),
+                rights: Some(fio::Operations::READ_BYTES),
+                ..Default::default()
+            });
+            protocols.to_object_request(server_end).handle(|req| {
+                DirectoryEntry::open2(validation.clone(), scope, VfsPath::dot(), protocols, req)
+            });
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+            );
+        }
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_rejects_forbidden_rights() {
+        let (_env, validation) = TestEnv::new().await;
+
+        for forbidden_rights in [fio::Operations::WRITE_BYTES, fio::Operations::EXECUTE] {
+            let (proxy, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let scope = ExecutionScope::new();
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                rights: Some(forbidden_rights),
+                ..Default::default()
+            });
+            protocols.to_object_request(server_end).handle(|req| {
+                DirectoryEntry::open2(validation.clone(), scope, VfsPath::dot(), protocols, req)
+            });
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+            );
+        }
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_rejects_file_protocols() {
+        let (_env, validation) = TestEnv::new().await;
+
+        for file_protocols in [
+            fio::FileProtocolFlags::default(),
+            fio::FileProtocolFlags::APPEND,
+            fio::FileProtocolFlags::TRUNCATE,
+        ] {
+            let (proxy, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let scope = ExecutionScope::new();
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                rights: Some(fio::Operations::READ_BYTES),
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(file_protocols),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+            protocols.to_object_request(server_end).handle(|req| {
+                DirectoryEntry::open2(validation.clone(), scope, VfsPath::dot(), protocols, req)
+            });
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FILE, .. })
+            );
+        }
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_missing() {
+        let (_env, validation) = TestEnv::with_base_blobs_and_blobfs_contents(
+            HashSet::from([[0; 32].into()]),
+            std::iter::empty(),
+        )
+        .await;
+
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            rights: Some(fio::Operations::READ_BYTES),
+            ..Default::default()
+        });
+        protocols.to_object_request(server_end).handle(|req| {
+            validation.clone().open2(
+                ExecutionScope::new(),
+                VfsPath::validate_and_split("missing").unwrap(),
+                protocols,
+                req,
+            )
+        });
+
+        assert_eq!(
+            fuchsia_fs::file::read(&proxy).await.unwrap(),
+            b"0000000000000000000000000000000000000000000000000000000000000000\n".to_vec()
         );
     }
 }

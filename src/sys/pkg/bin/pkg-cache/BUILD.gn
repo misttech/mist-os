@@ -111,6 +111,12 @@ rustc_binary("bin") {
     "//build/config/rust/lints:clippy_warn_all",
     "//build/config/rust:bootfs",
   ]
+
+  # TODO(https://fxbug.dev/324112857): When Blobfs also supports open2, remove this feature flag
+  # and the generated_fshost_config.gni import above.
+  if (fxfs_blob) {
+    features = [ "supports_open2" ]
+  }
 }
 
 fuchsia_component_manifest("manifest") {

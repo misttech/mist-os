@@ -30,6 +30,9 @@ use {
     },
 };
 
+#[cfg(feature = "supports_open2")]
+use vfs::{ObjectRequestRef, ProtocolsExt as _};
+
 mod variants;
 use variants::PkgfsPackagesVariants;
 
@@ -117,6 +120,61 @@ impl DirectoryEntry for PkgfsPackages {
                 }
             }
         });
+    }
+
+    #[cfg(feature = "supports_open2")]
+    fn open2(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        mut path: Path,
+        protocols: fio::ConnectionProtocols,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        match protocols.open_mode() {
+            fio::OpenMode::OpenExisting => {}
+            fio::OpenMode::AlwaysCreate | fio::OpenMode::MaybeCreate => {
+                return Err(zx::Status::NOT_SUPPORTED);
+            }
+        }
+        // This directory and all child nodes are read-only
+        if let Some(rights) = protocols.rights() {
+            if rights.intersects(fio::Operations::WRITE_BYTES) {
+                return Err(zx::Status::NOT_SUPPORTED);
+            }
+        }
+        // If file options was specified, `APPEND` or `TRUNCATE` modes are not support
+        if protocols.is_append() || object_request.truncate {
+            return Err(zx::Status::NOT_SUPPORTED);
+        }
+
+        match path.next().map(PackageName::from_str) {
+            None => {
+                object_request.spawn_connection(scope, self, protocols, ImmutableConnection::create)
+            }
+            Some(Ok(package_name)) => {
+                let object_request = object_request.take();
+                scope.clone().spawn(async move {
+                    match self.package_variants(&package_name).await {
+                        Some(variants) => {
+                            object_request.handle(|object_request| {
+                                PkgfsPackagesVariants::new(variants, self.blobfs.clone()).open2(
+                                    scope,
+                                    path,
+                                    protocols,
+                                    object_request,
+                                )
+                            });
+                        }
+                        None => object_request.shutdown(zx::Status::NOT_FOUND),
+                    }
+                });
+                Ok(())
+            }
+            Some(Err(_)) => {
+                // Names that are not valid package names can't exist in this directory.
+                Err(zx::Status::NOT_FOUND)
+            }
+        }
     }
 
     fn entry_info(&self) -> EntryInfo {
@@ -221,6 +279,25 @@ mod tests {
                 Path::dot(),
                 server_end.into_channel().into(),
             );
+
+            proxy
+        }
+
+        // Returns directory proxy from Open2
+        #[cfg(feature = "supports_open2")]
+        fn proxy2(self: &Arc<Self>, protocols: fio::ConnectionProtocols) -> fio::DirectoryProxy {
+            let (proxy, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+
+            protocols.to_object_request(server_end).handle(|req| {
+                vfs::directory::entry::DirectoryEntry::open2(
+                    Arc::clone(self),
+                    ExecutionScope::new(),
+                    Path::dot(),
+                    protocols,
+                    req,
+                )
+            });
 
             proxy
         }
@@ -420,5 +497,119 @@ mod tests {
         let (status, flags) = proxy.get_flags().await.unwrap();
         let () = zx::Status::ok(status).unwrap();
         assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE);
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn open2_rejects_invalid_name() {
+        let pkgfs_packages = PkgfsPackages::new_test([]);
+
+        let proxy = pkgfs_packages.proxy2(fio::ConnectionProtocols::Node(fio::NodeOptions {
+            rights: Some(fio::Operations::READ_BYTES),
+            ..Default::default()
+        }));
+
+        assert_matches!(
+            fuchsia_fs::directory::open2_directory(
+                &proxy,
+                "invalidname-!@#$%^&*()+=",
+                fio::ConnectionProtocols::Node(fio::NodeOptions {
+                    rights: Some(fio::Operations::READ_BYTES),
+                    ..Default::default()
+                })
+            )
+            .await,
+            Err(fuchsia_fs::node::OpenError::OnOpenDecode(fidl::Error::ClientChannelClosed {
+                status: zx::Status::NOT_FOUND,
+                ..
+            }))
+        );
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn open2_rejects_missing_package() {
+        let pkgfs_packages = PkgfsPackages::new_test([]);
+
+        let proxy = pkgfs_packages.proxy2(fio::ConnectionProtocols::Node(fio::NodeOptions {
+            rights: Some(fio::Operations::READ_BYTES),
+            ..Default::default()
+        }));
+
+        assert_matches!(
+            fuchsia_fs::directory::open2_directory(
+                &proxy,
+                "missing",
+                fio::ConnectionProtocols::Node(fio::NodeOptions {
+                    rights: Some(fio::Operations::READ_BYTES),
+                    ..Default::default()
+                })
+            )
+            .await,
+            Err(fuchsia_fs::node::OpenError::OnOpenDecode(fidl::Error::ClientChannelClosed {
+                status: zx::Status::NOT_FOUND,
+                ..
+            }))
+        );
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn open2_opens_static_package_variants() {
+        let pkgfs_packages = PkgfsPackages::new_test([(package_url("static", "0"), hash(0))]);
+
+        let proxy = pkgfs_packages.proxy2(fio::ConnectionProtocols::Node(fio::NodeOptions {
+            rights: Some(fio::Operations::READ_BYTES),
+            ..Default::default()
+        }));
+
+        assert_matches!(
+            fuchsia_fs::directory::open2_directory(
+                &proxy,
+                "static",
+                fio::ConnectionProtocols::Node(fio::NodeOptions {
+                    rights: Some(fio::Operations::READ_BYTES),
+                    ..Default::default()
+                })
+            )
+            .await,
+            Ok(_)
+        );
+    }
+
+    #[cfg(feature = "supports_open2")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn open2_opens_path_within_known_package_variant() {
+        let (blobfs_fake, blobfs_client) = FakeBlobfs::new();
+        let package = PackageBuilder::new("static")
+            .add_resource_at("meta/message", &b"yes"[..])
+            .build()
+            .await
+            .expect("created pkg");
+        let (metafar_blob, _) = package.contents();
+        blobfs_fake.add_blob(metafar_blob.merkle, metafar_blob.contents);
+        let pkgfs_packages = PkgfsPackages::new(
+            Arc::new(BasePackages::new_test_only(
+                HashSet::new(),
+                [("fuchsia-pkg://fuchsia.com/static".parse().unwrap(), *package.hash())],
+            )),
+            blobfs_client,
+        );
+        let proxy = pkgfs_packages.proxy2(fio::ConnectionProtocols::Node(fio::NodeOptions {
+            rights: Some(fio::Operations::READ_BYTES),
+            ..Default::default()
+        }));
+
+        let file = fuchsia_fs::directory::open2_file(
+            &proxy,
+            "static/0/meta/message",
+            fio::FileProtocolFlags::default(),
+            Some(fio::Operations::READ_BYTES),
+        )
+        .await
+        .expect("open2_file failed");
+
+        let message = fuchsia_fs::file::read_to_string(&file).await.expect("read_to_string failed");
+        assert_eq!(message, "yes");
     }
 }

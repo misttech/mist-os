@@ -148,6 +148,31 @@ pub async fn open_directory(
     node::verify_directory_describe_event(dir).await
 }
 
+pub async fn open2_directory(
+    parent: &fio::DirectoryProxy,
+    path: &str,
+    protocols: fio::ConnectionProtocols,
+) -> Result<fio::DirectoryProxy, OpenError> {
+    let (dir, server_end) =
+        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().map_err(OpenError::CreateProxy)?;
+
+    let mut protocols = protocols.clone();
+    if let fio::ConnectionProtocols::Node(fio::NodeOptions { flags, .. }) = &mut protocols {
+        if let Some(flags) = flags {
+            *flags &= fio::NodeFlags::GET_REPRESENTATION;
+        } else {
+            *flags = Some(fio::NodeFlags::GET_REPRESENTATION);
+        }
+    };
+
+    parent
+        .open2(path, &protocols, server_end.into_channel())
+        .map_err(OpenError::SendOpenRequest)?;
+
+    // wait for the directory to open and report success.
+    node::verify_directory_describe_event(dir).await
+}
+
 /// Creates a directory named `path` within the `parent` directory.
 pub async fn create_directory(
     parent: &fio::DirectoryProxy,
@@ -225,6 +250,30 @@ pub async fn open_file(
 
     parent
         .open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end.into_channel()))
+        .map_err(OpenError::SendOpenRequest)?;
+
+    // wait for the file to open and report success.
+    node::verify_file_describe_event(file).await
+}
+
+pub async fn open2_file(
+    parent: &fio::DirectoryProxy,
+    path: &str,
+    flags: fio::FileProtocolFlags,
+    rights: Option<fio::Operations>,
+) -> Result<fio::FileProxy, OpenError> {
+    let (file, server_end) =
+        fidl::endpoints::create_proxy::<fio::FileMarker>().map_err(OpenError::CreateProxy)?;
+
+    let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+        protocols: Some(fio::NodeProtocols { file: Some(flags), ..Default::default() }),
+        rights,
+        flags: Some(fio::NodeFlags::GET_REPRESENTATION),
+        ..Default::default()
+    });
+
+    parent
+        .open2(path, &protocols, server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
 
     // wait for the file to open and report success.
