@@ -12,8 +12,10 @@ use std::sync::Arc;
 
 use crate::error::{Error, Result};
 
+mod in_use_handle;
 mod iterator;
 
+pub use in_use_handle::InUseHandle;
 pub use iterator::{RangeCursor, ReplayableIterator, ReplayableIteratorCursor};
 
 macro_rules! error {
@@ -174,6 +176,10 @@ pub trait ValueExt: Sized {
     /// The FIDL codec should catch the rest.
     fn to_fidl_value(self, ns: &lib::Namespace, ty: &lib::Type) -> Result<FidlValue>;
 
+    /// Get an [`InUseHandle`] from this value. Will convert directly-stored
+    /// handle values or return the wrapped [`InUseHandle`] if applicable.
+    fn to_in_use_handle(self) -> Option<InUseHandle>;
+
     /// Whether this value represents a client endpoint for the given service.
     fn is_client(&self, service: &str) -> bool;
 }
@@ -203,10 +209,22 @@ impl ValueExt for Value {
             Value::List(a) => Value::List(a.iter_mut().map(|x| x.duplicate()).collect()),
 
             Value::ServerEnd(_, _) => {
-                todo!()
+                let Value::ServerEnd(a, b) = std::mem::replace(self, Value::Null) else {
+                    unreachable!();
+                };
+                let mut playground_value =
+                    PlaygroundValue::InUseHandle(InUseHandle::server_end(a, b));
+                *self = Value::OutOfLine(playground_value.duplicate());
+                Value::OutOfLine(playground_value)
             }
             Value::ClientEnd(_, _) => {
-                todo!()
+                let Value::ClientEnd(a, b) = std::mem::replace(self, Value::Null) else {
+                    unreachable!();
+                };
+                let mut playground_value =
+                    PlaygroundValue::InUseHandle(InUseHandle::client_end(a, b));
+                *self = Value::OutOfLine(playground_value.duplicate());
+                Value::OutOfLine(playground_value)
             }
             Value::Handle(_, _) => todo!(),
             Value::OutOfLine(a) => Value::OutOfLine(a.duplicate()),
@@ -429,9 +447,22 @@ impl ValueExt for Value {
         Ok(ret)
     }
 
+    fn to_in_use_handle(self) -> Option<InUseHandle> {
+        match self {
+            Value::ServerEnd(h, p) => Some(InUseHandle::server_end(h, p)),
+            Value::ClientEnd(h, p) => Some(InUseHandle::client_end(h, p)),
+            Value::Handle(h, t) => Some(InUseHandle::handle(h, t)),
+            Value::OutOfLine(PlaygroundValue::InUseHandle(s)) => Some(s),
+            _ => None,
+        }
+    }
+
     fn is_client(&self, service: &str) -> bool {
         match self {
             Value::ClientEnd(_, s) => s == service,
+            Value::OutOfLine(PlaygroundValue::InUseHandle(s)) => {
+                s.get_client_protocol().ok().map(|x| &x == service).unwrap_or(false)
+            }
             _ => false,
         }
     }
@@ -442,6 +473,8 @@ impl ValueExt for Value {
 pub enum PlaygroundValue {
     /// A function or closure.
     Invocable(Invocable),
+    /// A handle which can have multiple owners.
+    InUseHandle(InUseHandle),
     /// A number with no precision limits.
     Num(BigInt),
     /// An iterator.
@@ -504,6 +537,37 @@ impl PlaygroundValue {
                 LookupResultOrType::LookupResult(lib::LookupResult::Enum(lib::Enum { ty, .. })),
                 v,
             ) => v.to_fidl_value_by_type_or_lookup(ns, LookupResultOrType::Type(ty.clone())),
+            (
+                LookupResultOrType::Type(lib::Type::Request { identifier, .. }),
+                PlaygroundValue::InUseHandle(h),
+            ) => {
+                let h = h.take_server(&identifier)?;
+                let FidlValue::ServerEnd(_, s) = &h else {
+                    return Err(error!("Cannot conver type to server for {identifier}"));
+                };
+                if &identifier == s {
+                    Ok(h)
+                } else {
+                    Err(error!("Cannot convert handle to {} to handle to {}", s, identifier))
+                }
+            }
+            (
+                LookupResultOrType::LookupResult(lib::LookupResult::Protocol(lib::Protocol {
+                    name,
+                    ..
+                })),
+                PlaygroundValue::InUseHandle(h),
+            ) => {
+                let h = h.take_client(&name)?;
+                let FidlValue::ClientEnd(_, s) = &h else {
+                    return Err(error!("Cannot conver type to server for {name}"));
+                };
+                if name == s {
+                    Ok(h)
+                } else {
+                    Err(error!("Cannot convert handle to {} to handle to {}", s, name))
+                }
+            }
             (LookupResultOrType::Type(ty), PlaygroundValue::Invocable(_)) => {
                 Err(error!("Cannot convert invocable to {ty:?}"))
             }
@@ -527,6 +591,7 @@ impl PlaygroundValue {
     fn duplicate(&mut self) -> Self {
         match self {
             PlaygroundValue::Invocable(a) => PlaygroundValue::Invocable(a.clone()),
+            PlaygroundValue::InUseHandle(a) => PlaygroundValue::InUseHandle(a.clone()),
             PlaygroundValue::Num(a) => PlaygroundValue::Num(a.clone()),
             PlaygroundValue::Iterator(a) => PlaygroundValue::Iterator(a.clone()),
             PlaygroundValue::TypeHinted(a, b) => {
@@ -644,6 +709,7 @@ impl std::fmt::Display for PlaygroundValue {
             PlaygroundValue::Invocable(Invocable(a)) => write!(f, "<function@{:p}>", a),
             PlaygroundValue::Num(x) => std::fmt::Display::fmt(x, f),
             PlaygroundValue::Iterator(_) => write!(f, "<iterator>"),
+            PlaygroundValue::InUseHandle(_) => write!(f, "<handle in use>"),
             PlaygroundValue::TypeHinted(hint, v) => write!(f, "@{hint} {v}"),
         }
     }
@@ -1025,5 +1091,53 @@ mod test {
             panic!();
         };
         assert_eq!(5, b);
+    }
+
+    #[test]
+    fn promote_handles() {
+        let mut ns = lib::Namespace::new();
+        ns.load(test_fidl::TEST_FIDL).unwrap();
+        let (a, b) = fidl::Channel::create();
+
+        let mut client =
+            Value::ClientEnd(a, "test.fidlcodec.examples/FidlCodecTestProtocol".to_owned());
+        let mut server =
+            Value::ServerEnd(b, "test.fidlcodec.examples/FidlCodecTestProtocol".to_owned());
+        let client_dup = client.duplicate();
+        let server_dup = server.duplicate();
+
+        assert!(matches!(client_dup, Value::OutOfLine(PlaygroundValue::InUseHandle(_))));
+        assert!(matches!(server_dup, Value::OutOfLine(PlaygroundValue::InUseHandle(_))));
+
+        let Ok(FidlValue::ClientEnd(_channel, protocol)) = client_dup.to_fidl_value(
+            &ns,
+            &lib::Type::Identifier {
+                name: "test.fidlcodec.examples/FidlCodecTestProtocol".to_owned(),
+                nullable: false,
+            },
+        ) else {
+            panic!();
+        };
+        assert_eq!("test.fidlcodec.examples/FidlCodecTestProtocol", &protocol);
+
+        let Ok(FidlValue::ServerEnd(_channel, protocol)) = server_dup.to_fidl_value(
+            &ns,
+            &lib::Type::Request {
+                identifier: "test.fidlcodec.examples/FidlCodecTestProtocol".to_owned(),
+                rights: fidl::Rights::SAME_RIGHTS,
+                nullable: false,
+            },
+        ) else {
+            panic!();
+        };
+        assert_eq!("test.fidlcodec.examples/FidlCodecTestProtocol", &protocol);
+
+        let Value::OutOfLine(PlaygroundValue::InUseHandle(client)) = client else { panic!() };
+
+        assert!(client.take_client("test.fidlcodec.examples/FidlCodecTestProtocol").is_err());
+
+        let Value::OutOfLine(PlaygroundValue::InUseHandle(server)) = server else { panic!() };
+
+        assert!(server.take_server("test.fidlcodec.examples/FidlCodecTestProtocol").is_err());
     }
 }
