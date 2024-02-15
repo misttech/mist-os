@@ -155,7 +155,7 @@ class Validator:
         """Build a Validator given a path to
         docs/contribute/governance/areas/_areas.yaml."""
         with areas_file.open() as f:
-            parsed_areas = yaml.load(f, Loader=yaml.Loader)
+            parsed_areas = yaml.safe_load(f)
             return Validator(area_names_from_file(parsed_areas))
 
     def detect_violations(
