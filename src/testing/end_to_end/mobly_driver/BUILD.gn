@@ -8,10 +8,12 @@ import("//build/testing/host_test_data.gni")
 
 if (is_host) {
   python_library("api_infra") {
+    enable_pytype = true
     sources = [ "api_infra.py" ]
   }
 
   python_library("api_mobly") {
+    enable_pytype = true
     sources = [ "api_mobly.py" ]
     library_deps = [
       ":api_infra",
@@ -20,10 +22,12 @@ if (is_host) {
   }
 
   python_library("api_ffx") {
+    enable_pytype = true
     sources = [ "api_ffx.py" ]
   }
 
   python_library("mobly_driver_lib") {
+    enable_pytype = true
     sources = [ "mobly_driver_lib.py" ]
     library_deps = [
       ":api_infra",
@@ -32,6 +36,7 @@ if (is_host) {
   }
 
   python_library("driver_factory") {
+    enable_pytype = true
     sources = [ "driver_factory.py" ]
     library_deps = [
       ":api_infra",
@@ -69,7 +74,7 @@ if (is_host) {
   }
 
   # Mobly Driver test data definition.
-  # This enables the Python binary to be used as a host test data dependency..
+  # This enables the Python binary to be used as a host test data dependency.
   host_test_data("mobly_driver_test_data_target") {
     testonly = true
     sources = [ "${target_out_dir}/${_md_bin_name}" ]
