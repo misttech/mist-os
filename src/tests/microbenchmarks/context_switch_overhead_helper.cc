@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/scheduler/cpp/fidl.h>
 #include <lib/fdio/spawn.h>
+#include <lib/scheduler/role.h>
 #include <lib/sys/cpp/service_directory.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/eventpair.h>
@@ -22,6 +22,8 @@
 
 namespace {
 
+const std::string kRolePrefix = "fuchsia.microbenchmarks.pin_to_cpu_";
+
 struct State {
   pthread_barrier_t start_barrier;
   pthread_barrier_t stop_barrier;
@@ -35,65 +37,31 @@ struct State {
   }
 };
 
-class ProfileService {
- public:
-  bool Init() {
-    std::shared_ptr<sys::ServiceDirectory> svc = sys::ServiceDirectory::CreateFromNamespace();
-    if (svc == nullptr) {
-      FX_LOGS(ERROR) << "No service directory";
-      return false;
-    }
+zx::unowned<zx::thread> HandleFromThread(std::thread* thread) {
+  zx_handle_t handle = native_thread_get_zx_handle(thread->native_handle());
+  return zx::unowned<zx::thread>(handle);
+}
 
-    zx_status_t status = svc->Connect(provider_.NewRequest());
-    if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "Couldn't connect to service: " << zx_status_get_string(status);
-      return false;
-    }
-
-    return true;
+zx_status_t ApplyAffinityRole(size_t cpu_num, std::thread* thread_a, std::thread* thread_b) {
+  FX_CHECK(cpu_num <= 31);
+  std::ostringstream ostr;
+  ostr << kRolePrefix << cpu_num;
+  std::string role_name = ostr.str();
+  zx_status_t status = fuchsia_scheduler::SetRoleForThread(HandleFromThread(thread_a), role_name);
+  if (status != ZX_OK) {
+    FX_LOGS(ERROR) << "Failed to set role: " << role_name
+                   << ", status: " << zx_status_get_string(status);
+    return status;
   }
-
-  zx_status_t ApplyAffinityProfile(size_t cpu_num, std::thread* thread_a, std::thread* thread_b) {
-    FX_CHECK(cpu_num < 31);
-    uint32_t mask = 1 << cpu_num;
-
-    zx::profile profile;
-    zx_status_t server_status;
-    zx_status_t status = provider_->GetCpuAffinityProfile({mask}, &server_status, &profile);
-    if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to contact profile service: " << zx_status_get_string(status);
-      return status;
-    }
-    if (server_status != ZX_OK) {
-      FX_LOGS(ERROR) << "Profile service failure: " << zx_status_get_string(server_status);
-      return server_status;
-    }
-
-    status = HandleFromThread(thread_a)->set_profile(profile, /*options=*/0);
-    if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to set profile: " << zx_status_get_string(status);
-      return status;
-    }
-
-    status = HandleFromThread(thread_b)->set_profile(profile, /*options=*/0);
-    if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to set profile: " << zx_status_get_string(status);
-      return status;
-    }
-
-    return ZX_OK;
+  status = fuchsia_scheduler::SetRoleForThread(HandleFromThread(thread_b), role_name);
+  if (status != ZX_OK) {
+    FX_LOGS(ERROR) << "Failed to set profile: " << zx_status_get_string(status);
+    return status;
   }
+  return ZX_OK;
+}
 
- private:
-  zx::unowned<zx::thread> HandleFromThread(std::thread* thread) {
-    zx_handle_t handle = native_thread_get_zx_handle(thread->native_handle());
-    return zx::unowned<zx::thread>(handle);
-  }
-
-  fuchsia::scheduler::ProfileProviderSyncPtr provider_;
-};
-
-void ThreadPair(size_t cpu_num, State* state, ProfileService* profiles) {
+void ThreadPair(size_t cpu_num, State* state) {
   auto thread_action = [state](zx::eventpair event, bool first) {
     auto wait_val = pthread_barrier_wait(&state->start_barrier);
     FX_CHECK(wait_val == PTHREAD_BARRIER_SERIAL_THREAD || wait_val == 0);
@@ -121,7 +89,7 @@ void ThreadPair(size_t cpu_num, State* state, ProfileService* profiles) {
   std::thread thread_a(thread_action, std::move(e1), true);
   std::thread thread_b(thread_action, std::move(e2), false);
 
-  FX_CHECK(ZX_OK == profiles->ApplyAffinityProfile(cpu_num, &thread_a, &thread_b));
+  FX_CHECK(ZX_OK == ApplyAffinityRole(cpu_num, &thread_a, &thread_b));
 
   thread_a.detach();
   thread_b.detach();
@@ -146,9 +114,6 @@ int main(int argc, char** argv) {
   // Signal that this process is ready to accept instructions.
   FX_CHECK(ZX_OK == incoming.write(0, kMessage, kMessageSize, nullptr, 0));
 
-  ProfileService profiles;
-  FX_CHECK(profiles.Init());
-
   while (true) {
     // Read the number of context switches to perform.
     FX_CHECK(ZX_OK == incoming.wait_one(ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED,
@@ -161,7 +126,7 @@ int main(int argc, char** argv) {
 
     // Initialize all thread pairs with the state.
     for (size_t i = 0; i < cpus; i++) {
-      ThreadPair(i, &state, &profiles);
+      ThreadPair(i, &state);
     }
 
     // Wait until all threads are ready to start, then signal to the test that we have started.

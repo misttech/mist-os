@@ -141,8 +141,8 @@ executable("context_switch_overhead_helper") {
   testonly = true
   sources = [ "context_switch_overhead_helper.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
     "//sdk/lib/fdio",
+    "//sdk/lib/scheduler/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/zx",
