@@ -4,6 +4,7 @@
 
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
+use std::path::PathBuf;
 
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
@@ -18,6 +19,7 @@ pub struct PackagesCommand {
 pub enum PackagesSubCommand {
     List(ListSubCommand),
     Show(ShowSubCommand),
+    ExtractArchive(ExtractArchiveSubCommand),
 }
 
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
@@ -53,5 +55,25 @@ pub struct ShowSubCommand {
 
     #[argh(positional)]
     /// list this package's contents.
+    pub package: String,
+}
+
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
+#[argh(
+    subcommand,
+    name = "extract-archive",
+    description = "Extract a package archive from the repository"
+)]
+pub struct ExtractArchiveSubCommand {
+    /// output path for the extracted archive.
+    #[argh(option, short = 'o')]
+    pub out: PathBuf,
+
+    #[argh(option, short = 'r')]
+    /// extract package from this repository.
+    pub repository: Option<String>,
+
+    #[argh(positional)]
+    /// extract this package.
     pub package: String,
 }

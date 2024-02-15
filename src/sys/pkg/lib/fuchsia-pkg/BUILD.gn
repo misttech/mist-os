@@ -47,6 +47,7 @@ lib_sources = [
   "src/meta_package.rs",
   "src/meta_subpackages.rs",
   "src/package.rs",
+  "src/package_archive.rs",
   "src/package_build_manifest.rs",
   "src/package_builder.rs",
   "src/package_directory.rs",

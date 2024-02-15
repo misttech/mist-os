@@ -11,6 +11,7 @@ mod meta_contents;
 mod meta_package;
 mod meta_subpackages;
 mod package;
+mod package_archive;
 mod package_build_manifest;
 mod package_builder;
 pub mod package_directory;
@@ -29,6 +30,7 @@ pub use {
         meta_contents::MetaContents,
         meta_package::MetaPackage,
         meta_subpackages::MetaSubpackages,
+        package_archive::PackageArchiveBuilder,
         package_build_manifest::PackageBuildManifest,
         package_builder::{PackageBuilder, ABI_REVISION_FILE_PATH},
         package_directory::{

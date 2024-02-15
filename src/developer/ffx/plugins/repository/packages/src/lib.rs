@@ -8,10 +8,13 @@ use {
     errors::ffx_bail,
     ffx_core::ffx_plugin,
     ffx_repository_packages_args::{
-        ListSubCommand, PackagesCommand, PackagesSubCommand, ShowSubCommand,
+        ExtractArchiveSubCommand, ListSubCommand, PackagesCommand, PackagesSubCommand,
+        ShowSubCommand,
     },
     ffx_writer::Writer,
+    fuchsia_hash::Hash,
     fuchsia_hyper::new_https_client,
+    fuchsia_pkg::PackageArchiveBuilder,
     fuchsia_repo::{
         repo_client::{PackageEntry, RepoClient},
         repository::RepoProvider,
@@ -19,7 +22,11 @@ use {
     humansize::{file_size_opts, FileSize},
     pkg::repo::repo_spec_to_backend,
     prettytable::{cell, format::TableFormat, row, Row, Table},
-    std::time::{Duration, SystemTime},
+    std::{
+        fs::File,
+        io::{BufWriter, Cursor, Read},
+        time::{Duration, SystemTime},
+    },
 };
 
 const MAX_HASH: usize = 11;
@@ -49,6 +56,7 @@ pub async fn packages(
     match cmd.subcommand {
         PackagesSubCommand::List(subcmd) => list_impl(subcmd, None, &mut writer).await,
         PackagesSubCommand::Show(subcmd) => show_impl(subcmd, None, &mut writer).await,
+        PackagesSubCommand::ExtractArchive(subcmd) => extract_archive_impl(subcmd).await,
     }
 }
 
@@ -57,16 +65,7 @@ async fn show_impl(
     table_format: Option<TableFormat>,
     writer: &mut Writer,
 ) -> Result<()> {
-    let repo_name = if let Some(repo_name) = cmd.repository.clone() {
-        repo_name
-    } else if let Some(repo_name) = pkg::config::get_default_repository().await? {
-        repo_name
-    } else {
-        ffx_bail!(
-            "Either a default repository must be set, or the -r flag must be provided.\n\
-                You can set a default repository using: `ffx repository default set <name>`."
-        )
-    };
+    let repo_name = get_repo_name(cmd.repository.clone()).await?;
 
     let repo = connect(&repo_name).await?;
 
@@ -141,16 +140,7 @@ async fn list_impl(
     table_format: Option<TableFormat>,
     writer: &mut Writer,
 ) -> Result<()> {
-    let repo_name = if let Some(repo_name) = cmd.repository.clone() {
-        repo_name
-    } else if let Some(repo_name) = pkg::config::get_default_repository().await? {
-        repo_name
-    } else {
-        ffx_bail!(
-            "Either a default repository must be set, or the --repository flag must be provided.\n\
-                You can set a default repository using: `ffx repository default set <name>`."
-        )
-    };
+    let repo_name = get_repo_name(cmd.repository.clone()).await?;
 
     let repo = connect(&repo_name).await?;
 
@@ -281,11 +271,94 @@ fn to_rfc2822(time: SystemTime) -> String {
     DateTime::<Utc>::from(time).to_rfc2822()
 }
 
+async fn get_repo_name(repository: Option<String>) -> Result<String> {
+    if let Some(repo_name) = repository {
+        Ok(repo_name)
+    } else if let Some(repo_name) = pkg::config::get_default_repository().await? {
+        Ok(repo_name)
+    } else {
+        ffx_bail!(
+            "Either a default repository must be set, or the -r flag must be provided.\n\
+                You can set a default repository using: `ffx repository default set <name>`."
+        )
+    }
+}
+
+async fn extract_archive_impl(cmd: ExtractArchiveSubCommand) -> Result<()> {
+    let repo_name = get_repo_name(cmd.repository.clone()).await?;
+
+    let repo = connect(&repo_name).await?;
+
+    let Some(entries) = repo
+        .show_package(&cmd.package, true)
+        .await
+        .with_context(|| format!("showing package {}", cmd.package))?
+    else {
+        ffx_bail!("repository {:?} does not contain package {}", repo_name, cmd.package)
+    };
+
+    let entry_is_meta_far =
+        |entry: &&PackageEntry| entry.path == "meta.far" && entry.subpackage.is_none();
+
+    let Some(meta_far_entry) = entries.iter().find(entry_is_meta_far) else {
+        ffx_bail!("no meta.far entry in package {}", cmd.package)
+    };
+
+    let fetch_blob = |hash: Hash| {
+        let repo = &repo;
+        async move {
+            let mut blob_resource = repo
+                .fetch_blob(&hash.to_string())
+                .await
+                .with_context(|| format!("fetching blob {hash}"))?;
+            let mut buf = vec![];
+            blob_resource
+                .read_to_end(&mut buf)
+                .await
+                .with_context(|| format!("reading blob {hash}"))?;
+            Ok::<(u64, Box<dyn Read>), anyhow::Error>((
+                blob_resource.total_len(),
+                Box::new(Cursor::new(buf)),
+            ))
+        }
+    };
+
+    let (size, content) =
+        fetch_blob(meta_far_entry.hash.expect("meta.far entry should have hash")).await?;
+    let mut archive_builder = PackageArchiveBuilder::with_meta_far(size, content);
+
+    for entry in entries {
+        if entry_is_meta_far(&&entry) {
+            continue;
+        }
+        let Some(hash) = entry.hash else {
+            // skip entries inside meta.far
+            continue;
+        };
+
+        let (size, content) = fetch_blob(hash).await?;
+        archive_builder.add_blob(hash, size, content);
+    }
+
+    let out_file = File::create(&cmd.out)
+        .with_context(|| format!("creating package archive file {}", cmd.out.display()))?;
+    archive_builder
+        .build(BufWriter::new(out_file))
+        .with_context(|| format!("writing package archive file {}", cmd.out.display()))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
     use {
-        super::*, ffx_config::ConfigLevel, fuchsia_async as fasync, fuchsia_repo::test_utils,
-        pretty_assertions::assert_eq, prettytable::format::FormatBuilder, std::path::Path,
+        super::*,
+        ffx_config::ConfigLevel,
+        ffx_package_archive_utils::{read_file_entries, ArchiveEntry, FarArchiveReader},
+        fuchsia_async as fasync,
+        fuchsia_repo::test_utils,
+        pretty_assertions::assert_eq,
+        prettytable::format::FormatBuilder,
+        std::path::Path,
     };
 
     const PKG1_HASH: &str = "2881455493b5870aaea36537d70a2adc635f516ac2092598f4b6056dabc6b25d";
@@ -612,5 +685,72 @@ mod test {
         );
 
         assert_eq!(writer.test_error().unwrap(), "");
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_extract_archive() {
+        let tmp = tempfile::tempdir().unwrap();
+        let _env = setup_repo(&tmp.path().join("repo")).await;
+
+        let archive_path = tmp.path().join("archive.far");
+        extract_archive_impl(ExtractArchiveSubCommand {
+            out: archive_path.clone(),
+            repository: Some("devhost".to_string()),
+            package: "package1/0".to_string(),
+        })
+        .await
+        .unwrap();
+
+        let mut archive_reader = FarArchiveReader::new(&archive_path).unwrap();
+        let mut entries = read_file_entries(&mut archive_reader).unwrap();
+        entries.sort();
+
+        assert_eq!(
+            entries,
+            vec![
+                ArchiveEntry {
+                    name: "bin/package1".to_string(),
+                    path: "72e1e7a504f32edf4f23e7e8a3542c1d77d12541142261cfe272decfa75f542d"
+                        .to_string(),
+                    length: Some(15),
+                },
+                ArchiveEntry {
+                    name: "lib/package1".to_string(),
+                    path: "8a8a5f07f935a4e8e1fd1a1eda39da09bb2438ec0adfb149679ddd6e7e1fbb4f"
+                        .to_string(),
+                    length: Some(12),
+                },
+                ArchiveEntry {
+                    name: "meta.far".to_string(),
+                    path: "meta.far".to_string(),
+                    length: Some(24576),
+                },
+                ArchiveEntry {
+                    name: "meta/contents".to_string(),
+                    path: "meta/contents".to_string(),
+                    length: Some(156),
+                },
+                ArchiveEntry {
+                    name: "meta/fuchsia.abi/abi-revision".to_string(),
+                    path: "meta/fuchsia.abi/abi-revision".to_string(),
+                    length: Some(8),
+                },
+                ArchiveEntry {
+                    name: "meta/package".to_string(),
+                    path: "meta/package".to_string(),
+                    length: Some(33),
+                },
+                ArchiveEntry {
+                    name: "meta/package1.cm".to_string(),
+                    path: "meta/package1.cm".to_string(),
+                    length: Some(11),
+                },
+                ArchiveEntry {
+                    name: "meta/package1.cmx".to_string(),
+                    path: "meta/package1.cmx".to_string(),
+                    length: Some(12),
+                },
+            ]
+        );
     }
 }

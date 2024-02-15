@@ -5,7 +5,7 @@
 use {
     crate::{
         BlobEntry, MetaContents, MetaPackage, MetaPackageError, MetaSubpackages, Package,
-        PackageManifestError, PackageName, PackagePath, PackageVariant,
+        PackageArchiveBuilder, PackageManifestError, PackageName, PackagePath, PackageVariant,
     },
     anyhow::{Context, Result},
     camino::Utf8Path,
@@ -18,7 +18,7 @@ use {
         collections::{BTreeMap, HashMap, HashSet},
         fs::{self, create_dir_all, File},
         io,
-        io::{BufReader, Read, Seek, SeekFrom, Write},
+        io::{BufReader, Seek, SeekFrom, Write},
         path::Path,
         str,
     },
@@ -74,7 +74,6 @@ impl PackageManifest {
     ) -> Result<(), PackageManifestError> {
         let root_dir = root_dir.as_ref();
 
-        let mut contents: BTreeMap<_, (_, Box<dyn Read>)> = BTreeMap::new();
         let (meta_far_blob_info, all_blobs) = Self::package_and_subpackage_blobs(self)?;
 
         let source_path = root_dir.join(&meta_far_blob_info.source_path);
@@ -82,9 +81,9 @@ impl PackageManifest {
             PackageManifestError::IoErrorWithPath { cause: err, path: source_path }
         })?;
         meta_far_blob.seek(SeekFrom::Start(0))?;
-        contents.insert(
-            "meta.far".to_string(),
-            (meta_far_blob.metadata()?.len(), Box::new(meta_far_blob)),
+        let mut archive_builder = PackageArchiveBuilder::with_meta_far(
+            meta_far_blob.metadata()?.len(),
+            Box::new(meta_far_blob),
         );
 
         for (_merkle_key, blob_info) in all_blobs.iter() {
@@ -93,13 +92,14 @@ impl PackageManifest {
             let blob_file = File::open(&source_path).map_err(|err| {
                 PackageManifestError::IoErrorWithPath { cause: err, path: source_path }
             })?;
-            contents.insert(
-                blob_info.merkle.to_string(),
-                (blob_file.metadata()?.len(), Box::new(blob_file)),
+            archive_builder.add_blob(
+                blob_info.merkle,
+                blob_file.metadata()?.len(),
+                Box::new(blob_file),
             );
         }
 
-        fuchsia_archive::write(out, contents)?;
+        archive_builder.build(out)?;
         Ok(())
     }
 

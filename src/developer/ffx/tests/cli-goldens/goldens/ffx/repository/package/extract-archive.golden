@@ -1,0 +1,50 @@
+{
+  "name": "extract-archive",
+  "description": "Extract a package archive from the repository",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "out"
+        }
+      },
+      "optionality": "required",
+      "long": "--out",
+      "short": "o",
+      "description": "output path for the extracted archive.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "repository"
+        }
+      },
+      "optionality": "optional",
+      "long": "--repository",
+      "short": "r",
+      "description": "extract package from this repository.",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [
+    {
+      "name": "package",
+      "description": "extract this package.",
+      "optionality": "required",
+      "hidden": false
+    }
+  ],
+  "error_codes": []
+}
