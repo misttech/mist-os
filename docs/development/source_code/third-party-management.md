@@ -21,11 +21,13 @@ OSRB request is approved, continue with the steps below.
 
 ### Language-specific guides
 
-If you are adding Rust or Go dependencies, follow the guides below:
+If you are adding Rust, Go or Python dependencies, follow the guides below:
 
 - **Rust**: Follow the [external Rust crates][rust-third-party] guide.
 
 - **Go**: See [`//third_party/golibs/`][golibs].
+
+- **Python**: Follow the [external Python packages][pylibs] guide.
 
 For all other languages, continue with the steps below.
 
@@ -213,6 +215,7 @@ steps:
 [oss-licensing]: /docs/contribute/governance/policy/open-source-licensing-policies.md
 [owners]: /docs/development/source_code/owners.md
 [owners-best-practices]: /docs/development/source_code/owners.md#best_practices
+[pylibs]: /third_party/pylibs/README.md
 [readme-fuchsia]: /docs/development/source_code/third-party-metadata.md
 [rust-third-party]: /docs/development/languages/rust/external_crates.md
 [source-layout]: /docs/development/source_code/layout.md
