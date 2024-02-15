@@ -72,13 +72,13 @@ constexpr PowerOp kLcdPowerOffSequenceForVim3Ts050[] = {
 //   - The payload size must be in decimal.
 
 constexpr uint8_t lcd_shutdown_sequence[] = {
-    0xff, 5,
-    0x05, 1, 0x28,
-    0xff, 60,
-    0x05, 1, 0x10,
-    0xff, 110,
-    0xff, 5,
-    0xff, 0xff,
+    kDsiOpSleep, 5,
+    kMipiDsiDtDcsShortWrite0, 1, 0x28,
+    kDsiOpSleep, 60,
+    kMipiDsiDtDcsShortWrite0, 1, 0x10,
+    kDsiOpSleep, 110,
+    kDsiOpSleep, 5,
+    kDsiOpSleep, 0xff,
 };
 
 constexpr uint8_t lcd_init_sequence_TV070WSM_FT_ASTRO[] = {
