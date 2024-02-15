@@ -624,6 +624,11 @@ def main():
     bazel_test_args = [
         f"--config={cfg}" for cfg in _flatten_comma_list(args.bazel_config)
     ]
+    bazel_test_args += [
+        # In case of build or test errors, provide more details about the failed
+        # command. See https://fxbug.dev/325346878
+        "--verbose_failures",
+    ]
 
     if args.quiet:
         bazel_common_args += bazel_quiet_args
