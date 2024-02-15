@@ -213,7 +213,7 @@ TEST_F(QueuePairTest, TestSubmitWithDataOnePage) {
   ASSERT_EQ(FAKE_BTI_PHYS_ADDR, submitted->data_pointer[0]);
   ASSERT_EQ(0, submitted->data_pointer[1]);
   TransactionData& txn_data = txn(pair.value().get(), 0);
-  ASSERT_FALSE(txn_data.prp_buffer.is_valid());
+  ASSERT_FALSE(txn_data.prp_buffer);
   ASSERT_TRUE(txn_data.active);
 }
 
@@ -238,7 +238,7 @@ TEST_F(QueuePairTest, TestSubmitWithDataTwoPages) {
   ASSERT_EQ(FAKE_BTI_PHYS_ADDR, submitted->data_pointer[0]);
   ASSERT_EQ(0, submitted->data_pointer[1]);
   TransactionData& txn_data = txn(pair.value().get(), 0);
-  ASSERT_FALSE(txn_data.prp_buffer.is_valid());
+  ASSERT_FALSE(txn_data.prp_buffer);
   ASSERT_TRUE(txn_data.active);
 }
 
@@ -265,9 +265,9 @@ TEST_F(QueuePairTest, DISABLED_TestSubmitWithDataManyPages) {
   ASSERT_EQ(FAKE_BTI_PHYS_ADDR, submitted->data_pointer[0]);
   ASSERT_EQ(FAKE_BTI_PHYS_ADDR, submitted->data_pointer[1]);
   TransactionData& txn_data = txn(pair.value().get(), 0);
-  ASSERT_TRUE(txn_data.prp_buffer.is_valid());
+  ASSERT_TRUE(txn_data.prp_buffer);
   ASSERT_TRUE(txn_data.active);
-  uint64_t* prps = static_cast<uint64_t*>(txn_data.prp_buffer.virt());
+  uint64_t* prps = static_cast<uint64_t*>(txn_data.prp_buffer->virt());
   for (size_t i = 0; i < kNumPages - 1; i++) {
     ASSERT_EQ(FAKE_BTI_PHYS_ADDR, prps[i]);
   }
@@ -298,9 +298,9 @@ TEST_F(QueuePairTest, DISABLED_TestSubmitWithMultiPagePrp) {
   ASSERT_EQ(FAKE_BTI_PHYS_ADDR, submitted->data_pointer[0]);
   ASSERT_EQ(FAKE_BTI_PHYS_ADDR, submitted->data_pointer[1]);
   TransactionData& txn_data = txn(pair.value().get(), 0);
-  ASSERT_TRUE(txn_data.prp_buffer.is_valid());
+  ASSERT_TRUE(txn_data.prp_buffer);
   ASSERT_TRUE(txn_data.active);
-  uint64_t* prps = static_cast<uint64_t*>(txn_data.prp_buffer.virt());
+  uint64_t* prps = static_cast<uint64_t*>(txn_data.prp_buffer->virt());
   for (size_t i = 0; i < kNumAddresses; i++) {
     ASSERT_EQ(FAKE_BTI_PHYS_ADDR, prps[i], "PRP %zu had wrong value", i);
   }

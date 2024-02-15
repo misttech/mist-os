@@ -57,13 +57,10 @@ zx::result<std::unique_ptr<QueuePair>> QueuePair::Create(zx::unowned_bti bti, ui
 }
 
 zx_status_t QueuePair::PreallocatePrpBuffers() {
+  auto buffer_factory = dma_buffer::CreateBufferFactory();
   for (auto& txn_data : txns_) {
-    zx_status_t status;
-    status = txn_data.prp_buffer.Init(bti_->get(), zx_system_get_page_size(), IO_BUFFER_RW);
-    if (status != ZX_OK) {
-      return status;
-    }
-    status = txn_data.prp_buffer.PhysMap();
+    zx_status_t status =
+        buffer_factory->CreateContiguous(*bti_, zx_system_get_page_size(), 0, &txn_data.prp_buffer);
     if (status != ZX_OK) {
       return status;
     }
@@ -131,10 +128,9 @@ zx_status_t QueuePair::Submit(cpp20::span<uint8_t> submission_data,
   size_t index = submission_.NextIndex();
   TransactionData& txn_data = txns_[index];
   if (txn_data.active) {
-    // TODO(https://fxbug.dev/42053036): Consider decoupling the submission queue from the tracking of
-    // outstanding transactions.
-    // We tie a transaction's state to its submission queue slot, even if the submission entry has
-    // already been consumed by the controller.
+    // TODO(https://fxbug.dev/42053036): Consider decoupling the submission queue from the tracking
+    // of outstanding transactions. We tie a transaction's state to its submission queue slot, even
+    // if the submission entry has already been consumed by the controller.
     return ZX_ERR_SHOULD_WAIT;
   }
   txn_data.ClearExceptPrp();
@@ -172,11 +168,11 @@ zx_status_t QueuePair::Submit(cpp20::span<uint8_t> submission_data,
       }
       page_list = &single_page;
     } else {
-      if (!txn_data.prp_buffer.is_valid()) {
+      if (!txn_data.prp_buffer) {
         zxlogf(ERROR, "No PRP buffer was preallocated for this IO transaction.");
         return ZX_ERR_BAD_STATE;
       }
-      page_list = static_cast<zx_paddr_t*>(txn_data.prp_buffer.virt());
+      page_list = static_cast<zx_paddr_t*>(txn_data.prp_buffer->virt());
     }
 
     // Read disk and write memory (PERM_WRITE), or read memory (PERM_READ) and write disk.
@@ -198,7 +194,7 @@ zx_status_t QueuePair::Submit(cpp20::span<uint8_t> submission_data,
       submission->data_pointer[1] = page_list[1];
     } else if (page_count > 2) {
       // See QueuePair::kMaxTransferPages.
-      submission->data_pointer[1] = txn_data.prp_buffer.phys_list()[0] + sizeof(zx_paddr_t*);
+      submission->data_pointer[1] = txn_data.prp_buffer->phys() + sizeof(zx_paddr_t*);
     }
   }
 
@@ -211,27 +207,26 @@ zx_status_t QueuePair::Submit(cpp20::span<uint8_t> submission_data,
   return ZX_OK;
 }
 
-zx_status_t QueuePair::PreparePrpList(ddk::IoBuffer& buf, cpp20::span<const zx_paddr_t> pages) {
+zx_status_t QueuePair::PreparePrpList(std::unique_ptr<dma_buffer::PagedBuffer>& buf,
+                                      cpp20::span<const zx_paddr_t> pages) {
   const size_t addresses_per_page = zx_system_get_page_size() / sizeof(zx_paddr_t);
   size_t page_count = 0;
-  // TODO(https://fxbug.dev/42053036): improve this in cases where we would allocate a page with only one
-  // entry.
+  // TODO(https://fxbug.dev/42053036): improve this in cases where we would allocate a page with
+  // only one entry.
   page_count = pages.size() / (addresses_per_page - 1);
   page_count += 1;
 
-  zx_status_t status = buf.Init(bti_->get(), page_count * zx_system_get_page_size(), IO_BUFFER_RW);
-  if (status != ZX_OK) {
-    return status;
-  }
-  status = buf.PhysMap();
+  auto buffer_factory = dma_buffer::CreateBufferFactory();
+  zx_status_t status = buffer_factory->CreatePaged(*bti_, page_count * zx_system_get_page_size(),
+                                                   /*enable_cache=*/false, &buf);
   if (status != ZX_OK) {
     return status;
   }
 
-  zx_paddr_t* addresses = static_cast<zx_paddr_t*>(buf.virt());
+  zx_paddr_t* addresses = static_cast<zx_paddr_t*>(buf->virt());
   size_t prp_index = 0;
-  const zx_paddr_t* prp_list_pages = buf.phys_list();
-  size_t prp_list_page_count = buf.phys_count();
+  const zx_paddr_t* prp_list_pages = buf->phys();
+  size_t prp_list_page_count = page_count;
   for (size_t i = 0; i < pages.size(); i++, prp_index++) {
     // If we're about to cross a page boundary, put the address of the next page here.
     if (prp_index % addresses_per_page == (addresses_per_page - 1)) {

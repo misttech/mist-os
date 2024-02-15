@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_NVME_QUEUE_PAIR_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_NVME_QUEUE_PAIR_H_
 
-#include <lib/ddk/io-buffer.h>
+#include <lib/dma-buffer/buffer.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/stdcompat/span.h>
@@ -37,7 +37,7 @@ struct TransactionData {
   zx::pmt pmt;
   // Described by NVM Express Base Specification 2.0 Section 4.1.1, "Physical Region Page Entry and
   // List"
-  ddk::IoBuffer prp_buffer;
+  std::unique_ptr<dma_buffer::ContiguousBuffer> prp_buffer;
   // Set to true when a transaction is submitted, and set to false when it is completed.
   bool active = false;
   // VMO for the data that is read from or written to the device.
@@ -100,10 +100,11 @@ class QueuePair {
   zx_status_t Submit(cpp20::span<uint8_t> submission, std::optional<zx::unowned_vmo> data,
                      zx_off_t vmo_offset, size_t bytes, IoCommand* io_cmd);
 
-  // TODO(https://fxbug.dev/42053036): Use this if setting up PRP lists that span more than one page. See
-  // QueuePair::kMaxTransferPages.
-  // Puts a PRP list in |buf| containing the given addresses.
-  zx_status_t PreparePrpList(ddk::IoBuffer& buf, cpp20::span<const zx_paddr_t> pages);
+  // TODO(https://fxbug.dev/42053036): Use this if setting up PRP lists that span more than one
+  // page. See QueuePair::kMaxTransferPages. Puts a PRP list in |buf| containing the given
+  // addresses.
+  zx_status_t PreparePrpList(std::unique_ptr<dma_buffer::PagedBuffer>& buf,
+                             cpp20::span<const zx_paddr_t> pages);
 
   // System parameters.
   const uint64_t kPageSize;

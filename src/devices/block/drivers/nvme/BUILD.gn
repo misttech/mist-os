@@ -30,6 +30,7 @@ common_deps = [
   ":nvme_bind",
   "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
   "//src/devices/block/lib/common:common-dfv1",
+  "//src/devices/lib/dma-buffer",
   "//src/devices/lib/driver",
   "//src/devices/lib/mmio",
   "//src/devices/pci/lib/device-protocol-pci",
@@ -74,6 +75,7 @@ test("nvme-queue-tests-bin") {
   ]
   deps = [
     ":nvme_bind",
+    "//src/devices/lib/dma-buffer",
     "//src/devices/lib/driver",
     "//src/devices/testing/fake-bti",
     "//src/lib/ddk",
@@ -95,6 +97,7 @@ test("nvme-queue-pair-tests-bin") {
   ]
   deps = [
     ":nvme_bind",
+    "//src/devices/lib/dma-buffer",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
     "//src/devices/lib/mmio:test_helper",

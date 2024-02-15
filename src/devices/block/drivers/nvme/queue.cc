@@ -11,25 +11,19 @@
 namespace nvme {
 
 zx::result<> Queue::Init(zx::unowned_bti bti, uint32_t entries) {
-  size_t queue_size = entries * entry_size_;
-  if (queue_size > zx_system_get_page_size()) {
+  if (entries * entry_size_ > zx_system_get_page_size()) {
     entries = zx_system_get_page_size() / entry_size_;
-    queue_size = entries * entry_size_;
   }
 
   entry_count_ = entries;
 
-  zx_status_t status = io_.Init(bti->get(), queue_size, IO_BUFFER_RW);
+  auto buffer_factory = dma_buffer::CreateBufferFactory();
+  zx_status_t status = buffer_factory->CreateContiguous(*bti, zx_system_get_page_size(), 0, &io_);
   if (status != ZX_OK) {
     return zx::error(status);
   }
 
-  status = io_.PhysMap();
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
-
-  memset(io_.virt(), 0, io_.size());
+  memset(io_->virt(), 0, io_->size());
   return zx::ok();
 }
 
