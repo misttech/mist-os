@@ -42,6 +42,7 @@ class FlatlandScreenshot : public fuchsia::ui::composition::Screenshot {
 
  private:
   void FinishTake(zx::vmo response_vmo);
+  void FinishTakeFile(zx::vmo response_vmo);
   zx::vmo HandleFrameRender();
   void GetNextFrame();
 

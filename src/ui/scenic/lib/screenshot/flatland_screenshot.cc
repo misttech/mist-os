@@ -333,13 +333,6 @@ void FlatlandScreenshot::GetNextFrame() {
 
 void FlatlandScreenshot::TakeFile(fuchsia::ui::composition::ScreenshotTakeFileRequest params,
                                   TakeFileCallback callback) {
-  // TODO(b/304597135): Remove once we provide implementation for PNG format.
-  if (params.format() == ScreenshotFormat::PNG) {
-    FX_LOGS(ERROR)
-        << "PNG format is not yet implemented for Screenshot. Continuing with default BGRA_RAW format.";
-    params.set_format(ScreenshotFormat::BGRA_RAW);
-  }
-
   if (take_file_callback_ != nullptr) {
     FX_LOGS(ERROR)
         << "Screenshot::TakeFile() already in progress, closing connection. Wait for return "
@@ -375,42 +368,80 @@ void FlatlandScreenshot::TakeFile(fuchsia::ui::composition::ScreenshotTakeFileRe
   // Wait for the frame to render in an async fashion.
   render_wait_ = std::make_shared<async::WaitOnce>(render_event_.get(), ZX_EVENT_SIGNALED);
   zx_status_t status = render_wait_->Begin(
-      async_get_default_dispatcher(), [this, weak_ptr = weak_factory_.GetWeakPtr()](
-                                          async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
-                                          const zx_packet_signal_t*) mutable {
+      async_get_default_dispatcher(),
+      [this, weak_ptr = weak_factory_.GetWeakPtr(), params = std::move(params)](
+          async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
+          const zx_packet_signal_t*) mutable {
         FX_DCHECK(status == ZX_OK || status == ZX_ERR_CANCELED);
         if (!weak_ptr) {
           return;
         }
         FX_DCHECK(take_file_callback_);
 
-        zx::vmo response_vmo = weak_ptr->HandleFrameRender();
-        fuchsia::ui::composition::ScreenshotTakeFileResponse response;
+        zx::vmo raw_vmo = weak_ptr->HandleFrameRender();
 
-        fidl::InterfaceHandle<fuchsia::io::File> file_client;
+        if (params.format() == ScreenshotFormat::PNG) {
+          zx::vmo response_vmo;
+          zx::vmo response_vmo_copy;
+          const auto response_vmo_size =
+              display_size_.width * display_size_.height * kBytesPerPixel;
+          FX_CHECK(zx::vmo::create(response_vmo_size, 0, &response_vmo) == ZX_OK);
+          FX_CHECK(response_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &response_vmo_copy) == ZX_OK);
 
-        fidl::InterfaceRequest<fuchsia::io::File> file_server = file_client.NewRequest();
+          fuchsia_ui_compression_internal::ImageCompressorEncodePngRequest request;
+          request.raw_vmo() = std::move(raw_vmo);
+          request.image_dimensions() =
+              fuchsia_math::SizeU(display_size_.width, display_size_.height);
+          request.png_vmo() = std::move(response_vmo);
 
-        if (!file_server.is_valid()) {
-          FX_LOGS(ERROR) << "Cannot create file server channel";
+          client_->EncodePng(std::move(request))
+              .ThenExactlyOnce(
+                  [weak_ptr, vmo = std::move(response_vmo_copy)](
+                      fidl::Result<fuchsia_ui_compression_internal::ImageCompressor::EncodePng>
+                          result) mutable {
+                    if (!weak_ptr) {
+                      return;
+                    }
+                    FX_DCHECK(weak_ptr->take_file_callback_);
+                    if (result.is_error()) {
+                      FX_LOGS(ERROR) << result.error_value().FormatDescription();
+                      weak_ptr->render_event_.reset();
+                      // Release the buffer to allow for subsequent screenshots.
+                      weak_ptr->screen_capturer_->ReleaseFrame(kBufferIndex, [](auto result) {});
+                      return;
+                    }
+                    weak_ptr->FinishTakeFile(std::move(vmo));
+                  });
           return;
         }
-
-        const size_t screenshot_index = served_screenshots_next_id_++;
-        if (ServeScreenshot(file_server.TakeChannel(), std::move(response_vmo), screenshot_index,
-                            &served_screenshots_)) {
-          response.set_file(std::move(file_client));
-          response.set_size({display_size_.width, display_size_.height});
-        }
-
-        take_file_callback_(std::move(response));
-        take_file_callback_ = nullptr;
-        render_event_.reset();
-
-        // Release the buffer to allow for subsequent screenshots.
-        weak_ptr->screen_capturer_->ReleaseFrame(kBufferIndex, [](auto result) {});
+        weak_ptr->FinishTakeFile(std::move(raw_vmo));
       });
   FX_DCHECK(status == ZX_OK);
+}
+
+void FlatlandScreenshot::FinishTakeFile(zx::vmo response_vmo) {
+  fuchsia::ui::composition::ScreenshotTakeFileResponse response;
+  fidl::InterfaceHandle<fuchsia::io::File> file_client;
+  fidl::InterfaceRequest<fuchsia::io::File> file_server = file_client.NewRequest();
+
+  if (!file_server.is_valid()) {
+    FX_LOGS(ERROR) << "Cannot create file server channel";
+    return;
+  }
+
+  const size_t screenshot_index = served_screenshots_next_id_++;
+  if (ServeScreenshot(file_server.TakeChannel(), std::move(response_vmo), screenshot_index,
+                      &served_screenshots_)) {
+    response.set_file(std::move(file_client));
+    response.set_size({display_size_.width, display_size_.height});
+  }
+
+  take_file_callback_(std::move(response));
+  take_file_callback_ = nullptr;
+  render_event_.reset();
+
+  // Release the buffer to allow for subsequent screenshots.
+  screen_capturer_->ReleaseFrame(kBufferIndex, [](auto result) {});
 }
 
 }  // namespace screenshot

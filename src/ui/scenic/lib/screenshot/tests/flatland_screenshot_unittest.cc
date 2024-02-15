@@ -8,6 +8,7 @@
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 
+#include <functional>
 #include <iostream>
 #include <utility>
 
@@ -35,6 +36,28 @@ namespace test {
 
 constexpr auto kDisplayWidth = 100u;
 constexpr auto kDisplayHeight = 200u;
+
+constexpr auto kResolveEncodePng = [](ImageCompressorEncodePngRequest request,
+                                      MockImageCompression::EncodePngCallback callback) -> void {
+  fuchsia::ui::compression::internal::ImageCompressor_EncodePng_Result result;
+  if (!request.has_raw_vmo() || !request.has_png_vmo() || !request.has_image_dimensions()) {
+    result.set_err(fuchsia::ui::compression::internal::ImageCompressionError::MISSING_ARGS);
+  } else {
+    uint64_t in_vmo_size;
+    FX_CHECK(request.raw_vmo().get_size(&in_vmo_size) == ZX_OK);
+    fsl::SizedVmo raw_image = fsl::SizedVmo(std::move(*request.mutable_raw_vmo()), in_vmo_size);
+    std::vector<uint8_t> imgdata;
+    fsl::VectorFromVmo(raw_image, &imgdata);
+
+    // Just dump raw image data into png_vmo. Don't actually compress, just want to ensure
+    // Take() with PNG format makes a call to EncodePng().
+    FX_CHECK(request.png_vmo().write(imgdata.data(), 0, imgdata.size() * sizeof(uint8_t)) == ZX_OK);
+
+    fuchsia::ui::compression::internal::ImageCompressor_EncodePng_Response value;
+    result.set_response(value);
+  }
+  callback(std::move(result));
+};
 
 fidl::Endpoints<fuchsia_ui_compression_internal::ImageCompressor> CreateImageCompressorEndpoints() {
   zx::result<fidl::Endpoints<fuchsia_ui_compression_internal::ImageCompressor>> endpoints_result =
@@ -100,7 +123,7 @@ class FlatlandScreenshotTest : public gtest::RealLoopFixture,
     return flatland_screenshotter_->NumCurrentServedScreenshots();
   }
 
-  ScreenshotTakeFileResponse TakeFile(ScreenshotFormat format = ScreenshotFormat::BGRA_RAW) {
+  ScreenshotTakeFileResponse TakeFile(ScreenshotFormat format) {
     fuchsia::ui::composition::ScreenshotTakeFileRequest request;
     request.set_format(format);
 
@@ -141,27 +164,7 @@ TEST_P(FlatlandScreenshotTest, SimpleTest) {
   if (format == fuchsia::ui::composition::ScreenshotFormat::PNG) {
     EXPECT_CALL(mock_compressor_, EncodePng(testing::_, testing::_))
         .Times(1)
-        .WillOnce([](ImageCompressorEncodePngRequest request,
-                     MockImageCompression::EncodePngCallback callback) -> void {
-          fuchsia::ui::compression::internal::ImageCompressor_EncodePng_Result result;
-          if (!request.has_raw_vmo() || !request.has_png_vmo() || !request.has_image_dimensions()) {
-            result.set_err(fuchsia::ui::compression::internal::ImageCompressionError::MISSING_ARGS);
-          } else {
-            uint64_t in_vmo_size;
-            FX_CHECK(request.raw_vmo().get_size(&in_vmo_size) == ZX_OK);
-            fsl::SizedVmo raw_image =
-                fsl::SizedVmo(std::move(*request.mutable_raw_vmo()), in_vmo_size);
-            std::vector<uint8_t> imgdata;
-            fsl::VectorFromVmo(raw_image, &imgdata);
-
-            FX_CHECK(request.png_vmo().write(imgdata.data(), 0, imgdata.size() * sizeof(uint8_t)) ==
-                     ZX_OK);
-
-            fuchsia::ui::compression::internal::ImageCompressor_EncodePng_Response value;
-            result.set_response(value);
-          }
-          callback(std::move(result));
-        });
+        .WillOnce(kResolveEncodePng);
   }
 
   fuchsia::ui::composition::ScreenshotTakeRequest request;
@@ -197,9 +200,16 @@ TEST_P(FlatlandScreenshotTest, SimpleTest) {
 }
 
 TEST_P(FlatlandScreenshotTest, SimpleTakeFileTest) {
+  const auto& [format, _] = GetParam();
+  if (format == fuchsia::ui::composition::ScreenshotFormat::PNG) {
+    EXPECT_CALL(mock_compressor_, EncodePng(testing::_, testing::_))
+        .Times(1)
+        .WillOnce(kResolveEncodePng);
+  }
+
   EXPECT_EQ(NumCurrentServedScreenshots(), 0u);
 
-  ScreenshotTakeFileResponse takefile_response = TakeFile();
+  ScreenshotTakeFileResponse takefile_response = TakeFile(format);
 
   EXPECT_EQ(NumCurrentServedScreenshots(), 1u);
 
@@ -236,21 +246,28 @@ TEST_P(FlatlandScreenshotTest, SimpleTakeFileTest) {
 }
 
 TEST_P(FlatlandScreenshotTest, GetMultipleScreenshotsViaChannel) {
+  const auto& [format, _] = GetParam();
+  if (format == fuchsia::ui::composition::ScreenshotFormat::PNG) {
+    EXPECT_CALL(mock_compressor_, EncodePng(testing::_, testing::_))
+        .Times(3)
+        .WillRepeatedly(kResolveEncodePng);
+  }
+
   EXPECT_EQ(NumCurrentServedScreenshots(), 0u);
 
   // Serve clients.
 
-  auto response1 = TakeFile();
+  auto response1 = TakeFile(format);
   RunLoopUntilIdle();
   fidl::InterfaceHandle<::fuchsia::io::File>* file1 = response1.mutable_file();
   EXPECT_EQ(NumCurrentServedScreenshots(), 1u);
 
-  auto response2 = TakeFile();
+  auto response2 = TakeFile(format);
   RunLoopUntilIdle();
   fidl::InterfaceHandle<::fuchsia::io::File>* file2 = response2.mutable_file();
   EXPECT_EQ(NumCurrentServedScreenshots(), 2u);
 
-  auto response3 = TakeFile();
+  auto response3 = TakeFile(format);
   RunLoopUntilIdle();
   fidl::InterfaceHandle<::fuchsia::io::File>* file3 = response3.mutable_file();
   EXPECT_EQ(NumCurrentServedScreenshots(), 3u);
