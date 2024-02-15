@@ -838,12 +838,6 @@ def generate_sdk_build_rules(ctx, manifests, copy_content_strategy, constants, f
             else:
                 dir = meta_file_rel.rpartition("/")[0]
 
-            if "name" in meta:
-                key = "%s" % dir
-                if key in parent_sdk_contents:
-                    # TODO(https://fxbug.dev/42069224): compare meta with parent and fail if they are not similar.
-                    continue
-
             # we need to group all meta files per root directory, but only process each file once
             if dir in dir_to_meta:
                 dir_to_meta[dir][meta_file_rel] = meta
