@@ -4,9 +4,11 @@
 
 use anyhow::anyhow;
 use fidl_codec::{library as lib, Value as FidlValue};
+use futures::future::BoxFuture;
 use num::{bigint::BigInt, bigint::TryFromBigIntError, traits::ToPrimitive as _};
 use std::cmp::{Ordering, PartialOrd};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::error::{Error, Result};
 
@@ -125,6 +127,28 @@ impl<'a> std::fmt::Display for LookupResultOrType<'a> {
                 write!(f, "<<FrameworkError>>")
             }
         }
+    }
+}
+
+/// An invocable value, such as a function or closure.
+#[derive(Clone)]
+pub struct Invocable(
+    Arc<dyn Fn(Vec<Value>, Option<Value>) -> BoxFuture<'static, Result<Value>> + Send + Sync>,
+);
+
+impl Invocable {
+    /// Construct a new invocable.
+    pub fn new(
+        f: Arc<
+            dyn Fn(Vec<Value>, Option<Value>) -> BoxFuture<'static, Result<Value>> + Send + Sync,
+        >,
+    ) -> Self {
+        Self(f)
+    }
+
+    /// Invoke this invocable.
+    pub async fn invoke(self, args: Vec<Value>, underscore: Option<Value>) -> Result<Value> {
+        self.0(args, underscore).await
     }
 }
 
@@ -412,6 +436,8 @@ impl ValueExt for Value {
 /// These are value types which aren't strictly part of the FIDL value structure
 /// but instead serve a purpose within the playground environment.
 pub enum PlaygroundValue {
+    /// A function or closure.
+    Invocable(Invocable),
     /// A number with no precision limits.
     Num(BigInt),
     /// A value with a type hint associated with it.
@@ -472,6 +498,9 @@ impl PlaygroundValue {
                 LookupResultOrType::LookupResult(lib::LookupResult::Enum(lib::Enum { ty, .. })),
                 v,
             ) => v.to_fidl_value_by_type_or_lookup(ns, LookupResultOrType::Type(ty.clone())),
+            (LookupResultOrType::Type(ty), PlaygroundValue::Invocable(_)) => {
+                Err(error!("Cannot convert invocable to {ty:?}"))
+            }
             (LookupResultOrType::Type(ty), PlaygroundValue::Num(_)) => {
                 Err(error!("Cannot convert number to {ty:?}"))
             }
@@ -488,6 +517,7 @@ impl PlaygroundValue {
     /// single-owner forms to refcounted forms etc.
     fn duplicate(&mut self) -> Self {
         match self {
+            PlaygroundValue::Invocable(a) => PlaygroundValue::Invocable(a.clone()),
             PlaygroundValue::Num(a) => PlaygroundValue::Num(a.clone()),
             PlaygroundValue::TypeHinted(a, b) => {
                 PlaygroundValue::TypeHinted(a.clone(), Box::new(b.duplicate()))
@@ -601,6 +631,7 @@ impl std::fmt::Debug for PlaygroundValue {
 impl std::fmt::Display for PlaygroundValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            PlaygroundValue::Invocable(Invocable(a)) => write!(f, "<function@{:p}>", a),
             PlaygroundValue::Num(x) => std::fmt::Display::fmt(x, f),
             PlaygroundValue::TypeHinted(hint, v) => write!(f, "@{hint} {v}"),
         }
@@ -610,6 +641,7 @@ impl std::fmt::Display for PlaygroundValue {
 #[cfg(test)]
 mod test {
     use super::*;
+    use futures::FutureExt;
     use std::collections::HashMap;
 
     #[test]
@@ -959,5 +991,28 @@ mod test {
         ])
         .to_fidl_value(&ns, &ty)
         .unwrap_err();
+    }
+
+    #[fuchsia::test]
+    async fn clonable_invocable() {
+        let a = Invocable::new(Arc::new(|mut v, o| {
+            async move {
+                assert!(o.is_none());
+                let value = v.pop().unwrap();
+                assert!(v.is_empty());
+                let Value::U8(v) = value else { panic!() };
+                Ok(Value::U8(v + 2))
+            }
+            .boxed()
+        }));
+        let b = a.clone();
+        let Ok(Value::U8(a)) = a.invoke(vec![Value::U8(7)], None).await else {
+            panic!();
+        };
+        assert_eq!(9, a);
+        let Ok(Value::U8(b)) = b.invoke(vec![Value::U8(3)], None).await else {
+            panic!();
+        };
+        assert_eq!(5, b);
     }
 }
