@@ -2382,6 +2382,44 @@ pub fn sys_fdatasync(
     file.data_sync(current_task)
 }
 
+pub fn sys_sync_file_range(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    fd: FdNumber,
+    offset: off_t,
+    len: off_t,
+    flags: u32,
+) -> Result<(), Errno> {
+    const KNOWN_FLAGS: u32 = uapi::SYNC_FILE_RANGE_WAIT_BEFORE
+        | uapi::SYNC_FILE_RANGE_WRITE
+        | uapi::SYNC_FILE_RANGE_WAIT_AFTER;
+    if flags & !KNOWN_FLAGS != 0 {
+        return error!(EINVAL);
+    }
+
+    let file = current_task.files.get(fd)?;
+
+    if offset < 0 || len < 0 {
+        return error!(EINVAL);
+    }
+
+    // From <https://linux.die.net/man/2/sync_file_range>:
+    //
+    //   fd refers to something other than a regular file, a block device, a directory, or a symbolic link.
+    let mode = file.node().info().mode;
+    if !mode.is_reg() && !mode.is_blk() && !mode.is_dir() && !mode.is_lnk() {
+        return error!(ESPIPE);
+    }
+
+    if flags == 0 {
+        return Ok(());
+    }
+
+    // Syncing the whole file is much more than we need for sync_file_range, which only needs to
+    // sync the specified data range.
+    file.data_sync(current_task)
+}
+
 pub fn sys_fadvise64(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,

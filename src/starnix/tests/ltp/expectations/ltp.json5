@@ -208,7 +208,6 @@
                 "statx06",
                 "statx11",
                 "sync01",
-                "sync_file_range01",
                 "syslog11",
                 "syslog12",
                 "time-schedule01",

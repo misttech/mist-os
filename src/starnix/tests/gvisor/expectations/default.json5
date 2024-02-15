@@ -726,9 +726,8 @@
                 "SempahoreTest.*",
 
                 // sync_file_range_test
-                "SyncFileRangeTest.TempFileSucceeds",
                 "SyncFileRangeTest.BadArgs",
-                "SyncFileRangeTest.CannotSyncFileRangeOnUnopenedFd",
+                "SyncFileRangeTest.CannotSyncFileRangeWithWaitBefore",
 
                 // sysret_test
                 "SysretTest.BadRip",
