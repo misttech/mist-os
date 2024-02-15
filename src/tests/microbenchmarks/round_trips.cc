@@ -4,12 +4,12 @@
 
 #include "round_trips.h"
 
-#include <fidl/fuchsia.scheduler/cpp/wire.h>
 #include <fuchsia/zircon/benchmarks/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/spawn.h>
+#include <lib/scheduler/role.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/handle.h>
@@ -26,7 +26,6 @@
 
 #include "assert.h"
 #include "lib/fidl/cpp/binding.h"
-#include "src/lib/fxl/strings/string_number_conversions.h"
 #include "test_runner.h"
 
 // This file measures two things:
@@ -119,26 +118,13 @@ void ChannelServe(const zx::channel& channel, uint32_t count, uint32_t size) {
   }
 }
 
-// Set the CPU affinity for the current thread.  This allows setting
-// only the bottom 32 bits of the CPU affinity mask, but that is
-// enough for pinning threads to the same or different CPUs.
-void SetCpuAffinity(uint32_t cpu_mask) {
-  if (cpu_mask == 0)
+// Sets the role using the scheduler library.
+void SetSchedulerRole(const std::string& sched_role_name) {
+  // If the scheduler role name is empty, short circuit out.
+  if (sched_role_name.empty()) {
     return;
-
-  auto endpoints = fidl::CreateEndpoints<fuchsia_scheduler::ProfileProvider>();
-  ASSERT_OK(endpoints.status_value());
-  ASSERT_OK(fdio_service_connect_by_name(
-      fidl::DiscoverableProtocolName<fuchsia_scheduler::ProfileProvider>,
-      endpoints->server.channel().release()));
-  auto provider = std::move(endpoints->client);
-
-  fuchsia_scheduler::wire::CpuSet cpu_set = {};
-  cpu_set.mask[0] = cpu_mask;
-  auto result = fidl::WireCall(provider)->GetCpuAffinityProfile(cpu_set);
-  ASSERT_OK(result.status());
-  ASSERT_OK(result.value().status);
-  ASSERT_OK(zx::thread::self()->set_profile(result.value().profile, 0));
+  }
+  ASSERT_OK(fuchsia_scheduler::SetRoleForThisThread(sched_role_name));
 }
 
 typedef void (*ThreadFunc)(std::vector<zx::handle>&& handles);
@@ -152,7 +138,7 @@ enum MultiProc {
 // Parameters for launching a child thread or process.
 struct ThreadOrProcessParams {
   MultiProc multi_proc = SingleProcess;
-  uint32_t cpu_mask = 0;
+  const std::string sched_role_name;
 };
 
 // Helper class for launching a thread or a subprocess.
@@ -176,9 +162,8 @@ class ThreadOrProcess {
               ThreadOrProcessParams params) {
     if (params.multi_proc == MultiProcess) {
       const char* executable_path = "/pkg/bin/round_trips_helper";
-      std::string cpu_mask_arg = fxl::NumberToString(params.cpu_mask);
-      const char* args[] = {executable_path, "--subprocess", func_name, cpu_mask_arg.c_str(),
-                            nullptr};
+      const char* args[] = {executable_path, "--subprocess", func_name,
+                            params.sched_role_name.c_str(), nullptr};
       std::vector<fdio_spawn_action_t> actions;
       for (uint32_t i = 0; i < handles.size(); ++i) {
         fdio_spawn_action_t action{
@@ -207,7 +192,7 @@ class ThreadOrProcess {
       }
     } else {
       auto thread_func = [=](std::vector<zx::handle>&& handles) {
-        SetCpuAffinity(params.cpu_mask);
+        SetSchedulerRole(params.sched_role_name);
         GetThreadFunc(func_name)(std::move(handles));
       };
       thread_ = std::thread(thread_func, std::move(handles));
@@ -642,20 +627,18 @@ void RegisterTestMultiProc(const char* base_name, Args... args) {
                                       std::forward<Args>(args)...);
 }
 
-// Call the given function with CPU affinity set to the given mask.
+// Call the given function with the given scheduler role.
 //
 // Fuchsia does not currently provide a way to restore the zx::profile
 // for a thread after setting it, so in order to leave the zx::profile
 // of the calling thread unmodified, this creates a new thread for
 // running the function.
-void CallWithCpuAffinity(uint32_t cpu_mask, std::function<void()> func) {
-  if (cpu_mask == 0) {
-    // Simple case: Avoid the overhead of creating another thread, and
-    // use the current thread.
+void CallWithSchedulerRole(const std::string& sched_role_name, std::function<void()> func) {
+  if (sched_role_name.empty()) {
     func();
   } else {
     std::thread thread([=] {
-      SetCpuAffinity(cpu_mask);
+      SetSchedulerRole(sched_role_name);
       func();
     });
     thread.join();
@@ -663,11 +646,12 @@ void CallWithCpuAffinity(uint32_t cpu_mask, std::function<void()> func) {
 }
 
 // Register a test where the Run() method is run on a thread with the
-// given CPU affinity.
+// given scheduler role.
 template <class TestClass, typename... Args>
-void RegisterTestWithCpuAffinity(const char* test_name, uint32_t cpu_mask, Args... args) {
+void RegisterTestWithSchedulerRole(const char* test_name, const std::string& sched_role_name,
+                                   Args... args) {
   perftest::RegisterTest(test_name, [=](perftest::RepeatState* state) {
-    CallWithCpuAffinity(cpu_mask, [=] {
+    CallWithSchedulerRole(sched_role_name, [=] {
       TestClass test(args...);
       while (state->KeepRunning()) {
         test.Run();
@@ -693,8 +677,8 @@ void RegisterTestMultiProcSameDiffCpu(const char* base_name) {
 
   struct CpuParam {
     const char* suffix;
-    uint32_t parent_thread_cpu_mask;
-    uint32_t child_thread_cpu_mask;
+    const std::string parent_thread_role_name;
+    const std::string child_thread_role_name;
   };
   // These parameters pin the threads to CPUs 0 and 1.  This is
   // reasonable on systems with uniform CPUs, such as NUCs.  This
@@ -702,16 +686,16 @@ void RegisterTestMultiProcSameDiffCpu(const char* base_name) {
   // e.g. big.LITTLE systems such as VIM3s.  On a single-CPU system,
   // the pinning should have no effect.
   const static CpuParam cpu_params[] = {
-      {"_SameCpu", 1, 1},
-      {"_DiffCpu", 1, 2},
+      {"_SameCpu", "fuchsia.microbenchmarks.pin_to_cpu_0", "fuchsia.microbenchmarks.pin_to_cpu_0"},
+      {"_DiffCpu", "fuchsia.microbenchmarks.pin_to_cpu_0", "fuchsia.microbenchmarks.pin_to_cpu_1"},
   };
 
   for (auto multi_proc_param : multi_proc_params) {
     for (auto cpu_param : cpu_params) {
-      RegisterTestWithCpuAffinity<TestClass>(
+      RegisterTestWithSchedulerRole<TestClass>(
           (std::string(base_name) + multi_proc_param.suffix + cpu_param.suffix).c_str(),
-          cpu_param.parent_thread_cpu_mask,
-          ThreadOrProcessParams{multi_proc_param.value, cpu_param.child_thread_cpu_mask});
+          cpu_param.parent_thread_role_name,
+          ThreadOrProcessParams{multi_proc_param.value, cpu_param.child_thread_role_name});
     }
   };
 }
@@ -746,7 +730,7 @@ PERFTEST_CTOR(RegisterTests)
 
 }  // namespace
 
-void RunSubprocess(const char* func_name, const char* cpu_mask_arg) {
+void RunSubprocess(const char* func_name, const char* sched_role_name) {
   auto func = GetThreadFunc(func_name);
   // Retrieve the handles.
   std::vector<zx::handle> handles;
@@ -757,10 +741,7 @@ void RunSubprocess(const char* func_name, const char* cpu_mask_arg) {
       break;
     handles.push_back(std::move(handle));
   }
-
-  uint32_t cpu_mask;
-  FX_CHECK(fxl::StringToNumberWithError(cpu_mask_arg, &cpu_mask));
-  SetCpuAffinity(cpu_mask);
+  SetSchedulerRole(sched_role_name);
 
   func(std::move(handles));
 }

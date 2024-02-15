@@ -1,0 +1,11 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+// Profiles used by the fuchsia microbenchmarks.
+{
+  "scope": "core",
+  "profiles": {
+    "fuchsia.microbenchmarks.pin_to_cpu_0": { "affinity": [0] },
+    "fuchsia.microbenchmarks.pin_to_cpu_1": { "affinity": [1] }
+  }
+}

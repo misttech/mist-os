@@ -98,8 +98,8 @@ fuchsia_microbenchmark_deps = [
 if (is_fuchsia) {
   fuchsia_microbenchmark_deps += [
     ":fuchsia.zircon.benchmarks_hlcpp",
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/lib/fdio",
+    "//sdk/lib/scheduler/cpp",
     "//src/lib/fsl",
     "//src/storage/lib/vfs/cpp",
     "//src/zircon/lib/zircon",
@@ -171,8 +171,8 @@ if (is_fuchsia) {
     ]
     deps = [
       ":fuchsia.zircon.benchmarks_hlcpp",
-      "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
       "//sdk/lib/fdio",
+      "//sdk/lib/scheduler/cpp",
       "//sdk/lib/syslog/cpp",
       "//src/lib/fxl",
       "//src/storage/lib/vfs/cpp",
