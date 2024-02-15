@@ -7,6 +7,8 @@
 #include <fuchsia/bluetooth/bredr/cpp/fidl_test_base.h>
 #include <zircon/errors.h>
 
+#include <memory>
+
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -31,12 +33,9 @@ namespace {
 
 namespace fidlbredr = fuchsia::bluetooth::bredr;
 namespace hci_android = bt::hci_spec::vendor::android;
+using bt::l2cap::testing::FakeChannel;
 using pw::bluetooth::AclPriority;
 using FeaturesBits = pw::bluetooth::Controller::FeaturesBits;
-
-namespace {
-
-using FakeChannel = bt::l2cap::testing::FakeChannel;
 
 void NopAdvertiseCallback(fidlbredr::Profile_Advertise_Result) {}
 
@@ -119,7 +118,7 @@ class FakeScoConnectionReceiver : public fidlbredr::testing::ScoConnectionReceiv
                             async_dispatcher_t* dispatcher)
       : binding_(this, std::move(request), dispatcher), connected_count_(0), error_count_(0) {}
 
-  void Connected(fidl::InterfaceHandle<::fuchsia::bluetooth::bredr::ScoConnection> connection,
+  void Connected(fidlbredr::ScoConnectionHandle connection,
                  fidlbredr::ScoConnectionParameters params) override {
     connection_.Bind(std::move(connection));
     parameters_ = std::move(params);
@@ -133,8 +132,8 @@ class FakeScoConnectionReceiver : public fidlbredr::testing::ScoConnectionReceiv
   void Close() { binding_.Close(ZX_ERR_PEER_CLOSED); }
 
   size_t connected_count() const { return connected_count_; }
-  const fidl::InterfacePtr<fidlbredr::ScoConnection>& connection() const { return connection_; }
-  fidl::InterfacePtr<fidlbredr::ScoConnection> take_connection() { return std::move(connection_); }
+  const fidlbredr::ScoConnectionPtr& connection() const { return connection_; }
+  fidlbredr::ScoConnectionPtr take_connection() { return std::move(connection_); }
   const std::optional<fidlbredr::ScoConnectionParameters>& parameters() const {
     return parameters_;
   }
@@ -145,7 +144,7 @@ class FakeScoConnectionReceiver : public fidlbredr::testing::ScoConnectionReceiv
  private:
   fidl::Binding<ScoConnectionReceiver> binding_;
   size_t connected_count_;
-  fidl::InterfacePtr<fidlbredr::ScoConnection> connection_;
+  fidlbredr::ScoConnectionPtr connection_;
   std::optional<fidlbredr::ScoConnectionParameters> parameters_;
   std::optional<uint16_t> max_tx_data_size_;
   size_t error_count_;
@@ -154,8 +153,6 @@ class FakeScoConnectionReceiver : public fidlbredr::testing::ScoConnectionReceiv
     FAIL() << name << " is not implemented";
   }
 };
-
-}  // namespace
 
 using TestingBase = bthost::testing::AdapterTestFixture;
 class ProfileServerTest : public TestingBase {
@@ -171,7 +168,7 @@ class ProfileServerTest : public TestingBase {
     settings.total_num_synchronous_data_packets = kTotalNumSynchronousDataPackets;
     TestingBase::SetUp(settings, features);
 
-    fidl::InterfaceHandle<fidlbredr::Profile> profile_handle;
+    fidlbredr::ProfileHandle profile_handle;
     client_.Bind(std::move(profile_handle));
     server_ =
         std::make_unique<ProfileServer>(adapter()->AsWeakPtr(), client_.NewRequest(dispatcher()));
@@ -219,16 +216,16 @@ class FakeConnectionReceiver : public fidlbredr::testing::ConnectionReceiver_Tes
     return protocol_;
   }
 
-  std::optional<fidl::InterfacePtr<fidlbredr::AudioDirectionExt>> bind_ext_direction() {
+  std::optional<fidlbredr::AudioDirectionExtPtr> bind_ext_direction() {
     if (!channel().has_value()) {
       return std::nullopt;
     }
-    auto client = channel_.value().mutable_ext_direction()->Bind();
+    fidlbredr::AudioDirectionExtPtr client = channel_.value().mutable_ext_direction()->Bind();
     return client;
   }
 
   fidlbredr::Channel take_channel() {
-    auto channel = std::move(channel_.value());
+    fidlbredr::Channel channel = std::move(channel_.value());
     channel_.reset();
     return channel;
   }
@@ -276,8 +273,8 @@ class FakeSearchResults : public fidlbredr::testing::SearchResults_TestBase {
 };
 
 TEST_F(ProfileServerTest, ErrorOnInvalidDefinition) {
-  fidl::InterfaceHandle<fidlbredr::ConnectionReceiver> receiver_handle;
-  auto request = receiver_handle.NewRequest();
+  fidlbredr::ConnectionReceiverHandle receiver_handle;
+  fidl::InterfaceRequest<fidlbredr::ConnectionReceiver> request = receiver_handle.NewRequest();
 
   std::vector<fidlbredr::ServiceDefinition> services;
   fidlbredr::ServiceDefinition def;
@@ -285,9 +282,9 @@ TEST_F(ProfileServerTest, ErrorOnInvalidDefinition) {
 
   services.emplace_back(std::move(def));
 
-  auto cb = [](auto response) {
-    EXPECT_TRUE(response.is_err());
-    EXPECT_EQ(response.err(), fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+  auto cb = [](fidlbredr::Profile_Advertise_Result result) {
+    EXPECT_TRUE(result.is_err());
+    EXPECT_EQ(result.err(), fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
   };
 
   client()->Advertise(std::move(services), fidlbredr::ChannelParameters(),
@@ -302,8 +299,8 @@ TEST_F(ProfileServerTest, ErrorOnInvalidDefinition) {
 }
 
 TEST_F(ProfileServerTest, ErrorOnMultipleAdvertiseRequests) {
-  fidl::InterfaceHandle<fidlbredr::ConnectionReceiver> receiver_handle1;
-  auto request1 = receiver_handle1.NewRequest();
+  fidlbredr::ConnectionReceiverHandle receiver_handle1;
+  fidl::InterfaceRequest<fidlbredr::ConnectionReceiver> request1 = receiver_handle1.NewRequest();
 
   std::vector<fidlbredr::ServiceDefinition> services1;
   services1.emplace_back(MakeFIDLServiceDefinition());
@@ -319,15 +316,15 @@ TEST_F(ProfileServerTest, ErrorOnMultipleAdvertiseRequests) {
 
   ASSERT_EQ(cb1_count, 0u);
 
-  fidl::InterfaceHandle<fidlbredr::ConnectionReceiver> receiver_handle2;
-  auto request2 = receiver_handle2.NewRequest();
+  fidlbredr::ConnectionReceiverHandle receiver_handle2;
+  fidl::InterfaceRequest<fidlbredr::ConnectionReceiver> request2 = receiver_handle2.NewRequest();
 
   std::vector<fidlbredr::ServiceDefinition> services2;
   services2.emplace_back(MakeFIDLServiceDefinition());
 
   // Second callback should error because the second advertisement is requesting a taken PSM.
   size_t cb2_count = 0;
-  auto cb2 = [&](auto response) {
+  auto cb2 = [&](fidlbredr::Profile_Advertise_Result response) {
     cb2_count++;
     EXPECT_TRUE(response.is_err());
     EXPECT_EQ(response.err(), fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
@@ -358,19 +355,17 @@ TEST_F(ProfileServerTest, ErrorOnInvalidConnectParametersNoPsm) {
 
   // No PSM provided - this is invalid.
   fidlbredr::L2capParameters l2cap_params;
-  fidlbredr::ChannelParameters channel_params;
-  l2cap_params.set_parameters(std::move(channel_params));
-
-  fidlbredr::ConnectParameters connection;
-  connection.set_l2cap(std::move(l2cap_params));
+  fidlbredr::ConnectParameters conn_params;
+  l2cap_params.set_parameters(fidlbredr::ChannelParameters());
+  conn_params.set_l2cap(std::move(l2cap_params));
 
   // Expect an error result.
-  auto sock_cb = [](auto result) {
+  auto sock_cb = [](fidlbredr::Profile_Connect_Result result) {
     EXPECT_TRUE(result.is_err());
     EXPECT_EQ(result.err(), fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
   };
 
-  client()->Connect(peer_id, std::move(connection), std::move(sock_cb));
+  client()->Connect(peer_id, std::move(conn_params), std::move(sock_cb));
   RunLoopUntilIdle();
 }
 
@@ -380,28 +375,28 @@ TEST_F(ProfileServerTest, ErrorOnInvalidConnectParametersRfcomm) {
 
   // RFCOMM Parameters are provided - this is not supported.
   fidlbredr::RfcommParameters rfcomm_params;
-  fidlbredr::ConnectParameters connection;
-  connection.set_rfcomm(std::move(rfcomm_params));
+  fidlbredr::ConnectParameters conn_params;
+  conn_params.set_rfcomm(std::move(rfcomm_params));
 
   // Expect an error result.
-  auto sock_cb = [](auto result) {
+  auto sock_cb = [](fidlbredr::Profile_Connect_Result result) {
     EXPECT_TRUE(result.is_err());
     EXPECT_EQ(result.err(), fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
   };
 
-  client()->Connect(peer_id, std::move(connection), std::move(sock_cb));
+  client()->Connect(peer_id, std::move(conn_params), std::move(sock_cb));
   RunLoopUntilIdle();
 }
 
 TEST_F(ProfileServerTest, UnregisterAdvertisementTriggersCallback) {
-  fidl::InterfaceHandle<fidlbredr::ConnectionReceiver> receiver_handle;
-  auto request = receiver_handle.NewRequest();
+  fidlbredr::ConnectionReceiverHandle receiver_handle;
+  fidl::InterfaceRequest<fidlbredr::ConnectionReceiver> request = receiver_handle.NewRequest();
 
   std::vector<fidlbredr::ServiceDefinition> services;
   services.emplace_back(MakeFIDLServiceDefinition());
 
   size_t cb_count = 0;
-  auto cb = [&](auto result) {
+  auto cb = [&](fidlbredr::Profile_Advertise_Result result) {
     cb_count++;
     EXPECT_TRUE(result.is_response());
   };
@@ -431,7 +426,8 @@ class ProfileServerTestConnectedPeer : public ProfileServerTest {
   void SetUp(FeaturesBits features) {
     ProfileServerTest::SetUp(features);
     peer_ = peer_cache()->NewPeer(kTestDevAddr, /*connectable=*/true);
-    auto fake_peer = std::make_unique<bt::testing::FakePeer>(kTestDevAddr, pw_dispatcher());
+    std::unique_ptr<bt::testing::FakePeer> fake_peer =
+        std::make_unique<bt::testing::FakePeer>(kTestDevAddr, pw_dispatcher());
     test_device()->AddPeer(std::move(fake_peer));
 
     std::optional<bt::hci::Result<>> status;
@@ -451,6 +447,7 @@ class ProfileServerTestConnectedPeer : public ProfileServerTest {
     EXPECT_EQ(peer_->identifier(), connection_->peer_id());
     EXPECT_NE(bt::gap::Peer::ConnectionState::kNotConnected, peer_->bredr()->connection_state());
   }
+
   void SetUp() override { SetUp(FeaturesBits::kHciSco); }
 
   void TearDown() override {
@@ -488,7 +485,7 @@ class ProfileServerTestScoConnected : public ProfileServerTestConnectedPeer {
     std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
     sco_params_list.emplace_back(std::move(conn_params));
 
-    fidl::InterfaceHandle<fidlbredr::ScoConnectionReceiver> receiver_handle;
+    fidlbredr::ScoConnectionReceiverHandle receiver_handle;
     FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
     client()->ConnectSco(fuchsia::bluetooth::PeerId{peer()->identifier().value()},
                          /*initiator=*/false, std::move(sco_params_list),
@@ -516,14 +513,14 @@ class ProfileServerTestScoConnected : public ProfileServerTestConnectedPeer {
 
   void TearDown() override { ProfileServerTestConnectedPeer::TearDown(); }
 
-  fidl::InterfacePtr<fidlbredr::ScoConnection>& sco_connection() { return sco_connection_; }
+  fidlbredr::ScoConnectionPtr& sco_connection() { return sco_connection_; }
 
   std::optional<zx_status_t> sco_conn_error() const { return sco_conn_error_; }
 
   bt::hci_spec::ConnectionHandle sco_handle() const { return sco_conn_handle_; }
 
  private:
-  fidl::InterfacePtr<fidlbredr::ScoConnection> sco_connection_;
+  fidlbredr::ScoConnectionPtr sco_connection_;
   bt::hci_spec::ConnectionHandle sco_conn_handle_;
   std::optional<zx_status_t> sco_conn_error_;
 };
@@ -539,7 +536,7 @@ class ProfileServerTestOffloadedScoConnected : public ProfileServerTestScoConnec
 };
 
 TEST_F(ProfileServerTestConnectedPeer, ConnectL2capChannelParameters) {
-  auto pairing_delegate =
+  std::unique_ptr<bt::gap::FakePairingDelegate> pairing_delegate =
       std::make_unique<bt::gap::FakePairingDelegate>(bt::sm::IOCapability::kDisplayYesNo);
   adapter()->SetPairingDelegate(pairing_delegate->GetWeakPtr());
   // Approve pairing requests.
@@ -554,13 +551,9 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectL2capChannelParameters) {
   l2cap()->ExpectOutboundL2capChannel(connection()->link().handle(), kPsm, 0x40, 0x41,
                                       expected_params);
 
-  fidlbredr::ChannelParameters fidl_params;
-  fidl_params.set_channel_mode(fidlbredr::ChannelMode::ENHANCED_RETRANSMISSION);
-  fidl_params.set_max_rx_sdu_size(bt::l2cap::kMinACLMTU);
-
   // Expect a non-empty channel result.
   std::optional<fidlbredr::Channel> channel;
-  auto chan_cb = [&channel](auto result) {
+  auto chan_cb = [&channel](fidlbredr::Profile_Connect_Result result) {
     EXPECT_TRUE(result.is_response());
     channel = std::move(result.response().channel);
   };
@@ -568,20 +561,23 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectL2capChannelParameters) {
 
   fuchsia::bluetooth::PeerId peer_id{peer()->identifier().value()};
 
+  // Set L2CAP channel parameters
+  fidlbredr::ChannelParameters chan_params;
   fidlbredr::L2capParameters l2cap_params;
+  fidlbredr::ConnectParameters conn_params;
+  chan_params.set_channel_mode(fidlbredr::ChannelMode::ENHANCED_RETRANSMISSION);
+  chan_params.set_max_rx_sdu_size(bt::l2cap::kMinACLMTU);
   l2cap_params.set_psm(kPsm);
-  l2cap_params.set_parameters(std::move(fidl_params));
+  l2cap_params.set_parameters(std::move(chan_params));
+  conn_params.set_l2cap(std::move(l2cap_params));
 
-  fidlbredr::ConnectParameters connection;
-  connection.set_l2cap(std::move(l2cap_params));
-
-  client()->Connect(peer_id, std::move(connection), std::move(chan_cb));
+  client()->Connect(peer_id, std::move(conn_params), std::move(chan_cb));
   RunLoopUntilIdle();
 
   ASSERT_TRUE(channel.has_value());
   EXPECT_TRUE(channel->has_socket());
   EXPECT_FALSE(channel->IsEmpty());
-  EXPECT_EQ(channel->channel_mode(), fidl_params.channel_mode());
+  EXPECT_EQ(channel->channel_mode(), chan_params.channel_mode());
   // FakeL2cap returns channels with max tx sdu size of kDefaultMTU.
   EXPECT_EQ(channel->max_tx_sdu_size(), bt::l2cap::kDefaultMTU);
   EXPECT_FALSE(channel->has_ext_direction());
@@ -590,7 +586,7 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectL2capChannelParameters) {
 
 TEST_F(ProfileServerTestConnectedPeer,
        ConnectWithAuthenticationRequiredButLinkKeyNotAuthenticatedFails) {
-  auto pairing_delegate =
+  std::unique_ptr<bt::gap::FakePairingDelegate> pairing_delegate =
       std::make_unique<bt::gap::FakePairingDelegate>(bt::sm::IOCapability::kNoInputNoOutput);
   adapter()->SetPairingDelegate(pairing_delegate->GetWeakPtr());
   pairing_delegate->SetCompletePairingCallback(
@@ -598,16 +594,18 @@ TEST_F(ProfileServerTestConnectedPeer,
 
   fidlbredr::SecurityRequirements security;
   security.set_authentication_required(true);
+
+  // Set L2CAP channel parameters
   fidlbredr::ChannelParameters chan_params;
-  chan_params.set_security_requirements(std::move(security));
   fidlbredr::L2capParameters l2cap_params;
+  fidlbredr::ConnectParameters conn_params;
+  chan_params.set_security_requirements(std::move(security));
   l2cap_params.set_psm(kPsm);
   l2cap_params.set_parameters(std::move(chan_params));
-  fidlbredr::ConnectParameters conn_params;
   conn_params.set_l2cap(std::move(l2cap_params));
 
   size_t sock_cb_count = 0;
-  auto sock_cb = [&](auto result) {
+  auto sock_cb = [&](fidlbredr::Profile_Connect_Result result) {
     sock_cb_count++;
     ASSERT_TRUE(result.is_err());
     EXPECT_EQ(fuchsia::bluetooth::ErrorCode::FAILED, result.err());
@@ -625,7 +623,7 @@ TEST_F(ProfileServerTestConnectedPeer,
 
 // Tests receiving an empty Channel results in an error propagated through the callback.
 TEST_F(ProfileServerTestConnectedPeer, ConnectEmptyChannelResponse) {
-  auto pairing_delegate =
+  std::unique_ptr<bt::gap::FakePairingDelegate> pairing_delegate =
       std::make_unique<bt::gap::FakePairingDelegate>(bt::sm::IOCapability::kDisplayYesNo);
   adapter()->SetPairingDelegate(pairing_delegate->GetWeakPtr());
   // Approve pairing requests.
@@ -643,10 +641,10 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectEmptyChannelResponse) {
   l2cap()->ExpectOutboundL2capChannel(connection()->link().handle(), kPsm, 0x40, 0x41,
                                       expected_params);
 
-  fidlbredr::ChannelParameters fidl_params;
-  fidl_params.set_channel_mode(fidlbredr::ChannelMode::ENHANCED_RETRANSMISSION);
-  fidl_params.set_max_rx_sdu_size(bt::l2cap::kMinACLMTU);
-  auto sock_cb = [](auto result) {
+  fidlbredr::ChannelParameters chan_params;
+  chan_params.set_channel_mode(fidlbredr::ChannelMode::ENHANCED_RETRANSMISSION);
+  chan_params.set_max_rx_sdu_size(bt::l2cap::kMinACLMTU);
+  auto sock_cb = [](fidlbredr::Profile_Connect_Result result) {
     EXPECT_TRUE(result.is_err());
     EXPECT_EQ(fuchsia::bluetooth::ErrorCode::FAILED, result.err());
   };
@@ -654,35 +652,34 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectEmptyChannelResponse) {
 
   fuchsia::bluetooth::PeerId peer_id{peer()->identifier().value()};
 
+  // Set L2CAP channel parameters
   fidlbredr::L2capParameters l2cap_params;
+  fidlbredr::ConnectParameters conn_params;
   l2cap_params.set_psm(kPsm);
-  l2cap_params.set_parameters(std::move(fidl_params));
+  l2cap_params.set_parameters(std::move(chan_params));
+  conn_params.set_l2cap(std::move(l2cap_params));
 
-  fidlbredr::ConnectParameters connection;
-  connection.set_l2cap(std::move(l2cap_params));
-
-  client()->Connect(peer_id, std::move(connection), std::move(sock_cb));
+  client()->Connect(peer_id, std::move(conn_params), std::move(sock_cb));
   RunLoopUntilIdle();
 }
 
 TEST_F(ProfileServerTestConnectedPeer,
        AdvertiseChannelParametersReceivedInOnChannelConnectedCallback) {
-  fidlbredr::ChannelParameters fidl_chan_params;
-  fidl_chan_params.set_channel_mode(fidlbredr::ChannelMode::ENHANCED_RETRANSMISSION);
-
   constexpr uint16_t kTxMtu = bt::l2cap::kMinACLMTU;
 
-  auto pairing_delegate =
+  std::unique_ptr<bt::gap::FakePairingDelegate> pairing_delegate =
       std::make_unique<bt::gap::FakePairingDelegate>(bt::sm::IOCapability::kDisplayYesNo);
   adapter()->SetPairingDelegate(pairing_delegate->GetWeakPtr());
 
-  fidl::InterfaceHandle<fidlbredr::ConnectionReceiver> connect_receiver_handle;
+  fidlbredr::ConnectionReceiverHandle connect_receiver_handle;
   FakeConnectionReceiver connect_receiver(connect_receiver_handle.NewRequest(), dispatcher());
 
   std::vector<fidlbredr::ServiceDefinition> services;
   services.emplace_back(MakeFIDLServiceDefinition());
+  fidlbredr::ChannelParameters chan_params;
+  chan_params.set_channel_mode(fidlbredr::ChannelMode::ENHANCED_RETRANSMISSION);
 
-  client()->Advertise(std::move(services), std::move(fidl_chan_params),
+  client()->Advertise(std::move(services), std::move(chan_params),
                       std::move(connect_receiver_handle), NopAdvertiseCallback);
   RunLoopUntilIdle();
 
@@ -713,10 +710,10 @@ class PriorityTest
       public ::testing::WithParamInterface<std::pair<fidlbredr::A2dpDirectionPriority, bool>> {};
 
 TEST_P(PriorityTest, OutboundConnectAndSetPriority) {
-  const auto kPriority = GetParam().first;
+  const fidlbredr::A2dpDirectionPriority kPriority = GetParam().first;
   const bool kExpectSuccess = GetParam().second;
 
-  auto pairing_delegate =
+  std::unique_ptr<bt::gap::FakePairingDelegate> pairing_delegate =
       std::make_unique<bt::gap::FakePairingDelegate>(bt::sm::IOCapability::kDisplayYesNo);
   adapter()->SetPairingDelegate(pairing_delegate->GetWeakPtr());
   // Approve pairing requests.
@@ -728,20 +725,22 @@ TEST_P(PriorityTest, OutboundConnectAndSetPriority) {
   l2cap()->ExpectOutboundL2capChannel(connection()->link().handle(), kPsm, 0x40, 0x41,
                                       bt::l2cap::ChannelParameters());
 
-  bt::l2cap::testing::FakeChannel::WeakPtr fake_channel;
-  l2cap()->set_channel_callback([&](auto chan) { fake_channel = std::move(chan); });
+  FakeChannel::WeakPtr fake_channel;
+  l2cap()->set_channel_callback([&](FakeChannel::WeakPtr chan) { fake_channel = std::move(chan); });
 
   // Expect a non-empty channel result.
   std::optional<fidlbredr::Channel> channel;
-  auto chan_cb = [&channel](auto result) {
+  auto chan_cb = [&channel](fidlbredr::Profile_Connect_Result result) {
     ASSERT_TRUE(result.is_response());
     channel = std::move(result.response().channel);
   };
 
   fuchsia::bluetooth::PeerId peer_id{peer()->identifier().value()};
+
+  // Set L2CAP channel parameters
   fidlbredr::L2capParameters l2cap_params;
-  l2cap_params.set_psm(kPsm);
   fidlbredr::ConnectParameters conn_params;
+  l2cap_params.set_psm(kPsm);
   conn_params.set_l2cap(std::move(l2cap_params));
 
   // Initiates pairing
@@ -750,11 +749,11 @@ TEST_P(PriorityTest, OutboundConnectAndSetPriority) {
   ASSERT_TRUE(fake_channel.is_alive());
   ASSERT_TRUE(channel.has_value());
   ASSERT_TRUE(channel->has_ext_direction());
-  auto client = channel->mutable_ext_direction()->Bind();
+  fidlbredr::AudioDirectionExtPtr client = channel->mutable_ext_direction()->Bind();
 
   size_t priority_cb_count = 0;
   fake_channel->set_acl_priority_fails(!kExpectSuccess);
-  client->SetPriority(kPriority, [&](auto result) {
+  client->SetPriority(kPriority, [&](fidlbredr::AudioDirectionExt_SetPriority_Result result) {
     EXPECT_EQ(result.is_response(), kExpectSuccess);
     priority_cb_count++;
   });
@@ -789,24 +788,21 @@ INSTANTIATE_TEST_SUITE_P(ProfileServerTestConnectedPeer, PriorityTest,
                          ::testing::ValuesIn(kPriorityParams));
 
 TEST_F(AclPrioritySupportedTest, InboundConnectAndSetPriority) {
-  fidlbredr::ChannelParameters fidl_chan_params;
-
   constexpr uint16_t kTxMtu = bt::l2cap::kMinACLMTU;
 
-  auto pairing_delegate =
+  std::unique_ptr<bt::gap::FakePairingDelegate> pairing_delegate =
       std::make_unique<bt::gap::FakePairingDelegate>(bt::sm::IOCapability::kDisplayYesNo);
   adapter()->SetPairingDelegate(pairing_delegate->GetWeakPtr());
 
-  bt::l2cap::testing::FakeChannel::WeakPtr fake_channel;
-  l2cap()->set_channel_callback([&](auto chan) { fake_channel = std::move(chan); });
+  FakeChannel::WeakPtr fake_channel;
+  l2cap()->set_channel_callback([&](FakeChannel::WeakPtr chan) { fake_channel = std::move(chan); });
 
-  fidl::InterfaceHandle<fidlbredr::ConnectionReceiver> connect_receiver_handle;
+  fidlbredr::ConnectionReceiverHandle connect_receiver_handle;
   FakeConnectionReceiver connect_receiver(connect_receiver_handle.NewRequest(), dispatcher());
 
   std::vector<fidlbredr::ServiceDefinition> services;
   services.emplace_back(MakeFIDLServiceDefinition());
-
-  client()->Advertise(std::move(services), std::move(fidl_chan_params),
+  client()->Advertise(std::move(services), fidlbredr::ChannelParameters(),
                       std::move(connect_receiver_handle), NopAdvertiseCallback);
   RunLoopUntilIdle();
 
@@ -819,13 +815,14 @@ TEST_F(AclPrioritySupportedTest, InboundConnectAndSetPriority) {
   ASSERT_TRUE(connect_receiver.channel().has_value());
   ASSERT_TRUE(connect_receiver.channel().value().has_ext_direction());
   // Taking value() is safe because of the has_ext_direction() check.
-  auto client = connect_receiver.bind_ext_direction().value();
+  fidlbredr::AudioDirectionExtPtr client = connect_receiver.bind_ext_direction().value();
 
   size_t priority_cb_count = 0;
-  client->SetPriority(fidlbredr::A2dpDirectionPriority::SINK, [&](auto result) {
-    EXPECT_TRUE(result.is_response());
-    priority_cb_count++;
-  });
+  client->SetPriority(fidlbredr::A2dpDirectionPriority::SINK,
+                      [&](fidlbredr::AudioDirectionExt_SetPriority_Result result) {
+                        EXPECT_TRUE(result.is_response());
+                        priority_cb_count++;
+                      });
 
   RunLoopUntilIdle();
   EXPECT_EQ(priority_cb_count, 1u);
@@ -836,7 +833,7 @@ TEST_F(AclPrioritySupportedTest, InboundConnectAndSetPriority) {
 // Verifies that a socket channel relay is correctly set up such that bytes written to the socket
 // are sent to the channel.
 TEST_F(ProfileServerTestConnectedPeer, ConnectReturnsValidSocket) {
-  auto pairing_delegate =
+  std::unique_ptr<bt::gap::FakePairingDelegate> pairing_delegate =
       std::make_unique<bt::gap::FakePairingDelegate>(bt::sm::IOCapability::kDisplayYesNo);
   adapter()->SetPairingDelegate(pairing_delegate->GetWeakPtr());
   // Approve pairing requests.
@@ -849,29 +846,28 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectReturnsValidSocket) {
   l2cap()->ExpectOutboundL2capChannel(connection()->link().handle(), kPsm, 0x40, 0x41,
                                       expected_params);
 
-  fidlbredr::ChannelParameters fidl_params;
-
-  std::optional<bt::l2cap::testing::FakeChannel::WeakPtr> fake_chan;
-  l2cap()->set_channel_callback([&fake_chan](auto chan) { fake_chan = std::move(chan); });
+  std::optional<FakeChannel::WeakPtr> fake_chan;
+  l2cap()->set_channel_callback(
+      [&fake_chan](FakeChannel::WeakPtr chan) { fake_chan = std::move(chan); });
 
   // Expect a non-empty channel result.
   std::optional<fidlbredr::Channel> channel;
-  auto result_cb = [&channel](auto result) {
+  auto result_cb = [&channel](fidlbredr::Profile_Connect_Result result) {
     EXPECT_TRUE(result.is_response());
     channel = std::move(result.response().channel);
   };
 
   fuchsia::bluetooth::PeerId peer_id{peer()->identifier().value()};
 
+  // Set L2CAP channel parameters
   fidlbredr::L2capParameters l2cap_params;
+  fidlbredr::ConnectParameters conn_params;
   l2cap_params.set_psm(kPsm);
-  l2cap_params.set_parameters(std::move(fidl_params));
-
-  fidlbredr::ConnectParameters connection;
-  connection.set_l2cap(std::move(l2cap_params));
+  l2cap_params.set_parameters(fidlbredr::ChannelParameters());
+  conn_params.set_l2cap(std::move(l2cap_params));
 
   // Initiates pairing
-  client()->Connect(peer_id, std::move(connection), std::move(result_cb));
+  client()->Connect(peer_id, std::move(conn_params), std::move(result_cb));
   RunLoopUntilIdle();
 
   ASSERT_TRUE(channel.has_value());
@@ -879,7 +875,7 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectReturnsValidSocket) {
   auto& socket = channel->socket();
 
   ASSERT_TRUE(fake_chan.has_value());
-  auto fake_chan_ptr = fake_chan.value();
+  FakeChannel::WeakPtr fake_chan_ptr = fake_chan.value();
   size_t send_count = 0;
   fake_chan_ptr->SetSendCallback([&send_count](auto buffer) { send_count++; }, pw_dispatcher());
 
@@ -895,22 +891,20 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectReturnsValidSocket) {
 // Verifies that a socket channel relay is correctly set up such that bytes written to the socket
 // are sent to the channel.
 TEST_F(ProfileServerTestConnectedPeer, ConnectionReceiverReturnsValidSocket) {
-  auto pairing_delegate =
+  std::unique_ptr<bt::gap::FakePairingDelegate> pairing_delegate =
       std::make_unique<bt::gap::FakePairingDelegate>(bt::sm::IOCapability::kDisplayYesNo);
   adapter()->SetPairingDelegate(pairing_delegate->GetWeakPtr());
 
-  fidl::InterfaceHandle<fidlbredr::ConnectionReceiver> connect_receiver_handle;
+  fidlbredr::ConnectionReceiverHandle connect_receiver_handle;
   FakeConnectionReceiver connect_receiver(connect_receiver_handle.NewRequest(), dispatcher());
 
-  std::optional<bt::l2cap::testing::FakeChannel::WeakPtr> fake_chan;
-  l2cap()->set_channel_callback([&fake_chan](auto chan) { fake_chan = std::move(chan); });
-
-  fidlbredr::ChannelParameters fidl_chan_params;
+  std::optional<FakeChannel::WeakPtr> fake_chan;
+  l2cap()->set_channel_callback(
+      [&fake_chan](FakeChannel::WeakPtr chan) { fake_chan = std::move(chan); });
 
   std::vector<fidlbredr::ServiceDefinition> services;
   services.emplace_back(MakeFIDLServiceDefinition());
-
-  client()->Advertise(std::move(services), std::move(fidl_chan_params),
+  client()->Advertise(std::move(services), fidlbredr::ChannelParameters(),
                       std::move(connect_receiver_handle), NopAdvertiseCallback);
   RunLoopUntilIdle();
 
@@ -923,16 +917,16 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectionReceiverReturnsValidSocket) {
   ASSERT_TRUE(connect_receiver.channel().has_value());
   ASSERT_TRUE(connect_receiver.channel().value().has_socket());
   // Taking channel is safe because of the previous checks.
-  auto channel = connect_receiver.take_channel();
+  fidlbredr::Channel channel = connect_receiver.take_channel();
 
   ASSERT_TRUE(fake_chan.has_value());
-  auto fake_chan_ptr = fake_chan.value();
+  FakeChannel::WeakPtr fake_chan_ptr = fake_chan.value();
   size_t send_count = 0;
   fake_chan_ptr->SetSendCallback([&send_count](auto buffer) { send_count++; }, pw_dispatcher());
 
   const char write_data[2] = "a";
   size_t bytes_written = 0;
-  auto status = channel.socket().write(0, write_data, sizeof(write_data) - 1, &bytes_written);
+  int status = channel.socket().write(0, write_data, sizeof(write_data) - 1, &bytes_written);
   EXPECT_EQ(ZX_OK, status);
   EXPECT_EQ(1u, bytes_written);
   RunLoopUntilIdle();
@@ -942,7 +936,7 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectionReceiverReturnsValidSocket) {
 TEST_F(ProfileServerTest, ConnectScoWithInvalidParameters) {
   std::vector<fidlbredr::ScoConnectionParameters> bad_sco_params;
   bad_sco_params.emplace_back(fidlbredr::ScoConnectionParameters());
-  fidl::InterfaceHandle<fidlbredr::ScoConnectionReceiver> receiver_handle;
+  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
   FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
   client()->ConnectSco(fuchsia::bluetooth::PeerId{1}, /*initiator=*/true, std::move(bad_sco_params),
                        std::move(receiver_handle));
@@ -953,7 +947,7 @@ TEST_F(ProfileServerTest, ConnectScoWithInvalidParameters) {
 }
 
 TEST_F(ProfileServerTest, ConnectScoWithEmptyParameters) {
-  fidl::InterfaceHandle<fidlbredr::ScoConnectionReceiver> receiver_handle;
+  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
   FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
   client()->ConnectSco(fuchsia::bluetooth::PeerId{1}, /*initiator=*/true, /*params=*/{},
                        std::move(receiver_handle));
@@ -968,7 +962,7 @@ TEST_F(ProfileServerTest, ConnectScoInitiatorWithTooManyParameters) {
   sco_params_list.emplace_back(CreateScoConnectionParameters());
   sco_params_list.emplace_back(CreateScoConnectionParameters());
 
-  fidl::InterfaceHandle<fidlbredr::ScoConnectionReceiver> receiver_handle;
+  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
   FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
   client()->ConnectSco(fuchsia::bluetooth::PeerId{1}, /*initiator=*/true,
                        /*params=*/std::move(sco_params_list), std::move(receiver_handle));
@@ -984,7 +978,7 @@ TEST_F(ProfileServerTest, ConnectScoWithUnconnectedPeerReturnsError) {
   std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
   sco_params_list.emplace_back(std::move(sco_params));
 
-  fidl::InterfaceHandle<fidlbredr::ScoConnectionReceiver> receiver_handle;
+  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
   FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
   client()->ConnectSco(fuchsia::bluetooth::PeerId{1}, /*initiator=*/true,
                        std::move(sco_params_list), std::move(receiver_handle));
@@ -1001,7 +995,7 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectScoInitiatorSuccess) {
   std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
   sco_params_list.emplace_back(std::move(sco_params));
 
-  fidl::InterfaceHandle<fidlbredr::ScoConnectionReceiver> receiver_handle;
+  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
   FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
   client()->ConnectSco(fuchsia::bluetooth::PeerId{peer()->identifier().value()}, /*initiator=*/true,
                        std::move(sco_params_list), std::move(receiver_handle));
@@ -1023,7 +1017,7 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectScoResponderSuccess) {
   sco_params_list.emplace_back(CreateScoConnectionParameters(fidlbredr::HfpParameterSet::T2));
   sco_params_list.emplace_back(CreateScoConnectionParameters(fidlbredr::HfpParameterSet::D0));
 
-  fidl::InterfaceHandle<fidlbredr::ScoConnectionReceiver> receiver_handle;
+  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
   FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
   client()->ConnectSco(fuchsia::bluetooth::PeerId{peer()->identifier().value()},
                        /*initiator=*/false, std::move(sco_params_list), std::move(receiver_handle));
@@ -1042,7 +1036,7 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectScoResponderUnconnectedPeerReturns
   std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
   sco_params_list.emplace_back(CreateScoConnectionParameters());
 
-  fidl::InterfaceHandle<fidlbredr::ScoConnectionReceiver> receiver_handle;
+  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
   FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
   client()->ConnectSco(fuchsia::bluetooth::PeerId{1}, /*initiator=*/false,
                        std::move(sco_params_list), std::move(receiver_handle));
@@ -1058,7 +1052,7 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectScoInitiatorAndCloseReceiver) {
   std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
   sco_params_list.emplace_back(std::move(sco_params));
 
-  fidl::InterfaceHandle<fidlbredr::ScoConnectionReceiver> receiver_handle;
+  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
   FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
   client()->ConnectSco(fuchsia::bluetooth::PeerId{peer()->identifier().value()}, /*initiator=*/true,
                        std::move(sco_params_list), std::move(receiver_handle));
@@ -1076,7 +1070,7 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectScoInitiatorAndCloseReceiverBefore
   std::vector<fidlbredr::ScoConnectionParameters> sco_params_list;
   sco_params_list.emplace_back(std::move(sco_params));
 
-  fidl::InterfaceHandle<fidlbredr::ScoConnectionReceiver> receiver_handle;
+  fidlbredr::ScoConnectionReceiverHandle receiver_handle;
   FakeScoConnectionReceiver receiver(receiver_handle.NewRequest(), dispatcher());
 
   test_device()->SetDefaultCommandStatus(bt::hci_spec::kEnhancedSetupSynchronousConnection,
@@ -1103,7 +1097,7 @@ class ProfileServerTestFakeAdapter : public bt::fidl::testing::FakeAdapterTestFi
   void SetUp() override {
     FakeAdapterTestFixture::SetUp();
 
-    fidl::InterfaceHandle<fidlbredr::Profile> profile_handle;
+    fidlbredr::ProfileHandle profile_handle;
     client_.Bind(std::move(profile_handle));
     server_ =
         std::make_unique<ProfileServer>(adapter()->AsWeakPtr(), client_.NewRequest(dispatcher()));
@@ -1126,14 +1120,15 @@ TEST_F(ProfileServerTestFakeAdapter, ConnectChannelParametersContainsFlushTimeou
 
   FakeChannel::WeakPtr last_channel;
   adapter()->fake_bredr()->set_l2cap_channel_callback(
-      [&](auto chan) { last_channel = std::move(chan); });
+      [&](FakeChannel::WeakPtr chan) { last_channel = std::move(chan); });
 
+  // Set L2CAP channel parameters
   fidlbredr::ChannelParameters chan_params;
-  chan_params.set_flush_timeout(kFlushTimeout.count());
   fidlbredr::L2capParameters l2cap_params;
+  fidlbredr::ConnectParameters conn_params;
+  chan_params.set_flush_timeout(kFlushTimeout.count());
   l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
   l2cap_params.set_parameters(std::move(chan_params));
-  fidlbredr::ConnectParameters conn_params;
   conn_params.set_l2cap(std::move(l2cap_params));
 
   std::optional<fidlbredr::Channel> response_channel;
@@ -1159,7 +1154,7 @@ TEST_F(ProfileServerTestFakeAdapter, AdvertiseChannelParametersContainsFlushTime
   fidlbredr::ChannelParameters chan_params;
   chan_params.set_flush_timeout(kFlushTimeout.count());
 
-  fidl::InterfaceHandle<fidlbredr::ConnectionReceiver> connect_receiver_handle;
+  fidlbredr::ConnectionReceiverHandle connect_receiver_handle;
   FakeConnectionReceiver connect_receiver(connect_receiver_handle.NewRequest(), dispatcher());
 
   client()->Advertise(std::move(services), std::move(chan_params),
@@ -1193,15 +1188,17 @@ TEST_F(ProfileServerTestFakeAdapter, L2capParametersExtRequestParametersSucceeds
   const uint16_t kMaxRxSduSize(200);
 
   FakeChannel::WeakPtr last_channel;
-  adapter()->fake_bredr()->set_l2cap_channel_callback([&](auto chan) { last_channel = chan; });
+  adapter()->fake_bredr()->set_l2cap_channel_callback(
+      [&](FakeChannel::WeakPtr chan) { last_channel = chan; });
 
+  // Set L2CAP channel parameters
   fidlbredr::ChannelParameters chan_params;
+  fidlbredr::L2capParameters l2cap_params;
+  fidlbredr::ConnectParameters conn_params;
   chan_params.set_channel_mode(fidlbredr::ChannelMode::BASIC);
   chan_params.set_max_rx_sdu_size(kMaxRxSduSize);
-  fidlbredr::L2capParameters l2cap_params;
   l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
   l2cap_params.set_parameters(std::move(chan_params));
-  fidlbredr::ConnectParameters conn_params;
   conn_params.set_l2cap(std::move(l2cap_params));
 
   std::optional<fidlbredr::Channel> response_channel;
@@ -1221,7 +1218,7 @@ TEST_F(ProfileServerTestFakeAdapter, L2capParametersExtRequestParametersSucceeds
   request_chan_params.set_flush_timeout(kFlushTimeout.get());
 
   std::optional<fidlbredr::ChannelParameters> result_chan_params;
-  auto l2cap_client = response_channel->mutable_ext_l2cap()->Bind();
+  fidlbredr::L2capParametersExtPtr l2cap_client = response_channel->mutable_ext_l2cap()->Bind();
   l2cap_client->RequestParameters(
       std::move(request_chan_params),
       [&](fidlbredr::ChannelParameters new_params) { result_chan_params = std::move(new_params); });
@@ -1246,11 +1243,13 @@ TEST_F(ProfileServerTestFakeAdapter, L2capParametersExtRequestParametersFails) {
   const zx::duration kFlushTimeout(zx::msec(100));
 
   FakeChannel::WeakPtr last_channel;
-  adapter()->fake_bredr()->set_l2cap_channel_callback([&](auto chan) { last_channel = chan; });
+  adapter()->fake_bredr()->set_l2cap_channel_callback(
+      [&](FakeChannel::WeakPtr chan) { last_channel = chan; });
 
+  // Set L2CAP channel parameters
   fidlbredr::L2capParameters l2cap_params;
-  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
   fidlbredr::ConnectParameters conn_params;
+  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
   conn_params.set_l2cap(std::move(l2cap_params));
 
   std::optional<fidlbredr::Channel> response_channel;
@@ -1271,7 +1270,7 @@ TEST_F(ProfileServerTestFakeAdapter, L2capParametersExtRequestParametersFails) {
   fidlbredr::ChannelParameters request_chan_params;
   request_chan_params.set_flush_timeout(kFlushTimeout.get());
   std::optional<fidlbredr::ChannelParameters> result_chan_params;
-  auto l2cap_client = response_channel->mutable_ext_l2cap()->Bind();
+  fidlbredr::L2capParametersExtPtr l2cap_client = response_channel->mutable_ext_l2cap()->Bind();
   l2cap_client->RequestParameters(
       std::move(request_chan_params),
       [&](fidlbredr::ChannelParameters new_params) { result_chan_params = std::move(new_params); });
@@ -1287,11 +1286,13 @@ TEST_F(ProfileServerTestFakeAdapter, L2capParametersExtRequestParametersClosedOn
   const fuchsia::bluetooth::PeerId kFidlPeerId{kPeerId.value()};
 
   FakeChannel::WeakPtr last_channel;
-  adapter()->fake_bredr()->set_l2cap_channel_callback([&](auto chan) { last_channel = chan; });
+  adapter()->fake_bredr()->set_l2cap_channel_callback(
+      [&](FakeChannel::WeakPtr chan) { last_channel = chan; });
 
+  // Set L2CAP channel parameters
   fidlbredr::L2capParameters l2cap_params;
-  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
   fidlbredr::ConnectParameters conn_params;
+  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
   conn_params.set_l2cap(std::move(l2cap_params));
 
   std::optional<fidlbredr::Channel> response_channel;
@@ -1332,11 +1333,13 @@ TEST_F(ProfileServerTestFakeAdapter, AudioDirectionExtRequestParametersClosedOnC
   const fuchsia::bluetooth::PeerId kFidlPeerId{kPeerId.value()};
 
   FakeChannel::WeakPtr last_channel;
-  adapter()->fake_bredr()->set_l2cap_channel_callback([&](auto chan) { last_channel = chan; });
+  adapter()->fake_bredr()->set_l2cap_channel_callback(
+      [&](FakeChannel::WeakPtr chan) { last_channel = chan; });
 
+  // Set L2CAP channel parameters
   fidlbredr::L2capParameters l2cap_params;
-  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
   fidlbredr::ConnectParameters conn_params;
+  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
   conn_params.set_l2cap(std::move(l2cap_params));
 
   std::optional<fidlbredr::Channel> response_channel;
@@ -1360,10 +1363,10 @@ TEST_F(ProfileServerTestFakeAdapter, AudioDirectionExtRequestParametersClosedOnC
   EXPECT_TRUE(adapter()->fake_bredr()->DestroyChannel(last_channel->id()));
 
   // Any request for the closed channel should be ignored.
-  fidlbredr::ChannelParameters request_chan_params;
   size_t priority_cb_count = 0;
-  audio_client->SetPriority(fidlbredr::A2dpDirectionPriority::NORMAL,
-                            [&](auto result) { priority_cb_count++; });
+  audio_client->SetPriority(
+      fidlbredr::A2dpDirectionPriority::NORMAL,
+      [&](fidlbredr::AudioDirectionExt_SetPriority_Result result) { priority_cb_count++; });
 
   RunLoopUntilIdle();
   EXPECT_TRUE(audio_client_closed);
@@ -1397,13 +1400,11 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtGetSupportedFeatures) {
   const bt::PeerId peer_id(1);
   const fuchsia::bluetooth::PeerId fidl_peer_id{peer_id.value()};
 
+  // Set L2CAP channel parameters
   fidlbredr::L2capParameters l2cap_params;
-  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
-
-  fidlbredr::ChannelParameters chan_params;
-  l2cap_params.set_parameters(std::move(chan_params));
-
   fidlbredr::ConnectParameters conn_params;
+  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
+  l2cap_params.set_parameters(fidlbredr::ChannelParameters());
   conn_params.set_l2cap(std::move(l2cap_params));
 
   std::optional<fidlbredr::Channel> response_channel;
@@ -1421,7 +1422,7 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtGetSupportedFeatures) {
   ASSERT_TRUE(response_channel->has_ext_audio_offload());
 
   std::optional<fidlbredr::AudioOffloadExtGetSupportedFeaturesResponse> result_features;
-  fidl::InterfacePtr<fidlbredr::AudioOffloadExt> audio_offload_ext_client =
+  fidlbredr::AudioOffloadExtPtr audio_offload_ext_client =
       response_channel->mutable_ext_audio_offload()->Bind();
   audio_offload_ext_client->GetSupportedFeatures(
       [&result_features](fidlbredr::AudioOffloadExtGetSupportedFeaturesResponse features) {
@@ -1470,13 +1471,11 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadSuccess) {
   const bt::PeerId peer_id(1);
   const fuchsia::bluetooth::PeerId fidl_peer_id{peer_id.value()};
 
+  // Set L2CAP channel parameters
   fidlbredr::L2capParameters l2cap_params;
-  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
-
-  fidlbredr::ChannelParameters chan_params;
-  l2cap_params.set_parameters(std::move(chan_params));
-
   fidlbredr::ConnectParameters conn_params;
+  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
+  l2cap_params.set_parameters(fidlbredr::ChannelParameters());
   conn_params.set_l2cap(std::move(l2cap_params));
 
   std::optional<fidlbredr::Channel> response_channel;
@@ -1493,6 +1492,7 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadSuccess) {
   }
   ASSERT_TRUE(response_channel->has_ext_audio_offload());
 
+  // Set Audio Offload Configuration Values
   std::unique_ptr<fidlbredr::AudioOffloadFeatures> codec = fidlbredr::AudioOffloadFeatures::New();
   std::unique_ptr<fidlbredr::AudioSbcSupport> codec_value = fidlbredr::AudioSbcSupport::New();
   codec->set_sbc(std::move(*codec_value));
@@ -1514,14 +1514,14 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadSuccess) {
   config->set_encoded_bit_rate(10);
   config->set_encoder_settings(std::move(*encoder_settings));
 
-  fidl::InterfacePtr<fidlbredr::AudioOffloadExt> audio_offload_ext_client =
+  fidlbredr::AudioOffloadExtPtr audio_offload_ext_client =
       response_channel->mutable_ext_audio_offload()->Bind();
-  fidl::InterfaceHandle<fidlbredr::AudioOffloadController> controller_handle;
+  fidlbredr::AudioOffloadControllerHandle controller_handle;
   fidl::InterfaceRequest<fidlbredr::AudioOffloadController> controller_request =
       controller_handle.NewRequest();
   audio_offload_ext_client->StartAudioOffload(std::move(*config), std::move(controller_request));
 
-  fidl::InterfacePtr<fidlbredr::AudioOffloadController> audio_offload_controller_client;
+  fidlbredr::AudioOffloadControllerPtr audio_offload_controller_client;
   audio_offload_controller_client.Bind(std::move(controller_handle));
 
   std::optional<zx_status_t> audio_offload_controller_epitaph;
@@ -1543,7 +1543,7 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadSuccess) {
 TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadFail) {
   FakeChannel::WeakPtr fake_channel;
   adapter()->fake_bredr()->set_l2cap_channel_callback(
-      [&](auto chan) { fake_channel = std::move(chan); });
+      [&](FakeChannel::WeakPtr chan) { fake_channel = std::move(chan); });
 
   const bool android_vendor_ext_support = GetParam().first;
   const uint32_t a2dp_offload_capabilities = GetParam().second;
@@ -1564,13 +1564,11 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadFail) {
   const bt::PeerId peer_id(1);
   const fuchsia::bluetooth::PeerId fidl_peer_id{peer_id.value()};
 
+  // Set L2CAP channel parameters
   fidlbredr::L2capParameters l2cap_params;
-  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
-
-  fidlbredr::ChannelParameters chan_params;
-  l2cap_params.set_parameters(std::move(chan_params));
-
   fidlbredr::ConnectParameters conn_params;
+  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
+  l2cap_params.set_parameters(fidlbredr::ChannelParameters());
   conn_params.set_l2cap(std::move(l2cap_params));
 
   std::optional<fidlbredr::Channel> response_channel;
@@ -1591,6 +1589,7 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadFail) {
   ASSERT_TRUE(fake_channel.is_alive());
   fake_channel->set_a2dp_offload_fails(bt::HostError::kFailed);
 
+  // Set Audio Offload Configuration Values
   std::unique_ptr<fidlbredr::AudioOffloadFeatures> codec = fidlbredr::AudioOffloadFeatures::New();
   std::unique_ptr<fidlbredr::AudioSbcSupport> codec_value = fidlbredr::AudioSbcSupport::New();
   codec->set_sbc(std::move(*codec_value));
@@ -1612,14 +1611,14 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadFail) {
   config->set_encoded_bit_rate(10);
   config->set_encoder_settings(std::move(*encoder_settings));
 
-  fidl::InterfacePtr<fidlbredr::AudioOffloadExt> audio_offload_ext_client =
+  fidlbredr::AudioOffloadExtPtr audio_offload_ext_client =
       response_channel->mutable_ext_audio_offload()->Bind();
-  fidl::InterfaceHandle<fidlbredr::AudioOffloadController> controller_handle;
+  fidlbredr::AudioOffloadControllerHandle controller_handle;
   fidl::InterfaceRequest<fidlbredr::AudioOffloadController> controller_request =
       controller_handle.NewRequest();
   audio_offload_ext_client->StartAudioOffload(std::move(*config), std::move(controller_request));
 
-  fidl::InterfacePtr<fidlbredr::AudioOffloadController> audio_offload_controller_client;
+  fidlbredr::AudioOffloadControllerPtr audio_offload_controller_client;
   audio_offload_controller_client.Bind(std::move(controller_handle));
 
   std::optional<zx_status_t> audio_offload_controller_epitaph;
@@ -1640,7 +1639,7 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadFail) {
 TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadInProgress) {
   FakeChannel::WeakPtr fake_channel;
   adapter()->fake_bredr()->set_l2cap_channel_callback(
-      [&](auto chan) { fake_channel = std::move(chan); });
+      [&](FakeChannel::WeakPtr chan) { fake_channel = std::move(chan); });
 
   const bool android_vendor_ext_support = GetParam().first;
   const uint32_t a2dp_offload_capabilities = GetParam().second;
@@ -1661,13 +1660,11 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadInProgress)
   const bt::PeerId peer_id(1);
   const fuchsia::bluetooth::PeerId fidl_peer_id{peer_id.value()};
 
+  // Set L2CAP channel parameters
   fidlbredr::L2capParameters l2cap_params;
-  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
-
-  fidlbredr::ChannelParameters chan_params;
-  l2cap_params.set_parameters(std::move(chan_params));
-
   fidlbredr::ConnectParameters conn_params;
+  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
+  l2cap_params.set_parameters(fidlbredr::ChannelParameters());
   conn_params.set_l2cap(std::move(l2cap_params));
 
   std::optional<fidlbredr::Channel> response_channel;
@@ -1688,6 +1685,7 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadInProgress)
   ASSERT_TRUE(fake_channel.is_alive());
   fake_channel->set_a2dp_offload_fails(bt::HostError::kInProgress);
 
+  // Set Audio Offload Configuration Values
   std::unique_ptr<fidlbredr::AudioOffloadFeatures> codec = fidlbredr::AudioOffloadFeatures::New();
   std::unique_ptr<fidlbredr::AudioSbcSupport> codec_value = fidlbredr::AudioSbcSupport::New();
   codec->set_sbc(std::move(*codec_value));
@@ -1709,14 +1707,14 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadInProgress)
   config->set_encoded_bit_rate(10);
   config->set_encoder_settings(std::move(*encoder_settings));
 
-  fidl::InterfacePtr<fidlbredr::AudioOffloadExt> audio_offload_ext_client =
+  fidlbredr::AudioOffloadExtPtr audio_offload_ext_client =
       response_channel->mutable_ext_audio_offload()->Bind();
-  fidl::InterfaceHandle<fidlbredr::AudioOffloadController> controller_handle;
+  fidlbredr::AudioOffloadControllerHandle controller_handle;
   fidl::InterfaceRequest<fidlbredr::AudioOffloadController> controller_request =
       controller_handle.NewRequest();
   audio_offload_ext_client->StartAudioOffload(std::move(*config), std::move(controller_request));
 
-  fidl::InterfacePtr<fidlbredr::AudioOffloadController> audio_offload_controller_client;
+  fidlbredr::AudioOffloadControllerPtr audio_offload_controller_client;
   audio_offload_controller_client.Bind(std::move(controller_handle));
 
   std::optional<zx_status_t> audio_offload_controller_epitaph;
@@ -1737,7 +1735,7 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadInProgress)
 TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadControllerError) {
   FakeChannel::WeakPtr fake_channel;
   adapter()->fake_bredr()->set_l2cap_channel_callback(
-      [&](auto chan) { fake_channel = std::move(chan); });
+      [&](FakeChannel::WeakPtr chan) { fake_channel = std::move(chan); });
 
   const bool android_vendor_ext_support = GetParam().first;
   const uint32_t a2dp_offload_capabilities = GetParam().second;
@@ -1758,13 +1756,11 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadControllerE
   const bt::PeerId peer_id(1);
   const fuchsia::bluetooth::PeerId fidl_peer_id{peer_id.value()};
 
+  // Set L2CAP channel parameters
   fidlbredr::L2capParameters l2cap_params;
-  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
-
-  fidlbredr::ChannelParameters chan_params;
-  l2cap_params.set_parameters(std::move(chan_params));
-
   fidlbredr::ConnectParameters conn_params;
+  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
+  l2cap_params.set_parameters(fidlbredr::ChannelParameters());
   conn_params.set_l2cap(std::move(l2cap_params));
 
   std::optional<fidlbredr::Channel> response_channel;
@@ -1781,6 +1777,7 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadControllerE
   }
   ASSERT_TRUE(response_channel->has_ext_audio_offload());
 
+  // Set Audio Offload Configuration Values
   std::unique_ptr<fidlbredr::AudioOffloadFeatures> codec = fidlbredr::AudioOffloadFeatures::New();
   std::unique_ptr<fidlbredr::AudioSbcSupport> codec_value = fidlbredr::AudioSbcSupport::New();
   codec->set_sbc(std::move(*codec_value));
@@ -1802,14 +1799,14 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadControllerE
   config->set_encoded_bit_rate(10);
   config->set_encoder_settings(std::move(*encoder_settings));
 
-  fidl::InterfacePtr<fidlbredr::AudioOffloadExt> audio_offload_ext_client =
+  fidlbredr::AudioOffloadExtPtr audio_offload_ext_client =
       response_channel->mutable_ext_audio_offload()->Bind();
-  fidl::InterfaceHandle<fidlbredr::AudioOffloadController> controller_handle;
+  fidlbredr::AudioOffloadControllerHandle controller_handle;
   fidl::InterfaceRequest<fidlbredr::AudioOffloadController> controller_request =
       controller_handle.NewRequest();
   audio_offload_ext_client->StartAudioOffload(std::move(*config), std::move(controller_request));
 
-  fidl::InterfacePtr<fidlbredr::AudioOffloadController> audio_offload_controller_client;
+  fidlbredr::AudioOffloadControllerPtr audio_offload_controller_client;
   audio_offload_controller_client.Bind(std::move(controller_handle));
 
   std::optional<zx_status_t> audio_offload_controller_epitaph;
@@ -1838,11 +1835,12 @@ INSTANTIATE_TEST_SUITE_P(ProfileServerTestFakeAdapter, AndroidSupportedFeaturesT
                          ::testing::ValuesIn(kVendorCapabilitiesParams));
 
 TEST_F(ProfileServerTestFakeAdapter, ServiceFoundRelayedToFidlClient) {
-  fidl::InterfaceHandle<fidlbredr::SearchResults> search_results_handle;
+  fidlbredr::SearchResultsHandle search_results_handle;
   FakeSearchResults search_results(search_results_handle.NewRequest(), dispatcher());
 
-  auto search_uuid = fidlbredr::ServiceClassProfileIdentifier::AUDIO_SINK;
-  auto attr_ids = std::vector<uint16_t>();
+  fidlbredr::ServiceClassProfileIdentifier search_uuid =
+      fidlbredr::ServiceClassProfileIdentifier::AUDIO_SINK;
+  std::vector<uint16_t> attr_ids = std::vector<uint16_t>();
 
   EXPECT_EQ(adapter()->fake_bredr()->registered_searches().size(), 0u);
   EXPECT_EQ(search_results.service_found_count(), 0u);
@@ -1855,11 +1853,11 @@ TEST_F(ProfileServerTestFakeAdapter, ServiceFoundRelayedToFidlClient) {
 
   // Trigger a match on the service search with some data. Should be received by the FIDL
   // client.
-  auto peer_id = bt::PeerId{10};
+  bt::PeerId peer_id = bt::PeerId{10};
   bt::UUID uuid(static_cast<uint32_t>(search_uuid));
 
   bt::sdp::AttributeId attr_id = 50;  // Random Attribute ID
-  auto elem = bt::sdp::DataElement();
+  bt::sdp::DataElement elem = bt::sdp::DataElement();
   elem.SetUrl("https://foobar.dev");  // Random URL
   auto attributes = std::map<bt::sdp::AttributeId, bt::sdp::DataElement>();
   attributes.emplace(attr_id, std::move(elem));
