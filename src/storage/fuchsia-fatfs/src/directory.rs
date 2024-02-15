@@ -7,7 +7,7 @@ use {
         filesystem::{FatFilesystem, FatFilesystemInner},
         node::{Closer, FatNode, Node, WeakFatNode},
         refs::{FatfsDirRef, FatfsFileRef},
-        types::{Dir, DirEntry},
+        types::{Dir, DirEntry, File},
         util::{dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time},
     },
     async_trait::async_trait,
@@ -40,8 +40,9 @@ use {
             },
         },
         execution_scope::ExecutionScope,
+        file::FidlIoConnection,
         path::Path,
-        ToObjectRequest,
+        ObjectRequestRef, ProtocolsExt as _, ToObjectRequest,
     },
 };
 
@@ -291,6 +292,42 @@ impl FatDirectory {
         Ok(cur_entry)
     }
 
+    fn lookup_with_protocols(
+        self: &Arc<Self>,
+        protocols: fio::ConnectionProtocols,
+        mut path: Path,
+        closer: &mut Closer<'_>,
+    ) -> Result<FatNode, Status> {
+        let mut current_entry = FatNode::Dir(self.clone());
+
+        while !path.is_empty() {
+            let child_protocols = if path.is_single_component() {
+                protocols.clone()
+            } else {
+                fio::ConnectionProtocols::Node(fio::NodeOptions {
+                    protocols: Some(fio::NodeProtocols {
+                        directory: Some(fio::DirectoryProtocolOptions::default()),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                })
+            };
+
+            match current_entry {
+                FatNode::Dir(entry) => {
+                    let name = path.next().unwrap();
+                    validate_filename(name)?;
+                    current_entry = entry.clone().open2_child(name, child_protocols, closer)?;
+                }
+                FatNode::File(_) => {
+                    return Err(Status::NOT_DIR);
+                }
+            };
+        }
+
+        Ok(current_entry)
+    }
+
     /// Open a child entry with the given name.
     /// Flags can be any of the following, matching their fuchsia.io definitions:
     /// * OPEN_FLAG_CREATE
@@ -317,27 +354,10 @@ impl FatDirectory {
             let entry = self.find_child(&fs_lock, name)?;
             if let Some(entry) = entry {
                 check_open_flags_for_existing_entry(flags)?;
-
                 if entry.is_dir() {
-                    // Safe because we give the FatDirectory a FatFilesystem which ensures that the
-                    // FatfsDirRef will not outlive its FatFilesystem.
-                    let dir_ref = unsafe { FatfsDirRef::from(entry.to_dir()) };
-                    closer.add(FatNode::Dir(FatDirectory::new(
-                        dir_ref,
-                        Some(self.clone()),
-                        self.filesystem.clone(),
-                        name.to_owned(),
-                    )))
+                    self.add_directory(entry.to_dir(), name, closer)
                 } else {
-                    // Safe because we give the FatFile a FatFilesystem which ensures that the
-                    // FatfsFileRef will not outlive its FatFilesystem.
-                    let file_ref = unsafe { FatfsFileRef::from(entry.to_file()) };
-                    closer.add(FatNode::File(FatFile::new(
-                        file_ref,
-                        self.clone(),
-                        self.filesystem.clone(),
-                        name.to_owned(),
-                    )))
+                    self.add_file(entry.to_file(), name, closer)
                 }
             } else if flags.intersects(fio::OpenFlags::CREATE) {
                 // Child entry does not exist, but we've been asked to create it.
@@ -345,26 +365,10 @@ impl FatDirectory {
                 let dir = self.borrow_dir(&fs_lock)?;
                 if flags.intersects(fio::OpenFlags::DIRECTORY) {
                     let dir = dir.create_dir(name).map_err(fatfs_error_to_status)?;
-                    // Safe because we give the FatDirectory a FatFilesystem which ensures that the
-                    // FatfsDirRef will not outlive its FatFilesystem.
-                    let dir_ref = unsafe { FatfsDirRef::from(dir) };
-                    closer.add(FatNode::Dir(FatDirectory::new(
-                        dir_ref,
-                        Some(self.clone()),
-                        self.filesystem.clone(),
-                        name.to_owned(),
-                    )))
+                    self.add_directory(dir, name, closer)
                 } else {
                     let file = dir.create_file(name).map_err(fatfs_error_to_status)?;
-                    // Safe because we give the FatFile a FatFilesystem which ensures that the
-                    // FatfsFileRef will not outlive its FatFilesystem.
-                    let file_ref = unsafe { FatfsFileRef::from(file) };
-                    closer.add(FatNode::File(FatFile::new(
-                        file_ref,
-                        self.clone(),
-                        self.filesystem.clone(),
-                        name.to_owned(),
-                    )))
+                    self.add_file(file, name, closer)
                 }
             } else {
                 // Not creating, and no existing entry => not found.
@@ -375,6 +379,70 @@ impl FatDirectory {
         let mut data = self.data.write().unwrap();
         data.children.insert(InsensitiveString(name.to_owned()), node.downgrade());
         if created {
+            data.watchers.send_event(&mut SingleNameEventProducer::added(name));
+            self.filesystem.mark_dirty();
+        }
+
+        Ok(node)
+    }
+
+    pub(crate) fn open2_child(
+        self: &Arc<Self>,
+        name: &str,
+        protocols: fio::ConnectionProtocols,
+        closer: &mut Closer<'_>,
+    ) -> Result<FatNode, Status> {
+        let fs_lock = self.filesystem.lock().unwrap();
+
+        // Check if the entry already exists in the cache.
+        if let Some(entry) = self.cache_get(name) {
+            match protocols.open_mode() {
+                fio::OpenMode::OpenExisting | fio::OpenMode::MaybeCreate => {}
+                fio::OpenMode::AlwaysCreate => {
+                    return Err(Status::ALREADY_EXISTS);
+                }
+            }
+            entry.open_ref(&fs_lock)?;
+            return Ok(closer.add(entry));
+        };
+
+        let mut created_entry = false;
+        let node = match self.find_child(&fs_lock, name)? {
+            Some(entry) => match protocols.open_mode() {
+                fio::OpenMode::OpenExisting | fio::OpenMode::MaybeCreate => {
+                    if entry.is_dir() {
+                        self.add_directory(entry.to_dir(), name, closer)
+                    } else {
+                        self.add_file(entry.to_file(), name, closer)
+                    }
+                }
+                fio::OpenMode::AlwaysCreate => {
+                    return Err(Status::ALREADY_EXISTS);
+                }
+            },
+            None => match protocols.open_mode() {
+                fio::OpenMode::OpenExisting => {
+                    return Err(Status::NOT_FOUND);
+                }
+                fio::OpenMode::AlwaysCreate | fio::OpenMode::MaybeCreate => {
+                    created_entry = true;
+                    let dir = self.borrow_dir(&fs_lock)?;
+
+                    // Create directory if the directory protocol was explicitly specified.
+                    if protocols.is_dir_allowed() & !protocols.is_any_node_protocol_allowed() {
+                        let dir = dir.create_dir(name).map_err(fatfs_error_to_status)?;
+                        self.add_directory(dir, name, closer)
+                    } else {
+                        let file = dir.create_file(name).map_err(fatfs_error_to_status)?;
+                        self.add_file(file, name, closer)
+                    }
+                }
+            },
+        };
+
+        let mut data = self.data.write().unwrap();
+        data.children.insert(InsensitiveString(name.to_owned()), node.downgrade());
+        if created_entry {
             data.watchers.send_event(&mut SingleNameEventProducer::added(name));
             self.filesystem.mark_dirty();
         }
@@ -558,6 +626,37 @@ impl FatDirectory {
         }
 
         Ok(())
+    }
+
+    // Helper that adds a directory to the FatFilesystem
+    fn add_directory(
+        self: &Arc<Self>,
+        dir: Dir<'_>,
+        name: &str,
+        closer: &mut Closer<'_>,
+    ) -> FatNode {
+        // This is safe because we give the FatDirectory a FatFilesystem which ensures that the
+        // FatfsDirRef will not outlive its FatFilesystem.
+        let dir_ref = unsafe { FatfsDirRef::from(dir) };
+        closer.add(FatNode::Dir(FatDirectory::new(
+            dir_ref,
+            Some(self.clone()),
+            self.filesystem.clone(),
+            name.to_owned(),
+        )))
+    }
+
+    // Helper that adds a file to the FatFilesystem
+    fn add_file(self: &Arc<Self>, file: File<'_>, name: &str, closer: &mut Closer<'_>) -> FatNode {
+        // This is safe because we give the FatFile a FatFilesystem which ensures that the
+        // FatfsFileRef will not outlive its FatFilesystem.
+        let file_ref = unsafe { FatfsFileRef::from(file) };
+        closer.add(FatNode::File(FatFile::new(
+            file_ref,
+            self.clone(),
+            self.filesystem.clone(),
+            name.to_owned(),
+        )))
     }
 }
 
@@ -786,6 +885,37 @@ impl DirectoryEntry for FatDirectory {
         });
     }
 
+    fn open2(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: Path,
+        protocols: fio::ConnectionProtocols,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        let mut closer = Closer::new(&self.filesystem);
+
+        match self.lookup_with_protocols(protocols.clone(), path, &mut closer)? {
+            FatNode::Dir(entry) => {
+                let () = entry.open_ref(&self.filesystem.lock().unwrap())?;
+                object_request.spawn_connection(
+                    scope,
+                    entry.clone(),
+                    protocols,
+                    MutableConnection::create,
+                )
+            }
+            FatNode::File(entry) => {
+                let () = entry.open_ref(&self.filesystem.lock().unwrap())?;
+                object_request.spawn_connection(
+                    scope,
+                    entry.clone(),
+                    protocols,
+                    FidlIoConnection::create,
+                )
+            }
+        }
+    }
+
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
     }
@@ -810,6 +940,7 @@ impl vfs::node::Node for FatDirectory {
         })
     }
 
+    // TODO(https://fxbug.dev/324112547): add new io2 attributes, e.g. change time, access time.
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -981,6 +1112,8 @@ mod tests {
     use {
         super::*,
         crate::tests::{TestDiskContents, TestFatDisk},
+        assert_matches::assert_matches,
+        futures::TryStreamExt,
         scopeguard::defer,
         vfs::{
             directory::dirents_sink::{AppendResult, Sealed},
@@ -1196,5 +1329,93 @@ mod tests {
             .map_err(Status::from_raw)
             .expect("Second close OK");
         dir.close();
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_reopen2_root() {
+        let disk = TestFatDisk::empty_disk(TEST_DISK_SIZE);
+        let structure = TestDiskContents::dir().add_child("test", "Hello".into());
+        structure.create(&disk.root_dir());
+
+        let fs = disk.into_fatfs();
+        let root = fs.get_root().expect("get_root failed");
+
+        let scope = ExecutionScope::new();
+
+        // Open and close root.
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            rights: Some(fio::Operations::READ_BYTES),
+            ..Default::default()
+        });
+        protocols
+            .to_object_request(server_end)
+            .handle(|request| root.clone().open2(scope.clone(), Path::dot(), protocols, request));
+        proxy
+            .close()
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect("First close failed");
+
+        // Re-open and close root at "test".
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            rights: Some(fio::Operations::READ_BYTES),
+            ..Default::default()
+        });
+        protocols.to_object_request(server_end).handle(|request| {
+            root.clone().open2(
+                scope.clone(),
+                Path::validate_and_split("test").unwrap(),
+                protocols,
+                request,
+            )
+        });
+        proxy
+            .close()
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect("Second close failed");
+
+        root.close();
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_open2_already_exists() {
+        let disk = TestFatDisk::empty_disk(TEST_DISK_SIZE);
+        let structure = TestDiskContents::dir().add_child("test", "Hello".into());
+        structure.create(&disk.root_dir());
+
+        let fs = disk.into_fatfs();
+        let root = fs.get_root().expect("get_root failed");
+
+        let scope = ExecutionScope::new();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            rights: Some(fio::Operations::READ_BYTES),
+            mode: Some(fio::OpenMode::AlwaysCreate),
+            flags: Some(fio::NodeFlags::GET_REPRESENTATION),
+            ..Default::default()
+        });
+        protocols.to_object_request(server_end).handle(|request| {
+            root.clone().open2(
+                scope.clone(),
+                Path::validate_and_split("test").unwrap(),
+                protocols,
+                request,
+            )
+        });
+
+        let event =
+            proxy.take_event_stream().try_next().await.expect_err("open2 passed unexpectedly");
+
+        assert_matches!(
+            event,
+            fidl::Error::ClientChannelClosed { status: Status::ALREADY_EXISTS, .. }
+        );
+
+        root.close();
     }
 }

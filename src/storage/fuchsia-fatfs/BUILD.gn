@@ -44,6 +44,7 @@ rustc_library("lib") {
   deps = fatfs_deps
   test_deps = [
     "//src/lib/fuchsia",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
   ]
   sources = fatfs_sources
