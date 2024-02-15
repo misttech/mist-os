@@ -28,7 +28,7 @@ TEST_F(RequestProcessorTest, RequestListCreate) {
   for (uint8_t i = 0; i < kMaxTransferRequestListSize; ++i) {
     auto &slot = request_list->GetSlot(i);
     ASSERT_EQ(slot.state, SlotState::kFree);
-    ASSERT_EQ(slot.command_descriptor_io.is_valid(), true);
+    ASSERT_TRUE(slot.command_descriptor_io);
   }
 }
 
@@ -100,7 +100,7 @@ TEST_F(RequestProcessorTest, FillDescriptorAndSendRequest) {
   zx_paddr_t paddr = ufs_->GetTransferRequestProcessor()
                          .GetRequestList()
                          .GetSlot(slot_num.value())
-                         .command_descriptor_io.phys();
+                         .command_descriptor_io->phys();
   EXPECT_EQ(descriptor->utp_command_descriptor_base_address(), paddr & UINT32_MAX);
   EXPECT_EQ(descriptor->utp_command_descriptor_base_address_upper(),
             static_cast<uint32_t>(paddr >> 32));

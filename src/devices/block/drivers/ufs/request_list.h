@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_UFS_REQUEST_LIST_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_UFS_REQUEST_LIST_H_
 
-#include <lib/ddk/io-buffer.h>
+#include <lib/dma-buffer/buffer.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/result.h>
 
@@ -31,7 +31,7 @@ enum class SlotState {
 
 struct RequestSlot {
   SlotState state = SlotState::kFree;
-  ddk::IoBuffer command_descriptor_io;
+  std::unique_ptr<dma_buffer::ContiguousBuffer> command_descriptor_io;
   sync_completion_t complete;
   zx::pmt pmt;
   IoCommand *io_cmd;
@@ -50,12 +50,12 @@ class RequestList {
   // Get 'transfer/task management' request descriptor's physical address
   template <typename T>
   zx_paddr_t GetRequestDescriptorPhysicalAddress(uint8_t slot) const {
-    return io_buffer_.phys() + sizeof(T) * slot;
+    return io_buffer_->phys() + sizeof(T) * slot;
   }
   // Get 'transfer/task management' request descriptor's virtual address
   template <typename T>
   T *GetRequestDescriptor(uint8_t slot) const {
-    return static_cast<T *>(io_buffer_.virt()) + slot;
+    return static_cast<T *>(io_buffer_->virt()) + slot;
   }
 
   RequestSlot &GetSlot(uint8_t entry_num) {
@@ -68,20 +68,21 @@ class RequestList {
   T *GetDescriptorBuffer(uint8_t entry_num, uint16_t offset = 0) {
     ZX_ASSERT_MSG(entry_num < request_slots_.size(), "Invalid entry_num");
     return reinterpret_cast<T *>(
-        reinterpret_cast<uint8_t *>(request_slots_[entry_num].command_descriptor_io.virt()) +
+        reinterpret_cast<uint8_t *>(request_slots_[entry_num].command_descriptor_io->virt()) +
         offset);
   }
 
   size_t GetDescriptorBufferSize(uint8_t entry_num) {
     ZX_ASSERT_MSG(entry_num < request_slots_.size(), "Invalid entry_num");
-    return request_slots_[entry_num].command_descriptor_io.size();
+    return request_slots_[entry_num].command_descriptor_io->size();
   }
 
  private:
   zx::result<> Init(zx::unowned_bti bti, size_t entry_size, uint8_t entry_count);
-  zx::result<> IoBufferInit(zx::unowned_bti &bti, ddk::IoBuffer &io, size_t size);
+  zx::result<> IoBufferInit(zx::unowned_bti &bti, std::unique_ptr<dma_buffer::ContiguousBuffer> *io,
+                            size_t size);
 
-  ddk::IoBuffer io_buffer_;
+  std::unique_ptr<dma_buffer::ContiguousBuffer> io_buffer_;
 
   // Information about the requests that exist in the request list.
   std::vector<RequestSlot> request_slots_;

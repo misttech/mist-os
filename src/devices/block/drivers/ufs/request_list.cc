@@ -26,7 +26,7 @@ zx::result<> RequestList::Init(zx::unowned_bti bti, size_t entry_size, uint8_t e
   ZX_ASSERT_MSG(list_size <= zx_system_get_page_size(), "Invalid list_size");
 
   // Allocate list.
-  zx::result<> result = IoBufferInit(bti, io_buffer_, list_size);
+  zx::result<> result = IoBufferInit(bti, &io_buffer_, list_size);
   if (result.is_error()) {
     zxlogf(ERROR, "Failed to allocate memory for the Request List: %s", result.status_string());
     return result.take_error();
@@ -36,7 +36,7 @@ zx::result<> RequestList::Init(zx::unowned_bti bti, size_t entry_size, uint8_t e
   // Allocate slots.
   for (auto &slot : request_slots_) {
     slot.state = SlotState::kFree;
-    zx::result<> result = IoBufferInit(bti, slot.command_descriptor_io, kUtpCommandDescriptorSize);
+    zx::result<> result = IoBufferInit(bti, &slot.command_descriptor_io, kUtpCommandDescriptorSize);
     if (result.is_error()) {
       zxlogf(ERROR, "Failed to allocate memory for the Command Descriptor: %s",
              result.status_string());
@@ -47,19 +47,18 @@ zx::result<> RequestList::Init(zx::unowned_bti bti, size_t entry_size, uint8_t e
   return zx::ok();
 }
 
-zx::result<> RequestList::IoBufferInit(zx::unowned_bti &bti, ddk::IoBuffer &io, size_t size) {
-  if (zx_status_t status = io.InitAligned(bti->get(), size, 0, IO_BUFFER_RW | IO_BUFFER_CONTIG);
+zx::result<> RequestList::IoBufferInit(zx::unowned_bti &bti,
+                                       std::unique_ptr<dma_buffer::ContiguousBuffer> *io,
+                                       size_t size) {
+  const size_t buffer_size = fbl::round_up(size, zx_system_get_page_size());
+  auto buffer_factory = dma_buffer::CreateBufferFactory();
+  if (zx_status_t status = buffer_factory->CreateContiguous(*bti, buffer_size, 0, io);
       status != ZX_OK) {
     return zx::error(status);
   }
-  if (!io.is_valid()) {
+  if (!io->get()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
-
-  if (zx_status_t status = io.PhysMap(); status != ZX_OK) {
-    return zx::error(status);
-  }
-  memset(io.virt(), 0, io.size());
   return zx::ok();
 }
 

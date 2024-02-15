@@ -60,8 +60,8 @@ std::tuple<uint16_t, uint32_t> TransferRequestProcessor::PreparePrdt<ScsiCommand
 
   FillPrdt(prdt, buffer_phys, prdt_entry_count, data_transfer_length);
 
-  // TODO(https://fxbug.dev/42075643): Enable unmmap and write buffer command. Umap and writebuffer must set
-  // the xfer->count value differently.
+  // TODO(https://fxbug.dev/42075643): Enable unmmap and write buffer command. Umap and writebuffer
+  // must set the xfer->count value differently.
 
   return {prdt_offset, prdt_entry_count};
 }
@@ -407,7 +407,7 @@ zx::result<> TransferRequestProcessor::FillDescriptorAndSendRequest(
     uint8_t slot, const DataDirection data_dir, const uint16_t response_offset,
     const uint16_t response_length, const uint16_t prdt_offset, const uint32_t prdt_entry_count) {
   auto descriptor = request_list_.GetRequestDescriptor<TransferRequestDescriptor>(slot);
-  zx_paddr_t paddr = request_list_.GetSlot(slot).command_descriptor_io.phys();
+  zx_paddr_t paddr = request_list_.GetSlot(slot).command_descriptor_io->phys();
 
   // Fill up UTP Transfer Request Descriptor.
   memset(descriptor, 0, sizeof(TransferRequestDescriptor));
