@@ -103,6 +103,7 @@ LowEnergyConnectionManager::LowEnergyConnectionManager(
     gatt::GATT::WeakPtr gatt,
     LowEnergyDiscoveryManager::WeakPtr discovery_manager,
     sm::SecurityManagerFactory sm_creator,
+    const AdapterState& adapter_state,
     pw::async::Dispatcher& dispatcher)
     : dispatcher_(dispatcher),
       cmd_(std::move(cmd_channel)),
@@ -112,6 +113,7 @@ LowEnergyConnectionManager::LowEnergyConnectionManager(
       peer_cache_(peer_cache),
       l2cap_(l2cap),
       gatt_(gatt),
+      adapter_state_(adapter_state),
       discovery_manager_(discovery_manager),
       hci_connector_(connector),
       local_address_delegate_(addr_delegate),
@@ -420,6 +422,7 @@ void LowEnergyConnectionManager::RegisterRemoteInitiatedLink(
                                                      weak_self_.GetWeakPtr(),
                                                      l2cap_,
                                                      gatt_,
+                                                     adapter_state_,
                                                      dispatcher_);
   auto [conn_iter, _] = remote_connectors_.emplace(
       peer_id, RequestAndConnector{std::move(request), std::move(connector)});
@@ -507,6 +510,7 @@ void LowEnergyConnectionManager::TryCreateNextConnection() {
               weak_self_.GetWeakPtr(),
               l2cap_,
               gatt_,
+              adapter_state_,
               dispatcher_);
       connector->AttachInspect(inspect_node_,
                                kInspectOutboundConnectorNodeName);

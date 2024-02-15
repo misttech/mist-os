@@ -18,6 +18,7 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/metrics.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/windowed_inspect_numeric_property.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/adapter_state.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection_request.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connector.h"
@@ -80,6 +81,7 @@ class LowEnergyConnectionManager final {
   //                 connection and bonding state of a peer via the cache.
   // |l2cap|: Used to interact with the L2CAP layer.
   // |gatt|: Used to interact with the GATT profile layer.
+  // |adapter_state|: Provides information on controller capabilities.
   LowEnergyConnectionManager(
       hci::CommandChannel::WeakPtr cmd_channel,
       hci::LocalAddressDelegate* addr_delegate,
@@ -89,6 +91,7 @@ class LowEnergyConnectionManager final {
       gatt::GATT::WeakPtr gatt,
       LowEnergyDiscoveryManager::WeakPtr discovery_manager,
       sm::SecurityManagerFactory sm_creator,
+      const AdapterState& adapter_state,
       pw::async::Dispatcher& dispatcher);
   ~LowEnergyConnectionManager();
 
@@ -326,6 +329,9 @@ class LowEnergyConnectionManager final {
   // The GATT layer reference, used to add and remove ATT data bearers and
   // service discovery.
   gatt::GATT::WeakPtr gatt_;
+
+  // Provides us with information on the capabilities of our controller
+  AdapterState adapter_state_;
 
   // Local GATT service registry.
   std::unique_ptr<gatt::LocalServiceManager> gatt_registry_;

@@ -6,6 +6,7 @@
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_GAP_LOW_ENERGY_CONNECTOR_H_
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/device_address.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/adapter_state.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection_request.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_interrogator.h"
@@ -37,6 +38,7 @@ class LowEnergyConnector final {
                      WeakSelf<LowEnergyConnectionManager>::WeakPtr conn_mgr,
                      l2cap::ChannelManager* l2cap,
                      gatt::GATT::WeakPtr gatt,
+                     const AdapterState& adapter_state,
                      pw::async::Dispatcher& dispatcher);
 
   // Instances should only be destroyed after the result callback is called
@@ -139,6 +141,8 @@ class LowEnergyConnector final {
   // Layer pointers to be passed to LowEnergyConnection.
   l2cap::ChannelManager* l2cap_;
   gatt::GATT::WeakPtr gatt_;
+
+  AdapterState adapter_state_;
 
   // True if this connector is connecting an outbound connection, false if it is
   // connecting an inbound connection.
