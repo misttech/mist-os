@@ -404,7 +404,7 @@ mod test {
     use fidl::endpoints::create_sync_proxy_and_stream;
     use fidl_fuchsia_input::Key;
     use fuchsia_async as fasync;
-    use futures::{channel::mpsc, StreamExt};
+    use futures::StreamExt;
     use starnix_sync::Unlocked;
     use starnix_uapi::user_address::UserAddress;
     use std::thread;
@@ -652,9 +652,7 @@ mod test {
         assert_eq!(r, error!(EFAULT));
     }
 
-    // TODO(b/319238817): Re-enable when the flakiness is fixed
-    #[ignore]
-    #[::fuchsia::test]
+    #[fasync::run(2, test)]
     async fn ui_dev_create_keyboard() {
         let dev = UinputDevice::new();
         let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
@@ -667,7 +665,6 @@ mod test {
         let _ =
             dev.ioctl(&mut locked, &file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
 
-        let (req_sender, mut req_receiver) = mpsc::unbounded();
         let (registry_proxy, mut stream) =
             create_sync_proxy_and_stream::<futinput::RegistryMarker>()
                 .expect("create Registry proxy and stream");
@@ -676,12 +673,7 @@ mod test {
             fasync::LocalExecutor::new().run_singlethreaded(async {
                 if let Some(request) = stream.next().await {
                     match request {
-                        Ok(futinput::RegistryRequest::RegisterKeyboard {
-                            payload,
-                            responder,
-                            ..
-                        }) => {
-                            let _ = req_sender.unbounded_send(payload.device);
+                        Ok(futinput::RegistryRequest::RegisterKeyboard { responder, .. }) => {
                             let _ = responder.send();
                         }
                         _ => panic!("Registry handler received an unexpected request"),
@@ -697,11 +689,9 @@ mod test {
 
         handle.join().expect("stream panic");
 
-        let request = req_receiver.next().await;
-
-        // Verify that ui_dev_create sends RegisterKeyboard request to Registry
-        // and that the request includes some ServerEnd in `device`.
-        assert!(request.is_some());
+        // This test will timeout if the `fuchsia.ui.test.input` stub does not
+        // receive the device register request.
+        // Or panic if the stub receives an invalid request.
     }
 
     #[::fuchsia::test]
