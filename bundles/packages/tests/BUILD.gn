@@ -33,7 +33,6 @@ group("all") {
     "//src/developer/debug/zxdb:zxdb_tests($host_toolchain)",
     "//src/developer/memory/metrics/tests",
     "//src/developer/memory/monitor/tests",
-    "//src/developer/sched:tests",
     "//src/fonts:tests",
     "//src/graphics:tests",
     "//src/graphics/tests:vulkan-tests",

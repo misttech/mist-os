@@ -24,7 +24,6 @@ group("all") {
     ":cpuperf",
     ":debug_agent",
     ":far",
-    ":sched",
     ":telephony",
     ":terminal",
     ":tiles",
@@ -93,7 +92,6 @@ group("bluetooth_profiles") {
 group("cmdutils") {
   testonly = true
   public_deps = [
-    ":sched",
     "//examples/cowsay",
     "//src/zircon/bin/hwstress",
     "//src/zircon/bin/time",
@@ -129,11 +127,6 @@ group("far") {
     "//src/sys/pkg/bin/far",
     "//src/sys/pkg/bin/far:host",
   ]
-}
-
-group("sched") {
-  testonly = true
-  public_deps = [ "//src/developer/sched" ]
 }
 
 group("telephony") {
