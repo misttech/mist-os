@@ -154,13 +154,16 @@ _SWIFTSHADER_URL = "https://swiftshader.googlesource.com/SwiftShader"
 _GLSLANG_URL = "https://github.com/KhronosGroup/glslang"
 _VULKAN_HEADERS_URL = "https://github.com/KhronosGroup/Vulkan-Headers"
 _VULKAN_LOADER_URL = "https://github.com/KhronosGroup/Vulkan-Loader"
+_VULKAN_UTILITY_LIBRARIES_URL = (
+    "https://github.com/KhronosGroup/Vulkan-Utility-Libraries"
+)
 _VULKAN_VALIDATION_LAYERS_URL = (
     "https://github.com/KhronosGroup/Vulkan-ValidationLayers"
 )
 
-_DEFAULT_SWIFTSHADER_REVISION = "6c5a1c5220d3a90999340b4d2998d49e0c02d54a"
-_DEFAULT_GLSLANG_REVISION = "5755de46b07e4374c05fb1081f65f7ae1f8cca81"
-_DEFAULT_VULKAN_SDK_VERSION = "1.3.232"
+_DEFAULT_SWIFTSHADER_REVISION = "f4819d2276b777e8d6dfb32b34c1130e7945f9b8"
+_DEFAULT_GLSLANG_REVISION = "36d08c0d940cf307a23928299ef52c7970d8cee6"
+_DEFAULT_VULKAN_SDK_VERSION = "1.3.268"
 
 
 def make_git_url(site_url, revision):
@@ -193,8 +196,9 @@ def main(args):
 
     args = parser.parse_args(args[1:])
 
-    vulkan_headers_revision = "sdk-%s.0" % args.vulkan_sdk_version
+    vulkan_headers_revision = "vulkan-sdk-%s.0" % args.vulkan_sdk_version
     vulkan_loader_revision = vulkan_headers_revision
+    vulkan_utility_libraries_revision = vulkan_headers_revision
     vulkan_validation_layers_revision = vulkan_headers_revision
 
     d = {
@@ -208,6 +212,9 @@ def main(args):
         ),
         "vulkan_loader": make_git_url(
             _VULKAN_LOADER_URL, vulkan_loader_revision
+        ),
+        "vulkan_utility_libraries": make_git_url(
+            _VULKAN_UTILITY_LIBRARIES_URL, vulkan_utility_libraries_revision
         ),
         "vulkan_validation_layers": make_git_url(
             _VULKAN_VALIDATION_LAYERS_URL, vulkan_validation_layers_revision
@@ -250,6 +257,7 @@ GLSLANG_GIT_URL=${glslang}
 
 VULKAN_HEADERS_GIT_URL=${vulkan_headers}
 VULKAN_LOADER_GIT_URL=${vulkan_loader}
+VULKAN_UTILITY_LIBRARIES_GIT_URL=${vulkan_utility_libraries}
 VULKAN_VALIDATION_LAYERS_GIT_URL=${vulkan_validation_layers}
 
 # NOTE: SPIRV-Tools and SPIRV-Headers revisions from glslang/known_good.json

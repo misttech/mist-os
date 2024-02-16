@@ -383,6 +383,10 @@ source "${BUILD_CONFIG_FILE}"
 # copied to the real installation directory specified by INSTALL_DIR
 readonly INSTALL_PREFIX="${TOP_BUILD_DIR}/build-install"
 
+# Fuchsia's clang defaults to errors if there are undefined symbols in
+# the version script.
+FUCHSIA_CLANG_WORKAROUND="-DCMAKE_SHARED_LINKER_FLAGS=\"-Wl,--undefined-version\""
+
 # NOTE: For some reason, trying to use MinRelSize for the build type ends up
 #       with binaries that are far larger than Release (e.g. 43 MiB vs 23 MiB
 #       for libVkLayer_khronos_validation.so, or 95 MiB vs 29 MiB for
@@ -391,6 +395,7 @@ COMMON_CMAKE_FLAGS=(
   "-DCMAKE_BUILD_TYPE=Release"
   "-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}"
   "-DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX}"
+  $FUCHSIA_CLANG_WORKAROUND
 )
 
 # Auto-detect ccache and use it when available
@@ -590,11 +595,11 @@ clone_and_build "${VULKAN_LOADER_DIR}" "${VULKAN_LOADER_GIT_URL}" \
   "${VULKAN_HEADERS_CMD[@]}"
 
 #
-# glslang - no dependencies
+# Vulkan-Utility-Libraries - depends on Vulkan-Headers
 #
-readonly GLSLANG_DIR="${SOURCES_DIR}/glslang"
-clone_and_build "${GLSLANG_DIR}" "${GLSLANG_GIT_URL}"
-readonly GLSLANG_CMD=("-DGLSLANG_INSTALL_DIR=${INSTALL_PREFIX}")
+readonly VULKAN_UTILITY_LIBRARIES_DIR="${SOURCES_DIR}/Vulkan-Utility-Libraries"
+clone_and_build "${VULKAN_UTILITY_LIBRARIES_DIR}" "${VULKAN_UTILITY_LIBRARIES_GIT_URL}" \
+  "${VULKAN_HEADERS_CMD[@]}"
 
 #
 # effcee
@@ -628,7 +633,20 @@ symlink_dir "${SPIRV_TOOLS_DIR}/external/re2" "${RE2_DIR}"
 build_with_cmake "${SPIRV_TOOLS_DIR}" -DSPIRV_SKIP_TESTS=ON
 
 #
-# Vulkan-ValidationLayers - depends on Vulkan-Headers + glslang + SPIRV-Tools
+# glslang - depends on SPIRV_Tools
+#
+readonly GLSLANG_DIR="${SOURCES_DIR}/glslang"
+clone_or_update "${GLSLANG_DIR}" "${GLSLANG_GIT_URL}"
+
+# Special setup of the external sub-directory
+symlink_dir "${GLSLANG_DIR}/External/spirv-tools" "${SPIRV_TOOLS_DIR}"
+
+build_with_cmake "${GLSLANG_DIR}"
+
+readonly GLSLANG_CMD=("-DGLSLANG_INSTALL_DIR=${INSTALL_PREFIX}")
+
+#
+# Vulkan-ValidationLayers - depends on Vulkan-Headers + Vulkan-Utility-Libraries + glslang + SPIRV-Tools
 #
 # Note that when cross-compiling, the CMake probing will not find the installed
 # SPIRV-Tools libraries (probably due to pkg-config issues), so force them
@@ -640,6 +658,7 @@ clone_and_build "${VULKAN_VALIDATION_LAYERS}" "${VULKAN_VALIDATION_LAYERS_GIT_UR
     -DBUILD_WSI_WAYLAND_SUPPORT=OFF \
     "${VULKAN_HEADERS_CMD[@]}" "${GLSLANG_CMD[@]}" \
     -DSPIRV_HEADERS_INSTALL_DIR="${INSTALL_PREFIX}" \
+    -DVULKAN_UTILITY_LIBRARIES_INSTALL_DIR="${INSTALL_PREFIX}" \
     -DSPIRV_TOOLS_LIB="${INSTALL_PREFIX}/lib/libSPIRV-Tools.a" \
     -DSPIRV_TOOLS_OPT_LIB="${INSTALL_PREFIX}/lib/libSPIRV-Tools-opt.a" \
     -DUSE_ROBIN_HOOD_HASHING=OFF \
@@ -675,6 +694,7 @@ FILES=(
   share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json
 )
 
+echo "Installing to ${INSTALL_DIR}..."
 mkdir -p "${INSTALL_DIR}" &&
 (tar c -f- -C "${INSTALL_PREFIX}" --preserve-permissions "${FILES[@]}") | (tar x -f- --overwrite -C "${INSTALL_DIR}")
 
