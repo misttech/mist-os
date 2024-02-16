@@ -25,7 +25,10 @@
     "fuchsia.graphics.drivers.msd-vsi-vip.vsi-interrupt": { "priority": 25 },
 
     // Virtualization profiles.
-    "fuchsia.virtualization.virtio_sound": { "capacity": "500us", "deadline": "5ms", "period": "5ms" }
+    "fuchsia.virtualization.virtio_sound": { "capacity": "500us", "deadline": "5ms", "period": "5ms" },
+
+    // Fuchsia memory monitor profiles.
+    "fuchsia.memory-monitor.main": { "priority": 8},
   },
   "memory": {
     "fuchsia.media.audio.core": { "priority": 24 },

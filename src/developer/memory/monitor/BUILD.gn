@@ -64,7 +64,7 @@ metrics_registry("memory_metrics_registry") {
 
 _common_deps = [
   ":lib",
-  "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
+  "//sdk/lib/scheduler/cpp",
   "//sdk/lib/sys/cpp",
   "//src/lib/fsl",
   "//src/lib/fxl:fxl_cli",

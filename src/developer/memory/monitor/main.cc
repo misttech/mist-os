@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
-#include <fuchsia/scheduler/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fdio/directory.h>
+#include <lib/scheduler/role.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/provider.h>
 
@@ -58,17 +58,8 @@ int main(int argc, const char** argv) {
       sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
   // Lower the priority.
-  fuchsia::scheduler::ProfileProviderSyncPtr profile_provider;
-  startup_context->svc()->Connect<fuchsia::scheduler::ProfileProvider>(
-      profile_provider.NewRequest());
-  zx_status_t fidl_status;
-  zx::profile profile;
-  auto status =
-      profile_provider->GetProfile(8 /* LOW_PRIORITY */, "memory_monitor", &fidl_status, &profile);
-  FX_CHECK(status == ZX_OK) << "status: " << zx_status_get_string(status);
-  FX_CHECK(fidl_status == ZX_OK) << "fidl_status: " << zx_status_get_string(fidl_status);
-  auto set_status = zx_object_set_profile(zx_thread_self(), profile.get(), 0);
-  FX_CHECK(set_status == ZX_OK) << "set_status: " << zx_status_get_string(set_status);
+  zx_status_t status = fuchsia_scheduler::SetRoleForThisThread("fuchsia.memory-monitor.main");
+  FX_CHECK(status == ZX_OK) << "Set scheduler role status: " << zx_status_get_string(status);
 
   monitor::Monitor app(std::move(startup_context), command_line, loop.dispatcher(),
                        true /* send_metrics */, true /* watch_memory_pressure */,
