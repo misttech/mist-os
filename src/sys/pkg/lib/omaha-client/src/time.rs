@@ -22,13 +22,18 @@
 //! or they can be bounds for when an event in the future can happen:
 //!
 //! ```
-//! let past_event_wall_time: SystemTime = read_some_system_time();
+//! use omaha_client::time::{ComplexTime, MockTimeSource, TimeSource, Timer};
+//! use omaha_client::time::timers::MockTimer;
+//! use std::time::{Duration, SystemTime};
+//! let past_event_wall_time: SystemTime = SystemTime::now();
+//! let source = MockTimeSource::new_from_now();
 //! let duration_to_next = Duration::from_secs(1*60*60); // one hour
 //! let rough_next_event_time = ComplexTime{
 //!                               wall: past_event_wall_time + duration_to_next,
-//!                               mono: TimeSource::now_in_monotonic() + duration_to_next
+//!                               mono: source.now_in_monotonic() + duration_to_next
 //!                             };
-//! timer.wait_until_either(rough_next_event_time).await;
+//! let mut timer = MockTimer::new();
+//! timer.wait_until(rough_next_event_time);
 //! ```
 //!
 //! The above setups up a `ComplexTime` as a bound that based on an expected wall time, and
@@ -134,6 +139,7 @@ impl ComplexTime {
 ///
 /// The important differentiation of this vs. a struct such as:
 /// ```
+/// use std::time::SystemTime;
 /// struct MaybeBoth {
 ///   wall: Option<SystemTime>,
 ///   monotonic: Option<SystemTime>
@@ -258,6 +264,8 @@ where
 ///
 /// # Example
 /// ```
+/// use omaha_client::time::ReadableSystemTime;
+/// use std::time::{Duration, SystemTime};
 /// let sys_time = SystemTime::UNIX_EPOCH + Duration::from_nanos(994610096026420000);
 ///
 /// assert_eq!(

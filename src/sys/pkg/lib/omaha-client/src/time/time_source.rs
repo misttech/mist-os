@@ -33,6 +33,7 @@ impl TimeSource for StandardTimeSource {
 ///
 /// # Example
 /// ```
+/// use omaha_client::time::MockTimeSource;
 /// let mock_source = MockTimeSource::new_from_now();
 /// ```
 ///
@@ -60,9 +61,10 @@ impl MockTimeSource {
     ///
     /// # Example
     /// ```
-    /// let current_time = StandardTimeSource.now();
-    /// let mock_source = MockTimeSource.from(current_time);
-    /// mock_source.advance(Duration::from_secs(3600))
+    /// use omaha_client::time::{ComplexTime, MockTimeSource, TimeSource};
+    /// use std::time::{Duration, Instant, SystemTime};
+    /// let mut mock_source = MockTimeSource::new_from_now();
+    /// mock_source.advance(Duration::from_secs(3600));
     /// let next_time = mock_source.now();
     /// ```
     pub fn new(t: impl Into<ComplexTime>) -> Self {
@@ -80,8 +82,10 @@ impl MockTimeSource {
     ///
     /// # Example
     /// ```
-    /// let one_mock_source = MockTimeSource::from_now();
-    /// let initial_time = one_mock_source.now();
+    /// use omaha_client::time::{ComplexTime, MockTimeSource, TimeSource};
+    /// use std::time::{Duration, Instant, SystemTime};
+    /// let mut one_mock_source = MockTimeSource::new_from_now();
+    /// let initial_time: ComplexTime = one_mock_source.now();
     /// let two_mock_source = one_mock_source.clone();
     ///
     /// let one_hour = Duration::from_secs(3600);

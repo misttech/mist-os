@@ -34,14 +34,20 @@ pub use stub::StubStorage;
 /// the key.  This is so that the Result::uwrap_or(<...default...>) pattern will work.
 ///
 /// ```
-/// let storage = SomeStorageImpl::new();
+/// # futures::executor::block_on(async {
+/// use omaha_client::storage::{MemStorage, Storage};
+/// use omaha_client::unless::Unless;
+/// let mut storage = MemStorage::new();
 /// storage.set_int("key", 345);
 ///
-/// // value should be None
-/// let value: Option<String> = storage.get_string("key");
+/// // value should be None:
+/// let value: Option<String> = storage.get_string("key").await;
+/// assert_eq!(None, value);
 ///
-/// // value should be "default"
-/// let value: String = storage.get_string("key").unwrap_or("default");
+/// // value should be "default":
+/// let value: String = storage.get_string("key").await.unwrap_or("default".to_string());
+/// assert_eq!("default", value);
+/// # });
 /// ```
 pub trait Storage {
     type Error: std::error::Error;

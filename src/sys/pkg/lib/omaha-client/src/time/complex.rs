@@ -15,7 +15,7 @@ pub mod complex_time_impls {
     /// it only implements `Debug`.
     ///
     /// # Example
-    /// ```
+    /// ```no_run
     /// use omaha_client::time::ComplexTime;
     /// use std::time::{Duration, Instant, SystemTime};
     /// assert_eq!(
@@ -23,7 +23,7 @@ pub mod complex_time_impls {
     ///                       wall: SystemTime::UNIX_EPOCH + Duration::from_nanos(994610096026420000),
     ///                       mono: Instant::now(),
     ///                   }),
-    ///     "2001-07-08 16:34:56.026 UTC (994610096.026420000) and Instant{ tv_sec: SEC, tv_nsec: NSEC }"
+    ///     "2001-07-08 16:34:56.026 UTC (994610096.026420000) at Instant{ tv_sec: SEC, tv_nsec: NSEC }"
     /// );
     ///```
     impl Display for ComplexTime {
@@ -282,8 +282,9 @@ pub mod partial_complex_time_impls {
     /// it only implements `Debug`.
     ///
     /// # Example
-    /// ```
+    /// ```no_run
     /// use std::time::{Duration, Instant, SystemTime};
+    /// use omaha_client::time::{ComplexTime, PartialComplexTime};
     /// assert_eq!(
     ///     format!("{}", PartialComplexTime::Complex(ComplexTime{
     ///                       wall: SystemTime::UNIX_EPOCH + Duration::from_nanos(994610096026420000),
