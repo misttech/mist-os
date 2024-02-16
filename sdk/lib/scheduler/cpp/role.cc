@@ -46,8 +46,8 @@ zx_status_t SetRole(const zx_handle_t borrowed_handle, std::string_view role) {
 
 namespace fuchsia_scheduler {
 
-zx_status_t SetRoleForHandle(zx::unowned_handle handle, std::string_view role) {
-  return SetRole(handle->get(), role);
+zx_status_t SetRoleForVmar(zx::unowned_vmar vmar, std::string_view role) {
+  return SetRole(vmar->get(), role);
 }
 
 zx_status_t SetRoleForThread(zx::unowned_thread thread, std::string_view role) {

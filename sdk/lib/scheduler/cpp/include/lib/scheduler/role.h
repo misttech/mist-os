@@ -5,8 +5,8 @@
 #ifndef LIB_SCHEDULER_ROLE_H_
 #define LIB_SCHEDULER_ROLE_H_
 
-#include <lib/zx/handle.h>
 #include <lib/zx/thread.h>
+#include <lib/zx/vmar.h>
 
 #include <string_view>
 
@@ -21,7 +21,7 @@
 
 namespace fuchsia_scheduler {
 
-zx_status_t SetRoleForHandle(zx::unowned_handle handle, std::string_view role);
+zx_status_t SetRoleForVmar(zx::unowned_vmar vmar, std::string_view role);
 zx_status_t SetRoleForThread(zx::unowned_thread thread, std::string_view role);
 zx_status_t SetRoleForThisThread(std::string_view role);
 

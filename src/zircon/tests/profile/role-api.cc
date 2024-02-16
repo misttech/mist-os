@@ -48,15 +48,6 @@ TEST(RoleApi, SetRole) {
     condition.notify_all();
     thread.join();
   }
-
-  // Test setting a role on an unsupported object type.
-  {
-    zx::event event;
-    ASSERT_OK(zx::event::create(0, &event));
-
-    EXPECT_EQ(ZX_ERR_WRONG_TYPE, fuchsia_scheduler::SetRoleForHandle(
-                                     zx::unowned_handle{event.get()}, "fuchsia.test-role:ok"));
-  }
 }
 
 }  // anonymous namespace
