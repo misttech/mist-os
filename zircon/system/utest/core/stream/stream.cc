@@ -21,8 +21,6 @@
 
 #include <zxtest/zxtest.h>
 
-extern "C" __WEAK zx_handle_t get_root_resource(void);
-
 namespace {
 
 // This value corresponds to `VmObject::LookupInfo::kMaxPages`
@@ -1073,8 +1071,8 @@ TEST(StreamTestCase, ReadWriteShrinkRace) {
   }
 }
 
-// Regression test for https://fxbug.dev/42176351. Writing to an offset that requires expansion should not
-// result in an overflow when computing the new required VMO size.
+// Regression test for https://fxbug.dev/42176351. Writing to an offset that requires expansion
+// should not result in an overflow when computing the new required VMO size.
 TEST(StreamTestCase, ExpandOverflow) {
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), ZX_VMO_RESIZABLE, &vmo));
