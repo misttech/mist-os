@@ -118,6 +118,8 @@ impl<'bump> Ctx<'bump> {
         ProcessAlias.edit(bump, self, ty)?;
         ProcessTuple.edit(bump, self, ty)?;
         ProcessUnion.edit(bump, self, ty)?;
+        ProcessArray.edit(bump, self, ty)?;
+        ProcessMap.edit(bump, self, ty)?;
 
         // No edits occurred
         Continue(())
@@ -376,6 +378,80 @@ impl<'bump> Editor<'bump> for ProcessTuple {
     }
 }
 
+/// Processes an array type by rewriting its element type.
+///
+/// Arrays of `Type::Void` with a fixed size above zero are replaced with `Type::Void`, since
+/// parsing elements are impossible.
+///
+/// Arrays of `Type::Void` without a fixed size are given a fixed size of 0.
+struct ProcessArray;
+
+impl<'bump> Editor<'bump> for ProcessArray {
+    fn edit(
+        &mut self,
+        bump: &'bump Bump,
+        ctx: &mut Ctx<'bump>,
+        ty: &'bump Type<'bump>,
+    ) -> ControlFlow<&'bump Type<'bump>> {
+        let Type::Array { mut size, mut ty } = *ty else { return Continue(()) };
+
+        let mut changed = ctx.process_type(bump, &mut ty);
+
+        if matches!(ty, Type::Void) {
+            match size {
+                // A non-fixed size array of void values requires a size of 0
+                None => {
+                    size = Some(0);
+                    changed = true
+                }
+                Some(0) => {}
+                // Requiring a size greater than 0 is impossible.
+                Some(..) => return Break(&Type::Void),
+            }
+        }
+
+        if changed {
+            Break(bump.alloc(Type::Array { size, ty }))
+        } else {
+            Continue(())
+        }
+    }
+}
+
+/// Processes a map type by rewriting the key and value type.
+///
+/// If the key or value is `Type::Void` the map is replaced with a JSON constant of an empty map.
+struct ProcessMap;
+
+impl<'bump> Editor<'bump> for ProcessMap {
+    fn edit(
+        &mut self,
+        bump: &'bump Bump,
+        ctx: &mut Ctx<'bump>,
+        ty: &'bump Type<'bump>,
+    ) -> ControlFlow<&'bump Type<'bump>> {
+        let Type::Map { mut key, mut value } = *ty else { return Continue(()) };
+
+        let key_changed = ctx.process_type(bump, &mut key);
+        let value_changed = ctx.process_type(bump, &mut value);
+
+        let changed = key_changed || value_changed;
+
+        if matches!(key, Type::Void) || matches!(value, Type::Void) {
+            // Either the key or valid is void, replace with an empty map constant.
+            return Break(&Type::Constant { value: &InlineValue::Object(&[]) });
+        }
+
+        if changed {
+            // Allocate new type
+            Break(bump.alloc(Type::Map { key, value }))
+        } else {
+            // Keep original type
+            Continue(())
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use ffx_validation_proc_macro::schema;
@@ -593,6 +669,102 @@ mod test {
                 Type::Type { ty: ValueType::Integer },
                 Type::Type { ty: ValueType::String },
             ])
+        ));
+    }
+
+    #[test]
+    fn test_map_with_void_key_into_empty_map() {
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = &Type::Map { key: &Type::Void, value: u32::TYPE };
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(ty, Type::Constant { value: InlineValue::Object([]) }));
+    }
+
+    #[test]
+    fn test_map_with_void_value_into_empty_map() {
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = &Type::Map { key: u32::TYPE, value: &Type::Void };
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(ty, Type::Constant { value: InlineValue::Object([]) }));
+    }
+
+    #[test]
+    fn test_map_simplifies_element_type() {
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = &Type::Map { key: SimpleAlias::TYPE, value: u32::TYPE };
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(
+            ty,
+            Type::Map {
+                key: Type::Type { ty: ValueType::Integer },
+                value: Type::Type { ty: ValueType::Integer }
+            }
+        ));
+    }
+
+    #[test]
+    fn test_array_of_void_to_zero_size() {
+        struct Array;
+        schema! {
+            type Array = [Nothing];
+        }
+
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = Array::TYPE;
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(ty, Type::Array { size: Some(0), ty: Type::Void }));
+    }
+
+    #[test]
+    fn test_fixed_size_array_of_void_to_void() {
+        struct Array;
+        schema! {
+            type Array = [Nothing; 3];
+        }
+
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = Array::TYPE;
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(ty, Type::Void));
+    }
+
+    #[test]
+    fn test_array_simplifies_element_type() {
+        struct Array;
+        schema! {
+            type Array = [SimpleAlias];
+        }
+
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = Array::TYPE;
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(
+            ty,
+            Type::Array { size: None, ty: Type::Type { ty: ValueType::Integer } }
         ));
     }
 
