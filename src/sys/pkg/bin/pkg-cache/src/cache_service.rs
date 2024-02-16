@@ -239,13 +239,7 @@ async fn get(
                 .await
                 .map_err(|e| {
                     error!("error while caching package {}: {:#}", pkg, anyhow!(e));
-                    cobalt_sender.send(
-                        MetricEvent::builder(metrics::PKG_CACHE_OPEN_MIGRATED_METRIC_ID)
-                            .with_event_codes(
-                                metrics::PkgCacheOpenMigratedMetricDimensionResult::Io,
-                            )
-                            .as_occurrence(1),
-                    );
+                    cobalt_sender.open_io_error();
                     Status::UNAVAILABLE
                 })?;
                 (Some(root_dir), package_status)
@@ -269,13 +263,7 @@ async fn get(
                 } else {
                     package_directory::RootDir::new(blobfs.clone(), pkg).await.map_err(|e| {
                         error!("get: creating RootDir {}: {:#}", pkg, anyhow!(e));
-                        cobalt_sender.send(
-                            MetricEvent::builder(metrics::PKG_CACHE_OPEN_MIGRATED_METRIC_ID)
-                                .with_event_codes(
-                                    metrics::PkgCacheOpenMigratedMetricDimensionResult::Io,
-                                )
-                                .as_occurrence(1),
-                        );
+                        cobalt_sender.open_io_error();
                         Status::INTERNAL
                     })?
                 }
@@ -283,13 +271,7 @@ async fn get(
             fpkg::GcProtection::OpenPackageTracking => {
                 open_packages.get_or_insert(pkg, root_dir).await.map_err(|e| {
                     error!("get: open_packages.get_or_insert {}: {:#}", pkg, anyhow!(e));
-                    cobalt_sender.send(
-                        MetricEvent::builder(metrics::PKG_CACHE_OPEN_MIGRATED_METRIC_ID)
-                            .with_event_codes(
-                                metrics::PkgCacheOpenMigratedMetricDimensionResult::Io,
-                            )
-                            .as_occurrence(1),
-                    );
+                    cobalt_sender.open_io_error();
                     Status::INTERNAL
                 })?
             }
@@ -298,11 +280,7 @@ async fn get(
             root_dir.open(scope, open_flags, vfs::path::Path::dot(), dir.into_channel().into());
     }
 
-    cobalt_sender.send(
-        MetricEvent::builder(metrics::PKG_CACHE_OPEN_MIGRATED_METRIC_ID)
-            .with_event_codes(metrics::PkgCacheOpenMigratedMetricDimensionResult::Success)
-            .as_occurrence(1),
-    );
+    cobalt_sender.open_success();
     Ok(())
 }
 
@@ -802,6 +780,29 @@ async fn get_cached(
         );
 
     Ok(())
+}
+
+trait CobaltSenderExt {
+    fn open_io_error(&mut self);
+    fn open_success(&mut self);
+}
+
+impl CobaltSenderExt for ProtocolSender<MetricEvent> {
+    fn open_io_error(&mut self) {
+        self.send(
+            MetricEvent::builder(metrics::PKG_CACHE_OPEN_MIGRATED_METRIC_ID)
+                .with_event_codes(metrics::PkgCacheOpenMigratedMetricDimensionResult::Io)
+                .as_occurrence(1),
+        );
+    }
+
+    fn open_success(&mut self) {
+        self.send(
+            MetricEvent::builder(metrics::PKG_CACHE_OPEN_MIGRATED_METRIC_ID)
+                .with_event_codes(metrics::PkgCacheOpenMigratedMetricDimensionResult::Success)
+                .as_occurrence(1),
+        );
+    }
 }
 
 #[cfg(test)]
