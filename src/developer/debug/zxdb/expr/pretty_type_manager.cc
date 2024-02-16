@@ -158,6 +158,8 @@ void PrettyTypeManager::AddDefaultCppPrettyTypes() {
   cpp_.emplace_back(InternalGlob("std::__2::vector<bool, *>"),
                     std::make_unique<PrettyArray>("vector_bool_printer_not_implemented_yet",
                                                   "vector_bool_printer_not_implemented_yet"));
+  cpp_.emplace_back(InternalGlob("std::__2::vector<*>::iterator"),
+                    std::make_unique<PrettyIterator>("*__i_"));
 
   // Smart pointers.
   cpp_.emplace_back(InternalGlob("std::__2::unique_ptr<*>"),
@@ -175,8 +177,8 @@ void PrettyTypeManager::AddDefaultCppPrettyTypes() {
   cpp_.emplace_back(
       InternalGlob("std::__2::variant<*>"),
       std::make_unique<PrettyRecursiveVariant>(
-          "std::variant", "__impl.__data", "__impl.__index", "__tail", "__head.__value",
-          "std::variant::valueless_by_exception()", GetterList({{"index", "__impl.__index"}})));
+          "std::variant", "__impl_.__data", "__impl_.__index", "__tail", "__head.__value",
+          "std::variant::valueless_by_exception()", GetterList({{"index", "__impl_.__index"}})));
 
   // std::atomic
   cpp_.emplace_back(
