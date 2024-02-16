@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 #include <assert.h>
-#include <fuchsia/sysmem/cpp/fidl.h>
-#include <lib/fdio/directory.h>
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <unistd.h>
 
 #include <limits>
@@ -224,18 +224,26 @@ TEST(TransactionElimination, ForeignQueueSysmem) {
       std::make_shared<vkp::ImageView>(device, vkp_physical_device.get(), vk::Extent2D{64, 64});
 
   {
-    fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator;
+    auto sysmem_allocator_end = component::Connect<fuchsia_sysmem::Allocator>();
+    ASSERT_TRUE(sysmem_allocator_end.is_ok()) << sysmem_allocator_end.status_string();
     constexpr auto kFormat = vk::Format::eB8G8R8A8Unorm;
-    ASSERT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.sysmem.Allocator",
-                                          sysmem_allocator.NewRequest().TakeChannel().release()));
-    sysmem_allocator->SetDebugClientInfo(fsl::GetCurrentProcessName(),
-                                         fsl::GetCurrentProcessKoid());
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr token;
-    zx_status_t status = sysmem_allocator->AllocateSharedCollection(token.NewRequest());
-    ASSERT_EQ(status, ZX_OK);
-    token->SetName(1u, ::testing::UnitTest::GetInstance()->current_test_info()->name());
+    fidl::SyncClient sysmem_allocator(std::move(*sysmem_allocator_end));
+    ASSERT_TRUE(sysmem_allocator
+                    ->SetDebugClientInfo(fuchsia_sysmem::AllocatorSetDebugClientInfoRequest{
+                        fsl::GetCurrentProcessName(), fsl::GetCurrentProcessKoid()})
+                    .is_ok());
+    auto token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+    ASSERT_TRUE(token_endpoints.is_ok()) << token_endpoints.status_string();
+
+    ASSERT_TRUE(
+        sysmem_allocator->AllocateSharedCollection(std::move(token_endpoints->server)).is_ok());
+    fidl::SyncClient token(std::move(token_endpoints->client));
+    ASSERT_TRUE(token
+                    ->SetName(fuchsia_sysmem::NodeSetNameRequest{
+                        1u, ::testing::UnitTest::GetInstance()->current_test_info()->name()})
+                    .is_ok());
     token->Sync();
-    vk::BufferCollectionCreateInfoFUCHSIA import_info(token.Unbind().TakeChannel().release());
+    vk::BufferCollectionCreateInfoFUCHSIA import_info(token.TakeClientEnd().TakeHandle().release());
     auto [result, collection] =
         device->createBufferCollectionFUCHSIAUnique(import_info, nullptr, loader);
     ASSERT_EQ(vk::Result::eSuccess, result);
@@ -255,7 +263,7 @@ TEST(TransactionElimination, ForeignQueueSysmem) {
                                  .setSharingMode(vk::SharingMode::eExclusive)
                                  .setInitialLayout(vk::ImageLayout::eUndefined);
     vk::SysmemColorSpaceFUCHSIA color_space;
-    color_space.setColorSpace(static_cast<uint32_t>(fuchsia::sysmem::ColorSpaceType::SRGB));
+    color_space.setColorSpace(static_cast<uint32_t>(fuchsia_sysmem::ColorSpaceType::kSrgb));
     auto image_format_constraints =
         vk::ImageFormatConstraintsInfoFUCHSIA()
             .setSysmemPixelFormat(0u)
