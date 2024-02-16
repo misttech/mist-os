@@ -5,6 +5,7 @@
 use crate::task::TaskBuilder;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
+use selinux::security_server::SecurityServer;
 use starnix_sync::{FileOpsIoctl, Locked, ReadOps, Unlocked, WriteOps};
 use std::{ffi::CString, mem::MaybeUninit, sync::Arc};
 use zerocopy::{AsBytes, NoCell};
@@ -51,7 +52,7 @@ fn create_pkgfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
 /// The `Task` is backed by a real process, and can be used to test syscalls.
 pub fn create_kernel_task_and_unlocked_with_pkgfs<'l>(
 ) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
-    create_kernel_task_and_unlocked_with_fs(create_pkgfs)
+    create_kernel_task_and_unlocked_with_fs_and_selinux(create_pkgfs, None)
 }
 
 pub fn create_kernel_and_task() -> (Arc<Kernel>, AutoReleasableTask) {
@@ -59,16 +60,31 @@ pub fn create_kernel_and_task() -> (Arc<Kernel>, AutoReleasableTask) {
     (kernel, task)
 }
 
+pub fn create_kernel_and_task_with_selinux(
+    security_server: Arc<SecurityServer>,
+) -> (Arc<Kernel>, AutoReleasableTask) {
+    let (kernel, task, _) =
+        create_kernel_task_and_unlocked_with_fs_and_selinux(TmpFs::new_fs, Some(security_server));
+    (kernel, task)
+}
+
 pub fn create_kernel_task_and_unlocked<'l>(
 ) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
-    create_kernel_task_and_unlocked_with_fs(TmpFs::new_fs)
+    create_kernel_task_and_unlocked_with_fs_and_selinux(TmpFs::new_fs, None)
+}
+
+pub fn create_kernel_task_and_unlocked_with_selinux<'l>(
+    security_server: Arc<SecurityServer>,
+) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
+    create_kernel_task_and_unlocked_with_fs_and_selinux(TmpFs::new_fs, Some(security_server))
 }
 
 /// Creates a `Kernel`, `Task`, and `Locked<Unlocked>` for testing purposes.
 ///
 /// The `Task` is backed by a real process, and can be used to test syscalls.
-fn create_kernel_task_and_unlocked_with_fs<'l>(
+fn create_kernel_task_and_unlocked_with_fs_and_selinux<'l>(
     create_fs: impl FnOnce(&Arc<Kernel>) -> FileSystemHandle,
+    security_server: Option<Arc<SecurityServer>>,
 ) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
     let mut locked = Unlocked::new();
     let kernel = Kernel::new(
@@ -79,7 +95,7 @@ fn create_kernel_task_and_unlocked_with_fs<'l>(
         None,
         fuchsia_inspect::Node::default(),
         None,
-        None,
+        security_server,
     )
     .expect("failed to create kernel");
 
@@ -132,7 +148,7 @@ pub fn create_task(
     task.into()
 }
 
-/// Maps a region of memory at least `len` bytes long with `PROT_READ | PROT_WRITE`,
+/// Maps a region of mery at least `len` bytes long with `PROT_READ | PROT_WRITE`,
 /// `MAP_ANONYMOUS | MAP_PRIVATE`, returning the mapped address.
 pub fn map_memory_anywhere(current_task: &CurrentTask, len: u64) -> UserAddress {
     map_memory(current_task, UserAddress::NULL, len)

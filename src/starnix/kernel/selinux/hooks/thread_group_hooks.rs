@@ -2,11 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use selinux::{
-    permission_check::PermissionCheck,
-    security_server::{SecurityServer, SecurityServerStatus},
-    SecurityId,
-};
+use selinux::{permission_check::PermissionCheck, security_server::SecurityServer, SecurityId};
 use selinux_common::{security_context::SecurityContext, ProcessPermission};
 use starnix_uapi::{
     error,
@@ -17,28 +13,21 @@ use std::sync::Arc;
 
 /// Checks if creating a task is allowed.
 pub(crate) fn check_task_create_access(
-    status: &impl SecurityServerStatus,
     permission_check: &impl PermissionCheck,
     task_sid: Option<SecurityId>,
 ) -> Result<(), Errno> {
     // When creating a process there is no transition involved, the source and target SIDs
     // are the current SID.
     let target_sid = task_sid.clone();
-    check_permission(status, permission_check, task_sid, target_sid, ProcessPermission::Fork)
+    check_permission(permission_check, task_sid, target_sid, ProcessPermission::Fork)
 }
 
 /// Checks the SELinux permissions required for exec. Returns the SELinux state of a resolved
 /// elf if all required permissions are allowed.
 pub(crate) fn check_exec_access(
-    status: &impl SecurityServerStatus,
     permission_check: &impl PermissionCheck,
     selinux_state: &Option<SeLinuxThreadGroupState>,
 ) -> Result<Option<SeLinuxResolvedElfState>, Errno> {
-    if status.is_fake() || !status.is_enforcing() {
-        // No-op if SELinux is in fake mode or not enforcing.
-        return Ok(None);
-    }
-
     return selinux_state.as_ref().map_or(Ok(None), |selinux_state| {
         let current_sid = &selinux_state.current_sid;
         let new_sid = if let Some(exec_sid) = &selinux_state.exec_sid {
@@ -76,16 +65,9 @@ pub(crate) fn check_exec_access(
 /// Updates the SELinux thread group state on exec, using the security ID associated with the
 /// resolved elf.
 pub(crate) fn update_state_on_exec(
-    status: &impl SecurityServerStatus,
-    _permission_check: &impl PermissionCheck,
     selinux_state: &mut Option<SeLinuxThreadGroupState>,
     elf_selinux_state: &Option<SeLinuxResolvedElfState>,
 ) {
-    if status.is_fake() || !status.is_enforcing() {
-        // No-op if SELinux is in fake mode or not enforcing.
-        return;
-    }
-
     // TODO(http://b/316181721): check if the previous state needs to be updated regardless.
     if let Some(elf_selinux_state) = elf_selinux_state {
         selinux_state.as_mut().map(|selinux_state| {
@@ -100,50 +82,45 @@ pub(crate) fn update_state_on_exec(
 /// `target_sid` according to SELinux server status `status` and permission checker
 /// `permission`.
 pub fn check_getsched_access(
-    status: &impl SecurityServerStatus,
     permission_check: &impl PermissionCheck,
     source_sid: Option<SecurityId>,
     target_sid: Option<SecurityId>,
 ) -> Result<(), Errno> {
-    check_permission(status, permission_check, source_sid, target_sid, ProcessPermission::GetSched)
+    check_permission(permission_check, source_sid, target_sid, ProcessPermission::GetSched)
 }
 
 /// Checks if the task with `source_sid` is allowed to set scheduling parameters for the task with
 /// `target_sid`.
 pub(crate) fn check_setsched_access(
-    status: &impl SecurityServerStatus,
     permission_check: &impl PermissionCheck,
     source_sid: Option<SecurityId>,
     target_sid: Option<SecurityId>,
 ) -> Result<(), Errno> {
-    check_permission(status, permission_check, source_sid, target_sid, ProcessPermission::SetSched)
+    check_permission(permission_check, source_sid, target_sid, ProcessPermission::SetSched)
 }
 
 /// Checks if the task with `source_sid` is allowed to get the process group ID of the task with
 /// `target_sid`.
 pub(crate) fn check_getpgid_access(
-    status: &impl SecurityServerStatus,
     permission_check: &impl PermissionCheck,
     source_sid: Option<SecurityId>,
     target_sid: Option<SecurityId>,
 ) -> Result<(), Errno> {
-    check_permission(status, permission_check, source_sid, target_sid, ProcessPermission::GetPgid)
+    check_permission(permission_check, source_sid, target_sid, ProcessPermission::GetPgid)
 }
 
 /// Checks if the task with `source_sid` is allowed to set the process group ID of the task with
 /// `target_sid`.
 pub(crate) fn check_setpgid_access(
-    status: &impl SecurityServerStatus,
     permission_check: &impl PermissionCheck,
     source_sid: Option<SecurityId>,
     target_sid: Option<SecurityId>,
 ) -> Result<(), Errno> {
-    check_permission(status, permission_check, source_sid, target_sid, ProcessPermission::SetPgid)
+    check_permission(permission_check, source_sid, target_sid, ProcessPermission::SetPgid)
 }
 
 /// Checks if the task with `source_sid` is allowed to send `signal` to the task with `target_sid`.
 pub(crate) fn check_signal_access(
-    status: &impl SecurityServerStatus,
     permission_check: &impl PermissionCheck,
     source_sid: Option<SecurityId>,
     target_sid: Option<SecurityId>,
@@ -151,64 +128,39 @@ pub(crate) fn check_signal_access(
 ) -> Result<(), Errno> {
     match signal {
         // The `sigkill` permission is required for sending SIGKILL.
-        SIGKILL => check_permission(
-            status,
-            permission_check,
-            source_sid,
-            target_sid,
-            ProcessPermission::SigKill,
-        ),
+        SIGKILL => {
+            check_permission(permission_check, source_sid, target_sid, ProcessPermission::SigKill)
+        }
         // The `sigstop` permission is required for sending SIGSTOP.
-        SIGSTOP => check_permission(
-            status,
-            permission_check,
-            source_sid,
-            target_sid,
-            ProcessPermission::SigStop,
-        ),
+        SIGSTOP => {
+            check_permission(permission_check, source_sid, target_sid, ProcessPermission::SigStop)
+        }
         // The `sigchld` permission is required for sending SIGCHLD.
-        SIGCHLD => check_permission(
-            status,
-            permission_check,
-            source_sid,
-            target_sid,
-            ProcessPermission::SigChld,
-        ),
+        SIGCHLD => {
+            check_permission(permission_check, source_sid, target_sid, ProcessPermission::SigChld)
+        }
         // The `signal` permission is required for sending any signal other than SIGKILL, SIGSTOP
         // or SIGCHLD.
-        _ => check_permission(
-            status,
-            permission_check,
-            source_sid,
-            target_sid,
-            ProcessPermission::Signal,
-        ),
+        _ => check_permission(permission_check, source_sid, target_sid, ProcessPermission::Signal),
     }
 }
 
 /// Checks if the task with `source_sid` is allowed to trace the task with `target_sid`.
 pub(crate) fn check_ptrace_access(
-    status: &impl SecurityServerStatus,
     permission_check: &impl PermissionCheck,
     source_sid: Option<SecurityId>,
     target_sid: Option<SecurityId>,
 ) -> Result<(), Errno> {
-    check_permission(status, permission_check, source_sid, target_sid, ProcessPermission::Ptrace)
+    check_permission(permission_check, source_sid, target_sid, ProcessPermission::Ptrace)
 }
 
 /// Checks if `permission` is allowed from the task with `source_sid` to the task with `target_sid`.
 fn check_permission(
-    status: &impl SecurityServerStatus,
     permission_check: &impl PermissionCheck,
     source_sid: Option<SecurityId>,
     target_sid: Option<SecurityId>,
     permission: ProcessPermission,
 ) -> Result<(), Errno> {
-    if status.is_fake() || !status.is_enforcing() {
-        // No-op if SELinux is in fake mode or not enforcing.
-        return Ok(());
-    }
-
     // TODO(http://b/316181721): once security contexts are propagated to all tasks, revisit
     // whether to deny access if the source or target SIDs are not set.
     return source_sid.map_or(Ok(()), |source_sid| {
@@ -287,58 +239,13 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn permission_allowed_for_fake_mode() {
-        let security_server = SecurityServer::new(Mode::Fake);
-        security_server.set_enforcing(true);
-        let selinux_state = SeLinuxThreadGroupState::new_default(&security_server);
-        let sid = Some(selinux_state.current_sid);
-
-        assert_eq!(
-            check_permission(
-                security_server.as_ref(),
-                &security_server.as_permission_check(),
-                sid.clone(),
-                sid,
-                ProcessPermission::Fork,
-            ),
-            Ok(())
-        );
-    }
-
-    #[fuchsia::test]
-    fn permission_allowed_for_permissive_mode() {
-        let security_server = SecurityServer::new(Mode::Enable);
-        security_server.set_enforcing(false);
-        let selinux_state = SeLinuxThreadGroupState::new_default(&security_server);
-        let sid = Some(selinux_state.current_sid);
-
-        assert_eq!(
-            check_permission(
-                security_server.as_ref(),
-                &security_server.as_permission_check(),
-                sid.clone(),
-                sid,
-                ProcessPermission::Fork,
-            ),
-            Ok(())
-        );
-    }
-
-    #[fuchsia::test]
     fn task_create_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
         let security_context = SecurityContext::try_from("u:object_r:fork_yes_t:s0")
             .expect("invalid security context");
         let sid = Some(security_server.security_context_to_sid(&security_context));
 
-        assert_eq!(
-            check_task_create_access(
-                security_server.as_ref(),
-                &security_server.as_permission_check(),
-                sid
-            ),
-            Ok(())
-        );
+        assert_eq!(check_task_create_access(&security_server.as_permission_check(), sid), Ok(()));
     }
 
     #[fuchsia::test]
@@ -349,44 +256,8 @@ mod tests {
         let sid = Some(security_server.security_context_to_sid(&security_context));
 
         assert_eq!(
-            check_task_create_access(
-                security_server.as_ref(),
-                &security_server.as_permission_check(),
-                sid
-            ),
+            check_task_create_access(&security_server.as_permission_check(), sid),
             error!(EACCES)
-        );
-    }
-
-    #[fuchsia::test]
-    fn exec_access_allowed_for_fake_mode() {
-        let security_server = SecurityServer::new(Mode::Fake);
-        security_server.set_enforcing(true);
-        let selinux_state = Some(SeLinuxThreadGroupState::new_default(&security_server));
-
-        assert_eq!(
-            check_exec_access(
-                security_server.as_ref(),
-                &security_server.as_permission_check(),
-                &selinux_state
-            ),
-            Ok(None)
-        );
-    }
-
-    #[fuchsia::test]
-    fn exec_access_allowed_for_permissive_mode() {
-        let security_server = SecurityServer::new(Mode::Enable);
-        security_server.set_enforcing(false);
-        let selinux_state = Some(SeLinuxThreadGroupState::new_default(&security_server));
-
-        assert_eq!(
-            check_exec_access(
-                security_server.as_ref(),
-                &security_server.as_permission_check(),
-                &selinux_state
-            ),
-            Ok(None)
         );
     }
 
@@ -412,11 +283,7 @@ mod tests {
         });
 
         assert_eq!(
-            check_exec_access(
-                security_server.as_ref(),
-                &security_server.as_permission_check(),
-                &selinux_state
-            ),
+            check_exec_access(&security_server.as_permission_check(), &selinux_state),
             Ok(Some(SeLinuxResolvedElfState { sid: exec_sid }))
         );
     }
@@ -442,55 +309,9 @@ mod tests {
         });
 
         assert_eq!(
-            check_exec_access(
-                security_server.as_ref(),
-                &security_server.as_permission_check(),
-                &selinux_state
-            ),
+            check_exec_access(&security_server.as_permission_check(), &selinux_state),
             error!(EACCES)
         );
-    }
-
-    #[fuchsia::test]
-    fn no_state_update_for_fake_mode() {
-        let security_server = SecurityServer::new(Mode::Fake);
-        security_server.set_enforcing(true);
-        let initial_state = SeLinuxThreadGroupState::new_default(&security_server);
-        let mut selinux_state = Some(initial_state.clone());
-
-        let elf_security_context =
-            SecurityContext::try_from("u:object_r:type_t:s0").expect("invalid security context");
-        let elf_sid = security_server.security_context_to_sid(&elf_security_context);
-        let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
-        assert_ne!(elf_sid, initial_state.current_sid);
-        update_state_on_exec(
-            security_server.as_ref(),
-            &security_server.as_permission_check(),
-            &mut selinux_state,
-            &Some(elf_state),
-        );
-        assert_eq!(selinux_state.expect("missing SELinux state"), initial_state);
-    }
-
-    #[fuchsia::test]
-    fn no_state_update_for_permissive_mode() {
-        let security_server = SecurityServer::new(Mode::Enable);
-        security_server.set_enforcing(false);
-        let initial_state = SeLinuxThreadGroupState::new_default(&security_server);
-        let mut selinux_state = Some(initial_state.clone());
-
-        let elf_security_context =
-            SecurityContext::try_from("u:object_r:type_t:s0").expect("invalid security context");
-        let elf_sid = security_server.security_context_to_sid(&elf_security_context);
-        let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
-        assert_ne!(elf_sid, initial_state.current_sid);
-        update_state_on_exec(
-            security_server.as_ref(),
-            &security_server.as_permission_check(),
-            &mut selinux_state,
-            &Some(elf_state),
-        );
-        assert_eq!(selinux_state.expect("missing SELinux state"), initial_state);
     }
 
     #[fuchsia::test]
@@ -500,12 +321,7 @@ mod tests {
 
         let initial_state = SeLinuxThreadGroupState::new_default(&security_server);
         let mut selinux_state = Some(initial_state.clone());
-        update_state_on_exec(
-            security_server.as_ref(),
-            &security_server.as_permission_check(),
-            &mut selinux_state,
-            &None,
-        );
+        update_state_on_exec(&mut selinux_state, &None);
         assert_eq!(selinux_state.expect("missing SELinux state"), initial_state);
     }
 
@@ -522,12 +338,7 @@ mod tests {
         let elf_sid = security_server.security_context_to_sid(&elf_security_context);
         let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
         assert_ne!(elf_sid, initial_state.current_sid);
-        update_state_on_exec(
-            security_server.as_ref(),
-            &security_server.as_permission_check(),
-            &mut selinux_state,
-            &Some(elf_state),
-        );
+        update_state_on_exec(&mut selinux_state, &Some(elf_state));
         assert_eq!(
             selinux_state.expect("missing SELinux state"),
             SeLinuxThreadGroupState {
@@ -554,12 +365,7 @@ mod tests {
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
 
         assert_eq!(
-            check_getsched_access(
-                security_server.as_ref(),
-                &security_server.as_permission_check(),
-                source_sid,
-                target_sid
-            ),
+            check_getsched_access(&security_server.as_permission_check(), source_sid, target_sid),
             Ok(())
         );
     }
@@ -576,12 +382,7 @@ mod tests {
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
 
         assert_eq!(
-            check_getsched_access(
-                security_server.as_ref(),
-                &security_server.as_permission_check(),
-                source_sid,
-                target_sid
-            ),
+            check_getsched_access(&security_server.as_permission_check(), source_sid, target_sid),
             error!(EACCES)
         );
     }
@@ -598,12 +399,7 @@ mod tests {
                 .expect("invalid security context");
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
         assert_eq!(
-            check_setsched_access(
-                security_server.as_ref(),
-                &security_server.as_permission_check(),
-                source_sid,
-                target_sid
-            ),
+            check_setsched_access(&security_server.as_permission_check(), source_sid, target_sid),
             Ok(())
         );
     }
@@ -619,12 +415,7 @@ mod tests {
                 .expect("invalid security context");
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
         assert_eq!(
-            check_setsched_access(
-                security_server.as_ref(),
-                &security_server.as_permission_check(),
-                source_sid,
-                target_sid
-            ),
+            check_setsched_access(&security_server.as_permission_check(), source_sid, target_sid),
             error!(EACCES)
         );
     }
@@ -641,12 +432,7 @@ mod tests {
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
 
         assert_eq!(
-            check_getpgid_access(
-                security_server.as_ref(),
-                &security_server.as_permission_check(),
-                source_sid,
-                target_sid
-            ),
+            check_getpgid_access(&security_server.as_permission_check(), source_sid, target_sid),
             Ok(())
         );
     }
@@ -662,12 +448,7 @@ mod tests {
                 .expect("invalid security context");
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
         assert_eq!(
-            check_getpgid_access(
-                security_server.as_ref(),
-                &security_server.as_permission_check(),
-                source_sid,
-                target_sid
-            ),
+            check_getpgid_access(&security_server.as_permission_check(), source_sid, target_sid),
             error!(EACCES)
         );
     }
@@ -685,7 +466,6 @@ mod tests {
 
         assert_eq!(
             check_signal_access(
-                security_server.as_ref(),
                 &security_server.as_permission_check(),
                 source_sid,
                 target_sid,
@@ -708,7 +488,6 @@ mod tests {
 
         assert_eq!(
             check_signal_access(
-                security_server.as_ref(),
                 &security_server.as_permission_check(),
                 source_sid,
                 target_sid,
@@ -731,7 +510,6 @@ mod tests {
 
         assert_eq!(
             check_signal_access(
-                security_server.as_ref(),
                 &security_server.as_permission_check(),
                 source_sid,
                 target_sid,
@@ -754,7 +532,6 @@ mod tests {
         // The `signal` permission allows signals other than SIGKILL, SIGCHLD, SIGSTOP.
         assert_eq!(
             check_signal_access(
-                security_server.as_ref(),
                 &security_server.as_permission_check(),
                 source_sid,
                 target_sid,
@@ -778,7 +555,6 @@ mod tests {
         for signal in [SIGCHLD, SIGKILL, SIGSTOP] {
             assert_eq!(
                 check_signal_access(
-                    security_server.as_ref(),
                     &security_server.as_permission_check(),
                     source_sid.clone(),
                     target_sid.clone(),
@@ -802,12 +578,7 @@ mod tests {
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
 
         assert_eq!(
-            check_ptrace_access(
-                security_server.as_ref(),
-                &security_server.as_permission_check(),
-                source_sid,
-                target_sid
-            ),
+            check_ptrace_access(&security_server.as_permission_check(), source_sid, target_sid),
             Ok(())
         );
     }
@@ -824,12 +595,7 @@ mod tests {
                 .expect("invalid security context");
         let target_sid = Some(security_server.security_context_to_sid(&target_security_context));
         assert_eq!(
-            check_ptrace_access(
-                security_server.as_ref(),
-                &security_server.as_permission_check(),
-                source_sid,
-                target_sid
-            ),
+            check_ptrace_access(&security_server.as_permission_check(), source_sid, target_sid),
             error!(EACCES)
         );
     }
