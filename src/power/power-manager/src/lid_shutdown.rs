@@ -573,7 +573,7 @@ mod tests {
         let node =
             LidShutdownBuilder::new().driver_proxy(fake_lid_driver.proxy()).build_and_init().await;
 
-        match node.handle_message(&Message::GetCpuLoads).await {
+        match node.handle_message(&Message::ReadTemperature).await {
             Err(PowerManagerError::Unsupported) => {}
             e => panic!("Unexpected return value: {:?}", e),
         }

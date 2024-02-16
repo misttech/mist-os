@@ -490,7 +490,7 @@ pub mod tests {
             .driver_proxy(fake_temperature_driver(|| Celsius(0.0)))
             .build_and_init()
             .await;
-        match node.handle_message(&Message::GetCpuLoads).await {
+        match node.handle_message(&Message::NotifyMicEnabledChanged(true)).await {
             Err(PowerManagerError::Unsupported) => {}
             e => panic!("Unexpected return value: {:?}", e),
         }

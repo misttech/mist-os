@@ -115,22 +115,22 @@ mod tests {
 
         let receiving_node_1 = mock_maker.make(
             "receiving_node_1",
-            vec![(msg_eq!(GetPerformanceState), msg_ok_return!(GetPerformanceState(1)))],
+            vec![(msg_eq!(NotifyMicEnabledChanged(true)), msg_ok_return!(NotifyMicEnabledChanged))],
         );
         let receiving_node_2 = mock_maker.make(
-            "receiving_node_1",
-            vec![(msg_eq!(GetPerformanceState), msg_ok_return!(GetPerformanceState(2)))],
+            "receiving_node_2",
+            vec![(msg_eq!(NotifyMicEnabledChanged(true)), msg_ok_return!(NotifyMicEnabledChanged))],
         );
 
         let results = sending_node
             .send_message_to_many(
                 &vec![receiving_node_1, receiving_node_2],
-                &Message::GetPerformanceState,
+                &Message::NotifyMicEnabledChanged(true),
             )
             .await;
 
         assert_eq!(results.len(), 2);
-        assert_matches!(results[0], Ok(MessageReturn::GetPerformanceState(1)));
-        assert_matches!(results[1], Ok(MessageReturn::GetPerformanceState(2)));
+        assert_matches!(results[0], Ok(MessageReturn::NotifyMicEnabledChanged));
+        assert_matches!(results[1], Ok(MessageReturn::NotifyMicEnabledChanged));
     }
 }

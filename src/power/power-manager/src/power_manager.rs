@@ -19,11 +19,10 @@ use tracing::*;
 
 // nodes
 use crate::{
-    activity_handler, cpu_control_handler, cpu_device_handler, cpu_manager, cpu_stats_handler,
-    crash_report_handler, debug_service, dev_control_handler, input_settings_handler, lid_shutdown,
-    platform_metrics, shutdown_watcher, syscall_handler, system_power_mode_handler,
-    system_profile_handler, system_shutdown_handler, temperature_handler, thermal_load_driver,
-    thermal_policy, thermal_shutdown, thermal_state_handler,
+    activity_handler, crash_report_handler, debug_service, input_settings_handler, lid_shutdown,
+    platform_metrics, shutdown_watcher, system_power_mode_handler, system_profile_handler,
+    system_shutdown_handler, temperature_handler, thermal_load_driver, thermal_policy,
+    thermal_shutdown, thermal_state_handler,
 };
 
 pub struct PowerManager {
@@ -144,31 +143,6 @@ impl PowerManager {
             "CrashReportHandler" => {
                 crash_report_handler::CrashReportHandlerBuilder::new().build()?
             }
-            "CpuControlHandler" => {
-                cpu_control_handler::CpuControlHandlerBuilder::new_from_json(json_data, &self.nodes)
-                    .build()?
-            }
-            "CpuDeviceHandler" => {
-                cpu_device_handler::CpuDeviceHandlerBuilder::new_from_json(json_data, &self.nodes)
-                    .build()?
-            }
-            "CpuManager" => {
-                cpu_manager::CpuManagerBuilder::new_from_json(json_data, &self.nodes).build()?
-            }
-
-            // TODO(https://fxbug.dev/42062455): Remove async node creation
-            "CpuStatsHandler" => {
-                cpu_stats_handler::CpuStatsHandlerBuilder::new_from_json(json_data, &self.nodes)
-                    .build()
-                    .await?
-            }
-            "DeviceControlHandler" => {
-                dev_control_handler::DeviceControlHandlerBuilder::new_from_json(
-                    json_data,
-                    &self.nodes,
-                )
-                .build()?
-            }
             "InputSettingsHandler" => {
                 input_settings_handler::InputSettingsHandlerBuilder::new_from_json(
                     json_data,
@@ -183,9 +157,6 @@ impl PowerManager {
                 platform_metrics::PlatformMetricsBuilder::new_from_json(json_data, &self.nodes)
                     .build(node_futures)?
             }
-
-            // TODO(https://fxbug.dev/42062455): Remove async node creation
-            "SyscallHandler" => syscall_handler::SyscallHandlerBuilder::new().build().await?,
             "SystemPowerModeHandler" => {
                 system_power_mode_handler::SystemPowerModeHandlerBuilder::new_from_json(
                     json_data,

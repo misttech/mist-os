@@ -18,18 +18,12 @@ mod types;
 
 // nodes
 mod activity_handler;
-mod cpu_control_handler;
-mod cpu_device_handler;
-mod cpu_manager;
-mod cpu_stats_handler;
 mod crash_report_handler;
 mod debug_service;
-mod dev_control_handler;
 mod input_settings_handler;
 mod lid_shutdown;
 mod platform_metrics;
 mod shutdown_watcher;
-mod syscall_handler;
 mod system_power_mode_handler;
 mod system_profile_handler;
 mod system_shutdown_handler;

@@ -210,11 +210,11 @@ mod tests {
         let mock_node = mock_maker.make(
             "MockNode",
             vec![(
-                MessageMatcher::Eq(Message::GetCpuLoads),
-                Ok(MessageReturn::GetCpuLoads(vec![1.0])),
+                MessageMatcher::Eq(Message::NotifyMicEnabledChanged(true)),
+                Ok(MessageReturn::NotifyMicEnabledChanged),
             )],
         );
-        let _ = mock_node.handle_message(&Message::GetNumCpus).await;
+        let _ = mock_node.handle_message(&Message::ReadTemperature).await;
     }
 
     /// Tests that sending an expected Message results in the specified response.
@@ -224,13 +224,13 @@ mod tests {
         let mock_node = mock_maker.make(
             "MockNode",
             vec![(
-                MessageMatcher::Eq(Message::GetPerformanceState),
-                Ok(MessageReturn::GetPerformanceState(3)),
+                MessageMatcher::Eq(Message::NotifyMicEnabledChanged(true)),
+                Ok(MessageReturn::NotifyMicEnabledChanged),
             )],
         );
 
-        match mock_node.handle_message(&Message::GetPerformanceState).await {
-            Ok(MessageReturn::GetPerformanceState(3)) => {}
+        match mock_node.handle_message(&Message::NotifyMicEnabledChanged(true)).await {
+            Ok(MessageReturn::NotifyMicEnabledChanged) => {}
             e => panic!("Unexpected return value: {:?}", e),
         }
     }
@@ -244,11 +244,11 @@ mod tests {
         let mock_node = mock_maker.make(
             "MockNode",
             vec![(
-                MessageMatcher::Eq(Message::SetPerformanceState(2)),
-                Ok(MessageReturn::SetPerformanceState),
+                MessageMatcher::Eq(Message::NotifyMicEnabledChanged(true)),
+                Ok(MessageReturn::NotifyMicEnabledChanged),
             )],
         );
-        let _ = mock_node.handle_message(&Message::SetPerformanceState(1)).await;
+        let _ = mock_node.handle_message(&Message::NotifyMicEnabledChanged(false)).await;
     }
 
     /// Tests that dropping a MockNode while it's still expecting to receive a Message results in a
@@ -259,7 +259,10 @@ mod tests {
         let mut mock_maker = MockNodeMaker::new();
         let _mock_node = mock_maker.make(
             "MockNode",
-            vec![(MessageMatcher::Eq(Message::GetNumCpus), Ok(MessageReturn::GetNumCpus(1)))],
+            vec![(
+                MessageMatcher::Eq(Message::NotifyMicEnabledChanged(true)),
+                Ok(MessageReturn::NotifyMicEnabledChanged),
+            )],
         );
     }
 
@@ -278,8 +281,8 @@ mod tests {
     #[test]
     fn test_msg_matcher_macros() {
         // Test the `msg_eq` macro
-        match msg_eq!(SetPerformanceState(1)) {
-            MessageMatcher::Eq(Message::SetPerformanceState(1)) => {}
+        match msg_eq!(NotifyMicEnabledChanged(true)) {
+            MessageMatcher::Eq(Message::NotifyMicEnabledChanged(true)) => {}
             e => panic!("Unexpected value expanded from msg_eq!(): {:?}", e),
         }
     }
@@ -290,9 +293,9 @@ mod tests {
     fn test_msg_return_macros() {
         // Test the `msg_ok_return` macro. The compiler can't infer the Err type coming from the
         // macro call, so type annotation is required here.
-        let ret: Result<MessageReturn, PowerManagerError> = msg_ok_return!(GetNumCpus(4));
+        let ret: Result<MessageReturn, PowerManagerError> = msg_ok_return!(NotifyMicEnabledChanged);
         match ret {
-            Ok(MessageReturn::GetNumCpus(4)) => {}
+            Ok(MessageReturn::NotifyMicEnabledChanged) => {}
             e => panic!("Unexpected expression expanded from msg_ok_return!(): {:?}", e),
         }
     }
@@ -303,7 +306,7 @@ mod tests {
     async fn test_dummy_node() {
         let node = create_dummy_node();
         assert_matches!(
-            node.handle_message(&Message::SetPerformanceState(1)).await,
+            node.handle_message(&Message::NotifyMicEnabledChanged(true)).await,
             Err(PowerManagerError::Unsupported)
         )
     }
