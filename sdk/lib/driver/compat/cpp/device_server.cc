@@ -548,7 +548,7 @@ void AsyncInitializedDeviceServer::OnParentDevices(
   }
 
   if (!default_parent_client_.is_valid()) {
-    FDF_LOG(ERROR, "Failed to find the default parent. Assuming root.");
+    FDF_LOG(WARNING, "Failed to find the default parent. Assuming root.");
 
     // In case that there is no default parent, assume we are the root and create
     // the topological path from scratch.

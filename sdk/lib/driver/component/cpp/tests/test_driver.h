@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.driver.component.test/cpp/driver/wire.h>
 #include <fidl/fuchsia.driver.component.test/cpp/wire.h>
+#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
 
@@ -22,6 +23,9 @@ class TestDriver : public fdf::DriverBase,
   void Start(fdf::StartCompleter completer) override;
 
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
+
+  zx::result<> InitSyncCompat();
+  void BeginInitAsyncCompat(fit::callback<void(zx::result<>)> completed);
 
   zx::result<> ExportDevfsNodeSync();
   zx::result<> ServeDriverService();
@@ -71,6 +75,9 @@ class TestDriver : public fdf::DriverBase,
                                                  fidl::kIgnoreBindingClosure),
     });
   }
+
+  compat::SyncInitializedDeviceServer sync_device_server_;
+  compat::AsyncInitializedDeviceServer async_device_server_;
 
   fidl::WireClient<fuchsia_driver_framework::Node> node_client_;
   bool async_added_child_ = false;

@@ -94,11 +94,24 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
     });
     // [END move_server_handlers]
 
+    // test_environment_ and device_server live on the same dispatcher so moving the ptr from one
+    // to the other is fine to do.
+    fdf::OutgoingDirectory* outgoing_ptr;
+    test_environment_.SyncCall([&outgoing_ptr](fdf_testing::TestEnvironment* test_env) {
+      outgoing_ptr = &test_env->incoming_directory();
+    });
+    device_server.SyncCall([outgoing_ptr](compat::DeviceServer* device_server) {
+      device_server->Init(component::kDefaultInstance, "root");
+      EXPECT_EQ(ZX_OK, device_server->Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                            outgoing_ptr));
+    });
+
     // Store the start_args for the subclasses to use to start the driver.
     start_args_ = std::move(start_args->start_args);
   }
 
   void TearDown() override {
+    device_server.reset();
     test_environment_.reset();
     node_server_.reset();
     driver_proto_server_.reset();
@@ -141,6 +154,9 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
   async_patterns::TestDispatcherBound<DriverProtocolServer> driver_proto_server_{env_dispatcher(),
                                                                                  std::in_place};
   // [END custom_server_classes]
+
+  async_patterns::TestDispatcherBound<compat::DeviceServer> device_server{env_dispatcher(),
+                                                                          std::in_place};
 
   // Serves the fdf::Node protocol to the driver.
   async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{

@@ -130,6 +130,13 @@ zx::result<> TestDriver::ValidateIncomingZirconService() {
     return wire_result.value().take_error();
   }
 
+  // Validate the compat service which is a zircon service.
+  zx::result<> result = InitSyncCompat();
+  if (result.is_error()) {
+    FDF_LOG(ERROR, "Failed to sync init the compat server. %s", result.status_string());
+    return result.take_error();
+  }
+
   return zx::ok();
 }
 
@@ -152,13 +159,40 @@ void TestDriver::PrepareStop(fdf::PrepareStopCompleter completer) {
   }
 }
 
+zx::result<> TestDriver::InitSyncCompat() {
+  auto result = sync_device_server_.Initialize(incoming(), outgoing(), node_name(), "child",
+                                               compat::ForwardMetadata::All());
+  if (result.is_ok()) {
+    FDF_LOG(INFO, "The topological path is %s",
+            sync_device_server_.inner().topological_path().c_str());
+  }
+
+  return result;
+}
+
+void TestDriver::BeginInitAsyncCompat(fit::callback<void(zx::result<>)> completed) {
+  async_device_server_.Begin(
+      incoming(), outgoing(), node_name(), "child",
+      [this, completed_cb = std::move(completed)](zx::result<> result) mutable {
+        if (result.is_ok()) {
+          FDF_LOG(INFO, "The topological path is %s",
+                  async_device_server_.inner().topological_path().c_str());
+        }
+
+        completed_cb(result);
+      },
+      compat::ForwardMetadata::All());
+}
+
 void TestDriver::CreateChildNodeSync() {
   auto node_controller = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
   ZX_ASSERT(node_controller.is_ok());
 
   fidl::Arena arena;
-  auto args =
-      fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena).name(arena, "child").Build();
+  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                  .name(arena, "child")
+                  .offers2(sync_device_server_.CreateOffers2(arena))
+                  .Build();
   auto result = node_client_.sync()->AddChild(args, std::move(node_controller->server), {});
   ZX_ASSERT(result.ok());
   ZX_ASSERT(result->is_ok());
@@ -170,8 +204,10 @@ void TestDriver::CreateChildNodeAsync() {
   auto node_controller = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
   ZX_ASSERT(node_controller.is_ok());
   fidl::Arena arena;
-  auto args =
-      fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena).name(arena, "child").Build();
+  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                  .name(arena, "child")
+                  .offers2(async_device_server_.CreateOffers2(arena))
+                  .Build();
 
   node_client_->AddChild(args, std::move(node_controller->server), {})
       .Then([this, client = std::move(node_controller->client)](
