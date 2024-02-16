@@ -164,14 +164,37 @@ config("clang_defaults") {
   }
 }
 
-config("fast-math") {
+# -ffast-math enables 4 sets of optimizations:
+#     no-math-errno, no-rounding-math, unsafe-math-optimizations, finite-math-only
+# This config sets the first 3. Use one of the subsequent configs to disable/enable the last one.
+config("fast-math-baseline") {
   cflags = [
-    "-ffast-math",
+    "-fno-math-errno",
+    "-fno-rounding-math",
 
-    # Allow inf/nan to be used with ffast-math, and avoid UB.
-    "-fhonor-infinities",
-    "-fhonor-nans",
-    "-fno-finite-math-only",
+    # Enables six targeted optimizations: approx-func, associative-math,
+    # reciprocal-math, no-signed-zeros, no-trapping-math and fp-contract=fast
+    "-funsafe-math-optimizations",
+
+    # -ffinite-math-only is set (or cleared) elsewhere.
+  ]
+}
+
+# Disables finite-math-only, but sets all other fast-math optimizations.
+# Allow inf/nan to be used (while avoiding UB), with the other float-based optimizations.
+config("fast-math") {
+  configs = [ ":fast-math-baseline" ]
+  cflags = [
+    "-fno-finite-math-only",  # Implies honor-infinities and honor-nans.
+  ]
+}
+
+# Enables finite-math-only, along with all other fast-math optimizations.
+# To be used when inf/nan are guaranteed to NOT be encountered.
+config("fast-math-no-inf-nan") {
+  configs = [ ":fast-math-baseline" ]
+  cflags = [
+    "-ffinite-math-only",  # Implies no-honor-infinities and no-honor-nans.
   ]
 }
 
