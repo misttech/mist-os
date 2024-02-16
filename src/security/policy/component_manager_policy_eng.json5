@@ -192,6 +192,7 @@
                 source_name: "fuchsia.kernel.ProfileResource",
                 capability: "protocol",
                 target_monikers: [
+                    "/core/sshd-host/shell:**",
                     "/core/testing/system-tests:**",
                     "/bootstrap/role_manager",
                 ],

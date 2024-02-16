@@ -8,6 +8,7 @@
 #include <lib/zx/channel.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/resource.h>
+#include <lib/zx/result.h>
 #include <zircon/syscalls/object.h>
 #include <zircon/types.h>
 
@@ -20,40 +21,7 @@
 #include <re2/re2.h>
 
 #include "fuchsia/kernel/cpp/fidl.h"
-#include "fuchsia/scheduler/cpp/fidl.h"
 #include "lib/fdio/directory.h"
-
-namespace {
-
-// Returns a reference to a ProfileProvider proxy. Initializes the proxy on the
-// first invocation, otherwise returns a reference to the existing proxy.
-fuchsia::scheduler::ProfileProvider_SyncProxy& GetProfileProvider() {
-  static std::optional<fuchsia::scheduler::ProfileProvider_SyncProxy> provider;
-  static std::mutex mutex;
-
-  std::lock_guard<std::mutex> guard{mutex};
-
-  if (provider.has_value()) {
-    return *provider;
-  }
-
-  // Connect to the scheduler profile service.
-  zx::channel channel0, channel1;
-  zx_status_t status;
-
-  status = zx::channel::create(0u, &channel0, &channel1);
-  FX_CHECK(status == ZX_OK);
-
-  status = fdio_service_connect(
-      (std::string("/svc/") + fuchsia::scheduler::ProfileProvider::Name_).c_str(),
-      channel0.release());
-  FX_CHECK(status == ZX_OK);
-
-  provider.emplace(std::move(channel1));
-  return *provider;
-}
-
-}  // anonymous namespace
 
 // Represents ordering of CPU affinity masks.
 enum class MaskRelation {
@@ -150,6 +118,34 @@ size_t ParseInstancesString(const std::string& instances) {
   }
 }
 
+zx::unowned_resource GetProfileResource() {
+  static zx::resource profile_resource;
+  static std::mutex mutex;
+
+  std::lock_guard<std::mutex> guard{mutex};
+
+  if (profile_resource) {
+    return zx::unowned_resource{profile_resource.get()};
+  }
+
+  // Connect to the profile resource.
+  zx::channel channel0, channel1;
+  zx_status_t status;
+
+  status = zx::channel::create(0u, &channel0, &channel1);
+  FX_CHECK(status == ZX_OK);
+
+  status = fdio_service_connect(
+      (std::string("/svc/") + fuchsia::kernel::ProfileResource::Name_).c_str(), channel0.release());
+  FX_CHECK(status == ZX_OK);
+
+  fuchsia::kernel::ProfileResource_SyncProxy proxy(std::move(channel1));
+  status = proxy.Get(&profile_resource);
+  FX_CHECK(status == ZX_OK);
+
+  return zx::unowned_resource{profile_resource.get()};
+}
+
 // Returns an unowned handle to a profile for the specified priority. Maintains
 // an internal map of already requested profiles and returns the same handle for
 // multiple requests for the same priority.
@@ -169,13 +165,15 @@ zx::unowned_profile GetProfile(int priority, std::optional<zx_cpu_set_t> affinit
     return zx::unowned_profile{search->second.get()};
   }
 
-  auto& provider = GetProfileProvider();
-
-  zx_status_t fidl_status;
+  // Create a priority profile.
+  auto profile_resource = GetProfileResource();
+  zx_profile_info_t info = {
+      .flags = ZX_PROFILE_INFO_FLAG_PRIORITY,
+      .priority = priority,
+  };
   zx::profile profile;
-  const auto status = provider.GetProfile(priority, "garnet/bin/loadbench", &fidl_status, &profile);
+  zx_status_t status = zx::profile::create(*profile_resource, 0u, &info, &profile);
   FX_CHECK(status == ZX_OK);
-  FX_CHECK(fidl_status == ZX_OK);
 
   // Add the new profile to the map for later retrieval.
   auto [iter, okay] = profiles.emplace(key, std::move(profile));
@@ -204,14 +202,20 @@ zx::unowned_profile GetProfile(zx::duration capacity, zx::duration deadline, zx:
     return zx::unowned_profile{search->second.get()};
   }
 
-  auto& provider = GetProfileProvider();
-
-  zx_status_t fidl_status;
+  // Create a deadline profile.
+  auto profile_resource = GetProfileResource();
+  zx_profile_info_t info = {
+      .flags = ZX_PROFILE_INFO_FLAG_DEADLINE,
+      .deadline_params =
+          zx_sched_deadline_params_t{
+              .capacity = capacity.get(),
+              .relative_deadline = deadline.get(),
+              .period = period.get(),
+          },
+  };
   zx::profile profile;
-  const auto status = provider.GetDeadlineProfile(capacity.get(), deadline.get(), period.get(),
-                                                  "garnet/bin/loadbench", &fidl_status, &profile);
+  zx_status_t status = zx::profile::create(*profile_resource, 0u, &info, &profile);
   FX_CHECK(status == ZX_OK);
-  FX_CHECK(fidl_status == ZX_OK);
 
   // Add the new profile to the map for later retrieval.
   auto [iter, okay] = profiles.emplace(key, std::move(profile));
