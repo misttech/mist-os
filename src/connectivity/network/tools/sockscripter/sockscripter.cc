@@ -164,6 +164,11 @@ const struct Command {
     {"set-ipv6-only", "{0|1}", "set IPV6_V6ONLY flag", &SockScripter::SetIpV6Only},
     {"log-ipv6-only", nullptr, "log IPV6_V6ONLY option value", &SockScripter::LogIpV6Only},
 
+    {"set-ip-recvorigdstaddr", "{0|1}", "set IP_RECVORIGDSTADDR flag",
+     &SockScripter::SetIpRecvOrigDstAddr},
+    {"log-ip-recvorigdstaddr", nullptr, "log IP_RECVORIGDSTADDR option value",
+     &SockScripter::LogIpRecvOrigDstAddr},
+
     {"join4", "<mcast-ip>-<local-intf-Addr>",
      "join IPv4 mcast group (IP_ADD_MEMBERSHIP) on local interface", &SockScripter::Join4},
     {"drop4", "<mcast-ip>-<local-intf-Addr>",
@@ -709,6 +714,29 @@ bool SockScripter::LogPeerAddress(char* arg) {
   }
   LOG(INFO) << "Connected to " << Format(addr);
   return true;
+}
+
+bool SockScripter::SetIpRecvOrigDstAddr(char* arg) {
+#ifdef IP_RECVORIGDSTADDR
+  int flag;
+  if (!getFlagInt(arg, &flag)) {
+    LOG(ERROR) << "Error: Invalid IP_RECVORIGDSTADDR flag='" << arg << "'!";
+    return false;
+  }
+  SET_SOCK_OPT_VAL(IPPROTO_IP, IP_RECVORIGDSTADDR, flag)
+#else
+  LOG(ERROR) << "IP_RECVORIGDSTADDR not defined on this platform";
+  return false;
+#endif
+}
+
+bool SockScripter::LogIpRecvOrigDstAddr(char* arg) {
+#ifdef IP_RECVORIGDSTADDR
+  LOG_SOCK_OPT_VAL(IPPROTO_IP, IP_RECVORIGDSTADDR, int)
+#else
+  LOG(ERROR) << "IP_RECVORIGDSTADDR not defined on this platform";
+  return false;
+#endif
 }
 
 bool SockScripter::Bind(char* arg) {
