@@ -81,7 +81,7 @@ constexpr uint8_t lcd_shutdown_sequence[] = {
     kDsiOpSleep, 0xff,
 };
 
-constexpr uint8_t lcd_init_sequence_TV070WSM_FT_ASTRO[] = {
+constexpr uint8_t lcd_init_sequence_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO[] = {
     kDsiOpSleep, 10,
     kDsiOpGpio, 3, 0, 1, 30,
     kDsiOpGpio, 3, 0, 0, 10,
@@ -376,7 +376,7 @@ constexpr uint8_t lcd_init_sequence_TV070WSM_FT_ASTRO[] = {
     kDsiOpSleep, 5,
 };
 
-constexpr uint8_t lcd_init_sequence_TV070WSM_FT_9365[] = {
+constexpr uint8_t lcd_init_sequence_BOE_TV070WSM_FITIPOWER_JD9365[] = {
     // Sleeps for 10 milliseconds.
     //
     // BOE TV070WSM-TG1 spec, Section 8.0 "Power Sequence", page 21 states that
@@ -1429,7 +1429,7 @@ constexpr uint8_t lcd_init_sequence_TV070WSM_FT_9365[] = {
     kDsiOpSleep, 0xff,
 };
 
-constexpr uint8_t lcd_init_sequence_P070ACB_FT[] = {
+constexpr uint8_t lcd_init_sequence_INNOLUX_P070ACB_FITIPOWER_JD9364[] = {
     kDsiOpSleep, 10,
     kDsiOpGpio, 3, 0, 1, 30,
     kDsiOpGpio, 3, 0, 0, 10,
@@ -1660,7 +1660,7 @@ constexpr uint8_t lcd_init_sequence_P070ACB_FT[] = {
     kDsiOpSleep, 20,
 };
 
-constexpr uint8_t lcd_init_sequence_P101DEZ_FT[] = {
+constexpr uint8_t lcd_init_sequence_INNOLUX_P101DEZ_FITIPOWER_JD9364[] = {
     kDsiOpSleep, 10,
     kDsiOpGpio, 3, 0, 1, 30,
     kDsiOpGpio, 3, 0, 0, 10,
@@ -2014,7 +2014,7 @@ constexpr uint8_t lcd_init_sequence_P101DEZ_FT[] = {
     kDsiOpSleep, 5,
 };
 
-constexpr uint8_t lcd_init_sequence_TV101WXM_FT[] = {
+constexpr uint8_t lcd_init_sequence_BOE_TV101WXM_FITIPOWER_JD9364[] = {
     kDsiOpSleep, 10,
     kDsiOpGpio, 3, 0, 1, 30,
     kDsiOpGpio, 3, 0, 0, 10,
@@ -2289,7 +2289,7 @@ constexpr uint8_t lcd_init_sequence_TV101WXM_FT[] = {
     kDsiOpSleep, 0xff,
 };
 
-constexpr uint8_t lcd_init_sequence_TV101WXM_FT_9365[] = {
+constexpr uint8_t lcd_init_sequence_BOE_TV101WXM_FITIPOWER_JD9365[] = {
     kDsiOpSleep, 10,
     kDsiOpGpio, 3, 0, 1, 30,
     kDsiOpGpio, 3, 0, 0, 10,
@@ -2531,7 +2531,7 @@ constexpr uint8_t lcd_init_sequence_TV101WXM_FT_9365[] = {
     kDsiOpSleep, 0xff,
 };
 
-constexpr uint8_t lcd_init_sequence_KD070D82_FT[] = {
+constexpr uint8_t lcd_init_sequence_KD_KD070D82_FITIPOWER_JD9364[] = {
     kDsiOpSleep, 10,
     kDsiOpGpio, 3, 0, 1, 30,
     kDsiOpGpio, 3, 0, 0, 10,
@@ -2768,7 +2768,7 @@ constexpr uint8_t lcd_init_sequence_KD070D82_FT[] = {
     kDsiOpSleep, 0xff,
 };
 
-constexpr uint8_t lcd_init_sequence_KD070D82_FT_9365[] = {
+constexpr uint8_t lcd_init_sequence_KD_KD070D82_FITIPOWER_JD9365[] = {
     kDsiOpSleep, 10,
     kDsiOpGpio, 3, 0, 1, 30,
     kDsiOpGpio, 3, 0, 0, 10,
@@ -3019,7 +3019,7 @@ constexpr uint8_t lcd_init_sequence_KD070D82_FT_9365[] = {
 // publicly available documents.
 //
 // [1] https://dl.khadas.com/products/add-ons/ts050/nt35596_datasheet_v0.0511.pdf
-constexpr uint8_t lcd_init_sequence_MTF050FHDI_03[] = {
+constexpr uint8_t lcd_init_sequence_MICROTECH_MTF050FHDI03_NOVATEK_NT35596[] = {
     kMipiDsiDtDcsShortWrite1, 2, 0xff, 0x05,
     kMipiDsiDtDcsShortWrite1, 2, 0xfb, 0x01,
     kMipiDsiDtDcsShortWrite1, 2, 0xc5, 0x01,
@@ -3556,7 +3556,7 @@ constexpr uint8_t lcd_init_sequence_MTF050FHDI_03[] = {
     kDsiOpSleep, 0,
 };
 
-constexpr uint8_t lcd_init_sequence_TV070WSM_FT_NELSON[] = {
+constexpr uint8_t lcd_init_sequence_BOE_TV070WSM_FITIPOWER_JD9364_NELSON[] = {
     kDsiOpSleep, 10,
     kDsiOpGpio, 3, 0, 1, 30,
     kDsiOpGpio, 3, 0, 0, 10,

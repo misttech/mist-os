@@ -352,7 +352,8 @@ class FakeSysmemTest : public testing::Test {
     display_->SetCanvasForTesting(std::move(endpoints.value().client));
 
     zx::result<std::unique_ptr<Vout>> create_dsi_vout_result = Vout::CreateDsiVoutForTesting(
-        /*panel_type=*/PANEL_TV070WSM_FT_ASTRO, /*width=*/kWidth, /*height=*/kHeight);
+        /*panel_type=*/PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO, /*width=*/kWidth,
+        /*height=*/kHeight);
     ASSERT_OK(create_dsi_vout_result.status_value());
     display_->SetVoutForTesting(std::move(create_dsi_vout_result).value());
 

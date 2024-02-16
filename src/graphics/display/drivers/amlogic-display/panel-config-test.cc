@@ -16,64 +16,64 @@ namespace amlogic_display {
 
 namespace {
 
-TEST(PanelConfig, Tv070wsmFtAstro) {
-  const PanelConfig* config_tv070wsm_ft_astro = GetPanelConfig(PANEL_TV070WSM_FT_ASTRO);
-  ASSERT_NE(config_tv070wsm_ft_astro, nullptr);
-  EXPECT_STREQ(config_tv070wsm_ft_astro->name, "TV070WSM_FT_ASTRO");
+TEST(PanelConfig, BoeTv070wsmFitipowerJd9364Astro) {
+  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO);
+  ASSERT_NE(config, nullptr);
+  EXPECT_STREQ(config->name, "BOE_TV070WSM_FITIPOWER_JD9364_ASTRO");
 }
 
-TEST(PanelConfig, P070acbFt) {
-  const PanelConfig* config_p070acb_ft = GetPanelConfig(PANEL_P070ACB_FT);
-  ASSERT_NE(config_p070acb_ft, nullptr);
-  EXPECT_STREQ(config_p070acb_ft->name, "P070ACB_FT");
+TEST(PanelConfig, InnoluxP070acbFitipowerJd9364) {
+  const PanelConfig* config = GetPanelConfig(PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364);
+  ASSERT_NE(config, nullptr);
+  EXPECT_STREQ(config->name, "INNOLUX_P070ACB_FITIPOWER_JD9364");
 }
 
-TEST(PanelConfig, Tv101wxmFt) {
-  const PanelConfig* config_tv101wxm_ft = GetPanelConfig(PANEL_TV101WXM_FT);
-  ASSERT_NE(config_tv101wxm_ft, nullptr);
-  EXPECT_STREQ(config_tv101wxm_ft->name, "TV101WXM_FT");
+TEST(PanelConfig, BoeTv101wxmFitipowerJd9364) {
+  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV101WXM_FITIPOWER_JD9364);
+  ASSERT_NE(config, nullptr);
+  EXPECT_STREQ(config->name, "BOE_TV101WXM_FITIPOWER_JD9364");
 }
 
-TEST(PanelConfig, P101dezFt) {
-  const PanelConfig* config_p101dez_ft = GetPanelConfig(PANEL_P101DEZ_FT);
-  ASSERT_NE(config_p101dez_ft, nullptr);
-  EXPECT_STREQ(config_p101dez_ft->name, "P101DEZ_FT");
+TEST(PanelConfig, InnoluxP101dezFitipowerJd9364) {
+  const PanelConfig* config = GetPanelConfig(PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364);
+  ASSERT_NE(config, nullptr);
+  EXPECT_STREQ(config->name, "INNOLUX_P101DEZ_FITIPOWER_JD9364");
 }
 
-TEST(PanelConfig, Tv101wxmFt9365) {
-  const PanelConfig* config_tv101wxm_ft_9365 = GetPanelConfig(PANEL_TV101WXM_FT_9365);
-  ASSERT_NE(config_tv101wxm_ft_9365, nullptr);
-  EXPECT_STREQ(config_tv101wxm_ft_9365->name, "TV101WXM_FT_9365");
+TEST(PanelConfig, BoeTv101wxmFitipowerJd9365) {
+  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV101WXM_FITIPOWER_JD9365);
+  ASSERT_NE(config, nullptr);
+  EXPECT_STREQ(config->name, "BOE_TV101WXM_FITIPOWER_JD9365");
 }
 
-TEST(PanelConfig, Tv070wsmFt9365) {
-  const PanelConfig* config_tv070wsm_ft_9365 = GetPanelConfig(PANEL_TV070WSM_FT_9365);
-  ASSERT_NE(config_tv070wsm_ft_9365, nullptr);
-  EXPECT_STREQ(config_tv070wsm_ft_9365->name, "TV070WSM_FT_9365");
+TEST(PanelConfig, BoeTv070wsmFitipowerJd9365) {
+  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV070WSM_FITIPOWER_JD9365);
+  ASSERT_NE(config, nullptr);
+  EXPECT_STREQ(config->name, "BOE_TV070WSM_FITIPOWER_JD9365");
 }
 
-TEST(PanelConfig, Kd070d82Ft) {
-  const PanelConfig* config_kd070d82_ft = GetPanelConfig(PANEL_KD070D82_FT);
-  ASSERT_NE(config_kd070d82_ft, nullptr);
-  EXPECT_STREQ(config_kd070d82_ft->name, "KD070D82_FT");
+TEST(PanelConfig, KdKd070d82FitipowerJd9364) {
+  const PanelConfig* config = GetPanelConfig(PANEL_KD_KD070D82_FITIPOWER_JD9364);
+  ASSERT_NE(config, nullptr);
+  EXPECT_STREQ(config->name, "KD_KD070D82_FITIPOWER_JD9364");
 }
 
-TEST(PanelConfig, Kd070d82Ft9365) {
-  const PanelConfig* config_kd070d82_ft_9365 = GetPanelConfig(PANEL_KD070D82_FT_9365);
-  ASSERT_NE(config_kd070d82_ft_9365, nullptr);
-  EXPECT_STREQ(config_kd070d82_ft_9365->name, "KD070D82_FT_9365");
+TEST(PanelConfig, KdKd070d82FitipowerJd9365) {
+  const PanelConfig* config = GetPanelConfig(PANEL_KD_KD070D82_FITIPOWER_JD9365);
+  ASSERT_NE(config, nullptr);
+  EXPECT_STREQ(config->name, "KD_KD070D82_FITIPOWER_JD9365");
 }
 
-TEST(PanelConfig, Mtf050fhdi03) {
-  const PanelConfig* config_mtf050fhdi_03 = GetPanelConfig(PANEL_MTF050FHDI_03);
-  ASSERT_NE(config_mtf050fhdi_03, nullptr);
-  EXPECT_STREQ(config_mtf050fhdi_03->name, "MTF050FHDI_03");
+TEST(PanelConfig, MicrotechMtf050fhdi03NovatekNt35596) {
+  const PanelConfig* config = GetPanelConfig(PANEL_MICROTECH_MTF050FHDI03_NOVATEK_NT35596);
+  ASSERT_NE(config, nullptr);
+  EXPECT_STREQ(config->name, "MICROTECH_MTF050FHDI03_NOVATEK_NT35596");
 }
 
-TEST(PanelConfig, Tv070wsmFtNelson) {
-  const PanelConfig* config_tv070wsm_ft_nelson = GetPanelConfig(PANEL_TV070WSM_FT_NELSON);
-  ASSERT_NE(config_tv070wsm_ft_nelson, nullptr);
-  EXPECT_STREQ(config_tv070wsm_ft_nelson->name, "TV070WSM_FT_NELSON");
+TEST(PanelConfig, BoeTv070wsmFitipowerJd9364Nelson) {
+  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON);
+  ASSERT_NE(config, nullptr);
+  EXPECT_STREQ(config->name, "BOE_TV070WSM_FITIPOWER_JD9364_NELSON");
 }
 
 TEST(PanelConfig, InvalidPanels) {
@@ -93,76 +93,77 @@ TEST(PanelConfig, InvalidPanels) {
   EXPECT_EQ(config_unknown, nullptr);
 }
 
-TEST(PanelDisplaySetting, P070acbFt) {
-  const display_setting_t* timing_p070acb_ft = GetPanelDisplaySetting(PANEL_P070ACB_FT);
-  ASSERT_NE(timing_p070acb_ft, nullptr);
-  EXPECT_EQ(timing_p070acb_ft->h_active, 600u);
-  EXPECT_EQ(timing_p070acb_ft->v_active, 1024u);
+TEST(PanelDisplaySetting, InnoluxP070acbFitipowerJd9364) {
+  const display_setting_t* timing = GetPanelDisplaySetting(PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364);
+  ASSERT_NE(timing, nullptr);
+  EXPECT_EQ(timing->h_active, 600u);
+  EXPECT_EQ(timing->v_active, 1024u);
 }
 
-TEST(PanelDisplaySetting, Tv070wsmFtAstro) {
-  const display_setting_t* timing_tv070wsm_ft_astro =
-      GetPanelDisplaySetting(PANEL_TV070WSM_FT_ASTRO);
-  ASSERT_NE(timing_tv070wsm_ft_astro, nullptr);
-  EXPECT_EQ(timing_tv070wsm_ft_astro->h_active, 600u);
-  EXPECT_EQ(timing_tv070wsm_ft_astro->v_active, 1024u);
+TEST(PanelDisplaySetting, BoeTv070wsmFitipowerJd9364Astro) {
+  const display_setting_t* timing =
+      GetPanelDisplaySetting(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO);
+  ASSERT_NE(timing, nullptr);
+  EXPECT_EQ(timing->h_active, 600u);
+  EXPECT_EQ(timing->v_active, 1024u);
 }
 
-TEST(PanelDisplaySetting, Kd070d82Ft) {
-  const display_setting_t* timing_kd070d82_ft = GetPanelDisplaySetting(PANEL_KD070D82_FT);
-  ASSERT_NE(timing_kd070d82_ft, nullptr);
-  EXPECT_EQ(timing_kd070d82_ft->h_active, 600u);
-  EXPECT_EQ(timing_kd070d82_ft->v_active, 1024u);
+TEST(PanelDisplaySetting, KdKd070d82FitipowerJd9364) {
+  const display_setting_t* timing = GetPanelDisplaySetting(PANEL_KD_KD070D82_FITIPOWER_JD9364);
+  ASSERT_NE(timing, nullptr);
+  EXPECT_EQ(timing->h_active, 600u);
+  EXPECT_EQ(timing->v_active, 1024u);
 }
 
-TEST(PanelDisplaySetting, Kd070d82Ft9365) {
-  const display_setting_t* timing_kd070d82_ft_9365 = GetPanelDisplaySetting(PANEL_KD070D82_FT_9365);
-  ASSERT_NE(timing_kd070d82_ft_9365, nullptr);
-  EXPECT_EQ(timing_kd070d82_ft_9365->h_active, 600u);
-  EXPECT_EQ(timing_kd070d82_ft_9365->v_active, 1024u);
+TEST(PanelDisplaySetting, KdKd070d82FitipowerJd9365) {
+  const display_setting_t* timing = GetPanelDisplaySetting(PANEL_KD_KD070D82_FITIPOWER_JD9365);
+  ASSERT_NE(timing, nullptr);
+  EXPECT_EQ(timing->h_active, 600u);
+  EXPECT_EQ(timing->v_active, 1024u);
 }
 
-TEST(PanelDisplaySetting, Tv070wsmFt9365) {
-  const display_setting_t* timing_tv070wsm_ft_9365 = GetPanelDisplaySetting(PANEL_TV070WSM_FT_9365);
-  ASSERT_NE(timing_tv070wsm_ft_9365, nullptr);
-  EXPECT_EQ(timing_tv070wsm_ft_9365->h_active, 600u);
-  EXPECT_EQ(timing_tv070wsm_ft_9365->v_active, 1024u);
+TEST(PanelDisplaySetting, BoeTv070wsmFitipowerJd9365) {
+  const display_setting_t* timing = GetPanelDisplaySetting(PANEL_BOE_TV070WSM_FITIPOWER_JD9365);
+  ASSERT_NE(timing, nullptr);
+  EXPECT_EQ(timing->h_active, 600u);
+  EXPECT_EQ(timing->v_active, 1024u);
 }
 
-TEST(PanelDisplaySetting, P101dezFt) {
-  const display_setting_t* timing_p101dez_ft = GetPanelDisplaySetting(PANEL_P101DEZ_FT);
-  ASSERT_NE(timing_p101dez_ft, nullptr);
-  EXPECT_EQ(timing_p101dez_ft->h_active, 800u);
-  EXPECT_EQ(timing_p101dez_ft->v_active, 1280u);
+TEST(PanelDisplaySetting, InnoluxP101dezFitipowerJd9364) {
+  const display_setting_t* timing = GetPanelDisplaySetting(PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364);
+  ASSERT_NE(timing, nullptr);
+  EXPECT_EQ(timing->h_active, 800u);
+  EXPECT_EQ(timing->v_active, 1280u);
 }
 
-TEST(PanelDisplaySetting, Tv101wxmFt) {
-  const display_setting_t* timing_tv101wxm_ft = GetPanelDisplaySetting(PANEL_TV101WXM_FT);
-  ASSERT_NE(timing_tv101wxm_ft, nullptr);
-  EXPECT_EQ(timing_tv101wxm_ft->h_active, 800u);
-  EXPECT_EQ(timing_tv101wxm_ft->v_active, 1280u);
+TEST(PanelDisplaySetting, BoeTv101wxmFitipowerJd9364) {
+  const display_setting_t* timing = GetPanelDisplaySetting(PANEL_BOE_TV101WXM_FITIPOWER_JD9364);
+  ASSERT_NE(timing, nullptr);
+  EXPECT_EQ(timing->h_active, 800u);
+  EXPECT_EQ(timing->v_active, 1280u);
 }
 
-TEST(PanelDisplaySetting, Tv101wxmFt9365) {
-  const display_setting_t* timing_tv101wxm_ft_9365 = GetPanelDisplaySetting(PANEL_TV101WXM_FT_9365);
-  ASSERT_NE(timing_tv101wxm_ft_9365, nullptr);
-  EXPECT_EQ(timing_tv101wxm_ft_9365->h_active, 800u);
-  EXPECT_EQ(timing_tv101wxm_ft_9365->v_active, 1280u);
+TEST(PanelDisplaySetting, BoeTv101wxmFitipowerJd9365) {
+  const display_setting_t* timing = GetPanelDisplaySetting(PANEL_BOE_TV101WXM_FITIPOWER_JD9365);
+  ASSERT_NE(timing, nullptr);
+  EXPECT_EQ(timing->h_active, 800u);
+  EXPECT_EQ(timing->v_active, 1280u);
 }
 
-TEST(PanelDisplaySetting, Mtf050fhdi03) {
-  const display_setting_t* timing_mtf050fhdi_03 = GetPanelDisplaySetting(PANEL_MTF050FHDI_03);
-  ASSERT_NE(timing_mtf050fhdi_03, nullptr);
-  EXPECT_EQ(timing_mtf050fhdi_03->h_active, 1080u);
-  EXPECT_EQ(timing_mtf050fhdi_03->v_active, 1920u);
+TEST(PanelDisplaySetting, MicrotechMtf050fhdi03NovatekNt35596) {
+  const display_setting_t* timing =
+      GetPanelDisplaySetting(PANEL_MICROTECH_MTF050FHDI03_NOVATEK_NT35596);
+  ASSERT_NE(timing, nullptr);
+  EXPECT_EQ(timing->h_active, 1080u);
+  EXPECT_EQ(timing->v_active, 1920u);
 }
 
-TEST(PanelDisplaySetting, Tv070wsmFtNelson) {
-  const display_setting_t* timing_tv070wsm_ft_nelson =
-      GetPanelDisplaySetting(PANEL_TV070WSM_FT_NELSON);
-  ASSERT_NE(timing_tv070wsm_ft_nelson, nullptr);
-  EXPECT_EQ(timing_tv070wsm_ft_nelson->h_active, 600u);
-  EXPECT_EQ(timing_tv070wsm_ft_nelson->v_active, 1024u);
+TEST(PanelDisplaySetting, BoeTv070wsmFitipowerJd9364Nelson) {
+  const display_setting_t* timing =
+      GetPanelDisplaySetting(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON);
+  ASSERT_NE(timing, nullptr);
+  EXPECT_EQ(timing->h_active, 600u);
+  EXPECT_EQ(timing->v_active, 1024u);
 }
 
 TEST(PanelDisplaySetting, InvalidPanels) {
@@ -185,85 +186,77 @@ TEST(PanelDisplaySetting, InvalidPanels) {
   EXPECT_EQ(timing_unknown, nullptr);
 }
 
-TEST(RefreshRate, P070acbFt) {
-  const display_setting_t* setting_p070acb_ft = GetPanelDisplaySetting(PANEL_P070ACB_FT);
-  ASSERT_NE(setting_p070acb_ft, nullptr);
-  const display::DisplayTiming timing_p070acb_ft = display::ToDisplayTiming(*setting_p070acb_ft);
-  EXPECT_EQ(timing_p070acb_ft.vertical_field_refresh_rate_millihertz(), 60'000);
+TEST(RefreshRate, InnoluxP070acbFitipowerJd9364) {
+  const display_setting_t* setting = GetPanelDisplaySetting(PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364);
+  ASSERT_NE(setting, nullptr);
+  const display::DisplayTiming timing = display::ToDisplayTiming(*setting);
+  EXPECT_EQ(timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
-TEST(RefreshRate, Tv070wsmFtAstro) {
-  const display_setting_t* setting_tv070wsm_ft_astro =
-      GetPanelDisplaySetting(PANEL_TV070WSM_FT_ASTRO);
-  ASSERT_NE(setting_tv070wsm_ft_astro, nullptr);
-  const display::DisplayTiming timing_tv070wsm_ft_astro =
-      display::ToDisplayTiming(*setting_tv070wsm_ft_astro);
-  EXPECT_EQ(timing_tv070wsm_ft_astro.vertical_field_refresh_rate_millihertz(), 60'000);
+TEST(RefreshRate, BoeTv070wsmFitipowerJd9364Astro) {
+  const display_setting_t* setting =
+      GetPanelDisplaySetting(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO);
+  ASSERT_NE(setting, nullptr);
+  const display::DisplayTiming timing = display::ToDisplayTiming(*setting);
+  EXPECT_EQ(timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
-TEST(RefreshRate, Kd070d82Ft) {
-  const display_setting_t* setting_kd070d82_ft = GetPanelDisplaySetting(PANEL_KD070D82_FT);
-  ASSERT_NE(setting_kd070d82_ft, nullptr);
-  const display::DisplayTiming timing_kd070d82_ft = display::ToDisplayTiming(*setting_kd070d82_ft);
-  EXPECT_EQ(timing_kd070d82_ft.vertical_field_refresh_rate_millihertz(), 60'000);
+TEST(RefreshRate, KdKd070d82FitipowerJd9364) {
+  const display_setting_t* setting = GetPanelDisplaySetting(PANEL_KD_KD070D82_FITIPOWER_JD9364);
+  ASSERT_NE(setting, nullptr);
+  const display::DisplayTiming timing = display::ToDisplayTiming(*setting);
+  EXPECT_EQ(timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
-TEST(RefreshRate, Kd070d82Ft9365) {
-  const display_setting_t* setting_kd070d82_ft_9365 =
-      GetPanelDisplaySetting(PANEL_KD070D82_FT_9365);
-  ASSERT_NE(setting_kd070d82_ft_9365, nullptr);
-  const display::DisplayTiming timing_kd070d82_ft_9365 =
-      display::ToDisplayTiming(*setting_kd070d82_ft_9365);
-  EXPECT_EQ(timing_kd070d82_ft_9365.vertical_field_refresh_rate_millihertz(), 60'000);
+TEST(RefreshRate, KdKd070d82FitipowerJd9365) {
+  const display_setting_t* setting = GetPanelDisplaySetting(PANEL_KD_KD070D82_FITIPOWER_JD9365);
+  ASSERT_NE(setting, nullptr);
+  const display::DisplayTiming timing = display::ToDisplayTiming(*setting);
+  EXPECT_EQ(timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
-TEST(RefreshRate, Tv070wsmFt9365) {
-  const display_setting_t* setting_tv070wsm_ft_9365 =
-      GetPanelDisplaySetting(PANEL_TV070WSM_FT_9365);
-  ASSERT_NE(setting_tv070wsm_ft_9365, nullptr);
-  const display::DisplayTiming timing_tv070wsm_ft_9365 =
-      display::ToDisplayTiming(*setting_tv070wsm_ft_9365);
-  EXPECT_EQ(timing_tv070wsm_ft_9365.vertical_field_refresh_rate_millihertz(), 60'000);
+TEST(RefreshRate, BoeTv070wsmFitipowerJd9365) {
+  const display_setting_t* setting = GetPanelDisplaySetting(PANEL_BOE_TV070WSM_FITIPOWER_JD9365);
+  ASSERT_NE(setting, nullptr);
+  const display::DisplayTiming timing = display::ToDisplayTiming(*setting);
+  EXPECT_EQ(timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
-TEST(RefreshRate, P101dezFt) {
-  const display_setting_t* setting_p101dez_ft = GetPanelDisplaySetting(PANEL_P101DEZ_FT);
-  ASSERT_NE(setting_p101dez_ft, nullptr);
-  const display::DisplayTiming timing_p101dez_ft = display::ToDisplayTiming(*setting_p101dez_ft);
-  EXPECT_EQ(timing_p101dez_ft.vertical_field_refresh_rate_millihertz(), 60'000);
+TEST(RefreshRate, InnoluxP101dezFitipowerJd9364) {
+  const display_setting_t* setting = GetPanelDisplaySetting(PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364);
+  ASSERT_NE(setting, nullptr);
+  const display::DisplayTiming timing = display::ToDisplayTiming(*setting);
+  EXPECT_EQ(timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
-TEST(RefreshRate, Tv101wxmFt) {
-  const display_setting_t* setting_tv101wxm_ft = GetPanelDisplaySetting(PANEL_TV101WXM_FT);
-  ASSERT_NE(setting_tv101wxm_ft, nullptr);
-  const display::DisplayTiming timing_tv101wxm_ft = display::ToDisplayTiming(*setting_tv101wxm_ft);
-  EXPECT_EQ(timing_tv101wxm_ft.vertical_field_refresh_rate_millihertz(), 60'000);
+TEST(RefreshRate, BoeTv101wxmFitipowerJd9364) {
+  const display_setting_t* setting = GetPanelDisplaySetting(PANEL_BOE_TV101WXM_FITIPOWER_JD9364);
+  ASSERT_NE(setting, nullptr);
+  const display::DisplayTiming timing = display::ToDisplayTiming(*setting);
+  EXPECT_EQ(timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
-TEST(RefreshRate, Tv101wxmFt9365) {
-  const display_setting_t* setting_tv101wxm_ft_9365 =
-      GetPanelDisplaySetting(PANEL_TV101WXM_FT_9365);
-  ASSERT_NE(setting_tv101wxm_ft_9365, nullptr);
-  const display::DisplayTiming timing_tv101wxm_ft_9365 =
-      display::ToDisplayTiming(*setting_tv101wxm_ft_9365);
-  EXPECT_EQ(timing_tv101wxm_ft_9365.vertical_field_refresh_rate_millihertz(), 60'000);
+TEST(RefreshRate, BoeTv101wxmFitipowerJd9365) {
+  const display_setting_t* setting = GetPanelDisplaySetting(PANEL_BOE_TV101WXM_FITIPOWER_JD9365);
+  ASSERT_NE(setting, nullptr);
+  const display::DisplayTiming timing = display::ToDisplayTiming(*setting);
+  EXPECT_EQ(timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
-TEST(RefreshRate, Mtf050fhdi03) {
-  const display_setting_t* setting_mtf050fhdi_03 = GetPanelDisplaySetting(PANEL_MTF050FHDI_03);
-  ASSERT_NE(setting_mtf050fhdi_03, nullptr);
-  const display::DisplayTiming timing_mtf050fhdi_03 =
-      display::ToDisplayTiming(*setting_mtf050fhdi_03);
-  EXPECT_EQ(timing_mtf050fhdi_03.vertical_field_refresh_rate_millihertz(), 55'428);
+TEST(RefreshRate, MicrotechMtf050fhdi03NovatekNt35596) {
+  const display_setting_t* setting =
+      GetPanelDisplaySetting(PANEL_MICROTECH_MTF050FHDI03_NOVATEK_NT35596);
+  ASSERT_NE(setting, nullptr);
+  const display::DisplayTiming timing = display::ToDisplayTiming(*setting);
+  EXPECT_EQ(timing.vertical_field_refresh_rate_millihertz(), 55'428);
 }
 
-TEST(RefreshRate, Tv070wsmFtNelson) {
-  const display_setting_t* setting_tv070wsm_ft_nelson =
-      GetPanelDisplaySetting(PANEL_TV070WSM_FT_NELSON);
-  ASSERT_NE(setting_tv070wsm_ft_nelson, nullptr);
-  const display::DisplayTiming timing_tv070wsm_ft_nelson =
-      display::ToDisplayTiming(*setting_tv070wsm_ft_nelson);
-  EXPECT_EQ(timing_tv070wsm_ft_nelson.vertical_field_refresh_rate_millihertz(), 60'000);
+TEST(RefreshRate, BoeTv070wsmFitipowerJd9364Nelson) {
+  const display_setting_t* setting =
+      GetPanelDisplaySetting(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON);
+  ASSERT_NE(setting, nullptr);
+  const display::DisplayTiming timing = display::ToDisplayTiming(*setting);
+  EXPECT_EQ(timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
 }  // namespace

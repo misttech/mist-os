@@ -96,12 +96,12 @@ const std::vector<fpbus::Bti> display_btis{
 
 // The keys in the map must match the enum used by the bootloader.
 const std::map<uint32_t, uint32_t> kBootloaderPanelTypeToDisplayPanelType = {
-    {1, PANEL_KD070D82_FT},
-    {2, PANEL_TV070WSM_FT_NELSON},
+    {1, PANEL_KD_KD070D82_FITIPOWER_JD9364},
+    {2, PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON},
     // TODO(https://fxbug.dev/324461617): Remove this.
-    {3, PANEL_P070ACB_FT},
-    {4, PANEL_KD070D82_FT_9365},
-    {5, PANEL_TV070WSM_FT_9365},
+    {3, PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364},
+    {4, PANEL_KD_KD070D82_FITIPOWER_JD9365},
+    {5, PANEL_BOE_TV070WSM_FITIPOWER_JD9365},
     // 6 was for PANEL_TV070WSM_ST7703I.
 };
 
@@ -116,13 +116,13 @@ zx::result<uint32_t> GetDisplayPanelTypeFromBootloaderMetadata(uint32_t bootload
 zx::result<uint32_t> GetDisplayPanelTypeFromGpioPanelPins(uint32_t gpio_panel_type_pins) {
   switch (gpio_panel_type_pins) {
     case 0b10:
-      return zx::ok(PANEL_TV070WSM_FT_NELSON);
+      return zx::ok(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON);
     case 0b11:
-      return zx::ok(PANEL_TV070WSM_FT_9365);
+      return zx::ok(PANEL_BOE_TV070WSM_FITIPOWER_JD9365);
     case 0b01:
-      return zx::ok(PANEL_KD070D82_FT_9365);
+      return zx::ok(PANEL_KD_KD070D82_FITIPOWER_JD9365);
     case 0b00:
-      return zx::ok(PANEL_KD070D82_FT);
+      return zx::ok(PANEL_KD_KD070D82_FITIPOWER_JD9364);
   }
   FDF_LOG(ERROR, "Invalid GPIO panel type pins value: %d", gpio_panel_type_pins);
   return zx::error(ZX_ERR_INVALID_ARGS);

@@ -19,8 +19,9 @@ namespace {
 
 const std::vector<display_setting_t> kDisplaySettingsForTesting = [] {
   static constexpr uint32_t kPanelIdsToTest[] = {
-      PANEL_TV070WSM_FT_ASTRO, PANEL_P070ACB_FT,  PANEL_P101DEZ_FT,
-      PANEL_TV101WXM_FT,       PANEL_KD070D82_FT, PANEL_TV070WSM_FT_NELSON,
+      PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO, PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364,
+      PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364,    PANEL_BOE_TV101WXM_FITIPOWER_JD9364,
+      PANEL_KD_KD070D82_FITIPOWER_JD9364,        PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON,
   };
 
   std::vector<display_setting_t> display_settings = {};
@@ -54,34 +55,45 @@ TEST(AmlogicDisplayClock, PllTimingHdmiPllClockRatioCalculatedCorrectly) {
   // This test ensures that the calculated clock ratios match the hardcoded
   // values removed in Ie2c4721b14a92977ef31dd2951dc4cac207cb60e.
 
-  const display_setting_t* display_setting_tv070wsm_ft =
-      GetPanelDisplaySetting(PANEL_TV070WSM_FT_ASTRO);
-  ASSERT_NE(display_setting_tv070wsm_ft, nullptr);
-  zx::result<PllConfig> pll_tv070wsm_ft = Clock::GenerateHPLL(*display_setting_tv070wsm_ft);
-  static constexpr int kExpectedHdmiPllClockRatioTv070wsmFt = 8;
-  EXPECT_OK(pll_tv070wsm_ft.status_value());
-  EXPECT_EQ(kExpectedHdmiPllClockRatioTv070wsmFt, static_cast<int>(pll_tv070wsm_ft->clock_factor));
+  const display_setting_t* display_setting_boe_tv070wsm_fitipower_jd9364_astro =
+      GetPanelDisplaySetting(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO);
+  ASSERT_NE(display_setting_boe_tv070wsm_fitipower_jd9364_astro, nullptr);
+  zx::result<PllConfig> pll_boe_tv070wsm_fitipower_jd9364_astro =
+      Clock::GenerateHPLL(*display_setting_boe_tv070wsm_fitipower_jd9364_astro);
+  static constexpr int kExpectedHdmiPllClockRatioBoeTv070wsmFitipowerJd9364Astro = 8;
+  EXPECT_OK(pll_boe_tv070wsm_fitipower_jd9364_astro.status_value());
+  EXPECT_EQ(kExpectedHdmiPllClockRatioBoeTv070wsmFitipowerJd9364Astro,
+            static_cast<int>(pll_boe_tv070wsm_fitipower_jd9364_astro->clock_factor));
 
-  const display_setting_t* display_setting_p070acb_ft = GetPanelDisplaySetting(PANEL_P070ACB_FT);
-  ASSERT_NE(display_setting_p070acb_ft, nullptr);
-  zx::result<PllConfig> pll_p070acb_ft = Clock::GenerateHPLL(*display_setting_p070acb_ft);
-  static constexpr int kExpectedHdmiPllClockRatioP070acbFt = 8;
-  EXPECT_OK(pll_p070acb_ft.status_value());
-  EXPECT_EQ(kExpectedHdmiPllClockRatioP070acbFt, static_cast<int>(pll_p070acb_ft->clock_factor));
+  const display_setting_t* display_setting_innolux_p070acb_fitipower_jd9364 =
+      GetPanelDisplaySetting(PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364);
+  ASSERT_NE(display_setting_innolux_p070acb_fitipower_jd9364, nullptr);
+  zx::result<PllConfig> pll_innolux_p070acb_fitipower_jd9364 =
+      Clock::GenerateHPLL(*display_setting_innolux_p070acb_fitipower_jd9364);
+  static constexpr int kExpectedHdmiPllClockRatioInnoluxP070acbFitipowerJd9364 = 8;
+  EXPECT_OK(pll_innolux_p070acb_fitipower_jd9364.status_value());
+  EXPECT_EQ(kExpectedHdmiPllClockRatioInnoluxP070acbFitipowerJd9364,
+            static_cast<int>(pll_innolux_p070acb_fitipower_jd9364->clock_factor));
 
-  const display_setting_t* display_setting_p101dez_ft = GetPanelDisplaySetting(PANEL_P101DEZ_FT);
-  ASSERT_NE(display_setting_p101dez_ft, nullptr);
-  zx::result<PllConfig> pll_p101dez_ft = Clock::GenerateHPLL(*display_setting_p101dez_ft);
-  static constexpr int kExpectedHdmiPllClockRatioP101dezFt = 8;
-  EXPECT_OK(pll_p101dez_ft.status_value());
-  EXPECT_EQ(kExpectedHdmiPllClockRatioP101dezFt, static_cast<int>(pll_p101dez_ft->clock_factor));
+  const display_setting_t* display_setting_innolux_p101dez_fitipower_jd9364 =
+      GetPanelDisplaySetting(PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364);
+  ASSERT_NE(display_setting_innolux_p101dez_fitipower_jd9364, nullptr);
+  zx::result<PllConfig> pll_innolux_p101dez_fitipower_jd9364 =
+      Clock::GenerateHPLL(*display_setting_innolux_p101dez_fitipower_jd9364);
+  static constexpr int kExpectedHdmiPllClockRatioInnoluxP101dezFitipowerJd9364 = 8;
+  EXPECT_OK(pll_innolux_p101dez_fitipower_jd9364.status_value());
+  EXPECT_EQ(kExpectedHdmiPllClockRatioInnoluxP101dezFitipowerJd9364,
+            static_cast<int>(pll_innolux_p101dez_fitipower_jd9364->clock_factor));
 
-  const display_setting_t* display_setting_tv101wxm_ft = GetPanelDisplaySetting(PANEL_TV101WXM_FT);
-  ASSERT_NE(display_setting_tv101wxm_ft, nullptr);
-  zx::result<PllConfig> pll_tv101wxm_ft = Clock::GenerateHPLL(*display_setting_tv101wxm_ft);
-  static constexpr int kExpectedHdmiPllClockRatioTv101wxmFt = 8;
-  EXPECT_OK(pll_tv101wxm_ft.status_value());
-  EXPECT_EQ(kExpectedHdmiPllClockRatioTv101wxmFt, static_cast<int>(pll_tv101wxm_ft->clock_factor));
+  const display_setting_t* display_setting_boe_tv101wxm_fitipower_jd9364 =
+      GetPanelDisplaySetting(PANEL_BOE_TV101WXM_FITIPOWER_JD9364);
+  ASSERT_NE(display_setting_boe_tv101wxm_fitipower_jd9364, nullptr);
+  zx::result<PllConfig> pll_boe_tv101wxm_fitipower_jd9364 =
+      Clock::GenerateHPLL(*display_setting_boe_tv101wxm_fitipower_jd9364);
+  static constexpr int kExpectedHdmiPllClockRatioBoeTv101wxmFitipowerJd9364 = 8;
+  EXPECT_OK(pll_boe_tv101wxm_fitipower_jd9364.status_value());
+  EXPECT_EQ(kExpectedHdmiPllClockRatioBoeTv101wxmFitipowerJd9364,
+            static_cast<int>(pll_boe_tv101wxm_fitipower_jd9364->clock_factor));
 }
 
 }  // namespace

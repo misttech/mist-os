@@ -120,7 +120,7 @@ zx_status_t Vim3::DisplayInit() {
       {
           .width = 1080,
           .height = 1920,
-          .panel_type = PANEL_MTF050FHDI_03,
+          .panel_type = PANEL_MICROTECH_MTF050FHDI03_NOVATEK_NT35596,
       },
   };
 

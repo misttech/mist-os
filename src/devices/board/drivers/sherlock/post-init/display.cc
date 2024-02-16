@@ -105,12 +105,12 @@ zx::result<> PostInit::InitDisplay() {
   };
 
   if (display_vendor_) {
-    display_panel_info[0].panel_type = PANEL_P101DEZ_FT;
+    display_panel_info[0].panel_type = PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364;
   } else {
     if (ddic_version_) {
-      display_panel_info[0].panel_type = PANEL_TV101WXM_FT;
+      display_panel_info[0].panel_type = PANEL_BOE_TV101WXM_FITIPOWER_JD9364;
     } else {
-      display_panel_info[0].panel_type = PANEL_TV101WXM_FT_9365;
+      display_panel_info[0].panel_type = PANEL_BOE_TV101WXM_FITIPOWER_JD9365;
     }
   }
 

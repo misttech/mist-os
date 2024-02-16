@@ -15,15 +15,15 @@ namespace amlogic_display {
 
 namespace {
 
-constexpr PanelConfig kTv070wsmFtAstroPanelConfig = {
-    .name = "TV070WSM_FT_ASTRO",
-    .dsi_on = lcd_init_sequence_TV070WSM_FT_ASTRO,
+constexpr PanelConfig kBoeTv070wsmFitipowerJd9364AstroPanelConfig = {
+    .name = "BOE_TV070WSM_FITIPOWER_JD9364_ASTRO",
+    .dsi_on = lcd_init_sequence_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO,
     .dsi_off = lcd_shutdown_sequence,
     .power_on = kLcdPowerOnSequenceForAstroSherlockNelson,
     .power_off = kLcdPowerOffSequenceForAstroSherlockNelson,
 };
 
-constexpr display_setting_t kTv070wsmFitipowerDisplaySetting = {
+constexpr display_setting_t kBoeTv070wsmFitipowerDisplaySetting = {
     .lane_num = 4,
     .bit_rate_max = 360,
     .lcd_clock = 44226000,
@@ -39,15 +39,15 @@ constexpr display_setting_t kTv070wsmFitipowerDisplaySetting = {
     .vsync_pol = 0,
 };
 
-constexpr PanelConfig kP070acbFtPanelConfig = {
-    .name = "P070ACB_FT",
-    .dsi_on = lcd_init_sequence_P070ACB_FT,
+constexpr PanelConfig kInnoluxP070acbFitipowerJd9364PanelConfig = {
+    .name = "INNOLUX_P070ACB_FITIPOWER_JD9364",
+    .dsi_on = lcd_init_sequence_INNOLUX_P070ACB_FITIPOWER_JD9364,
     .dsi_off = lcd_shutdown_sequence,
     .power_on = kLcdPowerOnSequenceForAstroSherlockNelson,
     .power_off = kLcdPowerOffSequenceForAstroSherlockNelson,
 };
 
-constexpr display_setting_t kP070acbFitipowerDisplaySetting = {
+constexpr display_setting_t kInnoluxP070acbFitipowerDisplaySetting = {
     .lane_num = 4,
     .bit_rate_max = 400,
     .lcd_clock = 49434000,
@@ -63,15 +63,15 @@ constexpr display_setting_t kP070acbFitipowerDisplaySetting = {
     .vsync_pol = 0,
 };
 
-constexpr PanelConfig kTv101wxmFtPanelConfig = {
-    .name = "TV101WXM_FT",
-    .dsi_on = lcd_init_sequence_TV101WXM_FT,
+constexpr PanelConfig kBoeTv101wxmFitipowerJd9364PanelConfig = {
+    .name = "BOE_TV101WXM_FITIPOWER_JD9364",
+    .dsi_on = lcd_init_sequence_BOE_TV101WXM_FITIPOWER_JD9364,
     .dsi_off = lcd_shutdown_sequence,
     .power_on = kLcdPowerOnSequenceForAstroSherlockNelson,
     .power_off = kLcdPowerOffSequenceForAstroSherlockNelson,
 };
 
-constexpr display_setting_t kTv101wxmFitipowerDisplaySetting = {
+constexpr display_setting_t kBoeTv101wxmFitipowerDisplaySetting = {
     .lane_num = 4,
     .bit_rate_max = 566,
     .lcd_clock = 70701600,
@@ -87,15 +87,15 @@ constexpr display_setting_t kTv101wxmFitipowerDisplaySetting = {
     .vsync_pol = 0,
 };
 
-constexpr PanelConfig kP101dezFtPanelConfig = {
-    .name = "P101DEZ_FT",
-    .dsi_on = lcd_init_sequence_P101DEZ_FT,
+constexpr PanelConfig kInnoluxP101dezFitipowerJd9364PanelConfig = {
+    .name = "INNOLUX_P101DEZ_FITIPOWER_JD9364",
+    .dsi_on = lcd_init_sequence_INNOLUX_P101DEZ_FITIPOWER_JD9364,
     .dsi_off = lcd_shutdown_sequence,
     .power_on = kLcdPowerOnSequenceForAstroSherlockNelson,
     .power_off = kLcdPowerOffSequenceForAstroSherlockNelson,
 };
 
-constexpr display_setting_t kP101dezFitipowerDisplaySetting = {
+constexpr display_setting_t kInnoluxP101dezFitipowerDisplaySetting = {
     .lane_num = 4,
     .bit_rate_max = 566,
     .lcd_clock = 70701600,
@@ -111,31 +111,31 @@ constexpr display_setting_t kP101dezFitipowerDisplaySetting = {
     .vsync_pol = 0,
 };
 
-constexpr PanelConfig kTv101wxmFt9365PanelConfig = {
-    .name = "TV101WXM_FT_9365",
-    .dsi_on = lcd_init_sequence_TV101WXM_FT_9365,
+constexpr PanelConfig kBoeTv101wxmFitipowerJd9365PanelConfig = {
+    .name = "BOE_TV101WXM_FITIPOWER_JD9365",
+    .dsi_on = lcd_init_sequence_BOE_TV101WXM_FITIPOWER_JD9365,
     .dsi_off = lcd_shutdown_sequence,
     .power_on = kLcdPowerOnSequenceForAstroSherlockNelson,
     .power_off = kLcdPowerOffSequenceForAstroSherlockNelson,
 };
 
-constexpr PanelConfig kTv070wsmFt9365PanelConfig = {
-    .name = "TV070WSM_FT_9365",
-    .dsi_on = lcd_init_sequence_TV070WSM_FT_9365,
+constexpr PanelConfig kBoeTv070wsmFitipowerJd9365PanelConfig = {
+    .name = "BOE_TV070WSM_FITIPOWER_JD9365",
+    .dsi_on = lcd_init_sequence_BOE_TV070WSM_FITIPOWER_JD9365,
     .dsi_off = lcd_shutdown_sequence,
     .power_on = kLcdPowerOnSequenceForAstroSherlockNelson,
     .power_off = kLcdPowerOffSequenceForAstroSherlockNelson,
 };
 
-constexpr PanelConfig kKd070d82FtPanelConfig = {
-    .name = "KD070D82_FT",
-    .dsi_on = lcd_init_sequence_KD070D82_FT,
+constexpr PanelConfig kKdKd070d82FitipowerJd9364PanelConfig = {
+    .name = "KD_KD070D82_FITIPOWER_JD9364",
+    .dsi_on = lcd_init_sequence_KD_KD070D82_FITIPOWER_JD9364,
     .dsi_off = lcd_shutdown_sequence,
     .power_on = kLcdPowerOnSequenceForAstroSherlockNelson,
     .power_off = kLcdPowerOffSequenceForAstroSherlockNelson,
 };
 
-constexpr display_setting_t kKd070d82FitipowerDisplaySetting = {
+constexpr display_setting_t kKdKd070d82FitipowerDisplaySetting = {
     .lane_num = 4,
     .bit_rate_max = 400,
     .lcd_clock = 49434000,
@@ -151,17 +151,17 @@ constexpr display_setting_t kKd070d82FitipowerDisplaySetting = {
     .vsync_pol = 0,
 };
 
-constexpr PanelConfig kKd070d82Ft9365PanelConfig = {
-    .name = "KD070D82_FT_9365",
-    .dsi_on = lcd_init_sequence_KD070D82_FT_9365,
+constexpr PanelConfig kKdKd070d82FitipowerJd9365PanelConfig = {
+    .name = "KD_KD070D82_FITIPOWER_JD9365",
+    .dsi_on = lcd_init_sequence_KD_KD070D82_FITIPOWER_JD9365,
     .dsi_off = lcd_shutdown_sequence,
     .power_on = kLcdPowerOnSequenceForAstroSherlockNelson,
     .power_off = kLcdPowerOffSequenceForAstroSherlockNelson,
 };
 
-constexpr PanelConfig kVim3Ts050PanelConfig = {
-    .name = "MTF050FHDI_03",
-    .dsi_on = lcd_init_sequence_MTF050FHDI_03,
+constexpr PanelConfig kMicrotechMtf050fhdi03NovatekNt35596PanelConfig = {
+    .name = "MICROTECH_MTF050FHDI03_NOVATEK_NT35596",
+    .dsi_on = lcd_init_sequence_MICROTECH_MTF050FHDI03_NOVATEK_NT35596,
     .dsi_off = lcd_shutdown_sequence,
     .power_on = kLcdPowerOnSequenceForVim3Ts050,
     .power_off = kLcdPowerOffSequenceForVim3Ts050,
@@ -169,7 +169,7 @@ constexpr PanelConfig kVim3Ts050PanelConfig = {
 
 // Display timing information of the MTF050FHDI-03 LCD used for Khadas TS050
 // touchscreen. Provided by Microtech and tweaked by Khadas.
-constexpr display_setting_t kMtf050fhdi03DisplaySetting = {
+constexpr display_setting_t kMicrotechMtf050fhdi03NovatekNt35596DisplaySetting = {
     .lane_num = 4,
     .bit_rate_max = 1000,
     .lcd_clock = 120'000'000,
@@ -185,9 +185,9 @@ constexpr display_setting_t kMtf050fhdi03DisplaySetting = {
     .vsync_pol = 0,
 };
 
-constexpr PanelConfig kTv070wsmFtNelsonPanelConfig = {
-    .name = "TV070WSM_FT_NELSON",
-    .dsi_on = lcd_init_sequence_TV070WSM_FT_NELSON,
+constexpr PanelConfig kBoeTv070wsmFitipowerJd9364NelsonPanelConfig = {
+    .name = "BOE_TV070WSM_FITIPOWER_JD9364_NELSON",
+    .dsi_on = lcd_init_sequence_BOE_TV070WSM_FITIPOWER_JD9364_NELSON,
     .dsi_off = lcd_shutdown_sequence,
     .power_on = kLcdPowerOnSequenceForAstroSherlockNelson,
     .power_off = kLcdPowerOffSequenceForAstroSherlockNelson,
@@ -198,26 +198,26 @@ constexpr PanelConfig kTv070wsmFtNelsonPanelConfig = {
 const PanelConfig* GetPanelConfig(uint32_t panel_type) {
   // LINT.IfChange
   switch (panel_type) {
-    case PANEL_TV070WSM_FT_ASTRO:
-      return &kTv070wsmFtAstroPanelConfig;
-    case PANEL_P070ACB_FT:
-      return &kP070acbFtPanelConfig;
-    case PANEL_TV101WXM_FT:
-      return &kTv101wxmFtPanelConfig;
-    case PANEL_P101DEZ_FT:
-      return &kP101dezFtPanelConfig;
-    case PANEL_TV101WXM_FT_9365:
-      return &kTv101wxmFt9365PanelConfig;
-    case PANEL_TV070WSM_FT_9365:
-      return &kTv070wsmFt9365PanelConfig;
-    case PANEL_KD070D82_FT:
-      return &kKd070d82FtPanelConfig;
-    case PANEL_KD070D82_FT_9365:
-      return &kKd070d82Ft9365PanelConfig;
-    case PANEL_MTF050FHDI_03:
-      return &kVim3Ts050PanelConfig;
-    case PANEL_TV070WSM_FT_NELSON:
-      return &kTv070wsmFtNelsonPanelConfig;
+    case PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO:
+      return &kBoeTv070wsmFitipowerJd9364AstroPanelConfig;
+    case PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364:
+      return &kInnoluxP070acbFitipowerJd9364PanelConfig;
+    case PANEL_BOE_TV101WXM_FITIPOWER_JD9364:
+      return &kBoeTv101wxmFitipowerJd9364PanelConfig;
+    case PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364:
+      return &kInnoluxP101dezFitipowerJd9364PanelConfig;
+    case PANEL_BOE_TV101WXM_FITIPOWER_JD9365:
+      return &kBoeTv101wxmFitipowerJd9365PanelConfig;
+    case PANEL_BOE_TV070WSM_FITIPOWER_JD9365:
+      return &kBoeTv070wsmFitipowerJd9365PanelConfig;
+    case PANEL_KD_KD070D82_FITIPOWER_JD9364:
+      return &kKdKd070d82FitipowerJd9364PanelConfig;
+    case PANEL_KD_KD070D82_FITIPOWER_JD9365:
+      return &kKdKd070d82FitipowerJd9365PanelConfig;
+    case PANEL_MICROTECH_MTF050FHDI03_NOVATEK_NT35596:
+      return &kMicrotechMtf050fhdi03NovatekNt35596PanelConfig;
+    case PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON:
+      return &kBoeTv070wsmFitipowerJd9364NelsonPanelConfig;
   }
   // LINT.ThenChange(//src/graphics/display/lib/device-protocol-display/include/lib/device-protocol/display-panel.h)
   return nullptr;
@@ -226,22 +226,22 @@ const PanelConfig* GetPanelConfig(uint32_t panel_type) {
 const display_setting_t* GetPanelDisplaySetting(uint32_t panel_type) {
   // LINT.IfChange
   switch (panel_type) {
-    case PANEL_TV070WSM_FT_ASTRO:
-    case PANEL_TV070WSM_FT_NELSON:
-    case PANEL_TV070WSM_FT_9365:
-      return &kTv070wsmFitipowerDisplaySetting;
-    case PANEL_P070ACB_FT:
-      return &kP070acbFitipowerDisplaySetting;
-    case PANEL_KD070D82_FT_9365:
-    case PANEL_KD070D82_FT:
-      return &kKd070d82FitipowerDisplaySetting;
-    case PANEL_TV101WXM_FT_9365:
-    case PANEL_TV101WXM_FT:
-      return &kTv101wxmFitipowerDisplaySetting;
-    case PANEL_P101DEZ_FT:
-      return &kP101dezFitipowerDisplaySetting;
-    case PANEL_MTF050FHDI_03:
-      return &kMtf050fhdi03DisplaySetting;
+    case PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO:
+    case PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON:
+    case PANEL_BOE_TV070WSM_FITIPOWER_JD9365:
+      return &kBoeTv070wsmFitipowerDisplaySetting;
+    case PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364:
+      return &kInnoluxP070acbFitipowerDisplaySetting;
+    case PANEL_KD_KD070D82_FITIPOWER_JD9365:
+    case PANEL_KD_KD070D82_FITIPOWER_JD9364:
+      return &kKdKd070d82FitipowerDisplaySetting;
+    case PANEL_BOE_TV101WXM_FITIPOWER_JD9365:
+    case PANEL_BOE_TV101WXM_FITIPOWER_JD9364:
+      return &kBoeTv101wxmFitipowerDisplaySetting;
+    case PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364:
+      return &kInnoluxP101dezFitipowerDisplaySetting;
+    case PANEL_MICROTECH_MTF050FHDI03_NOVATEK_NT35596:
+      return &kMicrotechMtf050fhdi03NovatekNt35596DisplaySetting;
   }
   // LINT.ThenChange(//src/graphics/display/lib/device-protocol-display/include/lib/device-protocol/display-panel.h)
   return nullptr;
