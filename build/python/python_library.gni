@@ -89,6 +89,11 @@ template("python_library") {
       deps += invoker.deps
     }
 
+    # Run python type checks using Mypy if enable_pytype flag is set
+    if (_enable_pytype) {
+      deps += [ ":${target_name}_mypy_checker" ]
+    }
+
     source_root = _source_root
     metadata = {
       library_info = [
@@ -96,6 +101,7 @@ template("python_library") {
           library_name = library_name
           source_root = rebase_path(source_root, root_build_dir)
           sources = invoker.sources
+          pytype_support = _enable_pytype
         },
       ]
 
@@ -103,11 +109,6 @@ template("python_library") {
       library_info_barrier = library_deps
     }
     sources = _full_source_paths
-
-    # Run python type checks using Mypy if enable_pytype flag is set
-    if (_enable_pytype) {
-      deps += [ ":${target_name}_mypy_checker" ]
-    }
   }
 
   if (_enable_pytype) {

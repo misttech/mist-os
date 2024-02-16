@@ -10,17 +10,6 @@ import sys
 import os
 from pathlib import Path
 
-# Because files are directly passed, the mypy --exclude flag is bypassed. As a
-# result, we maintain an exclusion list here instead of in
-# `fuchsia/pyproject.toml`, and we use it to ignore files from the mypy command.
-_EXCLUDE_PATTERNS = [
-    "third_party/",
-    "out/",
-    "prebuilt/",
-    "__pycache__",
-    ".jiri_root",
-]
-
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -52,8 +41,8 @@ def run_mypy_checks(files: list[str]) -> int:
         int: returncode if type checking was successful, else error returncode
     """
 
-    # Remove the duplicate and excluded files.
-    files = exclude_files(files)
+    # Remove the duplicate files.
+    files = sorted(set(files))
     if not files:
         return ""
 
@@ -97,25 +86,6 @@ def run_mypy_checks(files: list[str]) -> int:
                     file=sys.stderr,
                 )
         return e.returncode
-
-
-def exclude_files(file_list: list[str]) -> set[str]:
-    """Exclude files matching the exclude_patterns from the file_list and
-        remove duplicate file paths
-
-    Args:
-        file_list: List of file paths
-
-    Returns:
-        set of file paths after excluding the specified patterns
-    """
-    return sorted(
-        set(
-            file
-            for file in file_list
-            if not any(pattern in file for pattern in _EXCLUDE_PATTERNS)
-        )
-    )
 
 
 if __name__ == "__main__":

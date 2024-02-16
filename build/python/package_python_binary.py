@@ -16,7 +16,7 @@ import zipapp
 import mypy_checker
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         "Creates a Python zip archive for the input main source"
     )
@@ -66,7 +66,6 @@ def main():
     args = parser.parse_args()
 
     infos = json.load(args.library_infos)
-    type_check_files = []
 
     # Temporary directory to stage the source tree for this python binary,
     # including sources of itself and all the libraries it imports.
@@ -90,7 +89,8 @@ def main():
         shutil.copy2(source, dest)
 
     # For writing a depfile.
-    files_to_copy = []
+    files_to_copy: list[str] = []
+    type_check_files: list[str] = args.sources
     # Make sub directories for all libraries and copy over their sources.
     for info in infos:
         dest_lib_root = os.path.join(app_dir, info["library_name"])
@@ -104,6 +104,9 @@ def main():
             # Make sub directories if necessary.
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             files_to_copy.append(src)
+            # Add the target sources only if pytype support is enabled.
+            if info["pytype_support"]:
+                type_check_files.append(src)
             shutil.copy2(src, dest)
 
     args.depfile.write("{}: {}\n".format(args.output, " ".join(files_to_copy)))
@@ -146,9 +149,9 @@ sys.exit({args.main_callable}())
     os.rmdir(app_dir)
 
     if args.enable_pytype:
-        # Type check for Python binary sources and their library sources
-        type_check_files: list[str] = args.sources + files_to_copy
+        # Type check for Python binary sources and their pytype_enabled library sources
         return mypy_checker.run_mypy_checks(type_check_files)
+    return 0
 
 
 if __name__ == "__main__":
