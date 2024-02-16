@@ -73,9 +73,7 @@ bool IsValidPath(std::string_view path) {
 }
 }  // namespace
 
-#if __Fuchsia_API_level__ < 17
 LocalComponent::~LocalComponent() = default;
-#endif
 
 LocalComponentImpl::~LocalComponentImpl() = default;
 
