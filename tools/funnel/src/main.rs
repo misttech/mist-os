@@ -4,6 +4,7 @@
 
 use crate::ssh::do_ssh;
 use crate::target::choose_target;
+use anyhow::anyhow;
 use anyhow::{Context, Result};
 use argh::FromArgs;
 use discovery::{
@@ -20,6 +21,7 @@ use tracing_subscriber::filter::LevelFilter;
 mod logging;
 mod ssh;
 mod target;
+mod update;
 
 fn default_log_level() -> LevelFilter {
     LevelFilter::ERROR
@@ -32,8 +34,27 @@ fn default_repository_port() -> u32 {
 #[derive(FromArgs)]
 /// ffx Remote forwarding.
 struct Funnel {
+    /// the level to log at.
+    #[argh(option, short = 'l', default = "default_log_level()")]
+    log_level: LevelFilter,
+
+    #[argh(subcommand)]
+    nested: FunnelSubcommands,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand)]
+enum FunnelSubcommands {
+    Host(SubCommandHost),
+    Update(SubCommandUpdate),
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Remotely forwards a target from your local host to a remote one.
+#[argh(subcommand, name = "host")]
+struct SubCommandHost {
     /// the remote host to forward to
-    #[argh(option, short = 'h')]
+    #[argh(positional)]
     host: String,
 
     /// the name of the target to forward
@@ -44,18 +65,23 @@ struct Funnel {
     #[argh(option, short = 'r', default = "default_repository_port()")]
     repository_port: u32,
 
-    /// the level to log at.
-    #[argh(option, short = 'l', default = "default_log_level()")]
-    log_level: LevelFilter,
-
-    /// additional ports to forward from the remote host to the target
+    /// additional ports to forward from the remote host to the target.
     #[argh(option, short = 'p')]
     additional_port_forwards: Vec<u32>,
 
-    /// time to wait to discover targets.  
+    /// time to wait to discover targets.
     #[argh(option, short = 'w', default = "1")]
     wait_for_target_time: u64,
 }
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "self-update")]
+/// Perform a self-update.
+///
+/// This assumes that your machine both has the cipd binary available in your
+/// $PATH and that there is a file named funnel-cipd-manifest in the same
+/// directory that the `funnel` tool resides in, which is a valid cipd-manifest
+struct SubCommandUpdate {}
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() -> Result<()> {
@@ -63,6 +89,18 @@ async fn main() -> Result<()> {
 
     logging::init(args.log_level)?;
 
+    match args.nested {
+        FunnelSubcommands::Host(host_command) => funnel_main(host_command).await,
+        FunnelSubcommands::Update(update_command) => update_main(update_command).await,
+    }
+}
+
+async fn update_main(_args: SubCommandUpdate) -> Result<()> {
+    let arg0 = std::env::args().into_iter().next().ok_or_else(|| anyhow!("No args passed"))?;
+    update::self_update(arg0).await.map_err(|e| anyhow!(e))
+}
+
+async fn funnel_main(args: SubCommandHost) -> Result<()> {
     tracing::trace!("Discoving targets...");
     let wait_duration = Duration::from_secs(args.wait_for_target_time);
 
