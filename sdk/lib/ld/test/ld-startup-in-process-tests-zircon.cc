@@ -17,7 +17,7 @@
 namespace ld::testing {
 namespace {
 
-constexpr std::string_view kLibprefix = LD_STARTUP_TEST_LIBPREFIX;
+constexpr std::string_view kLibprefix = LD_TEST_LIBPREFIX;
 
 // The dynamic linker gets loaded into this same test process, but it's given
 // a sub-VMAR to consider its "root" or allocation range so hopefully it will

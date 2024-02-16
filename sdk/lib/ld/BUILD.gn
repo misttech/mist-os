@@ -324,12 +324,12 @@ shared_library("ld-startup") {
       },
     ]
 
-    # This is collected by test:ld-startup-test-switches.rsp.  The
-    # user_basic_redirect may wind up in a different variant than the one
-    # requested, if the test's variant isn't available in user.basic, so we
-    # don't know statically which libprefix the test should load from.
-    ld_startup_test_switches =
-        [ "'-DLD_STARTUP_TEST_LIBPREFIX=\"${toolchain_variant.libprefix}\"'" ]
+    # This is collected by test:ld-test-switches.rsp.  The user_basic_redirect
+    # may wind up in a different variant than the one requested, if the test's
+    # variant isn't available in user.basic, so we don't know statically which
+    # libprefix the test should load from.
+    ld_test_switches =
+        [ "'-DLD_TEST_LIBPREFIX=\"${toolchain_variant.libprefix}\"'" ]
   }
 }
 

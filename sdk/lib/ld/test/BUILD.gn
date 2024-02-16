@@ -51,12 +51,12 @@ fuchsia_unittest_package("ld-tests") {
   disable_elf_binaries_checks = true
 }
 
-# This collects the -DLD_STARTUP_TEST_LIB=... flag in the response file.
-generated_file("ld-startup-test-switches.rsp") {
+# This collects the -DLD_TEST_LIBPREFIX=... flag in the response file.
+generated_file("ld-test-switches.rsp") {
   visibility = [ ":*" ]
   testonly = true
   output_conversion = "list lines"
-  data_keys = [ "ld_startup_test_switches" ]
+  data_keys = [ "ld_test_switches" ]
   outputs = [ "$target_gen_dir/$target_name" ]
   data_deps = [ ":load-test-data" ]
   metadata = {
@@ -64,6 +64,22 @@ generated_file("ld-startup-test-switches.rsp") {
     # depends on this target.
     distribution_entries_barrier = []
   }
+}
+
+# Depending on this plumbs through the response file into cflags.
+group("ld-test-switches") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  public_deps = [ ":ld-test-switches.rsp" ]
+  public_configs = [ ":ld-test-switches.config" ]
+}
+
+config("ld-test-switches.config") {
+  visibility = [ ":*" ]
+
+  inputs = get_target_outputs(":ld-test-switches.rsp")
+  cflags = [ "@" + rebase_path(inputs[0], root_build_dir) ]
 }
 
 source_set("load-tests") {
@@ -115,13 +131,6 @@ source_set("load-tests") {
     ]
     deps += [ ":test-chdir-guard" ]
   }
-
-  # Plumb in the switch via the response file to give the libprefix.
-  deps += [ ":ld-startup-test-switches.rsp" ]
-  inputs = get_target_outputs(":ld-startup-test-switches.rsp")
-  cflags = [ "@" + rebase_path(inputs[0], root_build_dir) ]
-
-  data_deps = [ ":load-test-data" ]
 }
 
 source_set("test-chdir-guard") {
@@ -243,12 +252,24 @@ toolchain_utils_action("gen-load-test-modules-info") {
   ]
 }
 
+# Depending on this gives access to `#include "load-test-modules.inc"` as well
+# as plumbing the LD_TEST_LIBPREFIX macro definition and bringing the test
+# modules all into the containing Fuchsia package or host test's data.
 source_set("load-test-modules-info") {
-  visibility = [ ":load-tests" ]
+  visibility = [
+    "./*",
+    "//sdk/lib/ld/test/*",
+  ]
   testonly = true
+
   public = [ "$target_gen_dir/load-test-modules.inc" ]
   public_configs = [ ":load-test-modules-info.config" ]
-  public_deps = [ ":gen-load-test-modules-info" ]
+  public_deps = [
+    ":gen-load-test-modules-info",
+    ":ld-test-switches",
+  ]
+
+  data_deps = [ ":load-test-data" ]
 }
 
 config("load-test-modules-info.config") {

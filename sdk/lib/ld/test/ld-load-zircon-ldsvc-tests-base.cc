@@ -8,7 +8,7 @@
 
 namespace ld::testing {
 
-constexpr std::string_view kLibprefix = LD_STARTUP_TEST_LIBPREFIX;
+constexpr std::string_view kLibprefix = LD_TEST_LIBPREFIX;
 
 LdLoadZirconLdsvcTestsBase::~LdLoadZirconLdsvcTestsBase() = default;
 
