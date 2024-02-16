@@ -77,6 +77,8 @@ class SockScripter {
   bool LogPeerAddress(char* arg);
   bool SetIpRecvOrigDstAddr(char* arg);
   bool LogIpRecvOrigDstAddr(char* arg);
+  bool SetIpv6RecvPktInfo(char* arg);
+  bool LogIpv6RecvPktInfo(char* arg);
   bool Bind(char* arg);
   bool Shutdown(char* arg);
   bool Connect(char* arg);

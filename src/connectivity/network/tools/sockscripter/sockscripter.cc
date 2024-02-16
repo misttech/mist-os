@@ -168,6 +168,10 @@ const struct Command {
      &SockScripter::SetIpRecvOrigDstAddr},
     {"log-ip-recvorigdstaddr", nullptr, "log IP_RECVORIGDSTADDR option value",
      &SockScripter::LogIpRecvOrigDstAddr},
+    {"set-ipv6-recvpktinfo", "{0|1}", "set IPV6_RECVPKTINFO flag",
+     &SockScripter::SetIpv6RecvPktInfo},
+    {"log-ipv6-recvpktinfo", nullptr, "log IPV6_RECVPKTINFO option value",
+     &SockScripter::LogIpv6RecvPktInfo},
 
     {"join4", "<mcast-ip>-<local-intf-Addr>",
      "join IPv4 mcast group (IP_ADD_MEMBERSHIP) on local interface", &SockScripter::Join4},
@@ -735,6 +739,29 @@ bool SockScripter::LogIpRecvOrigDstAddr(char* arg) {
   LOG_SOCK_OPT_VAL(IPPROTO_IP, IP_RECVORIGDSTADDR, int)
 #else
   LOG(ERROR) << "IP_RECVORIGDSTADDR not defined on this platform";
+  return false;
+#endif
+}
+
+bool SockScripter::SetIpv6RecvPktInfo(char* arg) {
+#ifdef IPV6_RECVPKTINFO
+  int flag;
+  if (!getFlagInt(arg, &flag)) {
+    LOG(ERROR) << "Error: Invalid IPV6_RECVPKTINFO flag='" << arg << "'!";
+    return false;
+  }
+  SET_SOCK_OPT_VAL(IPPROTO_IPV6, IPV6_RECVPKTINFO, flag)
+#else
+  LOG(ERROR) << "IPV6_RECVPKTINFO not defined on this platform";
+  return false;
+#endif
+}
+
+bool SockScripter::LogIpv6RecvPktInfo(char* arg) {
+#ifdef IPV6_RECVPKTINFO
+  LOG_SOCK_OPT_VAL(IPPROTO_IPV6, IPV6_RECVPKTINFO, int)
+#else
+  LOG(ERROR) << "IPV6_RECVPKTINFO not defined on this platform";
   return false;
 #endif
 }
