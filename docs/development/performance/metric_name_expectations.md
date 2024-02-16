@@ -72,15 +72,43 @@ message if necessary.
 ## How to add an expectation file
 
 If you are adding a new performance test, you can add an expectation
-file for it by doing the following, in order:
+file for it with the following steps.
 
-1.  Add an `expectedMetricNamesFile` argument in the Dart test code.
-2.  Run the test locally with `FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR`
+For tests using the `fuchsia_component_perf_test` GN template, the
+steps involve manually creating a placeholder expectation file:
+
+1.  Create an empty placeholder version of the expectation file in
+    `src/tests/end_to_end/perf/expected_metric_names/`.
+
+2.  Add the `expected_metric_names_filepath` argument in the GN
+    declaration of the test (the `fuchsia_component_perf_test` GN
+    template invocation).
+
+3.  Run the test locally with `FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR`
+    set, as described above, to generate the file contents.
+
+For tests using the `python_perf_test` GN template, the expectation
+file name is specified both in GN and in the test code, so it is
+possible to avoid the inconvenience of manually creating a placeholder
+file by following these steps:
+
+1.  Pass the name in the `expected_metric_names_filename` argument to
+    `publish_fuchsiaperf()` in the Python test code.
+
+2.  Set `expected_metric_names_filepaths = []` in the GN declaration
+    of the test (the `python_perf_test` GN template invocation).
+
+3.  Run the test locally with `FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR`
     set, as described above, to generate the file.
-3.  Add the name of the expectation file to the `metric_files` list in
-    [src/tests/end_to_end/perf/BUILD.gn](/src/tests/end_to_end/perf/BUILD.gn).
-    Add the expectation file to your Git checkout with `git add
+
+4.  Set `expected_metric_names_filepaths` to the actual list of
+    expectation files in the GN declaration of the test.
+
+5.  Add the expectation file to your Git checkout with `git add
     src/tests/end_to_end/perf/expected_metric_names/`.
+
+These steps for `python_perf_test` also work if the test has multiple
+expectation files.
 
 It is possible to add the file to the `BUILD.gn` file first, but the
 GN build will fail if the file does not exist.
