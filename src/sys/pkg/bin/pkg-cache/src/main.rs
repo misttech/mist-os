@@ -285,7 +285,6 @@ async fn main_inner() -> Result<(), Error> {
     {
         let base_resolver_base_packages = Arc::clone(&base_resolver_base_packages);
         let authenticator = authenticator.clone();
-        let blobfs = blobfs.clone();
         let open_packages = open_packages.clone();
         let scope = scope.clone();
         let () = svc_dir
@@ -297,7 +296,6 @@ async fn main_inner() -> Result<(), Error> {
                             stream,
                             Arc::clone(&base_resolver_base_packages),
                             authenticator.clone(),
-                            blobfs.clone(),
                             open_packages.clone(),
                             scope.clone(),
                         )
@@ -312,7 +310,6 @@ async fn main_inner() -> Result<(), Error> {
     {
         let base_resolver_base_packages = Arc::clone(&base_resolver_base_packages);
         let authenticator = authenticator.clone();
-        let blobfs = blobfs.clone();
         let open_packages = open_packages.clone();
         let scope = scope.clone();
         let () = svc_dir
@@ -324,7 +321,6 @@ async fn main_inner() -> Result<(), Error> {
                             stream,
                             Arc::clone(&base_resolver_base_packages),
                             authenticator.clone(),
-                            blobfs.clone(),
                             open_packages.clone(),
                             scope.clone(),
                         )

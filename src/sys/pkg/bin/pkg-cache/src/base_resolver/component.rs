@@ -19,7 +19,6 @@ pub(crate) async fn serve_request_stream(
     mut stream: fcomponent_resolution::ResolverRequestStream,
     base_packages: Arc<HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>>,
     authenticator: ContextAuthenticator,
-    blobfs: blobfs::Client,
     open_packages: package_directory::RootDirCache<blobfs::Client>,
     scope: package_directory::ExecutionScope,
 ) -> anyhow::Result<()> {
@@ -62,7 +61,6 @@ pub(crate) async fn serve_request_stream(
                             context,
                             &base_packages,
                             authenticator.clone(),
-                            &blobfs,
                             &open_packages,
                             scope.clone(),
                         )
@@ -117,7 +115,6 @@ async fn resolve_with_context(
     context: fcomponent_resolution::Context,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
     authenticator: ContextAuthenticator,
-    blobfs: &blobfs::Client,
     open_packages: &package_directory::RootDirCache<blobfs::Client>,
     scope: package_directory::ExecutionScope,
 ) -> Result<fcomponent_resolution::Component, ResolverError> {
@@ -130,7 +127,6 @@ async fn resolve_with_context(
         server_end,
         base_packages,
         authenticator,
-        blobfs,
         open_packages,
         scope,
     )

@@ -43,9 +43,6 @@ pub(crate) enum ResolverError {
     #[error("serve package directory")]
     ServePackageDirectory(#[source] package_directory::Error),
 
-    #[error("create package directory")]
-    CreatePackageDirectory(#[source] package_directory::Error),
-
     #[error("context must be empty when resolving absolute URL")]
     ContextWithAbsoluteUrl,
 
@@ -69,6 +66,14 @@ pub(crate) enum ResolverError {
 
     #[error("failed to convert proxy to channel")]
     ConvertProxyToChannel,
+
+    #[error(
+        "package directory for {superpackage} was not open when resolving subpackage {subpackage}"
+    )]
+    SuperpackageNotOpen {
+        superpackage: fuchsia_hash::Hash,
+        subpackage: fuchsia_url::RelativePackageUrl,
+    },
 }
 
 impl From<&ResolverError> for fcomponent_resolution::ResolverError {
@@ -88,9 +93,8 @@ impl From<&ResolverError> for fcomponent_resolution::ResolverError {
             ReadManifest(_)
             | CreateEndpoints(_)
             | ServePackageDirectory(_)
-            | CreatePackageDirectory(_)
             | ReadingSubpackageManifest(_) => ferror::Io,
-            ConvertProxyToChannel => ferror::Internal,
+            ConvertProxyToChannel | SuperpackageNotOpen { .. } => ferror::Internal,
             SubpackageNotFound | PackageNotInBase(_) => ferror::PackageNotFound,
             AbiRevision(_) => ferror::InvalidAbiRevision,
         }
@@ -114,11 +118,11 @@ impl From<&ResolverError> for fpkg::ResolveError {
             | ParsingManifest(_)
             | UnsupportedConfigSource(_)
             | InvalidConfigSource
-            | ConvertProxyToChannel => ferror::Internal,
+            | ConvertProxyToChannel
+            | SuperpackageNotOpen { .. } => ferror::Internal,
             ReadManifest(_)
             | CreateEndpoints(_)
             | ServePackageDirectory(_)
-            | CreatePackageDirectory(_)
             | ReadingSubpackageManifest(_) => ferror::Io,
             PackageNotInBase(_) | SubpackageNotFound => ferror::PackageNotFound,
             ContextWithAbsoluteUrl | InvalidContext(_) => ferror::InvalidContext,

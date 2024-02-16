@@ -17,7 +17,6 @@ pub(crate) async fn serve_request_stream(
     mut stream: fpkg::PackageResolverRequestStream,
     base_packages: Arc<HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>>,
     authenticator: ContextAuthenticator,
-    blobfs: blobfs::Client,
     open_packages: package_directory::RootDirCache<blobfs::Client>,
     scope: package_directory::ExecutionScope,
 ) -> anyhow::Result<()> {
@@ -61,7 +60,6 @@ pub(crate) async fn serve_request_stream(
                     dir,
                     &base_packages,
                     authenticator.clone(),
-                    &blobfs,
                     &open_packages,
                     scope.clone(),
                 )
@@ -100,7 +98,6 @@ async fn resolve_with_context(
     dir: ServerEnd<fio::DirectoryMarker>,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
     authenticator: ContextAuthenticator,
-    blobfs: &blobfs::Client,
     open_packages: &package_directory::RootDirCache<blobfs::Client>,
     scope: package_directory::ExecutionScope,
 ) -> Result<fpkg::ResolutionContext, ResolverError> {
@@ -110,7 +107,6 @@ async fn resolve_with_context(
         dir,
         base_packages,
         authenticator,
-        blobfs,
         open_packages,
         scope,
     )
@@ -123,7 +119,6 @@ pub(super) async fn resolve_with_context_impl(
     dir: ServerEnd<fio::DirectoryMarker>,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
     authenticator: ContextAuthenticator,
-    blobfs: &blobfs::Client,
     open_packages: &package_directory::RootDirCache<blobfs::Client>,
     scope: package_directory::ExecutionScope,
 ) -> Result<fpkg::ResolutionContext, ResolverError> {
@@ -135,7 +130,7 @@ pub(super) async fn resolve_with_context_impl(
             resolve_impl(url, dir, base_packages, authenticator, open_packages, scope).await
         }
         fuchsia_url::PackageUrl::Relative(url) => {
-            resolve_subpackage(url, context, dir, authenticator, blobfs, open_packages, scope).await
+            resolve_subpackage(url, context, dir, authenticator, open_packages, scope).await
         }
     }
 }
@@ -202,14 +197,15 @@ async fn resolve_subpackage(
     context: fpkg::ResolutionContext,
     dir: ServerEnd<fio::DirectoryMarker>,
     authenticator: ContextAuthenticator,
-    blobfs: &blobfs::Client,
     open_packages: &package_directory::RootDirCache<blobfs::Client>,
     scope: package_directory::ExecutionScope,
 ) -> Result<fpkg::ResolutionContext, ResolverError> {
     let super_hash = authenticator.clone().authenticate(context)?;
-    let super_package = package_directory::RootDir::new(blobfs.clone(), super_hash)
-        .await
-        .map_err(ResolverError::CreatePackageDirectory)?;
+    let super_package =
+        open_packages.get(&super_hash).ok_or_else(|| ResolverError::SuperpackageNotOpen {
+            superpackage: super_hash,
+            subpackage: package_url.clone(),
+        })?;
     let subpackage = *super_package
         .subpackages()
         .await?
@@ -266,8 +262,7 @@ mod tests {
                     [0; 32].into()
                 )]),
                 ContextAuthenticator::new(),
-                &blobfs::Client::new_test().0,
-                &package_directory::RootDirCache::new(blobfs::Client::new_test().0,),
+                &package_directory::RootDirCache::new(blobfs::Client::new_test().0),
                 vfs::execution_scope::ExecutionScope::new()
             )
             .await,

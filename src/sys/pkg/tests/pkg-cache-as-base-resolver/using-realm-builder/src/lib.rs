@@ -379,7 +379,7 @@ async fn resolve_with_context_relative_url_package() {
         .await
         .unwrap();
     let env = TestEnvBuilder::new().static_packages(&[&super_pkg]).await.build().await;
-    let (_, context) =
+    let (_dir, context) =
         env.resolve_package("fuchsia-pkg://fuchsia.com/super-package/0").await.unwrap();
 
     let (resolved, context) =
@@ -477,20 +477,19 @@ async fn resolve_with_context_component() {
         .unwrap();
     let env = TestEnvBuilder::new().static_packages(&[&base_pkg]).await.build().await;
 
-    let context = env
+    let component = env
         .resolve_with_context_component(
             "fuchsia-pkg://fuchsia.com/a-base-package/0#meta/manifest.cm",
             fcomponent_resolution::Context { bytes: vec![] },
         )
         .await
-        .unwrap()
-        .resolution_context
         .unwrap();
-    let context = env
-        .resolve_with_context_component("sub-package-url#meta/manifest.cm", context)
+    let component = env
+        .resolve_with_context_component(
+            "sub-package-url#meta/manifest.cm",
+            component.resolution_context.unwrap(),
+        )
         .await
-        .unwrap()
-        .resolution_context
         .unwrap();
 
     let fcomponent_resolution::Component {
@@ -502,7 +501,10 @@ async fn resolve_with_context_component() {
         abi_revision,
         ..
     } = env
-        .resolve_with_context_component("sub-sub-package-url#meta/manifest.cm", context)
+        .resolve_with_context_component(
+            "sub-sub-package-url#meta/manifest.cm",
+            component.resolution_context.unwrap(),
+        )
         .await
         .unwrap();
 
