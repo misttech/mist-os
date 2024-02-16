@@ -237,7 +237,7 @@ utf8parse = "0.1"
 vm-device = "0.1.0"
 walkdir = "2.2.7"
 which = "4.0.2"
-zerocopy = { version = "0.8.0-alpha.1", features = ["default", "derive", "simd"] }
+zerocopy = { version = "0.8.0-alpha.5", features = ["derive", "simd"] }
 zstd = "0.11.2"
 
 [dependencies.tracing-subscriber]
@@ -887,6 +887,9 @@ rustflags = []
 [gn.package.wasm-bindgen-shared."0.2.63"]
 # Do not quote, this is embedded directly in .wasm sections and is needed by wasm-bindgen.
 env_vars = [ "CARGO_PKG_VERSION=0.2.63" ]
+
+[gn.package.zerocopy."0.8.0-alpha.5"]
+rustflags = [ "--cfg=zerocopy_generic_bounds_in_const_fn", "--cfg=zerocopy_aarch64_simd", "--cfg=zerocopy_panic_in_const" ]
 
 [gn.package.zstd-safe."5.0.2+zstd.1.5.2"]
 rustflags = []

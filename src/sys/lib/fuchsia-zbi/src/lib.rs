@@ -481,10 +481,9 @@ mod tests {
     use {
         super::*,
         anyhow::Error,
-        byteorder::LittleEndian,
         fuchsia_zbi_abi::zbi_container_header,
         std::convert::TryInto,
-        zerocopy::{byteorder::U32, AsBytes},
+        zerocopy::{byteorder::little_endian::U32, AsBytes},
     };
 
     fn check_item_bytes(builder: &ZbiBuilder, parser: &ZbiParser) {
@@ -526,18 +525,18 @@ mod tests {
 
         fn simple_header(zbi_type: ZbiType, length: u32) -> zbi_header_t {
             zbi_header_t {
-                zbi_type: U32::<LittleEndian>::new(zbi_type.into_raw()),
-                length: U32::<LittleEndian>::new(length),
-                extra: U32::<LittleEndian>::new(if zbi_type == ZbiType::Container {
+                zbi_type: U32::new(zbi_type.into_raw()),
+                length: U32::new(length),
+                extra: U32::new(if zbi_type == ZbiType::Container {
                     ZBI_CONTAINER_MAGIC
                 } else {
                     0
                 }),
-                flags: U32::<LittleEndian>::new(ZBI_FLAGS_VERSION),
-                reserved_0: U32::<LittleEndian>::new(0),
-                reserved_1: U32::<LittleEndian>::new(0),
-                magic: U32::<LittleEndian>::new(ZBI_ITEM_MAGIC),
-                crc32: U32::<LittleEndian>::new(ZBI_ITEM_NO_CRC32),
+                flags: U32::new(ZBI_FLAGS_VERSION),
+                reserved_0: U32::new(0),
+                reserved_1: U32::new(0),
+                magic: U32::new(ZBI_ITEM_MAGIC),
+                crc32: U32::new(ZBI_ITEM_NO_CRC32),
             }
         }
 
@@ -560,9 +559,8 @@ mod tests {
         }
 
         fn calculate_item_length(mut self) -> Self {
-            let item_length = U32::<LittleEndian>::new(
-                u32::try_from(self.zbi_bytes.len() - ZBI_HEADER_SIZE).unwrap(),
-            );
+            let item_length =
+                U32::new(u32::try_from(self.zbi_bytes.len() - ZBI_HEADER_SIZE).unwrap());
             let item_length_bytes = item_length.as_bytes();
 
             let mut i = 4usize;
@@ -630,7 +628,7 @@ mod tests {
         let mut header = ZbiBuilder::simple_header(ZbiType::Container, 0);
 
         // Remove the container specific magic field.
-        header.extra = U32::<LittleEndian>::new(0);
+        header.extra = U32::new(0);
 
         let (zbi, _builder) =
             ZbiBuilder::new().add_header(header).generate().expect("Failed to create ZBI");
@@ -662,7 +660,7 @@ mod tests {
         let mut header = ZbiBuilder::simple_header(ZbiType::Container, 0);
 
         // Remove the required ZBI_FLAGS_VERSION flag.
-        header.flags = U32::<LittleEndian>::new(0);
+        header.flags = U32::new(0);
 
         let (zbi, _builder) =
             ZbiBuilder::new().add_header(header).generate().expect("Failed to create ZBI");
@@ -674,7 +672,7 @@ mod tests {
         let mut header = ZbiBuilder::simple_header(ZbiType::Container, 0);
 
         // Remove the required CRC32 disabled value.
-        header.crc32 = U32::<LittleEndian>::new(0);
+        header.crc32 = U32::new(0);
 
         let (zbi, _builder) =
             ZbiBuilder::new().add_header(header).generate().expect("failed to create zbi");
@@ -700,7 +698,7 @@ mod tests {
     #[fuchsia::test]
     async fn zbi_item_has_correct_extra_field() {
         let mut crash_header = ZbiBuilder::simple_header(ZbiType::Crashlog, 0x80);
-        crash_header.extra = U32::<LittleEndian>::new(0xABCD);
+        crash_header.extra = U32::new(0xABCD);
 
         let (zbi, _builder) = ZbiBuilder::new()
             .add_header(ZbiBuilder::simple_header(ZbiType::Container, 0))
@@ -759,7 +757,7 @@ mod tests {
         // ramdisk items to contain the header, and zero for an extra. See https://fxbug.dev/42174998 for details.
         let size = 0x40;
         let mut ramdisk_header = ZbiBuilder::simple_header(ZbiType::StorageRamdisk, size);
-        ramdisk_header.extra = U32::<LittleEndian>::new(0xABCD);
+        ramdisk_header.extra = U32::new(0xABCD);
 
         let (zbi, builder) = ZbiBuilder::new()
             .add_header(ZbiBuilder::simple_header(ZbiType::Container, 0))
@@ -850,21 +848,21 @@ mod tests {
         let mut driver_metadata_header3 = ZbiBuilder::simple_header(ZbiType::Unknown, 0x40);
 
         driver_metadata_header1.zbi_type =
-            U32::<LittleEndian>::new((0xABCD << 8) | ZbiType::DriverMetadata.into_raw());
+            U32::new((0xABCD << 8) | ZbiType::DriverMetadata.into_raw());
         assert_eq!(
             ZbiType::from_raw(driver_metadata_header1.zbi_type.get()),
             ZbiType::DriverMetadata
         );
 
         driver_metadata_header2.zbi_type =
-            U32::<LittleEndian>::new((0xDCBA << 8) | ZbiType::DriverMetadata.into_raw());
+            U32::new((0xDCBA << 8) | ZbiType::DriverMetadata.into_raw());
         assert_eq!(
             ZbiType::from_raw(driver_metadata_header2.zbi_type.get()),
             ZbiType::DriverMetadata
         );
 
         driver_metadata_header3.zbi_type =
-            U32::<LittleEndian>::new((0xEEEE << 8) | ZbiType::DriverMetadata.into_raw());
+            U32::new((0xEEEE << 8) | ZbiType::DriverMetadata.into_raw());
         assert_eq!(
             ZbiType::from_raw(driver_metadata_header3.zbi_type.get()),
             ZbiType::DriverMetadata
@@ -1057,16 +1055,16 @@ mod tests {
     async fn get_items_of_type_and_optional_extra() {
         let dm1: u32 = (0xABCD << 8) | ZbiType::DriverMetadata.into_raw();
         let mut dm_header1 = ZbiBuilder::simple_header(ZbiType::Unknown, 0x40);
-        dm_header1.zbi_type = U32::<LittleEndian>::new(dm1);
+        dm_header1.zbi_type = U32::new(dm1);
 
         let dm2: u32 = (0xDCBA << 8) | ZbiType::DriverMetadata.into_raw();
         let mut dm2_header1 = ZbiBuilder::simple_header(ZbiType::Unknown, 0x40);
-        dm2_header1.zbi_type = U32::<LittleEndian>::new(dm2);
-        dm2_header1.extra = U32::<LittleEndian>::new(1);
+        dm2_header1.zbi_type = U32::new(dm2);
+        dm2_header1.extra = U32::new(1);
 
         let mut dm2_header2 = ZbiBuilder::simple_header(ZbiType::Unknown, 0x40);
-        dm2_header2.zbi_type = U32::<LittleEndian>::new(dm2);
-        dm2_header2.extra = U32::<LittleEndian>::new(2);
+        dm2_header2.zbi_type = U32::new(dm2);
+        dm2_header2.extra = U32::new(2);
 
         // This ZBI contains three driver metadata items, with two of the same type but with
         // different extras. It also contains a single crashlog item.

@@ -353,6 +353,7 @@ rustc_library("starnix_core") {
     "//third_party/rust_crates:bit-vec",
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:bstr",
+    "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:dyn-clone",
     "//third_party/rust_crates:fragile",

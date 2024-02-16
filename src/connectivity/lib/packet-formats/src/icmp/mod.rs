@@ -34,6 +34,7 @@ use core::fmt::Debug;
 use core::marker::PhantomData;
 use core::mem;
 
+use byteorder::{ByteOrder, NetworkEndian};
 use derivative::Derivative;
 use internet_checksum::Checksum;
 use net_types::ip::{Ip, IpAddress, Ipv4, Ipv6};
@@ -42,7 +43,7 @@ use packet::{
     AsFragmentedByteSlice, BufferView, FragmentedByteSlice, FragmentedBytesMut, FromRaw,
     PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata, SerializeTarget,
 };
-use zerocopy::byteorder::{network_endian::U16, ByteOrder, NetworkEndian};
+use zerocopy::byteorder::network_endian::U16;
 use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 use crate::error::{ParseError, ParseResult};

@@ -20,6 +20,7 @@ use crate::{
         Anon, FileHandle, FileObject, FsNodeInfo,
     },
 };
+use byteorder::{ByteOrder as _, NativeEndian};
 use fuchsia_zircon as zx;
 use net_types::ip::IpAddress;
 use netlink_packet_core::{ErrorMessage, NetlinkHeader, NetlinkMessage, NetlinkPayload};
@@ -50,7 +51,7 @@ use starnix_uapi::{
 };
 use static_assertions::const_assert;
 use std::{collections::VecDeque, ffi::CStr, mem::size_of, sync::Arc};
-use zerocopy::{AsBytes, ByteOrder as _, FromBytes as _, NativeEndian};
+use zerocopy::{AsBytes, FromBytes as _};
 
 pub const DEFAULT_LISTEN_BACKLOG: usize = 1024;
 

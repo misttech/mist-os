@@ -886,11 +886,12 @@ impl<A: IpAddress> PacketBuilder for TcpSegmentBuilder<A> {
 
 /// Parsing and serialization of TCP options.
 pub mod options {
+    use byteorder::{ByteOrder, NetworkEndian};
     use packet::records::options::{
         OptionBuilder, OptionLayout, OptionParseErr, OptionParseLayout, OptionsImpl,
     };
     use packet::BufferViewMut as _;
-    use zerocopy::byteorder::{network_endian::U32, ByteOrder, NetworkEndian};
+    use zerocopy::byteorder::network_endian::U32;
     use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
     use super::*;
@@ -1089,10 +1090,10 @@ impl<B> Debug for TcpSegment<B> {
 
 #[cfg(test)]
 mod tests {
+    use byteorder::{ByteOrder, NetworkEndian};
     use core::num::NonZeroU16;
     use net_types::ip::{Ipv4, Ipv4Addr, Ipv6Addr};
     use packet::{Buf, InnerPacketBuilder, ParseBuffer, Serializer};
-    use zerocopy::byteorder::{ByteOrder, NetworkEndian};
 
     use super::*;
     use crate::compute_transport_checksum;

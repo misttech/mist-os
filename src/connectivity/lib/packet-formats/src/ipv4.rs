@@ -935,11 +935,12 @@ pub(crate) fn reassemble_fragmented_packet<
 
 /// Parsing and serialization of IPv4 options.
 pub mod options {
+    use byteorder::{ByteOrder, NetworkEndian};
     use packet::records::options::{
         OptionBuilder, OptionLayout, OptionParseErr, OptionParseLayout, OptionsImpl,
     };
     use packet::BufferViewMut;
-    use zerocopy::byteorder::{network_endian::U16, ByteOrder, NetworkEndian};
+    use zerocopy::byteorder::network_endian::U16;
 
     const OPTION_KIND_EOL: u8 = 0;
     const OPTION_KIND_NOP: u8 = 1;

@@ -11,6 +11,7 @@
 use core::convert::{Infallible as Never, TryFrom};
 use core::marker::PhantomData;
 
+use byteorder::{ByteOrder, NetworkEndian};
 use packet::records::options::{
     AlignedOptionBuilder, LengthEncoding, OptionBuilder, OptionLayout, OptionParseErr,
     OptionParseLayout,
@@ -20,7 +21,7 @@ use packet::records::{
     RecordsRawImpl,
 };
 use packet::{BufferView, BufferViewMut};
-use zerocopy::byteorder::{network_endian::U16, ByteOrder, NetworkEndian};
+use zerocopy::byteorder::network_endian::U16;
 
 use crate::ip::{IpProto, Ipv6ExtHdrType, Ipv6Proto};
 

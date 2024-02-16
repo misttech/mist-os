@@ -143,14 +143,13 @@ impl Items {
 mod tests {
     use {
         super::*,
-        byteorder::LittleEndian,
         fuchsia_async as fasync,
         fuchsia_zbi::{
             zbi_header_t, ZbiType, ZBI_CONTAINER_MAGIC, ZBI_FLAGS_VERSION, ZBI_ITEM_MAGIC,
             ZBI_ITEM_NO_CRC32,
         },
         std::convert::TryFrom,
-        zerocopy::{byteorder::U32, AsBytes},
+        zerocopy::{byteorder::little_endian::U32, AsBytes},
     };
 
     const ZBI_HEADER_SIZE: usize = size_of::<zbi_header_t>();
@@ -183,14 +182,14 @@ mod tests {
 
         fn simple_header(zbi_type: ZbiType, extra: u32, length: u32) -> zbi_header_t {
             zbi_header_t {
-                zbi_type: U32::<LittleEndian>::new(zbi_type as u32),
-                length: U32::<LittleEndian>::new(length),
-                extra: U32::<LittleEndian>::new(extra),
-                flags: U32::<LittleEndian>::new(ZBI_FLAGS_VERSION),
-                reserved_0: U32::<LittleEndian>::new(0),
-                reserved_1: U32::<LittleEndian>::new(0),
-                magic: U32::<LittleEndian>::new(ZBI_ITEM_MAGIC),
-                crc32: U32::<LittleEndian>::new(ZBI_ITEM_NO_CRC32),
+                zbi_type: U32::new(zbi_type as u32),
+                length: U32::new(length),
+                extra: U32::new(extra),
+                flags: U32::new(ZBI_FLAGS_VERSION),
+                reserved_0: U32::new(0),
+                reserved_1: U32::new(0),
+                magic: U32::new(ZBI_ITEM_MAGIC),
+                crc32: U32::new(ZBI_ITEM_NO_CRC32),
             }
         }
 
@@ -220,9 +219,8 @@ mod tests {
         }
 
         fn calculate_item_length(mut self) -> Self {
-            let item_length = U32::<LittleEndian>::new(
-                u32::try_from(self.zbi_bytes.len() - ZBI_HEADER_SIZE).unwrap(),
-            );
+            let item_length =
+                U32::new(u32::try_from(self.zbi_bytes.len() - ZBI_HEADER_SIZE).unwrap());
             let item_length_bytes = item_length.as_bytes();
 
             let mut i = 4usize;

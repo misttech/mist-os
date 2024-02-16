@@ -81,10 +81,10 @@ pub mod utils;
 use core::convert::TryInto;
 use core::num::TryFromIntError;
 
+use byteorder::{ByteOrder, NetworkEndian};
 use internet_checksum::Checksum;
 use net_types::ip::{Ip, IpAddress, IpInvariant as IpInv, Ipv6Addr};
 use packet::{FragmentedBytesMut, SerializeTarget};
-use zerocopy::byteorder::{ByteOrder, NetworkEndian};
 
 // The "sealed trait" pattern.
 //

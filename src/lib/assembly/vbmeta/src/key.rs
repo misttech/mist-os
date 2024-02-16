@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use byteorder::BigEndian;
 use modinv::modinv::inv_mod_u32;
 use num::bigint::BigUint;
 use num::traits::Pow;
 use ring::signature::KeyPair;
 use thiserror::Error;
-use zerocopy::{byteorder::U32, AsBytes};
+use zerocopy::{byteorder::big_endian::U32, AsBytes};
 
 /// Number of bytes of a Signature.
 pub const SIGNATURE_SIZE: u64 = 0x200;
@@ -85,7 +84,7 @@ impl Key {
     /// Generate the AVB key header to be written directly into the VBMeta blob.
     pub fn generate_key_header(&self) -> Vec<u8> {
         let num_bits: u32 = (self.rsa.public_modulus_len() * 8usize) as u32;
-        let num_bits_big_endian = U32::<BigEndian>::new(num_bits);
+        let num_bits_big_endian = U32::new(num_bits);
         let modulus = BigUint::from_bytes_be(
             self.rsa.public_key().modulus().big_endian_without_leading_zero(),
         );
@@ -96,7 +95,7 @@ impl Key {
         // Assemble the bytes.
         let mut bytes: Vec<u8> = Vec::new();
         bytes.extend_from_slice(num_bits_big_endian.as_bytes());
-        bytes.extend_from_slice(U32::<BigEndian>::new(n0inv).as_bytes());
+        bytes.extend_from_slice(U32::new(n0inv).as_bytes());
         bytes.extend_from_slice(&modulus.to_bytes_be());
         bytes.extend_from_slice(&rr.to_bytes_be());
         bytes

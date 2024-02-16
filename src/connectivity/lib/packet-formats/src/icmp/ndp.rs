@@ -451,6 +451,7 @@ pub mod options {
     use core::num::NonZeroUsize;
     use core::time::Duration;
 
+    use byteorder::{ByteOrder, NetworkEndian};
     use const_unwrap::const_unwrap_option;
     use net_types::ip::{IpAddress as _, Ipv6Addr, Subnet, SubnetError};
     use net_types::UnicastAddress;
@@ -458,7 +459,7 @@ pub mod options {
         LengthEncoding, OptionBuilder, OptionLayout, OptionParseErr, OptionParseLayout, OptionsImpl,
     };
     use packet::BufferView as _;
-    use zerocopy::byteorder::{network_endian::U32, ByteOrder, NetworkEndian};
+    use zerocopy::byteorder::network_endian::U32;
     use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
     use super::NonZeroNdpLifetime;
@@ -1109,11 +1110,11 @@ pub mod options {
 mod tests {
     use core::convert::TryFrom;
 
+    use byteorder::{ByteOrder, NetworkEndian};
     use net_types::ip::{Ip, IpAddress, Subnet};
     use packet::serialize::Serializer;
     use packet::{InnerPacketBuilder, ParseBuffer};
     use test_case::test_case;
-    use zerocopy::byteorder::{ByteOrder, NetworkEndian};
     use zerocopy::Ref;
 
     use super::*;

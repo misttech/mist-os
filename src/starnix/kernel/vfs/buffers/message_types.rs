@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zerocopy::{
-    byteorder::{ByteOrder, NativeEndian},
-    AsBytes, FromBytes,
-};
+use byteorder::{ByteOrder, NativeEndian};
+use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
     task::CurrentTask,
