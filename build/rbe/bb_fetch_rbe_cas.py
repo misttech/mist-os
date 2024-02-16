@@ -169,7 +169,7 @@ def _main(
         reproxy_log=reproxy_log,
         artifact_path=artifact_path,
         cfg=cfg,
-        output=output or artifact_path.name,
+        output=output or Path(artifact_path.name),
         verbose=verbose,
     )
 

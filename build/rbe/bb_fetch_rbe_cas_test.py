@@ -181,7 +181,7 @@ class MainTests(unittest.TestCase):
             reproxy_log=reproxy_log_path,
             artifact_path=artifact_path,
             cfg=cfg,
-            output=artifact_path.name,
+            output=Path(artifact_path.name),
             verbose=False,
         )
 
@@ -228,7 +228,7 @@ class MainTests(unittest.TestCase):
             reproxy_log=reproxy_log_path,
             artifact_path=artifact_path,
             cfg=cfg,
-            output=artifact_path.name,
+            output=Path(artifact_path.name),
             verbose=False,
         )
 
@@ -293,7 +293,7 @@ class MainTests(unittest.TestCase):
             reproxy_log=reproxy_log_path,
             artifact_path=artifact_path,
             cfg=cfg,
-            output=artifact_path.name,
+            output=Path(artifact_path.name),
             verbose=False,
         )
 
