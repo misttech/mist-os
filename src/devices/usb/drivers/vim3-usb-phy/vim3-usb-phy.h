@@ -175,8 +175,8 @@ class Vim3UsbPhyDevice : public fdf::DriverBase {
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
 
-  ChildNode xhci_{"xhci", PDEV_DID_USB_XHCI_COMPOSITE};
-  ChildNode dwc2_{"dwc2", PDEV_DID_USB_DWC2};
+  ChildNode xhci_{"xhci-phy", PDEV_DID_USB_XHCI_COMPOSITE};
+  ChildNode dwc2_{"dwc2-phy", PDEV_DID_USB_DWC2};
 };
 
 }  // namespace vim3_usb_phy

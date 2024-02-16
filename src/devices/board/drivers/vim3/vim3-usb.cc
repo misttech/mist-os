@@ -109,7 +109,7 @@ static const std::vector<fpbus::Metadata> usb_phy_metadata{
 
 static const fpbus::Node usb_phy_dev = []() {
   fpbus::Node dev = {};
-  dev.name() = "vim3_usb_phy";
+  dev.name() = "usb-phy-pdev";
   dev.pid() = PDEV_PID_VIM3;
   dev.vid() = PDEV_VID_AMLOGIC;
   dev.did() = PDEV_DID_VIM3_USB_PHY;
@@ -213,7 +213,7 @@ static const std::vector<fpbus::Irq> xhci_irqs{
 
 static const fpbus::Node xhci_dev = []() {
   fpbus::Node dev = {};
-  dev.name() = "xhci";
+  dev.name() = "xhci-pdev";
   dev.vid() = PDEV_VID_GENERIC;
   dev.pid() = PDEV_PID_GENERIC;
   dev.did() = PDEV_DID_USB_XHCI;
@@ -246,7 +246,7 @@ static const std::vector<fpbus::BootMetadata> usb_boot_metadata{
 
 static fpbus::Node dwc2_dev = []() {
   fpbus::Node dev = {};
-  dev.name() = "dwc2";
+  dev.name() = "dwc2-pdev";
   dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
   dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
   dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_USB_DWC2;
@@ -286,7 +286,7 @@ zx_status_t AddDwc2Composite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
   auto dwc2_result = pbus.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, dwc2_dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "dwc2_phy", .parents = kDwc2Parents}}));
+                                   {.name = "dwc2-composite", .parents = kDwc2Parents}}));
   if (!dwc2_result.ok()) {
     zxlogf(ERROR, "AddCompositeNodeSpec Usb(dwc2_phy) request failed: %s",
            dwc2_result.FormatDescription().data());
@@ -329,7 +329,7 @@ zx_status_t AddXhciComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
   auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, xhci_dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "xhci-phy", .parents = kXhciParents}}));
+                                   {.name = "xhci-composite", .parents = kXhciParents}}));
   if (!result.ok()) {
     zxlogf(ERROR, "AddCompositeNodeSpec Usb(xhci-phy) request failed: %s",
            result.FormatDescription().data());
@@ -365,7 +365,7 @@ zx_status_t Vim3::UsbInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('USB_');
   auto spec = fuchsia_driver_framework::CompositeNodeSpec{
-      {.name = "vim3_usb_phy", .parents = kUsbPhyDevParents}};
+      {.name = "usb-phy-composite", .parents = kUsbPhyDevParents}};
   fdf::WireUnownedResult usb_phy_result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, usb_phy_dev), fidl::ToWire(fidl_arena, spec));
   if (!usb_phy_result.ok()) {

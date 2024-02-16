@@ -77,10 +77,10 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:1/aml-gpio/gpio/gpio-93/fusb302",
 
       // USB
-      "sys/platform/05:03:2d/vim3_usb_phy",
-      "sys/platform/05:03:2d/vim3_usb_phy/vim3_usb_phy/dwc2/dwc2_phy/dwc2/usb-peripheral/function-000/cdc-eth-function",
-      "sys/platform/05:03:2d/vim3_usb_phy/vim3_usb_phy/xhci",
-      "sys/platform/00:00:2/xhci-phy/xhci",
+      "sys/platform/05:03:2d/usb-phy-composite",
+      "sys/platform/05:03:2d/usb-phy-composite/vim3_usb_phy/dwc2-phy/dwc2-composite/dwc2/usb-peripheral/function-000/cdc-eth-function",
+      "sys/platform/05:03:2d/usb-phy-composite/vim3_usb_phy/xhci-phy",
+      "sys/platform/00:00:2/xhci-composite/xhci",
 
       // USB 2.0 Hub
       // Ignored because we've had a spate of vim3 devices that seem to have
@@ -88,7 +88,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       // any way so we'd rather ignore such failures than cause flakiness or
       // have to remove more devices from the fleet.
       // See b/296738636 for more information.
-      // "sys/platform/05:03:2d/vim3_usb_phy/vim3_usb_phy/xhci/xhci/xhci/usb-bus/000/usb-hub",
+      // "sys/platform/00:00:2/xhci-composite/xhci/usb-bus/000/usb-hub",
 
       // Temperature Sensors / Trip Point Devices.
       "sys/platform/05:06:39/pll-temp-sensor/aml-trip-device",  // PLL Temperature Sensor
