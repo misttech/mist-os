@@ -312,6 +312,20 @@ void MinidumpRemoteAPI::CollectMemory() {
   unwinder_ = std::make_unique<unwinder::Unwinder>(memory_->GetUnwinderModules());
 }
 
+std::vector<debug_ipc::ThreadRecord> MinidumpRemoteAPI::GetThreadRecords() {
+  std::vector<debug_ipc::ThreadRecord> threads;
+
+  for (const auto& thread : minidump_->Threads()) {
+    auto& record = threads.emplace_back();
+
+    record.id.process = minidump_->ProcessID();
+    record.id.thread = thread->ThreadID();
+    record.state = debug_ipc::ThreadRecord::State::kCoreDump;
+  }
+
+  return threads;
+}
+
 void MinidumpRemoteAPI::OnDownloadsStopped(size_t num_succeeded, size_t num_failed) {
   // If we just downloaded new binary files, more memory information might be available than when we
   // last collected memory.
@@ -363,6 +377,7 @@ void MinidumpRemoteAPI::Hello(const debug_ipc::HelloRequest& request,
   }
 
   debug_ipc::HelloReply reply;
+  reply.version = debug_ipc::kCurrentProtocolVersion;
 
   const auto& threads = minidump_->Threads();
   if (threads.empty()) {
@@ -401,6 +416,23 @@ void MinidumpRemoteAPI::Hello(const debug_ipc::HelloRequest& request,
 
   // Assume 4K page size since minidumps don't include this information.
   reply.page_size = 4096;
+
+  Succeed(std::move(cb), reply);
+}
+
+void MinidumpRemoteAPI::Status(const debug_ipc::StatusRequest& request,
+                               fit::callback<void(const Err&, debug_ipc::StatusReply)> cb) {
+  if (!minidump_) {
+    ErrNoDump(std::move(cb));
+    return;
+  }
+
+  debug_ipc::StatusReply reply;
+
+  auto& process = reply.processes.emplace_back();
+  process.process_koid = minidump_->ProcessID();
+  process.process_name = ProcessName();
+  process.threads = GetThreadRecords();
 
   Succeed(std::move(cb), reply);
 }
@@ -614,13 +646,7 @@ void MinidumpRemoteAPI::Threads(const debug_ipc::ThreadsRequest& request,
   debug_ipc::ThreadsReply reply;
 
   if (static_cast<pid_t>(request.process_koid) == minidump_->ProcessID()) {
-    for (const auto& thread : minidump_->Threads()) {
-      auto& record = reply.threads.emplace_back();
-
-      record.id.process = request.process_koid;
-      record.id.thread = thread->ThreadID();
-      record.state = debug_ipc::ThreadRecord::State::kCoreDump;
-    }
+    reply.threads = GetThreadRecords();
   }
 
   Succeed(std::move(cb), reply);

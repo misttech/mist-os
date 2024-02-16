@@ -44,6 +44,8 @@ class MinidumpRemoteAPI : public RemoteAPI, public DownloadObserver {
   // RemoteAPI implementation. Not all APIs are implemented.
   void Hello(const debug_ipc::HelloRequest& request,
              fit::callback<void(const Err&, debug_ipc::HelloReply)> cb) override;
+  void Status(const debug_ipc::StatusRequest& request,
+              fit::callback<void(const Err&, debug_ipc::StatusReply)> cb) override;
   void Kill(const debug_ipc::KillRequest& request,
             fit::callback<void(const Err&, debug_ipc::KillReply)> cb) override;
   void Attach(const debug_ipc::AttachRequest& request,
@@ -90,6 +92,8 @@ class MinidumpRemoteAPI : public RemoteAPI, public DownloadObserver {
   // Initialization routine. Iterates minidump structures and finds all the readable memory.
   // memory_ becomes valid after calling this.
   void CollectMemory();
+
+  std::vector<debug_ipc::ThreadRecord> GetThreadRecords();
 
   // Get all the modules out of the dump in debug ipc form.
   std::vector<debug_ipc::Module> GetModules();
