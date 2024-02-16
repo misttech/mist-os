@@ -215,8 +215,10 @@ the future.
 
 * Fitipower Jadard JD9364 Data Sheet - Version 1.07, dated 2021/2/26,
   referenced as "JD9364 datasheet"
-* Fitipower Jadard JD9364 User Guide - Version 1.00, dated 2017/12/22,
+* Fitipower Jadard JD9364 User Guide - Version 1.01, dated 2018/5/31,
   referenced as "JD9364 user guide"
+* Fitipower Jadard JD9364 IP User Guide - Version 0.03, dated 2018/4/2,
+  referenced as "JD9364 IP user guide"
 * [Fitipower Jadard JD9365D Data Sheet][jd9365-datasheet] - Version 0.01,
   dated 2017/4/27, distributed by PINE64, referenced as "JD9365 datasheet"
 * Fitipower Jadard JD9365 User Guide - Version 0.11, dated 2015/10/28,
