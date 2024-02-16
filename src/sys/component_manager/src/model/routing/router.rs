@@ -121,6 +121,13 @@ impl Router {
         (self.route_fn)(request, completer)
     }
 
+    /// Obtain a capability this router, following the description in `request`.
+    pub async fn route_async(&self, request: Request) -> Result<Capability, RouteOrOpenError> {
+        let (fut, completer) = Completer::new();
+        self.route(request, completer);
+        fut.await
+    }
+
     /// Returns an router that requests capabilities from the specified `path` relative
     /// to the base router, i.e. attenuates the base router to the subset of capabilities
     /// that live under `path`.
@@ -243,7 +250,7 @@ impl Router {
                 let errors_fn = errors_fn.clone();
                 routing_task_group.spawn(async move {
                     // Request a capability from the `router`.
-                    let result = route(&router, request).await;
+                    let result = router.route_async(request).await;
                     match result {
                         Ok(capability) => {
                             // HACK: Dict needs special casing because [Dict::try_into_open]
@@ -363,22 +370,15 @@ impl Completer {
     }
 }
 
-fn try_routable_from_enum(capability: Capability) -> Option<Router> {
-    match capability {
-        Capability::Dictionary(c) => Some(Router::from_routable(c)),
-        Capability::Open(c) => Some(Router::from_routable(c)),
-        Capability::Router(c) => Some(Router::from_any(c)),
-        _ => None,
-    }
-}
-
 impl Routable for Capability {
     fn route(&self, request: Request, completer: Completer) {
-        match try_routable_from_enum(self.clone()) {
-            Some(router) => router.route(request, completer),
-            None => {
+        match self {
+            Capability::Dictionary(d) => d.route(request, completer),
+            Capability::Open(o) => o.route(request, completer),
+            Capability::Router(r) => Router::from_any(r.clone()).route(request, completer),
+            capability => {
                 if request.relative_path.is_empty() {
-                    completer.complete(Ok(self.clone()));
+                    completer.complete(Ok(capability.clone()));
                 } else {
                     completer.complete(Err(RoutingError::BedrockUnsupportedCapability.into()))
                 }
@@ -430,13 +430,6 @@ impl Routable for Router {
     }
 }
 
-/// Obtain a capability from `router`, following the description in `request`.
-pub async fn route(router: &Router, request: Request) -> Result<Capability, RouteOrOpenError> {
-    let (fut, completer) = Completer::new();
-    router.route(request, completer);
-    fut.await
-}
-
 pub struct PolicyCheckRouter {
     capability_source: CapabilitySource,
     policy_checker: GlobalPolicyChecker,
@@ -479,16 +472,14 @@ mod tests {
         let source: Capability = Data::String("hello".to_string()).into();
         let base = Router::from_routable(source);
         let proxy = base.with_availability(Availability::Optional);
-        let capability = route(
-            &proxy,
-            Request {
+        let capability = proxy
+            .route_async(Request {
                 relative_path: Path::default(),
                 availability: Availability::Optional,
                 target: WeakComponentInstance::invalid(),
-            },
-        )
-        .await
-        .unwrap();
+            })
+            .await
+            .unwrap();
         let capability = match capability {
             Capability::Data(d) => d,
             c => panic!("Bad enum {:#?}", c),
@@ -501,16 +492,14 @@ mod tests {
         let source: Capability = Data::String("hello".to_string()).into();
         let base = Router::from_routable(source);
         let proxy = base.with_availability(Availability::Optional);
-        let error = route(
-            &proxy,
-            Request {
+        let error = proxy
+            .route_async(Request {
                 relative_path: Path::default(),
                 availability: Availability::Required,
                 target: WeakComponentInstance::invalid(),
-            },
-        )
-        .await
-        .unwrap_err();
+            })
+            .await
+            .unwrap_err();
         use ::routing::error::AvailabilityRoutingError;
         assert_matches!(
             error,
@@ -528,16 +517,14 @@ mod tests {
         let router =
             Router::new(move |_request, completer| completer.complete(Ok(sender.clone().into())));
 
-        let capability = route(
-            &router,
-            Request {
+        let capability = router
+            .route_async(Request {
                 relative_path: Path::default(),
                 availability: Availability::Required,
                 target: WeakComponentInstance::invalid(),
-            },
-        )
-        .await
-        .unwrap();
+            })
+            .await
+            .unwrap();
         let sender = match capability {
             Capability::Sender(c) => c,
             c => panic!("Bad enum {:#?}", c),
@@ -563,16 +550,14 @@ mod tests {
         let base_router = Router::from_routable(dict2);
         let downscoped_router = base_router.with_path(iter::once("dict1"));
 
-        let capability = route(
-            &downscoped_router,
-            Request {
+        let capability = downscoped_router
+            .route_async(Request {
                 relative_path: Path::new("source"),
                 availability: Availability::Optional,
                 target: WeakComponentInstance::invalid(),
-            },
-        )
-        .await
-        .unwrap();
+            })
+            .await
+            .unwrap();
         let capability = match capability {
             Capability::Data(d) => d,
             c => panic!("Bad enum {:#?}", c),
@@ -595,16 +580,14 @@ mod tests {
         let base_router = Router::from_routable(dict4);
         let downscoped_router = base_router.with_path(vec!["dict3", "dict2"].into_iter());
 
-        let capability = route(
-            &downscoped_router,
-            Request {
+        let capability = downscoped_router
+            .route_async(Request {
                 relative_path: Path::new("dict1/source"),
                 availability: Availability::Optional,
                 target: WeakComponentInstance::invalid(),
-            },
-        )
-        .await
-        .unwrap();
+            })
+            .await
+            .unwrap();
         let capability = match capability {
             Capability::Data(d) => d,
             c => panic!("Bad enum {:#?}", c),

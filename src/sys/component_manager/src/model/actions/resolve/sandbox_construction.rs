@@ -8,7 +8,7 @@ use {
         model::{
             component::{ComponentInstance, ResolvedInstanceState, WeakComponentInstance},
             error::RouteOrOpenError,
-            routing::router::{self, Completer, Request, Router},
+            routing::router::{Completer, Request, Router},
         },
         sandbox_util::{DictExt, LaunchTaskOnReceive},
     },
@@ -301,11 +301,10 @@ fn make_dict_extending_router(
                         availability: cm_types::Availability::Required,
                         target: component.as_weak(),
                     };
-                    let source_dict =
-                        match router::route(&source_dict_router, source_request).await? {
-                            Capability::Dictionary(d) => d,
-                            _ => panic!("source_dict_router must return a Dict"),
-                        };
+                    let source_dict = match source_dict_router.route_async(source_request).await? {
+                        Capability::Dictionary(d) => d,
+                        _ => panic!("source_dict_router must return a Dict"),
+                    };
                     let mut entries = dict.lock_entries();
                     let source_entries = source_dict.lock_entries();
                     for source_key in source_entries.keys() {
