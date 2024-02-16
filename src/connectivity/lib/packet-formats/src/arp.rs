@@ -151,29 +151,14 @@ pub fn peek_arp_types<B: ByteSlice>(bytes: B) -> ParseResult<(ArpHardwareType, A
 
 // Body has the same memory layout (thanks to repr(C)) as an ARP body. Thus, we
 // can simply reinterpret the bytes of the ARP body as a Body and then safely
-// access its fields. Note the following caveats:
-// - While FromBytes and Unaligned are taken care of for us by their derives, we
-//   still have to manually verify the correctness of our AsBytes
-//   implementation. The AsBytes implementation is sound if all of the fields
-//   are themselves AsBytes and there is no padding. We are guaranteed no
-//   padding so long as each field also has no alignment requirement that would
-//   cause the layout algorithm to produce padding. Thus, we use an AsBytes +
-//   Unaligned bound for our type parameters.
-#[derive(FromZeros, FromBytes, NoCell, Unaligned)]
+// access its fields.
+#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
 #[repr(C)]
 struct Body<HwAddr, ProtoAddr> {
     sha: HwAddr,
     spa: ProtoAddr,
     tha: HwAddr,
     tpa: ProtoAddr,
-}
-
-unsafe impl<HwAddr: AsBytes + Unaligned, ProtoAddr: AsBytes + Unaligned> AsBytes
-    for Body<HwAddr, ProtoAddr>
-{
-    // We're doing a bad thing, but it's necessary until derive(AsBytes)
-    // supports type parameters.
-    fn only_derive_is_allowed_to_implement_this_trait() {}
 }
 
 /// An ARP packet.

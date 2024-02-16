@@ -334,22 +334,11 @@ pub trait IcmpMessageType: TryFrom<u8> + Into<u8> + Copy {
     fn is_err(self) -> bool;
 }
 
-#[derive(Copy, Clone, Debug, FromZeros, FromBytes, NoCell, Unaligned)]
+#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
 #[repr(C)]
 struct Header<M> {
     prefix: HeaderPrefix,
     message: M,
-}
-
-// So long as `M: Unaligned`, there will be no padding between the
-// `HeaderPrefix` and `M`. Since `HeaderPrefix` itself is `Unaligned`, the
-// alignment of `Header<M>` will be 1, meaning that no post-padding will need to
-// be added to get to a multiple of the alignment. Since there is no padding,
-// then so long as `M: AsBytes`, all of `Header<M>: AsBytes`.
-unsafe impl<M: AsBytes + Unaligned> AsBytes for Header<M> {
-    // We're doing a bad thing, but it's necessary until derive(AsBytes)
-    // supports type parameters.
-    fn only_derive_is_allowed_to_implement_this_trait() {}
 }
 
 /// A partially parsed and not yet validated ICMP packet.
