@@ -35,6 +35,15 @@ impl Fake {
         std::fs::write(self.root.path().join(hash.to_string()), data).unwrap();
     }
 
+    /// Delete a blob from the fake blobfs.
+    ///
+    /// # Panics
+    ///
+    /// Panics on error
+    pub fn delete_blob(&self, hash: Hash) {
+        std::fs::remove_file(self.root.path().join(hash.to_string())).unwrap();
+    }
+
     fn root_proxy(&self) -> fio::DirectoryProxy {
         fuchsia_fs::directory::open_in_namespace(
             self.root.path().to_str().unwrap(),

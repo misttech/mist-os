@@ -20,7 +20,8 @@ pub(crate) async fn serve_request_stream(
     base_packages: Arc<HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>>,
     authenticator: ContextAuthenticator,
     blobfs: blobfs::Client,
-    caching_package_server: caching_package_server::CachingPackageServer<blobfs::Client>,
+    open_packages: package_directory::RootDirCache<blobfs::Client>,
+    scope: package_directory::ExecutionScope,
 ) -> anyhow::Result<()> {
     while let Some(request) =
         stream.try_next().await.context("failed to read request from FIDL stream")?
@@ -33,7 +34,8 @@ pub(crate) async fn serve_request_stream(
                             &component_url,
                             &base_packages,
                             authenticator.clone(),
-                            &caching_package_server,
+                            &open_packages,
+                            scope.clone(),
                         )
                         .await
                         .map_err(|e| {
@@ -61,7 +63,8 @@ pub(crate) async fn serve_request_stream(
                             &base_packages,
                             authenticator.clone(),
                             &blobfs,
-                            &caching_package_server,
+                            &open_packages,
+                            scope.clone(),
                         )
                         .await
                         .map_err(|e| {
@@ -87,7 +90,8 @@ async fn resolve(
     url: &str,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
     authenticator: ContextAuthenticator,
-    caching_package_server: &caching_package_server::CachingPackageServer<blobfs::Client>,
+    open_packages: &package_directory::RootDirCache<blobfs::Client>,
+    scope: package_directory::ExecutionScope,
 ) -> Result<fcomponent_resolution::Component, ResolverError> {
     let url = fuchsia_url::ComponentUrl::parse(url)?;
     let (package, server_end) =
@@ -100,7 +104,8 @@ async fn resolve(
         server_end,
         base_packages,
         authenticator,
-        caching_package_server,
+        open_packages,
+        scope,
     )
     .await?;
     resolve_from_package(&url, package, fcomponent_resolution::Context { bytes: context.bytes })
@@ -113,7 +118,8 @@ async fn resolve_with_context(
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
     authenticator: ContextAuthenticator,
     blobfs: &blobfs::Client,
-    caching_package_server: &caching_package_server::CachingPackageServer<blobfs::Client>,
+    open_packages: &package_directory::RootDirCache<blobfs::Client>,
+    scope: package_directory::ExecutionScope,
 ) -> Result<fcomponent_resolution::Component, ResolverError> {
     let url = fuchsia_url::ComponentUrl::parse(url)?;
     let (package, server_end) =
@@ -125,7 +131,8 @@ async fn resolve_with_context(
         base_packages,
         authenticator,
         blobfs,
-        caching_package_server,
+        open_packages,
+        scope,
     )
     .await?;
     resolve_from_package(&url, package, fcomponent_resolution::Context { bytes: context.bytes })
@@ -195,7 +202,8 @@ mod tests {
                 "relative#meta/missing",
                 &HashMap::new(),
                 ContextAuthenticator::new(),
-                &caching_package_server::CachingPackageServer::new(blobfs::Client::new_test().0).0
+                &package_directory::RootDirCache::new(blobfs::Client::new_test().0),
+                package_directory::ExecutionScope::new(),
             )
             .await,
             Err(ResolverError::AbsoluteUrlRequired)

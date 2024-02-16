@@ -21,6 +21,7 @@ rustc_library("package-directory") {
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/async-utils",
+    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-fs",
     "//src/lib/zircon/rust:fuchsia-zircon",
@@ -39,7 +40,9 @@ rustc_library("package-directory") {
   ]
 
   test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-url",
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",
@@ -58,6 +61,7 @@ rustc_library("package-directory") {
     "src/meta_subdir.rs",
     "src/non_meta_subdir.rs",
     "src/root_dir.rs",
+    "src/root_dir_cache.rs",
   ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 

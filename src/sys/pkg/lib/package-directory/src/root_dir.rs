@@ -49,12 +49,36 @@ pub struct RootDir<S> {
     // The keys are object relative path expressions.
     pub(crate) non_meta_files: HashMap<String, fuchsia_hash::Hash>,
     meta_far_vmo: Once<zx::Vmo>,
+    dropper: Option<Box<dyn crate::OnRootDirDrop>>,
 }
 
 impl<S: crate::NonMetaStorage> RootDir<S> {
     /// Loads the package metadata given by `hash` from `non_meta_storage`, returning an object
     /// representing the package, backed by `non_meta_storage`.
     pub async fn new(non_meta_storage: S, hash: fuchsia_hash::Hash) -> Result<Arc<Self>, Error> {
+        Ok(Arc::new(Self::new_raw(non_meta_storage, hash, None).await?))
+    }
+
+    /// Loads the package metadata given by `hash` from `non_meta_storage`, returning an object
+    /// representing the package, backed by `non_meta_storage`.
+    /// Takes `dropper`, which will be dropped when the returned `RootDir` is dropped.
+    pub async fn new_with_dropper(
+        non_meta_storage: S,
+        hash: fuchsia_hash::Hash,
+        dropper: Box<dyn crate::OnRootDirDrop>,
+    ) -> Result<Arc<Self>, Error> {
+        Ok(Arc::new(Self::new_raw(non_meta_storage, hash, Some(dropper)).await?))
+    }
+
+    /// Loads the package metadata given by `hash` from `non_meta_storage`, returning an object
+    /// representing the package, backed by `non_meta_storage`.
+    /// Takes `dropper`, which will be dropped when the returned `RootDir` is dropped.
+    /// Like `new_with_dropper` except the returned `RootDir` is not in an `Arc`.
+    pub async fn new_raw(
+        non_meta_storage: S,
+        hash: fuchsia_hash::Hash,
+        dropper: Option<Box<dyn crate::OnRootDirDrop>>,
+    ) -> Result<Self, Error> {
         let meta_far = open_for_read(&non_meta_storage, &hash, fio::OpenFlags::DESCRIBE)
             .map_err(Error::OpenMetaFar)?;
 
@@ -110,14 +134,29 @@ impl<S: crate::NonMetaStorage> RootDir<S> {
 
         let meta_far_vmo = Default::default();
 
-        Ok(Arc::new(RootDir {
+        Ok(RootDir {
             non_meta_storage,
             hash,
             meta_far,
             meta_files,
             non_meta_files,
             meta_far_vmo,
-        }))
+            dropper,
+        })
+    }
+
+    /// Sets the dropper. If the dropper was already set, returns `dropper` in the error.
+    pub fn set_dropper(
+        &mut self,
+        dropper: Box<dyn crate::OnRootDirDrop>,
+    ) -> Result<(), Box<dyn crate::OnRootDirDrop>> {
+        match self.dropper {
+            Some(_) => Err(dropper),
+            None => {
+                self.dropper = Some(dropper);
+                Ok(())
+            }
+        }
     }
 
     /// Returns the contents, if present, of the file at object relative path expression `path`.
@@ -1109,9 +1148,8 @@ mod tests {
     }
 
     proptest::proptest! {
-        #![proptest_config(proptest::test_runner::Config {
-            failure_persistence:
-                Some(Box::new(proptest::test_runner::FileFailurePersistence::Off)),
+        #![proptest_config(proptest::prelude::ProptestConfig{
+            failure_persistence: None,
             ..Default::default()
         })]
 

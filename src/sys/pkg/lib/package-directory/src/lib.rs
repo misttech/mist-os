@@ -24,8 +24,10 @@ mod meta_file;
 mod meta_subdir;
 mod non_meta_subdir;
 mod root_dir;
+mod root_dir_cache;
 
 pub use root_dir::{PathError, ReadFileError, RootDir, SubpackagesError};
+pub use root_dir_cache::RootDirCache;
 pub use vfs::{execution_scope::ExecutionScope, path::Path as VfsPath};
 
 #[derive(thiserror::Error, Debug)]
@@ -54,6 +56,9 @@ pub enum Error {
 
     #[error("collision between a file and a directory at path: '{:?}'", path)]
     FileDirectoryCollision { path: String },
+
+    #[error("the supplied RootDir already has a dropper set")]
+    DropperAlreadySet,
 }
 
 impl From<&Error> for zx::Status {
@@ -62,7 +67,7 @@ impl From<&Error> for zx::Status {
         match e {
             MissingMetaFar => zx::Status::NOT_FOUND,
             OpenMetaFar(OpenError::OpenError(s)) => *s,
-            OpenMetaFar(_) => zx::Status::INTERNAL,
+            OpenMetaFar(_) | DropperAlreadySet => zx::Status::INTERNAL,
             ArchiveReader(fuchsia_archive::Error::Read(_)) => zx::Status::IO,
             ArchiveReader(_) | ReadMetaContents(_) | DeserializeMetaContents(_) => {
                 zx::Status::INVALID_ARGS
@@ -206,6 +211,20 @@ fn u64_to_usize_safe(u: u64) -> usize {
     static_assertions::assert_eq_size_val!(u, ret);
     ret
 }
+
+/// RootDir takes an optional `OnRootDirDrop` value that will be dropped when the RootDir is
+/// dropped.
+///
+/// This is useful because the VFS functions operate on `Arc<RootDir>`s (and create clones of the
+/// `Arc`s in response to e.g. `Directory::open` calls), so this allows clients to perform actions
+/// when the last clone of the `Arc<RootDir>` is dropped (which is frequently when the last
+/// fuchsia.io connection closes).
+///
+/// The `ExecutionScope` used to serve the connection could also be used to notice when all the
+/// `Arc<RootDir>`s are dropped, but only if the `Arc<RootDir>`s are only used by VFS. Tracking
+/// when the `RootDir` itself is dropped allows non VFS uses of the `Arc<RootDir>`s.
+pub trait OnRootDirDrop: Send + Sync + std::fmt::Debug {}
+impl<T> OnRootDirDrop for T where T: Send + Sync + std::fmt::Debug {}
 
 /// Takes a directory hierarchy and a directory in the hierarchy and returns all the directory's
 /// children in alphabetical order.

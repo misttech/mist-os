@@ -47,7 +47,6 @@ rustc_binary("bin") {
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/lib/mem_util",
     "//src/sys/pkg/lib/blobfs",
-    "//src/sys/pkg/lib/caching-package-server",
     "//src/sys/pkg/lib/fuchsia-hash",
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//src/sys/pkg/lib/fuchsia-pkg",

@@ -50,7 +50,7 @@ pub(crate) async fn serve(
     cache_packages: Arc<CachePackages>,
     executability_restrictions: system_image::ExecutabilityRestrictions,
     scope: package_directory::ExecutionScope,
-    caching_package_server: caching_package_server::CachingPackageServer<blobfs::Client>,
+    open_packages: package_directory::RootDirCache<blobfs::Client>,
     stream: PackageCacheRequestStream,
     cobalt_sender: ProtocolSender<MetricEvent>,
     serve_id: Arc<AtomicU32>,
@@ -88,7 +88,7 @@ pub(crate) async fn serve(
                         base_packages.as_ref(),
                         executability_restrictions,
                         &blobfs,
-                        &caching_package_server,
+                        &open_packages,
                         meta_far_blob,
                         gc_protection,
                         needed_blobs,
@@ -113,9 +113,10 @@ pub(crate) async fn serve(
                             base_packages.as_ref(),
                             executability_restrictions,
                             &blobfs,
-                            &caching_package_server,
+                            &open_packages,
                             BlobId::from(meta_far).into(),
                             dir,
+                            scope.clone(),
                         )
                         .await,
                     )?;
@@ -204,7 +205,7 @@ async fn get(
     base_packages: &BasePackages,
     executability_restrictions: system_image::ExecutabilityRestrictions,
     blobfs: &blobfs::Client,
-    caching_package_server: &caching_package_server::CachingPackageServer<blobfs::Client>,
+    open_packages: &package_directory::RootDirCache<blobfs::Client>,
     meta_far_blob: BlobInfo,
     gc_protection: fpkg::GcProtection,
     needed_blobs: ServerEnd<NeededBlobsMarker>,
@@ -261,10 +262,10 @@ async fn get(
     if let Some((dir, scope)) = dir_and_scope {
         let open_flags =
             make_pkgdir_flags(executability_status(executability_restrictions, &package_status));
-        match gc_protection {
+        let root_dir = match gc_protection {
             fpkg::GcProtection::Retained => {
-                let root_dir = if let Some(root_dir) = root_dir {
-                    root_dir
+                if let Some(root_dir) = root_dir {
+                    Arc::new(root_dir)
                 } else {
                     package_directory::RootDir::new(blobfs.clone(), pkg).await.map_err(|e| {
                         error!("get: creating RootDir {}: {:#}", pkg, anyhow!(e));
@@ -277,31 +278,24 @@ async fn get(
                         );
                         Status::INTERNAL
                     })?
-                };
-                let () = root_dir.open(
-                    scope,
-                    open_flags,
-                    vfs::path::Path::dot(),
-                    dir.into_channel().into(),
-                );
+                }
             }
             fpkg::GcProtection::OpenPackageTracking => {
-                let () = caching_package_server
-                    .serve(pkg, open_flags, dir, root_dir)
-                    .await
-                    .map_err(|e| {
-                        error!("get: caching_package_server.serve {}: {:#}", pkg, anyhow!(e));
-                        cobalt_sender.send(
-                            MetricEvent::builder(metrics::PKG_CACHE_OPEN_MIGRATED_METRIC_ID)
-                                .with_event_codes(
-                                    metrics::PkgCacheOpenMigratedMetricDimensionResult::Io,
-                                )
-                                .as_occurrence(1),
-                        );
-                        Status::INTERNAL
-                    })?;
+                open_packages.get_or_insert(pkg, root_dir).await.map_err(|e| {
+                    error!("get: open_packages.get_or_insert {}: {:#}", pkg, anyhow!(e));
+                    cobalt_sender.send(
+                        MetricEvent::builder(metrics::PKG_CACHE_OPEN_MIGRATED_METRIC_ID)
+                            .with_event_codes(
+                                metrics::PkgCacheOpenMigratedMetricDimensionResult::Io,
+                            )
+                            .as_occurrence(1),
+                    );
+                    Status::INTERNAL
+                })?
             }
-        }
+        };
+        let () =
+            root_dir.open(scope, open_flags, vfs::path::Path::dot(), dir.into_channel().into());
     }
 
     cobalt_sender.send(
@@ -422,8 +416,7 @@ async fn serve_needed_blobs(
     package_index: &async_lock::RwLock<PackageIndex>,
     blobfs: &blobfs::Client,
     node: &finspect::Node,
-) -> Result<(Arc<package_directory::RootDir<blobfs::Client>>, PackageStatus), ServeNeededBlobsError>
-{
+) -> Result<(package_directory::RootDir<blobfs::Client>, PackageStatus), ServeNeededBlobsError> {
     let state = node.create_string("state", "need-meta-far");
     let res = async {
         // Step 1: Open and write the meta.far, or determine it is not needed.
@@ -498,7 +491,7 @@ async fn handle_open_meta_blob(
     blobfs: &blobfs::Client,
     package_index: &async_lock::RwLock<PackageIndex>,
     state: &StringProperty,
-) -> Result<Arc<package_directory::RootDir<blobfs::Client>>, ServeNeededBlobsError> {
+) -> Result<package_directory::RootDir<blobfs::Client>, ServeNeededBlobsError> {
     let hash = meta_far_info.blob_id.into();
     package_index.write().await.start_install(hash, gc_protection);
     let mut opened = false;
@@ -762,18 +755,22 @@ async fn get_cached(
     base_packages: &BasePackages,
     executability_restrictions: system_image::ExecutabilityRestrictions,
     blobfs: &blobfs::Client,
-    caching_package_server: &caching_package_server::CachingPackageServer<blobfs::Client>,
+    open_packages: &package_directory::RootDirCache<blobfs::Client>,
     meta_far: Hash,
     dir: ServerEnd<fio::DirectoryMarker>,
+    scope: package_directory::ExecutionScope,
 ) -> Result<(), fpkg::GetCachedError> {
-    let pkg = package_directory::RootDir::new(blobfs.clone(), meta_far).await.map_err(|e| {
-        let err = match e {
-            package_directory::Error::MissingMetaFar => fpkg::GetCachedError::NotCached,
-            _ => fpkg::GetCachedError::Internal,
-        };
-        error!("get_cached: creating RootDir {}: {:#}", meta_far, anyhow!(e));
-        err
-    })?;
+    // TODO(https://fxbug.dev/307977824) Once open package tracking is live, get this RootDir from
+    // the open_packages.
+    let pkg =
+        package_directory::RootDir::new_raw(blobfs.clone(), meta_far, None).await.map_err(|e| {
+            let err = match e {
+                package_directory::Error::MissingMetaFar => fpkg::GetCachedError::NotCached,
+                _ => fpkg::GetCachedError::Internal,
+            };
+            error!("get_cached: creating RootDir {}: {:#}", meta_far, anyhow!(e));
+            err
+        })?;
 
     let package_status = get_package_status(base_packages, package_index, &meta_far).await;
     // Make sure clients are only using this for already cached packages.
@@ -790,18 +787,19 @@ async fn get_cached(
         }
     }
 
-    let () = caching_package_server
-        .serve(
-            meta_far,
-            make_pkgdir_flags(executability_status(executability_restrictions, &package_status)),
-            dir,
-            Some(pkg),
-        )
+    let () = open_packages
+        .get_or_insert(meta_far, Some(pkg))
         .await
         .map_err(|e| {
-            error!("get_cached: caching_package_server.serve {}: {:#}", meta_far, anyhow!(e));
+            error!("get_cached: open_packages.get_or_insert {}: {:#}", meta_far, anyhow!(e));
             fpkg::GetCachedError::Internal
-        })?;
+        })?
+        .open(
+            scope,
+            make_pkgdir_flags(executability_status(executability_restrictions, &package_status)),
+            vfs::path::Path::dot(),
+            dir.into_channel().into(),
+        );
 
     Ok(())
 }
@@ -2256,8 +2254,7 @@ mod get_handler_tests {
         let (_, stream) = fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
         let (blobfs, _) = blobfs::Client::new_test();
-        let (caching_package_server, _) =
-            caching_package_server::CachingPackageServer::new(blobfs.clone());
+        let open_packages = package_directory::RootDirCache::new(blobfs.clone());
         let inspector = fuchsia_inspect::Inspector::default();
         let package_index = Arc::new(async_lock::RwLock::new(PackageIndex::new()));
 
@@ -2267,7 +2264,7 @@ mod get_handler_tests {
                 &BasePackages::new_test_only(HashSet::new(), vec![]),
                 system_image::ExecutabilityRestrictions::DoNotEnforce,
                 &blobfs,
-                &caching_package_server,
+                &open_packages,
                 meta_blob_info,
                 fpkg::GcProtection::OpenPackageTracking,
                 stream,
