@@ -44,7 +44,7 @@ SECTIONS {
   . += SIZEOF_HEADERS;
 
   /*
-   * This is the metadata physboot looks to load and relocate the PIE kernel.
+   * This is the metadata physboot uses to load and relocate the PIE kernel.
    * Each one has to be a separate output section because they're specially
    * produced by the linker, or in the case of `.interp` recognized by name
    * by the linker.
@@ -76,15 +76,8 @@ SECTIONS {
 
   /*
    * This is the remainder of miscellaneous RODATA.
-   *
-   * **NOTE:** This includes `.rodata.rodso_image.*` sections that are
-   * page-aligned.  The only reason to sort the input sections is that the two
-   * page-aligned sections (for vDSO and for userboot) share a common prefix.
-   * This doesn't ensure they'll go last so as to minimize zero padding in the
-   * image, but at least there'll be only one chunk of padding.  These special
-   * sections will go away later when physboot handles those contents.
    */
-  .rodata : { *(SORT_BY_NAME(.rodata*)) }
+  .rodata : { *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.rodata*))) }
 
   /*
    * The named sections starting with kcountdesc are sorted by name so that
@@ -129,8 +122,11 @@ SECTIONS {
 
   /*
    * There should be no executable sections that don't start with `.text`.
+   *
+   * Sorting by alignment minimizes intersection padding; secondarily sorting
+   * by name groups prefixes like `.text.hot.*` or `.text.cold.*` together.
    */
-  .text : { *(.text*) }
+  .text : { *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.text*))) }
 
   PROVIDE_HIDDEN(__code_end = .);
 
@@ -189,7 +185,7 @@ SECTIONS {
     *(.data.cpu_align_exclusive)
     . = ALIGN(128);
 
-    *(.data .data.* .gnu.linkonce.d.*)
+    *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.data*)))
   }
 
   /*
@@ -238,7 +234,7 @@ SECTIONS {
            (kcountdesc_end - kcountdesc_begin) * 8 * SMP_MAX_CPUS / 64,
            "kcounters_arena size mismatch");
 
-    *(.bss*)
+    *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.bss*)))
   }
 
   /*
