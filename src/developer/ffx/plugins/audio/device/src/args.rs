@@ -94,12 +94,6 @@ pub struct DevicePlayCommand {
     pub file: Option<String>,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum InfoOutputFormat {
-    Json,
-    Text,
-}
-
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "record", description = "Capture audio data directly from ring buffer.")]
 pub struct DeviceRecordCommand {
@@ -156,19 +150,6 @@ fn string_to_enable(value: &str) -> Result<bool, String> {
         Ok(false)
     } else {
         Err(format!("Expected one of: on, off"))
-    }
-}
-
-impl FromStr for InfoOutputFormat {
-    type Err = anyhow::Error;
-    fn from_str(s: &str) -> Result<Self, anyhow::Error> {
-        match s.to_lowercase().as_str() {
-            "json" => Ok(InfoOutputFormat::Json),
-            "text" => Ok(InfoOutputFormat::Text),
-            _ => {
-                Err(anyhow::anyhow!("invalid format argument, {}. Expected one of: JSON, text", s))
-            }
-        }
     }
 }
 
