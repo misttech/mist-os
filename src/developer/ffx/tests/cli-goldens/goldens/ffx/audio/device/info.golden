@@ -1,6 +1,6 @@
 {
   "name": "info",
-  "description": "List information about a specific audio device.",
+  "description": "Show information about a specific audio device.",
   "examples": [
     "ffx audio device --type StreamConfig --direction input info"
   ],

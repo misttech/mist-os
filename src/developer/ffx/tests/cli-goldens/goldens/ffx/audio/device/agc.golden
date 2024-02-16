@@ -17,7 +17,7 @@
   "positionals": [
     {
       "name": "enable",
-      "description": "enable or disable agc. Accepted values: on, off",
+      "description": "enable or disable AGC. Accepted values: on, off",
       "optionality": "required",
       "hidden": false
     }

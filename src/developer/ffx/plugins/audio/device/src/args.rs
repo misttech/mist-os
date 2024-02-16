@@ -16,20 +16,30 @@ use {
     subcommand,
     name = "device",
     description = "Interact directly with device hardware.",
-    example = "\
-    To print information about a specific device: \n\
-    \t$ ffx audio device --id 3d99d780 --direction input info \n\n\
-    Play a wav file directly to device hardware: \n\
-    \t$ cat ~/sine.wav | ffx audio device --id  a70075f2 play \n\n
-    \t$ ffx audio device --id  a70075f2 play --file ~/sine.wav \n\n
-    Record a wav file directly from device hardware: \n\
-    \t$ ffx audio device --id 3d99d780 record --format 48000,uint8,1ch --duration 1s \n\n
-    Mute the stream of the output device: \n
-    \t$ ffx audio device --id a70075f2 --direction output mute \n\n
-    Set the gain of the output device to -20 dB: \n
-    \t$ ffx audio device --id a70075f2 --direction output gain -20 \n\n
-    Turn agc on for the input device: \n
-    \t$ ffx audio device --id 3d99d780 --direction input agc on"
+    example = "Show information about a specific device:
+
+    $ ffx audio device --id 3d99d780 --direction input info
+
+Play a WAV file directly to device hardware:
+
+    $ cat ~/sine.wav | ffx audio device --id a70075f2 play
+    $ ffx audio device --id a70075f2 play --file ~/sine.wav
+
+Record a WAV file directly from device hardware:
+
+    $ ffx audio device --id 3d99d780 record --format 48000,uint8,1ch --duration 1s
+
+Mute the stream of an output device:
+
+    $ ffx audio device --id a70075f2 --direction output mute
+
+Set the gain of an output device to -20 dB:
+
+    $ ffx audio device --id a70075f2 --direction output gain -20
+
+Turn AGC on for an input device:
+
+    $ ffx audio device --id 3d99d780 --direction input agc on"
 )]
 pub struct DeviceCommand {
     #[argh(subcommand)]
@@ -37,8 +47,8 @@ pub struct DeviceCommand {
 
     #[argh(
         option,
-        description = "device id. stream device node id from /dev/class/audio-input/,\
-        /dev/class/audio-output/, or /dev/class/audio-composite/.
+        description = "device ID. stream device node ID from /dev/class/audio-input/, \
+        /dev/class/audio-output/, or /dev/class/audio-composite/. \
         If not specified, command will default to first device alphabetically listed."
     )]
     pub id: Option<String>,
@@ -55,7 +65,7 @@ pub struct DeviceCommand {
         option,
         long = "type",
         description = "device type. Accepted values: StreamConfig, Composite. \
-        If not specified, defaults to StreamConfig",
+        If not specified, defaults to StreamConfig.",
         from_str_fn(parse_device_type),
         default = "fidl_fuchsia_hardware_audio::DeviceType::StreamConfig"
     )]
@@ -78,7 +88,7 @@ pub enum SubCommand {
 #[argh(
     subcommand,
     name = "info",
-    description = "List information about a specific audio device.",
+    description = "Show information about a specific audio device.",
     example = "ffx audio device --type StreamConfig --direction input info"
 )]
 pub struct InfoCommand {}
@@ -88,8 +98,8 @@ pub struct InfoCommand {}
 pub struct DevicePlayCommand {
     #[argh(
         option,
-        description = "file in WAV format containing audio signal. If not specified, \
-        ffx command will read from stdin."
+        description = "file in WAV format containing audio signal. \
+        If not specified, ffx command will read from stdin."
     )]
     pub file: Option<String>,
 }
@@ -99,8 +109,8 @@ pub struct DevicePlayCommand {
 pub struct DeviceRecordCommand {
     #[argh(
         option,
-        description = "duration of output signal. Examples: 5ms or 3s. If not specified, \
-        press ENTER to stop recording.",
+        description = "duration of output signal. Examples: 5ms or 3s. \
+        If not specified, press ENTER to stop recording.",
         from_str_fn(parse_duration)
     )]
     pub duration: Option<std::time::Duration>,
@@ -113,10 +123,10 @@ pub struct DeviceRecordCommand {
 #[argh(
     subcommand,
     name = "gain",
-    description = "Request to set the gain of the stream in decibels."
+    description = "Request to set the gain of the stream, in decibels."
 )]
 pub struct DeviceGainCommand {
-    #[argh(option, description = "gain (in decibles) to set the stream to.")]
+    #[argh(option, description = "gain, in decibels, to set the stream to.")]
     pub gain: f32,
 }
 
@@ -137,7 +147,7 @@ pub struct DeviceUnmuteCommand {}
 pub struct DeviceAgcCommand {
     #[argh(
         positional,
-        description = "enable or disable agc. Accepted values: on, off",
+        description = "enable or disable AGC. Accepted values: on, off",
         from_str_fn(string_to_enable)
     )]
     pub enable: bool,

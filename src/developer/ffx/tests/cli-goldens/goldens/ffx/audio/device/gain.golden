@@ -1,6 +1,6 @@
 {
   "name": "gain",
-  "description": "Request to set the gain of the stream in decibels.",
+  "description": "Request to set the gain of the stream, in decibels.",
   "examples": [],
   "flags": [
     {
@@ -20,7 +20,7 @@
       "optionality": "required",
       "long": "--gain",
       "short": null,
-      "description": "gain (in decibles) to set the stream to.",
+      "description": "gain, in decibels, to set the stream to.",
       "hidden": false
     }
   ],

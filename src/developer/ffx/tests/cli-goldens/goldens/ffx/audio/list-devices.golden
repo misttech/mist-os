@@ -2,7 +2,7 @@
   "name": "list-devices",
   "description": "Prints all available audio devices on target",
   "examples": [
-    "ffx audio list-devices \n ffx audio --machine json list-devices"
+    "$ ffx audio list-devices\n$ ffx audio --machine json list-devices"
   ],
   "flags": [
     {

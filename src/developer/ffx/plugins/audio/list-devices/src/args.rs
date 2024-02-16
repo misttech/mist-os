@@ -13,6 +13,7 @@ use {
     subcommand,
     name = "list-devices",
     description = "Prints all available audio devices on target",
-    example = "ffx audio list-devices \n ffx audio --machine json list-devices"
+    example = "$ ffx audio list-devices
+$ ffx audio --machine json list-devices"
 )]
 pub struct ListDevicesCommand {}
