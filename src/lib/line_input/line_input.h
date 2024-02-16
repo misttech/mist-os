@@ -126,6 +126,16 @@ class LineInput {
   // accept callback (typically you would add the current line at this point).
   virtual void AddToHistory(const std::string& line) = 0;
 
+  // Whether the input should handle interruptions (e.g., handle Ctrl-C by calling the cancel
+  // callback and handle Ctrl-D by calling EOF callbacks) while hidden.
+  enum class InterruptHandlingBehavior {
+    // Handle input interuptions in-band, such as Ctrl-C and Ctrl-D.
+    kHandleInterrupts,
+
+    // Ignore input interruptions, for example letting the pty route Ctrl-C to the shell.
+    kIgnoreInterrupts,
+  };
+
   // The input can be hidden and re-shown. Hiding it will erase the current line and put the cursor
   // at the beginning of the line, but not change any internal state. Showing it again will repaint
   // the line at the new cursor position. This allows other output to be printed to the screen
@@ -139,7 +149,8 @@ class LineInput {
   // Tip: When the application is done (the user types "quit" or whatever), call Hide() from within
   // the AcceptCallback or EofCallback. This will ensure the prompt isn't repainted when the
   // callback is complete only to be rehidden on exit (which will cause flickering).
-  virtual void Hide() = 0;
+  virtual void Hide(
+      InterruptHandlingBehavior behavior = InterruptHandlingBehavior::kHandleInterrupts) = 0;
   virtual void Show() = 0;
 
   // Replaces the contents of the current line with the given contents. The cursor will be placed
@@ -167,7 +178,8 @@ class LineInputEditor : public LineInput {
   const std::deque<std::string>& GetHistory() const override;
   void OnInput(char c) override;
   void AddToHistory(const std::string& line) override;
-  void Hide() override;
+  void Hide(
+      InterruptHandlingBehavior behavior = InterruptHandlingBehavior::kHandleInterrupts) override;
   void Show() override;
   void SetCurrentInput(const std::string& input) override;
 

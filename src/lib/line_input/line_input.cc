@@ -171,7 +171,7 @@ void LineInputEditor::AddToHistory(const std::string& line) {
   editing_history_.clear();
 }
 
-void LineInputEditor::Hide() {
+void LineInputEditor::Hide(InterruptHandlingBehavior behavior) {
   if (!visible_)
     return;  // Already hidden.
   visible_ = false;
@@ -181,7 +181,8 @@ void LineInputEditor::Hide() {
   cmd += SpecialCharacters::kTermClearToEnd;
 
   Write(cmd);
-  EnsureTerminalMode(kRawInMode);
+  EnsureTerminalMode(behavior == InterruptHandlingBehavior::kHandleInterrupts ? kRawInMode
+                                                                              : kOriginalMode);
 }
 
 void LineInputEditor::Show() {

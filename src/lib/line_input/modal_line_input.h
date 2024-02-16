@@ -74,7 +74,8 @@ class ModalLineInput : public LineInput {
   const std::deque<std::string>& GetHistory() const override;
   void OnInput(char c) override;
   void AddToHistory(const std::string& line) override;
-  void Hide() override;
+  void Hide(
+      InterruptHandlingBehavior behavior = InterruptHandlingBehavior::kHandleInterrupts) override;
   void Show() override;
   void SetCurrentInput(const std::string& input) override;
 

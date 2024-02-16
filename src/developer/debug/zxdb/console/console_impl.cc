@@ -28,6 +28,7 @@
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/lib/fxl/strings/trim.h"
+#include "src/lib/line_input/line_input.h"
 
 namespace zxdb {
 
@@ -265,7 +266,11 @@ void ConsoleImpl::DisableInput() {
   if (--input_enabled_ != 0)
     return;
 
-  line_input_.Hide();
+  auto behavior = context().GetConsoleMode() == ClientSettings::System::kConsoleMode_Embedded
+                      ? line_input::LineInput::InterruptHandlingBehavior::kIgnoreInterrupts
+                      : line_input::LineInput::InterruptHandlingBehavior::kHandleInterrupts;
+
+  line_input_.Hide(behavior);
   // Stop watching for stdin which will stop feeding input to the LineInput. Today, the LineInput
   // class doesn't suspend processing while hidden. If we didn't disable this watching, you would
   // still get commands executed even though you can't see your typing.

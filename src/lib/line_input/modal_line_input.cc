@@ -136,9 +136,9 @@ void ModalLineInput::AddToHistory(const std::string& line) {
   normal_input_->AddToHistory(line);
 }
 
-void ModalLineInput::Hide() {
+void ModalLineInput::Hide(InterruptHandlingBehavior behavior) {
   hidden_ = true;
-  current_input_->Hide();
+  current_input_->Hide(behavior);
 }
 
 void ModalLineInput::Show() {
