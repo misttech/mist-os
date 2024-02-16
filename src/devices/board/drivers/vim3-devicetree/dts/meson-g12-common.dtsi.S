@@ -5,6 +5,7 @@
 /dts-v1/;
 
 #include "src/devices/lib/amlogic/include/soc/aml-a311d/a311d-hw.h"
+#include "src/devices/lib/amlogic/include/soc/aml-a311d/a311d-gpio.h"
 #include "sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gicv2/arm-gicv2.h"
 
 / {
@@ -30,6 +31,28 @@
 				<GIC_SPI 71 GIC_IRQ_MODE_EDGE_RISING>;
 			gpio-controller;
 			#gpio-cells = <2>;
+
+			audio_tdm_a_cfg1: audio-tdm-a-cfg1 {
+				pins = <A311D_GPIOX(11) A311D_GPIOX(10) A311D_GPIOX(9)>;
+				function = <0 1>;
+				drive-strength-microamp = <0 3000>;
+			};
+
+			audio_tdm_a_cfg2: audio-tdm-a-cfg2 {
+				pins = <A311D_GPIOX(8)>;
+				function = <0 2>;
+			};
+
+			audio_tdm_b_cfg1: audio-tdm-b-cfg1 {
+				pins = <A311D_GPIOA(1) A311D_GPIOA(2) A311D_GPIOA(3)>;
+				function = <0 1>;
+				drive-strength-microamp = <0 3000>;
+			};
+
+			audio_tdm_b_cfg2: audio-tdm-b-cfg2 {
+				pins = <A311D_GPIOA(4)>;
+				function = <0 2>;
+			};
 		};
 
 		audio: audio-controller@ff642000 {
@@ -40,6 +63,10 @@
 			clock-names = "AUDIO_GATE", "AUDIO_PLL" ;
 			assigned-clocks = <&clock 0x20002>;
 			assigned-clock-rates = <768000000>;
+			gpios = <&gpio A311D_GPIOX(11) 0 &gpio A311D_GPIOA(1) 0>;
+			gpio-names = "TDM_A_SCLK", "TDM_B_SCLK";
+			pinctrl-0 = <&audio_tdm_a_cfg1 &audio_tdm_a_cfg2>,
+						<&audio_tdm_b_cfg1 &audio_tdm_b_cfg2>;
 		};
 
 		aobus: bus@ff800000 {

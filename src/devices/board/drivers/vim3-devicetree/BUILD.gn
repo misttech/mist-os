@@ -38,6 +38,7 @@ devicetree("vim3") {
     "//sdk/lib/driver/devicetree/visitors/drivers/registers:registers-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/clock-controllers/clockimpl-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/mali-gpu:mali-gpu-visitor",
+    "//sdk/lib/driver/devicetree/visitors/drivers/gpio-controllers/gpioimpl-visitor",
   ]
   golden = "dts/khadas-vim3.golden.dts"
 }
