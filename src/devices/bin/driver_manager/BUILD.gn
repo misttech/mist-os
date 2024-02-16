@@ -14,7 +14,7 @@ group("tests") {
   if (!is_coverage) {
     deps += [
       ":driver-manager-tests",
-      "v2:driver-runner-tests",
+      ":driver-runner-tests",
     ]
   }
 }
@@ -89,19 +89,249 @@ source_set("driver_host_loader_service") {
   ]
 }
 
-executable("driver_manager") {
+source_set("driver_runner") {
   sources = [
-    "main.cc",
-    "main.h",
-    "v2/main.cc",
+    "bind_manager.cc",
+    "bind_manager.h",
+    "bind_result_tracker.cc",
+    "bind_result_tracker.h",
+    "composite_assembler.cc",
+    "composite_assembler.h",
+    "composite_node_spec_v2.cc",
+    "composite_node_spec_v2.h",
+    "driver_host.cc",
+    "driver_host.h",
+    "driver_runner.cc",
+    "driver_runner.h",
+    "node.cc",
+    "node.h",
+    "node_removal_tracker.cc",
+    "node_removal_tracker.h",
+    "parent_set_collector.cc",
+    "parent_set_collector.h",
+    "runner.cc",
+    "runner.h",
+    "shutdown_helper.cc",
+    "shutdown_helper.h",
+    "shutdown_manager.cc",
+    "shutdown_manager.h",
   ]
 
   deps = [
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/zbi-format",
+    "//src/bringup/lib/mexec",
+    "//src/devices/bin/driver_manager:binding",
+    "//src/devices/bin/driver_manager/composite_node_spec:lib",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
+    "//src/devices/lib/log",
+    "//src/lib/fsl",
+    "//src/lib/fxl",
+    "//src/lib/zbitl",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+  ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
+    "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_cpp",
+    "//sdk/fidl/fuchsia.device.composite:fuchsia.device.composite_cpp",
+    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
+    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
+    "//sdk/fidl/fuchsia.driver.host:fuchsia.driver.host_cpp",
+    "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index_cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
+    "//sdk/lib/async_patterns/cpp",
+    "//sdk/lib/inspect/component/cpp",
+    "//sdk/lib/vfs/cpp",
+    "//src/devices/bin/driver_manager:inspect",
+    "//src/devices/bin/driver_manager/devfs",
+    "//src/lib/ddk",
+    "//src/storage/lib/vfs/cpp",
+    "//zircon/system/ulib/zircon-internal",
+  ]
+}
+
+source_set("driver_development_service") {
+  sources = [
+    "driver_development_service.cc",
+    "driver_development_service.h",
+  ]
+  public_deps = [
+    ":driver_runner",
+    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//src/devices/bin/driver_manager/driver_development:lib",
+    "//src/devices/lib/log",
+  ]
+}
+
+source_set("driver_manager_test_base") {
+  testonly = true
+  sources = [
+    "tests/driver_manager_test_base.cc",
+    "tests/driver_manager_test_base.h",
+  ]
+  public_deps = [
+    ":driver_runner",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
+    "//zircon/system/ulib/zircon-internal",
+  ]
+}
+
+executable("driver_runner_test") {
+  testonly = true
+  sources = [ "tests/driver_runner_test.cc" ]
+
+  deps = [
+    ":driver_runner",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp_testing",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp_testing",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp_testing",
+    "//sdk/fidl/fuchsia.driver.host:fuchsia.driver.host_cpp_testing",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_testing",
+    "//sdk/lib/inspect/testing/cpp",
+    "//sdk/lib/sys/cpp/testing:unit",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+  ]
+}
+
+fuchsia_unittest_component("driver-runner-test") {
+  deps = [ ":driver_runner_test" ]
+}
+
+executable("bind_manager_test") {
+  testonly = true
+  sources = [
+    "tests/bind_manager_test.cc",
+    "tests/bind_manager_test_base.cc",
+    "tests/bind_manager_test_base.h",
+    "tests/multibind_test.cc",
+  ]
+
+  deps = [
+    ":driver_manager_test_base",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+    "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index_cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/lib/testing/loop_fixture",
+  ]
+}
+
+fuchsia_unittest_component("bind-manager-test") {
+  deps = [ ":bind_manager_test" ]
+}
+
+executable("composite_assembler_test") {
+  testonly = true
+  sources = [ "tests/composite_assembler_test.cc" ]
+
+  deps = [
+    ":driver_manager_test_base",
+    "//sdk/lib/inspect/testing/cpp",
+    "//sdk/lib/sys/cpp/testing:unit",
+    "//src/lib/ddk",
+  ]
+}
+
+fuchsia_unittest_component("composite-assembler-test") {
+  deps = [ ":composite_assembler_test" ]
+}
+
+executable("composite_node_spec_v2_test") {
+  testonly = true
+  sources = [ "tests/composite_node_spec_v2_test.cc" ]
+
+  deps = [ ":driver_manager_test_base" ]
+}
+
+fuchsia_unittest_component("node-test") {
+  deps = [ ":node_test" ]
+}
+
+executable("node_test") {
+  testonly = true
+  sources = [ "tests/node_test.cc" ]
+
+  deps = [
+    ":driver_manager_test_base",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
+  ]
+}
+
+fuchsia_unittest_component("composite-node-spec-v2-test") {
+  deps = [ ":composite_node_spec_v2_test" ]
+}
+
+executable("node_removal_tracker_test") {
+  testonly = true
+  sources = [ "tests/node_removal_tracker_test.cc" ]
+
+  deps = [
+    ":driver_runner",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
+    "//zircon/system/ulib/zircon-internal",
+  ]
+}
+
+fuchsia_unittest_component("node-removal-tracker-test") {
+  deps = [ ":node_removal_tracker_test" ]
+}
+
+fuchsia_unittest_component("node-shutdown-test") {
+  deps = [ ":node_shutdown_test" ]
+}
+
+executable("node_shutdown_test") {
+  testonly = true
+  sources = [ "tests/node_shutdown_test.cc" ]
+
+  deps = [
+    ":driver_manager_test_base",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
+  ]
+}
+
+fuchsia_test_package("driver-runner-tests") {
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+
+  test_components = [
+    ":bind-manager-test",
+    ":composite-assembler-test",
+    ":composite-node-spec-v2-test",
+    ":driver-runner-test",
+    ":node-removal-tracker-test",
+    ":node-shutdown-test",
+    ":node-test",
+  ]
+}
+executable("driver_manager") {
+  sources = [ "main.cc" ]
+
+  deps = [
+    ":driver_development_service",
     ":driver_host_loader_service",
     ":driver_manager_config",
-    "v2:driver_development_service",
-    "v2:driver_runner",
-    "//sdk/lib/scheduler/cpp",
+    ":driver_runner",
     "//src/devices/lib/log",
     "//src/sys/lib/stdout-to-debuglog/cpp",
   ]
@@ -156,8 +386,8 @@ test("composite_node_spec_manager_test") {
   sources = [ "tests/composite_node_spec_manager_test.cc" ]
 
   deps = [
+    ":driver_runner",
     "composite_node_spec:lib",
-    "v2:driver_runner",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/fdio",

@@ -116,7 +116,7 @@ For `driver-tests`, did you mean any of the following?
 driver_tools_tests (91.67% similar)
     --with //src/devices/bin/driver_tools:driver_tools_tests
 driver-runner-tests (90.96% similar)
-    --with //src/devices/bin/driver_manager/v2:driver-runner-tests
+    --with //src/devices/bin/driver_manager:driver-runner-tests
 driver-inspect-test (90.96% similar)
     --with //src/devices/tests/driver-inspect-test:driver-inspect-test
 ```

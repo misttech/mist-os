@@ -94,7 +94,7 @@ sdk_source_set("cpp") {
     "//src/developer/build_info:*",
     "//src/developer/forensics/feedback_data:*",
     "//src/devices/bin/driver_host:*",
-    "//src/devices/bin/driver_manager/v2:*",
+    "//src/devices/bin/driver_manager:*",
     "//src/devices/sysmem/bin/sysmem_connector:*",
     "//src/diagnostics/validator/inspect/lib/cpp:*",
     "//src/lib/metrics_buffer:*",

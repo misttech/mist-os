@@ -11,7 +11,7 @@ fidl("fuchsia.device.composite") {
 
   # This should only be used by the compat shim.
   visibility = [
-    "//src/devices/bin/driver_manager/v2:driver_runner",
+    "//src/devices/bin/driver_manager:driver_runner",
     "//src/devices/misc/drivers/compat:lib",
   ]
 }

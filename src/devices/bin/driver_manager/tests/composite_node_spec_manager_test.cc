@@ -13,7 +13,7 @@
 #include <zxtest/zxtest.h>
 
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec.h"
-#include "src/devices/bin/driver_manager/v2/node.h"
+#include "src/devices/bin/driver_manager/node.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;

@@ -2,58 +2,54 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bin/driver_manager/main.h"
-
 #include <fidl/fuchsia.boot/cpp/wire.h>
-#include <fidl/fuchsia.kernel/cpp/wire.h>
+#include <fidl/fuchsia.device.manager/cpp/fidl.h>
+#include <fidl/fuchsia.driver.index/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async/cpp/task.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/fdio/directory.h>
+#include <lib/fdio/fdio.h>
+#include <lib/fdio/io.h>
+#include <lib/zx/event.h>
+#include <lib/zx/port.h>
 #include <lib/zx/resource.h>
+#include <lib/zx/vmo.h>
+#include <threads.h>
 #include <zircon/process.h>
 #include <zircon/processargs.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/object.h>
+#include <zircon/syscalls/policy.h>
 #include <zircon/types.h>
 
-#include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <limits>
 #include <memory>
 
+#include <fbl/unique_fd.h>
+
+#include "src/devices/bin/driver_manager/devfs/devfs.h"
+#include "src/devices/bin/driver_manager/driver_development_service.h"
+#include "src/devices/bin/driver_manager/driver_host_loader_service.h"
+#include "src/devices/bin/driver_manager/driver_manager_config.h"
+#include "src/devices/bin/driver_manager/driver_runner.h"
+#include "src/devices/bin/driver_manager/shutdown_manager.h"
 #include "src/devices/lib/log/log.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
 
-// Get the root job from the root job service.
-zx::result<zx::job> get_root_job() {
-  zx::result client_end = component::Connect<fuchsia_kernel::RootJob>();
-  if (client_end.is_error()) {
-    return client_end.take_error();
-  }
-  fidl::WireResult result = fidl::WireCall(client_end.value())->Get();
-  if (!result.ok()) {
-    return zx::error(result.status());
-  }
-  return zx::ok(std::move(result.value().job));
-}
+namespace fio = fuchsia_io;
 
-// Get the mexec resource from the mexec resource service. Not receiving the
-// startup handle is logged, but not fatal.  In test environments, it would not
-// be present.
-zx::result<zx::resource> get_mexec_resource() {
-  zx::result client_end = component::Connect<fuchsia_kernel::MexecResource>();
-  if (client_end.is_error()) {
-    return client_end.take_error();
-  }
-  fidl::WireResult result = fidl::WireCall(client_end.value())->Get();
-  if (!result.ok()) {
-    return zx::error(result.status());
-  }
-  return zx::ok(std::move(result.value().resource));
-}
-
+namespace {
 // Sets the logging process name. Needed to redirect output
 // to serial.
-static void SetLoggingProcessName() {
+void SetLoggingProcessName() {
   char process_name[ZX_MAX_NAME_LEN] = "";
 
   zx_status_t name_status =
@@ -63,6 +59,7 @@ static void SetLoggingProcessName() {
   }
   driver_logger::GetLogger().AddTag(process_name);
 }
+}  // namespace
 
 int main(int argc, char** argv) {
   zx_status_t status = StdoutToDebuglog::Init();
@@ -84,5 +81,98 @@ int main(int argc, char** argv) {
 
   SetLoggingProcessName();
 
-  return RunDfv2(std::move(config));
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  auto outgoing = component::OutgoingDirectory(loop.dispatcher());
+  InspectManager inspect_manager(loop.dispatcher());
+
+  // Launch DriverRunner for DFv2 drivers.
+  auto realm_result = component::Connect<fuchsia_component::Realm>();
+  if (realm_result.is_error()) {
+    return realm_result.error_value();
+  }
+  auto driver_index_result = component::Connect<fuchsia_driver_index::DriverIndex>();
+  if (driver_index_result.is_error()) {
+    LOGF(ERROR, "Failed to connect to driver_index: %d", driver_index_result.error_value());
+    return driver_index_result.error_value();
+  }
+  fbl::unique_fd lib_fd;
+  constexpr uint32_t kOpenFlags = static_cast<uint32_t>(fio::wire::OpenFlags::kDirectory |
+                                                        fio::wire::OpenFlags::kRightReadable |
+                                                        fio::wire::OpenFlags::kRightExecutable);
+  if (zx_status_t status = fdio_open_fd("/pkg/lib/", kOpenFlags, lib_fd.reset_and_get_address());
+      status != ZX_OK) {
+    LOGF(ERROR, "Failed to open /pkg/lib/ : %s", zx_status_get_string(status));
+    return status;
+  }
+  // The loader needs its own thread because DriverManager makes synchronous calls to the
+  // DriverHosts, which make synchronous calls to load their shared libraries.
+  async::Loop loader_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  loader_loop.StartThread("loader-loop");
+
+  auto loader_service =
+      DriverHostLoaderService::Create(loader_loop.dispatcher(), std::move(lib_fd));
+  dfv2::DriverRunner driver_runner(
+      std::move(realm_result.value()), std::move(driver_index_result.value()), inspect_manager,
+      [loader_service]() -> zx::result<fidl::ClientEnd<fuchsia_ldsvc::Loader>> {
+        zx::result client = loader_service->Connect();
+        if (client.is_error()) {
+          return client.take_error();
+        }
+    // TODO(https://fxbug.dev/42076026): Find a better way to set this config.
+#ifdef DRIVERHOST_LDSVC_CONFIG
+        // Inform the loader service to look for libraries of the right variant.
+        fidl::WireResult result = fidl::WireCall(client.value())->Config(DRIVERHOST_LDSVC_CONFIG);
+        if (!result.ok()) {
+          return zx::error(result.status());
+        }
+        if (result->rv != ZX_OK) {
+          return zx::error(result->rv);
+        }
+#endif
+        return client;
+      },
+      loop.dispatcher(), config.enable_test_shutdown_delays());
+
+  // Setup devfs.
+  std::optional<Devfs> devfs;
+  driver_runner.root_node()->SetupDevfsForRootNode(devfs);
+  driver_runner.PublishComponentRunner(outgoing);
+
+  // Find and load v2 Drivers.
+  LOGF(INFO, "Starting DriverRunner with root driver URL: %s", config.root_driver().c_str());
+  if (auto start = driver_runner.StartRootDriver(config.root_driver()); start.is_error()) {
+    return start.error_value();
+  }
+
+  driver_manager::DriverDevelopmentService driver_development_service(driver_runner,
+                                                                      loop.dispatcher());
+  driver_development_service.Publish(outgoing);
+  driver_runner.ScheduleWatchForDriverLoad();
+
+  dfv2::ShutdownManager shutdown_manager(&driver_runner, loop.dispatcher());
+  shutdown_manager.Publish(outgoing);
+
+  // TODO(https://fxbug.dev/42181480) Remove this when this issue is fixed.
+  LOGF(INFO, "driver_manager loader loop started");
+
+  fs::SynchronousVfs vfs(loop.dispatcher());
+
+  // Add the devfs folder to the tree:
+  {
+    zx::result devfs_client = devfs.value().Connect(vfs);
+    ZX_ASSERT_MSG(devfs_client.is_ok(), "%s", devfs_client.status_string());
+    const zx::result result = outgoing.AddDirectory(std::move(devfs_client.value()), "dev");
+    ZX_ASSERT(result.is_ok());
+  }
+
+  {
+    const zx::result result = outgoing.ServeFromStartupInfo();
+    ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
+  }
+
+  async::PostTask(loop.dispatcher(), [] { LOGF(INFO, "driver_manager main loop is running"); });
+
+  status = loop.Run();
+  LOGF(ERROR, "Driver Manager exited unexpectedly: %s", zx_status_get_string(status));
+  return status;
 }
