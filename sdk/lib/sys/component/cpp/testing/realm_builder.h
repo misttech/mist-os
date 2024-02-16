@@ -138,6 +138,12 @@ class RealmRoot final {
   async_dispatcher_t* dispatcher_;
 };
 
+#if __Fuchsia_API_level__ >= 17
+// Declare the class as it is used in method declarations that use
+// ZX_REMOVED_SINCE() and are not conditionally compiled.
+class LocalComponent;
+#endif
+
 // A `Realm` describes a component instance together with its children.
 // Clients can use this class to build a realm from scratch,
 // programmatically adding children and routes.
@@ -178,8 +184,8 @@ class Realm final {
   //
   // Names must be unique. Duplicate names will result in a panic.
   //
-  // TODO(https://fxbug.dev/296292544): Remove this method when build support
-  // for API level 16 is removed.
+  // TODO(https://fxbug.dev/296292544): Remove this method when build-time support for
+  // API level 16 is removed.
   Realm& AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
                        const ChildOptions& options = kDefaultChildOptions)
       ZX_REMOVED_SINCE(1, 9, 17, "Use AddLocalChild(..., LocalComponentFactory, ...) instead.");
@@ -314,8 +320,8 @@ class RealmBuilder final {
   // Add a component by raw pointer to a LocalComponent-derived instance.
   // See |Realm.AddLocalChild| for more details.
   //
-  // TODO(https://fxbug.dev/296292544): Remove this method when build support
-  // for API level 16 is removed.
+  // TODO(https://fxbug.dev/296292544): Remove this method when build-time support for
+  // API level 16 is removed.
   RealmBuilder& AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
                               const ChildOptions& options = kDefaultChildOptions)
       ZX_REMOVED_SINCE(1, 9, 17, "Use AddLocalChild(..., LocalComponentFactory, ...) instead.");

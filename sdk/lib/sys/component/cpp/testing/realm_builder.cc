@@ -65,8 +65,6 @@ Realm& Realm::AddChild(const std::string& child_name, const std::string& url,
   return *this;
 }
 
-// TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
-// The newer definition of LocalComponentKind is incompatible with LocalComponent*.
 #if __Fuchsia_API_level__ < 17
 Realm& Realm::AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
                             const ChildOptions& options) {
@@ -286,9 +284,6 @@ RealmBuilder& RealmBuilder::AddChild(const std::string& child_name, const std::s
   return *this;
 }
 
-// TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
-// The newer definition of LocalComponentKind, which is a parameter to AddLocalChildImpl(), is
-// incompatible with LocalComponent*.
 #if __Fuchsia_API_level__ < 17
 RealmBuilder& RealmBuilder::AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
                                           const ChildOptions& options) {

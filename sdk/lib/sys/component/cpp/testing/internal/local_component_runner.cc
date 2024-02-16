@@ -168,8 +168,6 @@ void LocalComponentRunner::Start(
   // take the component from the ready_components_ list
   auto component = std::move(ready_components_[name]);
   ZX_ASSERT_MSG(ready_components_.erase(name) == 1, "ready component not erased");
-
-// TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
 #if __Fuchsia_API_level__ < 17
   if (cpp17::holds_alternative<LocalComponent*>(component)) {
     auto local_component_ptr = cpp17::get<LocalComponent*>(component);
