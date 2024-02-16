@@ -355,11 +355,11 @@ TEST(CommandUtils, FormatAllThreadStacks) {
 
   event = console.GetOutputEvent();
   EXPECT_EQ(
-      "Thread 1 state=Suspended koid=1234 name=\"test thread\"\n"
+      "Thread 1 state=Suspended tid=1234 name=\"test thread\"\n"
       "▶ 0 function0() • file0.cc:10\n"
       "  1 function1() • file1.cc:15\n"
       "  2 function2() • file2.cc:20\n"
-      "Thread 2 state=Suspended koid=1234 name=\"test thread\"\n"
+      "Thread 2 state=Suspended tid=1234 name=\"test thread\"\n"
       "▶ 0 function3() • file3.cc:100\n"
       "  1 function4() • file4.cc:150\n"
       "  2 function5() • file5.cc:200\n"

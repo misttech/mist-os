@@ -35,7 +35,9 @@ OutputBuffer FormatTarget(ConsoleContext* context, const Target* target) {
   out.Append("=" + FormatConsoleString(TargetStateToString(target->GetState())));
 
   if (target->GetState() == Target::State::kRunning) {
-    out.Append(Syntax::kVariable, " koid");
+    const char* id_name = debug::PlatformProcessIdName(context->session()->platform(), false);
+    out.Append(" ");
+    out.Append(Syntax::kVariable, id_name);
     out.Append("=" + std::to_string(target->GetProcess()->GetKoid()));
   }
 
@@ -101,9 +103,11 @@ OutputBuffer FormatTargetList(ConsoleContext* context, int indent) {
     }
   }
 
+  const char* id_name = debug::PlatformProcessIdName(context->session()->platform(), true);
+
   OutputBuffer out;
   FormatTable({ColSpec(Align::kLeft), ColSpec(Align::kRight, 0, "#", 0, Syntax::kSpecial),
-               ColSpec(Align::kLeft, 0, "State"), ColSpec(Align::kRight, 0, "Koid"),
+               ColSpec(Align::kLeft, 0, "State"), ColSpec(Align::kRight, 0, id_name),
                ColSpec(Align::kLeft, 0, "Name"), ColSpec(Align::kLeft, 0, "Component")},
               rows, &out);
   return out;

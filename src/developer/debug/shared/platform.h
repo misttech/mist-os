@@ -19,6 +19,11 @@ Platform CurrentSystemPlatform();
 
 const char* PlatformToString(Platform p);
 
+// Returns the string to use for a process or thread ID on the given platform. When caps is set, the
+// result will be all caps, otherwise it will be all lowercase.
+const char* PlatformProcessIdName(Platform p, bool caps);
+const char* PlatformThreadIdName(Platform p, bool caps);
+
 }  // namespace debug
 
 #endif  // SRC_DEVELOPER_DEBUG_SHARED_PLATFORM_H_

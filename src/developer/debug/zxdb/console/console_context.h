@@ -55,6 +55,7 @@ class ConsoleContext : public ProcessObserver,
   ~ConsoleContext();
 
   Session* session() { return session_; }
+  const Session* session() const { return session_; }
 
   // Returns the ID for the object. Asserts and returns 0 if not found.
   int IdForTarget(const Target* target) const;

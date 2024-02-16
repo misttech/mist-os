@@ -215,7 +215,8 @@ OutputBuffer FormatException(const ConsoleContext* context, const Thread* thread
   out.Append(Syntax::kSpecial,
              std::to_string(context->IdForTarget(thread->GetProcess()->GetTarget())));
   out.Append(" (");
-  out.Append(Syntax::kVariable, "koid");
+  out.Append(Syntax::kVariable,
+             debug::PlatformProcessIdName(context->session()->platform(), false));
   out.Append("=");
   out.Append(std::to_string(thread->GetProcess()->GetKoid()));
   out.Append(") ");
@@ -224,7 +225,7 @@ OutputBuffer FormatException(const ConsoleContext* context, const Thread* thread
   out.Append("thread ");
   out.Append(Syntax::kSpecial, std::to_string(context->IdForThread(thread)));
   out.Append(" (");
-  out.Append(Syntax::kVariable, "koid");
+  out.Append(Syntax::kVariable, debug::PlatformThreadIdName(context->session()->platform(), false));
   out.Append("=");
   out.Append(std::to_string(thread->GetKoid()));
   out.Append(")\n");

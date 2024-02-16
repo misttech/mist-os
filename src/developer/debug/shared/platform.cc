@@ -32,4 +32,28 @@ const char* PlatformToString(Platform p) {
   return "Invalid platform";
 }
 
+const char* PlatformProcessIdName(Platform p, bool caps) {
+  switch (p) {
+    case Platform::kFuchsia:
+      return caps ? "KOID" : "koid";
+    case Platform::kUnknown:
+    case Platform::kLinux:
+    case Platform::kMac:
+    default:
+      return caps ? "PID" : "pid";
+  }
+}
+
+const char* PlatformThreadIdName(Platform p, bool caps) {
+  switch (p) {
+    case Platform::kFuchsia:
+      return caps ? "KOID" : "koid";
+    case Platform::kUnknown:
+    case Platform::kLinux:
+    case Platform::kMac:
+    default:
+      return caps ? "TID" : "tid";
+  }
+}
+
 }  // namespace debug

@@ -28,7 +28,7 @@ TEST(FormatTarget, FormatTarget) {
   MockProcess process(&target);
   target.SetRunningProcess(&process);
 
-  EXPECT_EQ("Process 2 state=Running koid=0 name=\"Mock process\" component=component.cm\n",
+  EXPECT_EQ("Process 2 state=Running pid=0 name=\"Mock process\" component=component.cm\n",
             FormatTarget(&context, &target).AsString());
 }
 

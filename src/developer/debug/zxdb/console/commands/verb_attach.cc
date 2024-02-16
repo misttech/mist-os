@@ -23,7 +23,7 @@ constexpr int kSwitchExact = 2;
 
 const char kAttachShortHelp[] = "attach: Attach to processes.";
 const char kAttachHelp[] =
-    R"(attach [ --job / -j <koid> ] [ --exact ] [ <what> ]
+    R"(attach [ --job / -j <pid/koid> ] [ --exact ] [ <what> ]
 
   Attaches to current or future process.
 
@@ -31,6 +31,7 @@ Arguments
 
     --job <koid>
     -j <koid>
+        [Fuchsia only]
         Only attaching to processes under the job with an id of <koid>. The
         <what> argument can be omitted and all processes under the job will be
         attached.
@@ -39,7 +40,7 @@ Arguments
         Attaching to processes with an exact name. The argument will be
         interpreted as a filter that requires an exact match against the process
         name. This bypasses any heuristics below and is useful if the process
-        name looks like a koid, a URL, or a moniker.
+        name looks like a pid/koid, a URL, or a moniker.
 
 Attaching to a process by a process id
 
@@ -49,7 +50,7 @@ Attaching to a process by a process id
     attach 12345
 
   This can only attach to existing processes. Use the "ps" command to view all
-  active processes, their names, and koids.
+  active processes, their names, and pids/koids.
 
 Attaching to processes by a component moniker
 
@@ -107,10 +108,10 @@ How "attach" works
 Examples
 
   attach 2371
-      Attaches to the process with koid 2371.
+      Attaches to the process with pid/koid 2371.
 
   process 4 attach 2371
-      Attaches process context 4 to the process with koid 2371.
+      Attaches process context 4 to the process with pid/koid 2371.
 
   attach foobar
       Attaches to processes with "foobar" in their process names.
@@ -156,7 +157,7 @@ void RunVerbAttach(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
   // attach <koid> accepts no switch.
   uint64_t koid = 0;
   if (!cmd.HasSwitch(kSwitchJob) && !cmd.HasSwitch(kSwitchExact) &&
-      ReadUint64Arg(cmd, 0, "process koid", &koid).ok()) {
+      ReadUint64Arg(cmd, 0, "process id/koid", &koid).ok()) {
     // Check for duplicate koids before doing anything else to avoid creating a container target
     // in this case. It's easy to hit enter twice which will cause a duplicate attach. The
     // duplicate target is the only reason to check here, the attach will fail later if there's

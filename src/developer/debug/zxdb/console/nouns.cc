@@ -299,9 +299,11 @@ void ListThreads(fxl::RefPtr<CommandContext> cmd_context, Process* process) {
     row.push_back(pair.second->GetName());
   }
 
+  const char* id_name = debug::PlatformThreadIdName(console_context->session()->platform(), false);
+
   OutputBuffer out;
   FormatTable({ColSpec(Align::kLeft), ColSpec(Align::kRight, 0, "#", 0, Syntax::kSpecial),
-               ColSpec(Align::kLeft, 0, "state"), ColSpec(Align::kRight, 0, "koid"),
+               ColSpec(Align::kLeft, 0, "state"), ColSpec(Align::kRight, 0, id_name),
                ColSpec(Align::kLeft, 0, "name")},
               rows, &out);
   cmd_context->Output(out);

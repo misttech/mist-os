@@ -103,7 +103,7 @@ TEST_F(VerbNewRmTest, Process) {
   console.ProcessInputLine("pr");
   event = console.GetOutputEvent();
   EXPECT_EQ(
-      "  # State       Koid Name Component\n"
+      "  # State       KOID Name Component\n"
       "▶ 1 Not running \n",
       event.output.AsString());
 

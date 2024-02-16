@@ -342,7 +342,9 @@ OutputBuffer FormatThread(const ConsoleContext* context, const Thread* thread) {
   out.Append("=" + FormatConsoleString(
                        ThreadStateToString(thread->GetState(), thread->GetBlockedReason())));
 
-  out.Append(Syntax::kVariable, " koid");
+  const char* id_name = debug::PlatformThreadIdName(context->session()->platform(), false);
+  out.Append(" ");
+  out.Append(Syntax::kVariable, id_name);
   out.Append("=" + std::to_string(thread->GetKoid()));
 
   out.Append(Syntax::kVariable, " name");
