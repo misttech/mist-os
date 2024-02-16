@@ -2,13 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.broadcom.platform;
+composite brcmfmac_sdio;
 
-fuchsia.BIND_COMPOSITE == 1;
-fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.broadcom.platform.BIND_PLATFORM_DEV_VID.BROADCOM;
-fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.broadcom.platform.BIND_PLATFORM_DEV_DID.WIFI;
-accept fuchsia.BIND_PLATFORM_DEV_PID {
-  fuchsia.broadcom.platform.BIND_PLATFORM_DEV_PID.BCM4356,
-  fuchsia.broadcom.platform.BIND_PLATFORM_DEV_PID.BCM43458,
-  fuchsia.broadcom.platform.BIND_PLATFORM_DEV_PID.BCM4359,
+using fuchsia.broadcom.platform;
+using fuchsia.hardware.gpio;
+using fuchsia.hardware.sdio;
+using fuchsia.platform;
+
+primary node "sdio-function-1" {
+  fuchsia.hardware.sdio.Service == fuchsia.hardware.sdio.Service.ZirconTransport;
+  fuchsia.BIND_SDIO_FUNCTION == 1;
+}
+
+node "sdio-function-2" {
+  fuchsia.hardware.sdio.Service == fuchsia.hardware.sdio.Service.ZirconTransport;
+  fuchsia.BIND_SDIO_FUNCTION == 2;
+}
+
+node "gpio-oob" {
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
+}
+
+node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.broadcom.platform.BIND_PLATFORM_DEV_VID.BROADCOM;
+  accept fuchsia.BIND_PLATFORM_DEV_PID {
+    fuchsia.broadcom.platform.BIND_PLATFORM_DEV_PID.BCM4356,
+    fuchsia.broadcom.platform.BIND_PLATFORM_DEV_PID.BCM43458,
+    fuchsia.broadcom.platform.BIND_PLATFORM_DEV_PID.BCM4359,
+  }
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.broadcom.platform.BIND_PLATFORM_DEV_DID.WIFI;
 }

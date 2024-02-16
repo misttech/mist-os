@@ -220,7 +220,12 @@ fuchsia_test_package("brcmfmac_test") {
 bind_test("brcmfmac_sdio_bind_test") {
   rules = "../brcmfmac_sdio.bind"
   tests = "bind_sdio_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.broadcom.platform" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
+    "//sdk/fidl/fuchsia.hardware.sdio:fuchsia.hardware.sdio_bindlib",
+    "//src/devices/bind/fuchsia.broadcom.platform",
+    "//src/devices/bind/fuchsia.platform",
+  ]
 }
 
 group("brcmfmac_host_tests") {

@@ -20,20 +20,6 @@ driver_bind_rules("sherlock-bind") {
   ]
 }
 
-driver_bind_rules("sherlock-wifi-bind") {
-  rules = "bind/sherlock-wifi.bind"
-  header_output = "sherlock-wifi-bind.h"
-  bind_output = "sherlock-wifi-bind.bc"
-  tests = "bind-tests/sherlock-wifi-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.t931",
-    "//src/devices/bind/fuchsia.broadcom.platform",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.sdio",
-  ]
-}
-
 template("sherlock_driver") {
   fuchsia_driver(target_name + "-driver") {
     output_name = invoker.target_name
@@ -83,7 +69,6 @@ template("sherlock_driver") {
     ]
 
     deps = [
-      ":sherlock-wifi-bind_header",
       "//sdk/banjo/fuchsia.hardware.iommu:fuchsia.hardware.iommu_banjo_cpp",
       "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
       "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
@@ -92,6 +77,7 @@ template("sherlock_driver") {
       "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
+      "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
       "//sdk/fidl/fuchsia.hardware.gpt.metadata:fuchsia.hardware.gpt.metadata_cpp",
       "//sdk/fidl/fuchsia.hardware.gpu.amlogic:fuchsia.hardware.gpu.amlogic_cpp",
@@ -99,6 +85,7 @@ template("sherlock_driver") {
       "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
       "//sdk/fidl/fuchsia.hardware.rpmb:fuchsia.hardware.rpmb_bindlib_cpp",
+      "//sdk/fidl/fuchsia.hardware.sdio:fuchsia.hardware.sdio_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
       "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
       "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib_cpp",
@@ -113,6 +100,8 @@ template("sherlock_driver") {
       "//src/devices/bind/fuchsia.amlogic.platform.t931:fuchsia.amlogic.platform.t931_cpp",
       "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
       "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
+      "//src/devices/bind/fuchsia.broadcom.platform:fuchsia.broadcom.platform_cpp",
+      "//src/devices/bind/fuchsia.broadcom.platform.sdio:fuchsia.broadcom.platform.sdio_cpp",
       "//src/devices/bind/fuchsia.camera:fuchsia.camera_cpp",
       "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
       "//src/devices/bind/fuchsia.codec:fuchsia.codec_cpp",
@@ -125,6 +114,7 @@ template("sherlock_driver") {
       "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
       "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
       "//src/devices/bind/fuchsia.rpmb:fuchsia.rpmb_cpp",
+      "//src/devices/bind/fuchsia.sdio:fuchsia.sdio_cpp",
       "//src/devices/bind/fuchsia.sony.platform:fuchsia.sony.platform_cpp",
       "//src/devices/bind/fuchsia.spi:fuchsia.spi_cpp",
       "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",

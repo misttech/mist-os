@@ -15,10 +15,15 @@
 #include <lib/zircon-internal/align.h>
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/broadcom/platform/cpp/bind.h>
+#include <bind/fuchsia/broadcom/platform/sdio/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/sdio/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/pwm/cpp/bind.h>
+#include <bind/fuchsia/sdio/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <soc/aml-common/aml-sdmmc.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>
@@ -27,7 +32,6 @@
 
 #include "astro-gpios.h"
 #include "astro.h"
-#include "src/devices/board/drivers/astro/astro-wifi-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace fdf {
@@ -228,6 +232,71 @@ zx_status_t Astro::SdEmmcConfigurePortB() {
   return status;
 }
 
+zx_status_t AddWifiComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
+                             fidl::AnyArena& fidl_arena, fdf::Arena& arena) {
+  const std::vector<fdf::BindRule> kGpioWifiHostRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              static_cast<uint32_t>(S905D2_WIFI_SDIO_WAKE_HOST)),
+  };
+
+  const std::vector<fdf::NodeProperty> kGpioWifiHostProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
+                        bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+  };
+
+  fpbus::Node wifi_dev;
+  wifi_dev.name() = "wifi";
+  wifi_dev.vid() = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_VID_BROADCOM;
+  wifi_dev.pid() = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458;
+  wifi_dev.did() = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_DID_WIFI;
+  wifi_dev.metadata() = wifi_metadata;
+  wifi_dev.metadata() = wifi_metadata;
+  wifi_dev.boot_metadata() = wifi_boot_metadata;
+
+  constexpr uint32_t kSdioFunctionCount = 2;
+  std::vector<fdf::ParentSpec> wifi_parents = {
+      fdf::ParentSpec{{kGpioWifiHostRules, kGpioWifiHostProperties}}};
+  wifi_parents.reserve(wifi_parents.size() + kSdioFunctionCount);
+  for (uint32_t i = 1; i <= kSdioFunctionCount; i++) {
+    auto sdio_bind_rules = {
+        fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_sdio::BIND_PROTOCOL_DEVICE),
+        fdf::MakeAcceptBindRule(bind_fuchsia::SDIO_VID,
+                                bind_fuchsia_broadcom_platform_sdio::BIND_SDIO_VID_BROADCOM),
+        fdf::MakeAcceptBindRule(bind_fuchsia::SDIO_PID,
+                                bind_fuchsia_broadcom_platform_sdio::BIND_SDIO_PID_BCM4345),
+        fdf::MakeAcceptBindRule(bind_fuchsia::SDIO_FUNCTION, i),
+    };
+
+    auto sdio_properties = {
+        fdf::MakeProperty(bind_fuchsia_hardware_sdio::SERVICE,
+                          bind_fuchsia_hardware_sdio::SERVICE_ZIRCONTRANSPORT),
+        fdf::MakeProperty(bind_fuchsia::SDIO_FUNCTION, i),
+    };
+
+    wifi_parents.push_back(fdf::ParentSpec{
+        {sdio_bind_rules, sdio_properties},
+    });
+  }
+
+  fdf::WireUnownedResult result = pbus.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, wifi_dev),
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "wifi", .parents = wifi_parents}}));
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request to platform bus: %s",
+           result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to add wifi composite to platform device: %s",
+           zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+  return ZX_OK;
+}
+
 zx_status_t Astro::SdioInit() {
   fidl::Arena<> fidl_arena;
 
@@ -289,31 +358,10 @@ zx_status_t Astro::SdioInit() {
     return result->error_value();
   }
 
-  // Add a composite device for wifi driver.
-  fpbus::Node wifi_dev;
-  wifi_dev.name() = "wifi";
-  wifi_dev.vid() = PDEV_VID_BROADCOM;
-  wifi_dev.pid() = PDEV_PID_BCM43458;
-  wifi_dev.did() = PDEV_DID_BCM_WIFI;
-  wifi_dev.metadata() = wifi_metadata;
-  wifi_dev.boot_metadata() = wifi_boot_metadata;
-
   fdf::Arena wifi_arena('WIFI');
-  fdf::WireUnownedResult wifi_result =
-      pbus_.buffer(wifi_arena)
-          ->AddComposite(fidl::ToWire(fidl_arena, wifi_dev),
-                         platform_bus_composite::MakeFidlFragment(fidl_arena, wifi_fragments,
-                                                                  std::size(wifi_fragments)),
-                         "sdio-function-1");
-  if (!wifi_result.ok()) {
-    zxlogf(ERROR, "Failed to send AddComposite request to platform bus: %s",
-           wifi_result.status_string());
-    return wifi_result.status();
-  }
-  if (wifi_result->is_error()) {
-    zxlogf(ERROR, "Failed to add wifi composite to platform device: %s",
-           zx_status_get_string(wifi_result->error_value()));
-    return wifi_result->error_value();
+  auto status = AddWifiComposite(pbus_, fidl_arena, wifi_arena);
+  if (status != ZX_OK) {
+    return status;
   }
 
   return ZX_OK;

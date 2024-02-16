@@ -40,21 +40,6 @@ driver_bind_rules("nelson-bind") {
   ]
 }
 
-driver_bind_rules("nelson_wifi_bind") {
-  rules = "bind/nelson_wifi.bind"
-  header_output = "nelson_wifi_bind.h"
-  bind_output = "nelson_wifi_bind.bc"
-  tests = "bind-tests/nelson-wifi-bind-tests.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
-    "//src/devices/bind/fuchsia.broadcom.platform",
-    "//src/devices/bind/fuchsia.broadcom.platform.sdio",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.sdio",
-  ]
-}
-
 driver_bind_rules("nelson_aml_video_bind") {
   rules = "bind/nelson_aml_video.bind"
   header_output = "nelson_aml_video_bind.h"
@@ -112,13 +97,13 @@ fuchsia_driver("nelson-module-driver") {
   ]
   deps = [
     ":nelson-bind",
-    ":nelson_wifi_bind_header",
     "//sdk/banjo/fuchsia.hardware.iommu:fuchsia.hardware.iommu_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
     "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
     "//sdk/fidl/fuchsia.hardware.gpt.metadata:fuchsia.hardware.gpt.metadata_cpp",
     "//sdk/fidl/fuchsia.hardware.gpu.amlogic:fuchsia.hardware.gpu.amlogic_cpp",
@@ -126,6 +111,7 @@ fuchsia_driver("nelson-module-driver") {
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/fidl/fuchsia.hardware.rpmb:fuchsia.hardware.rpmb_bindlib_cpp",
+    "//sdk/fidl/fuchsia.hardware.sdio:fuchsia.hardware.sdio_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp",
@@ -140,6 +126,8 @@ fuchsia_driver("nelson-module-driver") {
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3:fuchsia.amlogic.platform.s905d3_cpp",
     "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
     "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
+    "//src/devices/bind/fuchsia.broadcom.platform:fuchsia.broadcom.platform_cpp",
+    "//src/devices/bind/fuchsia.broadcom.platform.sdio:fuchsia.broadcom.platform.sdio_cpp",
     "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
     "//src/devices/bind/fuchsia.codec:fuchsia.codec_cpp",
     "//src/devices/bind/fuchsia.display.dsi:fuchsia.display.dsi_cpp",
@@ -153,9 +141,9 @@ fuchsia_driver("nelson-module-driver") {
     "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
     "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
     "//src/devices/bind/fuchsia.rpmb:fuchsia.rpmb_cpp",
+    "//src/devices/bind/fuchsia.sdio:fuchsia.sdio_cpp",
     "//src/devices/bind/fuchsia.spi:fuchsia.spi_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
-    "//src/devices/bind/fuchsia.tee:fuchsia.tee_cpp",
     "//src/devices/bind/fuchsia.tee:fuchsia.tee_cpp",
     "//src/devices/bind/fuchsia.ti.platform:fuchsia.ti.platform_cpp",
     "//src/devices/bind/fuchsia.usb.phy:fuchsia.usb.phy_cpp",
@@ -215,8 +203,5 @@ fuchsia_driver_package("package") {
 
 group("tests") {
   testonly = true
-  deps = [
-    ":nelson-bind_test",
-    ":nelson_wifi_bind_test",
-  ]
+  deps = [ ":nelson-bind_test" ]
 }
