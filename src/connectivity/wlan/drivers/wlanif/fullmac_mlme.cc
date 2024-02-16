@@ -4,8 +4,6 @@
 
 #include "fullmac_mlme.h"
 
-#include <lib/driver/logging/cpp/logger.h>
-
 #include <wlan/common/logging.h>
 
 #include "debug.h"
@@ -131,7 +129,7 @@ zx_status_t FullmacMlme::Init() {
   // This check is specifically needed for unit tests (where it always fails) so
   // StopMainLoop() is not called during release.
   if (!rust_mlme_.get()) {
-    lerror("rust mlme is not valid");
+    FDF_LOGL(ERROR, *(device_->Logger()), "rust mlme is not valid");
     return ZX_ERR_BAD_HANDLE;
   }
   return ZX_OK;

@@ -48,6 +48,7 @@ class Device final : public fdf::DriverBase,
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   void InitMlme();
+  fdf::Logger* Logger() { return logger_.get(); }
 
   zx_status_t StartFullmac(const rust_wlan_fullmac_ifc_protocol_copy_t* ifc,
                            zx::channel* out_sme_channel);
@@ -158,6 +159,7 @@ class Device final : public fdf::DriverBase,
   fdf::Dispatcher server_dispatcher_;
 
   fidl::WireClient<fdf::Node> parent_node_;
+  std::unique_ptr<fdf::Logger> logger_;
 };
 
 }  // namespace wlanif

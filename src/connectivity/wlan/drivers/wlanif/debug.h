@@ -5,15 +5,11 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_WLANIF_DEBUG_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_WLANIF_DEBUG_H_
 
-#include <wlan/drivers/log.h>
-
-#define FILTER_CATEGORY(name, value) constexpr uint32_t name = (1 << (value))
-FILTER_CATEGORY(kFiltFnTrace, 0);
-// Add additional categories here.
-#undef FILTER_CATEGORY
-
-constexpr uint32_t kFiltSetting = 0;
-
-#define ltrace_fn(msg...) ltrace(kFiltFnTrace, "wlanif-fn", msg)
+// ltrace_first and ltrace_rest are helper macros
+#define ltrace_first(arg, ...) arg
+#define ltrace_rest(arg, ...) __VA_OPT__(, ) __VA_ARGS__
+#define ltrace_fn(logger, ...)                                                  \
+  FDF_LOGL(ERROR, logger, "(%s)" __VA_OPT__(" ") ltrace_first(__VA_ARGS__, ""), \
+           __func__ ltrace_rest(__VA_ARGS__))
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_WLANIF_DEBUG_H_
