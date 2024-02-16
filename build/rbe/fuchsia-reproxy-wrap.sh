@@ -187,6 +187,13 @@ bootstrap_env=(
   RBE_cache_dir="$_RBE_cache_dir"
 )
 
+if [[ "${FX_BUILD_UUID-NOT_SET}" == "NOT_SET" ]]
+then
+  build_uuid=$("$python" -S -c 'import uuid; print(uuid.uuid4())')
+else
+  build_uuid="${FX_BUILD_UUID}"
+fi
+
 # These environment variables take precedence over those found in --cfg.
 readonly rewrapper_log_dir="$reproxy_logdir/rewrapper-logs"
 mkdir -p "$rewrapper_log_dir"
@@ -200,6 +207,8 @@ rewrapper_env=(
   # rewrapper executions that could be discovered and used in diagnostics,
   # so we include it.
   RBE_proxy_log_dir="$reproxy_logdir"
+  # Identify which build each remote action request comes from.
+  RBE_invocation_id="user:$build_uuid"
 )
 
 # Check authentication.
@@ -258,15 +267,6 @@ else
   fi
 fi
 
-test "$BUILD_METRICS_ENABLED" = 0 || {
-  if [[ "${FX_BUILD_UUID-NOT_SET}" == "NOT_SET" ]]
-  then
-    build_uuid=("$python" -S -c 'import uuid; print(uuid.uuid4())')
-  else
-    build_uuid="${FX_BUILD_UUID}"
-  fi
-}
-
 # reproxy wants temporary space on the same device where
 # the build happens.  The default $TMPDIR is not guaranteed to
 # be on the same physical device.
@@ -290,6 +290,7 @@ _timetrace "Bootstrapping reproxy"
   "${bootstrap_options[@]}" > "$reproxy_logdir"/bootstrap.stdout
 [[ "$verbose" != 1 ]] || {
   cat "$reproxy_logdir"/bootstrap.stdout
+  echo "build id: $build_uuid"
   echo "logs: $reproxy_logdir"
   echo "socket: $socket_path"
 }
