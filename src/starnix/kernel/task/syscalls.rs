@@ -293,7 +293,7 @@ pub fn sys_getcpu(
     node_out: UserRef<u32>,
 ) -> Result<(), Errno> {
     track_stub!(TODO("https://fxbug.dev/297305396"), "real getcpu implementation");
-    let fake_cpu_and_node = std::u32::MAX;
+    let fake_cpu_and_node = 0;
     current_task.write_object(cpu_out, &fake_cpu_and_node)?;
     current_task.write_object(node_out, &fake_cpu_and_node)?;
     Ok(())
