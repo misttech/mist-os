@@ -98,13 +98,15 @@ impl<Key: FutexKey> FutexTable<Key> {
 
     /// Requeue the waiters to another address.
     ///
-    /// See FUTEX_REQUEUE
+    /// See FUTEX_CMP_REQUEUE
     pub fn requeue(
         &self,
         current_task: &CurrentTask,
         addr: UserAddress,
-        count: usize,
+        wake_count: usize,
+        requeue_count: usize,
         new_addr: UserAddress,
+        expected_value: Option<u32>,
     ) -> Result<usize, Errno> {
         if !addr.is_aligned(4) || !new_addr.is_aligned(4) {
             return error!(EINVAL);
@@ -112,16 +114,36 @@ impl<Key: FutexKey> FutexTable<Key> {
         let key = Key::get_key(current_task, addr)?;
         let new_key = Key::get_key(current_task, new_addr)?;
         let mut state = self.state.lock();
-        let mut old_waiters = if let Some(old_waiters) = state.waiters.remove(&key) {
-            old_waiters
-        } else {
-            return Ok(0);
-        };
-        let woken = old_waiters.notify(FUTEX_BITSET_MATCH_ANY, count);
-        if !old_waiters.is_empty() {
-            state.get_waiters_or_default(new_key).transfer(old_waiters);
+        if let Some(expected) = expected_value {
+            let value = Self::load_futex_value(current_task, addr)?;
+            if value != expected {
+                return error!(EAGAIN);
+            }
         }
-        Ok(woken)
+
+        let woken;
+        let to_requeue;
+        match state.waiters.entry(key) {
+            Entry::Vacant(_) => return Ok(0),
+            Entry::Occupied(mut entry) => {
+                // Wake up at most `wake_count` waiters.
+                woken = entry.get_mut().notify(FUTEX_BITSET_MATCH_ANY, wake_count);
+
+                // Dequeue up to `requeue_count` waiters to requeue below.
+                to_requeue = entry.get_mut().split_for_requeue(requeue_count);
+
+                if entry.get().is_empty() {
+                    entry.remove();
+                }
+            }
+        }
+
+        let requeued = to_requeue.0.len();
+        if !to_requeue.is_empty() {
+            state.get_waiters_or_default(new_key).transfer(to_requeue);
+        }
+
+        Ok(woken + requeued)
     }
 
     /// Lock the futex at the given address.
@@ -612,6 +634,11 @@ impl FutexWaiters {
 
     fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    fn split_for_requeue(&mut self, max_count: usize) -> Self {
+        let pos = if max_count >= self.0.len() { 0 } else { self.0.len() - max_count };
+        FutexWaiters(self.0.split_off(pos))
     }
 }
 

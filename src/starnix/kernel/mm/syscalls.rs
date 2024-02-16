@@ -20,6 +20,7 @@ use crate::{
 };
 use fuchsia_inspect_contrib::profile_duration;
 use starnix_logging::{log_trace, trace_duration, track_stub, CATEGORY_STARNIX_MM};
+use starnix_syscalls::SyscallArg;
 use starnix_uapi::{
     auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
     errno, error,
@@ -28,7 +29,7 @@ use starnix_uapi::{
     time::{duration_from_timespec, time_from_timespec},
     timespec, uapi,
     user_address::{UserAddress, UserRef},
-    FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_LOCK_PI,
+    FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_CMP_REQUEUE, FUTEX_LOCK_PI,
     FUTEX_PRIVATE_FLAG, FUTEX_REQUEUE, FUTEX_UNLOCK_PI, FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAKE,
     FUTEX_WAKE_BITSET, MAP_ANONYMOUS, MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_GROWSDOWN,
     MAP_NORESERVE, MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, MAP_STACK, PROT_EXEC,
@@ -368,7 +369,7 @@ fn do_futex<Key: FutexKey>(
     addr: UserAddress,
     op: u32,
     value: u32,
-    utime: UserRef<timespec>,
+    timeout_or_value2: SyscallArg,
     addr2: UserAddress,
     value3: u32,
 ) -> Result<usize, Errno> {
@@ -376,6 +377,7 @@ fn do_futex<Key: FutexKey>(
     let cmd = op & (FUTEX_CMD_MASK as u32);
 
     let read_deadline = |current_task: &CurrentTask| {
+        let utime = UserRef::<timespec>::from(timeout_or_value2);
         if utime.is_null() {
             Ok(zx::Time::INFINITE)
         } else {
@@ -399,6 +401,7 @@ fn do_futex<Key: FutexKey>(
             }
             // The timeout is interpreted differently by WAIT and WAIT_BITSET: WAIT takes a
             // timeout and WAIT_BITSET takes a deadline.
+            let utime = UserRef::<timespec>::from(timeout_or_value2);
             let deadline = if utime.is_null() {
                 zx::Time::INFINITE
             } else if is_realtime {
@@ -416,7 +419,15 @@ fn do_futex<Key: FutexKey>(
             }
             futexes.wake(current_task, addr, value as usize, value3)
         }
-        FUTEX_REQUEUE => futexes.requeue(current_task, addr, value as usize, addr2),
+        FUTEX_REQUEUE | FUTEX_CMP_REQUEUE => {
+            let wake_count = value as usize;
+            let requeue_count: usize = timeout_or_value2.into();
+            if wake_count > std::i32::MAX as usize || requeue_count > std::i32::MAX as usize {
+                return error!(EINVAL);
+            }
+            let expected_value = if cmd == FUTEX_CMP_REQUEUE { Some(value3) } else { None };
+            futexes.requeue(current_task, addr, wake_count, requeue_count, addr2, expected_value)
+        }
         FUTEX_LOCK_PI => {
             let deadline = read_deadline(current_task)?;
             futexes.lock_pi(current_task, addr, deadline)?;
@@ -439,12 +450,21 @@ pub fn sys_futex(
     addr: UserAddress,
     op: u32,
     value: u32,
-    utime: UserRef<timespec>,
+    timeout_or_value2: SyscallArg,
     addr2: UserAddress,
     value3: u32,
 ) -> Result<usize, Errno> {
     if op & FUTEX_PRIVATE_FLAG != 0 {
-        do_futex(current_task, &current_task.mm().futex, addr, op, value, utime, addr2, value3)
+        do_futex(
+            current_task,
+            &current_task.mm().futex,
+            addr,
+            op,
+            value,
+            timeout_or_value2,
+            addr2,
+            value3,
+        )
     } else {
         do_futex(
             current_task,
@@ -452,7 +472,7 @@ pub fn sys_futex(
             addr,
             op,
             value,
-            utime,
+            timeout_or_value2,
             addr2,
             value3,
         )
