@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <climits>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -17,7 +18,18 @@ namespace {
 
 int bpf(int cmd, union bpf_attr attr) { return (int)syscall(__NR_bpf, cmd, &attr, sizeof(attr)); }
 
-class BpfTest : public testing::Test {
+TEST(BpfTest, ArraySizeOverflow) {
+  int result = SAFE_SYSCALL_SKIP_ON_EPERM(bpf(BPF_MAP_CREATE, (union bpf_attr){
+                                                                  .map_type = BPF_MAP_TYPE_ARRAY,
+                                                                  .key_size = sizeof(int),
+                                                                  .value_size = 1024,
+                                                                  .max_entries = INT_MAX / 8,
+                                                              }));
+  EXPECT_EQ(result, -1);
+  EXPECT_EQ(errno, EINVAL);
+}
+
+class BpfMapTest : public testing::Test {
  protected:
   void SetUp() override {
     map_fd_ = SAFE_SYSCALL_SKIP_ON_EPERM(bpf(BPF_MAP_CREATE, (union bpf_attr){
@@ -58,7 +70,7 @@ class BpfTest : public testing::Test {
   int map_fd_ = -1;
 };
 
-TEST_F(BpfTest, Map) {
+TEST_F(BpfMapTest, Map) {
   EXPECT_EQ(bpf(BPF_MAP_UPDATE_ELEM,
                 (union bpf_attr){
                     .map_fd = (unsigned)map_fd(),
@@ -101,7 +113,7 @@ TEST_F(BpfTest, Map) {
   CheckMapInfo();
 }
 
-TEST_F(BpfTest, PinMap) {
+TEST_F(BpfMapTest, PinMap) {
   const char *pin_path = "/sys/fs/bpf/foo";
 
   unlink(pin_path);
