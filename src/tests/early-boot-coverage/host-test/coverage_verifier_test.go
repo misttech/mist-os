@@ -22,6 +22,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/emulator"
 	"go.fuchsia.dev/fuchsia/tools/emulator/emulatortest"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
+	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 	"go.fuchsia.dev/fuchsia/tools/testing/tap"
 	"go.fuchsia.dev/fuchsia/tools/testing/testrunner"
@@ -138,7 +139,7 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 
 	// Create an ssh tester.
 	var shard testsharder.Test
-	var runner testrunner.Tester
+	var sshRunner testrunner.Tester
 
 	shard = testsharder.Test{
 		Test: build.Test{
@@ -152,16 +153,36 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 	var address net.IPAddr = ipv6
 
 	t.Log("Establishing SSH Session.")
-	runner_ctx := context.Background()
-	runner, err = testrunner.NewFuchsiaSSHTester(runner_ctx, address, config.Test.SshKeyFile, outDir, "")
+	runnerCtx := context.Background()
+	sshRunner, err = testrunner.NewFuchsiaSSHTester(runnerCtx, address, config.Test.SshKeyFile, outDir, "")
 	if err != nil {
 		t.Fatalf("Error initializing Fuchsia SSH Test. Reason: %s", err)
 	}
-	defer runner.Close()
+	defer sshRunner.Close()
 
-	test_ctx := context.Background()
+	// Create a new fuchsia tester that is responsible for executing the test.
+	// This should match what is currently used by the coverage builders. They
+	// currently use an FFXTester which defaults to the SSHTester if the ffx
+	// experiment level does not enable using `ffx test`. When updating the ffx
+	// experiment level on the coverage builders, the level should be updated
+	// here as well.
+	ffxExperimentLevel := 1
+
+	ffxInstance, err := ffxutil.NewFFXInstance(runnerCtx, config.Bin.Ffx, "", os.Environ(), defaultNodename, config.Test.SshKeyFile, outDir)
+	if err != nil {
+		t.Fatalf("Cannot create Ffx instance. Reason: %s", err)
+	}
+
+	ffxRunner, err := testrunner.NewFFXTester(runnerCtx, ffxInstance, sshRunner, outDir, ffxExperimentLevel)
+	if err != nil {
+		t.Fatalf("Cannot create Ffx Tester. Reason: %s", err)
+	}
+
+	defer ffxRunner.Close()
+
+	testCtx := context.Background()
 	t.Logf("Running Test: %s", config.Test.Name)
-	test_result, err := runner.Test(test_ctx, shard, os.Stdout, os.Stdout, "")
+	testResult, err := ffxRunner.Test(testCtx, shard, os.Stdout, os.Stdout, "")
 	if err != nil {
 		t.Fatalf("Test execution failed. Reason: %s", err)
 	}
@@ -172,13 +193,13 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 		t.Fatalf("Test output creation failed. Reason: %s", err)
 	}
 
-	if err := outputs.Record(ctx, *test_result); err != nil {
+	if err := outputs.Record(ctx, *testResult); err != nil {
 		t.Fatalf("Failed to record data sinks. Reason: %s", err)
 	}
 
 	var sinks []runtests.DataSinkReference
 
-	err = runner.EnsureSinks(ctx, sinks, outputs)
+	err = ffxRunner.EnsureSinks(ctx, sinks, outputs)
 	if err != nil {
 		t.Fatalf("Error collecting data sinks from fuchsia device. Reason: %s", err)
 	}
@@ -194,11 +215,11 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 		t.Logf("Test[%d] Name %s Sink count: %d", curr, test.Name, len(test.DataSinks))
 		for _, sinks := range test.DataSinks {
 			for _, sink := range sinks {
-				path_components := strings.Split(sink.Name, string(os.PathSeparator))
-				if path_components[0] == "llvm-profile" {
+				pathComponents := strings.Split(sink.Name, string(os.PathSeparator))
+				if pathComponents[0] == "llvm-profile" {
 					rawProfiles = append(rawProfiles, filepath.Join(outDir, sink.File))
 				} else {
-					t.Logf("Unexpected data sink: %s", path_components[0])
+					t.Logf("Unexpected data sink: %s", pathComponents[0])
 				}
 			}
 		}

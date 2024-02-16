@@ -24,6 +24,7 @@ go_library("lib") {
     "//tools/debug/covargs:llvm_api",
     "//tools/emulator",
     "//tools/emulator/emulatortest",
+    "//tools/lib/ffxutil",
     "//tools/testing/runtests",
     "//tools/testing/testrunner:lib",
   ]

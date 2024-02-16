@@ -112,6 +112,7 @@ template("coverage_verification_test") {
       llvm_cov = rebase_path("${clang_prefix}/llvm-cov", root_build_dir)
       llvm_cxxfilt = rebase_path("${clang_prefix}/llvm-cxxfilt", root_build_dir)
       fvm = rebase_path(fvm_host_tool, root_build_dir)
+      ffx = rebase_path("${host_tools_dir}/ffx", root_build_dir)
     }
 
     # Test specific artifacts.
@@ -156,6 +157,7 @@ template("coverage_verification_test") {
                     ":$instrumented_binary_label",
                     ":$system_image_label",
                     ":$test_config_host_label",
+                    "//src/developer/ffx:test_data",
                     "//src/tests/early-boot-coverage/host-test:coverage_tools",
                     "//src/tests/early-boot-coverage/host-test:fvm",
                     "//src/tests/early-boot-coverage/host-test:ssh_key",
