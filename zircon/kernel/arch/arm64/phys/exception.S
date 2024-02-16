@@ -48,7 +48,7 @@
 
 // This supplies the code (as if inside `.vbar_function`) that the phys
 // exception table will use by default.
-.macro phys_exception_entry name
+.macro phys_exception_entry name, offset
   // On entry the CFI state thinks the CFA is the SP.  But the SP is the
   // interrupted SP, or SP_ELx if coming from lower EL.  On the assumption
   // we're coming from the current EL so the interrupted SP is still in SP,
@@ -106,7 +106,7 @@
   stp_cfa 0, 1
 
   // The first argument register gets the vector offset as a handy identifier.
-  mov x0, #(\name - phys_exception)
+  mov x0, #\offset
 
   // The second argument register gets the name of this entry point.
   adr_global x1, 1f

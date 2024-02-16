@@ -84,8 +84,6 @@
     .endif
   .endif
 
-  .vbar_function.cfi
-
   // The first push decrements the SP as a side effect. In the case of a stack
   // overflow will result in an immediate fault, instead of 'walking the stack'
   // downwards in an exception loop if the sp were decremented first.
@@ -247,29 +245,26 @@
 // Unhandled exception or irq. Save the full state and pass the which value
 // through to the inner routine.
 .macro iframe.invalid_exception, name, which
-  .function \name, local, cfi=custom, nosection=nosection
+  // Save state in the iframe and restore kernel invariants.
+  iframe.exc.save
+  restore_fixed_regs x9
 
-    // Save state in the iframe and restore kernel invariants.
-    iframe.exc.save
-    restore_fixed_regs x9
+  // Call into the C++ code with the iframe and vector number as arguments.
+  mov x0, sp
+  mov x1, #\which
+  bl arm64_invalid_exception
 
-    // Call into the C++ code with the iframe and vector number as arguments.
-    mov x0, sp
-    mov x1, #\which
-    bl arm64_invalid_exception
-
-    // Spin rather than cascade exceptions if that ever returns.
-    // Definitely don't restore state from the iframe after this!
-    // The C++ code should have done a panic and not returned at all.
-    b .
-  .end_function
+  // Spin rather than cascade exceptions if that ever returns.
+  // Definitely don't restore state from the iframe after this!
+  // The C++ code should have done a panic and not returned at all.
+  b .
 .endm
 
 // Asynchronous exceptions (IRQ, SError).  Call into C++ with the iframe
 // and a flag indicating user (EL0) vs kernel (EL1), and then restore from
 // the iframe when C++ returns.
 .macro iframe.async_exception name, call, from_lower_el_64
-  .function \name, local, cfi=custom, nosection=nosection
+  .vbar_function \name
 
     // Save state in the iframe and restore kernel invariants.
     // x1 is the flag indicating a user-mode (EL0) exception.
@@ -293,14 +288,14 @@
       b arm64_exc_shared_restore
     .endif
 
-  .end_function
+  .end_vbar_function
 .endm
 
 // TODO: find the appropriate place to reenable FIQs here when they're needed.
 
 // Synchronous exceptions, i.e. everything expected that's not external.
 .macro iframe.sync_exception name, from_lower_el_64
-  .function \name, local, cfi=custom, nosection=nosection
+  .vbar_function \name
 
     // Save state in the iframe.
     iframe.exc.save \from_lower_el_64
@@ -337,72 +332,45 @@
       b arm64_exc_shared_restore
     .endif
 
-  .end_function
+  .end_vbar_function
 .endm
 
-// Put the vector table in its own section that's aligned to 2048.
-.pushsection .text.arm64_el1_exception, "ax", %progbits
-.balign 0x800
-.label arm64_el1_exception_base, global
-.size arm64_el1_exception_base, 0x800
 
-// exceptions from current EL, using SP0
-// the first 4 are invalid because SP0 is not used in EL1
-.org 0x000
-iframe.invalid_exception arm64_el1_sync_exc_current_el_SP0, 0
+// Define the vector table.  See <lib/arch/arm64/exception-asm.h> for a
+// more complete explanation.  Inside `.vbar_table` ... `.end_vbar_table`,
+// each use of `.vbar_function` uses the exact name that's the name given
+// to `.vbar_table` plus the exact suffix that describes the particular
+// vector entry point in the terms they appear in the ARM manual under
+// "Exception Vectors".  The `.vbar_function` entries must appear in the
+// correct order, and an assembly-time error will be diagnosed if any is
+// out of order (or too long).  Here it's the `iframe.*_exception` macros
+// defined just above that use `.vbar_function`, but the full name of the
+// `.vbar_function` entry point they'll define is spelled out in the macro
+// invocations below and those symbol names will be visible in disassembly.
+//
+// iframe.invalid_exception provides the body for entry points with no
+// individual `.vbar_function` below.  These are automatically filled in as
+// needed when a vector that must be ordered later than an omitted one is
+// defined, and at the end of the table.
+.vbar_table arm64_el1_exception, global, iframe.invalid_exception
 
-.org 0x080
-iframe.invalid_exception arm64_el1_irq_current_el_SP0, 1
+iframe.sync_exception arm64_el1_exception_sync_current_sp_elx
 
-.org 0x100
-iframe.invalid_exception arm64_el1_fiq_current_el_SP0, 2
+iframe.async_exception arm64_el1_exception_irq_current_sp_elx, arm64_irq
 
-.org 0x180
-iframe.invalid_exception arm64_el1_err_exc_current_el_SP0, 3
+iframe.async_exception arm64_el1_exception_serror_current_sp_elx, \
+                       arm64_serror_exception
 
-// exceptions from current EL, using SPx
-.org 0x200
-iframe.sync_exception arm64_el1_sync_exc_current_el_SPx // same EL, arm64
+iframe.sync_exception arm64_el1_exception_sync_lower_a64, lower_el_64
 
-.org 0x280
-iframe.async_exception arm64_el1_irq_current_el_SPx, arm64_irq // same EL, 64
+iframe.async_exception arm64_el1_exception_irq_lower_a64, \
+                       arm64_irq, lower_el_64
 
-.org 0x300
-iframe.invalid_exception arm64_el1_fiq_current_el_SPx, 0x12
-
-.org 0x380
-iframe.async_exception arm64_el1_err_exc_current_el_SPx, \
-                       arm64_serror_exception // same EL, 64
-
-// exceptions from lower EL, running arm64
-.org 0x400
-iframe.sync_exception arm64_el1_sync_exc_lower_el_64, lower_el_64
-
-.org 0x480
-iframe.async_exception arm64_el1_irq_lower_el_64, arm64_irq, lower_el_64
-
-.org 0x500
-iframe.invalid_exception arm64_el1_fiq_lower_el_64, 0x22
-
-.org 0x580
-iframe.async_exception arm64_el1_err_exc_lower_el_64, \
+iframe.async_exception arm64_el1_exception_serror_lower_a64, \
                        arm64_serror_exception, lower_el_64
 
-// Exceptions from lower EL, running arm32.
-// All of these are invalid since there is no arm32 user space.
-.org 0x600
-iframe.invalid_exception arm64_el1_sync_exc_lower_el_32, 0x30
+.end_vbar_table
 
-.org 0x680
-iframe.invalid_exception arm64_el1_irq_lower_el_32, 0x31
-
-.org 0x700
-iframe.invalid_exception arm64_el1_fiq_lower_el_32, 0x32
-
-.org 0x780
-iframe.invalid_exception arm64_el1_err_exc_lower_el_32, 0x33
-
-.popsection
 
 // Start the rest of the code on its own cache line.
 .balign 64

@@ -143,7 +143,7 @@ static void arm64_cpu_early_init() {
   arm64_init_percpu_early();
 
   // Set the vector base.
-  __arm_wsr64("vbar_el1", (uint64_t)&arm64_el1_exception_base);
+  arch::ArmVbarEl1::Write(reinterpret_cast<uintptr_t>(&arm64_el1_exception));
   __isb(ARM_MB_SY);
 
   // Set some control bits in sctlr.

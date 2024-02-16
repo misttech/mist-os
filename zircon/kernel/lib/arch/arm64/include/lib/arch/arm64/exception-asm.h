@@ -133,7 +133,11 @@
 ///     - Optional: This provides the name of an assembly macro (defined with
 ///       .macro) that will be invoked for each omitted entry point that does
 ///       not have its own `.vbar_function` invocation before this table ends
-///       with `.end_vbar_table`.
+///       with `.end_vbar_table`.  The macro receives two arguments: the entry
+///       point name, as would be given to `.vbar_funcion` (see above); and
+///       an immediate value (a local symbol) that evaluates to the offset of
+///       of that entry point in the table, which can be decoded using the
+///       ARCH_ARM64_VBAR_* macros above.
 ///     - Default: `.vbar_default_entry`
 ///
 .macro .vbar_table name, scope=local, default=.vbar_default_entry
@@ -141,7 +145,7 @@
 .endm
 
 // The default entry is just nothing but the standard trap fill.
-.macro .vbar_default_entry name
+.macro .vbar_default_entry name, offset
 .endm
 
 // This sets up the CFI state to represent the vector entry point conditions.
@@ -242,8 +246,8 @@
   .endm
 
   .purgem _.vbar_table.default
-  .macro _.vbar_table.default vector
-    \default \vector
+  .macro _.vbar_table.default vector, offset
+    \default \vector, \offset
   .endm
 .endm
 
@@ -319,7 +323,7 @@
     .if (. - \table_name) < \horizon
       // This entry point has not been defined.  Give it the default.
       _.vbar_function.cfi
-      _.vbar_table.default \entry_name
+      _.vbar_table.default \entry_name, .L.vbar_table.offset.\entry_name
       .cfi_endproc
       .size \entry_name, . - \entry_name
     .endif
