@@ -167,29 +167,4 @@ void ConvertToIoV1NodeInfo(VnodeRepresentation representation,
   });
 }
 
-ConnectionInfoConverter::ConnectionInfoConverter(VnodeRepresentation vnode_representation) {
-  vnode_representation.visit([&](auto&& repr) {
-    using T = std::decay_t<decltype(repr)>;
-    if constexpr (std::is_same_v<T, std::monostate>) {
-      ZX_PANIC("Representation variant is not initialized");
-    } else if constexpr (std::is_same_v<T, fs::VnodeRepresentation::Connector>) {
-      representation = fio::wire::Representation::WithConnector(arena);
-    } else if constexpr (std::is_same_v<T, fs::VnodeRepresentation::File>) {
-      auto file_builder = fio::wire::FileInfo::Builder(arena);
-      if (repr.observer.is_valid()) {
-        file_builder.observer(std::move(repr.observer));
-      }
-      if (repr.stream.is_valid()) {
-        file_builder.stream(std::move(repr.stream));
-      }
-      fio::wire::FileInfo file = file_builder.Build();
-      representation = fio::wire::Representation::WithFile(arena, file);
-    } else if constexpr (std::is_same_v<T, fs::VnodeRepresentation::Directory>) {
-      representation = fio::wire::Representation::WithDirectory(arena);
-    } else {
-      static_assert(always_false_v<T>, "non-exhaustive visitor");
-    }
-  });
-}
-
 }  // namespace fs

@@ -58,9 +58,6 @@ class PseudoFile : public Vnode {
   bool ValidateRights(Rights rights) const override;
   zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
 
-  zx_status_t GetNodeInfoForProtocol(VnodeProtocol protocol, Rights rights,
-                                     VnodeRepresentation* info) final;
-
  protected:
   PseudoFile(ReadHandler read_handler, WriteHandler write_handler);
 
@@ -105,8 +102,6 @@ class BufferedPseudoFile : public PseudoFile {
     zx_status_t Write(const void* data, size_t length, size_t offset, size_t* out_actual) final;
     zx_status_t Append(const void* data, size_t length, size_t* out_end, size_t* out_actual) final;
     zx_status_t Truncate(size_t length) final;
-    zx_status_t GetNodeInfoForProtocol(VnodeProtocol protocol, Rights rights,
-                                       VnodeRepresentation* info) final;
 
    private:
     friend fbl::internal::MakeRefCountedHelper<Content>;
@@ -202,8 +197,6 @@ class UnbufferedPseudoFile : public PseudoFile {
     zx_status_t Write(const void* data, size_t length, size_t offset, size_t* out_actual) final;
     zx_status_t Append(const void* data, size_t length, size_t* out_end, size_t* out_actual) final;
     zx_status_t Truncate(size_t length) final;
-    zx_status_t GetNodeInfoForProtocol(VnodeProtocol protocol, Rights rights,
-                                       VnodeRepresentation* info) final;
 
    private:
     friend fbl::internal::MakeRefCountedHelper<Content>;

@@ -20,18 +20,16 @@ class VnodeFile final : public Vnode {
 
   fs::VnodeProtocolSet GetProtocols() const final;
 
-  zx_status_t CreateStream(uint32_t stream_options, zx::stream* out_stream) final;
+  zx::result<zx::stream> CreateStream(uint32_t stream_options) final;
   void DidModifyStream() final;
 
   zx_status_t Truncate(size_t len) final;
   zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
   zx_status_t SetAttributes(fs::VnodeAttributesUpdate a) final;
-  zx_status_t GetNodeInfoForProtocol(fs::VnodeProtocol protocol, fs::Rights rights,
-                                     fs::VnodeRepresentation* info) final;
   zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) final;
   zx_status_t CloseNode() final;
   void Sync(SyncCallback closure) final;
-  bool SupportsClientSideStreams() final { return true; }
+  bool SupportsClientSideStreams() const final { return true; }
 
  private:
   zx_status_t CreateBackingStoreIfNeeded() __TA_REQUIRES(mutex_);

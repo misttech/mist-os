@@ -384,19 +384,7 @@ TEST(VmoFile, Getattr) {
   }
 }
 
-TEST(VmoFile, GetNodeInfo) {
-  {
-    SCOPED_TRACE("DefaultSharingMode::kNone");
-    zx::vmo abc;
-    CreateVmoABC(&abc);
-
-    fs::VnodeRepresentation info;
-    auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(abc), 23u, false,
-                                                 fs::VmoFile::DefaultSharingMode::kNone);
-    EXPECT_EQ(ZX_OK, file->GetNodeInfo(fs::Rights::ReadOnly(), &info));
-    EXPECT_TRUE(info.is_file());
-  }
-
+TEST(VmoFile, DefaultSharingMode) {
   {
     SCOPED_TRACE("DefaultSharingMode::kDuplicate,read-only");
     zx::vmo abc;

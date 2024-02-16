@@ -15,9 +15,7 @@
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
-namespace fs {
-
-namespace internal {
+namespace fs::internal {
 
 class RemoteFileConnection final : public FileConnection {
  public:
@@ -55,8 +53,6 @@ class RemoteFileConnection final : public FileConnection {
   size_t offset_ = 0;
 };
 
-}  // namespace internal
-
-}  // namespace fs
+}  // namespace fs::internal
 
 #endif  // SRC_STORAGE_LIB_VFS_CPP_REMOTE_FILE_CONNECTION_H_

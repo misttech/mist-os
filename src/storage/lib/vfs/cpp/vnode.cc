@@ -41,8 +41,8 @@ Vnode::~Vnode() = default;
 
 #ifdef __Fuchsia__
 
-zx_status_t Vnode::CreateStream(uint32_t stream_options, zx::stream* out_stream) {
-  return ZX_ERR_NOT_SUPPORTED;
+zx::result<zx::stream> Vnode::CreateStream(uint32_t stream_options) {
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
 zx_status_t Vnode::ConnectService(zx::channel channel) { return ZX_ERR_NOT_SUPPORTED; }
@@ -50,28 +50,6 @@ zx_status_t Vnode::ConnectService(zx::channel channel) { return ZX_ERR_NOT_SUPPO
 zx_status_t Vnode::WatchDir(FuchsiaVfs* vfs, fio::wire::WatchMask mask, uint32_t options,
                             fidl::ServerEnd<fuchsia_io::DirectoryWatcher> watcher) {
   return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t Vnode::GetNodeInfo(Rights rights, VnodeRepresentation* info) {
-  auto maybe_protocol = GetProtocols().which();
-  ZX_DEBUG_ASSERT(maybe_protocol.has_value());
-  VnodeProtocol protocol = *maybe_protocol;
-  zx_status_t status = GetNodeInfoForProtocol(protocol, rights, info);
-  if (status != ZX_OK) {
-    return status;
-  }
-  switch (protocol) {
-    case VnodeProtocol::kConnector:
-      ZX_DEBUG_ASSERT(info->is_connector());
-      break;
-    case VnodeProtocol::kFile:
-      ZX_DEBUG_ASSERT(info->is_file());
-      break;
-    case VnodeProtocol::kDirectory:
-      ZX_DEBUG_ASSERT(info->is_directory());
-      break;
-  }
-  return ZX_OK;
 }
 
 void Vnode::Notify(std::string_view name, fuchsia_io::wire::WatchEvent event) {}
@@ -199,7 +177,7 @@ zx_status_t Vnode::Append(const void* data, size_t len, size_t* out_end, size_t*
 
 void Vnode::DidModifyStream() {}
 
-bool Vnode::SupportsClientSideStreams() { return false; }
+bool Vnode::SupportsClientSideStreams() const { return false; }
 
 zx_status_t Vnode::Lookup(std::string_view name, fbl::RefPtr<Vnode>* out) {
   return ZX_ERR_NOT_SUPPORTED;

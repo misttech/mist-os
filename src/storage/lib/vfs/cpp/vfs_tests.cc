@@ -20,14 +20,6 @@ class TestNode : public fs::Vnode {
  public:
   // Vnode implementation:
   fs::VnodeProtocolSet GetProtocols() const override { return fs::VnodeProtocol::kFile; }
-  zx_status_t GetNodeInfoForProtocol(fs::VnodeProtocol protocol, fs::Rights,
-                                     fs::VnodeRepresentation* info) final {
-    if (protocol == fs::VnodeProtocol::kFile) {
-      *info = fs::VnodeRepresentation::File();
-      return ZX_OK;
-    }
-    return ZX_ERR_NOT_SUPPORTED;
-  }
 
  private:
   friend fbl::internal::MakeRefCountedHelper<TestNode>;

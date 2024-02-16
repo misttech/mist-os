@@ -28,8 +28,6 @@ class BuiltinDevVnode : public fs::Vnode {
   zx_status_t GetAttributes(fs::VnodeAttributes* a) override;
 
   fs::VnodeProtocolSet GetProtocols() const override;
-  zx_status_t GetNodeInfoForProtocol(fs::VnodeProtocol protocol, fs::Rights rights,
-                                     fs::VnodeRepresentation* info) override;
 
  private:
   const bool null_;

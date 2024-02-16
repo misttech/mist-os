@@ -335,25 +335,23 @@ void FileTester::ReadFromFile(File *file, void *data, size_t len, size_t off) {
 }
 
 zx_status_t FileTester::Read(File *file, void *data, size_t len, size_t off, size_t *out_actual) {
-  zx::stream stream;
-  if (auto ret = file->CreateStream(ZX_STREAM_MODE_READ, &stream); ret != ZX_OK) {
-    return ret;
+  zx::result<zx::stream> stream = file->CreateStream(ZX_STREAM_MODE_READ);
+  if (stream.is_error()) {
+    return stream.error_value();
   }
-
   zx_iovec_t iov = {
       .buffer = data,
       .capacity = len,
   };
-  return stream.readv_at(0, off, &iov, 1, out_actual);
+  return stream->readv_at(0, off, &iov, 1, out_actual);
 }
 
 zx_status_t FileTester::Write(File *file, const void *data, size_t len, size_t offset,
                               size_t *out_actual) {
-  zx::stream stream;
-  if (auto ret = file->CreateStream(ZX_STREAM_MODE_WRITE, &stream); ret != ZX_OK) {
-    return ret;
+  zx::result<zx::stream> stream = file->CreateStream(ZX_STREAM_MODE_WRITE);
+  if (stream.is_error()) {
+    return stream.error_value();
   }
-
   // Since zx_iovec_t::buffer is not a const type, we make a copied buffer and use it.
   auto copied = std::make_unique<uint8_t[]>(len);
   std::memcpy(copied.get(), data, len);
@@ -361,7 +359,7 @@ zx_status_t FileTester::Write(File *file, const void *data, size_t len, size_t o
       .buffer = copied.get(),
       .capacity = len,
   };
-  return stream.writev_at(0, offset, &iov, 1, out_actual);
+  return stream->writev_at(0, offset, &iov, 1, out_actual);
 }
 
 zx_status_t FileTester::Append(File *file, const void *data, size_t len, size_t *out_end,

@@ -193,19 +193,6 @@ fidl::VectorView<uint8_t> Connection::NodeQuery() {
   return fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size());
 }
 
-zx::result<VnodeRepresentation> Connection::NodeDescribe() {
-  if (options().flags.node_reference) {
-    return zx::ok(VnodeRepresentation::Connector());
-  }
-  fs::VnodeRepresentation representation;
-  zx_status_t status =
-      vnode()->GetNodeInfoForProtocol(protocol(), options().rights, &representation);
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
-  return zx::ok(std::move(representation));
-}
-
 void Connection::NodeSync(fit::callback<void(zx_status_t)> callback) {
   FS_PRETTY_TRACE_DEBUG("[NodeSync] options: ", options());
 

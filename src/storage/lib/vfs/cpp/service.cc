@@ -36,11 +36,4 @@ zx_status_t Service::ConnectService(zx::channel channel) {
   return connector_(std::move(channel));
 }
 
-zx_status_t Service::GetNodeInfoForProtocol([[maybe_unused]] VnodeProtocol protocol,
-                                            [[maybe_unused]] Rights rights,
-                                            VnodeRepresentation* info) {
-  *info = VnodeRepresentation::Connector();
-  return ZX_OK;
-}
-
 }  // namespace fs

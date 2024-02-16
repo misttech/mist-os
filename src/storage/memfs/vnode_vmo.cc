@@ -51,12 +51,6 @@ bool VnodeVmo::ValidateRights(fs::Rights rights) const {
   return !rights.write && (!rights.execute || executable_);
 }
 
-zx_status_t VnodeVmo::GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
-                                             fs::Rights rights, fs::VnodeRepresentation* info) {
-  *info = fs::VnodeRepresentation::File{};
-  return ZX_OK;
-}
-
 zx_status_t VnodeVmo::Read(void* data, size_t len, size_t off, size_t* out_actual) {
   if (off > length_) {
     *out_actual = 0;

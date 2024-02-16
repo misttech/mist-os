@@ -53,8 +53,5 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     assert(bytes_read == bytes_written);
     assert(memcmp(read_buffer, to_write.data(), bytes_read) == 0);
   }
-
-  fs::VnodeRepresentation info;
-  vmo_file->GetNodeInfo(rights, &info);
   return 0;
 }

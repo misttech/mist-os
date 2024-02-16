@@ -686,8 +686,8 @@ zx::result<> VnodeMinfs::TruncateInternal(Transaction* transaction, size_t len) 
       zx_status_t status =
           vmo_.op_range(ZX_VMO_OP_DECOMMIT, decommit_offset, decommit_length, nullptr, 0);
       if (status != ZX_OK) {
-        // TODO(https://fxbug.dev/42111421): This is a known issue; the additional logging here is to help
-        // diagnose.
+        // TODO(https://fxbug.dev/42111421): This is a known issue; the additional logging here is
+        // to help diagnose.
         FX_LOGS(ERROR) << "TruncateInternal: Modifying node length from " << inode_size << " to "
                        << len;
         FX_LOGS(ERROR) << "  Decommit from offset " << decommit_offset << ", length "
@@ -775,16 +775,6 @@ zx::result<> VnodeMinfs::TruncateInternal(Transaction* transaction, size_t len) 
 }
 
 #ifdef __Fuchsia__
-zx_status_t VnodeMinfs::GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
-                                               [[maybe_unused]] fs::Rights rights,
-                                               fs::VnodeRepresentation* info) {
-  if (IsDirectory()) {
-    *info = fs::VnodeRepresentation::Directory();
-  } else {
-    *info = fs::VnodeRepresentation::File();
-  }
-  return ZX_OK;
-}
 
 void VnodeMinfs::Sync(SyncCallback closure) {
   TRACE_DURATION("minfs", "VnodeMinfs::Sync");
@@ -800,7 +790,6 @@ void VnodeMinfs::Sync(SyncCallback closure) {
     cb(status);
     event.SetStatus(status);
   });
-  return;
 }
 
 #endif

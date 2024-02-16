@@ -99,8 +99,6 @@ class Devnode {
                          fidl::ServerEnd<fuchsia_io::DirectoryWatcher> watcher) final;
     zx_status_t Readdir(fs::VdirCookie* cookie, void* dirents, size_t len,
                         size_t* out_actual) final;
-    zx_status_t GetNodeInfoForProtocol(fs::VnodeProtocol protocol, fs::Rights rights,
-                                       fs::VnodeRepresentation* info) final;
     zx_status_t ConnectService(zx::channel channel) final;
     bool IsService() const final;
 

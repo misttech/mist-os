@@ -192,31 +192,6 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // Subclasses may override this behavior to serve custom protocols over the channel.
   virtual zx_status_t ConnectService(zx::channel channel);
 
-  // Extract handle, type, and extra info from a vnode.
-  //
-  // The |protocol| argument specifies which protocol the connection is negotiated to speak. For
-  // vnodes which only support a single protocol, the method may safely ignore this argument.
-  // Callers should make sure to supply one of the supported protocols, or call |GetNodeInfo| if the
-  // vnode is know to support a single protocol.
-  //
-  // The |rights| argument contain the access rights requested by the client, and should determine
-  // corresponding access rights on the returned handles if applicable.
-  //
-  // The returned variant in |info| should correspond to the |protocol|.
-  virtual zx_status_t GetNodeInfoForProtocol(VnodeProtocol protocol, Rights rights,
-                                             VnodeRepresentation* info) = 0;
-
-  // Extract handle, type, and extra info from a vnode. This version differs from
-  // |GetNodeInfoForProtocol| that it is a convenience wrapper for vnodes which only support a
-  // single protocol. If the vnode supports multiple protocols, clients should always call
-  // |GetNodeInfoForProtocol| and specify a protocol.
-  //
-  // The |rights| argument contain the access rights requested by the client, and should determine
-  // corresponding access rights on the returned handles if applicable.
-  //
-  // The returned variant in |info| should correspond to the |protocol|.
-  zx_status_t GetNodeInfo(Rights rights, VnodeRepresentation* info);
-
   // Invoked by the VFS layer whenever files are added or removed.
   virtual void Notify(std::string_view name, fuchsia_io::wire::WatchEvent event);
 
@@ -225,9 +200,8 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
 
   // Create a |zx::stream| for reading and writing to this vnode.
   //
-  // If this function returns |ZX_OK|, then all |Read|, |Write|, and |Append| operations will be
-  // directed to the stream returned via |out_stream| rather than to the |Read|, |Write|, and
-  // |Append| methods on the vnode.
+  // On success, all |Read|, |Write|, and |Append| operations will be directed to the returned
+  // stream rather than to the |Read|, |Write|, and |Append| methods on the vnode.
   //
   // If |SupportsClientSideStreams| is true then the |zx::stream| will be transported to a remote
   // process to improve performance. The |zx::vmo| backing the |zx::stream| will itself need to be
@@ -243,7 +217,10 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // If the vnode does not support reading and writing using a |zx::stream|, return
   // ZX_ERR_NOT_SUPPORTED, which will cause |Read|, |Write|, and |Append| operations to be called as
   // methods on the vnode. Other errors are considered fatal and will terminate the connection.
-  virtual zx_status_t CreateStream(uint32_t stream_options, zx::stream* out_stream);
+  virtual zx::result<zx::stream> CreateStream(uint32_t stream_options);
+
+  // Get an event which transmits information about an object's readability/writability.
+  virtual zx::result<zx::event> GetObserver() const { return zx::error(ZX_ERR_NOT_SUPPORTED); }
 
   // Acquire a vmo from a vnode.
   //
@@ -315,7 +292,7 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
 
   // Indicates if the |zx::stream| returned by |CreateStream| can be transported to another process
   // to improve performance.
-  virtual bool SupportsClientSideStreams();
+  virtual bool SupportsClientSideStreams() const;
 
   // Change the size of the vnode.
   virtual zx_status_t Truncate(size_t len);

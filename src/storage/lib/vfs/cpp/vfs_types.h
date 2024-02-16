@@ -304,8 +304,8 @@ struct VnodeConnectionOptions {
 
   // Some flags (e.g. POSIX) only affect the interpretation of rights at the time of Open/Clone, and
   // should have no effects thereafter. Hence we filter them here.
-  // TODO(https://fxbug.dev/42108521): Some of these flag groups should be defined in fuchsia.io and use that
-  // as the source of truth.
+  // TODO(https://fxbug.dev/42108521): Some of these flag groups should be defined in fuchsia.io and
+  // use that as the source of truth.
   static VnodeConnectionOptions FilterForNewConnection(VnodeConnectionOptions options);
 #endif  // __Fuchsia__
 };
@@ -378,6 +378,7 @@ class VnodeAttributesUpdate {
 
 // Describe how the vnode connection should be handled, and provides auxiliary handles and
 // information for the connection where applicable.
+// TODO(https://fxbug.dev/324112857): Replace with fuchsia.io/Representation.
 class VnodeRepresentation {
  public:
   struct Connector {};
@@ -430,13 +431,6 @@ class VnodeRepresentation {
 // LLCPP ownership limitations where an extensible union cannot recursively own its variant payload.
 void ConvertToIoV1NodeInfo(VnodeRepresentation representation,
                            fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated&&)> callback);
-
-struct ConnectionInfoConverter {
-  explicit ConnectionInfoConverter(VnodeRepresentation representation);
-
-  fidl::Arena<> arena;
-  fuchsia_io::wire::Representation representation;
-};
 
 #endif  // __Fuchsia__
 

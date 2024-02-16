@@ -55,8 +55,6 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   // const digest::Digest& digest() const;
 
   // fs::Vnode implementation:
-  zx_status_t GetNodeInfoForProtocol(fs::VnodeProtocol protocol, fs::Rights rights,
-                                     fs::VnodeRepresentation* info) final __TA_EXCLUDES(mutex_);
   fs::VnodeProtocolSet GetProtocols() const final __TA_EXCLUDES(mutex_);
   bool ValidateRights(fs::Rights rights) const final __TA_EXCLUDES(mutex_);
   zx_status_t Read(void* data, size_t len, size_t off, size_t* out_actual) final
@@ -133,6 +131,8 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   zx_status_t OpenNode(ValidatedOptions options, fbl::RefPtr<Vnode>* out_redirect) override
       __TA_EXCLUDES(mutex_);
   zx_status_t CloseNode() override __TA_EXCLUDES(mutex_);
+  // Returns a handle to an event which will be signalled when the blob is readable.
+  zx::result<zx::event> GetObserver() const override __TA_EXCLUDES(mutex_);
 
   // PagedVnode protected overrides:
   void OnNoPagedVmoClones() override __TA_REQUIRES(mutex_);
@@ -141,11 +141,6 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   BlobCache& GetCache() final;
   bool ShouldCache() const final __TA_EXCLUDES(mutex_);
   void ActivateLowMemory() final __TA_EXCLUDES(mutex_);
-
-  // Returns a handle to an event which will be signalled when the blob is readable.
-  //
-  // Returns "ZX_OK" if successful, otherwise the error code will indicate the failure status.
-  zx_status_t GetReadableEvent(zx::event* out) __TA_REQUIRES(mutex_);
 
   // Returns a clone of the blobfs VMO.
   //
@@ -235,7 +230,8 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   // is protected by the mutex.
   SyncingState syncing_state_ __TA_GUARDED(mutex_) = SyncingState::kDataIncomplete;
 
-  zx::event readable_event_ __TA_GUARDED(mutex_);
+  // Lazily initialized when required.
+  mutable zx::event readable_event_ __TA_GUARDED(mutex_);
 
   uint32_t map_index_ __TA_GUARDED(mutex_) = 0;
   uint64_t blob_size_ __TA_GUARDED(mutex_) = 0;

@@ -24,12 +24,17 @@ VnodeFile::~VnodeFile() {
 
 fs::VnodeProtocolSet VnodeFile::GetProtocols() const { return fs::VnodeProtocol::kFile; }
 
-zx_status_t VnodeFile::CreateStream(uint32_t stream_options, zx::stream* out_stream) {
+zx::result<zx::stream> VnodeFile::CreateStream(uint32_t stream_options) {
   std::lock_guard lock(mutex_);
   if (zx_status_t status = CreateBackingStoreIfNeeded(); status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
-  return zx::stream::create(stream_options, paged_vmo(), 0u, out_stream);
+  zx::stream stream;
+  if (zx_status_t status = zx::stream::create(stream_options, paged_vmo(), 0u, &stream);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(std::move(stream));
 }
 
 void VnodeFile::DidModifyStream() { UpdateModified(); }
@@ -103,13 +108,6 @@ zx_status_t VnodeFile::SetAttributes(fs::VnodeAttributesUpdate attr) {
     }
   }
   return Vnode::SetAttributes(attr);
-}
-
-zx_status_t VnodeFile::GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
-                                              [[maybe_unused]] fs::Rights rights,
-                                              fs::VnodeRepresentation* info) {
-  *info = fs::VnodeRepresentation::File();
-  return ZX_OK;
 }
 
 zx_status_t VnodeFile::Truncate(size_t length) {

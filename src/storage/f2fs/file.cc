@@ -384,15 +384,21 @@ void File::VmoRead(uint64_t offset, uint64_t length) {
   return VnodeF2fs::VmoRead(offset, length);
 }
 
-zx_status_t File::CreateStream(uint32_t stream_options, zx::stream *out_stream) {
+zx::result<zx::stream> File::CreateStream(uint32_t stream_options) {
   if (TestFlag(InodeInfoFlag::kInlineData)) {
     ConvertInlineData();
   }
+
   fs::SharedLock lock(mutex_);
-  return zx::stream::create(stream_options, paged_vmo(), 0u, out_stream);
+  zx::stream stream;
+  if (zx_status_t status = zx::stream::create(stream_options, paged_vmo(), 0u, &stream);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(std::move(stream));
 }
 
-bool File::SupportsClientSideStreams() { return true; }
+bool File::SupportsClientSideStreams() const { return true; }
 
 block_t File::GetBlockAddr(LockedPage &page) { return GetBlockAddrOnDataSegment(page); }
 

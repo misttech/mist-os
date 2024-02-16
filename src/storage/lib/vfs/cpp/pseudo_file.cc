@@ -50,13 +50,6 @@ zx_status_t PseudoFile::GetAttributes(VnodeAttributes* attr) {
   return ZX_OK;
 }
 
-zx_status_t PseudoFile::GetNodeInfoForProtocol([[maybe_unused]] VnodeProtocol protocol,
-                                               [[maybe_unused]] Rights rights,
-                                               VnodeRepresentation* info) {
-  *info = VnodeRepresentation::File();
-  return ZX_OK;
-}
-
 BufferedPseudoFile::BufferedPseudoFile(ReadHandler read_handler, WriteHandler write_handler,
                                        size_t input_buffer_capacity)
     : PseudoFile(std::move(read_handler), std::move(write_handler)),
@@ -164,12 +157,6 @@ zx_status_t BufferedPseudoFile::Content::Truncate(size_t length) {
     memset(input_data_ + old_length, 0, length - old_length);
   }
   return ZX_OK;
-}
-
-zx_status_t BufferedPseudoFile::Content::GetNodeInfoForProtocol(VnodeProtocol protocol,
-                                                                Rights rights,
-                                                                VnodeRepresentation* info) {
-  return file_->GetNodeInfoForProtocol(protocol, rights, info);
 }
 
 void BufferedPseudoFile::Content::SetInputLength(size_t length) {
@@ -282,12 +269,6 @@ zx_status_t UnbufferedPseudoFile::Content::Truncate(size_t length) {
 
   truncated_since_last_successful_write_ = true;
   return ZX_OK;
-}
-
-zx_status_t UnbufferedPseudoFile::Content::GetNodeInfoForProtocol(VnodeProtocol protocol,
-                                                                  Rights rights,
-                                                                  VnodeRepresentation* info) {
-  return file_->GetNodeInfoForProtocol(protocol, rights, info);
 }
 
 }  // namespace fs

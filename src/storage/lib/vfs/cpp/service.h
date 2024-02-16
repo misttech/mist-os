@@ -58,8 +58,6 @@ class Service : public Vnode {
   VnodeProtocolSet GetProtocols() const final;
   zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
   zx_status_t ConnectService(zx::channel channel) final;
-  zx_status_t GetNodeInfoForProtocol(VnodeProtocol protocol, Rights rights,
-                                     VnodeRepresentation* info) final;
   bool IsService() const override { return true; }
 
  protected:

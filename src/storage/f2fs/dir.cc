@@ -71,13 +71,6 @@ uint64_t DirBlockIndex(uint32_t level, uint8_t dir_level, uint32_t idx) {
 
 Dir::Dir(F2fs *fs, ino_t ino, umode_t mode) : VnodeF2fs(fs, ino, mode) {}
 
-zx_status_t Dir::GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
-                                        [[maybe_unused]] fs::Rights rights,
-                                        fs::VnodeRepresentation *info) {
-  *info = fs::VnodeRepresentation::Directory();
-  return ZX_OK;
-}
-
 fs::VnodeProtocolSet Dir::GetProtocols() const { return fs::VnodeProtocol::kDirectory; }
 
 block_t Dir::DirBlocks() { return safemath::checked_cast<block_t>(GetBlockCount()); }

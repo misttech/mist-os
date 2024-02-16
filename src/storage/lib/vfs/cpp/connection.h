@@ -28,9 +28,7 @@
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
-namespace fs {
-
-namespace internal {
+namespace fs::internal {
 
 class Binding;
 
@@ -77,9 +75,11 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   // |RegisterConnection|. Cannot be called more than once in the lifetime of the connection.
   void StartDispatching(zx::channel channel, OnUnbound on_unbound);
 
-  fbl::RefPtr<fs::Vnode>& vnode() { return vnode_; }
+  // Get the representation of this connection.
+  virtual zx::result<VnodeRepresentation> NodeGetRepresentation() const = 0;
 
-  zx::result<VnodeRepresentation> GetNodeRepresentation() { return NodeDescribe(); }
+  fbl::RefPtr<fs::Vnode>& vnode() { return vnode_; }
+  const fbl::RefPtr<fs::Vnode>& vnode() const { return vnode_; }
 
  protected:
   virtual std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) = 0;
@@ -125,7 +125,6 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   void NodeClone(fuchsia_io::wire::OpenFlags flags, fidl::ServerEnd<fuchsia_io::Node> server_end);
   zx::result<> NodeClose();
   fidl::VectorView<uint8_t> NodeQuery();
-  virtual zx::result<VnodeRepresentation> NodeDescribe();
   void NodeSync(fit::callback<void(zx_status_t)> callback);
   zx::result<VnodeAttributes> NodeGetAttr();
   zx::result<> NodeSetAttr(fuchsia_io::wire::NodeAttributeFlags flags,
@@ -188,8 +187,6 @@ class TypedBinding : public Binding {
   fidl::ServerBindingRef<Protocol> binding;
 };
 
-}  // namespace internal
-
-}  // namespace fs
+}  // namespace fs::internal
 
 #endif  // SRC_STORAGE_LIB_VFS_CPP_CONNECTION_H_

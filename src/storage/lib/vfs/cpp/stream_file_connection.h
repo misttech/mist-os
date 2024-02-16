@@ -16,9 +16,7 @@
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
-namespace fs {
-
-namespace internal {
+namespace fs::internal {
 
 class StreamFileConnection final : public FileConnection {
  public:
@@ -27,6 +25,8 @@ class StreamFileConnection final : public FileConnection {
                        VnodeProtocol protocol, VnodeConnectionOptions options, zx_koid_t koid);
 
   ~StreamFileConnection() final = default;
+
+  zx::result<VnodeRepresentation> NodeGetRepresentation() const final;
 
  private:
   //
@@ -52,13 +52,10 @@ class StreamFileConnection final : public FileConnection {
   zx_status_t WriteAtInternal(const void* data, size_t len, size_t offset, size_t* out_actual);
   zx::result<fuchsia_io::wire::OpenFlags> GetFlagsInternal();
   zx::result<> SetFlagsInternal(fuchsia_io::wire::OpenFlags flags);
-  zx::result<VnodeRepresentation> NodeDescribe() final;
 
   zx::stream stream_;
 };
 
-}  // namespace internal
-
-}  // namespace fs
+}  // namespace fs::internal
 
 #endif  // SRC_STORAGE_LIB_VFS_CPP_STREAM_FILE_CONNECTION_H_

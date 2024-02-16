@@ -37,12 +37,4 @@ zx_status_t RemoteFile::OpenRemote(fio::OpenFlags flags, fio::ModeType mode, fid
                                    fidl::ServerEnd<fio::Node> object) const {
   return fidl::WireCall(remote_client_)->Open(flags, mode, path, std::move(object)).status();
 }
-
-zx_status_t RemoteFile::GetNodeInfoForProtocol([[maybe_unused]] VnodeProtocol protocol,
-                                               [[maybe_unused]] Rights rights,
-                                               VnodeRepresentation* info) {
-  *info = VnodeRepresentation::File();
-  return ZX_OK;
-}
-
 }  // namespace fs

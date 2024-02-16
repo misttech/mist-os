@@ -40,21 +40,6 @@ class FileOrDirectory : public fs::Vnode {
   fs::VnodeProtocolSet GetProtocols() const final {
     return fs::VnodeProtocol::kFile | fs::VnodeProtocol::kDirectory;
   }
-
-  zx_status_t GetNodeInfoForProtocol(fs::VnodeProtocol protocol, fs::Rights,
-                                     fs::VnodeRepresentation* info) final {
-    switch (protocol) {
-      case fs::VnodeProtocol::kFile:
-        *info = fs::VnodeRepresentation::File();
-        break;
-      case fs::VnodeProtocol::kDirectory:
-        *info = fs::VnodeRepresentation::Directory();
-        break;
-      default:
-        ZX_ASSERT_MSG(false, "Unreachable");
-    }
-    return ZX_OK;
-  }
 };
 
 // Helper method to monitor the OnOpen event, used by the tests below when
@@ -357,12 +342,6 @@ class CountOutstandingOpenVnode : public fs::Vnode {
   CountOutstandingOpenVnode() = default;
 
   fs::VnodeProtocolSet GetProtocols() const final { return fs::VnodeProtocol::kFile; }
-
-  zx_status_t GetNodeInfoForProtocol(fs::VnodeProtocol protocol, fs::Rights rights,
-                                     fs::VnodeRepresentation* info) final {
-    *info = fs::VnodeRepresentation::File{};
-    return ZX_OK;
-  }
 
   uint64_t GetOpenCount() const {
     std::lock_guard lock(mutex_);

@@ -92,11 +92,4 @@ zx_status_t LazyDir::Readdir(VdirCookie* cookie, void* dirents, size_t len, size
   return ZX_OK;
 }
 
-zx_status_t LazyDir::GetNodeInfoForProtocol([[maybe_unused]] VnodeProtocol protocol,
-                                            [[maybe_unused]] Rights rights,
-                                            VnodeRepresentation* representation) {
-  *representation = VnodeRepresentation::Directory();
-  return ZX_OK;
-}
-
 }  // namespace fs

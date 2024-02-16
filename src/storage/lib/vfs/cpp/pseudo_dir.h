@@ -74,8 +74,6 @@ class PseudoDir : public Vnode {
   zx_status_t WatchDir(fs::FuchsiaVfs* vfs, fuchsia_io::wire::WatchMask mask, uint32_t options,
                        fidl::ServerEnd<fuchsia_io::DirectoryWatcher> watcher) final;
   zx_status_t Readdir(VdirCookie* cookie, void* dirents, size_t len, size_t* out_actual) final;
-  zx_status_t GetNodeInfoForProtocol(VnodeProtocol protocol, Rights rights,
-                                     VnodeRepresentation* info) final;
 
  private:
   friend fbl::internal::MakeRefCountedHelper<PseudoDir>;

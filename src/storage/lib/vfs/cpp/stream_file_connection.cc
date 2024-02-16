@@ -228,20 +228,16 @@ zx::result<> StreamFileConnection::SetFlagsInternal(fuchsia_io::wire::OpenFlags 
   return status;
 }
 
-zx::result<VnodeRepresentation> StreamFileConnection::NodeDescribe() {
-  zx::result representation = Connection::NodeDescribe();
+zx::result<VnodeRepresentation> StreamFileConnection::NodeGetRepresentation() const {
+  zx::result<VnodeRepresentation> representation = FileConnection::NodeGetRepresentation();
   if (representation.is_error()) {
     return representation.take_error();
   }
-  if (representation->is_file()) {
-    ZX_DEBUG_ASSERT_MSG(!representation->file().stream.is_valid(),
-                        "The stream should only be set by the connection");
-    if (vnode()->SupportsClientSideStreams()) {
-      if (zx_status_t status =
-              stream_.duplicate(ZX_RIGHT_SAME_RIGHTS, &representation->file().stream);
-          status != ZX_OK) {
-        return zx::error(status);
-      }
+  if (vnode()->SupportsClientSideStreams()) {
+    if (zx_status_t status =
+            stream_.duplicate(ZX_RIGHT_SAME_RIGHTS, &representation->file().stream);
+        status != ZX_OK) {
+      return zx::error(status);
     }
   }
   return representation;

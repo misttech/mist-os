@@ -66,13 +66,6 @@ zx_status_t VnodeDir::GetAttributes(fs::VnodeAttributes* attr) {
   return ZX_OK;
 }
 
-zx_status_t VnodeDir::GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
-                                             [[maybe_unused]] fs::Rights rights,
-                                             fs::VnodeRepresentation* info) {
-  *info = fs::VnodeRepresentation::Directory();
-  return ZX_OK;
-}
-
 zx_status_t VnodeDir::Readdir(fs::VdirCookie* cookie, void* data, size_t len, size_t* out_actual) {
   fs::DirentFiller df(data, len);
   if (!IsDirectory()) {

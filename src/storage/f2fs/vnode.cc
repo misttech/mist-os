@@ -48,13 +48,6 @@ bool VnodeF2fs::IsNode() const { return ino_ == superblock_info_.GetNodeIno(); }
 
 bool VnodeF2fs::IsMeta() const { return ino_ == superblock_info_.GetMetaIno(); }
 
-zx_status_t VnodeF2fs::GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
-                                              [[maybe_unused]] fs::Rights rights,
-                                              fs::VnodeRepresentation *info) {
-  *info = fs::VnodeRepresentation::File();
-  return ZX_OK;
-}
-
 zx_status_t VnodeF2fs::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) {
   std::lock_guard lock(mutex_);
   auto size_or = CreatePagedVmo(GetSize());

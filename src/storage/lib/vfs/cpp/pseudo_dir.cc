@@ -89,13 +89,6 @@ zx_status_t PseudoDir::Readdir(VdirCookie* cookie, void* data, size_t len, size_
 
 VnodeProtocolSet PseudoDir::GetProtocols() const { return VnodeProtocol::kDirectory; }
 
-zx_status_t PseudoDir::GetNodeInfoForProtocol([[maybe_unused]] VnodeProtocol protocol,
-                                              [[maybe_unused]] Rights rights,
-                                              VnodeRepresentation* info) {
-  *info = VnodeRepresentation::Directory();
-  return ZX_OK;
-}
-
 zx_status_t PseudoDir::AddEntry(fbl::String name, fbl::RefPtr<fs::Vnode> vn) {
   ZX_DEBUG_ASSERT(vn);
 

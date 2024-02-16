@@ -59,21 +59,32 @@ void FileConnection::Query(QueryCompleter::Sync& completer) {
   completer.Reply(Connection::NodeQuery());
 }
 
+zx::result<VnodeRepresentation> FileConnection::NodeGetRepresentation() const {
+  VnodeRepresentation representation = VnodeRepresentation::File();
+  zx::result<zx::event> observer = vnode()->GetObserver();
+  if (observer.is_ok()) {
+    representation.file().observer = std::move(*observer);
+  } else if (observer.error_value() != ZX_ERR_NOT_SUPPORTED) {
+    return observer.take_error();
+  }
+  return zx::ok(std::move(representation));
+}
+
 void FileConnection::Describe(DescribeCompleter::Sync& completer) {
-  zx::result result = Connection::NodeDescribe();
-  if (result.is_error()) {
-    return completer.Close(result.status_value());
+  zx::result representation = NodeGetRepresentation();
+  if (representation.is_error()) {
+    completer.Close(representation.status_value());
+    return;
   }
-  ConnectionInfoConverter converter(std::move(result).value());
-  switch (converter.representation.Which()) {
-    default:
-    case fio::wire::Representation::Tag::kConnector:
-    case fio::wire::Representation::Tag::kDirectory:
-      return completer.Close(ZX_ERR_BAD_STATE);
-    case fio::wire::Representation::Tag::kFile:
-      fio::wire::FileInfo file = converter.representation.file();
-      return completer.Reply(file);
+  fidl::Arena arena;
+  auto builder = fio::wire::FileInfo::Builder(arena);
+  if (representation->file().observer.is_valid()) {
+    builder.observer(std::move(representation->file().observer));
   }
+  if (representation->file().stream.is_valid()) {
+    builder.stream(std::move(representation->file().stream));
+  }
+  completer.Reply(builder.Build());
 }
 
 void FileConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {

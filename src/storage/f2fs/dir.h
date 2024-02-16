@@ -24,9 +24,6 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   void fbl_recycle() { RecycleNode(); }
 
   fs::VnodeProtocolSet GetProtocols() const final;
-  zx_status_t GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
-                                     [[maybe_unused]] fs::Rights rights,
-                                     fs::VnodeRepresentation *info) final;
 
   zx::result<LockedPage> FindDataPage(pgoff_t index, bool do_read = true);
 

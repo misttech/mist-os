@@ -31,13 +31,6 @@ class FdCountVnode : public fs::Vnode {
   }
 
   fs::VnodeProtocolSet GetProtocols() const final { return fs::VnodeProtocol::kFile; }
-
-  zx_status_t GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
-                                     [[maybe_unused]] fs::Rights rights,
-                                     fs::VnodeRepresentation* info) override {
-    *info = fs::VnodeRepresentation::Connector();
-    return ZX_OK;
-  }
 };
 
 struct AsyncTearDownSync {

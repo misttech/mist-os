@@ -43,8 +43,6 @@ class LazyDir : public Vnode {
   // returned. All IDs other than 0 are valid.
   zx_status_t Readdir(VdirCookie* cookie, void* dirents, size_t len, size_t* out_actual) final;
   zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out_vnode) final;
-  zx_status_t GetNodeInfoForProtocol(VnodeProtocol protocol, Rights rights,
-                                     VnodeRepresentation* info) final;
 
  protected:
   friend fbl::internal::MakeRefCountedHelper<LazyDir>;

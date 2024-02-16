@@ -237,8 +237,6 @@ class VnodeMinfs : public fs::Vnode,
   [[nodiscard]] zx::result<> Purge(Transaction* transaction);
 
 #ifdef __Fuchsia__
-  zx_status_t GetNodeInfoForProtocol(fs::VnodeProtocol protocol, fs::Rights rights,
-                                     fs::VnodeRepresentation* info) final;
 
   void Sync(SyncCallback closure) final;
 

@@ -90,12 +90,6 @@ zx_status_t VmoFile::Write(const void* data, size_t length, size_t offset, size_
   return status;
 }
 
-zx_status_t VmoFile::GetNodeInfoForProtocol([[maybe_unused]] VnodeProtocol protocol, Rights rights,
-                                            VnodeRepresentation* info) {
-  *info = fs::VnodeRepresentation::File{};
-  return ZX_OK;
-}
-
 zx_status_t VmoFile::GetVmo(fio::wire::VmoFlags flags, zx::vmo* out_vmo) {
   zx_rights_t rights = ZX_RIGHTS_BASIC | ZX_RIGHT_MAP | ZX_RIGHT_GET_PROPERTY;
   if (flags & fio::wire::VmoFlags::kRead) {

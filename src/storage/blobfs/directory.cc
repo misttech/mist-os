@@ -28,13 +28,6 @@ Directory::Directory(Blobfs* bs) : blobfs_(bs) {}
 
 Directory::~Directory() = default;
 
-zx_status_t Directory::GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
-                                              [[maybe_unused]] fs::Rights rights,
-                                              fs::VnodeRepresentation* info) {
-  *info = fs::VnodeRepresentation::Directory();
-  return ZX_OK;
-}
-
 fs::VnodeProtocolSet Directory::GetProtocols() const { return fs::VnodeProtocol::kDirectory; }
 
 zx_status_t Directory::Readdir(fs::VdirCookie* cookie, void* dirents, size_t len,

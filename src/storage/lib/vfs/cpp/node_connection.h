@@ -15,9 +15,7 @@
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
-namespace fs {
-
-namespace internal {
+namespace fs::internal {
 
 class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_io::Node> {
  public:
@@ -29,6 +27,9 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
 
  private:
   std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) override;
+  zx::result<VnodeRepresentation> NodeGetRepresentation() const override {
+    return zx::ok(VnodeRepresentation::Connector());
+  }
 
   //
   // |fuchsia.io/Node| operations.
@@ -76,8 +77,6 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
 #endif
 };
 
-}  // namespace internal
-
-}  // namespace fs
+}  // namespace fs::internal
 
 #endif  // SRC_STORAGE_LIB_VFS_CPP_NODE_CONNECTION_H_

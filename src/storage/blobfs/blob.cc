@@ -80,14 +80,15 @@ zx_status_t Blob::MarkReadable(const WrittenBlob& written_blob) {
   return ZX_OK;
 }
 
-zx_status_t Blob::GetReadableEvent(zx::event* out) {
-  TRACE_DURATION("blobfs", "Blobfs::GetReadableEvent");
+zx::result<zx::event> Blob::GetObserver() const {
+  TRACE_DURATION("blobfs", "Blobfs::GetObserver");
   zx_status_t status;
+  std::lock_guard guard(mutex_);
   // This is the first 'wait until read event' request received.
   if (!readable_event_.is_valid()) {
     status = zx::event::create(0, &readable_event_);
     if (status != ZX_OK) {
-      return status;
+      return zx::error(status);
     }
     if (state_ == BlobState::kReadable) {
       readable_event_.signal(0u, ZX_USER_SIGNAL_0);
@@ -96,11 +97,9 @@ zx_status_t Blob::GetReadableEvent(zx::event* out) {
   zx::event out_event;
   status = readable_event_.duplicate(ZX_RIGHTS_BASIC, &out_event);
   if (status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
-
-  *out = std::move(out_event);
-  return ZX_OK;
+  return zx::ok(std::move(out_event));
 }
 
 zx_status_t Blob::CloneDataVmo(zx_rights_t rights, zx::vmo* out_vmo) {
@@ -359,24 +358,11 @@ fs::VnodeProtocolSet Blob::GetProtocols() const { return fs::VnodeProtocol::kFil
 bool Blob::ValidateRights(fs::Rights rights) const {
   // To acquire write access to a blob, it must be empty.
   //
-  // TODO(https://fxbug.dev/42146597) If we run FIDL on multiple threads (we currently don't) there is
-  // a race condition here where another thread could start writing at the same time. Decide whether
-  // we support FIDL from multiple threads and if so, whether this condition is important.
+  // TODO(https://fxbug.dev/42146597) If we run FIDL on multiple threads (we currently don't) there
+  // is a race condition here where another thread could start writing at the same time. Decide
+  // whether we support FIDL from multiple threads and if so, whether this condition is important.
   std::lock_guard lock(mutex_);
   return !rights.write || state_ == BlobState::kEmpty;
-}
-
-zx_status_t Blob::GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
-                                         [[maybe_unused]] fs::Rights rights,
-                                         fs::VnodeRepresentation* info) {
-  std::lock_guard lock(mutex_);
-
-  zx::event observer;
-  if (zx_status_t status = GetReadableEvent(&observer); status != ZX_OK) {
-    return status;
-  }
-  *info = fs::VnodeRepresentation::File{.observer = std::move(observer)};
-  return ZX_OK;
 }
 
 zx_status_t Blob::Read(void* data, size_t len, size_t off, size_t* out_actual) {

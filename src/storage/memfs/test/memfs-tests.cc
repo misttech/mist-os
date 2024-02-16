@@ -434,8 +434,9 @@ TEST(MemfsTest, TruncateZerosTail) {
   fbl::RefPtr<fs::Vnode> file;
   ASSERT_OK(root->Create("file", S_IFREG, &file));
 
-  zx::stream stream;
-  ASSERT_OK(file->CreateStream(ZX_STREAM_MODE_READ | ZX_STREAM_MODE_WRITE, &stream));
+  zx::result<zx::stream> stream = file->CreateStream(ZX_STREAM_MODE_READ | ZX_STREAM_MODE_WRITE);
+  ASSERT_TRUE(stream.is_ok()) << stream.status_string();
+  ASSERT_TRUE(stream->is_valid());
 
   std::string data = "file-contents";
   zx_iovec_t iov = {
@@ -443,7 +444,7 @@ TEST(MemfsTest, TruncateZerosTail) {
       .capacity = data.size(),
   };
   size_t actual = 0;
-  ASSERT_OK(stream.writev_at(0, 500, &iov, 1, &actual));
+  ASSERT_OK(stream->writev_at(0, 500, &iov, 1, &actual));
   ASSERT_EQ(actual, data.size());
 
   // Shrink the file to before the write.
@@ -454,7 +455,7 @@ TEST(MemfsTest, TruncateZerosTail) {
   // Verify the data is gone.
   std::vector<char> file_contents(data.size(), 0);
   iov.buffer = file_contents.data();
-  ASSERT_OK(stream.readv_at(0, 500, &iov, 1, &actual));
+  ASSERT_OK(stream->readv_at(0, 500, &iov, 1, &actual));
   ASSERT_EQ(actual, data.size());
   EXPECT_THAT(file_contents, testing::Each('\0'));
 }
@@ -469,8 +470,9 @@ TEST(MemfsTest, WriteMaxFileSize) {
   fbl::RefPtr<fs::Vnode> file;
   ASSERT_OK(root->Create("file", S_IFREG, &file));
 
-  zx::stream stream;
-  ASSERT_OK(file->CreateStream(ZX_STREAM_MODE_READ | ZX_STREAM_MODE_WRITE, &stream));
+  zx::result<zx::stream> stream = file->CreateStream(ZX_STREAM_MODE_READ | ZX_STREAM_MODE_WRITE);
+  ASSERT_TRUE(stream.is_ok()) << stream.status_string();
+  ASSERT_TRUE(stream->is_valid());
 
   std::string data = "1";
   zx_iovec_t iov = {
@@ -478,14 +480,14 @@ TEST(MemfsTest, WriteMaxFileSize) {
       .capacity = data.size(),
   };
   size_t actual = 0;
-  ASSERT_OK(stream.writev_at(0, kMaxFileSize - 1, &iov, 1, &actual));
+  ASSERT_OK(stream->writev_at(0, kMaxFileSize - 1, &iov, 1, &actual));
   ASSERT_EQ(actual, data.size());
   fs::VnodeAttributes attributes;
   ASSERT_OK(file->GetAttributes(&attributes));
   ASSERT_EQ(attributes.content_size, kMaxFileSize);
 
   // Try to write beyond the max file size.
-  ASSERT_STATUS(stream.writev_at(0, kMaxFileSize, &iov, 1, &actual), ZX_ERR_OUT_OF_RANGE);
+  ASSERT_STATUS(stream->writev_at(0, kMaxFileSize, &iov, 1, &actual), ZX_ERR_OUT_OF_RANGE);
 }
 
 TEST(MemfsTest, TruncateToMaxFileSize) {

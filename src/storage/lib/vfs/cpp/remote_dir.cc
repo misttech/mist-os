@@ -38,11 +38,4 @@ zx_status_t RemoteDir::OpenRemote(fio::OpenFlags flags, fio::ModeType mode, fidl
   return fidl::WireCall(remote_client_)->Open(flags, mode, path, std::move(object)).status();
 }
 
-zx_status_t RemoteDir::GetNodeInfoForProtocol([[maybe_unused]] VnodeProtocol protocol,
-                                              [[maybe_unused]] Rights rights,
-                                              VnodeRepresentation* info) {
-  *info = VnodeRepresentation::Directory();
-  return ZX_OK;
-}
-
 }  // namespace fs

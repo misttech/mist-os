@@ -68,10 +68,6 @@ TEST(Rights, All) {
 class DummyVnode : public fs::Vnode {
  public:
   DummyVnode() = default;
-  zx_status_t GetNodeInfoForProtocol(fs::VnodeProtocol, fs::Rights,
-                                     fs::VnodeRepresentation*) final {
-    ZX_PANIC("Unused");
-  }
 };
 
 #define EXPECT_RESULT_OK(expr) EXPECT_TRUE((expr).is_ok())

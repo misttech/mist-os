@@ -312,7 +312,10 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
 
   // If |node_reference| is specified, serve |fuchsia.io/Node| even for |VnodeProtocol::kConnector|
   // nodes. Otherwise, connect the raw channel to the custom service.
-  if (!options->flags.node_reference && protocol == VnodeProtocol::kConnector) {
+  if (options->flags.node_reference) {
+    // In io2, the node reference flag is equivalent to the NodeProtocolKinds::CONNECTOR.
+    protocol = VnodeProtocol::kConnector;
+  } else if (protocol == VnodeProtocol::kConnector) {
     if (options->ToIoV1Flags() & ~(fio::OpenFlags::kNodeReference | fio::OpenFlags::kDescribe |
                                    fio::OpenFlags::kNotDirectory)) {
       fidl::ServerEnd<fuchsia_io::Node> node(std::move(server_end));
@@ -351,14 +354,14 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
     switch (protocol) {
       case VnodeProtocol::kFile: {
         if (!options->flags.node_reference) {
-          zx::stream stream;
-          if (zx_status_t status = vnode->CreateStream(ToStreamOptions(*options), &stream);
-              status == ZX_OK) {
+          zx::result<zx::stream> stream = vnode->CreateStream(ToStreamOptions(*options));
+          if (stream.is_ok()) {
             connection = std::make_unique<internal::StreamFileConnection>(
-                this, std::move(vnode), std::move(stream), protocol, *options, info.koid);
+                this, std::move(vnode), std::move(*stream), protocol, *options, info.koid);
             return ZX_OK;
-          } else if (status != ZX_ERR_NOT_SUPPORTED) {
-            return status;
+          }
+          if (stream.error_value() != ZX_ERR_NOT_SUPPORTED) {
+            return stream.error_value();
           }
         }
         connection = std::make_unique<internal::RemoteFileConnection>(
@@ -386,7 +389,7 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
 
   // Send an |fuchsia.io/OnOpen| event if requested.
   if (options->flags.describe) {
-    zx::result<VnodeRepresentation> result = connection->GetNodeRepresentation();
+    zx::result<VnodeRepresentation> result = connection->NodeGetRepresentation();
     if (result.is_error()) {
       // Ignore errors since there is nothing we can do if this fails.
       [[maybe_unused]] fidl::Status status =

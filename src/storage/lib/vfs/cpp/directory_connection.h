@@ -14,9 +14,7 @@
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
-namespace fs {
-
-namespace internal {
+namespace fs::internal {
 
 class DirectoryConnection final : public Connection,
                                   public fidl::WireServer<fuchsia_io::Directory> {
@@ -26,6 +24,10 @@ class DirectoryConnection final : public Connection,
                       VnodeConnectionOptions options, zx_koid_t koid);
 
   ~DirectoryConnection() final;
+
+  zx::result<VnodeRepresentation> NodeGetRepresentation() const final {
+    return zx::ok(VnodeRepresentation::Directory());
+  }
 
  private:
   std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) override;
@@ -115,8 +117,6 @@ class DirectoryConnection final : public Connection,
   const zx_koid_t koid_;
 };
 
-}  // namespace internal
-
-}  // namespace fs
+}  // namespace fs::internal
 
 #endif  // SRC_STORAGE_LIB_VFS_CPP_DIRECTORY_CONNECTION_H_

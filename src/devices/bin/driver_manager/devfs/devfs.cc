@@ -122,24 +122,6 @@ fs::VnodeProtocolSet Devnode::VnodeImpl::GetProtocols() const {
   return protocols;
 }
 
-zx_status_t Devnode::VnodeImpl::GetNodeInfoForProtocol(fs::VnodeProtocol protocol,
-                                                       fs::Rights rights,
-                                                       fs::VnodeRepresentation* info) {
-  switch (protocol) {
-    case fs::VnodeProtocol::kConnector:
-      if (IsDirectory()) {
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-      *info = fs::VnodeRepresentation::Connector{};
-      return ZX_OK;
-    case fs::VnodeProtocol::kFile:
-      return ZX_ERR_NOT_SUPPORTED;
-    case fs::VnodeProtocol::kDirectory:
-      *info = fs::VnodeRepresentation::Directory{};
-      return ZX_OK;
-  }
-}
-
 zx_status_t Devnode::VnodeImpl::ConnectService(zx::channel channel) {
   if (!target_.has_value()) {
     return ZX_ERR_NOT_SUPPORTED;

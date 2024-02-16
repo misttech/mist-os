@@ -31,12 +31,6 @@ TEST(ConnectionRightsTest, RightsBehaveAsExpected) {
   // Set up a vnode for the root directory
   class TestVNode : public fs::Vnode {
    public:
-    zx_status_t GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
-                                       [[maybe_unused]] fs::Rights rights,
-                                       fs::VnodeRepresentation* info) override {
-      *info = fs::VnodeRepresentation::File();
-      return ZX_OK;
-    }
     fs::VnodeProtocolSet GetProtocols() const final { return fs::VnodeProtocol::kFile; }
     zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) override {
       zx::vmo vmo;

@@ -21,29 +21,6 @@
 // consistency checks or other invariants.
 namespace {
 
-// This vnode returns a file in |GetProtocols|, but a directory in |GetNodeInfoForProtocol|.
-class ErraticVnode : public fs::Vnode {
- public:
-  ErraticVnode() = default;
-  fs::VnodeProtocolSet GetProtocols() const final { return fs::VnodeProtocol::kFile; }
-  zx_status_t GetNodeInfoForProtocol(fs::VnodeProtocol protocol, fs::Rights,
-                                     fs::VnodeRepresentation* info) final {
-    EXPECT_EQ(protocol, fs::VnodeProtocol::kFile);
-    *info = fs::VnodeRepresentation::Directory();
-    return ZX_OK;
-  }
-};
-
-TEST(Vnode, ProtocolShouldAgreeWithNodeInfo) {
-  ErraticVnode vnode;
-  if (ZX_DEBUG_ASSERT_IMPLEMENTED) {
-    ASSERT_DEATH([&] {
-      fs::VnodeRepresentation info;
-      vnode.GetNodeInfo(fs::Rights::All(), &info);
-    });
-  }
-}
-
 // This vnode supports the connector, file, and directory protocol.
 class PolymorphicVnode : public fs::Vnode {
  public:
@@ -52,11 +29,6 @@ class PolymorphicVnode : public fs::Vnode {
       : expected_candidate_(expected_candidate) {}
   fs::VnodeProtocolSet GetProtocols() const final {
     return fs::VnodeProtocol::kConnector | fs::VnodeProtocol::kFile | fs::VnodeProtocol::kDirectory;
-  }
-  zx_status_t GetNodeInfoForProtocol(fs::VnodeProtocol, fs::Rights,
-                                     fs::VnodeRepresentation*) final {
-    EXPECT_TRUE(false, "Should not be called");
-    return ZX_ERR_INTERNAL;
   }
   fs::VnodeProtocol Negotiate(fs::VnodeProtocolSet protocols) const final {
     EXPECT_TRUE(expected_candidate_.has_value());
