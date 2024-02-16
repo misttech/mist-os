@@ -1,0 +1,39 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#ifndef LIB_DL_TEST_DL_TESTS_BASE_H_
+#define LIB_DL_TEST_DL_TESTS_BASE_H_
+
+#include <lib/fit/result.h>
+
+#include <string>
+
+#include <gtest/gtest.h>
+
+namespace dl::testing {
+
+using Error = std::string;
+
+// The main purpose of this base class is to document and declare the testing
+// API that each test fixture is expected to provide definitions for. Default
+// values for shared feature flags are also defined here so that test fixtures
+// may support testing features independently from each other.
+class DlTestsBase : public ::testing::Test {
+ public:
+  // An indicator to GTEST of whether the test fixture supports the following
+  // features so that it may skip related tests if not supported.
+  static constexpr bool kHasDlOpen = true;
+  // Whether the test fixture can support matching error text exactly. This
+  // allows different system implementations to pass tests that check whether an
+  // expected error occurred without needing to adhere to the exact error
+  // verbiage.
+  static constexpr bool kCanMatchExactError = true;
+
+  // Test fixtures are expected to provide definitions for the following API:
+  fit::result<Error, void*> DlOpen(const char* name, int mode);
+};
+
+}  // namespace dl::testing
+
+#endif  // LIB_DL_TEST_DL_TESTS_BASE_H_
