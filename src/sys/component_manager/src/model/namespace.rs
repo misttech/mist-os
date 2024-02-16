@@ -297,7 +297,6 @@ fn service_or_protocol_use(
     // Bedrock routing.
     if let UseDecl::Protocol(use_protocol_decl) = &use_ {
         let request = Request {
-            rights: None,
             relative_path: sandbox::Path::default(),
             availability: use_protocol_decl.availability.clone(),
             target: component.clone(),

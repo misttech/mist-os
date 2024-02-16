@@ -44,11 +44,6 @@ pub type RouteFn = dyn Fn(Request, Completer) -> () + Send + Sync;
 /// [`Request`] contains metadata around how to obtain a capability.
 #[derive(Debug, Clone)]
 pub struct Request {
-    /// If the capability supports fuchsia.io rights attenuation,
-    /// requests to access an attenuated capability with the specified rights.
-    /// Otherwise, the request should be rejected with an unsupported error.
-    pub rights: Option<fio::OpenFlags>,
-
     /// If the capability supports path-style child object access and attenuation,
     /// requests to access into that path. Otherwise, the request should be rejected
     /// with an unsupported error.
@@ -194,7 +189,6 @@ impl Router {
                 Capability::Router(r) => {
                     let router = Router::from_any(r.clone());
                     let request = Request {
-                        rights: None,
                         relative_path: sandbox::Path::default(),
                         target: weak_component.clone(),
                         // Use the weakest availability, so that it gets immediately upgraded to
@@ -426,9 +420,6 @@ impl Routable for Open {
         if !request.relative_path.is_empty() {
             open = open.downscope_path(request.relative_path);
         }
-        if let Some(rights) = request.rights {
-            open = open.downscope_rights(rights)
-        }
         completer.complete(Ok(open.into()));
     }
 }
@@ -491,7 +482,6 @@ mod tests {
         let capability = route(
             &proxy,
             Request {
-                rights: None,
                 relative_path: Path::default(),
                 availability: Availability::Optional,
                 target: WeakComponentInstance::invalid(),
@@ -514,7 +504,6 @@ mod tests {
         let error = route(
             &proxy,
             Request {
-                rights: None,
                 relative_path: Path::default(),
                 availability: Availability::Required,
                 target: WeakComponentInstance::invalid(),
@@ -542,7 +531,6 @@ mod tests {
         let capability = route(
             &router,
             Request {
-                rights: None,
                 relative_path: Path::default(),
                 availability: Availability::Required,
                 target: WeakComponentInstance::invalid(),
@@ -578,7 +566,6 @@ mod tests {
         let capability = route(
             &downscoped_router,
             Request {
-                rights: None,
                 relative_path: Path::new("source"),
                 availability: Availability::Optional,
                 target: WeakComponentInstance::invalid(),
@@ -611,7 +598,6 @@ mod tests {
         let capability = route(
             &downscoped_router,
             Request {
-                rights: None,
                 relative_path: Path::new("dict1/source"),
                 availability: Availability::Optional,
                 target: WeakComponentInstance::invalid(),

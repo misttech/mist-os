@@ -297,7 +297,6 @@ fn make_dict_extending_router(
             let fut = async move {
                 let res = async {
                     let source_request = Request {
-                        rights: None,
                         relative_path: sandbox::Path::default(),
                         availability: cm_types::Availability::Required,
                         target: component.as_weak(),

@@ -10,7 +10,7 @@ use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::{FutureExt, TryStreamExt};
 use std::collections::VecDeque;
 use std::fmt::Debug;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use vfs::{common::send_on_open_with_error, execution_scope::ExecutionScope};
 
 use crate::{registry, CapabilityTrait, ConversionError, Directory, OneShotHandle};
@@ -97,30 +97,6 @@ impl Open {
                 send_on_open_with_error(describe, server_end.into(), error);
             }
         }
-    }
-
-    /// Returns an [`Open`] capability which will open with rights downscoped to
-    /// `rights`, from the base [`Open`] object.
-    ///
-    /// The base capability is lazily exercised when the returned capability is exercised.
-    pub fn downscope_rights(self, rights: fio::OpenFlags) -> Open {
-        let downscoped: OnceLock<Open> = OnceLock::new();
-        let entry_type = self.entry_type;
-        Open::new(
-            move |scope: ExecutionScope,
-                  flags: fio::OpenFlags,
-                  path: vfs::path::Path,
-                  server_end: zx::Channel| {
-                let open = downscoped.get_or_init(|| {
-                    let (downscoped_client_end, downscoped_server_end) = zx::Channel::create();
-                    self.open(scope.clone(), rights, vfs::path::Path::dot(), downscoped_server_end);
-                    let openable: ClientEnd<fio::OpenableMarker> = downscoped_client_end.into();
-                    Open::from(openable)
-                });
-                open.open(scope, flags, path, server_end);
-            },
-            entry_type,
-        )
     }
 
     /// Returns an [`Open`] capability which will open paths relative to
@@ -480,54 +456,11 @@ mod tests {
         assert_eq!(OPEN_COUNT.get(), 0);
     }
 
-    async fn get_connection_rights(directory: Directory) -> Result<(i32, fio::OpenFlags)> {
-        let client_end: ClientEnd<fio::DirectoryMarker> = directory.into();
-        let client = client_end.into_proxy()?;
-        let (status, flags) = client.get_flags().await?;
-        Ok((status, flags))
-    }
-
     async fn get_entries(directory: Directory) -> Result<Vec<String>> {
         let client_end: ClientEnd<fio::DirectoryMarker> = directory.into();
         let client = client_end.into_proxy()?;
         let entries = fuchsia_fs::directory::readdir(&client).await?;
         Ok(entries.into_iter().map(|entry| entry.name).collect())
-    }
-
-    #[fuchsia::test]
-    async fn downscope_rights() {
-        // Make an [Open] that corresponds to `/` with read-write rights.
-        let dir = pfs::simple();
-        let scope = ExecutionScope::new();
-        let (dir_client_end, dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
-        dir.clone().open(
-            scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            vfs::path::Path::dot(),
-            dir_server_end.into_channel().into(),
-        );
-        let open = Open::from(dir_client_end);
-
-        // Verify that the connection is read-write.
-        let directory = open.clone().into_directory(
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE,
-            ExecutionScope::new(),
-        );
-        let (status, flags) = get_connection_rights(directory).await.unwrap();
-        assert_eq!(status, zx::Status::OK.into_raw());
-        assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
-
-        // Downscope the rights to read-only.
-        let open = open.downscope_rights(fio::OpenFlags::RIGHT_READABLE);
-        let directory = open.into_directory(
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE,
-            ExecutionScope::new(),
-        );
-
-        // Verify that the connection is read-only.
-        let (status, flags) = get_connection_rights(directory).await.unwrap();
-        assert_eq!(status, zx::Status::OK.into_raw());
-        assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE);
     }
 
     #[fuchsia::test]
