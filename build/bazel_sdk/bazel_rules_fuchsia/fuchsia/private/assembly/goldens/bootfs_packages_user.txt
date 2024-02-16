@@ -16,7 +16,7 @@ devfs
 device-name-provider
 display-coordinator
 driver-index
-driver_host2
+driver_host
 driver_manager
 ftdi
 fvm

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bin/driver_host2/driver.h"
+#include "src/devices/bin/driver_host/driver.h"
 
 #include <lib/async/cpp/task.h>
 #include <lib/driver/component/cpp/internal/start_args.h>

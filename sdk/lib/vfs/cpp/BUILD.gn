@@ -93,7 +93,7 @@ sdk_source_set("cpp") {
     "//sdk/lib/vfs/cpp/testing:*",
     "//src/developer/build_info:*",
     "//src/developer/forensics/feedback_data:*",
-    "//src/devices/bin/driver_host2:*",
+    "//src/devices/bin/driver_host:*",
     "//src/devices/bin/driver_manager/v2:*",
     "//src/devices/sysmem/bin/sysmem_connector:*",
     "//src/diagnostics/validator/inspect/lib/cpp:*",

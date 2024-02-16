@@ -8,6 +8,6 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/driver_host2_test",
+        binary: "bin/driver_host_test",
     },
 }

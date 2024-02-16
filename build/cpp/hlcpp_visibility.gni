@@ -156,7 +156,7 @@ hlcpp_visibility = [
   "//src/developer/forensics/utils/*",
   "//src/developer/memory/monitor/*",
   "//src/developer/process_explorer/*",
-  "//src/devices/bin/driver_host2:*",
+  "//src/devices/bin/driver_host:*",
   "//src/devices/bin/driver_manager/v2:*",
   "//src/devices/bus/drivers/platform/test:*",
   "//src/devices/lib/sysmem:*",

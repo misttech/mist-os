@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_HOST2_DRIVER_HOST_H_
-#define SRC_DEVICES_BIN_DRIVER_HOST2_DRIVER_HOST_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_HOST_DRIVER_HOST_H_
+#define SRC_DEVICES_BIN_DRIVER_HOST_DRIVER_HOST_H_
 
 #include <fidl/fuchsia.driver.host/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -17,7 +17,7 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/ref_counted.h>
 
-#include "src/devices/bin/driver_host2/driver.h"
+#include "src/devices/bin/driver_host/driver.h"
 
 namespace dfv2 {
 
@@ -52,4 +52,4 @@ class DriverHost : public fidl::Server<fuchsia_driver_host::DriverHost> {
 
 }  // namespace dfv2
 
-#endif  // SRC_DEVICES_BIN_DRIVER_HOST2_DRIVER_HOST_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_HOST_DRIVER_HOST_H_

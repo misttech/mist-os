@@ -116,6 +116,6 @@ fuchsia_unittest_package("runtime-protocol-test") {
     ":leaf",
     ":root",
     "//sdk/lib/driver_test_realm:driver_test_realm_component",
-    "//src/devices/bin/driver_host2:component",
+    "//src/devices/bin/driver_host:component",
   ]
 }

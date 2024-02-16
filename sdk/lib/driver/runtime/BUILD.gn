@@ -67,7 +67,7 @@ sdk_source_set("driver_runtime_env") {
     "//build/sdk:sdk_versioned_source_sets",
     "//sdk/lib/driver/runtime/*",
     "//src/devices/bin/driver_host/*",
-    "//src/devices/bin/driver_host2/*",
+    "//src/devices/bin/driver_host/*",
     "//src/devices/bin/driver_runtime/*",
     "//src/devices/tee/drivers/optee:optee-controller-test-bin",
     "//src/devices/testing/driver-runtime-main/*",
@@ -111,7 +111,7 @@ sdk_source_set("driver_runtime_testing") {
     "//sdk/lib/driver/testing/*",
     "//sdk/lib/fidl_driver/tests/transport/*",
     "//src/devices/bin/driver_host/*",
-    "//src/devices/bin/driver_host2/*",
+    "//src/devices/bin/driver_host/*",
     "//src/devices/bin/driver_runtime/*",
     "//src/devices/misc/drivers/compat:unittests",
 

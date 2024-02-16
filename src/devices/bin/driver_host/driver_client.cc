@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bin/driver_host2/driver_client.h"
+#include "src/devices/bin/driver_host/driver_client.h"
 
-#include "src/devices/bin/driver_host2/driver.h"
+#include "src/devices/bin/driver_host/driver.h"
 #include "src/devices/lib/log/log.h"
 
 namespace dfv2 {

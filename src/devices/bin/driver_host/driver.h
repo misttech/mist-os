@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_HOST2_DRIVER_H_
-#define SRC_DEVICES_BIN_DRIVER_HOST2_DRIVER_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_HOST_DRIVER_H_
+#define SRC_DEVICES_BIN_DRIVER_HOST_DRIVER_H_
 
 #include <fidl/fuchsia.driver.host/cpp/fidl.h>
 #include <lib/async_patterns/cpp/dispatcher_bound.h>
@@ -16,7 +16,7 @@
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/devices/bin/driver_host2/driver_client.h"
+#include "src/devices/bin/driver_host/driver_client.h"
 
 namespace dfv2 {
 
@@ -100,4 +100,4 @@ void LoadDriver(fuchsia_driver_framework::DriverStartArgs start_args,
 
 }  // namespace dfv2
 
-#endif  // SRC_DEVICES_BIN_DRIVER_HOST2_DRIVER_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_HOST_DRIVER_H_

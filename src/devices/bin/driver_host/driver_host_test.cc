@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bin/driver_host2/driver_host.h"
+#include "src/devices/bin/driver_host/driver_host.h"
 
 #include <fidl/fuchsia.driverhost.test/cpp/wire.h>
 #include <fuchsia/io/cpp/fidl_test_base.h>

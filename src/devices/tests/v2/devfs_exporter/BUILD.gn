@@ -67,6 +67,6 @@ fuchsia_unittest_package("devfs_exporter_test") {
   deps = [
     ":bin",
     ":root",
-    "//src/devices/bin/driver_host2:component",
+    "//src/devices/bin/driver_host:component",
   ]
 }

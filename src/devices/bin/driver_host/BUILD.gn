@@ -8,7 +8,7 @@ import("//build/dist/component_manifest_resources.gni")
 import("//build/drivers.gni")
 import("//build/fidl/fidl.gni")
 
-group("driver_host2") {
+group("driver_host") {
   deps = [ ":component" ]
 }
 
@@ -114,7 +114,7 @@ fuchsia_driver_component("test_not_driver") {
 
 executable("unittests") {
   testonly = true
-  output_name = "driver_host2_test"
+  output_name = "driver_host_test"
 
   sources = [ "driver_host_test.cc" ]
 
@@ -143,7 +143,7 @@ fuchsia_unittest_package("driver-host2-test") {
       max_severity = "ERROR"
     }
   }
-  manifest = "meta/driver_host2_test.cml"
+  manifest = "meta/driver_host_test.cml"
   deps = [
     ":test_driver",
     ":test_not_driver",
@@ -152,7 +152,7 @@ fuchsia_unittest_package("driver-host2-test") {
 }
 
 executable("bin") {
-  output_name = "driver_host2"
+  output_name = "driver_host"
 
   sources = [ "main.cc" ]
 
@@ -172,12 +172,12 @@ executable("bin") {
 }
 
 fuchsia_component("component") {
-  component_name = "driver_host2"
-  manifest = "meta/driver_host2.cml"
+  component_name = "driver_host"
+  manifest = "meta/driver_host.cml"
   deps = [ ":bin" ]
 }
 
 fuchsia_package("package") {
-  package_name = "driver_host2"
+  package_name = "driver_host"
   deps = [ ":component" ]
 }

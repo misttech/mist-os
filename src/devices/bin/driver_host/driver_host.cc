@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bin/driver_host2/driver_host.h"
+#include "src/devices/bin/driver_host/driver_host.h"
 
 #include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
@@ -181,8 +181,8 @@ void DriverHost::ShutdownDriver(Driver* driver, fidl::ServerEnd<fdh::Driver> ser
       // If this is the last driver, shutdown the driver host.
       if (drivers_.is_empty()) {
         // We only exit if we're not shutting down in order to match DFv1 behavior.
-        // TODO(https://fxbug.dev/42075187): We should always exit driver hosts when we get down to 0
-        // drivers.
+        // TODO(https://fxbug.dev/42075187): We should always exit driver hosts when we get down to
+        // 0 drivers.
         zx::result client = component::Connect<fuchsia_device_manager::SystemStateTransition>();
         ZX_ASSERT_MSG(!client.is_error(), "Failed to connect to SystemStateTransition: %s",
                       client.status_string());

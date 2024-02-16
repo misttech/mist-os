@@ -48,7 +48,7 @@ at some point.
 ## Driver host
 
 Every driver lives in a driver host, which runs as a Fuchsia component
-(`driver_host2.cm`). Driver hosts provide isolation between drivers in
+(`driver_host.cm`). Driver hosts provide isolation between drivers in
 a Fuchsia system. Each driver host is a process, meaning it has its own address
 space and manages its own set of threads.
 

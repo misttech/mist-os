@@ -491,7 +491,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
         [coll, kDriverHostName](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
           EXPECT_EQ(coll, collection.name());
           EXPECT_EQ(kDriverHostName, decl.name().value().substr(0, kDriverHostName.size()));
-          EXPECT_EQ("fuchsia-boot:///driver_host2#meta/driver_host2.cm", decl.url());
+          EXPECT_EQ("fuchsia-boot:///driver_host#meta/driver_host.cm", decl.url());
         });
     realm().SetOpenExposedDirHandler(
         [this, coll, kDriverHostName](fdecl::ChildRef child, auto exposed_dir) {

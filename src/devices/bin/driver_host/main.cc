@@ -25,8 +25,8 @@ using namespace fuchsia_driver_framework;
 }  // namespace fdf
 
 int main(int argc, char** argv) {
-  fuchsia_logging::SetTags({"driver_host2", "driver"});
-  driver_logger::GetLogger().AddTag("driver_host2").AddTag("driver");
+  fuchsia_logging::SetTags({"driver_host", "driver"});
+  driver_logger::GetLogger().AddTag("driver_host").AddTag("driver");
   // TODO(https://fxbug.dev/42108351): Lock down job.
   zx_status_t status = StdoutToDebuglog::Init();
   if (status != ZX_OK) {

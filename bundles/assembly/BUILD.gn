@@ -1888,7 +1888,7 @@ assembly_input_bundle("diagnostics_triage_detect_mali") {
 #
 assembly_input_bundle("driver_framework_v2") {
   bootfs_packages = [
-    "//src/devices/bin/driver_host2:package",
+    "//src/devices/bin/driver_host:package",
     "//src/devices/bin/driver_manager:dfv2_package",
   ]
 }

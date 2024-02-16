@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_HOST2_DRIVER_CLIENT_H_
-#define SRC_DEVICES_BIN_DRIVER_HOST2_DRIVER_CLIENT_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_HOST_DRIVER_CLIENT_H_
+#define SRC_DEVICES_BIN_DRIVER_HOST_DRIVER_CLIENT_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/driver/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/natural_types.h>
@@ -44,4 +44,4 @@ class DriverClient : public fdf::WireAsyncEventHandler<fuchsia_driver_framework:
 
 }  // namespace dfv2
 
-#endif  // SRC_DEVICES_BIN_DRIVER_HOST2_DRIVER_CLIENT_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_HOST_DRIVER_CLIENT_H_

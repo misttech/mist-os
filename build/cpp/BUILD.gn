@@ -83,7 +83,7 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-    "//src/devices/bin/driver_host2:unittests",
+    "//src/devices/bin/driver_host:unittests",
 
     #------------------
     #------------------
