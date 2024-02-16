@@ -293,6 +293,15 @@ pub(crate) trait MulticastMembershipHandler<I: Ip, BC>: DeviceIdContext<AnyDevic
         device: &Self::DeviceId,
         addr: MulticastAddr<I::Addr>,
     );
+
+    /// Selects a default device with which to join the given multicast group.
+    ///
+    /// The selection is made by consulting the routing table; If there is no
+    /// route available to the given address, an error is returned.
+    fn select_device_for_multicast_group(
+        &mut self,
+        addr: MulticastAddr<I::Addr>,
+    ) -> Result<Self::DeviceId, ResolveRouteError>;
 }
 
 // TODO(joshlf): With all 256 protocol numbers (minus reserved ones) given their
@@ -3344,6 +3353,13 @@ pub(crate) mod testutil {
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
             self.get_mut().leave_multicast_group(bindings_ctx, device, addr)
+        }
+
+        fn select_device_for_multicast_group(
+            &mut self,
+            addr: MulticastAddr<<I as Ip>::Addr>,
+        ) -> Result<Self::DeviceId, ResolveRouteError> {
+            self.get_mut().select_device_for_multicast_group(addr)
         }
     }
 }

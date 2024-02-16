@@ -13,7 +13,7 @@ use core::{
 use derivative::Derivative;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, Ipv4Addr, Ipv6Addr, Ipv6SourceAddr},
-    NonMappedAddr, ScopeableAddress, SpecifiedAddr, UnicastAddr, Witness, ZonedAddr,
+    MulticastAddr, NonMappedAddr, ScopeableAddress, SpecifiedAddr, UnicastAddr, Witness, ZonedAddr,
 };
 
 use crate::{
@@ -142,6 +142,13 @@ impl<A: IpAddress> SocketIpAddr<A> {
     pub fn addr(self) -> A {
         let SocketIpAddr(addr) = self;
         **addr
+    }
+
+    /// Constructs a [`SocketIpAddr`] from the given multicast address.
+    pub(crate) fn new_from_multicast(addr: MulticastAddr<A>) -> SocketIpAddr<A> {
+        let addr: MulticastAddr<NonMappedAddr<_>> = addr.non_mapped().transpose();
+        let addr: NonMappedAddr<SpecifiedAddr<_>> = addr.into_specified().transpose();
+        SocketIpAddr(addr)
     }
 }
 

@@ -4649,6 +4649,7 @@ mod tests {
     fn try_join_leave_multicast<I: Ip + TestIpExt>(
         mcast_addr: MulticastAddr<I::Addr>,
         interface: MulticastMembershipInterfaceSelector<I::Addr, MultipleDevicesId>,
+        set_up_ctx: impl FnOnce(&mut UdpMultipleDevicesCtx),
         set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, SocketId<I>),
     ) -> (
         Result<(), SetMulticastMembershipError>,
@@ -4657,6 +4658,7 @@ mod tests {
         let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
             UdpMultipleDevicesCoreCtx::new_multiple_devices::<I>(),
         );
+        set_up_ctx(&mut ctx);
 
         let socket = UdpApi::<I, _>::new(ctx.as_mut()).create();
         set_up_socket(&mut ctx, socket);
@@ -4697,30 +4699,51 @@ mod tests {
 
     fn iface_id<A: IpAddress>(
         id: MultipleDevicesId,
-    ) -> MulticastInterfaceSelector<A, MultipleDevicesId> {
-        MulticastInterfaceSelector::Interface(id)
+    ) -> MulticastMembershipInterfaceSelector<A, MultipleDevicesId> {
+        MulticastInterfaceSelector::Interface(id).into()
     }
     fn iface_addr<A: IpAddress>(
         addr: SpecifiedAddr<A>,
-    ) -> MulticastInterfaceSelector<A, MultipleDevicesId> {
-        MulticastInterfaceSelector::LocalAddress(addr)
+    ) -> MulticastMembershipInterfaceSelector<A, MultipleDevicesId> {
+        MulticastInterfaceSelector::LocalAddress(addr).into()
     }
 
     #[ip_test]
     #[test_case(iface_id(MultipleDevicesId::A), leave_unbound::<I>; "device_no_addr_unbound")]
     #[test_case(iface_addr(local_ip::<I>()), leave_unbound::<I>; "addr_no_device_unbound")]
+    #[test_case(MulticastMembershipInterfaceSelector::AnyInterfaceWithRoute, leave_unbound::<I>;
+        "any_interface_unbound")]
     #[test_case(iface_id(MultipleDevicesId::A), bind_as_listener::<I>; "device_no_addr_listener")]
     #[test_case(iface_addr(local_ip::<I>()), bind_as_listener::<I>; "addr_no_device_listener")]
+    #[test_case(MulticastMembershipInterfaceSelector::AnyInterfaceWithRoute, bind_as_listener::<I>;
+        "any_interface_listener")]
     #[test_case(iface_id(MultipleDevicesId::A), bind_as_connected::<I>; "device_no_addr_connected")]
     #[test_case(iface_addr(local_ip::<I>()), bind_as_connected::<I>; "addr_no_device_connected")]
+    #[test_case(MulticastMembershipInterfaceSelector::AnyInterfaceWithRoute, bind_as_connected::<I>;
+        "any_interface_connected")]
     fn test_join_leave_multicast_succeeds<I: Ip + TestIpExt>(
-        interface: MulticastInterfaceSelector<I::Addr, MultipleDevicesId>,
+        interface: MulticastMembershipInterfaceSelector<I::Addr, MultipleDevicesId>,
         set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, SocketId<I>),
     ) {
         let mcast_addr = I::get_multicast_addr(3);
 
+        let set_up_ctx = |ctx: &mut UdpMultipleDevicesCtx| {
+            // Ensure there is a route to the multicast address, if the interface
+            // selector requires it.
+            match interface {
+                MulticastMembershipInterfaceSelector::Specified(_) => {}
+                MulticastMembershipInterfaceSelector::AnyInterfaceWithRoute => {
+                    let (core_ctx, _bindings_ctx) = ctx.contexts();
+                    let Wrapped { inner: Wrapped { inner, outer: _ }, outer: _ } = core_ctx;
+                    inner
+                        .get_mut()
+                        .add_route(MultipleDevicesId::A, mcast_addr.into_specified().into());
+                }
+            }
+        };
+
         let (result, ip_options) =
-            try_join_leave_multicast(mcast_addr, interface.into(), set_up_socket);
+            try_join_leave_multicast(mcast_addr, interface, set_up_ctx, set_up_socket);
         assert_eq!(result, Ok(()));
         assert_eq!(
             ip_options,
@@ -4729,6 +4752,25 @@ mod tests {
                 const_unwrap_option(NonZeroUsize::new(1))
             )])
         );
+    }
+
+    #[ip_test]
+    #[test_case(leave_unbound::<I>; "unbound")]
+    #[test_case(bind_as_listener::<I>; "listener")]
+    #[test_case(bind_as_connected::<I>; "connected")]
+    fn test_join_multicast_fails_without_route<I: Ip + TestIpExt>(
+        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, SocketId<I>),
+    ) {
+        let mcast_addr = I::get_multicast_addr(3);
+
+        let (result, ip_options) = try_join_leave_multicast(
+            mcast_addr,
+            MulticastMembershipInterfaceSelector::AnyInterfaceWithRoute,
+            |_: &mut UdpMultipleDevicesCtx| { /* Don't install a route to `mcast_addr` */ },
+            set_up_socket,
+        );
+        assert_eq!(result, Err(SetMulticastMembershipError::NoDeviceAvailable));
+        assert_eq!(ip_options, HashMap::new());
     }
 
     #[ip_test]
@@ -4753,6 +4795,7 @@ mod tests {
                 .map(MulticastInterfaceSelector::LocalAddress)
                 .map(Into::into)
                 .unwrap_or(MulticastMembershipInterfaceSelector::AnyInterfaceWithRoute),
+            |_: &mut UdpMultipleDevicesCtx| { /* No ctx setup required */ },
             |ctx, unbound| {
                 UdpApi::<I, _>::new(ctx.as_mut())
                     .set_device(&unbound, Some(&bound_device))

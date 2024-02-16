@@ -15,8 +15,11 @@ use crate::{
         device::{self, IpDeviceBindingsContext, IpDeviceIpExt},
         path_mtu::{PmtuCache, PmtuStateContext},
         reassembly::{FragmentStateContext, IpPacketFragmentCache},
-        MulticastMembershipHandler,
+        IpLayerBindingsContext, IpLayerContext, IpLayerIpExt, MulticastMembershipHandler,
+        ResolveRouteError,
     },
+    routes::ResolvedRoute,
+    socket::address::SocketIpAddr,
     BindingsContext, CoreCtx,
 };
 
@@ -54,12 +57,14 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<I
 }
 
 impl<
-        I: Ip + IpDeviceIpExt,
-        BC: BindingsContext + IpDeviceBindingsContext<I, Self::DeviceId>,
+        I: Ip + IpDeviceIpExt + IpLayerIpExt,
+        BC: BindingsContext
+            + IpDeviceBindingsContext<I, Self::DeviceId>
+            + IpLayerBindingsContext<I, Self::DeviceId>,
         L: LockBefore<crate::lock_ordering::IpState<I>>,
     > MulticastMembershipHandler<I, BC> for CoreCtx<'_, BC, L>
 where
-    Self: device::IpDeviceConfigurationContext<I, BC>,
+    Self: device::IpDeviceConfigurationContext<I, BC> + IpLayerContext<I, BC>,
 {
     fn join_multicast_group(
         &mut self,
@@ -77,5 +82,18 @@ where
         addr: MulticastAddr<I::Addr>,
     ) {
         crate::ip::device::leave_ip_multicast::<I, _, _>(self, bindings_ctx, device, addr)
+    }
+
+    fn select_device_for_multicast_group(
+        &mut self,
+        addr: MulticastAddr<I::Addr>,
+    ) -> Result<Self::DeviceId, ResolveRouteError> {
+        let remote_ip = SocketIpAddr::new_from_multicast(addr);
+        let ResolvedRoute { src_addr: _, device, local_delivery_device, next_hop: _ } =
+            crate::ip::resolve_route_to_destination(self, None, None, Some(remote_ip))?;
+        // NB: Because the original address is multicast, it cannot be assigned
+        // to a local interface. Thus local delivery should never be requested.
+        debug_assert!(local_delivery_device.is_none(), "{:?}", local_delivery_device);
+        Ok(device)
     }
 }

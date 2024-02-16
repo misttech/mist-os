@@ -798,6 +798,17 @@ impl_try_from_witness!(
     [NonMappedAddr: MappedAddress]
 );
 
+impl<A: MulticastAddress + MappedAddress> MulticastAddr<A> {
+    /// Wraps `self` in the [`NonMappedAddr`] witness type.
+    pub fn non_mapped(self) -> NonMappedAddr<MulticastAddr<A>> {
+        // Safety: IPv4 addresses cannot be mapped. For IPv6 addresses, the
+        // multicast subnet (FF00::/8) and the ipv4-mapped-ipv6 address space
+        // (::FFFF:0000:0000/96) are disjoint: presence in the multicast subnet
+        // implies absence from the ipv4-mapped-ipv6 address space.
+        unsafe { NonMappedAddr::new_unchecked(self) }
+    }
+}
+
 // BroadcastAddr
 impl_witness!(BroadcastAddr, "broadcast", BroadcastAddress, is_broadcast);
 impl_into_specified!(BroadcastAddr, BroadcastAddress, is_broadcast);

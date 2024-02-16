@@ -37,7 +37,8 @@ use crate::{
             IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSockSendError,
             IpSocketHandler, SendOneShotIpPacketError, SendOptions,
         },
-        EitherDeviceId, HopLimits, MulticastMembershipHandler, TransportIpContext,
+        EitherDeviceId, HopLimits, MulticastMembershipHandler, ResolveRouteError,
+        TransportIpContext,
     },
     socket::{
         self,
@@ -4316,14 +4317,14 @@ fn pick_interface_for_addr<
     CC: DatagramBoundStateContext<A::Version, BC, S>,
 >(
     core_ctx: &mut CC,
-    _remote_addr: MulticastAddr<A>,
+    remote_addr: MulticastAddr<A>,
     source_addr: Option<SpecifiedAddr<A>>,
 ) -> Result<CC::DeviceId, SetMulticastMembershipError>
 where
     A::Version: IpExt,
 {
-    core_ctx.with_transport_context(|core_ctx| {
-        if let Some(source_addr) = source_addr {
+    core_ctx.with_transport_context(|core_ctx| match source_addr {
+        Some(source_addr) => {
             let mut devices = TransportIpContext::<A::Version, _>::get_devices_with_assigned_addr(
                 core_ctx,
                 source_addr,
@@ -4333,11 +4334,20 @@ where
                     return Ok(d);
                 }
             }
+            Err(SetMulticastMembershipError::NoDeviceAvailable)
         }
-        tracing::warn!("Unimplemented: Interface selection without a source addr");
-        // TODO(https://fxbug.dev/42115343): Select a device by looking up a
-        // route to the remote_addr.
-        Err(SetMulticastMembershipError::NoDeviceAvailable)
+        None => {
+            let device = MulticastMembershipHandler::select_device_for_multicast_group(
+                core_ctx,
+                remote_addr,
+            )
+            .map_err(|e| match e {
+                ResolveRouteError::NoSrcAddr | ResolveRouteError::Unreachable => {
+                    SetMulticastMembershipError::NoDeviceAvailable
+                }
+            })?;
+            Ok(device)
+        }
     })
 }
 

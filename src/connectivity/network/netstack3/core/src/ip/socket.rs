@@ -1290,6 +1290,17 @@ pub(crate) mod testutil {
                 device_state.get_mut(device).unwrap_or_else(|| panic!("no device {device:?}"));
             state.multicast_groups.write().leave_multicast_group(addr)
         }
+
+        fn select_device_for_multicast_group(
+            &mut self,
+            addr: MulticastAddr<<I as Ip>::Addr>,
+        ) -> Result<Self::DeviceId, ResolveRouteError> {
+            let FakeIpSocketCtx { device_state, table, ip_forwarding_ctx, counters: _ } = self;
+            let remote_ip = SocketIpAddr::new_from_multicast(addr);
+            let ResolvedRoute { device, .. } =
+                lookup_route(table, ip_forwarding_ctx, device_state, None, None, remote_ip)?;
+            Ok(device)
+        }
     }
 
     impl<
@@ -1368,6 +1379,21 @@ pub(crate) mod testutil {
                     (device, device_state, remote_ips)
                 },
             ))
+        }
+
+        pub(crate) fn add_route(&mut self, device: D, ip: SpecifiedAddr<IpAddr>) {
+            match IpAddr::from(ip) {
+                IpAddr::V4(ip) => crate::ip::forwarding::testutil::add_on_link_forwarding_entry(
+                    self.table.as_mut(),
+                    ip,
+                    device,
+                ),
+                IpAddr::V6(ip) => crate::ip::forwarding::testutil::add_on_link_forwarding_entry(
+                    self.table.as_mut(),
+                    ip,
+                    device,
+                ),
+            }
         }
 
         pub(crate) fn get_device_state(&self, device: &D) -> &DualStackIpDeviceState<FakeInstant> {
@@ -1691,6 +1717,23 @@ pub(crate) mod testutil {
             let state: &IpDeviceState<_, I> = state.as_ref();
             let mut groups = state.multicast_groups.write();
             groups.leave_multicast_group(addr)
+        }
+
+        fn select_device_for_multicast_group(
+            &mut self,
+            addr: MulticastAddr<<I as Ip>::Addr>,
+        ) -> Result<Self::DeviceId, ResolveRouteError> {
+            let Self { device_state, table, ip_forwarding_ctx, .. } = self;
+            let remote_ip = SocketIpAddr::new_from_multicast(addr);
+            let ResolvedRoute { device, .. }: ResolvedRoute<I, _> = lookup_route(
+                table.as_ref(),
+                ip_forwarding_ctx,
+                device_state,
+                None,
+                None,
+                remote_ip,
+            )?;
+            Ok(device)
         }
     }
 
