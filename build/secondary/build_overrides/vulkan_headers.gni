@@ -3,4 +3,6 @@
 # found in the LICENSE file.
 #
 
-vulkan_use_wayland = is_linux
+# To support wayland on Vulkan on Linux correctly, vulkan_wayland_include_dirs
+# must also be set.
+vulkan_use_wayland = false
