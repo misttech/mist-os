@@ -11,6 +11,7 @@ rustc_library("playground") {
   with_unit_tests = true
   sources = [
     "src/error.rs",
+    "src/frame.rs",
     "src/lib.rs",
     "src/parser.rs",
     "src/value.rs",
