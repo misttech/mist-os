@@ -563,9 +563,9 @@ impl DatagramSocketSpec for Udp {
     }
 
     fn make_bound_socket_map_id<I: IpExt, D: WeakId>(
-        s: Self::SocketId<I>,
+        s: &Self::SocketId<I>,
     ) -> I::DualStackBoundSocketId<Udp> {
-        I::into_dual_stack_bound_socket_id(s)
+        I::into_dual_stack_bound_socket_id(s.clone())
     }
 
     fn make_packet<I: IpExt, B: BufferMut>(
@@ -1599,7 +1599,7 @@ where
         remote_port: UdpRemotePort,
     ) -> Result<(), ConnectError> {
         let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::connect(core_ctx, bindings_ctx, *id, remote_ip, remote_port, ())
+        datagram::connect(core_ctx, bindings_ctx, id, remote_ip, remote_port, ())
     }
 
     /// Sets the bound device for a socket.
@@ -1617,7 +1617,7 @@ where
         device_id: Option<&<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
     ) -> Result<(), SocketError> {
         let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::set_device(core_ctx, bindings_ctx, *id, device_id)
+        datagram::set_device(core_ctx, bindings_ctx, id, device_id)
     }
 
     /// Gets the device the specified socket is bound to.
@@ -1630,7 +1630,7 @@ where
         id: &SocketId<I>,
     ) -> Option<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
         let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::get_bound_device(core_ctx, bindings_ctx, *id)
+        datagram::get_bound_device(core_ctx, bindings_ctx, id)
     }
 
     /// Enable or disable dual stack operations on the given socket.
@@ -1654,7 +1654,7 @@ where
         datagram::with_other_stack_ip_options_mut_if_unbound(
             core_ctx,
             bindings_ctx,
-            *id,
+            id,
             |other_stack| {
                 I::map_ip(
                     (enabled, WrapOtherStackIpOptionsMut(other_stack)),
@@ -1695,7 +1695,7 @@ where
         id: &SocketId<I>,
     ) -> Result<bool, NotDualStackCapableError> {
         let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::with_other_stack_ip_options(core_ctx, bindings_ctx, *id, |other_stack| {
+        datagram::with_other_stack_ip_options(core_ctx, bindings_ctx, id, |other_stack| {
             I::map_ip(
                 WrapOtherStackIpOptions(other_stack),
                 |_v4| Err(NotDualStackCapableError),
@@ -1723,7 +1723,7 @@ where
     ) -> Result<(), ExpectedUnboundError> {
         datagram::update_sharing(
             self.core_ctx(),
-            *id,
+            id,
             if reuse_port { Sharing::ReusePort } else { Sharing::Exclusive },
         )
     }
@@ -1734,7 +1734,7 @@ where
     ///
     /// Panics if `id` is not a valid `SocketId`.
     pub fn get_posix_reuse_port(&mut self, id: &SocketId<I>) -> bool {
-        datagram::get_sharing(self.core_ctx(), *id).is_reuse_port()
+        datagram::get_sharing(self.core_ctx(), id).is_reuse_port()
     }
 
     /// Sets the specified socket's membership status for the given group.
@@ -1758,7 +1758,7 @@ where
         datagram::set_multicast_membership(
             core_ctx,
             bindings_ctx,
-            *id,
+            id,
             multicast_group,
             interface,
             want_membership,
@@ -1785,11 +1785,11 @@ where
             return Ok(crate::socket::datagram::update_ip_hop_limit(
                 core_ctx,
                 bindings_ctx,
-                *id,
+                id,
                 SocketHopLimits::set_unicast(unicast_hop_limit),
             ));
         }
-        datagram::with_other_stack_ip_options_mut(core_ctx, bindings_ctx, *id, |other_stack| {
+        datagram::with_other_stack_ip_options_mut(core_ctx, bindings_ctx, id, |other_stack| {
             I::map_ip(
                 (IpInvariant(unicast_hop_limit), WrapOtherStackIpOptionsMut(other_stack)),
                 |(IpInvariant(_unicast_hop_limit), _v4)| Err(NotDualStackCapableError),
@@ -1824,11 +1824,11 @@ where
             return Ok(crate::socket::datagram::update_ip_hop_limit(
                 core_ctx,
                 bindings_ctx,
-                *id,
+                id,
                 SocketHopLimits::set_multicast(multicast_hop_limit),
             ));
         }
-        datagram::with_other_stack_ip_options_mut(core_ctx, bindings_ctx, *id, |other_stack| {
+        datagram::with_other_stack_ip_options_mut(core_ctx, bindings_ctx, id, |other_stack| {
             I::map_ip(
                 (IpInvariant(multicast_hop_limit), WrapOtherStackIpOptionsMut(other_stack)),
                 |(IpInvariant(_multicast_hop_limit), _v4)| Err(NotDualStackCapableError),
@@ -1860,13 +1860,13 @@ where
         let (core_ctx, bindings_ctx) = self.contexts();
         if ip_version == I::VERSION {
             return Ok(
-                crate::socket::datagram::get_ip_hop_limits(core_ctx, bindings_ctx, *id).unicast
+                crate::socket::datagram::get_ip_hop_limits(core_ctx, bindings_ctx, id).unicast
             );
         }
         datagram::with_other_stack_ip_options_and_default_hop_limits(
             core_ctx,
             bindings_ctx,
-            *id,
+            id,
             |other_stack, default_hop_limits| {
                 I::map_ip::<_, Result<IpInvariant<NonZeroU8>, _>>(
                     (WrapOtherStackIpOptions(other_stack), IpInvariant(default_hop_limits)),
@@ -1903,13 +1903,13 @@ where
         let (core_ctx, bindings_ctx) = self.contexts();
         if ip_version == I::VERSION {
             return Ok(
-                crate::socket::datagram::get_ip_hop_limits(core_ctx, bindings_ctx, *id).multicast
+                crate::socket::datagram::get_ip_hop_limits(core_ctx, bindings_ctx, id).multicast
             );
         }
         datagram::with_other_stack_ip_options_and_default_hop_limits(
             core_ctx,
             bindings_ctx,
-            *id,
+            id,
             |other_stack, default_hop_limits| {
                 I::map_ip::<_, Result<IpInvariant<NonZeroU8>, _>>(
                     (WrapOtherStackIpOptions(other_stack), IpInvariant(default_hop_limits)),
@@ -1932,12 +1932,12 @@ where
 
     /// Gets the transparent option.
     pub fn get_transparent(&mut self, id: &SocketId<I>) -> bool {
-        crate::socket::datagram::get_ip_transparent(self.core_ctx(), *id)
+        crate::socket::datagram::get_ip_transparent(self.core_ctx(), id)
     }
 
     /// Sets the transparent option.
     pub fn set_transparent(&mut self, id: &SocketId<I>, value: bool) {
-        crate::socket::datagram::set_ip_transparent(self.core_ctx(), *id, value)
+        crate::socket::datagram::set_ip_transparent(self.core_ctx(), id, value)
     }
 
     /// Disconnects a connected UDP socket.
@@ -1954,7 +1954,7 @@ where
     /// Panics if `id` is not a valid `SocketId`.
     pub fn disconnect(&mut self, id: &SocketId<I>) -> Result<(), ExpectedConnError> {
         let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::disconnect_connected(core_ctx, bindings_ctx, *id)
+        datagram::disconnect_connected(core_ctx, bindings_ctx, id)
     }
 
     /// Shuts down a socket for reading and/or writing.
@@ -1972,7 +1972,7 @@ where
         which: ShutdownType,
     ) -> Result<(), ExpectedConnError> {
         let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::shutdown_connected(core_ctx, bindings_ctx, *id, which)
+        datagram::shutdown_connected(core_ctx, bindings_ctx, id, which)
     }
 
     /// Get the shutdown state for a socket.
@@ -1985,7 +1985,7 @@ where
     /// Panics if `id` is not a valid `SocketId`.
     pub fn get_shutdown(&mut self, id: &SocketId<I>) -> Option<ShutdownType> {
         let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::get_shutdown_connected(core_ctx, bindings_ctx, *id)
+        datagram::get_shutdown_connected(core_ctx, bindings_ctx, id)
     }
 
     /// Removes a socket that was previously created.
@@ -2012,7 +2012,7 @@ where
         id: &SocketId<I>,
     ) -> SocketInfo<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
         let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::get_info(core_ctx, bindings_ctx, *id).into()
+        datagram::get_info(core_ctx, bindings_ctx, id).into()
     }
 
     /// Use an existing socket to listen for incoming UDP packets.
@@ -2047,7 +2047,7 @@ where
         port: Option<NonZeroU16>,
     ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
         let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::listen(core_ctx, bindings_ctx, *id, addr, port)
+        datagram::listen(core_ctx, bindings_ctx, id, addr, port)
     }
 
     /// Sends a UDP packet on an existing socket.
@@ -2068,7 +2068,7 @@ where
     ) -> Result<(), Either<SendError, ExpectedConnError>> {
         let (core_ctx, bindings_ctx) = self.contexts();
         core_ctx.increment(|counters| &counters.tx);
-        datagram::send_conn(core_ctx, bindings_ctx, *id, body).map_err(|err| {
+        datagram::send_conn(core_ctx, bindings_ctx, id, body).map_err(|err| {
             core_ctx.increment(|counters| &counters.tx_error);
             match err {
                 DatagramSendError::NotConnected => Either::Right(ExpectedConnError),
@@ -2115,7 +2115,7 @@ where
 
         let (core_ctx, bindings_ctx) = self.contexts();
         core_ctx.increment(|counters| &counters.tx);
-        datagram::send_to(core_ctx, bindings_ctx, *id, remote_ip, remote_port, body).map_err(|e| {
+        datagram::send_to(core_ctx, bindings_ctx, id, remote_ip, remote_port, body).map_err(|e| {
             core_ctx.increment(|counters| &counters.tx_error);
             match e {
                 Either::Left(e) => Either::Left(e),
@@ -2285,8 +2285,8 @@ impl<
         *addr.to_ipv6_mapped()
     }
 
-    fn to_other_bound_socket_id(&self, id: SocketId<Ipv6>) -> EitherIpSocket<Udp> {
-        EitherIpSocket::V6(id)
+    fn to_other_bound_socket_id(&self, id: &SocketId<Ipv6>) -> EitherIpSocket<Udp> {
+        EitherIpSocket::V6(id.clone())
     }
 
     type LocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<Ipv6, CC::WeakDeviceId>>>;

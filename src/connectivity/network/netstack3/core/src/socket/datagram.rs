@@ -775,7 +775,7 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSoc
     /// be inserted into the demultiplexing map for IP version `I::OtherVersion`.
     fn to_other_bound_socket_id(
         &self,
-        id: S::SocketId<I>,
+        id: &S::SocketId<I>,
     ) -> <S::SocketMapSpec<I::OtherVersion, Self::WeakDeviceId> as DatagramSocketMapSpec<
         I::OtherVersion,
         Self::WeakDeviceId,
@@ -1177,7 +1177,7 @@ pub trait DatagramSocketSpec {
     /// protocols with dual-stack sockets, like UDP, implementations should
     /// perform a transformation. Otherwise it should be the identity function.
     fn make_bound_socket_map_id<I: IpExt, D: device::WeakId>(
-        s: Self::SocketId<I>,
+        s: &Self::SocketId<I>,
     ) -> <Self::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, Self::AddrSpec>>::BoundSocketId;
 
     /// The type of serializer returned by [`DatagramSocketSpec::make_packet`]
@@ -1247,7 +1247,7 @@ pub(crate) fn close<
             }
             SocketState::Bound(state) => match core_ctx.dual_stack_context() {
                 MaybeDualStack::DualStack(dual_stack) => {
-                    let op = DualStackRemoveOperation::new_from_state(dual_stack, id, &state);
+                    let op = DualStackRemoveOperation::new_from_state(dual_stack, &id, &state);
                     dual_stack
                         .with_both_bound_sockets_mut(
                             |_core_ctx, sockets, other_sockets, _alloc, _other_alloc| {
@@ -1257,7 +1257,8 @@ pub(crate) fn close<
                         .into_options_and_info()
                 }
                 MaybeDualStack::NotDualStack(not_dual_stack) => {
-                    let op = SingleStackRemoveOperation::new_from_state(not_dual_stack, id, &state);
+                    let op =
+                        SingleStackRemoveOperation::new_from_state(not_dual_stack, &id, &state);
                     core_ctx
                         .with_bound_sockets_mut(|_core_ctx, sockets, _allocator| op.apply(sockets))
                         .into_options_and_info()
@@ -1373,7 +1374,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> RemoveOperation<I, I, D, S> {
     /// Constructs the remove operation from existing socket state.
     fn new_from_state<BC, CC: NonDualStackDatagramBoundStateContext<I, BC, S, WeakDeviceId = D>>(
         core_ctx: &mut CC,
-        socket_id: S::SocketId<I>,
+        socket_id: &S::SocketId<I>,
         state: &BoundSocketState<I, D, S>,
     ) -> Self {
         let BoundSocketState { socket_type: state, original_bound_addr: _ } = state;
@@ -1540,7 +1541,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
     /// Constructs the removal operation from existing socket state.
     fn new_from_state<BC, CC: DualStackDatagramBoundStateContext<I, BC, S, WeakDeviceId = D>>(
         core_ctx: &mut CC,
-        socket_id: S::SocketId<I>,
+        socket_id: &S::SocketId<I>,
         state: &BoundSocketState<I, D, S>,
     ) -> Self {
         let BoundSocketState { socket_type: state, original_bound_addr: _ } = state;
@@ -1558,7 +1559,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                             ip_options: ip_options.clone(),
                             sharing: sharing.clone(),
                             socket_ids: PairedBoundSocketIds {
-                                this: S::make_bound_socket_map_id(socket_id.clone()),
+                                this: S::make_bound_socket_map_id(socket_id),
                                 other: core_ctx.to_other_bound_socket_id(socket_id),
                             },
                         }
@@ -1785,7 +1786,7 @@ pub(crate) fn get_info<
 >(
     core_ctx: &mut CC,
     _bindings_ctx: &mut BC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
 ) -> SocketInfo<I, CC::WeakDeviceId, S> {
     core_ctx.with_sockets_state(|_core_ctx, state| {
         match state.get(id.get_key_index()).expect("invalid socket ID") {
@@ -1813,7 +1814,7 @@ pub(crate) fn listen<
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
     addr: Option<ZonedAddr<SpecifiedAddr<I::Addr>, CC::DeviceId>>,
     local_id: Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
 ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
@@ -2121,7 +2122,7 @@ fn listen_inner<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     state: &mut SocketsState<I, CC::WeakDeviceId, S>,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
     addr: Option<ZonedAddr<SpecifiedAddr<I::Addr>, CC::DeviceId>>,
     local_id: Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
 ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
@@ -2309,7 +2310,7 @@ fn listen_inner<
         }
         BoundOperation::DualStackAnyAddr(core_ctx) => {
             let ids = PairedBoundSocketIds {
-                this: S::make_bound_socket_map_id(id.clone()),
+                this: S::make_bound_socket_map_id(id),
                 other: core_ctx.to_other_bound_socket_id(id),
             };
             core_ctx
@@ -2543,7 +2544,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackConnectOperation<I, 
         CC: NonDualStackDatagramBoundStateContext<I, BC, S, WeakDeviceId = D, DeviceId = D::Strong>,
     >(
         core_ctx: &mut CC,
-        socket_id: S::SocketId<I>,
+        socket_id: &S::SocketId<I>,
         state: &SocketState<I, D, S>,
         remote_ip: ZonedAddr<SocketIpAddr<I::Addr>, D::Strong>,
         remote_port: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
@@ -2571,7 +2572,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackConnectOperation<I, 
             }
             SocketState::Bound(state) => {
                 let remove_op =
-                    SingleStackRemoveOperation::new_from_state(core_ctx, socket_id.clone(), state);
+                    SingleStackRemoveOperation::new_from_state(core_ctx, socket_id, state);
                 let BoundSocketState { socket_type, original_bound_addr: _ } = state;
                 match socket_type {
                     BoundSocketStateType::Listener {
@@ -2690,7 +2691,7 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
         CC: DualStackDatagramBoundStateContext<I, BC, S, WeakDeviceId = D, DeviceId = D::Strong>,
     >(
         core_ctx: &mut CC,
-        socket_id: S::SocketId<I>,
+        socket_id: &S::SocketId<I>,
         state: &SocketState<I, D, S>,
         remote_ip: DualStackRemoteIp<I, D::Strong>,
         remote_port: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
@@ -2739,7 +2740,7 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
             }
             SocketState::Bound(state) => {
                 let remove_op =
-                    DualStackRemoveOperation::new_from_state(core_ctx, socket_id.clone(), state);
+                    DualStackRemoveOperation::new_from_state(core_ctx, socket_id, state);
 
                 let BoundSocketState { socket_type, original_bound_addr: _ } = state;
                 match socket_type {
@@ -3076,7 +3077,7 @@ pub(crate) fn connect<
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
     remote_ip: Option<ZonedAddr<SpecifiedAddr<I::Addr>, CC::DeviceId>>,
     remote_id: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     extra: S::ConnStateExtra,
@@ -3167,7 +3168,7 @@ pub(crate) fn disconnect_connected<
 >(
     core_ctx: &mut CC,
     _bindings_ctx: &mut BC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
 ) -> Result<(), ExpectedConnError> {
     core_ctx.with_sockets_state_mut(|core_ctx, state| {
         let mut entry = match state.entry(id.get_key_index()) {
@@ -3229,7 +3230,7 @@ fn disconnect_to_unbound<
     S: DatagramSocketSpec,
 >(
     core_ctx: &mut CC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
     clear_device_on_disconnect: bool,
     socket_state: &BoundSocketState<I, CC::WeakDeviceId, S>,
 ) -> UnboundSocketState<I, CC::WeakDeviceId, S> {
@@ -3267,7 +3268,7 @@ fn disconnect_to_listener<
     S: DatagramSocketSpec,
 >(
     core_ctx: &mut CC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
     listener_ip: S::ListenerIpAddr<I>,
     clear_device_on_disconnect: bool,
     socket_state: &BoundSocketState<I, CC::WeakDeviceId, S>,
@@ -3275,8 +3276,7 @@ fn disconnect_to_listener<
     let (ip_options, sharing, device) = match core_ctx.dual_stack_context() {
         MaybeDualStack::NotDualStack(nds) => {
             let ListenerIpAddr { addr, identifier } = nds.converter().convert(listener_ip.clone());
-            let remove_op =
-                SingleStackRemoveOperation::new_from_state(nds, id.clone(), socket_state);
+            let remove_op = SingleStackRemoveOperation::new_from_state(nds, id, socket_state);
             core_ctx.with_bound_sockets_mut(|_core_ctx, bound, _allocator| {
                 let (ip_options, sharing, mut device) =
                     remove_op.apply(bound).into_options_sharing_and_device();
@@ -3296,8 +3296,8 @@ fn disconnect_to_listener<
             })
         }
         MaybeDualStack::DualStack(ds) => {
-            let remove_op = DualStackRemoveOperation::new_from_state(ds, id.clone(), socket_state);
-            let other_id = ds.to_other_bound_socket_id(id.clone());
+            let remove_op = DualStackRemoveOperation::new_from_state(ds, id, socket_state);
+            let other_id = ds.to_other_bound_socket_id(id);
             let id = S::make_bound_socket_map_id(id);
             let converter = ds.converter();
             ds.with_both_bound_sockets_mut(
@@ -3366,7 +3366,7 @@ pub(crate) fn shutdown_connected<
 >(
     core_ctx: &mut CC,
     _bindings_ctx: &BC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
     which: ShutdownType,
 ) -> Result<(), ExpectedConnError> {
     core_ctx.with_sockets_state_mut(|core_ctx, state| {
@@ -3400,7 +3400,7 @@ pub(crate) fn get_shutdown_connected<
 >(
     core_ctx: &mut CC,
     _bindings_ctx: &BC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
 ) -> Option<ShutdownType> {
     core_ctx.with_sockets_state(|core_ctx, state| {
         let state = match state.get(id.get_key_index()).expect("invalid socket ID") {
@@ -3443,7 +3443,7 @@ pub(crate) fn send_conn<
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
     body: B,
 ) -> Result<(), SendError<S::SerializeError>> {
     core_ctx.with_sockets_state(|core_ctx, state| {
@@ -3576,13 +3576,13 @@ pub(crate) fn send_to<
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
     remote_ip: Option<ZonedAddr<SpecifiedAddr<I::Addr>, CC::DeviceId>>,
     remote_identifier: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     body: B,
 ) -> Result<(), Either<LocalAddressError, SendToError<S::SerializeError>>> {
     core_ctx.with_sockets_state_mut(|core_ctx, state| {
-        match listen_inner(core_ctx, bindings_ctx, state, id.clone(), None, None) {
+        match listen_inner(core_ctx, bindings_ctx, state, id, None, None) {
             Ok(()) | Err(Either::Left(ExpectedUnboundError)) => (),
             Err(Either::Right(e)) => return Err(Either::Left(e)),
         };
@@ -4126,7 +4126,7 @@ pub(crate) fn set_device<
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
     new_device: Option<&CC::DeviceId>,
 ) -> Result<(), SocketError> {
     core_ctx.with_sockets_state_mut(|core_ctx, state| {
@@ -4248,7 +4248,7 @@ pub(crate) fn set_device<
                     }
                     Operation::ListenerBothStacks { identifier, device, core_ctx } => {
                         let socket_id = PairedBoundSocketIds::<_, _, S> {
-                            this: S::make_bound_socket_map_id(id.clone()),
+                            this: S::make_bound_socket_map_id(id),
                             other: core_ctx.to_other_bound_socket_id(id),
                         };
                         core_ctx.with_both_bound_sockets_mut(
@@ -4277,7 +4277,7 @@ pub(crate) fn get_bound_device<
 >(
     core_ctx: &mut CC,
     _bindings_ctx: &BC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
 ) -> Option<CC::WeakDeviceId> {
     core_ctx.with_sockets_state(|core_ctx, state| {
         let (_, device): (&IpOptions<_, _, _>, _) =
@@ -4387,7 +4387,7 @@ pub(crate) fn set_multicast_membership<
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
     multicast_group: MulticastAddr<I::Addr>,
     interface: MulticastMembershipInterfaceSelector<I::Addr, CC::DeviceId>,
     want_membership: bool,
@@ -4535,7 +4535,7 @@ fn get_options_mut<
 >(
     core_ctx: &mut CC,
     state: &'a mut SocketsState<I, CC::WeakDeviceId, S>,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
 ) -> &'a mut IpOptions<I, CC::WeakDeviceId, S>
 where
     S::SocketId<I>: EntryKey,
@@ -4580,7 +4580,7 @@ pub(crate) fn update_ip_hop_limit<
 >(
     core_ctx: &mut CC,
     _bindings_ctx: &mut BC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
     update: impl FnOnce(&mut SocketHopLimits<I>),
 ) {
     // TODO(https://fxbug.dev/324279602): The options held by a connected
@@ -4600,7 +4600,7 @@ pub(crate) fn get_ip_hop_limits<
 >(
     core_ctx: &mut CC,
     _bindings_ctx: &BC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
 ) -> HopLimits {
     core_ctx.with_sockets_state(|core_ctx, state| {
         let (options, device) =
@@ -4627,7 +4627,7 @@ pub(crate) fn with_other_stack_ip_options_mut_if_unbound<
 >(
     core_ctx: &mut CC,
     _bindings_ctx: &mut BC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
     cb: impl FnOnce(&mut S::OtherStackIpOptions<I>) -> R,
 ) -> Result<R, ExpectedUnboundError> {
     core_ctx.with_sockets_state_mut(|core_ctx, state| {
@@ -4654,7 +4654,7 @@ pub(crate) fn with_other_stack_ip_options_mut<
 >(
     core_ctx: &mut CC,
     _bindings_ctx: &mut BC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
     cb: impl FnOnce(&mut S::OtherStackIpOptions<I>) -> R,
 ) -> R {
     core_ctx.with_sockets_state_mut(|core_ctx, state| {
@@ -4673,7 +4673,7 @@ pub(crate) fn with_other_stack_ip_options<
 >(
     core_ctx: &mut CC,
     _bindings_ctx: &BC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
     cb: impl FnOnce(&S::OtherStackIpOptions<I>) -> R,
 ) -> R {
     core_ctx.with_sockets_state(|core_ctx, state| {
@@ -4698,7 +4698,7 @@ pub(crate) fn with_other_stack_ip_options_and_default_hop_limits<
 >(
     core_ctx: &mut CC,
     _bindings_ctx: &BC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
     cb: impl FnOnce(&S::OtherStackIpOptions<I>, HopLimits) -> R,
 ) -> Result<R, NotDualStackCapableError> {
     core_ctx.with_sockets_state(|core_ctx, state| {
@@ -4732,7 +4732,7 @@ pub(crate) fn update_sharing<
     Sharing: Clone,
 >(
     core_ctx: &mut CC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
     new_sharing: Sharing,
 ) -> Result<(), ExpectedUnboundError> {
     core_ctx.with_sockets_state_mut(|_core_ctx, state| {
@@ -4755,7 +4755,7 @@ pub(crate) fn get_sharing<
     Sharing: Clone,
 >(
     core_ctx: &mut CC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
 ) -> Sharing {
     core_ctx.with_sockets_state(|_core_ctx, state| {
         match state.get(id.get_key_index()).expect("socket not found") {
@@ -4781,7 +4781,7 @@ pub(crate) fn set_ip_transparent<
     S: DatagramSocketSpec,
 >(
     core_ctx: &mut CC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
     value: bool,
 ) {
     core_ctx.with_sockets_state_mut(|core_ctx, state| {
@@ -4796,7 +4796,7 @@ pub(crate) fn get_ip_transparent<
     S: DatagramSocketSpec,
 >(
     core_ctx: &mut CC,
-    id: S::SocketId<I>,
+    id: &S::SocketId<I>,
 ) -> bool {
     core_ctx.with_sockets_state(|core_ctx, state| {
         let (options, _device) =
@@ -5005,10 +5005,10 @@ mod test {
         }
 
         fn make_bound_socket_map_id<I: IpExt, D: device::WeakId>(
-            s: Self::SocketId<I>,
+            s: &Self::SocketId<I>,
         ) -> <Self::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, Self::AddrSpec>>::BoundSocketId
         {
-            s
+            s.clone()
         }
 
         type Serializer<I: IpExt, B: BufferMut> = B;
@@ -5434,8 +5434,8 @@ mod test {
             addr.to_ipv6_mapped().get()
         }
 
-        fn to_other_bound_socket_id(&self, id: Id) -> Id {
-            id
+        fn to_other_bound_socket_id(&self, id: &Id) -> Id {
+            id.clone()
         }
 
         type LocalIdAllocator = ();
@@ -5547,7 +5547,7 @@ mod test {
             multicast: const_unwrap_option(NonZeroU8::new(23)),
         };
 
-        update_ip_hop_limit(&mut core_ctx, &mut bindings_ctx, unbound.clone(), |limits| {
+        update_ip_hop_limit(&mut core_ctx, &mut bindings_ctx, &unbound, |limits| {
             *limits = SocketHopLimits {
                 unicast: Some(EXPECTED_HOP_LIMITS.unicast),
                 multicast: Some(EXPECTED_HOP_LIMITS.multicast),
@@ -5555,10 +5555,7 @@ mod test {
             }
         });
 
-        assert_eq!(
-            get_ip_hop_limits(&mut core_ctx, &bindings_ctx, unbound.clone()),
-            EXPECTED_HOP_LIMITS
-        );
+        assert_eq!(get_ip_hop_limits(&mut core_ctx, &bindings_ctx, &unbound), EXPECTED_HOP_LIMITS);
     }
 
     #[ip_test]
@@ -5577,7 +5574,7 @@ mod test {
         let mut bindings_ctx = FakeBindingsCtx::default();
 
         let unbound = create(&mut core_ctx);
-        set_device(&mut core_ctx, &mut bindings_ctx, unbound.clone(), Some(&FakeDeviceId)).unwrap();
+        set_device(&mut core_ctx, &mut bindings_ctx, &unbound, Some(&FakeDeviceId)).unwrap();
 
         let HopLimits { mut unicast, multicast } = DEFAULT_HOP_LIMITS;
         unicast = unicast.checked_add(1).unwrap();
@@ -5591,17 +5588,14 @@ mod test {
             *default_hop_limit = unicast;
         }
         assert_eq!(
-            get_ip_hop_limits(&mut core_ctx, &bindings_ctx, unbound.clone()),
+            get_ip_hop_limits(&mut core_ctx, &bindings_ctx, &unbound),
             HopLimits { unicast, multicast }
         );
 
         // If the device is removed, use default hop limits.
         AsMut::<FakeIpDeviceIdCtx<_>>::as_mut(&mut core_ctx.inner.inner.get_mut())
             .set_device_removed(FakeDeviceId, true);
-        assert_eq!(
-            get_ip_hop_limits(&mut core_ctx, &bindings_ctx, unbound.clone()),
-            DEFAULT_HOP_LIMITS
-        );
+        assert_eq!(get_ip_hop_limits(&mut core_ctx, &bindings_ctx, &unbound), DEFAULT_HOP_LIMITS);
     }
 
     #[ip_test]
@@ -5613,12 +5607,9 @@ mod test {
         let mut bindings_ctx = FakeBindingsCtx::default();
 
         let unbound = create(&mut core_ctx);
-        assert_eq!(
-            get_ip_hop_limits(&mut core_ctx, &bindings_ctx, unbound.clone()),
-            DEFAULT_HOP_LIMITS
-        );
+        assert_eq!(get_ip_hop_limits(&mut core_ctx, &bindings_ctx, &unbound), DEFAULT_HOP_LIMITS);
 
-        update_ip_hop_limit(&mut core_ctx, &mut bindings_ctx, unbound.clone(), |limits| {
+        update_ip_hop_limit(&mut core_ctx, &mut bindings_ctx, &unbound, |limits| {
             *limits = SocketHopLimits {
                 unicast: Some(const_unwrap_option(NonZeroU8::new(1))),
                 multicast: Some(const_unwrap_option(NonZeroU8::new(1))),
@@ -5627,21 +5618,15 @@ mod test {
         });
 
         // The limits no longer match the default.
-        assert_ne!(
-            get_ip_hop_limits(&mut core_ctx, &bindings_ctx, unbound.clone()),
-            DEFAULT_HOP_LIMITS
-        );
+        assert_ne!(get_ip_hop_limits(&mut core_ctx, &bindings_ctx, &unbound), DEFAULT_HOP_LIMITS);
 
         // Clear the hop limits set on the socket.
-        update_ip_hop_limit(&mut core_ctx, &mut bindings_ctx, unbound.clone(), |limits| {
+        update_ip_hop_limit(&mut core_ctx, &mut bindings_ctx, &unbound, |limits| {
             *limits = Default::default()
         });
 
         // The values should be back at the defaults.
-        assert_eq!(
-            get_ip_hop_limits(&mut core_ctx, &bindings_ctx, unbound.clone()),
-            DEFAULT_HOP_LIMITS
-        );
+        assert_eq!(get_ip_hop_limits(&mut core_ctx, &bindings_ctx, &unbound), DEFAULT_HOP_LIMITS);
     }
 
     #[ip_test]
@@ -5652,14 +5637,14 @@ mod test {
 
         let unbound = create(&mut core_ctx);
 
-        set_device(&mut core_ctx, &mut bindings_ctx, unbound.clone(), Some(&FakeDeviceId)).unwrap();
+        set_device(&mut core_ctx, &mut bindings_ctx, &unbound, Some(&FakeDeviceId)).unwrap();
         assert_eq!(
-            get_bound_device(&mut core_ctx, &bindings_ctx, unbound.clone()),
+            get_bound_device(&mut core_ctx, &bindings_ctx, &unbound),
             Some(FakeWeakDeviceId(FakeDeviceId))
         );
 
-        set_device(&mut core_ctx, &mut bindings_ctx, unbound.clone(), None).unwrap();
-        assert_eq!(get_bound_device(&mut core_ctx, &bindings_ctx, unbound), None);
+        set_device(&mut core_ctx, &mut bindings_ctx, &unbound, None).unwrap();
+        assert_eq!(get_bound_device(&mut core_ctx, &bindings_ctx, &unbound), None);
     }
 
     #[ip_test]
@@ -5683,14 +5668,14 @@ mod test {
         send_to(
             &mut core_ctx,
             &mut bindings_ctx,
-            socket,
+            &socket,
             Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
             'a',
             body,
         )
         .expect("succeeds");
         assert_matches!(
-            get_info(&mut core_ctx, &mut bindings_ctx, socket),
+            get_info(&mut core_ctx, &mut bindings_ctx, &socket),
             SocketInfo::Listener(_)
         );
     }
@@ -5717,7 +5702,7 @@ mod test {
             send_to(
                 &mut core_ctx,
                 &mut bindings_ctx,
-                socket,
+                &socket,
                 Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
                 'a',
                 body,
@@ -5725,7 +5710,7 @@ mod test {
             Err(Either::Right(SendToError::CreateAndSend(_)))
         );
         assert_matches!(
-            get_info(&mut core_ctx, &mut bindings_ctx, socket),
+            get_info(&mut core_ctx, &mut bindings_ctx, &socket),
             SocketInfo::Listener(_)
         );
     }
@@ -5825,15 +5810,15 @@ mod test {
 
         let unbound = create(&mut core_ctx);
 
-        assert!(!get_ip_transparent(&mut core_ctx, unbound.clone()));
+        assert!(!get_ip_transparent(&mut core_ctx, &unbound));
 
-        set_ip_transparent(&mut core_ctx, unbound.clone(), true);
+        set_ip_transparent(&mut core_ctx, &unbound, true);
 
-        assert!(get_ip_transparent(&mut core_ctx, unbound.clone()));
+        assert!(get_ip_transparent(&mut core_ctx, &unbound));
 
-        set_ip_transparent(&mut core_ctx, unbound.clone(), false);
+        set_ip_transparent(&mut core_ctx, &unbound, false);
 
-        assert!(!get_ip_transparent(&mut core_ctx, unbound.clone()));
+        assert!(!get_ip_transparent(&mut core_ctx, &unbound));
     }
 
     // Translates a listener addr from the associated type to a concrete type.
@@ -5943,7 +5928,7 @@ mod test {
             OriginalSocketState::Listener => listen(
                 &mut core_ctx,
                 &mut bindings_ctx,
-                socket,
+                &socket,
                 SpecifiedAddr::new(local_ip).map(ZonedAddr::Unzoned),
                 Some(LOCAL_PORT),
             )
@@ -5951,7 +5936,7 @@ mod test {
             OriginalSocketState::Connected => connect(
                 &mut core_ctx,
                 &mut bindings_ctx,
-                socket,
+                &socket,
                 Some(ZonedAddr::Unzoned(remote_ip)),
                 ORIGINAL_REMOTE_PORT,
                 Default::default(),
@@ -5980,7 +5965,7 @@ mod test {
             connect(
                 &mut core_ctx,
                 &mut bindings_ctx,
-                socket,
+                &socket,
                 Some(ZonedAddr::Unzoned(remote_ip)),
                 NEW_REMOTE_PORT,
                 Default::default(),
@@ -5989,7 +5974,7 @@ mod test {
         );
 
         // Verify the original socket state is intact.
-        let info = get_info(&mut core_ctx, &mut bindings_ctx, socket);
+        let info = get_info(&mut core_ctx, &mut bindings_ctx, &socket);
         match original {
             OriginalSocketState::Unbound => assert_matches!(info, SocketInfo::Unbound),
             OriginalSocketState::Listener => {
@@ -6062,17 +6047,17 @@ mod test {
         connect(
             &mut core_ctx,
             &mut bindings_ctx,
-            socket,
+            &socket,
             Some(ZonedAddr::Unzoned(remote_ip)),
             REMOTE_PORT,
             Default::default(),
         )
         .expect("connect should succeed");
-        assert_eq!(get_shutdown_connected(&mut core_ctx, &bindings_ctx, socket), None);
+        assert_eq!(get_shutdown_connected(&mut core_ctx, &bindings_ctx, &socket), None);
 
-        shutdown_connected(&mut core_ctx, &bindings_ctx, socket, shutdown)
+        shutdown_connected(&mut core_ctx, &bindings_ctx, &socket, shutdown)
             .expect("shutdown should succeed");
-        assert_eq!(get_shutdown_connected(&mut core_ctx, &bindings_ctx, socket), Some(shutdown));
+        assert_eq!(get_shutdown_connected(&mut core_ctx, &bindings_ctx, &socket), Some(shutdown));
     }
 
     #[ip_test]
@@ -6140,7 +6125,7 @@ mod test {
                 OriginalSocketState::Listener => listen(
                     &mut core_ctx,
                     &mut bindings_ctx,
-                    socket,
+                    &socket,
                     SpecifiedAddr::new(local_ip).map(ZonedAddr::Unzoned),
                     Some(LOCAL_PORT),
                 )
@@ -6148,7 +6133,7 @@ mod test {
                 OriginalSocketState::Connected => connect(
                     &mut core_ctx,
                     &mut bindings_ctx,
-                    socket,
+                    &socket,
                     Some(ZonedAddr::Unzoned(remote_ip)),
                     REMOTE_PORT,
                     Default::default(),
@@ -6156,11 +6141,11 @@ mod test {
                 .expect("connect should succeed"),
             }
 
-            assert_eq!(get_bound_device(&mut core_ctx, &bindings_ctx, socket), None);
-            set_device(&mut core_ctx, &mut bindings_ctx, socket, Some(&device_id))
+            assert_eq!(get_bound_device(&mut core_ctx, &bindings_ctx, &socket), None);
+            set_device(&mut core_ctx, &mut bindings_ctx, &socket, Some(&device_id))
                 .expect("set device should succeed");
             assert_eq!(
-                get_bound_device(&mut core_ctx, &bindings_ctx, socket),
+                get_bound_device(&mut core_ctx, &bindings_ctx, &socket),
                 Some(FakeWeakDeviceId(device_id))
             );
         }
@@ -6170,16 +6155,16 @@ mod test {
         // the bound socket map)
         if original != OriginalSocketState::Unbound {
             assert_eq!(
-                set_device(&mut core_ctx, &mut bindings_ctx, socket2, Some(&DEVICE_ID1)),
+                set_device(&mut core_ctx, &mut bindings_ctx, &socket2, Some(&DEVICE_ID1)),
                 Err(SocketError::Local(LocalAddressError::AddressInUse))
             );
             // Verify both sockets still have their original device.
             assert_eq!(
-                get_bound_device(&mut core_ctx, &bindings_ctx, socket1),
+                get_bound_device(&mut core_ctx, &bindings_ctx, &socket1),
                 Some(FakeWeakDeviceId(DEVICE_ID1))
             );
             assert_eq!(
-                get_bound_device(&mut core_ctx, &bindings_ctx, socket2),
+                get_bound_device(&mut core_ctx, &bindings_ctx, &socket2),
                 Some(FakeWeakDeviceId(DEVICE_ID2))
             );
         }
@@ -6187,8 +6172,8 @@ mod test {
         // Verify the device can be unset.
         // NB: Close socket2 first, otherwise socket 1 will conflict with it.
         let _: SocketInfo<_, _, _> = close(&mut core_ctx, &mut bindings_ctx, socket2);
-        set_device(&mut core_ctx, &mut bindings_ctx, socket1, None)
+        set_device(&mut core_ctx, &mut bindings_ctx, &socket1, None)
             .expect("set device should succeed");
-        assert_eq!(get_bound_device(&mut core_ctx, &bindings_ctx, socket1), None,);
+        assert_eq!(get_bound_device(&mut core_ctx, &bindings_ctx, &socket1), None,);
     }
 }

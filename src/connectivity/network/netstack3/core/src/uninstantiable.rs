@@ -189,7 +189,7 @@ where
 
     fn to_other_bound_socket_id(
         &self,
-        _id: S::SocketId<I>,
+        _id: &S::SocketId<I>,
     ) -> <S::SocketMapSpec<I::OtherVersion, Self::WeakDeviceId> as DatagramSocketMapSpec<
         I::OtherVersion,
         Self::WeakDeviceId,
