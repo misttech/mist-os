@@ -35,7 +35,8 @@ closed protocol Msi {
     ///
     /// ## Rights
     ///
-    /// *handle* must have resource kind `ZX_RSRC_KIND_ROOT`.
+    /// *handle* must have resource kind `ZX_RSRC_KIND_SYSTEM` and resource base
+    /// `ZX_RSRC_SYSTEM_MSI_BASE`.
     ///
     /// ## Return value
     ///

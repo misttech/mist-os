@@ -45,7 +45,8 @@ closed protocol Iommu {
     ///
     /// ## Rights
     ///
-    /// *resource* must have resource kind `ZX_RSRC_KIND_ROOT`.
+    /// *resource* must have resource kind `ZX_RSRC_KIND_SYSTEM` and resource base
+    /// `ZX_RSRC_SYSTEM_IOMMU_BASE`.
     ///
     /// ## Return value
     ///

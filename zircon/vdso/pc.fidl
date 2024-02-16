@@ -25,7 +25,7 @@ closed protocol Pc {
     ///
     /// ## Rights
     ///
-    /// *handle* must have resource kind `ZX_RSRC_KIND_ROOT`.
+    /// *handle* must have resource kind `ZX_RSRC_KIND_MMIO`.
     ///
     /// ## Return value
     ///

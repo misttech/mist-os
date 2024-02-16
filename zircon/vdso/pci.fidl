@@ -84,7 +84,7 @@ closed protocol Pci {
     ///
     /// ## Rights
     ///
-    /// *handle* must have resource kind `ZX_RSRC_KIND_ROOT`.
+    /// *handle* must have resource kind `ZX_RSRC_KIND_IRQ`.
     ///
     /// ## Return value
     ///
@@ -293,7 +293,7 @@ closed protocol Pci {
     ///
     /// ## Rights
     ///
-    /// *handle* must have resource kind `ZX_RSRC_KIND_ROOT`.
+    /// *handle* must have resource kind `ZX_RSRC_KIND_IOPORT`.
     ///
     /// ## Return value
     ///
@@ -510,7 +510,7 @@ closed protocol Pci {
     ///
     /// ## Rights
     ///
-    /// *handle* must have resource kind `ZX_RSRC_KIND_ROOT`.
+    /// *handle* must have resource kind `ZX_RSRC_KIND_MMIO`.
     ///
     /// ## Return value
     ///
@@ -552,7 +552,7 @@ closed protocol Pci {
     ///
     /// ## Rights
     ///
-    /// *handle* must have resource kind `ZX_RSRC_KIND_ROOT`.
+    /// *handle* must have resource kind `ZX_RSRC_KIND_MMIO`.
     ///
     /// ## Return value
     ///

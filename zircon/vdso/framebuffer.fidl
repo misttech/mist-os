@@ -27,7 +27,8 @@ closed protocol Framebuffer {
     ///
     /// ## Rights
     ///
-    /// *resource* must have resource kind `ZX_RSRC_KIND_ROOT`.
+    /// *resource* must have resource kind `ZX_RSRC_KIND_SYSTEM` and resource
+    /// base `ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE`.
     ///
     /// ## Return value
     ///
@@ -74,7 +75,8 @@ closed protocol Framebuffer {
     ///
     /// ## Rights
     ///
-    /// *resource* must have resource kind `ZX_RSRC_KIND_ROOT`.
+    /// *resource* must have resource kind `ZX_RSRC_KIND_SYSTEM` and resource
+    /// base `ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE`.
     ///
     /// ## Return value
     ///

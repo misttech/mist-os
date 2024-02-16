@@ -46,8 +46,10 @@ closed protocol Resource {
     /// Valid bases for `ZX_RSRC_KIND_SYSTEM` are `ZX_RSRC_SYSTEM_HYPERVISOR_BASE`,
     /// `ZX_RSRC_SYSTEM_VMEX_BASE`, `ZX_RSRC_SYSTEM_DEBUG_BASE`,
     /// `ZX_RSRC_SYSTEM_INFO_BASE`, `ZX_RSRC_SYSTEM_CPU_BASE`,
-    /// `ZX_RSRC_SYSTEM_POWER_BASE`, and `ZX_RSRC_SYSTEM_MEXEC_BASE`. These all have
-    /// *size* 1.
+    /// `ZX_RSRC_SYSTEM_POWER_BASE`, `ZX_RSRC_SYSTEM_MEXEC_BASE`,
+    /// `ZX_RSRC_SYSTEM_ENERGY_INFO_BASE`, `ZX_RSRC_SYSTEM_IOMMU_BASE`,
+    /// `ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE`, `ZX_RSRC_SYSTEM_PROFILE_BASE` and
+    /// `ZX_RSRC_SYSTEM_MSI_BASE`. These all have *size* 1.
     /// `ZX_RSRC_KIND_ROOT` must be paired with zero values for *base* and *size*, as
     /// it does not use an address space range.
     ///
