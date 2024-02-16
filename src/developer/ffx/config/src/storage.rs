@@ -201,11 +201,13 @@ impl ConfigFile {
     }
 
     async fn save(&mut self) -> Result<()> {
+        tracing::debug!("Saving path {:?}", self.path);
+
         // FIXME(81502): There is a race between the ffx CLI and the daemon service
         // in updating the config. We can lose changes if both try to change the
         // config at the same time. We can reduce the rate of races by only writing
         // to the config if the value actually changed.
-        if self.is_dirty() {
+        let ret = if self.is_dirty() {
             self.dirty = false;
             with_writer(
                 self.path.as_deref(),
@@ -215,7 +217,9 @@ impl ConfigFile {
             .await
         } else {
             Ok(())
-        }
+        };
+        tracing::debug!("Saved path {:?}", self.path);
+        ret
     }
 }
 
