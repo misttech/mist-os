@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use crate::{
-    common::cmd::{ManifestParams, OemFile},
-    common::vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR},
+    common::{
+        cmd::{ManifestParams, OemFile},
+        vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR},
+    },
     file_resolver::FileResolver,
     manifest::{from_in_tree, from_local_product_bundle, from_path, from_sdk},
 };
@@ -19,8 +21,10 @@ use sdk::SdkVersion;
 use sparse::build_sparse_files;
 use std::{convert::Into, io::Write, path::PathBuf};
 use termion::{color, style};
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{
+    mpsc,
+    mpsc::{Receiver, Sender},
+};
 
 pub const MISSING_CREDENTIALS: &str =
     "The flash manifest is missing the credential files to unlock this device.\n\
@@ -642,8 +646,8 @@ where
                 writeln!(writer, "No manifest path was given, using SDK from {}.", path.display())?;
                 path.push("flash.json"); // Not actually used, placeholder value needed.
                 match sdk.get_version() {
-                    SdkVersion::InTree => from_in_tree(&sdk, writer, fastboot_interface, cmd).await,
-                    SdkVersion::Version(_) => from_sdk(&sdk, writer, fastboot_interface, cmd).await,
+                    SdkVersion::InTree => from_in_tree(writer, fastboot_interface, cmd).await,
+                    SdkVersion::Version(_) => from_sdk(writer, fastboot_interface, cmd).await,
                     _ => ffx_bail!("Unknown SDK type"),
                 }
             }

@@ -130,12 +130,16 @@ pub struct LoadedProductBundle {
 }
 
 impl LoadedProductBundle {
-    /// Load a ProductBundle from a path on disk. This method will return a
-    /// LoadedProductBundle which keeps track of where it was loaded from.
+    /// Load a ProductBundle from a directory containing product_bundle.json
+    /// on disk. This method will return a LoadedProductBundle which keeps
+    /// track of where it was loaded from.
     pub fn try_load_from(path: impl AsRef<Utf8Path>) -> Result<Self> {
+        if !path.as_ref().is_dir() {
+            anyhow::bail!("{} is not a directory", path.as_ref().as_str());
+        }
         let product_bundle_path = path.as_ref().join("product_bundle.json");
         let file = File::open(&product_bundle_path)
-            .with_context(|| format!("opening product bundle: {:?}", &product_bundle_path))?;
+            .map_err(|e| anyhow!("{e}: {product_bundle_path:?}"))?;
 
         match try_load_product_bundle(file)? {
             ProductBundle::V2(data) => {
@@ -274,9 +278,7 @@ mod tests {
     use serde_json::json;
     use std::io::Write;
     use tempfile::TempDir;
-    use zip::write::FileOptions;
-    use zip::CompressionMethod;
-    use zip::ZipWriter;
+    use zip::{write::FileOptions, CompressionMethod, ZipWriter};
 
     fn make_sample_pbv1(name: &str) -> serde_json::Value {
         json!({

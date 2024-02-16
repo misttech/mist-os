@@ -55,7 +55,6 @@ if (is_host) {
     inputs = [
       "test_data/virtual_device.json",
       "test_data/device_1.json.template",
-      "test_data/test_core.json",
     ]
   }
 

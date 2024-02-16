@@ -7,8 +7,10 @@ use crate::{
         cmd::{BootParams, Command, ManifestParams},
         prepare, Boot, Flash, Unlock,
     },
-    file_resolver::resolvers::{Resolver, ZipArchiveResolver},
-    file_resolver::FileResolver,
+    file_resolver::{
+        resolvers::{Resolver, ZipArchiveResolver},
+        FileResolver,
+    },
     manifest::{
         resolvers::{
             ArchiveResolver, FlashManifestResolver, FlashManifestTarResolver, ManifestResolver,
@@ -26,7 +28,7 @@ use camino::Utf8Path;
 use chrono::Utc;
 use errors::ffx_bail;
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
-use pbms::{load_product_bundle, ListingMode};
+use pbms::load_product_bundle;
 use sdk_metadata::{ProductBundle, ProductBundleV2};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, to_value, Value};
@@ -416,7 +418,6 @@ impl Boot for FlashManifestVersion {
 }
 
 pub async fn from_sdk<W: Write, F: FastbootInterface>(
-    sdk: &ffx_config::Sdk,
     writer: &mut W,
     fastboot_interface: &mut F,
     cmd: ManifestParams,
@@ -424,10 +425,7 @@ pub async fn from_sdk<W: Write, F: FastbootInterface>(
     tracing::debug!("fastboot manifest from_sdk");
     match cmd.product_bundle.as_ref() {
         Some(b) => {
-            let product_bundle =
-                load_product_bundle(sdk, &Some(b.to_string()), ListingMode::AllBundles)
-                    .await?
-                    .into();
+            let product_bundle = load_product_bundle(&Some(b.to_string())).await?.into();
             FlashManifest {
                 resolver: Resolver::new(PathBuf::from(b))?,
                 version: FlashManifestVersion::from_product_bundle(&product_bundle)?,
@@ -476,7 +474,6 @@ pub async fn from_local_product_bundle<W: Write, F: FastbootInterface>(
 }
 
 pub async fn from_in_tree<W: Write, T: FastbootInterface>(
-    sdk: &ffx_config::Sdk,
     writer: &mut W,
     fastboot_interface: &mut T,
     cmd: ManifestParams,
@@ -484,7 +481,7 @@ pub async fn from_in_tree<W: Write, T: FastbootInterface>(
     tracing::debug!("fastboot manifest from_in_tree");
     if cmd.product_bundle.is_some() {
         tracing::debug!("in tree, but product bundle specified, use in-tree sdk");
-        from_sdk(sdk, writer, fastboot_interface, cmd).await
+        from_sdk(writer, fastboot_interface, cmd).await
     } else {
         bail!("manifest or product_bundle must be specified")
     }

@@ -95,59 +95,48 @@ pub fn is_local_product_bundle<P: AsRef<Path>>(product_bundle: P) -> bool {
 }
 
 /// Load a product bundle by name, uri, or local path.
-/// This is capable of loading both v1 and v2 ProductBundles.
 ///
 /// If a build config value is set for product.path and the product bundle
 /// is None, this method will use the value that is set in the build config as
-/// the path. If the path is absolute it will be used as is, otherwise it will
-/// be relative to the build_dir.
-pub async fn load_product_bundle(
-    _sdk: &ffx_config::Sdk,
-    product_bundle: &Option<String>,
-    _mode: ListingMode,
-) -> Result<LoadedProductBundle> {
-    tracing::debug!("Loading a product bundle: {:?}", product_bundle);
-    let env = ffx_config::global_env_context().expect("cannot get global_env_context");
-    let build_dir = env.build_dir().map(Utf8Path::from_path).flatten().unwrap_or(Utf8Path::new(""));
-
-    //  If `product_bundle` is a local path, load it directly.
-    if let Some(path) = local_product_bundle_path(product_bundle, build_dir).await {
-        return LoadedProductBundle::try_load_from(path);
-    }
-    bail!("A path to a product bundle v2 is required because `build_pb_v1` was false");
-}
-
-/// Checks to see if the product bundle is valid. If not product bundle is set then
-/// we will check the config domains to see if a "product.path" key is present.
-/// If the product bundle does not exist then None is returned.
-#[allow(dead_code)]
-async fn local_product_bundle_path(
-    product_bundle: &Option<impl AsRef<Utf8Path>>,
-    build_dir: impl AsRef<Utf8Path>,
-) -> Option<Utf8PathBuf> {
-    match product_bundle {
-        Some(p) => Some(Utf8PathBuf::from(p.as_ref())),
+/// the path.
+/// If the path is absolute it will be used as is.
+/// otherwise the relative path is checked to exist, and if it does not,
+/// it is joined to the build_dir. This way, command line references to relative
+/// paths work as developer's expect, and still maintain the legacy behavior.
+pub async fn load_product_bundle(product_bundle: &Option<String>) -> Result<LoadedProductBundle> {
+    // Can't use unwrap_or_else here since ffx config get is async.
+    let bundle_path: Utf8PathBuf = match product_bundle {
+        Some(p) => p.into(),
         None => ffx_config::get::<String, &str>(PRODUCT_BUNDLE_PATH_KEY)
             .await
-            .ok()
-            .map(Utf8PathBuf::from),
-    }
-    .map(|s| resolve_product_bundle_path(s, build_dir))
-    .filter(|s| is_local_product_bundle(s))
-}
+            .unwrap_or_default()
+            .into(),
+    };
 
-/// Resolves the product bundle relative to the build_dir. If product_bundle is
-/// absolute return it as is otherwise rebase off of the build_dir.
-fn resolve_product_bundle_path(
-    product_bundle: impl AsRef<Utf8Path>,
-    build_dir: impl AsRef<Utf8Path>,
-) -> Utf8PathBuf {
-    let path = product_bundle.as_ref();
-    if path.is_absolute() {
-        return path.into();
-    } else {
-        return build_dir.as_ref().join(path);
+    if bundle_path.as_std_path() == Path::new("") {
+        anyhow::bail!("No product bundle path configured, nor specified.");
     }
+
+    tracing::debug!("Loading a product bundle: {:?}", bundle_path);
+
+    if is_local_product_bundle(&bundle_path) {
+        return LoadedProductBundle::try_load_from(&bundle_path);
+    } else if bundle_path.is_relative() {
+        let env = ffx_config::global_env_context().expect("cannot get global_env_context");
+
+        if let Some(base_path) = env.build_dir().map(Utf8Path::from_path).flatten() {
+            let base_dir_based_path: Utf8PathBuf = base_path.join(&bundle_path);
+
+            if is_local_product_bundle(&base_dir_based_path) {
+                return LoadedProductBundle::try_load_from(&base_dir_based_path);
+            } else {
+                anyhow::bail!(
+                    "Could not find product bundle in {bundle_path:?} nor {base_dir_based_path:?}"
+                );
+            }
+        }
+    }
+    anyhow::bail!("Could not find product bundle in {bundle_path:?}");
 }
 
 /// Determine if a product bundle url refers to a locally-built bundle.
@@ -250,10 +239,6 @@ pub async fn make_way_for_output(local_dir: &Path, force: bool) -> Result<()> {
             );
         }
     }
-    assert!(
-        !local_dir.exists(),
-        "The local_dir exists in make_way_for_output, please report this as a bug."
-    );
     tracing::debug!("local_dir dir clear.");
     Ok(())
 }
@@ -312,58 +297,71 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffx_config::ConfigLevel;
-    use sdk::{Sdk, SdkVersion};
+    use ffx_config::{environment::test_init_in_tree, ConfigLevel};
     use serde_json;
     use std::fs::File;
     use tempfile::TempDir;
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_local_product_bundle_path() {
-        let _env = ffx_config::test_init().await.unwrap();
+    async fn test_load_product_bundle_intree_errors() {
         let test_dir = TempDir::new().expect("output directory");
         let build_dir =
             Utf8Path::from_path(test_dir.path()).expect("cannot convert builddir to Utf8Path");
+        let _env = test_init_in_tree(&test_dir.path()).await.unwrap();
 
         let empty_pb: Option<String> = None;
         // If no product bundle path provided and no config return None
-        let pb = local_product_bundle_path(&empty_pb, build_dir).await;
-        assert_eq!(pb, None);
+        let pb = load_product_bundle(&empty_pb).await;
+        assert_eq!(
+            pb.err().unwrap().to_string(),
+            "No product bundle path configured, nor specified."
+        );
 
         // If pb provided but invalid path return None
-        let pb = local_product_bundle_path(&Some(build_dir.join("__invalid__")), build_dir).await;
-        assert_eq!(pb, None);
+        let pb_path = build_dir.join("__invalid__").to_string();
+        let pb = load_product_bundle(&Some(pb_path.clone())).await;
+        assert_eq!(
+            pb.err().unwrap().to_string(),
+            format!("Could not find product bundle in \"{pb_path}\"")
+        );
 
         // If pb provided and absolute and valid return Some(abspath)
-        let pb = local_product_bundle_path(&Some(build_dir), build_dir).await;
-        assert_eq!(pb, Some(build_dir.into()));
+        let pb = load_product_bundle(&Some(build_dir.to_string())).await;
+        assert_eq!(
+            pb.err().unwrap().to_string(),
+            format!("No such file or directory (os error 2): \"{build_dir}/product_bundle.json\"")
+        );
 
-        // If pb provided and relative and valid return Some(build_dir + relpath)
-        let relpath = "foo";
-        std::fs::File::create(build_dir.join(relpath)).expect("create relative dir");
-
-        let pb = local_product_bundle_path(&Some(relpath), build_dir).await;
-        assert_eq!(pb, Some(build_dir.join(relpath)));
+        // If pb provided, relative and but to a file not a directory.
+        let relpath = "foo".to_string();
+        std::fs::File::create(build_dir.join(relpath.clone())).expect("create relative dir");
+        let pb = load_product_bundle(&Some(relpath.clone())).await;
+        assert_eq!(
+            pb.err().unwrap().to_string(),
+            format!("{}/{relpath} is not a directory", build_dir.to_string())
+        );
 
         // If pb provided and relative and invalid return None
-        let pb = local_product_bundle_path(&Some("invalid"), build_dir).await;
-        assert_eq!(pb, None);
-
-        // Can handle an empty build path
-        let pb = local_product_bundle_path(&Some(build_dir), "").await;
-        assert_eq!(pb, Some(build_dir.into()));
+        let pb = load_product_bundle(&Some("invalid".into())).await;
+        assert_eq!(
+            pb.err().unwrap().to_string(),
+            format!(
+                "Could not find product bundle in \"invalid\" nor \"{}/invalid\"",
+                build_dir.to_string()
+            )
+        );
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_resolve_product_bundle_path() {
-        let build_dir = "/out";
+    async fn test_load_product_bundle_no_build_dir() {
+        let _env = ffx_config::test_init().await.unwrap();
 
-        // if absolute path then return it as is.
-        let abspb = "/some/abs/path";
-        assert_eq!(resolve_product_bundle_path(abspb, build_dir), Utf8Path::new(abspb));
-
-        // if relative return the path relative to the build dir
-        assert_eq!(resolve_product_bundle_path("foo", build_dir), Utf8Path::new("/out/foo"));
+        // Can handle an empty build path
+        let pb = load_product_bundle(&Some("some_place".to_string())).await;
+        assert_eq!(
+            pb.err().unwrap().to_string(),
+            format!("Could not find product bundle in \"some_place\"")
+        );
     }
 
     #[test]
@@ -390,40 +388,6 @@ mod tests {
         let test_dir = tempfile::TempDir::new().expect("temp dir");
         std::fs::create_dir(&test_dir.path().join("foo")).expect("make_dir foo");
         assert!(make_way_for_output(&test_dir.path(), /*force=*/ false).await.is_err());
-    }
-
-    #[cfg(feature = "build_pb_v1")]
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_load_product_bundle_v1() {
-        let env = ffx_config::test_init().await.expect("create test config");
-
-        let sdk_root_dir = create_test_intree_sdk();
-        let sdk_root = sdk_root_dir.path().to_str().expect("path to str");
-        env.context
-            .query("sdk.root")
-            .level(Some(ConfigLevel::User))
-            .set(sdk_root.into())
-            .await
-            .expect("set sdk root path");
-        env.context
-            .query("sdk.type")
-            .level(Some(ConfigLevel::User))
-            .set("in-tree".into())
-            .await
-            .expect("set sdk type");
-        env.context
-            .query(CONFIG_METADATA)
-            .level(Some(ConfigLevel::User))
-            .set(serde_json::json!(["{sdk.root}/*.json"]))
-            .await
-            .expect("set pbms metadata");
-
-        let sdk = env.context.get_sdk().await.expect("Loading configured sdk");
-
-        let pb = load_product_bundle(&sdk, &None, ListingMode::ReadyBundlesOnly)
-            .await
-            .expect("could not load product bundle");
-        assert_eq!(pb.loaded_from_path(), Utf8Path::new(sdk_root));
     }
 
     macro_rules! make_pb_v2_in {
@@ -453,21 +417,16 @@ mod tests {
         }
     }
 
-    //TODO(b/288891258) Fix the flakiness of these tests
-    #[ignore]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_load_product_bundle_v2_valid() {
         let tmp = TempDir::new().unwrap();
         let pb_dir = make_pb_v2_in!(tmp, "fake.x64");
 
         let env = ffx_config::test_init().await.expect("create test config");
-        let sdk = Sdk::get_empty_sdk_with_version(SdkVersion::InTree);
-
         // Load with passing a path directly
-        let pb =
-            load_product_bundle(&sdk, &Some(pb_dir.to_string()), ListingMode::ReadyBundlesOnly)
-                .await
-                .expect("could not load product bundle");
+        let pb = load_product_bundle(&Some(pb_dir.to_string()))
+            .await
+            .expect("could not load product bundle");
         assert_eq!(pb.loaded_from_path(), pb_dir);
 
         // Load with the config set with absolute path
@@ -477,25 +436,18 @@ mod tests {
             .set(serde_json::Value::String(pb_dir.to_string()))
             .await
             .expect("set product.path path");
-        let pb = load_product_bundle(&sdk, &None, ListingMode::ReadyBundlesOnly)
-            .await
-            .expect("could not load product bundle");
+        let pb = load_product_bundle(&None).await.expect("could not load product bundle");
         assert_eq!(pb.loaded_from_path(), pb_dir);
     }
 
-    //TODO(b/288891258) Fix the flakiness of these tests
-    #[ignore]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_load_product_bundle_v2_invalid() {
         let tmp = TempDir::new().unwrap();
         let pb_dir = Utf8Path::from_path(tmp.path()).unwrap();
         let _env = ffx_config::test_init().await.expect("create test config");
-        let sdk = Sdk::get_empty_sdk_with_version(SdkVersion::InTree);
 
         // Load with passing a path directly
-        let pb =
-            load_product_bundle(&sdk, &Some(pb_dir.to_string()), ListingMode::ReadyBundlesOnly)
-                .await;
+        let pb = load_product_bundle(&Some(pb_dir.to_string())).await;
         assert!(pb.is_err());
     }
 }
