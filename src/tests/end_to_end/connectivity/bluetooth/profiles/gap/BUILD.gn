@@ -19,10 +19,7 @@ if (is_host) {
     deps = [ "//src/tests/end_to_end/connectivity/bluetooth:bluetooth_utils" ]
     params_source = "params.yaml"
     transport = "sl4f"
-    environments = [
-      sherlock_env,
-      vim3_env,
-    ]
+    environments = lacewing_bluetooth_envs
   }
 }
 
