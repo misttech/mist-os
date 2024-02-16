@@ -1035,7 +1035,7 @@ impl<A: IpAddress, D> From<NonZeroU16> for ListenerInfo<A, D> {
 }
 
 /// A unique identifier for a UDP socket.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 
 pub struct SocketId<I: Ip>(usize, IpVersionMarker<I>);
@@ -3049,7 +3049,7 @@ mod tests {
         assert_eq!(
             bindings_ctx.state().received::<I>(),
             &HashMap::from([(
-                socket,
+                socket.clone(),
                 SocketReceived {
                     packets: vec![ReceivedPacket {
                         body: body.into(),
@@ -3162,7 +3162,10 @@ mod tests {
             &body[..],
         );
 
-        assert_eq!(bindings_ctx.state().socket_data(), HashMap::from([(socket, vec![&body[..]])]));
+        assert_eq!(
+            bindings_ctx.state().socket_data(),
+            HashMap::from([(socket.clone(), vec![&body[..]])])
+        );
 
         // Now try to send something over this new connection.
         api.send(&socket, Buf::new(body.to_vec(), ..)).expect("send_udp_conn returned an error");
@@ -3603,7 +3606,7 @@ mod tests {
         let send = |remote_ip, api: &mut UdpApi<_, _>, id| -> Result<(), NotWriteableError> {
             match remote_ip {
                 Some(remote_ip) => api.send_to(
-                    &id,
+                    id,
                     Some(remote_ip),
                     REMOTE_PORT.into(),
                     Buf::new(Vec::new(), ..),
@@ -3612,7 +3615,7 @@ mod tests {
                     |e| assert_matches!(e, Either::Right(SendToError::NotWriteable) => NotWriteableError)
                 ),
                 None => api.send(
-                    &id,
+                    id,
                     Buf::new(Vec::new(), ..),
                 )
                 .map_err(|e| assert_matches!(e, Either::Left(SendError::NotWriteable) => NotWriteableError)),
@@ -3628,10 +3631,10 @@ mod tests {
         let socket = api.create();
         api.connect(&socket, Some(remote_ip), REMOTE_PORT.into()).expect("connect failed");
 
-        send(send_to_ip, &mut api, socket).expect("can send");
+        send(send_to_ip, &mut api, &socket).expect("can send");
         api.shutdown(&socket, shutdown).expect("is connected");
 
-        assert_matches!(send(send_to_ip, &mut api, socket), Err(NotWriteableError));
+        assert_matches!(send(send_to_ip, &mut api, &socket), Err(NotWriteableError));
     }
 
     #[ip_test]
@@ -3667,7 +3670,7 @@ mod tests {
 
         assert_eq!(
             bindings_ctx.state().socket_data(),
-            HashMap::from([(socket, vec![&packet[..]])])
+            HashMap::from([(socket.clone(), vec![&packet[..]])])
         );
         api.shutdown(&socket, which).expect("is connected");
         let (core_ctx, bindings_ctx) = api.contexts();
@@ -3683,7 +3686,7 @@ mod tests {
         );
         assert_eq!(
             bindings_ctx.state().socket_data(),
-            HashMap::from([(socket, vec![&packet[..]])])
+            HashMap::from([(socket.clone(), vec![&packet[..]])])
         );
 
         // Calling shutdown for the send direction doesn't change anything.
@@ -4080,8 +4083,8 @@ mod tests {
         assert_eq!(
             bindings_ctx.state().socket_data(),
             HashMap::from([
-                (specific_listeners[0], vec![[1].as_slice(), &[2]]),
-                (specific_listeners[1], vec![&[1], &[2]]),
+                (specific_listeners[0].clone(), vec![[1].as_slice(), &[2]]),
+                (specific_listeners[1].clone(), vec![&[1], &[2]]),
                 (any_listener, vec![&[1], &[2], &[3]]),
             ]),
         );
@@ -4481,19 +4484,19 @@ mod tests {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
 
-        let listen_unbound = |api: &mut UdpApi<_, _>, socket| {
-            api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip::<I>())), Some(LOCAL_PORT))
+        let listen_unbound = |api: &mut UdpApi<_, _>, socket: &SocketId<_>| {
+            api.listen(socket, Some(ZonedAddr::Unzoned(local_ip::<I>())), Some(LOCAL_PORT))
         };
 
         // Tie up the address so the second call to `connect` fails.
         let listener = api.create();
-        listen_unbound(&mut api, listener)
+        listen_unbound(&mut api, &listener)
             .expect("Initial call to listen_udp was expected to succeed");
 
         // Trying to connect on the same address should fail.
         let unbound = api.create();
         assert_eq!(
-            listen_unbound(&mut api, unbound),
+            listen_unbound(&mut api, &unbound),
             Err(Either::Right(LocalAddressError::AddressInUse))
         );
 
@@ -4501,7 +4504,7 @@ mod tests {
         // connected.
         let _: SocketInfo<I::Addr, _> = api.close(listener);
 
-        listen_unbound(&mut api, unbound).expect("listen should succeed");
+        listen_unbound(&mut api, &unbound).expect("listen should succeed");
     }
 
     /// Tests local port allocation for [`listen_udp`].
@@ -4577,13 +4580,13 @@ mod tests {
     #[test_case(bind_as_listener)]
     #[test_case(bind_as_connected)]
     fn test_set_unset_reuse_port_bound<I: Ip + TestIpExt>(
-        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, SocketId<I>),
+        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &SocketId<I>),
     ) {
         let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
             UdpMultipleDevicesCoreCtx::new_multiple_devices::<I>(),
         );
         let socket = UdpApi::<I, _>::new(ctx.as_mut()).create();
-        set_up_socket(&mut ctx, socket);
+        set_up_socket(&mut ctx, &socket);
 
         // Per src/connectivity/network/netstack3/docs/POSIX_COMPATIBILITY.md,
         // Netstack3 only allows setting SO_REUSEPORT on unbound sockets.
@@ -4604,7 +4607,7 @@ mod tests {
         let socket = api.create();
         api.listen(&socket, Some(local_ip), Some(LOCAL_PORT)).unwrap();
         api.connect(&socket, Some(remote_ip), REMOTE_PORT.into()).expect("connect failed");
-        let info = api.close(socket);
+        let info = api.close(socket.clone());
         let info = assert_matches!(info, SocketInfo::Connected(info) => info);
         // Assert that the info gotten back matches what was expected.
         assert_eq!(info.local_ip.into_inner(), local_ip.map_zone(FakeWeakDeviceId));
@@ -4628,7 +4631,7 @@ mod tests {
         // Test removing a specified listener.
         let specified = api.create();
         api.listen(&specified, Some(local_ip), Some(LOCAL_PORT)).expect("listen_udp failed");
-        let info = api.close(specified);
+        let info = api.close(specified.clone());
         let info = assert_matches!(info, SocketInfo::Listener(info) => info);
         assert_eq!(info.local_ip.unwrap().into_inner(), local_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.local_port, LOCAL_PORT);
@@ -4638,7 +4641,7 @@ mod tests {
         // Test removing a wildcard listener.
         let wildcard = api.create();
         api.listen(&wildcard, None, Some(LOCAL_PORT)).expect("listen_udp failed");
-        let info = api.close(wildcard);
+        let info = api.close(wildcard.clone());
         let info = assert_matches!(info, SocketInfo::Listener(info) => info);
         assert_eq!(info.local_ip, None);
         assert_eq!(info.local_port, LOCAL_PORT);
@@ -4650,7 +4653,7 @@ mod tests {
         mcast_addr: MulticastAddr<I::Addr>,
         interface: MulticastMembershipInterfaceSelector<I::Addr, MultipleDevicesId>,
         set_up_ctx: impl FnOnce(&mut UdpMultipleDevicesCtx),
-        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, SocketId<I>),
+        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &SocketId<I>),
     ) -> (
         Result<(), SetMulticastMembershipError>,
         HashMap<(MultipleDevicesId, MulticastAddr<I::Addr>), NonZeroUsize>,
@@ -4661,7 +4664,7 @@ mod tests {
         set_up_ctx(&mut ctx);
 
         let socket = UdpApi::<I, _>::new(ctx.as_mut()).create();
-        set_up_socket(&mut ctx, socket);
+        set_up_socket(&mut ctx, &socket);
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let result = api.set_multicast_membership(&socket, mcast_addr, interface, true);
 
@@ -4679,18 +4682,18 @@ mod tests {
         (result, memberships_snapshot)
     }
 
-    fn leave_unbound<I: TestIpExt>(_ctx: &mut UdpMultipleDevicesCtx, _unbound: SocketId<I>) {}
+    fn leave_unbound<I: TestIpExt>(_ctx: &mut UdpMultipleDevicesCtx, _unbound: &SocketId<I>) {}
 
-    fn bind_as_listener<I: TestIpExt>(ctx: &mut UdpMultipleDevicesCtx, unbound: SocketId<I>) {
+    fn bind_as_listener<I: TestIpExt>(ctx: &mut UdpMultipleDevicesCtx, unbound: &SocketId<I>) {
         UdpApi::<I, _>::new(ctx.as_mut())
-            .listen(&unbound, Some(ZonedAddr::Unzoned(local_ip::<I>())), Some(LOCAL_PORT))
+            .listen(unbound, Some(ZonedAddr::Unzoned(local_ip::<I>())), Some(LOCAL_PORT))
             .expect("listen should succeed")
     }
 
-    fn bind_as_connected<I: TestIpExt>(ctx: &mut UdpMultipleDevicesCtx, unbound: SocketId<I>) {
+    fn bind_as_connected<I: TestIpExt>(ctx: &mut UdpMultipleDevicesCtx, unbound: &SocketId<I>) {
         UdpApi::<I, _>::new(ctx.as_mut())
             .connect(
-                &unbound,
+                unbound,
                 Some(ZonedAddr::Unzoned(I::get_other_remote_ip_address(1))),
                 REMOTE_PORT.into(),
             )
@@ -4723,7 +4726,7 @@ mod tests {
         "any_interface_connected")]
     fn test_join_leave_multicast_succeeds<I: Ip + TestIpExt>(
         interface: MulticastMembershipInterfaceSelector<I::Addr, MultipleDevicesId>,
-        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, SocketId<I>),
+        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &SocketId<I>),
     ) {
         let mcast_addr = I::get_multicast_addr(3);
 
@@ -4759,7 +4762,7 @@ mod tests {
     #[test_case(bind_as_listener::<I>; "listener")]
     #[test_case(bind_as_connected::<I>; "connected")]
     fn test_join_multicast_fails_without_route<I: Ip + TestIpExt>(
-        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, SocketId<I>),
+        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &SocketId<I>),
     ) {
         let mcast_addr = I::get_multicast_addr(3);
 
@@ -4785,7 +4788,7 @@ mod tests {
     fn test_join_leave_multicast_interface_inferred_from_bound_device<I: Ip + TestIpExt>(
         bound_device: MultipleDevicesId,
         interface_addr: Option<SpecifiedAddr<I::Addr>>,
-        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, SocketId<I>),
+        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &SocketId<I>),
         expected_result: Result<(), SetMulticastMembershipError>,
     ) {
         let mcast_addr = I::get_multicast_addr(3);
@@ -4800,7 +4803,7 @@ mod tests {
                 UdpApi::<I, _>::new(ctx.as_mut())
                     .set_device(&unbound, Some(&bound_device))
                     .unwrap();
-                set_up_socket(ctx, unbound)
+                set_up_socket(ctx, &unbound)
             },
         );
         assert_eq!(result, expected_result);
@@ -5647,7 +5650,7 @@ mod tests {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let unbound = api.create();
-        let _: SocketInfo<_, _> = api.close(unbound);
+        let _: SocketInfo<_, _> = api.close(unbound.clone());
 
         let Wrapped { outer: sockets_state, inner: _ } = api.core_ctx();
         assert_matches!(sockets_state.as_ref().get_socket_state(&unbound), None)
@@ -6439,7 +6442,7 @@ mod tests {
                         .try_insert(c, options, EitherIpSocket::V4(SocketId::from(socket_index)))
                         .map(|entry| {
                             Socket::Conn(
-                                assert_matches!(entry.id(), EitherIpSocket::V4(id) => *id),
+                                assert_matches!(entry.id(), EitherIpSocket::V4(id) => id.clone()),
                                 entry.get_addr().clone(),
                             )
                         })
@@ -6449,7 +6452,7 @@ mod tests {
                         .try_insert(l, options, EitherIpSocket::V4(SocketId::from(socket_index)))
                         .map(|entry| {
                             Socket::Listener(
-                                assert_matches!(entry.id(), EitherIpSocket::V4(id) => *id),
+                                assert_matches!(entry.id(), EitherIpSocket::V4(id) => id.clone()),
                                 entry.get_addr().clone(),
                             )
                         })

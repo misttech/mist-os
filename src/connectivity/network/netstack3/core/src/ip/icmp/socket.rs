@@ -60,7 +60,7 @@ pub(crate) struct IcmpSockets<I: IpExt + datagram::DualStackIpExt, D: WeakId> {
 }
 
 /// An identifier for an ICMP socket.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 pub struct SocketId<I: Ip>(usize, IpVersionMarker<I>);
 
@@ -96,7 +96,7 @@ pub trait IcmpEchoBindingsContext<I: IcmpIpExt, D> {
     /// Receives an ICMP echo reply.
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
-        conn: SocketId<I>,
+        conn: &SocketId<I>,
         device_id: &D,
         src_ip: I::Addr,
         dst_ip: I::Addr,

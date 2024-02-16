@@ -542,7 +542,7 @@ impl<I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho> + Ip
 {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
-        conn: icmp::SocketId<I>,
+        conn: &icmp::SocketId<I>,
         device: &DeviceId<BindingsCtx>,
         src_ip: I::Addr,
         dst_ip: I::Addr,

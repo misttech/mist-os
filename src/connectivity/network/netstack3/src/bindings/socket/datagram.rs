@@ -75,7 +75,7 @@ pub(crate) trait Transport<I: Ip>: Debug + Sized + Send + Sync + 'static {
     const PROTOCOL: DatagramProtocol;
     /// Whether the Transport Protocol supports dualstack sockets.
     const SUPPORTS_DUALSTACK: bool;
-    type SocketId: Debug + Copy + EntryKey + Send + Sync;
+    type SocketId: Debug + EntryKey + Send + Sync;
 
     /// Match Linux and implicitly map IPv4 addresses to IPv6 addresses for
     /// dual-stack capable protocols.
@@ -872,7 +872,7 @@ impl<E> IntoErrno for core_socket::SendToError<E> {
 impl<I: IpExt> IcmpEchoBindingsContext<I, DeviceId<BindingsCtx>> for SocketCollection<I, IcmpEcho> {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
-        conn: icmp::SocketId<I>,
+        conn: &icmp::SocketId<I>,
         device: &DeviceId<BindingsCtx>,
         src_ip: I::Addr,
         dst_ip: I::Addr,

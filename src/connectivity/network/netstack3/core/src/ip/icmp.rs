@@ -2898,7 +2898,7 @@ fn receive_icmp_echo_reply<
             if let Some(socket) = socket {
                 trace!("receive_icmp_echo_reply: Received echo reply for local socket");
                 bindings_ctx.receive_icmp_echo_reply(
-                    *socket,
+                    socket,
                     &strong_device,
                     src_ip.addr(),
                     dst_ip.addr(),
@@ -3201,7 +3201,7 @@ mod tests {
     impl<I: IcmpIpExt, D> IcmpEchoBindingsContext<I, D> for FakeIcmpBindingsCtx<I> {
         fn receive_icmp_echo_reply<B: BufferMut>(
             &mut self,
-            conn: SocketId<I>,
+            conn: &SocketId<I>,
             _device_id: &D,
             src_ip: I::Addr,
             dst_ip: I::Addr,
@@ -3209,7 +3209,7 @@ mod tests {
             data: B,
         ) {
             self.state_mut().receive_icmp_echo_reply.push(ReceiveIcmpEchoReply {
-                conn,
+                conn: conn.clone(),
                 src_ip,
                 dst_ip,
                 id,

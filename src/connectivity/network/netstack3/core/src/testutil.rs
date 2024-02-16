@@ -1484,7 +1484,7 @@ impl<I: IcmpIpExt> UdpBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
 impl<I: IcmpIpExt> IcmpEchoBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
-        conn: crate::ip::icmp::socket::SocketId<I>,
+        conn: &crate::ip::icmp::socket::SocketId<I>,
         _device: &DeviceId<Self>,
         _src_ip: I::Addr,
         _dst_ip: I::Addr,
@@ -1492,7 +1492,7 @@ impl<I: IcmpIpExt> IcmpEchoBindingsContext<I, DeviceId<Self>> for FakeBindingsCt
         data: B,
     ) {
         I::map_ip(
-            (IpInvariant(self.state_mut()), conn),
+            (IpInvariant(self.state_mut()), conn.clone()),
             |(IpInvariant(mut state), conn)| {
                 let replies = state.icmpv4_replies.entry(conn).or_insert_with(Vec::default);
                 replies.push(data.as_ref().to_owned());
