@@ -139,25 +139,6 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerColor) {
   }
 }
 
-TEST_F(GoldfishDisplayTest, CheckConfigLayerCursor) {
-  constexpr int kNumLayersPerDisplay = 1;
-  // First create layer for each device
-  for (size_t i = 0; i < kNumDisplays; i++) {
-    configs_[i].layer_list[0]->type = LAYER_TYPE_CURSOR;
-  }
-
-  size_t actual_result_size = 0;
-  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
-      const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays, results_.data(),
-      results_.size(), &actual_result_size);
-  EXPECT_OK(res);
-  EXPECT_EQ(actual_result_size, kNumDisplays * kNumLayersPerDisplay);
-  for (size_t i = 0; i < kNumDisplays; i++) {
-    EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_USE_PRIMARY,
-              results_[i] & CLIENT_COMPOSITION_OPCODE_USE_PRIMARY);
-  }
-}
-
 TEST_F(GoldfishDisplayTest, CheckConfigLayerPrimary) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device

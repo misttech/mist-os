@@ -77,21 +77,6 @@ type Info = struct {
     /// GPU to convert to the preferred format.
     pixel_format vector<fuchsia.images2.PixelFormat>:MAX;
 
-    /// Cursor layer configurations supported by the underlying display engine.
-    ///
-    /// The list is empty if the display engine driving the display device does
-    /// not support cursors.
-    ///
-    /// The list is not guaranteed to contain all configurations that are
-    /// accepted by cursor layers. Drivers can choose to return a subset of
-    /// acceptable configurations, if producing the full set would take too much
-    /// effort or would use up too much memory.
-    ///
-    /// A display config that uses a cursor layer configuration in this list may
-    /// still be rejected by the driver, due to limitations that can't be
-    /// covered by this API, such as total memory bandwidth constraints.
-    cursor_configs vector<fuchsia.hardware.display.types.CursorInfo>:MAX;
-
     /// Part of a display device identifier that persists across boot cycles.
     ///
     /// If the `manufacturer_name`, `monitor_name` and `monitor_serial` fields

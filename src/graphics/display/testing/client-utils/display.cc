@@ -32,11 +32,6 @@ Display::Display(const fhd::wire::Info& info) {
     modes_.push_back(mode[i]);
   }
 
-  auto cursors = reinterpret_cast<const fhdt::wire::CursorInfo*>(info.cursor_configs.data());
-  for (unsigned i = 0; i < info.cursor_configs.count(); i++) {
-    cursors_.push_back(cursors[i]);
-  }
-
   manufacturer_name_ = fbl::String(info.manufacturer_name.data());
   monitor_name_ = fbl::String(info.monitor_name.data());
   monitor_serial_ = fbl::String(info.monitor_serial.data());
@@ -62,12 +57,6 @@ void Display::Dump() {
     printf("\t\t%d\t: %dx%d\t%d.%02d\n", i, modes_[i].horizontal_resolution,
            modes_[i].vertical_resolution, modes_[i].refresh_rate_e2 / 100,
            modes_[i].refresh_rate_e2 % 100);
-  }
-
-  printf("\n\tSupported cursor modes:\n");
-  for (unsigned i = 0; i < cursors_.size(); i++) {
-    printf("\t\t%d\t: %dx%d\t%08x\n", i, cursors_[i].width, cursors_[i].height,
-           static_cast<uint32_t>(cursors_[i].pixel_format));
   }
 
   printf("\n\t%s Physical dimension in millimeters:\n",

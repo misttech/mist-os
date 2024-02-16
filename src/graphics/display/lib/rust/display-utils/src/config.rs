@@ -8,8 +8,8 @@ use crate::{
 };
 use fidl_fuchsia_hardware_display_types as fdisplay_types;
 
-/// LayerConfig is a variant type of the three distinct layer configuration types that are
-/// supported by the display driver: Primary, Cursor, and Color.
+/// LayerConfig is a variant type of the two distinct layer configuration types that are
+/// supported by the display driver: Primary and Color.
 // TODO(armansito): Complete the missing layer parameters.
 #[derive(Clone, Debug)]
 pub enum LayerConfig {
@@ -21,9 +21,6 @@ pub enum LayerConfig {
         /// Bytes representing the color. This must conform to the layout implied by `pixel_format`.
         color_bytes: Vec<u8>,
     },
-
-    /// A cursor layer can contain a cursor bitmap.
-    Cursor,
 
     /// A primary layer is draws its pixels from a sysmem buffer backed image and supports various
     /// transofmations.

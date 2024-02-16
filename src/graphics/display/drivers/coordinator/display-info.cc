@@ -108,16 +108,6 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
   }
   out->pixel_formats = std::move(get_display_info_pixel_formats_result.value());
 
-  zx::result get_display_info_cursor_infos_result =
-      CoordinatorCursorInfo::CreateFblVectorFromBanjoVector(
-          cpp20::span(info.cursor_info_list, info.cursor_info_count));
-  if (get_display_info_cursor_infos_result.is_error()) {
-    zxlogf(ERROR, "Cannot convert cursor info to FIDL cursor info value: %s",
-           get_display_info_cursor_infos_result.status_string());
-    return get_display_info_cursor_infos_result.take_error();
-  }
-  out->cursor_infos = std::move(get_display_info_cursor_infos_result.value());
-
   if (info.panel_capabilities_source == PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE) {
     out->mode = info.panel.mode;
     return zx::ok(std::move(out));

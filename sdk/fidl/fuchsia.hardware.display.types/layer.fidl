@@ -130,16 +130,6 @@ type PrimaryLayer = struct {
     dest_frame Frame;
 };
 
-type CursorLayer = struct {
-    image Image;
-
-    /// The position of the top-left corner of the cursor's image. When being
-    /// applied to a display, the cursor is guaranteed to have at least one
-    /// pixel of overlap with the display.
-    x_pos int32;
-    y_pos int32;
-};
-
 type ColorLayer = struct {
     /// The format of `color` bytes.
     format fuchsia.images2.PixelFormat;
@@ -151,8 +141,7 @@ type ColorLayer = struct {
 
 type LayerConfig = strict union {
     1: primary PrimaryLayer;
-    2: cursor CursorLayer;
-    3: color ColorLayer;
+    2: color ColorLayer;
 };
 
 type Layer = struct {

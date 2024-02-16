@@ -48,7 +48,6 @@ namespace sysmem = fuchsia_sysmem;
 namespace sysinfo = fuchsia_sysinfo;
 
 using display_test::ColorLayer;
-using display_test::CursorLayer;
 using display_test::Display;
 using display_test::PrimaryLayer;
 using display_test::VirtualLayer;
@@ -962,8 +961,6 @@ int main(int argc, const char* argv[]) {
     layer2->SetFormatModifier(kIntelYTilingModifier);
     layers.push_back(std::move(layer2));
 
-    // Intel only supports 3 layers, so add ifdef for quick toggling of the 3rd layer
-#if 1
     // Layer which is smaller than the display and bigger than its image
     // and which animates back and forth across all displays and also
     // its src image and also rotates.
@@ -987,10 +984,6 @@ int main(int argc, const char* argv[]) {
     layer3->SetRotates(true);
     layer3->SetFormatModifier(kIntelYTilingModifier);
     layers.push_back(std::move(layer3));
-#else
-    CursorLayer* layer4 = new CursorLayer(displays);
-    layers.push_back(std::move(layer4));
-#endif
   } else if (testbundle == BUNDLE3) {
     // Mediatek display test
     uint32_t width = displays[0].mode().horizontal_resolution;

@@ -114,8 +114,7 @@ class Pipe {
                              display::ConfigStamp config_stamp,
                              const SetupGttImageFunc& setup_gtt_image,
                              const GetImagePixelFormatFunc& get_pixel_format);
-  void ConfigureCursorPlane(const cursor_layer_t* cursor, bool enable_csc,
-                            registers::pipe_arming_regs* regs, display::ConfigStamp config_stamp);
+  void DisableCursorPlane(registers::pipe_arming_regs* regs, display::ConfigStamp config_stamp);
   void SetColorConversionOffsets(bool preoffsets, const float vals[3]);
   void ResetActiveTranscoder();
   void ResetScaler();

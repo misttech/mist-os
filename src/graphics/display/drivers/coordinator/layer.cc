@@ -129,18 +129,6 @@ void Layer::ApplyChanges(const display_mode_t& mode) {
   image_t* new_image_config = nullptr;
   if (current_layer_.type == LAYER_TYPE_PRIMARY) {
     new_image_config = &current_layer_.cfg.primary.image;
-  } else if (current_layer_.type == LAYER_TYPE_CURSOR) {
-    new_image_config = &current_layer_.cfg.cursor.image;
-
-    current_cursor_x_ = pending_cursor_x_;
-    current_cursor_y_ = pending_cursor_y_;
-
-    current_layer_.cfg.cursor.x_pos =
-        std::clamp(current_cursor_x_, -static_cast<int32_t>(new_image_config->width) + 1,
-                   static_cast<int32_t>(mode.h_addressable) - 1);
-    current_layer_.cfg.cursor.y_pos =
-        std::clamp(current_cursor_y_, -static_cast<int32_t>(new_image_config->height) + 1,
-                   static_cast<int32_t>(mode.v_addressable) - 1);
   } else if (current_layer_.type == LAYER_TYPE_COLOR) {
     memcpy(current_color_bytes_, pending_color_bytes_, sizeof(current_color_bytes_));
     current_layer_.cfg.color.color_list = current_color_bytes_;
@@ -164,8 +152,6 @@ void Layer::DiscardChanges() {
   if (config_change_) {
     pending_layer_ = current_layer_;
     config_change_ = false;
-    pending_cursor_x_ = current_cursor_x_;
-    pending_cursor_y_ = current_cursor_y_;
   }
 
   memcpy(pending_color_bytes_, current_color_bytes_, sizeof(pending_color_bytes_));
@@ -233,8 +219,6 @@ bool Layer::ActivateLatestReadyImage() {
   uint64_t handle = displayed_image_->info().handle;
   if (current_layer_.type == LAYER_TYPE_PRIMARY) {
     current_layer_.cfg.primary.image.handle = handle;
-  } else if (current_layer_.type == LAYER_TYPE_CURSOR) {
-    current_layer_.cfg.cursor.image.handle = handle;
   } else {
     // type is validated in Client::CheckConfig, so something must be very wrong.
     ZX_ASSERT(false);
@@ -295,25 +279,6 @@ void Layer::SetPrimaryAlpha(fhdt::wire::AlphaMode mode, float val) {
 
   primary_layer->alpha_mode = static_cast<alpha_t>(mode);
   primary_layer->alpha_layer_val = val;
-
-  config_change_ = true;
-}
-
-void Layer::SetCursorConfig(fhdt::wire::ImageConfig image_config) {
-  pending_layer_.type = LAYER_TYPE_CURSOR;
-  pending_cursor_x_ = pending_cursor_y_ = 0;
-
-  cursor_layer_t* cursor_layer = &pending_layer_.cfg.cursor;
-  populate_image(image_config, &cursor_layer->image);
-
-  pending_image_config_gen_++;
-  pending_image_ = nullptr;
-  config_change_ = true;
-}
-
-void Layer::SetCursorPosition(int32_t x, int32_t y) {
-  pending_cursor_x_ = x;
-  pending_cursor_y_ = y;
 
   config_change_ = true;
 }

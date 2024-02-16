@@ -40,10 +40,6 @@ constexpr display::ImageId GetPrimaryImageImportId(unsigned display_index, int i
   return display::ImageId(1 + display_index * 3 + image_index);
 }
 
-constexpr display::ImageId GetCursorImageImportId(unsigned display_index) {
-  return display::ImageId(1 + display_index * 3 + 2);
-}
-
 }  // namespace
 
 static uint32_t get_fg_color() {
@@ -374,67 +370,6 @@ bool PrimaryLayer::Wait(uint32_t idx) {
     }
   }
   return true;
-}
-
-CursorLayer::CursorLayer(Display* display) : VirtualLayer(display) {}
-
-CursorLayer::CursorLayer(const fbl::Vector<Display>& displays) : VirtualLayer(displays) {}
-
-bool CursorLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
-  fhdt::wire::CursorInfo info = displays_[0]->cursor();
-  uint32_t bg_color = 0xffffffff;
-
-  image_ = Image::Create(dc, info.width, info.height, info.pixel_format, Image::Pattern::kBorder,
-                         get_fg_color(), bg_color, fuchsia_images2::wire::kFormatModifierLinear);
-  if (!image_) {
-    return false;
-  }
-  image_->Render(-1, -1);
-
-  for (unsigned i = 0; i < displays_.size(); i++) {
-    custom_layer_t* layer = CreateLayer(dc);
-    if (layer == nullptr) {
-      return false;
-    }
-
-    layer->active = true;
-    if (!image_->Import(dc, GetCursorImageImportId(i), &layer->import_info[0])) {
-      return false;
-    }
-    layer->import_info[0].events[WAIT_EVENT].signal(0, ZX_EVENT_SIGNALED);
-
-    fhdt::wire::ImageConfig image_config = {};
-    image_config.height = info.height;
-    image_config.width = info.width;
-    image_config.type = fhdt::wire::kTypeSimple;
-
-    const fhdt::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
-    auto result = dc->SetLayerCursorConfig(fidl_layer_id, image_config);
-    if (!result.ok()) {
-      printf("Setting layer config failed\n");
-      return false;
-    }
-  }
-
-  SetLayerImages(dc, false);
-
-  return true;
-}
-
-void CursorLayer::StepLayout(int32_t frame_num) {
-  fhdt::wire::CursorInfo info = displays_[0]->cursor();
-
-  x_pos_ = interpolate(width_ + info.width, frame_num, kDestFrameBouncePeriod) - info.width;
-  y_pos_ = interpolate(height_ + info.height, frame_num, kDestFrameBouncePeriod) - info.height;
-}
-
-void CursorLayer::SendLayout(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
-  uint32_t display_start = 0;
-  for (unsigned i = 0; i < displays_.size(); i++) {
-    const fhdt::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layers_[i].id);
-    ZX_ASSERT(dc->SetLayerCursorPosition(fidl_layer_id, x_pos_ - display_start, y_pos_).ok());
-    display_start += displays_[i]->mode().horizontal_resolution;
-  }
 }
 
 ColorLayer::ColorLayer(Display* display) : VirtualLayer(display) {}

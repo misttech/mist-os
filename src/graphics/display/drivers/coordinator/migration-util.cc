@@ -42,37 +42,4 @@ CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(
 
 fuchsia_images2::wire::PixelFormat CoordinatorPixelFormat::ToFidl() const { return format; }
 
-// static
-CoordinatorCursorInfo CoordinatorCursorInfo::FromBanjo(const cursor_info_t& banjo_cursor_info) {
-  return CoordinatorCursorInfo{
-      .width = banjo_cursor_info.width,
-      .height = banjo_cursor_info.height,
-      .pixel_format = CoordinatorPixelFormat::FromBanjo(banjo_cursor_info.format),
-  };
-}
-
-// static
-zx::result<fbl::Vector<CoordinatorCursorInfo>>
-CoordinatorCursorInfo::CreateFblVectorFromBanjoVector(
-    cpp20::span<const cursor_info_t> banjo_cursor_infos) {
-  fbl::AllocChecker alloc_checker;
-  fbl::Vector<CoordinatorCursorInfo> result;
-  result.reserve(banjo_cursor_infos.size(), &alloc_checker);
-  if (!alloc_checker.check()) {
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-  for (const cursor_info_t& banjo_cursor_info : banjo_cursor_infos) {
-    result.push_back(CoordinatorCursorInfo::FromBanjo(banjo_cursor_info));
-  }
-  return zx::ok(std::move(result));
-}
-
-fuchsia_hardware_display_types::wire::CursorInfo CoordinatorCursorInfo::ToFidl() const {
-  return {
-      .width = width,
-      .height = height,
-      .pixel_format = pixel_format.ToFidl(),
-  };
-}
-
 }  // namespace display

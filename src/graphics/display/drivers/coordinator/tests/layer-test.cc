@@ -73,15 +73,6 @@ TEST_F(LayerTest, PrimaryBasic) {
   layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
 }
 
-TEST_F(LayerTest, CursorBasic) {
-  Layer layer(DriverLayerId(1));
-  layer.SetCursorConfig({});
-  layer.SetCursorPosition(/*x=*/4, /*y=*/10);
-  auto image = CreateReadyImage();
-  layer.SetImage(image, kInvalidEventId, kInvalidEventId);
-  layer.ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
-}
-
 TEST_F(LayerTest, CleanUpImage) {
   Layer layer(DriverLayerId(1));
   fhdt::wire::ImageConfig image_config = {

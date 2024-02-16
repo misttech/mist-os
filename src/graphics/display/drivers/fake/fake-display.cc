@@ -121,7 +121,6 @@ void FakeDisplay::PopulateAddedDisplayArgs(added_display_args_t* args) {
   args->panel.mode = display::ToBanjoDisplayMode(timing);
   args->pixel_format_list = kSupportedPixelFormats;
   args->pixel_format_count = std::size(kSupportedPixelFormats);
-  args->cursor_info_count = 0;
 }
 
 zx_status_t FakeDisplay::InitSysmemAllocatorClient() {

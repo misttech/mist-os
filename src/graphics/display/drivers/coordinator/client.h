@@ -86,7 +86,6 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, DisplayI
   fbl::DoublyLinkedList<LayerNode*> current_layers_;
 
   fbl::Array<CoordinatorPixelFormat> pixel_formats_;
-  fbl::Array<CoordinatorCursorInfo> cursor_infos_;
 
   bool display_config_change_ = false;
 
@@ -227,10 +226,6 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
                                SetLayerPrimaryPositionCompleter::Sync& _completer) override;
   void SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
                             SetLayerPrimaryAlphaCompleter::Sync& _completer) override;
-  void SetLayerCursorConfig(SetLayerCursorConfigRequestView request,
-                            SetLayerCursorConfigCompleter::Sync& _completer) override;
-  void SetLayerCursorPosition(SetLayerCursorPositionRequestView request,
-                              SetLayerCursorPositionCompleter::Sync& _completer) override;
   void SetLayerColorConfig(SetLayerColorConfigRequestView request,
                            SetLayerColorConfigCompleter::Sync& _completer) override;
   void SetLayerImage(SetLayerImageRequestView request,

@@ -113,8 +113,6 @@ class Controller : public DeviceType,
   zx::result<fbl::Array<CoordinatorPixelFormat>> GetSupportedPixelFormats(DisplayId display_id)
       __TA_REQUIRES(mtx());
 
-  zx::result<fbl::Array<CoordinatorCursorInfo>> GetCursorInfo(DisplayId display_id)
-      __TA_REQUIRES(mtx());
   bool GetDisplayIdentifiers(DisplayId display_id, const char** manufacturer_name,
                              const char** monitor_name, const char** monitor_serial)
       __TA_REQUIRES(mtx());

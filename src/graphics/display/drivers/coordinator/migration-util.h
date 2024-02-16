@@ -49,36 +49,6 @@ constexpr bool operator!=(const CoordinatorPixelFormat& lhs, const CoordinatorPi
   return !(lhs == rhs);
 }
 
-// Cursor metadata that the display coordinator can use internally.
-struct CoordinatorCursorInfo {
- public:
-  // Converts a banjo fuchsia.hardware.display.CursorInfo typed struct to a
-  // CoordinatorCursorInfo.
-  static CoordinatorCursorInfo FromBanjo(const cursor_info_t& banjo_cursor_info);
-
-  // Creates a fbl::Vector containing converted CursorInfos from a given
-  // banjo-typed Vector got from display engine drivers. Returned values may get
-  // de-duplicated.
-  static zx::result<fbl::Vector<CoordinatorCursorInfo>> CreateFblVectorFromBanjoVector(
-      cpp20::span<const cursor_info_t> banjo_cursor_infos);
-
-  // Converts a CoordinatorCursorInfo to the FIDL fuchsia.hardware.
-  // display.CursorInfo interface.
-  fuchsia_hardware_display_types::wire::CursorInfo ToFidl() const;
-
-  uint32_t width;
-  uint32_t height;
-  CoordinatorPixelFormat pixel_format;
-};
-
-constexpr bool operator==(const CoordinatorCursorInfo& lhs, const CoordinatorCursorInfo& rhs) {
-  return lhs.width == rhs.width && lhs.height == rhs.height && lhs.pixel_format == rhs.pixel_format;
-}
-
-constexpr bool operator!=(const CoordinatorCursorInfo& lhs, const CoordinatorCursorInfo& rhs) {
-  return !(lhs == rhs);
-}
-
 }  // namespace display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_MIGRATION_UTIL_H_

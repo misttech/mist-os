@@ -176,7 +176,6 @@ mod tests {
                 id: display_types::DisplayId { value: 42 },
                 modes: vec![],
                 pixel_format: vec![],
-                cursor_configs: vec![],
                 manufacturer_name: "Test double".to_string(),
                 monitor_name: "Display #1".to_string(),
                 monitor_serial: "42".to_string(),

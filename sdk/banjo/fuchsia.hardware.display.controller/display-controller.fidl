@@ -45,16 +45,6 @@ type ConfigStamp = struct {
     value uint64;
 };
 
-/// Info about valid cursor configurations.
-type CursorInfo = struct {
-    /// The width and height of the cursor configuration, in pixels.
-    width uint32;
-    height uint32;
-
-    /// Pixel format type of the cursor buffer.
-    format FuchsiaImages2PixelFormatEnumValue;
-};
-
 /// The capabilities of a display panel.
 type Panel = strict resource union {
     /// The i2c bus to use to read this display's EDID.
@@ -91,14 +81,6 @@ type AddedDisplayArgs = resource struct {
     /// A list of pixel formats supported by the display. The first entry is the
     /// preferred pixel format.
     pixel_format vector<FuchsiaImages2PixelFormatEnumValue>:MAX;
-
-    /// A list of cursor configurations most likely to be accepted by the driver. Can
-    /// be null if cursor_count is 0.
-    ///
-    /// The driver may reject some of these configurations in some circumstances, and
-    /// it may accept other configurations, but at least one of these configurations
-    /// should be valid at most times.
-    cursor_info vector<CursorInfo>:MAX;
 };
 
 /// The client will not make any `ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL` calls into the device
@@ -207,16 +189,6 @@ type PrimaryLayer = struct {
     dest_frame Frame;
 };
 
-type CursorLayer = struct {
-    image Image;
-
-    /// The position of the top-left corner of the cursor's image. When being
-    /// applied to a display, the cursor is guaranteed to have at least one
-    /// pixel of overlap with the display.
-    x_pos int32;
-    y_pos int32;
-};
-
 type ColorLayer = struct {
     /// The format of `color` bytes.
     format FuchsiaImages2PixelFormatEnumValue;
@@ -229,14 +201,12 @@ type ColorLayer = struct {
 /// Types of layers.
 type LayerType = strict enum : uint32 {
     PRIMARY = 0;
-    CURSOR = 1;
-    COLOR = 2;
+    COLOR = 1;
 };
 
 type LayerConfig = strict union {
     1: primary PrimaryLayer;
-    2: cursor CursorLayer;
-    3: color ColorLayer;
+    2: color ColorLayer;
 };
 
 type Layer = struct {
@@ -443,8 +413,7 @@ closed protocol DisplayControllerImpl {
     ///
     /// Whether or not the driver can accept the configuration cannot depend on the
     /// particular image handles, as it must always be possible to present a new image in
-    /// place of another image with a matching configuration. It also cannot depend on the
-    /// cursor position, as that can be updated without another call to check_configuration.
+    /// place of another image with a matching configuration.
     ///
     /// `config_check_result` should be set to a CONFIG_DISPLAY_* error if the combination of
     /// display modes is not supported.

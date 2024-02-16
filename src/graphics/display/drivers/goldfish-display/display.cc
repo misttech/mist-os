@@ -278,8 +278,6 @@ void Display::DisplayControllerImplSetDisplayControllerInterface(
             },
         .pixel_format_list = kPixelFormats,
         .pixel_format_count = sizeof(kPixelFormats) / sizeof(kPixelFormats[0]),
-        .cursor_info_list = nullptr,
-        .cursor_info_count = 0,
     };
     args.push_back(display);
   }

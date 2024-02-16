@@ -79,8 +79,6 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
 
   fbl::Vector<CoordinatorPixelFormat> pixel_formats;
 
-  fbl::Vector<CoordinatorCursorInfo> cursor_infos;
-
   // Flag indicating that the display is ready to be published to clients.
   bool init_done = false;
 

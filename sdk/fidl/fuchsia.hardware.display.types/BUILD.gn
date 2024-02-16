@@ -7,7 +7,6 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.display.types") {
   sources = [
     "config.fidl",
-    "cursor.fidl",
     "display.fidl",
     "image.fidl",
     "layer.fidl",

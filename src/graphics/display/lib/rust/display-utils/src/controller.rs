@@ -241,7 +241,6 @@ impl Coordinator {
                             &retirement_event.unwrap_or(INVALID_EVENT_ID).into(),
                         )?;
                     }
-                    _ => (),
                 }
             }
         }
@@ -460,7 +459,6 @@ mod tests {
                 id: display_types::DisplayId { value: 1 },
                 modes: Vec::new(),
                 pixel_format: Vec::new(),
-                cursor_configs: Vec::new(),
                 manufacturer_name: "Foo".to_string(),
                 monitor_name: "what".to_string(),
                 monitor_serial: "".to_string(),
@@ -472,7 +470,6 @@ mod tests {
                 id: display_types::DisplayId { value: 2 },
                 modes: Vec::new(),
                 pixel_format: Vec::new(),
-                cursor_configs: Vec::new(),
                 manufacturer_name: "Bar".to_string(),
                 monitor_name: "who".to_string(),
                 monitor_serial: "".to_string(),

@@ -474,13 +474,7 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
     ConfigurePrimaryPlane(plane, primary, !!banjo_display_config->cc_flags, &scaler_1_claimed,
                           &regs, config_stamp, get_gtt_region_fn, get_pixel_format);
   }
-  cursor_layer_t* cursor = nullptr;
-  if (banjo_display_config->layer_count &&
-      banjo_display_config->layer_list[banjo_display_config->layer_count - 1]->type ==
-          LAYER_TYPE_CURSOR) {
-    cursor = &banjo_display_config->layer_list[banjo_display_config->layer_count - 1]->cfg.cursor;
-  }
-  ConfigureCursorPlane(cursor, !!banjo_display_config->cc_flags, &regs, config_stamp);
+  DisableCursorPlane(&regs, config_stamp);
 
   if (platform_ != registers::Platform::kTigerLake) {
     pipe_regs.CscMode().FromValue(regs.csc_mode).WriteTo(mmio_space_);
@@ -720,54 +714,13 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
   latest_config_stamp_with_image_[image->handle] = config_stamp;
 }
 
-void Pipe::ConfigureCursorPlane(const cursor_layer_t* cursor, bool enable_csc,
-                                registers::pipe_arming_regs_t* regs,
-                                display::ConfigStamp config_stamp) {
+void Pipe::DisableCursorPlane(registers::pipe_arming_regs* regs,
+                              display::ConfigStamp config_stamp) {
   registers::PipeRegs pipe_regs(pipe_id());
 
   auto cursor_ctrl = pipe_regs.CursorCtrl().ReadFrom(mmio_space_);
-  // The hardware requires that the cursor has at least one pixel on the display,
-  // so disable the plane if there is no overlap.
-  if (cursor == nullptr) {
-    cursor_ctrl.set_mode_select(cursor_ctrl.kDisabled).WriteTo(mmio_space_);
-    regs->cur_base = regs->cur_pos = 0;
-    return;
-  }
-
-  if (cursor->image.width == 64) {
-    cursor_ctrl.set_mode_select(cursor_ctrl.kArgb64x64);
-  } else if (cursor->image.width == 128) {
-    cursor_ctrl.set_mode_select(cursor_ctrl.kArgb128x128);
-  } else if (cursor->image.width == 256) {
-    cursor_ctrl.set_mode_select(cursor_ctrl.kArgb256x256);
-  } else {
-    // The configuration was not properly validated
-    ZX_ASSERT(false);
-  }
-  cursor_ctrl.set_pipe_csc_enable(enable_csc);
-  cursor_ctrl.WriteTo(mmio_space_);
-
-  auto cursor_pos = pipe_regs.CursorPos().FromValue(0);
-  if (cursor->x_pos < 0) {
-    cursor_pos.set_x_sign(1);
-    cursor_pos.set_x_pos(-cursor->x_pos);
-  } else {
-    cursor_pos.set_x_pos(cursor->x_pos);
-  }
-  if (cursor->y_pos < 0) {
-    cursor_pos.set_y_sign(1);
-    cursor_pos.set_y_pos(-cursor->y_pos);
-  } else {
-    cursor_pos.set_y_pos(cursor->y_pos);
-  }
-  regs->cur_pos = cursor_pos.reg_value();
-
-  uint32_t base_address = static_cast<uint32_t>(reinterpret_cast<uint64_t>(cursor->image.handle));
-  auto cursor_base = pipe_regs.CursorBase().ReadFrom(mmio_space_);
-  cursor_base.set_cursor_base(base_address >> cursor_base.kPageShift);
-  regs->cur_base = cursor_base.reg_value();
-
-  latest_config_stamp_with_image_[cursor->image.handle] = config_stamp;
+  cursor_ctrl.set_mode_select(cursor_ctrl.kDisabled).WriteTo(mmio_space_);
+  regs->cur_base = regs->cur_pos = 0;
 }
 
 display::ConfigStamp Pipe::GetVsyncConfigStamp(const std::vector<uint64_t>& image_handles) {

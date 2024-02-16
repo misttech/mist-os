@@ -196,37 +196,6 @@ class PrimaryLayer : public VirtualLayer {
   Image* images_[2];
 };
 
-class CursorLayer : public VirtualLayer {
- public:
-  explicit CursorLayer(Display* display);
-  explicit CursorLayer(const fbl::Vector<Display>& displays);
-
-  bool Init(const fidl::WireSyncClient<Coordinator>& dc) override;
-  void StepLayout(int32_t frame_num) override;
-  void SendLayout(const fidl::WireSyncClient<Coordinator>& dc) override;
-
-  bool WaitForReady() override { return true; }
-  void Render(int32_t frame_num) override {}
-
-  void* GetCurrentImageBuf() override { return nullptr; }
-  size_t GetCurrentImageSize() override { return 0; }
-
-  display::ImageId image_id(display::DisplayId display_id) const override {
-    for (unsigned i = 0; i < displays_.size(); i++) {
-      if (displays_[i]->id() == display_id && layers_[i].active) {
-        return layers_[i].import_info[0].id;
-      }
-    }
-    return display::kInvalidImageId;
-  }
-
- private:
-  uint32_t x_pos_ = 0;
-  uint32_t y_pos_ = 0;
-
-  Image* image_;
-};
-
 class ColorLayer : public VirtualLayer {
  public:
   explicit ColorLayer(Display* display);

@@ -36,9 +36,6 @@ TestFidlClient::Display::Display(const fhd::wire::Info& info) {
   for (size_t i = 0; i < info.modes.count(); i++) {
     modes_.push_back(info.modes[i]);
   }
-  for (size_t i = 0; i < info.cursor_configs.count(); i++) {
-    cursors_.push_back(info.cursor_configs[i]);
-  }
   manufacturer_name_ = fbl::String(info.manufacturer_name.data());
   monitor_name_ = fbl::String(info.monitor_name.data());
   monitor_serial_ = fbl::String(info.monitor_serial.data());

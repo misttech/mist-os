@@ -208,17 +208,6 @@ impl fmt::Display for DisplayInfo {
                 mode.vertical_resolution
             )?;
         }
-        writeln!(f, "\tCursor Configurations:")?;
-        for (i, config) in self.0.cursor_configs.iter().enumerate() {
-            writeln!(
-                f,
-                "\t\t{}:\t{} - {}x{}",
-                i,
-                PixelFormat::from(config.pixel_format),
-                config.width,
-                config.height
-            )?;
-        }
 
         write!(f, "")
     }

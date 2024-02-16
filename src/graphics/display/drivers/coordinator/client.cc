@@ -536,43 +536,6 @@ void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
   // no Reply defined
 }
 
-void Client::SetLayerCursorConfig(SetLayerCursorConfigRequestView request,
-                                  SetLayerCursorConfigCompleter::Sync& /*_completer*/) {
-  LayerId layer_id = ToLayerId(request->layer_id);
-
-  // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
-  // driver-side ID will have to be looked up in a map.
-  DriverLayerId driver_layer_id(layer_id.value());
-  auto layer = layers_.find(driver_layer_id);
-  if (!layer.IsValid()) {
-    zxlogf(ERROR, "SetLayerCursorConfig on invalid layer");
-    TearDown();
-    return;
-  }
-
-  layer->SetCursorConfig(request->image_config);
-  pending_config_valid_ = false;
-  // no Reply defined
-}
-
-void Client::SetLayerCursorPosition(SetLayerCursorPositionRequestView request,
-                                    SetLayerCursorPositionCompleter::Sync& /*_completer*/) {
-  LayerId layer_id = ToLayerId(request->layer_id);
-
-  // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
-  // driver-side ID will have to be looked up in a map.
-  DriverLayerId driver_layer_id(layer_id.value());
-  auto layer = layers_.find(driver_layer_id);
-  if (!layer.IsValid() || layer->pending_type() != LAYER_TYPE_CURSOR) {
-    zxlogf(ERROR, "SetLayerCursorPosition on invalid layer");
-    TearDown();
-    return;
-  }
-
-  layer->SetCursorPosition(request->x, request->y);
-  // no Reply defined
-}
-
 void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
                                  SetLayerColorConfigCompleter::Sync& /*_completer*/) {
   LayerId layer_id = ToLayerId(request->layer_id);
@@ -613,7 +576,7 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
     TearDown();
     return;
   }
-  if (layer->pending_type() != LAYER_TYPE_PRIMARY && layer->pending_type() != LAYER_TYPE_CURSOR) {
+  if (layer->pending_type() != LAYER_TYPE_PRIMARY) {
     zxlogf(ERROR, "SetLayerImage ordinal with bad layer type");
     TearDown();
     return;
@@ -959,12 +922,6 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
         // The formats of layer images are negotiated by sysmem between clients
         // and display engine drivers when being imported, so they are always
         // accepted by the display coordinator.
-      } else if (layer_node.layer->pending_layer_.type == LAYER_TYPE_CURSOR) {
-        // TODO(https://fxbug.dev/42076871): Currently we don't check the pixel formats,
-        // nor sizes of the imported image. These should be done when we import
-        // cursor images to the display driver, and the clients should only use
-        // images imported for cursor use on cursor layers.
-        invalid = false;
       } else if (layer_node.layer->pending_layer_.type == LAYER_TYPE_COLOR) {
         // There aren't any API constraints on valid colors.
         layer_node.layer->pending_layer_.cfg.color.color_list =
@@ -1176,14 +1133,6 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     }
     config->pixel_formats_ = std::move(get_supported_pixel_formats_result.value());
 
-    zx::result get_cursor_infos_result = controller_->GetCursorInfo(config->id);
-    if (get_cursor_infos_result.is_error()) {
-      zxlogf(WARNING, "Failed to get cursor info when processing hotplug: %s",
-             get_cursor_infos_result.status_string());
-      continue;
-    }
-    config->cursor_infos_ = std::move(get_cursor_infos_result.value());
-
     const fbl::Vector<display::DisplayTiming>* edid_timings;
     const display_mode_t* mode;
     if (!controller_->GetPanelConfig(config->id, &edid_timings, &mode)) {
@@ -1264,14 +1213,6 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     for (size_t pixel_format_index = 0; pixel_format_index < info.pixel_format.count();
          ++pixel_format_index) {
       info.pixel_format[pixel_format_index] = config->pixel_formats_[pixel_format_index].ToFidl();
-    }
-
-    info.cursor_configs =
-        fidl::VectorView<fhdt::wire::CursorInfo>(arena, config->cursor_infos_.size());
-    for (size_t cursor_config_index = 0; cursor_config_index < info.cursor_configs.count();
-         ++cursor_config_index) {
-      info.cursor_configs[cursor_config_index] =
-          config->cursor_infos_[cursor_config_index].ToFidl();
     }
 
     const char* manufacturer_name = "";

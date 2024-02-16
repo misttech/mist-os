@@ -691,25 +691,6 @@ bool Controller::GetPanelConfig(DisplayId display_id,
   return false;
 }
 
-zx::result<fbl::Array<CoordinatorCursorInfo>> Controller::GetCursorInfo(DisplayId display_id) {
-  ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
-  fbl::Array<CoordinatorCursorInfo> cursor_info_out;
-  for (auto& display : displays_) {
-    if (display.id == display_id) {
-      fbl::AllocChecker alloc_checker;
-      size_t size = display.cursor_infos.size();
-      cursor_info_out =
-          fbl::Array<CoordinatorCursorInfo>(new (&alloc_checker) CoordinatorCursorInfo[size], size);
-      if (!alloc_checker.check()) {
-        return zx::error(ZX_ERR_NO_MEMORY);
-      }
-      std::copy(display.cursor_infos.begin(), display.cursor_infos.end(), cursor_info_out.begin());
-      return zx::ok(std::move(cursor_info_out));
-    }
-  }
-  return zx::error(ZX_ERR_NOT_FOUND);
-}
-
 zx::result<fbl::Array<CoordinatorPixelFormat>> Controller::GetSupportedPixelFormats(
     DisplayId display_id) {
   ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);

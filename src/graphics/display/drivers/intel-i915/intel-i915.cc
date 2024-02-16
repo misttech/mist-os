@@ -79,20 +79,6 @@ constexpr fuchsia_images2_pixel_format_enum_value_t kSupportedFormats[] = {
         fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
 };
 
-constexpr cursor_info_t kCursorInfos[3] = {
-    {.width = 64,
-     .height = 64,
-     .format = static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-         fuchsia_images2::wire::PixelFormat::kB8G8R8A8)},
-    {.width = 128,
-     .height = 128,
-     .format = static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-         fuchsia_images2::wire::PixelFormat::kB8G8R8A8)},
-    {.width = 256,
-     .height = 256,
-     .format = static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-         fuchsia_images2::wire::PixelFormat::kB8G8R8A8)},
-};
 constexpr uint32_t kImageTypes[4] = {
     IMAGE_TYPE_SIMPLE,
     IMAGE_TYPE_X_TILED,
@@ -816,8 +802,6 @@ void Controller::CallOnDisplaysChanged(cpp20::span<DisplayDevice*> added,
     added[i]->i2c().GetProto(&added_args[i].panel.i2c);
     added_args[i].pixel_format_list = kSupportedFormats;
     added_args[i].pixel_format_count = static_cast<uint32_t>(std::size(kSupportedFormats));
-    added_args[i].cursor_info_list = kCursorInfos;
-    added_args[i].cursor_info_count = static_cast<uint32_t>(std::size(kCursorInfos));
   }
 
   uint64_t banjo_removed_display_ids[std::max(static_cast<size_t>(1), removed.size())];
@@ -1139,12 +1123,6 @@ bool Controller::GetPlaneLayer(Pipe* pipe, uint32_t plane,
         if (plane != (banjo_display_config->layer_list[j]->z_index - has_color_layer)) {
           continue;
         }
-      } else if (banjo_display_config->layer_list[j]->type == LAYER_TYPE_CURSOR) {
-        // Since the config is validated, we know the cursor is the
-        // highest plane, so we don't care about the layer's z_index.
-        if (plane != registers::kCursorPlane) {
-          continue;
-        }
       } else if (banjo_display_config->layer_list[j]->type == LAYER_TYPE_COLOR) {
         // color layers aren't a plane
         continue;
@@ -1178,11 +1156,6 @@ bool Controller::CalculateMinimumAllocations(
       const layer_t* layer;
       if (!GetPlaneLayer(pipe, plane_num, banjo_display_configs, &layer)) {
         min_allocs[pipe_id][plane_num] = 0;
-        continue;
-      }
-
-      if (layer->type == LAYER_TYPE_CURSOR) {
-        min_allocs[pipe_id][plane_num] = 8;
         continue;
       }
 
@@ -1388,9 +1361,6 @@ void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t*> ban
 
         data_rate_bytes_per_frame[pipe_id][plane_num] =
             uint64_t{scaled_width} * scaled_height * bytes_per_pixel;
-      } else if (layer->type == LAYER_TYPE_CURSOR) {
-        // Use a tiny data rate so the cursor gets the minimum number of buffers
-        data_rate_bytes_per_frame[pipe_id][plane_num] = 1;
       } else {
         // Other layers don't use pipe/planes, so GetPlaneLayer should have returned false
         ZX_ASSERT(false);
@@ -1754,25 +1724,6 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
             } else {
               total_scalers_needed += scalers_needed;
             }
-          }
-          break;
-        }
-        case LAYER_TYPE_CURSOR: {
-          if (j != banjo_display_config->layer_count - 1) {
-            current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
-          }
-          const image_t* image = &banjo_display_config->layer_list[j]->cfg.cursor.image;
-          if (image->type != IMAGE_TYPE_SIMPLE) {
-            current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
-          }
-          bool found = false;
-          for (unsigned x = 0; x < std::size(kCursorInfos) && !found; x++) {
-            found =
-                image->width == kCursorInfos[x].width && image->height == kCursorInfos[x].height;
-          }
-          if (!found) {
-            out_client_composition_opcodes_list[client_composition_opcodes_offset + j] |=
-                CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
           }
           break;
         }

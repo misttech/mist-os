@@ -219,30 +219,6 @@ closed protocol Coordinator {
         val float32;
     });
 
-    // Configures the layer as a cursor layer with the given config. The
-    // default position is (0, 0).
-    //
-    // See the documentation on SetLayerImage for details on how this method
-    // affects the layer's contents.
-    //
-    // It is illegal to call this on an invalid layer.
-    strict SetLayerCursorConfig(struct {
-        layer_id fuchsia.hardware.display.types.LayerId;
-        image_config fuchsia.hardware.display.types.ImageConfig;
-    });
-
-    // Updates the cursor position.
-    //
-    // The driver will clamp x to [-cursor_width + 1, display_width - 1] and
-    // will clamp y to [-cursor_height + 1, display_height - 1].
-    //
-    // It is illegal to call this on a non-cursor layer.
-    strict SetLayerCursorPosition(struct {
-        layer_id fuchsia.hardware.display.types.LayerId;
-        x int32;
-        y int32;
-    });
-
     // Configures the layer as a color layer with the given color in
     // `pixel_format`.
     //
@@ -275,8 +251,8 @@ closed protocol Coordinator {
     //
     // By default, the driver retains an active image until a new image becomes
     // active. However, setting a layer's ImageConfig with SetLayerPrimaryConfig
-    // or SetLayerCursorConfig reset the layer's active and pending images, even
-    // if the new ImageConfig matches the old ImageConfig.
+    // resets the layer's active and pending images, even if the new ImageConfig
+    // matches the old ImageConfig.
     //
     // An image cannot be used for multiple layers simultaneously, nor can an
     // image be given back to the display coordinator while it is still in use.
@@ -303,9 +279,9 @@ closed protocol Coordinator {
     // configuration. If res is UNSUPPORTED_CONFIG, then ops will be
     // non-empty.
     //
-    // Most SetX operation require re-validating the configuration. The exception
-    // are SetLayerCursorPosition and SetLayerImage - these operations do not
-    // modify the configuration in a way which requires revalidation.
+    // Most SetX operations require revalidating the configuration. The
+    // following operations do not require revalidation.
+    // * SetLayerImage()
     //
     // If discard is true, the pending changes will be discarded after validation.
     strict CheckConfig(struct {

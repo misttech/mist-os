@@ -47,10 +47,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
   friend LayerTest;
 
   bool in_use() const { return current_node_.InContainer() || pending_node_.InContainer(); }
-  const image_t* pending_image() const {
-    return pending_layer_.type == LAYER_TYPE_PRIMARY ? &pending_layer_.cfg.primary.image
-                                                     : &pending_layer_.cfg.cursor.image;
-  }
+  const image_t* pending_image() const { return &pending_layer_.cfg.primary.image; }
   auto current_type() const { return current_layer_.type; }
   auto pending_type() const { return pending_layer_.type; }
 
@@ -103,8 +100,6 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
                           fuchsia_hardware_display_types::wire::Frame src_frame,
                           fuchsia_hardware_display_types::wire::Frame dest_frame);
   void SetPrimaryAlpha(fuchsia_hardware_display_types::wire::AlphaMode mode, float val);
-  void SetCursorConfig(fuchsia_hardware_display_types::wire::ImageConfig image_config);
-  void SetCursorPosition(int32_t x, int32_t y);
   void SetColorConfig(fuchsia_images2::wire::PixelFormat pixel_format,
                       ::fidl::VectorView<uint8_t> color_bytes);
   void SetImage(fbl::RefPtr<Image> image_id, EventId wait_event_id, EventId signal_event_id);
@@ -143,11 +138,6 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
   // Counters used for keeping track of when the layer's images need to be dropped.
   uint64_t pending_image_config_gen_ = 0;
   uint64_t current_image_config_gen_ = 0;
-
-  int32_t pending_cursor_x_;
-  int32_t pending_cursor_y_;
-  int32_t current_cursor_x_;
-  int32_t current_cursor_y_;
 
   // Storage for a color layer's color data bytes.
   uint8_t pending_color_bytes_[4];

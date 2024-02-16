@@ -151,7 +151,6 @@ void Vout::PopulateAddedDisplayArgs(
       args->panel.mode = display::ToBanjoDisplayMode(display_timing);
       args->pixel_format_list = pixel_formats.data();
       args->pixel_format_count = pixel_formats.size();
-      args->cursor_info_count = 0;
       return;
     }
     case VoutType::kHdmi:
@@ -161,7 +160,6 @@ void Vout::PopulateAddedDisplayArgs(
       args->panel.i2c.ctx = this;
       args->pixel_format_list = pixel_formats.data();
       args->pixel_format_count = pixel_formats.size();
-      args->cursor_info_count = 0;
       return;
   }
   ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));

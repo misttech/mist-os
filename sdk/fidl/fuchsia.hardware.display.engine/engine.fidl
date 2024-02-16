@@ -108,14 +108,6 @@ type AddedDisplayArgs = resource struct {
     /// A list of pixel formats supported by the display. The first entry is the
     /// preferred pixel format.
     pixel_formats vector<fuchsia.images2.PixelFormat>:MAX;
-
-    /// A list of cursor configurations most likely to be accepted by the
-    /// driver.
-    ///
-    /// The driver may reject some of these configurations in some
-    /// circumstances, and it may accept other configurations, but at least one
-    /// of these configurations should be valid at most times.
-    cursor_configs vector<fuchsia.hardware.display.types.CursorInfo>:MAX;
 };
 
 /// This protocol is `open` while under development.
@@ -192,9 +184,7 @@ open protocol Engine {
     ///
     /// Whether or not the driver can accept the configuration cannot depend on
     /// the particular image handles, as it must always be possible to present
-    /// a new image in place of another image with a matching configuration. It
-    /// also cannot depend on the cursor position, as that can be updated
-    /// without another call to `CheckConfiguration`.
+    /// a new image in place of another image with a matching configuration.
     ///
     /// `config_check_result` should be set to a CONFIG_DISPLAY_* error if the
     /// combination of display modes is not supported.
