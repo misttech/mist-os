@@ -39,6 +39,24 @@ _all_named_fuchsia_envs += [
   },
 ]
 
+bt_lacewing_sherlock_env = {
+  dimensions = {
+    device_type = "Sherlock"
+    pool = "fuchsia.tests.bluetooth"
+    sherlocks = "2"
+    testbed = "lacewing_bt_Sherlock"
+  }
+}
+
+bt_lacewing_vim3_env = {
+  dimensions = {
+    device_type = "Vim3"
+    pool = "fuchsia.tests.bluetooth"
+    vim3s = "2"
+    testbed = "lacewing_bt_vim3"
+  }
+}
+
 linux_env = {
   dimensions = {
     os = "Linux"
@@ -241,6 +259,12 @@ guest_vulkan_envs = guest_envs - [
                       nuc11_env,
                       gce_env,
                     ]
+
+# Set of environments for Lacewing Bluetooth multi-device testing.
+lacewing_bluetooth_envs = [
+  bt_lacewing_sherlock_env,
+  bt_lacewing_vim3_env,
+]
 
 basic_envs = []
 foreach(name, basic_env_names) {

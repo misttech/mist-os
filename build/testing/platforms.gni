@@ -252,4 +252,16 @@ test_platforms = [
     iperf_servers = "1"
     pool = "fuchsia.tests.connectivity"
   },
+  {
+    device_type = "Sherlock"
+    pool = "fuchsia.tests.bluetooth"
+    sherlocks = "2"
+    testbed = "lacewing_bt_Sherlock"
+  },
+  {
+    device_type = "Vim3"
+    pool = "fuchsia.tests.bluetooth"
+    testbed = "lacewing_bt_vim3"
+    vim3s = "2"
+  },
 ]
