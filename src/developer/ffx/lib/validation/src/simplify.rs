@@ -21,6 +21,10 @@ use std::{
 
 use crate::schema::{InlineValue, Type, ValueType};
 
+use self::compare::{cmp_processed_types, is_sorted_and_deduped_by};
+
+mod compare;
+
 /// Chain of active type aliases.
 ///
 /// This type is bump allocated. `drop` will not be called.
@@ -62,11 +66,12 @@ struct AliasInfo<'bump> {
 
 pub struct Ctx<'bump> {
     alias: AliasCtx<'bump>,
+    sorted: bool,
 }
 
 impl<'bump> Ctx<'bump> {
     pub fn new() -> Self {
-        Self { alias: AliasCtx { current: None, info: HashMap::new() } }
+        Self { alias: AliasCtx { current: None, info: HashMap::new() }, sorted: true }
     }
 
     /// Processes a single type, applying edits until it no longer has any edits to apply.
@@ -112,6 +117,7 @@ impl<'bump> Ctx<'bump> {
     ) -> ControlFlow<&'bump Type<'bump>> {
         ProcessAlias.edit(bump, self, ty)?;
         ProcessTuple.edit(bump, self, ty)?;
+        ProcessUnion.edit(bump, self, ty)?;
 
         // No edits occurred
         Continue(())
@@ -247,6 +253,80 @@ impl<'bump> Editor<'bump> for ProcessAlias {
     }
 }
 
+/// Processes union types by removing redundancies and rewriting inner types.
+///
+/// Unions containing `Type::Any` type are replaced with `Type::Any`, since they're functionally
+/// equivalent.
+///
+/// `Type::Void` union variants are removed, since they'll never match.
+///
+/// Empty unions are replaced with `Type::Void` since they'll never match against a value.
+///
+/// If requested, union fields are sorted and deduplicated by type.
+struct ProcessUnion;
+
+impl<'bump> Editor<'bump> for ProcessUnion {
+    fn edit(
+        &mut self,
+        bump: &'bump Bump,
+        ctx: &mut Ctx<'bump>,
+        ty: &'bump Type<'bump>,
+    ) -> ControlFlow<&'bump Type<'bump>> {
+        let Type::Union(mut tys) = *ty else { return Continue(()) };
+
+        let mut new_tys = rewrite_slice::<&'bump Type<'bump>>(
+            bump,
+            ctx,
+            tys,
+            RewriteFns {
+                type_from_item: |ty| ty,
+                remove_item_if: |ty| matches!(ty, Type::Void),
+                replace_whole_type_with: |ty| {
+                    // A union containing Any can be simplified to just Any.
+                    if matches!(ty, Type::Any) {
+                        Some(&Type::Any)
+                    } else {
+                        None
+                    }
+                },
+            },
+        )?;
+
+        let compare = |lhs: &&Type<'_>, rhs: &&Type<'_>| cmp_processed_types(*lhs, *rhs);
+        if ctx.sorted && !is_sorted_and_deduped_by(new_tys.as_deref().unwrap_or(tys), compare) {
+            // If the union's types aren't sorted or there are duplicates, sort and dedup.
+            let new_tys: &mut BumpVec<'_, &Type<'_>> =
+                new_tys.get_or_insert_with(|| BumpVec::from_iter_in(tys.iter().copied(), bump));
+            new_tys.sort_by(compare);
+            new_tys.dedup_by(|l, r| compare(l, r).is_eq());
+        }
+
+        let changed = new_tys.is_some();
+
+        if let Some(new_tys) = new_tys {
+            tys = new_tys.into_bump_slice();
+        }
+
+        // An empty union matches nothing.
+        if tys.is_empty() {
+            return Break(&Type::Void);
+        }
+
+        // A union type with a single member is just the member.
+        if let [single] = tys {
+            return Break(*single);
+        }
+
+        if changed {
+            // Allocate new type
+            Break(bump.alloc(Type::Union(tys)))
+        } else {
+            // Keep original type
+            Continue(())
+        }
+    }
+}
+
 /// Processes tuples by rewriting field types.
 ///
 /// Tuples containing required `Type::Void` fields replaced with `Type::Void`, since it will never
@@ -300,7 +380,7 @@ impl<'bump> Editor<'bump> for ProcessTuple {
 mod test {
     use ffx_validation_proc_macro::schema;
 
-    use crate::schema::{Nothing, Schema, ValueType};
+    use crate::schema::{json::Any, Field, Nothing, Schema, ValueType};
 
     use super::*;
 
@@ -358,6 +438,162 @@ mod test {
 
         assert!(changed);
         assert!(matches!(ty, Type::Type { ty: ValueType::Null }));
+    }
+
+    #[test]
+    fn test_empty_union() {
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = &Type::Union(&[]);
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(ty, Type::Void));
+    }
+
+    #[test]
+    fn test_union_unchanged() {
+        struct Union;
+        schema! {
+            // Use transparent to avoid unwrapping an alias, which would set the changed flag
+            #[transparent]
+            type Union = u32 | String;
+        }
+
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = Union::TYPE;
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(!changed);
+        assert!(matches!(
+            ty,
+            Type::Union([
+                Type::Type { ty: ValueType::Integer },
+                Type::Type { ty: ValueType::String }
+            ])
+        ));
+    }
+
+    #[test]
+    fn test_union_remove_void() {
+        struct Union;
+        schema! {
+            type Union = Nothing | u32 | String;
+        }
+
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = Union::TYPE;
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(
+            ty,
+            Type::Union([
+                Type::Type { ty: ValueType::Integer },
+                Type::Type { ty: ValueType::String }
+            ])
+        ));
+    }
+
+    #[test]
+    fn test_union_to_any() {
+        struct Union;
+        schema! {
+            type Union = Nothing | Any | String;
+        }
+
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = Union::TYPE;
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(ty, Type::Any));
+    }
+
+    #[test]
+    fn test_union_single_type() {
+        struct Union;
+        schema! {
+            type Union = Nothing | String;
+        }
+
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = Union::TYPE;
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(ty, Type::Type { ty: ValueType::String }));
+    }
+
+    #[test]
+    fn test_union_sorting() {
+        struct Union;
+        schema! {
+            type Union = String | u32 | struct { a: String } | struct { a: u32 };
+        }
+
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = Union::TYPE;
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(
+            ty,
+            Type::Union([
+                Type::Type { ty: ValueType::Integer },
+                Type::Type { ty: ValueType::String },
+                Type::Struct {
+                    fields: [Field {
+                        key: "a",
+                        value: Type::Type { ty: ValueType::Integer },
+                        optional: false,
+                    }],
+                    extras: None,
+                },
+                Type::Struct {
+                    fields: [Field {
+                        key: "a",
+                        value: Type::Type { ty: ValueType::String },
+                        optional: false,
+                    }],
+                    extras: None,
+                },
+            ])
+        ));
+    }
+
+    #[test]
+    fn test_union_deduplication() {
+        struct Union;
+        schema! {
+            type Union = String | u32 | String | SimpleAlias;
+        }
+
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = Union::TYPE;
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(
+            ty,
+            Type::Union([
+                Type::Type { ty: ValueType::Integer },
+                Type::Type { ty: ValueType::String },
+            ])
+        ));
     }
 
     #[test]

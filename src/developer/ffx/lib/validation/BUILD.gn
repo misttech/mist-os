@@ -15,6 +15,7 @@ rustc_library("lib") {
     "src/schema/inline_value.rs",
     "src/schema/macros.rs",
     "src/simplify.rs",
+    "src/simplify/compare.rs",
     "src/validate.rs",
     "src/validate/compare.rs",
   ]
