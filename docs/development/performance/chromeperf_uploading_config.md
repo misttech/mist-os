@@ -43,9 +43,9 @@ because it spans several locations:
     happens:
 
     *   Each test may generate `*.fuchsiaperf.json` files.
-    *   Tests that generate `fuchsiaperf` files pass them to the
-        [`performance.dart`][performance.dart] library. That does two
-        things with each `fuchsiaperf` file:
+    *   Tests that generate `fuchsiaperf` files pass them to the Python
+        [`perf_publish`][perf_publish] library or to the Dart [`performance.dart`][performance.dart]
+        library. That does two things with each `fuchsiaperf` file:
         *   It copies the `fuchsiaperf` file to the shard's output
             directory. `fuchsiaperf` files in this location are used
             by the per-build results summary pages (including for
@@ -71,9 +71,9 @@ When uploading to Chromeperf is disabled for a builder (which is the
 case for all CQ builders and for CI builders not listed in
 `catapult.star`), the `catapult_*` input properties are not set, and so
 the `CATAPULT_*` environment variables do not get set.
-`performance.dart` still runs `catapult_converter`, in order to check
-that the conversion succeeds, but it produces `*.catapult_json_disabled`
-files rather than `*.catapult_json` files.
+`performance.dart` and [`perf_publish`][perf_publish] still run `catapult_converter`,
+in order to check that the conversion succeeds, but they produce
+`*.catapult_json_disabled` files rather than `*.catapult_json` files.
 
 ## Limitations and hazards
 
@@ -115,6 +115,7 @@ for configuring regression alerting. This includes a file for Fuchsia,
 
 
 [internal-doc]: <https://goto.google.com/fuchsia-chromeperf-uploading>
+[perf_publish]: /src/performance/lib/perf_publish
 [performance.dart]: /sdk/testing/sl4f/client/lib/src/performance.dart
 [catapult_converter]: /src/testing/catapult_converter/
 [upload tool]: <https://fuchsia.googlesource.com/infra/infra/+/HEAD/cmd/catapult/>

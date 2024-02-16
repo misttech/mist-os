@@ -7,9 +7,9 @@ The format used for Fuchsia performance test results is the
 [`fuchsiaperf.json`](fuchsiaperf_format.md) format. All performance
 tests that run on Fuchsia Infra and whose results are tracked by the
 Fuchsia tools produce results in the `fuchsiaperf.json` format. All of
-these tests are run through the Dart-based SL4F testing framework,
-though in many cases the Dart SL4F code is just a small wrapper that
-runs some other test program that generates a `fuchsiaperf.json` file.
+these tests are run through the Python-based Lacewing framework or the
+Dart-based SL4F testing framework, though in many cases the Python code
+is hidden from view and developers just need to write GN.
 
 ## Options
 
@@ -19,6 +19,24 @@ depending on which programming language you want to use.
 The low level options listed below are thin wrappers for outputting
 `fuchsiaperf` JSON files, whereas the higher level options make more
 assumptions about the type of performance test being written.
+
+*   **Python:**
+
+    *   **High level:** You can use the Python [`trace_processing`
+        library][py_trace_processing] to extract performance metrics
+        Fuchsia traces. This approach is useful if you have an from
+        existing correctness test and you want to extend it to also
+        produce performance results. In that case, it is common to
+        modify the software-under-test to generate extra trace events.
+
+        An example is [`perftest_trace_events_test`][perftest_trace_events_test]
+        which uses the `trace_processing` library and extracts a set of events.
+
+        The test should use the [`python_perf_test`][python_perf_test]
+        template as it includes all the necessary dependencies for trace
+        processing and metrics publishing.
+
+        <!-- TODO(https://fxbug.dev/305080561): link to a better example -->
 
 *   **Dart:**
 
@@ -71,14 +89,26 @@ assumptions about the type of performance test being written.
     *   **Low level:** You can use the [go-benchmarking] library to
         generate `fuchsiaperf.json` files.
 
+## Declaring tests in GN
+
+For a wide amount of benchmarks, we only need to write the target side
+component, run it, process the fuchsiaperf file outputted by the test
+and publish the results. The template
+[`fuchsia_component_perf_test`][perf_test_gn] simplifies this.
+The template [`python_perf_test`][perf_test_gn] can be used by other host-side
+tests written in Python that deal with performance metrics.
+
 
 [dart-wrappers]: /src/tests/end_to_end/perf/test/
-[trace_processing]: /sdk/testing/sl4f/client/lib/src/trace_processing/
+[fuchsia-criterion Rust library]: /src/developer/fuchsia-criterion/
+[Fuchsiaperf Rust library]: /src/performance/lib/fuchsiaperf/src/lib.rs
+[go-benchmarking]: /src/lib/go-benchmarking/
 [metrics_results]: /sdk/testing/sl4f/client/lib/src/trace_processing/metrics_results.dart
 [perftest C++ library]: /zircon/system/ulib/perftest/
 [perftest.h]: /zircon/system/ulib/perftest/include/perftest/perftest.h
 [perftest/results.h]: /zircon/system/ulib/perftest/include/perftest/results.h
-[fuchsia-criterion Rust library]: /src/developer/fuchsia-criterion/
-[go-benchmarking]: /src/lib/go-benchmarking/
-[Fuchsiaperf Rust library]: /src/performance/lib/fuchsiaperf/src/lib.rs
-
+[perf_test_gn]: /build/testing/perf/test.gni
+[perftest_trace_events_test]: /src/tests/end_to_end/perf/test/perftest_trace_events_test.py
+[python_perf_test]: /build/testing/perf/test.gni
+[py_trace_processing]: /src/performance/lib/trace_processing/
+[trace_processing]: /sdk/testing/sl4f/client/lib/src/trace_processing/
