@@ -1,0 +1,54 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# This file exports variables containing the currently checked-out git revisions
+# of the following third-party repositories:
+#
+#  - gwp_asan_git_revision
+#  - llvm_libc_git_revision
+#  - scudo_git_revision
+#
+# They can be used during soft-migrations in conditional statements to stay
+# compatible with both the old and the new revision at the same time, e.g.:
+#
+#   libc_source_set("scudo-allocator") {
+#     ...
+#     if (scudo_git_revision != "<git hash of the old revision>") {
+#       sources += [ "file_that_only_exists_in_the_new_revision.cpp" ]
+#     }
+#   }
+
+import("//build/checkout.gni")
+import("libc.gni")
+
+_gwp_asan_git_path = "${gwp_asan}/.git"
+_llvm_libc_git_path = "${llvm_libc}/.git"
+_scudo_git_path = "${scudo}/.git"
+
+# If submodules are in use, their .git is actually a text file pointing to the
+# real git directory, which is stored inside the root project's .git directory.
+# For instance, third_party/scudo/src/.git will contain:
+#   gitdir: ../../../.git/modules/third_party%2fscudo%2fsrc
+if (submodules) {
+  _gwp_asan_git_link = read_file(_gwp_asan_git_path, "string")
+  _gwp_asan_git_link_split = string_split(_gwp_asan_git_link)
+  assert(_gwp_asan_git_link_split[0] == "gitdir:")
+  _gwp_asan_git_path = "${gwp_asan}/${_gwp_asan_git_link_split[1]}"
+
+  _llvm_libc_git_link = read_file(_llvm_libc_git_path, "string")
+  _llvm_libc_git_link_split = string_split(_llvm_libc_git_link)
+  assert(_llvm_libc_git_link_split[0] == "gitdir:")
+  _llvm_libc_git_path = "${llvm_libc}/${_llvm_libc_git_link_split[1]}"
+
+  _scudo_git_link = read_file(_scudo_git_path, "string")
+  _scudo_git_link_split = string_split(_scudo_git_link)
+  assert(_scudo_git_link_split[0] == "gitdir:")
+  _scudo_git_path = "${scudo}/${_scudo_git_link_split[1]}"
+}
+
+libc_git_revisions = {
+  gwp_asan = read_file("${_gwp_asan_git_path}/HEAD", "trim string")
+  llvm_libc = read_file("${_llvm_libc_git_path}/HEAD", "trim string")
+  scudo = read_file("${_scudo_git_path}/HEAD", "trim string")
+}
