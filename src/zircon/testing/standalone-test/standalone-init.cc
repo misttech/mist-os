@@ -21,7 +21,7 @@
 namespace standalone {
 namespace {
 
-zx::resource root_resource, mmio_root_resource, system_root_resource;
+zx::resource root_resource, ioport_resource, mmio_resource, system_resource;
 
 constexpr std::string_view kMissingRootResource =
     "*** standalone-test must run directly from userboot ***\n";
@@ -56,14 +56,19 @@ zx::unowned_resource GetRootResource() {
   return root_resource.borrow();
 }
 
-zx::unowned_resource GetMmioRootResource() {
-  ZX_ASSERT_MSG(mmio_root_resource, "standalone test didn't receive MMIO root resource");
-  return mmio_root_resource.borrow();
+zx::unowned_resource GetIoportResource() {
+  ZX_ASSERT_MSG(ioport_resource, "standalone test didn't receive Ioport resource");
+  return ioport_resource.borrow();
 }
 
-zx::unowned_resource GetSystemRootResource() {
-  ZX_ASSERT_MSG(system_root_resource, "standalone test didn't receive system root resource");
-  return system_root_resource.borrow();
+zx::unowned_resource GetMmioResource() {
+  ZX_ASSERT_MSG(mmio_resource, "standalone test didn't receive MMIO resource");
+  return mmio_resource.borrow();
+}
+
+zx::unowned_resource GetSystemResource() {
+  ZX_ASSERT_MSG(system_resource, "standalone test didn't receive system  resource");
+  return system_resource.borrow();
 }
 
 // This overrides a weak definition in libc, replacing the hook that's
@@ -89,12 +94,16 @@ extern "C" [[gnu::retain]] __EXPORT void __libc_extensions_init(uint32_t count,
         }
         break;
 
+      case PA_IOPORT_RESOURCE:
+        ioport_resource.reset(take_handle(n));
+        break;
+
       case PA_MMIO_RESOURCE:
-        mmio_root_resource.reset(take_handle(n));
+        mmio_resource.reset(take_handle(n));
         break;
 
       case PA_SYSTEM_RESOURCE:
-        system_root_resource.reset(take_handle(n));
+        system_resource.reset(take_handle(n));
         break;
 
       case PA_NS_DIR: {

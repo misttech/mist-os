@@ -26,7 +26,7 @@ namespace {
 zx::result<zx::resource> GetSystemProfileResource() {
   zx::resource system_profile_resource;
   const zx_status_t status =
-      zx::resource::create(*standalone::GetSystemRootResource(), ZX_RSRC_KIND_SYSTEM,
+      zx::resource::create(*standalone::GetSystemResource(), ZX_RSRC_KIND_SYSTEM,
                            ZX_RSRC_SYSTEM_PROFILE_BASE, 1, nullptr, 0, &system_profile_resource);
   if (status != ZX_OK) {
     return zx::error(status);
@@ -204,7 +204,7 @@ TEST(SchedulerProfileTest, CreateProfileOnNonProfileResourceIsAccessDenied) {
   zx_profile_info_t profile_info = MakeSchedulerProfileInfo(ZX_PRIORITY_DEFAULT);
   zx::profile profile;
   zx::resource power_resource;
-  zx::resource::create(*standalone::GetSystemRootResource(), ZX_RSRC_KIND_SYSTEM,
+  zx::resource::create(*standalone::GetSystemResource(), ZX_RSRC_KIND_SYSTEM,
                        ZX_RSRC_SYSTEM_POWER_BASE, 1, nullptr, 0, &power_resource);
 
   ASSERT_EQ(ZX_ERR_ACCESS_DENIED, zx::profile::create(power_resource, 0u, &profile_info, &profile));

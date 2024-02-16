@@ -114,7 +114,7 @@ zx::result<> ZbiTestEntry::Init(int argc, char** argv) {
   }
 
   zx_status_t status =
-      zx::resource::create(*standalone::GetSystemRootResource(), ZX_RSRC_KIND_SYSTEM,
+      zx::resource::create(*standalone::GetSystemResource(), ZX_RSRC_KIND_SYSTEM,
                            ZX_RSRC_SYSTEM_MEXEC_BASE, 1, nullptr, 0, &mexec_resource_);
   if (status != ZX_OK || !mexec_resource_.is_valid()) {
     printf("%s: unable to get ahold of the mexec resource\n", program_name);

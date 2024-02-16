@@ -30,7 +30,7 @@ namespace {
 zx::result<zx::resource> GetSystemCpuResource() {
   zx::resource system_cpu_resource;
   const zx_status_t status =
-      zx::resource::create(*standalone::GetSystemRootResource(), ZX_RSRC_KIND_SYSTEM,
+      zx::resource::create(*standalone::GetSystemResource(), ZX_RSRC_KIND_SYSTEM,
                            ZX_RSRC_SYSTEM_CPU_BASE, 1, nullptr, 0, &system_cpu_resource);
   if (status != ZX_OK) {
     return zx::error(status);

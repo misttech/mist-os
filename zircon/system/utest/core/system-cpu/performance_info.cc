@@ -66,7 +66,7 @@ zx::result<size_t> GetCpuCount() {
 zx::result<zx::resource> GetSystemProfileResource() {
   zx::resource system_profile_resource;
   const zx_status_t status =
-      zx::resource::create(*standalone::GetSystemRootResource(), ZX_RSRC_KIND_SYSTEM,
+      zx::resource::create(*standalone::GetSystemResource(), ZX_RSRC_KIND_SYSTEM,
                            ZX_RSRC_SYSTEM_PROFILE_BASE, 1, nullptr, 0, &system_profile_resource);
   if (status != ZX_OK) {
     return zx::error(status);
@@ -77,7 +77,7 @@ zx::result<zx::resource> GetSystemProfileResource() {
 zx::result<zx::resource> GetSystemCpuResource() {
   zx::resource system_cpu_resource;
   const zx_status_t status =
-      zx::resource::create(*standalone::GetSystemRootResource(), ZX_RSRC_KIND_SYSTEM,
+      zx::resource::create(*standalone::GetSystemResource(), ZX_RSRC_KIND_SYSTEM,
                            ZX_RSRC_SYSTEM_CPU_BASE, 1, nullptr, 0, &system_cpu_resource);
   if (status != ZX_OK) {
     return zx::error(status);
@@ -88,7 +88,7 @@ zx::result<zx::resource> GetSystemCpuResource() {
 zx::result<zx::resource> GetSystemInfoResource() {
   zx::resource system_info_resource;
   const zx_status_t status =
-      zx::resource::create(*standalone::GetSystemRootResource(), ZX_RSRC_KIND_SYSTEM,
+      zx::resource::create(*standalone::GetSystemResource(), ZX_RSRC_KIND_SYSTEM,
                            ZX_RSRC_SYSTEM_INFO_BASE, 1, nullptr, 0, &system_info_resource);
   if (status != ZX_OK) {
     return zx::error(status);
@@ -96,9 +96,7 @@ zx::result<zx::resource> GetSystemInfoResource() {
   return zx::ok(std::move(system_info_resource));
 }
 
-zx::result<zx::unowned_resource> GetMmioResource() {
-  return zx::ok(standalone::GetMmioRootResource());
-}
+zx::result<zx::unowned_resource> GetMmioResource() { return zx::ok(standalone::GetMmioResource()); }
 
 template <typename Callable>
 zx_status_t RunThread(Callable&& callable) {
@@ -348,7 +346,8 @@ TEST(SystemCpu, GetPerformanceInfo) {
 }
 
 // Verify that the scheduler's target preemption time is properly updated when the performance scale
-// changes. Failure to maintain consistency will result in a kernel panic. See https://fxbug.dev/42167963.
+// changes. Failure to maintain consistency will result in a kernel panic. See
+// https://fxbug.dev/42167963.
 TEST(SystemCpu, TargetPreemptionTimeAssert) {
   if (GetCpuCount() < kTestThreadCpu + 1) {
     return;

@@ -23,9 +23,11 @@ static uint64_t mmio_test_base;
 
 const zx::unowned_resource root() { return standalone::GetRootResource(); }
 
-const zx::unowned_resource mmio_root() { return standalone::GetMmioRootResource(); }
+const zx::unowned_resource get_ioport() { return standalone::GetIoportResource(); }
 
-const zx::unowned_resource system_root() { return standalone::GetSystemRootResource(); }
+const zx::unowned_resource get_mmio() { return standalone::GetMmioResource(); }
+
+const zx::unowned_resource get_system() { return standalone::GetSystemResource(); }
 
 // Physical memory is reserved during boot and its location varies based on
 // system and architecture. What this 'test' does is scan MMIO space looking
@@ -45,8 +47,8 @@ TEST(Resource, ProbeAddressSpace) {
   uint64_t step = 0x100000000;
   for (uint64_t base = 0; base < UINT64_MAX - step; base += step) {
     zx::resource handle;
-    status =
-        zx::resource::create(*root(), ZX_RSRC_KIND_MMIO, base, mmio_test_size, NULL, 0, &handle);
+    status = zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO, base, mmio_test_size, NULL, 0,
+                                  &handle);
     if (status == ZX_OK) {
       mmio_test_base = base;
       break;
@@ -97,9 +99,9 @@ TEST(Resource, BasicActions) {
 TEST(Resource, InvalidArgs) {
   zx::resource temp;
   zx::resource fail_hnd;
-  // test privilege inversion by seeing if an MMIO resource can other resources.
-  EXPECT_EQ(zx::resource::create(*root(), ZX_RSRC_KIND_MMIO, mmio_test_base, mmio_test_size, NULL,
-                                 0, &temp),
+  // test privilege inversion by seeing if an MMIO resource can create other resources.
+  EXPECT_EQ(zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO, mmio_test_base, mmio_test_size,
+                                 NULL, 0, &temp),
             ZX_OK);
   EXPECT_EQ(zx::resource::create(temp, ZX_RSRC_KIND_ROOT, 0, 0, NULL, 0, &fail_hnd),
             ZX_ERR_ACCESS_DENIED);
@@ -107,21 +109,21 @@ TEST(Resource, InvalidArgs) {
             ZX_ERR_ACCESS_DENIED);
 
   // test invalid kind
-  EXPECT_EQ(zx::resource::create(*root(), ZX_RSRC_KIND_COUNT, mmio_test_base, mmio_test_size, NULL,
-                                 0, &temp),
-            ZX_ERR_INVALID_ARGS);
-  EXPECT_EQ(zx::resource::create(*root(), ZX_RSRC_KIND_COUNT + 1, mmio_test_base, mmio_test_size,
+  EXPECT_EQ(zx::resource::create(*get_mmio(), ZX_RSRC_KIND_COUNT, mmio_test_base, mmio_test_size,
                                  NULL, 0, &temp),
+            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(zx::resource::create(*get_mmio(), ZX_RSRC_KIND_COUNT + 1, mmio_test_base,
+                                 mmio_test_size, NULL, 0, &temp),
             ZX_ERR_INVALID_ARGS);
 
   // test invalid base
-  EXPECT_EQ(zx::resource::create(*root(), ZX_RSRC_KIND_MMIO, UINT64_MAX, 1024, NULL, 0, &temp),
+  EXPECT_EQ(zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO, UINT64_MAX, 1024, NULL, 0, &temp),
             ZX_ERR_INVALID_ARGS);
   // test invalid size
-  EXPECT_EQ(zx::resource::create(*root(), ZX_RSRC_KIND_MMIO, 1024, UINT64_MAX, NULL, 0, &temp),
+  EXPECT_EQ(zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO, 1024, UINT64_MAX, NULL, 0, &temp),
             ZX_ERR_INVALID_ARGS);
   // test invalid options
-  EXPECT_EQ(zx::resource::create(*root(), ZX_RSRC_KIND_MMIO | 0xFF0000, mmio_test_base,
+  EXPECT_EQ(zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO | 0xFF0000, mmio_test_base,
                                  mmio_test_size, NULL, 0, &temp),
             ZX_ERR_INVALID_ARGS);
 }
@@ -130,11 +132,11 @@ TEST(Resource, ExclusiveShared) {
   // Try to create a shared  resource and ensure it blocks an exclusive
   // resource.
   zx::resource mmio_1, mmio_2;
-  EXPECT_EQ(zx::resource::create(*root(), ZX_RSRC_KIND_MMIO | ZX_RSRC_FLAG_EXCLUSIVE,
+  EXPECT_EQ(zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO | ZX_RSRC_FLAG_EXCLUSIVE,
                                  mmio_test_base, mmio_test_size, NULL, 0, &mmio_1),
             ZX_OK);
-  EXPECT_EQ(zx::resource::create(*root(), ZX_RSRC_KIND_MMIO, mmio_test_base, mmio_test_size, NULL,
-                                 0, &mmio_2),
+  EXPECT_EQ(zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO, mmio_test_base, mmio_test_size,
+                                 NULL, 0, &mmio_2),
             ZX_ERR_NOT_FOUND);
 }
 
@@ -142,30 +144,30 @@ TEST(Resource, SharedExclusive) {
   // Try to create a shared resource and ensure it blocks an exclusive
   // resource.
   zx::resource mmio_1, mmio_2;
-  EXPECT_EQ(zx::resource::create(*root(), ZX_RSRC_KIND_MMIO, mmio_test_base, mmio_test_size, NULL,
-                                 0, &mmio_1),
+  EXPECT_EQ(zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO, mmio_test_base, mmio_test_size,
+                                 NULL, 0, &mmio_1),
             ZX_OK);
-  EXPECT_EQ(zx::resource::create(*root(), ZX_RSRC_KIND_MMIO | ZX_RSRC_FLAG_EXCLUSIVE,
+  EXPECT_EQ(zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO | ZX_RSRC_FLAG_EXCLUSIVE,
                                  mmio_test_base, mmio_test_size, NULL, 0, &mmio_2),
             ZX_ERR_NOT_FOUND);
 }
 
 TEST(Resource, CreateFromRangedRoot) {
-  // Try to create an exclusive resource from a ranged root resource.
-  zx::resource mmio, mmio_root_dup;
-  EXPECT_EQ(zx::resource::create(*mmio_root(), ZX_RSRC_KIND_MMIO | ZX_RSRC_FLAG_EXCLUSIVE,
+  // Try to create an exclusive resource from a ranged resource.
+  zx::resource mmio, mmio_dup;
+  EXPECT_EQ(zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO | ZX_RSRC_FLAG_EXCLUSIVE,
                                  mmio_test_base, mmio_test_size, NULL, 0, &mmio),
             ZX_OK);
-  // Try to duplicate a ranged root resource.
-  EXPECT_EQ(mmio_root()->duplicate(ZX_RIGHT_SAME_RIGHTS, &mmio_root_dup), ZX_OK);
+  // Try to duplicate a ranged resource.
+  EXPECT_EQ(get_mmio()->duplicate(ZX_RIGHT_SAME_RIGHTS, &mmio_dup), ZX_OK);
 }
 
 TEST(Resource, VmoCreation) {
   // Attempt to create a resource and then a vmo using that resource.
   zx::resource mmio;
   zx::vmo vmo;
-  ASSERT_EQ(zx::resource::create(*root(), ZX_RSRC_KIND_MMIO, mmio_test_base, mmio_test_size, NULL,
-                                 0, &mmio),
+  ASSERT_EQ(zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO, mmio_test_base, mmio_test_size,
+                                 NULL, 0, &mmio),
             ZX_OK);
   EXPECT_EQ(zx_vmo_create_physical(mmio.get(), mmio_test_base, zx_system_get_page_size(),
                                    vmo.reset_and_get_address()),
@@ -177,7 +179,7 @@ TEST(Resource, VmoCreationSmaller) {
   // entire page.
   zx::resource mmio;
   zx::vmo vmo;
-  ASSERT_EQ(zx::resource::create(*root(), ZX_RSRC_KIND_MMIO, mmio_test_base,
+  ASSERT_EQ(zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO, mmio_test_base,
                                  zx_system_get_page_size() / 2, NULL, 0, &mmio),
             ZX_OK);
   EXPECT_EQ(zx_vmo_create_physical(mmio.get(), mmio_test_base, zx_system_get_page_size(),
@@ -190,8 +192,8 @@ TEST(Resource, VmoCreationUnaligned) {
   // to the proper zx_system_get_page_size().
   zx::resource mmio;
   zx::vmo vmo;
-  ASSERT_EQ(zx::resource::create(*root(), ZX_RSRC_KIND_MMIO, mmio_test_base + 0x7800, 0x2000, NULL,
-                                 0, &mmio),
+  ASSERT_EQ(zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO, mmio_test_base + 0x7800, 0x2000,
+                                 NULL, 0, &mmio),
             ZX_OK);
   EXPECT_EQ(zx_vmo_create_physical(mmio.get(), mmio_test_base + 0x7000, 0x2000,
                                    vmo.reset_and_get_address()),
@@ -218,7 +220,7 @@ TEST(Resource, VmoReplaceAsExecutable) {
   ASSERT_EQ(ZX_OK, zx_vmo_create(zx_system_get_page_size(), 0, vmo.reset_and_get_address()));
 
   // set-exec with valid VMEX resource
-  ASSERT_EQ(ZX_OK, zx::resource::create(*system_root(), ZX_RSRC_KIND_SYSTEM,
+  ASSERT_EQ(ZX_OK, zx::resource::create(*get_system(), ZX_RSRC_KIND_SYSTEM,
                                         ZX_RSRC_SYSTEM_VMEX_BASE, 1, NULL, 0, &vmex));
   ASSERT_EQ(ZX_OK, zx_handle_duplicate(vmo.get(), ZX_RIGHT_READ, vmo2.reset_and_get_address()));
   ASSERT_EQ(ZX_OK,
@@ -241,7 +243,7 @@ TEST(Resource, VmoReplaceAsExecutable) {
 TEST(Resource, CreateResourceSlice) {
   {
     zx::resource mmio, smaller_mmio;
-    ASSERT_EQ(ZX_OK, zx::resource::create(*root(), ZX_RSRC_KIND_MMIO, mmio_test_base,
+    ASSERT_EQ(ZX_OK, zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO, mmio_test_base,
                                           zx_system_get_page_size(), NULL, 0, &mmio));
     // A new resource shouldn't be able to create ROOT.
     EXPECT_EQ(ZX_ERR_ACCESS_DENIED,
@@ -265,7 +267,7 @@ TEST(Resource, CreateResourceSlice) {
     // Try to make a slice going from exclusive -> shared. This should fail.
     zx::resource mmio, smaller_mmio;
     ASSERT_EQ(ZX_OK,
-              zx::resource::create(*root(), ZX_RSRC_KIND_MMIO | ZX_RSRC_FLAG_EXCLUSIVE,
+              zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO | ZX_RSRC_FLAG_EXCLUSIVE,
                                    mmio_test_base, zx_system_get_page_size(), NULL, 0, &mmio));
     EXPECT_EQ(ZX_ERR_INVALID_ARGS,
               zx::resource::create(mmio, ZX_RSRC_KIND_MMIO, mmio_test_base,
@@ -274,7 +276,7 @@ TEST(Resource, CreateResourceSlice) {
   {
     // Try to make a slice going from shared -> exclusive. This should fail.
     zx::resource mmio, smaller_mmio;
-    ASSERT_EQ(ZX_OK, zx::resource::create(*root(), ZX_RSRC_KIND_MMIO, mmio_test_base,
+    ASSERT_EQ(ZX_OK, zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO, mmio_test_base,
                                           zx_system_get_page_size(), NULL, 0, &mmio));
     EXPECT_EQ(ZX_ERR_INVALID_ARGS,
               zx::resource::create(mmio, ZX_RSRC_KIND_MMIO | ZX_RSRC_FLAG_EXCLUSIVE, mmio_test_base,
@@ -284,7 +286,7 @@ TEST(Resource, CreateResourceSlice) {
     // Try to make a slice going from exclusive -> exclusive. This should fail.
     zx::resource mmio, smaller_mmio;
     ASSERT_EQ(ZX_OK,
-              zx::resource::create(*root(), ZX_RSRC_KIND_MMIO | ZX_RSRC_FLAG_EXCLUSIVE,
+              zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO | ZX_RSRC_FLAG_EXCLUSIVE,
                                    mmio_test_base, zx_system_get_page_size(), NULL, 0, &mmio));
     EXPECT_EQ(ZX_ERR_INVALID_ARGS,
               zx::resource::create(mmio, ZX_RSRC_KIND_MMIO | ZX_RSRC_FLAG_EXCLUSIVE, mmio_test_base,
@@ -293,7 +295,7 @@ TEST(Resource, CreateResourceSlice) {
   {
     // Creating a identically sized resource should succeed.
     zx::resource mmio, smaller_mmio;
-    ASSERT_EQ(ZX_OK, zx::resource::create(*root(), ZX_RSRC_KIND_MMIO, mmio_test_base,
+    ASSERT_EQ(ZX_OK, zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO, mmio_test_base,
                                           zx_system_get_page_size(), NULL, 0, &mmio));
     EXPECT_EQ(ZX_OK, zx::resource::create(mmio, ZX_RSRC_KIND_MMIO, mmio_test_base,
                                           zx_system_get_page_size(), NULL, 0, &smaller_mmio));
@@ -302,7 +304,7 @@ TEST(Resource, CreateResourceSlice) {
     // Creating an smaller resource should succeed.
     zx::vmo vmo;
     zx::resource mmio, smaller_mmio;
-    EXPECT_EQ(ZX_OK, zx::resource::create(*root(), ZX_RSRC_KIND_MMIO, mmio_test_base,
+    EXPECT_EQ(ZX_OK, zx::resource::create(*get_mmio(), ZX_RSRC_KIND_MMIO, mmio_test_base,
                                           zx_system_get_page_size() * 2, NULL, 0, &mmio));
     // This will succeed at creating an MMIO resource that is a single page size.
     EXPECT_EQ(ZX_OK, zx::resource::create(mmio, ZX_RSRC_KIND_MMIO, mmio_test_base,
@@ -331,7 +333,7 @@ TEST(Resource, Ioports) {
   uint16_t io_base = 0xCF8;
   uint32_t io_size = 8;  // CF8 - CFC (inclusive to 4 bytes each)
   char io_name[] = "ports!";
-  ASSERT_EQ(zx::resource::create(*root(), ZX_RSRC_KIND_IOPORT, io_base, io_size, io_name,
+  ASSERT_EQ(zx::resource::create(*get_ioport(), ZX_RSRC_KIND_IOPORT, io_base, io_size, io_name,
                                  sizeof(io_name), &io),
             ZX_OK);
   EXPECT_EQ(zx_ioports_request(io.get(), io_base, io_size), ZX_OK);
@@ -340,7 +342,7 @@ TEST(Resource, Ioports) {
 
   zx::resource one_io;
   char one_io_name[] = "one";
-  ASSERT_EQ(zx::resource::create(*root(), ZX_RSRC_KIND_IOPORT, 0x80, 1, one_io_name,
+  ASSERT_EQ(zx::resource::create(*get_ioport(), ZX_RSRC_KIND_IOPORT, 0x80, 1, one_io_name,
                                  strlen(one_io_name), &one_io),
             ZX_OK);
   // Ask for the wrong port. Should fail.
