@@ -56,6 +56,19 @@ TEST(PipeTest, SpliceShortRead) {
   ASSERT_EQ(strncmp(buffer, "hello", 5), 0);
 }
 
+TEST(PipeTest, TeeFromEmptyPipe) {
+  int pipe_a[2];
+  SAFE_SYSCALL(pipe2(pipe_a, 0));
+  // Closing the write end of pipe_a makes the read end readable even though it's empty.
+  close(pipe_a[1]);
+  int pipe_b[2];
+  SAFE_SYSCALL(pipe2(pipe_b, 0));
+  ASSERT_EQ(tee(pipe_a[0], pipe_b[1], 100, 0), 0);
+  close(pipe_a[0]);
+  close(pipe_b[0]);
+  close(pipe_b[1]);
+}
+
 std::string CreateNewFifo() {
   char* tmp = getenv("TEST_TMPDIR");
   std::string dir_path = tmp == nullptr ? "/tmp/dirXXXXXX" : std::string(tmp) + "/dirXXXXXX";

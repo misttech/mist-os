@@ -323,25 +323,30 @@ impl Pipe {
         if len == 0 {
             return Ok(0);
         }
-        let len = std::cmp::min(
-            len,
-            std::cmp::min(from.messages.len(), to.messages.available_capacity()),
-        );
-        let mut left = len;
-        while let Some(mut message) = from.messages.read_message() {
-            if let Some(data) = message.data.split_off(left) {
+        let mut bytes_transferred = 0;
+        loop {
+            let limit = std::cmp::min(len - bytes_transferred, to.messages.available_capacity());
+            if limit == 0 {
+                // We no longer want to transfer any bytes.
+                break;
+            }
+            let Some(mut message) = from.messages.read_message() else {
+                // The `from` pipe is empty.
+                break;
+            };
+            if let Some(data) = message.data.split_off(limit) {
                 // Some data is left in the message. Push it back.
+                assert!(data.len() > 0);
                 from.messages.write_front(data.into());
             }
-            left -= message.len();
+            bytes_transferred += message.len();
             to.messages.write_message(message);
-            if left == 0 {
-                from.notify_read();
-                to.notify_write();
-                return Ok(len);
-            }
         }
-        panic!();
+        if bytes_transferred > 0 {
+            from.notify_read();
+            to.notify_write();
+        }
+        return Ok(bytes_transferred);
     }
 
     /// Tee from the `from` pipe to the `to` pipe.
@@ -349,21 +354,20 @@ impl Pipe {
         if len == 0 {
             return Ok(0);
         }
-        let len = std::cmp::min(
-            len,
-            std::cmp::min(from.messages.len(), to.messages.available_capacity()),
-        );
-        let mut left = len;
+        let mut bytes_transferred = 0;
         for message in from.messages.peek_queue().iter() {
-            let message = message.clone_at_most(left);
-            left -= message.len();
-            to.messages.write_message(message);
-            if left == 0 {
-                to.notify_write();
-                return Ok(len);
+            let limit = std::cmp::min(len - bytes_transferred, to.messages.available_capacity());
+            if limit == 0 {
+                break;
             }
+            let message = message.clone_at_most(limit);
+            bytes_transferred += message.len();
+            to.messages.write_message(message);
         }
-        panic!();
+        if bytes_transferred > 0 {
+            to.notify_write();
+        }
+        return Ok(bytes_transferred);
     }
 }
 
