@@ -213,5 +213,8 @@ fuchsia_library_fuzzer("audio_core_config_fuzzer") {
 
 group("tests") {
   testonly = true
-  deps = [ ":audio_core_shared_unittests" ]
+  deps = [
+    ":audio_core_shared_unittests",
+    "//src/media/audio/audio_core/shared/mixer:tests",
+  ]
 }

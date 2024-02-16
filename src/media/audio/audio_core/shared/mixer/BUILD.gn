@@ -56,10 +56,7 @@ group("tools") {
 
 group("tests") {
   testonly = true
-  deps = [
-    ":audio_mixer_unittests",
-    "test",
-  ]
+  deps = [ ":audio_mixer_unittests" ]
 }
 
 executable("mixer_unittest_bin") {
@@ -70,8 +67,6 @@ executable("mixer_unittest_bin") {
     "gain_unittest.cc",
     "intersect_unittest.cc",
     "output_producer_unittest.cc",
-    "point_sampler_unittest.cc",
-    "sinc_sampler_unittest.cc",
   ]
 
   deps = [

@@ -4,6 +4,8 @@
 
 #include "src/media/audio/lib/processing/point_sampler.h"
 
+#include <fidl/fuchsia.audio/cpp/wire_types.h>
+
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -12,7 +14,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "fidl/fuchsia.audio/cpp/wire_types.h"
 #include "src/media/audio/lib/format2/channel_mapper.h"
 #include "src/media/audio/lib/format2/fixed.h"
 #include "src/media/audio/lib/format2/sample_converter.h"

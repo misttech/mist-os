@@ -1,6 +1,7 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
+#include <fidl/fuchsia.audio/cpp/wire_types.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <limits>
@@ -10,7 +11,6 @@
 
 #include <gtest/gtest.h>
 
-#include "fidl/fuchsia.audio/cpp/wire_types.h"
 #include "src/media/audio/lib/processing/sampler.h"
 #include "src/media/audio/lib/timeline/timeline_rate.h"
 

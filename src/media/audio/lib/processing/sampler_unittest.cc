@@ -4,14 +4,15 @@
 
 #include "src/media/audio/lib/processing/sampler.h"
 
+#include <fidl/fuchsia.audio/cpp/wire_types.h>
+
 #include <vector>
 
+#include <ffl/fixed.h>
 #include <ffl/string.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "ffl/fixed.h"
-#include "fidl/fuchsia.audio/cpp/wire_types.h"
 #include "src/media/audio/lib/format2/fixed.h"
 #include "src/media/audio/lib/format2/format.h"
 #include "src/media/audio/lib/processing/gain.h"

@@ -96,7 +96,7 @@ std::unique_ptr<Mixer> Mixer::Select(const fuchsia::media::AudioStreamType& sour
 
   if (source_format.channels < fuchsia::media::MIN_PCM_CHANNEL_COUNT ||
       dest_format.channels < fuchsia::media::MIN_PCM_CHANNEL_COUNT) {
-    FX_LOGS(WARNING) << "Mixer frame rates (" << source_format.channels << ":"
+    FX_LOGS(WARNING) << "Mixer channel counts (" << source_format.channels << ":"
                      << dest_format.channels << ") must be at least "
                      << fuchsia::media::MIN_PCM_CHANNEL_COUNT;
     return nullptr;
@@ -111,11 +111,21 @@ std::unique_ptr<Mixer> Mixer::Select(const fuchsia::media::AudioStreamType& sour
     return nullptr;
   }
 
+  if (resampler == Resampler::SampleAndHold &&
+      source_format.frames_per_second != dest_format.frames_per_second) {
+    FX_LOGS(WARNING) << "Mixer frame rates (" << source_format.frames_per_second << ":"
+                     << dest_format.frames_per_second
+                     << ") must be equal, for the SampleAndHold resampler";
+    return nullptr;
+  }
+
   const auto sampler_type = (resampler == Resampler::WindowedSinc) ? Sampler::Type::kSincSampler
                                                                    : Sampler::Type::kDefault;
-  return std::make_unique<Mixer>(
-      Sampler::Create(ToNewFormat(source_format), ToNewFormat(dest_format), sampler_type),
-      gain_limits);
+  auto mixer = Sampler::Create(ToNewFormat(source_format), ToNewFormat(dest_format), sampler_type);
+  if (mixer) {
+    return std::make_unique<Mixer>(mixer, gain_limits);
+  }
+  return nullptr;
 }
 
 void Mixer::Mix(float* dest_ptr, int64_t dest_frames, int64_t* dest_offset_ptr,
