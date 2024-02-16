@@ -23,8 +23,8 @@ assumptions about the type of performance test being written.
 *   **Python:**
 
     *   **High level:** You can use the Python [`trace_processing`
-        library][py_trace_processing] to extract performance metrics
-        Fuchsia traces. This approach is useful if you have an from
+        library][py_trace_processing] to extract performance metrics from
+        Fuchsia traces. This approach is useful if you have an
         existing correctness test and you want to extend it to also
         produce performance results. In that case, it is common to
         modify the software-under-test to generate extra trace events.
