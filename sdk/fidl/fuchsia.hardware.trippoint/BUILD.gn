@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.trippoint") {
   sdk_category = "partner"
+  sdk_area = "Unknown"
   sources = [ "trippoint.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.temperature",

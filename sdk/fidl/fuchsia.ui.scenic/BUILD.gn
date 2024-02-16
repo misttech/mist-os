@@ -13,6 +13,7 @@ fidl("fuchsia.ui.scenic") {
   ]
 
   sdk_category = "partner"
+  sdk_area = "Unknown"
 
   sources = [
     "commands.fidl",

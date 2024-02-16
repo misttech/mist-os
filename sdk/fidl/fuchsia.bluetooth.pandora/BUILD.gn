@@ -8,6 +8,7 @@ fidl("fuchsia.bluetooth.pandora") {
   name = "fuchsia.bluetooth.pandora"
 
   sdk_category = "partner_internal"
+  sdk_area = "Unknown"
 
   sources = [ "pandora.fidl" ]
 }

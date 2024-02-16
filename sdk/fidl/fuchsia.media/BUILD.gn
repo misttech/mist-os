@@ -14,6 +14,7 @@ fidl("fuchsia.media") {
   ]
 
   sdk_category = "partner"
+  sdk_area = "Unknown"
 
   sources = [
     "activity_reporter.fidl",

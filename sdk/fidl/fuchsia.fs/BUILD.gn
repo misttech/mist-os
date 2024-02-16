@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.fs") {
   sdk_category = "partner_internal"
+  sdk_area = "Unknown"
   sources = [
     "admin.fidl",
     "const.fidl",

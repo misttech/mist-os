@@ -12,6 +12,7 @@ fidl("fuchsia.bluetooth.gatt") {
   ]
 
   sdk_category = "partner"
+  sdk_area = "Unknown"
 
   sources = [
     "client.fidl",

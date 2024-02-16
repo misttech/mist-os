@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.media.target") {
   sdk_category = "partner"
+  sdk_area = "Unknown"
 
   sources = [ "target_discovery.fidl" ]
 

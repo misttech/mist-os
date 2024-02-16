@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.memory.debug") {
   sdk_category = "partner_internal"
+  sdk_area = "Unknown"
   sources = [ "debug.fidl" ]
   public_deps = [ "//sdk/fidl/fuchsia.memorypressure" ]
   enable_hlcpp = true

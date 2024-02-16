@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.weave") {
   sdk_category = "partner"
+  sdk_area = "Unknown"
 
   sources = [
     "auth.fidl",

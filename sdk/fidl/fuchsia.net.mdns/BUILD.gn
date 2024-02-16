@@ -17,6 +17,7 @@ fidl("fuchsia.net.mdns") {
   ]
 
   sdk_category = "partner"
+  sdk_area = "Unknown"
 
   sources = [
     "common.fidl",

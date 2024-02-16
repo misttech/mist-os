@@ -12,6 +12,7 @@ fidl("fuchsia.intl") {
   ]
 
   sdk_category = "partner"
+  sdk_area = "Unknown"
 
   sources = [
     "calendar.fidl",

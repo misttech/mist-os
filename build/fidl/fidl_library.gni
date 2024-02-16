@@ -40,7 +40,7 @@ import("//build/testing/golden_files.gni")
 #    - Type: list(path)
 #
 #  * api, available, excluded_checks, experimental_checks, experimental_flags,
-#    goldens_dir, non_fidl_deps, sdk_category
+#    goldens_dir, non_fidl_deps, sdk_category, sdk_area
 #    - Optional: See //build/fidl/fidl.gni for a description.
 #
 #  * testonly, visibility, public_deps, applicable_licenses
@@ -437,6 +437,9 @@ template("fidl_library") {
       id = "sdk://fidl/$library_name"
 
       category = sdk_category
+      if (defined(invoker.sdk_area)) {
+        area = invoker.sdk_area
+      }
       if (defined(api_reference)) {
         api = api_reference
         api_contents = [
@@ -485,5 +488,7 @@ template("fidl_library") {
         }
       }
     }
+  } else {  # is_sdk_included
+    not_needed(invoker, [ "sdk_area" ])
   }
 }

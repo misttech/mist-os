@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.accessibility.gesture") {
   sdk_category = "partner"
+  sdk_area = "Unknown"
 
   sources = [ "gesture_listener.fidl" ]
 

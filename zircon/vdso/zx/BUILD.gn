@@ -12,6 +12,7 @@ fidl("zx") {
   ]
 
   sdk_category = "partner"
+  sdk_area = "Unknown"
 
   api = "//sdk/fidl/zx/zx.api"
 

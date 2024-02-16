@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.sysinfo") {
   sdk_category = "partner"
+  sdk_area = "Unknown"
   api = "fuchsia.sysinfo.api"
   sources = [ "sysinfo.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]

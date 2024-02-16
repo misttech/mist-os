@@ -37,6 +37,10 @@ import("//build/testing/host_test_data.gni")
 #     Publication level of the library in SDKs.
 #     See //build/sdk/sdk_atom.gni.
 #
+#   sdk_area (optional)
+#     [string] The API area responsible for maintaining this FIDL library.
+#     See //build/sdk/sdk_atom.gni.
+#
 #   api (optional)
 #     Path to the file representing the API of this library.
 #     This file is used to ensure modifications to the library's API are
@@ -166,6 +170,7 @@ template("fidl") {
 
   fidl_only = [
     "api",
+    "sdk_area",
     "available",
     "excluded_checks",
     "experimental_checks",
@@ -289,6 +294,7 @@ template("fidl") {
     not_needed(invoker,
                [
                  "sdk_category",
+                 "sdk_area",
                  "sources",
                ])
   }

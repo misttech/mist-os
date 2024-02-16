@@ -9,6 +9,7 @@ fidl("fuchsia.sys.test") {
   excluded_checks = [ "invalid-copyright-for-platform-source-library" ]
 
   sdk_category = "partner"
+  sdk_area = "Unknown"
 
   sources = [ "cache.fidl" ]
 
