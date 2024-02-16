@@ -12,6 +12,7 @@ static_library("client") {
   ]
 
   public = [
+    "analytics.h",
     "arch_info.h",
     "breakpoint.h",
     "breakpoint_location.h",
@@ -66,6 +67,7 @@ static_library("client") {
   ]
 
   sources = [
+    "analytics.cc",
     "arch_info.cc",
     "breakpoint.cc",
     "breakpoint_action.cc",
@@ -156,6 +158,7 @@ static_library("client") {
     "//src/developer/debug/zxdb/common",
     "//src/developer/debug/zxdb/expr",
     "//src/developer/debug/zxdb/symbols",
+    "//src/lib/analytics/cpp/core_dev_tools",
     "//src/lib/containers/cpp",
     "//src/lib/fxl",
     "//src/lib/llvm:LLVMAArch64Desc",

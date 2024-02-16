@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/debug/zxdb/console/analytics.h"
+#include "src/developer/debug/zxdb/client/analytics.h"
 
 #include "src/developer/debug/zxdb/client/setting_schema_definition.h"
 

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVELOPER_DEBUG_ZXDB_CONSOLE_ANALYTICS_H_
-#define SRC_DEVELOPER_DEBUG_ZXDB_CONSOLE_ANALYTICS_H_
+#ifndef SRC_DEVELOPER_DEBUG_ZXDB_CLIENT_ANALYTICS_H_
+#define SRC_DEVELOPER_DEBUG_ZXDB_CLIENT_ANALYTICS_H_
 
 #include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/zxdb/client/session.h"
@@ -38,4 +38,4 @@ class Analytics : public analytics::core_dev_tools::Analytics<Analytics> {
 
 }  // namespace zxdb
 
-#endif  // SRC_DEVELOPER_DEBUG_ZXDB_CONSOLE_ANALYTICS_H_
+#endif  // SRC_DEVELOPER_DEBUG_ZXDB_CLIENT_ANALYTICS_H_
