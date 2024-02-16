@@ -2,6 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/compiled_action.gni")
+import("//build/python/python_action.gni")
+
 # Generate a final IDK archive, based on an `idk` target.
 #
 # The generated archive will go into
@@ -35,26 +38,53 @@ template("idk_archive") {
     _archive_output_name = invoker.output_name
   }
 
-  _exported_dir = root_build_dir + "/sdk/exported/${_idk_output_name}"
-  _output_archive = root_build_dir + "/sdk/archive/${_archive_output_name}"
+  labels = {
+    tarmaker_manifest = "${target_name}.tarmaker"
+  }
 
-  action(target_name) {
-    script = "//scripts/sdk/merger/merge.py"
-    outputs = [ _output_archive ]
-    inputs = [
-      # Invoked at runtime by this action's script.
-      "//prebuilt/third_party/pigz/pigz",
-    ]
-    mnemonic = "IDK_ARCHIVE"
-    args = [
-      "--input-directory",
-      rebase_path(_exported_dir, root_build_dir),
-      "--output-archive",
-      rebase_path(outputs[0], root_build_dir),
-    ]
+  files = {
+    exported_dir = root_build_dir + "/sdk/exported/${_idk_output_name}"
+    output_archive = root_build_dir + "/sdk/archive/${_archive_output_name}"
+
+    tarmaker_manifest = "${target_gen_dir}/${target_name}.tarmaker"
+  }
+
+  # Walks the exported IDK directory and generates a manifest of its contents.
+  python_action(labels.tarmaker_manifest) {
+    forward_variables_from(invoker, [ "testonly" ])
+
+    inputs = []  # Directories don't count as inputs.
+    outputs = [ files.tarmaker_manifest ]
     deps = [ invoker.idk ]
 
-    hermetic_inputs_file = "$target_gen_dir/$target_name.hermetic_inputs"
+    binary_label = "//build/sdk:generate_idk_archive_manifest"
+
+    args = [
+      "--exported-idk-dir",
+      rebase_path(files.exported_dir, root_build_dir),
+      "--output",
+      rebase_path(files.tarmaker_manifest, root_build_dir),
+    ]
+  }
+
+  # Generates the final archive.
+  compiled_action(target_name) {
+    tool = "//build/tools/tarmaker"
+    outputs = [ files.output_archive ]
+    inputs = [ files.tarmaker_manifest ]
+
+    mnemonic = "IDK_ARCHIVE"
+    args = [
+      "--manifest",
+      rebase_path(inputs[0], root_build_dir),
+      "--output",
+      rebase_path(outputs[0], root_build_dir),
+      "--use-parallel-gzip=false",
+    ]
+    deps = [
+      ":${labels.tarmaker_manifest}",
+      invoker.idk,
+    ]
 
     forward_variables_from(invoker,
                            [
@@ -74,7 +104,7 @@ template("idk_archive") {
           os = current_os
           cpu = current_cpu
           label = get_label_info(":$target_name", "label_with_toolchain")
-          path = rebase_path(_output_archive, root_build_dir)
+          path = rebase_path(files.output_archive, root_build_dir)
         },
       ]
     }

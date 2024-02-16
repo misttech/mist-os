@@ -101,7 +101,7 @@ TypeAlias = Any
 # for now. Define an alias for type checking only.
 SdkManifest: TypeAlias = Dict[str, Any]
 
-Path: TypeAlias = str
+PathStr: TypeAlias = str
 
 
 @total_ordering
@@ -126,12 +126,12 @@ class Part(object):
         return hash((self.meta, self.type))
 
 
-def _ensure_directory(path: Path):
+def _ensure_directory(path: PathStr):
     """Ensures that the directory hierarchy of the given path exists."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
 
-def _write_file_if_changed(path: Path, data: str):
+def _write_file_if_changed(path: PathStr, data: str):
     """Write data to a specific path if it does not exist with the same content."""
     # Do not do anything if the file exists with the same content.
     if os.path.exists(path):
@@ -188,7 +188,7 @@ class ElementMeta(object):
         """Return the JSON object for this element metadata instance."""
         return self._meta
 
-    def get_files(self) -> Tuple[Set[Path], Dict[str, Set[Path]]]:
+    def get_files(self) -> Tuple[Set[PathStr], Dict[str, Set[PathStr]]]:
         """Extracts the files associated with the given element.
         Returns a 2-tuple containing:
          - the set of variant-independent files;
@@ -437,7 +437,7 @@ def _merge_sdk_manifests(
 
 
 def tarfile_writer(
-    archive_file: Path, source_dir: Path, compressed: bool = True
+    archive_file: PathStr, source_dir: PathStr, compressed: bool = True
 ):
     """Write an archive using the Python tarfile module."""
     all_files: List[Tuple[str, str]] = []
@@ -464,7 +464,7 @@ def tarfile_writer(
                 archive.addfile(info, f)
 
 
-def pigz_writer(archive_file: Path, source_dir: Path):
+def pigz_writer(archive_file: PathStr, source_dir: PathStr):
     """Write an uncompressed archive using the Python tarfile module,
     then compress with pigz."""
     temp_archive = archive_file + ".tmp.tar"
@@ -476,13 +476,30 @@ def pigz_writer(archive_file: Path, source_dir: Path):
     os.rename(temp_archive + ".gz", archive_file)
 
 
+# rmtree manually removes all subdirectories and files instead of using
+# shutil.rmtree, to avoid registering spurious reads on stale
+# subdirectories. See https://fxbug.dev/42153728.
+def rmtree(dir: PathStr) -> None:
+    if not os.path.exists(dir):
+        return
+    for root, dirs, files in os.walk(dir, topdown=False):
+        for file in files:
+            os.unlink(os.path.join(root, file))
+        for dir in dirs:
+            full_path = os.path.join(root, dir)
+            if os.path.islink(full_path):
+                os.unlink(full_path)
+            else:
+                os.rmdir(full_path)
+
+
 class MergeState(object):
     """Common state for all merge operations. Can be used as a context manager."""
 
     def __init__(self):
-        self._all_outputs: Set[Path] = set()
-        self._all_inputs: Set[Path] = set()
-        self._temp_dirs: Set[Path] = set()
+        self._all_outputs: Set[PathStr] = set()
+        self._all_inputs: Set[PathStr] = set()
+        self._temp_dirs: Set[PathStr] = set()
 
     def __enter__(self):
         return self
@@ -491,7 +508,7 @@ class MergeState(object):
         self._remove_all_temp_dirs()
         return False  # Do not suppress exceptions
 
-    def get_temp_dir(self) -> Path:
+    def get_temp_dir(self) -> PathStr:
         """Return new temporary directory path."""
         temp_dir = tempfile.mkdtemp(prefix="fuchsia-sdk-merger")
 
@@ -503,7 +520,7 @@ class MergeState(object):
         for temp_dir in self._temp_dirs:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
-    def is_temp_file(self, path: Path) -> bool:
+    def is_temp_file(self, path: PathStr) -> bool:
         """Return true if path is inside one of our temporary directories."""
         assert os.path.isabs(path)
         for tmp_dir in self._temp_dirs:
@@ -511,14 +528,14 @@ class MergeState(object):
                 return True
         return False
 
-    def add_output(self, path: Path):
+    def add_output(self, path: PathStr):
         """Add an output path, ignored if temporary."""
         # For outputs, do not follow symlinks.
         path = os.path.abspath(path)
         if not self.is_temp_file(path):
             self._all_outputs.add(path)
 
-    def add_input(self, path: Path):
+    def add_input(self, path: PathStr):
         """Add an input path, ignored if temporary."""
         # For inputs, always resolve symlinks since that what matters
         # for Ninja (which never follows symlinks themselves).
@@ -528,7 +545,7 @@ class MergeState(object):
 
     def get_depfile_inputs_and_outputs(
         self,
-    ) -> Tuple[Sequence[Path], Sequence[Path]]:
+    ) -> Tuple[Sequence[PathStr], Sequence[PathStr]]:
         """Return the lists of inputs and outputs that should appear in the depfile."""
 
         def make_relative_paths(paths):
@@ -538,14 +555,14 @@ class MergeState(object):
             self._all_outputs
         )
 
-    def open_archive(self, archive: Path) -> Path:
+    def open_archive(self, archive: PathStr) -> PathStr:
         """Uncompress an archive and return the path of its temporary extraction directory."""
         extract_dir = self.get_temp_dir()
         with tarfile.open(archive) as archive_file:
             archive_file.extractall(extract_dir)
         return extract_dir
 
-    def write_archive(self, archive: Path, source_dir: Path):
+    def write_archive(self, archive: PathStr, source_dir: PathStr):
         """Write a compressed archive, using the pigz prebuilt if available"""
         if os.path.isfile(PIGZ_PATH):
             pigz_writer(archive, source_dir)
@@ -553,7 +570,7 @@ class MergeState(object):
             tarfile_writer(archive, source_dir)
         self.add_output(archive)
 
-    def write_json_output(self, path: Path, content: Any, dry_run: bool):
+    def write_json_output(self, path: PathStr, content: Any, dry_run: bool):
         """Write JSON output file."""
         if not dry_run:
             data = json.dumps(
@@ -566,7 +583,7 @@ class MergeState(object):
 class InputSdk(object):
     """Models a single input SDK archive or directory during merge operations."""
 
-    def __init__(self, archive: Path, directory: Path, state: MergeState):
+    def __init__(self, archive: PathStr, directory: PathStr, state: MergeState):
         """Initialize instance. Either archive or directory must be set."""
         self._state = state
         if archive:
@@ -585,11 +602,11 @@ class InputSdk(object):
         return False
 
     @property
-    def directory(self) -> Path:
+    def directory(self) -> PathStr:
         """Return directory path."""
         return self._directory
 
-    def _read_json(self, file: Path) -> Any:
+    def _read_json(self, file: PathStr) -> Any:
         source = os.path.join(self._directory, file)
         self._state.add_input(source)
         with open(source) as f:
@@ -606,7 +623,7 @@ class InputSdk(object):
         with open(file) as f:
             return int(f.read())
 
-    def get_element_meta(self, element: Path) -> ElementMeta:
+    def get_element_meta(self, element: PathStr) -> ElementMeta:
         """Return the contents of the given element's manifest."""
         # 'element' is actually a path to a meta.json file, relative
         # to the SDK's top directory.
@@ -617,7 +634,11 @@ class OutputSdk(object):
     """Model either an output archive or directory during a merge operation."""
 
     def __init__(
-        self, archive: Path, directory: Path, dry_run: bool, state: MergeState
+        self,
+        archive: PathStr,
+        directory: PathStr,
+        dry_run: bool,
+        state: MergeState,
     ):
         """Initialize instance. Either archive or directory must be set."""
         self._dry_run = dry_run
@@ -633,6 +654,13 @@ class OutputSdk(object):
                 self._directory = state.get_temp_dir()
             else:
                 self._directory = directory
+
+                # NOTE: Delete any directory that may already be there from a
+                # previous run, which could contain stale junk. This is very
+                # important because everything in the resulting directory will
+                # be shipped!
+                rmtree(directory)
+
         elif archive:
             # If only archive is provided, create a temporary output directory
             # for its content.
@@ -658,7 +686,7 @@ class OutputSdk(object):
             self._dry_run,
         )
 
-    def write_element_meta(self, element: Path, element_meta: ElementMeta):
+    def write_element_meta(self, element: PathStr, element_meta: ElementMeta):
         self._state.write_json_output(
             os.path.join(self._directory, element),
             element_meta.json,
@@ -727,7 +755,7 @@ class OutputSdk(object):
         self.copy_files(set_one, source_dir)
         return True
 
-    def copy_element(self, element: Path, source_sdk: InputSdk):
+    def copy_element(self, element: PathStr, source_sdk: InputSdk):
         """Copy an entire SDK element to a given directory."""
         meta = source_sdk.get_element_meta(element)
         assert (
@@ -805,11 +833,11 @@ def merge_sdks(
 InputInfo = collections.namedtuple("InputInfo", "archive directory")
 
 
-def make_archive_info(archive: Path) -> InputInfo:
+def make_archive_info(archive: PathStr) -> InputInfo:
     return InputInfo(archive=archive, directory=None)
 
 
-def make_directory_info(directory: Path) -> InputInfo:
+def make_directory_info(directory: PathStr) -> InputInfo:
     return InputInfo(archive=None, directory=directory)
 
 

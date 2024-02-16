@@ -155,6 +155,11 @@ python_binary("generate_archive_manifest") {
   deps = [ "//build/sdk/sdk_common" ]
 }
 
+python_binary("generate_idk_archive_manifest") {
+  visibility = [ "*" ]
+  main_source = "generate_idk_archive_manifest.py"
+}
+
 python_binary("generate_meta") {
   visibility = [ "*" ]
   main_source = "generate_meta.py"
