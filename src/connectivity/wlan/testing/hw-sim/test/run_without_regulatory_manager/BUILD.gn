@@ -7,9 +7,9 @@ import("//build/rust/rustc_test.gni")
 rustc_test("run_without_regulatory_manager") {
   edition = "2021"
   deps = [
-    "../../testing/fidl:test.wlan.realm_rust",
     "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_rust",
     "//src/connectivity/wlan/testing/hw-sim:wlan-hw-sim",
+    "//src/connectivity/wlan/tests/helpers/realm-factory/fidl:test.wlan.realm_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:pin-utils",

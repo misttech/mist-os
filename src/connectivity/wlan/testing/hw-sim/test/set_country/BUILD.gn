@@ -7,9 +7,9 @@ import("//build/rust/rustc_test.gni")
 rustc_test("set_country") {
   edition = "2021"
   deps = [
-    "../../testing/fidl:test.wlan.realm_rust",
     "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_rust",
     "//src/connectivity/wlan/testing/hw-sim:wlan-hw-sim",
+    "//src/connectivity/wlan/tests/helpers/realm-factory/fidl:test.wlan.realm_rust",
     "//src/lib/fuchsia",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:futures",

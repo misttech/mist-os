@@ -12,7 +12,7 @@ rustc_binary("bin") {
   with_unit_tests = true
   sources = [ "src/main.rs" ]
   deps = [
-    "../fidl:test.wlan.realm_rust",
+    "./fidl:test.wlan.realm_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
