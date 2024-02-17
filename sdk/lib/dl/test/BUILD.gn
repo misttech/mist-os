@@ -25,6 +25,7 @@ test("dl-unittests") {
     "dl-tests.cc",
   ]
   deps = [
+    "//src/lib/elfldltl/testing",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
   ]
@@ -35,9 +36,18 @@ test("dl-unittests") {
     ]
     deps += [ "..:runtime" ]
   }
+
+  # Plumb in the switch to set cflags, such as the libprefix for test files.
+  deps += [ "//sdk/lib/ld/test:load-test-modules-info" ]
 }
 
 fuchsia_unittest_package("dl-tests") {
   deps = [ ":dl-unittests" ]
   manifest = "meta/dl-tests.cml"
+
+  # By default the packaging step will do checks that try to detect bugs in the
+  # build system by verifying that ELF files in a package match a bunch of
+  # hard-coded assumptions about the old dynamic linker and libc implementation
+  # that don't hold true for the test binaries here.
+  disable_elf_binaries_checks = true
 }

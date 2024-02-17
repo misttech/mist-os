@@ -258,6 +258,7 @@ toolchain_utils_action("gen-load-test-modules-info") {
 source_set("load-test-modules-info") {
   visibility = [
     "./*",
+    "//sdk/lib/dl/test/*",
     "//sdk/lib/ld/test/*",
   ]
   testonly = true

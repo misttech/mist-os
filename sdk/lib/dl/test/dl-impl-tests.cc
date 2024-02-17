@@ -6,10 +6,17 @@
 
 #include "../runtime-dynamic-linker.h"
 
+#include <filesystem>
+
 namespace dl::testing {
 
+// Set the lib prefix used in library paths to the same prefix used in libld,
+// which generates the testing modules used by libdl.
+constexpr std::string_view kLibprefix = LD_TEST_LIBPREFIX;
+
 fit::result<Error, void*> DlImplTests::DlOpen(const char* name, int mode) {
-  return dynamic_linker_.Open(name, mode);
+  std::string path = std::filesystem::path("test") / "lib" / kLibprefix / name;
+  return dynamic_linker_.Open(path, mode);
 }
 
 }  // namespace dl::testing

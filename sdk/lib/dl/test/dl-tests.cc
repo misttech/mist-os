@@ -31,14 +31,10 @@ using TestTypes = ::testing::Types<
 TYPED_TEST_SUITE(DlTests, TestTypes);
 
 TYPED_TEST(DlTests, NotFound) {
-  if constexpr (!TestFixture::kHasDlOpen) {
-    GTEST_SKIP() << "test requires dlopen support";
-  }
-
   auto result = this->DlOpen("does_not_exist.so", RTLD_NOW | RTLD_LOCAL);
   EXPECT_TRUE(result.is_error());
   if constexpr (TestFixture::kCanMatchExactError) {
-    // TODO(https://fxbug.dev/324650368): libdl supports file retrieval.
+    EXPECT_EQ(result.error_value(), "cannot open dependency: test/lib/does_not_exist.so");
   } else {
     EXPECT_THAT(result.error_value(),
                 MatchesRegex(".*does_not_exist.so:.*(No such file or directory|ZX_ERR_NOT_FOUND)"));

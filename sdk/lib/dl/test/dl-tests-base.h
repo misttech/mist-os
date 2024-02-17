@@ -21,9 +21,9 @@ using Error = std::string;
 // may support testing features independently from each other.
 class DlTestsBase : public ::testing::Test {
  public:
-  // An indicator to GTEST of whether the test fixture supports the following
-  // features so that it may skip related tests if not supported.
-  static constexpr bool kHasDlOpen = true;
+  // These variables are indicators to GTEST of whether the test fixture
+  // supports the associated feature so that it may skip related tests if not
+  // supported:
   // Whether the test fixture can support matching error text exactly. This
   // allows different system implementations to pass tests that check whether an
   // expected error occurred without needing to adhere to the exact error

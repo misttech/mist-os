@@ -5,11 +5,15 @@
 #include "dl-system-tests.h"
 
 #include <dlfcn.h>
+#include <lib/elfldltl/testing/get-test-data.h>
+
+#include <filesystem>
 
 namespace dl::testing {
 
 fit::result<Error, void*> DlSystemTests::DlOpen(const char* name, int mode) {
-  void* result = dlopen(name, mode);
+  std::filesystem::path path = elfldltl::testing::GetTestDataPath(".") / name;
+  void* result = dlopen(path.c_str(), mode);
   if (!result) {
     return fit::error{ErrorResult()};
   }

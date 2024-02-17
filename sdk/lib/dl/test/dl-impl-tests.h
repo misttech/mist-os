@@ -11,8 +11,6 @@
 namespace dl::testing {
 class DlImplTests : public DlTestsBase {
  public:
-  // TODO(https://fxbug.dev/42085436): Implement dlopen.
-  static constexpr bool kHasDlOpen = false;
   // Error messages in tests can be matched exactly with this test fixture,
   // since the error message returned from the libdl implementation will be the
   // same regardless of the OS.

@@ -13,6 +13,8 @@ fit::result<RuntimeDynamicLinker::Error, void*> RuntimeDynamicLinker::Open(std::
   if (mode & ~(kOpenSymbolScopeMask | kOpenBindingModeMask | kOpenFlagsMask)) {
     return fit::error{ "TODO(https://fxbug.dev/323417704): handle invalid flags" };
   }
-  return fit::error{ "TODO(https://fxbug.dev/323422024): support module loading" };
+
+  // TODO(http://fxbug.dev/324650368): support file retrieval.
+  return fit::error { "cannot open dependency: " + name };
 }
 }  // namespace dl
