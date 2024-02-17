@@ -97,6 +97,7 @@ const std::map<PixelFormatWire, SamplingInfo> kPixelFormatSamplingInfo = {
     {PixelFormat::kMjpeg, {{8}, {kColorType_RGB}}},
     {PixelFormat::kYv12, {{8}, {kColorType_YUV}}},
     {PixelFormat::kB8G8R8, {{8}, {kColorType_RGB}}},
+    {PixelFormat::kR8G8B8, {{8}, {kColorType_RGB}}},
 
     // These use the same colorspaces as regular 8-bit-per-component formats
     {PixelFormat::kR5G6B5, {{8}, {kColorType_RGB}}},
@@ -615,6 +616,7 @@ uint64_t linear_size(uint32_t surface_height, uint32_t bytes_per_row, PixelForma
     case PixelFormat::kR8G8B8A8:
     case PixelFormat::kB8G8R8A8:
     case PixelFormat::kB8G8R8:
+    case PixelFormat::kR8G8B8:
     case PixelFormat::kR5G6B5:
     case PixelFormat::kR3G3B2:
     case PixelFormat::kR2G2B2X2:
@@ -696,6 +698,7 @@ class LinearFormats : public ImageFormatSet {
       case PixelFormat::kR8G8B8A8:
       case PixelFormat::kB8G8R8A8:
       case PixelFormat::kB8G8R8:
+      case PixelFormat::kR8G8B8:
       case PixelFormat::kI420:
       case PixelFormat::kM420:
       case PixelFormat::kNv12:
@@ -874,6 +877,7 @@ class ArmTELinearFormats : public ImageFormatSet {
       case PixelFormat::kR8G8B8A8:
       case PixelFormat::kB8G8R8A8:
       case PixelFormat::kB8G8R8:
+      case PixelFormat::kR8G8B8:
       case PixelFormat::kI420:
       case PixelFormat::kM420:
       case PixelFormat::kNv12:
@@ -1057,6 +1061,7 @@ uint32_t ImageFormatBitsPerPixel(const PixelFormatAndModifier& pixel_format) {
     case PixelFormat::kB8G8R8A8:
       return 4u * 8u;
     case PixelFormat::kB8G8R8:
+    case PixelFormat::kR8G8B8:
       return 3u * 8u;
     case PixelFormat::kI420:
       return 12u;
@@ -1110,6 +1115,7 @@ uint32_t ImageFormatStrideBytesPerWidthPixel(const PixelFormatAndModifier& pixel
     case PixelFormat::kB8G8R8A8:
       return 4u;
     case PixelFormat::kB8G8R8:
+    case PixelFormat::kR8G8B8:
       return 3u;
     case PixelFormat::kI420:
       return 1u;
@@ -1190,6 +1196,7 @@ uint32_t ImageFormatSurfaceWidthMinDivisor(const PixelFormatAndModifier& pixel_f
     case PixelFormat::kB8G8R8A8:
       return 1u;
     case PixelFormat::kB8G8R8:
+    case PixelFormat::kR8G8B8:
       return 1u;
     case PixelFormat::kI420:
       return 2u;
@@ -1245,6 +1252,7 @@ uint32_t ImageFormatSurfaceHeightMinDivisor(const PixelFormatAndModifier& pixel_
     case PixelFormat::kB8G8R8A8:
       return 1u;
     case PixelFormat::kB8G8R8:
+    case PixelFormat::kR8G8B8:
       return 1u;
     case PixelFormat::kI420:
       return 2u;
@@ -1300,6 +1308,7 @@ uint32_t ImageFormatSampleAlignment(const PixelFormatAndModifier& pixel_format) 
     case PixelFormat::kB8G8R8A8:
       return 4u;
     case PixelFormat::kB8G8R8:
+    case PixelFormat::kR8G8B8:
       return 1u;
     case PixelFormat::kI420:
       return 2u;

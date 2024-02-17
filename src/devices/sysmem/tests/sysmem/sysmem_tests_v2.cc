@@ -7032,7 +7032,10 @@ TEST(Sysmem, HeapConflictMovesToNextGroupChild) {
 }
 
 TEST(Sysmem, RequireBytesPerRowAtPixelBoundary) {
-  {
+  for (uint32_t i = 0; i < 2; ++i) {
+    auto pixel_format =
+        (i == 0) ? fuchsia_images2::PixelFormat::kR8G8B8 : fuchsia_images2::PixelFormat::kB8G8R8;
+
     auto parent = create_initial_token_v2();
     auto parent_collection = convert_token_to_collection_v2(std::move(parent));
 
@@ -7042,7 +7045,7 @@ TEST(Sysmem, RequireBytesPerRowAtPixelBoundary) {
     constraints.min_buffer_count() = 1;
     constraints.image_format_constraints().emplace(1);
     auto& ifc = constraints.image_format_constraints()->at(0);
-    ifc.pixel_format() = fuchsia_images2::PixelFormat::kB8G8R8;
+    ifc.pixel_format() = pixel_format;
     ifc.min_size() = {64, 64};
     ifc.color_spaces() = {fuchsia_images2::ColorSpace::kSrgb};
     ifc.bytes_per_row_divisor() = 4;
@@ -7062,7 +7065,10 @@ TEST(Sysmem, RequireBytesPerRowAtPixelBoundary) {
     ASSERT_EQ(4, info.settings()->image_format_constraints()->bytes_per_row_divisor().value());
   }
 
-  {
+  for (uint32_t i = 0; i < 2; ++i) {
+    auto pixel_format =
+        (i == 0) ? fuchsia_images2::PixelFormat::kR8G8B8 : fuchsia_images2::PixelFormat::kB8G8R8;
+
     auto parent = create_initial_token_v2();
     auto parent_collection = convert_token_to_collection_v2(std::move(parent));
 
@@ -7072,7 +7078,7 @@ TEST(Sysmem, RequireBytesPerRowAtPixelBoundary) {
     constraints.min_buffer_count() = 1;
     constraints.image_format_constraints().emplace(1);
     auto& ifc = constraints.image_format_constraints()->at(0);
-    ifc.pixel_format() = fuchsia_images2::PixelFormat::kB8G8R8;
+    ifc.pixel_format() = pixel_format;
     ifc.min_size() = {64, 64};
     ifc.color_spaces() = {fuchsia_images2::ColorSpace::kSrgb};
     ifc.bytes_per_row_divisor() = 4;

@@ -259,6 +259,11 @@ type PixelFormat = flexible enum {
     /// Compatible with VK_FORMAT_G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16.
     P010 = 117;
 
+    /// 24bpp RGB, 1 plane. RGB only, 8 bits per each of R/G/B sample
+    ///
+    /// Compatible with VK_FORMAT_R8G8B8_UNORM.
+    R8G8B8 = 118;
+
     /// A client is explicitly indicating that the client does not care which
     /// pixel format is chosen / used.  When setting this value, the client must
     /// not set `pixel_format_modifier`.
