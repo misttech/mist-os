@@ -312,8 +312,6 @@ async fn test_get_driver_info_not_found_filter_dfv2() -> Result<()> {
     Ok(())
 }
 
-// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-#[ignore]
 #[fasync::run_singlethreaded(test)]
 async fn test_get_device_info_fuzzy_filter() -> Result<()> {
     const DEVICE_FILTER: [&str; 1] = ["sample"];
@@ -327,13 +325,13 @@ async fn test_get_device_info_fuzzy_filter() -> Result<()> {
     assert_eq!(device_nodes.len(), 1);
 
     let matched_node = &device_nodes[0];
-    let Some(fdd::VersionedNodeInfo::V1(matched_node_info)) = &matched_node.info.versioned_info
+    let Some(fdd::VersionedNodeInfo::V2(matched_node_info)) = &matched_node.info.versioned_info
     else {
         panic!("wrong info type");
     };
     assert_eq!(
-        matched_node_info.topological_path.as_ref().expect("DFv1 device missing topological path"),
-        "/dev/sys/test/sample_driver"
+        matched_node_info.moniker.as_ref().expect("DFv2 device missing monier"),
+        "dev.sys.test.sample_driver"
     );
 
     Ok(())
