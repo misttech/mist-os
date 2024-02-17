@@ -57,10 +57,7 @@ constexpr uint32_t kBitCmdEmpty = 0;
 }  // namespace
 
 DsiDw::DsiDw(zx_device_t* parent, fdf::MmioBuffer mmio)
-    : DeviceType(parent), dsi_mmio_(std::move(mmio)) {
-  last_vidmode_ = DsiDwVidModeCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value();
-  zxlogf(INFO, "last_vidmode = 0x%x", last_vidmode_);
-}
+    : DeviceType(parent), dsi_mmio_(std::move(mmio)) {}
 
 DsiDw::~DsiDw() = default;
 
@@ -182,7 +179,6 @@ zx_status_t DsiDw::DsiImplSendCmd(const mipi_dsi_cmd_t* cmd_list, size_t cmd_cou
 void DsiDw::DsiImplSetMode(dsi_mode_t mode) {
   // Configure the operation mode (cmd or vid)
   DsiDwModeCfgReg::Get().ReadFrom(&dsi_mmio_).set_cmd_video_mode(mode).WriteTo(&dsi_mmio_);
-  dsi_mmio_.Write32(last_vidmode_, DW_DSI_VID_MODE_CFG);
 }
 
 zx_status_t DsiDw::DsiImplConfig(const dsi_config_t* dsi_config) {
@@ -260,21 +256,19 @@ zx_status_t DsiDw::DsiImplConfig(const dsi_config_t* dsi_config) {
   // in high-speed in Video Mode. In this case, the DWC_mipi_dsi_host automatically determines
   // the area where each command can be sent and no programming or calculation is required.
 
-  auto vidmode_reg = DsiDwVidModeCfgReg::Get()
-                         .ReadFrom(&dsi_mmio_)
-                         .set_vpg_en(0)
-                         .set_lp_cmd_en(0)
-                         .set_frame_bta_ack_en(1)
-                         .set_lp_hfp_en(1)
-                         .set_lp_hbp_en(1)
-                         .set_lp_vact_en(1)
-                         .set_lp_vfp_en(1)
-                         .set_lp_vbp_en(1)
-                         .set_lp_vsa_en(1)
-                         .set_vid_mode_type(video_mode);
-  last_vidmode_ = vidmode_reg.reg_value();
-  zxlogf(INFO, "last_vidmode = 0x%x", last_vidmode_);
-  vidmode_reg.WriteTo(&dsi_mmio_);
+  DsiDwVidModeCfgReg::Get()
+      .ReadFrom(&dsi_mmio_)
+      .set_vpg_en(0)
+      .set_lp_cmd_en(0)
+      .set_frame_bta_ack_en(1)
+      .set_lp_hfp_en(1)
+      .set_lp_hbp_en(1)
+      .set_lp_vact_en(1)
+      .set_lp_vfp_en(1)
+      .set_lp_vbp_en(1)
+      .set_lp_vsa_en(1)
+      .set_vid_mode_type(video_mode)
+      .WriteTo(&dsi_mmio_);
 
   // Define the max pkt size during Low Power mode
   DsiDwDpiLpCmdTimReg::Get()
