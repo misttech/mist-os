@@ -673,6 +673,7 @@ async def _stream_subprocess(
         stdin=stdin,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        limit=1024 * 1024,  # 1MB buffer for stdout/stderr StreamReaders
         **popen_kwargs,
     )
     pid = p.pid
