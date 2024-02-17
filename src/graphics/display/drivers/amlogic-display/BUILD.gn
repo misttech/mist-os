@@ -63,6 +63,8 @@ source_set("common_srcs") {
     "irq-handler-loop-util.h",
     "lcd.cc",
     "lcd.h",
+    "logging.cc",
+    "logging.h",
     "mipi-phy.cc",
     "mipi-phy.h",
     "panel-config.cc",
