@@ -44,8 +44,10 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
                                                                    uint32_t width, uint32_t height);
 
   // Creates a Vout instance that outputs MIPI-DSI signal.
+  //
+  // `panel_config` must be non-null and must outlive the `Vout` instance.
   Vout(std::unique_ptr<DsiHost> dsi_host, std::unique_ptr<Clock> dsi_clock, uint32_t width,
-       uint32_t height, display_setting_t display_setting, inspect::Node node);
+       uint32_t height, const PanelConfig* panel_config, inspect::Node node);
 
   // Creates a Vout instance that outputs HDMI signal.
   Vout(std::unique_ptr<HdmiHost> hdmi_host, inspect::Node node);
@@ -115,8 +117,9 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
     uint32_t width = 0;
     uint32_t height = 0;
 
-    // Display structure used by various layers of display controller
-    display_setting_t disp_setting;
+    // TODO(https://fxbug.dev/318800903): Use const reference when `dsi_` moves
+    // to its own implementation class.
+    PanelConfig panel_config;
   } dsi_;
 
   struct hdmi_t {

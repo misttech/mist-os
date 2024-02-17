@@ -5,8 +5,10 @@
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
+#include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
 #include <lib/device-protocol/display-panel.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
@@ -40,7 +42,7 @@ constexpr supported_features_t kHdmiSupportedFeatures = supported_features_t{
 }  // namespace
 
 Vout::Vout(std::unique_ptr<DsiHost> dsi_host, std::unique_ptr<Clock> dsi_clock, uint32_t width,
-           uint32_t height, display_setting_t display_setting, inspect::Node node)
+           uint32_t height, const PanelConfig* panel_config, inspect::Node node)
     : type_(VoutType::kDsi),
       supports_hpd_(kDsiSupportedFeatures.hpd),
       node_(std::move(node)),
@@ -49,8 +51,9 @@ Vout::Vout(std::unique_ptr<DsiHost> dsi_host, std::unique_ptr<Clock> dsi_clock, 
           .clock = std::move(dsi_clock),
           .width = width,
           .height = height,
-          .disp_setting = display_setting,
+          .panel_config = *panel_config,
       } {
+  ZX_DEBUG_ASSERT(panel_config != nullptr);
   node_.RecordInt("vout_type", static_cast<int>(type()));
 }
 
@@ -65,6 +68,13 @@ Vout::Vout(std::unique_ptr<HdmiHost> hdmi_host, inspect::Node node)
 zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(zx_device_t* parent, uint32_t panel_type,
                                                       uint32_t width, uint32_t height,
                                                       inspect::Node node) {
+  zxlogf(INFO, "Fixed panel type is %d", panel_type);
+  const PanelConfig* panel_config = GetPanelConfig(panel_type);
+  if (panel_config == nullptr) {
+    zxlogf(ERROR, "Failed to get panel config for panel %" PRIu32, panel_type);
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
   zx::result<std::unique_ptr<DsiHost>> dsi_host_result = DsiHost::Create(parent, panel_type);
   if (dsi_host_result.is_error()) {
     zxlogf(ERROR, "Could not create DSI host: %s", dsi_host_result.status_string());
@@ -85,18 +95,10 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(zx_device_t* parent, uint3
   }
   std::unique_ptr<Clock> clock = std::move(clock_result).value();
 
-  zxlogf(INFO, "Fixed panel type is %d", dsi_host->panel_type());
-  const PanelConfig* panel_config = GetPanelConfig(dsi_host->panel_type());
-  if (panel_config == nullptr) {
-    zxlogf(ERROR, "Unsupported panel (panel type %" PRIu32 ") detected!", panel_type);
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-  const display_setting_t display_setting = ToDisplaySetting(*panel_config);
-
   fbl::AllocChecker alloc_checker;
   std::unique_ptr<Vout> vout =
       fbl::make_unique_checked<Vout>(&alloc_checker, std::move(dsi_host), std::move(clock), width,
-                                     height, display_setting, std::move(node));
+                                     height, panel_config, std::move(node));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Vout.");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -108,15 +110,14 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVoutForTesting(uint32_t panel_t
                                                                 uint32_t height) {
   const PanelConfig* panel_config = GetPanelConfig(panel_type);
   if (panel_config == nullptr) {
-    zxlogf(ERROR, "Unsupported panel (panel type %" PRIu32 ") detected!", panel_type);
+    zxlogf(ERROR, "Failed to get panel config for panel %" PRIu32, panel_type);
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
-  const display_setting_t display_setting = ToDisplaySetting(*panel_config);
 
   fbl::AllocChecker alloc_checker;
   std::unique_ptr<Vout> vout = fbl::make_unique_checked<Vout>(
       &alloc_checker,
-      /*dsi_host=*/nullptr, /*dsi_clock=*/nullptr, width, height, display_setting, inspect::Node{});
+      /*dsi_host=*/nullptr, /*dsi_clock=*/nullptr, width, height, panel_config, inspect::Node{});
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Vout.");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -148,8 +149,7 @@ void Vout::PopulateAddedDisplayArgs(
     case VoutType::kDsi: {
       args->display_id = display::ToBanjoDisplayId(display_id);
       args->panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE;
-      display::DisplayTiming display_timing = display::ToDisplayTiming(dsi_.disp_setting);
-      args->panel.mode = display::ToBanjoDisplayMode(display_timing);
+      args->panel.mode = display::ToBanjoDisplayMode(dsi_.panel_config.display_timing);
       args->pixel_format_list = pixel_formats.data();
       args->pixel_format_count = pixel_formats.size();
       return;
@@ -193,7 +193,8 @@ zx::result<> Vout::PowerOff() {
   switch (type_) {
     case VoutType::kDsi: {
       dsi_.clock->Disable();
-      dsi_.dsi_host->Disable(dsi_.disp_setting);
+      const display_setting_t display_setting = ToDisplaySetting(dsi_.panel_config);
+      dsi_.dsi_host->Disable(display_setting);
       return zx::ok();
     }
     case VoutType::kHdmi: {
@@ -207,7 +208,8 @@ zx::result<> Vout::PowerOff() {
 zx::result<> Vout::PowerOn() {
   switch (type_) {
     case VoutType::kDsi: {
-      zx::result<> clock_enable_result = dsi_.clock->Enable(dsi_.disp_setting);
+      const display_setting_t display_setting = ToDisplaySetting(dsi_.panel_config);
+      zx::result<> clock_enable_result = dsi_.clock->Enable(display_setting);
       if (!clock_enable_result.is_ok()) {
         zxlogf(ERROR, "Could not enable display clocks: %s", clock_enable_result.status_string());
         return clock_enable_result;
@@ -216,7 +218,7 @@ zx::result<> Vout::PowerOn() {
       dsi_.clock->SetVideoOn(false);
       // Configure and enable DSI host interface.
       zx::result<> dsi_host_enable_result =
-          dsi_.dsi_host->Enable(dsi_.disp_setting, dsi_.clock->GetBitrate());
+          dsi_.dsi_host->Enable(display_setting, dsi_.clock->GetBitrate());
       if (!dsi_host_enable_result.is_ok()) {
         zxlogf(ERROR, "Could not enable DSI Host: %s", dsi_host_enable_result.status_string());
         return dsi_host_enable_result;
@@ -269,30 +271,59 @@ zx_status_t Vout::I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_count)
 
 void Vout::Dump() {
   switch (type_) {
-    case VoutType::kDsi:
-      zxlogf(INFO, "#############################");
-      zxlogf(INFO, "Dumping disp_setting structure:");
-      zxlogf(INFO, "#############################");
-      zxlogf(INFO, "h_active = 0x%x (%u)", dsi_.disp_setting.h_active, dsi_.disp_setting.h_active);
-      zxlogf(INFO, "v_active = 0x%x (%u)", dsi_.disp_setting.v_active, dsi_.disp_setting.v_active);
-      zxlogf(INFO, "h_period = 0x%x (%u)", dsi_.disp_setting.h_period, dsi_.disp_setting.h_period);
-      zxlogf(INFO, "v_period = 0x%x (%u)", dsi_.disp_setting.v_period, dsi_.disp_setting.v_period);
-      zxlogf(INFO, "hsync_width = 0x%x (%u)", dsi_.disp_setting.hsync_width,
-             dsi_.disp_setting.hsync_width);
-      zxlogf(INFO, "hsync_bp = 0x%x (%u)", dsi_.disp_setting.hsync_bp, dsi_.disp_setting.hsync_bp);
-      zxlogf(INFO, "hsync_pol = 0x%x (%u)", dsi_.disp_setting.hsync_pol,
-             dsi_.disp_setting.hsync_pol);
-      zxlogf(INFO, "vsync_width = 0x%x (%u)", dsi_.disp_setting.vsync_width,
-             dsi_.disp_setting.vsync_width);
-      zxlogf(INFO, "vsync_bp = 0x%x (%u)", dsi_.disp_setting.vsync_bp, dsi_.disp_setting.vsync_bp);
-      zxlogf(INFO, "vsync_pol = 0x%x (%u)", dsi_.disp_setting.vsync_pol,
-             dsi_.disp_setting.vsync_pol);
-      zxlogf(INFO, "lcd_clock = 0x%x (%u)", dsi_.disp_setting.lcd_clock,
-             dsi_.disp_setting.lcd_clock);
-      zxlogf(INFO, "lane_num = 0x%x (%u)", dsi_.disp_setting.lane_num, dsi_.disp_setting.lane_num);
-      zxlogf(INFO, "bit_rate_max = 0x%x (%u)", dsi_.disp_setting.bit_rate_max,
-             dsi_.disp_setting.bit_rate_max);
+    case VoutType::kDsi: {
+      const PanelConfig& panel_config = dsi_.panel_config;
+      zxlogf(INFO, "Panel Config for Panel \"%s\"", panel_config.name);
+      zxlogf(INFO, "  Power on DSI command sequence: size %zu", panel_config.dsi_on.size());
+      zxlogf(INFO, "  Power off DSI command sequence: size %zu", panel_config.dsi_off.size());
+      zxlogf(INFO, "  Power on PowerOp sequence: size %zu", panel_config.power_on.size());
+      zxlogf(INFO, "  Power off PowerOp sequence: size %zu", panel_config.power_off.size());
+      zxlogf(INFO, "");
+      zxlogf(INFO, "  D-PHY data lane count: %" PRId32, panel_config.dphy_data_lane_count);
+      zxlogf(INFO, "  Maximum D-PHY clock lane frequency (Hz): %" PRId64,
+             panel_config.maximum_dphy_clock_lane_frequency_hz);
+      zxlogf(INFO, "  Maximum D-PHY data lane bitrate (bit/second): %" PRId64,
+             panel_config.maximum_per_data_lane_bit_per_second());
+      zxlogf(INFO, "");
+
+      const display::DisplayTiming& display_timing = panel_config.display_timing;
+      zxlogf(INFO, "Display Timing: ");
+      zxlogf(INFO, "  Horizontal active (px): %" PRId32, display_timing.horizontal_active_px);
+      zxlogf(INFO, "  Horizontal front porch (px): %" PRId32,
+             display_timing.horizontal_front_porch_px);
+      zxlogf(INFO, "  Horizontal sync width (px): %" PRId32,
+             display_timing.horizontal_sync_width_px);
+      zxlogf(INFO, "  Horizontal back porch (px): %" PRId32,
+             display_timing.horizontal_back_porch_px);
+      zxlogf(INFO, "  Horizontal blank (px): %" PRId32, display_timing.horizontal_blank_px());
+      zxlogf(INFO, "  Horizontal total (px): %" PRId32, display_timing.horizontal_total_px());
+      zxlogf(INFO, "");
+      zxlogf(INFO, "  Vertical active (lines): %" PRId32, display_timing.vertical_active_lines);
+      zxlogf(INFO, "  Vertical front porch (lines): %" PRId32,
+             display_timing.vertical_front_porch_lines);
+      zxlogf(INFO, "  Vertical sync width (lines): %" PRId32,
+             display_timing.vertical_sync_width_lines);
+      zxlogf(INFO, "  Vertical back porch (lines): %" PRId32,
+             display_timing.vertical_back_porch_lines);
+      zxlogf(INFO, "  Vertical blank (lines): %" PRId32, display_timing.vertical_blank_lines());
+      zxlogf(INFO, "  Vertical total (lines): %" PRId32, display_timing.vertical_total_lines());
+      zxlogf(INFO, "");
+      zxlogf(INFO, "  Pixel clock frequency (kHz): %" PRId32,
+             display_timing.pixel_clock_frequency_khz);
+      zxlogf(INFO, "  Fields per frame: %s",
+             display_timing.fields_per_frame == display::FieldsPerFrame::kInterlaced
+                 ? "Interlaced"
+                 : "Progressive");
+      zxlogf(INFO, "  Hsync polarity: %s",
+             display_timing.hsync_polarity == display::SyncPolarity::kPositive ? "Positive"
+                                                                               : "Negative");
+      zxlogf(INFO, "  Vsync polarity: %s",
+             display_timing.vsync_polarity == display::SyncPolarity::kPositive ? "Positive"
+                                                                               : "Negative");
+      zxlogf(INFO, "  Vblank alternates: %s", display_timing.vblank_alternates ? "True" : "False");
+      zxlogf(INFO, "  Pixel repetition: %" PRId32, display_timing.pixel_repetition);
       return;
+    }
     case VoutType::kHdmi:
       zxlogf(INFO, "horizontal_active_px = %d", hdmi_.current_display_timing_.horizontal_active_px);
       zxlogf(INFO, "horizontal_front_porch_px = %d",
