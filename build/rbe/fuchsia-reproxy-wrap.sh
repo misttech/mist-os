@@ -332,7 +332,7 @@ shutdown() {
       --reclient-bindir="$reclient_bindir" \
       --uuid="$build_uuid" \
       --bq-logs-table="$cloud_project:$dataset".rbe_client_command_logs_developer \
-      --bq-metrics-table="$cloud_project:$dataset".rbe_client_metrics_developer \
+      --bq-metrics-table="$cloud_project:$dataset".rbe_client_metrics_developer_raw \
       "$reproxy_logdir"
       # The upload exit status does not propagate from inside a trap call.
     _timetrace "Processing RBE logs and uploading to BigQuery (done)"

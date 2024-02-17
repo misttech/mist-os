@@ -38,7 +38,7 @@ _DEFAULT_REPROXY_LOGS_TABLE = (
     "fuchsia-engprod-metrics-prod:metrics.rbe_client_command_logs_developer"
 )
 _DEFAULT_RBE_METRICS_TABLE = (
-    "fuchsia-engprod-metrics-prod:metrics.rbe_client_metrics_developer"
+    "fuchsia-engprod-metrics-prod:metrics.rbe_client_metrics_developer_raw"
 )
 
 
@@ -207,7 +207,14 @@ def main_upload_metrics(
 
     if verbose:
         msg(f"Converting metrics format to JSON for BQ.")
-    metrics_json = pb_message_util.proto_message_to_bq_dict(metrics_pb)
+
+    metrics_dict = pb_message_util.proto_message_to_bq_dict(metrics_pb)
+    # restructure to match the schema of the BQ table
+    metrics_bq_entry = {
+        "build_id": metrics_dict["build_id"],
+        "created_at": metrics_dict["created_at"],
+        "stats": json.dumps(metrics_dict["stats"]),
+    }
 
     if dry_run:
         return 0
@@ -215,7 +222,7 @@ def main_upload_metrics(
     if verbose:
         msg("Uploading aggregate metrics BQ")
     exit_code = bq_upload_metrics(
-        metrics=[metrics_json],
+        metrics=[metrics_bq_entry],
         bq_table=bq_metrics_table,
     )
     if exit_code != 0:
