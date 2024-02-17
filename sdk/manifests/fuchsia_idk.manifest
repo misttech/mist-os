@@ -3,6 +3,7 @@ bind_library://bind/fuchsia.arm.platform
 bind_library://bind/fuchsia.devicetree
 bind_library://bind/fuchsia.nxp.platform
 bind_library://bind/fuchsia.platform
+bind_library://bind/fuchsia.sysmem
 bind_library://bind/fuchsia.test
 bind_library://bind/fuchsia.test.platform
 cc_prebuilt_library://pkg/async-default

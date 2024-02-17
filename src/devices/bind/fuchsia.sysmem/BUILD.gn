@@ -7,4 +7,5 @@ import("//build/bind/bind.gni")
 bind_library("fuchsia.sysmem") {
   source = "fuchsia.sysmem.bind"
   sdk_category = "partner"
+  sdk_area = "Driver SDK"
 }
