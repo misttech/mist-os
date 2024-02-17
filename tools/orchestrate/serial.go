@@ -28,9 +28,6 @@ func StartSerialLogging(deviceConfig *DeviceConfig) (*SerialLogging, error) {
 	if err != nil {
 		return nil, fmt.Errorf("net.Dial: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(serialLog), 0755); err != nil {
-		return nil, fmt.Errorf("os.Mkdir: %w", err)
-	}
 	dst, err := os.Create(serialLog)
 	if err != nil {
 		return nil, fmt.Errorf("os.Create: %w", err)

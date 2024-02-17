@@ -38,6 +38,10 @@ func (r *runCmd) SetFlags(f *flag.FlagSet) {
 }
 
 func (r *runCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...any) subcommands.ExitStatus {
+	if err := initTestArtifactsDir(); err != nil {
+		fmt.Printf("Failed to initialize test artifacts directory: %v\n", err)
+		return subcommands.ExitFailure
+	}
 	oc := orchestrate.NewOrchestrateConfig()
 	runInput, err := oc.ReadRunInput(r.input)
 	fmt.Printf("Run input: %+v\n", runInput)
@@ -74,6 +78,13 @@ func (r *runCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...any) subcomman
 		return subcommands.ExitFailure
 	}
 	return subcommands.ExitSuccess
+}
+
+func initTestArtifactsDir() error {
+	if err := os.MkdirAll(os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR"), 0755); err != nil {
+		return fmt.Errorf("os.Mkdir: %w", err)
+	}
+	return nil
 }
 
 func dumpEnv() error {
