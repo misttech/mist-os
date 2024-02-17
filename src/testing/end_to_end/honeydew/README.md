@@ -68,6 +68,14 @@ to Honeydew:
 * If CL introduces a new affordance, then add yourself as [Affordance OWNER]
 
 ### Honeydew code guidelines
+Honeydew is a crowdsourced and community contributed library that is foundational
+to all Lacewing tests so we have curated a set of guidelines and conformance
+scripts to ensure its uniformity, functional correctness, and stability.
+
+To learn more, refer to [Honeydew code guidelines](markdowns/code_guidelines.md)
+about the specific guidelines, motivation behind them, and how Lacewing team is
+planning to further automate the processes.
+
 **Note** - Prior to running this, please make sure to follow
 [Setup](markdowns/interactive_usage.md#Setup)
 
@@ -85,9 +93,6 @@ INFO: Honeydew code has passed all of the conformance steps
 1. Initial patchset just before adding reviewers
 2. Final patchset just before merging the CL
 On all other patchsets, it is recommended but optional to run these guidelines.
-
-Note - You can refer to [Honeydew code guidelines](markdowns/code_guidelines.md)
-to get insights into what are all the guidelines we are following currently
 
 ### Code Review Expectations
 Here are some of the things to follow during Honeydew CL review process as a
