@@ -35,7 +35,6 @@ use starnix_uapi::{
     open_flags::OpenFlags,
     ownership::Releasable,
     pid_t,
-    resource_limits::Resource,
     seal_flags::SealFlags,
     uapi,
     user_address::UserAddress,
@@ -50,6 +49,14 @@ use std::{
 };
 
 pub const MAX_LFS_FILESIZE: usize = 0x7fff_ffff_ffff_ffff;
+
+pub fn checked_add_offset_and_length(offset: usize, length: usize) -> Result<usize, Errno> {
+    let end = offset.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
+    if end > MAX_LFS_FILESIZE {
+        return error!(EINVAL);
+    }
+    Ok(end)
+}
 
 #[derive(Debug)]
 pub enum SeekTarget {
@@ -896,16 +903,6 @@ impl FileAsyncOwner {
     }
 }
 
-fn check_offset(current_task: &CurrentTask, offset: usize) -> Result<(), Errno> {
-    if offset >= MAX_LFS_FILESIZE
-        || offset >= current_task.thread_group.get_rlimit(Resource::FSIZE) as usize
-    {
-        error!(EINVAL)
-    } else {
-        Ok(())
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FileObjectId(u64);
 
@@ -1106,12 +1103,17 @@ impl FileObject {
         self.read_internal(|| {
             let mut locked = locked.cast_locked::<ReadOps>();
             if !self.ops().has_persistent_offsets() {
+                if data.available() > MAX_LFS_FILESIZE {
+                    return error!(EINVAL);
+                }
                 return self.ops.read(&mut locked, self, current_task, 0, data);
             }
 
-            let mut offset = self.offset.lock();
-            let read = self.ops.read(&mut locked, self, current_task, *offset as usize, data)?;
-            *offset += read as off_t;
+            let mut offset_guard = self.offset.lock();
+            let offset = *offset_guard as usize;
+            checked_add_offset_and_length(offset, data.available())?;
+            let read = self.ops.read(&mut locked, self, current_task, offset, data)?;
+            *offset_guard += read as off_t;
             Ok(read)
         })
     }
@@ -1129,9 +1131,7 @@ impl FileObject {
         if !self.ops().is_seekable() {
             return error!(ESPIPE);
         }
-        if offset >= MAX_LFS_FILESIZE {
-            return error!(EINVAL);
-        }
+        checked_add_offset_and_length(offset, data.available())?;
         let mut locked = locked.cast_locked::<ReadOps>();
         self.read_internal(|| self.ops.read(&mut locked, self, current_task, offset, data))
     }
@@ -1153,9 +1153,7 @@ impl FileObject {
         //   The number of bytes written may be less than count if, for example, there is
         //   insufficient space on the underlying physical medium, or the RLIMIT_FSIZE resource
         //   limit is encountered (see setrlimit(2)),
-        //
-        // However, at the moment, we just check the `offset`.
-        check_offset(current_task, offset)?;
+        checked_add_offset_and_length(offset, data.available())?;
         let mut locked = locked.cast_locked::<WriteOps>();
         self.ops().write(&mut locked, self, current_task, offset, data)
     }
@@ -1235,7 +1233,7 @@ impl FileObject {
             //   location at which pwrite() writes data. However, on Linux, if a file is opened with
             //   O_APPEND, pwrite() appends data to the end of the file, regardless of the value of offset.
             if self.flags().contains(OpenFlags::APPEND) && self.ops().is_seekable() {
-                check_offset(current_task, offset)?;
+                checked_add_offset_and_length(offset, data.available())?;
                 offset = default_eof_offset(self, current_task)? as usize;
             }
 
@@ -1465,6 +1463,7 @@ impl FileObject {
         if !self.can_read() {
             return error!(EBADF);
         }
+        checked_add_offset_and_length(offset, length)?;
         self.ops().readahead(self, current_task, offset, length)
     }
 }

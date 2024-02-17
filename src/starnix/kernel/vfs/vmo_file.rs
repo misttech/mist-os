@@ -4,6 +4,7 @@
 
 use crate::{
     mm::{vmo::round_up_to_system_page_size, ProtectionFlags, PAGE_SIZE, VMEX_RESOURCE},
+    signals::{send_standard_signal, SignalInfo},
     task::CurrentTask,
     vfs::{
         anon_fs,
@@ -18,7 +19,8 @@ use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, track_stub};
 use starnix_sync::{LockBefore, Locked, ReadOps};
 use starnix_uapi::{
-    errno, error, errors::Errno, file_mode::mode, open_flags::OpenFlags, seal_flags::SealFlags,
+    errno, error, errors::Errno, file_mode::mode, open_flags::OpenFlags, resource_limits::Resource,
+    seal_flags::SealFlags, signals::SIGXFSZ,
 };
 use std::sync::Arc;
 
@@ -206,9 +208,6 @@ impl VmoFileObject {
             let info = file.node().info();
             let file_length = info.size;
             let want_read = data.available();
-            if want_read > MAX_LFS_FILESIZE - offset {
-                return error!(EINVAL);
-            }
             if offset < file_length {
                 let to_read =
                     if file_length < offset + want_read { file_length - offset } else { want_read };
@@ -227,15 +226,11 @@ impl VmoFileObject {
     pub fn write(
         vmo: &zx::Vmo,
         file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         let mut want_write = data.available();
-        if want_write > MAX_LFS_FILESIZE - offset {
-            return error!(EINVAL);
-        }
-
         let buf = data.peek_all()?;
 
         file.node().update_info(|info| {
@@ -279,6 +274,20 @@ impl VmoFileObject {
                         want_write = write_end - offset;
                     }
                 }
+            }
+
+            // Check against the FSIZE limt
+            let fsize_limit = current_task.thread_group.get_rlimit(Resource::FSIZE) as usize;
+            if write_end > fsize_limit {
+                if offset >= fsize_limit {
+                    // Write starts beyond the FSIZE limt.
+                    send_standard_signal(current_task, SignalInfo::default(SIGXFSZ));
+                    return error!(EFBIG);
+                }
+
+                // End write at FSIZE limit.
+                write_end = fsize_limit;
+                want_write = write_end - offset;
             }
 
             if write_end > info.size {
@@ -404,13 +413,10 @@ where
 fn update_vmo_file_size(
     vmo: &zx::Vmo,
     node_info: &mut FsNodeInfo,
-    min_size: usize,
+    requested_size: usize,
 ) -> Result<usize, Errno> {
-    if min_size > MAX_LFS_FILESIZE {
-        return error!(EFBIG);
-    }
-
-    let size = round_up_to_system_page_size(min_size)?;
+    assert!(requested_size <= MAX_LFS_FILESIZE);
+    let size = round_up_to_system_page_size(requested_size)?;
     vmo.set_size(size as u64).map_err(|status| match status {
         zx::Status::NO_MEMORY => errno!(ENOMEM),
         zx::Status::OUT_OF_RANGE => errno!(ENOMEM),

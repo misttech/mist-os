@@ -8,6 +8,7 @@ use crate::{
     task::{CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter},
     vfs::{
         buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer},
+        checked_add_offset_and_length,
         eventfd::{new_eventfd, EventFdType},
         inotify::InotifyFileObject,
         namespace::FileSystemCreator,
@@ -18,7 +19,7 @@ use crate::{
         FileHandle, FileSystemOptions, FlockOperation, FsStr, FsString, LookupContext,
         NamespaceNode, PathWithReachability, RecordLockCommand, RenameFlags, SeekTarget,
         StatxFlags, SymlinkMode, SymlinkTarget, TargetFdNumber, TimeUpdateType, UnlinkKind,
-        ValueOrSize, WdNumber, WhatToMount, XattrOp, MAX_LFS_FILESIZE,
+        ValueOrSize, WdNumber, WhatToMount, XattrOp,
     },
 };
 use fuchsia_zircon as zx;
@@ -2387,7 +2388,7 @@ pub fn sys_sync_file_range(
     current_task: &CurrentTask,
     fd: FdNumber,
     offset: off_t,
-    len: off_t,
+    length: off_t,
     flags: u32,
 ) -> Result<(), Errno> {
     const KNOWN_FLAGS: u32 = uapi::SYNC_FILE_RANGE_WAIT_BEFORE
@@ -2399,9 +2400,11 @@ pub fn sys_sync_file_range(
 
     let file = current_task.files.get(fd)?;
 
-    if offset < 0 || len < 0 || (len as usize).saturating_add(offset as usize) > MAX_LFS_FILESIZE {
+    if offset < 0 || length < 0 {
         return error!(EINVAL);
     }
+
+    checked_add_offset_and_length(offset as usize, length as usize)?;
 
     // From <https://linux.die.net/man/2/sync_file_range>:
     //
@@ -2628,9 +2631,6 @@ pub fn sys_readahead(
     length: usize,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
-    if length > crate::vfs::MAX_LFS_FILESIZE {
-        return error!(EINVAL);
-    }
     // Allow only non-negative values of `offset`. Some versions of Linux allow it to be negative,
     // but GVisor tests require `readahead()` to fail in this case.
     let offset: usize = offset.try_into().map_err(|_| errno!(EINVAL))?;

@@ -191,7 +191,6 @@
                 "setitimer02",
                 "setpgid01",
                 "setpriority01",
-                "setrlimit01",
                 "setrlimit03",
                 "settimeofday01",
                 "settimeofday02",

@@ -9,6 +9,7 @@ use crate::{
     task::{CurrentTask, Kernel, WaitQueue, Waiter},
     time::utc,
     vfs::{
+        checked_add_offset_and_length,
         fsverity::FsVerityState,
         inotify,
         pipe::{Pipe, PipeHandle},
@@ -16,7 +17,7 @@ use crate::{
         socket::SocketHandle,
         FileObject, FileOps, FileSystem, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
         FileWriteGuardState, FsNodeReleaser, FsStr, FsString, MountInfo, NamespaceNode, OPathOps,
-        RecordLockCommand, RecordLockOwner, RecordLocks, WeakFileHandle,
+        RecordLockCommand, RecordLockOwner, RecordLocks, WeakFileHandle, MAX_LFS_FILESIZE,
     },
 };
 use bitflags::bitflags;
@@ -1385,6 +1386,9 @@ impl FsNode {
 
     // Called by `truncate` and `ftruncate` above.
     fn truncate_common(&self, current_task: &CurrentTask, length: u64) -> Result<(), Errno> {
+        if length > MAX_LFS_FILESIZE as u64 {
+            return error!(EINVAL);
+        }
         if length > current_task.thread_group.get_rlimit(Resource::FSIZE) {
             send_standard_signal(current_task, SignalInfo::default(SIGXFSZ));
             return error!(EFBIG);
@@ -1407,7 +1411,8 @@ impl FsNode {
         offset: u64,
         length: u64,
     ) -> Result<(), Errno> {
-        let allocate_size = offset.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
+        let allocate_size = checked_add_offset_and_length(offset as usize, length as usize)
+            .map_err(|_| errno!(EFBIG))? as u64;
         if allocate_size > current_task.thread_group.get_rlimit(Resource::FSIZE) {
             send_standard_signal(current_task, SignalInfo::default(SIGXFSZ));
             return error!(EFBIG);

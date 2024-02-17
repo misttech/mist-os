@@ -17,11 +17,6 @@
                 // TODO(https://fxbug.dev/42083295): Re-enable once these pass on fxfs.
                 "MMapFileTest.ReadSharedTruncateSIGBUS",
                 "MMapFileTest.WriteSharedTruncateSIGBUS",
-
-                // sendfile_test
-                // Unclear why this test fails with fxfs only. Maybe we're validating
-                // the file offset differently?
-                "SendFileTest.Overflow",
             ],
         },
         {
