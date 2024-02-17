@@ -75,7 +75,8 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(zx_device_t* parent, uint3
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  zx::result<std::unique_ptr<DsiHost>> dsi_host_result = DsiHost::Create(parent, panel_type);
+  zx::result<std::unique_ptr<DsiHost>> dsi_host_result =
+      DsiHost::Create(parent, panel_type, panel_config);
   if (dsi_host_result.is_error()) {
     zxlogf(ERROR, "Could not create DSI host: %s", dsi_host_result.status_string());
     return dsi_host_result.take_error();
@@ -193,8 +194,7 @@ zx::result<> Vout::PowerOff() {
   switch (type_) {
     case VoutType::kDsi: {
       dsi_.clock->Disable();
-      const display_setting_t display_setting = ToDisplaySetting(dsi_.panel_config);
-      dsi_.dsi_host->Disable(display_setting);
+      dsi_.dsi_host->Disable();
       return zx::ok();
     }
     case VoutType::kHdmi: {
@@ -217,8 +217,7 @@ zx::result<> Vout::PowerOn() {
 
       dsi_.clock->SetVideoOn(false);
       // Configure and enable DSI host interface.
-      zx::result<> dsi_host_enable_result =
-          dsi_.dsi_host->Enable(display_setting, dsi_.clock->GetBitrate());
+      zx::result<> dsi_host_enable_result = dsi_.dsi_host->Enable(dsi_.clock->GetBitrate());
       if (!dsi_host_enable_result.is_ok()) {
         zxlogf(ERROR, "Could not enable DSI Host: %s", dsi_host_enable_result.status_string());
         return dsi_host_enable_result;

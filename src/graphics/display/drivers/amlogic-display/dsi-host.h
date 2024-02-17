@@ -34,8 +34,11 @@ class DsiHost {
   // way, and is thus safe to use when adopting a device that was initialized by
   // the bootloader.
   //
+  // `panel_config` must be non-null and must outlive the `DsiHost` instance.
+  //
   // Returns a non-null pointer to the DsiHost instance on success.
-  static zx::result<std::unique_ptr<DsiHost>> Create(zx_device_t* parent, uint32_t panel_type);
+  static zx::result<std::unique_ptr<DsiHost>> Create(zx_device_t* parent, uint32_t panel_type,
+                                                     const PanelConfig* panel_config);
 
   // Production code should prefer using the `Create()` factory method.
   //
@@ -54,12 +57,12 @@ class DsiHost {
   // The DesignWare setup could technically be moved to the dw_mipi_dsi driver. However,
   // given the highly configurable nature of this block, we'd have to provide a lot of
   // information to the generic driver. Therefore, it's just simpler to configure it here
-  zx::result<> Enable(const display_setting_t& disp_setting, uint32_t bitrate);
+  zx::result<> Enable(uint32_t bitrate);
 
   // This function will turn off DSI Host. It is a "best-effort" function. We will attempt
   // to shutdown whatever we can. Error during shutdown path is ignored and function proceeds
   // with shutting down.
-  void Disable(const display_setting_t& disp_setting);
+  void Disable();
   void Dump();
 
   uint32_t panel_type() const { return panel_type_; }
@@ -70,7 +73,7 @@ class DsiHost {
 
   // Configures the MIPI DSI Host controller (transmitter) hardware for video
   // data transmission.
-  zx::result<> ConfigureDsiHostController(const display_setting_t& disp_setting);
+  zx::result<> ConfigureDsiHostController();
 
   // Controls the shutdown register on the DSI host side.
   void SetSignalPower(bool on);

@@ -13,6 +13,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 
 namespace amlogic_display {
 
@@ -27,7 +28,10 @@ DsiHost::DsiHost(zx_device_t* parent, uint32_t panel_type, const PanelConfig* pa
 }
 
 // static
-zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32_t panel_type) {
+zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32_t panel_type,
+                                                     const PanelConfig* panel_config) {
+  ZX_DEBUG_ASSERT(panel_config != nullptr);
+
   const char* kLcdGpioFragmentName = "gpio-lcd-reset";
   zx::result lcd_gpio =
       ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
@@ -35,12 +39,6 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
   if (lcd_gpio.is_error()) {
     zxlogf(ERROR, "Failed to get gpio protocol from fragment: %s", kLcdGpioFragmentName);
     return lcd_gpio.take_error();
-  }
-
-  const PanelConfig* panel_config = GetPanelConfig(panel_type);
-  if (panel_config == nullptr) {
-    zxlogf(ERROR, "Failed to get panel config for panel type %" PRIu32, panel_type);
-    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   fbl::AllocChecker alloc_checker;
@@ -51,8 +49,8 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  // TODO(fxbug.dev/42082357): Replace the long multi-step initialization with
-  // builder / factory pattern.
+  // TODO(https://fxbug.dev/42082357): Replace the long multi-step
+  // initialization with builder / factory pattern.
   if (!self->pdev_.is_valid()) {
     zxlogf(ERROR, "DsiHost: Could not get ZX_PROTOCOL_PDEV protocol");
     return zx::error(ZX_ERR_INVALID_ARGS);
@@ -201,7 +199,7 @@ zx::result<> DsiHost::PerformPowerOpSequence(cpp20::span<const PowerOp> commands
   return zx::ok();
 }
 
-zx::result<> DsiHost::ConfigureDsiHostController(const display_setting_t& disp_setting) {
+zx::result<> DsiHost::ConfigureDsiHostController() {
   // Setup relevant TOP_CNTL register -- Undocumented --
   mipi_dsi_mmio_->Write32(
       SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CNTL), TOP_CNTL_DPI_CLR_MODE_START,
@@ -218,7 +216,7 @@ zx::result<> DsiHost::ConfigureDsiHostController(const display_setting_t& disp_s
 
   // setup dsi config
   dsi_config_t dsi_cfg;
-  dsi_cfg.display_setting = disp_setting;
+  dsi_cfg.display_setting = ToDisplaySetting(panel_config_);
   dsi_cfg.video_mode_type = VIDEO_MODE_BURST;
   dsi_cfg.color_coding = COLOR_CODE_PACKED_24BIT_888;
 
@@ -274,7 +272,7 @@ void DsiHost::SetSignalPower(bool on) {
   }
 }
 
-void DsiHost::Disable(const display_setting_t& disp_setting) {
+void DsiHost::Disable() {
   // turn host off only if it's been fully turned on
   if (!enabled_) {
     return;
@@ -301,7 +299,7 @@ void DsiHost::Disable(const display_setting_t& disp_setting) {
   enabled_ = false;
 }
 
-zx::result<> DsiHost::Enable(const display_setting_t& disp_setting, uint32_t bitrate) {
+zx::result<> DsiHost::Enable(uint32_t bitrate) {
   if (enabled_) {
     return zx::ok();
   }
@@ -344,7 +342,7 @@ zx::result<> DsiHost::Enable(const display_setting_t& disp_setting, uint32_t bit
 
     // Initialize host in command mode first
     dsiimpl_.SetMode(DSI_MODE_COMMAND);
-    zx::result<> dsi_host_config_result = ConfigureDsiHostController(disp_setting);
+    zx::result<> dsi_host_config_result = ConfigureDsiHostController();
     if (!dsi_host_config_result.is_ok()) {
       zxlogf(ERROR, "Failed to configure the MIPI DSI Host Controller: %s",
              dsi_host_config_result.status_string());
