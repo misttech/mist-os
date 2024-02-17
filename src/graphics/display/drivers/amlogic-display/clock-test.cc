@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/device-protocol/display-panel.h>
+#include <zircon/assert.h>
 
 #include <gtest/gtest.h>
 
@@ -17,33 +18,38 @@ namespace amlogic_display {
 
 namespace {
 
-const std::vector<display_setting_t> kDisplaySettingsForTesting = [] {
-  static constexpr uint32_t kPanelIdsToTest[] = {
+// All the PanelConfig pointers are non-null in the returned array.
+const std::vector<const PanelConfig*> kPanelConfigsForTesting = [] {
+  std::vector<const PanelConfig*> panel_configs;
+  const uint32_t kPanelIds[] = {
       PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO, PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364,
       PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364,    PANEL_BOE_TV101WXM_FITIPOWER_JD9364,
       PANEL_KD_KD070D82_FITIPOWER_JD9364,        PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON,
   };
-
-  std::vector<display_setting_t> display_settings = {};
-  for (const uint32_t panel_id : kPanelIdsToTest) {
-    const PanelConfig* panel_config = GetPanelConfig(panel_id);
+  for (const uint32_t panel : kPanelIds) {
+    const PanelConfig* panel_config = GetPanelConfig(panel);
     ZX_ASSERT(panel_config != nullptr);
-    const display_setting_t display_setting = ToDisplaySetting(*panel_config);
-    display_settings.push_back(std::move(display_setting));
+    panel_configs.push_back(panel_config);
   }
-  return display_settings;
+  return panel_configs;
 }();
 
 // For now, simply test that timing calculations don't segfault.
 TEST(AmlogicDisplayClock, PanelTiming) {
-  for (const display_setting_t& t : kDisplaySettingsForTesting) {
-    Clock::CalculateLcdTiming(t);
+  for (const PanelConfig* panel_config : kPanelConfigsForTesting) {
+    ASSERT_NE(panel_config, nullptr);
+    SCOPED_TRACE(::testing::Message() << panel_config->name);
+    Clock::CalculateLcdTiming(panel_config->display_timing);
   }
 }
 
 TEST(AmlogicDisplayClock, PllTiming_ValidMode) {
-  for (const display_setting_t& t : kDisplaySettingsForTesting) {
-    zx::result<PllConfig> pll_r = Clock::GenerateHPLL(t);
+  for (const PanelConfig* panel_config : kPanelConfigsForTesting) {
+    ASSERT_NE(panel_config, nullptr);
+    SCOPED_TRACE(::testing::Message() << panel_config->name);
+    zx::result<PllConfig> pll_r =
+        Clock::GenerateHPLL(panel_config->display_timing.pixel_clock_frequency_khz,
+                            panel_config->maximum_per_data_lane_bit_per_second());
     EXPECT_OK(pll_r.status_value());
   }
 }
@@ -58,8 +64,9 @@ TEST(AmlogicDisplayClock, PllTiming_ValidMode) {
 TEST(PllTimingHdmiPllClockRatioCalculatedCorrectly, BoeTv070wsmFitipowerJd9364Astro) {
   const PanelConfig* panel_config = GetPanelConfig(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO);
   ASSERT_NE(panel_config, nullptr);
-  const display_setting_t display_setting = ToDisplaySetting(*panel_config);
-  zx::result<PllConfig> pll_config = Clock::GenerateHPLL(display_setting);
+  zx::result<PllConfig> pll_config =
+      Clock::GenerateHPLL(panel_config->display_timing.pixel_clock_frequency_khz,
+                          panel_config->maximum_per_data_lane_bit_per_second());
   static constexpr int kExpectedHdmiPllClockRatio = 8;
   EXPECT_OK(pll_config.status_value());
   EXPECT_EQ(kExpectedHdmiPllClockRatio, static_cast<int>(pll_config->clock_factor));
@@ -68,8 +75,9 @@ TEST(PllTimingHdmiPllClockRatioCalculatedCorrectly, BoeTv070wsmFitipowerJd9364As
 TEST(PllTimingHdmiPllClockRatioCalculatedCorrectly, InnoluxP070acbFitipowerJd9364) {
   const PanelConfig* panel_config = GetPanelConfig(PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364);
   ASSERT_NE(panel_config, nullptr);
-  const display_setting_t display_setting = ToDisplaySetting(*panel_config);
-  zx::result<PllConfig> pll_config = Clock::GenerateHPLL(display_setting);
+  zx::result<PllConfig> pll_config =
+      Clock::GenerateHPLL(panel_config->display_timing.pixel_clock_frequency_khz,
+                          panel_config->maximum_per_data_lane_bit_per_second());
   static constexpr int kExpectedHdmiPllClockRatio = 8;
   EXPECT_OK(pll_config.status_value());
   EXPECT_EQ(kExpectedHdmiPllClockRatio, static_cast<int>(pll_config->clock_factor));
@@ -78,8 +86,9 @@ TEST(PllTimingHdmiPllClockRatioCalculatedCorrectly, InnoluxP070acbFitipowerJd936
 TEST(PllTimingHdmiPllClockRatioCalculatedCorrectly, InnoluxP101dezFitipowerJd9364) {
   const PanelConfig* panel_config = GetPanelConfig(PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364);
   ASSERT_NE(panel_config, nullptr);
-  const display_setting_t display_setting = ToDisplaySetting(*panel_config);
-  zx::result<PllConfig> pll_config = Clock::GenerateHPLL(display_setting);
+  zx::result<PllConfig> pll_config =
+      Clock::GenerateHPLL(panel_config->display_timing.pixel_clock_frequency_khz,
+                          panel_config->maximum_per_data_lane_bit_per_second());
   static constexpr int kExpectedHdmiPllClockRatio = 8;
   EXPECT_OK(pll_config.status_value());
   EXPECT_EQ(kExpectedHdmiPllClockRatio, static_cast<int>(pll_config->clock_factor));
@@ -88,8 +97,9 @@ TEST(PllTimingHdmiPllClockRatioCalculatedCorrectly, InnoluxP101dezFitipowerJd936
 TEST(PllTimingHdmiPllClockRatioCalculatedCorrectly, BoeTv101wxmFitipowerJd9364) {
   const PanelConfig* panel_config = GetPanelConfig(PANEL_BOE_TV101WXM_FITIPOWER_JD9364);
   ASSERT_NE(panel_config, nullptr);
-  const display_setting_t display_setting = ToDisplaySetting(*panel_config);
-  zx::result<PllConfig> pll_config = Clock::GenerateHPLL(display_setting);
+  zx::result<PllConfig> pll_config =
+      Clock::GenerateHPLL(panel_config->display_timing.pixel_clock_frequency_khz,
+                          panel_config->maximum_per_data_lane_bit_per_second());
   static constexpr int kExpectedHdmiPllClockRatio = 8;
   EXPECT_OK(pll_config.status_value());
   EXPECT_EQ(kExpectedHdmiPllClockRatio, static_cast<int>(pll_config->clock_factor));

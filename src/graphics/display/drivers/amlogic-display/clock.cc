@@ -15,26 +15,12 @@
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/fixed-point-util.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace amlogic_display {
 
 namespace {
 constexpr uint32_t kKHZ = 1000;
-
-void DumpDisplaySettings(const display_setting_t& settings) {
-  zxlogf(INFO, "#############################");
-  zxlogf(INFO, "Dumping display_setting structure:");
-  zxlogf(INFO, "#############################");
-  zxlogf(INFO, "lcd_clock = 0x%x (%u)", settings.lcd_clock, settings.lcd_clock);
-  zxlogf(INFO, "h_period = 0x%x (%u)", settings.h_period, settings.h_period);
-  zxlogf(INFO, "h_active = 0x%x (%u)", settings.h_active, settings.h_active);
-  zxlogf(INFO, "hsync_bp = 0x%x (%u)", settings.hsync_bp, settings.hsync_bp);
-  zxlogf(INFO, "hsync_width = 0x%x (%u)", settings.hsync_width, settings.hsync_width);
-  zxlogf(INFO, "v_period = 0x%x (%u)", settings.v_period, settings.v_period);
-  zxlogf(INFO, "v_active = 0x%x (%u)", settings.v_active, settings.v_active);
-  zxlogf(INFO, "vsync_bp = 0x%x (%u)", settings.vsync_bp, settings.vsync_bp);
-  zxlogf(INFO, "vsync_width = 0x%x (%u)", settings.vsync_width, settings.vsync_width);
-}
 
 }  // namespace
 
@@ -44,25 +30,31 @@ Clock::Clock(fdf::MmioBuffer vpu_mmio, fdf::MmioBuffer hhi_mmio, bool clock_enab
       clock_enabled_(clock_enabled) {}
 
 // static
-LcdTiming Clock::CalculateLcdTiming(const display_setting_t& d) {
+LcdTiming Clock::CalculateLcdTiming(const display::DisplayTiming& d) {
   LcdTiming out;
   // Calculate and store DataEnable horizontal and vertical start/stop times
-  const uint32_t de_hstart = d.h_period - d.h_active - 1;
-  const uint32_t de_vstart = d.v_period - d.v_active;
+  const uint32_t de_hstart = d.horizontal_total_px() - d.horizontal_active_px - 1;
+  const uint32_t de_vstart = d.vertical_total_lines() - d.vertical_active_lines;
   out.vid_pixel_on = de_hstart;
   out.vid_line_on = de_vstart;
 
   // Calculate and Store HSync horizontal and vertical start/stop times
-  const uint32_t hstart = (de_hstart + d.h_period - d.hsync_bp - d.hsync_width) % d.h_period;
-  const uint32_t hend = (de_hstart + d.h_period - d.hsync_bp) % d.h_period;
+  const uint32_t hstart = (de_hstart + d.horizontal_total_px() - d.horizontal_back_porch_px -
+                           d.horizontal_sync_width_px) %
+                          d.horizontal_total_px();
+  const uint32_t hend =
+      (de_hstart + d.horizontal_total_px() - d.horizontal_back_porch_px) % d.horizontal_total_px();
   out.hs_hs_addr = hstart;
   out.hs_he_addr = hend;
 
   // Calculate and Store VSync horizontal and vertical start/stop times
-  out.vs_hs_addr = (hstart + d.h_period) % d.h_period;
+  out.vs_hs_addr = (hstart + d.horizontal_total_px()) % d.horizontal_total_px();
   out.vs_he_addr = out.vs_hs_addr;
-  const uint32_t vstart = (de_vstart + d.v_period - d.vsync_bp - d.vsync_width) % d.v_period;
-  const uint32_t vend = (de_vstart + d.v_period - d.vsync_bp) % d.v_period;
+  const uint32_t vstart = (de_vstart + d.vertical_total_lines() - d.vertical_back_porch_lines -
+                           d.vertical_sync_width_lines) %
+                          d.vertical_total_lines();
+  const uint32_t vend = (de_vstart + d.vertical_total_lines() - d.vertical_back_porch_lines) %
+                        d.vertical_total_lines();
   out.vs_vs_addr = vstart;
   out.vs_ve_addr = vend;
   return out;
@@ -103,11 +95,12 @@ zx::result<> Clock::WaitForHdmiPllToLock() {
 }
 
 // static
-zx::result<PllConfig> Clock::GenerateHPLL(const display_setting_t& d) {
+zx::result<PllConfig> Clock::GenerateHPLL(int32_t pixel_clock_frequency_khz,
+                                          int64_t maximum_per_data_lane_bit_per_second) {
   PllConfig pll_cfg;
   uint32_t pll_fout;
   // Requested Pixel clock
-  pll_cfg.fout = d.lcd_clock / kKHZ;  // KHz
+  pll_cfg.fout = pixel_clock_frequency_khz;
   if (pll_cfg.fout > MAX_PIXEL_CLK_KHZ) {
     zxlogf(ERROR, "Pixel clock out of range (%u KHz)", pll_cfg.fout);
     return zx::error(ZX_ERR_OUT_OF_RANGE);
@@ -130,8 +123,8 @@ zx::result<PllConfig> Clock::GenerateHPLL(const display_setting_t& d) {
 
     // Make sure all clocks are within range
     // If these values are not within range, we will not have a valid display
-    uint32_t dsi_bit_rate_max_khz = d.bit_rate_max * 1000;  // change to KHz
-    uint32_t dsi_bit_rate_min_khz = dsi_bit_rate_max_khz - pll_cfg.fout;
+    const int64_t dsi_bit_rate_max_khz = maximum_per_data_lane_bit_per_second / kKHZ;
+    const int64_t dsi_bit_rate_min_khz = dsi_bit_rate_max_khz - pll_cfg.fout;
     if ((pll_fout < dsi_bit_rate_min_khz) || (pll_fout > dsi_bit_rate_max_khz)) {
       zxlogf(TRACE, "Calculated clocks out of range for xd = %u, skipped", clock_factor);
       continue;
@@ -183,8 +176,9 @@ zx::result<PllConfig> Clock::GenerateHPLL(const display_setting_t& d) {
     }
   }
 
-  zxlogf(ERROR, "Could not generate correct PLL values!");
-  DumpDisplaySettings(d);
+  zxlogf(ERROR, "Could not generate correct PLL values for: ");
+  zxlogf(ERROR, "  pixel_clock_frequency_khz = %" PRId32, pixel_clock_frequency_khz);
+  zxlogf(ERROR, "  max_per_data_lane_bit_rate_hz = %" PRId64, maximum_per_data_lane_bit_per_second);
   return zx::error(ZX_ERR_INTERNAL);
 }
 
@@ -216,14 +210,16 @@ void Clock::Disable() {
   clock_enabled_ = false;
 }
 
-zx::result<> Clock::Enable(const display_setting_t& d) {
+zx::result<> Clock::Enable(const PanelConfig& panel_config) {
   if (clock_enabled_) {
     return zx::ok();
   }
 
   // Populate internal LCD timing structure based on predefined tables
-  lcd_timing_ = CalculateLcdTiming(d);
-  zx::result<PllConfig> pll_result = GenerateHPLL(d);
+  lcd_timing_ = CalculateLcdTiming(panel_config.display_timing);
+  zx::result<PllConfig> pll_result =
+      GenerateHPLL(panel_config.display_timing.pixel_clock_frequency_khz,
+                   panel_config.maximum_per_data_lane_bit_per_second());
   if (pll_result.is_error()) {
     zxlogf(ERROR, "Failed to generate HDMI PLL and Video clock tree configuration: %s",
            pll_result.status_string());
@@ -363,13 +359,16 @@ zx::result<> Clock::Enable(const display_setting_t& d) {
   vpu_mmio_.Write32(0x0418, ENCL_VIDEO_MODE_ADV);  // Sampling rate: 1
 
   // bypass filter -- Undocumented registers
+  const display::DisplayTiming& display_timing = panel_config.display_timing;
   vpu_mmio_.Write32(0x1000, ENCL_VIDEO_FILT_CTRL);
-  vpu_mmio_.Write32(d.h_period - 1, ENCL_VIDEO_MAX_PXCNT);
-  vpu_mmio_.Write32(d.v_period - 1, ENCL_VIDEO_MAX_LNCNT);
+  vpu_mmio_.Write32(display_timing.horizontal_total_px() - 1, ENCL_VIDEO_MAX_PXCNT);
+  vpu_mmio_.Write32(display_timing.vertical_total_lines() - 1, ENCL_VIDEO_MAX_LNCNT);
   vpu_mmio_.Write32(lcd_timing_.vid_pixel_on, ENCL_VIDEO_HAVON_BEGIN);
-  vpu_mmio_.Write32(d.h_active - 1 + lcd_timing_.vid_pixel_on, ENCL_VIDEO_HAVON_END);
+  vpu_mmio_.Write32(display_timing.horizontal_active_px - 1 + lcd_timing_.vid_pixel_on,
+                    ENCL_VIDEO_HAVON_END);
   vpu_mmio_.Write32(lcd_timing_.vid_line_on, ENCL_VIDEO_VAVON_BLINE);
-  vpu_mmio_.Write32(d.v_active - 1 + lcd_timing_.vid_line_on, ENCL_VIDEO_VAVON_ELINE);
+  vpu_mmio_.Write32(display_timing.vertical_active_lines - 1 + lcd_timing_.vid_line_on,
+                    ENCL_VIDEO_VAVON_ELINE);
   vpu_mmio_.Write32(lcd_timing_.hs_hs_addr, ENCL_VIDEO_HSO_BEGIN);
   vpu_mmio_.Write32(lcd_timing_.hs_he_addr, ENCL_VIDEO_HSO_END);
   vpu_mmio_.Write32(lcd_timing_.vs_hs_addr, ENCL_VIDEO_VSO_BEGIN);

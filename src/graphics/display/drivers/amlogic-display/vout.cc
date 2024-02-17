@@ -208,8 +208,7 @@ zx::result<> Vout::PowerOff() {
 zx::result<> Vout::PowerOn() {
   switch (type_) {
     case VoutType::kDsi: {
-      const display_setting_t display_setting = ToDisplaySetting(dsi_.panel_config);
-      zx::result<> clock_enable_result = dsi_.clock->Enable(display_setting);
+      zx::result<> clock_enable_result = dsi_.clock->Enable(dsi_.panel_config);
       if (!clock_enable_result.is_ok()) {
         zxlogf(ERROR, "Could not enable display clocks: %s", clock_enable_result.status_string());
         return clock_enable_result;

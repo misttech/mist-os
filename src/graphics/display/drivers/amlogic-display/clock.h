@@ -21,7 +21,9 @@
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/dsi.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
+#include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace amlogic_display {
 
@@ -44,7 +46,7 @@ class Clock {
   // of the AMLogic A311D datasheet.
   Clock(fdf::MmioBuffer vpu_mmio, fdf::MmioBuffer hhi_mmio, bool clock_enabled);
 
-  zx::result<> Enable(const display_setting_t& d);
+  zx::result<> Enable(const PanelConfig& panel_config);
   void Disable();
 
   void SetVideoOn(bool on);
@@ -55,10 +57,11 @@ class Clock {
     return pll_cfg_.bitrate;
   }
 
-  static LcdTiming CalculateLcdTiming(const display_setting_t& disp_setting);
+  static LcdTiming CalculateLcdTiming(const display::DisplayTiming& display_timing);
   // This function calculates the required pll configurations needed to generate
   // the desired lcd clock
-  static zx::result<PllConfig> GenerateHPLL(const display_setting_t& disp_setting);
+  static zx::result<PllConfig> GenerateHPLL(int32_t pixel_clock_frequency_khz,
+                                            int64_t maximum_per_data_lane_bit_per_second);
 
  private:
   zx::result<> WaitForHdmiPllToLock();
