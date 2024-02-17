@@ -12,6 +12,7 @@
 #include "src/media/audio/lib/format2/fixed.h"
 #include "src/media/audio/lib/processing/coefficient_table.h"
 #include "src/media/audio/lib/processing/coefficient_table_cache.h"
+#include "src/media/audio/lib/processing/flags.h"
 
 namespace media_audio {
 
@@ -41,7 +42,8 @@ class Filter {
 
   // Eagerly precomputes needed data. If not called, needed data will be lazily computed on the
   // first `ComputeSample` call.
-  // TODO(https://fxbug.dev/42121558): This is for tests only and can be removed once filter creation is eager.
+  // TODO(https://fxbug.dev/42121558): This is for tests only and can be removed once filter
+  // creation is eager.
   virtual void EagerlyPrepare() = 0;
 
   int32_t source_rate() const { return source_rate_; }
@@ -54,7 +56,7 @@ class Filter {
  protected:
   float ComputeSampleFromTable(const CoefficientTable& filter_coefficients, int64_t frac_offset,
                                float* center);
-  void DisplayTable(const CoefficientTable& filter_coefficients);
+  inline void DisplayTable(const CoefficientTable& filter_coefficients);
 
  private:
   int32_t source_rate_;
@@ -83,7 +85,11 @@ class LinearFilter : public Filter {
     return ComputeSampleFromTable(*filter_coefficients_, frac_offset, center);
   }
 
-  void Display() override { DisplayTable(*filter_coefficients_); }
+  void Display() override {
+    if constexpr (kEnableDisplayForFilterTablesAndComputation) {
+      DisplayTable(*filter_coefficients_);
+    }
+  }
 
   const float& operator[](int64_t index) { return (*filter_coefficients_)[index]; }
 
@@ -122,7 +128,11 @@ class SincFilter : public Filter {
     return ComputeSampleFromTable(*filter_coefficients_, frac_offset, center);
   }
 
-  void Display() override { DisplayTable(*filter_coefficients_); }
+  void Display() override {
+    if constexpr (kEnableDisplayForFilterTablesAndComputation) {
+      DisplayTable(*filter_coefficients_);
+    }
+  }
 
   const float& operator[](int64_t index) { return (*filter_coefficients_)[index]; }
 

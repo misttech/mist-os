@@ -31,6 +31,7 @@ source_set("processing") {
     "coefficient_table_cache.h",
     "filter.cc",
     "filter.h",
+    "flags.h",
     "gain.h",
     "point_sampler.cc",
     "point_sampler.h",

@@ -17,6 +17,7 @@
 #include "src/media/audio/lib/clock/clock_synchronizer.h"
 #include "src/media/audio/lib/format2/fixed.h"
 #include "src/media/audio/lib/format2/format.h"
+#include "src/media/audio/lib/processing/flags.h"
 #include "src/media/audio/lib/processing/gain.h"
 #include "src/media/audio/lib/processing/sampler.h"
 #include "src/media/audio/services/mixer/common/basic_types.h"
@@ -212,9 +213,8 @@ bool MixerSource::Mix(MixJobContext& ctx, const TimelineFunction& dest_time_to_d
       FX_CHECK(dest_frame_offset <= dest_frame_count)
           << ffl::String::DecRational << "dest_frame_offset " << dest_frame_offset
           << " advanced by " << dest_frames_to_advance << " to " << dest_frame_count
-          << ", exceeding " << dest_frame_count << ";"
-          << " mix_to_packet_gap=" << mix_to_packet_gap << " step_size=" << state.step_size()
-          << " step_size_modulo=" << state.step_size_modulo()
+          << ", exceeding " << dest_frame_count << ";" << " mix_to_packet_gap=" << mix_to_packet_gap
+          << " step_size=" << state.step_size() << " step_size_modulo=" << state.step_size_modulo()
           << " step_size_denominator=" << state.step_size_denominator()
           << " source_pos_modulo=" << state.source_pos_modulo() << " (was "
           << initial_source_pos_modulo << ")";
@@ -339,8 +339,8 @@ void MixerSource::PrepareSourceGainForNextMix(MixJobContext& ctx,
   }
 
   const auto maybe_backfill_gain_scales_fn = [&]() {
-    // TODO(https://fxbug.dev/42066195): `GainType::kRamping` is misleading here, we should rename to reflect
-    // this behavior where it only indicates that `Sampler::Gain::scale_ramp` should be used.
+    // TODO(https://fxbug.dev/42066195): `GainType::kRamping` is misleading here. Should rename to
+    // reflect that it only indicates that `Sampler::Gain::scale_ramp` should be used.
     if (gain_.type != GainType::kRamping) {
       // We lazily fill the previous frames only when needed.
       std::fill_n(gain_scales_.data(), dest_frame_offset, gain_.scale);
@@ -384,8 +384,8 @@ std::optional<PipelineStage::Packet> MixerSource::ReadNextSourcePacket(MixJobCon
     source_frame_count = source_end_frame - source_start_frame;
     if (source_frame_count <= Fixed(0)) {
       // The source cannot be ahead of `state.next_source_frame` by more than `pos_filter_width`.
-      FX_LOGS(WARNING) << ffl::String::DecRational << "Unexpectedly small source request"
-                       << " [" << state.next_source_frame() << ", " << source_end_frame
+      FX_LOGS(WARNING) << ffl::String::DecRational << "Unexpectedly small source request" << " ["
+                       << state.next_source_frame() << ", " << source_end_frame
                        << ") is entirely before next available frame " << (*next_readable_frame);
       return std::nullopt;
     }
@@ -395,7 +395,7 @@ std::optional<PipelineStage::Packet> MixerSource::ReadNextSourcePacket(MixJobCon
   return source_->Read(ctx, source_start_frame, source_frame_count.Ceiling());
 }
 
-// TODO(https://fxbug.dev/42065692): Add more logging as needed from `Mixer::ReconcileClocksAndSetStepSize`.
+// TODO(https://fxbug.dev/42065692): Maybe add logging from `Mixer::ReconcileClocksAndSetStepSize`.
 void MixerSource::UpdateSamplerState(const TimelineFunction& dest_time_to_dest_frac_frame,
                                      int64_t dest_frame) {
   auto& state = sampler_->state();

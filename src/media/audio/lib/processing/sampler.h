@@ -19,9 +19,6 @@
 
 namespace media_audio {
 
-// Enable to emit trace events containing the position state.
-inline constexpr bool kTracePositionEvents = false;
-
 // Interface that takes an array of source samples in any format, and processes corresponding array
 // of destination samples in normalized 32-bit float format with a specified gain scale applied.
 //
@@ -117,9 +114,9 @@ class Sampler {
     // Because all the initial factors are 64-bit, our denominator-scaled version must use 128-bit.
     // Even then, we might overflow depending on parameters, so we scale back denominator if needed.
     //
-    // TODO(https://fxbug.dev/42167787): Generalize this (remove the scale-down denominator optimization) and
-    // extract the functionality into a 128-bit template specialization of `TimelineRate` and
-    // `TimelineFunction`.
+    // TODO(https://fxbug.dev/42167787): Generalize this (remove the scale-down denominator
+    // optimization) and extract the functionality into a 128-bit template specialization of
+    // `TimelineRate` and `TimelineFunction`.
     zx::time MonoTimeFromRunningSource(
         const media::TimelineFunction& clock_mono_to_frac_source_frames) const;
 
@@ -263,7 +260,8 @@ class Sampler {
 
   // Eagerly precomputes any needed data. If not called, that data will be lazily computed on the
   // first call to `Process`.
-  // TODO(https://fxbug.dev/42121558): This is for tests only and can be removed once filter creation is eager.
+  // TODO(https://fxbug.dev/42121558): This is for tests only and can be removed once filter
+  // creation is eager.
   virtual void EagerlyPrepare() = 0;
 
   // Processes `source` into `dest` with `gain`.

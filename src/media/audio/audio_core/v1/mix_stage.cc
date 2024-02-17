@@ -23,6 +23,7 @@
 #include "src/media/audio/audio_core/shared/reporter.h"
 #include "src/media/audio/audio_core/v1/base_renderer.h"
 #include "src/media/audio/audio_core/v1/silence_padding_stream.h"
+#include "src/media/audio/lib/processing/flags.h"
 #include "src/media/audio/lib/processing/gain.h"
 #include "src/media/audio/lib/timeline/timeline_rate.h"
 
@@ -515,8 +516,8 @@ std::optional<ReadableStream::Buffer> MixStage::NextSourceBuffer(Mixer& mixer,
     if (source_frames <= Fixed(0)) {
       // This shouldn't happen: the source should not be ahead of state.next_source_frame by
       // more than pos_filter_width and our initial source_frames should > pos_filter_width.
-      FX_LOGS(WARNING) << ffl::String::DecRational << "Unexpectedly small source request"
-                       << " [" << state.next_source_frame() << ", " << source_end << ")"
+      FX_LOGS(WARNING) << ffl::String::DecRational << "Unexpectedly small source request" << " ["
+                       << state.next_source_frame() << ", " << source_end << ")"
                        << " is entirely before next available frame (" << (*next_available) << ")";
       return std::nullopt;
     }
@@ -687,9 +688,9 @@ void MixStage::ReconcileClocksAndSetStepSize(::media_audio::ClockSynchronizer& c
     return;
   }
 
-  // TODO(https://fxbug.dev/42142286): pass through a signal if we expect discontinuity (Play, Pause, packet
-  // discontinuity bit); use it to log (or report to inspect) only unexpected discontinuities.
-  // Add a test to validate that we log discontinuities only when we should.
+  // TODO(https://fxbug.dev/42142286): pass through a signal if we expect discontinuity (Play,
+  // Pause, packet discontinuity bit); use it to log (or report to inspect) only unexpected
+  // discontinuities. Add a test to validate that we log discontinuities only when we should.
 
   // Project the source position state.next_source_frame (including pos_modulo effects) into
   // system MONOTONIC time as mono_now_from_source. Record the difference (in ns) between

@@ -8,6 +8,7 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/media/audio/lib/format2/fixed.h"
+#include "src/media/audio/lib/processing/flags.h"
 
 namespace media_audio {
 
@@ -26,16 +27,15 @@ class PositionManager {
   PositionManager(PositionManager&& other) = delete;
   PositionManager& operator=(PositionManager&& other) = delete;
 
+  // Used for debugging purposes only.
   // Validates source and destination frame positions.
   static void CheckPositions(int64_t dest_frame_count, int64_t* dest_offset_ptr,
                              int64_t source_frame_count, int64_t source_offset,
                              int64_t frac_pos_filter_length, int64_t frac_step_size,
                              uint64_t step_size_modulo, uint64_t step_size_denominator,
                              uint64_t source_pos_modulo);
-
-  // Used for debugging purposes only.
-  void Display() const;
-  void DisplayUpdate() const;
+  inline void Display() const;
+  inline void DisplayUpdate() const;
 
   // Establishes the parameters for this source and dest
   void SetSourceValues(const void* source_void_ptr, int64_t source_frame_count,
@@ -49,7 +49,7 @@ class PositionManager {
   // Retrieves the pointer to the current source frame (based on source offset).
   template <typename SourceSampleType>
   SourceSampleType* CurrentSourceFrame() const {
-    FX_CHECK(frac_source_offset_ >= 0);
+    FX_DCHECK(frac_source_offset_ >= 0);
 
     auto source_ptr = static_cast<SourceSampleType*>(source_void_ptr_);
     return source_ptr +

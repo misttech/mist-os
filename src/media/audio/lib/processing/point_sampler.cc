@@ -16,6 +16,7 @@
 #include "src/media/audio/lib/format2/channel_mapper.h"
 #include "src/media/audio/lib/format2/fixed.h"
 #include "src/media/audio/lib/format2/format.h"
+#include "src/media/audio/lib/processing/flags.h"
 #include "src/media/audio/lib/processing/gain.h"
 #include "src/media/audio/lib/processing/position_manager.h"
 
@@ -47,11 +48,13 @@ class PointSamplerImpl : public PointSampler {
   void Process(Source source, Dest dest, Gain gain, bool accumulate) final {
     TRACE_DURATION("audio", "PointSampler::Process");
 
-    PositionManager::CheckPositions(dest.frame_count, dest.frame_offset_ptr, source.frame_count,
-                                    source.frame_offset_ptr->raw_value(),
-                                    pos_filter_length().raw_value(),
-                                    state().step_size().raw_value(), state().step_size_modulo(),
-                                    state().step_size_denominator(), state().source_pos_modulo());
+    if constexpr (kCheckPositionsAndRatesOrDie) {
+      PositionManager::CheckPositions(dest.frame_count, dest.frame_offset_ptr, source.frame_count,
+                                      source.frame_offset_ptr->raw_value(),
+                                      pos_filter_length().raw_value(),
+                                      state().step_size().raw_value(), state().step_size_modulo(),
+                                      state().step_size_denominator(), state().source_pos_modulo());
+    }
 
     switch (gain.type) {
       case GainType::kSilent:

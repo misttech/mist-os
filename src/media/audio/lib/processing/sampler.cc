@@ -13,6 +13,7 @@
 
 #include "src/media/audio/lib/format2/fixed.h"
 #include "src/media/audio/lib/format2/format.h"
+#include "src/media/audio/lib/processing/flags.h"
 #include "src/media/audio/lib/processing/point_sampler.h"
 #include "src/media/audio/lib/processing/sinc_sampler.h"
 #include "src/media/audio/lib/timeline/timeline_function.h"
@@ -44,9 +45,9 @@ void Sampler::State::ResetSourceStride(
   step_size_modulo_ = source_frac_frame_per_dest_frame.subject_delta() -
                       (source_frac_frame_per_dest_frame.reference_delta() * step_size_.raw_value());
   const uint64_t new_step_size_denominator = source_frac_frame_per_dest_frame.reference_delta();
-  FX_CHECK(new_step_size_denominator > 0)
+  FX_DCHECK(new_step_size_denominator > 0)
       << "new_step_size_denominator: " << new_step_size_denominator;
-  FX_CHECK(step_size_modulo_ < new_step_size_denominator)
+  FX_DCHECK(step_size_modulo_ < new_step_size_denominator)
       << "step_size_modulo: " << step_size_modulo_
       << ", new_step_size_denominator: " << new_step_size_denominator;
 
@@ -91,7 +92,7 @@ void Sampler::State::ResetSourceStride(
     }
     source_pos_modulo_ = static_cast<uint64_t>(new_source_pos_modulo);
     step_size_denominator_ = new_step_size_denominator;
-    FX_CHECK(source_pos_modulo_ < step_size_denominator_)
+    FX_DCHECK(source_pos_modulo_ < step_size_denominator_)
         << "source_pos_modulo: " << source_pos_modulo_
         << ", new_step_size_denominator: " << step_size_denominator_;
   }
@@ -244,11 +245,10 @@ zx::time Sampler::State::MonoTimeFromRunningSource(
 }
 
 void Sampler::State::AdvancePositionsBy(int64_t dest_frames, bool advance_source_pos_modulo) {
-  FX_CHECK(dest_frames >= 0) << "Unexpected negative advance:"
-                             << " dest_frames=" << dest_frames
-                             << " denom=" << step_size_denominator_
-                             << " rate_mod=" << step_size_modulo_ << " "
-                             << " source_pos_mod=" << source_pos_modulo_;
+  FX_DCHECK(dest_frames >= 0) << "Unexpected negative advance:" << " dest_frames=" << dest_frames
+                              << " denom=" << step_size_denominator_
+                              << " rate_mod=" << step_size_modulo_ << " "
+                              << " source_pos_mod=" << source_pos_modulo_;
 
   int64_t frac_source_frame_delta = step_size_.raw_value() * dest_frames;
   if constexpr (kTracePositionEvents) {

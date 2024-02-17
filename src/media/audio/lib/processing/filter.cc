@@ -15,43 +15,39 @@
 #include <vector>
 
 #include "src/media/audio/lib/processing/coefficient_table.h"
+#include "src/media/audio/lib/processing/flags.h"
 
 namespace media_audio {
 
-namespace {
-
-// Debug computation of output values (`ComputeSample`), from coefficients and input values.
-// Extremely verbose, only useful in a controlled unittest setting.
-constexpr bool kTraceFilterComputation = false;
-
-}  // namespace
-
 void Filter::DisplayTable(const CoefficientTable& filter_coefficients) {
-  FX_LOGS(INFO) << "Filter: source rate " << source_rate_ << ", dest rate " << dest_rate_
-                << ", length 0x" << std::hex << side_length_;
+  if constexpr (kEnableDisplayForFilterTablesAndComputation) {
+    FX_LOGS(INFO) << "Filter: source rate " << source_rate_ << ", dest rate " << dest_rate_
+                  << ", length 0x" << std::hex << side_length_;
 
-  FX_LOGS(INFO) << " **************************************************************";
-  FX_LOGS(INFO) << " *** Displaying filter coefficient data for length " << side_length_ << "  ***";
-  FX_LOGS(INFO) << " **************************************************************";
+    FX_LOGS(INFO) << " **************************************************************";
+    FX_LOGS(INFO) << " *** Displaying filter coefficient data for length " << side_length_
+                  << "  ***";
+    FX_LOGS(INFO) << " **************************************************************";
 
-  char str[256];
-  str[0] = 0;
-  int n;
-  for (int64_t idx = 0; idx < side_length_; ++idx) {
-    if (idx % 16 == 0) {
-      FX_LOGS(INFO) << str;
-      n = sprintf(str, " [%5lx] ", idx);
+    char str[256];
+    str[0] = 0;
+    int n;
+    for (int64_t idx = 0; idx < side_length_; ++idx) {
+      if (idx % 16 == 0) {
+        FX_LOGS(INFO) << str;
+        n = sprintf(str, " [%5lx] ", idx);
+      }
+      if (filter_coefficients[idx] < std::numeric_limits<float>::epsilon() &&
+          filter_coefficients[idx] > -std::numeric_limits<float>::epsilon() &&
+          filter_coefficients[idx] != 0.0f) {
+        n += sprintf(str + n, "!%10.7f!", filter_coefficients[idx]);
+      } else {
+        n += sprintf(str + n, " %10.7f ", filter_coefficients[idx]);
+      }
     }
-    if (filter_coefficients[idx] < std::numeric_limits<float>::epsilon() &&
-        filter_coefficients[idx] > -std::numeric_limits<float>::epsilon() &&
-        filter_coefficients[idx] != 0.0f) {
-      n += sprintf(str + n, "!%10.7f!", filter_coefficients[idx]);
-    } else {
-      n += sprintf(str + n, " %10.7f ", filter_coefficients[idx]);
-    }
+    FX_LOGS(INFO) << str;
+    FX_LOGS(INFO) << " **************************************************************";
   }
-  FX_LOGS(INFO) << str;
-  FX_LOGS(INFO) << " **************************************************************";
 }
 
 // For `frac_offset` in [0.0, 1.0) we require source frames on each side depending on filter length.
@@ -87,7 +83,7 @@ float Filter::ComputeSampleFromTable(const CoefficientTable& filter_coefficients
   if (source_frames > 0) {
     sample_ptr = center;
     coefficient_ptr = filter_coefficients.ReadSlice(frac_offset, source_frames);
-    FX_CHECK(coefficient_ptr != nullptr);
+    FX_DCHECK(coefficient_ptr != nullptr);
 
     for (int64_t source_idx = 0; source_idx < source_frames; ++source_idx) {
       auto contribution = (*sample_ptr) * coefficient_ptr[source_idx];
@@ -110,7 +106,7 @@ float Filter::ComputeSampleFromTable(const CoefficientTable& filter_coefficients
   if (source_frames > 0) {
     sample_ptr = center + 1;
     coefficient_ptr = filter_coefficients.ReadSlice(frac_size_ - frac_offset, source_frames);
-    FX_CHECK(coefficient_ptr != nullptr);
+    FX_DCHECK(coefficient_ptr != nullptr);
 
     for (int64_t source_idx = 0; source_idx < source_frames; ++source_idx) {
       auto contribution = sample_ptr[source_idx] * coefficient_ptr[source_idx];

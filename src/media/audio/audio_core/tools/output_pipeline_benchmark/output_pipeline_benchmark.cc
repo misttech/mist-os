@@ -298,7 +298,7 @@ void OutputPipelineBenchmark::PrintLegend(zx::duration mix_period) {
       "        page_fault = how long the thread spent handling page faults\n"
       "        kernel_locks = how long the thread spent blocked on kernel locks\n"
       "\n"
-      "    The mixer config has the form X/VV, where X is a list of input\n"
+      "    The mixer config has the form X/VZ, where X is a list of input\n"
       "    streams, each of which has one of the following usages:\n"
       "\n"
       "        B: BACKGROUND\n"
@@ -308,7 +308,7 @@ void OutputPipelineBenchmark::PrintLegend(zx::duration mix_period) {
       "        C: COMMUNICATION\n"
       "        U: ULTRASOUND\n"
       "\n"
-      "    and VV is a volume setting:\n"
+      "    and VZ is a volume setting:\n"
       "\n"
       "        VM: muted volume\n"
       "        VC: constant non-unity volume\n"
@@ -427,8 +427,9 @@ void OutputPipelineBenchmark::Run(Scenario scenario, int64_t runs_per_scenario,
       }
     }
 
-    // This should never happen: we configure each input to cover the infinite past and
-    // future, so as long as we have inputs there should be something to mix.
+    // If we have streams, this should never happen: we configure each input to cover the infinite
+    // past and future, so as long as we have inputs there should be something to mix. However, one
+    // possible performance scenario is ZERO active streams, so this is possible.
     if (silent > 0 && !scenario.inputs.empty()) {
       printf("WARNING: %ld of %lu runs produced no output\n", silent, runs_per_scenario);
     }

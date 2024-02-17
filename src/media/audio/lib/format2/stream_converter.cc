@@ -82,11 +82,14 @@ void CopyAndClipWithConversion(const void* source_samples, void* dest_samples,
   const auto* source_ptr = static_cast<const SourceSampleType*>(source_samples);
   auto* dest_ptr = static_cast<DestSampleType*>(dest_samples);
   for (int64_t i = 0; i < sample_count; ++i) {
-    dest_ptr[i] = DestConverter::FromFloat(SourceConverter::ToFloat(source_ptr[i]));
     if constexpr (std::is_same_v<SourceSampleType, float> &&
                   std::is_same_v<DestSampleType, float>) {
-      // Clamp the sample for float -> float conversion.
-      dest_ptr[i] = std::clamp<float>(dest_ptr[i], -1.0f, 1.0f);
+      float source = DestConverter::FromFloat(SourceConverter::ToFloat(source_ptr[i]));
+      // Clamp the sample for float -> float conversion. Attempts to handle NAN without actually
+      // using isnan(), such as comparing the value to itself, were not fruitful.
+      dest_ptr[i] = std::clamp<float>(source, -1.0f, 1.0f);
+    } else {
+      dest_ptr[i] = DestConverter::FromFloat(SourceConverter::ToFloat(source_ptr[i]));
     }
   }
 }

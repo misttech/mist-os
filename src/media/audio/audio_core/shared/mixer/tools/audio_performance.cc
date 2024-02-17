@@ -277,7 +277,7 @@ void AudioPerformance::DisplayMixerCreationLegend() {
 
 void AudioPerformance::DisplayMixerCreationColumnHeader() {
   printf(
-      "\nCreation config        \t      Mean\t     First\t      Best\t     Worst\t  "
+      "Creation config        \t      Mean\t     First\t      Best\t     Worst\t  "
       "Iterations\t Mean Cached\n");
 }
 

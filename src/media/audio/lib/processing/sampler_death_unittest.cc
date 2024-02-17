@@ -11,6 +11,7 @@
 
 #include <gtest/gtest.h>
 
+#include "src/media/audio/lib/processing/flags.h"
 #include "src/media/audio/lib/processing/sampler.h"
 #include "src/media/audio/lib/timeline/timeline_rate.h"
 
@@ -22,6 +23,8 @@ using ::media::TimelineRate;
 
 constexpr int64_t kFrameCount = 3;
 
+// All the test case here (except the baseline) depend on media_audio::kCheckPositionsAndRatesOrDie
+// being set. If it isn't then we just SKIP the case.
 class SamplerDeathTest : public testing::TestWithParam<Sampler::Type> {
  protected:
   SamplerDeathTest() : source_samples_(kFrameCount), dest_samples_(kFrameCount) {}
@@ -49,33 +52,53 @@ class SamplerDeathTest : public testing::TestWithParam<Sampler::Type> {
 
 TEST_P(SamplerDeathTest, BaselineShouldSucceed) { Process(Fixed(0), 0); }
 
-TEST_P(SamplerDeathTest, DestPositionTooLow) { EXPECT_DEATH(Process(Fixed(0), -1), ""); }
+TEST_P(SamplerDeathTest, DestPositionTooLow) {
+  if constexpr (!kCheckPositionsAndRatesOrDie) {
+    GTEST_SKIP() << "kCheckPositionsAndRatesOrDie is not defined; cannot run this death-test";
+  }
+  EXPECT_DEATH(Process(Fixed(0), -1), "");
+}
 
 TEST_P(SamplerDeathTest, DestPositionTooHigh) {
+  if constexpr (!kCheckPositionsAndRatesOrDie) {
+    GTEST_SKIP() << "kCheckPositionsAndRatesOrDie is not defined; cannot run this death-test";
+  }
   Process(Fixed(0), kFrameCount - 1);
 
   EXPECT_DEATH(Process(Fixed(0), kFrameCount), "");
 }
 
 TEST_P(SamplerDeathTest, SourceFramesTooLow) {
+  if constexpr (!kCheckPositionsAndRatesOrDie) {
+    GTEST_SKIP() << "kCheckPositionsAndRatesOrDie is not defined; cannot run this death-test";
+  }
   Process(Fixed(0), 0, 1);
 
   EXPECT_DEATH(Process(Fixed(0), 0, 0), "");
 }
 
 TEST_P(SamplerDeathTest, SourcePositionTooLow) {
+  if constexpr (!kCheckPositionsAndRatesOrDie) {
+    GTEST_SKIP() << "kCheckPositionsAndRatesOrDie is not defined; cannot run this death-test";
+  }
   Process(Fixed(0) - sampler().pos_filter_length() + Fixed::FromRaw(1), 0);
 
   EXPECT_DEATH(Process(Fixed(0) - sampler().pos_filter_length(), 0), "");
 }
 
 TEST_P(SamplerDeathTest, SourcePositionTooHigh) {
+  if constexpr (!kCheckPositionsAndRatesOrDie) {
+    GTEST_SKIP() << "kCheckPositionsAndRatesOrDie is not defined; cannot run this death-test";
+  }
   Process(Fixed(kFrameCount), 0);
 
   EXPECT_DEATH(Process(Fixed(kFrameCount) + Fixed::FromRaw(1), 0), "");
 }
 
 TEST_P(SamplerDeathTest, StepSizeTooLow) {
+  if constexpr (!kCheckPositionsAndRatesOrDie) {
+    GTEST_SKIP() << "kCheckPositionsAndRatesOrDie is not defined; cannot run this death-test";
+  }
   sampler().state().ResetSourceStride(TimelineRate(1, 1));
   Process(Fixed(0), 0);
 
@@ -84,6 +107,9 @@ TEST_P(SamplerDeathTest, StepSizeTooLow) {
 }
 
 TEST_P(SamplerDeathTest, SourcePosModuloTooHigh) {
+  if constexpr (!kCheckPositionsAndRatesOrDie) {
+    GTEST_SKIP() << "kCheckPositionsAndRatesOrDie is not defined; cannot run this death-test";
+  }
   sampler().state().ResetSourceStride(TimelineRate(Fixed(64).raw_value(), 243));
   sampler().state().set_source_pos_modulo(242);
   Process(Fixed(0), 0);

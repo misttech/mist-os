@@ -12,6 +12,7 @@
 #include <ffl/string.h>
 
 #include "src/media/audio/lib/format2/fixed.h"
+#include "src/media/audio/lib/processing/flags.h"
 #include "src/media/audio/lib/processing/sampler.h"
 
 namespace media_audio {
@@ -26,78 +27,97 @@ PositionManager::PositionManager(int32_t source_channel_count, int32_t dest_chan
   FX_CHECK(frac_negative_length_ > 0);
 }
 
+// static
 void PositionManager::CheckPositions(int64_t dest_frame_count, int64_t* dest_offset_ptr,
                                      int64_t source_frame_count, int64_t frac_source_offset,
                                      int64_t frac_pos_filter_length, int64_t frac_step_size,
                                      uint64_t step_size_modulo, uint64_t step_size_denominator,
                                      uint64_t source_pos_modulo) {
-  CheckDestPositions(dest_frame_count, *dest_offset_ptr);
-  CheckSourcePositions(source_frame_count, frac_source_offset, frac_pos_filter_length);
-  CheckRateValues(frac_step_size, step_size_modulo, step_size_denominator, source_pos_modulo);
+  if constexpr (kCheckPositionsAndRatesOrDie) {
+    PositionManager::CheckDestPositions(dest_frame_count, *dest_offset_ptr);
+    PositionManager::CheckSourcePositions(source_frame_count, frac_source_offset,
+                                          frac_pos_filter_length);
+    PositionManager::CheckRateValues(frac_step_size, step_size_modulo, step_size_denominator,
+                                     source_pos_modulo);
+  }
 }
 
+// static
 void PositionManager::CheckDestPositions(int64_t dest_frame_count, int64_t dest_offset) {
-  // Location of first destination frame cannot be negative.
-  FX_CHECK(dest_offset >= 0) << "dest_offset (" << dest_offset << ") must be non-negative";
+  if constexpr (kCheckPositionsAndRatesOrDie) {
+    // Location of first destination frame cannot be negative.
+    FX_CHECK(dest_offset >= 0) << "dest_offset (" << dest_offset << ") must be non-negative";
 
-  // Location of first destination frame to produce must be within the provided buffer.
-  FX_CHECK(dest_offset < dest_frame_count)
-      << "dest_offset (" << dest_offset << ") must be less than dest_frame_count ("
-      << dest_frame_count << ")";
+    // Location of first destination frame to produce must be within the provided buffer.
+    FX_CHECK(dest_offset < dest_frame_count)
+        << "dest_offset (" << dest_offset << ") must be less than dest_frame_count ("
+        << dest_frame_count << ")";
+  }
 }
 
+// static
 void PositionManager::CheckSourcePositions(int64_t source_frame_count, int64_t frac_source_offset,
                                            int64_t frac_pos_filter_length) {
-  FX_CHECK(source_frame_count > 0) << "Source buffer must have at least one frame";
-  FX_CHECK(frac_pos_filter_length > 0)
-      << "Mixer lookahead frac_pos_filter_length (" << ffl::String::DecRational
-      << Fixed::FromRaw(frac_pos_filter_length) << ") must be positive";
+  if constexpr (kCheckPositionsAndRatesOrDie) {
+    FX_CHECK(source_frame_count > 0) << "Source buffer must have at least one frame";
+    FX_CHECK(frac_pos_filter_length > 0)
+        << "Mixer lookahead frac_pos_filter_length (" << ffl::String::DecRational
+        << Fixed::FromRaw(frac_pos_filter_length) << ") must be positive";
 
-  // Source offset can be negative but only within bounds of `frac_pos_filter_length`.
-  FX_CHECK(frac_source_offset + frac_pos_filter_length > 0)
-      << "frac_source_offset (" << ffl::String::DecRational << Fixed::FromRaw(frac_source_offset)
-      << ") must be greater than -pos_length (" << Fixed::FromRaw(-frac_pos_filter_length) << ")";
+    // Source offset can be negative but only within bounds of `frac_pos_filter_length`.
+    FX_CHECK(frac_source_offset + frac_pos_filter_length > 0)
+        << "frac_source_offset (" << ffl::String::DecRational << Fixed::FromRaw(frac_source_offset)
+        << ") must be greater than -pos_length (" << Fixed::FromRaw(-frac_pos_filter_length) << ")";
 
-  // Source offset cannot exceed `source_frame_count`.
-  FX_CHECK(((frac_source_offset - 1) >> Fixed::Format::FractionalBits) < source_frame_count)
-      << "frac_source_offset: " << ffl::String::DecRational << Fixed::FromRaw(frac_source_offset)
-      << ", source_frame_count: " << source_frame_count;
+    // Source offset cannot exceed `source_frame_count`.
+    FX_CHECK(((frac_source_offset - 1) >> Fixed::Format::FractionalBits) < source_frame_count)
+        << "frac_source_offset: " << ffl::String::DecRational << Fixed::FromRaw(frac_source_offset)
+        << ", source_frame_count: " << source_frame_count;
+  }
 }
 
+// static
 void PositionManager::CheckRateValues(int64_t frac_step_size, uint64_t step_size_modulo,
                                       uint64_t step_size_denominator, uint64_t source_pos_modulo) {
-  FX_CHECK(frac_step_size > 0) << "step_size must be positive; cannot be zero";
+  if constexpr (kCheckPositionsAndRatesOrDie) {
+    FX_CHECK(frac_step_size > 0) << "step_size must be positive; cannot be zero";
 
-  FX_CHECK(step_size_denominator > 0) << "step_size_denominator cannot be zero";
+    FX_CHECK(step_size_denominator > 0) << "step_size_denominator cannot be zero";
 
-  FX_CHECK(step_size_modulo < step_size_denominator)
-      << "step_size_modulo (" << step_size_modulo << ") must be less than step_size_denominator ("
-      << step_size_denominator << ")";
+    FX_CHECK(step_size_modulo < step_size_denominator)
+        << "step_size_modulo (" << step_size_modulo << ") must be less than step_size_denominator ("
+        << step_size_denominator << ")";
 
-  FX_CHECK(source_pos_modulo < step_size_denominator)
-      << "source_position_modulo (" << source_pos_modulo
-      << ") must be less than step_size_denominator (" << step_size_denominator << ")";
+    FX_CHECK(source_pos_modulo < step_size_denominator)
+        << "source_position_modulo (" << source_pos_modulo
+        << ") must be less than step_size_denominator (" << step_size_denominator << ")";
+  }
 }
 
 void PositionManager::Display() const {
-  FX_LOGS(INFO) << "Channels: source " << source_channel_count_ << ", dest " << dest_channel_count_
-                << ".   Filter Length: pos " << ffl::String::DecRational
-                << Fixed::FromRaw(frac_positive_length_) << ", neg "
-                << Fixed::FromRaw(frac_negative_length_);
+  if constexpr (kEnableDisplayForPositionsAndRates) {
+    FX_LOGS(INFO) << "Channels: source " << source_channel_count_ << ", dest "
+                  << dest_channel_count_ << ".   Filter Length: pos " << ffl::String::DecRational
+                  << Fixed::FromRaw(frac_positive_length_) << ", neg "
+                  << Fixed::FromRaw(frac_negative_length_);
 
-  FX_LOGS(INFO) << "Source:   len " << source_frame_count_ << ", to " << ffl::String::DecRational
-                << Fixed::FromRaw(frac_source_end_) << ". Dest: len " << dest_frame_count_;
+    FX_LOGS(INFO) << "Source:   len " << source_frame_count_ << ", to " << ffl::String::DecRational
+                  << Fixed::FromRaw(frac_source_end_) << ". Dest: len " << dest_frame_count_;
 
-  FX_LOGS(INFO) << "Rate:     frac_step_size " << ffl::String::DecRational << Fixed(frac_step_size_)
-                << ", rate_mod " << step_size_modulo_ << ", denom " << step_size_denominator_;
+    FX_LOGS(INFO) << "Rate:     frac_step_size " << ffl::String::DecRational
+                  << Fixed(frac_step_size_) << ", rate_mod " << step_size_modulo_ << ", denom "
+                  << step_size_denominator_;
 
-  DisplayUpdate();
+    DisplayUpdate();
+  }
 }
 
 void PositionManager::DisplayUpdate() const {
-  FX_LOGS(INFO) << "Position: frac_source_offset " << ffl::String::DecRational
-                << Fixed::FromRaw(frac_source_offset_) << ": dest_offset " << dest_offset_
-                << ", pos_mod " << source_pos_modulo_;
+  if constexpr (kEnableDisplayForPositionsAndRates) {
+    FX_LOGS(INFO) << "Position: frac_source_offset " << ffl::String::DecRational
+                  << Fixed::FromRaw(frac_source_offset_) << ": dest_offset " << dest_offset_
+                  << ", pos_mod " << source_pos_modulo_;
+  }
 }
 
 void PositionManager::SetDestValues(float* dest_ptr, int64_t dest_frame_count,
@@ -106,7 +126,9 @@ void PositionManager::SetDestValues(float* dest_ptr, int64_t dest_frame_count,
     TRACE_DURATION("audio", __func__, "dest_frame_count", dest_frame_count, "dest_offset",
                    *dest_offset_ptr);
   }
-  CheckDestPositions(dest_frame_count, *dest_offset_ptr);
+  if constexpr (kCheckPositionsAndRatesOrDie) {
+    CheckDestPositions(dest_frame_count, *dest_offset_ptr);
+  }
 
   dest_ptr_ = dest_ptr;
   dest_frame_count_ = dest_frame_count;
@@ -139,7 +161,9 @@ void PositionManager::SetRateValues(int64_t frac_step_size, uint64_t step_size_m
                    Fixed::FromRaw(frac_step_size).Fraction().raw_value(), "step_size_modulo",
                    step_size_modulo, "step_size_denominator", step_size_denominator);
   }
-  CheckRateValues(frac_step_size, step_size_modulo, step_size_denominator, source_pos_modulo);
+  if constexpr (kCheckPositionsAndRatesOrDie) {
+    CheckRateValues(frac_step_size, step_size_modulo, step_size_denominator, source_pos_modulo);
+  }
 
   frac_step_size_ = frac_step_size;
   step_size_modulo_ = step_size_modulo;

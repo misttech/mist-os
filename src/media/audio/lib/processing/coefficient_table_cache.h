@@ -98,7 +98,7 @@ class CoefficientTableCache {
     it->second->ref_cnt++;
     if (!it->second->table) {
       FX_DCHECK(lookup_result.second);
-      FX_CHECK(it->second->ref_cnt == 1);
+      FX_DCHECK(it->second->ref_cnt == 1);
       it->second->table = create_table();
     } else {
       FX_DCHECK(!lookup_result.second);

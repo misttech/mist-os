@@ -19,6 +19,7 @@
 #include "src/media/audio/lib/format2/format.h"
 #include "src/media/audio/lib/processing/channel_strip.h"
 #include "src/media/audio/lib/processing/filter.h"
+#include "src/media/audio/lib/processing/flags.h"
 #include "src/media/audio/lib/processing/gain.h"
 #include "src/media/audio/lib/processing/position_manager.h"
 
@@ -59,11 +60,13 @@ class SincSamplerImpl : public SincSampler {
                    "dest_rate", dest_frame_rate_, "source_chans", SourceChannelCount, "dest_chans",
                    DestChannelCount);
 
-    PositionManager::CheckPositions(dest.frame_count, dest.frame_offset_ptr, source.frame_count,
-                                    source.frame_offset_ptr->raw_value(),
-                                    pos_filter_length().raw_value(),
-                                    state().step_size().raw_value(), state().step_size_modulo(),
-                                    state().step_size_denominator(), state().source_pos_modulo());
+    if constexpr (kCheckPositionsAndRatesOrDie) {
+      PositionManager::CheckPositions(dest.frame_count, dest.frame_offset_ptr, source.frame_count,
+                                      source.frame_offset_ptr->raw_value(),
+                                      pos_filter_length().raw_value(),
+                                      state().step_size().raw_value(), state().step_size_modulo(),
+                                      state().step_size_denominator(), state().source_pos_modulo());
+    }
     position_.SetRateValues(state().step_size().raw_value(), state().step_size_modulo(),
                             state().step_size_denominator(), state().source_pos_modulo());
     position_.SetSourceValues(source.samples, source.frame_count, source.frame_offset_ptr);
@@ -182,7 +185,7 @@ class SincSamplerImpl : public SincSampler {
         int64_t frac_cache_offset = frac_source_offset - frac_source_offset_to_cache;
         int64_t frac_interp_fraction = frac_cache_offset & Fixed::Format::FractionalMask;
         auto cache_center_idx = Sampler::Floor(frac_cache_offset);
-        FX_CHECK(Sampler::Ceiling(frac_cache_offset - frac_filter_width) >= 0)
+        FX_DCHECK(Sampler::Ceiling(frac_cache_offset - frac_filter_width) >= 0)
             << Sampler::Ceiling(frac_cache_offset - frac_filter_width) << " should be >= 0";
         if constexpr (kTracePositionEvents) {
           TRACE_DURATION("audio", "SincSampler::Process chunk", "next_source_idx_to_copy",
