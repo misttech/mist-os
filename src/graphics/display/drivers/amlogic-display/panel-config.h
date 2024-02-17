@@ -12,6 +12,8 @@
 
 #include <cstdint>
 
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+
 namespace amlogic_display {
 
 // To simplify compatibility checks, DsiOpcode and PowerOpcode should match the
@@ -112,18 +114,55 @@ struct PanelConfig {
 
   // Power operation sequence to power off the panel.
   const cpp20::span<const PowerOp> power_off;
+
+  // The number of D-PHY data lanes used by the display's DSI connection.
+  //
+  // Must be >= 1 and <= 4.
+  //
+  // Chosen to satisfy the following constraints:
+  // * display engine: maximum supported data lanes in the D-PHY transmitter
+  //   PHY Protocol Interface (PPI).
+  // * SoC or board: maximum supported data lanes in the D-PHY transmitter
+  // * board: number of data lanes in the connection (traces and cables)
+  // * DDIC: maximum supported data lanes in the D-PHY receiver
+  int dphy_data_lane_count;
+
+  // Must be non-negative.
+  //
+  // Chosen to meet the maximum frequency constraints for all the components
+  // along the DSI connection, which include the display engine, the D-PHY
+  // transmitter in the host SoC or board, the DSI connection cables and
+  // traces, and the D-PHY receiver in the DDIC.
+  //
+  // The MIPI D-PHY clock frequency does not trivially translate into bitrates
+  // for the data lanes. Use `maximum_per_data_lane_bits_per_second()` to get
+  // the corresponding maximum data lane bitrate.
+  int64_t maximum_dphy_clock_lane_frequency_hz;
+
+  // Timing known to satisfy all the constraints for the panel and DDIC.
+  //
+  // All the timing fields must be valid.
+  //
+  // TODO(https://fxbug.dev/322242348): The current implementation of the
+  // amlogic-display driver requires that the timing must have progressive
+  // fields.
+  //
+  // The MIPI-DSI standard requires that the timing must have no repeated
+  // pixels.
+  display::DisplayTiming display_timing;
+
+  constexpr int64_t maximum_per_data_lane_bit_per_second() const {
+    // The MIPI D-PHY Clock lane uses a DDR (Double Data Rate) clock signal.
+    // Thus, the per lane data rate is 2 times of the clock signal frequency.
+    return maximum_dphy_clock_lane_frequency_hz * 2;
+  }
 };
 
 // If the `panel_type` is supported, returns the panel configuration.
 // Otherwise returns nullptr.
 const PanelConfig* GetPanelConfig(uint32_t panel_type);
 
-// If the `panel_type` is supported, returns the panel timing settings.
-// Otherwise returns nullptr.
-//
-// TODO(https://fxbug.dev/318479388): Unify the panel configuration and timing
-// types.
-const display_setting_t* GetPanelDisplaySetting(uint32_t panel_type);
+display_setting_t ToDisplaySetting(const PanelConfig& panel_config);
 
 }  // namespace amlogic_display
 

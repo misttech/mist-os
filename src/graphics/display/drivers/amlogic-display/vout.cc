@@ -86,16 +86,17 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(zx_device_t* parent, uint3
   std::unique_ptr<Clock> clock = std::move(clock_result).value();
 
   zxlogf(INFO, "Fixed panel type is %d", dsi_host->panel_type());
-  const display_setting_t* display_setting = GetPanelDisplaySetting(dsi_host->panel_type());
-  if (display_setting == nullptr) {
+  const PanelConfig* panel_config = GetPanelConfig(dsi_host->panel_type());
+  if (panel_config == nullptr) {
     zxlogf(ERROR, "Unsupported panel (panel type %" PRIu32 ") detected!", panel_type);
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
+  const display_setting_t display_setting = ToDisplaySetting(*panel_config);
 
   fbl::AllocChecker alloc_checker;
   std::unique_ptr<Vout> vout =
       fbl::make_unique_checked<Vout>(&alloc_checker, std::move(dsi_host), std::move(clock), width,
-                                     height, *display_setting, std::move(node));
+                                     height, display_setting, std::move(node));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Vout.");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -105,17 +106,17 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(zx_device_t* parent, uint3
 
 zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVoutForTesting(uint32_t panel_type, uint32_t width,
                                                                 uint32_t height) {
-  const display_setting_t* display_setting = GetPanelDisplaySetting(panel_type);
-  if (display_setting == nullptr) {
+  const PanelConfig* panel_config = GetPanelConfig(panel_type);
+  if (panel_config == nullptr) {
     zxlogf(ERROR, "Unsupported panel (panel type %" PRIu32 ") detected!", panel_type);
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
+  const display_setting_t display_setting = ToDisplaySetting(*panel_config);
 
   fbl::AllocChecker alloc_checker;
-  std::unique_ptr<Vout> vout =
-      fbl::make_unique_checked<Vout>(&alloc_checker,
-                                     /*dsi_host=*/nullptr, /*dsi_clock=*/nullptr, width, height,
-                                     *display_setting, inspect::Node{});
+  std::unique_ptr<Vout> vout = fbl::make_unique_checked<Vout>(
+      &alloc_checker,
+      /*dsi_host=*/nullptr, /*dsi_clock=*/nullptr, width, height, display_setting, inspect::Node{});
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Vout.");
     return zx::error(ZX_ERR_NO_MEMORY);
