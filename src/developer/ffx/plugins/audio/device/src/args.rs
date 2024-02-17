@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Result,
     argh::{ArgsInfo, FromArgs},
     ffx_core::ffx_command,
     format_utils::Format,
@@ -170,15 +169,13 @@ pub enum DeviceDirection {
 }
 
 impl FromStr for DeviceDirection {
-    type Err = anyhow::Error;
-    fn from_str(s: &str) -> Result<Self, anyhow::Error> {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "input" => Ok(DeviceDirection::Input),
             "output" => Ok(DeviceDirection::Output),
-            _ => Err(anyhow::anyhow!(
-                "invalid device direction, {}. Expected one of: input, output",
-                s
-            )),
+            _ => Err(format!("invalid device direction, {}. Expected one of: input, output", s)),
         }
     }
 }

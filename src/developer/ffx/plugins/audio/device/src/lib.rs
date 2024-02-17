@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Result,
     async_trait::async_trait,
     blocking::Unblock,
     errors::ffx_bail,
     ffx_audio_common::DeviceResult,
     ffx_audio_device_args::{DeviceCommand, DeviceDirection, SubCommand},
-    fho::{moniker, FfxMain, FfxTool, MachineWriter, ToolIO},
+    ffx_command::{bug, user_error},
+    fho::{moniker, FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO},
     fidl::{endpoints::ServerEnd, HandleBased},
     fidl_fuchsia_audio_controller::{
         DeviceControlDeviceSetGainStateRequest, DeviceControlGetDeviceInfoRequest,
@@ -42,17 +42,15 @@ impl FfxMain for DeviceTool {
     type Writer = MachineWriter<DeviceResult>;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         match &self.cmd.subcommand {
-            SubCommand::Info(_) => {
-                device_info(self.device_controller, self.cmd, writer).await.map_err(Into::into)
-            }
-
+            SubCommand::Info(_) => device_info(self.device_controller, self.cmd, writer).await,
             SubCommand::Play(play_command) => {
                 let (play_remote, play_local) = fidl::Socket::create_datagram();
                 let reader: Box<dyn Read + Send + 'static> = match &play_command.file {
                     Some(input_file_path) => {
-                        let file = std::fs::File::open(&input_file_path).map_err(|e| {
-                            anyhow::anyhow!("Error trying to open file \"{input_file_path}\": {e}")
-                        })?;
+                        let file =
+                            std::fs::File::open(&input_file_path).with_user_message(|| {
+                                format!("Failed to open file \"{input_file_path}\"")
+                            })?;
                         Box::new(file)
                     }
                     None => Box::new(std::io::stdin()),
@@ -68,15 +66,12 @@ impl FfxMain for DeviceTool {
                     writer,
                 )
                 .await
-                .map_err(Into::<fho::Error>::into)
             }
             SubCommand::Record(_) => {
                 let mut stdout = Unblock::new(std::io::stdout());
 
-                let (cancel_proxy, cancel_server) = fidl::endpoints::create_proxy::<
-                    fidl_fuchsia_audio_controller::RecordCancelerMarker,
-                >()
-                .map_err(|e| anyhow::anyhow!("FIDL Error creating canceler proxy: {e}"))?;
+                let (cancel_proxy, cancel_server) =
+                    fidl::endpoints::create_proxy::<RecordCancelerMarker>().bug()?;
 
                 let keypress_waiter = ffx_audio_common::cancel_on_keypress(
                     cancel_proxy,
@@ -94,30 +89,33 @@ impl FfxMain for DeviceTool {
                     keypress_waiter,
                 )
                 .await
-                .map_err(Into::into)
             }
             SubCommand::Gain(_)
             | SubCommand::Mute(_)
             | SubCommand::Unmute(_)
             | SubCommand::Agc(_) => {
-                let direction = self.cmd.device_direction;
+                let device_direction = self.cmd.device_direction;
 
-                let id = self.cmd.id.unwrap_or(
-                    get_first_device(
-                        &self.device_controller,
-                        fidl_fuchsia_hardware_audio::DeviceType::StreamConfig,
-                        direction
+                let device_id = match self.cmd.id {
+                    Some(id) => id,
+                    None => {
+                        let is_input = device_direction
                             .as_ref()
-                            .and_then(|direction| Some(direction == &DeviceDirection::Input)),
-                    )
-                    .await?
-                    .id
-                    .ok_or(anyhow::anyhow!("ID missing from default device."))?,
-                );
+                            .and_then(|direction| Some(direction == &DeviceDirection::Input));
+                        let device = get_first_device(
+                            &self.device_controller,
+                            fidl_fuchsia_hardware_audio::DeviceType::StreamConfig,
+                            is_input,
+                        )
+                        .await?;
+                        device.id.ok_or_else(|| bug!("Device ID missing from response"))?
+                    }
+                };
+
                 let mut request_info = DeviceGainStateRequest {
                     device_controller: self.device_controller,
-                    device_id: id,
-                    device_direction: direction,
+                    device_id,
+                    device_direction,
                     gain_db: None,
                     agc_enabled: None,
                     muted: None,
@@ -132,7 +130,7 @@ impl FfxMain for DeviceTool {
                     }
                     _ => {}
                 }
-                device_set_gain_state(request_info).await.map_err(Into::into)
+                device_set_gain_state(request_info).await
             }
         }
     }
@@ -142,76 +140,60 @@ async fn get_first_device(
     device_controller: &DeviceControlProxy,
     device_type: fidl_fuchsia_hardware_audio::DeviceType,
     is_input: Option<bool>,
-) -> Result<DeviceSelector> {
+) -> fho::Result<DeviceSelector> {
     let list_devices_response = device_controller
         .list_devices()
-        .await?
-        .map_err(|e| anyhow::anyhow!("Could not retrieve available devices. {e}"))?;
+        .await
+        .bug_context("Failed to call DeviceControl.ListDevices")?
+        .map_err(|status| Status::from_raw(status))
+        .bug_context("Could not retrieve available devices")?;
 
-    match list_devices_response.devices {
-        Some(devices) => devices
-            .into_iter()
-            .find(|device| {
-                device.device_type.is_some_and(|t| t == device_type) && device.is_input == is_input
-            })
-            .ok_or(anyhow::anyhow!("Could not find any devices with requested type.")),
-        None => Err(anyhow::anyhow!("Could not find default device.")),
-    }
+    let devices =
+        list_devices_response.devices.ok_or_else(|| bug!("Devices missing from response"))?;
+    devices
+        .into_iter()
+        .find(|device| {
+            device.device_type.is_some_and(|t| t == device_type) && device.is_input == is_input
+        })
+        .ok_or_else(|| user_error!("Could not find any devices with requested type"))
 }
 
 async fn device_info(
     device_control_proxy: DeviceControlProxy,
     cmd: DeviceCommand,
     mut writer: MachineWriter<DeviceResult>,
-) -> Result<()> {
+) -> fho::Result<()> {
     let device_direction = cmd.device_direction;
+    let is_input = device_direction
+        .and_then(|direction| Some(direction == ffx_audio_device_args::DeviceDirection::Input));
 
-    let (device_selector, _is_default_device) = match cmd.id {
-        Some(id) => (
-            DeviceSelector {
-                is_input: device_direction.and_then(|direction| {
-                    Some(direction == ffx_audio_device_args::DeviceDirection::Input)
-                }),
-                id: Some(id),
-                device_type: Some(cmd.device_type),
-                ..Default::default()
-            },
-            false,
-        ),
-
-        None => (
-            get_first_device(
-                &device_control_proxy,
-                cmd.device_type,
-                device_direction.and_then(|direction| {
-                    Some(direction == ffx_audio_device_args::DeviceDirection::Input)
-                }),
-            )
-            .await?,
-            true,
-        ),
+    let device_selector = match cmd.id {
+        Some(id) => DeviceSelector {
+            is_input,
+            id: Some(id),
+            device_type: Some(cmd.device_type),
+            ..Default::default()
+        },
+        None => get_first_device(&device_control_proxy, cmd.device_type, is_input).await?,
     };
 
     let request = DeviceControlGetDeviceInfoRequest {
         device: Some(device_selector.clone()),
         ..Default::default()
     };
-    let info = match device_control_proxy.get_device_info(request).await? {
-        Ok(value) => value,
-        Err(err) => ffx_bail!("Device info failed with error: {}", Status::from_raw(err)),
-    };
+    let info = device_control_proxy
+        .get_device_info(request)
+        .await
+        .bug_context("Failed to call DeviceControl.GetDeviceInfo")?
+        .map_err(|status| Status::from_raw(status))
+        .bug_context("Failed to get device info")?;
 
-    let device_info =
-        info.device_info.ok_or(anyhow::anyhow!("DeviceInfo missing from response."))?;
-
+    let device_info = info.device_info.ok_or_else(|| bug!("DeviceInfo missing from response."))?;
     let device_info_result =
         ffx_audio_common::device_info::DeviceInfoResult::from((device_info, &device_selector));
+    let device_result = DeviceResult::Info(device_info_result.clone());
 
-    let _ = writer
-        .machine_or_else(&DeviceResult::Info(device_info_result.clone()), || {
-            format!("{}", device_info_result)
-        })
-        .map_err(Into::<anyhow::Error>::into)?;
+    writer.machine_or_else(&device_result, || format!("{}", device_info_result))?;
 
     Ok(())
 }
@@ -222,24 +204,27 @@ async fn device_play(
     cmd: DeviceCommand,
     play_local: fidl::Socket,
     play_remote: fidl::Socket,
-    input_reader: Box<dyn std::io::Read + std::marker::Send + 'static>,
+    input_reader: Box<dyn Read + Send + 'static>,
     // Input generalized to stdin, file, or test buffer.
     mut writer: MachineWriter<DeviceResult>,
-) -> Result<(), anyhow::Error> {
+) -> fho::Result<()> {
     let device_id = match cmd.id {
-        Some(id) => Ok(id),
-        None => get_first_device(
-            &device_controller,
-            fidl_fuchsia_hardware_audio::DeviceType::StreamConfig,
-            Some(false),
-        )
-        .await
-        .and_then(|device| device.id.ok_or(anyhow::anyhow!("Failed to get default device"))),
-    }?;
+        Some(id) => id,
+        None => {
+            let device = get_first_device(
+                &device_controller,
+                fidl_fuchsia_hardware_audio::DeviceType::StreamConfig,
+                Some(false),
+            )
+            .await?;
+            device.id.ok_or_else(|| bug!("Device ID missing from response"))?
+        }
+    };
+
     // Duplicate socket handle so that connection stays alive in real + testing scenarios.
     let remote_socket = play_remote
         .duplicate_handle(fidl::Rights::SAME_RIGHTS)
-        .map_err(|e| anyhow::anyhow!("Error duplicating socket: {e}"))?;
+        .bug_context("Error duplicating socket")?;
 
     let request = PlayerPlayRequest {
         wav_source: Some(remote_socket),
@@ -251,7 +236,6 @@ async fn device_play(
                 ..Default::default()
             },
         )),
-
         gain_settings: Some(fidl_fuchsia_audio_controller::GainSettings {
             mute: None, // TODO(https://fxbug.dev/42072218)
             gain: None, // TODO(https://fxbug.dev/42072218)
@@ -265,15 +249,14 @@ async fn device_play(
     let bytes_processed = result.bytes_processed;
     let value = DeviceResult::Play(result);
 
-    let _ = writer
-        .machine_or_else(&value, || {
-            format!("Successfully processed all audio data. Bytes processed: {:?}", {
-                bytes_processed
-                    .map(|bytes| bytes.to_string())
-                    .unwrap_or_else(|| format!("Unavailable"))
-            })
+    writer.machine_or_else(&value, || {
+        format!("Successfully processed all audio data. Bytes processed: {:?}", {
+            bytes_processed
+                .map(|bytes| bytes.to_string())
+                .unwrap_or_else(|| "Unavailable".to_string())
         })
-        .map_err(Into::<anyhow::Error>::into)?;
+    })?;
+
     Ok(())
 }
 
@@ -285,21 +268,23 @@ async fn device_record<W, E>(
     mut output_writer: W,
     mut output_error_writer: E,
     keypress_waiter: impl futures::Future<Output = Result<(), std::io::Error>>,
-) -> Result<()>
+) -> fho::Result<()>
 where
     W: AsyncWrite + std::marker::Unpin,
     E: std::io::Write,
 {
     let device_id = match cmd.id {
-        Some(id) => Ok(id),
-        None => get_first_device(
-            &daemon_proxy,
-            fidl_fuchsia_hardware_audio::DeviceType::StreamConfig,
-            Some(true),
-        )
-        .await
-        .and_then(|device| device.id.ok_or(anyhow::anyhow!("Failed to get default device."))),
-    }?;
+        Some(id) => id,
+        None => {
+            let device = get_first_device(
+                &daemon_proxy,
+                fidl_fuchsia_hardware_audio::DeviceType::StreamConfig,
+                Some(true),
+            )
+            .await?;
+            device.id.ok_or_else(|| bug!("Device ID missing from response"))?
+        }
+    };
 
     let record_command = match cmd.subcommand {
         SubCommand::Record(record_command) => record_command,
@@ -336,8 +321,8 @@ where
 
     let message = ffx_audio_common::format_record_result(result);
 
-    writeln!(output_error_writer, "{}", message)
-        .map_err(|e| anyhow::anyhow!("Writing result failed with error {e}."))?;
+    writeln!(output_error_writer, "{}", message).bug_context("Failed to write result")?;
+
     Ok(())
 }
 
@@ -350,7 +335,7 @@ struct DeviceGainStateRequest {
     agc_enabled: Option<bool>,
 }
 
-async fn device_set_gain_state(request: DeviceGainStateRequest) -> Result<()> {
+async fn device_set_gain_state(request: DeviceGainStateRequest) -> fho::Result<()> {
     let dev_selector = DeviceSelector {
         is_input: request
             .device_direction
@@ -374,8 +359,11 @@ async fn device_set_gain_state(request: DeviceGainStateRequest) -> Result<()> {
             ..Default::default()
         })
         .await
-        .map(|_| ())
-        .map_err(|e| anyhow::anyhow!("Error setting gain state. {e}"))
+        .bug_context("Failed to call DeviceControl.DeviceSetGainState")?
+        .map_err(|status| Status::from_raw(status))
+        .bug_context("Failed to set gain state")?;
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -387,6 +375,7 @@ mod tests {
     };
     use ffx_core::macro_deps::futures::AsyncWriteExt;
     use ffx_writer::{SimpleWriter, TestBuffer, TestBuffers};
+    use fho::FfxContext;
     use fidl::HandleBased;
     use format_utils::Format;
     use std::fs;
@@ -440,11 +429,7 @@ mod tests {
         let test_dir = TempDir::new().unwrap();
         let test_dir_path = test_dir.path().to_path_buf();
         let test_wav_path = test_dir_path.join("sine.wav");
-        let wav_path = test_wav_path
-            .clone()
-            .into_os_string()
-            .into_string()
-            .map_err(|_e| anyhow::anyhow!("Error turning path into string"))?;
+        let wav_path = test_wav_path.clone().into_os_string().into_string().unwrap();
 
         // Create valid WAV file.
         fs::File::create(&test_wav_path)
@@ -454,7 +439,7 @@ mod tests {
         fs::set_permissions(&test_wav_path, fs::Permissions::from_mode(0o770)).unwrap();
 
         let file_reader = std::fs::File::open(&test_wav_path)
-            .map_err(|e| anyhow::anyhow!("Error trying to open file \"{}\": {e}", wav_path))?;
+            .with_bug_context(|| format!("Error trying to open file \"{}\"", wav_path))?;
 
         let file_command = DeviceCommand {
             subcommand: ffx_audio_device_args::SubCommand::Play(DevicePlayCommand {
