@@ -344,7 +344,7 @@ where
     pub fn new_from_args(cmd: &LogCommand, writer: W) -> Self {
         let is_json = writer.is_machine();
         let formatter = DefaultLogFormatter::new(
-            LogFilterCriteria::try_from(cmd).unwrap(),
+            LogFilterCriteria::try_from(cmd.clone()).unwrap(),
             writer,
             LogFormatterOptions {
                 display: if is_json {

@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use diagnostics_data::{LogsData, Severity};
+use fidl_fuchsia_diagnostics::LogInterestSelector;
 use fuchsia_zircon_types::zx_koid_t;
 use moniker::Moniker;
+use selectors::match_moniker_against_component_selector;
 use std::str::FromStr;
 
 use crate::{
@@ -30,6 +32,10 @@ pub struct LogFilterCriteria {
     pid: Option<zx_koid_t>,
     /// Filter by TID
     tid: Option<zx_koid_t>,
+    /// Log interest selectors used to filter severity on a per-component basis
+    /// Overrides min_severity for components matching the selector.
+    /// In the event of an ambiguous match, the lowest severity is used.
+    interest_selectors: Vec<LogInterestSelector>,
 }
 
 impl Default for LogFilterCriteria {
@@ -43,21 +49,23 @@ impl Default for LogFilterCriteria {
             exclude_tags: vec![],
             pid: None,
             tid: None,
+            interest_selectors: vec![],
         }
     }
 }
 
-impl From<&LogCommand> for LogFilterCriteria {
-    fn from(cmd: &LogCommand) -> Self {
+impl From<LogCommand> for LogFilterCriteria {
+    fn from(cmd: LogCommand) -> Self {
         Self {
             min_severity: cmd.severity,
-            filters: cmd.filter.clone(),
-            tags: cmd.tag.clone(),
-            excludes: cmd.exclude.clone(),
-            moniker_filters: if cmd.kernel { vec!["klog".into()] } else { cmd.moniker.clone() },
-            exclude_tags: cmd.exclude_tags.clone(),
-            pid: cmd.pid.clone(),
-            tid: cmd.tid.clone(),
+            filters: cmd.filter,
+            tags: cmd.tag,
+            excludes: cmd.exclude,
+            moniker_filters: if cmd.kernel { vec!["klog".into()] } else { cmd.moniker },
+            exclude_tags: cmd.exclude_tags,
+            pid: cmd.pid,
+            tid: cmd.tid,
+            interest_selectors: cmd.select,
         }
     }
 }
@@ -151,7 +159,21 @@ impl LogFilterCriteria {
 
     /// Returns true if the given `LogsData` matches the filter criteria.
     fn match_filters_to_log_data(&self, data: &LogsData) -> bool {
-        if data.metadata.severity < self.min_severity {
+        let min_severity = self
+            .interest_selectors
+            .iter()
+            .filter(|selector| {
+                match_moniker_against_component_selector(
+                    data.moniker.split('/'),
+                    &selector.selector,
+                )
+                .unwrap_or(false)
+            })
+            .map(|selector| selector.interest.min_severity)
+            .flatten()
+            .min()
+            .unwrap_or(self.min_severity.into());
+        if data.metadata.severity < min_severity {
             return false;
         }
 
@@ -209,6 +231,7 @@ impl LogFilterCriteria {
 mod test {
     use assert_matches::assert_matches;
     use diagnostics_data::Timestamp;
+    use selectors::parse_log_interest_selector;
     use std::time::Duration;
 
     use crate::{log_formatter::EventType, DumpCommand, LogSubCommand};
@@ -239,7 +262,7 @@ mod test {
             exclude_tags: vec!["tag3".to_string()],
             ..empty_dump_command()
         };
-        let criteria = LogFilterCriteria::try_from(&cmd).unwrap();
+        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -283,13 +306,82 @@ mod test {
     }
 
     #[fuchsia::test]
+    async fn test_per_component_severity() {
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
+            select: vec![parse_log_interest_selector("test_selector#DEBUG").unwrap()],
+            ..LogCommand::default()
+        };
+        let expectations = [
+            ("test_selector", diagnostics_data::Severity::Debug, true),
+            ("other_selector", diagnostics_data::Severity::Debug, false),
+            ("other_selector", diagnostics_data::Severity::Info, true),
+        ];
+        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+        assert_eq!(criteria.min_severity, Severity::Info);
+        for (moniker, severity, is_included) in expectations {
+            let entry = make_log_entry(
+                diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                    timestamp_nanos: 0.into(),
+                    component_url: Some(String::default()),
+                    moniker: moniker.into(),
+                    severity,
+                })
+                .set_message("message")
+                .add_tag("tag1")
+                .add_tag("tag2")
+                .build()
+                .into(),
+            );
+            assert_eq!(criteria.matches(&entry), is_included);
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_per_component_severity_uses_min_match() {
+        let severities = [
+            diagnostics_data::Severity::Info,
+            diagnostics_data::Severity::Trace,
+            diagnostics_data::Severity::Debug,
+        ];
+
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
+            select: vec![
+                parse_log_interest_selector("test_selector#INFO").unwrap(),
+                parse_log_interest_selector("test_selector#TRACE").unwrap(),
+                parse_log_interest_selector("test_selector#DEBUG").unwrap(),
+            ],
+            ..LogCommand::default()
+        };
+        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+
+        for severity in severities {
+            let entry = make_log_entry(
+                diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                    timestamp_nanos: 0.into(),
+                    component_url: Some(String::default()),
+                    moniker: "test_selector".into(),
+                    severity,
+                })
+                .set_message("message")
+                .add_tag("tag1")
+                .add_tag("tag2")
+                .build()
+                .into(),
+            );
+            assert_eq!(criteria.matches(&entry), true);
+        }
+    }
+
+    #[fuchsia::test]
     async fn test_criteria_tag_filter_legacy() {
         let cmd = LogCommand {
             tag: vec!["tag1".to_string()],
             exclude_tags: vec!["tag3".to_string()],
             ..empty_dump_command()
         };
-        let criteria = LogFilterCriteria::try_from(&cmd).unwrap();
+        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -336,7 +428,7 @@ mod test {
     async fn test_severity_filter_with_debug() {
         let mut cmd = empty_dump_command();
         cmd.severity = Severity::Trace;
-        let criteria = LogFilterCriteria::try_from(&cmd).unwrap();
+        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -377,7 +469,7 @@ mod test {
     async fn test_pid_filter() {
         let mut cmd = empty_dump_command();
         cmd.pid = Some(123);
-        let criteria = LogFilterCriteria::try_from(&cmd).unwrap();
+        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -411,7 +503,7 @@ mod test {
             moniker: vec!["/core/network/netstack".to_string()],
             ..empty_dump_command()
         };
-        let criteria = LogFilterCriteria::try_from(&cmd).unwrap();
+        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
 
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -426,7 +518,7 @@ mod test {
         )));
 
         let allowed_cmd = LogCommand { ..empty_dump_command() };
-        let allowed_criteria = LogFilterCriteria::try_from(&allowed_cmd).unwrap();
+        let allowed_criteria = LogFilterCriteria::try_from(allowed_cmd).unwrap();
         assert!(allowed_criteria
             .matches(&make_log_entry(LogData::FfxEvent(EventType::LoggingStarted),)));
 
@@ -459,7 +551,7 @@ mod test {
     async fn test_tid_filter() {
         let mut cmd = empty_dump_command();
         cmd.tid = Some(123);
-        let criteria = LogFilterCriteria::try_from(&cmd).unwrap();
+        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -506,7 +598,7 @@ mod test {
             severity: Severity::Error,
             ..empty_dump_command()
         };
-        let criteria = LogFilterCriteria::try_from(&cmd).unwrap();
+        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -591,7 +683,7 @@ mod test {
     #[fuchsia::test]
     async fn test_criteria_klog_only() {
         let cmd = LogCommand { tag: vec!["component_manager".into()], ..empty_dump_command() };
-        let criteria = LogFilterCriteria::try_from(&cmd).unwrap();
+        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -664,7 +756,7 @@ mod test {
     #[fuchsia::test]
     async fn test_criteria_klog_tag_hack() {
         let cmd = LogCommand { kernel: true, ..empty_dump_command() };
-        let criteria = LogFilterCriteria::try_from(&cmd).unwrap();
+        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -693,7 +785,7 @@ mod test {
     #[fuchsia::test]
     async fn test_empty_criteria() {
         let cmd = empty_dump_command();
-        let criteria = LogFilterCriteria::try_from(&cmd).unwrap();
+        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
