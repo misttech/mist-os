@@ -9,7 +9,6 @@
 namespace zxdb {
 
 using ::analytics::core_dev_tools::AnalyticsOption;
-using ::analytics::core_dev_tools::InvokeEvent;
 
 void Analytics::Init(Session& session, AnalyticsOption analytics_option) {
   InitBotAware(analytics_option, false);
@@ -21,9 +20,11 @@ bool Analytics::IsEnabled(Session* session) {
          session->system().settings().GetBool(ClientSettings::System::kEnableAnalytics);
 }
 
-void Analytics::IfEnabledSendInvokeEvent(Session* session) {
-  if (IsEnabled(session)) {
-    SendGa4Event(std::make_unique<InvokeEvent>());
+void Analytics::IfEnabledSendEvent(Session* session,
+                                   std::unique_ptr<analytics::core_dev_tools::Ga4Event> event) {
+  // The AnalyticsReporter will send us a NULL session if it has not been initialized.
+  if (session && IsEnabled(session)) {
+    SendGa4Event(std::move(event));
   }
 }
 

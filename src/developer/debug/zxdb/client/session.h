@@ -14,6 +14,7 @@
 #include "lib/fit/function.h"
 #include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/shared/platform.h"
+#include "src/developer/debug/zxdb/client/analytics_reporter.h"
 #include "src/developer/debug/zxdb/client/arch_info.h"
 #include "src/developer/debug/zxdb/client/component_observer.h"
 #include "src/developer/debug/zxdb/client/session_observer.h"
@@ -185,6 +186,8 @@ class Session : public SettingStoreObserver {
   // For test purposes, so that the Session appears to be connected.
   void set_stream(debug::StreamBuffer* stream) { stream_ = stream; }
 
+  AnalyticsReporter& analytics() { return analytics_reporter_; }
+
  protected:
   fxl::ObserverList<SessionObserver> observers_;
 
@@ -289,6 +292,8 @@ class Session : public SettingStoreObserver {
 
   std::map<uint32_t, Callback> pending_;
   uint32_t next_transaction_id_ = 1;  // Reserve 0 for notifications.
+
+  AnalyticsReporter analytics_reporter_;
 
   System system_;
 

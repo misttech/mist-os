@@ -220,7 +220,8 @@ int ConsoleMain(int argc, const char* argv[]) {
     }
 
     Analytics::Init(*session, options.analytics);
-    Analytics::IfEnabledSendInvokeEvent(session.get());
+    session->analytics().Init(session.get());
+    session->analytics().ReportInvoked();
 
     debug::SetLogCategories({debug::LogCategory::kAll});
     SetupCommandLineOptions(options, session.get());

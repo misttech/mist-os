@@ -312,7 +312,11 @@ Session::Session(debug::StreamBuffer* stream)
   SendLocalHello([](const Err&) {});
 }
 
-Session::~Session() = default;
+Session::~Session() {
+  // This class is guaranteed to destruct before the analytics cleanup routine is called. See
+  // zxdb/main.cc.
+  analytics_reporter_.ReportSessionEnded();
+}
 
 void Session::OnStreamReadable() {
   if (!stream_)
@@ -405,6 +409,8 @@ bool Session::ConnectCanProceed(fit::callback<void(const Err&)>& callback, bool 
     return false;
   }
 
+  // If the connection can proceed, then we are starting a session.
+  analytics_reporter_.ReportSessionStarted();
   return true;
 }
 
@@ -820,6 +826,12 @@ void Session::SyncAgentStatus() {
           LOGS(Error) << "Could not get debug agent status: " << err.msg();
           return;
         }
+
+        // This code path is called by all entrypoints, whether we are connected to a remote or
+        // local DebugAgent or using alternative RemoteAPI implementations (e.g. minidumps or other
+        // offline debugging). If we've gotten here, we are connected and in a good state.
+        analytics_reporter_.ReportSessionConnected(is_minidump_,
+                                                   system_.where() == System::Where::kLocal);
 
         if (!reply.filters.empty()) {
           for (auto& remote_filter : reply.filters) {

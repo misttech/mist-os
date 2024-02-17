@@ -14,7 +14,8 @@ namespace zxdb {
 class Analytics : public analytics::core_dev_tools::Analytics<Analytics> {
  public:
   static void Init(Session& session, analytics::core_dev_tools::AnalyticsOption analytics_option);
-  static void IfEnabledSendInvokeEvent(Session* session);
+  static void IfEnabledSendEvent(Session* session,
+                                 std::unique_ptr<analytics::core_dev_tools::Ga4Event> event);
 
  private:
   friend class analytics::core_dev_tools::Analytics<Analytics>;

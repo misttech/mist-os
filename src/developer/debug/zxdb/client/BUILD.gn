@@ -13,6 +13,8 @@ static_library("client") {
 
   public = [
     "analytics.h",
+    "analytics_event.h",
+    "analytics_reporter.h",
     "arch_info.h",
     "breakpoint.h",
     "breakpoint_location.h",
@@ -68,6 +70,8 @@ static_library("client") {
 
   sources = [
     "analytics.cc",
+    "analytics_event.cc",
+    "analytics_reporter.cc",
     "arch_info.cc",
     "breakpoint.cc",
     "breakpoint_action.cc",
@@ -167,6 +171,7 @@ static_library("client") {
     "//src/lib/llvm:LLVMRISCVDisassembler",
     "//src/lib/llvm:LLVMX86Desc",
     "//src/lib/llvm:LLVMX86Disassembler",
+    "//src/lib/uuid",
   ]
 
   deps = [
