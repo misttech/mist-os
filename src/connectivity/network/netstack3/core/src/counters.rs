@@ -13,6 +13,7 @@ use crate::{
     device::{arp::ArpCounters, DeviceCounters},
     inspect::Inspector,
     ip::{
+        device::nud::{NudCounters, NudCountersInner},
         icmp::{
             IcmpRxCounters, IcmpRxCountersInner, IcmpTxCounters, IcmpTxCountersInner, NdpCounters,
             NdpRxCounters, NdpTxCounters,
@@ -66,6 +67,8 @@ where
         + CounterContext<IcmpTxCounters<Ipv4>>
         + CounterContext<IcmpTxCounters<Ipv4>>
         + CounterContext<IcmpTxCounters<Ipv6>>
+        + CounterContext<NudCounters<Ipv4>>
+        + CounterContext<NudCounters<Ipv6>>
         + CounterContext<NdpCounters>
         + CounterContext<ArpCounters>
         + CounterContext<DeviceCounters>,
@@ -82,6 +85,14 @@ where
         });
         inspector.record_child("Arp", |inspector| {
             self.core_ctx().with_counters(|arp| inspect_arp_counters(inspector, arp));
+        });
+        inspector.record_child("NUD", |inspector| {
+            inspector.record_child("V4", |inspector| {
+                self.core_ctx().with_counters(|nud| inspect_nud_counters::<Ipv4>(inspector, nud));
+            });
+            inspector.record_child("V6", |inspector| {
+                self.core_ctx().with_counters(|nud| inspect_nud_counters::<Ipv6>(inspector, nud));
+            });
         });
         inspector.record_child("ICMP", |inspector| {
             inspector.record_child("V4", |inspector| {
@@ -169,6 +180,11 @@ fn inspect_device_counters(inspector: &mut impl Inspector, counters: &DeviceCoun
     });
 }
 
+fn inspect_nud_counters<I: Ip>(inspector: &mut impl Inspector, counters: &NudCounters<I>) {
+    let NudCountersInner { icmp_dest_unreachable_dropped } = counters.as_ref();
+    inspector.record_counter("IcmpDestUnreachableDropped", icmp_dest_unreachable_dropped);
+}
+
 fn inspect_arp_counters(inspector: &mut impl Inspector, counters: &ArpCounters) {
     let ArpCounters {
         rx_dropped_non_local_target,
@@ -224,6 +240,7 @@ fn inspect_icmp_tx_counters<I: Ip>(inspector: &mut impl Inspector, counters: &Ic
         reply,
         protocol_unreachable,
         port_unreachable,
+        address_unreachable,
         net_unreachable,
         ttl_expired,
         packet_too_big,
@@ -234,6 +251,7 @@ fn inspect_icmp_tx_counters<I: Ip>(inspector: &mut impl Inspector, counters: &Ic
     inspector.record_counter("Reply", reply);
     inspector.record_counter("ProtocolUnreachable", protocol_unreachable);
     inspector.record_counter("PortUnreachable", port_unreachable);
+    inspector.record_counter("AddressUnreachable", address_unreachable);
     inspector.record_counter("NetUnreachable", net_unreachable);
     inspector.record_counter("TtlExpired", ttl_expired);
     inspector.record_counter("PacketTooBig", packet_too_big);

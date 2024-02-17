@@ -22,19 +22,26 @@ use core::{
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use net_types::{
-    ip::{GenericOverIp, Ip},
+    ip::{GenericOverIp, Ip, IpMarked, Ipv4, Ipv6},
     SpecifiedAddr,
 };
-use packet::{Buf, BufferMut, Serializer};
-use packet_formats::utils::NonZeroDuration;
+use packet::{
+    Buf, BufferMut, GrowBuffer as _, ParsablePacket as _, ParseBufferMut as _, Serializer,
+};
+use packet_formats::{
+    ip::IpPacket as _, ipv4::Ipv4Packet, ipv6::Ipv6Packet, utils::NonZeroDuration,
+};
+use zerocopy::ByteSlice;
 
 use crate::{
-    context::{EventContext, InstantBindingsTypes, TimerContext, TimerHandler},
+    context::{CounterContext, EventContext, InstantBindingsTypes, TimerContext, TimerHandler},
+    counters::Counter,
     device::{
         link::{LinkAddress, LinkDevice, LinkUnicastAddress},
         AnyDevice, DeviceIdContext, StrongId,
     },
     error::AddressResolutionFailed,
+    socket::address::SocketIpAddr,
     Instant,
 };
 
@@ -93,6 +100,16 @@ pub const MAX_ENTRIES: usize = 512;
 /// neighbor table grows beyond `MAX_SIZE`.
 const MIN_GARBAGE_COLLECTION_INTERVAL: NonZeroDuration =
     const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(30));
+
+/// NUD counters.
+#[derive(Default)]
+pub struct NudCountersInner {
+    /// Count of ICMP destination unreachable errors that could not be sent.
+    pub icmp_dest_unreachable_dropped: Counter,
+}
+
+/// NUD counters.
+pub type NudCounters<I> = IpMarked<I, NudCountersInner>;
 
 #[derive(Debug, Copy, Clone)]
 pub(crate) struct ConfirmationFlags {
@@ -1580,6 +1597,52 @@ pub trait NudContext<I: Ip, D: LinkDevice, BC: NudBindingsContext<I, D, Self::De
     );
 }
 
+/// IP extension trait to support [`NudIcmpContext`].
+pub(crate) trait NudIcmpIpExt: packet_formats::ip::IpExt {
+    /// IP packet metadata needed when sending ICMP destination unreachable
+    /// errors as a result of link-layer address resolution failure.
+    type Metadata;
+
+    /// Extracts IP-version specific metadata from `packet`.
+    fn extract_metadata<B: ByteSlice>(packet: &Self::Packet<B>) -> Self::Metadata;
+}
+
+impl NudIcmpIpExt for Ipv4 {
+    type Metadata = usize;
+
+    fn extract_metadata<B: ByteSlice>(packet: &Ipv4Packet<B>) -> usize {
+        packet.header_len()
+    }
+}
+
+impl NudIcmpIpExt for Ipv6 {
+    type Metadata = ();
+
+    fn extract_metadata<B: ByteSlice>(_: &Ipv6Packet<B>) -> () {}
+}
+
+/// The execution context which allows sending ICMP destination unreachable
+/// errors, which needs to happen when address resolution fails.
+pub(crate) trait NudIcmpContext<I: Ip + NudIcmpIpExt, D: LinkDevice, BC>:
+    DeviceIdContext<D>
+{
+    /// Send an ICMP destination unreachable error to `original_src_ip` as
+    /// a result of `frame` being unable to be sent/forwarded due to link
+    /// layer address resolution failure.
+    ///
+    /// `original_src_ip`, `original_dst_ip`, and `header_len` are all IP
+    /// header fields from `frame`.
+    fn send_icmp_dest_unreachable(
+        &mut self,
+        bindings_ctx: &mut BC,
+        frame: Buf<Vec<u8>>,
+        device_id: Option<&Self::DeviceId>,
+        original_src_ip: SocketIpAddr<I::Addr>,
+        original_dst_ip: SocketIpAddr<I::Addr>,
+        header_len: I::Metadata,
+    );
+}
+
 /// NUD configurations.
 #[derive(Clone, Debug)]
 pub struct NudUserConfig {
@@ -1762,10 +1825,10 @@ enum TransmitProbe<A> {
 }
 
 impl<
-        I: Ip,
+        I: Ip + NudIcmpIpExt,
         D: LinkDevice,
         BC: NudBindingsContext<I, D, CC::DeviceId>,
-        CC: NudContext<I, D, BC>,
+        CC: NudContext<I, D, BC> + NudIcmpContext<I, D, BC> + CounterContext<NudCounters<I>>,
     > TimerHandler<BC, NudTimerId<I, D, CC::DeviceId>> for CC
 {
     fn handle_timer(
@@ -1789,11 +1852,15 @@ fn handle_neighbor_timer<I, D, CC, BC>(
     lookup_addr: SpecifiedAddr<I::Addr>,
     event: NudEvent,
 ) where
-    I: Ip,
+    I: Ip + NudIcmpIpExt,
     D: LinkDevice,
     BC: NudBindingsContext<I, D, CC::DeviceId>,
-    CC: NudContext<I, D, BC>,
+    CC: NudContext<I, D, BC> + NudIcmpContext<I, D, BC> + CounterContext<NudCounters<I>>,
 {
+    enum Action<A> {
+        TransmitProbe(TransmitProbe<A>),
+        SendIcmpDestUnreachable(VecDeque<Buf<Vec<u8>>>),
+    }
     let action =
         core_ctx.with_nud_state_mut(&device_id, |NudState { neighbors, last_gc }, core_ctx| {
             let num_entries = neighbors.len();
@@ -1812,7 +1879,7 @@ fn handle_neighbor_timer<I, D, CC, BC>(
                         &device_id,
                         lookup_addr,
                     ) {
-                        Some(TransmitProbe::Multicast)
+                        Some(Action::TransmitProbe(TransmitProbe::Multicast))
                     } else {
                         // Failed to complete neighbor resolution and no more probes to send.
                         // Subsequent traffic to this neighbor will recreate the entry and restart
@@ -1824,13 +1891,23 @@ fn handle_neighbor_timer<I, D, CC, BC>(
                         tracing::debug!(
                             "neighbor resolution failed for {lookup_addr}; removing entry"
                         );
-                        let _: NeighborState<_, _, _> = entry.remove();
+                        let Incomplete {
+                            transmit_counter: _,
+                            ref mut pending_frames,
+                            notifiers: _,
+                            _marker,
+                        } = assert_matches!(
+                            entry.remove(),
+                            NeighborState::Dynamic(DynamicNeighborState::Incomplete(incomplete))
+                                => incomplete
+                        );
+                        let pending_frames = core::mem::take(pending_frames);
                         bindings_ctx.on_event(Event::removed(
                             device_id,
                             lookup_addr,
                             bindings_ctx.now(),
                         ));
-                        None
+                        Some(Action::SendIcmpDestUnreachable(pending_frames))
                     }
                 }
                 NeighborState::Dynamic(DynamicNeighborState::Probe(probe)) => {
@@ -1844,7 +1921,7 @@ fn handle_neighbor_timer<I, D, CC, BC>(
                         &device_id,
                         lookup_addr,
                     ) {
-                        Some(TransmitProbe::Unicast(link_address))
+                        Some(Action::TransmitProbe(TransmitProbe::Unicast(link_address)))
                     } else {
                         let unreachable =
                             probe.enter_unreachable(bindings_ctx, &device_id, num_entries, last_gc);
@@ -1859,7 +1936,9 @@ fn handle_neighbor_timer<I, D, CC, BC>(
                 }
                 NeighborState::Dynamic(DynamicNeighborState::Unreachable(unreachable)) => {
                     assert_eq!(event, NudEvent::RetransmitMulticastProbe);
-                    unreachable.handle_timer(core_ctx, bindings_ctx, &device_id, lookup_addr)
+                    unreachable
+                        .handle_timer(core_ctx, bindings_ctx, &device_id, lookup_addr)
+                        .map(Action::TransmitProbe)
                 }
                 NeighborState::Dynamic(DynamicNeighborState::Reachable(Reachable {
                     link_address,
@@ -1926,7 +2005,7 @@ fn handle_neighbor_timer<I, D, CC, BC>(
                         bindings_ctx.now(),
                     ));
 
-                    Some(TransmitProbe::Unicast(link_address))
+                    Some(Action::TransmitProbe(TransmitProbe::Unicast(link_address)))
                 }
                 state @ (NeighborState::Static(_)
                 | NeighborState::Dynamic(DynamicNeighborState::Stale(_))) => {
@@ -1936,10 +2015,61 @@ fn handle_neighbor_timer<I, D, CC, BC>(
         });
 
     match action {
-        Some(TransmitProbe::Multicast) => {
+        Some(Action::SendIcmpDestUnreachable(mut pending_frames)) => {
+            for mut frame in pending_frames.drain(..) {
+                // TODO(https://fxbug.dev/323585811): Avoid needing to parse the packet to get
+                // IP header fields by extracting them from the serializer passed into the NUD
+                // layer and storing them alongside the pending frames instead.
+                let Some((packet, original_src_ip, original_dst_ip)) = frame
+                    .parse_mut::<I::Packet<_>>()
+                    .map_err(|e| {
+                        tracing::warn!(
+                            "not sending ICMP dest unreachable due to parsing error: {:?}",
+                            e
+                        );
+                    })
+                    .ok()
+                    .and_then(|packet| {
+                        let original_src_ip = SocketIpAddr::new(packet.src_ip())?;
+                        let original_dst_ip = SocketIpAddr::new(packet.dst_ip())?;
+                        Some((packet, original_src_ip, original_dst_ip))
+                    })
+                    .or_else(|| {
+                        core_ctx.increment(|counters| &counters.icmp_dest_unreachable_dropped);
+                        None
+                    })
+                else {
+                    continue;
+                };
+                let header_metadata = I::extract_metadata(&packet);
+                let metadata = packet.parse_metadata();
+                core::mem::drop(packet);
+                frame.undo_parse(metadata);
+                core_ctx.send_icmp_dest_unreachable(
+                    bindings_ctx,
+                    frame,
+                    // Provide the device ID if `original_src_ip`, the address the ICMP error
+                    // is destined for, is link-local. Note that if this address is link-local,
+                    // it should be an address assigned to one of our own interfaces, because the
+                    // link-local subnet should always be on-link according to RFC 5942 Section 3:
+                    //
+                    //   The link-local prefix is effectively considered a permanent entry on the
+                    //   Prefix List.
+                    //
+                    // Even if the link-local subnet is off-link, passing the device ID is never
+                    // incorrect because link-local traffic will never be forwarded, and
+                    // there is only ever one link and thus interface involved.
+                    crate::socket::must_have_zone(original_src_ip.as_ref()).then_some(device_id),
+                    original_src_ip,
+                    original_dst_ip,
+                    header_metadata,
+                );
+            }
+        }
+        Some(Action::TransmitProbe(TransmitProbe::Multicast)) => {
             core_ctx.send_neighbor_solicitation(bindings_ctx, &device_id, lookup_addr, None);
         }
-        Some(TransmitProbe::Unicast(link_addr)) => {
+        Some(Action::TransmitProbe(TransmitProbe::Unicast(link_addr))) => {
             core_ctx.send_neighbor_solicitation(
                 bindings_ctx,
                 &device_id,
@@ -2393,7 +2523,7 @@ mod tests {
 
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::{
-        ip::{AddrSubnet, IpAddress as _, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+        ip::{AddrSubnet, IpAddress as _, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
         UnicastAddr, Witness as _,
     };
     use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
@@ -2417,14 +2547,15 @@ mod tests {
         context::{
             testutil::{
                 FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx, FakeInstant,
-                FakeLinkResolutionNotifier, FakeNetwork, FakeNetworkLinks, FakeTimerCtxExt as _,
-                WrappedFakeCoreCtx,
+                FakeLinkResolutionNotifier, FakeNetwork, FakeNetworkContext as _, FakeNetworkLinks,
+                FakeTimerCtxExt as _, WrappedFakeCoreCtx,
             },
             CtxPair, InstantContext, SendFrameContext as _,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
             link::testutil::{FakeLinkAddress, FakeLinkDevice, FakeLinkDeviceId},
+            loopback::{LoopbackCreationProperties, LoopbackDevice},
             ndp::testutil::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
             testutil::FakeWeakDeviceId,
             EthernetDeviceId, EthernetWeakDeviceId, FrameDestination, WeakDeviceId,
@@ -2432,10 +2563,11 @@ mod tests {
         ip::{
             device::{
                 nud::api::NeighborApi, slaac::SlaacConfiguration, testutil::set_ip_device_enabled,
-                Ipv6DeviceConfigurationUpdate,
+                Ipv6DeviceConfigurationUpdate, Mtu,
             },
             icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
         },
+        routes::{AddableEntry, AddableMetric},
         testutil::{
             self, FakeEventDispatcherConfig, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
@@ -2446,6 +2578,7 @@ mod tests {
 
     struct FakeNudContext<I: Ip, D: LinkDevice> {
         nud: NudState<I, D, FakeInstant, FakeLinkResolutionNotifier<D>>,
+        counters: NudCounters<I>,
     }
 
     struct FakeConfigContext {
@@ -2472,6 +2605,7 @@ mod tests {
         IpFrame {
             dst_link_address: FakeLinkAddress,
         },
+        IcmpDestUnreachable,
     }
 
     type FakeBindingsCtxImpl<I> = FakeBindingsCtx<
@@ -2493,7 +2627,7 @@ mod tests {
                         max_multicast_solicitations: NonZeroU16::new(5).unwrap(),
                     },
                 },
-                FakeNudContext { nud: NudState::default() },
+                FakeNudContext { nud: NudState::default(), counters: Default::default() },
             )
         }
     }
@@ -2591,6 +2725,30 @@ mod tests {
                     Buf::new(Vec::new(), ..),
                 )
                 .unwrap()
+        }
+    }
+
+    impl<I: Ip + NudIcmpIpExt> NudIcmpContext<I, FakeLinkDevice, FakeBindingsCtxImpl<I>>
+        for FakeCoreCtxImpl<I>
+    {
+        fn send_icmp_dest_unreachable(
+            &mut self,
+            bindings_ctx: &mut FakeBindingsCtxImpl<I>,
+            frame: Buf<Vec<u8>>,
+            _device_id: Option<&Self::DeviceId>,
+            _original_src_ip: SocketIpAddr<I::Addr>,
+            _original_dst_ip: SocketIpAddr<I::Addr>,
+            _header_len: I::Metadata,
+        ) {
+            self.inner
+                .send_frame(bindings_ctx, FakeNudMessageMeta::IcmpDestUnreachable, frame)
+                .unwrap()
+        }
+    }
+
+    impl<I: Ip> CounterContext<NudCounters<I>> for FakeCoreCtxImpl<I> {
+        fn with_counters<O, F: FnOnce(&NudCounters<I>) -> O>(&self, cb: F) -> O {
+            cb(&self.outer.counters)
         }
     }
 
@@ -2709,7 +2867,7 @@ mod tests {
         }
     }
 
-    trait TestIpExt: Ip {
+    trait TestIpExt: NudIcmpIpExt {
         const LOOKUP_ADDR1: SpecifiedAddr<Self::Addr>;
         const LOOKUP_ADDR2: SpecifiedAddr<Self::Addr>;
         const LOOKUP_ADDR3: SpecifiedAddr<Self::Addr>;
@@ -3149,7 +3307,7 @@ mod tests {
             );
         }
 
-        let FakeNudContext { nud } = &core_ctx.outer;
+        let FakeNudContext { nud, counters: _ } = &core_ctx.outer;
         assert_eq!(nud.neighbors.get(&neighbor), Some(&NeighborState::Dynamic(state)));
     }
 
@@ -4003,7 +4161,8 @@ mod tests {
 
         delete_neighbor(&mut core_ctx, &mut bindings_ctx);
 
-        let FakeNudContext { nud: NudState { neighbors, last_gc: _ } } = &core_ctx.outer;
+        let FakeNudContext { nud: NudState { neighbors, last_gc: _ }, counters: _ } =
+            &core_ctx.outer;
         assert!(neighbors.is_empty(), "neighbor table should be empty: {neighbors:?}");
     }
 
@@ -4154,7 +4313,14 @@ mod tests {
         // The neighbor entry should have been removed.
         assert_neighbor_removed_with_ip(&mut core_ctx, &mut bindings_ctx, I::LOOKUP_ADDR1);
         bindings_ctx.timer_ctx().assert_no_timers_installed();
+
+        // The ICMP destination unreachable error sent as a result of solicitation failure
+        // will be dropped because the packets pending address resolution in this test
+        // is not a valid IP packet.
         assert_eq!(core_ctx.inner.take_frames(), []);
+        core_ctx.with_counters(|counters| {
+            assert_eq!(counters.as_ref().icmp_dest_unreachable_dropped.get(), 1)
+        });
     }
 
     #[ip_test]
@@ -4222,7 +4388,7 @@ mod tests {
         );
 
         let max_multicast_solicit = core_ctx.inner.max_multicast_solicit().get();
-        let FakeNudContext { nud } = &core_ctx.outer;
+        let FakeNudContext { nud, counters: _ } = &core_ctx.outer;
         assert_eq!(
             nud.neighbors,
             HashMap::from([
@@ -4255,7 +4421,7 @@ mod tests {
 
         // Flushing the table should clear all entries (dynamic and static) and timers.
         NudHandler::flush(&mut core_ctx, &mut bindings_ctx, &FakeLinkDeviceId);
-        let FakeNudContext { nud } = &core_ctx.outer;
+        let FakeNudContext { nud, counters: _ } = &core_ctx.outer;
         assert!(nud.neighbors.is_empty(), "neighbor table should be empty: {:?}", nud.neighbors);
         assert_eq!(
             bindings_ctx.take_events().into_iter().collect::<HashSet<_>>(),
@@ -4280,7 +4446,8 @@ mod tests {
         delete_neighbor(&mut core_ctx, &mut bindings_ctx);
 
         // Entry should be removed and timer cancelled.
-        let FakeNudContext { nud: NudState { neighbors, last_gc: _ } } = &core_ctx.outer;
+        let FakeNudContext { nud: NudState { neighbors, last_gc: _ }, counters: _ } =
+            &core_ctx.outer;
         assert!(neighbors.is_empty(), "neighbor table should be empty: {neighbors:?}");
         bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
@@ -5422,5 +5589,116 @@ mod tests {
                 ctx.test_api().clear_routes_and_remove_ethernet_device(device);
             });
         }
+    }
+
+    #[ip_test]
+    #[netstack3_macros::context_ip_bounds(I, testutil::FakeBindingsCtx, crate)]
+    fn icmp_error_on_address_resolution_failure_tcp_local<
+        I: Ip + testutil::TestIpExt + crate::IpExt,
+    >() {
+        let mut builder = testutil::FakeEventDispatcherBuilder::default();
+        let _device_id = builder.add_device_with_ip(
+            I::FAKE_CONFIG.local_mac,
+            I::FAKE_CONFIG.local_ip.get(),
+            I::FAKE_CONFIG.subnet,
+        );
+        let (mut ctx, _): (_, Vec<EthernetDeviceId<_>>) = builder.build();
+
+        // Add a loopback interface because local delivery of the ICMP error
+        // relies on loopback.
+        const MTU: Mtu = Mtu::new(65536);
+        let device = ctx
+            .core_api()
+            .device::<LoopbackDevice>()
+            .add_device_with_default_state(
+                LoopbackCreationProperties { mtu: MTU },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        crate::device::testutil::enable_device(&mut ctx, &device);
+
+        let mut tcp_api = ctx.core_api().tcp::<I>();
+        let socket = tcp_api.create(tcp::buffer::testutil::ProvidedBuffers::default());
+        const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
+        tcp_api
+            .connect(
+                &socket,
+                Some(net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
+                REMOTE_PORT,
+            )
+            .unwrap();
+
+        while ctx.process_queues() || ctx.trigger_next_timer().is_some() {}
+
+        let mut tcp_api = ctx.core_api().tcp::<I>();
+        assert_eq!(
+            tcp_api.get_socket_error(&socket),
+            Some(crate::transport::tcp::ConnectionError::HostUnreachable),
+        );
+    }
+
+    #[ip_test]
+    #[netstack3_macros::context_ip_bounds(I, testutil::FakeBindingsCtx, crate)]
+    fn icmp_error_on_address_resolution_failure_tcp_forwarding<
+        I: Ip + testutil::TestIpExt + crate::IpExt,
+    >() {
+        let (mut net, local_device, remote_device) = new_test_net::<I>();
+
+        let FakeEventDispatcherConfig { remote_ip, .. } = I::FAKE_CONFIG;
+
+        // These default routes mean that later when local tries to connect to an
+        // address not in the subnet on the network, it will send the SYN to remote,
+        // and remote will attempt to forward to the address as a neighbor (and
+        // link address resolution will fail here).
+        for (ctx, device, gateway) in
+            [("local", local_device, Some(remote_ip)), ("remote", remote_device.clone(), None)]
+        {
+            net.with_context(ctx, |ctx| {
+                let (mut core_ctx, bindings_ctx) = ctx.contexts();
+                crate::ip::forwarding::testutil::add_route::<I, _, _>(
+                    &mut core_ctx,
+                    bindings_ctx,
+                    AddableEntry {
+                        subnet: Subnet::new(I::UNSPECIFIED_ADDRESS, 0).unwrap(),
+                        device: device.into(),
+                        gateway: gateway,
+                        metric: AddableMetric::MetricTracksInterface,
+                    },
+                )
+                .expect("add default route");
+            });
+        }
+
+        net.with_context("remote", |ctx| {
+            crate::device::testutil::set_forwarding_enabled::<_, I>(
+                ctx,
+                &remote_device.into(),
+                true,
+            );
+        });
+
+        let socket = net.with_context("local", |ctx| {
+            let mut tcp_api = ctx.core_api().tcp::<I>();
+            let socket = tcp_api.create(tcp::buffer::testutil::ProvidedBuffers::default());
+            const REMOTE_PORT: NonZeroU16 =
+                const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
+            tcp_api
+                .connect(
+                    &socket,
+                    Some(net_types::ZonedAddr::Unzoned(I::get_other_remote_ip_address(1))),
+                    REMOTE_PORT,
+                )
+                .unwrap();
+            socket
+        });
+
+        net.run_until_idle();
+        net.with_context("local", |ctx| {
+            let mut tcp_api = ctx.core_api().tcp::<I>();
+            assert_eq!(
+                tcp_api.get_socket_error(&socket),
+                Some(crate::transport::tcp::ConnectionError::HostUnreachable),
+            );
+        });
     }
 }

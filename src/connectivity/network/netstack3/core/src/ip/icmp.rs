@@ -162,6 +162,8 @@ pub struct IcmpTxCountersInner {
     pub reply: Counter,
     /// Count of protocol unreachable messages sent.
     pub protocol_unreachable: Counter,
+    /// Count of host/address unreachable messages sent.
+    pub address_unreachable: Counter,
     /// Count of port unreachable messages sent.
     pub port_unreachable: Counter,
     /// Count of net unreachable messages sent.
@@ -2025,6 +2027,94 @@ fn receive_icmpv6_error<
 }
 
 /// Send an ICMP(v4) message in response to receiving a packet destined for an
+/// unreachable address.
+///
+/// `send_icmpv4_host_unreachable` sends the appropriate ICMP message in
+/// response to receiving an IP packet from `src_ip` to `dst_ip`, where
+/// `dst_ip` is unreachable. In particular, this is an ICMP
+/// "destination unreachable" message with a "host unreachable" code.
+///
+/// `original_packet` must be an initial fragment or a complete IP
+/// packet, per [RFC 792 Introduction]:
+///
+///   Also ICMP messages are only sent about errors in handling fragment zero of
+///   fragemented [sic] datagrams.
+///
+/// `header_len` is the length of the header including all options.
+///
+/// [RFC 792 Introduction]: https://datatracker.ietf.org/doc/html/rfc792
+pub(crate) fn send_icmpv4_host_unreachable<
+    B: BufferMut,
+    BC: IcmpBindingsContext<Ipv4, CC::DeviceId>,
+    CC: InnerIcmpv4Context<BC> + CounterContext<IcmpTxCounters<Ipv4>>,
+>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: Option<&CC::DeviceId>,
+    frame_dst: Option<FrameDestination>,
+    src_ip: SocketIpAddr<Ipv4Addr>,
+    dst_ip: SocketIpAddr<Ipv4Addr>,
+    original_packet: B,
+    header_len: usize,
+) {
+    core_ctx.with_counters(|counters| {
+        counters.address_unreachable.increment();
+    });
+
+    send_icmpv4_dest_unreachable(
+        core_ctx,
+        bindings_ctx,
+        device,
+        frame_dst,
+        src_ip,
+        dst_ip,
+        Icmpv4DestUnreachableCode::DestHostUnreachable,
+        original_packet,
+        header_len,
+        Ipv4FragmentType::InitialFragment,
+    );
+}
+
+/// Send an ICMPv6 message in response to receiving a packet destined for an
+/// unreachable address.
+///
+/// `send_icmpv6_address_unreachable` sends the appropriate ICMP message in
+/// response to receiving an IP packet from `src_ip` to `dst_ip`, where
+/// `dst_ip` is unreachable. In particular, this is an ICMP
+/// "destination unreachable" message with an "address unreachable" code.
+///
+/// `original_packet` contains the contents of the entire original packet,
+/// including extension headers.
+pub(crate) fn send_icmpv6_address_unreachable<
+    B: BufferMut,
+    BC: IcmpBindingsContext<Ipv6, CC::DeviceId>,
+    CC: InnerIcmpv6Context<BC> + CounterContext<IcmpTxCounters<Ipv6>>,
+>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: Option<&CC::DeviceId>,
+    frame_dst: Option<FrameDestination>,
+    src_ip: SocketIpAddr<Ipv6Addr>,
+    dst_ip: SocketIpAddr<Ipv6Addr>,
+    original_packet: B,
+) {
+    core_ctx.with_counters(|counters| {
+        counters.address_unreachable.increment();
+    });
+
+    send_icmpv6_dest_unreachable(
+        core_ctx,
+        bindings_ctx,
+        device,
+        frame_dst,
+        src_ip,
+        dst_ip,
+        Icmpv6DestUnreachableCode::AddrUnreachable,
+        original_packet,
+    );
+}
+
+/// Send an ICMP(v4) message in response to receiving a packet destined for an
 /// unsupported IPv4 protocol.
 ///
 /// `send_icmpv4_protocol_unreachable` sends the appropriate ICMP message in
@@ -2054,7 +2144,7 @@ pub(crate) fn send_icmpv4_protocol_unreachable<
     send_icmpv4_dest_unreachable(
         core_ctx,
         bindings_ctx,
-        device,
+        Some(device),
         frame_dst,
         src_ip,
         dst_ip,
@@ -2152,7 +2242,7 @@ pub(crate) fn send_icmpv4_port_unreachable<
     send_icmpv4_dest_unreachable(
         core_ctx,
         bindings_ctx,
-        device,
+        Some(device),
         frame_dst,
         src_ip,
         dst_ip,
@@ -2194,7 +2284,7 @@ pub(crate) fn send_icmpv6_port_unreachable<
     send_icmpv6_dest_unreachable(
         core_ctx,
         bindings_ctx,
-        device,
+        Some(device),
         frame_dst,
         src_ip,
         dst_ip,
@@ -2241,7 +2331,7 @@ pub(crate) fn send_icmpv4_net_unreachable<
     send_icmpv4_dest_unreachable(
         core_ctx,
         bindings_ctx,
-        device,
+        Some(device),
         frame_dst,
         src_ip,
         dst_ip,
@@ -2288,7 +2378,7 @@ pub(crate) fn send_icmpv6_net_unreachable<
     send_icmpv6_dest_unreachable(
         core_ctx,
         bindings_ctx,
-        device,
+        Some(device),
         frame_dst,
         src_ip,
         dst_ip,
@@ -2335,7 +2425,7 @@ pub(crate) fn send_icmpv4_ttl_expired<
     send_icmpv4_error_message(
         core_ctx,
         bindings_ctx,
-        device,
+        Some(device),
         frame_dst,
         src_ip,
         dst_ip,
@@ -2383,7 +2473,7 @@ pub(crate) fn send_icmpv6_ttl_expired<
     send_icmpv6_error_message(
         core_ctx,
         bindings_ctx,
-        device,
+        Some(device),
         frame_dst,
         src_ip,
         dst_ip,
@@ -2429,7 +2519,7 @@ pub(crate) fn send_icmpv6_packet_too_big<
     send_icmpv6_error_message(
         core_ctx,
         bindings_ctx,
-        device,
+        Some(device),
         frame_dst,
         src_ip,
         dst_ip,
@@ -2480,7 +2570,7 @@ pub(crate) fn send_icmpv4_parameter_problem<
     send_icmpv4_error_message(
         core_ctx,
         bindings_ctx,
-        device,
+        Some(device),
         frame_dst,
         src_ip,
         dst_ip,
@@ -2529,7 +2619,7 @@ pub(crate) fn send_icmpv6_parameter_problem<
     send_icmpv6_error_message(
         core_ctx,
         bindings_ctx,
-        device,
+        Some(device),
         frame_dst,
         src_ip,
         dst_ip,
@@ -2547,7 +2637,7 @@ fn send_icmpv4_dest_unreachable<
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    device: &CC::DeviceId,
+    device: Option<&CC::DeviceId>,
     frame_dst: Option<FrameDestination>,
     src_ip: SocketIpAddr<Ipv4Addr>,
     dst_ip: SocketIpAddr<Ipv4Addr>,
@@ -2579,7 +2669,7 @@ fn send_icmpv6_dest_unreachable<
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    device: &CC::DeviceId,
+    device: Option<&CC::DeviceId>,
     frame_dst: Option<FrameDestination>,
     src_ip: SocketIpAddr<Ipv6Addr>,
     dst_ip: SocketIpAddr<Ipv6Addr>,
@@ -2608,7 +2698,7 @@ fn send_icmpv4_error_message<
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    device: &CC::DeviceId,
+    device: Option<&CC::DeviceId>,
     frame_dst: Option<FrameDestination>,
     original_src_ip: SocketIpAddr<Ipv4Addr>,
     original_dst_ip: SocketIpAddr<Ipv4Addr>,
@@ -2641,7 +2731,7 @@ fn send_icmpv4_error_message<
         bindings_ctx,
         core_ctx.send_oneshot_ip_packet(
             bindings_ctx,
-            Some(EitherDeviceId::Strong(device)),
+            device.map(EitherDeviceId::Strong),
             None,
             original_src_ip,
             Ipv4Proto::Icmp,
@@ -2667,7 +2757,7 @@ fn send_icmpv6_error_message<
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    device: &CC::DeviceId,
+    device: Option<&CC::DeviceId>,
     frame_dst: Option<FrameDestination>,
     original_src_ip: SocketIpAddr<Ipv6Addr>,
     original_dst_ip: SocketIpAddr<Ipv6Addr>,
@@ -2695,7 +2785,7 @@ fn send_icmpv6_error_message<
         bindings_ctx,
         core_ctx.send_oneshot_ip_packet(
             bindings_ctx,
-            Some(EitherDeviceId::Strong(device)),
+            device.map(EitherDeviceId::Strong),
             None,
             original_src_ip,
             Ipv6Proto::Icmpv6,
@@ -4708,7 +4798,7 @@ mod tests {
             send_icmpv4_dest_unreachable(
                 &mut core_ctx.inner,
                 bindings_ctx,
-                &FakeDeviceId,
+                Some(&FakeDeviceId),
                 Some(FrameDestination::Individual { local: true }),
                 FAKE_CONFIG_V4.remote_ip.try_into().unwrap(),
                 FAKE_CONFIG_V4.local_ip.try_into().unwrap(),
@@ -4779,7 +4869,7 @@ mod tests {
             send_icmpv6_dest_unreachable(
                 &mut core_ctx.inner,
                 bindings_ctx,
-                &FakeDeviceId,
+                Some(&FakeDeviceId),
                 Some(FrameDestination::Individual { local: true }),
                 FAKE_CONFIG_V6.remote_ip.try_into().unwrap(),
                 FAKE_CONFIG_V6.local_ip.try_into().unwrap(),

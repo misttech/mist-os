@@ -13,7 +13,11 @@ use core::{
     sync::atomic::AtomicU16,
 };
 
-use lock_order::{lock::LockFor, relation::LockBefore, wrap::prelude::*};
+use lock_order::{
+    lock::{LockFor, UnlockedAccess},
+    relation::LockBefore,
+    wrap::prelude::*,
+};
 use net_types::{
     ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu},
     LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
@@ -35,7 +39,7 @@ use crate::{
             dad::{DadAddressContext, DadAddressStateRef, DadContext, DadHandler, DadStateRef},
             del_ip_addr_inner, get_ipv6_hop_limit, is_ip_device_enabled, is_ip_forwarding_enabled,
             join_ip_multicast_with_config, leave_ip_multicast_with_config,
-            nud::{self, ConfirmationFlags, NudIpHandler},
+            nud::{self, ConfirmationFlags, NudCounters, NudIpHandler},
             route_discovery::{
                 Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6RouteDiscoveryContext,
                 Ipv6RouteDiscoveryState,
@@ -64,7 +68,7 @@ use crate::{
         AddressStatus, IpLayerIpExt, IpStateContext, Ipv4PresentAddressStatus,
         Ipv6PresentAddressStatus, DEFAULT_TTL,
     },
-    BindingsContext, CoreCtx,
+    BindingsContext, CoreCtx, StackState,
 };
 
 use super::state::Ipv6NetworkLearnedParameters;
@@ -1454,5 +1458,22 @@ where
     fn flush_neighbor_table(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId) {
         let Self { config: _, core_ctx } = self;
         NudIpHandler::<I, BC>::flush_neighbor_table(core_ctx, bindings_ctx, device_id)
+    }
+}
+
+impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::NudCounters<I>>
+    for StackState<BC>
+{
+    type Data = NudCounters<I>;
+    type Guard<'l> = &'l NudCounters<I> where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        self.nud_counters()
+    }
+}
+
+impl<BC: BindingsContext, I: Ip, L> CounterContext<NudCounters<I>> for CoreCtx<'_, BC, L> {
+    fn with_counters<O, F: FnOnce(&NudCounters<I>) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::NudCounters<I>>())
     }
 }

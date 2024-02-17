@@ -114,7 +114,6 @@ impl<A: IpAddress> Debug for SocketIpAddr<A> {
 }
 
 impl<A: IpAddress> SocketIpAddr<A> {
-    #[cfg(test)]
     /// Constructs a [`SocketIpAddr`] if the address is compliant, else `None`.
     pub(crate) fn new(addr: A) -> Option<SocketIpAddr<A>> {
         Some(SocketIpAddr(NonMappedAddr::new(SpecifiedAddr::new(addr)?)?))

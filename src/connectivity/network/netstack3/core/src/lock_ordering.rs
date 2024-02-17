@@ -130,6 +130,8 @@ pub struct IpStateCounters<I>(PhantomData<I>, Never);
 pub struct IcmpTxCounters<I>(PhantomData<I>, Never);
 // Provides unlocked access of IcmpRxCounters.
 pub struct IcmpRxCounters<I>(PhantomData<I>, Never);
+// Provides unlocked access of NudCounters.
+pub struct NudCounters<I>(PhantomData<I>, Never);
 // Provides unlocked access of NdpCounters.
 pub enum NdpCounters {}
 // Provides unlocked access of DeviceCounters.

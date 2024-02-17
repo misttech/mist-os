@@ -4,7 +4,7 @@
 
 //! Structs containing the entire stack state.
 
-use net_types::ip::{GenericOverIp, Ip, IpInvariant};
+use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6};
 
 use crate::{
     api::CoreApi,
@@ -12,6 +12,7 @@ use crate::{
     device::{arp::ArpCounters, DeviceCounters, DeviceId, DeviceLayerState},
     ip::{
         self,
+        device::nud::NudCounters,
         device::slaac::SlaacCounters,
         icmp::{IcmpRxCounters, IcmpTxCounters, NdpCounters},
         IpCounters, IpLayerIpExt, Ipv4State, Ipv6State,
@@ -115,6 +116,14 @@ impl<BT: BindingsTypes> StackState<BT> {
             IpInvariant(self),
             |IpInvariant(state)| state.ipv4.icmp_rx_counters(),
             |IpInvariant(state)| state.ipv6.icmp_rx_counters(),
+        )
+    }
+
+    pub(crate) fn nud_counters<I: Ip>(&self) -> &NudCounters<I> {
+        I::map_ip(
+            IpInvariant(self),
+            |IpInvariant(state)| state.device.nud_counters::<Ipv4>(),
+            |IpInvariant(state)| state.device.nud_counters::<Ipv6>(),
         )
     }
 

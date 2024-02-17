@@ -66,10 +66,11 @@ use crate::{
     ip::{
         device::nud::{
             LinkResolutionContext, LinkResolutionNotifier, NudConfigContext, NudContext,
-            NudHandler, NudSenderContext, NudState, NudTimerId, NudUserConfig,
+            NudHandler, NudIcmpContext, NudSenderContext, NudState, NudTimerId, NudUserConfig,
         },
         icmp::NdpCounters,
     },
+    socket::address::SocketIpAddr,
     sync::{Mutex, RwLock},
     trace_duration, BindingsContext, BindingsTypes, CoreCtx, Instant, TracingContext,
 };
@@ -308,6 +309,34 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
             .into_serializer(),
             IcmpUnusedCode,
             NeighborSolicitation::new(lookup_addr.get()),
+        );
+    }
+}
+
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv6>>>
+    NudIcmpContext<Ipv6, EthernetLinkDevice, BC> for CoreCtx<'_, BC, L>
+{
+    fn send_icmp_dest_unreachable(
+        &mut self,
+        bindings_ctx: &mut BC,
+        frame: Buf<Vec<u8>>,
+        device_id: Option<&Self::DeviceId>,
+        original_src_ip: SocketIpAddr<Ipv6Addr>,
+        original_dst_ip: SocketIpAddr<Ipv6Addr>,
+        _: (),
+    ) {
+        crate::ip::icmp::send_icmpv6_address_unreachable(
+            self,
+            bindings_ctx,
+            device_id.map(|device_id| device_id.clone().into()).as_ref(),
+            // NB: link layer address resolution only happens for packets destined for
+            // a unicast address, so passing `None` as `FrameDestination` here is always
+            // correct since there's never a need to not send the ICMP error due to
+            // a multicast/broadcast destination.
+            None,
+            original_src_ip,
+            original_dst_ip,
+            frame,
         );
     }
 }
@@ -1261,6 +1290,35 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
                 cb(&arp)
             },
         )
+    }
+}
+
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>>
+    NudIcmpContext<Ipv4, EthernetLinkDevice, BC> for CoreCtx<'_, BC, L>
+{
+    fn send_icmp_dest_unreachable(
+        &mut self,
+        bindings_ctx: &mut BC,
+        frame: Buf<Vec<u8>>,
+        device_id: Option<&Self::DeviceId>,
+        original_src_ip: SocketIpAddr<Ipv4Addr>,
+        original_dst_ip: SocketIpAddr<Ipv4Addr>,
+        header_len: usize,
+    ) {
+        crate::ip::icmp::send_icmpv4_host_unreachable(
+            self,
+            bindings_ctx,
+            device_id.map(|device_id| device_id.clone().into()).as_ref(),
+            // NB: link layer address resolution only happens for packets destined for
+            // a unicast address, so passing `None` as `FrameDestination` here is always
+            // correct since there's never a need to not send the ICMP error due to
+            // a multicast/broadcast destination.
+            None,
+            original_src_ip,
+            original_dst_ip,
+            frame,
+            header_len,
+        );
     }
 }
 

@@ -660,8 +660,9 @@ mod tests {
                 assert_dynamic_neighbor_state, assert_dynamic_neighbor_with_addr,
                 assert_neighbor_unknown,
             },
-            DynamicNeighborState, NudHandler, Reachable, Stale,
+            DynamicNeighborState, NudCounters, NudHandler, NudIcmpContext, Reachable, Stale,
         },
+        socket::address::SocketIpAddr,
         testutil::assert_empty,
     };
 
@@ -685,6 +686,7 @@ mod tests {
         inner: FakeArpInnerCtx,
         config: FakeArpConfigCtx,
         counters: ArpCounters,
+        nud_counters: NudCounters<Ipv4>,
     }
 
     /// A fake `ArpSenderContext` that sends IP packets.
@@ -702,6 +704,7 @@ mod tests {
                 inner: FakeArpInnerCtx,
                 config: FakeArpConfigCtx,
                 counters: Default::default(),
+                nud_counters: Default::default(),
             }
         }
     }
@@ -848,9 +851,30 @@ mod tests {
             FakeLinkDeviceId: &FakeLinkDeviceId,
             cb: F,
         ) -> O {
-            let FakeArpCtx { arp_state, config, proto_addr: _, hw_addr: _, inner: _, counters: _ } =
-                self.get_mut();
+            let FakeArpCtx {
+                arp_state,
+                config,
+                proto_addr: _,
+                hw_addr: _,
+                inner: _,
+                counters: _,
+                nud_counters: _,
+            } = self.get_mut();
             cb(arp_state, config)
+        }
+    }
+
+    impl NudIcmpContext<Ipv4, EthernetLinkDevice, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
+        fn send_icmp_dest_unreachable(
+            &mut self,
+            _bindings_ctx: &mut FakeBindingsCtxImpl,
+            _frame: Buf<Vec<u8>>,
+            _device_id: Option<&Self::DeviceId>,
+            _original_src: SocketIpAddr<Ipv4Addr>,
+            _original_dst: SocketIpAddr<Ipv4Addr>,
+            _header_len: usize,
+        ) {
+            panic!("send_icmp_dest_unreachable should not be called");
         }
     }
 
@@ -879,6 +903,12 @@ mod tests {
     impl CounterContext<ArpCounters> for FakeCoreCtxImpl {
         fn with_counters<O, F: FnOnce(&ArpCounters) -> O>(&self, cb: F) -> O {
             cb(&self.get_ref().counters)
+        }
+    }
+
+    impl CounterContext<NudCounters<Ipv4>> for FakeCoreCtxImpl {
+        fn with_counters<O, F: FnOnce(&NudCounters<Ipv4>) -> O>(&self, cb: F) -> O {
+            cb(&self.get_ref().nud_counters)
         }
     }
 

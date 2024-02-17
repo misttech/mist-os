@@ -307,6 +307,14 @@ async fn inspect_counters(name: &str) {
                     Responses: 0u64,
                 },
             },
+            "NUD": {
+                "V4": {
+                    IcmpDestUnreachableDropped: 0u64,
+                },
+                "V6": {
+                    IcmpDestUnreachableDropped: 0u64,
+                },
+            },
             "ICMP": {
                 "V4": {
                     "Rx": {
@@ -323,6 +331,7 @@ async fn inspect_counters(name: &str) {
                     },
                     "Tx": {
                         Reply: 0u64,
+                        AddressUnreachable: 0u64,
                         ProtocolUnreachable: 0u64,
                         PortUnreachable: 0u64,
                         NetUnreachable: 0u64,
@@ -354,6 +363,7 @@ async fn inspect_counters(name: &str) {
                     },
                     "Tx": {
                         Reply: 0u64,
+                        AddressUnreachable: 0u64,
                         ProtocolUnreachable: 0u64,
                         PortUnreachable: 0u64,
                         NetUnreachable: 0u64,

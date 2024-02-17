@@ -10,7 +10,11 @@ use core::{
 
 use derivative::Derivative;
 use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
-use net_types::{ethernet::Mac, ip::Ip, BroadcastAddr, MulticastAddr};
+use net_types::{
+    ethernet::Mac,
+    ip::{Ip, Ipv4, Ipv6},
+    BroadcastAddr, MulticastAddr,
+};
 use packet::Buf;
 
 use crate::{
@@ -30,7 +34,9 @@ use crate::{
     },
     ip::{
         device::{
-            nud::LinkResolutionContext, state::IpDeviceFlags, IpDeviceIpExt, IpDeviceStateContext,
+            nud::{LinkResolutionContext, NudCounters},
+            state::IpDeviceFlags,
+            IpDeviceIpExt, IpDeviceStateContext,
         },
         forwarding::IpForwardingDeviceContext,
         types::RawMetric,
@@ -259,12 +265,18 @@ pub(crate) struct DeviceLayerState<BT: DeviceLayerTypes> {
     pub(super) origin: OriginTracker,
     pub(super) shared_sockets: HeldSockets<BT>,
     pub(super) counters: DeviceCounters,
+    pub(super) nud_v4_counters: NudCounters<Ipv4>,
+    pub(super) nud_v6_counters: NudCounters<Ipv6>,
     pub(super) arp_counters: ArpCounters,
 }
 
 impl<BT: DeviceLayerTypes> DeviceLayerState<BT> {
     pub(crate) fn counters(&self) -> &DeviceCounters {
         &self.counters
+    }
+
+    pub(crate) fn nud_counters<I: Ip>(&self) -> &NudCounters<I> {
+        I::map_ip((), |()| &self.nud_v4_counters, |()| &self.nud_v6_counters)
     }
 
     pub(crate) fn arp_counters(&self) -> &ArpCounters {
@@ -397,6 +409,8 @@ impl<BC: DeviceLayerTypes + socket::DeviceSocketBindingsContext<DeviceId<BC>>>
             origin: OriginTracker::new(),
             shared_sockets: Default::default(),
             counters: Default::default(),
+            nud_v4_counters: Default::default(),
+            nud_v6_counters: Default::default(),
             arp_counters: Default::default(),
         }
     }
