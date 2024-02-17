@@ -29,6 +29,8 @@ class DlTestsBase : public ::testing::Test {
   // expected error occurred without needing to adhere to the exact error
   // verbiage.
   static constexpr bool kCanMatchExactError = true;
+  // Whether the dlopen implementation validates the mode argument.
+  static constexpr bool kCanValidateMode = true;
 
   // Test fixtures are expected to provide definitions for the following API:
   fit::result<Error, void*> DlOpen(const char* name, int mode);

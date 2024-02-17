@@ -11,7 +11,7 @@ namespace dl {
 fit::result<RuntimeDynamicLinker::Error, void*> RuntimeDynamicLinker::Open(std::string name,
                                                                            int mode) {
   if (mode & ~(kOpenSymbolScopeMask | kOpenBindingModeMask | kOpenFlagsMask)) {
-    return fit::error{ "TODO(https://fxbug.dev/323417704): handle invalid flags" };
+    return fit::error{ "invalid mode parameter" };
   }
 
   // TODO(http://fxbug.dev/324650368): support file retrieval.

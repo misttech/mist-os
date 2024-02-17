@@ -40,4 +40,15 @@ TYPED_TEST(DlTests, NotFound) {
                 MatchesRegex(".*does_not_exist.so:.*(No such file or directory|ZX_ERR_NOT_FOUND)"));
   }
 }
+
+TYPED_TEST(DlTests, InvalidMode) {
+  if constexpr (!TestFixture::kCanValidateMode) {
+    GTEST_SKIP() << "test requires dlopen to validate mode argment";
+  }
+
+  auto result = this->DlOpen("libld-dep-a.so", -1);
+  ASSERT_TRUE(result.is_error());
+  EXPECT_EQ(result.error_value(), "invalid mode parameter");
+}
+
 }  // namespace

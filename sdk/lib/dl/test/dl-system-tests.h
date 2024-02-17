@@ -14,6 +14,11 @@ class DlSystemTests : public DlTestsBase {
   // This test fixture does not need to match on exact error text, since the
   // error message can vary between different system implementations.
   static constexpr bool kCanMatchExactError = false;
+#ifdef __Fuchsia__
+  // Fuchsia's musl implementation of dlopen does not validate flag values for
+  // the mode argument.
+  static constexpr bool kCanValidateMode = false;
+#endif
 
   fit::result<Error, void*> DlOpen(const char* name, int mode);
 
