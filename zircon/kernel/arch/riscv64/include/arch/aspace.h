@@ -57,8 +57,13 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
 
   zx_status_t Unmap(vaddr_t vaddr, size_t count, EnlargeOperation enlarge,
                     size_t* unmapped) override;
+  // riscv does not document any restrictions on manipulating page tables such that duplicate TLB
+  // entries could exist, as long as sfence.vma gets called, so unmap is safe to split large pages
+  // without enlarging.
+  bool UnmapOnlyEnlargeOnOom() const override { return true; }
 
-  zx_status_t Protect(vaddr_t vaddr, size_t count, uint mmu_flags) override;
+  zx_status_t Protect(vaddr_t vaddr, size_t count, uint mmu_flags,
+                      EnlargeOperation enlarge) override;
 
   zx_status_t Query(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) override;
 

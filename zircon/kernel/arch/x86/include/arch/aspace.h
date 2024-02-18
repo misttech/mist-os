@@ -110,7 +110,12 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
                   ExistingEntryAction existing_action, size_t* mapped) override;
   zx_status_t Unmap(vaddr_t vaddr, size_t count, EnlargeOperation enlarge,
                     size_t* unmapped) override;
-  zx_status_t Protect(vaddr_t vaddr, size_t count, uint mmu_flags) override;
+  // x86 may generate duplicate TLB entries if changing the translation size of mapping, but this
+  // does not lead to any incorrectness as long as the we invalidate the TLB (which we do),
+  // therefore unmap is safe to split large pages without enlarging.
+  bool UnmapOnlyEnlargeOnOom() const override { return true; }
+  zx_status_t Protect(vaddr_t vaddr, size_t count, uint mmu_flags,
+                      EnlargeOperation enlarge) override;
   zx_status_t Query(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) override;
 
   vaddr_t PickSpot(vaddr_t base, vaddr_t end, vaddr_t align, size_t size, uint mmu_flags) override;

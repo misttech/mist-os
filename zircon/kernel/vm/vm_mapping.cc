@@ -179,7 +179,10 @@ zx_status_t VmMapping::ProtectOrUnmap(const fbl::RefPtr<VmAspace>& aspace, vaddr
   // If not removing all permissions do the protect, otherwise skip straight to unmapping the entire
   // region.
   if ((new_arch_mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK) != 0) {
-    zx_status_t status = aspace->arch_aspace().Protect(base, size / PAGE_SIZE, new_arch_mmu_flags);
+    zx_status_t status = aspace->arch_aspace().Protect(base, size / PAGE_SIZE, new_arch_mmu_flags,
+                                                       aspace->EnlargeArchUnmap()
+                                                           ? ArchVmAspace::EnlargeOperation::Yes
+                                                           : ArchVmAspace::EnlargeOperation::No);
     // If the unmap failed and we are allowed to unmap extra portions of the aspace then fall
     // through and unmap, otherwise return with whatever the status is.
     if (likely(status == ZX_OK) || !aspace->EnlargeArchUnmap()) {
@@ -1074,7 +1077,8 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
                    !(range.mmu_flags & ARCH_MMU_FLAG_PERM_WRITE));
 
       // same page, different permission
-      zx_status_t status = aspace_->arch_aspace().Protect(va, 1, range.mmu_flags);
+      zx_status_t status = aspace_->arch_aspace().Protect(va, 1, range.mmu_flags,
+                                                          ArchVmAspace::EnlargeOperation::Yes);
       if (unlikely(status != ZX_OK)) {
         // ZX_ERR_NO_MEMORY is the only legitimate reason for Protect to fail.
         ASSERT_MSG(status == ZX_ERR_NO_MEMORY, "Unexpected failure from protect: %d\n", status);
