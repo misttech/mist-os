@@ -110,6 +110,9 @@ struct SecurityServerState {
 }
 
 impl SecurityServerState {
+    fn sid_to_security_context(&self, sid: &SecurityId) -> Option<&SecurityContext> {
+        self.sids.get(sid)
+    }
     fn deny_unknown(&self) -> bool {
         self.policy.as_ref().map_or(true, |p| *p.parsed.handle_unknown() != HandleUnknown::Allow)
     }
@@ -178,9 +181,11 @@ impl SecurityServer {
         })
     }
 
-    /// Returns the security context mapped to `sid`.
-    pub fn sid_to_security_context(&self, sid: &SecurityId) -> Option<SecurityContext> {
-        self.state.lock().sids.get(sid).map(Clone::clone)
+    /// Returns the Security Context string for the requested `sid`.
+    /// This is used only where Contexts need to be stringified to expose to userspace, as
+    /// is the case for e.g. the `/proc/*/attr/` filesystem.
+    pub fn sid_to_security_context(&self, sid: &SecurityId) -> Option<String> {
+        self.state.lock().sid_to_security_context(sid).map(|x| x.to_string())
     }
 
     /// Applies the supplied policy to the security server.
@@ -283,25 +288,29 @@ impl SecurityServer {
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
     ) -> AccessVector {
-        let policy = match self.state.lock().policy.as_ref().map(Clone::clone) {
+        let state = self.state.lock();
+        let policy = match state.policy.as_ref().map(Clone::clone) {
             Some(policy) => policy,
             // Policy is "allow all" when no policy is loaded, regardless of enforcing state.
             None => return AccessVector::ALL,
         };
 
         if let (Some(source_security_context), Some(target_security_context)) =
-            (self.sid_to_security_context(&source_sid), self.sid_to_security_context(&target_sid))
+            (state.sid_to_security_context(&source_sid), state.sid_to_security_context(&target_sid))
         {
-            let source_type = source_security_context.type_();
-            let target_type: &str = target_security_context.type_();
+            // Take copies of the the type fields before dropping the state lock.
+            let source_type = source_security_context.type_().to_string();
+            let target_type = target_security_context.type_().to_string();
+            drop(state);
+
             match target_class {
                 AbstractObjectClass::System(target_class) => policy
                     .parsed
-                    .compute_explicitly_allowed(source_type, target_type, target_class)
+                    .compute_explicitly_allowed(&source_type, &target_type, target_class)
                     .unwrap_or(AccessVector::NONE),
                 AbstractObjectClass::Custom(target_class) => policy
                     .parsed
-                    .compute_explicitly_allowed_custom(source_type, target_type, &target_class)
+                    .compute_explicitly_allowed_custom(&source_type, &target_type, &target_class)
                     .unwrap_or(AccessVector::NONE),
                 // No meaningful policy can be determined without target class.
                 _ => AccessVector::NONE,
@@ -320,16 +329,20 @@ impl SecurityServer {
         target_sid: SecurityId,
         file_class: FileClass,
     ) -> Result<SecurityId, anyhow::Error> {
-        let policy = match self.state.lock().policy.as_ref().map(Clone::clone) {
+        let state = self.state.lock();
+        let policy = match state.policy.as_ref().map(Clone::clone) {
             Some(policy) => policy,
             None => {
                 return Err(anyhow::anyhow!("no policy loaded")).context("computing new file sid")
             }
         };
 
-        if let (Some(source_security_context), Some(target_security_context)) =
-            (self.sid_to_security_context(&source_sid), self.sid_to_security_context(&target_sid))
-        {
+        if let (Some(source_security_context), Some(target_security_context)) = (
+            state.sid_to_security_context(&source_sid).cloned(),
+            state.sid_to_security_context(&target_sid).cloned(),
+        ) {
+            drop(state);
+
             policy
                 .parsed
                 .new_file_security_context(
@@ -478,7 +491,7 @@ mod tests {
         let sid = security_server.security_context_to_sid(&security_context);
         assert_eq!(
             security_server.sid_to_security_context(&sid).expect("sid not found"),
-            security_context
+            security_context.to_string()
         );
     }
 
@@ -745,11 +758,9 @@ mod tests {
             .sid_to_security_context(&computed_sid)
             .expect("computed sid associated with context");
 
-        assert_eq!("user_u", computed_context.user()); // Default: copy from source.
-        assert_eq!("object_r", computed_context.role()); // Default: "object_r".
-        assert_eq!("file_t", computed_context.type_()); // Default: copied from target.
-        assert_eq!("s0", format!("{}", computed_context.low_level()).as_str()); // Default: source low.
-        assert_eq!(None, computed_context.high_level());
+        // User and low security level should be copied from the source,
+        // and the role and type from the target.
+        assert_eq!(computed_context, "user_u:object_r:file_t:s0");
     }
 
     #[fuchsia::test]
@@ -759,9 +770,9 @@ mod tests {
             include_bytes!("../testdata/micro_policies/file_source_defaults_policy.pp").to_vec();
         security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
 
-        let source_context = SecurityContext::try_from("user_u:unconfined_r:unconfined_t:s0-s1:c0")
+        let source_context = SecurityContext::try_from("user_u:unconfined_r:unconfined_t:s0-s2:c0")
             .expect("creating source security context should succeed");
-        let target_context = SecurityContext::try_from("file_u:object_r:file_t:s0")
+        let target_context = SecurityContext::try_from("file_u:object_r:file_t:s1-s3:c0")
             .expect("creating target security context should succeed");
         let source_sid = security_server.security_context_to_sid(&source_context);
         let target_sid = security_server.security_context_to_sid(&target_context);
@@ -773,9 +784,9 @@ mod tests {
             .sid_to_security_context(&computed_sid)
             .expect("computed sid associated with context");
 
-        assert_eq!("user_u", computed_context.user()); // Copy from source.
-        assert_eq!("unconfined_r", computed_context.role()); // Copy from source.
-        assert_eq!("unconfined_t", computed_context.type_()); // Copy from source.
+        // All fields should be copied from the source, but only the "low" part of the security
+        // range.
+        assert_eq!(computed_context, "user_u:unconfined_r:unconfined_t:s0");
     }
 
     #[fuchsia::test]
@@ -785,9 +796,9 @@ mod tests {
             include_bytes!("../testdata/micro_policies/file_target_defaults_policy.pp").to_vec();
         security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
 
-        let source_context = SecurityContext::try_from("user_u:unconfined_r:unconfined_t:s0-s1:c0")
+        let source_context = SecurityContext::try_from("user_u:unconfined_r:unconfined_t:s0-s2:c0")
             .expect("creating source security context should succeed");
-        let target_context = SecurityContext::try_from("file_u:object_r:file_t:s0-s1:c0")
+        let target_context = SecurityContext::try_from("file_u:object_r:file_t:s1-s3:c0")
             .expect("creating target security context should succeed");
         let source_sid = security_server.security_context_to_sid(&source_context);
         let target_sid = security_server.security_context_to_sid(&target_context);
@@ -799,9 +810,8 @@ mod tests {
             .sid_to_security_context(&computed_sid)
             .expect("computed sid associated with context");
 
-        assert_eq!("file_u", computed_context.user()); // Copy from target.
-        assert_eq!("object_r", computed_context.role()); // Copy from target.
-        assert_eq!("file_t", computed_context.type_()); // Copy from target.
+        // User, role and type copied from target, with source's low security level.
+        assert_eq!(computed_context, "file_u:object_r:file_t:s0");
     }
 
     #[fuchsia::test]
@@ -825,8 +835,8 @@ mod tests {
             .sid_to_security_context(&computed_sid)
             .expect("computed sid associated with context");
 
-        assert_eq!("s0", format!("{}", computed_context.low_level()).as_str());
-        assert_eq!(None, computed_context.high_level());
+        // User and low security level copied from source, role and type as default.
+        assert_eq!(computed_context, "user_u:object_r:file_t:s0");
     }
 
     #[fuchsia::test]
@@ -851,11 +861,8 @@ mod tests {
             .sid_to_security_context(&computed_sid)
             .expect("computed sid associated with context");
 
-        assert_eq!("s0", format!("{}", computed_context.low_level()).as_str());
-        assert_eq!(
-            "s1:c0",
-            format!("{}", computed_context.high_level().expect("high level")).as_str()
-        );
+        // User and full security range copied from source, role and type as default.
+        assert_eq!(computed_context, "user_u:object_r:file_t:s0-s1:c0");
     }
 
     #[fuchsia::test]
@@ -879,8 +886,8 @@ mod tests {
             .sid_to_security_context(&computed_sid)
             .expect("computed sid associated with context");
 
-        assert_eq!("s1:c0", format!("{}", computed_context.low_level()).as_str());
-        assert_eq!(None, computed_context.high_level());
+        // User and high security level copied from source, role and type as default.
+        assert_eq!(computed_context, "user_u:object_r:file_t:s1:c0");
     }
 
     #[fuchsia::test]
@@ -904,8 +911,8 @@ mod tests {
             .sid_to_security_context(&computed_sid)
             .expect("computed sid associated with context");
 
-        assert_eq!("s0", format!("{}", computed_context.low_level()).as_str());
-        assert_eq!(None, computed_context.high_level());
+        // User copied from source, low security level from target, role and type as default.
+        assert_eq!(computed_context, "user_u:object_r:file_t:s0");
     }
 
     #[fuchsia::test]
@@ -930,11 +937,8 @@ mod tests {
             .sid_to_security_context(&computed_sid)
             .expect("computed sid associated with context");
 
-        assert_eq!("s0", format!("{}", computed_context.low_level()).as_str());
-        assert_eq!(
-            "s1:c0",
-            format!("{}", computed_context.high_level().expect("high level")).as_str()
-        );
+        // User copied from source, full security range from target, role and type as default.
+        assert_eq!(computed_context, "user_u:object_r:file_t:s0-s1:c0");
     }
 
     #[fuchsia::test]
@@ -958,7 +962,7 @@ mod tests {
             .sid_to_security_context(&computed_sid)
             .expect("computed sid associated with context");
 
-        assert_eq!("s1:c0", format!("{}", computed_context.low_level()).as_str());
-        assert_eq!(None, computed_context.high_level());
+        // User copied from source, high security level from target, role and type as default.
+        assert_eq!(computed_context, "user_u:object_r:file_t:s1:c0");
     }
 }
