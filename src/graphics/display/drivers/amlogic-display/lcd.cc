@@ -4,7 +4,10 @@
 
 #include "src/graphics/display/drivers/amlogic-display/lcd.h"
 
+#include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
 #include <lib/ddk/debug.h>
+#include <lib/ddk/device.h>
+#include <lib/ddk/driver.h>
 #include <lib/device-protocol/display-panel.h>
 #include <lib/mipi-dsi/mipi-dsi.h>
 #include <lib/zx/result.h>
@@ -116,6 +119,53 @@ zx::result<uint32_t> GetMipiDsiDisplayId(ddk::DsiImplProtocolClient dsiimpl) {
 
 }  // namespace
 
+// static
+zx::result<std::unique_ptr<Lcd>> Lcd::Create(zx_device_t* parent, uint32_t panel_type,
+                                             const PanelConfig* panel_config, bool enabled) {
+  ZX_DEBUG_ASSERT(parent != nullptr);
+  ZX_DEBUG_ASSERT(panel_config != nullptr);
+
+  static constexpr char kDsiFragmentName[] = "dsi";
+  ddk::DsiImplProtocolClient dsiimpl;
+  zx_status_t status =
+      device_get_fragment_protocol(parent, kDsiFragmentName, ZX_PROTOCOL_DSI_IMPL, &dsiimpl);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to get the DsiImpl banjo protocol: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  static constexpr char kLcdGpioFragmentName[] = "gpio-lcd-reset";
+  zx::result<fidl::ClientEnd<fuchsia_hardware_gpio::Gpio>> lcd_reset_gpio_result =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+          parent, kLcdGpioFragmentName);
+  if (lcd_reset_gpio_result.is_error()) {
+    zxlogf(ERROR, "Failed to get gpio protocol from fragment: %s", kLcdGpioFragmentName);
+    return lcd_reset_gpio_result.take_error();
+  }
+
+  fbl::AllocChecker alloc_checker;
+  auto lcd =
+      fbl::make_unique_checked<Lcd>(&alloc_checker, panel_type, panel_config, std::move(dsiimpl),
+                                    std::move(lcd_reset_gpio_result).value(), enabled);
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "Failed to allocate memory for Lcd");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  return zx::ok(std::move(lcd));
+}
+
+Lcd::Lcd(uint32_t panel_type, const PanelConfig* panel_config, ddk::DsiImplProtocolClient dsiimpl,
+         fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio, bool enabled)
+    : panel_type_(panel_type),
+      panel_config_(*panel_config),
+      dsiimpl_(std::move(dsiimpl)),
+      lcd_reset_gpio_(std::move(lcd_reset_gpio)) {
+  ZX_DEBUG_ASSERT(panel_config != nullptr);
+  ZX_DEBUG_ASSERT(dsiimpl_.is_valid());
+  ZX_DEBUG_ASSERT(lcd_reset_gpio_.is_valid());
+}
+
 // This function write DSI commands based on the input buffer.
 zx::result<> Lcd::PerformDisplayInitCommandSequence(cpp20::span<const uint8_t> encoded_commands) {
   zx_status_t status = ZX_OK;
@@ -163,7 +213,7 @@ zx::result<> Lcd::PerformDisplayInitCommandSequence(cpp20::span<const uint8_t> e
           //
           // return ZX_ERR_UNKNOWN;
         } else {
-          fidl::WireResult result = gpio_->ConfigOut(encoded_commands[i + 3]);
+          fidl::WireResult result = lcd_reset_gpio_->ConfigOut(encoded_commands[i + 3]);
           if (!result.ok()) {
             zxlogf(ERROR, "Failed to send ConfigOut request to gpio: %s", result.status_string());
             return zx::error(result.status());
@@ -266,12 +316,8 @@ zx::result<> Lcd::Disable() {
     zxlogf(INFO, "LCD is already off, no work to do");
     return zx::ok();
   }
-  if (dsi_off_.size() == 0) {
-    zxlogf(ERROR, "Unsupported panel (%d) detected!", panel_type_);
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
   zxlogf(INFO, "Powering off the LCD [type=%d]", panel_type_);
-  zx::result<> power_off_result = PerformDisplayInitCommandSequence(dsi_off_);
+  zx::result<> power_off_result = PerformDisplayInitCommandSequence(panel_config_.dsi_off);
   if (!power_off_result.is_ok()) {
     zxlogf(ERROR, "Failed to decode and execute panel off sequence: %s",
            power_off_result.status_string());
@@ -287,13 +333,8 @@ zx::result<> Lcd::Enable() {
     return zx::ok();
   }
 
-  if (dsi_on_.size() == 0) {
-    zxlogf(ERROR, "Unsupported panel (%d) detected!", panel_type_);
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-
   zxlogf(INFO, "Powering on the LCD [type=%d]", panel_type_);
-  zx::result<> power_on_result = PerformDisplayInitCommandSequence(dsi_on_);
+  zx::result<> power_on_result = PerformDisplayInitCommandSequence(panel_config_.dsi_on);
   if (!power_on_result.is_ok()) {
     zxlogf(ERROR, "Failed to decode and execute panel init sequence: %s",
            power_on_result.status_string());
@@ -313,32 +354,6 @@ zx::result<> Lcd::Enable() {
   // LCD is on now.
   enabled_ = true;
   return zx::ok();
-}
-
-// static
-zx::result<std::unique_ptr<Lcd>> Lcd::Create(uint32_t panel_type, cpp20::span<const uint8_t> dsi_on,
-                                             cpp20::span<const uint8_t> dsi_off,
-                                             ddk::DsiImplProtocolClient dsiimpl,
-                                             fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio,
-                                             bool already_enabled) {
-  fbl::AllocChecker alloc_checker;
-  std::unique_ptr<Lcd> lcd = fbl::make_unique_checked<Lcd>(&alloc_checker, panel_type);
-  if (!alloc_checker.check()) {
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-  lcd->dsi_on_ = dsi_on;
-  lcd->dsi_off_ = dsi_off;
-  lcd->dsiimpl_ = dsiimpl;
-
-  if (!gpio.is_valid()) {
-    zxlogf(ERROR, "Could not obtain GPIO protocol");
-    return zx::error(ZX_ERR_NO_RESOURCES);
-  }
-  lcd->gpio_.Bind(std::move(gpio));
-
-  lcd->enabled_ = already_enabled;
-
-  return zx::ok(std::move(lcd));
 }
 
 }  // namespace amlogic_display

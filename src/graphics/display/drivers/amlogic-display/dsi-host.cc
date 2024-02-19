@@ -69,22 +69,13 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
   }
   self->hhi_mmio_ = std::move(hhi_mmio_result).value();
 
-  // panel_type_ is now canonical.
-  lcd_gpio =
-      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
-          parent, kLcdGpioFragmentName);
-  if (lcd_gpio.is_error()) {
-    zxlogf(ERROR, "Failed to get gpio protocol from fragment: %s", kLcdGpioFragmentName);
-    return lcd_gpio.take_error();
+  zx::result<std::unique_ptr<Lcd>> lcd_result =
+      Lcd::Create(parent, panel_type, panel_config, kBootloaderDisplayEnabled);
+  if (lcd_result.is_error()) {
+    zxlogf(ERROR, "Failed to Create Lcd: %s", lcd_result.status_string());
+    return lcd_result.take_error();
   }
-  zx::result<std::unique_ptr<Lcd>> lcd_or_status =
-      Lcd::Create(self->panel_type_, self->panel_config_.dsi_on, self->panel_config_.dsi_off,
-                  self->dsiimpl_, std::move(lcd_gpio.value()), kBootloaderDisplayEnabled);
-  if (lcd_or_status.is_error()) {
-    zxlogf(ERROR, "Failed to create LCD object: %s", lcd_or_status.status_string());
-    return zx::error(lcd_or_status.error_value());
-  }
-  self->lcd_ = std::move(lcd_or_status).value();
+  self->lcd_ = std::move(lcd_result).value();
 
   auto phy_or_status = MipiPhy::Create(self->pdev_, self->dsiimpl_, kBootloaderDisplayEnabled);
   if (phy_or_status.is_error()) {

@@ -14,22 +14,35 @@
 #include <fbl/alloc_checker.h>
 #include <hwreg/mmio.h>
 
+#include "src/graphics/display/drivers/amlogic-display/panel-config.h"
+
 namespace amlogic_display {
 
 // An Lcd controls the panel attached to a MIPI-DSI endpoint.
 class Lcd {
  public:
-  explicit Lcd(uint32_t panel_type) : panel_type_(panel_type) {}
+  // Factory method intended for production use.
+  //
+  // `enabled` is true iff the driver adopts an already initialized panel.
+  //
+  // Creating an Lcd instance doesn't change the hardware state, and is
+  // therefore safe to use when adopting a device previously initialized by
+  // the bootloader or another driver.
+  static zx::result<std::unique_ptr<Lcd>> Create(zx_device_t* parent, uint32_t panel_type,
+                                                 const PanelConfig* panel_config, bool enabled);
 
-  // Create an Lcd to control the panel at `dsiimpl`. The panel can be reset
-  // using the `gpio` reset pin. If `already_enabled`, there will be no attempt
-  // to power the LCD on or probe its panel type for correctness.
-  static zx::result<std::unique_ptr<Lcd>> Create(uint32_t panel_type,
-                                                 cpp20::span<const uint8_t> dsi_on,
-                                                 cpp20::span<const uint8_t> dsi_off,
-                                                 ddk::DsiImplProtocolClient dsiimpl,
-                                                 fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio,
-                                                 bool already_enabled);
+  // Production code should prefer using the `Create()` factory method.
+  //
+  // It must satisfy the following constraints:
+  // - `panel_config` must not be null and outlive the `Lcd` instance.
+  // - `dsiimpl` must be valid.
+  // - `lcd_reset_gpio` must be a valid GPIO pin.
+  explicit Lcd(uint32_t panel_type, const PanelConfig* panel_config,
+               ddk::DsiImplProtocolClient dsiimpl,
+               fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio, bool enabled);
+
+  Lcd(const Lcd&) = delete;
+  Lcd& operator=(const Lcd&) = delete;
 
   // Turn the panel on
   zx::result<> Enable();
@@ -48,12 +61,10 @@ class Lcd {
   zx::result<> PerformDisplayInitCommandSequence(cpp20::span<const uint8_t> encoded_commands);
 
   uint32_t panel_type_;
-  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_;
+  const PanelConfig& panel_config_;
 
-  // Init and shutdown sequences for the fixed panel.
-  cpp20::span<const uint8_t> dsi_on_;
-  cpp20::span<const uint8_t> dsi_off_;
   ddk::DsiImplProtocolClient dsiimpl_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio_;
 
   bool enabled_ = false;
 };
