@@ -3,9 +3,19 @@
 # found in the LICENSE file.
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
-load(":cc_toolchain_config.bzl", "cc_toolchain_config", "feature_flag")
-load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_cpu_filter_dict", "fuchsia_cpu_select", "fuchsia_debug_symbols", "fuchsia_package_resource_group")
 load("@fuchsia_sdk//:generated_constants.bzl", sdk_constants = "constants")
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cpu_filter_dict",
+    "fuchsia_cpu_select",
+    "fuchsia_debug_symbols",
+    "fuchsia_package_resource_group",
+)
+load(
+    ":cc_toolchain_config.bzl",
+    "cc_toolchain_config",
+    "feature_flag",
+)
 
 licenses(["notice"])
 
@@ -202,6 +212,28 @@ filegroup(
         srcs = [
             # TODO(https://fxbug.dev/42172715): Don't hard code this path.
             "//:lib/clang/%{CLANG_VERSION}/lib/%s-unknown-fuchsia/libclang_rt.builtins.a" % cpu,
+        ] + [
+            # TODO(b/325505298): Only add these when the Asan sanitizer is enabled.
+            #
+            # Right now, it is impossible to use a select({":asan_variant": [...], ...}) expression
+            # here because it creates a circular dependency, where Bazel complains with:
+            #
+            # ERROR: ..../output_base/external/fuchsia_clang/BUILD.bazel:226:17: in cc_toolchain rule @fuchsia_clang//:cc-compiler-x86_64: cycle in dependency graph:
+            # //fuchsia/cpp_variants:cc_20_all (a678e6e6bfc73a8f721fea3bfa0e9d627d5e47c4a8e47004ab6f334d7e0876ba)
+            #     //fuchsia/cpp_variants:cc_20_all_variant_test (506c6d7aa0811ba7b20143e66fdb0c286ec4cf232a5d959198c85b75fa28174f)
+            # .-> @fuchsia_clang//:cc-compiler-x86_64 (506c6d7aa0811ba7b20143e66fdb0c286ec4cf232a5d959198c85b75fa28174f)
+            # |   @fuchsia_clang//:runtime-x86_64 (506c6d7aa0811ba7b20143e66fdb0c286ec4cf232a5d959198c85b75fa28174f)
+            # |   @fuchsia_clang//:asan_variant (506c6d7aa0811ba7b20143e66fdb0c286ec4cf232a5d959198c85b75fa28174f)
+            # |   @fuchsia_clang//:asan_flag (506c6d7aa0811ba7b20143e66fdb0c286ec4cf232a5d959198c85b75fa28174f)
+            # `-- @fuchsia_clang//:cc-compiler-x86_64 (506c6d7aa0811ba7b20143e66fdb0c286ec4cf232a5d959198c85b75fa28174f)
+            #
+            # The root of the problem is that a feature_flag() cannot be select()-ed properly within the toolchain
+            # definition. An alternative would be to use a custom build_setting() target to set the sanitizer mode
+            # instead, and use transitions to change it whenever needed.
+            #
+            "//:lib/clang/%{CLANG_VERSION}/lib/%s-unknown-fuchsia/libclang_rt.asan.so" % cpu,
+            "//:lib/clang/%{CLANG_VERSION}/lib/%s-unknown-fuchsia/libclang_rt.asan-preinit.a" % cpu,
+            "//:lib/clang/%{CLANG_VERSION}/lib/%s-unknown-fuchsia/libclang_rt.asan_static.a" % cpu,
         ],
     )
     for cpu in TARGET_CPUS
