@@ -338,20 +338,3 @@ group("default-images") {
     deps += extra_bazel_assembly_targets
   }
 }
-
-# Write delivery_blob_config.json file to be uploaded as a build artifact.
-# TODO(https://fxbug.dev/323356546): Change this to a proper build API module as this is
-# used by artifactory after the build!
-if (delivery_blob_type != false) {
-  generated_file("delivery_blob_config") {
-    outputs = [ "$root_build_dir/delivery_blob_config.json" ]
-    output_conversion = "json"
-
-    contents = {
-      type = delivery_blob_type
-    }
-  }
-} else {
-  group("delivery_blob_config") {
-  }
-}

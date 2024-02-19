@@ -182,6 +182,7 @@ build_api_module("api") {
     ":checkout_artifacts",
     ":cipd_assembly_artifacts",
     ":clippy_target_mapping",
+    ":delivery_blob_config",
     ":detailed_size_checker_data",
     ":fuzzers",
     ":generated_sources",
@@ -608,6 +609,20 @@ build_api_module("golden_files") {
   testonly = true
   data_keys = [ "golden_files" ]
   deps = [ ":default" ]
+}
+
+# This exposes the value of delivery_blob_type to artifactory after the build.
+#
+# Type: scope
+#
+# * type
+#   - Required: Value of delivery_blob_type for this build configuration.
+#   - Type: integer
+#
+build_api_module("delivery_blob_config") {
+  contents = {
+    type = delivery_blob_type
+  }
 }
 
 # Describes the "fuzzers" in the build, in the file:
@@ -1862,10 +1877,6 @@ group("root_targets") {
   testonly = true
   deps = [
     "//build/bazel:legacy_ninja_build_outputs",
-
-    # TODO(https://fxbug.dev/323356546): Change this into a proper build API module
-    # since this file is only used after the build by artifactory.
-    "//build/images:delivery_blob_config",
 
     # These are only required by the core.x64-sdk_source_sets_and_shlibs-apiXX-build_only
     # builders. TODO(https://fxbug.dev/42082833): Remove these lines once these builders are
