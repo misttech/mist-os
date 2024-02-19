@@ -241,8 +241,8 @@ zx_status_t zxio_create_with_info(zx_handle_t raw_handle, const zx_info_handle_b
           const zx_status_t status =
               // TODO(https://fxbug.dev/42068636): define this and other signals in FIDL.
               response.socket().wait_one(ZX_USER_SIGNAL_3, zx::time::infinite_past(), nullptr);
-          // TODO(https://fxbug.dev/42161904): Transferring a listening or connecting socket to another
-          // process doesn't work correctly since those states can't be observed here.
+          // TODO(https://fxbug.dev/42161904): Transferring a listening or connecting socket to
+          // another process doesn't work correctly since those states can't be observed here.
           switch (status) {
             case ZX_OK:
               is_connected = true;
@@ -430,7 +430,7 @@ zx_status_t zxio_create_with_nodeinfo(fidl::ClientEnd<fio::Node> node,
     case fio::wire::NodeInfoDeprecated::Tag::kService: {
       return zxio_node_init(storage, std::move(node));
     }
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 18
     case fio::wire::NodeInfoDeprecated::Tag::kSymlink: {
       fio::wire::SymlinkObject& symlink = info.symlink();
       const auto& span = symlink.target.get();

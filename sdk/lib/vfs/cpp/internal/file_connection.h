@@ -60,7 +60,7 @@ class FileConnection final : public Connection, public fuchsia::io::File {
                         UpdateAttributesCallback callback) override {
     callback(fuchsia::io::Node2_UpdateAttributes_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
   }
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 18
   void ListExtendedAttributes(
       fidl::InterfaceRequest<fuchsia::io::ExtendedAttributeIterator> iterator) override {
     iterator.Close(ZX_ERR_NOT_SUPPORTED);
@@ -82,6 +82,8 @@ class FileConnection final : public Connection, public fuchsia::io::File {
   void LinkInto(zx::event dst_parent_token, std::string dst, LinkIntoCallback callback) override {
     callback(fuchsia::io::Linkable_LinkInto_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
   }
+#endif
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
   void Allocate(uint64_t offset, uint64_t len, fuchsia::io::AllocateMode mode,
                 AllocateCallback callback) override {
     callback(fuchsia::io::File_Allocate_Result::WithErr(ZX_ERR_NOT_SUPPORTED));

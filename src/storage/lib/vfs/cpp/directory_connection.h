@@ -57,7 +57,7 @@ class DirectoryConnection final : public Connection,
               ReopenCompleter::Sync& completer) final {
     request->object_request.Close(ZX_ERR_NOT_SUPPORTED);
   }
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 18
   void ListExtendedAttributes(ListExtendedAttributesRequestView request,
                               ListExtendedAttributesCompleter::Sync& completer) final {
     request->iterator.Close(ZX_ERR_NOT_SUPPORTED);
@@ -98,7 +98,7 @@ class DirectoryConnection final : public Connection,
                  EnumerateCompleter::Sync& completer) final {
     request->iterator.Close(ZX_ERR_NOT_SUPPORTED);
   }
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 18
   void CreateSymlink(fuchsia_io::wire::Directory2CreateSymlinkRequest* request,
                      CreateSymlinkCompleter::Sync& completer) final {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);

@@ -1331,7 +1331,7 @@ template <typename Protocol>
 zx_status_t Remote<Protocol>::LinkInto(zx_handle_t dst_token_handle, const char* dst_path,
                                        size_t dst_path_len) {
   zx::event dst_token(dst_token_handle);
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 18
   const fidl::WireResult result = client()->LinkInto(
       std::move(dst_token), fidl::StringView::FromExternal(dst_path, dst_path_len));
   if (!result.ok()) {
@@ -1419,7 +1419,7 @@ template <typename Protocol>
 zx_status_t Remote<Protocol>::XattrList(void (*callback)(void* context, const uint8_t* name,
                                                          size_t name_len),
                                         void* context) {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 18
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
   }
@@ -1463,7 +1463,7 @@ zx_status_t Remote<Protocol>::XattrGet(const uint8_t* name, size_t name_len,
                                        zx_status_t (*callback)(void* context,
                                                                zxio_xattr_data_t data),
                                        void* context) {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 18
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
   }
@@ -1510,7 +1510,7 @@ zx_status_t Remote<Protocol>::XattrGet(const uint8_t* name, size_t name_len,
 template <typename Protocol>
 zx_status_t Remote<Protocol>::XattrSet(const uint8_t* name, size_t name_len, const uint8_t* value,
                                        size_t value_len, zxio_xattr_set_mode_t mode) {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 18
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
   }
@@ -1565,7 +1565,7 @@ zx_status_t Remote<Protocol>::XattrSet(const uint8_t* name, size_t name_len, con
 
 template <typename Protocol>
 zx_status_t Remote<Protocol>::XattrRemove(const uint8_t* name, size_t name_len) {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 18
   if (!client().is_valid()) {
     return ZX_ERR_BAD_STATE;
   }
@@ -1781,7 +1781,7 @@ class Directory : public Remote<fio::Directory> {
 
   zx_status_t CreateSymlink(const char* name, size_t name_len, const uint8_t* target,
                             size_t target_len, zxio_storage_t* storage) {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 18
     fidl::Endpoints<fio::Symlink> endpoints;
     if (storage) {
       if (auto result = fidl::CreateEndpoints<fio::Symlink>(); result.is_error()) {
@@ -2025,7 +2025,7 @@ constexpr zxio_ops_t File::kOps = ([]() {
   return ops;
 })();
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 18
 
 class Symlink : public Remote<fio::Symlink> {
  public:
@@ -2067,7 +2067,7 @@ constexpr zxio_ops_t Symlink::kOps = ([]() {
   return ops;
 })();
 
-#endif  // #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#endif  // #if __Fuchsia_API_level__ >= 18
 
 }  // namespace
 
@@ -2093,7 +2093,7 @@ zx_status_t zxio_pty_init(zxio_storage_t* storage, zx::eventpair event,
   return ZX_OK;
 }
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 18
 zx_status_t zxio_symlink_init(zxio_storage_t* storage, fidl::ClientEnd<fio::Symlink> client,
                               std::vector<uint8_t> target) {
   new (storage) Symlink(std::move(client), std::move(target));

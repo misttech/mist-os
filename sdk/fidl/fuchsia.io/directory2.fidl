@@ -7,7 +7,7 @@ using zx;
 
 type DirectoryInfo = table {
     /// Requested attributes for the directory. This is only populated if requested.
-    @available(added=HEAD)
+    @available(added=18)
     1: attributes NodeAttributes2;
 };
 
@@ -143,6 +143,7 @@ closed protocol Directory2 {
                         /// do forbid directories).
                         1: optional_rights Rights;
                     };
+
                     2: file @generated_name("FileProtocolFlags") flexible bits : uint64 {
                         /// Opens the file in append mode, i.e. the connection
                         /// should seek to the end of the file before every
@@ -162,15 +163,16 @@ closed protocol Directory2 {
                         /// result in a `ZX_ERR_NOT_SUPPORTED` epitaph.
                         TRUNCATE = 0x02;
                     };
-                    @available(added=HEAD)
+                    @available(added=18)
                     3: symlink @generated_name("SymlinkProtocolFlags") flexible bits : uint64 {};
+
                     /// Asks for the node protocol. The only right supported is
                     /// GET_ATTRIBUTES. Calling `SetFlags` on the resulting
                     /// connection will result in `ZX_ERR_BAD_HANDLE`. If
                     /// [`NodeFlags.GET_REPRESENTATION`] is specified, the
                     /// `connector` variant will be returned (even if the object
                     /// supports a different representation).
-                    @available(added=HEAD)
+                    @available(added=18)
                     4: node @generated_name("NodeProtocolFlags") flexible bits : uint64 {
                         /// Only allow the connection if the underlying object
                         /// is a directory. An attempt to open something other
@@ -218,14 +220,14 @@ closed protocol Directory2 {
                 /// returned in [`Node.OnRepresentation`]. This requires the
                 /// GET_ATTRIBUTES right on the parent connection, but this is
                 /// not required on the resulting connection.
-                @available(added=HEAD)
+                @available(added=18)
                 5: attributes NodeAttributesQuery;
 
                 /// If an object is to be created, this specifies attributes
                 /// that should be stored with the object at creation time.
                 /// Servers might not support setting any or all attributes in
                 /// which case they will return `ZX_ERR_NOT_SUPPORTED`.
-                @available(added=HEAD)
+                @available(added=18)
                 6: create_attributes MutableNodeAttributes;
             };
         };
@@ -382,7 +384,7 @@ closed protocol Directory2 {
     /// * error `ZX_ERR_BAD_PATH` if `target` exceeds the server length limit for symbolic links.
     /// * error `ZX_ERR_INVALID_ARGS` if `name` is not a valid [`Name`].
     /// * error `ZX_ERR_NOT_SUPPORTED` if creating symbolic links is not supported by the server.
-    @available(added=HEAD)
+    @available(added=18)
     @selector("fuchsia.io/Directory.CreateSymlink")
     @transitional
     strict CreateSymlink(resource struct {

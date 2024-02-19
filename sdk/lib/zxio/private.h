@@ -113,10 +113,12 @@ zx_status_t zxio_pty_init(zxio_storage_t* storage, zx::eventpair event,
 
 zx_status_t zxio_pipe_init(zxio_storage_t* pipe, zx::socket socket, zx_info_socket_t info);
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 18
 zx_status_t zxio_symlink_init(zxio_storage_t* storage, fidl::ClientEnd<fuchsia_io::Symlink> client,
                               std::vector<uint8_t> target);
+#endif
 
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
 zx_status_t zxio_attr_from_wire(const fuchsia_io::wire::NodeAttributes2& in,
                                 zxio_node_attributes_t* out);
 #endif

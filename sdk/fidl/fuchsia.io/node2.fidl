@@ -7,28 +7,28 @@ using fuchsia.unknown;
 using zx;
 
 /// The maximum size for an extended attribute name.
-@available(added=HEAD)
+@available(added=18)
 const MAX_ATTRIBUTE_NAME uint64 = 255;
 
 /// The name of an extended attribute. It can not contain any null bytes. Other
 /// than that and the maximum size, no particular structure is imposed on the
 /// name.
-@available(added=HEAD)
+@available(added=18)
 alias ExtendedAttributeName = vector<uint8>:MAX_ATTRIBUTE_NAME;
 
 /// The maximum size for an extended attribute value to be included inline.
 /// Values larger than this size are passed in a vmo.
-@available(added=HEAD)
+@available(added=18)
 const MAX_INLINE_ATTRIBUTE_VALUE uint64 = 32768;
 
 /// The maximum size of a chunk in the ListExtendedAttributes iterator.
-@available(added=HEAD)
+@available(added=18)
 const MAX_LIST_ATTRIBUTES_CHUNK uint64 = 128;
 
 /// The value type for an extended attribute. If the value is less than 32768
 /// bytes, then it is included inline. Values larger than this size are written
 /// into a vmo buffer.
-@available(added=HEAD)
+@available(added=18)
 type ExtendedAttributeValue = strict resource union {
     1: bytes vector<uint8>:MAX_INLINE_ATTRIBUTE_VALUE;
     2: buffer zx.Handle:VMO;
@@ -60,17 +60,17 @@ type NodeAttributesQuery = strict bits : uint64 {
     MODIFICATION_TIME = 0x80;
 
     /// Posix attributes.
-    @available(added=HEAD)
+    @available(added=18)
     MODE = 0x100;
-    @available(added=HEAD)
+    @available(added=18)
     UID = 0x200;
-    @available(added=HEAD)
+    @available(added=18)
     GID = 0x400;
-    @available(added=HEAD)
+    @available(added=18)
     RDEV = 0x800;
-    @available(added=HEAD)
+    @available(added=18)
     ACCESS_TIME = 0x1000;
-    @available(added=HEAD)
+    @available(added=18)
     CHANGE_TIME = 0x2000;
 
     /// Verity attributes.
@@ -93,18 +93,18 @@ type MutableNodeAttributes = table {
     /// these. Those that do must simply store and retrieve them (e.g. as
     /// extended attributes) and not attempt to interpret them (e.g. by doing
     /// permission checks or handling device opens specially).
-    @available(added=HEAD)
+    @available(added=18)
     3: mode uint32; // mode_t
-    @available(added=HEAD)
+    @available(added=18)
     4: uid uint32; // uid_t
-    @available(added=HEAD)
+    @available(added=18)
     5: gid uint32; // gid_t
-    @available(added=HEAD)
+    @available(added=18)
     6: rdev uint64; // dev_t
 
     /// Time of last access in nanoseconds since the Unix epoch, UTC. Note that servers might not
     /// always update this if this is the only attribute being updated.
-    @available(added=HEAD)
+    @available(added=18)
     7: access_time uint64;
 };
 
@@ -237,7 +237,7 @@ closed protocol Node2 {
         /// See [`NodeProtocolKinds.CONNECTOR`].
         1: connector @generated_name("ConnectorInfo") table {
             /// Requested attributes for the object. This is only populated if requested.
-            @available(added=HEAD)
+            @available(added=18)
             1: attributes NodeAttributes2;
         };
 
@@ -260,7 +260,7 @@ closed protocol Node2 {
         /// connection speaks the [`Symlink`] protocol.
         ///
         /// See [`NodeProtocolKinds.SYMLINK`].
-        @available(added=HEAD)
+        @available(added=18)
         4: symlink SymlinkInfo;
     });
 
@@ -333,7 +333,7 @@ closed protocol Node2 {
     /// the associated value.
     ///
     /// This method requires the [`Rights.GET_ATTRIBUTES`] right.
-    @available(added=HEAD)
+    @available(added=18)
     @selector("fuchsia.io/Node.ListExtendedAttributes")
     @transitional
     strict ListExtendedAttributes(resource struct {
@@ -346,7 +346,7 @@ closed protocol Node2 {
     /// particular structure is imposed on them.
     ///
     /// This method requires the [`Rights.GET_ATTRIBUTES`] right.
-    @available(added=HEAD)
+    @available(added=18)
     @selector("fuchsia.io/Node.GetExtendedAttribute")
     @transitional
     strict GetExtendedAttribute(struct {
@@ -360,7 +360,7 @@ closed protocol Node2 {
     /// null bytes in it. If it does, ZX_ERR_INVALID_ARGS is returned.
     ///
     /// This method requires the [`Rights.UPDATE_ATTRIBUTES`] right.
-    @available(added=HEAD)
+    @available(added=18)
     @selector("fuchsia.io/Node.SetExtendedAttribute")
     @transitional
     strict SetExtendedAttribute(resource struct {
@@ -386,7 +386,7 @@ closed protocol Node2 {
     /// If the attribute doesn't exist, ZX_ERR_NOT_FOUND is returned.
     ///
     /// This method requires the [`Rights.UPDATE_ATTRIBUTES`] right.
-    @available(added=HEAD)
+    @available(added=18)
     @selector("fuchsia.io/Node.RemoveExtendedAttribute")
     @transitional
     strict RemoveExtendedAttribute(struct {
@@ -394,7 +394,7 @@ closed protocol Node2 {
     }) -> () error zx.Status;
 };
 
-@available(added=HEAD)
+@available(added=18)
 closed protocol ExtendedAttributeIterator {
     /// Get the next chunk of extended attribute names. If this is the last
     /// chunk, last will be true, and the channel will be closed after the
@@ -407,7 +407,7 @@ closed protocol ExtendedAttributeIterator {
 };
 
 // Not all nodes support Linkable (e.g. Directories don't).
-@available(added=HEAD)
+@available(added=18)
 closed protocol Linkable {
     /// Creates a link to this this object with name `dst` in the directory represented by
     /// `dst_parent_token`.

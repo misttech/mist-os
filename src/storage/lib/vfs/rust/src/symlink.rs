@@ -198,6 +198,9 @@ impl<T: Symlink> Connection<T> {
                     Ok(info) => responder.send(0, Some(&info))?,
                 }
             }
+            fio::SymlinkRequest::_UnknownMethod { ordinal, .. } => {
+                tracing::warn!(ordinal, "Received unknown method")
+            }
         }
         Ok(false)
     }

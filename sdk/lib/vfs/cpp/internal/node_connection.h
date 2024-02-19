@@ -51,7 +51,7 @@ class NodeConnection final : public Connection, public fuchsia::io::Node {
                         UpdateAttributesCallback callback) override {
     callback(fuchsia::io::Node2_UpdateAttributes_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
   }
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 18
   void ListExtendedAttributes(
       fidl::InterfaceRequest<fuchsia::io::ExtendedAttributeIterator> iterator) override {
     iterator.Close(ZX_ERR_NOT_SUPPORTED);

@@ -653,6 +653,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 .trace(trace::trace_future_args!("storage", "File::RemoveExtendedAttribute"))
                 .await?;
             }
+            #[cfg(feature = "target_api_level_head")]
             fio::FileRequest::EnableVerity { options, responder } => {
                 async move {
                     let res = self.handle_enable_verity(options).await.map_err(Status::into_raw);
@@ -763,6 +764,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                     Ok(info) => responder.send(0, Some(&info))?,
                 }
             }
+            #[cfg(feature = "target_api_level_head")]
             fio::FileRequest::Allocate { offset, length, mode, responder } => {
                 async move {
                     let result = self.handle_allocate(offset, length, mode).await;
@@ -883,6 +885,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         self.file.update_attributes(attributes).await
     }
 
+    #[cfg(feature = "target_api_level_head")]
     async fn handle_enable_verity(
         &mut self,
         options: fio::VerificationOptions,
@@ -974,6 +977,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         self.file.clone().link_into(target_parent, target_name).await
     }
 
+    #[cfg(feature = "target_api_level_head")]
     async fn handle_allocate(
         &mut self,
         offset: u64,

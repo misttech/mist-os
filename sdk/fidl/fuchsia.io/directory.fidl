@@ -122,7 +122,7 @@ type DirentType = strict enum : uint8 {
     /// A dirent representing a file object.
     FILE = 8;
     /// A symbolic link.
-    @available(added=HEAD)
+    @available(added=18)
     SYMLINK = 10;
     /// A dirent representing a service object.
     SERVICE = 16;

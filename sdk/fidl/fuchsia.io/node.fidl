@@ -119,7 +119,7 @@ closed protocol Node1 {
             3: directory @generated_name("DirectoryObject") struct {};
 
             /// The connection composes ['Symlink'].
-            @available(added=HEAD)
+            @available(added=18)
             4: symlink @generated_name("SymlinkObject") struct {
                 target SymlinkTarget;
             };

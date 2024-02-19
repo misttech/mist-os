@@ -60,7 +60,7 @@ type FileInfo = resource table {
     3: stream zx.Handle:STREAM;
 
     /// Requested attributes for the file. This is only populated if requested.
-    @available(added=HEAD)
+    @available(added=18)
     4: attributes NodeAttributes2;
 };
 
@@ -73,7 +73,7 @@ const FILE_PROTOCOL_NAME string = "fuchsia.io/File";
 /// connection.
 closed protocol File {
     compose AdvisoryLocking;
-    @available(added=HEAD)
+    @available(added=18)
     compose Linkable;
     compose Node;
     compose Readable;
