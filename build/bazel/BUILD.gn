@@ -166,6 +166,10 @@ action("generate_fuchsia_sdk_repository") {
     ]
   }
 
+  # This script invokes Bazel directly. Use console pool to prevent
+  # concurrent bazel invocations.
+  pool = "//:console($default_toolchain)"
+
   # This cannot be hermetic as well since it creates a ton of
   # files in the output base that cannot be listed in advance.
   hermetic_deps = false
