@@ -115,14 +115,14 @@ impl<S: crate::NonMetaStorage + Clone> RootDirCache<S> {
     /// Returns the `Arc<RootDir>` with the given `hash`, if one exists in the cache.
     /// Otherwise returns `None`.
     /// Holding on to the returned `Arc` will keep the package open (as reported by
-    /// `Self::open_packages`).
+    /// `Self::list`).
     pub fn get(&self, hash: &fuchsia_hash::Hash) -> Option<Arc<crate::RootDir<S>>> {
         self.dirs.lock().expect("poisoned mutex").get(hash)?.upgrade()
     }
 
     /// Packages with live `Arc<RootDir>`s.
     /// Holding on to the returned `Arc`s will keep the packages open.
-    pub fn open_packages(&self) -> Vec<Arc<crate::RootDir<S>>> {
+    pub fn list(&self) -> Vec<Arc<crate::RootDir<S>>> {
         self.dirs.lock().expect("poisoned mutex").iter().filter_map(|(_, v)| v.upgrade()).collect()
     }
 
@@ -208,10 +208,10 @@ mod tests {
 
         let dir = server.get_or_insert(metafar_blob.merkle, None).await.unwrap();
 
-        assert_eq!(server.open_packages().len(), 1);
+        assert_eq!(server.list().len(), 1);
 
         drop(dir);
-        assert_eq!(server.open_packages().len(), 0);
+        assert_eq!(server.list().len(), 0);
         assert!(server.dirs.lock().expect("poisoned mutex").is_empty());
     }
 
@@ -234,11 +234,11 @@ mod tests {
         );
         let _: fio::ConnectionInfo =
             proxy.get_connection_info().await.expect("directory succesfully handling requests");
-        assert_eq!(server.open_packages().len(), 1);
+        assert_eq!(server.list().len(), 1);
 
         drop(proxy);
         let () = scope.wait().await;
-        assert_eq!(server.open_packages().len(), 0);
+        assert_eq!(server.list().len(), 0);
         assert!(server.dirs.lock().expect("poisoned mutex").is_empty());
     }
 
@@ -253,12 +253,12 @@ mod tests {
         let dir0 = server.get_or_insert(metafar_blob.merkle, None).await.unwrap();
 
         let dir1 = server.get_or_insert(metafar_blob.merkle, None).await.unwrap();
-        assert_eq!(server.open_packages().len(), 1);
-        assert_eq!(Arc::strong_count(&server.open_packages()[0]), 3);
+        assert_eq!(server.list().len(), 1);
+        assert_eq!(Arc::strong_count(&server.list()[0]), 3);
 
         drop(dir0);
         drop(dir1);
-        assert_eq!(server.open_packages().len(), 0);
+        assert_eq!(server.list().len(), 0);
         assert!(server.dirs.lock().expect("poisoned mutex").is_empty());
     }
 
@@ -275,10 +275,10 @@ mod tests {
         let server = RootDirCache::new(blobfs_client);
 
         let dir = server.get_or_insert(metafar_blob.merkle, Some(root_dir)).await.unwrap();
-        assert_eq!(server.open_packages().len(), 1);
+        assert_eq!(server.list().len(), 1);
 
         drop(dir);
-        assert_eq!(server.open_packages().len(), 0);
+        assert_eq!(server.list().len(), 0);
         assert!(server.dirs.lock().expect("poisoned mutex").is_empty());
     }
 
@@ -328,12 +328,12 @@ mod tests {
         let (res0, res1) = futures::future::join(fut0, fut1).await;
         let (dir0, dir1) = (res0.unwrap(), res1.unwrap());
 
-        assert_eq!(server.open_packages().len(), 1);
-        assert_eq!(Arc::strong_count(&server.open_packages()[0]), 3);
+        assert_eq!(server.list().len(), 1);
+        assert_eq!(Arc::strong_count(&server.list()[0]), 3);
 
         drop(dir0);
         drop(dir1);
-        assert_eq!(server.open_packages().len(), 0);
+        assert_eq!(server.list().len(), 0);
         assert!(server.dirs.lock().expect("poisoned mutex").is_empty());
     }
 
