@@ -79,8 +79,7 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
   }
   zx::result<std::unique_ptr<Lcd>> lcd_or_status =
       Lcd::Create(self->panel_type_, self->panel_config_.dsi_on, self->panel_config_.dsi_off,
-                  fit::bind_member(self.get(), &DsiHost::SetSignalPower), self->dsiimpl_,
-                  std::move(lcd_gpio.value()), kBootloaderDisplayEnabled);
+                  self->dsiimpl_, std::move(lcd_gpio.value()), kBootloaderDisplayEnabled);
   if (lcd_or_status.is_error()) {
     zxlogf(ERROR, "Failed to create LCD object: %s", lcd_or_status.status_string());
     return zx::error(lcd_or_status.error_value());
@@ -248,28 +247,6 @@ void DsiHost::PhyDisable() {
   hhi_mmio_->Write32(0, HHI_MIPI_CNTL0);
   hhi_mmio_->Write32(0, HHI_MIPI_CNTL1);
   hhi_mmio_->Write32(0, HHI_MIPI_CNTL2);
-}
-
-void DsiHost::SetSignalPower(bool on) {
-  // These bits latch after vsync.
-  if (on) {
-    mipi_dsi_mmio_->Write32(
-        SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CNTL), /*field_begin_bit=*/2,
-                        /*field_size_bits=*/1, /*field_value=*/1),
-        MIPI_DSI_TOP_CNTL);
-    zx::nanosleep(zx::deadline_after(zx::msec(20)));
-    mipi_dsi_mmio_->Write32(
-        SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CNTL), /*field_begin_bit=*/2,
-                        /*field_size_bits=*/1, /*field_value=*/0),
-        MIPI_DSI_TOP_CNTL);
-    zx::nanosleep(zx::deadline_after(zx::msec(20)));
-  } else {
-    mipi_dsi_mmio_->Write32(
-        SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CNTL), /*field_begin_bit=*/2,
-                        /*field_size_bits=*/1, /*field_value=*/0),
-        MIPI_DSI_TOP_CNTL);
-    zx::nanosleep(zx::deadline_after(zx::msec(20)));
-  }
 }
 
 void DsiHost::Disable() {

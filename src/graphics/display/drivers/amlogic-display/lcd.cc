@@ -207,14 +207,6 @@ zx::result<> Lcd::PerformDisplayInitCommandSequence(cpp20::span<const uint8_t> e
         }
         break;
       }
-      case kDsiOpPhyPowerOn:
-        zxlogf(TRACE, "dsi_phy_power_on size=%d", payload_size);
-        set_signal_power_(/*on=*/true);
-        break;
-      case kDsiOpPhyPowerOff:
-        zxlogf(TRACE, "dsi_phy_power_off size=%d", payload_size);
-        set_signal_power_(/*on=*/false);
-        break;
       // All other cmd_type bytes are real DSI commands
       case kMipiDsiDtDcsShortWrite0:
       case kMipiDsiDtDcsShortWrite1:
@@ -326,13 +318,11 @@ zx::result<> Lcd::Enable() {
 // static
 zx::result<std::unique_ptr<Lcd>> Lcd::Create(uint32_t panel_type, cpp20::span<const uint8_t> dsi_on,
                                              cpp20::span<const uint8_t> dsi_off,
-                                             fit::function<void(bool)> set_signal_power,
                                              ddk::DsiImplProtocolClient dsiimpl,
                                              fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio,
                                              bool already_enabled) {
   fbl::AllocChecker alloc_checker;
-  std::unique_ptr<Lcd> lcd =
-      fbl::make_unique_checked<Lcd>(&alloc_checker, panel_type, std::move(set_signal_power));
+  std::unique_ptr<Lcd> lcd = fbl::make_unique_checked<Lcd>(&alloc_checker, panel_type);
   if (!alloc_checker.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }

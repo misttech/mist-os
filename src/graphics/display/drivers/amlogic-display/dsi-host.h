@@ -75,9 +75,6 @@ class DsiHost {
   // data transmission.
   zx::result<> ConfigureDsiHostController();
 
-  // Controls the shutdown register on the DSI host side.
-  void SetSignalPower(bool on);
-
   // Performs the Amlogic-specific power operation sequence.
   //
   // The Amlogic-specific power operations are defined in the Amlogic MIPI DSI

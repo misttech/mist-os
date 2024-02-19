@@ -25,15 +25,6 @@ namespace amlogic_display {
 // 8.5.1 "Data Identifier Byte" and Section 8.7 "Processor to Peripheral
 // Direction (Processor-Sourced) Packet Data Types" of the DSI spec.
 enum DsiOpcode : uint8_t {
-  // Turn the DSI phy off/on.
-  // <op> <size=0>
-  //
-  // These opcodes are intentionally the same as the "Shut Down Peripheral
-  // Command" (for PHY power off) and "Turn On Peripheral Command" (for PHY
-  // power on) DSI packet DT (Data Type) values for Virtual Channel 0.
-  kDsiOpPhyPowerOff = 0x22,
-  kDsiOpPhyPowerOn = 0x32,
-
   // Drive a GPIO pin.
   //
   // <op> <size=2|3> <gpio_id=0> <value> [delay_ms]

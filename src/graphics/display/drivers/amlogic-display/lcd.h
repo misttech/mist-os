@@ -19,18 +19,17 @@ namespace amlogic_display {
 // An Lcd controls the panel attached to a MIPI-DSI endpoint.
 class Lcd {
  public:
-  Lcd(uint32_t panel_type, fit::function<void(bool)> set_signal_power)
-      : panel_type_(panel_type), set_signal_power_(std::move(set_signal_power)) {}
+  explicit Lcd(uint32_t panel_type) : panel_type_(panel_type) {}
 
-  // Create an Lcd to control the panel at `dsiimpl`. Panel type detection is
-  // performed using `gpio`. If `already_enabled`, there will be no attempt to
-  // power the LCD on or probe its panel type for correctness.
-  // `set_signal_power(bool on)` will be called when the DSI should be turned on
-  // or off.
-  static zx::result<std::unique_ptr<Lcd>> Create(
-      uint32_t panel_type, cpp20::span<const uint8_t> dsi_on, cpp20::span<const uint8_t> dsi_off,
-      fit::function<void(bool)> set_signal_power, ddk::DsiImplProtocolClient dsiimpl,
-      fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio, bool already_enabled);
+  // Create an Lcd to control the panel at `dsiimpl`. The panel can be reset
+  // using the `gpio` reset pin. If `already_enabled`, there will be no attempt
+  // to power the LCD on or probe its panel type for correctness.
+  static zx::result<std::unique_ptr<Lcd>> Create(uint32_t panel_type,
+                                                 cpp20::span<const uint8_t> dsi_on,
+                                                 cpp20::span<const uint8_t> dsi_off,
+                                                 ddk::DsiImplProtocolClient dsiimpl,
+                                                 fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio,
+                                                 bool already_enabled);
 
   // Turn the panel on
   zx::result<> Enable();
@@ -49,7 +48,6 @@ class Lcd {
   zx::result<> PerformDisplayInitCommandSequence(cpp20::span<const uint8_t> encoded_commands);
 
   uint32_t panel_type_;
-  fit::function<void(bool)> set_signal_power_;
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_;
 
   // Init and shutdown sequences for the fixed panel.
