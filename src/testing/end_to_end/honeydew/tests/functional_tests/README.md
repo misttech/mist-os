@@ -44,14 +44,14 @@ detectable by FFX
     ```shell
     $ ffx target list
     NAME                SERIAL       TYPE             STATE      ADDRS/IP                           RCS
-    fuchsia-emulator*   <unknown>    core.qemu-x64    Product    [fe80::1a1c:ebd2:2db:6104%qemu]    Y
+    fuchsia-emulator*   <unknown>    core.x64         Product    [fe80::1a1c:ebd2:2db:6104%qemu]    Y
     ```
-  **Note**: Depending on which Fuchsia device is being used for the test, you
-  can refer to following resources for more information on how to setup those
-  devices:
-  * [femu](https://fuchsia.dev/fuchsia-src/get-started/set_up_femu)
-  * [Intel NUC](https://fuchsia.dev/fuchsia-src/development/hardware/intel_nuc)
-  * [vim3](https://fuchsia.dev/fuchsia-src/development/hardware/khadas-vim3)
+    **Note**: Depending on which Fuchsia device is being used for the test, you
+    can refer to following resources for more information on how to setup those
+    devices:
+      * [femu](https://fuchsia.dev/fuchsia-src/get-started/set_up_femu)
+      * [Intel NUC](https://fuchsia.dev/fuchsia-src/development/hardware/intel_nuc)
+      * [vim3](https://fuchsia.dev/fuchsia-src/development/hardware/khadas-vim3)
 
 2. Determine if your local testbed requires a manual local config to be provided
 or not. For more information, refer to
@@ -61,9 +61,12 @@ that one device connected then you can most likely skip this step
 
 3. Run appropriate `fx set` command along with
    `--with //src/testing/end_to_end/honeydew/tests/functional_tests` param.
-    - If test case requires `SL4f` transport then make sure to use a `<PRODUCT>`
-      that supports `SL4F` (such as `core`) and include
-      `--args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]'`
+    * If test case requires `SL4f` transport then make sure to do the following:
+      * Use a `<PRODUCT>` that supports `SL4F` (such as `core`)
+      * Include `--args=core_realm_shards+="[\"//src/testing/sl4f:sl4f_core_shard\"]"`
+        * Alternatively, run `fx set` without the `--args` option, and then run
+        `fx args`, and add the line directly to the `args.gn` file in the editor
+        that opens.
 
 4. If test needs SL4F then run a package server in a separate terminal
     ```shell
@@ -75,8 +78,8 @@ that one device connected then you can most likely skip this step
 
   Here is an example to run a functional test on emulator
   ```shell
-  $ fx set core.qemu-x64 \
-      --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
+  $ fx set core.x64 \
+      --args=core_realm_shards+="[\"//src/testing/sl4f:sl4f_core_shard\"]" \
       --with //src/testing/end_to_end/honeydew/tests/functional_tests
 
   # start the emulator with networking enabled
@@ -131,9 +134,8 @@ Based on this we have created the following:
     * `[ |_sl4f]` informs whether a test group can be run on certain products.
     * `<BOARD>` informs whether a test group can be run on certain boards.
 * Builder examples:
-  * `core.qemu-x64-debug-pye2e` - CQ builder to run stable emulator tests
-  * `core.qemu-x64-debug-pye2e-staging` - FYI builder to run unstable emulator tests
-  * `core.x64-debug-pye2e-staging` - FYI builder to run unstable NUC tests
+  * `core.x64-debug-pye2e` - CQ builder to run stable emulator and NUC tests
+  * `core.x64-debug-pye2e-staging` - FYI builder to run unstable emulator and NUC tests
   * `core.vim3-debug-pye2e-staging` - FYI builder to run unstable VIM3 tests
   * format: `<PRODUCT>.<BOARD>-debug-pye2e-[ |staging|ci]`, where
     * if builder is for "CQ" then no postfix is needed but for other stages,

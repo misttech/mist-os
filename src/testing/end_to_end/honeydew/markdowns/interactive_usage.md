@@ -16,22 +16,20 @@ for Honeydew to be successfully imported in Python. So before running
 [conformance scripts](../README.md#honeydew-code-guidelines) or to use Honeydew
 in interactive python terminal, you need to run the below commands.
 
+* Run appropriate `fx set` command along with
+`--with-host //src/testing/end_to_end/honeydew` param.
+  * If test case requires `SL4f` transport then make sure to do the following:
+    * Use a `<PRODUCT>` that supports `SL4F` (such as `core`)
+    * Include `--with //src/testing/sl4f --with //src/sys/bin/start_sl4f`
+    * Include `--args=core_realm_shards+="[\"//src/testing/sl4f:sl4f_core_shard\"]"`
+      * Alternatively, run `fx set` without the `--args` option, and then run
+      `fx args`, and add the line directly to the `args.gn` file in the editor
+      that opens.
+* Run `fx build`
 ```shell
-~/fuchsia$ fx set core.qemu-x64 \
---with-host //src/testing/end_to_end/honeydew \
---with //src/testing/sl4f --with //src/sys/bin/start_sl4f \
---args='core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]'
-
+~/fuchsia$ fx set core.x64 --with-host //src/testing/end_to_end/honeydew
 ~/fuchsia$ fx build
 ```
-
-* The `core.qemu-x64` product config can be updated out to match the
-`product.board` combination you want to test against.
-* `--with-host //src/testing/end_to_end/honeydew` is required so that
-Honeydew dependencies are built (e.g. Fuchsia controller's shared libraries).
-* (Optional) `--with //src/testing/sl4f --with //src/sys/bin/start_sl4f \
---args='core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]'` is only
-required if you wish to use Honeydew's SL4F-based affordances.
 
 ## Creation
 ```python

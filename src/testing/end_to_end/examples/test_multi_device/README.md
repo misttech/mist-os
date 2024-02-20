@@ -104,7 +104,7 @@ Then, after we setup the two devices, we will run a Bluetooth Sample test which 
 Finally, let's run the test!
 ```sh
 $ fx set core.vim3 \
-    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
+    --args=core_realm_shards+="[\"//src/testing/sl4f:sl4f_core_shard\"]" \
     --with //src/testing/end_to_end/examples
 
 $ fx test //src/testing/end_to_end/examples/test_multi_device:multi_device_test_sl4f --e2e --output
