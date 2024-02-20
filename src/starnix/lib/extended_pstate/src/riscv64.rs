@@ -6,10 +6,10 @@ use core::arch::asm;
 use static_assertions::const_assert_eq;
 
 const NUM_FP_REGISTERS: usize = 32;
-const NUM_V_REGISTERS: usize = 32;
+pub const NUM_V_REGISTERS: usize = 32;
 
 // Currently only VLEN=128 is supported.
-const VLEN: usize = 128;
+pub const VLEN: usize = 128;
 
 #[derive(Copy, Clone, Default, PartialEq, Debug)]
 #[repr(C)]

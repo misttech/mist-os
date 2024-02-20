@@ -390,14 +390,15 @@ pub fn dispatch_signal_handler(
 
 pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(), Errno> {
     // Read the signal stack frame from memory.
-    let signal_frame_address =
-        align_stack_pointer(current_task.thread_state.registers.stack_pointer_register());
-    let signal_stack_bytes = current_task
-        .read_memory_to_array::<SIG_STACK_SIZE>(UserAddress::from(signal_frame_address))?;
+    let signal_frame_address = UserAddress::from(align_stack_pointer(
+        current_task.thread_state.registers.stack_pointer_register(),
+    ));
+    let signal_stack_bytes =
+        current_task.read_memory_to_array::<SIG_STACK_SIZE>(signal_frame_address)?;
 
     // Grab the registers state from the stack frame.
     let signal_stack_frame = SignalStackFrame::from_bytes(signal_stack_bytes);
-    restore_registers(current_task, &signal_stack_frame)?;
+    restore_registers(current_task, &signal_stack_frame, signal_frame_address)?;
 
     // Restore the stored signal mask.
     current_task.write().signals.set_mask(SigSet::from(signal_stack_frame.context.uc_sigmask));

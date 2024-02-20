@@ -20,7 +20,7 @@ use once_cell as _;
 mod aarch64;
 
 #[cfg(target_arch = "riscv64")]
-mod riscv64;
+pub mod riscv64;
 
 #[derive(Clone, Copy, Default)]
 pub struct ExtendedPstateState {
@@ -101,19 +101,13 @@ impl ExtendedPstateState {
     }
 
     #[cfg(target_arch = "riscv64")]
-    pub fn get_riscv64_fp_registers(&self) -> &[u64; 32] {
-        &self.state.fp_registers
+    pub fn get_riscv64_state(&self) -> &riscv64::State {
+        &self.state
     }
 
     #[cfg(target_arch = "riscv64")]
-    pub fn get_riscv64_fcsr(&self) -> u32 {
-        self.state.fcsr
-    }
-
-    #[cfg(target_arch = "riscv64")]
-    pub fn set_riscv64_fp(&mut self, fp_registers: &[u64; 32], fcsr: u32) {
-        self.state.fp_registers = *fp_registers;
-        self.state.fcsr = fcsr;
+    pub fn get_riscv64_state_mut(&mut self) -> &mut riscv64::State {
+        &mut self.state
     }
 
     #[cfg(target_arch = "x86_64")]

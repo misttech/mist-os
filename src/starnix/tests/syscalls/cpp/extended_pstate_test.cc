@@ -18,6 +18,32 @@
 
 namespace {
 
+#if defined(__riscv)
+// Only VLEN=128 is supported currently.
+const size_t RISCV_VLEN = 128;
+
+// The following constants and structs duplicate the definitions that are
+// available only with newer UAPI headers.
+// TODO(b/325538967): Remove once we the headers used to compile this test are updated.
+#define RISCV_V_MAGIC 0x53465457U
+#define END_MAGIC 0x0U
+#define END_HDR_SIZE 0x0U
+
+struct riscv_ctx_hdr {
+  uint32_t magic;
+  uint32_t size;
+};
+
+struct riscv_v_ext_state {
+  uint64_t vstart;
+  uint64_t vl;
+  uint64_t vtype;
+  uint64_t vcsr;
+  uint64_t vlenb;
+  void* datap;
+};
+#endif  // defined(__riscv)
+
 struct RegistersValue {
   // The tests below set and then check 32 bytes in FP or SIMD registers. Which registers are
   // being used is architecture-specific.
@@ -116,7 +142,29 @@ RegistersValue GetTestRegistersFromUcontext(ucontext_t* ucontext) {
   EXPECT_EQ(fp_context->head.size, sizeof(fpsimd_context));
   memcpy(&result, fp_context->vregs, sizeof(result));
 #elif defined(__riscv)
-  memcpy(&result, reinterpret_cast<void*>(ucontext->uc_mcontext.__fpregs.__d.__f), sizeof(result));
+  // Copy first 2 values from the F registers
+  memcpy(&result, reinterpret_cast<void*>(ucontext->uc_mcontext.__fpregs.__d.__f),
+         sizeof(uint64_t) * 2);
+
+  // The header for the first RISC-V context extension is at the end of `uc_mcontext`.
+  riscv_ctx_hdr* hdr = reinterpret_cast<riscv_ctx_hdr*>(&(ucontext->uc_mcontext) + 1) - 1;
+
+  EXPECT_EQ(hdr->magic, RISCV_V_MAGIC);
+  // Assuming VLEN=128 we meed 512 bytes to store 32 V registers.
+  EXPECT_EQ(hdr->size, sizeof(riscv_ctx_hdr) + sizeof(riscv_v_ext_state) + 512);
+
+  riscv_v_ext_state* v_state = reinterpret_cast<riscv_v_ext_state*>(hdr + 1);
+  EXPECT_EQ(v_state->vlenb, RISCV_VLEN / 8);
+  EXPECT_EQ(hdr->size, sizeof(riscv_ctx_hdr) + sizeof(riscv_v_ext_state) + RISCV_VLEN / 8 * 32);
+  EXPECT_EQ(v_state->datap, v_state + 1);
+
+  // Copy the last 2 values from the V registers.
+  memcpy(&result.x[2], reinterpret_cast<void*>(v_state->datap), sizeof(uint64_t) * 2);
+
+  riscv_ctx_hdr* end_hdr =
+      reinterpret_cast<riscv_ctx_hdr*>(reinterpret_cast<uint8_t*>(hdr) + hdr->size);
+  EXPECT_EQ(end_hdr->size, END_MAGIC);
+  EXPECT_EQ(end_hdr->size, END_HDR_SIZE);
 #else
 #error Add support for this architecture
 #endif

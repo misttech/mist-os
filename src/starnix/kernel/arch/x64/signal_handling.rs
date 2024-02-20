@@ -185,6 +185,7 @@ fn get_xstate(extended_pstate: &ExtendedPstateState) -> XState {
 pub fn restore_registers(
     current_task: &mut CurrentTask,
     signal_stack_frame: &SignalStackFrame,
+    _stack_pointer: UserAddress,
 ) -> Result<(), Errno> {
     let uctx = &signal_stack_frame.context.uc_mcontext;
     // Restore the register state from before executing the signal handler.

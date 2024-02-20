@@ -10,11 +10,15 @@ use crate::{
     signals::{SignalInfo, SignalState},
     task::{CurrentTask, Task},
 };
-use extended_pstate::ExtendedPstateState;
+use extended_pstate::{
+    riscv64::{RiscvVectorCsrs, NUM_V_REGISTERS, VLEN},
+    ExtendedPstateState,
+};
+use starnix_logging::log_debug;
 use starnix_uapi::{
-    __NR_restart_syscall,
+    self as uapi, error,
     errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK},
-    sigaction, sigaltstack, sigcontext, sigcontext__bindgen_ty_1, siginfo_t, ucontext,
+    sigaction, sigaltstack, sigcontext, siginfo_t, ucontext,
     user_address::UserAddress,
 };
 
@@ -35,6 +39,24 @@ pub const SIG_STACK_SIZE: usize = std::mem::size_of::<SignalStackFrame>();
 pub struct SignalStackFrame {
     pub siginfo_bytes: [u8; std::mem::size_of::<siginfo_t>()],
     pub context: ucontext,
+
+    // On RISC-V, state for extensions not included in `ucontext` can be stored immediately after
+    // `ucontext`. Each extension starts with a header defined by `__riscv_ctx_hdr`. The header for
+    // the first extensions is placed at the tail of `ucontext`.  The end of these extension is
+    // marked by the header containing zeros (see `end_header` below).
+    // Currently only V extension is supported.
+    v_state: VState,
+
+    // Should be set to `{END_MAGIC, END_HDR_SIZE}`
+    end_header: uapi::__riscv_ctx_hdr,
+}
+
+pub const V_REGISTERS_SIZE: usize = VLEN / 8 * NUM_V_REGISTERS;
+
+#[repr(C)]
+struct VState {
+    v_csrs: uapi::__riscv_v_ext_state,
+    v_registers: [u8; V_REGISTERS_SIZE],
 }
 
 impl SignalStackFrame {
@@ -45,7 +67,7 @@ impl SignalStackFrame {
         signal_state: &SignalState,
         siginfo: &SignalInfo,
         _action: sigaction,
-        _stack_pointer: UserAddress,
+        stack_pointer: UserAddress,
     ) -> SignalStackFrame {
         let context = ucontext {
             uc_flags: 0,
@@ -62,7 +84,7 @@ impl SignalStackFrame {
             uc_sigmask: signal_state.mask().into(),
             uc_mcontext: sigcontext {
                 sc_regs: registers.to_user_regs_struct(),
-                __bindgen_anon_1: sigcontext__bindgen_ty_1 {
+                __bindgen_anon_1: uapi::sigcontext__bindgen_ty_1 {
                     sc_fpregs: extended_pstate_to_riscv_fpregs(extended_pstate),
                 },
             },
@@ -73,7 +95,38 @@ impl SignalStackFrame {
         let sigreturn_addr = task.mm().state.read().vdso_base.ptr() as u64 + vdso_sigreturn_offset;
         registers.ra = sigreturn_addr;
 
-        SignalStackFrame { context, siginfo_bytes: siginfo.as_siginfo_bytes() }
+        let v_registers_addr = stack_pointer.ptr()
+            + memoffset::offset_of!(SignalStackFrame, v_state)
+            + memoffset::offset_of!(VState, v_registers);
+        let state = extended_pstate.get_riscv64_state();
+        let v_state = VState {
+            v_csrs: uapi::__riscv_v_ext_state {
+                vstart: state.vcsrs.vstart,
+                vl: state.vcsrs.vl,
+                vtype: state.vcsrs.vtype,
+                vcsr: state.vcsrs.vcsr,
+                vlenb: VLEN as u64 / 8,
+                datap: uapi::uaddr { addr: v_registers_addr as u64 },
+            },
+            v_registers: unsafe { std::mem::transmute(state.v_registers) },
+        };
+
+        let mut sigstack = SignalStackFrame {
+            siginfo_bytes: siginfo.as_siginfo_bytes(),
+            context,
+            v_state,
+            end_header: uapi::__riscv_ctx_hdr { magic: uapi::END_MAGIC, size: uapi::END_HDR_SIZE },
+        };
+
+        // Setup headers for `VState`. It follows immediately after `context`. Size of this
+        // section also includes size of the header.
+        sigstack.context.uc_mcontext.__bindgen_anon_1.sc_extdesc.hdr = uapi::__riscv_ctx_hdr {
+            magic: uapi::RISCV_V_MAGIC,
+            size: (std::mem::size_of::<VState>() + std::mem::size_of::<uapi::__riscv_ctx_hdr>())
+                as u32,
+        };
+
+        sigstack
     }
 
     pub fn as_bytes(&self) -> &[u8; SIG_STACK_SIZE] {
@@ -88,6 +141,7 @@ impl SignalStackFrame {
 pub fn restore_registers(
     current_task: &mut CurrentTask,
     signal_stack_frame: &SignalStackFrame,
+    stack_pointer: UserAddress,
 ) -> Result<(), Errno> {
     let regs = &signal_stack_frame.context.uc_mcontext.sc_regs;
     // Restore the register state from before executing the signal handler.
@@ -127,8 +181,35 @@ pub fn restore_registers(
     }
     .into();
 
+    let v_registers_addr = stack_pointer.ptr()
+        + memoffset::offset_of!(SignalStackFrame, v_state)
+        + memoffset::offset_of!(VState, v_registers);
+    let hdr = unsafe { &signal_stack_frame.context.uc_mcontext.__bindgen_anon_1.sc_extdesc.hdr };
+    let vcsrs = &signal_stack_frame.v_state.v_csrs;
+    if hdr.magic != uapi::RISCV_V_MAGIC
+        || hdr.size as usize
+            != std::mem::size_of::<VState>() + std::mem::size_of::<uapi::__riscv_ctx_hdr>()
+        || vcsrs.vlenb != (VLEN as u64 / 8)
+        || vcsrs.datap.addr != v_registers_addr as u64
+    {
+        log_debug!("Invalid V state found in signal stack frame.");
+        return error!(EINVAL);
+    }
+
     let d_state = unsafe { &signal_stack_frame.context.uc_mcontext.__bindgen_anon_1.sc_fpregs.d };
-    current_task.thread_state.extended_pstate.set_riscv64_fp(&d_state.f, d_state.fcsr);
+    let state = current_task.thread_state.extended_pstate.get_riscv64_state_mut();
+    state.fp_registers = d_state.f;
+    state.fcsr = d_state.fcsr;
+
+    state.vcsrs = RiscvVectorCsrs {
+        vstart: vcsrs.vstart,
+        vl: vcsrs.vl,
+        vtype: vcsrs.vtype,
+        vcsr: vcsrs.vcsr,
+    };
+    unsafe {
+        state.v_registers = std::mem::transmute(signal_stack_frame.v_state.v_registers);
+    };
 
     Ok(())
 }
@@ -140,7 +221,7 @@ pub fn align_stack_pointer(pointer: u64) -> u64 {
 pub fn update_register_state_for_restart(registers: &mut RegisterState, err: ErrnoCode) {
     if err == ERESTART_RESTARTBLOCK {
         // Update the register containing the syscall number to reference `restart_syscall`.
-        registers.a7 = __NR_restart_syscall as u64;
+        registers.a7 = uapi::__NR_restart_syscall as u64;
     }
     // Reset the a0 register value to what it was when the original syscall trap occurred. This
     // needs to be done because a0 may have been overwritten in the syscall dispatch loop.
@@ -151,14 +232,33 @@ pub fn update_register_state_for_restart(registers: &mut RegisterState, err: Err
 fn extended_pstate_to_riscv_fpregs(
     extended_pstate: &ExtendedPstateState,
 ) -> starnix_uapi::__riscv_fp_state {
+    let state = extended_pstate.get_riscv64_state();
     let d_state = starnix_uapi::__riscv_d_ext_state {
-        f: *extended_pstate.get_riscv64_fp_registers(),
-        fcsr: extended_pstate.get_riscv64_fcsr(),
+        f: state.fp_registers,
+        fcsr: state.fcsr,
         __bindgen_padding_0: [0u8; 4],
     };
     unsafe {
         let mut r: starnix_uapi::__riscv_fp_state = std::mem::zeroed();
         r.d = d_state;
         r
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[::fuchsia::test]
+    fn sigstack_layout() {
+        // There should be no padding between `context`, `v_state` and `end_header` in `SignalStackFrame`.
+        assert_eq!(
+            memoffset::offset_of!(SignalStackFrame, context) + std::mem::size_of::<ucontext>(),
+            memoffset::offset_of!(SignalStackFrame, v_state)
+        );
+        assert_eq!(
+            memoffset::offset_of!(SignalStackFrame, v_state) + std::mem::size_of::<VState>(),
+            memoffset::offset_of!(SignalStackFrame, end_header)
+        );
     }
 }

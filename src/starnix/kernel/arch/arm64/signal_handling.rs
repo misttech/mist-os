@@ -102,6 +102,7 @@ impl SignalStackFrame {
 pub fn restore_registers(
     current_task: &mut CurrentTask,
     signal_stack_frame: &SignalStackFrame,
+    _stack_pointer: UserAddress,
 ) -> Result<(), Errno> {
     let uctx = &signal_stack_frame.context.uc_mcontext;
     // `zx_thread_state_general_regs_t` stores the link register separately from the other general
