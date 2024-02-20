@@ -665,7 +665,7 @@ impl Allocator {
         }
         let max_extent_size_bytes = max_extent_size_for_block_size(filesystem.block_size());
         // Note that we use BestFit strategy for new filesystems to favour dense packing of
-        // data and 'Buddy' for existing filesystems for better fragmentation.
+        // data and 'FirstFit' for existing filesystems for better fragmentation.
         let mut strategy: Box<dyn strategy::AllocatorStrategy> =
             Box::new(strategy::best_fit::BestFit::default());
         strategy.free(0..filesystem.device().size());
@@ -823,9 +823,9 @@ impl Allocator {
                 self.object_id,
                 tree::reservation_amount_from_layer_size(total_size),
             );
-            // Use Buddy for existing filesystems to minimise fragmentation in the face of heavy
+            // Use FirstFit for existing filesystems to minimise fragmentation in the face of heavy
             // filesystem churn.
-            strategy = Box::new(strategy::buddy::Buddy::default());
+            strategy = Box::new(strategy::first_fit::FirstFit::default());
         } else {
             // Use BestFit for new filesystems so we pack files together without creating gaps.
             // This can help us produce minimal sized filesystem images.
