@@ -13,7 +13,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use vfs::{common::send_on_open_with_error, execution_scope::ExecutionScope};
 
-use crate::{registry, CapabilityTrait, ConversionError, Directory, OneShotHandle};
+use crate::{registry, CapabilityTrait, ConversionError, Directory};
 
 /// An [Open] capability lets the holder obtain other capabilities by pipelining
 /// a [zx::Channel], usually treated as the server endpoint of some FIDL protocol.
@@ -215,41 +215,6 @@ impl From<ClientEnd<fio::DirectoryMarker>> for Open {
     }
 }
 
-impl TryFrom<OneShotHandle> for Open {
-    type Error = ConversionError;
-
-    /// Attempts to convert into an Open that calls `fuchsia.io.Openable/Open` on the handle.
-    ///
-    /// The handle must be a channel that speaks the `Openable` protocol.
-    fn try_from(one_shot: OneShotHandle) -> Result<Self, Self::Error> {
-        let handle = one_shot.get_handle().map_err(|err| ConversionError::Handle { err })?;
-        let basic_info = handle.basic_info().map_err(|_| ConversionError::NotSupported)?;
-        if basic_info.object_type != zx::ObjectType::CHANNEL {
-            return Err(ConversionError::NotSupported);
-        }
-
-        let openable = ClientEnd::<fio::OpenableMarker>::from(handle).into_proxy().unwrap();
-
-        Ok(Self::new(
-            move |_scope: vfs::execution_scope::ExecutionScope,
-                  flags: fio::OpenFlags,
-                  relative_path: vfs::path::Path,
-                  server_end: zx::Channel| {
-                // TODO(b/306037927): Calling Open on a channel that doesn't speak Openable may
-                // inadvertently close the channel.
-                let _ = openable.open(
-                    flags,
-                    fio::ModeType::empty(),
-                    relative_path.as_str(),
-                    server_end.into(),
-                );
-            },
-            // TODO(b/298112397): Determine a more accurate dirent type.
-            fio::DirentType::Unknown,
-        ))
-    }
-}
-
 impl From<Open> for ClientEnd<fio::OpenableMarker> {
     /// Serves the `fuchsia.io.Openable` protocol for this Open and moves it into the registry.
     fn from(open: Open) -> Self {
@@ -346,15 +311,15 @@ fn join_path(base: &Path, mut relative: vfs::path::Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Capability, Dict, Directory, OneShotHandle, Receiver};
+    use crate::{Capability, Dict, Directory, Receiver};
     use anyhow::Result;
     use assert_matches::assert_matches;
-    use fidl::endpoints::{create_endpoints, spawn_stream_handler, ClientEnd, Proxy};
+    use fidl::endpoints::{create_endpoints, ClientEnd};
     use fidl_fuchsia_io as fio;
     use fuchsia_async as fasync;
     use fuchsia_zircon as zx;
     use fuchsia_zircon::AsHandleRef;
-    use futures::channel::{mpsc, oneshot};
+    use futures::channel::oneshot;
     use futures::{StreamExt, TryStreamExt};
     use lazy_static::lazy_static;
     use std::sync::Mutex;
@@ -535,46 +500,6 @@ mod tests {
         assert_eq!(join_path(&crate::Path::default(), "abc".try_into().unwrap()), "abc");
         assert_eq!(join_path(&crate::Path::new("abc"), ".".try_into().unwrap()), "abc");
         assert_eq!(join_path(&crate::Path::new("abc"), "def".try_into().unwrap()), "abc/def");
-    }
-
-    /// Tests that a OneShotHandle to a channel that speaks `Openable` can be converted to Open.
-    #[fuchsia::test]
-    async fn test_from_openable_one_shot_handle() -> Result<()> {
-        let (object_tx, mut object_rx) = mpsc::unbounded();
-
-        let openable_proxy: fio::OpenableProxy = spawn_stream_handler(move |request| {
-            let object_tx = object_tx.clone();
-            async move {
-                match request {
-                    fio::OpenableRequest::Open { flags, mode, path, object, control_handle: _ } => {
-                        assert_eq!(flags, fio::OpenFlags::DIRECTORY);
-                        assert_eq!(mode, fio::ModeType::empty());
-                        assert_eq!(&path, "");
-                        object_tx.unbounded_send(object).unwrap();
-                    }
-                }
-            }
-        })?;
-
-        let zx_handle: zx::Handle = openable_proxy.into_channel().unwrap().into_zx_channel().into();
-        let handle: OneShotHandle = zx_handle.into();
-
-        let open: Open = handle.try_into()?;
-
-        // Opening should send a server end to Open.
-        let scope = vfs::execution_scope::ExecutionScope::new();
-        let (_dir_client_end, dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
-        open.open(
-            scope,
-            fio::OpenFlags::DIRECTORY,
-            ".".to_string(),
-            dir_server_end.into_channel().into(),
-        );
-
-        let server_end = object_rx.next().await;
-        assert!(server_end.is_some());
-
-        Ok(())
     }
 
     #[fuchsia::test]
