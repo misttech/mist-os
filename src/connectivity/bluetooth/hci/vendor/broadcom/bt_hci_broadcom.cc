@@ -21,6 +21,7 @@
 #include <sys/random.h>
 #include <threads.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
 #include <zircon/status.h>
 #include <zircon/threads.h>
 
@@ -72,7 +73,8 @@ void BtHciBroadcom::OpenHci(OpenHciCompleter::Sync& completer) {
 void BtHciBroadcom::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  ZX_PANIC("Unknown method in Vendor request");
+  zxlogf(ERROR, "Unknown method in Vendor request, closing with ZX_ERR_NOT_SUPPORTED");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 const std::unordered_map<uint16_t, std::string> BtHciBroadcom::kFirmwareMap = {
@@ -193,7 +195,8 @@ void BtHciBroadcom::OpenSnoopChannel(OpenSnoopChannelRequestView request,
 void BtHciBroadcom::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  ZX_PANIC("Unknown method in HCI request");
+  zxlogf(ERROR, "Unknown method in Hci request, closing with ZX_ERR_NOT_SUPPORTED");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)

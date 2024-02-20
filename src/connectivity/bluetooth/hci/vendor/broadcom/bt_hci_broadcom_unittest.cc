@@ -15,6 +15,7 @@
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include "zircon/errors.h"
 
 namespace bt_hci_broadcom {
 
@@ -295,6 +296,45 @@ TEST_F(BtHciBroadcomTest, VendorProtocolSanityTest) {
   ASSERT_TRUE(result.ok());
 
   EXPECT_EQ(result->features, fuchsia_hardware_bluetooth::BtVendorFeatures::kSetAclPriorityCommand);
+}
+
+// TODO(b/326070040): Re-enable this test.  Issues with ddk / DFv1
+TEST_F(BtHciBroadcomTest, DISABLED_VendorProtocolUnknownMethod) {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Vendor>();
+  ASSERT_FALSE(endpoints.is_error());
+
+  // Bind server end
+  auto server_dispatcher = mock_ddk::GetDriverRuntime()->StartBackgroundDispatcher();
+  fidl::BindServer(server_dispatcher->async_dispatcher(), std::move(endpoints->server),
+                   dut()->GetDeviceContext<BtHciBroadcom>());
+
+  // Bind client end (to the wrong protocol)
+  fidl::ClientEnd<fuchsia_hardware_bluetooth::Hci> hci_end(endpoints->client.TakeChannel());
+  fidl::WireSyncClient hci_client(std::move(hci_end));
+
+  auto result = hci_client->ResetSco();
+
+  ASSERT_TRUE(result.status() != ZX_OK);
+  ASSERT_EQ(result.status(), ZX_ERR_NOT_SUPPORTED);
+}
+
+TEST_F(BtHciBroadcomTest, HciProtocolUnknownMethod) {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Hci>();
+  ASSERT_FALSE(endpoints.is_error());
+
+  // Bind server end
+  auto server_dispatcher = mock_ddk::GetDriverRuntime()->StartBackgroundDispatcher();
+  fidl::BindServer(server_dispatcher->async_dispatcher(), std::move(endpoints->server),
+                   dut()->GetDeviceContext<BtHciBroadcom>());
+
+  // Bind client end (to the wrong protocol)
+  fidl::ClientEnd<fuchsia_hardware_bluetooth::Vendor> vendor_end(endpoints->client.TakeChannel());
+  fidl::WireSyncClient vendor_client(std::move(vendor_end));
+
+  auto result = vendor_client->GetFeatures();
+
+  ASSERT_TRUE(result.status() != ZX_OK);
+  ASSERT_EQ(result.status(), ZX_ERR_NOT_SUPPORTED);
 }
 
 TEST_F(BtHciBroadcomInitializedTest, EncodeSetAclPrioritySuccessWithParametersHighSink) {
