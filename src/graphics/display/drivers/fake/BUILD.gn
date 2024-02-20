@@ -43,9 +43,6 @@ source_set("fake-lib") {
   deps = [
     "//src/graphics/display/drivers/coordinator:preferred-scanout-image-type",
   ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 static_library("sysmem-proxy-device") {

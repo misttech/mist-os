@@ -470,7 +470,10 @@ fuchsia_sysmem::BufferCollectionConstraints FakeDisplay::CreateBufferCollectionC
       }
     }
   }
-  constraints.image_format_constraints_count() = format_constraints_count;
+  // format_constraints_count <= kPixelFormats.size(), so this should always
+  // hold true.
+  ZX_DEBUG_ASSERT(format_constraints_count <= std::numeric_limits<uint32_t>::max());
+  constraints.image_format_constraints_count() = static_cast<uint32_t>(format_constraints_count);
   return constraints;
 }
 
