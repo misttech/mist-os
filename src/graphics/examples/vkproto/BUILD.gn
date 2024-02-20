@@ -47,8 +47,7 @@ config("vulkan_sdk_linux_config") {
 
 vulkan_executable("bin") {
   output_name = "vkproto"
-  sources = common_sources
-  sources += [ "example/main.cc" ]
+  sources = [ "example/main.cc" ]
 
   include_dirs = [ "//src/graphics/examples/vkproto/common" ]
 
@@ -93,6 +92,8 @@ vulkan_executable("bin") {
       libs = [ "vulkan" ]
     }
   }
+
+  deps += [ "common:srcs" ]
 
   data = [
     "common/shaders/frag.spv",

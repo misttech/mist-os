@@ -29,15 +29,15 @@ config("vulkan_sdk_linux_config") {
 executable("bin") {
   output_name = "vkproto-test"
   testonly = true
-  sources = common_sources
 
-  sources += [ "main.cc" ]
+  sources = [ "main.cc" ]
 
   include_dirs = [ "//src/graphics/examples/vkproto/common" ]
 
   defines = [ "VULKAN_HPP_NO_EXCEPTIONS" ]
 
   deps = [
+    "../common:srcs",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
   ]

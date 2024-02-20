@@ -45,9 +45,7 @@ config("vulkan_sdk_linux_config") {
 
 executable("bin") {
   output_name = "cmd-buf-benchmark"
-  sources = common_sources
-
-  sources += [ "main.cc" ]
+  sources = [ "main.cc" ]
 
   include_dirs = [ "//src/graphics/examples/vkproto/common" ]
 
@@ -90,6 +88,8 @@ executable("bin") {
       libs = [ "vulkan" ]
     }
   }
+
+  deps += [ "../common:srcs" ]
 
   data = [
     "../common/shaders/frag.spv",

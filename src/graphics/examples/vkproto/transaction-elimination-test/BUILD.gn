@@ -19,9 +19,8 @@ fuchsia_test_component("transaction_elimination_test") {
 executable("bin") {
   testonly = true
   output_name = "transaction-elimination-test"
-  sources = common_sources
 
-  sources += [ "main.cc" ]
+  sources = [ "main.cc" ]
 
   include_dirs = [ "//src/graphics/examples/vkproto/common" ]
 
@@ -30,6 +29,7 @@ executable("bin") {
   deps = [
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/lib/component/incoming/cpp",
+    "//src/graphics/examples/vkproto/common:srcs",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/vulkan",
