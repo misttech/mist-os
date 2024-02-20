@@ -75,9 +75,6 @@ TEST_F(DeviceEnumerationTest, Nuc7i5DNBTest) {
       // "sys/platform/pt/PCI0/bus/00:1f.3/00_1f_3/intel-hda-000",
       // "sys/platform/pt/PCI0/bus/00:1f.3/00_1f_3/intel-hda-controller",
       "sys/platform/pt/PCI0/bus/00:1f.6/00_1f_6/e1000",
-#ifdef include_packaged_drivers
-      "sys/platform/pt/PCI0/bus/01:00.0/01:00.0/iwlwifi-wlanphyimpl",
-#endif
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
@@ -88,6 +85,16 @@ TEST_F(DeviceEnumerationTest, Nuc7i5DNBTest) {
   //     "sys/platform/pt/PCI0/bus/00:15.1/00:15.1/i2c-bus-9d61",
   // };
   // ASSERT_NO_FATAL_FAILURE(TestRunner(kDfv1DevicePaths, std::size(kDfv1DevicePaths)));
+
+  // TODO(b/42178510): Remove older path once we migrate iwlwifi to composite node specs.
+#ifdef include_packaged_drivers
+  static const char* kIwlwifiDevicePaths[] = {
+      "sys/platform/pt/PCI0/bus/01:00.0/01_00_0/iwlwifi-wlanphyimpl",
+      "sys/platform/pt/PCI0/bus/01:00.0/01:00.0/iwlwifi-wlanphyimpl",
+  };
+  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(
+      cpp20::span(kIwlwifiDevicePaths, std::size(kIwlwifiDevicePaths))));
+#endif
 }
 
 TEST_F(DeviceEnumerationTest, Nuc11TNBv5Test) {
@@ -100,12 +107,18 @@ TEST_F(DeviceEnumerationTest, Nuc11TNBv5Test) {
       "sys/platform/pt/PC00/bus/00:02.0/00_02_0/intel_i915/intel-display-controller/display-coordinator",
       "sys/platform/pt/PC00/bus/00:14.0/00_14_0/xhci/usb-bus",
       "sys/platform/pt/PC00/bus/00:17.0/00_17_0/ahci",
-#ifdef include_packaged_drivers
-      "sys/platform/pt/PC00/bus/00:14.3/00:14.3/iwlwifi-wlanphyimpl",
-#endif
   };
-
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
+
+// TODO(b/42178510): Remove older path once we migrate iwlwifi to composite node specs.
+#ifdef include_packaged_drivers
+  static const char* kIwlwifiDevicePaths[] = {
+      "sys/platform/pt/PC00/bus/00:14.3/00:14.3/iwlwifi-wlanphyimpl",
+      "sys/platform/pt/PC00/bus/00:14.3/00_14_3/iwlwifi-wlanphyimpl",
+  };
+  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(
+      cpp20::span(kIwlwifiDevicePaths, std::size(kIwlwifiDevicePaths))));
+#endif
 }
 
 }  // namespace
