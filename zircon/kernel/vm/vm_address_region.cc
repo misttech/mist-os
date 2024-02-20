@@ -1101,8 +1101,7 @@ zx_status_t VmAddressRegion::ReserveSpace(const char* name, vaddr_t base, size_t
     return aspace_->arch_aspace().Unmap(base, size / PAGE_SIZE, ArchVmAspace::EnlargeOperation::No,
                                         nullptr);
   } else {
-    return aspace_->arch_aspace().Protect(base, size / PAGE_SIZE, arch_mmu_flags,
-                                          ArchVmAspace::EnlargeOperation::No);
+    return aspace_->arch_aspace().Protect(base, size / PAGE_SIZE, arch_mmu_flags);
   }
 }
 

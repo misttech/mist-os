@@ -103,8 +103,7 @@ zx::result<> El2TranslationTable::Init() {
   DEBUG_ASSERT(IsPhysicallyContiguous(code_start, code_size));
   paddr_t code_start_paddr = vaddr_to_paddr(reinterpret_cast<const void*>(code_start));
   status = el2_aspace_->Protect(code_start_paddr, code_size / PAGE_SIZE,
-                                ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_EXECUTE,
-                                ArchVmAspace::EnlargeOperation::Yes);
+                                ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_EXECUTE);
   if (status != ZX_OK) {
     Reset();
     return zx::error(status);

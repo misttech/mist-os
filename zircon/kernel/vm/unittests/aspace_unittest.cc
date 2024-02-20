@@ -1657,8 +1657,7 @@ static bool arch_vm_aspace_protect_split_pages() {
   // pages.
   constexpr vaddr_t kProtectedRange = kRegionSize / 2 - PAGE_SIZE;
   constexpr size_t kProtectedPages = 2;
-  ASSERT_OK(aspace.Protect(kProtectedRange, /*count=*/kProtectedPages, kReadWrite,
-                           ArchVmAspace::EnlargeOperation::Yes));
+  ASSERT_OK(aspace.Protect(kProtectedRange, /*count=*/kProtectedPages, kReadWrite));
 
   // Ensure the pages inside the range changed.
   EXPECT_EQ(get_vaddr_flags(&aspace, kProtectedRange), kReadWrite);
@@ -1710,8 +1709,7 @@ static bool arch_vm_aspace_protect_split_pages_out_of_memory() {
   // pages. Expect this to fail.
   constexpr vaddr_t kProtectedRange = kRegionSize / 2 - PAGE_SIZE;
   constexpr size_t kProtectedSize = 2 * PAGE_SIZE;
-  zx_status_t status =
-      aspace.Protect(kProtectedRange, /*count=*/2, kReadWrite, ArchVmAspace::EnlargeOperation::Yes);
+  zx_status_t status = aspace.Protect(kProtectedRange, /*count=*/2, kReadWrite);
   EXPECT_EQ(status, ZX_ERR_NO_MEMORY);
 
   // The pages surrounding our protect range should still be mapped.

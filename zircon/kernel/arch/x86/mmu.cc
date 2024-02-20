@@ -872,8 +872,7 @@ zx_status_t X86ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
   return result;
 }
 
-zx_status_t X86ArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags,
-                                     EnlargeOperation enlarge) {
+zx_status_t X86ArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags) {
   DEBUG_ASSERT(!pt_->IsUnified());
   if (!IsValidVaddr(vaddr))
     return ZX_ERR_INVALID_ARGS;
