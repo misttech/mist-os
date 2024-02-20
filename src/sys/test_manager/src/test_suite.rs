@@ -7,7 +7,6 @@ use {
         above_root_capabilities::AboveRootCapabilitiesForTest,
         constants::{self, HERMETIC_TESTS_COLLECTION},
         debug_data_processor::{DebugDataDirectory, DebugDataProcessor, DebugDataSender},
-        debug_data_server,
         error::*,
         facet,
         facet::SuiteFacets,
@@ -189,7 +188,7 @@ impl TestRunBuilder {
 
         let debug_task = fasync::Task::local(
             debug_data_processor
-                .collect_and_serve(event_sender.clone())
+                .collect_and_serve(event_sender)
                 .unwrap_or_else(|err| warn!(?err, "Error serving debug data")),
         );
 
@@ -249,12 +248,6 @@ impl TestRunBuilder {
 
         let ((), ()) = futures::future::join(
             remote.then(|_| async move {
-                // send debug data once the test completes.
-                debug_data_server::deprecated_send_kernel_debug_data(
-                    event_sender,
-                    accumulate_debug_data,
-                )
-                .await;
                 debug_task.await;
             }),
             Self::run_controller(

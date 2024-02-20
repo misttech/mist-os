@@ -3,67 +3,13 @@
 // found in the LICENSE file.
 
 use {
-    crate::constants,
     crate::run_events::RunEvent,
-    anyhow::{anyhow, Context, Error},
+    anyhow::Error,
     fidl::endpoints::{create_proxy, create_request_stream, Proxy},
     fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync,
     futures::{channel::mpsc, pin_mut, prelude::*, stream::FusedStream, StreamExt, TryStreamExt},
-    std::path::{Path, PathBuf},
     tracing::warn,
 };
-
-struct DebugDataFile {
-    pub name: String,
-    pub contents: Vec<u8>,
-}
-
-async fn copy_kernel_debug_data(
-    files: Vec<DebugDataFile>,
-    dest_root_dir: PathBuf,
-) -> Result<(), Error> {
-    let read_write_flags: fuchsia_fs::OpenFlags =
-        fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE;
-    let overwite_file_flag: fuchsia_fs::OpenFlags = fuchsia_fs::OpenFlags::RIGHT_WRITABLE
-        | fuchsia_fs::OpenFlags::RIGHT_READABLE
-        | fuchsia_fs::OpenFlags::TRUNCATE
-        | fuchsia_fs::OpenFlags::CREATE;
-
-    let tmp_dir_root = fuchsia_fs::directory::open_in_namespace(
-        dest_root_dir.to_str().unwrap(),
-        read_write_flags,
-    )?;
-    let tmp_dir_root_ref = &tmp_dir_root;
-    futures::stream::iter(files)
-        .map(Ok)
-        .try_for_each_concurrent(None, move |DebugDataFile { name, contents }| {
-            let rel_file_path = PathBuf::from(&name);
-            async move {
-                if let Some(parent) = rel_file_path.parent() {
-                    if !parent.as_os_str().is_empty() {
-                        fuchsia_fs::directory::create_directory_recursive(
-                            tmp_dir_root_ref,
-                            parent.to_str().ok_or(anyhow!("Invalid path"))?,
-                            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                        )
-                        .await
-                        .context("create subdirectories")?;
-                    }
-                }
-                let file = fuchsia_fs::directory::open_file_no_describe(
-                    tmp_dir_root_ref,
-                    &name,
-                    overwite_file_flag,
-                )
-                .context("open file")?;
-                fuchsia_fs::file::write(&file, &contents).await.context("write file")?;
-                Result::<_, Error>::Ok(())
-            }
-        })
-        .await?;
-
-    Ok(())
-}
 
 const DEBUG_DATA_TIMEOUT_SECONDS: i64 = 15;
 const EARLY_BOOT_DEBUG_DATA_PATH: &'static str = "/debugdata";
@@ -78,103 +24,6 @@ pub(crate) async fn send_kernel_debug_data(
     )?;
 
     serve_iterator(EARLY_BOOT_DEBUG_DATA_PATH, directory, iterator).await
-}
-
-// TODO(b/308192477): Remove once our clients stop using this scp.
-pub(crate) async fn deprecated_send_kernel_debug_data(
-    mut event_sender: mpsc::Sender<RunEvent>,
-    accumulate: bool,
-) {
-    if !accumulate {
-        tracing::info!("(deprecated) Serving kernel debug data");
-        // If we're not accumulating, we don't need the custom copy logic.
-        if let Err(e) = serve_directory(EARLY_BOOT_DEBUG_DATA_PATH, event_sender).await {
-            warn!("Error serving kernel debug data: {:?}", e);
-        }
-        return;
-    }
-
-    let root_dir = match fuchsia_fs::directory::open_in_namespace(
-        EARLY_BOOT_DEBUG_DATA_PATH,
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    ) {
-        Ok(dir) => dir,
-        Err(err) => {
-            warn!("Failed to open '/debugdata'. Error: {}", err);
-            return;
-        }
-    };
-
-    let files = fuchsia_fs::directory::readdir_recursive(
-        &root_dir,
-        Some(fasync::Duration::from_seconds(DEBUG_DATA_TIMEOUT_SECONDS)),
-    )
-    .filter_map(|result| async move {
-        match result {
-            Ok(entry) => {
-                if entry.kind != fio::DirentType::File {
-                    None
-                } else {
-                    Some(entry)
-                }
-            }
-            Err(err) => {
-                warn!("Error while reading directory entry. Error: {}", err);
-                None
-            }
-        }
-    })
-    .filter_map(|entry| async move {
-        let path = PathBuf::from(EARLY_BOOT_DEBUG_DATA_PATH)
-            .join(entry.name)
-            .to_string_lossy()
-            .to_string();
-        match fuchsia_fs::file::open_in_namespace(&path, fuchsia_fs::OpenFlags::RIGHT_READABLE) {
-            Ok(file) => Some((path, file)),
-            Err(err) => {
-                warn!("Failed to read file {}. Error {}", path, err);
-                None
-            }
-        }
-    })
-    .filter_map(|(path, file)| async move {
-        match fuchsia_fs::file::read(&file).await {
-            Ok(contents) => Some((path, contents)),
-            Err(err) => {
-                warn!("Failed to read file {}. Error {}", path, err);
-                None
-            }
-        }
-    })
-    .map(|(name, contents)| {
-        // Remove the leading '/' so there is no 'root' entry.
-        DebugDataFile { name: name.trim_start_matches('/').to_string(), contents }
-    })
-    .collect::<Vec<DebugDataFile>>()
-    .await;
-
-    if !files.is_empty() {
-        tracing::info!(
-            "Found early boot profile files: {:?}",
-            files
-                .iter()
-                .map(|file| format!("file: {}, content_len: {:?}", file.name, file.contents.len()))
-                .collect::<Vec<_>>()
-        );
-        // We copy the files to a well known directory in /tmp. This supports exporting the
-        // files off device via SCP. Once this flow is no longer needed, we can use something
-        // like an ephemeral directory which is torn down once we're done instead.
-        copy_kernel_debug_data(
-            files,
-            Path::new(constants::KERNEL_DEBUG_DATA_FOR_SCP).to_path_buf(),
-        )
-        .await
-        .unwrap_or_else(|e| warn!("Error copying kernel debug data: {:?}", e));
-        // deliberately hold event_sender open even though we aren't sending anything... this
-        // keeps RunController channel open, and run-test-suite running until copying files to
-        // tmp/ is complete. See https://fxbug.dev/42088142#c11 for details.
-        event_sender.disconnect();
-    }
 }
 
 const ITERATOR_BATCH_SIZE: usize = 10;
@@ -316,48 +165,6 @@ mod test {
         super::*, crate::run_events::RunEventPayload, fuchsia_async as fasync,
         std::collections::HashSet, tempfile::tempdir, test_diagnostics::collect_string_from_socket,
     };
-
-    #[fuchsia::test]
-    async fn copy_empty() {
-        let dir = tempdir().unwrap();
-        copy_kernel_debug_data(vec![], dir.path().to_path_buf()).await.unwrap();
-        let contents = std::fs::read_dir(dir.path()).unwrap().collect::<Vec<_>>();
-        assert!(contents.is_empty());
-    }
-
-    #[fuchsia::test]
-    async fn single_file() {
-        let dir = tempdir().unwrap();
-        copy_kernel_debug_data(
-            vec![DebugDataFile { name: "file".to_string(), contents: b"test".to_vec() }],
-            dir.path().to_path_buf(),
-        )
-        .await
-        .unwrap();
-        let contents = std::fs::read_dir(dir.path()).unwrap().collect::<Vec<_>>();
-        assert_eq!(contents.len(), 1);
-
-        assert_eq!(std::fs::read(dir.path().join("file")).unwrap().as_slice(), b"test");
-    }
-
-    #[fuchsia::test]
-    async fn multiple_files() {
-        let dir = tempdir().unwrap();
-        copy_kernel_debug_data(
-            vec![
-                DebugDataFile { name: "file".to_string(), contents: b"test".to_vec() },
-                DebugDataFile { name: "dir/file2".to_string(), contents: b"test2".to_vec() },
-            ],
-            dir.path().to_path_buf(),
-        )
-        .await
-        .unwrap();
-        let contents = std::fs::read_dir(dir.path()).unwrap().collect::<Vec<_>>();
-        assert_eq!(contents.len(), 2);
-
-        assert_eq!(std::fs::read(dir.path().join("file")).unwrap().as_slice(), b"test");
-        assert_eq!(std::fs::read(dir.path().join("dir/file2")).unwrap().as_slice(), b"test2");
-    }
 
     async fn serve_iterator_from_tmp(
         dir: &tempfile::TempDir,
