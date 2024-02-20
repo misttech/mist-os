@@ -14,7 +14,7 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use dense_map::{DenseMap, Entry as DenseMapEntry, EntryKey};
+use dense_map::{DenseMap, EntryKey};
 use derivative::Derivative;
 use either::Either;
 use net_types::{
@@ -567,6 +567,8 @@ pub(crate) trait DatagramStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>;
 
     /// Calls the function with an immutable reference to the datagram sockets.
+    // TODO(https://fxbug.dev/42076297): Delete this function when sockets are
+    // referency.
     fn with_sockets_state<
         O,
         F: FnOnce(&mut Self::SocketsStateCtx<'_>, &SocketsState<I, Self::WeakDeviceId, S>) -> O,
@@ -576,6 +578,8 @@ pub(crate) trait DatagramStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
     ) -> O;
 
     /// Calls the function with a mutable reference to the datagram sockets.
+    // TODO(https://fxbug.dev/42076297): Delete this function when sockets are
+    // referency.
     fn with_sockets_state_mut<
         O,
         F: FnOnce(&mut Self::SocketsStateCtx<'_>, &mut SocketsState<I, Self::WeakDeviceId, S>) -> O,
@@ -584,12 +588,34 @@ pub(crate) trait DatagramStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
         cb: F,
     ) -> O;
 
-    /// Calls the function with access to a [`DatagramBoundStateContext`].
-    #[allow(dead_code)]
-    fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketsStateCtx<'_>) -> O>(
+    /// Calls the function with an immutable reference to the given socket's
+    /// state.
+    fn with_socket_state<
+        O,
+        F: FnOnce(&mut Self::SocketsStateCtx<'_>, &SocketState<I, Self::WeakDeviceId, S>) -> O,
+    >(
         &mut self,
+        id: &S::SocketId<I>,
         cb: F,
-    ) -> O;
+    ) -> O {
+        self.with_sockets_state(move |ctx, state| {
+            cb(ctx, state.get(id.get_key_index()).expect("invalid socket ID"))
+        })
+    }
+
+    /// Calls the function with a mutable reference to the given socket's state.
+    fn with_socket_state_mut<
+        O,
+        F: FnOnce(&mut Self::SocketsStateCtx<'_>, &mut SocketState<I, Self::WeakDeviceId, S>) -> O,
+    >(
+        &mut self,
+        id: &S::SocketId<I>,
+        cb: F,
+    ) -> O {
+        self.with_sockets_state_mut(move |ctx, state| {
+            cb(ctx, state.get_mut(id.get_key_index()).expect("invalid socket ID"))
+        })
+    }
 }
 
 pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, BC, S: DatagramSocketSpec>:
@@ -1789,18 +1815,16 @@ pub(crate) fn get_info<
     _bindings_ctx: &mut BC,
     id: &S::SocketId<I>,
 ) -> SocketInfo<I, CC::WeakDeviceId, S> {
-    core_ctx.with_sockets_state(|_core_ctx, state| {
-        match state.get(id.get_key_index()).expect("invalid socket ID") {
-            SocketState::Unbound(_) => SocketInfo::Unbound,
-            SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
-                match socket_type {
-                    BoundSocketStateType::Listener { state, sharing: _ } => {
-                        let ListenerState { addr, ip_options: _ } = state;
-                        SocketInfo::Listener(addr.clone())
-                    }
-                    BoundSocketStateType::Connected { state, sharing: _ } => {
-                        SocketInfo::Connected(S::conn_addr_from_state(state))
-                    }
+    core_ctx.with_socket_state(id, |_core_ctx, state| match state {
+        SocketState::Unbound(_) => SocketInfo::Unbound,
+        SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
+            match socket_type {
+                BoundSocketStateType::Listener { state, sharing: _ } => {
+                    let ListenerState { addr, ip_options: _ } = state;
+                    SocketInfo::Listener(addr.clone())
+                }
+                BoundSocketStateType::Connected { state, sharing: _ } => {
+                    SocketInfo::Connected(S::conn_addr_from_state(state))
                 }
             }
         }
@@ -1819,7 +1843,7 @@ pub(crate) fn listen<
     addr: Option<ZonedAddr<SpecifiedAddr<I::Addr>, CC::DeviceId>>,
     local_id: Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
 ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
-    core_ctx.with_sockets_state_mut(|core_ctx, state| {
+    core_ctx.with_socket_state_mut(id, |core_ctx, state| {
         listen_inner::<_, BC, _, S>(core_ctx, bindings_ctx, state, id, addr, local_id)
     })
 }
@@ -2122,7 +2146,7 @@ fn listen_inner<
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    state: &mut SocketsState<I, CC::WeakDeviceId, S>,
+    state: &mut SocketState<I, CC::WeakDeviceId, S>,
     id: &S::SocketId<I>,
     addr: Option<ZonedAddr<SpecifiedAddr<I::Addr>, CC::DeviceId>>,
     local_id: Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
@@ -2147,11 +2171,7 @@ fn listen_inner<
         ),
     }
 
-    let mut entry = match state.entry(id.get_key_index()) {
-        DenseMapEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
-        DenseMapEntry::Occupied(o) => o,
-    };
-    let UnboundSocketState { device, sharing, ip_options } = match entry.get() {
+    let UnboundSocketState { device, sharing, ip_options } = match state {
         SocketState::Unbound(state) => state,
         SocketState::Bound(_) => return Err(Either::Left(ExpectedUnboundError)),
     };
@@ -2364,7 +2384,7 @@ fn listen_inner<
 
     // Replace the unbound state only after we're sure the
     // insertion has succeeded.
-    *entry.get_mut() = SocketState::Bound(BoundSocketState {
+    *state = SocketState::Bound(BoundSocketState {
         socket_type: BoundSocketStateType::Listener {
             state: ListenerState {
                 // TODO(https://fxbug.dev/42082099): Remove this clone().
@@ -3083,24 +3103,14 @@ pub(crate) fn connect<
     remote_id: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     extra: S::ConnStateExtra,
 ) -> Result<(), ConnectError> {
-    core_ctx.with_sockets_state_mut(|core_ctx, state| {
-        let mut entry = match state.entry(id.get_key_index()) {
-            DenseMapEntry::Vacant(_) => panic!("socket ID {:?} is invalid", id),
-            DenseMapEntry::Occupied(o) => o,
-        };
-
+    core_ctx.with_socket_state_mut(id, |core_ctx, state| {
         let (conn_state, sharing) = match (
             core_ctx.dual_stack_context(),
             dual_stack_remote_ip::<I, _>(remote_ip.clone()),
         ) {
             (MaybeDualStack::DualStack(ds), remote_ip) => {
                 let connect_op = DualStackConnectOperation::new_from_state(
-                    ds,
-                    id,
-                    entry.get(),
-                    remote_ip,
-                    remote_id,
-                    extra,
+                    ds, id, state, remote_ip, remote_id, extra,
                 )?;
                 let converter = ds.converter();
                 let (conn_state, sharing) = ds.with_both_bound_sockets_mut(
@@ -3119,12 +3129,7 @@ pub(crate) fn connect<
             }
             (MaybeDualStack::NotDualStack(nds), DualStackRemoteIp::ThisStack(remote_ip)) => {
                 let connect_op = SingleStackConnectOperation::new_from_state(
-                    nds,
-                    id,
-                    entry.get(),
-                    remote_ip,
-                    remote_id,
-                    extra,
+                    nds, id, state, remote_ip, remote_id, extra,
                 );
                 let converter = nds.converter();
                 let (conn_state, sharing) =
@@ -3137,13 +3142,13 @@ pub(crate) fn connect<
                 Err(ConnectError::RemoteUnexpectedlyMapped)
             }
         }?;
-        let original_bound_addr = match entry.get() {
+        let original_bound_addr = match state {
             SocketState::Unbound(_) => None,
             SocketState::Bound(BoundSocketState { socket_type: _, original_bound_addr }) => {
                 original_bound_addr.clone()
             }
         };
-        *entry.get_mut() = SocketState::Bound(BoundSocketState {
+        *state = SocketState::Bound(BoundSocketState {
             socket_type: BoundSocketStateType::Connected { state: conn_state, sharing },
             original_bound_addr,
         });
@@ -3171,16 +3176,12 @@ pub(crate) fn disconnect_connected<
     _bindings_ctx: &mut BC,
     id: &S::SocketId<I>,
 ) -> Result<(), ExpectedConnError> {
-    core_ctx.with_sockets_state_mut(|core_ctx, state| {
-        let mut entry = match state.entry(id.get_key_index()) {
-            DenseMapEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
-            DenseMapEntry::Occupied(o) => o,
-        };
-        let state = match entry.get() {
+    core_ctx.with_socket_state_mut(id, |core_ctx, state| {
+        let inner_state = match state {
             SocketState::Unbound(_) => return Err(ExpectedConnError),
             SocketState::Bound(state) => state,
         };
-        let BoundSocketState { socket_type, original_bound_addr } = state;
+        let BoundSocketState { socket_type, original_bound_addr } = inner_state;
         let conn_state = match socket_type {
             BoundSocketStateType::Listener { state: _, sharing: _ } => {
                 return Err(ExpectedConnError)
@@ -3201,19 +3202,19 @@ pub(crate) fn disconnect_connected<
             }
         };
 
-        *entry.get_mut() = match original_bound_addr {
+        *state = match original_bound_addr {
             None => SocketState::Unbound(disconnect_to_unbound(
                 core_ctx,
                 id,
                 clear_device_on_disconnect,
-                state,
+                inner_state,
             )),
             Some(original_bound_addr) => SocketState::Bound(disconnect_to_listener(
                 core_ctx,
                 id,
                 original_bound_addr.clone(),
                 clear_device_on_disconnect,
-                state,
+                inner_state,
             )),
         };
         Ok(())
@@ -3370,8 +3371,8 @@ pub(crate) fn shutdown_connected<
     id: &S::SocketId<I>,
     which: ShutdownType,
 ) -> Result<(), ExpectedConnError> {
-    core_ctx.with_sockets_state_mut(|core_ctx, state| {
-        let state = match state.get_mut(id.get_key_index()).expect("invalid socket ID") {
+    core_ctx.with_socket_state_mut(id, |core_ctx, state| {
+        let state = match state {
             SocketState::Unbound(_) => return Err(ExpectedConnError),
             SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
                 match socket_type {
@@ -3403,8 +3404,8 @@ pub(crate) fn get_shutdown_connected<
     _bindings_ctx: &BC,
     id: &S::SocketId<I>,
 ) -> Option<ShutdownType> {
-    core_ctx.with_sockets_state(|core_ctx, state| {
-        let state = match state.get(id.get_key_index()).expect("invalid socket ID") {
+    core_ctx.with_socket_state(id, |core_ctx, state| {
+        let state = match state {
             SocketState::Unbound(_) => return None,
             SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
                 match socket_type {
@@ -3447,8 +3448,8 @@ pub(crate) fn send_conn<
     id: &S::SocketId<I>,
     body: B,
 ) -> Result<(), SendError<S::SerializeError>> {
-    core_ctx.with_sockets_state(|core_ctx, state| {
-        let state = match state.get(id.get_key_index()).expect("invalid socket ID") {
+    core_ctx.with_socket_state(id, |core_ctx, state| {
+        let state = match state {
             SocketState::Unbound(_) => return Err(SendError::NotConnected),
             SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
                 match socket_type {
@@ -3582,12 +3583,12 @@ pub(crate) fn send_to<
     remote_identifier: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     body: B,
 ) -> Result<(), Either<LocalAddressError, SendToError<S::SerializeError>>> {
-    core_ctx.with_sockets_state_mut(|core_ctx, state| {
+    core_ctx.with_socket_state_mut(id, |core_ctx, state| {
         match listen_inner(core_ctx, bindings_ctx, state, id, None, None) {
             Ok(()) | Err(Either::Left(ExpectedUnboundError)) => (),
             Err(Either::Right(e)) => return Err(Either::Left(e)),
         };
-        let state = match state.get(id.get_key_index()).expect("no such socket") {
+        let state = match state {
             SocketState::Unbound(_) => panic!("expected bound socket"),
             SocketState::Bound(BoundSocketState { socket_type: state, original_bound_addr: _ }) => {
                 state
@@ -3637,7 +3638,7 @@ pub(crate) fn send_to<
                                     local_id: identifier,
                                     remote_ip,
                                     remote_id: remote_identifier,
-                                    device: &device,
+                                    device,
                                     send_options: &ip_options.hop_limits,
                                 },
                                 core_ctx,
@@ -3665,7 +3666,7 @@ pub(crate) fn send_to<
                                     local_id: *local_id,
                                     remote_ip,
                                     remote_id: remote_identifier,
-                                    device: &device,
+                                    device,
                                     send_options: &ip_options.hop_limits,
                                 },
                                 core_ctx,
@@ -3696,7 +3697,7 @@ pub(crate) fn send_to<
                                 local_id: *identifier,
                                 remote_ip,
                                 remote_id: remote_identifier,
-                                device: &device,
+                                device,
                                 send_options: &ip_options.hop_limits,
                             },
                             core_ctx,
@@ -3713,7 +3714,7 @@ pub(crate) fn send_to<
                                 local_id: *identifier,
                                 remote_ip,
                                 remote_id: remote_identifier,
-                                device: &device,
+                                device,
                                 send_options: &ip_options.hop_limits,
                             },
                             core_ctx,
@@ -3730,8 +3731,8 @@ pub(crate) fn send_to<
                                 local_id: *identifier,
                                 remote_ip,
                                 remote_id: remote_identifier,
-                                device: &device,
-                                send_options: ds.to_other_send_options(&ip_options),
+                                device,
+                                send_options: ds.to_other_send_options(ip_options),
                             },
                             ds,
                         )),
@@ -3747,8 +3748,8 @@ pub(crate) fn send_to<
                                 local_id: *identifier,
                                 remote_ip,
                                 remote_id: remote_identifier,
-                                device: &device,
-                                send_options: ds.to_other_send_options(&ip_options),
+                                device,
+                                send_options: ds.to_other_send_options(ip_options),
                             },
                             ds,
                         )),
@@ -3784,7 +3785,7 @@ pub(crate) fn send_to<
                                     local_id: *local_id,
                                     remote_ip,
                                     remote_id: remote_identifier,
-                                    device: &device,
+                                    device,
                                     send_options: &ip_options.hop_limits,
                                 },
                                 core_ctx,
@@ -3812,8 +3813,8 @@ pub(crate) fn send_to<
                                     local_id: *local_id,
                                     remote_ip,
                                     remote_id: remote_identifier,
-                                    device: &device,
-                                    send_options: ds.to_other_send_options(&ip_options),
+                                    device,
+                                    send_options: ds.to_other_send_options(ip_options),
                                 },
                                 ds,
                             )),
@@ -4130,8 +4131,8 @@ pub(crate) fn set_device<
     id: &S::SocketId<I>,
     new_device: Option<&CC::DeviceId>,
 ) -> Result<(), SocketError> {
-    core_ctx.with_sockets_state_mut(|core_ctx, state| {
-        match state.get_mut(id.get_key_index()).expect("invalid socket ID") {
+    core_ctx.with_socket_state_mut(id, |core_ctx, state| {
+        match state {
             SocketState::Unbound(state) => {
                 let UnboundSocketState { ref mut device, sharing: _, ip_options: _ } = state;
                 *device = new_device.map(|d| core_ctx.downgrade_device_id(d));
@@ -4280,9 +4281,8 @@ pub(crate) fn get_bound_device<
     _bindings_ctx: &BC,
     id: &S::SocketId<I>,
 ) -> Option<CC::WeakDeviceId> {
-    core_ctx.with_sockets_state(|core_ctx, state| {
-        let (_, device): (&IpOptions<_, _, _>, _) =
-            get_options_device(core_ctx, state.get(id.get_key_index()).expect("missing socket"));
+    core_ctx.with_socket_state(id, |core_ctx, state| {
+        let (_, device): (&IpOptions<_, _, _>, _) = get_options_device(core_ctx, state);
         device.clone()
     })
 }
@@ -4402,9 +4402,8 @@ pub(crate) fn set_multicast_membership<
     interface: MulticastMembershipInterfaceSelector<I::Addr, CC::DeviceId>,
     want_membership: bool,
 ) -> Result<(), SetMulticastMembershipError> {
-    core_ctx.with_sockets_state_mut(|core_ctx, state| {
-        let (_, bound_device): (&IpOptions<_, _, _>, _) =
-            get_options_device(core_ctx, state.get(id.get_key_index()).expect("socket not found"));
+    core_ctx.with_socket_state_mut(id, |core_ctx, state| {
+        let (_, bound_device): (&IpOptions<_, _, _>, _) = get_options_device(core_ctx, state);
 
         let interface = match interface {
             MulticastMembershipInterfaceSelector::Specified(selector) => match selector {
@@ -4432,7 +4431,7 @@ pub(crate) fn set_multicast_membership<
             }
         };
 
-        let ip_options = get_options_mut(core_ctx, state, id);
+        let ip_options = get_options_mut(core_ctx, state);
 
         let Some(strong_interface) = interface.as_strong(core_ctx) else {
             return Err(SetMulticastMembershipError::DeviceDoesNotExist);
@@ -4544,13 +4543,12 @@ fn get_options_mut<
     CC: DatagramBoundStateContext<I, BC, S>,
 >(
     core_ctx: &mut CC,
-    state: &'a mut SocketsState<I, CC::WeakDeviceId, S>,
-    id: &S::SocketId<I>,
+    state: &'a mut SocketState<I, CC::WeakDeviceId, S>,
 ) -> &'a mut IpOptions<I, CC::WeakDeviceId, S>
 where
     S::SocketId<I>: EntryKey,
 {
-    match state.get_mut(id.get_key_index()).expect("socket not found") {
+    match state {
         SocketState::Unbound(state) => {
             let UnboundSocketState { ip_options, device: _, sharing: _ } = state;
             ip_options
@@ -4595,8 +4593,8 @@ pub(crate) fn update_ip_hop_limit<
 ) {
     // TODO(https://fxbug.dev/324279602): The options held by a connected
     // socket's `IpSock` will now be out of sync with the options updated here.
-    core_ctx.with_sockets_state_mut(|core_ctx, state| {
-        let options = get_options_mut(core_ctx, state, id);
+    core_ctx.with_socket_state_mut(id, |core_ctx, state| {
+        let options = get_options_mut(core_ctx, state);
 
         update(&mut options.hop_limits)
     })
@@ -4612,9 +4610,8 @@ pub(crate) fn get_ip_hop_limits<
     _bindings_ctx: &BC,
     id: &S::SocketId<I>,
 ) -> HopLimits {
-    core_ctx.with_sockets_state(|core_ctx, state| {
-        let (options, device) =
-            get_options_device(core_ctx, state.get(id.get_key_index()).expect("socket not found"));
+    core_ctx.with_socket_state(id, |core_ctx, state| {
+        let (options, device) = get_options_device(core_ctx, state);
         let device = device.as_ref().and_then(|d| core_ctx.upgrade_weak_device_id(d));
         DatagramBoundStateContext::<I, _, _>::with_transport_context(core_ctx, |core_ctx| {
             options.hop_limits.get_limits_with_defaults(
@@ -4640,13 +4637,13 @@ pub(crate) fn with_other_stack_ip_options_mut_if_unbound<
     id: &S::SocketId<I>,
     cb: impl FnOnce(&mut S::OtherStackIpOptions<I>) -> R,
 ) -> Result<R, ExpectedUnboundError> {
-    core_ctx.with_sockets_state_mut(|core_ctx, state| {
-        let is_unbound = match state.get(id.get_key_index()).expect("socket not found") {
+    core_ctx.with_socket_state_mut(id, |core_ctx, state| {
+        let is_unbound = match state {
             SocketState::Unbound(_) => true,
             SocketState::Bound(_) => false,
         };
         if is_unbound {
-            let options = get_options_mut(core_ctx, state, id);
+            let options = get_options_mut(core_ctx, state);
             Ok(cb(&mut options.other_stack))
         } else {
             Err(ExpectedUnboundError)
@@ -4667,8 +4664,8 @@ pub(crate) fn with_other_stack_ip_options_mut<
     id: &S::SocketId<I>,
     cb: impl FnOnce(&mut S::OtherStackIpOptions<I>) -> R,
 ) -> R {
-    core_ctx.with_sockets_state_mut(|core_ctx, state| {
-        let options = get_options_mut(core_ctx, state, id);
+    core_ctx.with_socket_state_mut(id, |core_ctx, state| {
+        let options = get_options_mut(core_ctx, state);
         cb(&mut options.other_stack)
     })
 }
@@ -4686,9 +4683,8 @@ pub(crate) fn with_other_stack_ip_options<
     id: &S::SocketId<I>,
     cb: impl FnOnce(&S::OtherStackIpOptions<I>) -> R,
 ) -> R {
-    core_ctx.with_sockets_state(|core_ctx, state| {
-        let (options, _device) =
-            get_options_device(core_ctx, state.get(id.get_key_index()).expect("not found"));
+    core_ctx.with_socket_state(id, |core_ctx, state| {
+        let (options, _device) = get_options_device(core_ctx, state);
 
         cb(&options.other_stack)
     })
@@ -4711,9 +4707,8 @@ pub(crate) fn with_other_stack_ip_options_and_default_hop_limits<
     id: &S::SocketId<I>,
     cb: impl FnOnce(&S::OtherStackIpOptions<I>, HopLimits) -> R,
 ) -> Result<R, NotDualStackCapableError> {
-    core_ctx.with_sockets_state(|core_ctx, state| {
-        let (options, device) =
-            get_options_device(core_ctx, state.get(id.get_key_index()).expect("not found"));
+    core_ctx.with_socket_state(id, |core_ctx, state| {
+        let (options, device) = get_options_device(core_ctx, state);
         let device = device.as_ref().and_then(|d| core_ctx.upgrade_weak_device_id(d));
         match DatagramBoundStateContext::<I, _, _>::dual_stack_context(core_ctx) {
             MaybeDualStack::NotDualStack(_) => Err(NotDualStackCapableError),
@@ -4745,8 +4740,8 @@ pub(crate) fn update_sharing<
     id: &S::SocketId<I>,
     new_sharing: Sharing,
 ) -> Result<(), ExpectedUnboundError> {
-    core_ctx.with_sockets_state_mut(|_core_ctx, state| {
-        let state = match state.get_mut(id.get_key_index()).expect("socket not found") {
+    core_ctx.with_socket_state_mut(id, |_core_ctx, state| {
+        let state = match state {
             SocketState::Bound(_) => return Err(ExpectedUnboundError),
             SocketState::Unbound(state) => state,
         };
@@ -4767,8 +4762,8 @@ pub(crate) fn get_sharing<
     core_ctx: &mut CC,
     id: &S::SocketId<I>,
 ) -> Sharing {
-    core_ctx.with_sockets_state(|_core_ctx, state| {
-        match state.get(id.get_key_index()).expect("socket not found") {
+    core_ctx.with_socket_state(id, |_core_ctx, state| {
+        match state {
             SocketState::Unbound(state) => {
                 let UnboundSocketState { device: _, sharing, ip_options: _ } = state;
                 sharing
@@ -4794,8 +4789,8 @@ pub(crate) fn set_ip_transparent<
     id: &S::SocketId<I>,
     value: bool,
 ) {
-    core_ctx.with_sockets_state_mut(|core_ctx, state| {
-        get_options_mut(core_ctx, state, id).transparent = value;
+    core_ctx.with_socket_state_mut(id, |core_ctx, state| {
+        get_options_mut(core_ctx, state).transparent = value;
     })
 }
 
@@ -4808,9 +4803,8 @@ pub(crate) fn get_ip_transparent<
     core_ctx: &mut CC,
     id: &S::SocketId<I>,
 ) -> bool {
-    core_ctx.with_sockets_state(|core_ctx, state| {
-        let (options, _device) =
-            get_options_device(core_ctx, state.get(id.get_key_index()).expect("missing socket"));
+    core_ctx.with_socket_state(id, |core_ctx, state| {
+        let (options, _device) = get_options_device(core_ctx, state);
         options.transparent
     })
 }
@@ -5273,14 +5267,6 @@ mod test {
         ) -> O {
             let Self { outer, inner } = self;
             cb(inner, outer)
-        }
-
-        fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketsStateCtx<'_>) -> O>(
-            &mut self,
-            cb: F,
-        ) -> O {
-            let Self { outer: _, inner } = self;
-            cb(inner)
         }
     }
 
@@ -5955,8 +5941,8 @@ mod test {
         }
 
         // Update the sharing state to generate conflicts during the call to `connect`.
-        core_ctx.with_sockets_state_mut(|_core_ctx, state| {
-            let sharing = match state.get_mut(socket.get_key_index()).expect("socket not found") {
+        core_ctx.with_socket_state_mut(&socket, |_core_ctx, state| {
+            let sharing = match state {
                 SocketState::Unbound(UnboundSocketState { device: _, sharing, ip_options: _ }) => {
                     sharing
                 }

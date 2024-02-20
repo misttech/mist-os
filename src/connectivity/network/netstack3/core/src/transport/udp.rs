@@ -2187,13 +2187,6 @@ impl<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>, CC: StateContext<
     ) -> O {
         self.with_sockets_state_mut(|core_ctx, sockets_state| cb(core_ctx, sockets_state))
     }
-
-    fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketsStateCtx<'_>) -> O>(
-        &mut self,
-        cb: F,
-    ) -> O {
-        self.with_bound_state_context(cb)
-    }
 }
 
 impl<

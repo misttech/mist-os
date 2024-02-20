@@ -395,14 +395,6 @@ where
     ) -> O {
         StateContext::with_sockets_state_mut(self, cb)
     }
-
-    /// Calls the function with access to a [`DatagramBoundStateContext`].
-    fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketsStateCtx<'_>) -> O>(
-        &mut self,
-        cb: F,
-    ) -> O {
-        StateContext::with_bound_state_context(self, cb)
-    }
 }
 
 impl<I: IpExt, D: Id> SocketMapStateSpec for (Icmp, I, D) {
