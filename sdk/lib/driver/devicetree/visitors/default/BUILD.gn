@@ -6,6 +6,7 @@ import("//build/cpp/sdk_source_set.gni")
 
 group("tests") {
   deps = [
+    "boot-metadata:tests",
     "bti:tests",
     "mmio:tests",
   ]
@@ -24,6 +25,7 @@ sdk_source_set("default") {
 
   deps = [
     "bind-property",
+    "boot-metadata",
     "bti",
     "mmio",
     "//sdk/lib/driver/logging/cpp",

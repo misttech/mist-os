@@ -92,6 +92,13 @@ void Node::AddMetadata(fuchsia_hardware_platform_bus::Metadata metadata) {
   pbus_node_.metadata()->emplace_back(std::move(metadata));
 }
 
+void Node::AddBootMetadata(fuchsia_hardware_platform_bus::BootMetadata boot_metadata) {
+  if (!pbus_node_.boot_metadata()) {
+    pbus_node_.boot_metadata() = std::vector<fuchsia_hardware_platform_bus::BootMetadata>();
+  }
+  pbus_node_.boot_metadata()->emplace_back(std::move(boot_metadata));
+}
+
 void Node::AddNodeSpec(fuchsia_driver_framework::ParentSpec spec) {
   parents_.emplace_back(spec);
   composite_ = true;

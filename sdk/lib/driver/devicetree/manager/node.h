@@ -50,6 +50,8 @@ class Node {
 
   void AddMetadata(fuchsia_hardware_platform_bus::Metadata metadata);
 
+  void AddBootMetadata(fuchsia_hardware_platform_bus::BootMetadata boot_metadata);
+
   void AddNodeSpec(fuchsia_driver_framework::ParentSpec spec);
 
   // Publish this node.
