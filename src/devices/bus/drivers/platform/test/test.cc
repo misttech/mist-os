@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/platform-defs.h>
 
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "test-resources.h"
 
 namespace board_test {

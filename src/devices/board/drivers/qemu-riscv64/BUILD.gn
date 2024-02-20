@@ -41,7 +41,6 @@ fuchsia_driver("qemu-riscv64-driver") {
     "//src/devices/bind/fuchsia.google.platform:fuchsia.google.platform_cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
-    "//src/devices/bus/lib/platform-bus-composites",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/pci/lib/pci",

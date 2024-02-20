@@ -24,7 +24,6 @@
 #include <soc/aml-common/aml-audio.h>
 #include <soc/aml-meson/g12b-clk.h>
 
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "vim3-gpios.h"
 #include "vim3.h"
 

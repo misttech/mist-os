@@ -53,7 +53,6 @@ fuchsia_driver("test-board-driver") {
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
     "//src/devices/bind/fuchsia.test.platform:fuchsia.test.platform_cpp",
-    "//src/devices/bus/lib/platform-bus-composites",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",

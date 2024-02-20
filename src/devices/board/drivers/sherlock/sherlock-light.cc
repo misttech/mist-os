@@ -25,7 +25,6 @@
 
 #include "sherlock-gpios.h"
 #include "sherlock.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;

@@ -22,7 +22,6 @@
 #include <soc/aml-t931/t931-hw.h>
 
 #include "sherlock.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;

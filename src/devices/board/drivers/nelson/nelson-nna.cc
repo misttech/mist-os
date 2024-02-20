@@ -15,7 +15,6 @@
 #include <soc/aml-s905d3/s905d3-hw.h>
 
 #include "nelson.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;

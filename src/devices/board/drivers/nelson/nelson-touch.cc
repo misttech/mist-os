@@ -19,7 +19,6 @@
 #include <bind/fuchsia/i2c/cpp/bind.h>
 
 #include "nelson.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;

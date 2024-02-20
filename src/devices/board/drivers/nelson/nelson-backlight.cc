@@ -18,7 +18,6 @@
 #include <soc/aml-s905d3/s905d3-hw.h>
 
 #include "nelson.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "src/ui/backlight/drivers/ti-lp8556/ti-lp8556Metadata.h"
 
 namespace nelson {

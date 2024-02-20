@@ -20,7 +20,6 @@
 #include <soc/aml-meson/g12b-clk.h>
 
 #include "src/devices/board/drivers/vim3/vim3.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace vim3 {
 namespace fpbus = fuchsia_hardware_platform_bus;

@@ -122,7 +122,6 @@ template("sherlock_driver") {
       "//src/devices/bind/fuchsia.thermal:fuchsia.thermal_cpp",
       "//src/devices/bind/fuchsia.ti.platform:fuchsia.ti.platform_cpp",
       "//src/devices/bind/fuchsia.usb.phy:fuchsia.usb.phy_cpp",
-      "//src/devices/bus/lib/platform-bus-composites",
       "//src/devices/lib/amlogic",
       "//src/devices/lib/broadcom",
       "//src/devices/lib/driver",

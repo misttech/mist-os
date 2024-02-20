@@ -20,7 +20,6 @@
 #include <bind/fuchsia/platform/cpp/bind.h>
 
 #include "astro.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "src/devices/lib/fidl-metadata/tee.h"
 
 namespace fdf {

@@ -28,7 +28,6 @@
 
 #include "astro-gpios.h"
 #include "astro.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 // Enables BT PCM audio.
 #define ENABLE_BT

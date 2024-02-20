@@ -29,7 +29,6 @@
 
 #include "sherlock-gpios.h"
 #include "sherlock.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 // Enables BT PCM audio.
 #define ENABLE_BT

@@ -28,7 +28,6 @@
 
 #include "nelson-gpios.h"
 #include "nelson.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 #ifdef TAS5805M_CONFIG_PATH
 #include TAS5805M_CONFIG_PATH

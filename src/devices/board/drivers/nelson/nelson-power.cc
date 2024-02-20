@@ -24,7 +24,6 @@
 
 #include "nelson-gpios.h"
 #include "nelson.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "src/devices/power/drivers/ti-ina231/ti-ina231-metadata.h"
 
 namespace fdf {

@@ -17,7 +17,6 @@
 #include <soc/aml-s905d2/s905d2-hw.h>
 
 #include "astro.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "src/ui/backlight/drivers/ti-lp8556/ti-lp8556Metadata.h"
 
 namespace astro {

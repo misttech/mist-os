@@ -30,7 +30,6 @@
 #include <soc/aml-a311d/a311d-pwm.h>
 #include <soc/aml-common/aml-power.h>
 
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "src/devices/lib/metadata/llcpp/vreg.h"
 #include "vim3-gpios.h"
 #include "vim3.h"

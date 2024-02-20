@@ -19,7 +19,6 @@
 
 #include "banjo-internal.h"
 #include "lib/fidl/cpp/wire/arena.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 // DDK bus-protocol support
 //

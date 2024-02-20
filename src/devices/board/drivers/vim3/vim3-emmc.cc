@@ -24,7 +24,6 @@
 #include <soc/aml-meson/g12b-clk.h>
 
 #include "src/devices/board/drivers/vim3/vim3.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;

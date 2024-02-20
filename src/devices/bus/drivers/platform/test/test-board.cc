@@ -26,7 +26,6 @@
 #include "src/devices/bus/drivers/platform/test/test-metadata.h"
 #include "src/devices/bus/drivers/platform/test/test-resources.h"
 #include "src/devices/bus/drivers/platform/test/test.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace board_test {
 

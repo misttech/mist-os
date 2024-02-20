@@ -27,18 +27,17 @@
 
 #include "nelson-gpios.h"
 #include "nelson.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "src/devices/lib/fidl-metadata/spi.h"
 
 #define HHI_SPICC_CLK_CNTL (0xf7 * 4)
 
 #define spicc0_clk_sel_fclk_div4 (2 << 7)
 #define spicc0_clk_en (1 << 6)
-#define spicc0_clk_div(x) ((x)-1)
+#define spicc0_clk_div(x) ((x) - 1)
 
 #define spicc1_clk_sel_fclk_div3 (3 << 23)
 #define spicc1_clk_en (1 << 22)
-#define spicc1_clk_div(x) (((x)-1) << 16)
+#define spicc1_clk_div(x) (((x) - 1) << 16)
 
 namespace {
 
@@ -104,8 +103,8 @@ zx_status_t Nelson::SpiInit() {
       // SPICC1 clock enable (666 MHz)
       spicc1_clk_sel_fclk_div3 | spicc1_clk_en | spicc1_clk_div(1);
 
-  // TODO(https://fxbug.dev/42109271): fix this clock enable block when the clock driver can handle the
-  // dividers
+  // TODO(https://fxbug.dev/42109271): fix this clock enable block when the clock driver can handle
+  // the dividers
   {
     zx::unowned_resource resource(get_mmio_resource(parent()));
     zx::vmo vmo;

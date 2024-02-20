@@ -32,7 +32,6 @@
 
 #include "nelson-gpios.h"
 #include "nelson.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;

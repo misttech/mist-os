@@ -16,7 +16,6 @@
 #include <bind/fuchsia/i2c/cpp/bind.h>
 
 #include "sherlock.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "src/ui/backlight/drivers/ti-lp8556/ti-lp8556Metadata.h"
 
 namespace sherlock {

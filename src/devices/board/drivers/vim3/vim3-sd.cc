@@ -21,7 +21,6 @@
 #include <soc/aml-a311d/a311d-hw.h>
 #include <soc/aml-common/aml-sdmmc.h>
 
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "vim3.h"
 
 namespace fdf {

@@ -25,7 +25,6 @@
 
 #include "astro-gpios.h"
 #include "astro.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace astro {
 namespace fpbus = fuchsia_hardware_platform_bus;

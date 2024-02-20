@@ -24,13 +24,12 @@
 
 #include "sherlock-gpios.h"
 #include "sherlock.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "src/devices/lib/fidl-metadata/spi.h"
 
 #define HHI_SPICC_CLK_CNTL (0xf7 * 4)
 #define spicc_0_clk_sel_fclk_div3 (3 << 7)
 #define spicc_0_clk_en (1 << 6)
-#define spicc_0_clk_div(x) ((x)-1)
+#define spicc_0_clk_div(x) ((x) - 1)
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
@@ -147,8 +146,8 @@ zx_status_t Sherlock::SpiInit() {
 
   spi_dev.metadata() = std::move(spi_metadata);
 
-  // TODO(https://fxbug.dev/42109271): fix this clock enable block when the clock driver can handle the
-  // dividers
+  // TODO(https://fxbug.dev/42109271): fix this clock enable block when the clock driver can handle
+  // the dividers
   {
     zx::unowned_resource resource(get_mmio_resource(parent()));
     zx::vmo vmo;

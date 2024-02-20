@@ -23,7 +23,6 @@ source_set("fuchsia.hardware.platform.bus_banjo_cpp") {
   public_deps = [
     ":fuchsia.hardware.platform.bus_banjo_c",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
-    "//src/devices/bus/lib/platform-bus-composites",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddktl",
   ]

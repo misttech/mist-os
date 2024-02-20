@@ -24,7 +24,6 @@
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
 
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "vim3-gpios.h"
 #include "vim3.h"
 
