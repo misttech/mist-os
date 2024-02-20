@@ -10,10 +10,6 @@ driver_bind_rules("aml-g12-tdm-bind") {
   rules = "aml_tdm.bind"
   bind_output = "aml-g12-tdm.bindbc"
   tests = "tests-stream.json"
-
-  # TODO(https://fxbug.dev/42067063): Remove this once we no longer need to generate
-  # fragments for composite bind rules.
-  disable_fragment_gen = true
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",

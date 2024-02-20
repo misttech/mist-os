@@ -10,10 +10,6 @@ import("//build/test.gni")
 driver_bind_rules("fusb302-bind") {
   rules = "fusb302.bind"
   tests = "bind-tests.json"
-
-  # TODO(https://fxbug.dev/42067063): Remove this once we no longer need to generate
-  # fragments for composite bind rules.
-  disable_fragment_gen = true
   deps = [
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.i2c",

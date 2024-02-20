@@ -12,11 +12,6 @@ driver_bind_rules("vim3-pwm-backlight-bind") {
   rules = "vim3-pwm-backlight.bind"
   bind_output = "vim3-pwm-backlight.bindbc"
   tests = "vim3-pwm-backlight-bind-test.json"
-
-  # TODO(https://fxbug.dev/42067063): Remove this once we no longer need to generate
-  # fragments for composite bind rules.
-  disable_fragment_gen = true
-
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.a311d",
     "//src/devices/bind/fuchsia.gpio",

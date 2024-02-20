@@ -8,11 +8,6 @@ import("config.gni")
 driver_bind_rules("ot_radio_bind") {
   rules = "ot_radio.bind"
   tests = "bind_tests.json"
-
-  # TODO(https://fxbug.dev/42067063): Remove this once we no longer need to generate
-  # fragments for composite bind rules.
-  disable_fragment_gen = true
-
   deps = [
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.nordic.platform",

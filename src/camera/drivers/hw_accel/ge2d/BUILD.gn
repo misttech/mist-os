@@ -17,10 +17,6 @@ group("tests") {
 driver_bind_rules("ge2d_bind") {
   rules = "ge2d.bind"
   tests = "bind_tests.json"
-
-  # TODO(https://fxbug.dev/42067063): Remove this once we no longer need to generate
-  # fragments for composite bind rules.
-  disable_fragment_gen = true
   deps = [
     "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",

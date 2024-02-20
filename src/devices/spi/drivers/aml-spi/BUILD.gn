@@ -12,10 +12,6 @@ driver_bind_rules("aml_spi_bind") {
   bind_output = "aml-spi.bindbc"
   tests = "bind_tests.json"
 
-  # TODO(https://fxbug.dev/42067063): Remove this once we no longer need to generate
-  # fragments for composite bind rules.
-  disable_fragment_gen = true
-
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.gpio",

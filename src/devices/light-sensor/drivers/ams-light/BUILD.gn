@@ -11,10 +11,6 @@ driver_bind_rules("tcs3400_light_bind") {
   rules = "tcs3400_light.bind"
   bind_output = "ams-light.bindbc"
   tests = "bind_tests.json"
-
-  # TODO(https://fxbug.dev/42067063): Remove this once we no longer need to generate
-  # fragments for composite bind rules.
-  disable_fragment_gen = true
   deps = [
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.i2c",

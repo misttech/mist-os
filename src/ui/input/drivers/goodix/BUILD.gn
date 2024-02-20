@@ -11,11 +11,6 @@ import("//build/test.gni")
 driver_bind_rules("gt92xx_bind") {
   rules = "gt92xx.bind"
   bind_output = "goodix.bindbc"
-
-  # TODO(https://fxbug.dev/42067063): Remove this once we no longer need to generate
-  # fragments for composite bind rules.
-  disable_fragment_gen = true
-
   tests = "bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.goodix.platform",

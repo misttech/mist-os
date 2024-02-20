@@ -389,6 +389,7 @@ template("bindc") {
       rebase_path(response_file, root_build_dir),
       "--depfile",
       rebase_path(depfile, root_build_dir),
+      "--disable-fragment-gen",
     ]
     if (defined(invoker.disable_autobind) && invoker.disable_autobind) {
       args += [ "--disable-autobind" ]
@@ -402,9 +403,6 @@ template("bindc") {
     if (!defined(invoker.disable_new_bytecode) ||
         !invoker.disable_new_bytecode) {
       args += [ "--use-new-bytecode" ]
-    }
-    if (defined(invoker.disable_fragment_gen) && invoker.disable_fragment_gen) {
-      args += [ "--disable-fragment-gen" ]
     }
 
     inputs = [ response_file ]
@@ -494,7 +492,6 @@ template("driver_bind_rules") {
                                "testonly",
                                "disable_autobind",
                                "disable_new_bytecode",
-                               "disable_fragment_gen",
                                "visibility",
                              ])
       header_output = "$header_output"
@@ -511,7 +508,6 @@ template("driver_bind_rules") {
                              "testonly",
                              "disable_autobind",
                              "disable_new_bytecode",
-                             "disable_fragment_gen",
                              "visibility",
                            ])
     bytecode_output = bind_output

@@ -26,7 +26,6 @@ driver_bind_rules("aml_uart_bind") {
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.pwm",
   ]
-  disable_fragment_gen = true
 }
 
 # -----

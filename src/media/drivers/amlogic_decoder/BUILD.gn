@@ -44,7 +44,6 @@ if (target_cpu == "arm64") {
   driver_bind_rules("amlogic_video_bind") {
     rules = "amlogic_video.bind"
     tests = "bind_tests.json"
-    disable_fragment_gen = true
     deps = [
       "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
       "//src/devices/bind/fuchsia.amlogic.platform",
@@ -60,7 +59,6 @@ if (target_cpu == "arm64") {
   driver_bind_rules("amlogic_video_test_bind") {
     rules = "amlogic_video.bind"
     disable_autobind = true
-    disable_fragment_gen = true
     deps = [
       "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
       "//src/devices/bind/fuchsia.amlogic.platform",

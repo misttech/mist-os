@@ -9,7 +9,6 @@ import("//build/test.gni")
 
 driver_bind_rules("aml-thermal-s905d2g-legacy-bind") {
   rules = "aml-thermal-s905d2g-legacy.bind"
-  disable_fragment_gen = true
   bind_output = "aml-thermal-s905d2g-legacy.bindbc"
   tests = "aml-thermal-s905d2g-legacy-bind-test.json"
   deps = [
