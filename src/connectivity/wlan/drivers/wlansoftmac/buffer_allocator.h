@@ -31,24 +31,28 @@ class Buffer {
   };
 };
 
-class UsedBuffer {
+class FinalizedBuffer {
  public:
-  UsedBuffer() = delete;
-  UsedBuffer(const UsedBuffer&) = delete;
+  FinalizedBuffer(FinalizedBuffer&&) noexcept = default;
+  FinalizedBuffer& operator=(FinalizedBuffer&&) noexcept = default;
 
-  uint8_t const* data() const { return buffer_->data(); }
-  size_t size() const { return written_bytes_; }
+  FinalizedBuffer() = delete;
+  FinalizedBuffer(const FinalizedBuffer&) noexcept = delete;
+  FinalizedBuffer& operator=(const FinalizedBuffer&) noexcept = delete;
 
-  static UsedBuffer FromOutBuf(wlansoftmac_out_buf_t buf) {
-    return UsedBuffer(static_cast<Buffer*>(buf.raw), buf.written_bytes);
+  const uint8_t* data() const { return buffer_->data(); }
+  size_t written() const { return written_; }
+
+  static FinalizedBuffer FromRaw(void* raw, size_t written) {
+    return FinalizedBuffer(static_cast<Buffer*>(raw), written);
   }
 
  private:
-  UsedBuffer(Buffer* buffer, size_t written_bytes)
-      : buffer_(std::unique_ptr<Buffer>(buffer)), written_bytes_(written_bytes) {}
+  FinalizedBuffer(Buffer* buffer, size_t written)
+      : buffer_(std::unique_ptr<Buffer>(buffer)), written_(written) {}
 
   std::unique_ptr<Buffer> buffer_;
-  size_t written_bytes_;
+  size_t written_;
 };
 
 // Huge buffers are used for sending lots of data between drivers and the

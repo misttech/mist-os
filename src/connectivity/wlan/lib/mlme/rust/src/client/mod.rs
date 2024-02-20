@@ -14,7 +14,7 @@ use {
     crate::{
         akm_algorithm,
         block_ack::BlockAckTx,
-        buffer::{BufferProvider, OutBuf},
+        buffer::{BufferProvider, FinalizedBuffer},
         ddk_converter,
         device::{self, DeviceOps},
         disconnect::LocallyInitiated,
@@ -600,7 +600,7 @@ impl Client {
         ctx: &mut Context<D>,
         state: PowerState,
     ) -> Result<(), Error> {
-        let (buf, bytes_written) = write_frame!(&mut ctx.buf_provider, {
+        let (buffer, written) = write_frame!(&mut ctx.buf_provider, {
             headers: {
                 mac::FixedDataHdrFields: &mac::FixedDataHdrFields {
                     frame_ctrl: mac::FrameControl(0)
@@ -617,9 +617,8 @@ impl Client {
                 },
             },
         })?;
-        let out_buf = OutBuf::from(buf, bytes_written);
         ctx.device
-            .send_wlan_frame(out_buf, 0, None)
+            .send_wlan_frame(buffer.finalize(written), 0, None)
             .map_err(|error| Error::Status(format!("error sending power management frame"), error))
     }
 
@@ -708,7 +707,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         result_code: mac::StatusCode,
         auth_content: &[u8],
     ) -> Result<(), Error> {
-        let (buf, bytes_written) = write_frame!(&mut self.ctx.buf_provider, {
+        let (buffer, written) = write_frame!(&mut self.ctx.buf_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_to_ap(
                     mac::FrameControl(0)
@@ -727,8 +726,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             },
             body: auth_content,
         })?;
-        let out_buf = OutBuf::from(buf, bytes_written);
-        self.send_mgmt_or_ctrl_frame(out_buf)
+        self.send_mgmt_or_ctrl_frame(buffer.finalize(written))
             .map_err(|s| Error::Status(format!("error sending open auth frame"), s))
     }
 
@@ -753,7 +751,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         let vht_cap = cap.vht_cap;
         let security_ie = self.sta.connect_req.security_ie.clone();
 
-        let (buf, bytes_written) = write_frame!(&mut self.ctx.buf_provider, {
+        let (buffer, written) = write_frame!(&mut self.ctx.buf_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_to_ap(
                     mac::FrameControl(0)
@@ -782,8 +780,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
                 vht_cap?: vht_cap,
             },
         })?;
-        let out_buf = OutBuf::from(buf, bytes_written);
-        self.send_mgmt_or_ctrl_frame(out_buf)
+        self.send_mgmt_or_ctrl_frame(buffer.finalize(written))
             .map_err(|s| Error::Status(format!("error sending assoc req frame"), s))
     }
 
@@ -793,7 +790,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     // be some investigation, whether these "keep alive" frames are the right way of keeping a
     // client associated to legacy APs.
     fn send_keep_alive_resp_frame(&mut self) -> Result<(), Error> {
-        let (buf, bytes_written) = write_frame!(&mut self.ctx.buf_provider, {
+        let (buffer, written) = write_frame!(&mut self.ctx.buf_provider, {
             headers: {
                 mac::FixedDataHdrFields: &data_writer::data_hdr_client_to_ap(
                     mac::FrameControl(0)
@@ -806,15 +803,14 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
                 ),
             },
         })?;
-        let out_buf = OutBuf::from(buf, bytes_written);
         self.ctx
             .device
-            .send_wlan_frame(out_buf, 0, None)
+            .send_wlan_frame(buffer.finalize(written), 0, None)
             .map_err(|s| Error::Status(format!("error sending keep alive frame"), s))
     }
 
     pub fn send_deauth_frame(&mut self, reason_code: mac::ReasonCode) -> Result<(), Error> {
-        let (buf, bytes_written) = write_frame!(&mut self.ctx.buf_provider, {
+        let (buffer, written) = write_frame!(&mut self.ctx.buf_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_to_ap(
                     mac::FrameControl(0)
@@ -830,9 +826,8 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
                 },
             },
         })?;
-        let out_buf = OutBuf::from(buf, bytes_written);
         let result = self
-            .send_mgmt_or_ctrl_frame(out_buf)
+            .send_mgmt_or_ctrl_frame(buffer.finalize(written))
             .map_err(|s| Error::Status(format!("error sending deauthenticate frame"), s));
         // Clear main_channel since there is no "main channel" after deauthenticating
         self.channel_state.bind(&mut self.ctx, &mut self.scanner).clear_main_channel();
@@ -888,7 +883,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         };
         let addr4 = if from_ds && to_ds { Some(src) } else { None };
 
-        let (buf, bytes_written) = write_frame!(&mut self.ctx.buf_provider, {
+        let (buffer, written) = write_frame!(&mut self.ctx.buf_provider, {
             headers: {
                 mac::FixedDataHdrFields: &mac::FixedDataHdrFields {
                     frame_ctrl: mac::FrameControl(0)
@@ -920,17 +915,18 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             }
             e
         })?;
-        let out_buf = OutBuf::from(buf, bytes_written);
         let tx_flags = match ether_type {
             mac::ETHER_TYPE_EAPOL => banjo_wlan_softmac::WlanTxInfoFlags::FAVOR_RELIABILITY.0,
             _ => 0,
         };
-        self.ctx.device.send_wlan_frame(out_buf, tx_flags, Some(async_id)).map_err(|s| {
-            if !async_id_provided {
-                wtrace::async_end_wlansoftmac_tx(async_id, s);
-            }
-            Error::Status(format!("error sending data frame"), s)
-        })
+        self.ctx.device.send_wlan_frame(buffer.finalize(written), tx_flags, Some(async_id)).map_err(
+            |s| {
+                if !async_id_provided {
+                    wtrace::async_end_wlansoftmac_tx(async_id, s);
+                }
+                Error::Status(format!("error sending data frame"), s)
+            },
+        )
     }
 
     /// Sends an MLME-EAPOL.indication to MLME's SME peer.
@@ -993,7 +989,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     pub fn send_ps_poll_frame(&mut self, aid: Aid) -> Result<(), Error> {
         const PS_POLL_ID_MASK: u16 = 0b11000000_00000000;
 
-        let (buf, bytes_written) = write_frame!(&mut self.ctx.buf_provider, {
+        let (buffer, written) = write_frame!(&mut self.ctx.buf_provider, {
             headers: {
                 mac::FrameControl: &mac::FrameControl(0)
                     .with_frame_type(mac::FrameType::CTRL)
@@ -1007,8 +1003,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
                 },
             },
         })?;
-        let out_buf = OutBuf::from(buf, bytes_written);
-        self.send_mgmt_or_ctrl_frame(out_buf)
+        self.send_mgmt_or_ctrl_frame(buffer.finalize(written))
             .map_err(|s| Error::Status(format!("error sending PS-Poll frame"), s))
     }
 
@@ -1169,8 +1164,8 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             .unwrap_or_else(|e| error!("error sending OnSaeHandshakeInd: {}", e));
     }
 
-    fn send_mgmt_or_ctrl_frame(&mut self, out_buf: OutBuf) -> Result<(), zx::Status> {
-        self.ctx.device.send_wlan_frame(out_buf, 0, None)
+    fn send_mgmt_or_ctrl_frame(&mut self, buffer: FinalizedBuffer) -> Result<(), zx::Status> {
+        self.ctx.device.send_wlan_frame(buffer, 0, None)
     }
 }
 
@@ -1251,9 +1246,8 @@ impl<'a, D: DeviceOps> BlockAckTx for BoundClient<'a, D> {
             &mut self.ctx.seq_mgr,
         )
         .and_then(|_| writer.append_bytes(body).map_err(Into::into))?;
-        let n = writer.bytes_written();
-        let buffer = OutBuf::from(buffer, n);
-        self.send_mgmt_or_ctrl_frame(buffer)
+        let written = writer.bytes_written();
+        self.send_mgmt_or_ctrl_frame(buffer.finalize(written))
             .map_err(|status| Error::Status(format!("error sending BlockAck frame"), status))
     }
 }

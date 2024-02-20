@@ -74,11 +74,11 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
         WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.deliver_eth_frame");
         return DeviceInterface::from(device_interface)->DeliverEthernet({data, len});
       },
-      .queue_tx = [](void* device_interface, uint32_t options, wlansoftmac_out_buf_t buf,
+      .queue_tx = [](void* device_interface, uint32_t options, void* buffer, size_t written,
                      wlan_tx_info_t tx_info, trace_async_id_t async_id) -> zx_status_t {
         WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.queue_tx");
         return DeviceInterface::from(device_interface)
-            ->QueueTx(UsedBuffer::FromOutBuf(buf), tx_info, async_id);
+            ->QueueTx(FinalizedBuffer::FromRaw(buffer, written), tx_info, async_id);
       },
       .set_ethernet_status = [](void* device_interface, uint32_t status) -> zx_status_t {
         WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.set_ethernet_status");
@@ -384,18 +384,18 @@ void SoftmacBridge::DispatchAndComplete(const std::string& method_name,
   completer.Reply(std::move(result));
 }
 
-wlansoftmac_in_buf_t SoftmacBridge::IntoRustInBuf(std::unique_ptr<Buffer> owned_buffer) {
+wlansoftmac_buffer_t SoftmacBridge::IntoRustBuffer(std::unique_ptr<Buffer> buffer) {
   WLAN_TRACE_DURATION();
-  auto* buffer = owned_buffer.release();
-  return wlansoftmac_in_buf_t{
-      .free_buffer =
+  auto* released_buffer = buffer.release();
+  return wlansoftmac_buffer_t{
+      .free =
           [](void* raw) {
             WLAN_LAMBDA_TRACE_DURATION("wlansoftmac_in_buf_t.free_buffer");
             std::unique_ptr<Buffer>(static_cast<Buffer*>(raw)).reset();
           },
-      .raw = buffer,
-      .data = buffer->data(),
-      .len = buffer->capacity(),
+      .raw = released_buffer,
+      .data = released_buffer->data(),
+      .capacity = released_buffer->capacity(),
   };
 }
 

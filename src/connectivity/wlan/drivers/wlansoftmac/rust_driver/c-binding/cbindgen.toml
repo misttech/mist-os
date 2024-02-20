@@ -34,8 +34,7 @@ include = [
     "BufferProvider",
     "CSpan",
     "DeviceInterface",
-    "InBuf",
-    "OutBuf",
+    "CBuffer",
     "WlanSoftmacHandle",
     "TraceId",
 ]
@@ -65,8 +64,7 @@ exclude = [
 "BufferProvider" = "wlansoftmac_buffer_provider_ops_t"
 "CSpan" = "wlan_span_t"
 "DeviceInterface" = "rust_device_interface_t"
-"InBuf" = "wlansoftmac_in_buf_t"
-"OutBuf" = "wlansoftmac_out_buf_t"
+"CBuffer" = "wlansoftmac_buffer_t"
 "WlanSoftmacHandle" = "wlansoftmac_handle_t"
 "TraceId" = "trace_async_id_t"
 

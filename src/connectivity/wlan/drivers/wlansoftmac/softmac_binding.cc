@@ -424,10 +424,10 @@ zx_status_t SoftmacBinding::DeliverEthernet(cpp20::span<const uint8_t> eth_frame
   return ZX_OK;
 }
 
-zx_status_t SoftmacBinding::QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info,
+zx_status_t SoftmacBinding::QueueTx(FinalizedBuffer buffer, wlan_tx_info_t tx_info,
                                     trace_async_id_t async_id) {
   WLAN_TRACE_DURATION();
-  ZX_DEBUG_ASSERT(used_buffer.size() <= std::numeric_limits<uint16_t>::max());
+  ZX_DEBUG_ASSERT(buffer.written() <= std::numeric_limits<uint16_t>::max());
 
   zx_status_t status = ZX_OK;
 
@@ -440,7 +440,7 @@ zx_status_t SoftmacBinding::QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_in
   }
 
   fuchsia_wlan_softmac::wire::WlanTxPacket fidl_tx_packet;
-  status = ConvertTxPacket(used_buffer.data(), used_buffer.size(), tx_info, &fidl_tx_packet);
+  status = ConvertTxPacket(buffer.data(), buffer.written(), tx_info, &fidl_tx_packet);
   if (status != ZX_OK) {
     lerror("WlanTxPacket conversion failed: %s", zx_status_get_string(status));
     WLAN_TRACE_ASYNC_END_TX(async_id, status);

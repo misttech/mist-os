@@ -41,22 +41,6 @@ typedef struct {
 } rust_wlan_softmac_ifc_protocol_copy_t;
 
 /**
- * An output buffer requires its owner to manage the underlying buffer's memory themselves.
- * An output buffer is used for every buffer handed from Rust to C++.
- */
-typedef struct {
-  /**
-   * Pointer to the buffer's underlying data structure.
-   */
-  void *raw;
-  /**
-   * Pointer to the start of the buffer's data portion and the amount of bytes written.
-   */
-  uint8_t *data;
-  uintptr_t written_bytes;
-} wlansoftmac_out_buf_t;
-
-/**
  * A `Device` allows transmitting frames and MLME messages.
  */
 typedef struct {
@@ -72,8 +56,12 @@ typedef struct {
   int32_t (*deliver_eth_frame)(void *device, const uint8_t *data, uintptr_t len);
   /**
    * Deliver a WLAN frame directly through the firmware.
+   *
+   * The `buffer` and `written` arguments must be from a call to `FinalizedBuffer::release`. The
+   * C++ portion of wlansoftmac will reconstruct an instance of the `FinalizedBuffer` class
+   * defined in buffer_allocator.h.
    */
-  int32_t (*queue_tx)(void *device, uint32_t options, wlansoftmac_out_buf_t buf,
+  int32_t (*queue_tx)(void *device, uint32_t options, void *buffer, uintptr_t written,
                       wlan_tx_info_t tx_info, trace_async_id_t async_id);
   /**
    * Reports the current status to the ethernet driver.
@@ -82,32 +70,56 @@ typedef struct {
 } rust_device_interface_t;
 
 /**
- * An input buffer will always be returned to its original owner when no longer being used.
- * An input buffer is used for every buffer handed from C++ to Rust.
+ * Type that wraps a pointer to a buffer allocated in the C++ portion of wlansoftmac.
  */
 typedef struct {
   /**
    * Returns the buffer's ownership and free it.
+   *
+   * # Safety
+   *
+   * The `free` function is unsafe because the function cannot guarantee the pointer it's
+   * called with is the `raw` field in this struct.
+   *
+   * By calling `free`, the caller promises the pointer it's called with is the `raw` field
+   * in this struct.
    */
-  void (*free_buffer)(void *raw);
+  void (*free)(void *raw);
   /**
-   * Pointer to the buffer's underlying data structure.
+   * Pointer to the buffer allocated in the C++ portion of wlansoftmac and owned by the Rust
+   * portion of wlansoftmac.
    */
   void *raw;
   /**
-   * Pointer to the start of the buffer's data portion and its length.
+   * Pointer to the start of bytes written in the buffer.
    */
   uint8_t *data;
-  uintptr_t len;
-} wlansoftmac_in_buf_t;
+  /**
+   * Capacity of the buffer, starting at `data`.
+   */
+  uintptr_t capacity;
+} wlansoftmac_buffer_t;
 
 typedef struct {
   /**
-   * Acquire a `InBuf` with a given minimum length from the provider.
-   * The provider must release the underlying buffer's ownership and transfer it to this crate.
-   * The buffer will be returned via the `free_buffer` callback when it's no longer used.
+   * Allocate and take ownership of a buffer allocated by the C++ portion of wlansoftmac
+   * with at least `min_capacity` bytes of capacity.
+   *
+   * The returned `CBuffer` contains a pointer whose pointee the caller now owns, unless that
+   * pointer is the null pointer. If the pointer is non-null, then the `Drop` implementation of
+   * `CBuffer` ensures its `free` will be called if its dropped. If the pointer is null, the
+   * allocation failed, and the caller must discard the `CBuffer` without calling its `Drop`
+   * implementation.
+   *
+   * # Safety
+   *
+   * This function is unsafe because the returned `CBuffer` could contain null pointers,
+   * indicating the allocation failed.
+   *
+   * By calling this function, the caller promises to call `mem::forget` on the returned
+   * `CBuffer` if either the `raw` or `data` fields in the `CBuffer` are null.
    */
-  wlansoftmac_in_buf_t (*get_buffer)(uintptr_t min_len);
+  wlansoftmac_buffer_t (*get_buffer)(uintptr_t min_capacity);
 } wlansoftmac_buffer_provider_ops_t;
 
 /**

@@ -9,7 +9,7 @@ use {
             remote_client::{ClientRejection, RemoteClient},
             BeaconOffloadParams, BufferedFrame, Context, Rejection, TimedEvent,
         },
-        buffer::{InBuf, OutBuf},
+        buffer::Buffer,
         ddk_converter::softmac_key_configuration_from_mlme,
         device::{self, DeviceOps},
         error::Error,
@@ -103,7 +103,7 @@ impl InfraBss {
         // TODO(https://fxbug.dev/42113580): Support DTIM.
 
         let (in_buf, _, beacon_offload_params) = bss.make_beacon_frame(ctx)?;
-        let mac_frame = in_buf.as_slice().to_vec();
+        let mac_frame = in_buf.to_vec();
         let tim_ele_offset = u64::try_from(beacon_offload_params.tim_ele_offset).map_err(|_| {
             Error::Internal(format_err!(
                 "failed to convert TIM offset for beacon frame packet template"
@@ -271,7 +271,7 @@ impl InfraBss {
     fn make_beacon_frame<D>(
         &self,
         ctx: &Context<D>,
-    ) -> Result<(InBuf, usize, BeaconOffloadParams), Error> {
+    ) -> Result<(Buffer, usize, BeaconOffloadParams), Error> {
         let tim = self.make_tim();
         let (pvb_offset, pvb_bitmap) = tim.make_partial_virtual_bitmap();
 
@@ -301,7 +301,7 @@ impl InfraBss {
         // According to IEEE Std 802.11-2016, 11.1.4.1, we should intersect our IEs with the probe
         // request IEs. However, the client is able to do this anyway so we just send the same IEs
         // as we would with a beacon frame.
-        let (in_buf, bytes_written) = ctx
+        let (buffer, written) = ctx
             .make_probe_resp_frame(
                 client_addr,
                 self.beacon_interval,
@@ -312,7 +312,7 @@ impl InfraBss {
                 self.rsne.as_ref().map_or(&[], |rsne| &rsne),
             )
             .map_err(|e| Rejection::Client(client_addr, ClientRejection::WlanSendError(e)))?;
-        ctx.device.send_wlan_frame(OutBuf::from(in_buf, bytes_written), 0, None).map_err(|s| {
+        ctx.device.send_wlan_frame(buffer.finalize(written), 0, None).map_err(|s| {
             Rejection::Client(
                 client_addr,
                 ClientRejection::WlanSendError(Error::Status(
@@ -517,7 +517,7 @@ impl InfraBss {
         body: &[u8],
         async_id: trace::Id,
     ) -> Result<(), Rejection> {
-        let (in_buf, bytes_written) = ctx
+        let (buffer, written) = ctx
             .make_data_frame(
                 hdr.da,
                 hdr.sa,
@@ -531,7 +531,7 @@ impl InfraBss {
 
         if !self.clients.values().any(|client| client.dozing()) {
             ctx.device
-                .send_wlan_frame(OutBuf::from(in_buf, bytes_written), tx_flags, Some(async_id))
+                .send_wlan_frame(buffer.finalize(written), tx_flags, Some(async_id))
                 .map_err(move |s| {
                     Rejection::Client(
                         hdr.da,
@@ -542,12 +542,7 @@ impl InfraBss {
                     )
                 })?;
         } else {
-            self.group_buffered.push_back(BufferedFrame {
-                in_buf,
-                bytes_written,
-                tx_flags,
-                async_id,
-            });
+            self.group_buffered.push_back(BufferedFrame { buffer, written, tx_flags, async_id });
         }
 
         Ok(())
@@ -590,14 +585,13 @@ impl InfraBss {
         self.dtim_count = self.dtim_period;
 
         let mut buffered = self.group_buffered.drain(..).peekable();
-        while let Some(BufferedFrame { mut in_buf, bytes_written, tx_flags, async_id }) =
-            buffered.next()
+        while let Some(BufferedFrame { mut buffer, written, tx_flags, async_id }) = buffered.next()
         {
             if buffered.peek().is_some() {
-                frame_writer::set_more_data(&mut in_buf.as_mut_slice()[..bytes_written])?;
+                frame_writer::set_more_data(&mut buffer[..written])?;
             }
             ctx.device
-                .send_wlan_frame(OutBuf::from(in_buf, bytes_written), tx_flags, Some(async_id))
+                .send_wlan_frame(buffer.finalize(written), tx_flags, Some(async_id))
                 .map_err(|s| Error::Status(format!("error sending buffered frame on wake"), s))?;
         }
 

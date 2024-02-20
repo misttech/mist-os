@@ -35,7 +35,7 @@ class DeviceInterface {
                             zx::channel* out_sme_channel) = 0;
 
   virtual zx_status_t DeliverEthernet(cpp20::span<const uint8_t> eth_frame) = 0;
-  virtual zx_status_t QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info,
+  virtual zx_status_t QueueTx(FinalizedBuffer buffer, wlan_tx_info_t tx_info,
                               trace_async_id_t async_id) = 0;
 
   virtual zx_status_t SetEthernetStatus(uint32_t status) = 0;

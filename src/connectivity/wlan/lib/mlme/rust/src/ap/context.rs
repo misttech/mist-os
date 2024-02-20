@@ -5,7 +5,7 @@
 use {
     crate::{
         ap::TimedEvent,
-        buffer::{BufferProvider, InBuf},
+        buffer::{Buffer, BufferProvider},
         device::DeviceOps,
         disconnect::LocallyInitiated,
         error::Error,
@@ -35,7 +35,7 @@ pub struct BeaconOffloadParams {
 
 pub struct Context<D> {
     pub device: D,
-    pub buf_provider: BufferProvider,
+    pub buffer_provider: BufferProvider,
     pub timer: Timer<TimedEvent>,
     pub seq_mgr: SequenceManager,
     pub bssid: Bssid,
@@ -44,11 +44,11 @@ pub struct Context<D> {
 impl<D> Context<D> {
     pub fn new(
         device: D,
-        buf_provider: BufferProvider,
+        buffer_provider: BufferProvider,
         timer: Timer<TimedEvent>,
         bssid: Bssid,
     ) -> Self {
-        Self { device, timer, buf_provider, seq_mgr: SequenceManager::new(), bssid }
+        Self { device, timer, buffer_provider, seq_mgr: SequenceManager::new(), bssid }
     }
 
     pub fn schedule_after(&mut self, duration: zx::Duration, event: TimedEvent) -> EventId {
@@ -62,8 +62,8 @@ impl<D> Context<D> {
         auth_alg_num: AuthAlgorithmNumber,
         auth_txn_seq_num: u16,
         status_code: StatusCode,
-    ) -> Result<(InBuf, usize), Error> {
-        write_frame!(&self.buf_provider, {
+    ) -> Result<(Buffer, usize), Error> {
+        write_frame!(&self.buffer_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -86,8 +86,8 @@ impl<D> Context<D> {
         aid: Aid,
         rates: &[u8],
         max_idle_period: Option<u16>,
-    ) -> Result<(InBuf, usize), Error> {
-        write_frame!(&self.buf_provider, {
+    ) -> Result<(Buffer, usize), Error> {
+        write_frame!(&self.buffer_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -130,8 +130,8 @@ impl<D> Context<D> {
         addr: MacAddr,
         capabilities: mac::CapabilityInfo,
         status_code: StatusCode,
-    ) -> Result<(InBuf, usize), Error> {
-        write_frame!(&self.buf_provider, {
+    ) -> Result<(Buffer, usize), Error> {
+        write_frame!(&self.buffer_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -155,8 +155,8 @@ impl<D> Context<D> {
         &mut self,
         addr: MacAddr,
         reason_code: mac::ReasonCode,
-    ) -> Result<(InBuf, usize), Error> {
-        write_frame!(&self.buf_provider, {
+    ) -> Result<(Buffer, usize), Error> {
+        write_frame!(&self.buffer_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -176,8 +176,8 @@ impl<D> Context<D> {
         &mut self,
         addr: MacAddr,
         reason_code: mac::ReasonCode,
-    ) -> Result<(InBuf, usize), Error> {
-        write_frame!(&self.buf_provider, {
+    ) -> Result<(Buffer, usize), Error> {
+        write_frame!(&self.buffer_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -203,8 +203,8 @@ impl<D> Context<D> {
         rates: &[u8],
         channel: u8,
         rsne: &[u8],
-    ) -> Result<(InBuf, usize), Error> {
-        write_frame!(&self.buf_provider, {
+    ) -> Result<(Buffer, usize), Error> {
+        write_frame!(&self.buffer_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -248,9 +248,9 @@ impl<D> Context<D> {
         tim_header: ie::TimHeader,
         tim_bitmap: &[u8],
         rsne: &[u8],
-    ) -> Result<(InBuf, usize, BeaconOffloadParams), Error> {
+    ) -> Result<(Buffer, usize, BeaconOffloadParams), Error> {
         let mut tim_ele_offset = 0;
-        let (buf, bytes_written) = write_frame!(&self.buf_provider, {
+        let (buffer, written) = write_frame!(&self.buffer_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -290,7 +290,7 @@ impl<D> Context<D> {
 
             }
         })?;
-        Ok((buf, bytes_written, BeaconOffloadParams { tim_ele_offset }))
+        Ok((buffer, written, BeaconOffloadParams { tim_ele_offset }))
     }
     /// Sends a WLAN data frame (IEEE Std 802.11-2016, 9.3.2) to the PHY.
     pub fn make_data_frame(
@@ -301,7 +301,7 @@ impl<D> Context<D> {
         qos_ctrl: bool,
         ether_type: u16,
         payload: &[u8],
-    ) -> Result<(InBuf, usize), Error> {
+    ) -> Result<(Buffer, usize), Error> {
         let qos_ctrl = if qos_ctrl {
             Some(
                 wmm::derive_tid(ether_type, payload)
@@ -311,7 +311,7 @@ impl<D> Context<D> {
             None
         };
 
-        write_frame!(&self.buf_provider, {
+        write_frame!(&self.buffer_provider, {
             headers: {
                 mac::FixedDataHdrFields: &mac::FixedDataHdrFields {
                     frame_ctrl: mac::FrameControl(0)
@@ -344,7 +344,7 @@ impl<D> Context<D> {
         src_addr: MacAddr,
         is_protected: bool,
         eapol_frame: &[u8],
-    ) -> Result<(InBuf, usize), Error> {
+    ) -> Result<(Buffer, usize), Error> {
         self.make_data_frame(
             dst_addr,
             src_addr,
@@ -501,7 +501,7 @@ impl<D: DeviceOps> Context<D> {
         protocol_id: u16,
         body: &[u8],
     ) -> Result<(), Error> {
-        let (buf, bytes_written) = write_frame_with_fixed_buf!([0u8; mac::MAX_ETH_FRAME_LEN], {
+        let (buffer, written) = write_frame_with_fixed_buf!([0u8; mac::MAX_ETH_FRAME_LEN], {
             headers: {
                 mac::EthernetIIHdr: &mac::EthernetIIHdr {
                     da: dst_addr,
@@ -511,7 +511,7 @@ impl<D: DeviceOps> Context<D> {
             },
             payload: body,
         })?;
-        let (written, _remaining) = buf.split_at(bytes_written);
+        let (written, _remaining) = buffer.split_at(written);
         self.device
             .deliver_eth_frame(written)
             .map_err(|s| Error::Status(format!("could not deliver Ethernet II frame"), s))
@@ -694,7 +694,7 @@ mod test {
         let exec = fasync::TestExecutor::new();
         let (fake_device, _) = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device);
-        let (in_buf, bytes_written) = ctx
+        let (buffer, written) = ctx
             .make_auth_frame(
                 *CLIENT_ADDR,
                 AuthAlgorithmNumber::FAST_BSS_TRANSITION,
@@ -703,7 +703,7 @@ mod test {
             )
             .expect("error making auth frame");
         assert_eq!(
-            &in_buf.as_slice()[..bytes_written],
+            &buffer[..written],
             &[
                 // Mgmt header
                 0b10110000, 0, // Frame Control
@@ -725,7 +725,7 @@ mod test {
         let exec = fasync::TestExecutor::new();
         let (fake_device, _) = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device);
-        let (in_buf, bytes_written) = ctx
+        let (buffer, written) = ctx
             .make_assoc_resp_frame(
                 *CLIENT_ADDR,
                 mac::CapabilityInfo(0),
@@ -735,7 +735,7 @@ mod test {
             )
             .expect("error making assoc resp frame");
         assert_eq!(
-            &in_buf.as_slice()[..bytes_written],
+            &buffer[..written],
             &[
                 // Mgmt header
                 0b00010000, 0, // Frame Control
@@ -761,7 +761,7 @@ mod test {
         let exec = fasync::TestExecutor::new();
         let (fake_device, _) = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device);
-        let (in_buf, bytes_written) = ctx
+        let (buffer, written) = ctx
             .make_assoc_resp_frame_error(
                 *CLIENT_ADDR,
                 mac::CapabilityInfo(0),
@@ -769,7 +769,7 @@ mod test {
             )
             .expect("error making assoc resp frame error");
         assert_eq!(
-            &in_buf.as_slice()[..bytes_written],
+            &buffer[..written],
             &[
                 // Mgmt header
                 0b00010000, 0, // Frame Control
@@ -791,7 +791,7 @@ mod test {
         let exec = fasync::TestExecutor::new();
         let (fake_device, _) = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device);
-        let (in_buf, bytes_written) = ctx
+        let (buffer, written) = ctx
             .make_assoc_resp_frame(
                 *CLIENT_ADDR,
                 mac::CapabilityInfo(0),
@@ -801,7 +801,7 @@ mod test {
             )
             .expect("error making assoc resp frame");
         assert_eq!(
-            &in_buf.as_slice()[..bytes_written],
+            &buffer[..written],
             &[
                 // Mgmt header
                 0b00010000, 0, // Frame Control
@@ -826,14 +826,14 @@ mod test {
         let exec = fasync::TestExecutor::new();
         let (fake_device, _) = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device);
-        let (in_buf, bytes_written) = ctx
+        let (buffer, written) = ctx
             .make_disassoc_frame(
                 *CLIENT_ADDR,
                 fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc.into(),
             )
             .expect("error making disassoc frame");
         assert_eq!(
-            &in_buf.as_slice()[..bytes_written],
+            &buffer[..written],
             &[
                 // Mgmt header
                 0b10100000, 0, // Frame Control
@@ -853,7 +853,7 @@ mod test {
         let exec = fasync::TestExecutor::new();
         let (fake_device, _) = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device);
-        let (in_buf, bytes_written) = ctx
+        let (buffer, written) = ctx
             .make_probe_resp_frame(
                 *CLIENT_ADDR,
                 TimeUnit(10),
@@ -865,7 +865,7 @@ mod test {
             )
             .expect("error making probe resp frame");
         assert_eq!(
-            &in_buf.as_slice()[..bytes_written],
+            &buffer[..written],
             &[
                 // Mgmt header
                 0b01010000, 0, // Frame Control
@@ -894,7 +894,7 @@ mod test {
         let (fake_device, _) = FakeDevice::new(&exec);
         let (ctx, _) = make_context(fake_device);
 
-        let (in_buf, bytes_written, params) = ctx
+        let (buffer, written, params) = ctx
             .make_beacon_frame(
                 TimeUnit(10),
                 mac::CapabilityInfo(33),
@@ -907,7 +907,7 @@ mod test {
             )
             .expect("error making probe resp frame");
         assert_eq!(
-            &in_buf.as_slice()[..bytes_written],
+            &buffer[..written],
             &[
                 // Mgmt header
                 0b10000000, 0, // Frame Control
@@ -937,11 +937,11 @@ mod test {
         let exec = fasync::TestExecutor::new();
         let (fake_device, _) = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device);
-        let (in_buf, bytes_written) = ctx
+        let (buffer, written) = ctx
             .make_data_frame(*CLIENT_ADDR2, *CLIENT_ADDR, false, false, 0x1234, &[1, 2, 3, 4, 5])
             .expect("error making data frame");
         assert_eq!(
-            &in_buf.as_slice()[..bytes_written],
+            &buffer[..written],
             &[
                 // Mgmt header
                 0b00001000, 0b00000010, // Frame Control
@@ -964,7 +964,7 @@ mod test {
         let exec = fasync::TestExecutor::new();
         let (fake_device, _) = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device);
-        let (in_buf, bytes_written) = ctx
+        let (buffer, written) = ctx
             .make_data_frame(
                 *CLIENT_ADDR2,
                 *CLIENT_ADDR,
@@ -977,7 +977,7 @@ mod test {
             )
             .expect("error making data frame");
         assert_eq!(
-            &in_buf.as_slice()[..bytes_written],
+            &buffer[..written],
             &[
                 // Mgmt header
                 0b10001000, 0b00000010, // Frame Control
@@ -1001,7 +1001,7 @@ mod test {
         let exec = fasync::TestExecutor::new();
         let (fake_device, _) = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device);
-        let (in_buf, bytes_written) = ctx
+        let (buffer, written) = ctx
             .make_data_frame(
                 *CLIENT_ADDR2,
                 *CLIENT_ADDR,
@@ -1014,7 +1014,7 @@ mod test {
             )
             .expect("error making data frame");
         assert_eq!(
-            &in_buf.as_slice()[..bytes_written],
+            &buffer[..written],
             &[
                 // Mgmt header
                 0b10001000, 0b00000010, // Frame Control
@@ -1038,11 +1038,11 @@ mod test {
         let exec = fasync::TestExecutor::new();
         let (fake_device, _) = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device);
-        let (in_buf, bytes_written) = ctx
+        let (buffer, written) = ctx
             .make_eapol_frame(*CLIENT_ADDR2, *CLIENT_ADDR, false, &[1, 2, 3, 4, 5])
             .expect("error making eapol frame");
         assert_eq!(
-            &in_buf.as_slice()[..bytes_written],
+            &buffer[..written],
             &[
                 // Mgmt header
                 0b00001000, 0b00000010, // Frame Control

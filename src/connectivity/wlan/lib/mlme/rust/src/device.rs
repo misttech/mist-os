@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{buffer::OutBuf, common::mac::WlanGi, error::Error},
+    crate::{buffer::FinalizedBuffer, common::mac::WlanGi, error::Error},
     anyhow::format_err,
     banjo_fuchsia_wlan_common as banjo_common,
     banjo_fuchsia_wlan_softmac::{self as banjo_wlan_softmac, WlanRxPacket, WlanTxPacket},
@@ -236,11 +236,11 @@ pub trait DeviceOps {
         &mut self,
     ) -> Result<fidl_common::SpectrumManagementSupport, zx::Status>;
     fn deliver_eth_frame(&mut self, slice: &[u8]) -> Result<(), zx::Status>;
-    /// Sends the given |buf| as a frame over the air. If the caller does not pass an |async_id| to this
+    /// Sends the given |buffer| as a frame over the air. If the caller does not pass an |async_id| to this
     /// function, then this function will generate its own |async_id| and end the trace if an error occurs.
     fn send_wlan_frame(
         &mut self,
-        buf: OutBuf,
+        buffer: FinalizedBuffer,
         tx_flags: u32,
         async_id: Option<TraceId>,
     ) -> Result<(), zx::Status>;
@@ -444,7 +444,7 @@ impl DeviceOps for Device {
 
     fn send_wlan_frame(
         &mut self,
-        buf: OutBuf,
+        buffer: FinalizedBuffer,
         mut tx_flags: u32,
         async_id: Option<TraceId>,
     ) -> Result<(), zx::Status> {
@@ -456,7 +456,7 @@ impl DeviceOps for Device {
         });
         trace::duration!(c"wlan", c"Device::send_data_frame");
 
-        if buf.as_slice().len() < REQUIRED_WLAN_HEADER_LEN {
+        if buffer.len() < REQUIRED_WLAN_HEADER_LEN {
             let status = zx::Status::BUFFER_TOO_SMALL;
             if !async_id_provided {
                 wtrace::async_end_wlansoftmac_tx(async_id, status);
@@ -465,26 +465,36 @@ impl DeviceOps for Device {
         }
         // Unwrap is safe since the byte slice is always the same size.
         let frame_control =
-            zerocopy::Ref::<&[u8], FrameControl>::new(&buf.as_slice()[0..=1]).unwrap().into_ref();
+            zerocopy::Ref::<&[u8], FrameControl>::new(&buffer[0..=1]).unwrap().into_ref();
         if frame_control.protected() {
             tx_flags |= banjo_wlan_softmac::WlanTxInfoFlags::PROTECTED.0;
         }
         let peer_addr: MacAddr = {
             let mut peer_addr = [0u8; 6];
-            peer_addr.copy_from_slice(&buf.as_slice()[PEER_ADDR_OFFSET..PEER_ADDR_OFFSET + 6]);
+            peer_addr.copy_from_slice(&buffer[PEER_ADDR_OFFSET..PEER_ADDR_OFFSET + 6]);
             peer_addr.into()
         };
         let tx_vector_idx = self.tx_vector_idx(frame_control, &peer_addr, tx_flags);
 
         let tx_info = wlan_common::tx_vector::TxVector::from_idx(tx_vector_idx)
             .to_banjo_tx_info(tx_flags, self.minstrel.is_some());
-        zx::ok((self.raw_device.queue_tx)(self.raw_device.device, 0, buf, tx_info, async_id))
-            .map_err(|s| {
-                if !async_id_provided {
-                    wtrace::async_end_wlansoftmac_tx(async_id, s);
-                }
-                s
-            })
+        // Safety: This call is safe because the returned `buffer` pointer is sent back
+        // to the C++ portion of wlansoftmac.
+        let (buffer, _free, written) = unsafe { buffer.release() };
+        zx::ok((self.raw_device.queue_tx)(
+            self.raw_device.device,
+            0,
+            buffer,
+            written,
+            tx_info,
+            async_id,
+        ))
+        .map_err(|s| {
+            if !async_id_provided {
+                wtrace::async_end_wlansoftmac_tx(async_id, s);
+            }
+            s
+        })
     }
 
     fn set_ethernet_status(&mut self, status: LinkStatus) -> Result<(), zx::Status> {
@@ -721,7 +731,6 @@ impl<'a> WlanSoftmacIfcProtocol<'a> {
     }
 }
 
-
 /// A `Device` allows transmitting frames and MLME messages.
 #[repr(C)]
 pub struct DeviceInterface {
@@ -736,10 +745,15 @@ pub struct DeviceInterface {
     /// Request to deliver an Ethernet II frame to Fuchsia's Netstack.
     deliver_eth_frame: extern "C" fn(device: *mut c_void, data: *const u8, len: usize) -> i32,
     /// Deliver a WLAN frame directly through the firmware.
+    ///
+    /// The `buffer` and `written` arguments must be from a call to `FinalizedBuffer::release`. The
+    /// C++ portion of wlansoftmac will reconstruct an instance of the `FinalizedBuffer` class
+    /// defined in buffer_allocator.h.
     queue_tx: extern "C" fn(
         device: *mut c_void,
         options: u32,
-        buf: OutBuf,
+        buffer: *mut c_void,
+        written: usize,
         tx_info: banjo_wlan_softmac::WlanTxInfo,
         async_id: TraceId,
     ) -> i32,
@@ -1218,17 +1232,15 @@ pub mod test_utils {
 
         fn send_wlan_frame(
             &mut self,
-            buf: OutBuf,
+            buffer: FinalizedBuffer,
             _tx_flags: u32,
             _async_id: Option<TraceId>,
         ) -> Result<(), zx::Status> {
             let mut state = self.state.lock();
             if state.config.send_wlan_frame_fails {
-                buf.free();
                 return Err(zx::Status::IO);
             }
-            state.wlan_queue.push((buf.as_slice().to_vec(), 0));
-            buf.free();
+            state.wlan_queue.push((buffer.to_vec(), 0));
             Ok(())
         }
 
@@ -1829,10 +1841,10 @@ mod tests {
     fn enable_disable_beaconing() {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
-        let mut in_buf =
+        let mut buffer =
             fake_device_state.lock().buffer_provider.get_buffer(4).expect("error getting buffer");
-        in_buf.as_mut_slice().copy_from_slice(&[1, 2, 3, 4][..]);
-        let mac_frame = in_buf.as_slice().to_vec();
+        buffer.copy_from_slice(&[1, 2, 3, 4][..]);
+        let mac_frame = buffer.to_vec();
 
         fake_device
             .enable_beaconing(fidl_softmac::WlanSoftmacBaseEnableBeaconingRequest {
@@ -1844,8 +1856,8 @@ mod tests {
             .expect("error enabling beaconing");
         assert_variant!(
         fake_device_state.lock().beacon_config.as_ref(),
-        Some((buf, tim_ele_offset, beacon_interval)) => {
-            assert_eq!(&buf[..], &[1, 2, 3, 4][..]);
+        Some((buffer, tim_ele_offset, beacon_interval)) => {
+            assert_eq!(&buffer[..], &[1, 2, 3, 4][..]);
             assert_eq!(*tim_ele_offset, 1);
             assert_eq!(*beacon_interval, TimeUnit(2));
         });

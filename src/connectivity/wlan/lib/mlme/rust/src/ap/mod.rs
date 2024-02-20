@@ -9,7 +9,7 @@ mod remote_client;
 
 use {
     crate::{
-        buffer::{BufferProvider, InBuf},
+        buffer::{Buffer, BufferProvider},
         ddk_converter,
         device::{self, DeviceOps},
         error::Error,
@@ -35,8 +35,8 @@ use remote_client::*;
 
 #[derive(Debug)]
 struct BufferedFrame {
-    in_buf: InBuf,
-    bytes_written: usize,
+    buffer: Buffer,
+    written: usize,
     tx_flags: u32,
     async_id: trace::Id,
 }
