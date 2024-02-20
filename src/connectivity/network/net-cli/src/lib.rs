@@ -618,20 +618,18 @@ async fn do_if<C: NetCliDepsConnector>(
                     finterfaces_admin::AddressStateProviderMarker,
                 >()
                 .context("create proxy")?;
-                // TODO(https://fxbug.dev/42175224): Call `detach` at the end
-                // (after `add_forwarding_entry` below). This will ensure that
-                // the address is only added if all intermediate operations
-                // succeed. In the meantime, `detach` is called before the
-                // `assignment_state_stream` is operated on to ensure that it is
-                // not racy.
-                let () = address_state_provider.detach().context("detach address lifetime")?;
                 let () = control
                     .add_address(
                         &subnet.into(),
-                        &finterfaces_admin::AddressParameters::default(),
+                        &finterfaces_admin::AddressParameters {
+                            add_subnet_route: Some(!no_subnet_route),
+                            ..Default::default()
+                        },
                         server_end,
                     )
                     .context("call add address")?;
+
+                let () = address_state_provider.detach().context("detach address lifetime")?;
                 let state_stream =
                     finterfaces_ext::admin::assignment_state_stream(address_state_provider);
 
@@ -653,22 +651,6 @@ async fn do_if<C: NetCliDepsConnector>(
                                  This is probably a bug."
                         )
                     })?;
-
-                if !no_subnet_route {
-                    let stack: fstack::StackProxy =
-                        connect_with_context::<fstack::StackMarker, _>(connector).await?;
-                    let forwarding_entry = fstack::ForwardingEntry {
-                        subnet: fnet_ext::apply_subnet_mask(subnet.into()),
-                        device_id: id,
-                        next_hop: None,
-                        metric: 0,
-                    };
-                    let () = fstack_ext::exec_fidl!(
-                        stack.add_forwarding_entry(&forwarding_entry),
-                        "error adding forwarding entry"
-                    )?;
-                    info!("Added forwarding entry {:?}", forwarding_entry);
-                }
 
                 info!("Address {}/{} added to interface {}", addr, prefix, id);
             }
@@ -2137,18 +2119,8 @@ mod tests {
         let (root_interfaces, mut requests) =
             fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>().unwrap();
 
-        let (stack_proxy, stack_stream) = match (!no_subnet_route)
-            .then(|| fidl::endpoints::create_proxy_and_stream::<fstack::StackMarker>().unwrap())
-        {
-            Some((proxy, stream)) => (Some(proxy), Some(stream)),
-            None => (None, None),
-        };
-
-        let connector = TestConnector {
-            root_interfaces: Some(root_interfaces),
-            stack: stack_proxy,
-            ..Default::default()
-        };
+        let connector =
+            TestConnector { root_interfaces: Some(root_interfaces), ..Default::default() };
         let mut out = ffx_writer::Writer::new_test(None);
         let do_if_fut = do_if(
             &mut out,
@@ -2178,7 +2150,7 @@ mod tests {
                 control.into_stream().expect("control request stream");
             let (
                 addr,
-                _addr_params,
+                addr_params,
                 address_state_provider_server_end,
                 _admin_control_control_handle,
             ) = control
@@ -2189,6 +2161,13 @@ mod tests {
                 .into_add_address()
                 .expect("add address request");
             assert_eq!(addr, IF_ADDR_V6);
+            assert_eq!(
+                addr_params,
+                finterfaces_admin::AddressParameters {
+                    add_subnet_route: Some(!no_subnet_route),
+                    ..Default::default()
+                }
+            );
 
             let mut address_state_provider_request_stream = address_state_provider_server_end
                 .into_stream()
@@ -2230,32 +2209,7 @@ mod tests {
                 .expect("send address assignment state succeeds");
         };
 
-        let stack_fut = async {
-            if let Some(mut stack_requests) = stack_stream {
-                let (entry, responder) = stack_requests
-                    .try_next()
-                    .await
-                    .expect("add route FIDL error")
-                    .expect("request stream should not have ended")
-                    .into_add_forwarding_entry()
-                    .expect("request should be of type AddRoute");
-                assert_eq!(
-                    entry,
-                    fstack::ForwardingEntry {
-                        subnet: fnet_ext::apply_subnet_mask(fnet::Subnet {
-                            addr: IF_ADDR_V6.addr,
-                            prefix_len: TEST_PREFIX_LENGTH
-                        }),
-                        device_id: interface1.nicid,
-                        next_hop: None,
-                        metric: 0,
-                    }
-                );
-                responder.send(Ok(())).expect("responder.send should succeed");
-            }
-        };
-
-        let ((), (), ()) = futures::join!(admin_fut, do_if_fut, stack_fut);
+        let ((), ()) = futures::join!(admin_fut, do_if_fut);
     }
 
     #[test_case(false ; "providing nicids")]
