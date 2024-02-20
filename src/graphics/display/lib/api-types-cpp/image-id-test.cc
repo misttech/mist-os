@@ -56,11 +56,10 @@ TEST(ImageIdTest, ToFidlImageId) {
 }
 
 TEST(ImageIdTest, ToImageIdWithFidlValue) {
-  EXPECT_EQ(kOne, ToImageId(fuchsia_hardware_display_types::wire::ImageId{.value = 1}));
-  EXPECT_EQ(kTwo, ToImageId(fuchsia_hardware_display_types::wire::ImageId{.value = 2}));
-  EXPECT_EQ(kLargeId,
-            ToImageId(fuchsia_hardware_display_types::wire::ImageId{.value = kLargeIdValue}));
-  EXPECT_EQ(kInvalidImageId, ToImageId(fuchsia_hardware_display_types::wire::ImageId{
+  EXPECT_EQ(kOne, ToImageId(fuchsia_hardware_display::wire::ImageId{.value = 1}));
+  EXPECT_EQ(kTwo, ToImageId(fuchsia_hardware_display::wire::ImageId{.value = 2}));
+  EXPECT_EQ(kLargeId, ToImageId(fuchsia_hardware_display::wire::ImageId{.value = kLargeIdValue}));
+  EXPECT_EQ(kInvalidImageId, ToImageId(fuchsia_hardware_display::wire::ImageId{
                                  .value = fuchsia_hardware_display_types::wire::kInvalidDispId}));
 }
 

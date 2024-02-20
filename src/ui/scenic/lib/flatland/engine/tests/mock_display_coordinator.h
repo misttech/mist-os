@@ -42,9 +42,8 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
                std::vector<uint8_t>));
 
   MOCK_METHOD(void, SetLayerImage,
-              (fuchsia::hardware::display::types::LayerId,
-               fuchsia::hardware::display::types::ImageId, fuchsia::hardware::display::EventId,
-               fuchsia::hardware::display::EventId));
+              (fuchsia::hardware::display::types::LayerId, fuchsia::hardware::display::ImageId,
+               fuchsia::hardware::display::EventId, fuchsia::hardware::display::EventId));
 
   MOCK_METHOD(void, ApplyConfig, ());
 
@@ -66,9 +65,9 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
 
   MOCK_METHOD(void, ImportImage,
               (fuchsia::hardware::display::types::ImageConfig, fuchsia::hardware::display::BufferId,
-               fuchsia::hardware::display::types::ImageId, ImportImageCallback));
+               fuchsia::hardware::display::ImageId, ImportImageCallback));
 
-  MOCK_METHOD(void, ReleaseImage, (fuchsia::hardware::display::types::ImageId));
+  MOCK_METHOD(void, ReleaseImage, (fuchsia::hardware::display::ImageId));
 
   MOCK_METHOD(void, SetLayerPrimaryConfig,
               (fuchsia::hardware::display::types::LayerId,

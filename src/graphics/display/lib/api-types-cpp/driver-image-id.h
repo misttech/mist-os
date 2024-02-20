@@ -13,14 +13,17 @@
 
 namespace display {
 
-// Type-safe wrapper around image IDs exposed to display drivers.
+// More useful representation of `fuchsia.hardware.display.engine/ImageId`.
 //
 // The Banjo API between the Display Coordinator and drivers currently refers to
 // this concept as "image handle". This name will be phased out when the
 // API is migrated from Banjo to FIDL.
 //
-// TODO(https://fxbug.dev/42079544): Unify this type with `DriverCaptureImageId` when
-// unifying image ID namespaces.
+// See `ImageId` for the type used at the interface between the display
+// coordinator and clients such as Scenic.
+//
+// TODO(https://fxbug.dev/42079544): Unify this type with `DriverCaptureImageId`
+// when unifying image ID namespaces.
 DEFINE_STRONG_INT(DriverImageId, uint64_t);
 
 constexpr inline DriverImageId ToDriverImageId(uint64_t banjo_driver_image_id) {

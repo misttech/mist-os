@@ -406,7 +406,7 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
   const fuchsia::hardware::display::types::ImageConfig image_config = CreateImageConfig(metadata);
   fuchsia::hardware::display::Coordinator_ImportImage_Result import_image_result;
   {
-    const fuchsia::hardware::display::types::ImageId fidl_image_id =
+    const fuchsia::hardware::display::ImageId fidl_image_id =
         allocation::ToFidlImageId(metadata.identifier);
     const auto status = (*display_coordinator_)
                             ->ImportImage(image_config, /*buffer_id=*/
@@ -435,8 +435,7 @@ void DisplayCompositor::ReleaseBufferImage(const allocation::GlobalImageId image
 
   renderer_->ReleaseBufferImage(image_id);
 
-  const fuchsia::hardware::display::types::ImageId fidl_image_id =
-      allocation::ToFidlImageId(image_id);
+  const fuchsia::hardware::display::ImageId fidl_image_id = allocation::ToFidlImageId(image_id);
   std::scoped_lock lock(lock_);
 
   if (display_imported_images_.erase(image_id) == 1) {
@@ -592,8 +591,7 @@ void DisplayCompositor::ApplyLayerImage(const fuchsia::hardware::display::types:
   (*display_coordinator_)->SetLayerPrimaryPosition(layer_id, transform, src, dst);
   (*display_coordinator_)->SetLayerPrimaryAlpha(layer_id, alpha_mode, image.multiply_color[3]);
   // Set the imported image on the layer.
-  const fuchsia::hardware::display::types::ImageId image_id =
-      allocation::ToFidlImageId(image.identifier);
+  const fuchsia::hardware::display::ImageId image_id = allocation::ToFidlImageId(image.identifier);
   (*display_coordinator_)->SetLayerImage(layer_id, image_id, wait_id, signal_id);
 }
 

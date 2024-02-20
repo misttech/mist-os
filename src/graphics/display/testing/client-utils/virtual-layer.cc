@@ -340,7 +340,7 @@ void VirtualLayer::SetLayerImages(const fidl::WireSyncClient<fhd::Coordinator>& 
   for (auto& layer : layers_) {
     const auto& image = layer.import_info[alt_image];
     const fhdt::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer.id);
-    const fhdt::wire::ImageId fidl_image_id = display::ToFidlImageId(image.id);
+    const fhd::wire::ImageId fidl_image_id = display::ToFidlImageId(image.id);
     const fhd::wire::EventId fidl_wait_event_id =
         display::ToFidlEventId(image.event_ids[WAIT_EVENT]);
     const fhd::wire::EventId fidl_signal_event_id =

@@ -122,7 +122,7 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
 
   void ImportImage(fuchsia::hardware::display::types::ImageConfig image_config,
                    fuchsia::hardware::display::BufferId buffer_id,
-                   fuchsia::hardware::display::types::ImageId image_id,
+                   fuchsia::hardware::display::ImageId image_id,
                    ImportImageCallback callback) override {
     callback(fuchsia::hardware::display::Coordinator_ImportImage_Result::WithResponse({}));
   }

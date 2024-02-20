@@ -31,8 +31,7 @@ constexpr inline fuchsia::hardware::display::BufferCollectionId ToDisplayBufferC
   return {.value = global_buffer_collection_id};
 }
 
-constexpr inline fuchsia::hardware::display::types::ImageId ToFidlImageId(
-    GlobalImageId global_image_id) {
+constexpr inline fuchsia::hardware::display::ImageId ToFidlImageId(GlobalImageId global_image_id) {
   return {.value = global_image_id};
 }
 

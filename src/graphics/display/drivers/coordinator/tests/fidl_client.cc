@@ -442,7 +442,7 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
   }
 
   const ImageId image_id = next_image_id_++;
-  const fhdt::wire::ImageId fidl_image_id = ToFidlImageId(image_id);
+  const fhd::wire::ImageId fidl_image_id = ToFidlImageId(image_id);
   const auto import_result =
       dc_->ImportImage(image_config,
                        fhd::wire::BufferId{

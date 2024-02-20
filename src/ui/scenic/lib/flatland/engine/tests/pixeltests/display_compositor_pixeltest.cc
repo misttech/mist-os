@@ -548,7 +548,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     // This ID would only be zero if we were running in an environment without capture support.
     EXPECT_NE(capture_image_id, 0U);
-    const fuchsia::hardware::display::types::ImageId fidl_capture_image_id =
+    const fuchsia::hardware::display::ImageId fidl_capture_image_id =
         allocation::ToFidlImageId(capture_image_id);
 
     auto display = display_manager_->default_display();
@@ -1244,7 +1244,8 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   EXPECT_TRUE(images_are_same);
 }
 
-// TODO(https://fxbug.dev/42154038): Add YUV formats when they are supported by fake or real display.
+// TODO(https://fxbug.dev/42154038): Add YUV formats when they are supported by fake or real
+// display.
 INSTANTIATE_TEST_SUITE_P(PixelFormats, DisplayCompositorParameterizedPixelTest,
                          ::testing::Values(fuchsia::sysmem::PixelFormatType::BGRA32,
                                            fuchsia::sysmem::PixelFormatType::R8G8B8A8));
@@ -1614,7 +1615,8 @@ class DisplayCompositorParameterizedTest
     : public DisplayCompositorPixelTest,
       public ::testing::WithParamInterface<fuchsia::sysmem::PixelFormatType> {};
 
-// TODO(https://fxbug.dev/42154038): Add YUV formats when they are supported by fake or real display.
+// TODO(https://fxbug.dev/42154038): Add YUV formats when they are supported by fake or real
+// display.
 INSTANTIATE_TEST_SUITE_P(PixelFormats, DisplayCompositorParameterizedTest,
                          ::testing::Values(fuchsia::sysmem::PixelFormatType::BGRA32));
 

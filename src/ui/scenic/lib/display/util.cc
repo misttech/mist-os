@@ -121,8 +121,7 @@ zx_status_t ImportImageForCapture(
 
   const fuchsia::hardware::display::BufferCollectionId display_buffer_collection_id =
       allocation::ToDisplayBufferCollectionId(buffer_collection_id);
-  const fuchsia::hardware::display::types::ImageId fidl_image_id =
-      allocation::ToFidlImageId(image_id);
+  const fuchsia::hardware::display::ImageId fidl_image_id = allocation::ToFidlImageId(image_id);
   fuchsia::hardware::display::Coordinator_ImportImage_Result import_result;
   const zx_status_t status =
       display_coordinator->ImportImage(image_config, /*buffer_id=*/
