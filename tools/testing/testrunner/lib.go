@@ -612,8 +612,7 @@ func runTestOnce(
 	var err error
 	select {
 	case res := <-ch:
-		result = res.result
-		err = res.err
+		result, err = t.ProcessResult(testCtx, test, outDir, res.result, res.err)
 		timeout = test.Timeout
 	case <-timeoutCh:
 		result.Result = runtests.TestAborted
@@ -689,12 +688,11 @@ func runTestOnce(
 			result.Cases[i].Tags = caseToTags[tc.DisplayName]
 		}
 	}
-	if result.StartTime.IsZero() {
-		result.StartTime = startTime
-	}
-	if result.EndTime.IsZero() {
-		result.EndTime = endTime
-	}
+
+	// The start time and end time should cover the entire duration to run the test
+	// and process the results.
+	result.StartTime = startTime
+	result.EndTime = endTime
 	result.Affected = test.Affected
 	return result, nil
 }

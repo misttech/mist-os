@@ -183,6 +183,7 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 	testCtx := context.Background()
 	t.Logf("Running Test: %s", config.Test.Name)
 	testResult, err := ffxRunner.Test(testCtx, shard, os.Stdout, os.Stdout, "")
+	testResult, err = ffxRunner.ProcessResult(testCtx, shard, "", testResult, err)
 	if err != nil {
 		t.Fatalf("Test execution failed. Reason: %s", err)
 	}
