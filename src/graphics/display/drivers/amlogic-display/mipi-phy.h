@@ -6,9 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_MIPI_PHY_H_
 
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
-#include <lib/ddk/device.h>
 #include <lib/device-protocol/pdev-fidl.h>
-#include <lib/mmio/mmio-buffer.h>
 #include <lib/mmio/mmio.h>
 #include <unistd.h>
 #include <zircon/compiler.h>
@@ -24,28 +22,10 @@ namespace amlogic_display {
 
 class MipiPhy {
  public:
-  // Factory method intended for production use.
-  //
-  // `enabled` is true iff the driver adopts an already initialized MIPI D-PHY
-  // controller.
-  //
-  // Creating an MipiPhy instance doesn't change the hardware state, and is
-  // therefore safe to use when adopting a device previously initialized by
-  // the bootloader or another driver.
-  static zx::result<std::unique_ptr<MipiPhy>> Create(zx_device_t* parent, bool enabled);
-
-  // Production code should prefer using the `Create()` factory method.
-  //
-  // `d_phy_mmio` is the MIPI D-PHY controller register MMIO region (also known
-  // as "MIPI_DSI_PHY" in the "Memory Map" Section of Amlogic datasheets).
-  // It must be a valid MMIO buffer.
-  //
-  // `dsiimpl` must be valid.
-  explicit MipiPhy(fdf::MmioBuffer d_phy_mmio, ddk::DsiImplProtocolClient dsiimpl, bool enabled);
-
-  MipiPhy(const MipiPhy&) = delete;
-  MipiPhy& operator=(const MipiPhy&) = delete;
-
+  // This function initializes internal state of the object
+  static zx::result<std::unique_ptr<MipiPhy>> Create(ddk::PDevFidl& pdev,
+                                                     ddk::DsiImplProtocolClient dsi,
+                                                     bool already_enabled);
   // This function enables and starts up the Mipi Phy
   zx::result<> Startup();
   // This function stops Mipi Phy
@@ -55,6 +35,7 @@ class MipiPhy {
   uint32_t GetLowPowerEscaseTime() { return dsi_phy_cfg_.lp_tesc; }
 
  private:
+  MipiPhy() = default;
   // This structure holds the timing parameters used for MIPI D-PHY
   // This can be moved later on to MIPI D-PHY specific header if need be
   struct DsiPhyConfig {
@@ -78,7 +59,7 @@ class MipiPhy {
 
   void PhyInit();
 
-  fdf::MmioBuffer dsi_phy_mmio_;
+  std::optional<fdf::MmioBuffer> dsi_phy_mmio_;
   DsiPhyConfig dsi_phy_cfg_;
   ddk::DsiImplProtocolClient dsiimpl_;
 

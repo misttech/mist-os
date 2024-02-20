@@ -6,7 +6,6 @@
 
 #include <lib/ddk/debug.h>
 #include <lib/device-protocol/display-panel.h>
-#include <lib/mmio/mmio-buffer.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
 
@@ -78,13 +77,12 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
   }
   self->lcd_ = std::move(lcd_result).value();
 
-  zx::result<std::unique_ptr<MipiPhy>> mipi_phy_result =
-      MipiPhy::Create(parent, kBootloaderDisplayEnabled);
-  if (mipi_phy_result.is_error()) {
-    zxlogf(ERROR, "Failed to Create MipiPhy: %s", mipi_phy_result.status_string());
-    return mipi_phy_result.take_error();
+  auto phy_or_status = MipiPhy::Create(self->pdev_, self->dsiimpl_, kBootloaderDisplayEnabled);
+  if (phy_or_status.is_error()) {
+    zxlogf(ERROR, "Failed to create PHY object: %s", phy_or_status.status_string());
+    return zx::error(phy_or_status.error_value());
   }
-  self->phy_ = std::move(mipi_phy_result).value();
+  self->phy_ = std::move(phy_or_status.value());
 
   self->enabled_ = kBootloaderDisplayEnabled;
 
