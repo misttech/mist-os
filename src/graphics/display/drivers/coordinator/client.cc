@@ -614,7 +614,7 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
 
 void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::Sync& completer) {
   fhdt::wire::ConfigResult res;
-  std::vector<fhdt::wire::ClientCompositionOp> ops;
+  std::vector<fhd::wire::ClientCompositionOp> ops;
 
   pending_config_valid_ = CheckConfig(&res, &ops);
 
@@ -622,7 +622,7 @@ void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::S
     DiscardConfig();
   }
 
-  completer.Reply(res, ::fidl::VectorView<fhdt::wire::ClientCompositionOp>::FromExternal(ops));
+  completer.Reply(res, ::fidl::VectorView<fhd::wire::ClientCompositionOp>::FromExternal(ops));
 }
 
 void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
@@ -855,7 +855,7 @@ void Client::SetDisplayPower(SetDisplayPowerRequestView request,
 }
 
 bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
-                         std::vector<fhdt::wire::ClientCompositionOp>* ops) {
+                         std::vector<fhd::wire::ClientCompositionOp>* ops) {
   if (res && ops) {
     *res = fhdt::wire::ConfigResult::kOk;
     ops->clear();
@@ -1014,7 +1014,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
 
       for (uint8_t i = 0; i < 32; i++) {
         if (err & (1 << i)) {
-          ops->emplace_back(fhdt::wire::ClientCompositionOp{
+          ops->emplace_back(fhd::wire::ClientCompositionOp{
               .display_id = ToFidlDisplayId(display_config.id),
               .layer_id = ToFidlLayerId(layer_id),
               .opcode = static_cast<fhdt::wire::ClientCompositionOpcode>(i),

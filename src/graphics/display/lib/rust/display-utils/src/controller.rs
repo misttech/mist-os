@@ -4,8 +4,8 @@
 
 use {
     fidl::endpoints::ClientEnd,
-    fidl_fuchsia_hardware_display::{self as display, CoordinatorEvent},
-    fidl_fuchsia_hardware_display_types::{self as display_types, LayerId as FidlLayerId},
+    fidl_fuchsia_hardware_display::{self as display, CoordinatorEvent, LayerId as FidlLayerId},
+    fidl_fuchsia_hardware_display_types::{self as display_types},
     fidl_fuchsia_io as fio,
     fuchsia_async::{DurationExt as _, TimeoutExt as _},
     fuchsia_component::client::connect_to_protocol_at_path,

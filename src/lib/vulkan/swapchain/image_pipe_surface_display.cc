@@ -529,7 +529,7 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
         status = result.is_err() ? result.err() : ZX_OK;
         layer_id_ = result.is_response()
                         ? result.response().layer_id
-                        : fuchsia::hardware::display::types::LayerId{
+                        : fuchsia::hardware::display::LayerId{
                               .value = fuchsia::hardware::display::types::INVALID_DISP_ID};
         got_message_response_ = true;
       });
@@ -542,7 +542,7 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
   }
 
   display_coordinator_->SetDisplayLayers(
-      display_id_, std::vector<fuchsia::hardware::display::types::LayerId>{layer_id_});
+      display_id_, std::vector<fuchsia::hardware::display::LayerId>{layer_id_});
   display_coordinator_->SetLayerPrimaryConfig(layer_id_, image_config);
 
   return true;

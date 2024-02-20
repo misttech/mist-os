@@ -5,25 +5,6 @@ library fuchsia.hardware.display.types;
 
 using fuchsia.images2;
 
-/// Type of the internal value in [`fuchsia.hardware.display.types/LayerId`].
-alias LayerIdValue = uint64;
-
-/// Identifies a layer resource owned by a Display Coordinator client.
-///
-/// [`fuchsia.hardware.display.types/INVALID_DISP_ID`] represents an invalid
-/// value.
-///
-/// Values are managed by [`fuchsia.hardware.display/Coordinator`] clients, to
-/// facilitate feed-forward dataflow.
-///
-/// Valid values uniquely identify "live" layers within a Display Coordinator
-/// connection. The identifier of a layer destroyed via
-/// [`fuchsia.hardware.display/Coordinator.DestroyLayer`] can be reused in a
-/// subsequent [`fuchsia.hardware.display/Coordinator.CreateLayer`] call.
-type LayerId = struct {
-    value LayerIdValue;
-};
-
 // Rotations are applied counter-clockwise, and are applied before reflections.  Note: this doesn't
 // affect the output region on the physical display; use the layer's `dest_frame` for that.  In
 // other words, if you have a 600x300 image that you want to rotate 90 degrees without changing the
@@ -86,18 +67,6 @@ type ClientCompositionOpcode = strict enum : uint8 {
     CLIENT_COLOR_CONVERSION = 6;
     /// The client should apply the alpha itself.
     CLIENT_ALPHA = 7;
-};
-
-type ClientCompositionOp = struct {
-    /// display_id and layer_id uniquely identify the subject of the
-    /// opcode.
-    display_id DisplayId;
-
-    /// Invalid for issues that aren't scoped to a specific layer, such as
-    /// unsupported color conversion tables.
-    layer_id LayerId;
-
-    opcode ClientCompositionOpcode;
 };
 
 type PrimaryLayer = struct {

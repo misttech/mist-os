@@ -6,11 +6,9 @@ use crate::{error::Result, pixel_format::PixelFormat};
 use {
     fidl_fuchsia_hardware_display::{
         BufferCollectionId as FidlBufferCollectionId, BufferId as FidlBufferId,
-        EventId as FidlEventId, ImageId as FidlImageId, Info,
+        EventId as FidlEventId, ImageId as FidlImageId, Info, LayerId as FidlLayerId,
     },
-    fidl_fuchsia_hardware_display_types::{
-        DisplayId as FidlDisplayId, LayerId as FidlLayerId, INVALID_DISP_ID,
-    },
+    fidl_fuchsia_hardware_display_types::{DisplayId as FidlDisplayId, INVALID_DISP_ID},
     fuchsia_async::OnSignals,
     fuchsia_zircon::{self as zx, AsHandleRef},
     std::fmt,

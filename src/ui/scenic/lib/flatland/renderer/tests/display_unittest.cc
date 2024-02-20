@@ -74,7 +74,7 @@ class DisplayTest : public gtest::RealLoopFixture {
     gtest::RealLoopFixture::TearDown();
   }
 
-  fuchsia::hardware::display::types::LayerId InitializeDisplayLayer(
+  fuchsia::hardware::display::LayerId InitializeDisplayLayer(
       fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
       scenic_impl::display::Display* display) {
     fuchsia::hardware::display::Coordinator_CreateLayer_Result result;
@@ -88,7 +88,7 @@ class DisplayTest : public gtest::RealLoopFixture {
       FX_LOGS(ERROR) << "Failed to create layer: " << zx_status_get_string(result.err());
       return {.value = fuchsia::hardware::display::types::INVALID_DISP_ID};
     }
-    const fuchsia::hardware::display::types::LayerId layer_id = result.response().layer_id;
+    const fuchsia::hardware::display::LayerId layer_id = result.response().layer_id;
 
     const zx_status_t set_display_layers_status =
         display_coordinator->SetDisplayLayers(display->display_id(), {layer_id});
@@ -228,7 +228,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   auto display = display_manager_->default_display();
   ASSERT_TRUE(display);
 
-  fuchsia::hardware::display::types::LayerId layer_id =
+  fuchsia::hardware::display::LayerId layer_id =
       InitializeDisplayLayer(*display_coordinator.get(), display);
   ASSERT_NE(layer_id.value, fuchsia::hardware::display::types::INVALID_DISP_ID);
 
@@ -304,7 +304,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
 
   // Apply the config.
   fuchsia::hardware::display::types::ConfigResult result;
-  std::vector<fuchsia::hardware::display::types::ClientCompositionOp> ops;
+  std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
   (*display_coordinator.get())->CheckConfig(/*discard=*/false, &result, &ops);
   EXPECT_EQ(result, fuchsia::hardware::display::types::ConfigResult::OK);
   status = (*display_coordinator.get())->ApplyConfig();

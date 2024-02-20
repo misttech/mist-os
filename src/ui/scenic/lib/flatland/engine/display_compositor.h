@@ -66,14 +66,14 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
     static RenderFrameTestArgs Default() { return {}; }
   };
 
-  // TODO(https://fxbug.dev/42145655): The DisplayCompositor has multiple parts of its code where usage of the
-  // display coordinator is protected by locks, because of the multithreaded environment of
-  // flatland. Ideally, we'd want the DisplayCompositor to have sole ownership of the display
-  // coordinator - meaning that it would require a unique_ptr instead of a shared_ptr. But since
-  // access to the real display coordinator is provided to clients via a shared_ptr, we take in a
-  // shared_ptr as a parameter here. However, this could cause problems with our locking mechanisms,
-  // as other display-coordinator clients could be accessing the same functions and/or state at the
-  // same time as the DisplayCompositor without making use of locks.
+  // TODO(https://fxbug.dev/42145655): The DisplayCompositor has multiple parts of its code where
+  // usage of the display coordinator is protected by locks, because of the multithreaded
+  // environment of flatland. Ideally, we'd want the DisplayCompositor to have sole ownership of the
+  // display coordinator - meaning that it would require a unique_ptr instead of a shared_ptr. But
+  // since access to the real display coordinator is provided to clients via a shared_ptr, we take
+  // in a shared_ptr as a parameter here. However, this could cause problems with our locking
+  // mechanisms, as other display-coordinator clients could be accessing the same functions and/or
+  // state at the same time as the DisplayCompositor without making use of locks.
   DisplayCompositor(
       async_dispatcher_t* main_dispatcher,
       std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator,
@@ -127,9 +127,8 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // |out_collection_info|. This out parameter is only allowed to be nullptr when
   // |num_render_targets| is 0. Otherwise, a valid handle to return the buffer collection data is
   // required.
-  // TODO(https://fxbug.dev/42137737): We need to figure out exactly how we want the display to anchor
-  // to the Flatland hierarchy.
-  // Only called from the main thread.
+  // TODO(https://fxbug.dev/42137737): We need to figure out exactly how we want the display to
+  // anchor to the Flatland hierarchy. Only called from the main thread.
   void AddDisplay(scenic_impl::display::Display* display, DisplayInfo info,
                   uint32_t num_render_targets,
                   fuchsia::sysmem::BufferCollectionInfo_2* out_collection_info)
@@ -155,7 +154,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
     fuchsia::hardware::display::types::ConfigResult result;
     // If the config is invalid, this vector will list all the operations
     // that need to be performed to make the config valid again.
-    std::vector<fuchsia::hardware::display::types::ClientCompositionOp> ops;
+    std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
   };
 
   struct FrameEventData {
@@ -172,7 +171,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   struct DisplayEngineData {
     // The hardware layers we've created to use on this display.
-    std::vector<fuchsia::hardware::display::types::LayerId> layers;
+    std::vector<fuchsia::hardware::display::LayerId> layers;
 
     // The number of vmos we are using in the case of software composition
     // (1 for each render target).
@@ -213,8 +212,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   // Generates a hardware layer for direct compositing on the display. Returns the ID used
   // to reference that layer in the display coordinator API.
-  fuchsia::hardware::display::types::LayerId CreateDisplayLayer()
-      FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  fuchsia::hardware::display::LayerId CreateDisplayLayer() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Moves a token out of |display_buffer_collection_ptrs_| and returns it.
   fuchsia::sysmem::BufferCollectionSyncPtr TakeDisplayBufferCollectionPtr(
@@ -239,15 +237,15 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   // Sets the provided layers onto the display referenced by the given display_id.
   void SetDisplayLayers(fuchsia::hardware::display::types::DisplayId display_id,
-                        const std::vector<fuchsia::hardware::display::types::LayerId>& layers)
+                        const std::vector<fuchsia::hardware::display::LayerId>& layers)
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Takes a solid color rectangle and directly composites it to a hardware layer on the display.
-  void ApplyLayerColor(fuchsia::hardware::display::types::LayerId layer_id, ImageRect rectangle,
+  void ApplyLayerColor(fuchsia::hardware::display::LayerId layer_id, ImageRect rectangle,
                        allocation::ImageMetadata image) FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Takes an image and directly composites it to a hardware layer on the display.
-  void ApplyLayerImage(fuchsia::hardware::display::types::LayerId layer_id, ImageRect rectangle,
+  void ApplyLayerImage(fuchsia::hardware::display::LayerId layer_id, ImageRect rectangle,
                        allocation::ImageMetadata image, scenic_impl::DisplayEventId wait_id,
                        scenic_impl::DisplayEventId signal_id) FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
@@ -285,16 +283,15 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
       FXL_GUARDED_BY(lock_);
 
   // Maps the flatland global image id to the events used by the display coordinator.
-  std::unordered_map<allocation::GlobalImageId, ImageEventData> image_event_map_ FXL_GUARDED_BY(
-      lock_);
+  std::unordered_map<allocation::GlobalImageId, ImageEventData> image_event_map_
+      FXL_GUARDED_BY(lock_);
 
   // Maps a buffer collection ID to a BufferCollectionSyncPtr in the same domain as the token with
   // display constraints set. This is used as a bridge between ImportBufferCollection() and
   // ImportBufferImage() calls, so that we can check if the existing allocation is
   // display-compatible.
-  std::unordered_map<allocation::GlobalBufferCollectionId,
-                     fuchsia::sysmem::BufferCollectionSyncPtr> display_buffer_collection_ptrs_
-      FXL_GUARDED_BY(lock_);
+  std::unordered_map<allocation::GlobalBufferCollectionId, fuchsia::sysmem::BufferCollectionSyncPtr>
+      display_buffer_collection_ptrs_ FXL_GUARDED_BY(lock_);
 
   // Maps a buffer collection ID to a boolean indicating if it can be imported into display.
   std::unordered_map<allocation::GlobalBufferCollectionId, bool> buffer_collection_supports_display_
@@ -305,9 +302,8 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   // Maps a buffer collection ID to a collection pixel format struct.
   // TODO(https://fxbug.dev/42150686): Delete after we don't need the pixel format anymore.
-  std::unordered_map<allocation::GlobalBufferCollectionId,
-                     fuchsia::sysmem::PixelFormat> buffer_collection_pixel_format_
-      FXL_GUARDED_BY(lock_);
+  std::unordered_map<allocation::GlobalBufferCollectionId, fuchsia::sysmem::PixelFormat>
+      buffer_collection_pixel_format_ FXL_GUARDED_BY(lock_);
 
   /// The below members are either thread-safe or only manipulated from the main thread and
   /// therefore don't need locks.
@@ -353,9 +349,9 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Constant except for in tests.
   bool enable_display_composition_ = true;
 
-  // TODO(https://fxbug.dev/42078234): Display controller currently doesn't allow flipping one image on one
-  // layer, but keeping the image on another layer the same in consecutive configs. As a result,
-  // using multiple layers is broken. This field is used to limit it.
+  // TODO(https://fxbug.dev/42078234): Display controller currently doesn't allow flipping one image
+  // on one layer, but keeping the image on another layer the same in consecutive configs. As a
+  // result, using multiple layers is broken. This field is used to limit it.
   uint32_t max_display_layers_ = 1;
 
   ColorConversionStateMachine cc_state_machine_;

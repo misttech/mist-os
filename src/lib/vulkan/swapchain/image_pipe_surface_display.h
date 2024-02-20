@@ -60,8 +60,7 @@ class ImagePipeSurfaceDisplay : public ImagePipeSurface {
   uint32_t height_ = 0;
   fuchsia::hardware::display::types::DisplayId display_id_ = {
       .value = fuchsia::hardware::display::types::INVALID_DISP_ID};
-  fuchsia::hardware::display::types::LayerId layer_id_{
-      fuchsia::hardware::display::types::INVALID_DISP_ID};
+  fuchsia::hardware::display::LayerId layer_id_{fuchsia::hardware::display::types::INVALID_DISP_ID};
   fuchsia::hardware::display::CoordinatorPtr display_coordinator_;
   fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
   SupportedImageProperties supported_image_properties_;

@@ -179,7 +179,7 @@ bool PrimaryLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
 
     fhdt::wire::ImageConfig image_config;
     images_[0]->GetConfig(&image_config);
-    const fhdt::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
+    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
     auto set_config_result = dc->SetLayerPrimaryConfig(fidl_layer_id, image_config);
     if (!set_config_result.ok()) {
       printf("Setting layer config failed\n");
@@ -330,7 +330,7 @@ void PrimaryLayer::Render(int32_t frame_num) {
 
 void PrimaryLayer::SetLayerPositions(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
   for (auto& layer : layers_) {
-    const fhdt::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer.id);
+    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer.id);
     ZX_ASSERT(dc->SetLayerPrimaryPosition(fidl_layer_id, rotation_, layer.src, layer.dest).ok());
   }
 }
@@ -339,7 +339,7 @@ void VirtualLayer::SetLayerImages(const fidl::WireSyncClient<fhd::Coordinator>& 
                                   bool alt_image) {
   for (auto& layer : layers_) {
     const auto& image = layer.import_info[alt_image];
-    const fhdt::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer.id);
+    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer.id);
     const fhd::wire::ImageId fidl_image_id = display::ToFidlImageId(image.id);
     const fhd::wire::EventId fidl_wait_event_id =
         display::ToFidlEventId(image.event_ids[WAIT_EVENT]);
@@ -393,7 +393,7 @@ bool ColorLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
     uint8_t data[kColorLayerBytesPerPixel];
     *reinterpret_cast<uint32_t*>(data) = kColorLayerColor;
 
-    const fhdt::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
+    const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
     auto result = dc->SetLayerColorConfig(
         fidl_layer_id, kColorLayerFormat,
         ::fidl::VectorView<uint8_t>::FromExternal(data, kColorLayerBytesPerPixel));

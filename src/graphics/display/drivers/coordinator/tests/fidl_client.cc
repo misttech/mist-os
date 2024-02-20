@@ -263,19 +263,19 @@ TestFidlClient::~TestFidlClient() {
 zx_status_t TestFidlClient::PresentLayers(std::vector<PresentLayerInfo> present_layers) {
   fbl::AutoLock l(mtx());
 
-  std::vector<fhdt::wire::LayerId> fidl_layers;
+  std::vector<fhd::wire::LayerId> fidl_layers;
   for (const auto& info : present_layers) {
     fidl_layers.push_back(ToFidlLayerId(info.layer_id));
   }
   if (auto reply =
           dc_->SetDisplayLayers(ToFidlDisplayId(display_id()),
-                                fidl::VectorView<fhdt::wire::LayerId>::FromExternal(fidl_layers));
+                                fidl::VectorView<fhd::wire::LayerId>::FromExternal(fidl_layers));
       !reply.ok()) {
     return reply.status();
   }
 
   for (const auto& info : present_layers) {
-    const fhdt::wire::LayerId fidl_layer_id = ToFidlLayerId(info.layer_id);
+    const fhd::wire::LayerId fidl_layer_id = ToFidlLayerId(info.layer_id);
     const EventId wait_event_id = info.image_ready_wait_event_id.value_or(kInvalidEventId);
     if (auto reply = dc_->SetLayerImage(fidl_layer_id, ToFidlImageId(info.image_id),
                                         /*wait_event_id=*/ToFidlEventId(wait_event_id),
