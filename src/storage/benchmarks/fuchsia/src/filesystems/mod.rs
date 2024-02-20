@@ -20,7 +20,7 @@ use {
 mod blobfs;
 mod f2fs;
 mod fxblob;
-mod fxfs;
+pub mod fxfs;
 mod memfs;
 mod minfs;
 mod pkgdir;

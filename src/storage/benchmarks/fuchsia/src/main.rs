@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        blob_benchmarks::{
-            OpenAndGetVmoContentBlobCold, OpenAndGetVmoContentBlobWarm, OpenAndGetVmoMetaFileCold,
-            OpenAndGetVmoMetaFileWarm, PageInBlobRandomCompressed, PageInBlobSequentialCompressed,
-            PageInBlobSequentialUncompressed, WriteBlob, WriteRealisticBlobs,
-        },
+    crate::blob_benchmarks::{
+        OpenAndGetVmoContentBlobCold, OpenAndGetVmoContentBlobWarm, OpenAndGetVmoMetaFileCold,
+        OpenAndGetVmoMetaFileWarm, PageInBlobRandomCompressed, PageInBlobSequentialCompressed,
+        PageInBlobSequentialUncompressed, WriteBlob, WriteRealisticBlobs,
+    },
+    fuchia_storage_benchmarks_lib::{
         block_devices::FvmVolumeFactory,
         filesystems::{Blobfs, F2fs, Fxblob, Fxfs, Memfs, Minfs, PkgDirTest},
     },
@@ -31,8 +31,8 @@ use {
 
 mod blob_benchmarks;
 mod blob_loader;
-mod block_devices;
-mod filesystems;
+
+const FXFS_VOLUME_SIZE: u64 = 60 * 1024 * 1024;
 
 /// Fuchsia Filesystem Benchmarks
 #[derive(argh::FromArgs)]
@@ -82,7 +82,7 @@ fn add_io_benchmarks(benchmark_set: &mut BenchmarkSet) {
             WriteSequentialFsyncCold::new(OP_SIZE, OP_COUNT),
             WriteSequentialFsyncWarm::new(OP_SIZE, OP_COUNT),
         ],
-        [Fxfs, F2fs, Memfs, Minfs]
+        [Fxfs::new(FXFS_VOLUME_SIZE), F2fs, Memfs, Minfs]
     );
     add_benchmarks!(
         benchmark_set,
@@ -91,7 +91,7 @@ fn add_io_benchmarks(benchmark_set: &mut BenchmarkSet) {
             ReadRandomCold::new(OP_SIZE, OP_COUNT),
             ReadSparseCold::new(OP_SIZE, OP_COUNT),
         ],
-        [Fxfs, F2fs, Minfs]
+        [Fxfs::new(FXFS_VOLUME_SIZE), F2fs, Minfs]
     );
 }
 
@@ -111,9 +111,13 @@ fn add_directory_benchmarks(benchmark_set: &mut BenchmarkSet) {
             WalkDirectoryTreeWarm::new(dts, 20),
             GitStatus::new(),
         ],
-        [Fxfs, F2fs, Memfs, Minfs]
+        [Fxfs::new(FXFS_VOLUME_SIZE), F2fs, Memfs, Minfs]
     );
-    add_benchmarks!(benchmark_set, [WalkDirectoryTreeCold::new(dts, 20)], [Fxfs, F2fs, Minfs]);
+    add_benchmarks!(
+        benchmark_set,
+        [WalkDirectoryTreeCold::new(dts, 20)],
+        [Fxfs::new(FXFS_VOLUME_SIZE), F2fs, Minfs]
+    );
 }
 
 fn add_blob_benchmarks(benchmark_set: &mut BenchmarkSet) {

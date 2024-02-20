@@ -4,16 +4,15 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_library.gni")
 import("//build/testing/perf/test.gni")
 import("//src/storage/testing/driver_test_realm.gni")
 
-rustc_binary("fuchsia-storage-benchmarks") {
-  edition = "2021"
+rustc_library("framework") {
   testonly = true
-  name = "fuchsia_storage_benchmarks"
+  edition = "2021"
+  name = "fuchia_storage_benchmarks_lib"
   sources = [
-    "src/blob_benchmarks.rs",
-    "src/blob_loader.rs",
     "src/block_devices.rs",
     "src/filesystems/blobfs.rs",
     "src/filesystems/f2fs.rs",
@@ -24,7 +23,7 @@ rustc_binary("fuchsia-storage-benchmarks") {
     "src/filesystems/mod.rs",
     "src/filesystems/pkgdir.rs",
     "src/filesystems/testing.rs",
-    "src/main.rs",
+    "src/lib.rs",
   ]
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
@@ -36,12 +35,9 @@ rustc_binary("fuchsia-storage-benchmarks") {
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_rust",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
-    "//src/lib/fuchsia-runtime",
-    "//src/lib/trace/rust:trace-provider",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/benchmarks:framework",
     "//src/storage/benchmarks/fuchsia/pkgdir-component/fidl/test.pkgdir:test.pkgdir_rust",
@@ -50,10 +46,35 @@ rustc_binary("fuchsia-storage-benchmarks") {
     "//src/storage/lib/delivery_blob",
     "//src/storage/lib/fs_management/rust:fs_management",
     "//src/storage/lib/ramdevice_client",
-    "//src/storage/lib/trace",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/storage/testing/rust:storage-isolated-driver-manager",
     "//src/sys/pkg/lib/fuchsia-merkle",
+    "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
+  ]
+}
+
+rustc_binary("fuchsia-storage-benchmarks") {
+  edition = "2021"
+  testonly = true
+  name = "fuchsia_storage_benchmarks"
+  sources = [
+    "src/blob_benchmarks.rs",
+    "src/blob_loader.rs",
+    "src/main.rs",
+  ]
+  deps = [
+    ":framework",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-fs",
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/trace/rust:trace-provider",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/storage/benchmarks:framework",
+    "//src/storage/lib/delivery_blob",
+    "//src/storage/lib/trace",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-trait",
@@ -67,7 +88,6 @@ rustc_binary("fuchsia-storage-benchmarks") {
     "//src/lib/fuchsia-runtime",
     "//src/lib/test_util",
     "//src/sys/test_runners:tmp_storage",
-    "//third_party/rust_crates:gpt",
   ]
   with_unit_tests = true
 }

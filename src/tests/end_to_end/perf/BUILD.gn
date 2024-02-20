@@ -150,6 +150,7 @@ _python_benchmarks += [
   "//src/media/audio/audio_core/shared/mixer/tools:benchmarks",
   "//src/starnix:benchmarks",
   "//src/storage/benchmarks/fuchsia:benchmarks",
+  "//src/storage/benchmarks/verity:benchmarks",
   "//src/storage/benchmarks/starnix:benchmarks",
   "//src/tests/benchmarks",
   "//src/tests/microbenchmarks:benchmarks",

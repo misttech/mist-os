@@ -20,7 +20,15 @@ use {
 
 /// Config object for starting Fxfs instances.
 #[derive(Clone)]
-pub struct Fxfs;
+pub struct Fxfs {
+    volume_size: u64,
+}
+
+impl Fxfs {
+    pub fn new(volume_size: u64) -> Self {
+        Fxfs { volume_size }
+    }
+}
 
 #[async_trait]
 impl FilesystemConfig for Fxfs {
@@ -33,7 +41,7 @@ impl FilesystemConfig for Fxfs {
         let block_device = block_device_factory
             .create_block_device(&BlockDeviceConfig {
                 use_zxcrypt: false,
-                fvm_volume_size: Some(60 * 1024 * 1024),
+                fvm_volume_size: Some(self.volume_size),
             })
             .await;
         FxfsInstance {

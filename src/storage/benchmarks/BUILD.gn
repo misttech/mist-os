@@ -51,6 +51,7 @@ group("benchmarks") {
     "fuchsia:benchmark-packages",
     "host:benchmarks",
     "starnix:benchmark-packages",
+    "verity:benchmark-packages",
   ]
 
   # TODO(b/297312145): Remove when Starnix can be built on RISC-V.

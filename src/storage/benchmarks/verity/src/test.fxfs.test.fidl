@@ -1,0 +1,15 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.fxfs.test;
+using fuchsia.io;
+using zx;
+
+/// Clears the cache of the running test filesystem instance and return the new root directory.
+@discoverable
+closed protocol TestFxfsAdmin {
+    strict ClearCache() -> (resource struct {
+        root_dir client_end:fuchsia.io.Directory;
+    }) error zx.Status;
+};

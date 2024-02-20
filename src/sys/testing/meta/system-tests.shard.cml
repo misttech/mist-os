@@ -286,7 +286,16 @@
             directory: "sys",
             from: "parent",
             to: [ "#system-tests" ],
-            rights: [ "r*" ],
+            rights: [ "rw*" ],
+        },
+
+        // Storage verity benchmarks need access to /dev/class/block
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-class-block",
+            to: [ "#system-tests" ],
+            subdir: "block",
         },
 
         // flutter_*_runner

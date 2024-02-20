@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::filesystems::{BlobFilesystem, DeliveryBlob, PkgDirInstance},
     async_trait::async_trait,
     delivery_blob::CompressionMode,
     fidl_fuchsia_io as fio,
+    fuchia_storage_benchmarks_lib::filesystems::{BlobFilesystem, DeliveryBlob, PkgDirInstance},
     fuchsia_pkg_testing::PackageBuilder,
     fuchsia_runtime, fuchsia_zircon as zx,
     futures::stream::{self, StreamExt},
@@ -370,7 +370,7 @@ async fn page_in_blob_benchmark(
 mod tests {
     use {
         super::*,
-        crate::{
+        fuchia_storage_benchmarks_lib::{
             block_devices::RamdiskFactory,
             filesystems::{Blobfs, Fxblob, PkgDirTest},
         },

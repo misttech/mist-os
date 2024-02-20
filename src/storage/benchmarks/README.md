@@ -88,6 +88,13 @@ When cold writing to memfs, the kernel needs to allocate pages for the VMO backi
 pages are used. This causes cold writes to be slower than warm writes which have the pages already
 allocated.
 
+### Verity Benchmarks
+The verity benchmarks are implemented as a Starnix integration test. The test launches a Linux
+program that creates and writes a new file and then enables verity on it. The test then clears
+the filesystem cache and then launches a second Linux program that performs a verified read on
+the verity-enabled file. The benchmark has two metrics: 1) The time to enable verity 2) Time to
+perform a verified read.
+
 ## Framework
 The Fuchsia Filesystem Benchmarks use a custom framework for timing filesystem operations.
 Filesystems hold state external to the `read` or `write` operations being benchmarked which can lead
