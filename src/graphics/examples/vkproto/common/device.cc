@@ -39,7 +39,7 @@ bool Device::Init() {
   queue_info.pQueuePriorities = &queue_priority;
 
   std::vector<const char *> exts;
-  PhysicalDevice::AppendRequiredPhysDeviceExts(&exts);
+  PhysicalDevice::AppendRequiredPhysDeviceExts(&exts, swapchain_enabled_);
 
   vk::PhysicalDeviceFeatures device_features;
   vk::DeviceCreateInfo device_info;

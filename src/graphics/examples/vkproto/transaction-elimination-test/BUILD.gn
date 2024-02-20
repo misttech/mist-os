@@ -11,7 +11,6 @@ fuchsia_test_component("transaction_elimination_test") {
   deps = [
     ":bin",
     "//src/graphics/examples/vkproto:shaders",
-    "//src/lib/vulkan/swapchain:image_pipe_swapchain_fb_layer",
     "//src/lib/vulkan/validation_layers",
   ]
   test_type = "system"
@@ -22,11 +21,7 @@ executable("bin") {
   output_name = "transaction-elimination-test"
   sources = common_sources
 
-  sources += [
-    "../fuchsia/fuchsia_surface.cc",
-    "../fuchsia/fuchsia_surface.h",
-    "main.cc",
-  ]
+  sources += [ "main.cc" ]
 
   include_dirs = [ "//src/graphics/examples/vkproto/common" ]
 

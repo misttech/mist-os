@@ -18,6 +18,7 @@ class Device {
                   vk::QueueFlags queue_flags = vk::QueueFlagBits::eGraphics);
   ~Device();
 
+  void set_swapchain_enabled(bool enabled) { swapchain_enabled_ = enabled; }
   bool Init();
   std::shared_ptr<vk::Device> shared();
   const vk::Device &get() const;
@@ -28,6 +29,7 @@ class Device {
  private:
   VKP_DISALLOW_COPY_AND_ASSIGN(Device);
 
+  bool swapchain_enabled_{true};
   bool initialized_;
   vk::PhysicalDevice physical_device_;
   VkSurfaceKHR surface_;

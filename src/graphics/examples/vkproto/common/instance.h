@@ -20,8 +20,8 @@ class Instance {
       : validation_layers_enabled_(validation_layers_enabled), allocator_(nullptr) {}
 
   Instance(const vk::InstanceCreateInfo &instance_info, bool validation_layers_enabled,
-           std::vector<const char *> extensions, std::vector<const char *> layers,
-           vk::Optional<const vk::AllocationCallbacks> allocator);
+           bool swapchain_enabled, std::vector<const char *> extensions,
+           std::vector<const char *> layers, vk::Optional<const vk::AllocationCallbacks> allocator);
 
   Instance(Instance &&other) noexcept;
 
@@ -42,6 +42,7 @@ class Instance {
   vk::ValidationFeaturesEXT validation_features_{};
 
   bool validation_layers_enabled_ = true;
+  bool swapchain_enabled_ = true;
   std::vector<const char *> extensions_;
   std::vector<const char *> layers_;
   vk::Optional<const vk::AllocationCallbacks> allocator_ = nullptr;
@@ -62,6 +63,7 @@ class Instance::Builder {
   Builder &set_extensions(std::vector<const char *> v);
   Builder &set_layers(std::vector<const char *> v);
   Builder &set_validation_layers_enabled(bool v);
+  Builder &set_swapchain_enabled(bool v);
   Builder &set_allocator(const vk::Optional<const vk::AllocationCallbacks> &v);
 
   const vk::InstanceCreateInfo &instance_info() const { return instance_info_; }
@@ -69,6 +71,7 @@ class Instance::Builder {
  private:
   vk::InstanceCreateInfo instance_info_{};
   bool validation_layers_enabled_ = true;
+  bool swapchain_enabled_ = true;
   std::vector<const char *> extensions_;
   std::vector<const char *> layers_;
   vk::Optional<const vk::AllocationCallbacks> allocator_ = nullptr;

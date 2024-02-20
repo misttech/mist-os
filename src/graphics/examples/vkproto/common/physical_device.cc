@@ -14,18 +14,20 @@ namespace {
 const char *kMagmaLayer = "VK_LAYER_FUCHSIA_imagepipe_swapchain_fb";
 
 const std::vector<const char *> s_required_physical_device_exts = {
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 #ifdef __Fuchsia__
-    VK_FUCHSIA_EXTERNAL_MEMORY_EXTENSION_NAME,
-    VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
-    VK_FUCHSIA_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
-    VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
+    VK_FUCHSIA_EXTERNAL_MEMORY_EXTENSION_NAME,    VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
+    VK_FUCHSIA_EXTERNAL_SEMAPHORE_EXTENSION_NAME, VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
+    VK_FUCHSIA_BUFFER_COLLECTION_EXTENSION_NAME,
 #endif
 };
 
 bool ChoosePhysicalDevice(const vk::PhysicalDevice &physical_device_in, const VkSurfaceKHR &surface,
-                          const vk::QueueFlags &queue_flags,
+                          const vk::QueueFlags &queue_flags, bool swapchain_enabled,
                           vk::PhysicalDevice *physical_device_out) {
+  auto required_physical_device_exts = s_required_physical_device_exts;
+  if (swapchain_enabled) {
+    required_physical_device_exts.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+  }
   if (!FindRequiredProperties(s_required_physical_device_exts, vkp::PHYS_DEVICE_EXT_PROP,
                               kMagmaLayer, physical_device_in)) {
     return false;
@@ -91,7 +93,8 @@ bool PhysicalDevice::Init() {
         continue;
       }
     }
-    if (ChoosePhysicalDevice(phys_device, surface_, queue_flags_, &physical_device_)) {
+    if (ChoosePhysicalDevice(phys_device, surface_, queue_flags_, swapchain_enabled_,
+                             &physical_device_)) {
       LogMemoryProperties(physical_device_);
       initialized_ = true;
       break;
@@ -103,9 +106,13 @@ bool PhysicalDevice::Init() {
   return initialized_;
 }
 
-void PhysicalDevice::AppendRequiredPhysDeviceExts(std::vector<const char *> *exts) {
+void PhysicalDevice::AppendRequiredPhysDeviceExts(std::vector<const char *> *exts,
+                                                  bool swapchain_enabled) {
   exts->insert(exts->end(), s_required_physical_device_exts.begin(),
                s_required_physical_device_exts.end());
+  if (swapchain_enabled) {
+    exts->push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+  }
 }
 
 const vk::PhysicalDevice &PhysicalDevice::get() const {

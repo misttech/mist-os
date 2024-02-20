@@ -107,6 +107,7 @@ static void InitCommandBuffers(const vk::Image* image_for_foreign_transition, ui
 TEST(TransactionElimination, ForeignQueue) {
   vkp::Instance vkp_instance(vkp::Instance::Builder()
                                  .set_validation_layers_enabled(true)
+                                 .set_swapchain_enabled(false)
                                  .set_extensions({
                                      VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME,
                                      VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME,
@@ -117,9 +118,11 @@ TEST(TransactionElimination, ForeignQueue) {
   ASSERT_TRUE(vkp_debug_messenger.Init());
 
   vkp::PhysicalDevice vkp_physical_device(vkp_instance.shared());
+  vkp_physical_device.set_swapchain_enabled(false);
   ASSERT_TRUE(vkp_physical_device.Init());
 
   vkp::Device vkp_device(vkp_physical_device.get());
+  vkp_device.set_swapchain_enabled(false);
   ASSERT_TRUE(vkp_device.Init());
   std::shared_ptr<vk::Device> device = vkp_device.shared();
 
@@ -197,6 +200,7 @@ TEST(TransactionElimination, ForeignQueue) {
 TEST(TransactionElimination, ForeignQueueSysmem) {
   vkp::Instance vkp_instance(vkp::Instance::Builder()
                                  .set_validation_layers_enabled(true)
+                                 .set_swapchain_enabled(false)
                                  .set_extensions({
                                      VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME,
                                      VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME,
@@ -209,9 +213,11 @@ TEST(TransactionElimination, ForeignQueueSysmem) {
   ASSERT_TRUE(vkp_debug_messenger.Init());
 
   vkp::PhysicalDevice vkp_physical_device(vkp_instance.shared());
+  vkp_physical_device.set_swapchain_enabled(false);
   ASSERT_TRUE(vkp_physical_device.Init());
 
   vkp::Device vkp_device(vkp_physical_device.get());
+  vkp_device.set_swapchain_enabled(false);
   ASSERT_TRUE(vkp_device.Init());
   std::shared_ptr<vk::Device> device = vkp_device.shared();
 

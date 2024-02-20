@@ -40,12 +40,15 @@ class PhysicalDevice {
   bool Init();
   const vk::PhysicalDevice &get() const;
 
-  static void AppendRequiredPhysDeviceExts(std::vector<const char *> *exts);
+  void set_swapchain_enabled(bool enabled) { swapchain_enabled_ = enabled; }
+
+  static void AppendRequiredPhysDeviceExts(std::vector<const char *> *exts, bool swapchain_enabled);
 
  private:
   PhysicalDevice() = delete;
   VKP_DISALLOW_COPY_AND_ASSIGN(PhysicalDevice);
 
+  bool swapchain_enabled_{true};
   bool initialized_;
   std::shared_ptr<vk::Instance> instance_;
   VkSurfaceKHR surface_;

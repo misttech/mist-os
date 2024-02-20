@@ -92,10 +92,12 @@ void AddRequiredExtensions(std::vector<const char *> *extensions) {
 namespace vkp {
 
 Instance::Instance(const vk::InstanceCreateInfo &instance_info, bool validation_layers_enabled,
-                   std::vector<const char *> extensions, std::vector<const char *> layers,
+                   bool swapchain_enabled, std::vector<const char *> extensions,
+                   std::vector<const char *> layers,
                    vk::Optional<const vk::AllocationCallbacks> allocator)
     : instance_info_(instance_info),
       validation_layers_enabled_(validation_layers_enabled),
+      swapchain_enabled_(swapchain_enabled),
       extensions_(std::move(extensions)),
       layers_(std::move(layers)),
       allocator_(allocator) {}
@@ -104,6 +106,7 @@ Instance::Instance(Instance &&other) noexcept
     : initialized_(other.initialized_),
       instance_info_(other.instance_info_),
       validation_layers_enabled_(other.validation_layers_enabled_),
+      swapchain_enabled_(other.swapchain_enabled_),
       extensions_(std::move(other.extensions_)),
       layers_(std::move(other.layers_)),
       allocator_(other.allocator_) {}
@@ -136,7 +139,9 @@ bool Instance::Init() {
 
 // Layers
 #ifdef __Fuchsia__
-  layers_.emplace_back("VK_LAYER_FUCHSIA_imagepipe_swapchain_fb");
+  if (swapchain_enabled_) {
+    layers_.emplace_back("VK_LAYER_FUCHSIA_imagepipe_swapchain_fb");
+  }
 #endif
 
   if (validation_layers_enabled_) {
@@ -211,6 +216,11 @@ Instance::Builder &Instance::Builder::set_validation_layers_enabled(bool v) {
   return *this;
 }
 
+Instance::Builder &Instance::Builder::set_swapchain_enabled(bool v) {
+  swapchain_enabled_ = v;
+  return *this;
+}
+
 Instance::Builder &Instance::Builder::set_extensions(std::vector<const char *> v) {
   extensions_ = std::move(v);
   return *this;
@@ -223,7 +233,7 @@ Instance::Builder &Instance::Builder::set_layers(std::vector<const char *> v) {
 
 std::unique_ptr<Instance> Instance::Builder::Unique() const {
   auto instance = std::make_unique<Instance>(instance_info_, validation_layers_enabled_,
-                                             extensions_, layers_, allocator_);
+                                             swapchain_enabled_, extensions_, layers_, allocator_);
   if (!instance->Init()) {
     RTN_MSG(nullptr, "Failed to initialize Instance.\n")
   }
@@ -232,7 +242,7 @@ std::unique_ptr<Instance> Instance::Builder::Unique() const {
 
 std::shared_ptr<Instance> Instance::Builder::Shared() const {
   auto instance = std::make_shared<Instance>(instance_info_, validation_layers_enabled_,
-                                             extensions_, layers_, allocator_);
+                                             swapchain_enabled_, extensions_, layers_, allocator_);
   if (!instance->Init()) {
     RTN_MSG(nullptr, "Failed to initialize Instance.\n")
   }
@@ -240,8 +250,8 @@ std::shared_ptr<Instance> Instance::Builder::Shared() const {
 }
 
 Instance Instance::Builder::Build() const {
-  vkp::Instance instance(instance_info_, validation_layers_enabled_, extensions_, layers_,
-                         allocator_);
+  vkp::Instance instance(instance_info_, validation_layers_enabled_, swapchain_enabled_,
+                         extensions_, layers_, allocator_);
   if (!instance.Init()) {
     RTN_MSG(instance, "Failed to initialize Instance.\n")
   }
