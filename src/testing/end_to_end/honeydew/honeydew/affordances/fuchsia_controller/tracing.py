@@ -13,6 +13,8 @@ import fidl.fuchsia_tracing as f_tracing
 import fidl.fuchsia_tracing_controller as f_tracingcontroller
 import fuchsia_controller_py as fc
 
+from fidl import AsyncSocket
+
 from honeydew import errors
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.device_classes import affordances_capable
@@ -114,7 +116,7 @@ class Tracing(tracing.Tracing):
             raise errors.FuchsiaControllerError(
                 "fuchsia.tracing.controller.Initialize FIDL Error"
             ) from status
-        self._trace_socket = trace_socket_client
+        self._trace_socket = AsyncSocket(trace_socket_client)
         self._session_initialized = True
 
     def start(self) -> None:
@@ -247,27 +249,12 @@ class Tracing(tracing.Tracing):
         """
         assert self._trace_socket is not None
 
-        socket_bytes = bytes()
-        while True:
-            try:
-                socket_bytes = socket_bytes + self._trace_socket.read()
-            except fc.ZxStatus as status:
-                # ZX_ERR_PEER_CLOSED is expected when the trace_manager is done
-                # writing to the socket.
-                # ZX_ERR_SHOULD_WAIT is expected when the socket has more data
-                # to read.
-                zx_status: int | None = (
-                    status.args[0] if len(status.args) > 0 else None
-                )
-                if zx_status == fc.ZxStatus.ZX_ERR_PEER_CLOSED:
-                    break
-                elif zx_status == fc.ZxStatus.ZX_ERR_SHOULD_WAIT:
-                    continue
-                else:
-                    raise errors.FuchsiaControllerError(
-                        "Error reading fuchsia.tracing.controller socket"
-                    ) from status
-        return socket_bytes
+        try:
+            return await self._trace_socket.read_all()
+        except fc.ZxStatus as status:
+            raise errors.FuchsiaControllerError(
+                "Error reading fuchsia.tracing.controller socket"
+            ) from status
 
     async def _terminate_and_drain_async(self, download: bool) -> bytes:
         """Concurrently terminates the trace session and (optionally) reads the

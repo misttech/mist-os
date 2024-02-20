@@ -140,7 +140,6 @@ class GlobalHandleWaker(HandleWaker):
             pass
 
     def unregister(self, channel: fc.Channel):
-        logging.debug(f"Unregistering channel: {channel.as_int()}")
         channel_number = channel.as_int()
         if channel_number in self.handle_ready_queues:
             self.handle_ready_queues.pop(channel_number)
