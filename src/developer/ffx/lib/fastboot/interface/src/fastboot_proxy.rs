@@ -18,7 +18,6 @@ use fastboot::{
     send, send_with_listener, send_with_timeout, upload, SendError,
 };
 use ffx_config::get;
-use fuchsia_async::Timer;
 use futures::io::{AsyncRead, AsyncWrite};
 use std::fmt::Debug;
 use std::fs::read;
@@ -109,9 +108,6 @@ impl fastboot::UploadProgressListener for ProgressListener {
     }
 }
 
-/// Timeout in seconds to wait for target after a reboot to fastboot mode
-const FASTBOOT_REBOOT_RECONNECT_TIMEOUT: &str = "fastboot.reboot.reconnect_timeout";
-
 impl<T: AsyncRead + AsyncWrite + Unpin + Debug> FastbootProxy<T> {
     pub fn new(
         target_id: String,
@@ -129,6 +125,11 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> FastbootProxy<T> {
         // Explicitly here.
         self.interface = None;
 
+        // Wait for it to show up again
+        tracing::debug!("About to rediscover target");
+        self.interface_factory.rediscover().await?;
+
+        //Reconnect
         self.interface.replace(self.interface_factory.open().await?);
         tracing::warn!("Reconnected");
         Ok(())
@@ -313,12 +314,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
                         send_res
                     );
                 }
-                let reboot_sleep_duration =
-                    Duration::seconds(get(FASTBOOT_REBOOT_RECONNECT_TIMEOUT).await.unwrap_or(10));
-                tracing::warn!(
-                    "Sleeping for 5 seconds to give the target time to reboot to bootloader."
-                );
-                Timer::new(reboot_sleep_duration.to_std()?).await;
             }
             Reply::Fail(s) => bail!("Failed to reboot to bootloader: {}", s),
             _ => {

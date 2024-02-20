@@ -13,7 +13,7 @@ func (f *FFXInstance) Flash(ctx context.Context, serialNum, sshKey, productBundl
 	if err := f.ConfigSet(ctx, "fastboot.flash.timeout_rate", "4"); err != nil {
 		return err
 	}
-	ffxArgs := []string{"--target", serialNum,
+	ffxArgs := []string{"-v", "--target", serialNum,
 		"--config", "{\"ffx\": {\"fastboot\": {\"inline_target\": true}}}",
 		"target", "flash"}
 	if sshKey != "" {
