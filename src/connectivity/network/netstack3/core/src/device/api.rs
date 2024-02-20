@@ -4,7 +4,7 @@
 
 //! Device layer api.
 
-use core::{convert::Infallible as Never, marker::PhantomData};
+use core::marker::PhantomData;
 
 use net_types::ip::{Ipv4, Ipv6};
 use packet::BufferMut;
@@ -34,35 +34,11 @@ use crate::{
         },
         types::RawMetric,
     },
-    sync::PrimaryRc,
+    sync::{
+        types::{RemoveResourceResult, RemoveResourceResultWithContext},
+        PrimaryRc,
+    },
 };
-
-/// The result of removing a device from core.
-#[derive(Debug)]
-pub enum RemoveDeviceResult<R, D> {
-    /// The device was synchronously removed and no more references to it exist.
-    Removed(R),
-    /// The device was marked for destruction but there are still references to
-    /// it in existence. The provided receiver can be polled on to observe
-    /// device destruction completion.
-    Deferred(D),
-}
-
-impl<R> RemoveDeviceResult<R, Never> {
-    /// A helper function to unwrap a [`RemovedDeviceResult`] that can never be
-    /// [`RemovedDeviceResult::Deferred`].
-    pub fn into_removed(self) -> R {
-        match self {
-            Self::Removed(r) => r,
-            Self::Deferred(never) => match never {},
-        }
-    }
-}
-
-/// An alias for [`RemoveDeviceResult`] that extracts the receiver type from the
-/// bindings context.
-pub type RemoveDeviceResultWithContext<S, BT> =
-    RemoveDeviceResult<S, <BT as crate::ReferenceNotifiers>::ReferenceReceiver<S>>;
 
 /// Pending device configuration update.
 ///
@@ -158,7 +134,7 @@ where
     pub fn remove_device(
         &mut self,
         device: BaseDeviceId<D, C::BindingsContext>,
-    ) -> RemoveDeviceResultWithContext<D::External<C::BindingsContext>, C::BindingsContext>
+    ) -> RemoveResourceResultWithContext<D::External<C::BindingsContext>, C::BindingsContext>
     where
         // Required to call into IP layer for cleanup on removal:
         BaseDeviceId<D, C::BindingsContext>: Into<DeviceId<C::BindingsContext>>,
@@ -194,8 +170,8 @@ where
                 });
             (notifier, receiver)
         }) {
-            Ok(s) => RemoveDeviceResult::Removed(s.external_state),
-            Err(receiver) => RemoveDeviceResult::Deferred(receiver),
+            Ok(s) => RemoveResourceResult::Removed(s.external_state),
+            Err(receiver) => RemoveResourceResult::Deferred(receiver),
         }
     }
 

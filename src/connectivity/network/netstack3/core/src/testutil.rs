@@ -406,8 +406,8 @@ where
         let ethernet_device =
             assert_matches!(device_id, crate::device::DeviceId::Ethernet(id) => id);
         match self.core_api().device().remove_device(ethernet_device) {
-            crate::device::RemoveDeviceResult::Removed(_external_state) => {}
-            crate::device::RemoveDeviceResult::Deferred(_reference_receiver) => {
+            crate::sync::RemoveResourceResult::Removed(_external_state) => {}
+            crate::sync::RemoveResourceResult::Deferred(_reference_receiver) => {
                 panic!("failed to remove ethernet device")
             }
         }

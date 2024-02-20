@@ -62,6 +62,7 @@ use netstack3_core::{
         Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError,
         UpdateIpConfigurationError,
     },
+    sync::{RemoveResourceResult, RemoveResourceResultWithContext},
 };
 
 use crate::bindings::{
@@ -679,15 +680,15 @@ async fn dispatch_control_request(
 
 async fn wait_for_device_removal<T: 'static>(
     id: BindingId,
-    result: netstack3_core::device::RemoveDeviceResultWithContext<T, BindingsCtx>,
+    result: RemoveResourceResultWithContext<T, BindingsCtx>,
     weak_id: &netstack3_core::device::WeakDeviceId<BindingsCtx>,
 ) -> T {
     let mut receiver = match result {
-        netstack3_core::device::RemoveDeviceResult::Removed(r) => {
+        RemoveResourceResult::Removed(r) => {
             tracing::debug!("device {id} removal completed synchronously");
             return r;
         }
-        netstack3_core::device::RemoveDeviceResult::Deferred(receiver) => receiver,
+        RemoveResourceResult::Deferred(receiver) => receiver,
     };
     let debug_refs = weak_id.debug_references();
 

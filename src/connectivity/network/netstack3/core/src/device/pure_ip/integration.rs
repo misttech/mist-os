@@ -306,9 +306,8 @@ mod tests {
     use packet_formats::ip::{IpPacketBuilder, IpProto};
 
     use crate::{
-        device::{
-            pure_ip::PureIpDeviceCreationProperties, RemoveDeviceResult, TransmitQueueConfiguration,
-        },
+        device::{pure_ip::PureIpDeviceCreationProperties, TransmitQueueConfiguration},
+        sync::RemoveResourceResult,
         testutil::{TestIpExt, DEFAULT_INTERFACE_METRIC},
     };
 
@@ -325,7 +324,7 @@ mod tests {
             PureIpDeviceCreationProperties { mtu: MTU },
             DEFAULT_INTERFACE_METRIC,
         );
-        assert_matches!(device_api.remove_device(device), RemoveDeviceResult::Removed(_));
+        assert_matches!(device_api.remove_device(device), RemoveResourceResult::Removed(_));
     }
 
     #[test]

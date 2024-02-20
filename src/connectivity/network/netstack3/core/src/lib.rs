@@ -71,7 +71,6 @@ pub mod device {
     pub(crate) use id::*;
 
     // Re-exported types.
-    pub use api::{RemoveDeviceResult, RemoveDeviceResultWithContext};
     pub use base::{DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError};
     pub use config::{
         ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration, DeviceConfigurationUpdate,
@@ -211,6 +210,7 @@ pub mod socket {
 
 /// Useful synchronization primitives.
 pub mod sync {
+    pub(crate) mod types;
     // TODO(https://fxbug.dev/42062225): Support single-threaded variants of types
     // exported from this module.
 
@@ -222,6 +222,8 @@ pub mod sync {
         },
         LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
     };
+
+    pub use types::{RemoveResourceResult, RemoveResourceResultWithContext};
 }
 
 /// Methods for dealing with TCP sockets.
