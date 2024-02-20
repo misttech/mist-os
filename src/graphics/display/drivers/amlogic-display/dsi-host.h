@@ -30,10 +30,12 @@ namespace amlogic_display {
 
 class DsiHost {
  public:
-  // Map all necessary resources. This will not modify hardware state in any
-  // way, and is thus safe to use when adopting a device that was initialized by
-  // the bootloader.
+  // Factory method intended for production use.
   //
+  // This method doesn't modify hardware state in any way, and is thus safe to
+  // use when adopting a device that was initialized by the bootloader.
+  //
+  // `parent` provides all resources needed to drive the DSI host hardware.
   // `panel_config` must be non-null and must outlive the `DsiHost` instance.
   //
   // Returns a non-null pointer to the DsiHost instance on success.
@@ -43,8 +45,19 @@ class DsiHost {
   // Production code should prefer using the `Create()` factory method.
   //
   // `panel_config` must be non-null and must outlive the `DsiHost` instance.
-  DsiHost(zx_device_t* parent, uint32_t panel_type, const PanelConfig* panel_config,
-          fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_gpio);
+  // `mipi_dsi_top_mmio` is the MIPI-DSI top-level control MMIO register
+  // region. It must be a valid MMIO buffer.
+  // `hhi_mmio` is the HHI (HIU) MMIO register region. It must be a valid
+  // MMIO buffer.
+  // `dsiimpl` must be valid.
+  // `lcd_reset_gpio` is the LCD RESET GPIO pin and must be valid.
+  // `lcd` must not be nullptr.
+  // `phy` must not be nullptr.
+  explicit DsiHost(uint32_t panel_type, const PanelConfig* panel_config,
+                   fdf::MmioBuffer mipi_dsi_top_mmio, fdf::MmioBuffer hhi_mmio,
+                   ddk::DsiImplProtocolClient dsiimpl,
+                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio,
+                   std::unique_ptr<Lcd> lcd, std::unique_ptr<MipiPhy> phy, bool enabled);
 
   ~DsiHost() = default;
 
@@ -84,14 +97,13 @@ class DsiHost {
   // `power_on` is called for each command of type Signal.
   zx::result<> PerformPowerOpSequence(cpp20::span<const PowerOp> power_ops,
                                       fit::callback<zx::result<>()> power_on);
-  std::optional<fdf::MmioBuffer> mipi_dsi_mmio_;
-  std::optional<fdf::MmioBuffer> hhi_mmio_;
 
-  ddk::PDevFidl pdev_;
+  fdf::MmioBuffer mipi_dsi_top_mmio_;
+  fdf::MmioBuffer hhi_mmio_;
 
   ddk::DsiImplProtocolClient dsiimpl_;
 
-  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> lcd_gpio_;
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio_;
 
   uint32_t panel_type_;
   const PanelConfig& panel_config_;

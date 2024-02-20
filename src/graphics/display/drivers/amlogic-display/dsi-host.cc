@@ -5,7 +5,9 @@
 #include "src/graphics/display/drivers/amlogic-display/dsi-host.h"
 
 #include <lib/ddk/debug.h>
+#include <lib/ddk/device.h>
 #include <lib/device-protocol/display-panel.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
@@ -18,14 +20,25 @@
 
 namespace amlogic_display {
 
-DsiHost::DsiHost(zx_device_t* parent, uint32_t panel_type, const PanelConfig* panel_config,
-                 fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_gpio)
-    : pdev_(ddk::PDevFidl::FromFragment(parent)),
-      dsiimpl_(parent, "dsi"),
-      lcd_gpio_(std::move(lcd_gpio)),
-      panel_type_(panel_type),
-      panel_config_(*panel_config) {
+DsiHost::DsiHost(uint32_t panel_type, const PanelConfig* panel_config,
+                 fdf::MmioBuffer mipi_dsi_top_mmio, fdf::MmioBuffer hhi_mmio,
+                 ddk::DsiImplProtocolClient dsiimpl,
+                 fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio,
+                 std::unique_ptr<Lcd> lcd, std::unique_ptr<MipiPhy> phy, bool enabled)
+    : mipi_dsi_top_mmio_(std::move(mipi_dsi_top_mmio)),
+      hhi_mmio_(std::move(hhi_mmio)),
+      dsiimpl_(std::move(dsiimpl)),
+      lcd_reset_gpio_(std::move(lcd_reset_gpio)),
+      panel_type_(std::move(panel_type)),
+      panel_config_(*panel_config),
+      enabled_(enabled),
+      lcd_(std::move(lcd)),
+      phy_(std::move(phy)) {
   ZX_DEBUG_ASSERT(panel_config != nullptr);
+  ZX_DEBUG_ASSERT(dsiimpl_.is_valid());
+  ZX_DEBUG_ASSERT(lcd_reset_gpio_.is_valid());
+  ZX_DEBUG_ASSERT(lcd_ != nullptr);
+  ZX_DEBUG_ASSERT(phy_ != nullptr);
 }
 
 // static
@@ -33,42 +46,45 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
                                                      const PanelConfig* panel_config) {
   ZX_DEBUG_ASSERT(panel_config != nullptr);
 
-  const char* kLcdGpioFragmentName = "gpio-lcd-reset";
-  zx::result lcd_gpio =
+  static constexpr char kDsiFragmentName[] = "dsi";
+  ddk::DsiImplProtocolClient dsiimpl;
+  zx_status_t status =
+      device_get_fragment_protocol(parent, kDsiFragmentName, ZX_PROTOCOL_DSI_IMPL, &dsiimpl);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to get the DsiImpl banjo protocol: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  static const char kLcdGpioFragmentName[] = "gpio-lcd-reset";
+  zx::result lcd_reset_gpio_result =
       ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
           parent, kLcdGpioFragmentName);
-  if (lcd_gpio.is_error()) {
+  if (lcd_reset_gpio_result.is_error()) {
     zxlogf(ERROR, "Failed to get gpio protocol from fragment: %s", kLcdGpioFragmentName);
-    return lcd_gpio.take_error();
+    return lcd_reset_gpio_result.take_error();
   }
+  fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio =
+      std::move(lcd_reset_gpio_result).value();
 
-  fbl::AllocChecker alloc_checker;
-  std::unique_ptr<DsiHost> self = fbl::make_unique_checked<DsiHost>(
-      &alloc_checker, parent, panel_type, panel_config, std::move(lcd_gpio).value());
-  if (!alloc_checker.check()) {
-    zxlogf(ERROR, "No memory to allocate a DSI host");
-    return zx::error(ZX_ERR_NO_MEMORY);
+  static constexpr char kPdevFragmentName[] = "pdev";
+  zx::result<ddk::PDevFidl> pdev_result = ddk::PDevFidl::Create(parent, kPdevFragmentName);
+  if (pdev_result.is_error()) {
+    zxlogf(ERROR, "Failed to get the pdev client: %s", pdev_result.status_string());
+    return pdev_result.take_error();
   }
+  ddk::PDevFidl pdev = std::move(pdev_result).value();
 
-  // TODO(https://fxbug.dev/42082357): Replace the long multi-step
-  // initialization with builder / factory pattern.
-  if (!self->pdev_.is_valid()) {
-    zxlogf(ERROR, "DsiHost: Could not get ZX_PROTOCOL_PDEV protocol");
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-
-  zx::result<fdf::MmioBuffer> dsi_top_mmio_result =
-      MapMmio(MmioResourceIndex::kDsiTop, self->pdev_);
+  zx::result<fdf::MmioBuffer> dsi_top_mmio_result = MapMmio(MmioResourceIndex::kDsiTop, pdev);
   if (dsi_top_mmio_result.is_error()) {
     return dsi_top_mmio_result.take_error();
   }
-  self->mipi_dsi_mmio_ = std::move(dsi_top_mmio_result).value();
+  fdf::MmioBuffer mipi_dsi_top_mmio = std::move(dsi_top_mmio_result).value();
 
-  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, self->pdev_);
+  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, pdev);
   if (hhi_mmio_result.is_error()) {
     return hhi_mmio_result.take_error();
   }
-  self->hhi_mmio_ = std::move(hhi_mmio_result).value();
+  fdf::MmioBuffer hhi_mmio = std::move(hhi_mmio_result).value();
 
   zx::result<std::unique_ptr<Lcd>> lcd_result =
       Lcd::Create(parent, panel_type, panel_config, kBootloaderDisplayEnabled);
@@ -76,7 +92,7 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
     zxlogf(ERROR, "Failed to Create Lcd: %s", lcd_result.status_string());
     return lcd_result.take_error();
   }
-  self->lcd_ = std::move(lcd_result).value();
+  std::unique_ptr<Lcd> lcd = std::move(lcd_result).value();
 
   zx::result<std::unique_ptr<MipiPhy>> mipi_phy_result =
       MipiPhy::Create(parent, kBootloaderDisplayEnabled);
@@ -84,11 +100,18 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
     zxlogf(ERROR, "Failed to Create MipiPhy: %s", mipi_phy_result.status_string());
     return mipi_phy_result.take_error();
   }
-  self->phy_ = std::move(mipi_phy_result).value();
+  std::unique_ptr<MipiPhy> phy = std::move(mipi_phy_result).value();
 
-  self->enabled_ = kBootloaderDisplayEnabled;
-
-  return zx::ok(std::move(self));
+  fbl::AllocChecker alloc_checker;
+  auto dsi_host = fbl::make_unique_checked<DsiHost>(
+      &alloc_checker, panel_type, panel_config, std::move(mipi_dsi_top_mmio), std::move(hhi_mmio),
+      std::move(dsiimpl), std::move(lcd_reset_gpio), std::move(lcd), std::move(phy),
+      /*enabled=*/kBootloaderDisplayEnabled);
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "Failed to allocate memory for DsiHost");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+  return zx::ok(std::move(dsi_host));
 }
 
 zx::result<> DsiHost::PerformPowerOpSequence(cpp20::span<const PowerOp> commands,
@@ -112,7 +135,7 @@ zx::result<> DsiHost::PerformPowerOpSequence(cpp20::span<const PowerOp> commands
           zxlogf(ERROR, "Unrecognized GPIO pin #%d, ignoring", op.index);
           break;
         }
-        fidl::WireResult result = lcd_gpio_->Write(op.value);
+        fidl::WireResult result = lcd_reset_gpio_->Write(op.value);
         if (!result.ok()) {
           zxlogf(ERROR, "Failed to send Write request to lcd gpio: %s", result.status_string());
           return zx::error(result.status());
@@ -142,7 +165,7 @@ zx::result<> DsiHost::PerformPowerOpSequence(cpp20::span<const PowerOp> commands
         }
         {
           fidl::WireResult result =
-              lcd_gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullDown);
+              lcd_reset_gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullDown);
           if (!result.ok()) {
             zxlogf(ERROR, "Failed to send ConfigIn request to lcd gpio: %s",
                    result.status_string());
@@ -157,7 +180,7 @@ zx::result<> DsiHost::PerformPowerOpSequence(cpp20::span<const PowerOp> commands
           }
         }
         for (wait_count = 0; wait_count < op.sleep_ms; wait_count++) {
-          fidl::WireResult read_result = lcd_gpio_->Read();
+          fidl::WireResult read_result = lcd_reset_gpio_->Read();
           if (!read_result.ok()) {
             zxlogf(ERROR, "Failed to send Read request to lcd gpio: %s",
                    read_result.status_string());
@@ -193,16 +216,16 @@ zx::result<> DsiHost::PerformPowerOpSequence(cpp20::span<const PowerOp> commands
 
 zx::result<> DsiHost::ConfigureDsiHostController() {
   // Setup relevant TOP_CNTL register -- Undocumented --
-  mipi_dsi_mmio_->Write32(
-      SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CNTL), TOP_CNTL_DPI_CLR_MODE_START,
+  mipi_dsi_top_mmio_.Write32(
+      SetFieldValue32(mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_CNTL), TOP_CNTL_DPI_CLR_MODE_START,
                       TOP_CNTL_DPI_CLR_MODE_BITS, SUPPORTED_DPI_FORMAT),
       MIPI_DSI_TOP_CNTL);
-  mipi_dsi_mmio_->Write32(
-      SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CNTL), TOP_CNTL_IN_CLR_MODE_START,
+  mipi_dsi_top_mmio_.Write32(
+      SetFieldValue32(mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_CNTL), TOP_CNTL_IN_CLR_MODE_START,
                       TOP_CNTL_IN_CLR_MODE_BITS, SUPPORTED_VENC_DATA_WIDTH),
       MIPI_DSI_TOP_CNTL);
-  mipi_dsi_mmio_->Write32(
-      SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CNTL), TOP_CNTL_CHROMA_SUBSAMPLE_START,
+  mipi_dsi_top_mmio_.Write32(
+      SetFieldValue32(mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_CNTL), TOP_CNTL_CHROMA_SUBSAMPLE_START,
                       TOP_CNTL_CHROMA_SUBSAMPLE_BITS, 0),
       MIPI_DSI_TOP_CNTL);
 
@@ -228,18 +251,18 @@ zx::result<> DsiHost::ConfigureDsiHostController() {
 }
 
 void DsiHost::PhyEnable() {
-  hhi_mmio_->Write32(MIPI_CNTL0_CMN_REF_GEN_CTRL(0x29) | MIPI_CNTL0_VREF_SEL(VREF_SEL_VR) |
-                         MIPI_CNTL0_LREF_SEL(LREF_SEL_L_ROUT) | MIPI_CNTL0_LBG_EN |
-                         MIPI_CNTL0_VR_TRIM_CNTL(0x7) | MIPI_CNTL0_VR_GEN_FROM_LGB_EN,
-                     HHI_MIPI_CNTL0);
-  hhi_mmio_->Write32(MIPI_CNTL1_DSI_VBG_EN | MIPI_CNTL1_CTL, HHI_MIPI_CNTL1);
-  hhi_mmio_->Write32(MIPI_CNTL2_DEFAULT_VAL, HHI_MIPI_CNTL2);  // 4 lane
+  hhi_mmio_.Write32(MIPI_CNTL0_CMN_REF_GEN_CTRL(0x29) | MIPI_CNTL0_VREF_SEL(VREF_SEL_VR) |
+                        MIPI_CNTL0_LREF_SEL(LREF_SEL_L_ROUT) | MIPI_CNTL0_LBG_EN |
+                        MIPI_CNTL0_VR_TRIM_CNTL(0x7) | MIPI_CNTL0_VR_GEN_FROM_LGB_EN,
+                    HHI_MIPI_CNTL0);
+  hhi_mmio_.Write32(MIPI_CNTL1_DSI_VBG_EN | MIPI_CNTL1_CTL, HHI_MIPI_CNTL1);
+  hhi_mmio_.Write32(MIPI_CNTL2_DEFAULT_VAL, HHI_MIPI_CNTL2);  // 4 lane
 }
 
 void DsiHost::PhyDisable() {
-  hhi_mmio_->Write32(0, HHI_MIPI_CNTL0);
-  hhi_mmio_->Write32(0, HHI_MIPI_CNTL1);
-  hhi_mmio_->Write32(0, HHI_MIPI_CNTL2);
+  hhi_mmio_.Write32(0, HHI_MIPI_CNTL0);
+  hhi_mmio_.Write32(0, HHI_MIPI_CNTL1);
+  hhi_mmio_.Write32(0, HHI_MIPI_CNTL2);
 }
 
 void DsiHost::Disable() {
@@ -287,27 +310,27 @@ zx::result<> DsiHost::Enable(uint32_t bitrate) {
     }
 
     // Enable dwc mipi_dsi_host's clock
-    mipi_dsi_mmio_->Write32(
-        SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CNTL), /*field_begin_bit=*/4,
+    mipi_dsi_top_mmio_.Write32(
+        SetFieldValue32(mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_CNTL), /*field_begin_bit=*/4,
                         /*field_size_bits=*/2, /*field_value=*/0x3),
         MIPI_DSI_TOP_CNTL);
     // mipi_dsi_host's reset
-    mipi_dsi_mmio_->Write32(
-        SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_SW_RESET), /*field_begin_bit=*/0,
+    mipi_dsi_top_mmio_.Write32(
+        SetFieldValue32(mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_SW_RESET), /*field_begin_bit=*/0,
                         /*field_size_bits=*/4, /*field_value=*/0xf),
         MIPI_DSI_TOP_SW_RESET);
     // Release mipi_dsi_host's reset
-    mipi_dsi_mmio_->Write32(
-        SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_SW_RESET), /*field_begin_bit=*/0,
+    mipi_dsi_top_mmio_.Write32(
+        SetFieldValue32(mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_SW_RESET), /*field_begin_bit=*/0,
                         /*field_size_bits=*/4, /*field_value=*/0x0),
         MIPI_DSI_TOP_SW_RESET);
     // Enable dwc mipi_dsi_host's clock
-    mipi_dsi_mmio_->Write32(
-        SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CLK_CNTL), /*field_begin_bit=*/0,
+    mipi_dsi_top_mmio_.Write32(
+        SetFieldValue32(mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_CLK_CNTL), /*field_begin_bit=*/0,
                         /*field_size_bits=*/2, /*field_value=*/0x3),
         MIPI_DSI_TOP_CLK_CNTL);
 
-    mipi_dsi_mmio_->Write32(0, MIPI_DSI_TOP_MEM_PD);
+    mipi_dsi_top_mmio_.Write32(0, MIPI_DSI_TOP_MEM_PD);
     zx::nanosleep(zx::deadline_after(zx::msec(10)));
 
     // Initialize host in command mode first
@@ -350,27 +373,28 @@ zx::result<> DsiHost::Enable(uint32_t bitrate) {
 }
 
 void DsiHost::Dump() {
-  zxlogf(INFO, "MIPI_DSI_TOP_SW_RESET = 0x%x", mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_SW_RESET));
-  zxlogf(INFO, "MIPI_DSI_TOP_CLK_CNTL = 0x%x", mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CLK_CNTL));
-  zxlogf(INFO, "MIPI_DSI_TOP_CNTL = 0x%x", mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CNTL));
+  zxlogf(INFO, "MIPI_DSI_TOP_SW_RESET = 0x%x", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_SW_RESET));
+  zxlogf(INFO, "MIPI_DSI_TOP_CLK_CNTL = 0x%x", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_CLK_CNTL));
+  zxlogf(INFO, "MIPI_DSI_TOP_CNTL = 0x%x", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_CNTL));
   zxlogf(INFO, "MIPI_DSI_TOP_SUSPEND_CNTL = 0x%x",
-         mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_SUSPEND_CNTL));
+         mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_SUSPEND_CNTL));
   zxlogf(INFO, "MIPI_DSI_TOP_SUSPEND_LINE = 0x%x",
-         mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_SUSPEND_LINE));
-  zxlogf(INFO, "MIPI_DSI_TOP_SUSPEND_PIX = 0x%x", mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_SUSPEND_PIX));
-  zxlogf(INFO, "MIPI_DSI_TOP_MEAS_CNTL = 0x%x", mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_MEAS_CNTL));
-  zxlogf(INFO, "MIPI_DSI_TOP_STAT = 0x%x", mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_STAT));
+         mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_SUSPEND_LINE));
+  zxlogf(INFO, "MIPI_DSI_TOP_SUSPEND_PIX = 0x%x",
+         mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_SUSPEND_PIX));
+  zxlogf(INFO, "MIPI_DSI_TOP_MEAS_CNTL = 0x%x", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEAS_CNTL));
+  zxlogf(INFO, "MIPI_DSI_TOP_STAT = 0x%x", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_STAT));
   zxlogf(INFO, "MIPI_DSI_TOP_MEAS_STAT_TE0 = 0x%x",
-         mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_MEAS_STAT_TE0));
+         mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEAS_STAT_TE0));
   zxlogf(INFO, "MIPI_DSI_TOP_MEAS_STAT_TE1 = 0x%x",
-         mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_MEAS_STAT_TE1));
+         mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEAS_STAT_TE1));
   zxlogf(INFO, "MIPI_DSI_TOP_MEAS_STAT_VS0 = 0x%x",
-         mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_MEAS_STAT_VS0));
+         mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEAS_STAT_VS0));
   zxlogf(INFO, "MIPI_DSI_TOP_MEAS_STAT_VS1 = 0x%x",
-         mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_MEAS_STAT_VS1));
+         mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEAS_STAT_VS1));
   zxlogf(INFO, "MIPI_DSI_TOP_INTR_CNTL_STAT = 0x%x",
-         mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_INTR_CNTL_STAT));
-  zxlogf(INFO, "MIPI_DSI_TOP_MEM_PD = 0x%x", mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_MEM_PD));
+         mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_INTR_CNTL_STAT));
+  zxlogf(INFO, "MIPI_DSI_TOP_MEM_PD = 0x%x", mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_MEM_PD));
 }
 
 }  // namespace amlogic_display
