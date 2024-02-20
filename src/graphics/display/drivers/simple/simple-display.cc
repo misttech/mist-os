@@ -46,13 +46,18 @@ static constexpr int kRefreshRateHz = 30;
 static constexpr auto kVSyncInterval = zx::usec(1000000 / kRefreshRateHz);
 
 fuchsia_hardware_sysmem::wire::HeapProperties GetHeapProperties(fidl::AnyArena& arena) {
-  fuchsia_hardware_sysmem::wire::CoherencyDomainSupport coherency_domain_support(arena);
-  coherency_domain_support.set_cpu_supported(false)
-      .set_ram_supported(true)
-      .set_inaccessible_supported(false);
-  fuchsia_hardware_sysmem::wire::HeapProperties heap_properties(arena);
-  heap_properties.set_coherency_domain_support(arena, std::move(coherency_domain_support))
-      .set_need_clear(false);
+  fuchsia_hardware_sysmem::wire::CoherencyDomainSupport coherency_domain_support =
+      fuchsia_hardware_sysmem::wire::CoherencyDomainSupport::Builder(arena)
+          .cpu_supported(false)
+          .ram_supported(true)
+          .inaccessible_supported(false)
+          .Build();
+
+  fuchsia_hardware_sysmem::wire::HeapProperties heap_properties =
+      fuchsia_hardware_sysmem::wire::HeapProperties::Builder(arena)
+          .coherency_domain_support(std::move(coherency_domain_support))
+          .need_clear(false)
+          .Build();
   return heap_properties;
 }
 
@@ -142,10 +147,12 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportBufferCollection(
   auto& [collection_client_endpoint, collection_server_endpoint] = endpoints.value();
 
   fidl::Arena arena;
-  fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest bind_request(arena);
-  bind_request.set_token(
-      fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(std::move(collection_token)));
-  bind_request.set_buffer_collection_request(std::move(collection_server_endpoint));
+  fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest bind_request =
+      fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
+          .token(
+              fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(std::move(collection_token)))
+          .buffer_collection_request(std::move(collection_server_endpoint))
+          .Build();
   auto bind_result = sysmem_->BindSharedCollection(std::move(bind_request));
   if (!bind_result.ok()) {
     zxlogf(ERROR, "Cannot complete FIDL call BindSharedCollection: %s",
