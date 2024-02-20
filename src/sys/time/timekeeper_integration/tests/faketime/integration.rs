@@ -5,7 +5,7 @@
 use anyhow::{Context, Result};
 use fidl::{endpoints, AsHandleRef, HandleBased};
 use fidl_fuchsia_testing as ffte;
-use fidl_fuchsia_testing_harness as ftth;
+use fidl_fuchsia_testing_harness as ffth;
 use fidl_fuchsia_time as fft;
 use fidl_test_time_realm as fttr;
 use fuchsia_component::client;
@@ -39,7 +39,7 @@ fn koid_of(c: &zx::Clock) -> u64 {
 /// is "stringly typed", this function allows us to use a less error prone protocol
 /// marker instead of a string name.
 async fn connect_into_realm<T>(
-    realm_proxy: &ftth::RealmProxy_Proxy,
+    realm_proxy: &ffth::RealmProxy_Proxy,
 ) -> <T as endpoints::ProtocolMarker>::Proxy
 where
     T: endpoints::ProtocolMarker,
@@ -90,7 +90,7 @@ where
 
     // realm_proxy must live as long as you need your test realm to live.
     let (realm_proxy, realm_server_end) =
-        endpoints::create_proxy::<ftth::RealmProxy_Marker>().expect("infallible");
+        endpoints::create_proxy::<ffth::RealmProxy_Marker>().expect("infallible");
 
     let (push_source_puppet, _opts, cobalt_metric_client) = test_realm_proxy
         .create_realm(fttr::RealmOptions { ..Default::default() }, utc_clock_copy, realm_server_end)
