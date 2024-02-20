@@ -16,5 +16,8 @@ group("tests") {
     "bt-manifest-integration-tests:tests",
     "bt-profile-integration:bt-profile-integration-tests",
     "//src/connectivity/bluetooth/core/bt-host:bt_host_bind_test",
+
+    # TODO(https://fxbug.dev/42085245): Add when bt-host component is enabled
+    # "bt-host-component-integration:bt-host-component-integration-tests",
   ]
 }
