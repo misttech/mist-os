@@ -100,11 +100,17 @@ struct ControlRegister2 : public hwreg::RegisterBase<ControlRegister2, uint32_t>
   static auto Get() { return hwreg::RegisterAddr<ControlRegister2>(0x84); }
 };
 
-struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_IMX_UART, zbi_dcfg_simple_t> {
+// The number of `IoSlots` used by this driver, determined by the last accessed register, see
+// `LineControlRegister`. For unscaled MMIO, this corresponds to the size of the MMIO region
+// from a provided base address.
+static constexpr size_t kIoSlots = 0x84 + sizeof(uint32_t);
+
+struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_IMX_UART, zbi_dcfg_simple_t,
+                                  IoRegisterType::kMmio8, kIoSlots> {
   template <typename... Args>
   explicit Driver(Args&&... args)
-      : DriverBase<Driver, ZBI_KERNEL_DRIVER_IMX_UART, zbi_dcfg_simple_t>(
-            std::forward<Args>(args)...) {}
+      : DriverBase<Driver, ZBI_KERNEL_DRIVER_IMX_UART, zbi_dcfg_simple_t, IoRegisterType::kMmio8,
+                   kIoSlots>(std::forward<Args>(args)...) {}
 
   static constexpr std::string_view config_name() { return "imx"; }
 

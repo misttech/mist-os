@@ -10,6 +10,7 @@
 #include <lib/zbi-format/zbi.h>
 
 #include <array>
+#include <cstdint>
 #include <string_view>
 
 #include <hwreg/bitfields.h>
@@ -136,8 +137,15 @@ struct LineControlRegister : public hwreg::RegisterBase<LineControlRegister, uin
   static auto Get() { return hwreg::RegisterAddr<LineControlRegister>(0x2C); }
 };
 
-struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_PL011_UART, zbi_dcfg_simple_t> {
-  using Base = DriverBase<Driver, ZBI_KERNEL_DRIVER_PL011_UART, zbi_dcfg_simple_t>;
+// The number of `IoSlots` used by this driver, determined by the last accessed register, see
+// `LineControlRegister`. For unscaled MMIO, this corresponds to the size of the MMIO region
+// from a provided base address.
+static constexpr size_t kIoSlots = 0x2C + sizeof(uint16_t);
+
+struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_PL011_UART, zbi_dcfg_simple_t,
+                                  IoRegisterType::kMmio8, kIoSlots> {
+  using Base = DriverBase<Driver, ZBI_KERNEL_DRIVER_PL011_UART, zbi_dcfg_simple_t,
+                          IoRegisterType::kMmio8, kIoSlots>;
 
   static constexpr auto kDevicetreeBindings =
       cpp20::to_array<std::string_view>({"arm,primecell", "arm,pl011"});

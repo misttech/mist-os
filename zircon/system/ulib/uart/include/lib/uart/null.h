@@ -114,6 +114,7 @@ struct Driver {
 
   // This tells the IoProvider what device resources to provide.
   constexpr config_type config() const { return {}; }
+  constexpr size_t io_slots() const { return 0; }
 };
 
 }  // namespace null
@@ -123,7 +124,7 @@ struct Driver {
 template <>
 class BasicIoProvider<null::Driver::config_type, IoRegisterType::kMmio8> {
  public:
-  explicit BasicIoProvider(const null::Driver::config_type&) {}
+  BasicIoProvider(const null::Driver::config_type&, size_t) {}
 
  private:
   // Nothing should call this.  The visibility will cause a compilation error.

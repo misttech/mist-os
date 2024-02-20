@@ -700,6 +700,6 @@ zx_status_t platform_append_mexec_data(ktl::span<ktl::byte> data_zbi) { return Z
 
 ktl::optional<uint32_t> PlatformUartGetIrqNumber(uint32_t irq_num) { return irq_num; }
 
-volatile void* PlatformUartMapMmio(paddr_t paddr) {
+volatile void* PlatformUartMapMmio(paddr_t paddr, size_t size) {
   return reinterpret_cast<volatile void*>(paddr_to_physmap(paddr));
 }

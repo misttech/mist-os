@@ -17,17 +17,17 @@
 
 #include "memory.h"
 
-volatile void* PlatformUartMapMmio(paddr_t paddr) {
+volatile void* PlatformUartMapMmio(paddr_t paddr, size_t size) {
   volatile void* vaddr = paddr_to_physmap(paddr);
-  mark_mmio_region_to_reserve(reinterpret_cast<vaddr_t>(vaddr), PAGE_SIZE);
+  mark_mmio_region_to_reserve(reinterpret_cast<vaddr_t>(vaddr), size);
   return vaddr;
 }
 
 PlatformUartIoProvider<zbi_dcfg_simple_pio_t, uart::IoRegisterType::kPio>::PlatformUartIoProvider(
-    const zbi_dcfg_simple_pio_t& config)
-    : Base(config) {
+    const zbi_dcfg_simple_pio_t& config, uint16_t io_slots)
+    : Base(config, io_slots) {
   // Reserve pio.
-  mark_pio_region_to_reserve(config.base, 8);
+  mark_pio_region_to_reserve(config.base, io_slots);
 }
 
 ktl::optional<uint32_t> PlatformUartGetIrqNumber(uint32_t irq_num) {

@@ -14,6 +14,6 @@
 
 ktl::optional<uint32_t> PlatformUartGetIrqNumber(uint32_t irq_num) { return irq_num; }
 
-volatile void* PlatformUartMapMmio(paddr_t paddr) {
+volatile void* PlatformUartMapMmio(paddr_t paddr, size_t size) {
   return reinterpret_cast<volatile void*>(periph_paddr_to_vaddr(paddr));
 }

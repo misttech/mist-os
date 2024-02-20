@@ -89,6 +89,13 @@ enum class IoRegisterType {
   kPio,
 };
 
+template <IoRegisterType IoRegType>
+using IoSlotType = std::conditional_t<IoRegType == IoRegisterType::kPio, uint16_t, size_t>;
+
+// Constant indicating that the number of `io_slots()` is to be determined at
+// runtime.
+constexpr size_t kDynamicIoSlot = std::numeric_limits<size_t>::max();
+
 // Specific hardware support is implemented in a class uart::xyz::Driver,
 // referred to here as UartDriver.  The uart::DriverBase template class
 // provides a helper base class for UartDriver implementations.
@@ -127,8 +134,13 @@ enum class IoRegisterType {
 // hwreg ReadFrom and WriteTo calls on the pointers from the provider.  The
 // IoProvider constructed is passed uart.config() and uart.pio_size().
 //
-template <typename Driver, uint32_t KdrvExtra, typename KdrvConfig,
-          IoRegisterType IoRegType = IoRegisterType::kMmio8>
+// `IoSlots` is an opaque parameter whose meaning is tied to the value of `IoRegType`.
+// A very broad description would be the number of 'slots' to perform I/O operations.
+// * `kMmio8` and `kMmio32` represents the number of bytes from the base address with the proper
+//    scaling factor applied, 1 and 4 respectively.
+// * `kPio` represents the number the port count.
+template <typename Driver, uint32_t KdrvExtra, typename KdrvConfig, IoRegisterType IoRegType,
+          IoSlotType<IoRegType> IoSlots = kDynamicIoSlot>
 class DriverBase {
  public:
   using config_type = KdrvConfig;
@@ -218,6 +230,22 @@ class DriverBase {
 
   // API for use in IoProvider setup.
   const config_type& config() const { return cfg_; }
+
+  // Number of 'slots' to perform I/O operations.
+  template <IoSlotType<IoRegType> _IoSlots = IoSlots,
+            std::enable_if_t<_IoSlots != kDynamicIoSlot, bool> = true>
+  constexpr IoSlotType<IoRegType> io_slots() const {
+    return IoSlots;
+  }
+
+  template <IoSlotType<IoRegType> _IoSlots = IoSlots,
+            std::enable_if_t<_IoSlots == kDynamicIoSlot, bool> = true>
+  constexpr IoSlotType<IoRegType> io_slots() const {
+    static_assert(
+        !std::is_same_v<void, void>,
+        "|IoSlots| must be different from |kDynamicIoSlot| or |io_slots| implementation must be provided in derived class.");
+    return IoSlots;
+  }
 
  protected:
   config_type cfg_;
@@ -312,7 +340,12 @@ class BasicIoProvider;
 // This is the default "identity mapping" callback for BasicIoProvider::Init.
 // A subclass can have an Init function that calls BasicIoProvider::Init with
 // a different callback function.
-inline auto DirectMapMmio(uint64_t phys) { return reinterpret_cast<volatile void*>(phys); }
+//
+// The `size` parameter represents the number of bytes from `phys`, such that
+// the mmio region to be mapped is contained in p[`phys`, `phys` + `size`).
+inline auto DirectMapMmio(uint64_t phys, size_t size) {
+  return reinterpret_cast<volatile void*>(phys);
+}
 
 // The specialization used most commonly handles simple MMIO devices.
 template <IoRegisterType IoType>
@@ -322,19 +355,19 @@ class BasicIoProvider<zbi_dcfg_simple_t, IoType> {
   // a subclass constructor method to map the physical address to a virtual
   // address.
   template <typename T>
-  BasicIoProvider(const zbi_dcfg_simple_t& cfg, T&& map_mmio) {
-    auto ptr = map_mmio(cfg.mmio_phys);
+  BasicIoProvider(const zbi_dcfg_simple_t& cfg, size_t io_slots, T&& map_mmio) {
     if constexpr (IoType == IoRegisterType::kMmio8) {
-      io_.emplace<hwreg::RegisterMmio>(ptr);
+      io_.emplace<hwreg::RegisterMmio>(map_mmio(cfg.mmio_phys, io_slots));
     } else if constexpr (IoType == IoRegisterType::kMmio32) {
-      io_.emplace<hwreg::RegisterMmioScaled<uint32_t>>(ptr);
+      io_.emplace<hwreg::RegisterMmioScaled<uint32_t>>(map_mmio(cfg.mmio_phys, io_slots * 4));
     } else {
       // Pio uses a different specialization, this should never be reached.
       static_assert(!std::is_same_v<T, T>);
     }
   }
 
-  explicit BasicIoProvider(const zbi_dcfg_simple_t& cfg) : BasicIoProvider(cfg, DirectMapMmio) {}
+  BasicIoProvider(const zbi_dcfg_simple_t& cfg, size_t io_slots)
+      : BasicIoProvider(cfg, io_slots, DirectMapMmio) {}
 
   BasicIoProvider& operator=(BasicIoProvider&& other) {
     io_.swap(other.io_);
@@ -353,8 +386,9 @@ class BasicIoProvider<zbi_dcfg_simple_t, IoType> {
 template <IoRegisterType IoType>
 class BasicIoProvider<zbi_dcfg_simple_pio_t, IoType> {
  public:
-  explicit BasicIoProvider(const zbi_dcfg_simple_pio_t& cfg) : io_(cfg.base) {
+  explicit BasicIoProvider(const zbi_dcfg_simple_pio_t& cfg, uint16_t io_slots) : io_(cfg.base) {
     static_assert(IoType == IoRegisterType::kPio);
+    ZX_DEBUG_ASSERT(io_slots > 0);
   }
 
   auto* io() { return &io_; }
@@ -401,7 +435,8 @@ class KernelDriver {
   // or might never actually be set up because this instantiation gets
   // replaced with a different one before ever calling Init.
   template <typename... Args>
-  explicit KernelDriver(Args&&... args) : uart_(std::forward<Args>(args)...), io_(uart_.config()) {
+  explicit KernelDriver(Args&&... args)
+      : uart_(std::forward<Args>(args)...), io_(uart_.config(), uart_.io_slots()) {
     if constexpr (std::is_same_v<mock::Driver, uart_type>) {
       // Initialize the mock sync object with the mock driver.
       lock_.Init(uart_);

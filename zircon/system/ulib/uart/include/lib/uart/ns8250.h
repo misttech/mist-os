@@ -8,6 +8,7 @@
 #include <lib/acpi_lite/debug_port.h>
 #include <lib/stdcompat/array.h>
 #include <lib/zbi-format/driver-config.h>
+#include <zircon/limits.h>
 
 #include <array>
 #include <optional>
@@ -180,27 +181,26 @@ class UartStatusRegister : public hwreg::RegisterBase<UartStatusRegister, uint32
   static auto Get() { return hwreg::RegisterAddr<UartStatusRegister>(0x7c / 4); }
 };
 
-// Determines the flavor of the MMIO access to be performed by the |BasicIoProvider| for MMIO
-// access. When this is 0, an unscaled access is perfomed, that is byte aligned 1 byte regions.
-//
-// When this value is non zero, then each 1 byte region is aligned as the least significant byte of
-// of a 4 byte region, hence 'scaled' mmio is performed. This flavor also implies that all accesses
-// are performed through 4 byte read/writes.
-//
-// TODO(https://fxbug.dev/42080554): Clean up port count usage.
+// The scaled number of `IoSlots` used by this driver, for PIO corresponds to the number of
+// IO Ports used by the driver.
 template <uint32_t KdrvExtra>
-inline constexpr uint32_t kPortCount = 8;
+inline constexpr uint32_t kIoSlots = 8;
 
+// Accomodates for the registers specific to this model that are used in the implementation.
+// Specifically `UartStatusRegister`. For Scaled MMIO, this corresponds to the number of
+// unscaled registers that need to be accessed by the implementation. The MMIO region size
+// can be obtained by scaling the register by their access width(`sizeof(uint32_t)`).
 template <>
-inline constexpr uint32_t kPortCount<ZBI_KERNEL_DRIVER_I8250_MMIO8_UART> = 0;
+inline constexpr uint32_t kIoSlots<ZBI_KERNEL_DRIVER_DW8250_UART> = (0x7c + sizeof(uint32_t)) / 4;
 
 // This provides the actual driver logic common to MMIO and PIO variants.
-template <uint32_t KdrvExtra, typename KdrvConfig, IoRegisterType IoRegType>
-class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType>, KdrvExtra,
-                                     KdrvConfig, IoRegType> {
+template <uint32_t KdrvExtra, typename KdrvConfig, IoRegisterType IoRegType,
+          size_t IoSlots = kIoSlots<KdrvExtra>>
+class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType, IoSlots>,
+                                     KdrvExtra, KdrvConfig, IoRegType, IoSlots> {
  public:
-  using Base =
-      DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType>, KdrvExtra, KdrvConfig, IoRegType>;
+  using Base = DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType, IoSlots>, KdrvExtra,
+                          KdrvConfig, IoRegType, IoSlots>;
 
   static constexpr auto kDevicetreeBindings = []() {
     if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_MMIO32_UART ||

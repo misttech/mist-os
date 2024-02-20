@@ -35,7 +35,8 @@ namespace mock {
 template <typename Config, IoRegisterType>
 class IoProvider {
  public:
-  explicit IoProvider(const Config&) {}
+  explicit IoProvider(const Config&, size_t) {}
+  explicit IoProvider(const Config&, uint16_t) {}
 
   auto* io() { return io_.io(); }
 
@@ -59,6 +60,7 @@ class Driver {
   struct config_type {};
   static constexpr IoRegisterType kIoType = IoRegisterType::kMmio8;
   constexpr config_type config() const { return {}; }
+  constexpr size_t io_slots() const { return 0; }
 
   using IoProviderType = IoProvider<config_type, kIoType>;
   // Fluent API for priming and checking the mock.

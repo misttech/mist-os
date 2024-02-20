@@ -15,7 +15,7 @@
 
 // Returns the virtual address of the |base_addr| used in the uart.
 // Any memory related book keeping with this mapping take place here.
-volatile void* PlatformUartMapMmio(paddr_t base_addr);
+volatile void* PlatformUartMapMmio(paddr_t base_addr, size_t size);
 
 // Returns the |irq| number to be used for registering an IRQ Handler if such |irq_num| can be
 // translated.
@@ -44,8 +44,8 @@ class PlatformUartIoProvider<zbi_dcfg_simple_t, IoType>
   using Base = uart::BasicIoProvider<zbi_dcfg_simple_t, IoType>;
 
   using Base::Base;
-  explicit PlatformUartIoProvider(const zbi_dcfg_simple_t& config)
-      : Base(config, PlatformUartMapMmio) {}
+  PlatformUartIoProvider(const zbi_dcfg_simple_t& config, size_t io_slots)
+      : Base(config, io_slots, PlatformUartMapMmio) {}
 };
 
 #if defined(__x86_64__) || defined(__i386__)
@@ -56,8 +56,7 @@ class PlatformUartIoProvider<zbi_dcfg_simple_pio_t, uart::IoRegisterType::kPio>
  public:
   using Base = uart::BasicIoProvider<zbi_dcfg_simple_pio_t, uart::IoRegisterType::kPio>;
   using Base::Base;
-
-  explicit PlatformUartIoProvider(const zbi_dcfg_simple_pio_t& config);
+  PlatformUartIoProvider(const zbi_dcfg_simple_pio_t& config, uint16_t io_slots);
 };
 #endif
 

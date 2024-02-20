@@ -96,14 +96,20 @@ struct IrqControlRegister : public hwreg::RegisterBase<IrqControlRegister, uint3
   static auto Get() { return hwreg::RegisterAddr<IrqControlRegister>(0x10); }
 };
 
-struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dcfg_simple_t> {
+// The number of `IoSlots` used by this driver, determined by the last accessed register, see
+// `IrqControlRegister`. For unscaled MMIO, this corresponds to the size of the MMIO region
+// from a provided base address.
+static constexpr size_t kIoSlots = 0x10 + sizeof(uint32_t);
+
+struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dcfg_simple_t,
+                                  IoRegisterType::kMmio8, kIoSlots> {
   static constexpr auto kDevicetreeBindings =
       cpp20::to_array<std::string_view>({"amlogic,meson-gx-uart", "amlogic,meson-ao-uart"});
 
   template <typename... Args>
   explicit Driver(Args&&... args)
-      : DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dcfg_simple_t>(
-            std::forward<Args>(args)...) {}
+      : DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dcfg_simple_t,
+                   IoRegisterType::kMmio8, kIoSlots>(std::forward<Args>(args)...) {}
 
   static constexpr std::string_view config_name() { return "amlogic"; }
 
