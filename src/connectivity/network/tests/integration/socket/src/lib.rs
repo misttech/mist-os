@@ -1443,6 +1443,7 @@ async fn tcp_socket_accept_cross_ns<
         .add_address_and_subnet_route(I::CLIENT_SUBNET)
         .await
         .expect("configure address");
+    client_interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     let server = sandbox
         .create_netstack_realm::<Server, _>(format!("{}_server", name))
@@ -1453,6 +1454,7 @@ async fn tcp_socket_accept_cross_ns<
         .add_address_and_subnet_route(I::SERVER_SUBNET)
         .await
         .expect("configure address");
+    server_interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     let fnet_ext::IpAddress(client_ip) = I::CLIENT_SUBNET.addr.into();
 
@@ -1551,6 +1553,7 @@ async fn tcp_socket_shutdown_listener<I: net_types::ip::Ip + TestIpExt, N: Netst
         .add_address_and_subnet_route(I::CLIENT_SUBNET)
         .await
         .expect("configure address");
+    client_interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     let server = sandbox
         .create_netstack_realm::<N, _>(format!("{}_server", name))
@@ -1561,6 +1564,7 @@ async fn tcp_socket_shutdown_listener<I: net_types::ip::Ip + TestIpExt, N: Netst
         .add_address_and_subnet_route(I::SERVER_SUBNET)
         .await
         .expect("configure address");
+    server_interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     let fnet_ext::IpAddress(client_ip) = I::CLIENT_SUBNET.addr.into();
     let fnet_ext::IpAddress(server_ip) = I::SERVER_SUBNET.addr.into();
