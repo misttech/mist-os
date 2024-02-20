@@ -1058,7 +1058,7 @@ pub trait UdpBindingsContext<I: IcmpIpExt, D> {
     /// Receives a UDP packet on a socket.
     fn receive_udp<B: BufferMut>(
         &mut self,
-        id: SocketId<I>,
+        id: &SocketId<I>,
         device_id: &D,
         dst_addr: (I::Addr, NonZeroU16),
         src_addr: (I::Addr, Option<NonZeroU16>),
@@ -1347,14 +1347,14 @@ fn try_deliver<
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    id: SocketId<I>,
+    id: &SocketId<I>,
     device: &CC::DeviceId,
     (dst_ip, dst_port): (I::Addr, NonZeroU16),
     (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
     buffer: &B,
 ) -> bool {
-    core_ctx.with_sockets_state(|core_ctx, state| {
-        let should_deliver = match state.get_socket_state(&id).expect("socket ID is valid") {
+    core_ctx.with_socket_state(&id, |core_ctx, state| {
+        let should_deliver = match state {
             DatagramSocketState::Bound(DatagramBoundSocketState {
                 socket_type,
                 original_bound_addr: _,
@@ -1441,7 +1441,7 @@ fn try_dual_stack_deliver<
         DualStackOutputs::CurrentStack(Outputs { src_ip, dst_ip, socket }) => try_deliver(
             core_ctx,
             bindings_ctx,
-            socket,
+            &socket,
             device,
             (dst_ip, dst_port),
             (src_ip, src_port),
@@ -1450,7 +1450,7 @@ fn try_dual_stack_deliver<
         DualStackOutputs::OtherStack(Outputs { src_ip, dst_ip, socket }) => try_deliver(
             core_ctx,
             bindings_ctx,
-            socket,
+            &socket,
             device,
             (dst_ip, dst_port),
             (src_ip, src_port),
@@ -2534,6 +2534,13 @@ mod tests {
     type UdpFakeDeviceCtx = FakeUdpCtx<FakeDeviceId>;
     type UdpFakeDeviceCoreCtx = FakeUdpCoreCtx<FakeDeviceId>;
 
+    #[track_caller]
+    fn assert_state_removed<I: IpExt, D: crate::device::WeakId>(
+        id: &SocketId<I>,
+        state: &SocketsState<I, D>,
+    ) {
+        assert_matches!(state.get(id.get_key_index()), None)
+    }
     #[derive(Default)]
     struct FakeBindingsCtxState {
         received_v4: HashMap<SocketId<Ipv4>, SocketReceived<Ipv4>>,
@@ -2581,13 +2588,13 @@ mod tests {
     impl<I: IcmpIpExt, D> UdpBindingsContext<I, D> for FakeUdpBindingsCtx {
         fn receive_udp<B: BufferMut>(
             &mut self,
-            id: SocketId<I>,
+            id: &SocketId<I>,
             _device: &D,
             (dst_ip, _dst_port): (I::Addr, NonZeroU16),
             (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
             body: &B,
         ) {
-            self.state_mut().received_mut::<I>().entry(id).or_default().packets.push(
+            self.state_mut().received_mut::<I>().entry(id.clone()).or_default().packets.push(
                 ReceivedPacket {
                     addr: ReceivedPacketAddrs { src_ip, dst_ip, src_port },
                     body: body.as_ref().to_owned(),
@@ -4611,7 +4618,7 @@ mod tests {
         // Assert that that connection id was removed from the connections
         // state.
         let Wrapped { outer: sockets_state, inner: _ } = api.core_ctx();
-        assert_matches!(sockets_state.as_ref().get_socket_state(&socket), None);
+        assert_state_removed(&socket, sockets_state.as_ref());
     }
 
     /// Tests [`remove_udp`]
@@ -4629,7 +4636,7 @@ mod tests {
         assert_eq!(info.local_ip.unwrap().into_inner(), local_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.local_port, LOCAL_PORT);
         let Wrapped { outer: sockets_state, inner: _ } = api.core_ctx();
-        assert_matches!(sockets_state.as_ref().get_socket_state(&specified), None);
+        assert_state_removed(&specified, sockets_state.as_ref());
 
         // Test removing a wildcard listener.
         let wildcard = api.create();
@@ -4639,7 +4646,7 @@ mod tests {
         assert_eq!(info.local_ip, None);
         assert_eq!(info.local_port, LOCAL_PORT);
         let Wrapped { outer: sockets_state, inner: _ } = api.core_ctx();
-        assert_matches!(sockets_state.as_ref().get_socket_state(&wildcard), None);
+        assert_state_removed(&wildcard, sockets_state.as_ref());
     }
 
     fn try_join_leave_multicast<I: Ip + TestIpExt>(
@@ -5646,7 +5653,7 @@ mod tests {
         let _: SocketInfo<_, _> = api.close(unbound.clone());
 
         let Wrapped { outer: sockets_state, inner: _ } = api.core_ctx();
-        assert_matches!(sockets_state.as_ref().get_socket_state(&unbound), None)
+        assert_state_removed(&unbound, sockets_state.as_ref());
     }
 
     #[ip_test]

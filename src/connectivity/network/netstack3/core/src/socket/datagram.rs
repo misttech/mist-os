@@ -79,12 +79,6 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> DerefMut for SocketsSta
     }
 }
 
-impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> SocketsState<I, D, S> {
-    pub(crate) fn get_socket_state(&self, id: &S::SocketId<I>) -> Option<&SocketState<I, D, S>> {
-        self.get(id.get_key_index())
-    }
-}
-
 impl<I: IpExt, NewIp: IpExt, D: device::WeakId, S: DatagramSocketSpec> GenericOverIp<NewIp>
     for SocketsState<I, D, S>
 {

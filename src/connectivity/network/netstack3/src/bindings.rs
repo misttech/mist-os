@@ -561,7 +561,7 @@ where
 {
     fn receive_udp<B: BufferMut>(
         &mut self,
-        id: udp::SocketId<I>,
+        id: &udp::SocketId<I>,
         device: &DeviceId<BindingsCtx>,
         dst_addr: (<I>::Addr, NonZeroU16),
         src_addr: (<I>::Addr, Option<NonZeroU16>),

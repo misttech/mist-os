@@ -1469,14 +1469,15 @@ impl FakeNetworkContext for FakeCtx {
 impl<I: IcmpIpExt> UdpBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
     fn receive_udp<B: BufferMut>(
         &mut self,
-        id: udp::SocketId<I>,
+        id: &udp::SocketId<I>,
         _device: &DeviceId<Self>,
         _dst_addr: (<I>::Addr, core::num::NonZeroU16),
         _src_addr: (<I>::Addr, Option<core::num::NonZeroU16>),
         body: &B,
     ) {
         let mut state = self.state_mut();
-        let received = (&mut *state).udp_state_mut::<I>().entry(id).or_insert_with(Vec::default);
+        let received =
+            (&mut *state).udp_state_mut::<I>().entry(id.clone()).or_insert_with(Vec::default);
         received.push(body.as_ref().to_owned());
     }
 }

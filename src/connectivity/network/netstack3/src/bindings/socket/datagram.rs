@@ -573,7 +573,7 @@ where
 impl<I: IpExt> UdpBindingsContext<I, DeviceId<BindingsCtx>> for SocketCollection<I, Udp> {
     fn receive_udp<B: BufferMut>(
         &mut self,
-        id: udp::SocketId<I>,
+        id: &udp::SocketId<I>,
         device_id: &DeviceId<BindingsCtx>,
         (dst_ip, dst_port): (<I>::Addr, NonZeroU16),
         (src_ip, src_port): (<I>::Addr, Option<NonZeroU16>),
