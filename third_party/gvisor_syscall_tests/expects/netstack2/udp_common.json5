@@ -90,6 +90,7 @@
 
                 // https://fxbug.dev/42085960
                 "AllInetTests/UdpSocketTest.ReconnectDoesNotClearReadShutdown/*",
+                "AllInetTests/UdpSocketTest.ReconnectDoesNotClearWriteShutdown/*",
             ],
         },
     ],
