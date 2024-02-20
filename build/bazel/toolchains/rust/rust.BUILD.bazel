@@ -6,6 +6,7 @@
 
 load("@fuchsia_build_config//:defs.bzl", "build_config")
 load("@rules_rust//rust:toolchain.bzl", "rust_stdlib_filegroup", "rust_toolchain")
+load("@main//:build/bazel/toolchains/rust/rust_toolchain_transition.bzl", "rust_toolchain_transition")
 
 host_os = build_config.host_os
 host_arch = build_config.host_arch
@@ -23,7 +24,7 @@ rust_stdlib_filegroup(
     srcs = glob(["lib/rustlib/%s/lib/*" % host_triple]),
 )
 
-rust_toolchain(
+rust_toolchain_transition(
     name = "rust_%s_%s_toolchain" % (host_os, host_arch),
     rustc = "//:bin/rustc",
     rustc_lib = "//:rustc_lib",
@@ -59,7 +60,7 @@ rust_stdlib_filegroup(
     srcs = glob(["lib/rustlib/x86_64-fuchsia/lib/*"]),
 )
 
-rust_toolchain(
+rust_toolchain_transition(
     name = "rust_fuchsia_x64_toolchain",
     rustc = "//:bin/rustc",
     rustc_lib = "//:rustc_lib",
@@ -95,7 +96,7 @@ rust_stdlib_filegroup(
     srcs = glob(["lib/rustlib/aarch64-fuchsia/lib/*"]),
 )
 
-rust_toolchain(
+rust_toolchain_transition(
     name = "rust_fuchsia_arm64_toolchain",
     rustc = "//:bin/rustc",
     rustc_lib = "//:rustc_lib",

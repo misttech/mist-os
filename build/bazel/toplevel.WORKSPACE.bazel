@@ -59,7 +59,7 @@ local_repository(
 new_local_repository(
     name = "rules_rust_tinyjson",
     path = "third_party/rust_crates/vendor/tinyjson-2.5.0",
-    build_file = "third_party/bazel_rules_rust/util/process_wrapper/BUILD.tinyjson.bazel",
+    build_file = "@rules_rust//util/process_wrapper:BUILD.tinyjson.bazel",
 )
 
 local_repository(
