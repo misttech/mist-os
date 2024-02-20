@@ -8,7 +8,7 @@ use {
         model::{
             component::{ComponentInstance, ResolvedInstanceState, WeakComponentInstance},
             error::RouteOrOpenError,
-            routing::router::{Completer, Request, Router},
+            routing::router::{Request, Routable, Router},
         },
         sandbox_util::{DictExt, LaunchTaskOnReceive},
     },
@@ -19,14 +19,10 @@ use {
     },
     cm_rust::{self, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon},
     cm_types::{IterablePath, Name},
-    futures::future::{BoxFuture, FutureExt, Shared},
+    futures::future::FutureExt,
     moniker::{ChildName, ChildNameBase, MonikerBase},
     sandbox::{Capability, Dict, Unit},
-    std::{
-        collections::HashMap,
-        iter,
-        sync::{self, Arc},
-    },
+    std::{collections::HashMap, iter, sync::Arc},
     tracing::warn,
 };
 
@@ -245,7 +241,6 @@ fn extend_dict_with_dictionary(
                 };
                 let child = child.as_weak();
                 new_forwarding_router_to_child(
-                    &component,
                     child,
                     source_path.clone(),
                     RoutingError::BedrockSourceDictionaryExposeNotFound,
@@ -260,95 +255,56 @@ fn extend_dict_with_dictionary(
     program_output_dict.insert_capability(iter::once(decl.name.as_str()), router.into());
 }
 
-/// Returns a [Router] that merges the contents of the [Dict] returned by
-/// `source_dict_router` into `dict`, then returns `dict`. Henceforth, the [Router]
-/// will return `dict` immediately.
+/// Returns a [Router] that returns a [Dict].
+/// The first time this router is called, it calls `source_dict_router` to get another [Dict],
+/// and combines those entries with `dict``.
+/// Each time after, this router returns `dict`` that has the combined entries.
+/// NOTE: This function modifies `dict`!
 fn make_dict_extending_router(
     component: WeakComponentInstance,
     dict: Dict,
     source_dict_router: Router,
 ) -> Router {
-    enum State {
-        /// The router hasn't been called yet or failed on a previous run, not doing work.
-        NotStarted { source_dict_router: Router },
-        /// Working on resolving the source dict and extending. Concurrent callers will block
-        /// on the future.
-        Working { fut: Shared<BoxFuture<'static, Result<Dict, RouteOrOpenError>>> },
-        /// Work has completed, and `dict` can be returned immediately.
-        Resolved,
-    }
-
-    let state_lock = Arc::new(sync::Mutex::new(State::NotStarted { source_dict_router }));
-    let route_fn = move |request: Request, completer: Completer| {
-        let Ok(component) = component.upgrade() else {
-            completer.complete(Err(RoutingError::from(
-                ComponentInstanceError::instance_not_found(component.moniker.clone()),
-            )
-            .into()));
-            return;
-        };
-
-        let mut state = state_lock.lock().unwrap();
-        if let State::NotStarted { source_dict_router } = &*state {
-            let state_lock = state_lock.clone();
-            let source_dict_router = source_dict_router.clone();
-            let component = component.clone();
-            let dict = dict.clone();
-            let fut = async move {
-                let res = async {
-                    let source_request = Request {
-                        relative_path: sandbox::Path::default(),
-                        availability: cm_types::Availability::Required,
-                        target: component.as_weak(),
-                    };
-                    let source_dict = match source_dict_router.route_async(source_request).await? {
-                        Capability::Dictionary(d) => d,
-                        _ => panic!("source_dict_router must return a Dict"),
-                    };
-                    let mut entries = dict.lock_entries();
-                    let source_entries = source_dict.lock_entries();
-                    for source_key in source_entries.keys() {
-                        if entries.contains_key(source_key.as_str()) {
-                            return Err(RoutingError::BedrockSourceDictionaryCollision.into());
-                        }
-                    }
-                    for (source_key, source_value) in &*source_entries {
-                        entries.insert(source_key.clone(), source_value.clone());
-                    }
-                    Ok(())
-                }
-                .await;
-                let mut state = state_lock.lock().unwrap();
-                match &res {
-                    Ok(_) => {
-                        *state = State::Resolved;
-                    }
-                    Err(_) => {
-                        // Reset state so next route attempt will retry.
-                        *state = State::NotStarted { source_dict_router };
-                    }
-                }
-                res.map(|()| dict)
-            };
-            *state = State::Working { fut: fut.boxed().shared() };
-        }
-        match &*state {
-            State::NotStarted { .. } => unreachable!("handled above"),
-            State::Resolved => Router::from_routable(dict.clone()).route(request, completer),
-            State::Working { fut } => {
-                let fut = fut.clone();
-                component.blocking_task_group().spawn(async move {
-                    match fut.await {
-                        Ok(dict) => {
-                            Router::from_routable(dict).route(request, completer);
-                        }
-                        Err(e) => {
-                            completer.complete(Err(e));
-                        }
-                    };
-                });
+    let did_combine = Arc::new(std::sync::Mutex::new(false));
+    let route_fn = move |request: Request| {
+        let source_dict_router = source_dict_router.clone();
+        let dict = dict.clone();
+        let did_combine = did_combine.clone();
+        let component = component.clone();
+        async move {
+            // If we've already combined then route from our dict.
+            if *did_combine.lock().unwrap() {
+                return dict.route(request).await;
             }
-        };
+
+            // Otherwise combine the two.
+            let source_request = Request {
+                relative_path: sandbox::Path::default(),
+                availability: cm_types::Availability::Required,
+                target: component,
+            };
+            let source_dict = match source_dict_router.route(source_request).await? {
+                Capability::Dictionary(d) => d,
+                _ => panic!("source_dict_router must return a Dict"),
+            };
+            {
+                let mut entries = dict.lock_entries();
+                let source_entries = source_dict.lock_entries();
+                for source_key in source_entries.keys() {
+                    if entries.contains_key(source_key.as_str()) {
+                        return Err(RouteOrOpenError::RoutingError(
+                            RoutingError::BedrockSourceDictionaryCollision,
+                        ));
+                    }
+                }
+                for (source_key, source_value) in &*source_entries {
+                    entries.insert(source_key.clone(), source_value.clone());
+                }
+            }
+            *did_combine.lock().unwrap() = true;
+            dict.route(request).await
+        }
+        .boxed()
     };
     Router::new(route_fn)
 }
@@ -410,7 +366,6 @@ fn extend_dict_with_use(
             let Some(child) = children.get(&child_name) else { return };
             let weak_child = WeakComponentInstance::new(child);
             new_forwarding_router_to_child(
-                component,
                 weak_child,
                 source_path.to_owned(),
                 RoutingError::use_from_child_expose_not_found(
@@ -469,49 +424,54 @@ fn use_from_parent_router(
     let component_input_capability = Router::from_routable(component_input.capabilities.clone())
         .with_path(source_path.iter_segments());
 
-    Router::new(move |request, completer| {
+    Router::new(move |request| {
         let source_path = source_path.clone();
         let component_input_capability = component_input_capability.clone();
         let Ok(component) = weak_component.upgrade() else {
-            return completer.complete(Err(RoutingError::from(
+            return std::future::ready(Err(RoutingError::from(
                 ComponentInstanceError::InstanceNotFound {
                     moniker: weak_component.moniker.clone(),
                 },
             )
-            .into()));
+            .into()))
+            .boxed();
         };
-        component.clone().blocking_task_group().spawn(async move {
-            let state = match component.lock_resolved_state().await {
-                Ok(state) => state,
-                Err(err) => {
-                    return completer.complete(Err(RoutingError::from(
-                        ComponentInstanceError::resolve_failed(component.moniker.clone(), err),
-                    )
-                    .into()))
-                }
+        async move {
+            let router = {
+                let state = match component.lock_resolved_state().await {
+                    Ok(state) => state,
+                    Err(err) => {
+                        return Err(RoutingError::from(ComponentInstanceError::resolve_failed(
+                            component.moniker.clone(),
+                            err,
+                        ))
+                        .into());
+                    }
+                };
+                // Try to get the capability from the incoming dict, which was passed when the child was
+                // started.
+                //
+                // Unlike the program input dict below that contains Routers created by
+                // component manager, the incoming dict may contain capabilities created externally.
+                // Currently there is no way to create a Router externally, so assume these
+                // are Open capabilities and convert them to Router here.
+                //
+                // TODO(https://fxbug.dev/319542502): Convert from the external Router type, once it
+                // exists.
+                state
+                    .incoming_dict
+                    .as_ref()
+                    .and_then(|dict| match dict.get_capability(source_path.iter_segments()) {
+                        Some(Capability::Open(o)) => Some(Router::from_routable(o)),
+                        _ => None,
+                    })
+                    // Try to get the capability from the component input dict, created from static
+                    // routes when the component was resolved.
+                    .unwrap_or(component_input_capability)
             };
-            // Try to get the capability from the incoming dict, which was passed when the child was
-            // started.
-            //
-            // Unlike the program input dict below that contains Routers created by
-            // component manager, the incoming dict may contain capabilities created externally.
-            // Currently there is no way to create a Router externally, so assume these
-            // are Open capabilities and convert them to Router here.
-            //
-            // TODO(https://fxbug.dev/319542502): Convert from the external Router type, once it
-            // exists.
-            let router = state
-                .incoming_dict
-                .as_ref()
-                .and_then(|dict| match dict.get_capability(source_path.iter_segments()) {
-                    Some(Capability::Open(o)) => Some(Router::from_routable(o)),
-                    _ => None,
-                })
-                // Try to get the capability from the component input dict, created from static
-                // routes when the component was resolved.
-                .unwrap_or(component_input_capability);
-            router.route(request, completer);
-        });
+            router.route(request).await
+        }
+        .boxed()
     })
 }
 
@@ -560,7 +520,6 @@ fn extend_dict_with_offer(
             let Some(child) = children.get(&child_name) else { return };
             let weak_child = WeakComponentInstance::new(child);
             new_forwarding_router_to_child(
-                component,
                 weak_child,
                 source_path.to_owned(),
                 RoutingError::offer_from_child_expose_not_found(
@@ -641,7 +600,6 @@ fn extend_dict_with_expose(
             if let Some(child) = children.get(&child_name) {
                 let weak_child = WeakComponentInstance::new(child);
                 new_forwarding_router_to_child(
-                    component,
                     weak_child,
                     source_path.to_owned(),
                     RoutingError::expose_from_child_expose_not_found(
@@ -693,24 +651,22 @@ fn extend_dict_with_expose(
 }
 
 fn new_unit_router() -> Router {
-    Router::new(|_: Request, completer: Completer| completer.complete(Ok(Unit {}.into())))
+    Router::new_non_async(|_: Request| Ok(Unit {}.into()))
 }
 
 fn new_forwarding_router_to_child(
-    component: &Arc<ComponentInstance>,
     weak_child: WeakComponentInstance,
     capability_path: impl IterablePath + 'static,
     expose_not_found_error: RoutingError,
 ) -> Router {
-    let task_group = component.nonblocking_task_group().as_weak();
-    Router::new(move |request: Request, completer: Completer| {
-        task_group.spawn(forward_request_to_child(
+    Router::new(move |request: Request| {
+        forward_request_to_child(
             weak_child.clone(),
             capability_path.clone(),
             expose_not_found_error.clone(),
             request,
-            completer,
-        ));
+        )
+        .boxed()
     })
 }
 
@@ -719,26 +675,19 @@ async fn forward_request_to_child(
     capability_path: impl IterablePath + 'static,
     expose_not_found_error: RoutingError,
     request: Request,
-    completer: Completer,
-) {
-    let mut completer = Some(completer);
-    let res: Result<(), RoutingError> = async {
-        let child = weak_child.upgrade()?;
-        let child_state = child
-            .lock_resolved_state()
-            .await
-            .map_err(|e| ComponentInstanceError::resolve_failed(child.moniker.clone(), e))?;
-        if let Some(router) =
-            child_state.component_output_dict.get_router(capability_path.iter_segments())
-        {
-            router.route(request, completer.take().unwrap());
-            return Ok(());
+) -> Result<Capability, RouteOrOpenError> {
+    let router = {
+        let child = weak_child.upgrade().map_err(|e| RoutingError::ComponentInstanceError(e))?;
+        let child_state = child.lock_resolved_state().await.map_err(|e| {
+            RoutingError::ComponentInstanceError(ComponentInstanceError::resolve_failed(
+                child.moniker.clone(),
+                e,
+            ))
+        })?;
+        match child_state.component_output_dict.get_router(capability_path.iter_segments()) {
+            Some(router) => router,
+            None => return Err(expose_not_found_error.clone().into()),
         }
-        return Err(expose_not_found_error.clone().into());
-    }
-    .await;
-
-    if let Err(err) = res {
-        completer.take().unwrap().complete(Err(err.into()));
-    }
+    };
+    router.route(request).await
 }

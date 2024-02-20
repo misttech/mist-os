@@ -5,16 +5,15 @@
 use crate::capability::CapabilitySource;
 use crate::model::{component::WeakComponentInstance, error::RouteOrOpenError};
 use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
+use async_trait::async_trait;
 use cm_types::Availability;
 use cm_util::TaskGroup;
 use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
-use futures::{
-    channel::oneshot::{self, Canceled},
-    Future,
-};
+use futures::future::BoxFuture;
+use futures::FutureExt;
 use sandbox::{AnyCapability, Capability, CapabilityTrait, Dict, Open, Path};
 use std::{fmt, sync::Arc};
 use vfs::execution_scope::ExecutionScope;
@@ -22,8 +21,9 @@ use zx::HandleBased;
 
 /// Types that implement [`Routable`] let the holder asynchronously request
 /// capabilities from them.
-pub trait Routable {
-    fn route(&self, request: Request, completer: Completer);
+#[async_trait]
+pub trait Routable: Send + Sync {
+    async fn route(&self, request: Request) -> Result<Capability, RouteOrOpenError>;
 }
 
 /// A [`Router`] is a capability that lets the holder obtain other capabilities
@@ -39,7 +39,8 @@ pub struct Router {
 
 /// [`RouteFn`] encapsulates arbitrary logic to fulfill a request to asynchronously
 /// obtain a capability.
-pub type RouteFn = dyn Fn(Request, Completer) -> () + Send + Sync;
+pub type RouteFn =
+    dyn Fn(Request) -> BoxFuture<'static, Result<Capability, RouteOrOpenError>> + Send + Sync;
 
 /// [`Request`] contains metadata around how to obtain a capability.
 #[derive(Debug, Clone)]
@@ -73,16 +74,17 @@ impl From<Router> for Capability {
 
 /// If `T` is [`Routable`], then a `Weak<T>` is also [`Routable`], except the request
 /// may fail if the weak pointer has expired.
+#[async_trait]
 impl<T> Routable for std::sync::Weak<T>
 where
     T: Routable + Send + Sync + 'static,
 {
-    fn route(&self, request: Request, completer: Completer) {
+    async fn route(&self, request: Request) -> Result<Capability, RouteOrOpenError> {
         match self.upgrade() {
             Some(routable) => {
-                routable.route(request, completer);
+                return routable.route(request).await;
             }
-            None => completer.complete(Err(RoutingError::BedrockObjectDestroyed.into())),
+            None => return Err(RoutingError::BedrockObjectDestroyed.into()),
         }
     }
 }
@@ -91,18 +93,24 @@ impl Router {
     /// Creates a router that calls the provided function to route a request.
     pub fn new<F>(route_fn: F) -> Self
     where
-        F: Fn(Request, Completer) -> () + Send + Sync + 'static,
+        F: Fn(Request) -> BoxFuture<'static, Result<Capability, RouteOrOpenError>>
+            + Send
+            + Sync
+            + 'static,
     {
         Router { route_fn: Arc::new(route_fn) }
     }
 
+    pub fn new_non_async<F>(route_fn: F) -> Self
+    where
+        F: Fn(Request) -> Result<Capability, RouteOrOpenError> + Send + Sync + 'static,
+    {
+        Router::new(move |request: Request| std::future::ready(route_fn(request)).boxed())
+    }
+
     /// Creates a router that will always fail a request with the provided error.
     pub fn new_error(error: RouteOrOpenError) -> Self {
-        Router {
-            route_fn: Arc::new(move |_request, completer| {
-                completer.complete(Err(error.clone()));
-            }),
-        }
+        Router::new_non_async(move |_request| Err(error.clone()))
     }
     pub fn from_any(any: AnyCapability) -> Router {
         *any.into_any().downcast::<Router>().unwrap()
@@ -110,22 +118,17 @@ impl Router {
 
     /// Package a [`Routable`] object into a [`Router`].
     pub fn from_routable<T: Routable + Send + Sync + 'static>(routable: T) -> Router {
-        let route_fn = move |request, completer| {
-            routable.route(request, completer);
+        let routable = Arc::new(routable);
+        let route_fn = move |request| {
+            let routable = routable.clone();
+            async move { routable.route(request).await }.boxed()
         };
         Router::new(route_fn)
     }
 
     /// Obtain a capability from this router, following the description in `request`.
-    pub fn route(&self, request: Request, completer: Completer) {
-        (self.route_fn)(request, completer)
-    }
-
-    /// Obtain a capability this router, following the description in `request`.
-    pub async fn route_async(&self, request: Request) -> Result<Capability, RouteOrOpenError> {
-        let (fut, completer) = Completer::new();
-        self.route(request, completer);
-        fut.await
+    pub async fn route(&self, request: Request) -> Result<Capability, RouteOrOpenError> {
+        (self.route_fn)(request).await
     }
 
     /// Returns an router that requests capabilities from the specified `path` relative
@@ -136,11 +139,12 @@ impl Router {
         if segments.is_empty() {
             return self;
         }
-        let route_fn = move |mut request: Request, completer: Completer| {
+        let route_fn = move |mut request: Request| {
             for name in &segments {
                 request.relative_path.prepend(name.clone());
             }
-            self.route(request, completer);
+            let router = self.clone();
+            async move { router.route(request).await }.boxed()
         };
         Router::new(route_fn)
     }
@@ -148,18 +152,23 @@ impl Router {
     /// Returns a router that ensures the capability request has an availability
     /// strength that is at least the provided `availability`.
     pub fn with_availability(self, availability: Availability) -> Router {
-        let route_fn = move |mut request: Request, completer: Completer| {
-            // The availability of the request must be compatible with the
-            // availability of this step of the route.
-            let mut state = ::routing::availability::AvailabilityState(request.availability);
-            match state.advance(&availability) {
-                Ok(()) => {
-                    request.availability = state.0;
-                    // Everything checks out, forward the request.
-                    self.route(request, completer);
+        let route_fn = move |mut request: Request| {
+            let router = self.clone();
+            async move {
+                // The availability of the request must be compatible with the
+                // availability of this step of the route.
+                let mut state = ::routing::availability::AvailabilityState(request.availability);
+                match state.advance(&availability) {
+                    Ok(()) => {
+                        request.availability = state.0;
+                        // Everything checks out, forward the request.
+                        let res = router.route(request).await;
+                        res
+                    }
+                    Err(e) => Err(RoutingError::from(e).into()),
                 }
-                Err(e) => completer.complete(Err(RoutingError::from(e).into())),
             }
+            .boxed()
         };
         Router::new(route_fn)
     }
@@ -250,7 +259,7 @@ impl Router {
                 let errors_fn = errors_fn.clone();
                 routing_task_group.spawn(async move {
                     // Request a capability from the `router`.
-                    let result = router.route_async(request).await;
+                    let result = router.route(request).await;
                     match result {
                         Ok(capability) => {
                             // HACK: Dict needs special casing because [Dict::try_into_open]
@@ -347,40 +356,25 @@ impl From<Router> for fsandbox::Capability {
     }
 }
 
-/// The completer pattern avoids boxing futures at each router in the chain.
-/// Instead of building a chain of boxed futures during recursive route calls,
-/// each router can pass the completer buck to the next router.
-pub struct Completer {
-    sender: oneshot::Sender<Result<Capability, RouteOrOpenError>>,
-}
-
-impl Completer {
-    pub fn complete(self, result: Result<Capability, RouteOrOpenError>) {
-        let _ = self.sender.send(result);
-    }
-
-    pub fn new() -> (impl Future<Output = Result<Capability, RouteOrOpenError>>, Self) {
-        let (sender, receiver) = oneshot::channel();
-        let fut = async move {
-            let result: Result<_, Canceled> = receiver.await;
-            let capability = result.map_err(|_| RoutingError::BedrockRoutingRequestCanceled)??;
-            Ok(capability)
-        };
-        (fut, Completer { sender })
+fn try_routable_from_enum(capability: Capability) -> Option<Router> {
+    match capability {
+        Capability::Dictionary(c) => Some(Router::from_routable(c)),
+        Capability::Open(c) => Some(Router::from_routable(c)),
+        Capability::Router(c) => Some(Router::from_any(c)),
+        _ => None,
     }
 }
 
+#[async_trait]
 impl Routable for Capability {
-    fn route(&self, request: Request, completer: Completer) {
-        match self {
-            Capability::Dictionary(d) => d.route(request, completer),
-            Capability::Open(o) => o.route(request, completer),
-            Capability::Router(r) => Router::from_any(r.clone()).route(request, completer),
-            capability => {
+    async fn route(&self, request: Request) -> Result<Capability, RouteOrOpenError> {
+        match try_routable_from_enum(self.clone()) {
+            Some(router) => router.route(request).await,
+            None => {
                 if request.relative_path.is_empty() {
-                    completer.complete(Ok(capability.clone()));
+                    Ok(self.clone())
                 } else {
-                    completer.complete(Err(RoutingError::BedrockUnsupportedCapability.into()))
+                    Err(RoutingError::BedrockUnsupportedCapability.into())
                 }
             }
         }
@@ -392,41 +386,35 @@ impl Routable for Capability {
 /// - If not, see if there's a entry corresponding to the next path segment, and
 ///   - Delegate the rest of the request to that entry.
 ///   - If no entry found, close the completer with an error.
+#[async_trait]
 impl Routable for Dict {
-    fn route(&self, mut request: Request, completer: Completer) {
+    async fn route(&self, mut request: Request) -> Result<Capability, RouteOrOpenError> {
         let Some(name) = request.relative_path.next() else {
-            completer.complete(Ok(self.clone().into()));
-            return;
+            return Ok(self.clone().into());
         };
-        let entries = self.lock_entries();
-        let Some(capability) = entries.get(&name) else {
-            completer
-                .complete(Err(
+        let capability = {
+            let entries = self.lock_entries();
+            let Some(capability) = entries.get(&name) else {
+                return Err(
                     RoutingError::BedrockNotPresentInDictionary { name: name.into() }.into()
-                ));
-            return;
+                );
+            };
+            capability.clone()
         };
-        let capability = capability.clone();
-        drop(entries);
-        capability.route(request, completer);
+        capability.route(request).await
     }
 }
 
+#[async_trait]
 impl Routable for Open {
     /// Each request from the router will yield an [`Open`]  with rights downscoped to
     /// `request.rights` and paths relative to `request.relative_path`.
-    fn route(&self, request: Request, completer: Completer) {
+    async fn route(&self, request: Request) -> Result<Capability, RouteOrOpenError> {
         let mut open = self.clone();
         if !request.relative_path.is_empty() {
             open = open.downscope_path(request.relative_path);
         }
-        completer.complete(Ok(open.into()));
-    }
-}
-
-impl Routable for Router {
-    fn route(&self, request: Request, completer: Completer) {
-        self.route(request, completer);
+        Ok(open.into())
     }
 }
 
@@ -446,16 +434,15 @@ impl PolicyCheckRouter {
     }
 }
 
+#[async_trait]
 impl Routable for PolicyCheckRouter {
-    fn route(&self, request: Request, completer: Completer) {
+    async fn route(&self, request: Request) -> Result<Capability, RouteOrOpenError> {
         match self
             .policy_checker
             .can_route_capability(&self.capability_source, &request.target.moniker)
         {
-            Ok(()) => self.router.route(request, completer),
-            Err(policy_error) => {
-                completer.complete(Err(RoutingError::PolicyError(policy_error).into()));
-            }
+            Ok(()) => self.router.route(request).await,
+            Err(policy_error) => Err(RoutingError::PolicyError(policy_error).into()),
         }
     }
 }
@@ -473,7 +460,7 @@ mod tests {
         let base = Router::from_routable(source);
         let proxy = base.with_availability(Availability::Optional);
         let capability = proxy
-            .route_async(Request {
+            .route(Request {
                 relative_path: Path::default(),
                 availability: Availability::Optional,
                 target: WeakComponentInstance::invalid(),
@@ -493,7 +480,7 @@ mod tests {
         let base = Router::from_routable(source);
         let proxy = base.with_availability(Availability::Optional);
         let error = proxy
-            .route_async(Request {
+            .route(Request {
                 relative_path: Path::default(),
                 availability: Availability::Required,
                 target: WeakComponentInstance::invalid(),
@@ -514,11 +501,10 @@ mod tests {
         // We want to test vending a sender with a router, dropping the associated receiver, and
         // then using the sender. The objective is to observe an error, and not panic.
         let (receiver, sender) = Receiver::new();
-        let router =
-            Router::new(move |_request, completer| completer.complete(Ok(sender.clone().into())));
+        let router = Router::new_non_async(move |_request| Ok(sender.clone().into()));
 
         let capability = router
-            .route_async(Request {
+            .route(Request {
                 relative_path: Path::default(),
                 availability: Availability::Required,
                 target: WeakComponentInstance::invalid(),
@@ -551,7 +537,7 @@ mod tests {
         let downscoped_router = base_router.with_path(iter::once("dict1"));
 
         let capability = downscoped_router
-            .route_async(Request {
+            .route(Request {
                 relative_path: Path::new("source"),
                 availability: Availability::Optional,
                 target: WeakComponentInstance::invalid(),
@@ -581,7 +567,7 @@ mod tests {
         let downscoped_router = base_router.with_path(vec!["dict3", "dict2"].into_iter());
 
         let capability = downscoped_router
-            .route_async(Request {
+            .route(Request {
                 relative_path: Path::new("dict1/source"),
                 availability: Availability::Optional,
                 target: WeakComponentInstance::invalid(),

@@ -25,7 +25,7 @@ use {
         namespace::create_namespace,
         routing::{
             self,
-            router::{Completer, Request, Routable, Router},
+            router::{Request, Routable, Router},
             service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
         },
         routing_fns::route_fn,
@@ -1716,12 +1716,12 @@ impl ResolvedInstanceState {
         }
         let outgoing_dict = Self::build_program_outgoing_dict(component, &decl.capabilities);
         let weak_component = WeakComponentInstance::new(component);
-        Router::new(move |mut request, completer| {
+        Router::new(move |mut request| {
             if let Ok(component) = weak_component.upgrade() {
                 let component_clone = component.clone();
                 let outgoing_dict = outgoing_dict.clone();
                 let capability_name = capability_name.clone();
-                component.nonblocking_task_group().spawn(async move {
+                async move {
                     let target_moniker = request.target.moniker.clone();
                     request.relative_path.prepend(capability_name.to_string());
 
@@ -1737,18 +1737,20 @@ impl ResolvedInstanceState {
                         )
                         .await
                     {
-                        Ok(_) => outgoing_dict.route(request, completer),
-                        Err(e) => completer.complete(Err(OpenError::from(
-                            CapabilityProviderError::from(ComponentProviderError::from(e)),
-                        )
-                        .into())),
+                        Ok(_) => outgoing_dict.route(request).await,
+                        Err(e) => Err(OpenError::from(CapabilityProviderError::from(
+                            ComponentProviderError::from(e),
+                        ))
+                        .into()),
                     }
-                });
+                }
+                .boxed()
             } else {
-                completer.complete(Err(OpenError::from(CapabilityProviderError::from(
+                std::future::ready(Err(OpenError::from(CapabilityProviderError::from(
                     ComponentProviderError::SourceInstanceNotFound,
                 ))
-                .into()));
+                .into()))
+                .boxed()
             }
         })
     }
@@ -1773,11 +1775,8 @@ impl ResolvedInstanceState {
             let name = capability.name().as_str();
             let path = fuchsia_fs::canonicalize_path(path.as_str());
             let open = outgoing_dir.clone().downscope_path(sandbox::Path::new(path));
-            let router = Router::from_routable(open).with_capability_requested_hook(
-                component.nonblocking_task_group(),
-                weak_component.clone(),
-                capability.name().clone(),
-            );
+            let router = open
+                .with_capability_requested_hook(weak_component.clone(), capability.name().clone());
             dict.insert_capability(iter::once(name), router.into());
         }
         dict
@@ -2538,34 +2537,31 @@ impl ComponentRuntime {
 trait RouterExt: Routable + Clone + Send + Sync + 'static {
     /// Returns a router that delegates to the event system if the capability request is
     /// intercepted by some hook, and delegates to the current router otherwise.
-    fn with_capability_requested_hook(
-        self,
-        task_group: TaskGroup,
-        source: WeakComponentInstance,
-        name: Name,
-    ) -> Router {
+    fn with_capability_requested_hook(self, source: WeakComponentInstance, name: Name) -> Router {
         let name = name.to_string();
-        let route_fn = move |request: Request, completer: Completer| {
+        let route_fn = move |request: Request| {
             let source = match source.upgrade() {
                 Ok(component) => component,
                 Err(_) => {
-                    return completer.complete(Err(OpenError::from(
+                    return std::future::ready(Err(OpenError::from(
                         CapabilityProviderError::from(
                             ComponentProviderError::SourceInstanceNotFound,
                         ),
                     )
-                    .into()));
+                    .into()))
+                    .boxed();
                 }
             };
             let target = match request.target.upgrade() {
                 Ok(component) => component,
                 Err(_) => {
-                    return completer.complete(Err(OpenError::from(
+                    return std::future::ready(Err(OpenError::from(
                         CapabilityProviderError::from(
                             ComponentProviderError::TargetInstanceNotFound,
                         ),
                     )
-                    .into()));
+                    .into()))
+                    .boxed();
                 }
             };
             let (receiver, sender) = CapabilityReceiver::new();
@@ -2578,14 +2574,15 @@ trait RouterExt: Routable + Clone + Send + Sync + 'static {
                 },
             );
             let router = self.clone();
-            task_group.spawn(async move {
+            async move {
                 source.hooks.dispatch(&event).await;
                 if receiver.is_taken() {
-                    completer.complete(Ok(sender.into()))
+                    Ok(sender.into())
                 } else {
-                    router.route(request, completer)
+                    router.route(request).await
                 }
-            });
+            }
+            .boxed()
         };
         Router::new(route_fn)
     }

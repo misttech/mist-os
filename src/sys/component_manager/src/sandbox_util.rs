@@ -5,7 +5,7 @@
 use {
     crate::model::{
         component::{ComponentInstance, WeakComponentInstance},
-        routing::router::{Completer, Request, Router},
+        routing::router::{Request, Router},
     },
     crate::PathBuf,
     ::routing::{
@@ -259,8 +259,8 @@ impl LaunchTaskOnReceive {
 
     pub fn into_router(self) -> Router {
         let me = Arc::new(self);
-        Router::new(move |request: Request, completer: Completer| {
-            completer.complete(Ok(me.clone().into_open(request.target).into()));
+        Router::new_non_async(move |request: Request| {
+            Ok(me.clone().into_open(request.target).into())
         })
     }
 
