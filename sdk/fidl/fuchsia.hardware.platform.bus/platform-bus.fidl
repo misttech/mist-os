@@ -4,7 +4,6 @@
 library fuchsia.hardware.platform.bus;
 
 using zx;
-using fuchsia.device.manager;
 using fuchsia.driver.framework;
 using fuchsia.hardware.power;
 
@@ -204,16 +203,6 @@ closed protocol PlatformBus {
 
     strict RegisterSysSuspendCallback(resource struct {
         suspend_cb client_end:SysSuspend;
-    }) -> () error zx.Status;
-
-    /// Adds a composite platform device to the bus.
-    /// This will not implicitly include the platform device specified by |dev|
-    /// in the final composite.
-    /// Deprecated, prefer to use |NodeAdd| and |AddCompositeNodeSpec|.
-    strict AddComposite(struct {
-        node Node;
-        fragments vector<fuchsia.device.manager.DeviceFragment>:MAX;
-        primary_fragment string:<MAX, optional>;
     }) -> () error zx.Status;
 
     /// Adds a composite node specification that has |node| as one of the

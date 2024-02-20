@@ -63,9 +63,7 @@ class FakePlatformBus final : public fdf::Server<fuchsia_hardware_platform_bus::
                          SetBootloaderInfoCompleter::Sync& completer) override {
     completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
-  void AddComposite(AddCompositeRequest& request, AddCompositeCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
+
   void RegisterSysSuspendCallback(RegisterSysSuspendCallbackRequest& request,
                                   RegisterSysSuspendCallbackCompleter::Sync& completer) override {
     completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));

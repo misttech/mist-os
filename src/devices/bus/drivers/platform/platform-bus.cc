@@ -5,15 +5,8 @@
 #include "src/devices/bus/drivers/platform/platform-bus.h"
 
 #include <assert.h>
-#include <fidl/fuchsia.boot/cpp/wire.h>
-#include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
-#include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.platform.bus/cpp/markers.h>
-#include <fidl/fuchsia.sysinfo/cpp/wire_types.h>
-#include <lib/async/cpp/task.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -22,10 +15,6 @@
 #include <lib/zbi-format/board.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/zbi.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <zircon/errors.h>
 #include <zircon/process.h>
 #include <zircon/status.h>
@@ -35,7 +24,6 @@
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
-#include <ddktl/device.h>
 #include <ddktl/fidl.h>
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
@@ -481,132 +469,6 @@ void PlatformBus::RegisterSysSuspendCallback(RegisterSysSuspendCallbackRequestVi
                                              RegisterSysSuspendCallbackCompleter::Sync& completer) {
   suspend_cb_.Bind(std::move(request->suspend_cb),
                    fdf::Dispatcher::GetCurrent()->async_dispatcher());
-  completer.buffer(arena).ReplySuccess();
-}
-
-namespace {
-struct CompositeFragmentData {
-  std::vector<std::vector<zx_bind_inst_t>> match_programs;
-  std::vector<device_fragment_part_t> fragment_parts;
-  std::string name;
-};
-
-// Given |desc|, populates |fragments| with fragments. The return value contains ancillary data for
-// the fragment definitions and must live as long as the |fragments| array is used.
-zx::result<std::vector<CompositeFragmentData>> ConvertFidlFragments(
-    fidl::VectorView<fuchsia_device_manager::wire::DeviceFragment> fragments_list,
-    cpp20::span<device_fragment_t> fragments) {
-  if (fragments_list.count() > fragments.size()) {
-    zxlogf(ERROR, "Too many fragments requested.");
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-
-  std::vector<CompositeFragmentData> ret(fragments_list.count());
-  // Convert the FIDL composite definition to a C one for the driver framework.
-  for (size_t i = 0; i < fragments_list.count(); i++) {
-    CompositeFragmentData& data = ret[i];
-    // How many fragment parts (and match programs) are there?
-    const size_t num_parts = fragments_list[i].parts.count();
-    data.fragment_parts.resize(num_parts);
-    data.match_programs.resize(num_parts);
-    // Store the fragment name as a null-terminated string.
-    data.name = fragments_list[i].name.get();
-
-    auto& parts = data.fragment_parts;
-    auto& programs = data.match_programs;
-
-    // For each part...
-    for (size_t j = 0; j < num_parts; j++) {
-      // Convert the match program to the C zx_bind_inst_t.
-      auto program = fragments_list[i].parts[j].match_program;
-      std::vector<zx_bind_inst_t> dst{program.count()};
-      for (size_t k = 0; k < program.count(); k++) {
-        dst[k].arg = program[k].arg;
-        dst[k].debug = program[k].debug;
-        dst[k].op = program[k].op;
-      }
-
-      // Store the program in the vector and create a device_fragment_part_t.
-      programs[j] = std::move(dst);
-      parts[j] = device_fragment_part_t{
-          .instruction_count = static_cast<uint32_t>(programs[j].size()),
-          .match_program = programs[j].data(),
-      };
-    }
-
-    // Update the fragment info after we've converted all of the parts.
-    fragments[i].name = data.name.data();
-    fragments[i].parts_count = static_cast<uint32_t>(num_parts);
-    fragments[i].parts = data.fragment_parts.data();
-  }
-
-  return zx::ok(std::move(ret));
-}
-}  // namespace
-
-void PlatformBus::AddComposite(AddCompositeRequestView request, fdf::Arena& arena,
-                               AddCompositeCompleter::Sync& completer) {
-  auto pdev = request->node;
-  const zx_device_prop_t props[] = {
-      {BIND_PLATFORM_DEV_VID, 0, pdev.has_vid() ? pdev.vid() : 0},
-      {BIND_PLATFORM_DEV_PID, 0, pdev.has_pid() ? pdev.pid() : 0},
-      {BIND_PLATFORM_DEV_DID, 0, pdev.has_did() ? pdev.did() : 0},
-      {BIND_PLATFORM_DEV_INSTANCE_ID, 0, pdev.has_instance_id() ? pdev.instance_id() : 0},
-  };
-
-  std::vector<device_fragment_t> fragments(request->fragments.count());
-  std::string primary_fragment(request->primary_fragment.get());
-
-  auto ret = ConvertFidlFragments(request->fragments, cpp20::span(fragments));
-  if (ret.is_error()) {
-    completer.buffer(arena).ReplyError(ret.error_value());
-    return;
-  }
-
-  const bool is_primary_pdev = primary_fragment == "pdev";
-  const composite_device_desc_t comp_desc = {
-      .props = props,
-      .props_count = std::size(props),
-      .fragments = fragments.data(),
-      .fragments_count = fragments.size(),
-      .primary_fragment = primary_fragment.data(),
-      .spawn_colocated = !is_primary_pdev,
-      .metadata_list = nullptr,
-      .metadata_count = 0,
-  };
-  if (!request->node.has_name()) {
-    completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
-    return;
-  }
-
-  zx_status_t status = DdkAddComposite(std::string(request->node.name().get()).data(), &comp_desc);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s DdkAddComposite failed %d", __FUNCTION__, status);
-    completer.buffer(arena).ReplyError(status);
-    return;
-  }
-
-  std::unique_ptr<platform_bus::PlatformDevice> dev;
-  auto natural = fidl::ToNatural(request->node);
-  auto valid = ValidateResources(natural);
-  if (valid.is_error()) {
-    completer.buffer(arena).ReplyError(valid.error_value());
-    return;
-  }
-  status =
-      PlatformDevice::Create(std::move(natural), zxdev(), this, PlatformDevice::Fragment, &dev);
-  if (status != ZX_OK) {
-    completer.buffer(arena).ReplyError(status);
-    return;
-  }
-  status = dev->Start();
-  if (status != ZX_OK) {
-    completer.buffer(arena).ReplyError(status);
-    return;
-  }
-  // devmgr is now in charge of the device.
-  [[maybe_unused]] auto* dummy = dev.release();
-
   completer.buffer(arena).ReplySuccess();
 }
 

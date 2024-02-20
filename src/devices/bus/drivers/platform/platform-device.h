@@ -54,9 +54,6 @@ class RestrictPlatformBus : public fdf::WireServer<fuchsia_hardware_platform_bus
 
   void RegisterSysSuspendCallback(RegisterSysSuspendCallbackRequestView request, fdf::Arena& arena,
                                   RegisterSysSuspendCallbackCompleter::Sync& completer) override;
-  void AddComposite(AddCompositeRequestView request, fdf::Arena& arena,
-                    AddCompositeCompleter::Sync& completer) override;
-
   void AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, fdf::Arena& arena,
                             AddCompositeNodeSpecCompleter::Sync& completer) override;
 

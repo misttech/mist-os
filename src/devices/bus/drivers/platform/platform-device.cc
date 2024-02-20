@@ -116,10 +116,6 @@ void RestrictPlatformBus::RegisterSysSuspendCallback(
     RegisterSysSuspendCallbackCompleter::Sync& completer) {
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
-void RestrictPlatformBus::AddComposite(AddCompositeRequestView request, fdf::Arena& arena,
-                                       AddCompositeCompleter::Sync& completer) {
-  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
 void RestrictPlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request,
                                                fdf::Arena& arena,
                                                AddCompositeNodeSpecCompleter::Sync& completer) {

@@ -13,7 +13,6 @@
 #include <fuchsia/hardware/iommu/cpp/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/device.h>
-#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/channel.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/sync/completion.h>
@@ -23,19 +22,11 @@
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
-#include <stdint.h>
-#include <threads.h>
 #include <zircon/types.h>
 
-#include <map>
-#include <optional>
-#include <vector>
-
-#include <ddktl/device.h>
 #include <fbl/array.h>
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
-#include <fbl/vector.h>
 #include <sdk/lib/component/outgoing/cpp/outgoing_directory.h>
 
 #include "platform-device.h"
@@ -77,8 +68,6 @@ class PlatformBus : public PlatformBusType,
 
   void RegisterSysSuspendCallback(RegisterSysSuspendCallbackRequestView request, fdf::Arena& arena,
                                   RegisterSysSuspendCallbackCompleter::Sync& completer) override;
-  void AddComposite(AddCompositeRequestView request, fdf::Arena& arena,
-                    AddCompositeCompleter::Sync& completer) override;
   void AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, fdf::Arena& arena,
                             AddCompositeNodeSpecCompleter::Sync& completer) override;
 
