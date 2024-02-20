@@ -43,6 +43,10 @@ type FeatureConfig = table {
     /// `detailed_logging_enabled` is set to true.
     @available(added=12)
     5: detailed_logging_level DetailedLoggingLevel;
+
+    /// Determines if DHCPv6-PD is enabled or disabled.
+    @available(added=18)
+    6: dhcpv6_pd_enabled bool;
 };
 
 /// Protocol for connecting to [`Feature`] on a LoWPAN device.
