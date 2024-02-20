@@ -664,7 +664,7 @@ constexpr uint8_t lcd_init_sequence_BOE_TV070WSM_FITIPOWER_JD9365[] = {
     // provided by the internal charge pump (CP).
     kMipiDsiDtGenShortWrite2, 2, 0x55, 0x02,
     //
-    // Sets the AUTO_RT register to 0.
+    // Sets the AUTO_RT register to false.
     // The auto pumping ratio function is disabled. The charge pump circuit
     // will not detect voltage of VCI to select suitable ratio for the charge
     // pump circuit.
@@ -1137,44 +1137,44 @@ constexpr uint8_t lcd_init_sequence_BOE_TV070WSM_FITIPOWER_JD9365[] = {
     //
     // Sets STV_S0[10:0] to 0x007.
     // Sets the initial phase of the first vertical start pulse signal (STV0).
-    // The first vertical start pulse signal (STV0) is emitted 7 lines after
-    // the beginning of a vertical sync pulse.
+    // The first vertical start pulse signal (STV0) is emitted 1 + 7 = 8 lines
+    // after the beginning of a vertical sync pulse.
     kMipiDsiDtGenShortWrite2, 2, 0x5b, 0x10,
     kMipiDsiDtGenShortWrite2, 2, 0x5c, 0x07,
     //
     // Sets STV_W[3:0] to 0x2.
     // The duration (width) of all the vertical start pulse signals are
-    //   1 + STV_W[3:0] = 1 + 2 = 3 pixel clocks.
+    //   1 + STV_W[3:0] = 1 + 2 = 3 lines.
     //
     // Sets STV_S1[2:0] to 0.
     // The phase difference between vertical start pulse signals STV0 and STV1
-    // is zero. Thus, the STV0 and STV1 signals are emitted at the same time.
+    // is 0 + 1 = 1 line.
     kMipiDsiDtGenShortWrite2, 2, 0x5d, 0x20,
     //
     // Sets STV_S2[4:0] to 0.
     // The phase difference between vertical start pulse signals STV0 and STV2
-    // is zero.
+    // is 0 + 1 = 1 line.
     // The STV2 signal is disabled, thus this register configuration won't take
     // effect.
     kMipiDsiDtGenShortWrite2, 2, 0x5e, 0x00,
     //
     // Sets STV_S3[4:0] to 0.
     // The phase difference between vertical start pulse signals STV0 and STV3
-    // is zero.
+    // is 0 + 1 = 1 line.
     // The STV3 signal is disabled, thus this register configuration won't take
     // effect.
     kMipiDsiDtGenShortWrite2, 2, 0x5f, 0x00,
     //
     // Sets ETV_S2[4:0] to 0.
     // The phase difference between vertical end pulse signals EVT0 and EVT2
-    // is zero.
+    // is 0 + 1 = 1 line.
     // The ETV (vertical end pulse) signals are not used by the panel.
     // This register configuration won't take effect.
     kMipiDsiDtGenShortWrite2, 2, 0x61, 0x00,
     //
     // Sets ETV_S3[4:0] to 0.
     // The phase difference between vertical end pulse signals EVT0 and EVT3
-    // is zero.
+    // is 0 + 1 = 1 line.
     // The ETV (vertical end pulse) signals are not used. This register
     // configuration won't take effect.
     kMipiDsiDtGenShortWrite2, 2, 0x62, 0x00,
@@ -1210,7 +1210,8 @@ constexpr uint8_t lcd_init_sequence_BOE_TV070WSM_FITIPOWER_JD9365[] = {
     kMipiDsiDtGenShortWrite2, 2, 0x66, 0x00,
     //
     // Sets CKV0_NUM[3:0] to 3.
-    // Enables 4 vertical clock (CKV) signals: CKV0, CKV1, CKV2 and CKV3.
+    // Enables 4 vertical clock (CKV) signals on the CKV signal group 0:
+    // CKV0, CKV1, CKV2 and CKV3.
     //
     // Sets CKV0_W[2:0] to 2.
     // The duration (width) of a vertical clock (CKV) signal is
@@ -1219,7 +1220,7 @@ constexpr uint8_t lcd_init_sequence_BOE_TV070WSM_FITIPOWER_JD9365[] = {
     //
     // Sets CKV0_S0[7:0] to 8.
     // Sets the initial phase of the first vertical clock signal (CKV0).
-    // The first vertical clock signal (CKV0) is emitted 8 pixels after
+    // The first vertical clock signal (CKV0) is emitted 1 + 8 = 9 lines after
     // the beginning of a vertical sync pulse.
     kMipiDsiDtGenShortWrite2, 2, 0x68, 0x08,
     //
@@ -1271,27 +1272,30 @@ constexpr uint8_t lcd_init_sequence_BOE_TV070WSM_FITIPOWER_JD9365[] = {
     //
     // Sets GIPDR[1:0] = 0b10, VGHO_SEL = 0, VGLO_SEL = 0, VGLO_SEL2 = 1,
     // CKV_GROUP = 0.
-    // The registers above are not documented.
+    // The registers above are not documented in the JD9365 user guide.
+    // JD9364 user guide states that CKV_GROUP = 0 indicates that all CKV
+    // signals belong to the CKV signal group 0. CKV1_* registers will not be
+    // effective.
     //
     // Sets CKV0_CON = 1.
     // Overrides the CKV0_DUM configuration. CKV signals CKV0-CKV3 always output
     // on blanking areas.
     //
     // Sets CKV1_CON = 0.
-    // Does not override the CKV1_DUM configuration. CKV1 signals (CKV8-CKV11)
-    // are not enabled, thus this register is not effective.
+    // Does not override the CKV1_DUM configuration. CKV1 signals are not
+    // enabled, thus this register is not effective.
     kMipiDsiDtGenShortWrite2, 2, 0x6f, 0x89,
     //
     // Sets CKV1_NUM[3:0] = 0.
-    // No CKV1 signal (CKV8-CKV11) is enabled.
+    // No signals from the CKV signal group 1 is enabled.
     //
     // Sets CKV1_W[3:0] = 0.
-    // The width (duration) of CKV1 signals is 0 pixels. No CKV1 signal is
-    // enabled, so this register is not effective.
+    // The width (duration) of CKV1 signals is 0 + 1 = 1 line. No CKV1 signal
+    // is enabled, so this register is not effective.
     kMipiDsiDtGenShortWrite2, 2, 0x70, 0x00,
     //
-    // Registers 0x70-0x74 further configure the vertical clock signals
-    // CKV8-CKV11.
+    // Registers 0x70-0x74 further configure the vertical clock signals of the
+    // CKV signal group 1.
     // Since these CKV signals are not enabled, the configuration registers
     // are not effective and are thus not documented.
     kMipiDsiDtGenShortWrite2, 2, 0x71, 0x00,
@@ -1299,7 +1303,7 @@ constexpr uint8_t lcd_init_sequence_BOE_TV070WSM_FITIPOWER_JD9365[] = {
     kMipiDsiDtGenShortWrite2, 2, 0x73, 0x7b,
     kMipiDsiDtGenShortWrite2, 2, 0x74, 0x00,
     //
-    // Sets FLM_EN to 0.
+    // Sets FLM_EN to false.
     // Disables the generation of the first line marker signal (FLM).
     //
     // Other fields on registers 0x75-0x78 further configure the first line
@@ -1308,7 +1312,7 @@ constexpr uint8_t lcd_init_sequence_BOE_TV070WSM_FITIPOWER_JD9365[] = {
     kMipiDsiDtGenShortWrite2, 2, 0x75, 0x07,
     kMipiDsiDtGenShortWrite2, 2, 0x76, 0x00,
     //
-    // Sets VEN_EN to 0.
+    // Sets VEN_EN to false.
     // Disables the generation of the VEN (Vertical enabled?) signal.
     //
     // Other fields on registers 0x77, 0x79-0x7e further configure the VEN
@@ -1381,13 +1385,13 @@ constexpr uint8_t lcd_init_sequence_BOE_TV070WSM_FITIPOWER_JD9365[] = {
     //
     // JD9365 datasheet Section 10.2.37, page 166
     //
-    // Sets BCTRL to 1.
+    // Sets BCTRL to true.
     // Enables the brightness control block.
     //
-    // Sets DD to 1.
+    // Sets DD to true.
     // Enables display dimming.
     //
-    // Sets BL to 1.
+    // Sets BL to true.
     // Enables the backlight control circuit.
     kMipiDsiDtGenShortWrite2, 2, 0x53, 0x2c,
 
