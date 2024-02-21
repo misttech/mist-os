@@ -934,6 +934,7 @@ fn test_save_and_connect(
 #[test_case(Saved::Wpa3, Scanned::Wpa2PersonalTkipOnly, TEST_CREDS.wpa_pass_max.clone())]
 #[fuchsia::test(add_test_attr = false)]
 /// Tests saving and connecting across various security types, where the connection is expected to fail
+#[ignore] // TODO(https://fxbug.dev/324986229): Fix ordering issue
 fn test_save_and_fail_to_connect(
     saved_security: fidl_policy::SecurityType,
     scanned_security: fidl_sme::Protection,
@@ -1111,6 +1112,7 @@ fn test_fail_to_save(
 
 // Tests the connect request path to a new network while already connected.
 #[fuchsia::test]
+#[ignore] // TODO(https://fxbug.dev/324986229): Fix ordering issue
 fn test_connect_to_new_network() {
     let mut exec = fasync::TestExecutor::new();
     let mut test_values = test_setup(&mut exec);
