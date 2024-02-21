@@ -883,7 +883,7 @@ void Device::InitReply(zx_status_t status) {
             // exported.
             status = ExportAfterInit();
             if (status != ZX_OK) {
-              FDF_LOGL(ERROR, *logger_, "Device %s failed to create node: %s",
+              FDF_LOGL(WARNING, *logger_, "Device %s failed to create node: %s",
                        topological_path_.c_str(), zx_status_get_string(status));
             }
           }
