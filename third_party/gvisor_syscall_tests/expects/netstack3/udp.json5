@@ -71,10 +71,13 @@
                 "AllUDPSockets/UDPSocketPairTest.IPPKTINFODefault/*",
                 "AllUDPSockets/UDPSocketPairTest.RecvTosDefault/*",
                 "AllInetTests/UdpSocketControlMessagesTest.SendAndReceiveTTLOrHopLimit/*",
-                "AllInetTests/UdpSocketControlMessagesTest.SetAndReceivePktInfo/*",
                 "AllInetTests/UdpSocketControlMessagesTest.SetAndReceiveTOSOrTClass/*",
                 "AllInetTests/UdpSocketControlMessagesTest.SetAndReceiveTTLOrHopLimit/*",
                 "AllUDPSockets/UDPSocketPairTest.TOSRecvMismatch/*",
+
+                // TODO(https://fxbug.dev/326281908): Support IP_PKTINFO.
+                "AllInetTests/UdpSocketControlMessagesTest.SetAndReceivePktInfo/0",
+                "AllInetTests/UdpSocketControlMessagesTest.SetAndReceivePktInfo/2",
 
                 // Netstack3 does not have complete support for multicast UDP sockets.
                 "AllUDPSockets/UDPSocketPairTest.MulticastLoopDefault/*",

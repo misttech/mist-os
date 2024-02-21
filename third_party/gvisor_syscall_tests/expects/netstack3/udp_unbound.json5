@@ -54,7 +54,6 @@
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToMcastThenSend/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestMcastReceptionOnTwoSockets/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestMcastReceptionWhenDroppingMemberships/*",
-                "IPv6UDPSockets/IPv6UDPUnboundSocketTest.IPv6PacketInfo/*",
                 "IPv6UDPSockets/IPv6UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
             ],
         },

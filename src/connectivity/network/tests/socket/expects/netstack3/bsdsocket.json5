@@ -172,18 +172,19 @@
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Datagram_IPPROTO_IPV6_IPV6_RECVHOPLIMIT",
 
                 // IPPROTO_IPV6_IPV6_RECVPKTINFO
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_IPPROTO_IPV6_IPV6_RECVPKTINFO",
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Datagram_IPPROTO_IPV6_IPV6_RECVPKTINFO",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Stream_IPPROTO_IPV6_IPV6_RECVPKTINFO",
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Datagram_IPPROTO_IPV6_IPV6_RECVPKTINFO",
-                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Stream_IPPROTO_IPV6_IPV6_RECVPKTINFO",
-                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Datagram_IPPROTO_IPV6_IPV6_RECVPKTINFO",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Stream_IPPROTO_IPV6_IPV6_RECVPKTINFO",
-                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Datagram_IPPROTO_IPV6_IPV6_RECVPKTINFO",
-                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Stream_IPPROTO_IPV6_IPV6_RECVPKTINFO",
-                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Datagram_IPPROTO_IPV6_IPV6_RECVPKTINFO",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Stream_IPPROTO_IPV6_IPV6_RECVPKTINFO",
-                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Datagram_IPPROTO_IPV6_IPV6_RECVPKTINFO",
+
+                // NB: Netstack3 disallows getting/setting the
+                // `IPV6_RECVPKTINFO` option on IPv4 sockets. This conforms with
+                // Linux, but diverges from Netstack2 (gVisor).
+                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Datagram_IPPROTO_IPV6_IPV6_RECVPKTINFO",
+                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Datagram_IPPROTO_IPV6_IPV6_RECVPKTINFO",
+                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Datagram_IPPROTO_IPV6_IPV6_RECVPKTINFO",
+                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_IPPROTO_IPV6_IPV6_RECVPKTINFO",
+                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Stream_IPPROTO_IPV6_IPV6_RECVPKTINFO",
+                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Stream_IPPROTO_IPV6_IPV6_RECVPKTINFO",
 
                 // SOL_SOCKET_SO_NO_CHECK
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_SOL_SOCKET_SO_NO_CHECK",

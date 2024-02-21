@@ -25,7 +25,7 @@ use explicit::ResultExt as _;
 use fidl::endpoints::RequestStream as _;
 use fuchsia_zircon::{self as zx, prelude::HandleBased as _, Peered as _};
 use net_types::{
-    ip::{Ip, IpVersion, Ipv4, Ipv6},
+    ip::{GenericOverIp, Ip, IpInvariant, IpVersion, Ipv4, Ipv6},
     MulticastAddr, SpecifiedAddr, ZonedAddr,
 };
 use netstack3_core::{
@@ -911,8 +911,47 @@ impl<I: Ip, T> BodyLen for AvailableMessage<I, T> {
     }
 }
 
+/// IP extension providing separate types of bindings data for IPv4 and IPv6.
+trait BindingsDataIpExt: Ip {
+    /// The version specific bindings data.
+    ///
+    /// [`Ipv4BindingsData`] for IPv4, and [`Ipv6BindingsData`] for IPv6.
+    type VersionSpecificData: Default
+        + Send
+        + GenericOverIp<Self, Type = Self::VersionSpecificData>
+        + GenericOverIp<Ipv4, Type = Ipv4BindingsData>
+        + GenericOverIp<Ipv6, Type = Ipv6BindingsData>;
+}
+
+impl BindingsDataIpExt for Ipv4 {
+    type VersionSpecificData = Ipv4BindingsData;
+}
+
+impl BindingsDataIpExt for Ipv6 {
+    type VersionSpecificData = Ipv6BindingsData;
+}
+
+/// Datagram bindings data specific to IPv4 sockets.
+#[derive(Default)]
+struct Ipv4BindingsData {
+    // NB: At the moment, IPv4 sockets don't need to hold any unique data.
+}
+impl<I: Ip + BindingsDataIpExt> GenericOverIp<I> for Ipv4BindingsData {
+    type Type = I::VersionSpecificData;
+}
+
+/// Datagram bindings data specific to IPv6 sockets.
+#[derive(Default)]
+struct Ipv6BindingsData {
+    // Corresponds to the IPV6_RECVPKTINFO socket option.
+    recv_pkt_info: bool,
+}
+impl<I: Ip + BindingsDataIpExt> GenericOverIp<I> for Ipv6BindingsData {
+    type Type = I::VersionSpecificData;
+}
+
 #[derive(Debug)]
-struct BindingData<I: Ip, T: Transport<I>> {
+struct BindingData<I: BindingsDataIpExt, T: Transport<I>> {
     peer_event: zx::EventPair,
     info: SocketControlInfo<I, T>,
     /// The queue for messages received on this socket.
@@ -920,6 +959,8 @@ struct BindingData<I: Ip, T: Transport<I>> {
     /// The message queue is held here and also in the [`SocketCollection`]
     /// to which the socket belongs.
     messages: Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>,
+    /// The bindings data specific to `I`.
+    version_specific_data: I::VersionSpecificData,
     /// If true, return the original received destination address in the control data.  This is
     /// modified using the SetIpReceiveOriginalDestinationAddress method (a.k.a. IP_RECVORIGDSTADDR)
     /// and is useful for transparent sockets (IP_TRANSPARENT).
@@ -928,7 +969,7 @@ struct BindingData<I: Ip, T: Transport<I>> {
 
 impl<I, T> BindingData<I, T>
 where
-    I: SocketCollectionIpExt<T> + IpExt + IpSockAddrExt,
+    I: SocketCollectionIpExt<T> + IpExt + IpSockAddrExt + BindingsDataIpExt,
     T: Transport<Ipv4>,
     T: Transport<Ipv6>,
     T: TransportState<I>,
@@ -959,6 +1000,7 @@ where
             peer_event,
             info: SocketControlInfo { _properties: properties, id },
             messages,
+            version_specific_data: I::VersionSpecificData::default(),
             ip_receive_original_destination_address: false,
         }
     }
@@ -1053,7 +1095,7 @@ impl worker::CloseResponder for fposix_socket::SynchronousDatagramSocketCloseRes
 
 impl<I, T> worker::SocketWorkerHandler for BindingData<I, T>
 where
-    I: SocketCollectionIpExt<T> + IpExt + IpSockAddrExt,
+    I: SocketCollectionIpExt<T> + IpExt + IpSockAddrExt + BindingsDataIpExt,
     T: Transport<Ipv4>,
     T: Transport<Ipv6>,
     T: TransportState<I>,
@@ -1104,14 +1146,14 @@ where
 {
 }
 /// A borrow into a [`SocketWorker`]'s state.
-struct RequestHandler<'a, I: Ip, T: Transport<I>> {
+struct RequestHandler<'a, I: BindingsDataIpExt, T: Transport<I>> {
     ctx: &'a mut crate::bindings::Ctx,
     data: &'a mut BindingData<I, T>,
 }
 
 impl<'a, I, T> RequestHandler<'a, I, T>
 where
-    I: SocketCollectionIpExt<T> + IpExt + IpSockAddrExt,
+    I: SocketCollectionIpExt<T> + IpExt + IpSockAddrExt + BindingsDataIpExt,
     T: Transport<Ipv4>,
     T: Transport<Ipv6>,
     T: TransportState<I>,
@@ -1564,15 +1606,17 @@ where
                 respond_not_supported!("syncudp::GetIpReceiveTypeOfService", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6ReceivePacketInfo {
-                value: _,
+                value,
                 responder,
             } => {
-                respond_not_supported!("syncudp::SetIpv6ReceivePacketInfo", responder)
+                responder.send(self.set_ipv6_recv_pkt_info(value))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6ReceivePacketInfo {
                 responder,
             } => {
-                respond_not_supported!("syncudp::GetIpv6ReceivePacketInfo", responder)
+                responder.send(self.get_ipv6_recv_pkt_info())
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpReceiveTtl {
                 value: _,
@@ -1634,6 +1678,7 @@ where
                     peer_event: _,
                     messages: _,
                     info: SocketControlInfo { _properties: _, id },
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
@@ -1667,6 +1712,7 @@ where
                     peer_event: _,
                     messages: _,
                     info: SocketControlInfo { _properties: _, id },
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
@@ -1692,6 +1738,7 @@ where
                     peer_event: _,
                     messages: _,
                     info: SocketControlInfo { _properties: _, id },
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
@@ -1710,6 +1757,7 @@ where
                     peer_event: _,
                     messages: _,
                     info: SocketControlInfo { _properties: _, id },
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
@@ -1746,6 +1794,7 @@ where
                     peer_event: _,
                     messages: _,
                     info: SocketControlInfo { _properties: _, id },
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
@@ -1772,6 +1821,7 @@ where
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
                     messages: _,
+                    version_specific_data,
                     ip_receive_original_destination_address,
                 },
         } = self;
@@ -1840,12 +1890,38 @@ where
                 .into_sock_addr(),
             );
         }
+
+        let IpInvariant(ipv6_control_data) = I::map_ip(
+            (version_specific_data, destination_addr, IpInvariant(interface_id)),
+            |(Ipv4BindingsData {}, _ipv4_dst_addr, _interface_id)| IpInvariant(None),
+            |(Ipv6BindingsData { recv_pkt_info }, ipv6_dst_addr, IpInvariant(interface_id))| {
+                let mut ipv6_control_data = None;
+                if *recv_pkt_info {
+                    ipv6_control_data
+                        .get_or_insert_with(|| fposix_socket::Ipv6RecvControlData::default())
+                        .pktinfo = Some(fposix_socket::Ipv6PktInfoRecvControlData {
+                        iface: interface_id.into(),
+                        header_destination_addr: ipv6_dst_addr.into_fidl(),
+                    })
+                }
+                // TODO(https://fxbug.dev/326102014): Support SOL_IPV6, IPV6_RECVTCLASS.
+                // TODO(https://fxbug.dev/326102020): Support SOL_IPV6, IPV6_RECVHOPLIMIT.
+                IpInvariant(ipv6_control_data)
+            },
+        );
+
         let mut network = None;
         if let Some(ip) = ip {
             network
                 .get_or_insert_with(|| fposix_socket::NetworkSocketRecvControlData::default())
                 .ip = Some(ip);
         }
+        if let Some(ipv6_control_data) = ipv6_control_data {
+            network
+                .get_or_insert_with(|| fposix_socket::NetworkSocketRecvControlData::default())
+                .ipv6 = Some(ipv6_control_data);
+        }
+
         let control_data =
             fposix_socket::DatagramSocketRecvControlData { network, ..Default::default() };
 
@@ -1870,6 +1946,7 @@ where
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
                     messages: _,
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
@@ -1898,6 +1975,7 @@ where
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
                     messages: _,
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
@@ -1918,6 +1996,7 @@ where
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
                     messages: _,
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
@@ -1942,6 +2021,7 @@ where
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
                     messages: _,
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
@@ -1956,10 +2036,32 @@ where
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
                     messages: _,
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
         T::get_dual_stack_enabled(ctx, id).map_err(IntoErrno::into_errno)
+    }
+
+    fn set_ipv6_recv_pkt_info(self, new: bool) -> Result<(), fposix::Errno> {
+        let correct_ip_version: Option<()> = I::map_ip(
+            &mut self.data.version_specific_data,
+            |_v4| None,
+            |Ipv6BindingsData { recv_pkt_info: old }| {
+                *old = new;
+                Some(())
+            },
+        );
+        correct_ip_version.ok_or(fposix::Errno::Enoprotoopt)
+    }
+
+    fn get_ipv6_recv_pkt_info(self) -> Result<bool, fposix::Errno> {
+        let correct_ip_version: Option<bool> = I::map_ip(
+            &self.data.version_specific_data,
+            |_v4| None,
+            |Ipv6BindingsData { recv_pkt_info }| Some(*recv_pkt_info),
+        );
+        correct_ip_version.ok_or(fposix::Errno::Eopnotsupp)
     }
 
     fn set_reuse_port(self, reuse_port: bool) -> Result<(), fposix::Errno> {
@@ -1970,6 +2072,7 @@ where
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
                     messages: _,
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
@@ -1984,6 +2087,7 @@ where
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
                     messages: _,
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
@@ -1997,6 +2101,7 @@ where
                     peer_event: _,
                     info: SocketControlInfo { id, _properties },
                     messages,
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
             ctx,
@@ -2050,6 +2155,7 @@ where
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
                     messages: _,
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
@@ -2077,6 +2183,7 @@ where
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
                     messages: _,
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
@@ -2101,6 +2208,7 @@ where
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
                     messages: _,
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
@@ -2115,6 +2223,7 @@ where
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
                     messages: _,
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
@@ -2131,6 +2240,7 @@ where
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
                     messages: _,
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
@@ -2147,6 +2257,7 @@ where
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
                     messages: _,
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;
@@ -2161,6 +2272,7 @@ where
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
                     messages: _,
+                    version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
         } = self;

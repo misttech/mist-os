@@ -12,9 +12,6 @@
         {
             type: "expect_failure",
             matchers: [
-                "SocketTests/SendIpv6PacketInfoSuccessTest.SendAndRecv/NIC1_local_address",
-                "SocketTests/SendIpv6PacketInfoSuccessTest.SendAndRecv/NIC1_local_interface",
-                "SocketTests/SendIpv6PacketInfoSuccessTest.SendAndRecv/NIC1_local_address_and_interface",
                 "SocketTests/SendIpv6PacketInfoSuccessTest.SendAndRecv/NIC2_local_address",
                 "SocketTests/SendIpv6PacketInfoSuccessTest.SendAndRecv/NIC2_local_interface",
                 "SocketTests/SendIpv6PacketInfoSuccessTest.SendAndRecv/NIC2_local_address_and_interface",
