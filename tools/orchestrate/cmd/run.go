@@ -81,6 +81,10 @@ func (r *runCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...any) subcomman
 }
 
 func initTestArtifactsDir() error {
+	if os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR") == "" {
+		fmt.Printf("Environment variable TEST_UNDECLARED_OUTPUTS_DIR is not set, test artifacts will be written to the current working directory.\n")
+		return nil
+	}
 	if err := os.MkdirAll(os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR"), 0755); err != nil {
 		return fmt.Errorf("os.Mkdir: %w", err)
 	}
