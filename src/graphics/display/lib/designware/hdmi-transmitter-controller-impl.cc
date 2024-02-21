@@ -5,6 +5,7 @@
 #include "src/graphics/display/lib/designware/hdmi-transmitter-controller-impl.h"
 
 #include <lib/ddk/debug.h>
+#include <zircon/assert.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/designware/color-param.h"
@@ -65,44 +66,45 @@ void HdmiTransmitterControllerImpl::ConfigHdmitx(const ColorParam& color_param,
                                                  const display::DisplayTiming& mode,
                                                  const hdmi_param_tx& p) {
   // setup video input mapping
-  uint32_t hdmi_data = 0;
+  uint8_t video_input_mapping_config = 0;
   if (color_param.input_color_format == ColorFormat::kCfRgb) {
     switch (color_param.color_depth) {
       case ColorDepth::kCd24B:
-        hdmi_data |= TX_INVID0_VM_RGB444_8B;
+        video_input_mapping_config |= TX_INVID0_VM_RGB444_8B;
         break;
       case ColorDepth::kCd30B:
-        hdmi_data |= TX_INVID0_VM_RGB444_10B;
+        video_input_mapping_config |= TX_INVID0_VM_RGB444_10B;
         break;
       case ColorDepth::kCd36B:
-        hdmi_data |= TX_INVID0_VM_RGB444_12B;
+        video_input_mapping_config |= TX_INVID0_VM_RGB444_12B;
         break;
       case ColorDepth::kCd48B:
       default:
-        hdmi_data |= TX_INVID0_VM_RGB444_16B;
+        video_input_mapping_config |= TX_INVID0_VM_RGB444_16B;
         break;
     }
   } else if (color_param.input_color_format == ColorFormat::kCf444) {
     switch (color_param.color_depth) {
       case ColorDepth::kCd24B:
-        hdmi_data |= TX_INVID0_VM_YCBCR444_8B;
+        video_input_mapping_config |= TX_INVID0_VM_YCBCR444_8B;
         break;
       case ColorDepth::kCd30B:
-        hdmi_data |= TX_INVID0_VM_YCBCR444_10B;
+        video_input_mapping_config |= TX_INVID0_VM_YCBCR444_10B;
         break;
       case ColorDepth::kCd36B:
-        hdmi_data |= TX_INVID0_VM_YCBCR444_12B;
+        video_input_mapping_config |= TX_INVID0_VM_YCBCR444_12B;
         break;
       case ColorDepth::kCd48B:
       default:
-        hdmi_data |= TX_INVID0_VM_YCBCR444_16B;
+        video_input_mapping_config |= TX_INVID0_VM_YCBCR444_16B;
         break;
     }
   } else {
-    zxlogf(ERROR, "Unsupported format!\n");
+    ZX_DEBUG_ASSERT_MSG(false, "Invalid display input color format: %d",
+                        static_cast<uint8_t>(color_param.input_color_format));
     return;
   }
-  WriteReg(HDMITX_DWC_TX_INVID0, hdmi_data);
+  WriteReg(HDMITX_DWC_TX_INVID0, video_input_mapping_config);
 
   // Disable video input stuffing and zero-out related registers
   WriteReg(HDMITX_DWC_TX_INSTUFFING, 0x00);
@@ -119,80 +121,84 @@ void HdmiTransmitterControllerImpl::ConfigHdmitx(const ColorParam& color_param,
   // Video packet color depth and pixel repetition (none). writing 0 is also valid
   // hdmi_data = (4 << 4); // 4 == 24bit
   // hdmi_data = (display->color_depth << 4); // 4 == 24bit
-  hdmi_data = (0 << 4);  // 4 == 24bit
-  WriteReg(HDMITX_DWC_VP_PR_CD, hdmi_data);
+  WriteReg(HDMITX_DWC_VP_PR_CD, (0 << 4));  // 4 == 24bit
 
   // setup video packet stuffing (nothing fancy to be done here)
-  hdmi_data = 0;
-  WriteReg(HDMITX_DWC_VP_STUFF, hdmi_data);
+  WriteReg(HDMITX_DWC_VP_STUFF, 0);
 
   // setup video packet remap (nothing here as well since we don't support 422)
-  hdmi_data = 0;
-  WriteReg(HDMITX_DWC_VP_REMAP, hdmi_data);
+  WriteReg(HDMITX_DWC_VP_REMAP, 0);
 
   // vp packet output configuration
-  // hdmi_data = 0;
-  hdmi_data = VP_CONF_BYPASS_EN;
-  hdmi_data |= VP_CONF_BYPASS_SEL_VP;
-  hdmi_data |= VP_CONF_OUTSELECTOR;
-  WriteReg(HDMITX_DWC_VP_CONF, hdmi_data);
+  const uint8_t vp_packet_configuration =
+      VP_CONF_BYPASS_EN | VP_CONF_BYPASS_SEL_VP | VP_CONF_OUTSELECTOR;
+  WriteReg(HDMITX_DWC_VP_CONF, vp_packet_configuration);
 
   // Video packet Interrupt Mask
-  hdmi_data = 0xFF;  // set all bits
-  WriteReg(HDMITX_DWC_VP_MASK, hdmi_data);
+  WriteReg(HDMITX_DWC_VP_MASK, 0xFF);  // set all bits
 
   // TODO: For now skip audio configuration
 
   // Setup frame composer
 
   // fc_invidconf setup
-  hdmi_data = 0;
-  hdmi_data |= FC_INVIDCONF_HDCP_KEEPOUT;
-  hdmi_data |= FC_INVIDCONF_VSYNC_POL(mode->flags & ModeFlag::kVsyncPositive);
-  hdmi_data |= FC_INVIDCONF_HSYNC_POL(mode->flags & ModeFlag::kHsyncPositive);
-  hdmi_data |= FC_INVIDCONF_DE_POL_H;
-  hdmi_data |= FC_INVIDCONF_DVI_HDMI_MODE;
+  uint8_t input_video_configuration =
+      FC_INVIDCONF_HDCP_KEEPOUT | FC_INVIDCONF_VSYNC_POL(mode->flags & ModeFlag::kVsyncPositive) |
+      FC_INVIDCONF_HSYNC_POL(mode->flags & ModeFlag::kHsyncPositive) | FC_INVIDCONF_DE_POL_H |
+      FC_INVIDCONF_DVI_HDMI_MODE;
   if (mode.fields_per_frame == display::FieldsPerFrame::kInterlaced) {
-    hdmi_data |= FC_INVIDCONF_VBLANK_OSC | FC_INVIDCONF_IN_VID_INTERLACED;
+    input_video_configuration |= FC_INVIDCONF_VBLANK_OSC | FC_INVIDCONF_IN_VID_INTERLACED;
   }
-  WriteReg(HDMITX_DWC_FC_INVIDCONF, hdmi_data);
+  WriteReg(HDMITX_DWC_FC_INVIDCONF, input_video_configuration);
+
+  // TODO(https://fxbug.dev/325994853): Add a configuration on the display
+  // timings and make the ZX_ASSERT() checks below preconditions of
+  // ConfigHdmiTx.
 
   // HActive
-  hdmi_data = mode.horizontal_active_px;
-  WriteReg(HDMITX_DWC_FC_INHACTV0, (hdmi_data & 0xff));
-  WriteReg(HDMITX_DWC_FC_INHACTV1, ((hdmi_data >> 8) & 0x3f));
+  const int horizontal_active_px = mode.horizontal_active_px;
+  ZX_ASSERT(horizontal_active_px <= 0x3fff);
+  WriteReg(HDMITX_DWC_FC_INHACTV0, (horizontal_active_px & 0xff));
+  WriteReg(HDMITX_DWC_FC_INHACTV1, ((horizontal_active_px >> 8) & 0x3f));
 
   // HBlank
-  hdmi_data = mode.horizontal_blank_px();
-  WriteReg(HDMITX_DWC_FC_INHBLANK0, (hdmi_data & 0xff));
-  WriteReg(HDMITX_DWC_FC_INHBLANK1, ((hdmi_data >> 8) & 0x1f));
+  const int horizontal_blank_px = mode.horizontal_blank_px();
+  ZX_ASSERT(horizontal_blank_px <= 0x1fff);
+  WriteReg(HDMITX_DWC_FC_INHBLANK0, (horizontal_blank_px & 0xff));
+  WriteReg(HDMITX_DWC_FC_INHBLANK1, ((horizontal_blank_px >> 8) & 0x1f));
 
   // VActive
-  hdmi_data = mode.vertical_active_lines;
-  WriteReg(HDMITX_DWC_FC_INVACTV0, (hdmi_data & 0xff));
-  WriteReg(HDMITX_DWC_FC_INVACTV1, ((hdmi_data >> 8) & 0x1f));
+  const int vertical_active_lines = mode.vertical_active_lines;
+  ZX_ASSERT(vertical_active_lines <= 0x1fff);
+  WriteReg(HDMITX_DWC_FC_INVACTV0, (vertical_active_lines & 0xff));
+  WriteReg(HDMITX_DWC_FC_INVACTV1, ((vertical_active_lines >> 8) & 0x1f));
 
   // VBlank
-  hdmi_data = mode.vertical_blank_lines();
-  WriteReg(HDMITX_DWC_FC_INVBLANK, (hdmi_data & 0xff));
+  const int vertical_blank_lines = mode.vertical_blank_lines();
+  ZX_ASSERT(vertical_blank_lines <= 0xff);
+  WriteReg(HDMITX_DWC_FC_INVBLANK, (vertical_blank_lines & 0xff));
 
   // HFP
-  hdmi_data = mode.horizontal_front_porch_px;
-  WriteReg(HDMITX_DWC_FC_HSYNCINDELAY0, (hdmi_data & 0xff));
-  WriteReg(HDMITX_DWC_FC_HSYNCINDELAY1, ((hdmi_data >> 8) & 0x1f));
+  const int horizontal_front_porch_px = mode.horizontal_front_porch_px;
+  ZX_ASSERT(horizontal_front_porch_px <= 0x1fff);
+  WriteReg(HDMITX_DWC_FC_HSYNCINDELAY0, (horizontal_front_porch_px & 0xff));
+  WriteReg(HDMITX_DWC_FC_HSYNCINDELAY1, ((horizontal_front_porch_px >> 8) & 0x1f));
 
   // HSync
-  hdmi_data = mode.horizontal_sync_width_px;
-  WriteReg(HDMITX_DWC_FC_HSYNCINWIDTH0, (hdmi_data & 0xff));
-  WriteReg(HDMITX_DWC_FC_HSYNCINWIDTH1, ((hdmi_data >> 8) & 0x3));
+  const int horizontal_sync_width_px = mode.horizontal_sync_width_px;
+  ZX_ASSERT(horizontal_sync_width_px <= 0x3ff);
+  WriteReg(HDMITX_DWC_FC_HSYNCINWIDTH0, (horizontal_sync_width_px & 0xff));
+  WriteReg(HDMITX_DWC_FC_HSYNCINWIDTH1, ((horizontal_sync_width_px >> 8) & 0x3));
 
   // VFront
-  hdmi_data = mode.vertical_front_porch_lines;
-  WriteReg(HDMITX_DWC_FC_VSYNCINDELAY, (hdmi_data & 0xff));
+  const int vertical_front_porch_lines = mode.vertical_front_porch_lines;
+  ZX_ASSERT(vertical_front_porch_lines <= 0xff);
+  WriteReg(HDMITX_DWC_FC_VSYNCINDELAY, (vertical_front_porch_lines & 0xff));
 
   // VSync
-  hdmi_data = mode.vertical_sync_width_lines;
-  WriteReg(HDMITX_DWC_FC_VSYNCINWIDTH, (hdmi_data & 0x3f));
+  const int vertical_sync_width_lines = mode.vertical_sync_width_lines;
+  ZX_ASSERT(vertical_sync_width_lines <= 0x3f);
+  WriteReg(HDMITX_DWC_FC_VSYNCINWIDTH, (vertical_sync_width_lines & 0x3f));
 
   // Frame Composer control period duration (set to 12 per spec)
   WriteReg(HDMITX_DWC_FC_CTRLDUR, 12);
@@ -206,27 +212,26 @@ void HdmiTransmitterControllerImpl::ConfigHdmitx(const ColorParam& color_param,
   // Frame Composer preamble filler (from uBoot)
 
   // Frame Composer GCP packet config
-  hdmi_data = (1 << 0);  // set avmute. defauly_phase is 0
-  WriteReg(HDMITX_DWC_FC_GCP, hdmi_data);
+  WriteReg(HDMITX_DWC_FC_GCP, (1 << 0));  // set avmute. defauly_phase is 0
 
   // Frame Composer AVI Packet config (set active_format_present bit)
   // aviconf0 populates Table 10 of CEA spec (AVI InfoFrame Data Byte 1)
   // Y1Y0 = 00 for RGB, 10 for 444
   if (color_param.output_color_format == ColorFormat::kCfRgb) {
-    hdmi_data = FC_AVICONF0_RGB;
+    video_input_mapping_config = FC_AVICONF0_RGB;
   } else {
-    hdmi_data = FC_AVICONF0_444;
+    video_input_mapping_config = FC_AVICONF0_444;
   }
   // A0 = 1 Active Formate present on R3R0
-  hdmi_data |= FC_AVICONF0_A0;
-  WriteReg(HDMITX_DWC_FC_AVICONF0, hdmi_data);
+  video_input_mapping_config |= FC_AVICONF0_A0;
+  WriteReg(HDMITX_DWC_FC_AVICONF0, video_input_mapping_config);
 
   // aviconf1 populates Table 11 of AVI InfoFrame Data Byte 2
   // C1C0 = 0, M1M0=0x2 (16:9), R3R2R1R0=0x8 (same of M1M0)
-  hdmi_data = FC_AVICONF1_R3R0;  // set to 0x8 (same as coded frame aspect ratio)
-  hdmi_data |= FC_AVICONF1_M1M0(static_cast<uint8_t>(p.aspect_ratio));
-  hdmi_data |= FC_AVICONF1_C1C0(static_cast<uint8_t>(p.colorimetry));
-  WriteReg(HDMITX_DWC_FC_AVICONF1, hdmi_data);
+  video_input_mapping_config = FC_AVICONF1_R3R0;  // set to 0x8 (same as coded frame aspect ratio)
+  video_input_mapping_config |= FC_AVICONF1_M1M0(static_cast<uint8_t>(p.aspect_ratio));
+  video_input_mapping_config |= FC_AVICONF1_C1C0(static_cast<uint8_t>(p.colorimetry));
+  WriteReg(HDMITX_DWC_FC_AVICONF1, video_input_mapping_config);
 
   // Since we are support RGB/444, no need to write to ECx
   WriteReg(HDMITX_DWC_FC_AVICONF2, 0x0);
@@ -240,9 +245,9 @@ void HdmiTransmitterControllerImpl::ConfigHdmitx(const ColorParam& color_param,
   WriteReg(HDMITX_DWC_FC_ACTSPC_HDLR_CFG, 0);
 
   // Frame composer 2d vact config
-  hdmi_data = mode.vertical_active_lines;
-  WriteReg(HDMITX_DWC_FC_INVACT_2D_0, (hdmi_data & 0xff));
-  WriteReg(HDMITX_DWC_FC_INVACT_2D_1, ((hdmi_data >> 8) & 0xf));
+  ZX_ASSERT(vertical_active_lines <= 0xfff);
+  WriteReg(HDMITX_DWC_FC_INVACT_2D_0, (vertical_active_lines & 0xff));
+  WriteReg(HDMITX_DWC_FC_INVACT_2D_1, ((vertical_active_lines >> 8) & 0xf));
 
   // disable all Frame Composer interrupts
   WriteReg(HDMITX_DWC_FC_MASK0, 0xe7);
@@ -251,8 +256,8 @@ void HdmiTransmitterControllerImpl::ConfigHdmitx(const ColorParam& color_param,
 
   // No pixel repetition for the currently supported resolution
   // TODO: pixel repetition is 0 for most progressive. We don't support interlaced
-  uint8_t pixel_repeat = 0;
-  WriteReg(HDMITX_DWC_FC_PRCONF, ((pixel_repeat + 1) << 4) | (pixel_repeat) << 0);
+  static constexpr uint8_t kPixelRepeat = 0;
+  WriteReg(HDMITX_DWC_FC_PRCONF, ((kPixelRepeat + 1) << 4) | (kPixelRepeat) << 0);
 
   // Skip HDCP for now
 
@@ -369,16 +374,14 @@ void HdmiTransmitterControllerImpl::ConfigCsc(const ColorParam& color_param) {
   uint8_t csc_coef_c4_msb;
   uint8_t csc_coef_c4_lsb;
   uint8_t csc_scale;
-  uint32_t hdmi_data;
 
+  // Color space conversion is needed by default.
+  uint8_t main_controller_feed_through_control = MC_FLOWCTRL_ENB_CSC;
   if (color_param.input_color_format == color_param.output_color_format) {
     // no need to convert
-    hdmi_data = MC_FLOWCTRL_BYPASS_CSC;
-  } else {
-    // conversion will be needed
-    hdmi_data = MC_FLOWCTRL_ENB_CSC;
+    main_controller_feed_through_control = MC_FLOWCTRL_BYPASS_CSC;
   }
-  WriteReg(HDMITX_DWC_MC_FLOWCTRL, hdmi_data);
+  WriteReg(HDMITX_DWC_MC_FLOWCTRL, main_controller_feed_through_control);
 
   // Since we don't support 422 at this point, set csc_cfg to 0
   WriteReg(HDMITX_DWC_CSC_CFG, 0);
@@ -548,10 +551,20 @@ void HdmiTransmitterControllerImpl::ConfigCsc(const ColorParam& color_param) {
   WriteReg(HDMITX_DWC_CSC_COEF_C4_MSB, csc_coef_c4_msb);
   WriteReg(HDMITX_DWC_CSC_COEF_C4_LSB, csc_coef_c4_lsb);
 
-  hdmi_data = 0;
-  hdmi_data |= CSC_SCALE_COLOR_DEPTH(static_cast<uint8_t>(color_param.color_depth));
-  hdmi_data |= CSC_SCALE_CSCSCALE(csc_scale);
-  WriteReg(HDMITX_DWC_CSC_SCALE, hdmi_data);
+  // The value of `color_param.color_depth` is >= 0 and <= 7. So
+  // `CSC_SCALE_COLOR_DEPTH()` won't cause an integer overflow.
+  //
+  // The value of `csc_scale` is 0, 1, or 2. So `CSC_SCALE_CSCSCALE()` won't
+  // cause an integer overflow.
+  //
+  // `CSC_SCALE_COLOR_DEPTH(color_param.color_depth)` only occupies the bits 4-6
+  // and `CSC_SCALE_CSCSCALE(csc_scale)` only occupies the bits 0-1. Thus they
+  // won't overlap in any bit in the bitwise or operation.
+  const uint8_t color_space_conversion_config =
+      static_cast<const uint8_t>(
+          CSC_SCALE_COLOR_DEPTH(static_cast<uint8_t>(color_param.color_depth))) |
+      static_cast<const uint8_t>(CSC_SCALE_CSCSCALE(csc_scale));
+  WriteReg(HDMITX_DWC_CSC_SCALE, color_space_conversion_config);
 }
 
 zx_status_t HdmiTransmitterControllerImpl::EdidTransfer(const i2c_impl_op_t* op_list,
@@ -612,8 +625,8 @@ zx_status_t HdmiTransmitterControllerImpl::EdidTransfer(const i2c_impl_op_t* op_
 }
 
 #define PRINT_REG(name) PrintReg(#name, (name))
-void HdmiTransmitterControllerImpl::PrintReg(std::string name, uint8_t reg) {
-  zxlogf(INFO, "%s (0x%4x): %u", &name[0], reg, ReadReg(reg));
+void HdmiTransmitterControllerImpl::PrintReg(const char* name, uint32_t address) {
+  zxlogf(INFO, "%s (0x%4x): %u", name, address, ReadReg(address));
 }
 
 void HdmiTransmitterControllerImpl::PrintRegisters() {

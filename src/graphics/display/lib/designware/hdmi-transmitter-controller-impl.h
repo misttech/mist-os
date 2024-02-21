@@ -43,7 +43,7 @@ class HdmiTransmitterControllerImpl : public HdmiTransmitterController {
   void WriteReg(uint32_t addr, uint8_t data) { controller_mmio_.Write8(data, addr); }
   uint8_t ReadReg(uint32_t addr) { return controller_mmio_.Read8(addr); }
 
-  void PrintReg(std::string name, uint8_t reg);
+  void PrintReg(const char* name, uint32_t address);
 
   void ScdcWrite(uint8_t addr, uint8_t val);
   void ScdcRead(uint8_t addr, uint8_t* val);
