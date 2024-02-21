@@ -29,11 +29,10 @@ group("tests") {
     "tests",
     "triage:tests",
     "validator:tests",
-    "wasm:tests",
 
-    # This is included to make sure changes to fuchsia_async (or elsewhere)
-    # don't break the WASM build.
-    "//src/diagnostics/lib/triage/wasm:wasm",
+    # Disabled due to lack of support in Clang and Rust toolchain;
+    # see https://fxbug.dev/325488864.
+    # "wasm:tests",
   ]
 }
 
