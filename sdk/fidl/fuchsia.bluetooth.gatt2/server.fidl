@@ -22,9 +22,9 @@ type ValueChangedParameters = table {
     /// limit are truncated internally by the stack.
     /// Mandatory.
     2: value vector<uint8>:MAX_VALUE_LENGTH;
-    /// Only signal a subset of peers.  
+    /// Only signal a subset of peers.
     /// If not present or empty, all peers that can be updated are signaled.
-    /// If included, only the set of peers in this list will be signaled.  
+    /// If included, only the set of peers in this list will be signaled.
     /// Peers are only signaled if they have configured updates or notifications per `LocalService.`
     /// `CharacteristicConfiguration`; other peers in `peer_ids` will be ignored.
     3: peer_ids vector<bt.PeerId>:MAX;
@@ -99,13 +99,14 @@ closed protocol LocalService {
     /// LocalService (Write/ReadValue, CharacteristicConfiguration) on a best-effort basis, as long
     /// as all preceding PeerUpdates were acknowledged.
     ///
+    /// Not currently sent. Comment on https://fxbug.dev/42178509 to request support
+    ///
     /// + request `peer_id` The PeerId the update pertains to. Always present.
     /// + request `mtu` The maximum number of bytes that fit in a notification/indication to this
     ///   peer. Any bytes past this limit are silently truncated. Most clients need not concern
     ///   themselves with this unless they are using notifications/indications for high throughput.
     ///   Optional.
     /// - response An empty response to acknowledge that the update was received.
-    @transitional("Not currently sent. Comment on https://fxbug.dev/42178509 to request support")
     strict PeerUpdate(table {
         1: peer_id bt.PeerId;
         2: mtu uint16;
@@ -114,8 +115,6 @@ closed protocol LocalService {
     /// After this event, new peers will no longer be able to discover the service, although peers
     /// which have already discovered this service may still access it. This should be sent once per
     /// service lifetime; sending more than once closes the protocol and disconnects GATT clients.
-    @transitional(
-            "Not currently supported. Comment on https://fxbug.dev/42180948 to request support")
     strict -> OnSuppressDiscovery();
 
     /// This event is used to send a notification to a peer. Notifications should be used instead of
@@ -162,7 +161,7 @@ closed protocol LocalService {
     /// INITIAL_VALUE_CHANGED_CREDITS credits before this method is called. Implementors must keep
     /// track of the available credit they have. The implementor can send exactly one OnNotifyValue
     /// or OnIndicateValue event for each credit. Note that `ValueChangedCredit` will only be called
-    /// if at least one indication/notification has been sent since the prior call. 
+    /// if at least one indication/notification has been sent since the prior call.
     strict ValueChangedCredit(struct {
         additional_credit uint8;
     });
@@ -184,7 +183,6 @@ closed protocol Server {
     ///   of a `LocalService`.
     /// - response An empty response indicates the service was successfully published.
     /// * error See `gatt2.PublishServiceError` for possible failure modes.
-    @transitional("Implementation and migration progress tracked in https://fxbug.dev/42111896")
     strict PublishService(resource struct {
         info ServiceInfo;
         service client_end:LocalService;
