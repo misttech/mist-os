@@ -1006,11 +1006,6 @@ zx_status_t Device::AddCompositeNodeSpec(const char* name, const composite_node_
     return ZX_ERR_INVALID_ARGS;
   }
 
-  ZX_ASSERT_MSG(spec->metadata_list == nullptr,
-                "Metadata not supported on composite node specs. Please add metadata to a child.");
-  ZX_ASSERT_MSG(spec->metadata_count == 0,
-                "Metadata not supported on composite node specs. Please add metadata to a child.");
-
   auto composite_node_manager =
       driver_->driver_namespace().Connect<fuchsia_driver_framework::CompositeNodeManager>();
   if (composite_node_manager.is_error()) {
@@ -1026,13 +1021,6 @@ zx_status_t Device::AddCompositeNodeSpec(const char* name, const composite_node_
       return parents_result.error_value();
     }
     parents[i] = std::move(parents_result.value());
-  }
-
-  // TODO(https://fxbug.dev/42063200): Support metadata for AddCompositeNodeSpec().
-  if (spec->metadata_count > 0) {
-    FDF_LOGL(
-        WARNING, *logger_,
-        "AddCompositeNodeSpec() currently doesn't support metadata. See https://fxbug.dev/42063200.");
   }
 
   auto fidl_spec = fdf::wire::CompositeNodeSpec::Builder(allocator)

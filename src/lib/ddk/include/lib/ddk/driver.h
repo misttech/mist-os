@@ -552,9 +552,6 @@ typedef struct parent_spec {
 typedef struct composite_node_spec {
   const parent_spec_t* parents;
   size_t parent_count;
-
-  const device_metadata_t* metadata_list;
-  size_t metadata_count;
 } composite_node_spec_t;
 
 zx_status_t device_add_composite_spec(zx_device_t* dev, const char* name,

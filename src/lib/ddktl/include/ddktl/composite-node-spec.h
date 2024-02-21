@@ -325,12 +325,6 @@ class CompositeNodeSpec {
     return *this;
   }
 
-  CompositeNodeSpec& set_metadata(cpp20::span<const device_metadata_t> metadata) {
-    specs_.metadata_list = metadata.data();
-    specs_.metadata_count = static_cast<uint32_t>(metadata.size());
-    return *this;
-  }
-
   const composite_node_spec_t& get() const { return specs_; }
 
  private:
