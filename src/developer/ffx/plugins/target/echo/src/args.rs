@@ -12,4 +12,7 @@ pub struct EchoCommand {
     #[argh(positional)]
     /// text string to echo back and forth
     pub text: Option<String>,
+    /// run the echo test repeatedly until the command is killed
+    #[argh(switch)]
+    pub repeat: bool,
 }

@@ -10,6 +10,14 @@
       "short": null,
       "description": "display usage information",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--repeat",
+      "short": null,
+      "description": "run the echo test repeatedly until the command is killed",
+      "hidden": false
     }
   ],
   "notes": [],
