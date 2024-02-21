@@ -219,13 +219,8 @@ then
   if [[ "$?" = 0 ]]
   then
     # In a Corp environment.
-    # For developers (not infra), automatically use LOAS credentials
-    # to acquire an OAuth2 token.  This saves a step of having to
-    # authenticate with a second mechanism.
-    # bootstrap --automatic_auth is available in re-client 0.97+
-    # See go/rbe/dev/x/reclientoptions#autoauth
-    auth_option+=( --automatic_auth=true )
-    # bootstrap will call gcert (prompting the user) as needed.
+    # Use the credentials helper named in the cfg.
+    :
   else
     # Everyone else uses gcloud authentication.
     gcloud="$(which gcloud)" || {
