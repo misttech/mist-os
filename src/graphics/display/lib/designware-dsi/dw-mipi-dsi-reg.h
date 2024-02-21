@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_DSI_DW_DW_MIPI_DSI_REG_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_DSI_DW_DW_MIPI_DSI_REG_H_
+#ifndef SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_DSI_DW_MIPI_DSI_REG_H_
+#define SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_DSI_DW_MIPI_DSI_REG_H_
 
 #include <hwreg/bitfields.h>
 
@@ -61,6 +61,8 @@
 #define DW_DSI_INT_ST1 (0x30 << 2)              // status of intr related to timeout, ECC, etc
 #define DW_DSI_INT_MSK0 (0x31 << 2)             // masks interrupts that affect the INT_ST0 reg
 #define DW_DSI_INT_MSK1 (0x32 << 2)             // masks interrupts that affect the INT_ST1 reg
+
+namespace designware_dsi {
 
 class DsiDwVersionReg : public hwreg::RegisterBase<DsiDwVersionReg, uint32_t> {
  public:
@@ -536,4 +538,6 @@ class DsiDwIntMsk1Reg : public hwreg::RegisterBase<DsiDwIntMsk1Reg, uint32_t> {
   static auto Get() { return hwreg::RegisterAddr<DsiDwIntMsk1Reg>(DW_DSI_INT_MSK1); }
 };
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_DSI_DW_DW_MIPI_DSI_REG_H_
+}  // namespace designware_dsi
+
+#endif  // SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_DSI_DW_MIPI_DSI_REG_H_

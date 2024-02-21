@@ -348,6 +348,7 @@ sdk_static_library("ddk") {
     "//src/graphics/display/drivers/ssd1306:*",
     "//src/graphics/display/drivers/virtio-guest/v1:*",
     "//src/graphics/display/lib/designware:*",
+    "//src/graphics/display/lib/designware-dsi:*",
     "//src/graphics/display/lib/designware/test:*",
     "//src/graphics/display/lib/edid:*",
     "//src/graphics/drivers/aml-gpu:*",

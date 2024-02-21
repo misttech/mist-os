@@ -1,0 +1,22 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+source_set("dsi-host-controller") {
+  sources = [
+    "dsi-host-controller.cc",
+    "dsi-host-controller.h",
+    "dw-mipi-dsi-reg.h",
+  ]
+  public_deps = [
+    "//sdk/banjo/fuchsia.hardware.dsiimpl:fuchsia.hardware.dsiimpl_banjo_cpp",
+    "//src/devices/lib/mmio",
+    "//src/graphics/display/lib/mipi-dsi",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zircon-internal",
+  ]
+  deps = [
+    "//src/lib/ddk",
+    "//zircon/system/ulib/hwreg",
+  ]
+}
