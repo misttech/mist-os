@@ -61,6 +61,8 @@ class FixtureBasedTestEnvironment {
     return env;
   }
 
+  std::string GetName() { return std::string(device_server_.name()); }
+
  private:
   ZirconProtocolServer zircon_proto_server_;
   DriverProtocolServer driver_proto_server_;
@@ -82,6 +84,16 @@ class BackgroundFixtureConfig final {
 // main test thread.
 class FixtureBasedTestBackground : public fdf_testing::DriverTestFixture<BackgroundFixtureConfig> {
 };
+
+TEST_F(FixtureBasedTestBackground, GetNameFromEnv) {
+  RunInEnvironmentTypeContext([](FixtureBasedTestEnvironment& env) {
+    env.GetName();
+    ASSERT_EQ(component::kDefaultInstance, env.GetName());
+  });
+  auto name = RunInEnvironmentTypeContext<std::string>(
+      [](FixtureBasedTestEnvironment& env) { return env.GetName(); });
+  ASSERT_EQ(component::kDefaultInstance, name);
+}
 
 TEST_F(FixtureBasedTestBackground, ValidateDriverIncomingServices) {
   RunInDriverContext([](TestDriver& driver) {
@@ -153,6 +165,16 @@ class FixtureConfig final {
 };
 
 class FixtureBasedTest : public fdf_testing::DriverTestFixture<FixtureConfig> {};
+
+TEST_F(FixtureBasedTest, GetNameFromEnv) {
+  RunInEnvironmentTypeContext([](FixtureBasedTestEnvironment& env) {
+    env.GetName();
+    ASSERT_EQ(component::kDefaultInstance, env.GetName());
+  });
+  auto name = RunInEnvironmentTypeContext<std::string>(
+      [](FixtureBasedTestEnvironment& env) { return env.GetName(); });
+  ASSERT_EQ(component::kDefaultInstance, name);
+}
 
 TEST_F(FixtureBasedTest, ValidateDriverIncomingServices) {
   zx::result result = driver()->ValidateIncomingDriverService();

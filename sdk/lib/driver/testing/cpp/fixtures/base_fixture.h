@@ -246,6 +246,31 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
     return zx::ok(std::move(result_container.value()));
   }
 
+  // Runs a task on the dispatcher context of the EnvironmentType. This will be a different thread
+  // than the main test thread, so be careful when capturing and returning pointers to objects that
+  // live on different dispatchers like test fixture properties, or the driver.
+  //
+  // Returns the result of the given task once it has completed.
+  template <typename T>
+  T RunInEnvironmentTypeContext(fit::callback<T(EnvironmentType&)> task) {
+    return env_wrapper_.SyncCall(
+        [env_task = std::move(task)](internal::EnvWrapper<EnvironmentType>* env_ptr) mutable {
+          return env_task(env_ptr->user_env());
+        });
+  }
+
+  // Runs a task on the dispatcher context of the EnvironmentType. This will be a different thread
+  // than the main test thread, so be careful when capturing and returning pointers to objects that
+  // live on different dispatchers like test fixture properties, or the driver.
+  //
+  // Returns when the given task has completed.
+  void RunInEnvironmentTypeContext(fit::callback<void(EnvironmentType&)> task) {
+    env_wrapper_.SyncCall(
+        [env_task = std::move(task)](internal::EnvWrapper<EnvironmentType>* env_ptr) mutable {
+          env_task(env_ptr->user_env());
+        });
+  }
+
   // Runs a task on the dispatcher context of the TestNode. This will be a different thread than
   // the main test thread, so be careful when capturing and returning pointers to objects that live
   // on different dispatchers like test fixture properties, or the driver.

@@ -30,7 +30,7 @@ class EnvWrapper {
                   result.status_string());
     outgoing_client_ = std::move(start_args->outgoing_directory_client);
 
-    user_env = EnvironmentType::CreateAndInitialize(test_environment_.incoming_directory());
+    user_env_ = EnvironmentType::CreateAndInitialize(test_environment_.incoming_directory());
 
     return std::move(start_args->start_args);
   }
@@ -42,13 +42,15 @@ class EnvWrapper {
 
   fdf_testing::TestNode& node_server() { return node_server_; }
 
+  EnvironmentType& user_env() { return *user_env_; }
+
  private:
   fdf_testing::TestNode node_server_{"root"};
   fdf_testing::TestEnvironment test_environment_;
   fidl::ClientEnd<fuchsia_io::Directory> outgoing_client_;
 
   // User env should be the last field as it could contain references to the test_environment_.
-  std::unique_ptr<EnvironmentType> user_env;
+  std::unique_ptr<EnvironmentType> user_env_;
 };
 
 template <typename DriverType, bool DriverOnForeground>
