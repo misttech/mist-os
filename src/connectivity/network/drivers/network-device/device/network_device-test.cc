@@ -3466,6 +3466,20 @@ TEST_F(NetworkDeviceShimTest, BindAndTeardown) {
   teardown_complete.Wait();
 }
 
+TEST_F(NetworkDeviceShimTest, TeardownFromOtherDispatcher) {
+  // Verify that a bound NetworkDeviceShim can be safely torn down from a dispatcher with a
+  // different driver owner. This is a tricky case because it allows posted tasks to be inlined
+  // which can cause unbinding to deadlock. The different driver owner case happens because the shim
+  // dispatchers are created with a different owner to support inlining.
+
+  libsync::Completion teardown_complete;
+  // The ifc dispatcher has a different owner, post a task to it to set up the correct prerequisites
+  // for inlining.
+  async::PostTask(ifc_dispatcher_.async_dispatcher(),
+                  [&]() { shim_->Teardown([&] { teardown_complete.Signal(); }); });
+  teardown_complete.Wait();
+}
+
 TEST_F(NetworkDeviceShimTest, AddPort) {
   // Verify that AddPort works and manages the lifetime of the NetworkPortShim object correctly.
   ASSERT_OK(InitImpl());

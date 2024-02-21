@@ -59,7 +59,12 @@ NetworkDeviceImplBinder::Synchronicity NetworkDeviceShim::Teardown(
   if (binding_.has_value()) {
     ZX_ASSERT(!on_teardown_complete_);
     on_teardown_complete_ = std::move(on_teardown_complete);
-    binding_->Unbind();
+    // Make sure that unbinding happens asynchronously. Because the shim dispatchers are created
+    // with an owner that's separate from the dispatcher that calls this method there is a chance
+    // that the unbinding could get inlined if called directly. The FIDL part of the unbinding will
+    // deadlock if that happens.
+    async::PostTask(dispatchers_.shim_->async_dispatcher(),
+                    [binding = std::move(binding_)]() mutable { binding->Unbind(); });
     return Synchronicity::Async;
   }
   // Nothing to tear down, completed synchronously.
