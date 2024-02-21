@@ -100,7 +100,7 @@ pub async fn start_and_serve<D: DeviceOps + 'static>(
     });
 
     let (mlme_init_sender, mlme_init_receiver) = oneshot::channel();
-    let StartedDriver { mlme: mlme_fut, sme: sme_fut } =
+    let StartedDriver { mlme, sme } =
         match start(mlme_init_sender, driver_event_sink, driver_event_stream, device, buf_provider)
             .await
         {
@@ -111,7 +111,7 @@ pub async fn start_and_serve<D: DeviceOps + 'static>(
             Ok(x) => x,
         };
 
-    serve(init_completer, mlme_init_receiver, mlme_fut, sme_fut).await
+    serve(init_completer, mlme_init_receiver, mlme, sme).await
 }
 
 #[derive(Debug)]
@@ -199,7 +199,7 @@ async fn start<D: DeviceOps + 'static>(
     };
 
     // Create an SME future to serve
-    let (mlme_request_stream, sme_fut) = match create_sme(
+    let (mlme_request_stream, sme) = match create_sme(
         config,
         mlme_event_stream,
         &device_info,
@@ -210,7 +210,7 @@ async fn start<D: DeviceOps + 'static>(
         persistence_req_sender,
         generic_sme_request_stream,
     ) {
-        Ok((mlme_request_stream, sme_fut)) => (mlme_request_stream, sme_fut),
+        Ok((mlme_request_stream, sme)) => (mlme_request_stream, sme),
         Err(e) => {
             error!("Failed to create sme: {}", e);
             return Err(zx::Status::INTERNAL);
@@ -218,7 +218,7 @@ async fn start<D: DeviceOps + 'static>(
     };
 
     // Create an MLME future to serve
-    let mlme_fut: Pin<Box<dyn Future<Output = Result<(), Error>>>> = match device_info.role {
+    let mlme: Pin<Box<dyn Future<Output = Result<(), Error>>>> = match device_info.role {
         fidl_common::WlanMacRole::Client => {
             info!("Running wlansoftmac with client role");
             let config = wlan_mlme::client::ClientConfig {
@@ -258,7 +258,7 @@ async fn start<D: DeviceOps + 'static>(
         }
     };
 
-    Ok(StartedDriver { mlme: mlme_fut, sme: sme_fut })
+    Ok(StartedDriver { mlme, sme })
 }
 
 /// Await on futures hosting the following three servers:
@@ -271,16 +271,16 @@ async fn start<D: DeviceOps + 'static>(
 async fn serve<InitFn>(
     init_completer: InitCompleter<InitFn>,
     mlme_init_receiver: oneshot::Receiver<Result<(), zx::Status>>,
-    mlme_fut: Pin<Box<dyn Future<Output = Result<(), Error>>>>,
-    sme_fut: Pin<Box<impl Future<Output = Result<(), Error>>>>,
+    mlme: Pin<Box<dyn Future<Output = Result<(), Error>>>>,
+    sme: Pin<Box<impl Future<Output = Result<(), Error>>>>,
 ) -> Result<(), zx::Status>
 where
     InitFn: FnOnce(Result<(), zx::Status>) + Send,
 {
     wtrace::duration_begin_scope!(c"rust_driver::serve");
 
-    let mut mlme_fut = mlme_fut.fuse();
-    let mut sme_fut = sme_fut.fuse();
+    let mut mlme = mlme.fuse();
+    let mut sme = sme.fuse();
 
     // oneshot::Receiver implements FusedFuture incorrectly, so we must call .fuse()
     // to get the right behavior in the select!().
@@ -312,7 +312,7 @@ where
                     }
                 }
             },
-            mlme_result = mlme_fut => {
+            mlme_result = mlme => {
                 error!("MLME future completed before signaling init_sender: {:?}", mlme_result);
                 let status = zx::Status::INTERNAL;
                 init_completer.complete(Err(status));
@@ -325,7 +325,7 @@ where
     let server_shutdown_result = {
         wtrace::duration_begin_scope!(c"run MLME and SME");
         futures::select! {
-            mlme_result = mlme_fut => {
+            mlme_result = mlme => {
                 match mlme_result {
                     Ok(()) => {
                         info!("MLME shut down gracefully.");
@@ -337,7 +337,7 @@ where
                     }
                 }
             }
-            sme_result = sme_fut => {
+            sme_result = sme => {
                 error!("SME shut down before MLME: {:?}", sme_result);
                 Err(zx::Status::INTERNAL)
             }
@@ -350,7 +350,7 @@ where
 
     // Since the MLME server is shut down at this point, the SME server will shut down soon because the SME
     // server always shuts down when it loses connection with the MLME server.
-    sme_fut.await.map(|()| info!("SME shut down gracefully")).map_err(|e| {
+    sme.await.map(|()| info!("SME shut down gracefully")).map_err(|e| {
         error!("SME shut down with error: {}", e);
         zx::Status::INTERNAL
     })
@@ -613,17 +613,13 @@ mod tests {
         fn new(
             fake_device: FakeDevice,
         ) -> (
-            Pin<
-                Box<
-                    impl Future<
-                        Output = Result<
-                            StartedDriver<
-                                Pin<Box<dyn Future<Output = Result<(), Error>>>>,
-                                Pin<Box<impl Future<Output = Result<(), Error>>>>,
-                            >,
-                            zx::Status,
-                        >,
+            impl Future<
+                Output = Result<
+                    StartedDriver<
+                        Pin<Box<dyn Future<Output = Result<(), Error>>>>,
+                        Pin<Box<impl Future<Output = Result<(), Error>>>>,
                     >,
+                    zx::Status,
                 >,
             >,
             StartTestHarness,

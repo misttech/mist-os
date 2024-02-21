@@ -4,8 +4,6 @@
 
 //! C bindings for wlansoftmac-rust crate.
 
-// Explicitly declare usage for cbindgen.
-
 use {
     diagnostics_log::PublishOptions,
     fidl_fuchsia_wlan_softmac as fidl_softmac,
