@@ -224,6 +224,8 @@ zx_status_t AddMetadata(Device* device,
 
 promise<void, zx_status_t> GetAndAddMetadata(
     fidl::WireClient<fuchsia_driver_compat::Device>& client, Device* device) {
+  ZX_ASSERT_MSG(
+      client, "Attempted to access metadata from an invalid fuchsia.driver.compat.Device client.");
   bridge<void, zx_status_t> bridge;
   client->GetMetadata().Then(
       [device, completer = std::move(bridge.completer)](
@@ -963,6 +965,12 @@ zx_status_t Driver::ServeDiagnosticsDir() {
 }
 
 zx_status_t Driver::GetProtocol(uint32_t proto_id, void* out) {
+  if (!parent_client_) {
+    FDF_LOGL(WARNING, *logger_,
+             "Invalid fuchsia.driver.compat.Device client. Failed to retrieve Banjo protocol.");
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
   return RunOnDispatcher([proto_id, out, &client = parent_client_, &logger = logger_]() {
     static uint64_t process_koid = []() {
       zx_info_handle_basic_t basic;
