@@ -53,6 +53,7 @@ sdk_source_set("cpp") {
     "//sdk/lib/driver/symbols",
     "//sdk/lib/fidl",
     "//sdk/lib/fidl_driver",
+    "//sdk/lib/inspect/component/cpp",
   ]
 }
 

@@ -5,6 +5,9 @@
 #if __Fuchsia_API_level__ >= 15
 
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/inspect/component/cpp/component.h>
+
+#include <mutex>
 
 namespace fdf {
 
@@ -40,6 +43,21 @@ void DriverBase::InitializeAndServe(
   outgoing_ =
       std::make_shared<OutgoingDirectory>(OutgoingDirectory::Create(driver_dispatcher_->get()));
   ZX_ASSERT(outgoing_->Serve(std::move(outgoing_directory_request)).is_ok());
+}
+
+void DriverBase::InitInspectorExactlyOnce(inspect::Inspector inspector) {
+  std::call_once(init_inspector_once_, [&] {
+#if __Fuchsia_API_level__ >= 16
+    inspector_.emplace(
+        dispatcher(), inspect::PublishOptions{
+                          .inspector = std::move(inspector),
+                          .tree_name = {name_},
+                          .client_end = incoming()->Connect<fuchsia_inspect::InspectSink>().value(),
+                      });
+#else
+    inspector_.emplace(outgoing()->component(), dispatcher(), std::move(inspector));
+#endif
+  });
 }
 
 DriverBase::~DriverBase() { Logger::SetGlobalInstance(nullptr); }

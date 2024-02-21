@@ -31,12 +31,9 @@ class ReceiverDriver : public fdf::DriverBase, public fidl::WireServer<scr::Conf
     ZX_ASSERT(result.is_ok());
 
     // Serve the inspect data
-    auto config_node = inspector_.GetRoot().CreateChild("config");
+    auto config_node = inspector().root().CreateChild("config");
     config_.RecordInspect(&config_node);
-    inspector_.emplace(std::move(config_node));
-    exposed_inspector_.emplace(inspect::ComponentInspector(
-        dispatcher(), {.inspector = inspector_,
-                       .client_end = incoming()->Connect<fuchsia_inspect::InspectSink>().value()}));
+    inspector().root().Record(std::move(config_node));
 
     return zx::ok();
   }
@@ -90,8 +87,6 @@ class ReceiverDriver : public fdf::DriverBase, public fidl::WireServer<scr::Conf
   }
 
   receiver_config::Config config_;
-  inspect::Inspector inspector_;
-  std::optional<inspect::ComponentInspector> exposed_inspector_ = std::nullopt;
 };
 
 }  // namespace

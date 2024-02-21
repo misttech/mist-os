@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
+        "//sdk/lib/inspect/client.shard.cml",
         "//sdk/lib/syslog/client.shard.cml",
         "sys/testing/elf_test_runner.shard.cml",
     ],

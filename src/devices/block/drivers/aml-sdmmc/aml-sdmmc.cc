@@ -174,15 +174,6 @@ zx::result<> AmlSdmmc::Start() {
     }
   }
 
-  auto inspect_sink = incoming()->Connect<fuchsia_inspect::InspectSink>();
-  if (inspect_sink.is_error() || !inspect_sink->is_valid()) {
-    FDF_LOGL(ERROR, logger(), "Failed to connect to inspect sink: %s",
-             inspect_sink.status_string());
-    return inspect_sink.take_error();
-  }
-  exposed_inspector_.emplace(inspect::ComponentInspector(
-      dispatcher(), {.inspector = inspector(), .client_end = std::move(inspect_sink.value())}));
-
   auto no_sync_calls_dispatcher =
       fdf::SynchronizedDispatcher::Create({}, "aml-sdmmc-worker", [](fdf_dispatcher_t*) {});
   if (no_sync_calls_dispatcher.is_error()) {
@@ -372,7 +363,7 @@ void AmlSdmmc::ClearStatus() {
       .WriteTo(&*mmio_);
 }
 
-void AmlSdmmc::Inspect::Init(const pdev_device_info_t& device_info) {
+void AmlSdmmc::Inspect::Init(const pdev_device_info_t& device_info, inspect::Node& parent) {
   std::string root_name = "aml-sdmmc-port";
   if (device_info.did == PDEV_DID_AMLOGIC_SDMMC_A) {
     root_name += 'A';
@@ -384,7 +375,7 @@ void AmlSdmmc::Inspect::Init(const pdev_device_info_t& device_info) {
     root_name += "-unknown";
   }
 
-  root = inspector.GetRoot().CreateChild(root_name);
+  root = parent.CreateChild(root_name);
 
   bus_clock_frequency = root.CreateUint(
       "bus_clock_frequency", AmlSdmmcClock::kCtsOscinClkFreq / AmlSdmmcClock::kDefaultClkDiv);
@@ -1699,7 +1690,7 @@ zx_status_t AmlSdmmc::Init(const pdev_device_info_t& device_info) {
   max_freq_ = board_config_.max_freq;
   min_freq_ = board_config_.min_freq;
 
-  inspect_.Init(device_info);
+  inspect_.Init(device_info, inspector().root());
   inspect_.max_delay.Set(max_delay() + 1);
 
   return ZX_OK;

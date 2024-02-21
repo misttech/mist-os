@@ -353,12 +353,6 @@ Driver::~Driver() {
 }
 
 void Driver::Start(fdf::StartCompleter completer) {
-  // Serve the diagnostics directory.
-  if (zx_status_t status = ServeDiagnosticsDir(); status != ZX_OK) {
-    completer(zx::error(status));
-    return;
-  }
-
   zx::result loader_vmo = LoadVmo(*incoming(), kLibDriverPath, kOpenFlags);
   if (loader_vmo.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Failed to open loader vmo: %s", loader_vmo.status_string());
@@ -941,27 +935,6 @@ zx::result<std::string> Driver::GetVariable(const char* name) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
   return zx::ok(std::string(result->value.data(), result->value.size()));
-}
-
-zx_status_t Driver::ServeDiagnosticsDir() {
-  diagnostics_vfs_ = std::make_unique<fs::SynchronousVfs>(dispatcher());
-
-  zx::result endpoints = fidl::CreateEndpoints<fio::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.status_value();
-  }
-  auto& [client, server] = endpoints.value();
-  zx_status_t status = diagnostics_vfs_->ServeDirectory(diagnostics_dir_, std::move(server));
-  if (status != ZX_OK) {
-    FDF_LOGL(ERROR, *logger_, "Failed to serve diagnostics dir: %s", zx_status_get_string(status));
-    return status;
-  }
-  zx::result result = outgoing().AddDirectory(std::move(client), "diagnostics");
-  if (result.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Failed to add diagnostics directory: %s", result.status_string());
-    return result.status_value();
-  }
-  return ZX_OK;
 }
 
 zx_status_t Driver::GetProtocol(uint32_t proto_id, void* out) {

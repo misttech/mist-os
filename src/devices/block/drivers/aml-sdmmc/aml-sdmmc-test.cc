@@ -44,12 +44,7 @@ class TestAmlSdmmc : public AmlSdmmc {
   }
 
   const inspect::Hierarchy* GetInspectRoot(const std::string& suffix) {
-    const zx::vmo inspect_vmo = inspector().DuplicateVmo();
-    if (!inspect_vmo.is_valid()) {
-      return nullptr;
-    }
-
-    inspector_.ReadInspect(inspect_vmo);
+    inspector_.ReadInspect(inspector().inspector());
     return inspector_.hierarchy().GetByPath({"aml-sdmmc-port" + suffix});
   }
 
@@ -113,8 +108,7 @@ class TestAmlSdmmc : public AmlSdmmc {
     return ZX_OK;
   }
 
-  void WaitForBus() const override { /* Do nothing, bus is always ready in tests */
-  }
+  void WaitForBus() const override { /* Do nothing, bus is always ready in tests */ }
 
   void SetRequestResults(const char* request_results) {
     request_results_.clear();

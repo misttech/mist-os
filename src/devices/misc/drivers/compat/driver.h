@@ -19,8 +19,6 @@
 #include <unordered_set>
 
 #include "src/devices/misc/drivers/compat/device.h"
-#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
-#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 extern std::mutex kDriverGlobalsLock;
 
@@ -86,8 +84,6 @@ class Driver : public fdf::DriverBase {
 
   uint32_t GetNextDeviceId() { return next_device_id_++; }
 
-  fs::PseudoDir& diagnostics_dir() { return *diagnostics_dir_; }
-
   const std::string& driver_path() const { return driver_path_; }
 
   fuchsia_device_manager::wire::SystemPowerState system_state() const { return system_state_; }
@@ -115,9 +111,6 @@ class Driver : public fdf::DriverBase {
   fpromise::promise<void, zx_status_t> ConnectToParentDevices();
   fpromise::promise<void, zx_status_t> GetDeviceInfo();
 
-  // Serves the diagnostics directory that is used to host inspect files.
-  zx_status_t ServeDiagnosticsDir();
-
   bool ShouldCallRelease() {
     // We purposefully leak in shutdown/reboot flows to emulate DFv1 shutdown. The fdf::Node client
     // should have been torn down by the driver runtime canceling all outstanding waits by the time
@@ -137,9 +130,6 @@ class Driver : public fdf::DriverBase {
   fuchsia_device_manager::wire::SystemPowerState system_state_ =
       fuchsia_device_manager::wire::SystemPowerState::kFullyOn;
   bool stop_triggered_ = false;
-
-  std::unique_ptr<fs::SynchronousVfs> diagnostics_vfs_;
-  fbl::RefPtr<fs::PseudoDir> diagnostics_dir_ = fbl::MakeRefCounted<fs::PseudoDir>();
 
   // The next unique device id for devices. Starts at 1 because `device_` has id zero.
   uint32_t next_device_id_ = 1;

@@ -15,6 +15,7 @@
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/dispatcher.h>
+#include <lib/inspect/component/cpp/component.h>
 
 namespace fdf_internal {
 template <typename DriverBaseImpl>
@@ -53,6 +54,7 @@ extern bool logger_wait_for_initial_interest;
 //     incoming()->Connect(...);
 //     outgoing()->AddService(...);
 //     FDF_LOG(INFO, "hello world!");
+//     inspector().Health().Ok();
 //     node_client_.Bind(std::move(node()), dispatcher());
 //
 //     /* Ensure all capabilities offered have been added to the outgoing directory first. */
@@ -193,6 +195,20 @@ class DriverBase {
     return start_args_.symbols();
   }
 
+  // A component-wide Inspector for the driver.
+  inspect::ComponentInspector& inspector() {
+    if (!inspector_.has_value()) {
+      InitInspectorExactlyOnce({});
+    }
+
+    return *inspector_;
+  }
+
+  // Initialize the driver's Inspector exactly one time.
+  //
+  // To avoid data races, subsequent calls are ignored are not an error.
+  void InitInspectorExactlyOnce(inspect::Inspector inspector);
+
  private:
   void InitializeAndServe(Namespace incoming,
                           fidl::ServerEnd<fuchsia_io::Directory> outgoing_directory_request);
@@ -203,6 +219,8 @@ class DriverBase {
   async_dispatcher_t* dispatcher_;
   std::shared_ptr<Namespace> incoming_;
   std::shared_ptr<OutgoingDirectory> outgoing_;
+  std::optional<inspect::ComponentInspector> inspector_;
+  std::once_flag init_inspector_once_;
 };
 
 }  // namespace fdf

@@ -26,10 +26,7 @@
 #include <memory>
 #include <unordered_map>
 
-#include <fbl/intrusive_double_list.h>
-
 #include "src/devices/lib/fidl/device_server.h"
-#include "src/storage/lib/vfs/cpp/vmo_file.h"
 
 namespace compat {
 
@@ -107,8 +104,7 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   void CompleteUnbind();
   void CompleteSuspend();
 
-  // Serves the |inspect_vmo| from the driver's diagnostics directory.
-  zx_status_t ServeInspectVmo(zx::vmo inspect_vmo);
+  zx_status_t PublishInspect(zx::vmo inspect_vmo);
 
   // Stores the child's release op, to be called after dispatcher shutdown.
   void AddDelayedChildReleaseOp(std::unique_ptr<DelayedReleaseOp> op);
@@ -269,7 +265,7 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   async::Executor executor_;
 
   // File representing the device's inspect vmo, if any.
-  std::optional<fbl::RefPtr<fs::VmoFile>> inspect_vmo_file_;
+  std::optional<zx::vmo> inspect_vmo_;
 
   // NOTE: Must be the last member.
   fpromise::scope scope_;

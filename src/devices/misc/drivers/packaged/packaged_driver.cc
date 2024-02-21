@@ -6,9 +6,6 @@
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
-#include <lib/inspect/component/cpp/component.h>
-
-#include <optional>
 
 namespace {
 
@@ -19,18 +16,12 @@ class PackagedDriver : public fdf::DriverBase {
       : fdf::DriverBase("packaged", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
-    exposed_inspector_.emplace(inspect::ComponentInspector(
-        dispatcher(), {.client_end = incoming()->Connect<fuchsia_inspect::InspectSink>().value()}));
-    auto& root = exposed_inspector_->root();
-    root.RecordString("hello", "world");
+    inspector().root().RecordString("hello", "world");
 
     FDF_SLOG(DEBUG, "Debug world");
     FDF_SLOG(INFO, "Hello world", KV("The answer is", 42));
     return zx::ok();
   }
-
- private:
-  std::optional<inspect::ComponentInspector> exposed_inspector_ = std::nullopt;
 };
 
 }  // namespace

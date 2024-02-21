@@ -377,7 +377,7 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
   }
 
   if (zx_args->inspect_vmo != ZX_HANDLE_INVALID) {
-    zx_status_t status = device->ServeInspectVmo(zx::vmo(zx_args->inspect_vmo));
+    zx_status_t status = device->PublishInspect(zx::vmo(zx_args->inspect_vmo));
     if (status != ZX_OK) {
       return status;
     }
@@ -585,10 +585,11 @@ zx_status_t Device::CreateNode() {
     if (!class_name.empty()) {
       devfs_args.class_name(class_name);
     }
-    if (inspect_vmo_file_.has_value()) {
+
+    // TODO(b/324637276): this is where the component is exporting its data back to driver_manager
+    if (inspect_vmo_.has_value()) {
       zx::vmo inspect;
-      zx_status_t status =
-          inspect_vmo_file_.value()->vmo().duplicate(ZX_RIGHT_SAME_RIGHTS, &inspect);
+      zx_status_t status = inspect_vmo_->duplicate(ZX_RIGHT_SAME_RIGHTS, &inspect);
       if (status != ZX_OK) {
         FDF_LOGL(ERROR, *logger_, "Failed to duplicate inspect vmo: %s",
                  zx_status_get_string(status));
@@ -1063,23 +1064,23 @@ zx_status_t Device::ConnectFragmentRuntime(const char* fragment_name, const char
   return ConnectFragmentFidl(fragment_name, service_name, protocol_name, std::move(server_token));
 }
 
-zx_status_t Device::ServeInspectVmo(zx::vmo inspect_vmo) {
-  uint64_t size;
-  zx_status_t status = inspect_vmo.get_size(&size);
+zx_status_t Device::PublishInspect(zx::vmo inspect_vmo) {
+  inspect_vmo_.emplace(std::move(inspect_vmo));
+  zx::vmo publishable;
+  auto status = inspect_vmo_->duplicate(ZX_RIGHT_SAME_RIGHTS, &publishable);
   if (status != ZX_OK) {
-    FDF_LOGL(ERROR, *logger_, "Failed to vmo size: %s", zx_status_get_string(status));
+    FDF_LOGL(ERROR, logger(), "Device %s failed to duplicate vmo", OutgoingName().c_str());
     return status;
   }
-  inspect_vmo_file_.emplace(fbl::MakeRefCounted<fs::VmoFile>(std::move(inspect_vmo), size));
 
-  auto inspect_filename = OutgoingName().append(".inspect");
-  ZX_ASSERT(driver() != nullptr);
-  status =
-      driver()->diagnostics_dir().AddEntry(inspect_filename.c_str(), inspect_vmo_file_.value());
-  if (status != ZX_OK) {
-    FDF_LOGL(ERROR, *logger_, "Failed to add inspect vmo: %s", zx_status_get_string(status));
-    return status;
-  }
+  inspect::PublishVmo(
+      dispatcher(), std::move(publishable),
+      inspect::VmoOptions{
+          .tree_name = OutgoingName(),
+          .client_end =
+              driver()->driver_namespace().Connect<fuchsia_inspect::InspectSink>().value(),
+      });
+
   return ZX_OK;
 }
 

@@ -139,7 +139,6 @@ class AmlSdmmc : public fdf::DriverBase,
     fbl::AutoLock lock(&lock_);
     return descs_buffer_->virt();
   }
-  const inspect::Inspector& inspector() const { return inspect_.inspector; }
 
  private:
   constexpr static size_t kResponseCount = 4;
@@ -177,7 +176,6 @@ class AmlSdmmc : public fdf::DriverBase,
   };
 
   struct Inspect {
-    inspect::Inspector inspector;
     inspect::Node root;
     inspect::UintProperty bus_clock_frequency;
     inspect::UintProperty adj_delay;
@@ -190,7 +188,7 @@ class AmlSdmmc : public fdf::DriverBase,
     inspect::UintProperty longest_window_adj_delay;
     inspect::UintProperty distance_to_failing_point;
 
-    void Init(const pdev_device_info_t& device_info);
+    void Init(const pdev_device_info_t& device_info, inspect::Node& parent);
   };
 
   struct TuneContext {
@@ -281,8 +279,6 @@ class AmlSdmmc : public fdf::DriverBase,
   uint64_t consecutive_data_errors_ = 0;
 
   Inspect inspect_;
-
-  std::optional<inspect::ComponentInspector> exposed_inspector_;
 
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;

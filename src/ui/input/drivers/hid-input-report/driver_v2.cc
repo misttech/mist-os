@@ -13,7 +13,6 @@
 #include <lib/driver/component/cpp/internal/symbols.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
-#include <lib/inspect/component/cpp/component.h>
 #include <zircon/errors.h>
 
 #include "lib/fidl/cpp/wire/channel.h"
@@ -48,9 +47,7 @@ class InputReportDriver : public fdf::DriverBase {
     input_report_.emplace(std::move(hiddev));
 
     // Expose the driver's inspect data.
-    exposed_inspector_.emplace(inspect::ComponentInspector(
-        dispatcher(), {.inspector = input_report_->Inspector(),
-                       .client_end = incoming()->Connect<fuchsia_inspect::InspectSink>().value()}));
+    InitInspectorExactlyOnce(input_report_->Inspector());
 
     // Start the inner DFv1 driver.
     input_report_->Start();
@@ -120,7 +117,6 @@ class InputReportDriver : public fdf::DriverBase {
 
   std::optional<hid_input_report_dev::InputReport> input_report_;
   fidl::ServerBindingGroup<fuchsia_input_report::InputDevice> input_report_bindings_;
-  std::optional<inspect::ComponentInspector> exposed_inspector_;
 
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
