@@ -546,7 +546,7 @@ pub enum UdpSerializeError {
 
 impl DatagramSocketSpec for Udp {
     type AddrSpec = Self;
-    type SocketId<I: IpExt> = SocketId<I>;
+    type SocketId<I: IpExt> = UdpSocketId<I>;
     type OtherStackIpOptions<I: IpExt> = I::OtherStackIpOptions<DualStackSocketState>;
     type ListenerIpAddr<I: IpExt> = I::DualStackListenerIpAddr<NonZeroU16>;
     type ConnIpAddr<I: IpExt> = I::DualStackConnIpAddr<Self>;
@@ -1038,15 +1038,15 @@ impl<A: IpAddress, D> From<NonZeroU16> for ListenerInfo<A, D> {
 #[derive(Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 
-pub struct SocketId<I: Ip>(usize, IpVersionMarker<I>);
+pub struct UdpSocketId<I: Ip>(usize, IpVersionMarker<I>);
 
-impl<I: Ip> From<usize> for SocketId<I> {
+impl<I: Ip> From<usize> for UdpSocketId<I> {
     fn from(value: usize) -> Self {
         Self(value, IpVersionMarker::default())
     }
 }
 
-impl<I: Ip> EntryKey for SocketId<I> {
+impl<I: Ip> EntryKey for UdpSocketId<I> {
     fn get_key_index(&self) -> usize {
         let Self(index, _marker) = self;
         *index
@@ -1058,7 +1058,7 @@ pub trait UdpBindingsContext<I: IcmpIpExt, D> {
     /// Receives a UDP packet on a socket.
     fn receive_udp<B: BufferMut>(
         &mut self,
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
         device_id: &D,
         dst_addr: (I::Addr, NonZeroU16),
         src_addr: (I::Addr, Option<NonZeroU16>),
@@ -1347,7 +1347,7 @@ fn try_deliver<
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    id: &SocketId<I>,
+    id: &UdpSocketId<I>,
     device: &CC::DeviceId,
     (dst_ip, dst_port): (I::Addr, NonZeroU16),
     (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
@@ -1410,7 +1410,7 @@ fn try_dual_stack_deliver<
     struct Outputs<I: IpExt> {
         src_ip: I::Addr,
         dst_ip: I::Addr,
-        socket: SocketId<I>,
+        socket: UdpSocketId<I>,
     }
 
     #[derive(GenericOverIp)]
@@ -1561,7 +1561,7 @@ where
     /// Creates an unbound UDP socket.
     ///
     /// `create` creates a new UDP socket and returns an identifier for it.
-    pub fn create(&mut self) -> SocketId<I> {
+    pub fn create(&mut self) -> UdpSocketId<I> {
         datagram::create(self.core_ctx())
     }
 
@@ -1589,7 +1589,7 @@ where
     /// `connect` panics if `id` is not a valid [`SocketId`].
     pub fn connect(
         &mut self,
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
         remote_ip: Option<
             ZonedAddr<
                 SpecifiedAddr<I::Addr>,
@@ -1610,10 +1610,10 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if `id` is not a valid [`SocketId`].
+    /// Panics if `id` is not a valid [`UdpSocketId`].
     pub fn set_device(
         &mut self,
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
         device_id: Option<&<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
     ) -> Result<(), SocketError> {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -1627,7 +1627,7 @@ where
     /// Panics if `id` is not a valid socket ID.
     pub fn get_bound_device(
         &mut self,
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
     ) -> Option<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::get_bound_device(core_ctx, bindings_ctx, id)
@@ -1644,10 +1644,10 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if `id` is not a valid `SocketId`.
+    /// Panics if `id` is not a valid `UdpSocketId`.
     pub fn set_dual_stack_enabled(
         &mut self,
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
         enabled: bool,
     ) -> Result<(), SetDualStackEnabledError> {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -1689,10 +1689,10 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if `id` is not a valid `SocketId`.
+    /// Panics if `id` is not a valid `UdpSocketId`.
     pub fn get_dual_stack_enabled(
         &mut self,
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
     ) -> Result<bool, NotDualStackCapableError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::with_other_stack_ip_options(core_ctx, bindings_ctx, id, |other_stack| {
@@ -1715,10 +1715,10 @@ where
     ///
     /// # Panics
     ///
-    /// panics if `id` is not a valid `SocketId`.
+    /// panics if `id` is not a valid `UdpSocketId`.
     pub fn set_posix_reuse_port(
         &mut self,
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
         reuse_port: bool,
     ) -> Result<(), ExpectedUnboundError> {
         datagram::update_sharing(
@@ -1732,8 +1732,8 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if `id` is not a valid `SocketId`.
-    pub fn get_posix_reuse_port(&mut self, id: &SocketId<I>) -> bool {
+    /// Panics if `id` is not a valid `UdpSocketId`.
+    pub fn get_posix_reuse_port(&mut self, id: &UdpSocketId<I>) -> bool {
         datagram::get_sharing(self.core_ctx(), id).is_reuse_port()
     }
 
@@ -1746,7 +1746,7 @@ where
     /// the existing socket state.
     pub fn set_multicast_membership(
         &mut self,
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
         multicast_group: MulticastAddr<I::Addr>,
         interface: MulticastMembershipInterfaceSelector<
             I::Addr,
@@ -1776,7 +1776,7 @@ where
     /// `ip_version` of [`IpVersion::V6`].
     pub fn set_unicast_hop_limit(
         &mut self,
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
         unicast_hop_limit: Option<NonZeroU8>,
         ip_version: IpVersion,
     ) -> Result<(), NotDualStackCapableError> {
@@ -1815,7 +1815,7 @@ where
     /// `ip_version` of [`IpVersion::V6`].
     pub fn set_multicast_hop_limit(
         &mut self,
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
         multicast_hop_limit: Option<NonZeroU8>,
         ip_version: IpVersion,
     ) -> Result<(), NotDualStackCapableError> {
@@ -1854,7 +1854,7 @@ where
     /// `ip_version` of [`IpVersion::V6`].
     pub fn get_unicast_hop_limit(
         &mut self,
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
         ip_version: IpVersion,
     ) -> Result<NonZeroU8, NotDualStackCapableError> {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -1897,7 +1897,7 @@ where
     /// `ip_version` of [`IpVersion::V6`].
     pub fn get_multicast_hop_limit(
         &mut self,
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
         ip_version: IpVersion,
     ) -> Result<NonZeroU8, NotDualStackCapableError> {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -1931,12 +1931,12 @@ where
     }
 
     /// Gets the transparent option.
-    pub fn get_transparent(&mut self, id: &SocketId<I>) -> bool {
+    pub fn get_transparent(&mut self, id: &UdpSocketId<I>) -> bool {
         crate::socket::datagram::get_ip_transparent(self.core_ctx(), id)
     }
 
     /// Sets the transparent option.
-    pub fn set_transparent(&mut self, id: &SocketId<I>, value: bool) {
+    pub fn set_transparent(&mut self, id: &UdpSocketId<I>, value: bool) {
         crate::socket::datagram::set_ip_transparent(self.core_ctx(), id, value)
     }
 
@@ -1951,8 +1951,8 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if `id` is not a valid `SocketId`.
-    pub fn disconnect(&mut self, id: &SocketId<I>) -> Result<(), ExpectedConnError> {
+    /// Panics if `id` is not a valid `UdpSocketId`.
+    pub fn disconnect(&mut self, id: &UdpSocketId<I>) -> Result<(), ExpectedConnError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::disconnect_connected(core_ctx, bindings_ctx, id)
     }
@@ -1965,10 +1965,10 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if `id` is not a valid `SocketId`.
+    /// Panics if `id` is not a valid `UdpSocketId`.
     pub fn shutdown(
         &mut self,
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
         which: ShutdownType,
     ) -> Result<(), ExpectedConnError> {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -1982,8 +1982,8 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if `id` is not a valid `SocketId`.
-    pub fn get_shutdown(&mut self, id: &SocketId<I>) -> Option<ShutdownType> {
+    /// Panics if `id` is not a valid `UdpSocketId`.
+    pub fn get_shutdown(&mut self, id: &UdpSocketId<I>) -> Option<ShutdownType> {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::get_shutdown_connected(core_ctx, bindings_ctx, id)
     }
@@ -1992,10 +1992,10 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if `id` is not a valid [`SocketId`].
+    /// Panics if `id` is not a valid [`UdpSocketId`].
     pub fn close(
         &mut self,
-        id: SocketId<I>,
+        id: UdpSocketId<I>,
     ) -> SocketInfo<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::close(core_ctx, bindings_ctx, id).into()
@@ -2006,10 +2006,10 @@ where
     ///
     /// # Panics
     ///
-    /// `get_udp_info` panics if `id` is not a valid `SocketId`.
+    /// `get_udp_info` panics if `id` is not a valid `UdpSocketId`.
     pub fn get_info(
         &mut self,
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
     ) -> SocketInfo<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::get_info(core_ctx, bindings_ctx, id).into()
@@ -2034,10 +2034,10 @@ where
     ///
     /// # Panics
     ///
-    /// `listen_udp` panics if `id` is not a valid [`SocketId`].
+    /// `listen_udp` panics if `id` is not a valid [`UdpSocketId`].
     pub fn listen(
         &mut self,
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
         addr: Option<
             ZonedAddr<
                 SpecifiedAddr<I::Addr>,
@@ -2063,7 +2063,7 @@ where
     /// Panics if `id` is not a valid UDP socket identifier.
     pub fn send<B: BufferMut>(
         &mut self,
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
         body: B,
     ) -> Result<(), Either<SendError, ExpectedConnError>> {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -2097,7 +2097,7 @@ where
     /// Panics if `id` is not a valid UDP socket identifier.
     pub fn send_to<B: BufferMut>(
         &mut self,
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
         remote_ip: Option<
             ZonedAddr<
                 SpecifiedAddr<I::Addr>,
@@ -2278,7 +2278,7 @@ impl<
         *addr.to_ipv6_mapped()
     }
 
-    fn to_other_bound_socket_id(&self, id: &SocketId<Ipv6>) -> EitherIpSocket<Udp> {
+    fn to_other_bound_socket_id(&self, id: &UdpSocketId<Ipv6>) -> EitherIpSocket<Udp> {
         EitherIpSocket::V6(id.clone())
     }
 
@@ -2536,22 +2536,22 @@ mod tests {
 
     #[track_caller]
     fn assert_state_removed<I: IpExt, D: crate::device::WeakId>(
-        id: &SocketId<I>,
+        id: &UdpSocketId<I>,
         state: &SocketsState<I, D>,
     ) {
         assert_matches!(state.get(id.get_key_index()), None)
     }
     #[derive(Default)]
     struct FakeBindingsCtxState {
-        received_v4: HashMap<SocketId<Ipv4>, SocketReceived<Ipv4>>,
-        received_v6: HashMap<SocketId<Ipv6>, SocketReceived<Ipv6>>,
+        received_v4: HashMap<UdpSocketId<Ipv4>, SocketReceived<Ipv4>>,
+        received_v6: HashMap<UdpSocketId<Ipv6>, SocketReceived<Ipv6>>,
     }
 
     impl FakeBindingsCtxState {
-        fn received<I: TestIpExt>(&self) -> &HashMap<SocketId<I>, SocketReceived<I>> {
+        fn received<I: TestIpExt>(&self) -> &HashMap<UdpSocketId<I>, SocketReceived<I>> {
             #[derive(GenericOverIp)]
             #[generic_over_ip(I, Ip)]
-            struct Wrap<'a, I: TestIpExt>(&'a HashMap<SocketId<I>, SocketReceived<I>>);
+            struct Wrap<'a, I: TestIpExt>(&'a HashMap<UdpSocketId<I>, SocketReceived<I>>);
             let Wrap(map) = I::map_ip(
                 IpInvariant(self),
                 |IpInvariant(state)| Wrap(&state.received_v4),
@@ -2560,10 +2560,12 @@ mod tests {
             map
         }
 
-        fn received_mut<I: IcmpIpExt>(&mut self) -> &mut HashMap<SocketId<I>, SocketReceived<I>> {
+        fn received_mut<I: IcmpIpExt>(
+            &mut self,
+        ) -> &mut HashMap<UdpSocketId<I>, SocketReceived<I>> {
             #[derive(GenericOverIp)]
             #[generic_over_ip(I, Ip)]
-            struct Wrap<'a, I: IcmpIpExt>(&'a mut HashMap<SocketId<I>, SocketReceived<I>>);
+            struct Wrap<'a, I: IcmpIpExt>(&'a mut HashMap<UdpSocketId<I>, SocketReceived<I>>);
             let Wrap(map) = I::map_ip(
                 IpInvariant(self),
                 |IpInvariant(state)| Wrap(&mut state.received_v4),
@@ -2572,7 +2574,7 @@ mod tests {
             map
         }
 
-        fn socket_data<I: TestIpExt>(&self) -> HashMap<SocketId<I>, Vec<&'_ [u8]>> {
+        fn socket_data<I: TestIpExt>(&self) -> HashMap<UdpSocketId<I>, Vec<&'_ [u8]>> {
             self.received::<I>()
                 .iter()
                 .map(|(id, SocketReceived { packets })| {
@@ -2588,7 +2590,7 @@ mod tests {
     impl<I: IcmpIpExt, D> UdpBindingsContext<I, D> for FakeUdpBindingsCtx {
         fn receive_udp<B: BufferMut>(
             &mut self,
-            id: &SocketId<I>,
+            id: &UdpSocketId<I>,
             _device: &D,
             (dst_ip, _dst_port): (I::Addr, NonZeroU16),
             (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
@@ -3749,7 +3751,7 @@ mod tests {
         let wildcard_list = api.create();
         api.listen(&wildcard_list, None, Some(local_port_c)).expect("listen_udp failed");
 
-        let mut expectations = HashMap::<SocketId<I>, SocketReceived<I>>::new();
+        let mut expectations = HashMap::<UdpSocketId<I>, SocketReceived<I>>::new();
         // Now inject UDP packets that each of the created connections should
         // receive.
         let body_conn1 = [1, 1, 1, 1];
@@ -4484,7 +4486,7 @@ mod tests {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
 
-        let listen_unbound = |api: &mut UdpApi<_, _>, socket: &SocketId<_>| {
+        let listen_unbound = |api: &mut UdpApi<_, _>, socket: &UdpSocketId<_>| {
             api.listen(socket, Some(ZonedAddr::Unzoned(local_ip::<I>())), Some(LOCAL_PORT))
         };
 
@@ -4580,7 +4582,7 @@ mod tests {
     #[test_case(bind_as_listener)]
     #[test_case(bind_as_connected)]
     fn test_set_unset_reuse_port_bound<I: Ip + TestIpExt>(
-        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &SocketId<I>),
+        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &UdpSocketId<I>),
     ) {
         let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
             UdpMultipleDevicesCoreCtx::new_multiple_devices::<I>(),
@@ -4653,7 +4655,7 @@ mod tests {
         mcast_addr: MulticastAddr<I::Addr>,
         interface: MulticastMembershipInterfaceSelector<I::Addr, MultipleDevicesId>,
         set_up_ctx: impl FnOnce(&mut UdpMultipleDevicesCtx),
-        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &SocketId<I>),
+        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &UdpSocketId<I>),
     ) -> (
         Result<(), SetMulticastMembershipError>,
         HashMap<(MultipleDevicesId, MulticastAddr<I::Addr>), NonZeroUsize>,
@@ -4682,15 +4684,15 @@ mod tests {
         (result, memberships_snapshot)
     }
 
-    fn leave_unbound<I: TestIpExt>(_ctx: &mut UdpMultipleDevicesCtx, _unbound: &SocketId<I>) {}
+    fn leave_unbound<I: TestIpExt>(_ctx: &mut UdpMultipleDevicesCtx, _unbound: &UdpSocketId<I>) {}
 
-    fn bind_as_listener<I: TestIpExt>(ctx: &mut UdpMultipleDevicesCtx, unbound: &SocketId<I>) {
+    fn bind_as_listener<I: TestIpExt>(ctx: &mut UdpMultipleDevicesCtx, unbound: &UdpSocketId<I>) {
         UdpApi::<I, _>::new(ctx.as_mut())
             .listen(unbound, Some(ZonedAddr::Unzoned(local_ip::<I>())), Some(LOCAL_PORT))
             .expect("listen should succeed")
     }
 
-    fn bind_as_connected<I: TestIpExt>(ctx: &mut UdpMultipleDevicesCtx, unbound: &SocketId<I>) {
+    fn bind_as_connected<I: TestIpExt>(ctx: &mut UdpMultipleDevicesCtx, unbound: &UdpSocketId<I>) {
         UdpApi::<I, _>::new(ctx.as_mut())
             .connect(
                 unbound,
@@ -4726,7 +4728,7 @@ mod tests {
         "any_interface_connected")]
     fn test_join_leave_multicast_succeeds<I: Ip + TestIpExt>(
         interface: MulticastMembershipInterfaceSelector<I::Addr, MultipleDevicesId>,
-        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &SocketId<I>),
+        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &UdpSocketId<I>),
     ) {
         let mcast_addr = I::get_multicast_addr(3);
 
@@ -4762,7 +4764,7 @@ mod tests {
     #[test_case(bind_as_listener::<I>; "listener")]
     #[test_case(bind_as_connected::<I>; "connected")]
     fn test_join_multicast_fails_without_route<I: Ip + TestIpExt>(
-        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &SocketId<I>),
+        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &UdpSocketId<I>),
     ) {
         let mcast_addr = I::get_multicast_addr(3);
 
@@ -4788,7 +4790,7 @@ mod tests {
     fn test_join_leave_multicast_interface_inferred_from_bound_device<I: Ip + TestIpExt>(
         bound_device: MultipleDevicesId,
         interface_addr: Option<SpecifiedAddr<I::Addr>>,
-        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &SocketId<I>),
+        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &UdpSocketId<I>),
         expected_result: Result<(), SetMulticastMembershipError>,
     ) {
         let mcast_addr = I::get_multicast_addr(3);
@@ -6386,12 +6388,12 @@ mod tests {
         let mut try_insert = |(index, (addr, options))| match addr {
             AddrVec::Conn(c) => map
                 .conns_mut()
-                .try_insert(c, options, EitherIpSocket::V4(SocketId::from(index)))
+                .try_insert(c, options, EitherIpSocket::V4(UdpSocketId::from(index)))
                 .map(|_| ())
                 .map_err(|(e, _)| e),
             AddrVec::Listen(l) => map
                 .listeners_mut()
-                .try_insert(l, options, EitherIpSocket::V4(SocketId::from(index)))
+                .try_insert(l, options, EitherIpSocket::V4(UdpSocketId::from(index)))
                 .map(|_| ())
                 .map_err(|(e, _)| e),
         };
@@ -6426,8 +6428,8 @@ mod tests {
         I::IntoIter: ExactSizeIterator,
     {
         enum Socket<A: IpAddress, D, LI, RI> {
-            Listener(SocketId<A::Version>, ListenerAddr<ListenerIpAddr<A, LI>, D>),
-            Conn(SocketId<A::Version>, ConnAddr<ConnIpAddr<A, LI, RI>, D>),
+            Listener(UdpSocketId<A::Version>, ListenerAddr<ListenerIpAddr<A, LI>, D>),
+            Conn(UdpSocketId<A::Version>, ConnAddr<ConnIpAddr<A, LI, RI>, D>),
         }
         let spec = spec.into_iter();
         let spec_len = spec.len();
@@ -6439,7 +6441,7 @@ mod tests {
                 .map(|(socket_index, (addr, options))| match addr {
                     AddrVec::Conn(c) => map
                         .conns_mut()
-                        .try_insert(c, options, EitherIpSocket::V4(SocketId::from(socket_index)))
+                        .try_insert(c, options, EitherIpSocket::V4(UdpSocketId::from(socket_index)))
                         .map(|entry| {
                             Socket::Conn(
                                 assert_matches!(entry.id(), EitherIpSocket::V4(id) => id.clone()),
@@ -6449,7 +6451,7 @@ mod tests {
                         .expect("insert_failed"),
                     AddrVec::Listen(l) => map
                         .listeners_mut()
-                        .try_insert(l, options, EitherIpSocket::V4(SocketId::from(socket_index)))
+                        .try_insert(l, options, EitherIpSocket::V4(UdpSocketId::from(socket_index)))
                         .map(|entry| {
                             Socket::Listener(
                                 assert_matches!(entry.id(), EitherIpSocket::V4(id) => id.clone()),
@@ -6535,7 +6537,7 @@ mod tests {
     }
 
     impl OriginalSocketState {
-        fn create_socket<I, C>(&self, api: &mut UdpApi<I, C>) -> SocketId<I>
+        fn create_socket<I, C>(&self, api: &mut UdpApi<I, C>) -> UdpSocketId<I>
         where
             I: TestIpExt,
             C: ContextPair,

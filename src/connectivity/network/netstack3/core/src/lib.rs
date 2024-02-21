@@ -128,7 +128,7 @@ pub mod inspect {
 
 /// Methods for dealing with ICMP sockets.
 pub mod icmp {
-    pub use crate::ip::icmp::socket::{IcmpEchoBindingsContext, SocketId, SocketInfo};
+    pub use crate::ip::icmp::socket::{IcmpEchoBindingsContext, IcmpSocketId, SocketInfo};
 }
 
 /// The Internet Protocol, versions 4 and 6.
@@ -251,8 +251,8 @@ pub mod types {
 /// Methods for dealing with UDP sockets.
 pub mod udp {
     pub use crate::transport::udp::{
-        ConnInfo, ListenerInfo, SendError, SendToError, SocketId, SocketInfo, UdpBindingsContext,
-        UdpRemotePort,
+        ConnInfo, ListenerInfo, SendError, SendToError, SocketInfo, UdpBindingsContext,
+        UdpRemotePort, UdpSocketId,
     };
 }
 

@@ -72,7 +72,7 @@ use netstack3_core::{
     },
     error::NetstackError,
     filter::FilterBindingsTypes,
-    icmp::{self, IcmpEchoBindingsContext},
+    icmp::{IcmpEchoBindingsContext, IcmpSocketId},
     inspect::{InspectableValue, Inspector},
     ip::{
         AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
@@ -81,7 +81,7 @@ use netstack3_core::{
     },
     neighbor,
     routes::RawMetric,
-    udp::{self, UdpBindingsContext},
+    udp::{UdpBindingsContext, UdpSocketId},
     EventContext, InstantBindingsTypes, InstantContext, IpExt, RngContext, StackState,
     TimerContext, TimerId, TracingContext,
 };
@@ -542,7 +542,7 @@ impl<I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho> + Ip
 {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
-        conn: &icmp::SocketId<I>,
+        conn: &IcmpSocketId<I>,
         device: &DeviceId<BindingsCtx>,
         src_ip: I::Addr,
         dst_ip: I::Addr,
@@ -561,7 +561,7 @@ where
 {
     fn receive_udp<B: BufferMut>(
         &mut self,
-        id: &udp::SocketId<I>,
+        id: &UdpSocketId<I>,
         device: &DeviceId<BindingsCtx>,
         dst_addr: (<I>::Addr, NonZeroU16),
         src_addr: (<I>::Addr, Option<NonZeroU16>),

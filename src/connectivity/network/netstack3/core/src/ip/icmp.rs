@@ -3055,7 +3055,7 @@ mod tests {
                 route_discovery::Ipv6DiscoveredRoute, state::IpDeviceStateIpExt, IpDeviceAddr,
                 IpDeviceHandler,
             },
-            icmp::socket::{IcmpEchoSocketApi, SocketId, SocketsState, StateContext},
+            icmp::socket::{IcmpEchoSocketApi, IcmpSocketId, SocketsState, StateContext},
             path_mtu::testutil::FakePmtuState,
             socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
             testutil::DualStackSendIpPacketMeta,
@@ -3291,7 +3291,7 @@ mod tests {
     impl<I: IcmpIpExt, D> IcmpEchoBindingsContext<I, D> for FakeIcmpBindingsCtx<I> {
         fn receive_icmp_echo_reply<B: BufferMut>(
             &mut self,
-            conn: &SocketId<I>,
+            conn: &IcmpSocketId<I>,
             _device_id: &D,
             src_ip: I::Addr,
             dst_ip: I::Addr,
@@ -3948,7 +3948,7 @@ mod tests {
     // The arguments to `BufferIcmpContext::receive_icmp_echo_reply`.
     #[allow(unused)] // TODO(joshlf): Remove once we access these fields.
     struct ReceiveIcmpEchoReply<I: Ip> {
-        conn: SocketId<I>,
+        conn: IcmpSocketId<I>,
         src_ip: I::Addr,
         dst_ip: I::Addr,
         id: u16,
@@ -4191,7 +4191,7 @@ mod tests {
             // 0. If this assertion fails in the future, that isn't necessarily
             // evidence of a bug; we may just have to update this test to
             // accommodate whatever new ID allocation scheme is being used.
-            assert_eq!(conn, SocketId::new(0));
+            assert_eq!(conn, IcmpSocketId::new(0));
             socket_api.bind(&conn, None, NonZeroU16::new(ICMP_ID)).unwrap();
             socket_api
                 .connect(&conn, Some(ZonedAddr::Unzoned(FAKE_CONFIG_V4.remote_ip)), REMOTE_ID)
@@ -4490,7 +4490,7 @@ mod tests {
             // 0. If this assertion fails in the future, that isn't necessarily
             // evidence of a bug; we may just have to update this test to
             // accommodate whatever new ID allocation scheme is being used.
-            assert_eq!(conn, SocketId::new(0));
+            assert_eq!(conn, IcmpSocketId::new(0));
             socket_api.bind(&conn, None, NonZeroU16::new(ICMP_ID)).unwrap();
             socket_api
                 .connect(&conn, Some(ZonedAddr::Unzoned(FAKE_CONFIG_V6.remote_ip)), REMOTE_ID)

@@ -31,7 +31,7 @@ use net_types::{
 use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
     error::{LocalAddressError, NotSupportedError, SocketError},
-    icmp::{self, IcmpEchoBindingsContext},
+    icmp::{self, IcmpEchoBindingsContext, IcmpSocketId},
     ip::{IpSockCreateAndSendError, IpSockSendError},
     socket::{
         self as core_socket, ConnectError, ExpectedConnError, ExpectedUnboundError,
@@ -39,7 +39,7 @@ use netstack3_core::{
         SetDualStackEnabledError, SetMulticastMembershipError, ShutdownType,
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
-    udp::{self, UdpBindingsContext},
+    udp::{self, UdpBindingsContext, UdpSocketId},
     IpExt,
 };
 use packet::{Buf, BufferMut};
@@ -369,7 +369,7 @@ pub(crate) enum Udp {}
 impl<I: Ip> Transport<I> for Udp {
     const PROTOCOL: DatagramProtocol = DatagramProtocol::Udp;
     const SUPPORTS_DUALSTACK: bool = true;
-    type SocketId = udp::SocketId<I>;
+    type SocketId = UdpSocketId<I>;
 }
 
 impl OptionFromU16 for NonZeroU16 {
@@ -573,7 +573,7 @@ where
 impl<I: IpExt> UdpBindingsContext<I, DeviceId<BindingsCtx>> for SocketCollection<I, Udp> {
     fn receive_udp<B: BufferMut>(
         &mut self,
-        id: &udp::SocketId<I>,
+        id: &UdpSocketId<I>,
         device_id: &DeviceId<BindingsCtx>,
         (dst_ip, dst_port): (<I>::Addr, NonZeroU16),
         (src_ip, src_port): (<I>::Addr, Option<NonZeroU16>),
@@ -598,7 +598,7 @@ pub(crate) enum IcmpEcho {}
 impl<I: Ip> Transport<I> for IcmpEcho {
     const PROTOCOL: DatagramProtocol = DatagramProtocol::IcmpEcho;
     const SUPPORTS_DUALSTACK: bool = false;
-    type SocketId = icmp::SocketId<I>;
+    type SocketId = IcmpSocketId<I>;
 }
 
 impl OptionFromU16 for u16 {
@@ -872,7 +872,7 @@ impl<E> IntoErrno for core_socket::SendToError<E> {
 impl<I: IpExt> IcmpEchoBindingsContext<I, DeviceId<BindingsCtx>> for SocketCollection<I, IcmpEcho> {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
-        conn: &icmp::SocketId<I>,
+        conn: &IcmpSocketId<I>,
         device: &DeviceId<BindingsCtx>,
         src_ip: I::Addr,
         dst_ip: I::Addr,
