@@ -6,6 +6,7 @@
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <unistd.h>
+#include <zircon/process.h>
 
 #include <limits>
 #include <memory>
@@ -25,9 +26,29 @@
 #include "src/graphics/examples/vkproto/common/physical_device.h"
 #include "src/graphics/examples/vkproto/common/render_pass.h"
 #include "src/graphics/examples/vkproto/common/utils.h"
-#include "src/lib/fsl/handles/object_info.h"
 
 #include <vulkan/vulkan.hpp>
+
+namespace {
+
+static std::string GetObjectName(zx_handle_t handle) {
+  char name[ZX_MAX_NAME_LEN];
+  zx_status_t status = zx_object_get_property(handle, ZX_PROP_NAME, name, sizeof(name));
+  return status == ZX_OK ? std::string(name) : std::string();
+}
+
+zx_koid_t GetKoid(zx_handle_t handle) {
+  zx_info_handle_basic_t info;
+  zx_status_t status =
+      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
+}
+
+zx_koid_t GetCurrentProcessKoid() { return GetKoid(zx_process_self()); }
+
+std::string GetCurrentProcessName() { return GetObjectName(zx_process_self()); }
+
+}  // namespace
 
 static inline uint32_t to_uint32(uint64_t val) {
   assert(val <= std::numeric_limits<uint32_t>::max());
@@ -236,7 +257,7 @@ TEST(TransactionElimination, ForeignQueueSysmem) {
     fidl::SyncClient sysmem_allocator(std::move(*sysmem_allocator_end));
     ASSERT_TRUE(sysmem_allocator
                     ->SetDebugClientInfo(fuchsia_sysmem::AllocatorSetDebugClientInfoRequest{
-                        fsl::GetCurrentProcessName(), fsl::GetCurrentProcessKoid()})
+                        GetCurrentProcessName(), GetCurrentProcessKoid()})
                     .is_ok());
     auto token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
     ASSERT_TRUE(token_endpoints.is_ok()) << token_endpoints.status_string();
