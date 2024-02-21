@@ -12,14 +12,6 @@
             url: "vkreadback-test#meta/vkreadback_child.cm",
         },
     ],
-    offer: [
-        {
-            from: "void",
-            to: "#test",
-            config: "fuchsia.gpu.test.GpuVendorId",
-            availability: "optional",
-        },
-    ],
     expose: [
         {
             protocol: "fuchsia.test.Suite",
