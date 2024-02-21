@@ -27,6 +27,7 @@ use {
             self,
             router::{Request, Routable, Router},
             service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
+            RoutingError,
         },
         routing_fns::route_fn,
         token::{InstanceToken, InstanceTokenState},
@@ -639,7 +640,7 @@ impl ComponentInstance {
                 //
                 // TODO(https://fxbug.dev/319542502): Consider using the external Router type, once it exists
                 let router = match value {
-                    Capability::Open(o) => Router::from_routable(o),
+                    Capability::Open(o) => Router::from_capability(o.into()),
                     _ => return Err(AddDynamicChildError::InvalidDictionary),
                 };
 
@@ -1716,28 +1717,36 @@ impl ResolvedInstanceState {
         }
         let outgoing_dict = Self::build_program_outgoing_dict(component, &decl.capabilities);
         let weak_component = WeakComponentInstance::new(component);
-        Router::new(move |mut request| {
+        Router::new(move |request| {
             if let Ok(component) = weak_component.upgrade() {
                 let component_clone = component.clone();
                 let outgoing_dict = outgoing_dict.clone();
                 let capability_name = capability_name.clone();
                 async move {
                     let target_moniker = request.target.moniker.clone();
-                    request.relative_path.prepend(capability_name.to_string());
-
                     // If the component is already started, this will be a no-op.
                     match component_clone
                         .start(
                             &StartReason::AccessCapability {
                                 target: target_moniker,
-                                name: capability_name,
+                                name: capability_name.clone(),
                             },
                             None,
                             IncomingCapabilities::default(),
                         )
                         .await
                     {
-                        Ok(_) => outgoing_dict.route(request).await,
+                        Ok(_) => {
+                            let cap =
+                                outgoing_dict.get_capability(iter::once(capability_name.as_str()));
+                            match cap {
+                                Some(cap) => cap.route(request).await,
+                                None => Err(RoutingError::BedrockNotPresentInDictionary {
+                                    name: capability_name.into(),
+                                }
+                                .into()),
+                            }
+                        }
                         Err(e) => Err(OpenError::from(CapabilityProviderError::from(
                             ComponentProviderError::from(e),
                         ))
@@ -1775,7 +1784,7 @@ impl ResolvedInstanceState {
             let name = capability.name().as_str();
             let path = fuchsia_fs::canonicalize_path(path.as_str());
             let open = outgoing_dir.clone().downscope_path(sandbox::Path::new(path));
-            let router = open
+            let router = Capability::Open(open)
                 .with_capability_requested_hook(weak_component.clone(), capability.name().clone());
             dict.insert_capability(iter::once(name), router.into());
         }

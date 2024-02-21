@@ -4,6 +4,7 @@
 
 use crate::capability::CapabilitySource;
 use crate::model::{component::WeakComponentInstance, error::RouteOrOpenError};
+use crate::sandbox_util::walk_dict_resolve_routers;
 use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
 use async_trait::async_trait;
 use cm_types::Availability;
@@ -45,11 +46,6 @@ pub type RouteFn =
 /// [`Request`] contains metadata around how to obtain a capability.
 #[derive(Debug, Clone)]
 pub struct Request {
-    /// If the capability supports path-style child object access and attenuation,
-    /// requests to access into that path. Otherwise, the request should be rejected
-    /// with an unsupported error.
-    pub relative_path: Path,
-
     /// The minimal availability strength of the capability demanded by the requestor.
     pub availability: Availability,
 
@@ -126,6 +122,10 @@ impl Router {
         Router::new(route_fn)
     }
 
+    pub fn from_capability(capability: Capability) -> Router {
+        Router::from_routable(capability)
+    }
+
     /// Obtain a capability from this router, following the description in `request`.
     pub async fn route(&self, request: Request) -> Result<Capability, RouteOrOpenError> {
         (self.route_fn)(request).await
@@ -135,16 +135,35 @@ impl Router {
     /// to the base router, i.e. attenuates the base router to the subset of capabilities
     /// that live under `path`.
     pub fn with_path<'a>(self, path: impl DoubleEndedIterator<Item = &'a str>) -> Router {
-        let segments: Vec<_> = path.map(|s| s.to_string()).rev().collect();
+        let segments: Vec<_> = path.map(|s| s.to_string()).collect();
         if segments.is_empty() {
             return self;
         }
-        let route_fn = move |mut request: Request| {
-            for name in &segments {
-                request.relative_path.prepend(name.clone());
-            }
+        let route_fn = move |request: Request| {
             let router = self.clone();
-            async move { router.route(request).await }.boxed()
+            let segments = segments.clone();
+            async move {
+                match router.route(request.clone()).await? {
+                    Capability::Dictionary(dict) => {
+                        match walk_dict_resolve_routers(&dict, segments.clone(), request.clone())
+                            .await
+                        {
+                            Some(cap) => cap.route(request).await,
+                            None => {
+                                return Err(RoutingError::BedrockNotPresentInDictionary {
+                                    name: segments.join("/"),
+                                }
+                                .into());
+                            }
+                        }
+                    }
+                    Capability::Open(open) => {
+                        Ok(open.downscope_path(Path::new(&segments.join("/")).into()).into())
+                    }
+                    _ => Err(RoutingError::BedrockUnsupportedCapability.into()),
+                }
+            }
+            .boxed()
         };
         Router::new(route_fn)
     }
@@ -205,7 +224,6 @@ impl Router {
                 Capability::Router(r) => {
                     let router = Router::from_any(r.clone());
                     let request = Request {
-                        relative_path: sandbox::Path::default(),
                         target: weak_component.clone(),
                         // Use the weakest availability, so that it gets immediately upgraded to
                         // the availability in `router`.
@@ -273,7 +291,7 @@ impl Router {
                                 .into(),
                                 cap => cap,
                             };
-                            match super::capability_into_open(capability) {
+                            match super::capability_into_open(capability.clone()) {
                                 Ok(open) => open.open(scope, flags, relative_path, server_end),
                                 Err(error) => errors_fn(ErrorCapsule {
                                     error,
@@ -356,65 +374,13 @@ impl From<Router> for fsandbox::Capability {
     }
 }
 
-fn try_routable_from_enum(capability: Capability) -> Option<Router> {
-    match capability {
-        Capability::Dictionary(c) => Some(Router::from_routable(c)),
-        Capability::Open(c) => Some(Router::from_routable(c)),
-        Capability::Router(c) => Some(Router::from_any(c)),
-        _ => None,
-    }
-}
-
 #[async_trait]
 impl Routable for Capability {
     async fn route(&self, request: Request) -> Result<Capability, RouteOrOpenError> {
-        match try_routable_from_enum(self.clone()) {
-            Some(router) => router.route(request).await,
-            None => {
-                if request.relative_path.is_empty() {
-                    Ok(self.clone())
-                } else {
-                    Err(RoutingError::BedrockUnsupportedCapability.into())
-                }
-            }
+        match self.clone() {
+            Capability::Router(router) => Router::from_any(router).route(request).await,
+            capability => Ok(capability),
         }
-    }
-}
-
-/// Dictionary supports routing requests:
-/// - Check if path is empty, then resolve the completer with the current object.
-/// - If not, see if there's a entry corresponding to the next path segment, and
-///   - Delegate the rest of the request to that entry.
-///   - If no entry found, close the completer with an error.
-#[async_trait]
-impl Routable for Dict {
-    async fn route(&self, mut request: Request) -> Result<Capability, RouteOrOpenError> {
-        let Some(name) = request.relative_path.next() else {
-            return Ok(self.clone().into());
-        };
-        let capability = {
-            let entries = self.lock_entries();
-            let Some(capability) = entries.get(&name) else {
-                return Err(
-                    RoutingError::BedrockNotPresentInDictionary { name: name.into() }.into()
-                );
-            };
-            capability.clone()
-        };
-        capability.route(request).await
-    }
-}
-
-#[async_trait]
-impl Routable for Open {
-    /// Each request from the router will yield an [`Open`]  with rights downscoped to
-    /// `request.rights` and paths relative to `request.relative_path`.
-    async fn route(&self, request: Request) -> Result<Capability, RouteOrOpenError> {
-        let mut open = self.clone();
-        if !request.relative_path.is_empty() {
-            open = open.downscope_path(request.relative_path);
-        }
-        Ok(open.into())
     }
 }
 
@@ -461,7 +427,6 @@ mod tests {
         let proxy = base.with_availability(Availability::Optional);
         let capability = proxy
             .route(Request {
-                relative_path: Path::default(),
                 availability: Availability::Optional,
                 target: WeakComponentInstance::invalid(),
             })
@@ -481,7 +446,6 @@ mod tests {
         let proxy = base.with_availability(Availability::Optional);
         let error = proxy
             .route(Request {
-                relative_path: Path::default(),
                 availability: Availability::Required,
                 target: WeakComponentInstance::invalid(),
             })
@@ -505,7 +469,6 @@ mod tests {
 
         let capability = router
             .route(Request {
-                relative_path: Path::default(),
                 availability: Availability::Required,
                 target: WeakComponentInstance::invalid(),
             })
@@ -530,15 +493,12 @@ mod tests {
         let source = Capability::Data(Data::String("hello".to_string()));
         let dict1 = Dict::new();
         dict1.lock_entries().insert("source".to_owned(), source);
-        let dict2 = Dict::new();
-        dict2.lock_entries().insert("dict1".to_owned(), Capability::Dictionary(dict1));
 
-        let base_router = Router::from_routable(dict2);
-        let downscoped_router = base_router.with_path(iter::once("dict1"));
+        let base_router = Router::from_capability(dict1.into());
+        let downscoped_router = base_router.with_path(iter::once("source"));
 
         let capability = downscoped_router
             .route(Request {
-                relative_path: Path::new("source"),
                 availability: Availability::Optional,
                 target: WeakComponentInstance::invalid(),
             })
@@ -563,12 +523,12 @@ mod tests {
         let dict4 = Dict::new();
         dict4.lock_entries().insert("dict3".to_owned(), Capability::Dictionary(dict3));
 
-        let base_router = Router::from_routable(dict4);
-        let downscoped_router = base_router.with_path(vec!["dict3", "dict2"].into_iter());
+        let base_router = Router::from_capability(dict4.into());
+        let downscoped_router =
+            base_router.with_path(vec!["dict3", "dict2", "dict1", "source"].into_iter());
 
         let capability = downscoped_router
             .route(Request {
-                relative_path: Path::new("dict1/source"),
                 availability: Availability::Optional,
                 target: WeakComponentInstance::invalid(),
             })

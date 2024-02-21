@@ -297,7 +297,6 @@ fn service_or_protocol_use(
     // Bedrock routing.
     if let UseDecl::Protocol(use_protocol_decl) = &use_ {
         let request = Request {
-            relative_path: sandbox::Path::default(),
             availability: use_protocol_decl.availability.clone(),
             target: component.clone(),
         };
@@ -345,7 +344,7 @@ fn service_or_protocol_use(
         // TODO(https://fxbug.dev/324138478): We will be able to assert that the program input dict
         // must have the required capability if we always add a Router to the program input
         // dict for every protocol use declaration.
-        let router = Router::from_routable(program_input_dict.clone())
+        let router = Router::from_capability(program_input_dict.clone().into())
             .with_path(use_protocol_decl.target_path.iter_segments());
         let open =
             router.into_open(request, fio::DirentType::Service, blocking_task_group, errors_fn);

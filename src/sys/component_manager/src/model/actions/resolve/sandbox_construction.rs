@@ -8,7 +8,7 @@ use {
         model::{
             component::{ComponentInstance, ResolvedInstanceState, WeakComponentInstance},
             error::RouteOrOpenError,
-            routing::router::{Request, Routable, Router},
+            routing::router::{Request, Router},
         },
         sandbox_util::{DictExt, LaunchTaskOnReceive},
     },
@@ -249,7 +249,7 @@ fn extend_dict_with_dictionary(
         };
         make_dict_extending_router(component.as_weak(), dict.clone(), source_dict_router)
     } else {
-        Router::from_routable(dict.clone())
+        Router::from_capability(dict.clone().into())
     };
     declared_dictionaries.insert_capability(iter::once(decl.name.as_str()), dict.into());
     program_output_dict.insert_capability(iter::once(decl.name.as_str()), router.into());
@@ -266,23 +266,20 @@ fn make_dict_extending_router(
     source_dict_router: Router,
 ) -> Router {
     let did_combine = Arc::new(std::sync::Mutex::new(false));
-    let route_fn = move |request: Request| {
+    let route_fn = move |_request: Request| {
         let source_dict_router = source_dict_router.clone();
         let dict = dict.clone();
         let did_combine = did_combine.clone();
         let component = component.clone();
         async move {
-            // If we've already combined then route from our dict.
+            // If we've already combined then return our dict.
             if *did_combine.lock().unwrap() {
-                return dict.route(request).await;
+                return Ok(dict.into());
             }
 
             // Otherwise combine the two.
-            let source_request = Request {
-                relative_path: sandbox::Path::default(),
-                availability: cm_types::Availability::Required,
-                target: component,
-            };
+            let source_request =
+                Request { availability: cm_types::Availability::Required, target: component };
             let source_dict = match source_dict_router.route(source_request).await? {
                 Capability::Dictionary(d) => d,
                 _ => panic!("source_dict_router must return a Dict"),
@@ -302,7 +299,7 @@ fn make_dict_extending_router(
                 }
             }
             *did_combine.lock().unwrap() = true;
-            dict.route(request).await
+            Ok(dict.into())
         }
         .boxed()
     };
@@ -421,8 +418,9 @@ fn use_from_parent_router(
     source_path: impl IterablePath + 'static,
     weak_component: WeakComponentInstance,
 ) -> Router {
-    let component_input_capability = Router::from_routable(component_input.capabilities.clone())
-        .with_path(source_path.iter_segments());
+    let component_input_capability =
+        Router::from_capability(component_input.capabilities.clone().into())
+            .with_path(source_path.iter_segments());
 
     Router::new(move |request| {
         let source_path = source_path.clone();
@@ -462,7 +460,7 @@ fn use_from_parent_router(
                     .program_input_dict_additions
                     .as_ref()
                     .and_then(|dict| match dict.get_capability(source_path.iter_segments()) {
-                        Some(Capability::Open(o)) => Some(Router::from_routable(o)),
+                        Some(Capability::Open(o)) => Some(Router::from_capability(o.into())),
                         _ => None,
                     })
                     // Try to get the capability from the component input dict, created from static

@@ -5,7 +5,7 @@
 use {
     crate::model::{
         component::{ComponentInstance, WeakComponentInstance},
-        routing::router::{Request, Router},
+        routing::router::{Request, Routable, Router},
     },
     crate::PathBuf,
     ::routing::{
@@ -115,7 +115,7 @@ impl DictExt for Dict {
     }
 
     fn get_capability<'a>(&self, mut path: impl Iterator<Item = &'a str>) -> Option<Capability> {
-        let Some(mut current_name) = path.next() else { return None };
+        let Some(mut current_name) = path.next() else { return Some(self.clone().into()) };
         let mut current_dict = self.clone();
         loop {
             match path.next() {
@@ -196,6 +196,28 @@ impl DictExt for Dict {
             }
         }
     }
+}
+
+// Attempt to look up `path` within `dict`. If any of the capbilities along the `path` field are
+// routers, then get the underlying capability by using `request`.
+pub async fn walk_dict_resolve_routers(
+    dict: &Dict,
+    path: Vec<String>,
+    request: Request,
+) -> Option<Capability> {
+    let mut current_capability: Capability = dict.clone().into();
+    for next_name in path {
+        // We have another name but no subdictionary, so exit.
+        let Capability::Dictionary(current_dict) = &current_capability else {
+            return None;
+        };
+
+        // Get the capability.
+        let capability = current_dict.lock_entries().get(&next_name.to_string())?.clone();
+        // Resolve the capability, this is a noop if it's not a resolver.
+        current_capability = capability.route(request.clone()).await.ok()?;
+    }
+    Some(current_capability)
 }
 
 /// Waits for a new message on a receiver, and launches a new async task on a `WeakTaskGroup` to
@@ -417,7 +439,7 @@ pub mod tests {
         let test_dict = Dict::new();
         test_dict.lock_entries().insert("foo".to_string(), Capability::Dictionary(sub_dict));
 
-        assert!(test_dict.get_capability(iter::empty()).is_none());
+        assert!(test_dict.get_capability(iter::empty()).is_some());
         assert!(test_dict.get_capability(iter::once("nonexistent")).is_none());
         assert!(test_dict.get_capability(iter::once("foo")).is_some());
         assert!(test_dict.get_capability(["foo", "bar"].into_iter()).is_some());
