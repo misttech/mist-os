@@ -139,7 +139,7 @@ impl MountedVolumesGuard<'_> {
         .await?;
         volume
             .volume()
-            .start_flush_task(flush_task_config, self.volumes_directory.mem_monitor.as_ref());
+            .start_background_task(flush_task_config, self.volumes_directory.mem_monitor.as_ref());
         self.mounted_volumes.insert(store_id, (name.to_string(), volume.clone()));
         if let Some(inspect) = self.volumes_directory.inspect_tree.upgrade() {
             inspect.register_volume(

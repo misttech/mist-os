@@ -56,8 +56,9 @@ const DIRENT_CACHE_LIMIT: usize = 8000;
 
 #[derive(Clone)]
 pub struct MemoryPressureLevelConfig {
-    /// The period to wait between flushes.
-    pub flush_period: Duration,
+    /// The period to wait between flushes, as well as perform other background maintenance tasks
+    /// (e.g. purging caches).
+    pub background_task_period: Duration,
     /// The limit of cached nodes.
     pub cache_size_limit: usize,
 }
@@ -90,15 +91,15 @@ impl Default for MemoryPressureConfig {
         // frequency.
         Self {
             mem_normal: MemoryPressureLevelConfig {
-                flush_period: Duration::from_secs(20),
+                background_task_period: Duration::from_secs(20),
                 cache_size_limit: DIRENT_CACHE_LIMIT,
             },
             mem_warning: MemoryPressureLevelConfig {
-                flush_period: Duration::from_secs(5),
+                background_task_period: Duration::from_secs(5),
                 cache_size_limit: 100,
             },
             mem_critical: MemoryPressureLevelConfig {
-                flush_period: Duration::from_millis(1500),
+                background_task_period: Duration::from_millis(1500),
                 cache_size_limit: 20,
             },
         }
@@ -115,7 +116,7 @@ pub struct FxVolume {
     executor: fasync::EHandle,
 
     // A tuple of the actual task and a channel to signal to terminate the task.
-    flush_task: Mutex<Option<(fasync::Task<()>, oneshot::Sender<()>)>>,
+    background_task: Mutex<Option<(fasync::Task<()>, oneshot::Sender<()>)>>,
 
     // Unique identifier of the filesystem that owns this volume.
     fs_id: u64,
@@ -140,7 +141,7 @@ impl FxVolume {
             store,
             pager: Pager::new(scope.clone())?,
             executor: fasync::EHandle::local(),
-            flush_task: Mutex::new(None),
+            background_task: Mutex::new(None),
             fs_id,
             scope,
             dirent_cache: DirentCache::new(DIRENT_CACHE_LIMIT),
@@ -185,7 +186,7 @@ impl FxVolume {
         self.scope.wait().await;
 
         self.store.filesystem().graveyard().flush().await;
-        let task = std::mem::replace(&mut *self.flush_task.lock().unwrap(), None);
+        let task = std::mem::replace(&mut *self.background_task.lock().unwrap(), None);
         if let Some((task, terminate)) = task {
             let _ = terminate.send(());
             task.await;
@@ -278,49 +279,51 @@ impl FxVolume {
         Ok(())
     }
 
-    /// Starts the background flush task.  This task will periodically scan all files and flush them
-    /// to disk.
+    /// Starts the background work task.  This task will periodically:
+    ///   - scan all files and flush them to disk, and
+    ///   - purge unused cached data.
     /// The task will hold a strong reference to the FxVolume while it is running, so the task must
     /// be closed later with Self::terminate, or the FxVolume will never be dropped.
-    pub fn start_flush_task(
+    pub fn start_background_task(
         self: &Arc<Self>,
         config: MemoryPressureConfig,
         mem_monitor: Option<&MemoryPressureMonitor>,
     ) {
-        let mut flush_task = self.flush_task.lock().unwrap();
-        if flush_task.is_none() {
+        let mut background_task = self.background_task.lock().unwrap();
+        if background_task.is_none() {
             let (tx, rx) = oneshot::channel();
 
             let task = if let Some(mem_monitor) = mem_monitor {
-                fasync::Task::spawn(self.clone().flush_task(
+                fasync::Task::spawn(self.clone().background_task(
                     config,
                     mem_monitor.get_level_stream(),
                     rx,
                 ))
             } else {
                 // With no memory pressure monitoring, just stub the stream out as always pending.
-                fasync::Task::spawn(self.clone().flush_task(config, stream::pending(), rx))
+                fasync::Task::spawn(self.clone().background_task(config, stream::pending(), rx))
             };
 
-            *flush_task = Some((task, tx));
+            *background_task = Some((task, tx));
         }
     }
 
-    async fn flush_task(
+    async fn background_task(
         self: Arc<Self>,
         config: MemoryPressureConfig,
         mut level_stream: impl Stream<Item = MemoryPressureLevel> + FusedStream + Unpin,
         terminate: oneshot::Receiver<()>,
     ) {
-        debug!(store_id = self.store.store_object_id(), "FxVolume::flush_task start");
+        debug!(store_id = self.store.store_object_id(), "FxVolume::background_task start");
         let mut terminate = terminate.fuse();
-        // Default to the normal flush period until updates come from the `level_stream`.
+        // Default to the normal period until updates come from the `level_stream`.
         let mut level = MemoryPressureLevel::Normal;
-        let mut timer = fasync::Timer::new(config.for_level(&level).flush_period).fuse();
+        let mut timer = fasync::Timer::new(config.for_level(&level).background_task_period).fuse();
 
         loop {
             let mut should_terminate = false;
             let mut should_flush = false;
+            let mut should_purge_layer_files = false;
             let mut should_update_cache_limit = false;
 
             futures::select_biased! {
@@ -331,20 +334,26 @@ impl FxVolume {
                     // At critical levels, it's okay to undertake expensive work immediately
                     // to reclaim memory.
                     should_flush = matches!(new_level, MemoryPressureLevel::Critical);
+                    should_purge_layer_files = true;
                     if new_level != level {
                         level = new_level;
                         should_update_cache_limit = true;
-                        timer = fasync::Timer::new(config.for_level(&level).flush_period).fuse();
+                        timer =
+                            fasync::Timer::new(config.for_level(&level).background_task_period)
+                            .fuse();
                         debug!(
-                            "Background flush period changed to {:?} due to new memory pressure \
+                            "Background task period changed to {:?} due to new memory pressure \
                             level ({:?}).",
-                            config.for_level(&level).flush_period, level
+                            config.for_level(&level).background_task_period, level
                         );
                     }
                 }
                 _ = timer => {
-                    timer = fasync::Timer::new(config.for_level(&level).flush_period).fuse();
+                    timer =
+                        fasync::Timer::new(config.for_level(&level).background_task_period).fuse();
                     should_flush = true;
+                    // Only purge layer file caches once we have elevated memory pressure.
+                    should_purge_layer_files = !matches!(level, MemoryPressureLevel::Normal);
                 }
             };
             if should_terminate {
@@ -355,12 +364,16 @@ impl FxVolume {
                 self.flush_all_files().await;
                 self.dirent_cache.recycle_stale_files();
             }
-
+            if should_purge_layer_files {
+                for layer in self.store.tree().immutable_layer_set().layers {
+                    layer.purge_cached_data();
+                }
+            }
             if should_update_cache_limit {
                 self.dirent_cache.set_limit(config.for_level(&level).cache_size_limit);
             }
         }
-        debug!(store_id = self.store.store_object_id(), "FxVolume::flush_task end");
+        debug!(store_id = self.store.store_object_id(), "FxVolume::background_task end");
     }
 
     /// Reports that a certain number of bytes will be dirtied in a pager-backed VMO.
@@ -975,18 +988,18 @@ mod tests {
             };
             assert!(!data_has_persisted().await);
 
-            vol.volume().start_flush_task(
+            vol.volume().start_background_task(
                 MemoryPressureConfig {
                     mem_normal: MemoryPressureLevelConfig {
-                        flush_period: Duration::from_millis(100),
+                        background_task_period: Duration::from_millis(100),
                         cache_size_limit: 100,
                     },
                     mem_warning: MemoryPressureLevelConfig {
-                        flush_period: Duration::from_millis(100),
+                        background_task_period: Duration::from_millis(100),
                         cache_size_limit: 100,
                     },
                     mem_critical: MemoryPressureLevelConfig {
-                        flush_period: Duration::from_millis(100),
+                        background_task_period: Duration::from_millis(100),
                         cache_size_limit: 100,
                     },
                 },
@@ -1075,19 +1088,19 @@ mod tests {
             // Configure the flush task to only flush quickly on warning.
             let flush_config = MemoryPressureConfig {
                 mem_normal: MemoryPressureLevelConfig {
-                    flush_period: Duration::from_secs(20),
+                    background_task_period: Duration::from_secs(20),
                     cache_size_limit: DIRENT_CACHE_LIMIT,
                 },
                 mem_warning: MemoryPressureLevelConfig {
-                    flush_period: Duration::from_millis(100),
+                    background_task_period: Duration::from_millis(100),
                     cache_size_limit: 100,
                 },
                 mem_critical: MemoryPressureLevelConfig {
-                    flush_period: Duration::from_secs(20),
+                    background_task_period: Duration::from_secs(20),
                     cache_size_limit: 50,
                 },
             };
-            vol.volume().start_flush_task(flush_config, Some(&mem_pressure));
+            vol.volume().start_background_task(flush_config, Some(&mem_pressure));
 
             // Send the memory pressure update.
             let _ = watcher_proxy
@@ -1186,19 +1199,19 @@ mod tests {
             // Configure the flush task to only flush quickly on warning.
             let flush_config = MemoryPressureConfig {
                 mem_normal: MemoryPressureLevelConfig {
-                    flush_period: Duration::from_secs(20),
+                    background_task_period: Duration::from_secs(20),
                     cache_size_limit: DIRENT_CACHE_LIMIT,
                 },
                 mem_warning: MemoryPressureLevelConfig {
-                    flush_period: Duration::from_secs(20),
+                    background_task_period: Duration::from_secs(20),
                     cache_size_limit: 100,
                 },
                 mem_critical: MemoryPressureLevelConfig {
-                    flush_period: Duration::from_secs(20),
+                    background_task_period: Duration::from_secs(20),
                     cache_size_limit: 50,
                 },
             };
-            vol.volume().start_flush_task(flush_config, Some(&mem_pressure));
+            vol.volume().start_background_task(flush_config, Some(&mem_pressure));
 
             // Send the memory pressure update.
             watcher_proxy

@@ -21,7 +21,6 @@ mod tree;
 mod tree_cache;
 pub mod volume;
 
-pub use caching_object_handle::CachingObjectHandle;
 pub use data_object_handle::{DataObjectHandle, DirectWriter, FsverityState, FsverityStateInner};
 pub use directory::Directory;
 pub use object_record::{ChildValue, ObjectDescriptor, PosixAttributes, Timestamp};

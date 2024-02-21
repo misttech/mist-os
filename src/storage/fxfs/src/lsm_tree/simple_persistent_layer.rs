@@ -45,7 +45,7 @@ use {
             BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator, LayerWriter, Value,
         },
         object_handle::{ObjectHandle, ReadObjectHandle, WriteBytes},
-        object_store::CachingObjectHandle,
+        object_store::caching_object_handle::{CachedChunk, CachingObjectHandle, CHUNK_SIZE},
         round::{how_many, round_down, round_up},
         serialized_types::{
             Version, Versioned, VersionedLatest, INTERBLOCK_SEEK_VERSION, LATEST_VERSION,
@@ -99,16 +99,22 @@ pub struct SimplePersistentLayer {
     close_event: Mutex<Option<Arc<DropEvent>>>,
 }
 
-struct BufferCursor<'a> {
-    buffer: &'a [u8],
+#[derive(Debug)]
+struct BufferCursor {
+    chunk: Option<CachedChunk>,
     pos: usize,
 }
 
-impl std::io::Read for BufferCursor<'_> {
+impl std::io::Read for BufferCursor {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let to_read = std::cmp::min(buf.len(), self.buffer.len().saturating_sub(self.pos));
+        let chunk = if let Some(chunk) = &self.chunk {
+            chunk
+        } else {
+            return Ok(0);
+        };
+        let to_read = std::cmp::min(buf.len(), chunk.len().saturating_sub(self.pos));
         if to_read > 0 {
-            buf[..to_read].copy_from_slice(&self.buffer[self.pos..self.pos + to_read]);
+            buf[..to_read].copy_from_slice(&chunk[self.pos..self.pos + to_read]);
             self.pos += to_read;
         }
         Ok(to_read)
@@ -120,7 +126,7 @@ const BLOCK_SEEK_ENTRY_SIZE: usize = 2;
 
 struct Iterator<'iter, K: Key, V: Value> {
     // Allocated out of |layer|.
-    buffer: BufferCursor<'iter>,
+    buffer: BufferCursor,
 
     layer: &'iter SimplePersistentLayer,
 
@@ -139,9 +145,10 @@ struct Iterator<'iter, K: Key, V: Value> {
 
 impl<K: Key, V: Value> Iterator<'_, K, V> {
     fn new<'iter>(layer: &'iter SimplePersistentLayer, pos: u64) -> Iterator<'iter, K, V> {
+        assert!(pos % layer.layer_info.block_size == 0);
         Iterator {
             layer,
-            buffer: BufferCursor { buffer: &[], pos: 0 },
+            buffer: BufferCursor { chunk: None, pos: pos as usize % CHUNK_SIZE },
             pos,
             item_index: 0,
             item_count: 0,
@@ -149,28 +156,34 @@ impl<K: Key, V: Value> Iterator<'_, K, V> {
         }
     }
 
-    // Find the offset in the block for a particular object index. Returns error if the index is
-    // out of range or the resulting offset contains an obviously invalid value.
-    fn offset_for_index<'a>(&'a mut self, index: usize) -> Result<u16, Error> {
-        ensure!(index < usize::from(self.item_count), FxfsError::OutOfRange);
-        // First entry isn't actually recorded, it is at the start of the block.
-        if index == 0 {
-            return Ok(BLOCK_HEADER_SIZE.try_into().unwrap());
-        }
-
-        let old_buffer_pos = self.buffer.pos;
-        self.buffer.pos = self.layer.layer_info.block_size as usize
-            - (BLOCK_SEEK_ENTRY_SIZE * (usize::from(self.item_count) - index));
-        let res = self.buffer.read_u16::<LittleEndian>();
-        self.buffer.pos = old_buffer_pos;
-        let offset = res.context("Failed to read offset")?;
-        if u64::from(offset) >= self.layer.layer_info.block_size
-            || usize::try_from(offset).unwrap() <= BLOCK_HEADER_SIZE
-        {
-            return Err(anyhow!(FxfsError::Inconsistent))
-                .context(format!("Offset {} is out of valid range.", offset));
-        }
-        Ok(offset)
+    // Repositions the iterator to point to the `index`'th item in the current block.
+    // Returns an error if the index is out of range or the resulting offset contains an obviously
+    // invalid value.
+    fn seek_to_block_item(&mut self, index: u16) -> Result<(), Error> {
+        ensure!(index < self.item_count, FxfsError::OutOfRange);
+        let offset_in_block = if index == 0 {
+            // First entry isn't actually recorded, it is at the start of the block.
+            0
+        } else {
+            let old_buffer_pos = self.buffer.pos;
+            self.buffer.pos = round_up(self.buffer.pos, self.layer.layer_info.block_size as usize)
+                .unwrap()
+                - (BLOCK_SEEK_ENTRY_SIZE * (usize::from(self.item_count - index)));
+            let res = self.buffer.read_u16::<LittleEndian>();
+            self.buffer.pos = old_buffer_pos;
+            let offset_in_block = res.context("Failed to read offset")? as usize;
+            if offset_in_block >= self.layer.layer_info.block_size as usize
+                || offset_in_block <= BLOCK_HEADER_SIZE
+            {
+                return Err(anyhow!(FxfsError::Inconsistent))
+                    .context(format!("Offset {} is out of valid range.", offset_in_block));
+            }
+            offset_in_block
+        };
+        self.item_index = index;
+        self.buffer.pos = round_down(self.buffer.pos, self.layer.layer_info.block_size as usize)
+            + offset_in_block;
+        Ok(())
     }
 
     async fn advance(&mut self) -> Result<(), Error> {
@@ -179,15 +192,19 @@ impl<K: Key, V: Value> Iterator<'_, K, V> {
                 self.item = None;
                 return Ok(());
             }
-            self.buffer.buffer = self
-                .layer
-                .caching_object_handle
-                .read(self.pos as usize, self.layer.layer_info.block_size as usize)
-                .await
-                .context("Reading during advance")?;
-            self.buffer.pos = 0;
+            if self.buffer.chunk.is_none() || self.pos as usize % CHUNK_SIZE == 0 {
+                self.buffer.chunk = Some(
+                    self.layer
+                        .caching_object_handle
+                        .read(self.pos as usize)
+                        .await
+                        .context("Reading during advance")?,
+                );
+            }
+            self.buffer.pos = self.pos as usize % CHUNK_SIZE;
             debug!(
                 pos = self.pos,
+                buf = ?self.buffer,
                 object_size = self.layer.size,
                 oid = self.layer.object_handle.object_id()
             );
@@ -357,6 +374,10 @@ impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
         Some(&self.object_handle)
     }
 
+    fn purge_cached_data(&self) {
+        self.caching_object_handle.purge();
+    }
+
     async fn seek<'a>(&'a self, bound: Bound<&K>) -> Result<BoxedLayerIterator<'a, K, V>, Error> {
         let first_block_offset = self.layer_info.block_size;
         let (key, excluded) = match bound {
@@ -445,10 +466,8 @@ impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
             // If the size is zero then we don't touch the iterator.
             while left_index < (right_index - 1) {
                 let mid_index = left_index + ((right_index - left_index) / 2);
-                left.buffer.pos = left
-                    .offset_for_index(mid_index.into())
-                    .context("Read index offset for binary search")?
-                    as usize;
+                left.seek_to_block_item(mid_index)
+                    .context("Read index offset for binary search")?;
                 left.item_index = u16::try_from(mid_index).unwrap();
                 // Only deserialize the key while searching.
                 let current_key = K::deserialize_from_version(
@@ -494,10 +513,9 @@ impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
             // within the "left" buffer.
             if right_index < left.item_count {
                 right = left;
-                right.buffer.pos = right
-                    .offset_for_index(right_index.into())
-                    .context("Read index for offset of right pointer")?
-                    as usize;
+                right
+                    .seek_to_block_item(right_index)
+                    .context("Read index for offset of right pointer")?;
                 right.item_index = u16::try_from(right_index).unwrap();
                 right.advance().await?;
             } else if right.item.is_none() {

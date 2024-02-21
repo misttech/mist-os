@@ -271,6 +271,10 @@ pub trait Layer<K, V>: Send + Sync {
         None
     }
 
+    /// Some layer implementations may choose to cache data in-memory.  Calling this function will
+    /// request that the layer purges unused cached data.  This is intended to run on a timer.
+    fn purge_cached_data(&self) {}
+
     /// Searches for a key. Bound::Excluded is not supported. Bound::Unbounded positions the
     /// iterator on the first item in the layer.
     async fn seek(&self, bound: std::ops::Bound<&K>)
