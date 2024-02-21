@@ -287,10 +287,6 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			// LINT.ThenChange(/src/sys/pkg/bin/pkg-resolver/src/cache.rs:blob_header_timeout)
 			Type: syslogType,
 		},
-		&stringInLogCheck{
-			String: "Got no package for fuchsia-pkg://",
-			Type:   swarmingOutputType,
-		},
 	}
 
 	oopsExceptBlocks := []*logBlock{
@@ -349,27 +345,28 @@ func fuchsiaLogChecks() []FailureModeCheck {
 		}...)
 	}
 
-	// These may be in the output of tests, but the syslog and serial log don't contain any test output.
-	for _, lt := range []logType{serialLogType, syslogType} {
-		ret = append(ret, []FailureModeCheck{
-			// `ASSERT FAILED` may show up in crash hexdumps, so prepend with a space to match it when
-			// it's at the start of a logline.
-			&stringInLogCheck{String: " ASSERT FAILED", Type: lt, ExceptBlocks: []*logBlock{
-				// These tests deliberately trigger asserts in order to verify that they properly terminate
-				// the program.
-				{startString: "[ RUN      ] ZxAssertCppTest.ZxAssertMsgInvalidPredicateFails", endString: "[       OK ] ZxAssertCppTest.ZxAssertMsgInvalidPredicateFails"},
-				{startString: "[ RUN      ] ZxAssertCppTest.ZxDebugAssertMsgInvalidPredicateFails", endString: "[       OK ] ZxAssertCppTest.ZxDebugAssertMsgInvalidPredicateFails"},
-				{startString: "[ RUN      ] ZxAssertCppTest.ZxAssertInvalidPredicateFails", endString: "[       OK ] ZxAssertCppTest.ZxAssertInvalidPredicateFails"},
-				{startString: "[ RUN      ] ZxAssertCppTest.ZxDebugAssertInvalidPredicateFails", endString: "[       OK ] ZxAssertCppTest.ZxDebugAssertInvalidPredicateFails"},
-				{startString: "[ RUN      ] ZxAssertCTest.ZxAssertMsgInvalidPredicateFails", endString: "[       OK ] ZxAssertCTest.ZxAssertMsgInvalidPredicateFails"},
-				{startString: "[ RUN      ] ZxAssertCTest.ZxDebugAssertMsgInvalidPredicateFails", endString: "[       OK ] ZxAssertCTest.ZxDebugAssertMsgInvalidPredicateFails"},
-				{startString: "[ RUN      ] ZxAssertCTest.ZxAssertInvalidPredicateFails", endString: "[       OK ] ZxAssertCTest.ZxAssertInvalidPredicateFails"},
-				{startString: "[ RUN      ] ZxAssertCTest.ZxDebugAssertInvalidPredicateFails", endString: "[       OK ] ZxAssertCTest.ZxDebugAssertInvalidPredicateFails"},
-				{startString: "[ RUN      ] ZxTestSmokeTest.DeathStatementCrash", endString: "[       OK ] ZxTestSmokeTest.DeathStatementCrash"},
-			}},
-			&stringInLogCheck{String: "DEVICE SUSPEND TIMED OUT", Type: lt},
-		}...)
-	}
+	ret = append(ret, []FailureModeCheck{
+		// These may be in the output of tests, but the syslogType doesn't contain any test output.
+		// `ASSERT FAILED` may show up in crash hexdumps, so prepend with a space to match it when
+		// it's at the start of a logline.
+		&stringInLogCheck{String: " ASSERT FAILED", Type: syslogType, ExceptBlocks: []*logBlock{
+			// These tests deliberately trigger asserts in order to verify that they properly terminate
+			// the program.
+			{startString: "[ RUN      ] ZxAssertCppTest.ZxAssertMsgInvalidPredicateFails", endString: "[       OK ] ZxAssertCppTest.ZxAssertMsgInvalidPredicateFails"},
+			{startString: "[ RUN      ] ZxAssertCppTest.ZxDebugAssertMsgInvalidPredicateFails", endString: "[       OK ] ZxAssertCppTest.ZxDebugAssertMsgInvalidPredicateFails"},
+			{startString: "[ RUN      ] ZxAssertCppTest.ZxAssertInvalidPredicateFails", endString: "[       OK ] ZxAssertCppTest.ZxAssertInvalidPredicateFails"},
+			{startString: "[ RUN      ] ZxAssertCppTest.ZxDebugAssertInvalidPredicateFails", endString: "[       OK ] ZxAssertCppTest.ZxDebugAssertInvalidPredicateFails"},
+			{startString: "[ RUN      ] ZxAssertCTest.ZxAssertMsgInvalidPredicateFails", endString: "[       OK ] ZxAssertCTest.ZxAssertMsgInvalidPredicateFails"},
+			{startString: "[ RUN      ] ZxAssertCTest.ZxDebugAssertMsgInvalidPredicateFails", endString: "[       OK ] ZxAssertCTest.ZxDebugAssertMsgInvalidPredicateFails"},
+			{startString: "[ RUN      ] ZxAssertCTest.ZxAssertInvalidPredicateFails", endString: "[       OK ] ZxAssertCTest.ZxAssertInvalidPredicateFails"},
+			{startString: "[ RUN      ] ZxAssertCTest.ZxDebugAssertInvalidPredicateFails", endString: "[       OK ] ZxAssertCTest.ZxDebugAssertInvalidPredicateFails"},
+		}},
+		&stringInLogCheck{String: "DEVICE SUSPEND TIMED OUT", Type: syslogType},
+		&stringInLogCheck{
+			String: "Got no package for fuchsia-pkg://",
+			Type:   swarmingOutputType,
+		},
+	}...)
 	return ret
 }
 
