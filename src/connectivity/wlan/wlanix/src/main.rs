@@ -30,7 +30,6 @@ use {
     nl80211::{Nl80211, Nl80211Attr, Nl80211BandAttr, Nl80211Cmd, Nl80211FrequencyAttr},
 };
 
-const FAKE_CHIP_ID: u32 = 1;
 const IFACE_NAME: &str = "wlan";
 
 async fn handle_wifi_sta_iface_request(req: fidl_wlanix::WifiStaIfaceRequest) -> Result<(), Error> {
@@ -50,25 +49,26 @@ async fn handle_wifi_sta_iface_request(req: fidl_wlanix::WifiStaIfaceRequest) ->
     Ok(())
 }
 
-async fn serve_wifi_sta_iface(reqs: fidl_wlanix::WifiStaIfaceRequestStream) {
+async fn serve_wifi_sta_iface(iface_id: u16, reqs: fidl_wlanix::WifiStaIfaceRequestStream) {
     reqs.for_each_concurrent(None, |req| async {
         match req {
             Ok(req) => {
                 if let Err(e) = handle_wifi_sta_iface_request(req).await {
-                    warn!("Failed to handle WifiStaIfaceRequest: {}", e);
+                    warn!("Failed to handle WifiStaIfaceRequest for iface {}: {}", iface_id, e);
                 }
             }
             Err(e) => {
-                error!("Wifi sta iface request stream failed: {}", e);
+                error!("Wifi sta iface {} request stream failed: {}", iface_id, e);
             }
         }
     })
     .await;
 }
 
-async fn handle_wifi_chip_request(
+async fn handle_wifi_chip_request<I: IfaceManager>(
     req: fidl_wlanix::WifiChipRequest,
     chip_id: u16,
+    iface_manager: Arc<I>,
 ) -> Result<(), Error> {
     match req {
         fidl_wlanix::WifiChipRequest::CreateStaIface { payload, responder, .. } => {
@@ -76,8 +76,9 @@ async fn handle_wifi_chip_request(
             match payload.iface {
                 Some(iface) => {
                     let reqs = iface.into_stream().context("create WifiStaIface stream")?;
+                    let iface_id = iface_manager.create_client_iface(chip_id).await?;
                     responder.send(Ok(())).context("send CreateStaIface response")?;
-                    serve_wifi_sta_iface(reqs).await;
+                    serve_wifi_sta_iface(iface_id, reqs).await;
                 }
                 None => {
                     responder
@@ -89,9 +90,10 @@ async fn handle_wifi_chip_request(
         fidl_wlanix::WifiChipRequest::GetStaIfaceNames { responder } => {
             // TODO(b/323586414): Unit test once we actually support this.
             info!("fidl_wlanix::WifiChipRequest::GetStaIfaceNames");
-            let names = vec![IFACE_NAME.to_string()];
+            let ifaces = iface_manager.list_ifaces();
+            // TODO(b/298030634): Serve actual interface names.
             let response = fidl_wlanix::WifiChipGetStaIfaceNamesResponse {
-                iface_names: Some(names),
+                iface_names: Some(vec![IFACE_NAME.to_string(); ifaces.len()]),
                 ..Default::default()
             };
             responder.send(&response).context("send GetStaIfaceNames response")?;
@@ -101,9 +103,18 @@ async fn handle_wifi_chip_request(
             info!("fidl_wlanix::WifiChipRequest::GetStaIface");
             match payload.iface {
                 Some(iface) => {
+                    // TODO(b/298030634): Use the iface name to identify the correct iface here.
                     let reqs = iface.into_stream().context("create WifiStaIface stream")?;
-                    responder.send(Ok(())).context("send GetStaIface response")?;
-                    serve_wifi_sta_iface(reqs).await;
+                    let ifaces = iface_manager.list_ifaces();
+                    if ifaces.is_empty() {
+                        warn!("No iface available for GetStaIface.");
+                        responder
+                            .send(Err(zx::sys::ZX_ERR_INVALID_ARGS))
+                            .context("send GetStaIface response")?;
+                    } else {
+                        responder.send(Ok(())).context("send GetStaIface response")?;
+                        serve_wifi_sta_iface(ifaces[0], reqs).await;
+                    }
                 }
                 None => {
                     responder
@@ -114,13 +125,31 @@ async fn handle_wifi_chip_request(
         }
         fidl_wlanix::WifiChipRequest::RemoveStaIface { payload: _, responder, .. } => {
             info!("fidl_wlanix::WifiChipRequest::RemoveStaIface");
-            responder.send(Ok(()))?;
+            // TODO(b/298030634): Use the iface name to identify the correct iface here.
+            let ifaces = iface_manager.list_ifaces();
+            if ifaces.is_empty() {
+                warn!("No iface available to remove.");
+                responder
+                    .send(Err(zx::sys::ZX_ERR_INVALID_ARGS))
+                    .context("send RemoveStaIface response")?;
+            } else {
+                info!("Removing iface {}", ifaces[0]);
+                match iface_manager.destroy_iface(ifaces[0]).await {
+                    Ok(()) => responder.send(Ok(())).context("send RemoveStaIface response")?,
+                    Err(e) => {
+                        error!("Failed to remove iface: {}", e);
+                        responder
+                            .send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))
+                            .context("send RemoveStaIface response")?;
+                    }
+                }
+            }
         }
         fidl_wlanix::WifiChipRequest::GetAvailableModes { responder } => {
             info!("fidl_wlanix::WifiChipRequest::GetAvailableModes");
             let response = fidl_wlanix::WifiChipGetAvailableModesResponse {
                 chip_modes: Some(vec![fidl_wlanix::ChipMode {
-                    id: Some(1),
+                    id: Some(chip_id as u32),
                     available_combinations: Some(vec![fidl_wlanix::ChipConcurrencyCombination {
                         limits: Some(vec![fidl_wlanix::ChipConcurrencyCombinationLimit {
                             types: Some(vec![fidl_wlanix::IfaceConcurrencyType::Sta]),
@@ -164,11 +193,17 @@ async fn handle_wifi_chip_request(
     Ok(())
 }
 
-async fn serve_wifi_chip(chip_id: u16, reqs: fidl_wlanix::WifiChipRequestStream) {
+async fn serve_wifi_chip<I: IfaceManager>(
+    chip_id: u16,
+    reqs: fidl_wlanix::WifiChipRequestStream,
+    iface_manager: Arc<I>,
+) {
     reqs.for_each_concurrent(None, |req| async {
         match req {
             Ok(req) => {
-                if let Err(e) = handle_wifi_chip_request(req, chip_id).await {
+                if let Err(e) =
+                    handle_wifi_chip_request(req, chip_id, Arc::clone(&iface_manager)).await
+                {
                     warn!("Failed to handle WifiChipRequest: {}", e);
                 }
             }
@@ -204,9 +239,10 @@ struct WifiState {
     mlme_multicast_proxy: Option<fidl_wlanix::Nl80211MulticastProxy>,
 }
 
-async fn handle_wifi_request(
+async fn handle_wifi_request<I: IfaceManager>(
     req: fidl_wlanix::WifiRequest,
     state: Arc<Mutex<WifiState>>,
+    iface_manager: Arc<I>,
 ) -> Result<(), Error> {
     match req {
         fidl_wlanix::WifiRequest::RegisterEventCallback { payload, .. } => {
@@ -228,6 +264,15 @@ async fn handle_wifi_request(
         }
         fidl_wlanix::WifiRequest::Stop { responder } => {
             info!("fidl_wlanix::WifiRequest::Stop");
+            // This should look like a reset of the chip. Tear down all ifaces.
+            for iface in iface_manager.list_ifaces() {
+                if let Err(e) = iface_manager.destroy_iface(iface).await {
+                    error!(
+                        "Failed to destroy iface {} in response to WifiRequest::Stop: {}",
+                        iface, e
+                    );
+                }
+            }
             let mut state = state.lock();
             state.started = false;
             run_callbacks(
@@ -247,8 +292,9 @@ async fn handle_wifi_request(
         }
         fidl_wlanix::WifiRequest::GetChipIds { responder } => {
             info!("fidl_wlanix::WifiRequest::GetChipIds");
+            let phy_ids = iface_manager.list_phys().await?;
             let response = fidl_wlanix::WifiGetChipIdsResponse {
-                chip_ids: Some(vec![FAKE_CHIP_ID]),
+                chip_ids: Some(phy_ids.into_iter().map(Into::into).collect()),
                 ..Default::default()
             };
             responder.send(&response).context("send GetChipIds response")?;
@@ -261,7 +307,7 @@ async fn handle_wifi_request(
                     match u16::try_from(chip_id) {
                         Ok(chip_id) => {
                             responder.send(Ok(())).context("send GetChip response")?;
-                            serve_wifi_chip(chip_id, chip_stream).await;
+                            serve_wifi_chip(chip_id, chip_stream, iface_manager).await;
                         }
                         Err(_e) => {
                             warn!("fidl_wlanix::WifiRequest::GetChip chip_id > u16::MAX");
@@ -286,11 +332,17 @@ async fn handle_wifi_request(
     Ok(())
 }
 
-async fn serve_wifi(reqs: fidl_wlanix::WifiRequestStream, state: Arc<Mutex<WifiState>>) {
+async fn serve_wifi<I: IfaceManager>(
+    reqs: fidl_wlanix::WifiRequestStream,
+    state: Arc<Mutex<WifiState>>,
+    iface_manager: Arc<I>,
+) {
     reqs.for_each_concurrent(None, |req| async {
         match req {
             Ok(req) => {
-                if let Err(e) = handle_wifi_request(req, Arc::clone(&state)).await {
+                if let Err(e) =
+                    handle_wifi_request(req, Arc::clone(&state), Arc::clone(&iface_manager)).await
+                {
                     warn!("Failed to handle WifiRequest: {}", e);
                 }
             }
@@ -690,24 +742,23 @@ async fn handle_supplicant_request<I: IfaceManager>(
     match req {
         fidl_wlanix::SupplicantRequest::AddStaInterface { payload, .. } => {
             info!("fidl_wlanix::SupplicantRequest::AddStaInterface");
+            // TODO(b/299349496): Check that the iface name matches the request.
             if let Some(supplicant_sta_iface) = payload.iface {
-                // TODO(b/316037136): Actually create the iface.
-                let existing_ifaces = iface_manager.list_interfaces().await?;
-                for iface in existing_ifaces {
-                    if iface.role == fidl_fuchsia_wlan_common::WlanMacRole::Client {
-                        let client_iface = iface_manager.get_client_iface(iface.id).await?;
-                        let supplicant_sta_iface_stream = supplicant_sta_iface
-                            .into_stream()
-                            .context("create SupplicantStaIface stream")?;
-                        serve_supplicant_sta_iface(
-                            supplicant_sta_iface_stream,
-                            state,
-                            client_iface,
-                            iface.id,
-                        )
-                        .await;
-                        break;
-                    }
+                let ifaces = iface_manager.list_ifaces();
+                if ifaces.is_empty() {
+                    bail!("AddStaInterface but no interfaces exist.");
+                } else {
+                    let client_iface = iface_manager.get_client_iface(ifaces[0]).await?;
+                    let supplicant_sta_iface_stream = supplicant_sta_iface
+                        .into_stream()
+                        .context("create SupplicantStaIface stream")?;
+                    serve_supplicant_sta_iface(
+                        supplicant_sta_iface_stream,
+                        state,
+                        client_iface,
+                        ifaces[0],
+                    )
+                    .await;
                 }
             }
         }
@@ -851,15 +902,16 @@ async fn handle_nl80211_message<I: IfaceManager>(
         }
         Nl80211Cmd::GetInterface => {
             info!("Nl80211Cmd::GetInterface");
-            let ifaces = iface_manager.list_interfaces().await?;
+            let ifaces = iface_manager.list_ifaces();
             let mut resp = vec![];
             for iface in ifaces {
+                let iface_info = iface_manager.query_iface(iface).await?;
                 resp.push(build_nl80211_message(
                     Nl80211Cmd::NewInterface,
                     vec![
-                        Nl80211Attr::IfaceIndex(iface.id.into()),
+                        Nl80211Attr::IfaceIndex(iface.into()),
                         Nl80211Attr::IfaceName(IFACE_NAME.to_string()),
-                        Nl80211Attr::Mac(iface.sta_addr),
+                        Nl80211Attr::Mac(iface_info.sta_addr),
                     ],
                 ));
             }
@@ -991,7 +1043,16 @@ async fn handle_nl80211_message<I: IfaceManager>(
             info!("Nl80211Cmd::GetScan");
             match find_iface_id(&message.payload.attrs[..]) {
                 Some(iface_id) => {
-                    let client_iface = iface_manager.get_client_iface(iface_id.try_into()?).await?;
+                    let client_iface =
+                        match iface_manager.get_client_iface(iface_id.try_into()?).await {
+                            Ok(iface) => iface,
+                            Err(e) => {
+                                responder.send(Err(zx::sys::ZX_ERR_BAD_STATE)).context(
+                                    "sending error status due to missing iface for GetScan",
+                                )?;
+                                bail!("Failed to get client iface: {}", e);
+                            }
+                        };
                     let results = client_iface.get_last_scan_results();
                     info!("Processing {} scan results", results.len());
                     let mut resp = vec![];
@@ -1125,7 +1186,7 @@ async fn handle_wlanix_request<I: IfaceManager>(
             info!("fidl_wlanix::WlanixRequest::GetWifi");
             if let Some(wifi) = payload.wifi {
                 let wifi_stream = wifi.into_stream().context("create Wifi stream")?;
-                serve_wifi(wifi_stream, Arc::clone(&state)).await;
+                serve_wifi(wifi_stream, Arc::clone(&state), Arc::clone(&iface_manager)).await;
             }
         }
         fidl_wlanix::WlanixRequest::GetSupplicant { payload, .. } => {
@@ -1229,7 +1290,7 @@ mod tests {
     }
 
     #[test]
-    fn test_wifi_get_state_is_started_false_at_beginning() {
+    fn test_wifi_get_state_is_started() {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let get_state_fut = test_helper.wifi_proxy.get_state();
@@ -1244,7 +1305,7 @@ mod tests {
     }
 
     #[test]
-    fn test_wifi_get_state_is_started_true_after_start() {
+    fn test_wifi_start() {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let start_fut = test_helper.wifi_proxy.start();
@@ -1263,7 +1324,7 @@ mod tests {
     }
 
     #[test]
-    fn test_wifi_get_state_is_started_false_after_stop() {
+    fn test_wifi_stop() {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
         let start_fut = test_helper.wifi_proxy.start();
@@ -1283,6 +1344,14 @@ mod tests {
             Poll::Ready(Ok(response)) => response
         );
         assert_eq!(response.is_started, Some(false));
+
+        // On stop, we shut down all remaining ifaces.
+        let calls = test_helper.iface_manager.calls.lock();
+        assert!(!calls.is_empty());
+        assert_variant!(
+            &calls[calls.len() - 1],
+            ifaces::test_utils::IfaceManagerCall::DestroyIface(_)
+        );
     }
 
     #[test]
@@ -1376,6 +1445,82 @@ mod tests {
     }
 
     #[test]
+    fn test_wifi_chip_get_sta_iface_names() {
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
+
+        // We observe the iface created by setup_wifi_test.
+        let get_iface_names_fut = test_helper.wifi_chip_proxy.get_sta_iface_names();
+        pin_mut!(get_iface_names_fut);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let result = assert_variant!(test_helper.exec.run_until_stalled(&mut get_iface_names_fut), Poll::Ready(Ok(result)) => result);
+        assert_eq!(result.iface_names, Some(vec![IFACE_NAME.to_string()]));
+    }
+
+    #[test]
+    fn test_wifi_chip_get_sta_iface_names_no_ifaces() {
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
+
+        // Remove the iface from setup.
+        let _ = test_helper.iface_manager.client_iface.lock().take();
+
+        // No ifaces show up.
+        let get_iface_names_fut = test_helper.wifi_chip_proxy.get_sta_iface_names();
+        pin_mut!(get_iface_names_fut);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let result = assert_variant!(test_helper.exec.run_until_stalled(&mut get_iface_names_fut), Poll::Ready(Ok(result)) => result);
+        assert_eq!(result.iface_names, Some(vec![]));
+    }
+
+    #[test]
+    fn test_wifi_chip_get_sta_iface() {
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
+
+        let (wifi_sta_iface_proxy, wifi_sta_iface_server_end) =
+            create_proxy::<fidl_wlanix::WifiStaIfaceMarker>()
+                .expect("create WifiStaIface proxy should succeed");
+        let mut get_sta_iface_fut =
+            test_helper.wifi_chip_proxy.get_sta_iface(fidl_wlanix::WifiChipGetStaIfaceRequest {
+                iface_name: Some("FOO".to_string()),
+                iface: Some(wifi_sta_iface_server_end),
+                ..Default::default()
+            });
+
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let result = assert_variant!(test_helper.exec.run_until_stalled(&mut get_sta_iface_fut), Poll::Ready(Ok(result)) => result);
+        assert!(result.is_ok());
+
+        let get_name_fut = wifi_sta_iface_proxy.get_name();
+        pin_mut!(get_name_fut);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut get_name_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response = assert_variant!(
+            test_helper.exec.run_until_stalled(&mut get_name_fut),
+            Poll::Ready(Ok(response)) => response
+        );
+        assert_eq!(response.iface_name, Some(IFACE_NAME.to_string()));
+    }
+
+    #[test]
+    fn test_wifi_chip_get_sta_iface_no_iface() {
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
+        let _ = test_helper.iface_manager.client_iface.lock().take();
+
+        let (_wifi_sta_iface_proxy, wifi_sta_iface_server_end) =
+            create_proxy::<fidl_wlanix::WifiStaIfaceMarker>()
+                .expect("create WifiStaIface proxy should succeed");
+        let mut get_sta_iface_fut =
+            test_helper.wifi_chip_proxy.get_sta_iface(fidl_wlanix::WifiChipGetStaIfaceRequest {
+                iface_name: Some("FOO".to_string()),
+                iface: Some(wifi_sta_iface_server_end),
+                ..Default::default()
+            });
+
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let result = assert_variant!(test_helper.exec.run_until_stalled(&mut get_sta_iface_fut), Poll::Ready(Ok(result)) => result);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_wifi_sta_iface_get_name() {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
@@ -1395,6 +1540,7 @@ mod tests {
         wifi_proxy: fidl_wlanix::WifiProxy,
         wifi_chip_proxy: fidl_wlanix::WifiChipProxy,
         wifi_sta_iface_proxy: fidl_wlanix::WifiStaIfaceProxy,
+        iface_manager: Arc<TestIfaceManager>,
 
         // Note: keep the executor field last in the struct so it gets dropped last.
         exec: fasync::TestExecutor,
@@ -1437,7 +1583,7 @@ mod tests {
 
         let wifi_state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new());
-        let test_fut = serve_wlanix(wlanix_stream, wifi_state, iface_manager);
+        let test_fut = serve_wlanix(wlanix_stream, wifi_state, Arc::clone(&iface_manager));
         let mut test_fut = Box::pin(test_fut);
         assert_eq!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
@@ -1449,6 +1595,7 @@ mod tests {
             wifi_proxy,
             wifi_chip_proxy,
             wifi_sta_iface_proxy,
+            iface_manager,
             exec,
         };
         (test_helper, test_fut)
@@ -1712,8 +1859,7 @@ mod tests {
             reason_code: fidl_fuchsia_wlan_ieee80211::ReasonCode::ReasonInactivity,
         });
         {
-            let client_iface =
-                test_helper.iface_manager.client_iface.as_ref().expect("No client iface found");
+            let client_iface = test_helper.iface_manager.get_client_iface();
             let transaction_handle = client_iface.transaction_handle.lock();
             let control_handle = transaction_handle.as_ref().expect("No control handle found");
             control_handle
@@ -1786,8 +1932,7 @@ mod tests {
             reason_code: fidl_fuchsia_wlan_ieee80211::ReasonCode::ReasonInactivity,
         });
         {
-            let client_iface =
-                test_helper.iface_manager.client_iface.as_ref().expect("No client iface found");
+            let client_iface = test_helper.iface_manager.get_client_iface();
             let transaction_handle = client_iface.transaction_handle.lock();
             let control_handle = transaction_handle.as_ref().expect("No control handle found");
             control_handle
@@ -1807,7 +1952,7 @@ mod tests {
         assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
         // Send and process the reconnect result.
-        let client_iface = test_helper.iface_manager.client_iface.as_ref().unwrap();
+        let client_iface = test_helper.iface_manager.get_client_iface();
         let locked_handle = client_iface.transaction_handle.lock();
         let handle = locked_handle.as_ref().unwrap();
         handle
@@ -1861,8 +2006,7 @@ mod tests {
         let mocked_signal_report =
             fidl_internal::SignalReportIndication { rssi_dbm: -35, snr_db: 20 };
         {
-            let client_iface =
-                test_helper.iface_manager.client_iface.as_ref().expect("No client iface found");
+            let client_iface = test_helper.iface_manager.get_client_iface();
             let transaction_handle = client_iface.transaction_handle.lock();
             let control_handle = transaction_handle.as_ref().expect("No control handle found");
             control_handle
