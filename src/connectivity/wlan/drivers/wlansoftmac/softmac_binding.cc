@@ -237,7 +237,7 @@ void SoftmacBinding::Unbind() {
   auto softmac_bridge = softmac_bridge_.release();
   auto stop_returned = std::make_unique<libsync::Completion>();
   auto unowned_stop_returned = stop_returned.get();
-  auto completer = std::make_unique<StopCompleter>(
+  auto stop_completer = std::make_unique<StopCompleter>(
       [softmac_bridge_server_dispatcher = softmac_bridge_server_dispatcher_.async_dispatcher(),
        softmac_bridge, client_dispatcher = client_dispatcher_.release(),
        stop_returned = std::move(stop_returned)]() mutable {
@@ -251,7 +251,7 @@ void SoftmacBinding::Unbind() {
               fdf_dispatcher_shutdown_async(client_dispatcher);
             });
       });
-  softmac_bridge->Stop(std::move(completer));
+  softmac_bridge->Stop(std::move(stop_completer));
   unowned_stop_returned->Signal();
 }
 

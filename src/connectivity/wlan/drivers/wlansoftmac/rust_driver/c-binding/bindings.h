@@ -132,14 +132,26 @@ typedef struct {
 
 /**
  * Start and run a bridged wlansoftmac driver hosting an MLME server and an SME server. The driver
- * is "bridged" in sense that it requires a bridge to a Fuchsia driver to communicate with other
- * Fuchsia drivers over the FDF transport. When initialization of the bridged driver completes,
- * run_init_completer will be called.
+ * is "bridged" in the sense that it requires a bridge to a Fuchsia driver to communicate with
+ * other Fuchsia drivers over the FDF transport. When initialization of the bridged driver
+ * completes, run_init_completer will be called.
  *
  * # Safety
  *
- * The caller of this function should provide raw pointers that will be valid in the address space
- * where the Rust portion of wlansoftmac will run.
+ * This function is unsafe for the following reasons:
+ *
+ *   - This function cannot guarantee `run_init_completer` is thread-safe, i.e., that it's safe to
+ *     call at any time from any thread.
+ *   - This function cannot guarantee `init_completer` points to a valid object when
+ *     `run_init_completer` is called.
+ *   - This function cannot guarantee `wlan_softmac_bridge_client_handle` is a valid handle.
+ *
+ * By calling this function, the caller promises:
+ *
+ *   - The `run_init_completer` function is thread-safe.
+ *   - The `init_completer` pointer will point to a valid object at least until
+ *     `run_init_completer` is called.
+ *   - The `wlan_softmac_bridge_client_handle` is a valid handle.
  */
 extern "C" zx_status_t start_and_run_bridged_wlansoftmac(
     void *init_completer,
@@ -149,15 +161,32 @@ extern "C" zx_status_t start_and_run_bridged_wlansoftmac(
     zx_handle_t wlan_softmac_bridge_client_handle);
 
 /**
- * FFI interface: Stop a WlanSoftmac via the WlanSoftmacHandle. Takes ownership and invalidates
- * the passed WlanSoftmacHandle.
+ * Stop the bridged wlansoftmac driver associated with `softmac`.
+ *
+ * This function takes ownership of the `WlanSoftmacHandle` that `softmac` points to and destroys
+ * it.
  *
  * # Safety
  *
- * This function casts a raw pointer to a WlanSoftmacHandle. This API is fundamentally
- * unsafe, and relies on the caller passing ownership of the correct pointer.
+ * This function is unsafe for the following reasons:
+ *
+ *   - This function cannot guarantee `run_stop_completer` is thread-safe, i.e., that it's safe to
+ *     to call at any time from any thread.
+ *   - This function cannot guarantee `stop_completer` points to a valid object when
+ *     `run_stop_completer` is called.
+ *   - This function cannot guarantee `softmac` is a valid pointer, and the only pointer, to a
+ *     `WlanSoftmacHandle`.
+ *
+ * By calling this function, the caller promises the following:
+ *
+ *   - The `run_stop_completer` function is thread-safe.
+ *   - The `stop_completer` pointer will point to a valid object at least until
+ *     `run_stop_completer` is called.
+ *   - The `softmac` pointer is the same pointer received from `run_init_completer` (called as
+ *     a consequence of the startup initiated by calling `start_and_run_bridged_wlansoftmac`.
  */
-extern "C" void stop_bridged_wlansoftmac(void *completer, void (*run_completer)(void *completer),
+extern "C" void stop_bridged_wlansoftmac(void *stop_completer,
+                                         void (*run_stop_completer)(void *stop_completer),
                                          wlansoftmac_handle_t *softmac);
 
 /**

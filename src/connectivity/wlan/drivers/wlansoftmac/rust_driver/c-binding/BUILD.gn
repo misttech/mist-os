@@ -14,6 +14,7 @@ rustc_staticlib("wlansoftmac-c") {
   deps = [
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_rust",
     "//src/connectivity/wlan/drivers/wlansoftmac/rust_driver:wlansoftmac-rust",
+    "//src/connectivity/wlan/lib/common/rust:wlan-common",
     "//src/connectivity/wlan/lib/mlme/rust:wlan-mlme",
     "//src/connectivity/wlan/lib/span:wlan-span",
     "//src/connectivity/wlan/lib/trace:wlan-trace",

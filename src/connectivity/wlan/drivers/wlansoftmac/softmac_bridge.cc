@@ -134,6 +134,8 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
                         init_completer.release(),
                         [](void* ctx, zx_status_t status, wlansoftmac_handle_t* rust_handle) {
                           WLAN_LAMBDA_TRACE_DURATION("run InitCompleter");
+                          // Safety: `init_completer` is now owned by this function, so it's safe to
+                          // cast it to a non-const pointer.
                           auto init_completer = static_cast<InitCompleter*>(ctx);
                           if (init_completer == nullptr) {
                             lerror("Received NULL InitCompleter pointer!");
@@ -156,27 +158,28 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
   return fit::success(std::move(softmac_bridge));
 }
 
-zx_status_t SoftmacBridge::Stop(std::unique_ptr<StopCompleter> completer) {
+zx_status_t SoftmacBridge::Stop(std::unique_ptr<StopCompleter> stop_completer) {
   WLAN_TRACE_DURATION();
   if (rust_handle_ == nullptr) {
     lerror("Failed to call stop_bridged_wlansoftmac()! Encountered NULL rust_handle_");
     return ZX_ERR_BAD_STATE;
   }
   stop_bridged_wlansoftmac(
-      completer.release(),
+      stop_completer.release(),
       [](void* ctx) {
         WLAN_LAMBDA_TRACE_DURATION("run StopCompleter");
-        auto completer = static_cast<StopCompleter*>(ctx);
-        if (completer == nullptr) {
+        // Safety: `stop_completer` is now owned by this function, so it's safe to cast it to a
+        // non-const pointer.
+        auto stop_completer = static_cast<StopCompleter*>(ctx);
+        if (stop_completer == nullptr) {
           lerror("Received NULL StopCompleter pointer!");
           return;
         }
-        // Skip the check for whether completer has already been
-        // called.  This is the only location where completer is
-        // called, and its deallocated immediately after. Thus, such a
-        // check would be a use-after-free violation.
-        (*completer)();
-        delete completer;
+        // Skip the check for whether stop_completer has already been called.  This is the only
+        // location where stop_completer is called, and its deallocated immediately after. Thus,
+        // such a check would be a use-after-free violation.
+        (*stop_completer)();
+        delete stop_completer;
       },
       rust_handle_);
   return ZX_OK;

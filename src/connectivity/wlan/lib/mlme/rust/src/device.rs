@@ -75,7 +75,6 @@ pub mod completers {
             Self { completer: Some(completer) }
         }
 
-        /// Safety: Must only be called if calling |completer| is thread-safe.
         pub fn complete(mut self) {
             let completer = match self.completer.take() {
                 None => {
