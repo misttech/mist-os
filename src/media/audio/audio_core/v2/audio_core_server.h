@@ -52,6 +52,11 @@ class AudioCoreServer
       CreateAudioCapturerWithConfigurationRequestView request,
       CreateAudioCapturerWithConfigurationCompleter::Sync& completer) final;
 
+  void EnableDeviceSettings(EnableDeviceSettingsRequestView request,
+                            EnableDeviceSettingsCompleter::Sync& completer) final {
+    ZX_PANIC("Not implemented");
+  }
+
   void SetRenderUsageGain(SetRenderUsageGainRequestView request,
                           SetRenderUsageGainCompleter::Sync& completer) final;
 

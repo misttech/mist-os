@@ -13,7 +13,7 @@
 
 namespace media::audio {
 
-class AudioCoreImpl : public fuchsia::media::AudioCore {
+class AudioCoreImpl final : public fuchsia::media::AudioCore {
  public:
   AudioCoreImpl(Context* context);
 
@@ -39,6 +39,7 @@ class AudioCoreImpl : public fuchsia::media::AudioCore {
   void CreateAudioCapturer(
       bool loopback,
       fidl::InterfaceRequest<fuchsia::media::AudioCapturer> audio_capturer_request) final;
+  void EnableDeviceSettings(bool enabled) final { ZX_PANIC("Not implemented"); }
   void SetRenderUsageGain(fuchsia::media::AudioRenderUsage usage, float gain_db) final;
   void SetCaptureUsageGain(fuchsia::media::AudioCaptureUsage usage, float gain_db) final;
   void BindUsageVolumeControl(

@@ -96,8 +96,6 @@ closed protocol AudioCore {
     /// `configuration` must be initialized to a variant, or no capturer
     /// can be created.
     ///
-    /// TODO(https://fxbug.dev/42121743): Implement
-    @transitional
     strict CreateAudioCapturerWithConfiguration(resource struct {
         stream_type AudioStreamType;
         configuration AudioCapturerConfiguration;
@@ -168,7 +166,6 @@ closed protocol AudioCore {
     // TODO(https://fxbug.dev/42085388): Move this to the hub, instead of FIDL API. Alternately,
     // simply remove; going forward, HermeticTestEnvironment accepts a
     // parameter that disables device settings writeback during testing.
-    @transitional
     @deprecated
     strict EnableDeviceSettings(struct {
         enabled bool;
@@ -197,7 +194,6 @@ closed protocol AudioCore {
     /// Queries the volume percentage [0, 1] that maps to a `gain_db` value for a particular
     /// `usage`. This is the same mapping as used by the VolumeControl from
     /// `BindUsageVolumeControl`.
-    @transitional
     strict GetVolumeFromDb(struct {
         usage Usage;
         gain_db float32;
@@ -207,7 +203,6 @@ closed protocol AudioCore {
 
     /// Queries the decibel value that maps to a volume percentage [0, 1] for a particular `usage`.
     /// This is the same mapping as used by the VolumeControl from `BindUsageVolumeControl`.
-    @transitional
     strict GetDbFromVolume(struct {
         usage Usage;
         volume float32;

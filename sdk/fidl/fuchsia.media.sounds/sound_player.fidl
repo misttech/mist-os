@@ -65,7 +65,6 @@ closed protocol Player {
     /// `PlaySound` for that sound. If `id` doesn't identify an existing sound in the collection
     /// or if the sound is not currently playing, this method does nothing. If more than one
     /// `PlaySound` method is currently pending for that sound, only the most recent is stopped.
-    @transitional
     strict StopPlayingSound(struct {
         id uint32;
     });

@@ -16,7 +16,7 @@
 
 namespace media::audio::tests {
 
-class FakeAudioCore : public fidl::Server<fuchsia_media::AudioCore> {
+class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
  public:
   FakeAudioCore(async_dispatcher_t* dispatcher,
                 fidl::ServerEnd<fuchsia_media::AudioCore> server_end)
@@ -56,6 +56,12 @@ class FakeAudioCore : public fidl::Server<fuchsia_media::AudioCore> {
     FX_NOTIMPLEMENTED();
   }
 
+  void CreateAudioCapturerWithConfiguration(
+      CreateAudioCapturerWithConfigurationRequest& request,
+      CreateAudioCapturerWithConfigurationCompleter::Sync& completer) override {
+    FX_NOTIMPLEMENTED();
+  }
+
   void SetRenderUsageGain(SetRenderUsageGainRequest& request,
                           SetRenderUsageGainCompleter::Sync& completer) override {
     FX_NOTIMPLEMENTED();
@@ -78,6 +84,11 @@ class FakeAudioCore : public fidl::Server<fuchsia_media::AudioCore> {
         std::move(request.usage()), request.volume(), completer.ToAsync());
   }
 
+  void GetVolumeFromDb(GetVolumeFromDbRequest& request,
+                       GetVolumeFromDbCompleter::Sync& completer) override {
+    FX_NOTIMPLEMENTED();
+  }
+
   void SetInteraction(SetInteractionRequest& request,
                       SetInteractionCompleter::Sync& completer) override {
     FX_NOTIMPLEMENTED();
@@ -88,6 +99,11 @@ class FakeAudioCore : public fidl::Server<fuchsia_media::AudioCore> {
   }
 
   void LoadDefaults(LoadDefaultsCompleter::Sync& completer) override { FX_NOTIMPLEMENTED(); }
+
+  void EnableDeviceSettings(EnableDeviceSettingsRequest& request,
+                            EnableDeviceSettingsCompleter::Sync& completer) override {
+    FX_NOTIMPLEMENTED();
+  }
 
   // Checks
   bool WasGetDbFromVolumeCalled(const fuchsia_media::Usage& expected_usage, float expected_volume,
