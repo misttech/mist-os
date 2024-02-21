@@ -270,6 +270,11 @@
             ],
         },
         {
+            protocol: [ "fuchsia.kernel.InfoResource" ],
+            from: "parent",
+            to: [ "#console-launcher" ],
+        },
+        {
             protocol: [
                 "fuchsia.dash.Launcher",
                 "fuchsia.tracing.controller.Controller",
