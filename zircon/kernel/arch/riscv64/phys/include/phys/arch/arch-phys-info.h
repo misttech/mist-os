@@ -13,7 +13,7 @@
 // This is data that physboot et al might need from phys early start-up.
 // It's initialized in physload and then referred to by reference elsewhere.
 struct ArchPhysInfo {
-  uint64_t boot_hart_id;
+  uint64_t boot_hart_id = -1;
 
   // The lowest common denominator of all supported features/extensions across
   // all harts.

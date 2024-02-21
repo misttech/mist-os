@@ -9,6 +9,7 @@
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/items/cpu-topology.h>
 #include <lib/zbitl/view.h>
+#include <zircon/compiler.h>
 
 #include <ktl/optional.h>
 #include <ktl/string_view.h>
@@ -18,8 +19,9 @@
 
 #include "riscv64.h"
 
+// All globals in phys code must be constinit.
 // The boot_hart_id field is initialized by start.S.
-ArchPhysInfo gArchPhysInfoStorage;
+__CONSTINIT ArchPhysInfo gArchPhysInfoStorage;
 
 ArchPhysInfo* gArchPhysInfo;
 
