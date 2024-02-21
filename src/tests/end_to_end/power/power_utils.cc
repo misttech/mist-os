@@ -30,7 +30,7 @@ void intenseComputationOnAllCores(uint64_t duration) {
   }
 }
 
-void idleCPU(uint64_t duration) {
+void idleThread(uint64_t duration) {
   std::this_thread::sleep_for(
       std::chrono::seconds(static_cast<std::chrono::seconds::rep>(duration)));
 }

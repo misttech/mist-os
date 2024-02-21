@@ -9,7 +9,7 @@
 namespace power {
 void intenseComputation(uint64_t duration);
 void intenseComputationOnAllCores(uint64_t duration);
-void idleCPU(uint64_t duration);
+void idleThread(uint64_t duration);
 }  // namespace power
 
 #endif  // SRC_TESTS_END_TO_END_POWER_POWER_UTILS_H_

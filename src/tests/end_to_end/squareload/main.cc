@@ -26,7 +26,7 @@ void squareWaveCPU(uint64_t totalDurationSec, uint64_t dutyCycles) {
     power::intenseComputationOnAllCores(intenseDuration);
 
     FX_LOGS(INFO) << "Idle phase: CPU utilization at 0% for " << idleDuration << " seconds";
-    power::idleCPU(idleDuration);
+    power::idleThread(idleDuration);
   }
 }
 }  // namespace squareload

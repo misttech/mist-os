@@ -5,6 +5,7 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <cstdint>
+#include <thread>
 
 #include <gtest/gtest.h>
 
@@ -13,19 +14,25 @@
 
 namespace suspend {
 namespace {
-uint64_t intenseDuration = 5;
+uint64_t intenseDuration = 100;
+uint64_t resumeInterval = 5;
 uint64_t cycles = 10;
 }  // namespace
 
 void sysfs_suspend() {
-  for (uint32_t i = 0; i < cycles; ++i) {
-    FX_LOGS(INFO) << "Intense computation phase: CPU utilization at 100% for " << intenseDuration
-                  << " seconds";
-    power::intenseComputationOnAllCores(intenseDuration);
-
-    FX_LOGS(INFO) << "Suspend phase: CPU utilization at 0% for 5 seconds";
-    ASSERT_TRUE(files::WriteFile("/sys/power/state", "mem"));
-  }
+  std::thread suspend_thread([]() {
+    for (uint32_t i = 0; i < cycles; ++i) {
+      FX_LOGS(INFO) << "Intense computation phase: CPU utilization at 100% for " << resumeInterval
+                    << " seconds";
+      // By idling the thread, we are yielding to the intensive load.
+      power::idleThread(resumeInterval);
+      FX_LOGS(INFO) << "Suspend phase: CPUs are suspended for 5 seconds";
+      ASSERT_TRUE(files::WriteFile("/sys/power/state", "mem"));
+    }
+  });
+  suspend_thread.detach();
+  FX_LOGS(INFO) << "Starting the intense computation";
+  power::intenseComputationOnAllCores(intenseDuration);
 }
 }  // namespace suspend
 
