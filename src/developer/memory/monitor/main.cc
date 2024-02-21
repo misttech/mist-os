@@ -63,7 +63,8 @@ int main(int argc, const char** argv) {
 
   monitor::Monitor app(std::move(startup_context), command_line, loop.dispatcher(),
                        true /* send_metrics */, true /* watch_memory_pressure */,
-                       SendCriticalMemoryPressureCrashReports());
+                       SendCriticalMemoryPressureCrashReports(),
+                       memory_monitor_config::Config::TakeFromStartupHandle());
   SetRamDevice(&app);
   loop.Run();
 

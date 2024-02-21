@@ -33,7 +33,6 @@
 #include <zircon/utc.h>
 
 #include <iostream>
-#include <type_traits>
 
 #include <gtest/gtest.h>
 #include <test/virtualkeyboard/cpp/fidl.h>
@@ -67,12 +66,14 @@ using test::virtualkeyboard::InputPositionListener;
 
 // Types imported for the realm_builder library.
 using component_testing::ChildRef;
+using component_testing::Config;
 using component_testing::Directory;
 using component_testing::LocalComponentImpl;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::Realm;
 using component_testing::Route;
+using component_testing::VoidRef;
 
 // Alias for Component child name as provided to Realm Builder.
 using ChildName = std::string;
@@ -101,7 +102,7 @@ class InputPositionState {
 
  private:
   friend class InputPositionListenerServer;
-  std::optional<test::virtualkeyboard::BoundingBox> input_position_{};
+  std::optional<test::virtualkeyboard::BoundingBox> input_position_;
 };
 
 // This component implements the interface for a RealmBuilder
@@ -435,6 +436,21 @@ class WebEngineTest : public VirtualKeyboardBase {
                           Protocol{fuchsia::scheduler::ProfileProvider::Name_}},
          .source = ParentRef(),
          .targets = {ChildRef{kMemoryPressureProvider}}},
+        {.capabilities = {Config{kCaptureOnPressureChange}},
+         .source = VoidRef(),
+         .targets = {ChildRef{kMemoryPressureProvider}}},
+        {.capabilities = {Config{kImminentOomCaptureDelay}},
+         .source = VoidRef(),
+         .targets = {ChildRef{kMemoryPressureProvider}}},
+        {.capabilities = {Config{kCriticalCaptureDelay}},
+         .source = VoidRef(),
+         .targets = {ChildRef{kMemoryPressureProvider}}},
+        {.capabilities = {Config{kWarningCaptureDelay}},
+         .source = VoidRef(),
+         .targets = {ChildRef{kMemoryPressureProvider}}},
+        {.capabilities = {Config{kNormalCaptureDelay}},
+         .source = VoidRef(),
+         .targets = {ChildRef{kMemoryPressureProvider}}},
         {.capabilities = {Protocol{fuchsia::ui::scenic::Scenic::Name_}},
          .source = ParentRef(),
          .targets = {target}},
@@ -477,6 +493,11 @@ class WebEngineTest : public VirtualKeyboardBase {
 
   static constexpr auto kMemoryPressureProvider = "memory_pressure_provider";
   static constexpr auto kMemoryPressureProviderUrl = "#meta/memory_monitor.cm";
+  static constexpr auto kCaptureOnPressureChange = "fuchsia.memory.CaptureOnPressureChange";
+  static constexpr auto kImminentOomCaptureDelay = "fuchsia.memory.ImminentOomCaptureDelay";
+  static constexpr auto kCriticalCaptureDelay = "fuchsia.memory.CriticalCaptureDelay";
+  static constexpr auto kWarningCaptureDelay = "fuchsia.memory.WarningCaptureDelay";
+  static constexpr auto kNormalCaptureDelay = "fuchsia.memory.NormalCaptureDelay";
 
   static constexpr auto kNetstack = "netstack";
   static constexpr auto kNetstackUrl = "#meta/netstack.cm";

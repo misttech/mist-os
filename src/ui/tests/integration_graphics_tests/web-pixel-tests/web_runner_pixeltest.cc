@@ -34,7 +34,6 @@
 
 #include <gtest/gtest.h>
 
-#include "fuchsia/component/decl/cpp/fidl.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/ui/testing/util/portable_ui_test.h"
 #include "src/ui/testing/util/screenshot_helper.h"
@@ -43,10 +42,12 @@
 namespace integration_tests {
 
 using component_testing::ChildRef;
+using component_testing::Config;
 using component_testing::Directory;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::Route;
+using component_testing::VoidRef;
 
 constexpr zx::duration kPredicateTimeout = zx::sec(10);
 
@@ -173,6 +174,21 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
                               Protocol{fuchsia::tracing::provider::Registry::Name_}},
              .source = ParentRef(),
              .targets = {ChildRef{kMemoryPressureProvider}}},
+            {.capabilities = {Config{kCaptureOnPressureChange}},
+             .source = VoidRef(),
+             .targets = {ChildRef{kMemoryPressureProvider}}},
+            {.capabilities = {Config{kImminentOomCaptureDelay}},
+             .source = VoidRef(),
+             .targets = {ChildRef{kMemoryPressureProvider}}},
+            {.capabilities = {Config{kCriticalCaptureDelay}},
+             .source = VoidRef(),
+             .targets = {ChildRef{kMemoryPressureProvider}}},
+            {.capabilities = {Config{kWarningCaptureDelay}},
+             .source = VoidRef(),
+             .targets = {ChildRef{kMemoryPressureProvider}}},
+            {.capabilities = {Config{kNormalCaptureDelay}},
+             .source = VoidRef(),
+             .targets = {ChildRef{kMemoryPressureProvider}}},
             {.capabilities = {Protocol{fuchsia::posix::socket::Provider::Name_}},
              .source = ChildRef{kNetstack},
              .targets = {target, ChildRef{kHttpServer}}},
@@ -237,6 +253,11 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
 
   static constexpr auto kMemoryPressureProvider = "memory_pressure_provider";
   static constexpr auto kMemoryPressureProviderUrl = "#meta/memory_monitor.cm";
+  static constexpr auto kCaptureOnPressureChange = "fuchsia.memory.CaptureOnPressureChange";
+  static constexpr auto kImminentOomCaptureDelay = "fuchsia.memory.ImminentOomCaptureDelay";
+  static constexpr auto kCriticalCaptureDelay = "fuchsia.memory.CriticalCaptureDelay";
+  static constexpr auto kWarningCaptureDelay = "fuchsia.memory.WarningCaptureDelay";
+  static constexpr auto kNormalCaptureDelay = "fuchsia.memory.NormalCaptureDelay";
 
   static constexpr auto kNetstack = "netstack";
   static constexpr auto kNetstackUrl = "#meta/netstack.cm";

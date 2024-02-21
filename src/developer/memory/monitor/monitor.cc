@@ -127,13 +127,14 @@ std::vector<memory::BucketMatch> CreateBucketMatchesFromConfigData() {
 Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
                  const fxl::CommandLine& command_line, async_dispatcher_t* dispatcher,
                  bool send_metrics, bool watch_memory_pressure,
-                 bool send_critical_pressure_crash_reports)
+                 bool send_critical_pressure_crash_reports, memory_monitor_config::Config config)
     : prealloc_size_(0),
       logging_(command_line.HasOption("log")),
       tracing_(false),
       delay_(zx::sec(1)),
       dispatcher_(dispatcher),
       component_context_(std::move(context)),
+      config_(config),
       inspector_(dispatcher_, {}),
       logger_(
           dispatcher_,
@@ -141,7 +142,7 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
             auto strategy = std::make_unique<StarnixCaptureStrategy>();
             return GetCapture(c, std::move(strategy));
           },
-          [this](const Capture& c, Digest* d) { GetDigest(c, d); }),
+          [this](const Capture& c, Digest* d) { GetDigest(c, d); }, &config_),
       level_(Level::kNumLevels) {
   auto bucket_matches = CreateBucketMatchesFromConfigData();
   digester_ = std::make_unique<Digester>(Digester(bucket_matches));
@@ -166,6 +167,8 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
       "memory_measurements", [this, bucket_matches = std::move(bucket_matches)] {
         return fpromise::make_result_promise(fpromise::ok(Inspect(bucket_matches)));
       });
+  inspect::Node config_node = inspector_.root().CreateChild("config");
+  config_.RecordInspect(&config_node);
 
   zx_status_t status = component_context_->outgoing()->AddPublicService(bindings_.GetHandler(this));
   FX_CHECK(status == ZX_OK);

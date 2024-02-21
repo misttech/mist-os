@@ -23,6 +23,7 @@
 #include "src/developer/memory/monitor/debugger.h"
 #include "src/developer/memory/monitor/high_water.h"
 #include "src/developer/memory/monitor/logger.h"
+#include "src/developer/memory/monitor/memory_monitor_config.h"
 #include "src/developer/memory/monitor/metrics.h"
 #include "src/developer/memory/monitor/pressure_notifier.h"
 #include "src/lib/fxl/command_line.h"
@@ -38,7 +39,7 @@ class Monitor : public fuchsia::memory::inspection::Collector {
  public:
   Monitor(std::unique_ptr<sys::ComponentContext> context, const fxl::CommandLine& command_line,
           async_dispatcher_t* dispatcher, bool send_metrics, bool watch_memory_pressure,
-          bool send_critical_pressure_crash_reports);
+          bool send_critical_pressure_crash_reports, memory_monitor_config::Config config);
   ~Monitor();
 
   // For memory bandwidth measurement, SetRamDevice should be called once
@@ -90,6 +91,7 @@ class Monitor : public fuchsia::memory::inspection::Collector {
   fuchsia::metrics::MetricEventLoggerSyncPtr metric_event_logger_;
   fidl::BindingSet<fuchsia::memory::inspection::Collector> bindings_;
   trace::TraceObserver trace_observer_;
+  memory_monitor_config::Config config_;
   inspect::ComponentInspector inspector_;
   Logger logger_;
   std::unique_ptr<Metrics> metrics_;

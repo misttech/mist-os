@@ -25,6 +25,7 @@ source_set("lib") {
     "pressure_observer.h",
   ]
   public_deps = [
+    ":memory_monitor_config",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
     "//sdk/fidl/fuchsia.hardware.ram.metrics:fuchsia.hardware.ram.metrics_hlcpp",
     "//sdk/fidl/fuchsia.memory.debug:fuchsia.memory.debug_hlcpp",
@@ -87,26 +88,58 @@ executable("bin_with_memory_sampler") {
       _common_deps + [ "//src/performance/memory/sampler/instrumentation:lib" ]
 }
 
-fuchsia_component("component") {
+fuchsia_component_manifest("memory_monitor_manifest") {
   component_name = "memory_monitor"
   manifest = "meta/memory_monitor.cml"
-  deps = [ ":bin" ]
+}
+
+fuchsia_component_manifest("memory_monitor_with_memory_sampler_manifest") {
+  component_name = "memory_monitor"
+  manifest = "meta/memory_monitor_with_memory_sampler.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("memory_monitor_config") {
+  cm_label = ":memory_monitor_manifest"
+}
+
+fuchsia_structured_config_values("memory_monitor_default_config") {
+  cm_label = ":memory_monitor_manifest"
+  values_source = "config/config_values.json5"
+}
+
+fuchsia_component("component") {
+  cm_label = ":memory_monitor_manifest"
+  deps = [
+    ":bin",
+    ":memory_monitor_default_config",
+  ]
+}
+
+fuchsia_structured_config_values(
+    "memory_monitor_with_memory_sampler_default_config") {
+  cm_label = ":memory_monitor_with_memory_sampler_manifest"
+  values_source = "config/config_values.json5"
 }
 
 fuchsia_component("component_with_memory_sampler") {
-  component_name = "memory_monitor"
-  manifest = "meta/memory_monitor_with_memory_sampler.cml"
+  cm_label = ":memory_monitor_with_memory_sampler_manifest"
   deps = [ ":bin_with_memory_sampler" ]
 }
 
 fuchsia_package("monitor_without_memory_sampler") {
   package_name = "memory_monitor"
-  deps = [ ":component" ]
+  deps = [
+    ":component",
+    ":memory_monitor_default_config",
+  ]
 }
 
 fuchsia_package("monitor_with_memory_sampler") {
   package_name = "memory_monitor"
-  deps = [ ":component_with_memory_sampler" ]
+  deps = [
+    ":component_with_memory_sampler",
+    ":memory_monitor_with_memory_sampler_default_config",
+  ]
 }
 
 core_shard("memory_monitor_core_shard") {

@@ -31,7 +31,6 @@
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
-#include <algorithm>
 #include <cctype>
 
 #include <gtest/gtest.h>
@@ -42,9 +41,11 @@ namespace accessibility_test {
 namespace {
 
 using component_testing::ChildRef;
+using component_testing::Config;
 using component_testing::Directory;
 using component_testing::ParentRef;
 using component_testing::Protocol;
+using component_testing::VoidRef;
 
 static constexpr auto kStaticHtml = R"(
 <html>
@@ -111,6 +112,11 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
 
   static constexpr auto kMemoryPressureProvider = "memory_pressure_provider";
   static constexpr auto kMemoryPressureProviderUrl = "#meta/memory_monitor.cm";
+  static constexpr auto kCaptureOnPressureChange = "fuchsia.memory.CaptureOnPressureChange";
+  static constexpr auto kImminentOomCaptureDelay = "fuchsia.memory.ImminentOomCaptureDelay";
+  static constexpr auto kCriticalCaptureDelay = "fuchsia.memory.CriticalCaptureDelay";
+  static constexpr auto kWarningCaptureDelay = "fuchsia.memory.WarningCaptureDelay";
+  static constexpr auto kNormalCaptureDelay = "fuchsia.memory.NormalCaptureDelay";
 
   static constexpr auto kNetstack = "netstack";
   static constexpr auto kNetstackUrl = "#meta/netstack.cm";
@@ -186,6 +192,21 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
                                         Protocol{fuchsia::scheduler::ProfileProvider::Name_},
                                         Protocol{fuchsia::tracing::provider::Registry::Name_}},
                        .source = ParentRef(),
+                       .targets = {ChildRef{kMemoryPressureProvider}}});
+    realm()->AddRoute({.capabilities = {Config{kCaptureOnPressureChange}},
+                       .source = VoidRef(),
+                       .targets = {ChildRef{kMemoryPressureProvider}}});
+    realm()->AddRoute({.capabilities = {Config{kImminentOomCaptureDelay}},
+                       .source = VoidRef(),
+                       .targets = {ChildRef{kMemoryPressureProvider}}});
+    realm()->AddRoute({.capabilities = {Config{kCriticalCaptureDelay}},
+                       .source = VoidRef(),
+                       .targets = {ChildRef{kMemoryPressureProvider}}});
+    realm()->AddRoute({.capabilities = {Config{kWarningCaptureDelay}},
+                       .source = VoidRef(),
+                       .targets = {ChildRef{kMemoryPressureProvider}}});
+    realm()->AddRoute({.capabilities = {Config{kNormalCaptureDelay}},
+                       .source = VoidRef(),
                        .targets = {ChildRef{kMemoryPressureProvider}}});
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::posix::socket::Provider::Name_}},
                        .source = ChildRef{kNetstack},

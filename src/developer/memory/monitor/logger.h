@@ -10,6 +10,7 @@
 
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/digest.h"
+#include "src/developer/memory/monitor/memory_monitor_config.h"
 #include "src/developer/memory/monitor/pressure_observer.h"
 #include "src/lib/fxl/macros.h"
 
@@ -20,10 +21,12 @@ class Logger {
   using CaptureCb = fit::function<zx_status_t(memory::Capture*)>;
   using DigestCb = fit::function<void(const memory::Capture&, memory::Digest*)>;
 
-  Logger(async_dispatcher_t* dispatcher, CaptureCb capture_cb, DigestCb digest_cb)
+  Logger(async_dispatcher_t* dispatcher, CaptureCb capture_cb, DigestCb digest_cb,
+         memory_monitor_config::Config* config)
       : dispatcher_(dispatcher),
         capture_cb_(std::move(capture_cb)),
-        digest_cb_(std::move(digest_cb)) {}
+        digest_cb_(std::move(digest_cb)),
+        config_(config) {}
 
   void SetPressureLevel(Level l);
 
@@ -32,6 +35,7 @@ class Logger {
   async_dispatcher_t* dispatcher_;
   CaptureCb capture_cb_;
   DigestCb digest_cb_;
+  memory_monitor_config::Config* config_;
   zx::duration duration_;
   async::TaskClosureMethod<Logger, &Logger::Log> task_{this};
 

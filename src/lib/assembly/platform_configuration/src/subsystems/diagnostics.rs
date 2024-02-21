@@ -210,13 +210,41 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         let gendir = context.get_gendir().context("Getting gendir for diagnostics")?;
         let buckets_path = gendir.join("buckets.json");
         write_json_file(&buckets_path, &buckets)?;
-        builder
-            .package("memory_monitor")
+        let memory_monitor_package = builder.package("memory_monitor");
+        memory_monitor_package
             .config_data(FileEntry {
                 source: buckets_path.clone(),
                 destination: "buckets.json".into(),
             })
             .context(format!("Adding buckets config to memory_monitor: {}", &buckets_path))?;
+
+        builder.set_config_capability(
+            "fuchsia.memory.CaptureOnPressureChange",
+            Config::new(ConfigValueType::Bool, memory_monitor.capture_on_pressure_change.into()),
+        )?;
+
+        builder.set_config_capability(
+            "fuchsia.memory.ImminentOomCaptureDelay",
+            Config::new(
+                ConfigValueType::Uint32,
+                memory_monitor.imminent_oom_capture_delay_s.into(),
+            ),
+        )?;
+
+        builder.set_config_capability(
+            "fuchsia.memory.CriticalCaptureDelay",
+            Config::new(ConfigValueType::Uint32, memory_monitor.critical_capture_delay_s.into()),
+        )?;
+
+        builder.set_config_capability(
+            "fuchsia.memory.WarningCaptureDelay",
+            Config::new(ConfigValueType::Uint32, memory_monitor.warning_capture_delay_s.into()),
+        )?;
+
+        builder.set_config_capability(
+            "fuchsia.memory.NormalCaptureDelay",
+            Config::new(ConfigValueType::Uint32, memory_monitor.normal_capture_delay_s.into()),
+        )?;
 
         Ok(())
     }

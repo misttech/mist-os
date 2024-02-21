@@ -1,5 +1,3 @@
-
-
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -13,27 +11,40 @@
 
 namespace monitor {
 
-using namespace memory;
-
-const zx::duration log_durations[kNumLevels] = {zx::sec(30), zx::min(1), zx::min(5), zx::min(10)};
-
 void Logger::SetPressureLevel(Level l) {
-  duration_ = log_durations[l];
-  task_.Cancel();
-  task_.PostDelayed(dispatcher_, zx::usec(1));
+  switch (l) {
+    case kImminentOOM:
+      duration_ = zx::sec(config_->imminent_oom_capture_delay_s());
+      break;
+    case kCritical:
+      duration_ = zx::sec(config_->critical_capture_delay_s());
+      break;
+    case kWarning:
+      duration_ = zx::sec(config_->warning_capture_delay_s());
+      break;
+    case kNormal:
+      duration_ = zx::sec(config_->normal_capture_delay_s());
+      break;
+    case kNumLevels:
+      break;
+  }
+  if (config_->capture_on_pressure_change()) {
+    task_.Cancel();
+    task_.PostDelayed(dispatcher_, zx::usec(1));
+  }
 }
 
 void Logger::Log() {
-  Capture c;
+  memory::Capture c;
   auto s = capture_cb_(&c);
   if (s != ZX_OK) {
     FX_LOGS_FIRST_N(INFO, 1) << "Error getting Capture: " << s;
     return;
   }
-  Digest d;
+  memory::Digest d;
   digest_cb_(c, &d);
   std::ostringstream oss;
-  Printer p(oss);
+  memory::Printer p(oss);
 
   p.PrintDigest(d);
   auto str = oss.str();

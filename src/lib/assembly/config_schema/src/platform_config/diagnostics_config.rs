@@ -64,6 +64,25 @@ pub struct MemoryMonitorConfig {
     /// The memory buckets config file to provide to memory monitor.
     #[serde(default)]
     pub buckets: Option<Utf8PathBuf>,
+    /// Control whether a pressure change should trigger a capture.
+    #[serde(default)]
+    pub capture_on_pressure_change: Option<bool>,
+    /// Expected delay between scheduled captures upon imminent OOM, in
+    /// seconds.
+    #[serde(default)]
+    pub imminent_oom_capture_delay_s: Option<u32>,
+    /// Expected delay between scheduled captures when the memory
+    /// pressure is critical, in seconds.
+    #[serde(default)]
+    pub critical_capture_delay_s: Option<u32>,
+    /// Expected delay between scheduled captures when the memory
+    /// pressure is abnormal, in seconds.
+    #[serde(default)]
+    pub warning_capture_delay_s: Option<u32>,
+    /// Expected delay between scheduled captures when the memory
+    /// pressure is normal, in seconds.
+    #[serde(default)]
+    pub normal_capture_delay_s: Option<u32>,
 }
 
 #[cfg(test)]

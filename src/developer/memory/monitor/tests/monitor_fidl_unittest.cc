@@ -17,11 +17,9 @@
 #include "src/developer/memory/monitor/monitor.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
-namespace monitor {
-namespace test {
+namespace monitor::test {
 
 using namespace memory;
-using namespace monitor;
 
 class FakeRamDevice : public fuchsia::hardware::ram::metrics::testing::Device_TestBase {
  public:
@@ -111,7 +109,8 @@ class MemoryBandwidthInspectTest : public gtest::TestLoopFixture {
  public:
   MemoryBandwidthInspectTest()
       : monitor_(std::make_unique<Monitor>(context_provider_.TakeContext(), fxl::CommandLine{},
-                                           dispatcher(), false, false, false)),
+                                           dispatcher(), false, false, false,
+                                           memory_monitor_config::Config{})),
         executor_(dispatcher()),
         ram_binding_(&fake_device_),
         logger_factory_(new MockLoggerFactory()) {
@@ -189,5 +188,4 @@ TEST_F(MemoryBandwidthInspectTest, MemoryBandwidth) {
   ASSERT_TRUE(timestamp);
 }
 
-}  // namespace test
-}  // namespace monitor
+}  // namespace monitor::test

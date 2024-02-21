@@ -59,9 +59,15 @@
             from: "#config",
             to: "#core",
             config: [
+                "fuchsia.memory.CaptureOnPressureChange",
+                "fuchsia.memory.CriticalCaptureDelay",
+                "fuchsia.memory.ImminentOomCaptureDelay",
+                "fuchsia.memory.NormalCaptureDelay",
+                "fuchsia.memory.WarningCaptureDelay",
                 "fuchsia.session.AutoLaunch",
                 "fuchsia.session.SessionUrl",
             ],
+            availability: "same_as_target",
         },
         {
             protocol: "fuchsia.process.Launcher",
