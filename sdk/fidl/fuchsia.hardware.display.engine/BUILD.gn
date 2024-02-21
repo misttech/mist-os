@@ -7,6 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.display.engine") {
   sources = [
     "engine.fidl",
+    "ids.fidl",
     "overview.fidl",
   ]
   public_deps = [

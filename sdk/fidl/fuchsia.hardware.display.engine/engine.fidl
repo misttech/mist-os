@@ -20,18 +20,6 @@ type Image = struct {
     type uint32;
 };
 
-/// Type of the internal value in [`ImageId`].
-alias ImageIdValue = uint64;
-
-/// Unique identifier for an image exposed to display drivers.
-///
-/// [`INVALID_ID`] represents an invalid value.
-type ImageId = struct {
-    value ImageIdValue;
-};
-
-const INVALID_ID uint64 = 0;
-
 type ColorConversion = strict bits : uint32 {
     /// If set, use the 0 vector for the color conversion preoffset
     PREOFFSET = 0x1;
@@ -119,7 +107,8 @@ open protocol Engine {
     ///
     /// Returns ZX_ERR_ALREADY_EXISTS if `collection_id` is in use.
     flexible ImportBufferCollection(resource struct {
-        collection_id uint64;
+        buffer_collection_id BufferCollectionId;
+
         // TODO(https://fxbug.dev/42171012): This is a client end channel of FIDL protocol
         // fuchsia.sysmem.BufferCollectionToken. The raw channel needs to be
         // replaced with FIDL client end once banjo to FIDL migration finishes.
@@ -142,8 +131,7 @@ open protocol Engine {
     /// allocated.
     flexible ImportImage(struct {
         image Image;
-        collection_id uint64;
-        index uint32;
+        buffer_id BufferId;
     }) -> (struct {
         image_id ImageId;
     }) error zx.Status;
@@ -159,8 +147,7 @@ open protocol Engine {
     /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
     /// allocated.
     flexible ImportImageForCapture(struct {
-        collection_id uint64;
-        index uint32;
+        buffer_id BufferId;
     }) -> (struct {
         capture_image_id ImageId;
     }) error zx.Status;
@@ -263,7 +250,7 @@ open protocol Engine {
     /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
     flexible SetBufferCollectionConstraints(struct {
         config Image;
-        collection_id uint64;
+        buffer_collection_id BufferCollectionId;
     }) -> () error zx.Status;
 
     /// Power off/on the display panel. Newly added displays are turned on by
