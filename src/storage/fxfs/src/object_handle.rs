@@ -6,7 +6,7 @@ use {
     crate::object_store::{PosixAttributes, Timestamp},
     anyhow::Error,
     async_trait::async_trait,
-    std::{future::Future, pin::Pin},
+    std::{future::Future, ops::Deref, pin::Pin},
     storage_device::buffer::{BufferFuture, BufferRef, MutableBufferRef},
 };
 
@@ -101,7 +101,9 @@ pub trait WriteBytes: Sized {
     fn skip(&mut self, amount: u64) -> impl Future<Output = Result<(), Error>> + Send;
 }
 
-impl ReadObjectHandle for Box<dyn ReadObjectHandle> {
+// Implements ReadObjectHandle for things like `Arc<dyn ReadObjectHandle>` and
+// `Box<dyn ReadObjectHandle>`.  The below impl of `ObjectHandle` is also necessary for this.
+impl<T: Deref<Target = dyn ReadObjectHandle> + Send + Sync + 'static> ReadObjectHandle for T {
     // Manual expansion of `async_trait` to avoid double boxing the `Future`.
     fn read<'a, 'b, 'c>(
         &'a self,
@@ -121,7 +123,7 @@ impl ReadObjectHandle for Box<dyn ReadObjectHandle> {
     }
 }
 
-impl ObjectHandle for Box<dyn ReadObjectHandle> {
+impl<T: Deref<Target = dyn ReadObjectHandle> + Send + Sync + 'static> ObjectHandle for T {
     fn object_id(&self) -> u64 {
         (**self).object_id()
     }

@@ -5,10 +5,9 @@
 use {
     crate::object_handle::{ObjectHandle, ReadObjectHandle},
     anyhow::Error,
-    async_trait::async_trait,
     event_listener::{Event, EventListener},
     std::{cell::UnsafeCell, sync::RwLock, vec::Vec},
-    storage_device::buffer::{BufferFuture, MutableBufferRef},
+    storage_device::buffer::BufferFuture,
 };
 
 const CHUNK_SIZE: usize = 128 * 1024;
@@ -161,20 +160,6 @@ impl<S: ReadObjectHandle> ObjectHandle for CachingObjectHandle<S> {
 
     fn block_size(&self) -> u64 {
         self.source.block_size()
-    }
-}
-
-#[async_trait]
-impl<S: ReadObjectHandle> ReadObjectHandle for CachingObjectHandle<S> {
-    async fn read(&self, offset: u64, mut buf: MutableBufferRef<'_>) -> Result<usize, Error> {
-        let buf = buf.as_mut_slice();
-        let slice = self.read(offset as usize, buf.len()).await?;
-        buf[0..slice.len()].copy_from_slice(slice);
-        Ok(slice.len())
-    }
-
-    fn get_size(&self) -> u64 {
-        self.source.get_size()
     }
 }
 
@@ -439,26 +424,5 @@ mod tests {
 
         let slice = caching_object_handle.read(0, 10).await.unwrap();
         assert!(slice.is_empty());
-    }
-
-    #[fuchsia::test]
-    async fn test_read_with_read_object_handle() {
-        let device = Arc::new(FakeDevice::new(1024, 512));
-        let source = FakeSource::new(device.clone(), CHUNK_SIZE + 8192);
-        source.start();
-        let caching_object_handle = CachingObjectHandle::new(source);
-
-        let mut buf = device.allocate_buffer(4096).await;
-        assert_eq!(
-            ReadObjectHandle::read(
-                &caching_object_handle,
-                (CHUNK_SIZE + 4096) as u64,
-                buf.as_mut()
-            )
-            .await
-            .unwrap(),
-            4096
-        );
-        assert_eq!(buf.as_slice(), make_buf(1, 4096));
     }
 }

@@ -265,6 +265,8 @@ pub trait LayerKey: Clone {
 /// Layer is a trait that all layers need to implement (mutable and immutable).
 #[async_trait]
 pub trait Layer<K, V>: Send + Sync {
+    /// If the layer is persistent, returns the handle to its contents.  Returns None for in-memory
+    /// layers.
     fn handle(&self) -> Option<&dyn ReadObjectHandle> {
         None
     }

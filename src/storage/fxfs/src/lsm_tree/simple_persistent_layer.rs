@@ -85,7 +85,14 @@ pub struct LayerInfo {
 /// Implements a very primitive persistent layer where items are packed into blocks and searching
 /// for items is done via a simple binary search.
 pub struct SimplePersistentLayer {
-    object_handle: CachingObjectHandle<Box<dyn ReadObjectHandle>>,
+    // We retain a reference to the underlying object handle so we can hand out references to it for
+    // `Layer::handle` when clients need it.  Internal reads should go through
+    // `caching_object_handle` so they are cached.  Note that `CachingObjectHandle` used to
+    // implement `ReadObjectHandle`, but that was removed so that `CachingObjectHandle` could hand
+    // out data references rather than requiring copying to a buffer, which speeds up LSM tree
+    // operations.
+    object_handle: Arc<dyn ReadObjectHandle>,
+    caching_object_handle: CachingObjectHandle<Arc<dyn ReadObjectHandle>>,
     layer_info: LayerInfo,
     size: u64,
     seek_table: Option<Vec<u64>>,
@@ -174,7 +181,7 @@ impl<K: Key, V: Value> Iterator<'_, K, V> {
             }
             self.buffer.buffer = self
                 .layer
-                .object_handle
+                .caching_object_handle
                 .read(self.pos as usize, self.layer.layer_info.block_size as usize)
                 .await
                 .context("Reading during advance")?;
@@ -331,8 +338,11 @@ impl SimplePersistentLayer {
 
         let (seek_table, data_size) = parse_seek_table(&object_handle, &layer_info, buffer).await?;
 
+        let object_handle = Arc::new(object_handle) as Arc<dyn ReadObjectHandle>;
+        let caching_object_handle = CachingObjectHandle::new(object_handle.clone());
         Ok(Arc::new(SimplePersistentLayer {
-            object_handle: CachingObjectHandle::new(Box::new(object_handle)),
+            object_handle,
+            caching_object_handle,
             layer_info,
             size: data_size,
             seek_table,
