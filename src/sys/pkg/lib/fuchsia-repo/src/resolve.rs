@@ -46,13 +46,13 @@ use {
 pub async fn resolve_repository<R>(
     repo: &RepoClient<R>,
     metadata_dir: impl AsRef<Path>,
-    blobs_dir: impl AsRef<Path>,
+    output_blobs_dir: impl AsRef<Path>,
     concurrency: usize,
 ) -> Result<()>
 where
     R: RepoProvider,
 {
-    let blobs_dir = blobs_dir.as_ref();
+    let blobs_dir = output_blobs_dir.as_ref();
 
     let trusted_targets = resolve_repository_metadata(repo, metadata_dir).await?;
 
