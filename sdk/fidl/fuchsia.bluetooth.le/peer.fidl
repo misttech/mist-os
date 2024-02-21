@@ -95,7 +95,6 @@ closed protocol Connection {
     /// The following epitaphs may be sent by the server on error:
     /// + `ZX_ERR_ALREADY_BOUND`: A Client server has already been bound in this Connection
     ///                           protocol. The existing Client should be used.
-    @transitional
     @available(added=HEAD)
     strict RequestGattClient(resource struct {
         client server_end:gatt2.Client;
