@@ -53,8 +53,7 @@ fuchsia_unittest_package("msd-vsi-vip-integration-tests") {
   deps = [ ":msd_vsi_vip_integration_tests" ]
   test_specs = {
     environments = [
-      # TODO(https://fxbug.dev/42083831): Re-enable once DFv2 is eanbled on sherlock.
-      #sherlock_env,
+      sherlock_env,
       vim3_env,
     ]
     log_settings = {
