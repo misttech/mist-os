@@ -22,8 +22,8 @@
 #include "src/graphics/display/drivers/amlogic-display/power-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/designware/hdmi-transmitter-controller-impl.h"
-#include "src/graphics/display/lib/designware/hdmi-transmitter-controller.h"
+#include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller-impl.h"
+#include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller.h"
 
 namespace amlogic_display {
 

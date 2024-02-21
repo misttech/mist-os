@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/lib/designware/hdmi-transmitter-controller-impl.h"
+#include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller-impl.h"
 
 #include <lib/ddk/debug.h>
 #include <zircon/assert.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/designware/color-param.h"
-#include "src/graphics/display/lib/designware/regs.h"
+#include "src/graphics/display/lib/designware-hdmi/color-param.h"
+#include "src/graphics/display/lib/designware-hdmi/regs.h"
 
 namespace designware_hdmi {
 

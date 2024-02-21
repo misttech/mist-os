@@ -16,8 +16,8 @@
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/designware/color-param.h"
-#include "src/graphics/display/lib/designware/hdmi-transmitter-controller.h"
+#include "src/graphics/display/lib/designware-hdmi/color-param.h"
+#include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller.h"
 
 namespace amlogic_display {
 

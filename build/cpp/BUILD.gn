@@ -203,7 +203,7 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-    "//src/graphics/display/lib/designware/test:hdmi-dw",
+    "//src/graphics/display/lib/designware-hdmi/test:hdmi-dw",
 
     #------------------
     #------------------

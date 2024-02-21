@@ -12,7 +12,7 @@ test("hdmi-transmitter-controller-impl-test-bin") {
     "//src/devices/lib/mmio",
     "//src/devices/testing/mock-mmio-range",
     "//src/devices/testing/no_ddk",
-    "//src/graphics/display/lib/designware:hdmi-transmitter-controller-impl",
+    "//src/graphics/display/lib/designware-hdmi:hdmi-transmitter-controller-impl",
     "//src/lib/ddk",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",

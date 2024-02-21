@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_COLOR_PARAM_H_
-#define SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_COLOR_PARAM_H_
+#ifndef SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_HDMI_COLOR_PARAM_H_
+#define SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_HDMI_COLOR_PARAM_H_
 
 #include <cinttypes>
 
@@ -37,4 +37,4 @@ struct ColorParam {
 
 }  // namespace designware_hdmi
 
-#endif  // SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_COLOR_PARAM_H_
+#endif  // SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_HDMI_COLOR_PARAM_H_

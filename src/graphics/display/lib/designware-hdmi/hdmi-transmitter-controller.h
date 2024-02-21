@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_HDMI_TRANSMITTER_CONTROLLER_H_
-#define SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_HDMI_TRANSMITTER_CONTROLLER_H_
+#ifndef SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_HDMI_HDMI_TRANSMITTER_CONTROLLER_H_
+#define SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_HDMI_HDMI_TRANSMITTER_CONTROLLER_H_
 
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/mmio/mmio-buffer.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/designware/color-param.h"
+#include "src/graphics/display/lib/designware-hdmi/color-param.h"
 
 namespace designware_hdmi {
 
@@ -47,4 +47,4 @@ class HdmiTransmitterController {
 
 }  // namespace designware_hdmi
 
-#endif  // SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_HDMI_TRANSMITTER_CONTROLLER_H_
+#endif  // SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_HDMI_HDMI_TRANSMITTER_CONTROLLER_H_
