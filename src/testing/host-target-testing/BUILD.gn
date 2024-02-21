@@ -9,7 +9,6 @@ import("//build/testing/host_test_data.gni")
 test_packages = [
   "artifacts",
   "avb",
-  "device",
   "ffx",
   "flasher",
   "omaha_tool",

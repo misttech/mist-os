@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -26,9 +25,6 @@ type DeviceResolverMode = string
 const (
 	// Resolve devices with ffx.
 	FfxResolver = "ffx"
-
-	// Resolve devices with the legacy device-finder.
-	DeviceFinderResolver = "device-finder"
 )
 
 type DeviceConfig struct {
@@ -97,34 +93,12 @@ func (c *DeviceConfig) FFXTool() (*ffx.FFXTool, error) {
 	return c.ffx, nil
 }
 
-// newDeviceFinder constructs a DeviceFinder in order to help `device.Client` discover and resolve
-// nodenames into IP addresses.
-func (c *DeviceConfig) newDeviceFinder() (*device.DeviceFinder, error) {
-	if c.deviceFinderPath == "" {
-		c.deviceFinderPath = filepath.Join(c.testDataPath, "device-finder")
-	}
-
-	if _, err := os.Stat(c.deviceFinderPath); err != nil {
-		return nil, fmt.Errorf("error accessing %v: %w", c.deviceFinderPath, err)
-	}
-
-	return device.NewDeviceFinder(c.deviceFinderPath), nil
-}
-
 func (c *DeviceConfig) DeviceResolver(ctx context.Context) (device.DeviceResolver, error) {
 	if c.deviceHostname != "" {
 		return device.NewConstantHostResolver(ctx, c.deviceName, c.deviceHostname), nil
 	}
 
 	switch c.deviceResolverMode {
-	case DeviceFinderResolver:
-		deviceFinder, err := c.newDeviceFinder()
-		if err != nil {
-			return nil, err
-		}
-
-		return device.NewDeviceFinderResolver(ctx, deviceFinder, c.deviceName)
-
 	case FfxResolver:
 		ffx, err := c.FFXTool()
 		if err != nil {

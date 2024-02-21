@@ -25,14 +25,8 @@ if (is_host) {
       "device.go",
       "finder.go",
       "monotonic.go",
-      "node_names.go",
-      "node_names_test.go",
       "resolver.go",
       "serial.go",
     ]
-  }
-
-  go_test("host-target-testing-device-test") {
-    library = ":device"
   }
 }

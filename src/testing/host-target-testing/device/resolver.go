@@ -14,8 +14,8 @@ import (
 )
 
 type DeviceResolver interface {
-	// NodeNames returns a list of nodenames for a device.
-	NodeNames() []string
+	// NodeName returns a nodename for a device.
+	NodeName() string
 
 	// Resolve the device's nodename into a hostname.
 	ResolveName(ctx context.Context) (string, error)
@@ -26,34 +26,20 @@ type DeviceResolver interface {
 
 // ConstnatAddressResolver returns a fixed hostname for the specified nodename.
 type ConstantHostResolver struct {
-	nodeName    string
-	oldNodeName string
-	host        string
+	nodeName string
+	host     string
 }
 
 // NewConstantAddressResolver constructs a fixed host.
 func NewConstantHostResolver(ctx context.Context, nodeName string, host string) ConstantHostResolver {
-	oldNodeName, err := translateToOldNodeName(nodeName)
-	if err == nil {
-		logger.Infof(ctx, "translated device name %q to old nodename %q", nodeName, oldNodeName)
-	} else {
-		logger.Warningf(ctx, "could not translate %q into old device name: %v", nodeName, err)
-		oldNodeName = ""
-	}
-
 	return ConstantHostResolver{
-		nodeName:    nodeName,
-		oldNodeName: oldNodeName,
-		host:        host,
+		nodeName: nodeName,
+		host:     host,
 	}
 }
 
-func (r ConstantHostResolver) NodeNames() []string {
-	if r.oldNodeName == "" {
-		return []string{r.nodeName}
-	} else {
-		return []string{r.nodeName, r.oldNodeName}
-	}
+func (r ConstantHostResolver) NodeName() string {
+	return r.nodeName
 }
 
 func (r ConstantHostResolver) ResolveName(ctx context.Context) (string, error) {
@@ -64,83 +50,6 @@ func (r ConstantHostResolver) WaitToFindDeviceInNetboot(ctx context.Context) (st
 	// We have no way to tell if the device is in netboot, so just exit.
 	logger.Warningf(ctx, "ConstantHostResolver cannot tell if device is in netboot, assuming nodename is %s", r.nodeName)
 	return r.nodeName, nil
-}
-
-// DeviceFinderResolver uses `device-finder` to resolve a nodename into a hostname.
-// The logic here should match get-fuchsia-device-addr (//tools/devshell/lib/vars.sh).
-type DeviceFinderResolver struct {
-	deviceFinder *DeviceFinder
-	nodeName     string
-	oldNodeName  string
-}
-
-// NewDeviceFinderResolver constructs a new `DeviceFinderResolver` for the specific
-func NewDeviceFinderResolver(ctx context.Context, deviceFinder *DeviceFinder, nodeName string) (*DeviceFinderResolver, error) {
-	if nodeName == "" {
-		entries, err := deviceFinder.List(ctx, Mdns)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list devices: %w", err)
-		}
-		if len(entries) == 0 {
-			return nil, fmt.Errorf("no devices found")
-		}
-
-		if len(entries) != 1 {
-			return nil, fmt.Errorf("cannot use empty nodename with multiple devices: %v", entries)
-		}
-
-		nodeName = entries[0].NodeName
-	}
-
-	var oldNodeName string
-
-	// FIXME(https://fxbug.dev/42150466) we can switch back to the resolver
-	// resolving a single name after we no longer support testing builds
-	// older than 2021-02-22.
-	if name, err := translateToOldNodeName(nodeName); err == nil {
-		logger.Infof(ctx, "translated device name %q to old nodename %q", nodeName, name)
-		oldNodeName = name
-	} else {
-		logger.Warningf(ctx, "could not translate %q into old device name: %v", nodeName, err)
-	}
-
-	return &DeviceFinderResolver{
-		deviceFinder: deviceFinder,
-		nodeName:     nodeName,
-		oldNodeName:  oldNodeName,
-	}, nil
-}
-
-func (r *DeviceFinderResolver) NodeNames() []string {
-	return []string{r.nodeName, r.oldNodeName}
-}
-
-func (r *DeviceFinderResolver) ResolveName(ctx context.Context) (string, error) {
-	entry, err := r.deviceFinder.Resolve(ctx, Mdns, r.NodeNames())
-	if err != nil {
-		return "", err
-	}
-
-	return entry.Address, nil
-}
-
-func (r *DeviceFinderResolver) WaitToFindDeviceInNetboot(ctx context.Context) (string, error) {
-	nodeNames := r.NodeNames()
-
-	// Wait for the device to be listening in netboot.
-	logger.Infof(ctx, "waiting for the to be listening on the nodenames: %v", nodeNames)
-
-	attempt := 0
-	for {
-		attempt += 1
-
-		if entry, err := r.deviceFinder.Resolve(ctx, Netboot, nodeNames); err == nil {
-			logger.Infof(ctx, "device %v is listening on %q", nodeNames, entry)
-			return entry.NodeName, nil
-		} else {
-			logger.Infof(ctx, "attempt %d failed to resolve nodenames %v: %v", attempt, nodeNames, err)
-		}
-	}
 }
 
 // FfxResolver uses `ffx target list` to resolve a nodename into a hostname.
@@ -169,46 +78,33 @@ func NewFfxResolver(ctx context.Context, ffx *ffx.FFXTool, nodeName string) (*Ff
 		nodeName = entries[0].NodeName
 	}
 
-	var oldNodeName string
-
-	// FIXME(https://fxbug.dev/42150466) we can switch back to the resolver
-	// resolving a single name after we no longer support testing builds
-	// older than 2021-02-22.
-	if name, err := translateToOldNodeName(nodeName); err == nil {
-		logger.Infof(ctx, "translated device name %q to old nodename %q", nodeName, name)
-		oldNodeName = name
-	} else {
-		logger.Warningf(ctx, "could not translate %q into old device name: %v", nodeName, err)
-	}
-
 	return &FfxResolver{
-		ffx:         ffx,
-		nodeName:    nodeName,
-		oldNodeName: oldNodeName,
+		ffx:      ffx,
+		nodeName: nodeName,
 	}, nil
 }
 
-func (r *FfxResolver) NodeNames() []string {
-	return []string{r.nodeName, r.oldNodeName}
+func (r *FfxResolver) NodeName() string {
+	return r.nodeName
 }
 
 func (r *FfxResolver) ResolveName(ctx context.Context) (string, error) {
-	nodeNames := r.NodeNames()
-	logger.Infof(ctx, "resolving the nodenames %v", nodeNames)
+	nodeName := r.NodeName()
+	logger.Infof(ctx, "resolving the nodename %v", nodeName)
 
-	targets, err := r.ffx.TargetListForNode(ctx, nodeNames)
+	targets, err := r.ffx.TargetListForNode(ctx, nodeName)
 	if err != nil {
 		return "", err
 	}
 
-	logger.Infof(ctx, "resolved the nodenames %v to %v", nodeNames, targets)
+	logger.Infof(ctx, "resolved the nodename %v to %v", nodeName, targets)
 
 	if len(targets) == 0 {
-		return "", fmt.Errorf("no addresses found for nodenames: %v", nodeNames)
+		return "", fmt.Errorf("no addresses found for nodename: %v", nodeName)
 	}
 
 	if len(targets) > 1 {
-		return "", fmt.Errorf("multiple addresses found for nodenames %v: %v", nodeNames, targets)
+		return "", fmt.Errorf("multiple addresses found for nodename %v: %v", nodeName, targets)
 	}
 
 	return targets[0].Addresses[0], nil
@@ -226,16 +122,16 @@ func (r *FfxResolver) WaitToFindDeviceInNetboot(ctx context.Context) (string, er
 		return r.nodeName, nil
 	}
 
-	nodeNames := r.NodeNames()
+	nodeName := r.NodeName()
 
 	// Wait for the device to be listening in netboot.
-	logger.Infof(ctx, "waiting for the to be listening on the nodenames: %v", nodeNames)
+	logger.Infof(ctx, "waiting for the to be listening on the nodename: %v", nodeName)
 
 	attempt := 0
 	for {
 		attempt += 1
 
-		if entries, err := r.ffx.TargetListForNode(ctx, nodeNames); err == nil {
+		if entries, err := r.ffx.TargetListForNode(ctx, nodeName); err == nil {
 			for _, entry := range entries {
 				logger.Infof(ctx, "device is in %v", entry.TargetState)
 				if entry.TargetState == "Zedboot (R)" {
@@ -247,7 +143,7 @@ func (r *FfxResolver) WaitToFindDeviceInNetboot(ctx context.Context) (string, er
 			logger.Infof(ctx, "attempt %d waiting for device to boot into zedboot", attempt)
 			time.Sleep(5 * time.Second)
 		} else {
-			logger.Infof(ctx, "attempt %d failed to resolve nodenames %v: %v", attempt, nodeNames, err)
+			logger.Infof(ctx, "attempt %d failed to resolve nodename %v: %v", attempt, nodeName, err)
 		}
 
 	}

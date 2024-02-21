@@ -81,23 +81,17 @@ func (f *FFXTool) TargetList(ctx context.Context) ([]targetEntry, error) {
 	return entries, nil
 }
 
-func (f *FFXTool) TargetListForNode(ctx context.Context, nodeNames []string) ([]targetEntry, error) {
+func (f *FFXTool) TargetListForNode(ctx context.Context, nodeName string) ([]targetEntry, error) {
 	entries, err := f.TargetList(ctx)
 	if err != nil {
 		return []targetEntry{}, err
 	}
 
-	if len(nodeNames) == 0 {
-		return entries, nil
-	}
-
 	var matchingTargets []targetEntry
 
 	for _, target := range entries {
-		for _, nodeName := range nodeNames {
-			if target.NodeName == nodeName {
-				matchingTargets = append(matchingTargets, target)
-			}
+		if target.NodeName == nodeName {
+			matchingTargets = append(matchingTargets, target)
 		}
 	}
 

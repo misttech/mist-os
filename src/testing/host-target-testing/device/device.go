@@ -687,7 +687,7 @@ func (c *Client) Flash(ctx context.Context, build artifacts.Build) error {
 }
 
 func (c *Client) Name() string {
-	return c.deviceResolver.NodeNames()[0]
+	return c.deviceResolver.NodeName()
 }
 
 type addrResolver struct {
@@ -698,13 +698,13 @@ type addrResolver struct {
 func (r addrResolver) Resolve(ctx context.Context) (net.Addr, error) {
 	host, err := r.deviceResolver.ResolveName(ctx)
 	if err != nil {
-		logger.Warningf(ctx, "failed to resolve %v: %v", r.deviceResolver.NodeNames(), err)
+		logger.Warningf(ctx, "failed to resolve %v: %v", r.deviceResolver.NodeName(), err)
 		return nil, err
 	}
 
 	addr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(host, r.port))
 	if err != nil {
-		logger.Warningf(ctx, "failed to connet to %v (%v): %v", r.deviceResolver.NodeNames(), host, err)
+		logger.Warningf(ctx, "failed to connet to %v (%v): %v", r.deviceResolver.NodeName(), host, err)
 		return nil, err
 	}
 

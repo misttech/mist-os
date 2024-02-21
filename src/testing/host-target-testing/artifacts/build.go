@@ -92,25 +92,46 @@ func (b *ArtifactsBuild) GetBootserver(ctx context.Context) (string, error) {
 }
 
 func (b *ArtifactsBuild) GetFfx(ctx context.Context) (*ffx.FFXTool, error) {
-	buildFlasher, err := b.getFfxFlasher(ctx)
+	buildImageDir, err := b.GetBuildImages(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return buildFlasher.Ffx, nil
+
+	currentBuildId := os.Getenv("BUILDBUCKET_ID")
+	if currentBuildId == "" {
+		currentBuildId = b.id
+	}
+
+	// Use the latest ffx
+	ffxPath := filepath.Join(buildImageDir, "ffx")
+	if b.ffxPath != "" {
+		ffxPath = b.ffxPath
+	}
+
+	if err := b.archive.download(ctx, currentBuildId, false, ffxPath, []string{"tools/linux-x64/ffx"}); err != nil {
+		return nil, fmt.Errorf("failed to download ffxPath: %w", err)
+	}
+
+	// Make ffx executable.
+	if err := os.Chmod(ffxPath, os.ModePerm); err != nil {
+		return nil, fmt.Errorf("failed to make ffxPath executable: %w", err)
+	}
+
+	return ffx.NewFFXTool(ffxPath)
 }
 
 func (b *ArtifactsBuild) GetFlashManifest(ctx context.Context) (string, error) {
-	ffxFlasher, err := b.getFfxFlasher(ctx)
-	if err == nil {
-		return ffxFlasher.FlashManifest, nil
-	}
-
-	scriptFlasher, err := b.getScriptFlasher(ctx)
+	buildImageDir, err := b.GetBuildImages(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	return scriptFlasher.FlashManifest, nil
+	flashManifest := filepath.Join(buildImageDir, "flash.json")
+	if err := b.archive.download(ctx, b.id, false, flashManifest, []string{"images/flash.json"}); err != nil {
+		return "", fmt.Errorf("failed to download flash.json for flasher: %w", err)
+	}
+
+	return flashManifest, nil
 }
 
 // GetPackageRepository returns a Repository for this build. It tries to
@@ -348,74 +369,17 @@ func (b *ArtifactsBuild) getPaver(ctx context.Context) (*paver.BuildPaver, error
 
 // GetFlasher downloads and returns a flasher for the build.
 func (b *ArtifactsBuild) GetFlasher(ctx context.Context) (flasher.Flasher, error) {
-	if flasher, err := b.getFfxFlasher(ctx); err == nil {
-		return flasher, nil
-	}
-
-	return b.getScriptFlasher(ctx)
-}
-
-func (b *ArtifactsBuild) getFfxFlasher(ctx context.Context) (*flasher.FfxFlasher, error) {
-	buildImageDir, err := b.GetBuildImages(ctx)
+	ffx, err := b.GetFfx(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	currentBuildId := os.Getenv("BUILDBUCKET_ID")
-	if currentBuildId == "" {
-		currentBuildId = b.id
-	}
-	// Use the latest ffx
-	ffxPath := filepath.Join(buildImageDir, "ffx")
-	if b.ffxPath != "" {
-		ffxPath = b.ffxPath
-	}
-
-	flashManifest := filepath.Join(buildImageDir, "flash.json")
-	if err := b.archive.download(ctx, currentBuildId, false, ffxPath, []string{"tools/linux-x64/ffx"}); err != nil {
-		return nil, fmt.Errorf("failed to download ffxPath: %w", err)
-	}
-
-	if err := b.archive.download(ctx, currentBuildId, false, flashManifest, []string{"images/flash.json"}); err != nil {
-		return nil, fmt.Errorf("failed to download flash.json for flasher: %w", err)
-	}
-
-	// Make ffx executable.
-	if err := os.Chmod(ffxPath, os.ModePerm); err != nil {
-		return nil, fmt.Errorf("failed to make ffxPath executable: %w", err)
-	}
-
-	ffx, err := ffx.NewFFXTool(ffxPath)
+	flashManifest, err := b.GetFlashManifest(ctx)
 	if err != nil {
 		return nil, err
 	}
+
 	return flasher.NewFfxFlasher(ffx, flashManifest, false, flasher.SSHPublicKey(b.sshPublicKey))
-}
-
-func (b *ArtifactsBuild) getScriptFlasher(ctx context.Context) (*flasher.ScriptFlasher, error) {
-	buildImageDir, err := b.GetBuildImages(ctx)
-	if err != nil {
-		return nil, err
-	}
-	currentBuildId := os.Getenv("BUILDBUCKET_ID")
-	if currentBuildId == "" {
-		currentBuildId = b.id
-	}
-	flashManifest := filepath.Join(buildImageDir, "flash.json")
-	flashScript := filepath.Join(buildImageDir, "flash.sh")
-	if err := b.archive.download(ctx, currentBuildId, false, flashScript, []string{"images/flash.sh"}); err != nil {
-		return nil, fmt.Errorf("failed to download flash.sh flasher: %w", err)
-	}
-
-	if err := b.archive.download(ctx, currentBuildId, false, flashManifest, []string{"images/flash.json"}); err != nil {
-		return nil, fmt.Errorf("failed to download flash.json for flasher: %w", err)
-	}
-
-	if err := os.Chmod(flashScript, os.ModePerm); err != nil {
-		return nil, fmt.Errorf("failed to make flash.sh executable: %w", err)
-	}
-
-	return flasher.NewScriptFlasher(flashScript, flashManifest, flasher.ScriptFlasherSSHPublicKey(b.sshPublicKey))
 }
 
 func (b *ArtifactsBuild) GetSshPublicKey() ssh.PublicKey {

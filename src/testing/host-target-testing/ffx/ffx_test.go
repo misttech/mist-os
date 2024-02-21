@@ -66,7 +66,7 @@ func TestTargetList(t *testing.T) {
 		t.Fatalf("unexpected entries, diff:\n%s", diff)
 	}
 
-	entries, err = ffx.TargetListForNode(context.Background(), []string{"1"})
+	entries, err = ffx.TargetListForNode(context.Background(), "1")
 	if err != nil {
 		t.Fatalf("Failed to run target list: %s", err)
 	}
