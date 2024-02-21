@@ -183,7 +183,7 @@ function main {
 
 
     register_args=()
-    if [[ -z "{persist}" ]]; then
+    if [[ ! -z "${persist}" ]]; then
       register_args+=( --storage-type persistent )
     fi
     # When alias conflict detected, replace with what is being registered here.
