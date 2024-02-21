@@ -224,6 +224,7 @@ TEST_F(RealmBuilderTest, RoutesProtocolFromRelativeChild) {
   EXPECT_EQ(response, fidl::StringPtr("hello"));
 }
 
+// TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
 #if __Fuchsia_API_level__ < 17
 class LocalEchoServerByPtr : public test::placeholders::Echo, public LocalComponent {
  public:
@@ -290,6 +291,7 @@ class LocalEchoServer : public test::placeholders::Echo, public LocalComponentIm
   bool exit_after_serve_;
 };
 
+// TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
 #if __Fuchsia_API_level__ < 17
 // Tests and demonstrates that the deprecated AddLocalChild(LocalComponent*)
 // still works.

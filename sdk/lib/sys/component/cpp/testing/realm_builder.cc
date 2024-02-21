@@ -65,6 +65,8 @@ Realm& Realm::AddChild(const std::string& child_name, const std::string& url,
   return *this;
 }
 
+// TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
+// The newer definition of LocalComponentKind is incompatible with LocalComponent*.
 #if __Fuchsia_API_level__ < 17
 Realm& Realm::AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
                             const ChildOptions& options) {
@@ -79,10 +81,16 @@ Realm& Realm::AddLocalChild(const std::string& child_name, LocalComponentFactory
 
 Realm& Realm::AddLocalChildImpl(const std::string& child_name, LocalComponentKind local_impl,
                                 const ChildOptions& options) {
+// TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
 #if __Fuchsia_API_level__ < 17
+// Ignore warnings caused by the use of the deprecated `LocalComponent` type as it is part of the
+// implementation that supports the deprecated type.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   if (cpp17::holds_alternative<LocalComponent*>(local_impl)) {
     ZX_SYS_ASSERT_NOT_NULL(cpp17::get<LocalComponent*>(local_impl));
   }
+#pragma clang diagnostic pop
 #endif
   runner_builder_->Register(GetResolvedName(child_name), std::move(local_impl));
   fuchsia::component::test::Realm_AddLocalChild_Result result;
@@ -284,6 +292,9 @@ RealmBuilder& RealmBuilder::AddChild(const std::string& child_name, const std::s
   return *this;
 }
 
+// TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
+// The newer definition of LocalComponentKind, which is a parameter to AddLocalChildImpl(), is
+// incompatible with LocalComponent*.
 #if __Fuchsia_API_level__ < 17
 RealmBuilder& RealmBuilder::AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
                                           const ChildOptions& options) {

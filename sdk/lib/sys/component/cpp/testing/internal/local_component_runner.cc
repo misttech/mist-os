@@ -168,9 +168,16 @@ void LocalComponentRunner::Start(
   // take the component from the ready_components_ list
   auto component = std::move(ready_components_[name]);
   ZX_ASSERT_MSG(ready_components_.erase(name) == 1, "ready component not erased");
+
+// TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
 #if __Fuchsia_API_level__ < 17
+// Ignore warnings caused by the use of the deprecated `LocalComponent` type as it is part of the
+// implementation that supports the deprecated type.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   if (cpp17::holds_alternative<LocalComponent*>(component)) {
     auto local_component_ptr = cpp17::get<LocalComponent*>(component);
+#pragma clang diagnostic pop
     auto on_start = [local_component_ptr](LocalComponentInstance*,
                                           std::unique_ptr<LocalComponentHandles> handles) {
       local_component_ptr->Start(std::move(handles));
