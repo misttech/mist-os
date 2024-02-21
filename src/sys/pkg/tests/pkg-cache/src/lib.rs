@@ -29,7 +29,7 @@ use {
     mock_paver::{MockPaverService, MockPaverServiceBuilder},
     mock_reboot::{MockRebootService, RebootReason},
     mock_verifier::MockVerifierService,
-    std::{collections::HashMap, sync::Arc, time::Duration},
+    std::{collections::HashMap, sync::Arc},
     vfs::directory::{entry::DirectoryEntry as _, helper::DirectlyMutable as _},
 };
 
@@ -46,6 +46,9 @@ mod startup;
 mod sync;
 
 static SHELL_COMMANDS_BIN_PATH: &'static str = "shell-commands-bin";
+// Sleep duration while waiting for pkg-cache to update inspect state. Chosen arbitrarily.
+// Do not just sleep once and assume good, loop until expected state occurs.
+const INSPECT_WAIT: std::time::Duration = std::time::Duration::from_millis(10);
 
 #[derive(Debug)]
 enum WriteBlobError {
@@ -914,7 +917,26 @@ impl<B: Blobfs> TestEnv<B> {
             if desired_state.run(&hierarchy).is_ok() {
                 break hierarchy;
             }
-            fasync::Timer::new(Duration::from_millis(10)).await;
+            let () = fasync::Timer::new(INSPECT_WAIT).await;
+        }
+    }
+
+    /// Wait for pkg-cache to notice that all of the connections to `pkg` have closed and stop
+    /// protecting it from GC.
+    pub async fn wait_for_package_to_close(&self, pkg: &Hash) {
+        let pkg = pkg.to_string();
+        loop {
+            if self
+                .inspect_hierarchy()
+                .await
+                .get_child("open-packages")
+                .unwrap()
+                .get_child(&pkg)
+                .is_none()
+            {
+                break;
+            }
+            let () = fasync::Timer::new(INSPECT_WAIT).await;
         }
     }
 

@@ -172,6 +172,7 @@ async fn gc_dynamic_index_protected() {
 
     let () = get_fut.await.unwrap().unwrap();
     let () = pkgprime.verify_contents(&dir).await.unwrap();
+    let () = env.wait_for_package_to_close(pkg.hash()).await;
     assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
 
     // At this point, we expect blobfs to only contain the blobs from the system image package and
@@ -328,6 +329,7 @@ async fn gc_updated_static_package() {
 
     let () = get_fut.await.unwrap().unwrap();
     let () = pkgprime.verify_contents(&dir).await.unwrap();
+    let () = env.wait_for_package_to_close(pkg.hash()).await;
     assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
 
     // At this point, we expect blobfs to only contain the blobs from the system image package and
@@ -591,6 +593,15 @@ async fn blobs_protected_from_gc_during_get(gc_protection: fpkg::GcProtection) {
                 crate::get_and_verify_package(&env.proxies.package_cache, &evictor).await;
         }
     }
+    // With open package tracking, also need to wait until pkg-cache notices that the package
+    // connection closed.
+    match gc_protection {
+        fpkg::GcProtection::Retained => (),
+        fpkg::GcProtection::OpenPackageTracking => {
+            drop(dir);
+            let () = env.wait_for_package_to_close(superpackage.hash()).await;
+        }
+    }
     let () = env.proxies.space_manager.gc().await.unwrap().unwrap();
     assert!(env.blobfs.list_blobs().unwrap().is_disjoint(&to_be_fetched_hashes));
 
@@ -653,11 +664,7 @@ async fn blobs_protected_from_gc_by_open_package_tracking() {
     // notices that the client end of the channel was closed and then finishes, which drops the
     // Arc<RootDir>.
     drop(dir0);
-    loop {
-        assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
-        if env.blobfs.list_blobs().unwrap().is_disjoint(&pkg0_protected) {
-            break;
-        }
-        let () = fasync::Timer::new(std::time::Duration::from_millis(30)).await;
-    }
+    let () = env.wait_for_package_to_close(pkg0.hash()).await;
+    assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
+    assert!(env.blobfs.list_blobs().unwrap().is_disjoint(&pkg0_protected));
 }
