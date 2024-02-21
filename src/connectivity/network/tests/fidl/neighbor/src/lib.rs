@@ -707,6 +707,18 @@ async fn neigh_clear_entries<N: Netstack>(name: &str) {
     )
     .await;
 
+    for ip in [&alice.ipv6, &ALICE_IP] {
+        // Add static entries on Bob so that it will never send out neighbor
+        // solicitations that could cause confusion for the assertions at the
+        // end of this test.
+        let () = controller
+            .add_entry(bob.ep.id(), ip, &ALICE_MAC)
+            .await
+            .expect("add_entry FIDL error")
+            .map_err(fuchsia_zircon::Status::from_raw)
+            .expect("add_entry failed");
+    }
+
     // Exchange datagrams again and assert that new solicitation requests were
     // sent.
     let () = exchange_dgrams(&alice, &bob).await;
