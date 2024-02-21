@@ -11,7 +11,12 @@ int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
+  // This is a test for a deprecated thing (sys::ComponentInspector). We keep the test
+  // to not lose coverage of the deprecated type, but silence the build warning.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   auto inspector = std::make_unique<sys::ComponentInspector>(context.get());
+#pragma clang diagnostic pop
 
   inspector->root().CreateInt("val1", 1, inspector->inspector());
   inspector->root().CreateInt("val2", 2, inspector->inspector());
