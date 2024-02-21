@@ -7,7 +7,7 @@
 use {
     diagnostics_log::PublishOptions,
     fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_async::LocalExecutor,
+    fuchsia_async::SendExecutor,
     fuchsia_trace as trace, fuchsia_zircon as zx,
     std::{ffi::c_void, sync::Once},
     trace::Id as TraceId,
@@ -94,46 +94,44 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
     };
     let device = Device::new(device.into(), wlan_softmac_bridge_proxy);
 
-    let mut executor = LocalExecutor::new();
-    executor.run_singlethreaded(async move {
-        // Safety: This is safe because `init_completer` will never be cast to any other type, i.e.,
-        // its type will always be `*mut c_void`.
-        let init_completer = unsafe { SendPtr::from_always_void(init_completer) };
-        zx::Status::from(
-            wlansoftmac_rust::start_and_serve(
-                move |result: Result<WlanSoftmacHandle, zx::Status>| match result {
-                    Ok(handle) => {
-                        // Safety: This is safe because the caller of this function promised
-                        // `run_init_completer` is thread-safe and `init_completer` is valid until
-                        // its called.
-                        unsafe {
-                            run_init_completer(
-                                init_completer.as_ptr(),
-                                zx::Status::OK.into_raw(),
-                                Box::into_raw(Box::new(handle)),
-                            );
-                        }
-                    }
-                    Err(status) => {
-                        // Safety: This is safe because the caller of this function promised
-                        // `run_init_completer` is thread-safe and `init_completer` is valid until
-                        // its called.
-                        unsafe {
-                            run_init_completer(
-                                init_completer.as_ptr(),
-                                status.into_raw(),
-                                std::ptr::null_mut(),
-                            );
-                        }
-                    }
-                },
-                device,
-                buf_provider,
-            )
-            .await,
-        )
-        .into_raw()
-    })
+    // Safety: This is safe because `init_completer` will never be cast to any other type, i.e.,
+    // its type will always be `*mut c_void`.
+    let init_completer = unsafe { SendPtr::from_always_void(init_completer) };
+
+    // Use two worker threads so the `Task` serving SME and MLME can synchronously block without
+    // blocking the `Task` for sending new `DriverEvent` values to the `DriverEventSink`.
+    let mut executor = SendExecutor::new(2);
+    let result = executor.run(wlansoftmac_rust::start_and_serve(
+        move |result: Result<WlanSoftmacHandle, zx::Status>| match result {
+            Ok(handle) => {
+                // Safety: This is safe because the caller of this function promised
+                // `run_init_completer` is thread-safe and `init_completer` is valid until
+                // its called.
+                unsafe {
+                    run_init_completer(
+                        init_completer.as_ptr(),
+                        zx::Status::OK.into_raw(),
+                        Box::into_raw(Box::new(handle)),
+                    );
+                }
+            }
+            Err(status) => {
+                // Safety: This is safe because the caller of this function promised
+                // `run_init_completer` is thread-safe and `init_completer` is valid until
+                // its called.
+                unsafe {
+                    run_init_completer(
+                        init_completer.as_ptr(),
+                        status.into_raw(),
+                        std::ptr::null_mut(),
+                    );
+                }
+            }
+        },
+        device,
+        buf_provider,
+    ));
+    zx::Status::from(result).into_raw()
 }
 
 /// Stop the bridged wlansoftmac driver associated with `softmac`.

@@ -667,7 +667,7 @@ impl DeviceOps for Device {
 /// signatures are correct.
 #[repr(C)]
 pub struct WlanSoftmacIfcProtocol<'a> {
-    ops: *const WlanSoftmacIfcProtocolOps,
+    ops: &'static WlanSoftmacIfcProtocolOps,
     ctx: &'a mut crate::DriverEventSink,
 }
 

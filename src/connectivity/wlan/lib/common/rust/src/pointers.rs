@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::ffi::c_void;
+use std::{ffi::c_void, ptr::NonNull};
 
 /// Type that can be unsafely constructed from a pointer and implements `Send`.
 ///
@@ -71,6 +71,31 @@ impl SendPtr<*const c_void> {
     /// and thus unable to be read or mutated by safe Rust code. The caller must still ensure the
     /// pointee lives longer than the wrapped `ptr`.
     pub unsafe fn from_always_const_void(ptr: *const c_void) -> Self {
+        Self(ptr)
+    }
+}
+
+impl SendPtr<NonNull<c_void>> {
+    /// Constructs a `SendPtr<NonNull<c_void>>.
+    ///
+    /// Supposing the wrapped pointer points to a `c_void` its entire lifetime, Rust cannot read or
+    /// mutate a `c_void` directly. Therefore, it's not possible to write safe code that mutates the
+    /// pointee.
+    ///
+    /// # Safety
+    ///
+    /// The caller of this function **must not** assume wrapping `ptr` in a `SendPtr` makes
+    /// `ptr` always safe to pass to other functions. `SendPtr` does not ensure the pointee of `ptr`
+    /// lives longer than the `SendPtr` constructed here. `SendPtr` merely wraps `ptr` to implement
+    /// `Send` after the caller promises to uphold an invariant about the pointer itself.
+    ///
+    /// This function is unsafe because its liable to be abused. The caller should not use this
+    /// function to send a pointer to another thread when it would otherwise be unsafe to do so.
+    ///
+    /// By calling this function, the caller promises the pointee of `ptr` will always be a `c_void`
+    /// and thus unable to be read or mutated by safe Rust code. The caller must still ensure the
+    /// pointee lives longer than the wrapped `ptr`.
+    pub unsafe fn from_always_non_null_void(ptr: NonNull<c_void>) -> Self {
         Self(ptr)
     }
 }

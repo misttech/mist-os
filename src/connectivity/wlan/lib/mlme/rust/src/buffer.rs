@@ -13,6 +13,7 @@ use {
         ptr::NonNull,
         slice,
     },
+    wlan_common::pointers::SendPtr,
 };
 
 #[repr(C)]
@@ -103,7 +104,7 @@ pub struct Buffer {
     free: unsafe extern "C" fn(raw: *mut c_void),
     /// Pointer to the buffer allocated in the C++ portion of wlansoftmac and owned by the Rust
     /// portion of wlansoftmac.
-    raw: NonNull<c_void>,
+    raw: SendPtr<NonNull<c_void>>,
     /// Boxed slice containing a buffer of bytes available to read and write.
     data: ManuallyDrop<Box<[u8]>>,
 }
@@ -123,6 +124,9 @@ impl TryFrom<CBuffer> for Buffer {
             (_, _, 0) => return Err(Error::Internal(format_err!("CBuffer.capacity is zero"))),
             (Some(raw), Some(data), capacity) => (raw, data, capacity),
         };
+
+        // Safety: This call is safe because the pointee of `raw` will always be a `c_void`.
+        let raw = unsafe { SendPtr::from_always_non_null_void(raw) };
 
         Ok(Self {
             free: buffer.free,
@@ -172,7 +176,12 @@ impl Buffer {
     /// the same pointer it was returned with.
     unsafe fn release(self) -> (*mut c_void, unsafe extern "C" fn(raw: *mut c_void)) {
         let me = ManuallyDrop::new(self);
-        (me.raw.as_ptr() as *mut c_void, me.free)
+        (
+            // Safety: This call to `SendPtr::clone` is safe because the original and copy will not
+            // exist after this function returns.
+            unsafe { me.raw.clone().as_ptr().as_ptr() },
+            me.free,
+        )
     }
 }
 
@@ -180,7 +189,11 @@ impl Drop for Buffer {
     fn drop(&mut self) {
         // Safety: This call of `self.free` is safe because it's called on the `raw` field
         // of this struct.
-        unsafe { (self.free)(self.raw.as_ptr() as *mut c_void) };
+        //
+        // Safety: This call to `SendPtr::clone` is safe because the original and copy are
+        // both dropped after this call to `self.free`, i.e., neither can be sent to another
+        // thread after this point.
+        unsafe { (self.free)(self.raw.clone().as_ptr().as_ptr()) };
     }
 }
 

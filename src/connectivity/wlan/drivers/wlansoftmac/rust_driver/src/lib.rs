@@ -87,7 +87,7 @@ impl WlanSoftmacHandle {
 ///
 /// Generally, errors during initializations will be returned immediately after this function calls init_completer()
 /// with the same error. Later errors can be returned after this functoin calls init_completer().
-pub async fn start_and_serve<D: DeviceOps + 'static>(
+pub async fn start_and_serve<D: DeviceOps + Send + 'static>(
     init_completer: impl FnOnce(Result<WlanSoftmacHandle, zx::Status>) + Send + 'static,
     device: D,
     buf_provider: BufferProvider,
@@ -127,7 +127,7 @@ struct StartedDriver<F1, F2> {
 ///
 /// This function will use the provided |device| to make various calls into the vendor driver necessary to
 /// configure and create the components to run the futures.
-async fn start<D: DeviceOps + 'static>(
+async fn start<D: DeviceOps + Send + 'static>(
     mlme_init_sender: oneshot::Sender<Result<(), zx::Status>>,
     driver_event_sink: mpsc::UnboundedSender<DriverEvent>,
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
@@ -135,7 +135,7 @@ async fn start<D: DeviceOps + 'static>(
     buf_provider: BufferProvider,
 ) -> Result<
     StartedDriver<
-        Pin<Box<dyn Future<Output = Result<(), Error>>>>,
+        Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>,
         Pin<Box<impl Future<Output = Result<(), Error>>>>,
     >,
     zx::Status,
@@ -218,7 +218,7 @@ async fn start<D: DeviceOps + 'static>(
     };
 
     // Create an MLME future to serve
-    let mlme: Pin<Box<dyn Future<Output = Result<(), Error>>>> = match device_info.role {
+    let mlme: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> = match device_info.role {
         fidl_common::WlanMacRole::Client => {
             info!("Running wlansoftmac with client role");
             let config = wlan_mlme::client::ClientConfig {
@@ -271,7 +271,7 @@ async fn start<D: DeviceOps + 'static>(
 async fn serve<InitFn>(
     init_completer: InitCompleter<InitFn>,
     mlme_init_receiver: oneshot::Receiver<Result<(), zx::Status>>,
-    mlme: Pin<Box<dyn Future<Output = Result<(), Error>>>>,
+    mlme: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>,
     sme: Pin<Box<impl Future<Output = Result<(), Error>>>>,
 ) -> Result<(), zx::Status>
 where
@@ -616,7 +616,7 @@ mod tests {
             impl Future<
                 Output = Result<
                     StartedDriver<
-                        Pin<Box<dyn Future<Output = Result<(), Error>>>>,
+                        Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>,
                         Pin<Box<impl Future<Output = Result<(), Error>>>>,
                     >,
                     zx::Status,
