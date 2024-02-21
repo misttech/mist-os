@@ -41,8 +41,8 @@ def run_mypy_checks(files: list[str]) -> int:
         int: returncode if type checking was successful, else error returncode
     """
 
-    # Remove the duplicate files.
-    files = sorted(set(files))
+    # Remove the duplicate and non-MyPy supported files
+    files = exclude_files(files)
     if not files:
         return ""
 
@@ -86,6 +86,25 @@ def run_mypy_checks(files: list[str]) -> int:
                     file=sys.stderr,
                 )
         return e.returncode
+
+
+def exclude_files(file_list: list[str]) -> set[str]:
+    """Returns a list of unique files with Mypy-supported file extensions.
+
+    Args:
+        file_list: List of file paths
+
+    Returns:
+        set of Mypy-supported file paths
+    """
+    supported_extensions = (".py", ".pyi", ".pyx")
+    return sorted(
+        set(
+            file
+            for file in file_list
+            if os.path.splitext(file)[1].lower() in supported_extensions
+        )
+    )
 
 
 if __name__ == "__main__":
