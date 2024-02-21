@@ -3370,6 +3370,7 @@ async fn tcp_icmp_error_v4<N: Netstack>(name: &str, code: Icmpv4DestUnreachableC
         .add_address_and_subnet_route(Ipv4::CLIENT_SUBNET)
         .await
         .expect("configure address");
+    client_interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     let fnet_ext::IpAddress(server_ip) = Ipv4::SERVER_SUBNET.addr.into();
     let fnet_ext::IpAddress(client_ip) = Ipv4::CLIENT_SUBNET.addr.into();
