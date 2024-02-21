@@ -175,7 +175,7 @@ where
                     };
                     responder.send(status, &attrs)
                 }
-                .trace(trace::trace_future_args!("storage", "Directory::GetAttr"))
+                .trace(trace::trace_future_args!(c"storage", c"Directory::GetAttr"))
                 .await?;
             }
             fio::DirectoryRequest::GetAttributes { query, responder } => {
@@ -194,7 +194,7 @@ where
                             .map_err(|status| Status::into_raw(*status)),
                     )
                 }
-                .trace(trace::trace_future_args!("storage", "Directory::GetAttributes"))
+                .trace(trace::trace_future_args!(c"storage", c"Directory::GetAttributes"))
                 .await?;
             }
             fio::DirectoryRequest::UpdateAttributes { payload: _, responder } => {
@@ -294,7 +294,7 @@ where
                     let (status, entries) = self.handle_read_dirents(max_bytes).await;
                     responder.send(status.into_raw(), entries.as_slice())
                 }
-                .trace(trace::trace_future_args!("storage", "Directory::ReadDirents"))
+                .trace(trace::trace_future_args!(c"storage", c"Directory::ReadDirents"))
                 .await?;
             }
             fio::DirectoryRequest::Enumerate { options: _, iterator, control_handle: _ } => {
@@ -313,7 +313,7 @@ where
                     let status: Status = self.handle_link(&src, dst_parent_token, dst).await.into();
                     responder.send(status.into_raw())
                 }
-                .trace(trace::trace_future_args!("storage", "Directory::Link"))
+                .trace(trace::trace_future_args!(c"storage", c"Directory::Link"))
                 .await?;
             }
             fio::DirectoryRequest::Watch { mask, options, watcher, responder } => {

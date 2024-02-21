@@ -11,6 +11,7 @@ rustc_library("trace") {
   edition = "2021"
   sources = [ "src/lib.rs" ]
   deps = [
+    "//src/lib/cstr",
     "//src/storage/fxfs/trace/macros:fxfs_trace_macros",
     "//src/storage/lib/trace",
   ]

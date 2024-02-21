@@ -512,7 +512,7 @@ impl VolumesDirectory {
                     self.pager_dirty_bytes_count.fetch_add(byte_count, Ordering::AcqRel);
                     mark_dirty();
                 }
-                .trace(trace_future_args!("flush-before-mark-dirty")),
+                .trace(trace_future_args!(c"flush-before-mark-dirty")),
             )
         }
     }

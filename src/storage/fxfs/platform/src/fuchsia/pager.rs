@@ -414,7 +414,7 @@ pub trait PagerBacked: Sync + Send + Sized + 'static {
 /// A generic page_in implementation that supplies pages using block-aligned reads.
 pub fn default_page_in<P: PagerBacked>(this: Arc<P>, pager_range: PageInRange<P>) {
     fxfs_trace::duration!(
-        "start-page-in",
+        c"start-page-in",
         "offset" => pager_range.start(),
         "len" => pager_range.len()
     );

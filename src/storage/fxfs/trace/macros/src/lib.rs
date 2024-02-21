@@ -221,7 +221,7 @@ fn add_tracing_to_async_block(
     // move any variables used in the future.
     let stmts = &block.stmts;
     block.stmts = parse_quote!(
-        let __trace_args = ::fxfs_trace::trace_future_args!(#name #args);
+        let __trace_args = ::fxfs_trace::trace_future_args!(::fxfs_trace::cstr::cstr!(#name) #args);
         ::fxfs_trace::TraceFutureExt::trace(async move {
             #type_inference_fix
             #(#stmts)*
@@ -232,7 +232,7 @@ fn add_tracing_to_async_block(
 fn add_tracing_to_sync_block(block: &mut Block, name: &str, args: TraceArgs) {
     let stmts = &block.stmts;
     block.stmts = parse_quote!(
-        ::fxfs_trace::duration!(#name #args);
+        ::fxfs_trace::duration!(::fxfs_trace::cstr::cstr!(#name) #args);
         #(#stmts)*
     );
 }

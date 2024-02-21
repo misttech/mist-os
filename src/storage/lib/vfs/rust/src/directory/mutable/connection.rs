@@ -148,8 +148,8 @@ impl MutableConnection {
             fio::DirectoryRequest::ListExtendedAttributes { iterator, control_handle: _ } => {
                 this.handle_list_extended_attribute(iterator)
                     .trace(trace::trace_future_args!(
-                        "storage",
-                        "Directory::ListExtendedAttributes"
+                        c"storage",
+                        c"Directory::ListExtendedAttributes"
                     ))
                     .await;
             }
@@ -159,7 +159,7 @@ impl MutableConnection {
                         this.handle_get_extended_attribute(name).await.map_err(Status::into_raw);
                     responder.send(res)
                 }
-                .trace(trace::trace_future_args!("storage", "Directory::GetExtendedAttribute"))
+                .trace(trace::trace_future_args!(c"storage", c"Directory::GetExtendedAttribute"))
                 .await?;
             }
             fio::DirectoryRequest::SetExtendedAttribute { name, value, mode, responder } => {
@@ -170,7 +170,7 @@ impl MutableConnection {
                         .map_err(Status::into_raw);
                     responder.send(res)
                 }
-                .trace(trace::trace_future_args!("storage", "Directory::SetExtendedAttribute"))
+                .trace(trace::trace_future_args!(c"storage", c"Directory::SetExtendedAttribute"))
                 .await?;
             }
             fio::DirectoryRequest::RemoveExtendedAttribute { name, responder } => {
@@ -179,7 +179,7 @@ impl MutableConnection {
                         this.handle_remove_extended_attribute(name).await.map_err(Status::into_raw);
                     responder.send(res)
                 }
-                .trace(trace::trace_future_args!("storage", "Directory::RemoveExtendedAttribute"))
+                .trace(trace::trace_future_args!(c"storage", c"Directory::RemoveExtendedAttribute"))
                 .await?;
             }
             fio::DirectoryRequest::UpdateAttributes { payload, responder } => {
@@ -191,7 +191,7 @@ impl MutableConnection {
                             .map_err(Status::into_raw),
                     )
                 }
-                .trace(trace::trace_future_args!("storage", "Directory::UpdateAttributes"))
+                .trace(trace::trace_future_args!(c"storage", c"Directory::UpdateAttributes"))
                 .await?;
             }
         }

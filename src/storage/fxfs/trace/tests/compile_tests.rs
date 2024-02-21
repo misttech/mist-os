@@ -223,9 +223,9 @@ fn test_flow_begin() {
 fn test_flow_step() {
     let tace_only_var = 6;
     let flow_id = 5u64;
-    fxfs_trace::flow_step!("some-flow", flow_id);
-    fxfs_trace::flow_step!("some-flow", flow_id, "arg" => 5);
-    fxfs_trace::flow_step!("some-flow", flow_id, "arg" => 5, "arg2" => tace_only_var);
+    fxfs_trace::flow_step!(c"some-flow", flow_id);
+    fxfs_trace::flow_step!(c"some-flow", flow_id, "arg" => 5);
+    fxfs_trace::flow_step!(c"some-flow", flow_id, "arg" => 5, "arg2" => tace_only_var);
 }
 
 #[fuchsia::test]
@@ -239,15 +239,15 @@ fn test_flow_end() {
 
 #[fuchsia::test]
 async fn test_trace_future() {
-    let value = async move { 5 }.trace(trace_future_args!("test-future")).await;
+    let value = async move { 5 }.trace(trace_future_args!(c"test-future")).await;
     assert_eq!(value, 5);
 
-    let value = async move { 5 }.trace(trace_future_args!("test-future", "arg1" => 6)).await;
+    let value = async move { 5 }.trace(trace_future_args!(c"test-future", "arg1" => 6)).await;
     assert_eq!(value, 5);
 
     let tace_only_var = 7;
     let value = async move { 5 }
-        .trace(trace_future_args!("test-future", "arg1" => 6, "ar2" => tace_only_var))
+        .trace(trace_future_args!(c"test-future", "arg1" => 6, "ar2" => tace_only_var))
         .await;
     assert_eq!(value, 5);
 }
@@ -257,7 +257,7 @@ async fn test_trace_future_with_args() {
     let range = 0u64..10;
     let value = async move { 5 }
         .trace(fxfs_trace::trace_future_args!(
-            "test-future",
+            c"test-future",
             "offset" => range.start,
             "len" => range.end - range.start
         ))

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+pub use cstr;
 pub use fxfs_trace_macros::*;
 pub use storage_trace::{self, TraceFutureExt};
 
@@ -22,7 +23,7 @@ macro_rules! flow_begin {
 #[macro_export]
 macro_rules! flow_step {
     ($name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-        $crate::storage_trace::flow_step!("fxfs", $name, $flow_id $(,$key => $val)*);
+        $crate::storage_trace::flow_step!(c"fxfs", $name, $flow_id $(,$key => $val)*);
     }
 }
 
@@ -36,6 +37,6 @@ macro_rules! flow_end {
 #[macro_export]
 macro_rules! trace_future_args {
     ($name:expr $(, $key:expr => $val:expr)*) => {
-        $crate::storage_trace::trace_future_args!("fxfs", $name $(,$key => $val)*);
+        $crate::storage_trace::trace_future_args!(c"fxfs", $name $(,$key => $val)*);
     };
 }

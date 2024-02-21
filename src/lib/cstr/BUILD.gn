@@ -20,6 +20,7 @@ cstr_full_deps_allowlist = [
   "//src/lib/cstr:*",
   "//src/lib/pty:*",
   "//src/lib/trace/rust/bench:*",
+  "//src/storage/fxfs/trace:*",
 ]
 
 rustc_library("cstr") {

@@ -322,8 +322,8 @@ impl Common {
     // Sends the request and waits for the response.
     async fn send(&self, mut request: BlockFifoRequest) -> Result<(), Error> {
         let trace_args = storage_trace::trace_future_args!(
-            "storage",
-            "BlockOp",
+            c"storage",
+            c"BlockOp",
             "op" => opcode_str(request.command.opcode)
         );
         async move {

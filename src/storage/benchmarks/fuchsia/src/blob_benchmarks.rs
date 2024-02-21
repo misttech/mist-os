@@ -29,7 +29,7 @@ use {
 const RNG_SEED: u64 = 0xda782a0c3ce1819a;
 
 macro_rules! open_and_get_vmo_benchmark {
-    ($benchmark:ident, $resource_path:expr, $cold:expr) => {
+    ($benchmark:ident, $resource_path:expr, $cold:expr, $trace_name:literal $(,)?) => {
         #[derive(Clone)]
         pub struct $benchmark {
             resource_path: String,
@@ -63,7 +63,7 @@ macro_rules! open_and_get_vmo_benchmark {
         #[async_trait]
         impl Benchmark<PkgDirInstance> for $benchmark {
             async fn run(&self, fs: &mut PkgDirInstance) -> Vec<OperationDuration> {
-                storage_trace::duration!(c"benchmark", stringify!($benchmark));
+                storage_trace::duration!(c"benchmark", $trace_name);
                 let package = PackageBuilder::new("pkg")
                     .add_resource_at(&self.resource_path, "data".as_bytes())
                     .build()
@@ -109,13 +109,33 @@ macro_rules! open_and_get_vmo_benchmark {
     };
 }
 
-open_and_get_vmo_benchmark!(OpenAndGetVmoMetaFileCold, "meta/bar", true);
-open_and_get_vmo_benchmark!(OpenAndGetVmoMetaFileWarm, "meta/bar", false);
-open_and_get_vmo_benchmark!(OpenAndGetVmoContentBlobCold, "data/foo", true);
-open_and_get_vmo_benchmark!(OpenAndGetVmoContentBlobWarm, "data/foo", false);
+open_and_get_vmo_benchmark!(
+    OpenAndGetVmoMetaFileCold,
+    "meta/bar",
+    true,
+    c"OpenAndGetVmoMetaFileCold",
+);
+open_and_get_vmo_benchmark!(
+    OpenAndGetVmoMetaFileWarm,
+    "meta/bar",
+    false,
+    c"OpenAndGetVmoMetaFileWarm",
+);
+open_and_get_vmo_benchmark!(
+    OpenAndGetVmoContentBlobCold,
+    "data/foo",
+    true,
+    c"OpenAndGetVmoContentBlobCold",
+);
+open_and_get_vmo_benchmark!(
+    OpenAndGetVmoContentBlobWarm,
+    "data/foo",
+    false,
+    c"OpenAndGetVmoContentBlobWarm",
+);
 
 macro_rules! page_in_benchmark {
-    ($benchmark:ident, $data_gen_fn:ident, $page_iter_gen_fn:ident) => {
+    ($benchmark:ident, $data_gen_fn:ident, $page_iter_gen_fn:ident, $trace_name:literal $(,)?) => {
         #[derive(Clone)]
         pub struct $benchmark {
             blob_size: usize,
@@ -131,8 +151,8 @@ macro_rules! page_in_benchmark {
         impl<T:BlobFilesystem> Benchmark<T> for $benchmark {
             async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
                 storage_trace::duration!(
-                    "benchmark",
-                    stringify!($benchmark),
+                    c"benchmark",
+                    $trace_name,
                     "blob_size" => self.blob_size
                 );
                 let mut rng = XorShiftRng::seed_from_u64(RNG_SEED);
@@ -151,10 +171,21 @@ macro_rules! page_in_benchmark {
 page_in_benchmark!(
     PageInBlobSequentialUncompressed,
     create_incompressible_data,
-    sequential_page_iter
+    sequential_page_iter,
+    c"PageInBlobSequentialUncompressed",
 );
-page_in_benchmark!(PageInBlobSequentialCompressed, create_compressible_data, sequential_page_iter);
-page_in_benchmark!(PageInBlobRandomCompressed, create_compressible_data, random_page_iter);
+page_in_benchmark!(
+    PageInBlobSequentialCompressed,
+    create_compressible_data,
+    sequential_page_iter,
+    c"PageInBlobSequentialCompressed",
+);
+page_in_benchmark!(
+    PageInBlobRandomCompressed,
+    create_compressible_data,
+    random_page_iter,
+    c"PageInBlobRandomCompressed",
+);
 
 #[derive(Clone)]
 pub struct WriteBlob {
