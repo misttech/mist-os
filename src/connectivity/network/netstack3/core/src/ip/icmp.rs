@@ -49,7 +49,7 @@ use crate::{
     context::{CounterContext, InstantContext, RngContext},
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
-    device::{AnyDevice, DeviceIdContext, FrameDestination, WeakId},
+    device::{self, AnyDevice, DeviceIdContext, FrameDestination},
     ip::{
         device::{
             nud::{ConfirmationFlags, NudIpHandler},
@@ -145,7 +145,7 @@ impl From<Icmpv6ErrorCode> for IcmpErrorCode {
     }
 }
 
-pub(crate) struct IcmpState<I: IpExt + datagram::DualStackIpExt, Instant, D: WeakId> {
+pub(crate) struct IcmpState<I: IpExt + datagram::DualStackIpExt, Instant, D: device::WeakId> {
     pub(crate) sockets: IcmpSockets<I, D>,
     pub(crate) error_send_bucket: Mutex<TokenBucket<Instant>>,
     pub(crate) tx_counters: IcmpTxCounters<I>,
@@ -317,7 +317,7 @@ impl Icmpv4StateBuilder {
         self
     }
 
-    pub(crate) fn build<Instant, D: WeakId>(self) -> Icmpv4State<Instant, D> {
+    pub(crate) fn build<Instant, D: device::WeakId>(self) -> Icmpv4State<Instant, D> {
         Icmpv4State {
             inner: IcmpState {
                 sockets: Default::default(),
@@ -331,20 +331,20 @@ impl Icmpv4StateBuilder {
 }
 
 /// The state associated with the ICMPv4 protocol.
-pub(crate) struct Icmpv4State<Instant, D: WeakId> {
+pub(crate) struct Icmpv4State<Instant, D: device::WeakId> {
     pub(crate) inner: IcmpState<Ipv4, Instant, D>,
     send_timestamp_reply: bool,
 }
 
 // Used by `receive_icmp_echo_reply`.
-impl<Instant, D: WeakId> AsRef<IcmpState<Ipv4, Instant, D>> for Icmpv4State<Instant, D> {
+impl<Instant, D: device::WeakId> AsRef<IcmpState<Ipv4, Instant, D>> for Icmpv4State<Instant, D> {
     fn as_ref(&self) -> &IcmpState<Ipv4, Instant, D> {
         &self.inner
     }
 }
 
 // Used by `send_icmpv4_echo_request_inner`.
-impl<Instant, D: WeakId> AsMut<IcmpState<Ipv4, Instant, D>> for Icmpv4State<Instant, D> {
+impl<Instant, D: device::WeakId> AsMut<IcmpState<Ipv4, Instant, D>> for Icmpv4State<Instant, D> {
     fn as_mut(&mut self) -> &mut IcmpState<Ipv4, Instant, D> {
         &mut self.inner
     }
@@ -363,7 +363,7 @@ impl Default for Icmpv6StateBuilder {
 }
 
 impl Icmpv6StateBuilder {
-    pub(crate) fn build<Instant, D: WeakId>(self) -> Icmpv6State<Instant, D> {
+    pub(crate) fn build<Instant, D: device::WeakId>(self) -> Icmpv6State<Instant, D> {
         Icmpv6State {
             inner: IcmpState {
                 sockets: Default::default(),
@@ -377,20 +377,20 @@ impl Icmpv6StateBuilder {
 }
 
 /// The state associated with the ICMPv6 protocol.
-pub(crate) struct Icmpv6State<Instant, D: WeakId> {
+pub(crate) struct Icmpv6State<Instant, D: device::WeakId> {
     pub(crate) inner: IcmpState<Ipv6, Instant, D>,
     pub(crate) ndp_counters: NdpCounters,
 }
 
 // Used by `receive_icmp_echo_reply`.
-impl<Instant, D: WeakId> AsRef<IcmpState<Ipv6, Instant, D>> for Icmpv6State<Instant, D> {
+impl<Instant, D: device::WeakId> AsRef<IcmpState<Ipv6, Instant, D>> for Icmpv6State<Instant, D> {
     fn as_ref(&self) -> &IcmpState<Ipv6, Instant, D> {
         &self.inner
     }
 }
 
 // Used by `send_icmpv6_echo_request_inner`.
-impl<Instant, D: WeakId> AsMut<IcmpState<Ipv6, Instant, D>> for Icmpv6State<Instant, D> {
+impl<Instant, D: device::WeakId> AsMut<IcmpState<Ipv6, Instant, D>> for Icmpv6State<Instant, D> {
     fn as_mut(&mut self) -> &mut IcmpState<Ipv6, Instant, D> {
         &mut self.inner
     }
@@ -3160,14 +3160,14 @@ mod tests {
     pub(super) type FakeIcmpCtx<I> =
         FakeCtxWithCoreCtx<FakeIcmpCoreCtx<I>, (), (), FakeIcmpBindingsCtxState<I>>;
 
-    pub(super) struct FakeIcmpInnerCoreCtxState<I: IpExt, W: WeakId> {
-        bound_socket_map_and_allocator: BoundSockets<I, W>,
+    pub(super) struct FakeIcmpInnerCoreCtxState<I: IpExt, D: device::WeakId> {
+        bound_socket_map_and_allocator: BoundSockets<I, D>,
         error_send_bucket: TokenBucket<FakeInstant>,
         receive_icmp_error: Vec<I::ErrorCode>,
         pmtu_state: FakePmtuState<I::Addr>,
     }
 
-    impl<I: IpExt, W: WeakId> FakeIcmpInnerCoreCtxState<I, W> {
+    impl<I: IpExt, D: device::WeakId> FakeIcmpInnerCoreCtxState<I, D> {
         fn with_errors_per_second(errors_per_second: u64) -> Self {
             Self {
                 bound_socket_map_and_allocator: Default::default(),

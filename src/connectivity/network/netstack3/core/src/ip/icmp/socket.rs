@@ -28,7 +28,7 @@ use crate::{
     base::ContextPair,
     context::RngContext,
     data_structures::socketmap::IterShadows as _,
-    device::{AnyDevice, DeviceIdContext, Id, WeakId},
+    device::{self, AnyDevice, DeviceIdContext},
     error::{LocalAddressError, SocketError},
     ip::{
         icmp::{IcmpAddr, IcmpBindingsContext, IcmpIpExt, IcmpStateContext, InnerIcmpContext},
@@ -52,7 +52,7 @@ pub type SocketsState<I, D> = datagram::SocketsState<I, D, Icmp>;
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct IcmpSockets<I: IpExt + datagram::DualStackIpExt, D: WeakId> {
+pub(crate) struct IcmpSockets<I: IpExt + datagram::DualStackIpExt, D: device::WeakId> {
     // This will be used to store state for unbound sockets, like socket
     // options.
     pub(crate) state: RwLock<SocketsState<I, D>>,
@@ -150,13 +150,14 @@ impl DatagramSocketSpec for Icmp {
 
     type SharingState = ();
 
-    type SocketMapSpec<I: datagram::IpExt + datagram::DualStackIpExt, D: WeakId> = (Self, I, D);
+    type SocketMapSpec<I: datagram::IpExt + datagram::DualStackIpExt, D: device::WeakId> =
+        (Self, I, D);
 
     fn ip_proto<I: IpProtoExt>() -> I::Proto {
         I::map_ip((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6)
     }
 
-    fn make_bound_socket_map_id<I: datagram::IpExt, D: WeakId>(
+    fn make_bound_socket_map_id<I: datagram::IpExt, D: device::WeakId>(
         s: &Self::SocketId<I>,
     ) -> <Self::SocketMapSpec<I, D> as datagram::DatagramSocketMapSpec<
         I,
@@ -193,7 +194,7 @@ impl DatagramSocketSpec for Icmp {
         Ok(body.encapsulate(icmp_builder))
     }
 
-    fn try_alloc_listen_identifier<I: datagram::IpExt, D: WeakId>(
+    fn try_alloc_listen_identifier<I: datagram::IpExt, D: device::WeakId>(
         bindings_ctx: &mut impl RngContext,
         is_available: impl Fn(
             <Self::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
@@ -245,7 +246,7 @@ impl SocketMapAddrSpec for IcmpAddrSpec {
 
 type IcmpBoundSockets<I, D> = datagram::BoundSockets<I, D, IcmpAddrSpec, (Icmp, I, D)>;
 
-impl<I: IpExt, D: WeakId> PortAllocImpl for IcmpBoundSockets<I, D> {
+impl<I: IpExt, D: device::WeakId> PortAllocImpl for IcmpBoundSockets<I, D> {
     const EPHEMERAL_RANGE: core::ops::RangeInclusive<u16> = 1..=u16::MAX;
     type Id = DatagramFlowId<I::Addr, ()>;
     type PortAvailableArg = ();
@@ -273,12 +274,12 @@ type LocalIdAllocator<I, D> = Option<PortAlloc<IcmpBoundSockets<I, D>>>;
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct BoundSockets<I: IpExt, D: WeakId> {
+pub struct BoundSockets<I: IpExt, D: device::WeakId> {
     pub(crate) socket_map: IcmpBoundSockets<I, D>,
     pub(crate) allocator: LocalIdAllocator<I, D>,
 }
 
-impl<I: IpExt, D: WeakId, BC: RngContext>
+impl<I: IpExt, D: device::WeakId, BC: RngContext>
     datagram::LocalIdentifierAllocator<I, D, IcmpAddrSpec, BC, (Icmp, I, D)>
     for LocalIdAllocator<I, D>
 {
@@ -397,7 +398,7 @@ where
     }
 }
 
-impl<I: IpExt, D: Id> SocketMapStateSpec for (Icmp, I, D) {
+impl<I: IpExt, D: device::Id> SocketMapStateSpec for (Icmp, I, D) {
     type ListenerId = IcmpSocketId<I>;
     type ConnId = IcmpSocketId<I>;
 
@@ -456,11 +457,12 @@ impl<I: IpExt> SocketMapAddrStateSpec for IcmpSocketId<I> {
     }
 }
 
-impl<I: IpExt, D: WeakId> DatagramSocketMapSpec<I, D, IcmpAddrSpec> for (Icmp, I, D) {
+impl<I: IpExt, D: device::WeakId> DatagramSocketMapSpec<I, D, IcmpAddrSpec> for (Icmp, I, D) {
     type BoundSocketId = IcmpSocketId<I>;
 }
 
-impl<AA, I: IpExt, D: WeakId> SocketMapConflictPolicy<AA, (), I, D, IcmpAddrSpec> for (Icmp, I, D)
+impl<AA, I: IpExt, D: device::WeakId> SocketMapConflictPolicy<AA, (), I, D, IcmpAddrSpec>
+    for (Icmp, I, D)
 where
     AA: Into<AddrVec<I, D, IcmpAddrSpec>> + Clone,
 {
