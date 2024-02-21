@@ -145,6 +145,8 @@ impl From<Icmpv6ErrorCode> for IcmpErrorCode {
     }
 }
 
+#[derive(GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 pub(crate) struct IcmpState<I: IpExt + datagram::DualStackIpExt, Instant, D: device::WeakId> {
     pub(crate) sockets: IcmpSockets<I, D>,
     pub(crate) error_send_bucket: Mutex<TokenBucket<Instant>>,
@@ -239,35 +241,39 @@ pub struct NdpCounters {
     pub tx: NdpTxCounters,
 }
 
-impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::IcmpTxCounters<I>>
-    for StackState<BC>
+impl<BC: BindingsContext, I: datagram::DualStackIpExt>
+    UnlockedAccess<crate::lock_ordering::IcmpTxCounters<I>> for StackState<BC>
 {
     type Data = IcmpTxCounters<I>;
     type Guard<'l> = &'l IcmpTxCounters<I> where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.icmp_tx_counters()
+        &self.inner_icmp_state().tx_counters
     }
 }
 
-impl<BC: BindingsContext, I: Ip, L> CounterContext<IcmpTxCounters<I>> for CoreCtx<'_, BC, L> {
+impl<BC: BindingsContext, I: datagram::DualStackIpExt, L> CounterContext<IcmpTxCounters<I>>
+    for CoreCtx<'_, BC, L>
+{
     fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::IcmpTxCounters<I>>())
     }
 }
 
-impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::IcmpRxCounters<I>>
-    for StackState<BC>
+impl<BC: BindingsContext, I: datagram::DualStackIpExt>
+    UnlockedAccess<crate::lock_ordering::IcmpRxCounters<I>> for StackState<BC>
 {
     type Data = IcmpRxCounters<I>;
     type Guard<'l> = &'l IcmpRxCounters<I> where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.icmp_rx_counters()
+        &self.inner_icmp_state().rx_counters
     }
 }
 
-impl<BC: BindingsContext, I: Ip, L> CounterContext<IcmpRxCounters<I>> for CoreCtx<'_, BC, L> {
+impl<BC: BindingsContext, I: datagram::DualStackIpExt, L> CounterContext<IcmpRxCounters<I>>
+    for CoreCtx<'_, BC, L>
+{
     fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::IcmpRxCounters<I>>())
     }
@@ -3378,18 +3384,30 @@ mod tests {
             let count = match *counter {
                 "send_ipv4_packet" => core_ctx.ipv4.inner.counters().send_ip_packet.get(),
                 "send_ipv6_packet" => core_ctx.ipv6.inner.counters().send_ip_packet.get(),
-                "echo_request" => core_ctx.icmp_rx_counters::<I>().echo_request.get(),
-                "timestamp_request" => core_ctx.icmp_rx_counters::<I>().timestamp_request.get(),
-                "protocol_unreachable" => {
-                    core_ctx.icmp_tx_counters::<I>().protocol_unreachable.get()
+                "echo_request" => core_ctx.inner_icmp_state::<I>().rx_counters.echo_request.get(),
+                "timestamp_request" => {
+                    core_ctx.inner_icmp_state::<I>().rx_counters.timestamp_request.get()
                 }
-                "port_unreachable" => core_ctx.icmp_tx_counters::<I>().port_unreachable.get(),
-                "net_unreachable" => core_ctx.icmp_tx_counters::<I>().net_unreachable.get(),
-                "ttl_expired" => core_ctx.icmp_tx_counters::<I>().ttl_expired.get(),
-                "packet_too_big" => core_ctx.icmp_tx_counters::<I>().packet_too_big.get(),
-                "parameter_problem" => core_ctx.icmp_tx_counters::<I>().parameter_problem.get(),
-                "dest_unreachable" => core_ctx.icmp_tx_counters::<I>().dest_unreachable.get(),
-                "error" => core_ctx.icmp_tx_counters::<I>().error.get(),
+                "protocol_unreachable" => {
+                    core_ctx.inner_icmp_state::<I>().tx_counters.protocol_unreachable.get()
+                }
+                "port_unreachable" => {
+                    core_ctx.inner_icmp_state::<I>().tx_counters.port_unreachable.get()
+                }
+                "net_unreachable" => {
+                    core_ctx.inner_icmp_state::<I>().tx_counters.net_unreachable.get()
+                }
+                "ttl_expired" => core_ctx.inner_icmp_state::<I>().tx_counters.ttl_expired.get(),
+                "packet_too_big" => {
+                    core_ctx.inner_icmp_state::<I>().tx_counters.packet_too_big.get()
+                }
+                "parameter_problem" => {
+                    core_ctx.inner_icmp_state::<I>().tx_counters.parameter_problem.get()
+                }
+                "dest_unreachable" => {
+                    core_ctx.inner_icmp_state::<I>().tx_counters.dest_unreachable.get()
+                }
+                "error" => core_ctx.inner_icmp_state::<I>().tx_counters.error.get(),
                 c => panic!("unrecognized counter: {c}"),
             };
             assert!(count > 0, "counter at zero: {counter}");

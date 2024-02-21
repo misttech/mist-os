@@ -25,7 +25,7 @@ use crate::{
 
 impl<I, BC, L> FragmentStateContext<I, BC::Instant> for CoreCtx<'_, BC, L>
 where
-    I: Ip,
+    I: IpLayerIpExt,
     BC: BindingsContext,
     L: LockBefore<crate::lock_ordering::IpStateFragmentCache<I>>,
 {

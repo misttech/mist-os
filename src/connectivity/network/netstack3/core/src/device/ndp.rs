@@ -409,7 +409,10 @@ mod tests {
             assert_eq!(bindings_ctx.frames_sent().len(), 1);
         });
         let _: StepResult = net.step();
-        assert_eq!(net.core_ctx("remote").icmp_rx_counters::<Ipv6>().echo_request.get(), 1);
+        assert_eq!(
+            net.core_ctx("remote").inner_icmp_state::<Ipv6>().rx_counters.echo_request.get(),
+            1
+        );
 
         // TODO(brunodalbo): We should be able to verify that remote also sends
         //  back an echo reply, but we're having some trouble with IPv6 link

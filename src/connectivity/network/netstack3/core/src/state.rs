@@ -9,14 +9,15 @@ use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6};
 use crate::{
     api::CoreApi,
     context::{ContextProvider, CtxPair},
-    device::{arp::ArpCounters, DeviceCounters, DeviceId, DeviceLayerState},
+    device::{arp::ArpCounters, DeviceCounters, DeviceId, DeviceLayerState, WeakDeviceId},
     ip::{
         self,
         device::nud::NudCounters,
         device::slaac::SlaacCounters,
-        icmp::{IcmpRxCounters, IcmpTxCounters, NdpCounters},
-        IpCounters, IpLayerIpExt, Ipv4State, Ipv6State,
+        icmp::{IcmpState, NdpCounters},
+        IpCounters, IpLayerIpExt, IpStateInner, Ipv4State, Ipv6State,
     },
+    socket::datagram,
     sync::RwLock,
     transport::{self, udp::UdpCounters, TransportLayerState},
     BindingsContext, BindingsTypes, CoreCtx,
@@ -103,22 +104,6 @@ impl<BT: BindingsTypes> StackState<BT> {
         state
     }
 
-    pub(crate) fn icmp_tx_counters<I: Ip>(&self) -> &IcmpTxCounters<I> {
-        I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(state)| state.ipv4.icmp_tx_counters(),
-            |IpInvariant(state)| state.ipv6.icmp_tx_counters(),
-        )
-    }
-
-    pub(crate) fn icmp_rx_counters<I: Ip>(&self) -> &IcmpRxCounters<I> {
-        I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(state)| state.ipv4.icmp_rx_counters(),
-            |IpInvariant(state)| state.ipv6.icmp_rx_counters(),
-        )
-    }
-
     pub(crate) fn nud_counters<I: Ip>(&self) -> &NudCounters<I> {
         I::map_ip(
             IpInvariant(self),
@@ -128,7 +113,7 @@ impl<BT: BindingsTypes> StackState<BT> {
     }
 
     pub(crate) fn ndp_counters(&self) -> &NdpCounters {
-        &self.ipv6.ndp_counters()
+        &self.ipv6.icmp().ndp_counters
     }
 
     pub(crate) fn device_counters(&self) -> &DeviceCounters {
@@ -145,6 +130,18 @@ impl<BT: BindingsTypes> StackState<BT> {
 
     pub(crate) fn slaac_counters(&self) -> &SlaacCounters {
         &self.ipv6.slaac_counters()
+    }
+
+    pub(crate) fn inner_ip_state<I: IpLayerIpExt>(
+        &self,
+    ) -> &IpStateInner<I, BT::Instant, DeviceId<BT>> {
+        I::map_ip((), |()| self.ipv4.inner(), |()| self.ipv6.inner())
+    }
+
+    pub(crate) fn inner_icmp_state<I: ip::IpExt + datagram::DualStackIpExt>(
+        &self,
+    ) -> &IcmpState<I, BT::Instant, WeakDeviceId<BT>> {
+        I::map_ip((), |()| &self.ipv4.icmp().inner, |()| &self.ipv6.icmp().inner)
     }
 }
 

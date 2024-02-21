@@ -896,9 +896,16 @@ mod tests {
 
         net.run_until_idle();
 
-        assert_eq!(net.core_ctx(LOCAL_CTX_NAME).icmp_rx_counters::<I>().echo_reply.get(), 1);
         assert_eq!(
-            net.core_ctx(ctx_name_receiving_req).icmp_rx_counters::<I>().echo_request.get(),
+            net.core_ctx(LOCAL_CTX_NAME).inner_icmp_state::<I>().rx_counters.echo_reply.get(),
+            1
+        );
+        assert_eq!(
+            net.core_ctx(ctx_name_receiving_req)
+                .inner_icmp_state::<I>()
+                .rx_counters
+                .echo_request
+                .get(),
             1
         );
         let replies = net.bindings_ctx(LOCAL_CTX_NAME).take_icmp_replies(conn);

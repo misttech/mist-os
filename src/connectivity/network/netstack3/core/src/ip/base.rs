@@ -25,8 +25,7 @@ use lock_order::{
 use net_types::ip::IpVersion;
 use net_types::{
     ip::{
-        GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr,
-        Mtu, Subnet,
+        GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu, Subnet,
     },
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
@@ -47,10 +46,7 @@ use crate::{
     },
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
-    device::{
-        AnyDevice, DeviceId, DeviceIdContext, DeviceLayerTypes, FrameDestination, Id, StrongId,
-        WeakDeviceId,
-    },
+    device::{AnyDevice, DeviceId, DeviceIdContext, FrameDestination, Id, StrongId, WeakDeviceId},
     inspect::{Inspectable, Inspector},
     ip::{
         device::{
@@ -60,10 +56,9 @@ use crate::{
         forwarding::{ForwardingTable, IpForwardingDeviceContext},
         icmp,
         icmp::{
-            IcmpErrorHandler, IcmpHandlerIpExt, IcmpIpExt, IcmpIpTransportContext, IcmpRxCounters,
-            IcmpTxCounters, Icmpv4Error, Icmpv4ErrorCode, Icmpv4ErrorKind, Icmpv4State,
-            Icmpv4StateBuilder, Icmpv6ErrorCode, Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder,
-            InnerIcmpContext, NdpCounters,
+            IcmpErrorHandler, IcmpHandlerIpExt, IcmpIpExt, IcmpIpTransportContext, Icmpv4Error,
+            Icmpv4ErrorCode, Icmpv4ErrorKind, Icmpv4State, Icmpv4StateBuilder, Icmpv6ErrorCode,
+            Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder, InnerIcmpContext,
         },
         ipv6,
         ipv6::Ipv6PacketAction,
@@ -75,6 +70,7 @@ use crate::{
         types,
         types::{Destination, NextHop, ResolvedRoute, RoutableIpAddr},
     },
+    socket::datagram,
     sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     transport::{tcp::socket::TcpIpTransportContext, udp::UdpIpTransportContext},
     uninstantiable::UninstantiableWrapper,
@@ -1164,16 +1160,16 @@ pub struct Ipv4State<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceCl
 impl<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass>
     Ipv4State<Instant, StrongDeviceId, DeviceClass>
 {
-    pub(crate) fn icmp_tx_counters(&self) -> &IcmpTxCounters<Ipv4> {
-        &self.icmp.inner.tx_counters
-    }
-
-    pub(crate) fn icmp_rx_counters(&self) -> &IcmpRxCounters<Ipv4> {
-        &self.icmp.inner.rx_counters
-    }
-
     pub fn filter(&self) -> &RwLock<crate::filter::ValidState<Ipv4, DeviceClass>> {
         &self.filter
+    }
+
+    pub(crate) fn inner(&self) -> &IpStateInner<Ipv4, Instant, StrongDeviceId> {
+        &self.inner
+    }
+
+    pub(crate) fn icmp(&self) -> &Icmpv4State<Instant, StrongDeviceId::Weak> {
+        &self.icmp
     }
 }
 
@@ -1201,24 +1197,20 @@ pub struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceCl
 impl<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass>
     Ipv6State<Instant, StrongDeviceId, DeviceClass>
 {
-    pub(crate) fn icmp_tx_counters(&self) -> &IcmpTxCounters<Ipv6> {
-        &self.icmp.inner.tx_counters
-    }
-
-    pub(crate) fn icmp_rx_counters(&self) -> &IcmpRxCounters<Ipv6> {
-        &self.icmp.inner.rx_counters
-    }
-
-    pub(crate) fn ndp_counters(&self) -> &NdpCounters {
-        &self.icmp.ndp_counters
-    }
-
     pub(crate) fn slaac_counters(&self) -> &SlaacCounters {
         &self.slaac_counters
     }
 
     pub fn filter(&self) -> &RwLock<crate::filter::ValidState<Ipv6, DeviceClass>> {
         &self.filter
+    }
+
+    pub(crate) fn inner(&self) -> &IpStateInner<Ipv6, Instant, StrongDeviceId> {
+        &self.inner
+    }
+
+    pub(crate) fn icmp(&self) -> &Icmpv6State<Instant, StrongDeviceId::Weak> {
+        &self.icmp
     }
 }
 
@@ -1232,49 +1224,31 @@ impl<I: Instant, StrongDeviceId: StrongId, DeviceClass> AsRef<IpStateInner<Ipv6,
 
 impl<I, BT> LockFor<crate::lock_ordering::IpStateFragmentCache<I>> for StackState<BT>
 where
-    I: Ip,
+    I: IpLayerIpExt,
     BT: BindingsTypes,
 {
     type Data = IpPacketFragmentCache<I, BT::Instant>;
     type Guard<'l> = LockGuard<'l, IpPacketFragmentCache<I, BT::Instant>> where Self: 'l;
 
     fn lock(&self) -> Self::Guard<'_> {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        pub(super) struct Wrap<'l, I: Ip, II>(LockGuard<'l, IpPacketFragmentCache<I, II>>);
-
-        let Wrap(guard) = I::map_ip(
-            (),
-            |()| Wrap(self.ipv4.inner.fragment_cache.lock()),
-            |()| Wrap(self.ipv6.inner.fragment_cache.lock()),
-        );
-        guard
+        self.inner_ip_state().fragment_cache.lock()
     }
 }
 
 impl<I, BT> LockFor<crate::lock_ordering::IpStatePmtuCache<I>> for StackState<BT>
 where
-    I: Ip,
+    I: IpLayerIpExt,
     BT: BindingsTypes,
 {
     type Data = PmtuCache<I, BT::Instant>;
     type Guard<'l> = LockGuard<'l, PmtuCache<I, BT::Instant>> where Self: 'l;
 
     fn lock(&self) -> Self::Guard<'_> {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        pub(super) struct Wrap<'l, I: Ip, II>(LockGuard<'l, PmtuCache<I, II>>);
-
-        let Wrap(guard) = I::map_ip(
-            (),
-            |()| Wrap(self.ipv4.inner.pmtu_cache.lock()),
-            |()| Wrap(self.ipv6.inner.pmtu_cache.lock()),
-        );
-        guard
+        self.inner_ip_state().pmtu_cache.lock()
     }
 }
 
-impl<I: Ip, BT: BindingsTypes> RwLockFor<crate::lock_ordering::IpStateRoutingTable<I>>
+impl<I: IpLayerIpExt, BT: BindingsTypes> RwLockFor<crate::lock_ordering::IpStateRoutingTable<I>>
     for StackState<BT>
 {
     type Data = ForwardingTable<I, DeviceId<BT>>;
@@ -1284,39 +1258,17 @@ impl<I: Ip, BT: BindingsTypes> RwLockFor<crate::lock_ordering::IpStateRoutingTab
         where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadGuard<'_> {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        pub(super) struct Wrap<'l, I: Ip, BT: DeviceLayerTypes>(
-            RwLockReadGuard<'l, ForwardingTable<I, DeviceId<BT>>>,
-        );
-
-        let Wrap(guard) = I::map_ip(
-            (),
-            |()| Wrap(self.ipv4.inner.table.read()),
-            |()| Wrap(self.ipv6.inner.table.read()),
-        );
-        guard
+        self.inner_ip_state().table.read()
     }
 
     fn write_lock(&self) -> Self::WriteGuard<'_> {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        pub(super) struct Wrap<'l, I: Ip, BT: DeviceLayerTypes>(
-            RwLockWriteGuard<'l, ForwardingTable<I, DeviceId<BT>>>,
-        );
-
-        let Wrap(guard) = I::map_ip(
-            (),
-            |()| Wrap(self.ipv4.inner.table.write()),
-            |()| Wrap(self.ipv6.inner.table.write()),
-        );
-        guard
+        self.inner_ip_state().table.write()
     }
 }
 
 impl<I, BT> RwLockFor<crate::lock_ordering::IcmpBoundMap<I>> for StackState<BT>
 where
-    I: IpExt,
+    I: datagram::DualStackIpExt,
     BT: BindingsTypes,
 {
     type Data = icmp::socket::BoundSockets<I, WeakDeviceId<BT>>;
@@ -1324,36 +1276,16 @@ where
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadGuard<'_> {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        pub(super) struct Wrap<'l, I: IpExt, D: crate::device::WeakId>(
-            RwLockReadGuard<'l, icmp::socket::BoundSockets<I, D>>,
-        );
-        let Wrap(guard) = I::map_ip(
-            (),
-            |()| Wrap(self.ipv4.icmp.inner.sockets.bound_and_id_allocator.read()),
-            |()| Wrap(self.ipv6.icmp.inner.sockets.bound_and_id_allocator.read()),
-        );
-        guard
+        self.inner_icmp_state().sockets.bound_and_id_allocator.read()
     }
     fn write_lock(&self) -> Self::WriteGuard<'_> {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        pub(super) struct Wrap<'l, I: IpExt, D: crate::device::WeakId>(
-            RwLockWriteGuard<'l, icmp::socket::BoundSockets<I, D>>,
-        );
-        let Wrap(guard) = I::map_ip(
-            (),
-            |()| Wrap(self.ipv4.icmp.inner.sockets.bound_and_id_allocator.write()),
-            |()| Wrap(self.ipv6.icmp.inner.sockets.bound_and_id_allocator.write()),
-        );
-        guard
+        self.inner_icmp_state().sockets.bound_and_id_allocator.write()
     }
 }
 
 impl<I, BT> RwLockFor<crate::lock_ordering::IcmpSocketsTable<I>> for StackState<BT>
 where
-    I: crate::socket::datagram::DualStackIpExt,
+    I: datagram::DualStackIpExt,
     BT: BindingsTypes,
 {
     type Data = icmp::socket::SocketsState<I, WeakDeviceId<BT>>;
@@ -1361,36 +1293,16 @@ where
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadGuard<'_> {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        pub(super) struct Wrap<'l, I: crate::socket::datagram::DualStackIpExt, D: crate::device::WeakId>(
-            RwLockReadGuard<'l, icmp::socket::SocketsState<I, D>>,
-        );
-        let Wrap(guard) = I::map_ip(
-            (),
-            |()| Wrap(self.ipv4.icmp.inner.sockets.state.read()),
-            |()| Wrap(self.ipv6.icmp.inner.sockets.state.read()),
-        );
-        guard
+        self.inner_icmp_state().sockets.state.read()
     }
     fn write_lock(&self) -> Self::WriteGuard<'_> {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        pub(super) struct Wrap<'l, I: crate::socket::datagram::DualStackIpExt, D: crate::device::WeakId>(
-            RwLockWriteGuard<'l, icmp::socket::SocketsState<I, D>>,
-        );
-        let Wrap(guard) = I::map_ip(
-            (),
-            |()| Wrap(self.ipv4.icmp.inner.sockets.state.write()),
-            |()| Wrap(self.ipv6.icmp.inner.sockets.state.write()),
-        );
-        guard
+        self.inner_icmp_state().sockets.state.write()
     }
 }
 
 impl<I, BT> LockFor<crate::lock_ordering::IcmpTokenBucket<I>> for StackState<BT>
 where
-    I: Ip,
+    I: datagram::DualStackIpExt,
     BT: BindingsTypes,
 {
     type Data = TokenBucket<BT::Instant>;
@@ -1398,12 +1310,7 @@ where
         where Self: 'l;
 
     fn lock(&self) -> Self::Guard<'_> {
-        let IpInvariant(guard) = I::map_ip(
-            (),
-            |()| IpInvariant(self.ipv4.icmp.as_ref().error_send_bucket.lock()),
-            |()| IpInvariant(self.ipv6.icmp.as_ref().error_send_bucket.lock()),
-        );
-        guard
+        self.inner_icmp_state::<I>().error_send_bucket.lock()
     }
 }
 
@@ -1528,8 +1435,9 @@ impl<BC: BindingsContext, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::
     }
 }
 
-#[derive(Derivative)]
+#[derive(Derivative, GenericOverIp)]
 #[derivative(Default(bound = ""))]
+#[generic_over_ip(I, Ip)]
 pub struct IpStateInner<I: IpLayerIpExt, Instant: crate::Instant, DeviceId> {
     table: RwLock<ForwardingTable<I, DeviceId>>,
     fragment_cache: Mutex<IpPacketFragmentCache<I, Instant>>,
@@ -3169,7 +3077,7 @@ pub(crate) mod testutil {
 
     use alloc::collections::HashSet;
 
-    use net_types::MulticastAddr;
+    use net_types::{ip::IpInvariant, MulticastAddr};
 
     use crate::{
         context::{testutil::FakeInstant, RngContext},
@@ -3638,8 +3546,8 @@ mod tests {
             buf,
         );
 
-        assert_eq!(ctx.core_ctx.ipv4.icmp_tx_counters().parameter_problem.get(), 0);
-        assert_eq!(ctx.core_ctx.ipv6.icmp_tx_counters().parameter_problem.get(), 0);
+        assert_eq!(ctx.core_ctx.ipv4.icmp.inner.tx_counters.parameter_problem.get(), 0);
+        assert_eq!(ctx.core_ctx.ipv6.icmp.inner.tx_counters.parameter_problem.get(), 0);
         assert_eq!(ctx.core_ctx.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 0);
         assert_eq!(ctx.core_ctx.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
     }
@@ -3712,7 +3620,10 @@ mod tests {
             false,
         );
         ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
-        assert_eq!(ctx.core_ctx.icmp_tx_counters::<Ipv6>().parameter_problem.get(), expected_icmps);
+        assert_eq!(
+            ctx.core_ctx.inner_icmp_state::<Ipv6>().tx_counters.parameter_problem.get(),
+            expected_icmps
+        );
         assert_eq!(ctx.core_ctx.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
         assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
 
@@ -3725,7 +3636,10 @@ mod tests {
             false,
         );
         ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
-        assert_eq!(ctx.core_ctx.icmp_tx_counters::<Ipv6>().parameter_problem.get(), expected_icmps);
+        assert_eq!(
+            ctx.core_ctx.inner_icmp_state::<Ipv6>().tx_counters.parameter_problem.get(),
+            expected_icmps
+        );
         assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
 
         // Test with unrecognized option type set with
@@ -3739,7 +3653,10 @@ mod tests {
         );
         ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
         expected_icmps += 1;
-        assert_eq!(ctx.core_ctx.icmp_tx_counters::<Ipv6>().parameter_problem.get(), expected_icmps);
+        assert_eq!(
+            ctx.core_ctx.inner_icmp_state::<Ipv6>().tx_counters.parameter_problem.get(),
+            expected_icmps
+        );
         assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
         verify_icmp_for_unrecognized_ext_hdr_option(
             &mut ctx.bindings_ctx,
@@ -3759,7 +3676,10 @@ mod tests {
         );
         ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
         expected_icmps += 1;
-        assert_eq!(ctx.core_ctx.icmp_tx_counters::<Ipv6>().parameter_problem.get(), expected_icmps);
+        assert_eq!(
+            ctx.core_ctx.inner_icmp_state::<Ipv6>().tx_counters.parameter_problem.get(),
+            expected_icmps
+        );
         assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
         verify_icmp_for_unrecognized_ext_hdr_option(
             &mut ctx.bindings_ctx,
@@ -3779,7 +3699,10 @@ mod tests {
         );
         ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
         expected_icmps += 1;
-        assert_eq!(ctx.core_ctx.icmp_tx_counters::<Ipv6>().parameter_problem.get(), expected_icmps);
+        assert_eq!(
+            ctx.core_ctx.inner_icmp_state::<Ipv6>().tx_counters.parameter_problem.get(),
+            expected_icmps
+        );
         assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
         verify_icmp_for_unrecognized_ext_hdr_option(
             &mut ctx.bindings_ctx,
@@ -3799,13 +3722,16 @@ mod tests {
         );
         // Do not expect an ICMP response for this packet
         ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
-        assert_eq!(ctx.core_ctx.icmp_tx_counters::<Ipv6>().parameter_problem.get(), expected_icmps);
+        assert_eq!(
+            ctx.core_ctx.inner_icmp_state::<Ipv6>().tx_counters.parameter_problem.get(),
+            expected_icmps
+        );
         assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
 
         // None of our tests should have sent an icmpv4 packet, or dispatched an
         // IP packet after the first.
 
-        assert_eq!(ctx.core_ctx.icmp_tx_counters::<Ipv4>().parameter_problem.get(), 0);
+        assert_eq!(ctx.core_ctx.inner_icmp_state::<Ipv4>().tx_counters.parameter_problem.get(), 0);
         assert_eq!(ctx.core_ctx.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
     }
 
@@ -4082,7 +4008,7 @@ mod tests {
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // Should not have dispatched the packet.
         assert_eq!(core_ctx.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
-        assert_eq!(core_ctx.icmp_tx_counters::<Ipv6>().packet_too_big.get(), 1);
+        assert_eq!(core_ctx.inner_icmp_state::<Ipv6>().tx_counters.packet_too_big.get(), 1);
 
         // Should have sent out one frame though.
         assert_eq!(bindings_ctx.frames_sent().len(), 1);
@@ -4505,7 +4431,7 @@ mod tests {
 
         // Should have dispatched the packet but resulted in an ICMP error.
         assert_eq!(ctx.core_ctx.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 1);
-        assert_eq!(ctx.core_ctx.icmp_tx_counters::<Ipv4>().dest_unreachable.get(), 1);
+        assert_eq!(ctx.core_ctx.inner_icmp_state::<Ipv4>().tx_counters.dest_unreachable.get(), 1);
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
         let buf = &ctx.bindings_ctx.frames_sent()[0].1[..];
         let (_, _, _, _, _, _, code) = parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
