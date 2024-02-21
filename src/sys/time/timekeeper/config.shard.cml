@@ -60,5 +60,10 @@
 
         // If set, timekeeper will exit early without managing the clock.
         early_exit: { type: "bool" },
+
+        // If set, timekeeper will attempt to contact the System Activity
+        // Governor, and/or Power Broker to take part in the system's power
+        // topology.
+        power_topology_integration_enabled: { type: "bool" },
     },
 }

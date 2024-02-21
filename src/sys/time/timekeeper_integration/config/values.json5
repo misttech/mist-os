@@ -11,4 +11,5 @@
     monitor_time_source_url: "",
     utc_start_at_startup: true,
     early_exit: false,
+    power_topology_integration_enabled: false,
 }

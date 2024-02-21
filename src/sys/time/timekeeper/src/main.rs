@@ -10,6 +10,7 @@ mod clock_manager;
 mod diagnostics;
 mod enums;
 mod estimator;
+mod power_topology_integration;
 mod rtc;
 mod time_source;
 mod time_source_manager;
@@ -108,6 +109,12 @@ impl Config {
 
     fn get_early_exit(&self) -> bool {
         self.source_config.early_exit
+    }
+
+    // TODO: b/295537795 - remove annotation once used.
+    #[allow(dead_code)]
+    fn power_topology_integration_enabled(&self) -> bool {
+        self.source_config.power_topology_integration_enabled
     }
 }
 
@@ -485,6 +492,7 @@ mod tests {
             primary_uses_pull: false,
             utc_start_at_startup: false,
             early_exit: false,
+            power_topology_integration_enabled: false,
         }))
     }
 

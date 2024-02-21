@@ -64,6 +64,7 @@ timekeeper_sources = [
   "src/estimator/kalman_filter.rs",
   "src/estimator/mod.rs",
   "src/main.rs",
+  "src/power_topology_integration.rs",
   "src/rtc.rs",
   "src/time_source.rs",
   "src/time_source_manager.rs",

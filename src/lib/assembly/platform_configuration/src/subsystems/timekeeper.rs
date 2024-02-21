@@ -49,7 +49,9 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
                 config.back_off_time_between_pull_samples_sec)?
             .field("first_sampling_delay_sec", config.first_sampling_delay_sec)?
             .field("utc_start_at_startup", utc_start_at_startup)?
-            .field("early_exit", early_exit)?;
+            .field("early_exit", early_exit)?
+            // TODO: b/295537795 - provide this setting somehow.
+            .field("power_topology_integration_enabled", false)?;
 
         Ok(())
     }
