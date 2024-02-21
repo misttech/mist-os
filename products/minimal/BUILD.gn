@@ -14,14 +14,6 @@ assert(
 product_assembly_configuration("minimal") {
   platform = {
     build_type = "eng"
-    diagnostics = {
-      archivist_pipelines = [
-        {
-          name = "feedback"
-          files = []
-        },
-      ]
-    }
     fonts = {
       # minimal is headless, so ostensibly does not need fonts.
       enabled = false

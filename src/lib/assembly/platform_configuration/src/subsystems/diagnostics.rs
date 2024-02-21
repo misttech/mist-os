@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
 use assembly_config_schema::platform_config::diagnostics_config::{
-    ArchivistConfig, ArchivistPipeline, DiagnosticsConfig,
+    ArchivistConfig, ArchivistPipeline, DiagnosticsConfig, PipelineType,
 };
 use assembly_util::{
     read_config, write_json_file, BootfsPackageDestination, FileEntry, PackageSetDestination,
@@ -138,6 +138,13 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
                 .directory("config");
             for pipeline in archivist_pipelines {
                 let ArchivistPipeline { name, files } = pipeline;
+                if files.is_empty() {
+                    bail!("An archivist pipeline must have a non-zero number of files");
+                }
+                if *name == PipelineType::All && *context.build_type == BuildType::User {
+                    bail!("The 'all' archivist pipeline is not allowed on user builds");
+                }
+
                 for file in files {
                     let filename = file.file_name().ok_or(anyhow!(
                         "Failed to get filename for archivist pipeline: {}",

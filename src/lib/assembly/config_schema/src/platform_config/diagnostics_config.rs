@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 pub struct DiagnosticsConfig {
     #[serde(default)]
     pub archivist: Option<ArchivistConfig>,
+    /// The set of pipeline config files to supply to archivist.
     #[serde(default)]
     pub archivist_pipelines: Vec<ArchivistPipeline>,
     #[serde(default)]
@@ -33,8 +34,47 @@ pub enum ArchivistConfig {
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ArchivistPipeline {
-    pub name: String,
+    /// The name of the pipeline.
+    pub name: PipelineType,
+    /// The files to add to the pipeline.
+    /// Zero files is not valid.
     pub files: Vec<Utf8PathBuf>,
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[serde(rename_all = "snake_case")]
+#[serde(into = "String")]
+pub enum PipelineType {
+    /// A pipeline that makes all diagnostics data visible.
+    /// This is not available on user builds.
+    All,
+    /// A pipeline for feedback data.
+    Feedback,
+    /// A pipeline for legacy metrics.
+    LegacyMetrics,
+    /// A pipeline for LoWPAN metrics.
+    Lowpan,
+}
+
+impl std::fmt::Display for PipelineType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::All => "all",
+                Self::Feedback => "feedback",
+                Self::LegacyMetrics => "legacy_metrics",
+                Self::Lowpan => "lowpan",
+            }
+        )
+    }
+}
+
+impl From<PipelineType> for String {
+    fn from(t: PipelineType) -> Self {
+        t.to_string()
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
