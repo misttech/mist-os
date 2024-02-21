@@ -23,6 +23,98 @@ constexpr size_t kInterruptRegOffset = 0x3c00;
 }  // namespace
 
 namespace gpio {
+template <uint32_t kPid>
+class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_device::Device> {
+ public:
+  fuchsia_hardware_platform_device::Service::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_platform_device::Service::InstanceHandler({
+        .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                          fidl::kIgnoreBindingClosure),
+    });
+  }
+  void SetExpectedInterruptFlags(uint32_t flags) { expected_interrupt_flags_ = flags; }
+
+ private:
+  void GetMmioById(fuchsia_hardware_platform_device::wire::DeviceGetMmioByIdRequest* request,
+                   GetMmioByIdCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void GetMmioByName(fuchsia_hardware_platform_device::wire::DeviceGetMmioByNameRequest* request,
+                     GetMmioByNameCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void GetInterruptById(
+      fuchsia_hardware_platform_device::wire::DeviceGetInterruptByIdRequest* request,
+      GetInterruptByIdCompleter::Sync& completer) override {
+    EXPECT_EQ(request->flags, expected_interrupt_flags_);
+    zx::interrupt irq;
+    if (zx_status_t status = zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq);
+        status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+    completer.ReplySuccess(std::move(irq));
+  }
+
+  void GetInterruptByName(
+      fuchsia_hardware_platform_device::wire::DeviceGetInterruptByNameRequest* request,
+      GetInterruptByNameCompleter::Sync& completer) override {
+    zx::interrupt irq;
+    if (zx_status_t status = zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq);
+        status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+    completer.ReplySuccess(std::move(irq));
+  }
+
+  void GetBtiById(fuchsia_hardware_platform_device::wire::DeviceGetBtiByIdRequest* request,
+                  GetBtiByIdCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void GetBtiByName(fuchsia_hardware_platform_device::wire::DeviceGetBtiByNameRequest* request,
+                    GetBtiByNameCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void GetSmcById(fuchsia_hardware_platform_device::wire::DeviceGetSmcByIdRequest* request,
+                  GetSmcByIdCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void GetNodeDeviceInfo(GetNodeDeviceInfoCompleter::Sync& completer) override {
+    fidl::Arena arena;
+    auto info = fuchsia_hardware_platform_device::wire::NodeDeviceInfo::Builder(arena);
+    // Report kIrqCount IRQs even though we don't check on GetInterruptX calls.
+    static constexpr size_t kIrqCount = 3;
+    completer.ReplySuccess(info.vid(PDEV_VID_AMLOGIC).pid(kPid).irq_count(kIrqCount).Build());
+  }
+
+  void GetSmcByName(fuchsia_hardware_platform_device::wire::DeviceGetSmcByNameRequest* request,
+                    GetSmcByNameCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  fidl::ServerBindingGroup<fuchsia_hardware_platform_device::Device> bindings_;
+  uint32_t expected_interrupt_flags_ = ZX_INTERRUPT_MODE_EDGE_HIGH;
+};
 
 class TestAmlGpioDriver : public AmlGpioDriver {
  public:
@@ -70,8 +162,9 @@ class TestAmlGpioDriver : public AmlGpioDriver {
                                                    kInterruptRegOffset};
 };
 
+template <uint32_t kPid>
 struct IncomingNamespace {
-  fake_pdev::FakePDevFidl pdev_server;
+  FakePlatformDevice<kPid> platform_device;
 };
 
 template <uint32_t kPid>
@@ -92,16 +185,9 @@ class AmlGpioTest : public zxtest::Test {
     }
 
     {
-      incoming_.pdev_server.SetConfig(fake_pdev::FakePDevFidl::Config{
-          .use_fake_irq = true,
-          // make-up info, pid and irq_count needed for Create
-          .device_info = pdev_device_info_t{0, kPid, 0, 2, 3, 0, 0, 0, {0}, "fake_info"},
-      });
-      auto instance_handler = incoming_.pdev_server.GetInstanceHandler(
-          fdf::Dispatcher::GetCurrent()->async_dispatcher());
-      zx::result result =
-          test_environment_.incoming_directory()
-              .AddService<fuchsia_hardware_platform_device::Service>(std::move(instance_handler));
+      zx::result result = test_environment_.incoming_directory()
+                              .AddService<fuchsia_hardware_platform_device::Service>(
+                                  incoming_.platform_device.GetInstanceHandler());
       ASSERT_TRUE(result.is_ok());
     }
 
@@ -134,6 +220,32 @@ class AmlGpioTest : public zxtest::Test {
   }
 
  protected:
+  void CheckA113GetInterrupt(uint32_t requested_interrupt_flags,
+                             uint32_t expected_kernel_interrupt_flags,
+                             uint32_t expected_register_polarity_values) {
+    incoming_.platform_device.SetExpectedInterruptFlags(expected_kernel_interrupt_flags);
+    interrupt_mmio()[0x3c20 * sizeof(uint32_t)]
+        .ExpectRead(0x00000000)
+        .ExpectWrite(expected_register_polarity_values);
+
+    // Modify IRQ index for IRQ pin.
+    interrupt_mmio()[0x3c21 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000048);
+    // Interrupt select filter.
+    interrupt_mmio()[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
+
+    zx::interrupt out_int;
+    fdf::Arena arena('GPIO');
+    client_.buffer(arena)->GetInterrupt(0x0B, requested_interrupt_flags).Then([&](auto& result) {
+      ASSERT_TRUE(result.ok());
+      EXPECT_TRUE(result->is_ok());
+      runtime_.Quit();
+    });
+    runtime_.Run();
+
+    mmio().VerifyAll();
+    ao_mmio().VerifyAll();
+    interrupt_mmio().VerifyAll();
+  }
   ddk_mock::MockMmioRegRegion& mmio() { return dut_->mmio(); }
   ddk_mock::MockMmioRegRegion& ao_mmio() { return dut_->ao_mmio(); }
   ddk_mock::MockMmioRegRegion& interrupt_mmio() { return dut_->interrupt_mmio(); }
@@ -144,7 +256,7 @@ class AmlGpioTest : public zxtest::Test {
  private:
   fidl::ClientEnd<fuchsia_io::Directory> driver_outgoing_;
   fdf::UnownedSynchronizedDispatcher background_dispatcher_;
-  IncomingNamespace incoming_;
+  IncomingNamespace<kPid> incoming_;
   fdf_testing::TestNode node_server_;
   fdf_testing::TestEnvironment test_environment_;
   fdf_testing::DriverUnderTest<TestAmlGpioDriver> dut_;
@@ -488,25 +600,24 @@ TEST_F(A113AmlGpioTest, A113GetInterruptFail) {
   interrupt_mmio().VerifyAll();
 }
 
-TEST_F(A113AmlGpioTest, A113GetInterrupt) {
-  interrupt_mmio()[0x3c21 * sizeof(uint32_t)]
-      .ExpectRead(0x00000000)
-      .ExpectWrite(0x00000048);  // modify
-  interrupt_mmio()[0x3c20 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00010001);
-  interrupt_mmio()[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
-  zx::interrupt out_int;
+TEST_F(A113AmlGpioTest, A113GetInterruptEdgeLow) {
+  // Request edge low polarity. Expect the kernel polarity to be converted to edge high.
+  CheckA113GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW, ZX_INTERRUPT_MODE_EDGE_HIGH, 0x0001'0001);
+}
 
-  fdf::Arena arena('GPIO');
-  client_.buffer(arena)->GetInterrupt(0x0B, ZX_INTERRUPT_MODE_EDGE_LOW).Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    EXPECT_TRUE(result->is_ok());
-    runtime_.Quit();
-  });
-  runtime_.Run();
+TEST_F(A113AmlGpioTest, A113GetInterruptEdgeHigh) {
+  // Request edge high polarity. Expect the kernel polarity to stay as edge high.
+  CheckA113GetInterrupt(ZX_INTERRUPT_MODE_EDGE_HIGH, ZX_INTERRUPT_MODE_EDGE_HIGH, 0x0000'0001);
+}
 
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+TEST_F(A113AmlGpioTest, A113GetInterruptLevelLow) {
+  // Request level low polarity. Expect the kernel polarity to be converted to level high.
+  CheckA113GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_LOW, ZX_INTERRUPT_MODE_LEVEL_HIGH, 0x0001'0000);
+}
+
+TEST_F(A113AmlGpioTest, A113GetInterruptLevelHigh) {
+  // Request level high polarity. Expect the kernel polarity to stay as level high.
+  CheckA113GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_HIGH, ZX_INTERRUPT_MODE_LEVEL_HIGH, 0x0000'0000);
 }
 
 // GpioImplReleaseInterrupt Tests

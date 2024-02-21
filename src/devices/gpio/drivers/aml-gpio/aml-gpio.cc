@@ -492,13 +492,6 @@ void AmlGpio::GetInterrupt(fuchsia_hardware_gpioimpl::wire::GpioImplGetInterrupt
     FDF_LOG(ERROR, "Pin not found %u", request->index);
     return completer.buffer(arena).ReplyError(status);
   }
-  uint32_t flags_ = request->flags;
-  if (request->flags == ZX_INTERRUPT_MODE_EDGE_LOW) {
-    // GPIO controller sets the polarity
-    flags_ = ZX_INTERRUPT_MODE_EDGE_HIGH;
-  } else if (request->flags == ZX_INTERRUPT_MODE_LEVEL_LOW) {
-    flags_ = ZX_INTERRUPT_MODE_LEVEL_HIGH;
-  }
 
   // Configure GPIO Interrupt EDGE and Polarity
   uint32_t mode_reg_val =
@@ -543,8 +536,20 @@ void AmlGpio::GetInterrupt(fuchsia_hardware_gpioimpl::wire::GpioImplGetInterrupt
   irq_status_ |= static_cast<uint8_t>(1 << index);
   irq_info_[index] = static_cast<uint16_t>(request->index);
 
-  // Create Interrupt Object
-  pdev_->GetInterruptById(index, flags_)
+  // Create Interrupt Object, removing the requested polarity, since the polarity is managed
+  // by the GPIO HW via MMIO setting above.
+  // Interrupt modes are represented by values (not a bitmask) within the ZX_INTERRUPT_MODE_MASK.
+  // We only change ZX_INTERRUPT_MODE_[EDGE|LEVEL]_LOW values, passing other values in flags
+  // unchanged including values outside ZX_INTERRUPT_MODE_MASK.
+  uint32_t mode = request->flags & ZX_INTERRUPT_MODE_MASK;
+  uint32_t flags = request->flags & ~ZX_INTERRUPT_MODE_MASK;
+  if (mode == ZX_INTERRUPT_MODE_EDGE_LOW) {
+    mode = ZX_INTERRUPT_MODE_EDGE_HIGH;
+  } else if (mode == ZX_INTERRUPT_MODE_LEVEL_LOW) {
+    mode = ZX_INTERRUPT_MODE_LEVEL_HIGH;
+  }
+  flags |= mode;
+  pdev_->GetInterruptById(index, flags)
       .Then([this, index, irq_index = request->index,
              completer = completer.ToAsync()](auto& out_irq) mutable {
         fdf::Arena arena('GPIO');
