@@ -68,10 +68,10 @@ closed protocol Coordinator {
     /// dropped. The resources associated with the image will be released as
     /// soon as the image is no longer in use.
     //
-    // TODO(https://fxbug.dev/42080380): The precondition on capture image exists because
-    // capture images have different constraints on image reuse compared with
-    // non-capture images. We should have a unified design on image reuse for
-    // both capture and non-capture images.
+    // TODO(https://fxbug.dev/42080380): The precondition on capture image
+    // exists because capture images have different constraints on image reuse
+    // compared with non-capture images. We should have a unified design on
+    // image reuse for both capture and non-capture images.
     strict ReleaseImage(struct {
         image_id ImageId;
     });
