@@ -52,10 +52,6 @@ _platform_configuration_base = {
     config_type = "small"
   }
 
-  icu = {
-    revision = "default"
-  }
-
   media = {
     audio = {
       full_stack = {
@@ -64,8 +60,6 @@ _platform_configuration_base = {
   }
 
   setui = {
-    use_icu = "with_icu"
-    with_camera = false
   }
 
   ui = {

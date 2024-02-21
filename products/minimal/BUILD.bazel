@@ -34,15 +34,10 @@ _PRODUCT_CONFIG_BASE_JSON = {
         "fonts": {
             "enabled": False,
         },
-        "icu": {
-            "revision": "default",
-        },
         "intl": {
             "config_type": "default",
         },
         "setui": {
-            "use_icu": "with_icu",
-            "with_camera": False,
         },
         "ui": {
             "supported_input_devices": [
@@ -52,10 +47,6 @@ _PRODUCT_CONFIG_BASE_JSON = {
         },
         "storage": {
             "configure_fshost": True,
-            "live_usb_enabled": False,
-            "filesystems": {
-                "volume": "fxfs",
-            },
         },
     },
     "product": {

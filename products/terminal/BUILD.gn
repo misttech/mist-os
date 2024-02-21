@@ -72,13 +72,7 @@ product_assembly_configuration("terminal") {
       config_type = "default"
     }
 
-    icu = {
-      revision = "default"
-    }
-
     setui = {
-      use_icu = "with_icu"
-      with_camera = false
     }
 
     fonts = {

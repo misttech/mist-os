@@ -31,15 +31,10 @@ workbench_platform_config = {
             "low_memory": True,
         },
     },
-    "icu": {
-        "revision": "default",
-    },
     "intl": {
         "config_type": "default",
     },
     "setui": {
-        "use_icu": "with_icu",
-        "with_camera": False,
     },
     "timekeeper": {
         "first_sampling_delay_sec": 86400,
@@ -54,7 +49,6 @@ workbench_platform_config = {
     },
     "storage": {
         "configure_fshost": True,
-        "live_usb_enabled": False,
     },
     "session": {
         "enabled": True,

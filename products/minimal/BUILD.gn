@@ -29,12 +29,7 @@ product_assembly_configuration("minimal") {
     intl = {
       config_type = "default"
     }
-    icu = {
-      revision = "default"
-    }
     setui = {
-      use_icu = "with_icu"
-      with_camera = false
     }
     ui = {
       supported_input_devices = [
@@ -44,10 +39,6 @@ product_assembly_configuration("minimal") {
     }
     storage = {
       configure_fshost = true
-      live_usb_enabled = false
-      filesystems = {
-        volume = "fxfs"
-      }
     }
 
     # If the 'authorized_ssh_keys_path' GN arg has been set, then pass that path
