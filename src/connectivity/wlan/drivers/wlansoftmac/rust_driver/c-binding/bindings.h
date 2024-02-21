@@ -145,27 +145,43 @@ typedef struct {
 } wlan_span_t;
 
 /**
- * Start and run a bridged wlansoftmac driver hosting an MLME server and an SME server. The driver
- * is "bridged" in the sense that it requires a bridge to a Fuchsia driver to communicate with
- * other Fuchsia drivers over the FDF transport. When initialization of the bridged driver
- * completes, run_init_completer will be called.
+ * Start and run a bridged wlansoftmac driver hosting an MLME server and an SME server.
+ *
+ * The driver is "bridged" in the sense that it requires a bridge to a Fuchsia driver to
+ * communicate with other Fuchsia drivers over the FDF transport. When initialization of the
+ * bridged driver completes, `run_init_completer` will be called.
  *
  * # Safety
+ *
+ * There are two layers of safety documentation for this function. The first layer is for this
+ * function itself, and the second is for the `run_init_completer` function.
+ *
+ * ## For this function itself
  *
  * This function is unsafe for the following reasons:
  *
  *   - This function cannot guarantee `run_init_completer` is thread-safe, i.e., that it's safe to
- *     call at any time from any thread.
+ *     to call at any time from any thread.
  *   - This function cannot guarantee `init_completer` points to a valid object when
  *     `run_init_completer` is called.
  *   - This function cannot guarantee `wlan_softmac_bridge_client_handle` is a valid handle.
  *
- * By calling this function, the caller promises:
+ * By calling this function, the caller promises the following:
  *
  *   - The `run_init_completer` function is thread-safe.
  *   - The `init_completer` pointer will point to a valid object at least until
  *     `run_init_completer` is called.
  *   - The `wlan_softmac_bridge_client_handle` is a valid handle.
+ *
+ * ## For `run_init_completer`
+ *
+ * The `run_init_completer` function is unsafe because it cannot guarantee the `init_completer`
+ * argument will be the same `init_completer` passed to `start_and_run_bridged_wlansoftmac`, and
+ * cannot guarantee it will be called exactly once.
+ *
+ * The caller of `run_init_completer` must promise to pass the same `init_completer` from
+ * `start_and_run_bridged_wlansoftmac` to `run_init_completer` and call `run_init_completer`
+ * exactly once.
  */
 extern "C" zx_status_t start_and_run_bridged_wlansoftmac(
     void *init_completer,
@@ -178,9 +194,14 @@ extern "C" zx_status_t start_and_run_bridged_wlansoftmac(
  * Stop the bridged wlansoftmac driver associated with `softmac`.
  *
  * This function takes ownership of the `WlanSoftmacHandle` that `softmac` points to and destroys
- * it.
+ * it. When the bridged driver stops, `run_stop_completer` will be called.
  *
  * # Safety
+ *
+ * There are two layers of safety documentation for this function. The first layer is for this
+ * function itself, and the second is for the `run_stop_completer` function.
+ *
+ * ## For this function itself
  *
  * This function is unsafe for the following reasons:
  *
@@ -198,6 +219,15 @@ extern "C" zx_status_t start_and_run_bridged_wlansoftmac(
  *     `run_stop_completer` is called.
  *   - The `softmac` pointer is the same pointer received from `run_init_completer` (called as
  *     a consequence of the startup initiated by calling `start_and_run_bridged_wlansoftmac`.
+ *
+ * ## For `run_stop_completer`
+ *
+ * The `run_stop_completer` function is unsafe because it cannot guarantee the `stop_completer`
+ * argument will be the same `stop_completer` passed to `stop_bridged_wlansoftmac`, and cannot
+ * guarantee it will be called exactly once.
+ *
+ * The caller of `run_stop_completer` must promise to pass the same `stop_completer` from
+ * `stop_bridged_wlansoftmac` to `run_stop_completer` and call `run_stop_completer` exactly once.
  */
 extern "C" void stop_bridged_wlansoftmac(void *stop_completer,
                                          void (*run_stop_completer)(void *stop_completer),
