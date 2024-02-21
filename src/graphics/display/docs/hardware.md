@@ -218,7 +218,7 @@ This section will be expanded in the future.
 [graphics-card]: https://en.wikipedia.org/wiki/Graphics_card
 [gpu]: https://en.wikipedia.org/wiki/Graphics_processing_unit
 [hdmi]: https://en.wikipedia.org/wiki/HDMI
-[human-vision-perception]: https://en.wikipedia.org/wiki/Visual_perception
+[human-visual-perception]: https://en.wikipedia.org/wiki/Visual_perception
 [human-vision-system]: https://en.wikipedia.org/wiki/Visual_system
 [image]: https://en.wikipedia.org/wiki/Image
 [lcd-panel]: https://en.wikipedia.org/wiki/Liquid-crystal_display

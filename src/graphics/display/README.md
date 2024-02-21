@@ -12,8 +12,9 @@ many terms needed to understand display code, and is a good background reading.
 
 The official entry point to the display driver stack is the
 [`fuchsia.hardware.display/Coordinator`][display-coordinator-fidl] FIDL
-interface. This FIDL interface will eventually become a part of the [Fuchsia
-System Interface][fsi], and will be covered by ABI stability guarantees.
+interface. This FIDL interface will eventually become a part of the
+[Fuchsia System Interface][fuchsia-system-interface], and will be covered by ABI
+stability guarantees.
 
 The interface's consumers are called **display clients**. This is a reference to
 the fact that consumers use FIDL clients for the Coordinator interface.
