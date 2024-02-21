@@ -45,7 +45,7 @@ std::unique_ptr<LowEnergyConnection> LowEnergyConnection::Create(
   // TODO(https://fxbug.dev/325646523): Only create an IsoStreamManager instance
   // if our adapter supports Isochronous streams.
   std::unique_ptr<iso::IsoStreamManager> iso_mgr =
-      std::make_unique<iso::IsoStreamManager>(cmd_channel);
+      std::make_unique<iso::IsoStreamManager>(link->handle(), cmd_channel);
   std::unique_ptr<LowEnergyConnection> connection(
       new LowEnergyConnection(std::move(peer),
                               std::move(link),

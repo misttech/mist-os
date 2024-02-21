@@ -17,3 +17,11 @@ pw_source_set("iso") {
     "//src/connectivity/bluetooth/core/bt-host/transport",
   ]
 }
+
+pw_test("tests") {
+  sources = [ "iso_stream_manager_test.cc" ]
+
+  deps = [ "//src/connectivity/bluetooth/core/bt-host/testing" ]
+
+  test_main = "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main"
+}

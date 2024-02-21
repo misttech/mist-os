@@ -347,6 +347,10 @@ bt_gtest_package("bt-host-sm-tests") {
   deps = [ "sm:tests.lib" ]
 }
 
+bt_gtest_package("bt-host-iso-tests") {
+  deps = [ "iso:tests.lib" ]
+}
+
 bt_gtest_package("bt-host-testing-tests") {
   deps = [ "testing:tests.lib" ]
 }
@@ -362,6 +366,7 @@ group("tests") {
     ":bt-host-gatt-tests",
     ":bt-host-hci-spec-tests",
     ":bt-host-hci-tests",
+    ":bt-host-iso-tests",
     ":bt-host-l2cap-tests",
     ":bt-host-sco-tests",
     ":bt-host-sdp-tests",
