@@ -19,7 +19,7 @@ bootstrap_user_platform_aib_names = [
   "bootstrap",
 
   # Driver Framework
-  "driver_framework_v2",
+  "driver_framework",
 
   # Graphics
   "virtcon",
@@ -299,7 +299,7 @@ required_user_aib_names = [
   "bootstrap",
   "core_realm",
   "core_realm_user_and_userdebug",
-  "driver_framework_v2",
+  "driver_framework",
   "zircon",
 ]
 

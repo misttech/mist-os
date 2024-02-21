@@ -434,13 +434,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
 
     // Set driver_manager config based on request.
     configurations = std::vector<component_testing::ConfigCapability>();
-    const bool is_dfv2 =
-        request.args().use_driver_framework_v2().value_or(USE_DRIVER_FRAMEWORK_V2_DEFAULT);
     const std::string default_root = "fuchsia-boot:///#meta/test-parent-sys.cm";
-    configurations.push_back({
-        .name = "fuchsia.driver.manager.UseDriverFrameworkV2",
-        .value = ConfigValue::Bool(is_dfv2),
-    });
     configurations.push_back({
         .name = "fuchsia.driver.manager.RootDriver",
         .value = request.args().root_driver().value_or(default_root),
@@ -449,7 +443,6 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     realm_builder_.AddRoute({
         .capabilities =
             {
-                component_testing::Config{.name = "fuchsia.driver.manager.UseDriverFrameworkV2"},
                 component_testing::Config{.name = "fuchsia.driver.manager.RootDriver"},
             },
         .source = component_testing::SelfRef{},

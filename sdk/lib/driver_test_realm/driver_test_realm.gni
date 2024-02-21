@@ -1,9 +1,0 @@
-# Copyright 2023 The Fuchsia Authors. All rights reserved.
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
-
-declare_args() {
-  # If this is true, then DriverManager will load DFv2 drivers when unspecified by
-  # fuchsia.driver.test/RealmArgs.use_driver_framework_v2.
-  use_driver_framework_v2_default = false
-}

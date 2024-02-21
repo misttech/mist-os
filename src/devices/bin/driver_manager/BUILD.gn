@@ -36,7 +36,6 @@ fuchsia_structured_config_values("driver_manager_config_default") {
     delay_fallback_until_base_drivers_indexed = true
     suspend_timeout_fallback = true
     verbose = false
-    use_driver_framework_v2 = true
     driver_host_crash_policy = "restart-driver-host"
     root_driver = "fuchsia-boot:///platform-bus#meta/platform-bus.cm"
     enable_test_shutdown_delays = false
@@ -435,7 +434,7 @@ group("driver_shared_libraries") {
   ]
 }
 
-fuchsia_package("dfv2_package") {
+fuchsia_package("package") {
   package_name = "driver_manager"
   deps = [
     ":component",

@@ -52,7 +52,6 @@
                 "fuchsia.driver.manager.DriverHostCrashPolicy",
                 "fuchsia.driver.manager.EnableTestShutdownDelays",
                 "fuchsia.driver.manager.RootDriver",
-                "fuchsia.driver.manager.UseDriverFrameworkV2",
             ],
         },
         {

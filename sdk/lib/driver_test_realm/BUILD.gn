@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/drivers.gni")
-import("//sdk/lib/driver_test_realm/driver_test_realm.gni")
 import("//tools/cmc/build/expect_includes.gni")
 
 group("driver_test_realm") {
@@ -76,9 +75,6 @@ executable("bin") {
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
-
-  defines =
-      [ "USE_DRIVER_FRAMEWORK_V2_DEFAULT=$use_driver_framework_v2_default" ]
 }
 
 fuchsia_component_manifest("manifest") {
@@ -137,7 +133,6 @@ fuchsia_structured_config_values("test_config") {
     delay_fallback_until_base_drivers_indexed = true
     suspend_timeout_fallback = true
     verbose = false
-    use_driver_framework_v2 = false
     driver_host_crash_policy = "restart-driver-host"
     root_driver = "fuchsia-boot:///#meta/test-parent-sys.cm"
     enable_test_shutdown_delays = false
