@@ -87,28 +87,14 @@ async fn resolve_relative_impl(
     } else {
         return Err(ResolveWithContextError::EmptyContext);
     };
-    let superpackage = pkg_cache
-        .get_cached(*super_blob)
+    let subpackage = pkg_cache
+        .get_subpackage(*super_blob, url)
         .await
-        .map_err(ResolveWithContextError::MissingSuperpackage)?;
-    let subpackages = superpackage.meta_subpackages().await?;
-    let subpackage = if let Some(hash) = subpackages.subpackages().get(url) {
-        pkg::BlobId::from(*hash)
-    } else {
-        return Err(ResolveWithContextError::NotASubpackage);
-    };
-
-    // Resolving the superpackage resolves all subpackages and superpackages protect subpackages
-    // from GC, so the subpackage should already be cached.
-    // https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0154_subpackages#eager_package_loading
-    let () = pkg_cache
-        .get_cached(subpackage)
-        .await
-        .map_err(ResolveWithContextError::MissingSubpackage)?
-        .reopen(dir)
-        .map_err(ResolveWithContextError::Reopen)?;
-
-    Ok(subpackage.into())
+        .map_err(ResolveWithContextError::GetSubpackage)?;
+    let hash =
+        subpackage.merkle_root().await.map_err(ResolveWithContextError::ReadSubpackageHash)?;
+    let () = subpackage.reopen(dir).map_err(ResolveWithContextError::Reopen)?;
+    Ok(hash.into())
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -119,17 +105,11 @@ enum ResolveWithContextError {
     #[error("resolving a relative url requires a populated resolution context")]
     EmptyContext,
 
-    #[error("the superpackage was not cached")]
-    MissingSuperpackage(#[source] pkg::cache::GetCachedError),
+    #[error("reading the subpackage hash")]
+    ReadSubpackageHash(#[source] fuchsia_pkg::ReadHashError),
 
-    #[error("loading superpackage's subpackage manifest")]
-    SubpackageManifest(#[from] fuchsia_pkg::package_directory::LoadMetaSubpackagesError),
-
-    #[error("the relative url is not a subpackage of the superpackage indicated by the context")]
-    NotASubpackage,
-
-    #[error("the subpackage was not cached")]
-    MissingSubpackage(#[source] pkg::cache::GetCachedError),
+    #[error("error getting subpackage")]
+    GetSubpackage(#[source] pkg::cache::GetSubpackageError),
 
     #[error("reopening subpackage onto the request handle")]
     Reopen(#[source] fuchsia_pkg::package_directory::CloneError),
@@ -137,15 +117,11 @@ enum ResolveWithContextError {
 
 impl ResolveWithContextError {
     fn to_fidl_err(&self) -> pkg::ResolveError {
-        use ResolveWithContextError::*;
+        use {pkg::ResolveError as pErr, ResolveWithContextError::*};
         match self {
-            InvalidContext(_) => pkg::ResolveError::InvalidContext,
-            EmptyContext => pkg::ResolveError::InvalidContext,
-            MissingSuperpackage(_) => pkg::ResolveError::Internal,
-            SubpackageManifest(_) => pkg::ResolveError::Io,
-            NotASubpackage => pkg::ResolveError::PackageNotFound,
-            MissingSubpackage(_) => pkg::ResolveError::Internal,
-            Reopen(_) => pkg::ResolveError::Internal,
+            GetSubpackage(pkg::cache::GetSubpackageError::DoesNotExist) => pErr::PackageNotFound,
+            InvalidContext(_) | EmptyContext => pErr::InvalidContext,
+            ReadSubpackageHash(_) | Reopen(_) | GetSubpackage(_) => pErr::Internal,
         }
     }
 }

@@ -105,29 +105,25 @@ impl Client {
         get.finish().await.map_err(GetAlreadyCachedError::FinishGet)
     }
 
-    /// Uses PackageCache.GetCached to obtain the package directory of a package that is already
-    /// cached (all blobs are already in blobfs).
-    /// Errors if the package is not already cached.
-    /// Does not protect the package from GC, so clients should only use this method on packages
-    /// that have GC protection from another source (e.g. they are subpackages of a protected
-    /// package).
-    ///
-    /// Compared to `get_already_cached`:
-    ///   * Does not activate `meta_far` in the dynamic index
-    ///   * Can be called concurrently with the same `meta_far`
-    pub async fn get_cached(&self, meta_far: BlobId) -> Result<PackageDirectory, GetCachedError> {
-        let (pkg_dir, pkg_dir_server_end) =
-            PackageDirectory::create_request().map_err(GetCachedError::CreatingHandles)?;
+    /// Uses PackageCache.GetSubpackage to obtain the package directory of a subpackage.
+    /// Errors if there is not an open connection to the superpackage.
+    pub async fn get_subpackage(
+        &self,
+        superpackage: BlobId,
+        subpackage: &fuchsia_url::RelativePackageUrl,
+    ) -> Result<PackageDirectory, GetSubpackageError> {
+        let (dir, dir_server_end) =
+            PackageDirectory::create_request().map_err(GetSubpackageError::CreatingHandles)?;
         let () = self
             .proxy
-            .get_cached(&meta_far.into(), pkg_dir_server_end)
+            .get_subpackage(
+                &superpackage.into(),
+                &fpkg::PackageUrl { url: subpackage.into() },
+                dir_server_end,
+            )
             .await
-            .map_err(GetCachedError::CallingGetCached)?
-            .map_err(|e| match e {
-                fpkg::GetCachedError::NotCached => GetCachedError::NotCached,
-                fpkg::GetCachedError::Internal => GetCachedError::Internal,
-            })?;
-        Ok(pkg_dir)
+            .map_err(GetSubpackageError::CallingGetSubpackage)??;
+        Ok(dir)
     }
 }
 
@@ -166,18 +162,32 @@ impl GetAlreadyCachedError {
 
 #[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]
-pub enum GetCachedError {
+pub enum GetSubpackageError {
     #[error("creating handles")]
     CreatingHandles(#[source] fidl::Error),
 
     #[error("calling GetCached FIDL")]
-    CallingGetCached(#[source] fidl::Error),
+    CallingGetSubpackage(#[source] fidl::Error),
 
-    #[error("the package was not cached")]
-    NotCached,
+    #[error("the superpackage does not have an open package connection")]
+    SuperpackageClosed,
+
+    #[error("the subpackage does not exist")]
+    DoesNotExist,
 
     #[error("internal")]
     Internal,
+}
+
+impl From<fpkg::GetSubpackageError> for GetSubpackageError {
+    fn from(fidl: fpkg::GetSubpackageError) -> Self {
+        use {fpkg::GetSubpackageError as fErr, GetSubpackageError::*};
+        match fidl {
+            fErr::SuperpackageClosed => SuperpackageClosed,
+            fErr::DoesNotExist => DoesNotExist,
+            fErr::Internal => Internal,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

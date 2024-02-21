@@ -106,15 +106,16 @@ pub(crate) async fn serve(
                     drop(node);
                     responder.send(response.map_err(|status| status.into_raw()))?;
                 }
-                PackageCacheRequest::GetCached { meta_far, dir, responder } => {
+                PackageCacheRequest::GetSubpackage { superpackage, subpackage, dir, responder } => {
+                    let fpkg::PackageUrl { url } = subpackage;
                     let () = responder.send(
-                        get_cached(
+                        get_subpackage(
                             package_index.as_ref(),
                             base_packages.as_ref(),
                             executability_restrictions,
-                            &blobfs,
                             &open_packages,
-                            BlobId::from(meta_far).into(),
+                            BlobId::from(superpackage).into(),
+                            url,
                             dir,
                             scope.clone(),
                         )
@@ -728,53 +729,60 @@ async fn serve_package_index(
     })
 }
 
-async fn get_cached(
+async fn get_subpackage(
     package_index: &async_lock::RwLock<PackageIndex>,
     base_packages: &BasePackages,
     executability_restrictions: system_image::ExecutabilityRestrictions,
-    blobfs: &blobfs::Client,
     open_packages: &package_directory::RootDirCache<blobfs::Client>,
-    meta_far: Hash,
+    superpackage: Hash,
+    subpackage: String,
     dir: ServerEnd<fio::DirectoryMarker>,
     scope: package_directory::ExecutionScope,
-) -> Result<(), fpkg::GetCachedError> {
-    // TODO(https://fxbug.dev/307977824) Once open package tracking is live, get this RootDir from
-    // the open_packages.
-    let pkg =
-        package_directory::RootDir::new_raw(blobfs.clone(), meta_far, None).await.map_err(|e| {
-            let err = match e {
-                package_directory::Error::MissingMetaFar => fpkg::GetCachedError::NotCached,
-                _ => fpkg::GetCachedError::Internal,
-            };
-            error!("get_cached: creating RootDir {}: {:#}", meta_far, anyhow!(e));
-            err
-        })?;
-
-    let package_status = get_package_status(base_packages, package_index, &meta_far).await;
-    // Make sure clients are only using this for already cached packages.
-    match package_status {
-        PackageStatus::Base | PackageStatus::Active => (),
-        PackageStatus::Other => {
-            let missing = blobfs
-                .filter_to_missing_blobs(&pkg.external_file_hashes().copied().collect(), None)
-                .await;
-            if !missing.is_empty() {
-                error!("get_cached: missing content blobs for {}: {:?}", meta_far, missing);
-                return Err(fpkg::GetCachedError::NotCached);
-            }
-        }
-    }
-
+) -> Result<(), fpkg::GetSubpackageError> {
+    let subpackage = subpackage.parse::<fuchsia_url::RelativePackageUrl>().map_err(|e| {
+        error!(
+            %superpackage,
+            %subpackage,
+            "get_subpackage: invalid subpackage url: {:#}",
+            anyhow!(e)
+        );
+        fpkg::GetSubpackageError::DoesNotExist
+    })?;
+    let Some(super_dir) = open_packages.get(&superpackage) else {
+        error!(%superpackage, %subpackage, "get_subpackage: superpackage not open");
+        return Err(fpkg::GetSubpackageError::SuperpackageClosed);
+    };
+    let subpackages = super_dir.subpackages().await.map_err(|e| {
+        error!(
+            %superpackage,
+            %subpackage,
+            "get_subpackage: determining subpackages: {:#}",
+            anyhow!(e)
+        );
+        fpkg::GetSubpackageError::Internal
+    })?;
+    let Some(hash) = subpackages.subpackages().get(&subpackage) else {
+        error!(%superpackage, %subpackage, "get_subpackage: not a subpackage of the superpackage");
+        return Err(fpkg::GetSubpackageError::DoesNotExist);
+    };
     let () = open_packages
-        .get_or_insert(meta_far, Some(pkg))
+        .get_or_insert(*hash, None)
         .await
         .map_err(|e| {
-            error!("get_cached: open_packages.get_or_insert {}: {:#}", meta_far, anyhow!(e));
-            fpkg::GetCachedError::Internal
+            error!(
+                %superpackage,
+                %subpackage,
+                "get_subpackage: creating subpackage RootDir: {:#}",
+                anyhow!(e)
+            );
+            fpkg::GetSubpackageError::Internal
         })?
         .open(
             scope,
-            make_pkgdir_flags(executability_status(executability_restrictions, &package_status)),
+            make_pkgdir_flags(executability_status(
+                executability_restrictions,
+                &get_package_status(base_packages, package_index, &hash).await,
+            )),
             vfs::path::Path::dot(),
             dir.into_channel().into(),
         );

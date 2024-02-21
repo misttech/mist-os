@@ -155,6 +155,12 @@ impl From<BlobId> for ResolutionContext {
     }
 }
 
+impl From<fuchsia_hash::Hash> for ResolutionContext {
+    fn from(hash: fuchsia_hash::Hash) -> Self {
+        Self { blob_id: Some(hash.into()) }
+    }
+}
+
 impl TryFrom<&[u8]> for ResolutionContext {
     type Error = ResolutionContextError;
 

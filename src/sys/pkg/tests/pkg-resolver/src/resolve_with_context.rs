@@ -70,7 +70,7 @@ async fn relative_url_succeeds() {
     let served_repository = Arc::clone(&repo).server().start().unwrap();
     let repo_config = served_repository.make_repo_config("fuchsia-pkg://test".parse().unwrap());
     let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
-    let (_, context) = env
+    let (_superdir, context) = env
         .resolve_package("fuchsia-pkg://test/superpackage")
         .await
         .expect("package to resolve without error");
@@ -114,11 +114,11 @@ async fn subpackage_of_a_subpackage() {
     let served_repository = Arc::clone(&repo).server().start().unwrap();
     let repo_config = served_repository.make_repo_config("fuchsia-pkg://test".parse().unwrap());
     let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
-    let (_, context) = env
+    let (_superdir, context) = env
         .resolve_package("fuchsia-pkg://test/superpackage")
         .await
         .expect("package to resolve without error");
-    let (_, subcontext) = env.resolve_with_context("my-subpackage", context).await.unwrap();
+    let (_subdir, subcontext) = env.resolve_with_context("my-subpackage", context).await.unwrap();
 
     let (resolved_subsubpackage, _) =
         env.resolve_with_context("my-subsubpackage", subcontext).await.unwrap();
@@ -189,7 +189,7 @@ async fn bad_relative_url_fails() {
     let served_repository = Arc::clone(&repo).server().start().unwrap();
     let repo_config = served_repository.make_repo_config("fuchsia-pkg://test".parse().unwrap());
     let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
-    let (_, context) = env
+    let (_superdir, context) = env
         .resolve_package("fuchsia-pkg://test/superpackage")
         .await
         .expect("package to resolve without error");
@@ -223,7 +223,7 @@ async fn base_superpackage_base_subpackage_succeeds() {
         .await
         .build()
         .await;
-    let (_, context) = env
+    let (_superdir, context) = env
         .resolve_package("fuchsia-pkg://fuchsia.com/superpackage")
         .await
         .expect("package to resolve without error");
@@ -265,7 +265,7 @@ async fn non_base_superpackage_base_subpackage_succeeds() {
     let served_repository = Arc::clone(&repo).server().start().unwrap();
     let repo_config = served_repository.make_repo_config("fuchsia-pkg://test".parse().unwrap());
     let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
-    let (_, context) = env
+    let (_superdir, context) = env
         .resolve_package("fuchsia-pkg://test/superpackage")
         .await
         .expect("package to resolve without error");
@@ -302,7 +302,7 @@ async fn concurrent_succeeds() {
     let served_repository = Arc::clone(&repo).server().start().unwrap();
     let repo_config = served_repository.make_repo_config("fuchsia-pkg://test".parse().unwrap());
     let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
-    let (_, context) = env
+    let (_superdir, context) = env
         .resolve_package("fuchsia-pkg://test/superpackage")
         .await
         .expect("package to resolve without error");

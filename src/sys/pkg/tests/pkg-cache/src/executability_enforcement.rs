@@ -35,10 +35,12 @@ async fn verify_package_executability(
     system_image: SystemImageBuilder,
     is_retained: IsRetained,
     expected_flags: fio::OpenFlags,
+    superpackage: Package,
+    subpackage_url: String,
 ) {
     let system_image = system_image.build().await;
     let env = TestEnv::builder()
-        .blobfs_from_system_image_and_extra_packages(&system_image, &[&pkg])
+        .blobfs_from_system_image_and_extra_packages(&system_image, &[&pkg, &superpackage])
         .await
         .build()
         .await;
@@ -61,8 +63,15 @@ async fn verify_package_executability(
     let dir = crate::verify_package_cached(&env.proxies.package_cache, &pkg).await;
     let () = verify_flags(&dir, expected_flags).await;
 
-    // Verify GetCached flags
-    let dir = crate::verify_get_cached(&env.proxies.package_cache, &pkg).await;
+    // Verify GetSubpackage flags
+    let _super = crate::verify_package_cached(&env.proxies.package_cache, &superpackage).await;
+    let dir = crate::verify_get_subpackage(
+        &env.proxies.package_cache,
+        *superpackage.hash(),
+        subpackage_url,
+        &pkg,
+    )
+    .await;
     let () = verify_flags(&dir, expected_flags).await;
 
     let () = env.stop().await;
@@ -71,6 +80,8 @@ async fn verify_package_executability(
 #[fuchsia_async::run_singlethreaded(test)]
 async fn base_package_executable() {
     let pkg = PackageBuilder::new("base-package").build().await.unwrap();
+    let superpkg =
+        PackageBuilder::new("super").add_subpackage("my-subpackage", &pkg).build().await.unwrap();
     let system_image = SystemImageBuilder::new().static_packages(&[&pkg]);
 
     let () = verify_package_executability(
@@ -78,6 +89,8 @@ async fn base_package_executable() {
         system_image,
         IsRetained::False,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        superpkg,
+        "my-subpackage".into(),
     )
     .await;
 }
@@ -85,6 +98,8 @@ async fn base_package_executable() {
 #[fuchsia_async::run_singlethreaded(test)]
 async fn dynamic_index_active_package_not_executable() {
     let pkg = PackageBuilder::new("cache-package").build().await.unwrap();
+    let superpkg =
+        PackageBuilder::new("super").add_subpackage("my-subpackage", &pkg).build().await.unwrap();
     let system_image = SystemImageBuilder::new().cache_packages(&[&pkg]);
 
     let () = verify_package_executability(
@@ -92,6 +107,8 @@ async fn dynamic_index_active_package_not_executable() {
         system_image,
         IsRetained::False,
         fio::OpenFlags::RIGHT_READABLE,
+        superpkg,
+        "my-subpackage".into(),
     )
     .await;
 }
@@ -99,6 +116,8 @@ async fn dynamic_index_active_package_not_executable() {
 #[fuchsia_async::run_singlethreaded(test)]
 async fn retained_index_package_not_executable() {
     let pkg = PackageBuilder::new("retained-package").build().await.unwrap();
+    let superpkg =
+        PackageBuilder::new("super").add_subpackage("my-subpackage", &pkg).build().await.unwrap();
     let system_image = SystemImageBuilder::new();
 
     let () = verify_package_executability(
@@ -106,6 +125,8 @@ async fn retained_index_package_not_executable() {
         system_image,
         IsRetained::True,
         fio::OpenFlags::RIGHT_READABLE,
+        superpkg,
+        "my-subpackage".into(),
     )
     .await;
 }
@@ -113,6 +134,8 @@ async fn retained_index_package_not_executable() {
 #[fuchsia_async::run_singlethreaded(test)]
 async fn enforcement_disabled_dynamic_index_active_package_executable() {
     let pkg = PackageBuilder::new("cache-package").build().await.unwrap();
+    let superpkg =
+        PackageBuilder::new("super").add_subpackage("my-subpackage", &pkg).build().await.unwrap();
     let system_image = SystemImageBuilder::new()
         .cache_packages(&[&pkg])
         .pkgfs_disable_executability_restrictions();
@@ -122,6 +145,8 @@ async fn enforcement_disabled_dynamic_index_active_package_executable() {
         system_image,
         IsRetained::False,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        superpkg,
+        "my-subpackage".into(),
     )
     .await;
 }
@@ -129,6 +154,8 @@ async fn enforcement_disabled_dynamic_index_active_package_executable() {
 #[fuchsia_async::run_singlethreaded(test)]
 async fn enforcement_disabled_retained_index_package_executable() {
     let pkg = PackageBuilder::new("retained-package").build().await.unwrap();
+    let superpkg =
+        PackageBuilder::new("super").add_subpackage("my-subpackage", &pkg).build().await.unwrap();
     let system_image = SystemImageBuilder::new().pkgfs_disable_executability_restrictions();
 
     let () = verify_package_executability(
@@ -136,6 +163,8 @@ async fn enforcement_disabled_retained_index_package_executable() {
         system_image,
         IsRetained::True,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        superpkg,
+        "my-subpackage".into(),
     )
     .await;
 }

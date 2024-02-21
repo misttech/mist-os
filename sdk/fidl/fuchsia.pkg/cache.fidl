@@ -42,21 +42,20 @@ closed protocol PackageCache {
         dir server_end:<fuchsia.io.Directory, optional>;
     }) -> () error zx.Status;
 
-    /// Gets the package directory if it (the meta.far and all content blobs, but not
-    /// necessarily subpackage blobs) is present on the local system.
-    /// Otherwise, an error will be returned.
-    /// This method does not protect the package from garbage collection, therefore
-    /// callers must only use this method when the package has protection from some other
-    /// source, e.g. the package is in base or the package is a subpackage and its superpackage is
-    /// protected.
+    /// Gets the package directory for a subpackage.
+    /// The connection to the superpackage's package directory must still be open when this is
+    /// called.
+    /// The returned package will be protected by open package tracking.
     ///
-    /// + request `meta_far` the hash of the package's meta.far.
+    /// + request `superpackage` the hash of the superpackage's meta.far.
+    /// + request `subpackage` the relative package URL of the subpackage.
     /// + request `dir` the channel on which the package directory will be served.
-    /// * error a GetCachedError value indicating failure.
-    strict GetCached(resource struct {
-        meta_far BlobId;
+    /// * error a GetSubpackageError value indicating failure.
+    strict GetSubpackage(resource struct {
+        superpackage BlobId;
+        subpackage PackageUrl;
         dir server_end:<fuchsia.io.Directory>;
-    }) -> () error GetCachedError;
+    }) -> () error GetSubpackageError;
 
     /// Retrieves a chunk iterator to the base package index.
     ///
@@ -92,13 +91,16 @@ type GcProtection = strict enum {
     RETAINED = 2;
 };
 
-/// Error type for [`PackageCache.GetCached`].
-type GetCachedError = strict enum {
-    /// Some of the package's blobs were missing from Blobfs.
-    NOT_CACHED = 1;
+/// Error type for [`PackageCache.GetSubpackage`].
+type GetSubpackageError = strict enum {
+    /// The superpackage was not open.
+    SUPERPACKAGE_CLOSED = 1;
+
+    /// The requested subpackage does not exist.
+    DOES_NOT_EXIST = 2;
 
     /// An unspecified error occurred.
-    INTERNAL = 2;
+    INTERNAL = 3;
 };
 
 /// Error type for [`NeededBlobs.OpenMetaBlob`] and [`NeededBlobs.OpenBlob`].

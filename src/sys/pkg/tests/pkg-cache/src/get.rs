@@ -745,31 +745,28 @@ async fn get_with_retained_protection_refetches_blobs() {
 }
 
 #[fuchsia_async::run_singlethreaded(test)]
-async fn get_cached_fails_if_content_blob_missing() {
-    let missing_blob = &b"content of missing blob"[..];
-    let pkg = PackageBuilder::new("package-with-missing-blob")
-        .add_resource_at("missing blob", missing_blob)
-        .build()
-        .await
-        .unwrap();
+async fn get_subpackage_fails_if_superpackage_closed() {
+    let subpkg = PackageBuilder::new("sub").build().await.unwrap();
+    let superpkg =
+        PackageBuilder::new("super").add_subpackage("subpackage", &subpkg).build().await.unwrap();
     let system_image = SystemImageBuilder::new().build().await;
     let env = TestEnv::builder()
-        .blobfs_from_system_image_and_extra_packages(&system_image, &[&pkg])
+        .blobfs_from_system_image_and_extra_packages(&system_image, &[&superpkg])
         .await
         .build()
         .await;
     let () = env.block_until_started().await;
 
-    // Delete the content blob.
-    let blob_hash = MerkleTree::from_reader(missing_blob).unwrap().root();
-    let blobfs = env.blobfs.client();
-    let () = blobfs.delete_blob(&blob_hash).await.unwrap();
-    assert!(!blobfs.has_blob(&blob_hash).await);
-
-    // GetCached should fail because if the package is neither in base nor active in the dynamic
-    // index it will check all the content blobs.
-    let meta_far = BlobId::from(*pkg.hash()).into();
     let (_dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    let res = env.proxies.package_cache.get_cached(&meta_far, dir_server_end).await;
-    assert_eq!(res.unwrap(), Err(fpkg::GetCachedError::NotCached));
+    assert_matches!(
+        env.proxies
+            .package_cache
+            .get_subpackage(
+                &BlobId::from(*superpkg.hash()).into(),
+                &fpkg::PackageUrl { url: "subpackage".into() },
+                dir_server_end
+            )
+            .await,
+        Ok(Err(fpkg::GetSubpackageError::SuperpackageClosed))
+    );
 }
