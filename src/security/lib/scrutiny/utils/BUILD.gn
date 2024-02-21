@@ -82,6 +82,7 @@ if (is_host) {
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:bincode",
       "//third_party/rust_crates:byteorder",
+      "//third_party/rust_crates:difference",
       "//third_party/rust_crates:hex",
       "//third_party/rust_crates:libc",
       "//third_party/rust_crates:once_cell",

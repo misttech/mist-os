@@ -10,10 +10,12 @@ use {
         package::{extract_system_image_hash_string, read_content_blob, ReadContentBlobError},
     },
     anyhow::{Error, Result},
+    difference::{Changeset, Difference},
     fuchsia_archive::Utf8Reader as FarReader,
     serde::{Deserialize, Serialize},
     std::collections::{HashMap, HashSet},
     std::fmt::Display,
+    std::fs::read_to_string,
     std::path::Path,
     std::str::from_utf8,
     thiserror::Error,
@@ -77,6 +79,10 @@ pub enum ValidationError {
     ContentMustContainValueMissing { value: String, content_source: String },
     #[error("Validation failure: Content MUST NOT contain {value}, but does. Content source: {content_source}")]
     ContentMustNotContainValuePresent { value: String, content_source: String },
+    #[error("Validation error: Could not open golden file at {golden_path}, error: {error}")]
+    FailedToOpenGoldenFile { golden_path: String, error: String },
+    #[error("Validation failure: Golden file mismatch. The golden file contents from {golden_path} do not match content from {content_source}. \nDiffs:\n{diffs}")]
+    ContentGoldenFileMismatch { golden_path: String, content_source: String, diffs: String },
 }
 
 impl ValidationError {
@@ -195,6 +201,9 @@ pub struct ContentCheckSpec {
     pub must_contain: Option<Vec<ContentType>>,
     /// Set of items that must not be present in the target content.
     pub must_not_contain: Option<Vec<ContentType>>,
+    /// The path to a golden file.
+    /// The contents of the golden file must match target content as a string.
+    pub matches_golden: Option<String>,
 }
 
 /// Validates the provided build artifacts according to the provided policy.
@@ -454,7 +463,7 @@ fn validate_file_contents(
 
     // Currently, content checks expect contents representable as a string.
     // The string content may be further processed into a key-value map.
-    let content_string = match from_utf8(&content_bytes) {
+    let content_str = match from_utf8(&content_bytes) {
         Ok(content_str) => content_str,
         Err(e) => {
             errors.push(ValidationError::FailedToParseContentsToString {
@@ -465,15 +474,16 @@ fn validate_file_contents(
         }
     };
 
-    errors.extend(file_contents_must_contain(checks, content_string, content_source));
-    errors.extend(file_contents_must_not_contain(checks, content_string, content_source));
+    errors.extend(file_contents_must_contain(checks, content_str, content_source));
+    errors.extend(file_contents_must_not_contain(checks, content_str, content_source));
+    errors.extend(file_contents_match_golden(checks, content_str, content_source));
 
     errors
 }
 
 fn file_contents_must_contain(
     checks: &ContentCheckSpec,
-    content_string: &str,
+    content_str: &str,
     content_source: &str,
 ) -> Vec<ValidationError> {
     let mut errors = Vec::new();
@@ -482,7 +492,7 @@ fn file_contents_must_contain(
         for check in must_contain {
             match check {
                 ContentType::KeyValuePair(key, value) => {
-                    let mapping = match parse_key_value(content_string) {
+                    let mapping = match parse_key_value(content_str) {
                         Ok(map) => map,
                         Err(e) => {
                             errors.push(ValidationError::FailedToParseContentsAsKeyValueMap {
@@ -516,7 +526,7 @@ fn file_contents_must_contain(
                     }
                 }
                 ContentType::String(value) => {
-                    if !content_string.contains(value) {
+                    if !content_str.contains(value) {
                         errors.push(ValidationError::ContentMustContainValueMissing {
                             value: value.to_string(),
                             content_source: content_source.to_string(),
@@ -531,7 +541,7 @@ fn file_contents_must_contain(
 
 fn file_contents_must_not_contain(
     checks: &ContentCheckSpec,
-    content_string: &str,
+    content_str: &str,
     content_source: &str,
 ) -> Vec<ValidationError> {
     let mut errors = Vec::new();
@@ -539,7 +549,7 @@ fn file_contents_must_not_contain(
         for check in must_not_contain {
             match check {
                 ContentType::KeyValuePair(key, value) => {
-                    let mapping = match parse_key_value(content_string) {
+                    let mapping = match parse_key_value(content_str) {
                         Ok(map) => map,
                         Err(e) => {
                             errors.push(ValidationError::FailedToParseContentsAsKeyValueMap {
@@ -563,13 +573,57 @@ fn file_contents_must_not_contain(
                     }
                 }
                 ContentType::String(value) => {
-                    if content_string.contains(value) {
+                    if content_str.contains(value) {
                         errors.push(ValidationError::ContentMustNotContainValuePresent {
                             value: value.to_string(),
                             content_source: content_source.to_string(),
                         });
                     }
                 }
+            }
+        }
+    }
+    errors
+}
+
+fn file_contents_match_golden(
+    checks: &ContentCheckSpec,
+    content_str: &str,
+    content_source: &str,
+) -> Vec<ValidationError> {
+    let mut errors = Vec::new();
+    if let Some(golden_file_path_string) = &checks.matches_golden {
+        let golden_path = Path::new(golden_file_path_string);
+        match read_to_string(golden_path) {
+            Ok(golden_contents) => {
+                // Diffs are calculated and reported relative to the golden file.
+                let Changeset { diffs, distance, .. } =
+                    Changeset::new(&golden_contents, content_str, "\n");
+                if distance > 0 {
+                    let mut reported_diffs = String::new();
+                    for diff in diffs {
+                        match diff {
+                            Difference::Same(_) => {}
+                            Difference::Add(ref line) => {
+                                reported_diffs.push_str(&format!("+{}\n", line));
+                            }
+                            Difference::Rem(ref line) => {
+                                reported_diffs.push_str(&format!("-{}\n", line));
+                            }
+                        }
+                    }
+                    errors.push(ValidationError::ContentGoldenFileMismatch {
+                        golden_path: golden_file_path_string.to_string(),
+                        content_source: content_source.to_string(),
+                        diffs: reported_diffs,
+                    });
+                }
+            }
+            Err(e) => {
+                errors.push(ValidationError::FailedToOpenGoldenFile {
+                    golden_path: golden_file_path_string.to_string(),
+                    error: e.to_string(),
+                });
             }
         }
     }
@@ -652,18 +706,17 @@ impl FileValidator for PackageFileValidator {
 mod tests {
     use {
         super::*,
-        crate::artifact::ArtifactReader,
-        crate::io::ReadSeek,
-        crate::package::META_CONTENTS_PATH,
+        crate::{artifact::ArtifactReader, io::ReadSeek, package::META_CONTENTS_PATH},
         anyhow::{anyhow, Result},
         fuchsia_archive::write as far_write,
         maplit::hashmap,
         std::{
             collections::{BTreeMap, HashMap, HashSet},
-            io::{BufWriter, Cursor, Read},
+            io::{BufWriter, Cursor, Read, Write},
             path::{Path, PathBuf},
             str::FromStr,
         },
+        tempfile::NamedTempFile,
     };
 
     struct TestArtifactReader {
@@ -737,6 +790,7 @@ mod tests {
                     "some_other_key".to_string(),
                     "and_value".to_string(),
                 )]),
+                matches_golden: None,
             }),
             package_checks: Vec::new(),
         };
@@ -782,6 +836,7 @@ mod tests {
                 expected_value.to_string(),
             )]),
             must_not_contain: None,
+            matches_golden: None,
         };
         let input_data = hashmap! {
             expected_key.to_string() => vec![expected_value.to_string()]
@@ -802,6 +857,7 @@ mod tests {
                 expected_value.to_string(),
             )]),
             must_not_contain: None,
+            matches_golden: None,
         };
         let input_data = hashmap! {
             "some_other_key".to_string() => vec!["some_other_value".to_string()]
@@ -829,6 +885,7 @@ mod tests {
         let policy = ContentCheckSpec {
             must_contain: Some(vec![ContentType::String("test".to_string())]),
             must_not_contain: None,
+            matches_golden: None,
         };
         let input_data = HashMap::new();
 
@@ -853,6 +910,7 @@ mod tests {
                 expected_key.to_string(),
                 expected_value.to_string(),
             )]),
+            matches_golden: None,
         };
         // The input data here conforms to the policy.
         let input_data = hashmap! {
@@ -875,6 +933,7 @@ mod tests {
                 expected_key.to_string(),
                 expected_value.to_string(),
             )]),
+            matches_golden: None,
         };
         // The input data here does not conform to the policy.
         let input_data = hashmap! {
@@ -903,6 +962,7 @@ mod tests {
         let policy = ContentCheckSpec {
             must_contain: None,
             must_not_contain: Some(vec![ContentType::String("test".to_string())]),
+            matches_golden: None,
         };
         let input_data = HashMap::new();
 
@@ -1242,7 +1302,8 @@ mod tests {
 
     #[test]
     fn test_validate_file_contents_not_string_readable() {
-        let checks = ContentCheckSpec { must_contain: None, must_not_contain: None };
+        let checks =
+            ContentCheckSpec { must_contain: None, must_not_contain: None, matches_golden: None };
         // Invalid utf8 bytes from the from_utf8 documentation.
         let content_bytes = vec![0, 159, 146, 150];
         let content_source = "content_source".to_string();
@@ -1272,6 +1333,7 @@ mod tests {
                 expected_value.to_string(),
             )]),
             must_not_contain: None,
+            matches_golden: None,
         };
         let content_string = format!("{}={}", expected_key, expected_value);
         let content_bytes = content_string.as_bytes().to_vec();
@@ -1292,6 +1354,7 @@ mod tests {
                 expected_value.to_string(),
             )]),
             must_not_contain: None,
+            matches_golden: None,
         };
         // This should trigger the KeyMissing error.
         let content_string = format!("{}={}", "not_expected_key", "not_expected_value");
@@ -1325,6 +1388,7 @@ mod tests {
                 expected_value.to_string(),
             )]),
             must_not_contain: None,
+            matches_golden: None,
         };
         // This should trigger the failure to parse error.
         let content_bytes = "something not a key value pair".as_bytes().to_vec();
@@ -1350,6 +1414,7 @@ mod tests {
         let checks = ContentCheckSpec {
             must_contain: Some(vec![ContentType::String(expected_string.to_string())]),
             must_not_contain: None,
+            matches_golden: None,
         };
         let content_string = format!("some other text, {}, more text", expected_string);
         let content_bytes = content_string.as_bytes().to_vec();
@@ -1366,6 +1431,7 @@ mod tests {
         let checks = ContentCheckSpec {
             must_contain: Some(vec![ContentType::String(expected_string.to_string())]),
             must_not_contain: None,
+            matches_golden: None,
         };
         let content_bytes =
             "some other text, not the magic string though, more text".as_bytes().to_vec();
@@ -1396,6 +1462,7 @@ mod tests {
                 expected_key.to_string(),
                 expected_value.to_string(),
             )]),
+            matches_golden: None,
         };
         let content_string = format!("{}={}", "some_other_key", "some_other_value");
         let content_bytes = content_string.as_bytes().to_vec();
@@ -1416,6 +1483,7 @@ mod tests {
                 expected_key.to_string(),
                 expected_value.to_string(),
             )]),
+            matches_golden: None,
         };
         let content_string = format!("{}={}", expected_key, expected_value);
         let content_bytes = content_string.as_bytes().to_vec();
@@ -1448,6 +1516,7 @@ mod tests {
                 expected_key.to_string(),
                 expected_value.to_string(),
             )]),
+            matches_golden: None,
         };
         // This should trigger the failure to parse error.
         let content_bytes = "something not a key value pair".as_bytes().to_vec();
@@ -1473,6 +1542,7 @@ mod tests {
         let checks = ContentCheckSpec {
             must_contain: None,
             must_not_contain: Some(vec![ContentType::String(expected_string.to_string())]),
+            matches_golden: None,
         };
         let content_bytes =
             "some other text, not the expected string, more text".as_bytes().to_vec();
@@ -1489,6 +1559,7 @@ mod tests {
         let checks = ContentCheckSpec {
             must_contain: None,
             must_not_contain: Some(vec![ContentType::String(expected_string.to_string())]),
+            matches_golden: None,
         };
         let content_string = format!("some other text, {}, more text", expected_string);
         let content_bytes = content_string.as_bytes().to_vec();
@@ -1504,6 +1575,93 @@ mod tests {
             } => {
                 assert_eq!(expected_string, *value);
                 assert_eq!(content_source, *reported_source);
+            }
+            e => assert!(false, "Unexpected error from failure or error case test: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_validate_file_matches_golden_success() {
+        let content_string = "some content
+        another line of stuff
+        third line";
+        // Set up the golden file to have the same contents as expected contents.
+        let mut golden_file = NamedTempFile::new().unwrap();
+        golden_file.write_all(content_string.as_bytes()).unwrap();
+
+        let checks = ContentCheckSpec {
+            must_contain: None,
+            must_not_contain: None,
+            matches_golden: Some(golden_file.path().display().to_string()),
+        };
+
+        let content_bytes = content_string.as_bytes().to_vec();
+        let content_source = "content_source".to_string();
+
+        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+
+        assert_eq!(errors.len(), 0);
+    }
+
+    #[test]
+    fn test_validate_file_matches_golden_failure() {
+        let content_string = "some content
+        another line of stuff
+        third line\n";
+        let extra_golden_content = "extra expected content";
+        // Set up the golden file to have the same contents as expected contents.
+        let mut golden_file = NamedTempFile::new().unwrap();
+        golden_file.write_all(content_string.as_bytes()).unwrap();
+        golden_file.write_all("extra expected content".as_bytes()).unwrap();
+
+        let checks = ContentCheckSpec {
+            must_contain: None,
+            must_not_contain: None,
+            matches_golden: Some(golden_file.path().display().to_string()),
+        };
+
+        let content_bytes = content_string.as_bytes().to_vec();
+        let content_source = "content_source".to_string();
+
+        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+
+        assert_eq!(errors.len(), 1);
+        match &errors[0] {
+            ValidationError::ContentGoldenFileMismatch {
+                golden_path,
+                diffs,
+                content_source: reported_source,
+            } => {
+                assert_eq!(golden_file.path().display().to_string(), *golden_path);
+                assert!(diffs.contains(extra_golden_content));
+                assert_eq!(content_source, *reported_source);
+            }
+            e => assert!(false, "Unexpected error from failure or error case test: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_validate_file_matches_golden_error_loading_golden() {
+        let content_string = "some content
+        another line of stuff
+        third line";
+
+        let golden_file_path = "non_existent_file_path";
+        let checks = ContentCheckSpec {
+            must_contain: None,
+            must_not_contain: None,
+            matches_golden: Some(golden_file_path.to_string()),
+        };
+
+        let content_bytes = content_string.as_bytes().to_vec();
+        let content_source = "content_source".to_string();
+
+        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+
+        assert_eq!(errors.len(), 1);
+        match &errors[0] {
+            ValidationError::FailedToOpenGoldenFile { golden_path, error: _ } => {
+                assert_eq!(golden_file_path, golden_path);
             }
             e => assert!(false, "Unexpected error from failure or error case test: {}", e),
         }
