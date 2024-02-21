@@ -606,3 +606,58 @@ async fn blobs_protected_from_gc_during_get_by_retained_index() {
 async fn blobs_protected_from_gc_during_get_by_dynamic_index() {
     let () = blobs_protected_from_gc_during_get(fpkg::GcProtection::OpenPackageTracking).await;
 }
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn blobs_protected_from_gc_by_open_package_tracking() {
+    let env = TestEnv::builder().protect_open_packages(true).build().await;
+    let () = env.block_until_started().await;
+
+    let subpkg0 = PackageBuilder::new("open-subpackage0")
+        .add_resource_at("content-blob", "open-subpackage0-contents".as_bytes())
+        .build()
+        .await
+        .unwrap();
+    let pkg0 = PackageBuilder::new("open-package")
+        .add_subpackage("subpackage", &subpkg0)
+        .add_resource_at("content-blob", "v0-contents".as_bytes())
+        .build()
+        .await
+        .unwrap();
+
+    // The four blobs protected from GC by pkg0.
+    let pkg0_protected = BTreeSet::from_iter([
+        *pkg0.hash(),
+        pkg0.contents().1.into_iter().next().unwrap().0,
+        *subpkg0.hash(),
+        subpkg0.contents().1.into_iter().next().unwrap().0,
+    ]);
+    assert_eq!(pkg0_protected.len(), 4);
+    assert!(env.blobfs.list_blobs().unwrap().is_disjoint(&pkg0_protected));
+
+    // While dir0 lives, pkg0 protects its blobs.
+    let dir0 = crate::get_and_verify_package(&env.proxies.package_cache, &pkg0).await;
+    assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
+    assert!(env.blobfs.list_blobs().unwrap().is_superset(&pkg0_protected));
+
+    // pkg0 blobs are still protected even if a different package (by hash) with the same name
+    // ("open-package") is opened (before open package tracking, this would evict pkg0 from the
+    // dynamic index and its blobs would no longer be protected).
+    let pkg1 = PackageBuilder::new("open-package").build().await.unwrap();
+    let _: fio::DirectoryProxy =
+        crate::get_and_verify_package(&env.proxies.package_cache, &pkg1).await;
+    assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
+    assert!(env.blobfs.list_blobs().unwrap().is_superset(&pkg0_protected));
+
+    // Sometime after the connection to dir0 closes, open package tracking stops protecting pkg0's
+    // blobs. This occurs asynchronously, when pkg-cache's VFS task serving the package directory
+    // notices that the client end of the channel was closed and then finishes, which drops the
+    // Arc<RootDir>.
+    drop(dir0);
+    loop {
+        assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
+        if env.blobfs.list_blobs().unwrap().is_disjoint(&pkg0_protected) {
+            break;
+        }
+        let () = fasync::Timer::new(std::time::Duration::from_millis(30)).await;
+    }
+}

@@ -113,15 +113,11 @@ pub fn main() -> Result<(), Error> {
 async fn main_inner() -> Result<(), Error> {
     info!("starting package cache service");
     let inspector = finspect::Inspector::default();
-
-    let (use_fxblob, use_system_image) = {
-        let config = pkg_cache_config::Config::take_from_startup_handle();
-        inspector
-            .root()
-            .record_child("structured_config", |config_node| config.record_inspect(config_node));
-        (config.use_fxblob, config.use_system_image)
-    };
-
+    let config = pkg_cache_config::Config::take_from_startup_handle();
+    inspector
+        .root()
+        .record_child("structured_config", |config_node| config.record_inspect(config_node));
+    let pkg_cache_config::Config { protect_open_packages, use_fxblob, use_system_image } = config;
     let mut package_index = PackageIndex::new();
     let builder = blobfs::Client::builder().readable().writable().executable();
     let blobfs = if use_fxblob { builder.use_creator().use_reader() } else { builder }
@@ -259,6 +255,7 @@ async fn main_inner() -> Result<(), Error> {
     {
         let blobfs = blobfs.clone();
         let base_packages = Arc::clone(&base_packages);
+        let open_packages = open_packages.clone();
         let commit_status_provider =
             fuchsia_component::client::connect_to_protocol::<CommitStatusProviderMarker>()
                 .context("while connecting to commit status provider")?;
@@ -272,6 +269,8 @@ async fn main_inner() -> Result<(), Error> {
                         Arc::clone(&base_packages),
                         Arc::clone(&cache_packages),
                         Arc::clone(&package_index),
+                        open_packages.clone(),
+                        protect_open_packages,
                         commit_status_provider.clone(),
                         stream,
                     )
