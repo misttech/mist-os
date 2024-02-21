@@ -54,7 +54,7 @@ use {
         },
         range::RangeExt,
         round::round_up,
-        serialized_types::{Version, Versioned, VersionedLatest},
+        serialized_types::{Migrate, Version, Versioned, VersionedLatest},
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
     assert_matches::assert_matches,
@@ -142,6 +142,24 @@ pub struct StoreInfo {
     /// reveal (such as the number of files in the system and the ordering of their creation in
     /// time).  Only the bottom 32 bits of the object ID are encrypted whilst the top 32 bits will
     /// increment after 2^32 object IDs have been used and this allows us to roll the key.
+    object_id_key: Option<WrappedKey>,
+
+    /// A directory for storing internal files in a directory structure. Holds INVALID_OBJECT_ID
+    /// when the directory doesn't yet exist.
+    internal_directory_object_id: u64,
+}
+
+#[derive(Clone, Debug, Default, Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+pub struct StoreInfoV17 {
+    guid: [u8; 16],
+    last_object_id: u64,
+    pub layers: Vec<u64>,
+    root_directory_object_id: u64,
+    graveyard_directory_object_id: u64,
+    object_count: u64,
+    mutations_key: Option<WrappedKey>,
+    mutations_cipher_offset: u64,
+    pub encrypted_mutations_object_id: u64,
     object_id_key: Option<WrappedKey>,
 }
 
@@ -280,6 +298,7 @@ impl EncryptedMutations {
 #[derive(Debug, Default)]
 struct ReplayInfo {
     object_count_delta: i64,
+    internal_directory_object_id: Option<u64>,
 }
 
 impl ReplayInfo {
@@ -339,6 +358,18 @@ impl StoreOrReplayInfo {
             }
             StoreOrReplayInfo::Replay(replay_info) => {
                 replay_info.front_mut().unwrap().object_count_delta += delta;
+            }
+            StoreOrReplayInfo::Locked => unreachable!(),
+        }
+    }
+
+    fn set_internal_dir(&mut self, dir_id: u64) {
+        match self {
+            StoreOrReplayInfo::Info(StoreInfo { internal_directory_object_id, .. }) => {
+                *internal_directory_object_id = dir_id;
+            }
+            StoreOrReplayInfo::Replay(replay_info) => {
+                replay_info.front_mut().unwrap().internal_directory_object_id = Some(dir_id);
             }
             StoreOrReplayInfo::Locked => unreachable!(),
         }
@@ -801,6 +832,31 @@ impl ObjectStore {
                 panic!("Store is of unknown lock state; has the journal been replayed yet?")
             }
         }
+    }
+
+    pub async fn get_or_create_internal_directory_id(self: &Arc<Self>) -> Result<u64, Error> {
+        // Create the transaction first to use the object store lock.
+        let mut transaction = self
+            .filesystem()
+            .new_transaction(
+                lock_keys![LockKey::object(
+                    self.parent_store.as_ref().unwrap().store_object_id,
+                    self.store_object_id,
+                )],
+                Options::default(),
+            )
+            .await?;
+        let obj_id = self.store_info.lock().unwrap().info().unwrap().internal_directory_object_id;
+        if obj_id != INVALID_OBJECT_ID {
+            return Ok(obj_id);
+        }
+
+        // Need to create an internal directory.
+        let directory = Directory::create(&mut transaction, self, Default::default()).await?;
+
+        transaction.add(self.store_object_id, Mutation::CreateInternalDir(directory.object_id()));
+        transaction.commit().await?;
+        Ok(directory.object_id())
     }
 
     /// Returns the file size for the object without opening the object.
@@ -1369,6 +1425,9 @@ impl ObjectStore {
         if info.graveyard_directory_object_id != INVALID_OBJECT_ID {
             objects.push(info.graveyard_directory_object_id);
         }
+        if info.internal_directory_object_id != INVALID_OBJECT_ID {
+            objects.push(info.internal_directory_object_id);
+        }
         objects
     }
 
@@ -1419,6 +1478,9 @@ impl ObjectStore {
                     info.object_count =
                         info.object_count.saturating_add(replay_info.object_count_delta as u64);
                 }
+                if let Some(dir_id) = replay_info.internal_directory_object_id {
+                    info.internal_directory_object_id = dir_id;
+                }
             }
 
             object_tree_layer_object_ids = info.layers.clone();
@@ -1433,7 +1495,7 @@ impl ObjectStore {
             } else {
                 *store_info = StoreOrReplayInfo::Info(info);
             }
-        };
+        }
 
         if encrypted.is_some() {
             *self.lock_state.lock().unwrap() = LockState::Locked;
@@ -2110,6 +2172,10 @@ impl JournalingObject for ObjectStore {
                     FxfsError::Inconsistent
                 );
             }
+            Mutation::CreateInternalDir(object_id) => {
+                ensure!(object_id != INVALID_OBJECT_ID, FxfsError::Inconsistent);
+                self.store_info.lock().unwrap().set_internal_dir(object_id);
+            }
             _ => bail!("unexpected mutation: {:?}", mutation),
         }
         self.counters.lock().unwrap().mutations_applied += 1;
@@ -2133,7 +2199,7 @@ impl JournalingObject for ObjectStore {
     fn write_mutation(&self, mutation: &Mutation, mut writer: journal::Writer<'_>) {
         match mutation {
             // Encrypt all mutations that could be related to a volume object store.
-            Mutation::ObjectStore(_) => {
+            Mutation::ObjectStore(_) | Mutation::CreateInternalDir(_) => {
                 let mut cipher = self.mutations_cipher.lock().unwrap();
                 if let Some(cipher) = cipher.as_mut() {
                     // If this is the first time we've used this key, we must write the key out.
@@ -2250,7 +2316,7 @@ mod tests {
             object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID},
             object_store::{
                 directory::Directory,
-                object_record::{AttributeKey, ObjectKey, ObjectValue},
+                object_record::{AttributeKey, ObjectKey, ObjectKind, ObjectValue},
                 transaction::{lock_keys, Options},
                 volume::root_volume,
                 FsverityMetadata, HandleOptions, LockKey, Mutation, ObjectStore, RootDigest,
@@ -2473,6 +2539,86 @@ mod tests {
         {
             let store = fs.object_manager().store(store_id).expect("store not found");
             store.unlock(Arc::new(InsecureCrypt::new())).await.expect("unlock failed");
+        }
+        fs.close().await.expect("Close failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_create_and_open_internal_dir() {
+        let fs = test_filesystem().await;
+        let dir_id;
+        let store_id;
+        {
+            let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
+            let store = root_volume
+                .new_volume("test", Some(Arc::new(InsecureCrypt::new())))
+                .await
+                .expect("new_volume failed");
+            dir_id =
+                store.get_or_create_internal_directory_id().await.expect("Create internal dir");
+            store_id = store.store_object_id();
+        }
+
+        fs.close().await.expect("close failed");
+        let device = fs.take_device().await;
+        device.reopen(false);
+        let fs = FxFilesystem::open(device).await.expect("open failed");
+
+        {
+            let store = fs.object_manager().store(store_id).expect("store not found");
+            store.unlock(Arc::new(InsecureCrypt::new())).await.expect("unlock failed");
+            assert_eq!(
+                dir_id,
+                store.get_or_create_internal_directory_id().await.expect("Retrieving dir")
+            );
+            let obj = store
+                .tree()
+                .find(&ObjectKey::object(dir_id))
+                .await
+                .expect("Searching tree for dir")
+                .unwrap();
+            assert_matches!(
+                obj.value,
+                ObjectValue::Object { kind: ObjectKind::Directory { .. }, .. }
+            );
+        }
+        fs.close().await.expect("Close failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_create_and_open_internal_dir_unencrypted() {
+        let fs = test_filesystem().await;
+        let dir_id;
+        let store_id;
+        {
+            let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
+            let store = root_volume.new_volume("test", None).await.expect("new_volume failed");
+            dir_id =
+                store.get_or_create_internal_directory_id().await.expect("Create internal dir");
+            store_id = store.store_object_id();
+        }
+
+        fs.close().await.expect("close failed");
+        let device = fs.take_device().await;
+        device.reopen(false);
+        let fs = FxFilesystem::open(device).await.expect("open failed");
+
+        {
+            let store = fs.object_manager().store(store_id).expect("store not found");
+            assert_eq!(
+                dir_id,
+                store.get_or_create_internal_directory_id().await.expect("Retrieving dir")
+            );
+            let obj = store
+                .tree()
+                .find(&ObjectKey::object(dir_id))
+                .await
+                .expect("Searching tree for dir")
+                .unwrap();
+            assert_matches!(
+                obj.value,
+                ObjectValue::Object { kind: ObjectKind::Directory { .. }, .. }
+            );
         }
         fs.close().await.expect("Close failed");
     }
@@ -3018,6 +3164,7 @@ mod tests {
                 wrapping_key_id: 0x1234567812345678,
                 key: WrappedKeyBytes([0xff; WRAPPED_KEY_SIZE]),
             }),
+            internal_directory_object_id: INVALID_OBJECT_ID,
         };
         let mut serialized_info = Vec::new();
         info.serialize_with_version(&mut serialized_info).unwrap();

@@ -102,9 +102,23 @@ pub enum Mutation {
     DeleteVolume,
     UpdateBorrowed(u64),
     UpdateMutationsKey(UpdateMutationsKey),
+    CreateInternalDir(u64),
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+pub enum MutationV32 {
+    ObjectStore(ObjectStoreMutation),
+    EncryptedObjectStore(Box<[u8]>),
+    Allocator(AllocatorMutation),
+    BeginFlush,
+    EndFlush,
+    DeleteVolume,
+    UpdateBorrowed(u64),
+    UpdateMutationsKey(UpdateMutationsKey),
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(MutationV32)]
 pub enum MutationV31 {
     ObjectStore(ObjectStoreMutationV31),
     EncryptedObjectStore(Box<[u8]>),
