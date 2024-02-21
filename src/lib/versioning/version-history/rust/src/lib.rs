@@ -20,17 +20,59 @@ pub const LATEST_VERSION: &Version = &version_history_macro::latest_sdk_version!
 /// SUPPORTED_API_LEVELS are the supported API levels.
 pub const SUPPORTED_API_LEVELS: &[Version] = &version_history_macro::get_supported_versions!();
 
+/// An `ApiLevel` represents an API level of the Fuchsia platform.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Clone)]
+pub struct ApiLevel(u64);
+
+impl ApiLevel {
+    pub fn from_u64(value: u64) -> Self {
+        Self(value)
+    }
+
+    pub fn as_u64(&self) -> u64 {
+        self.0
+    }
+}
+
+impl fmt::Display for ApiLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::str::FromStr for ApiLevel {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(ApiLevel::from_u64(s.parse()?))
+    }
+}
+
+impl From<u64> for ApiLevel {
+    fn from(api_level: u64) -> ApiLevel {
+        ApiLevel(api_level)
+    }
+}
+
+impl From<&u64> for ApiLevel {
+    fn from(api_level: &u64) -> ApiLevel {
+        ApiLevel(*api_level)
+    }
+}
+
+impl From<ApiLevel> for u64 {
+    fn from(api_level: ApiLevel) -> u64 {
+        api_level.0
+    }
+}
+
 /// An `AbiRevision` represents the ABI revision of a Fuchsia Package.
 /// https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0135_package_abi_revision?#design
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Clone)]
-pub struct AbiRevision(pub u64);
+pub struct AbiRevision(u64);
 
 impl AbiRevision {
     pub const PATH: &'static str = "meta/fuchsia.abi/abi-revision";
-
-    pub fn new(u: u64) -> AbiRevision {
-        AbiRevision(u)
-    }
 
     /// Parse the ABI revision from little-endian bytes.
     pub fn from_bytes(b: [u8; 8]) -> Self {
@@ -41,11 +83,27 @@ impl AbiRevision {
     pub fn as_bytes(&self) -> [u8; 8] {
         self.0.to_le_bytes()
     }
+
+    pub fn from_u64(u: u64) -> AbiRevision {
+        AbiRevision(u)
+    }
+
+    pub fn as_u64(&self) -> u64 {
+        self.0
+    }
 }
 
 impl fmt::Display for AbiRevision {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:x}", self.0)
+    }
+}
+
+impl std::str::FromStr for AbiRevision {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(AbiRevision::from_u64(s.parse()?))
     }
 }
 
@@ -82,14 +140,6 @@ impl TryFrom<&[u8]> for AbiRevision {
     }
 }
 
-impl std::ops::Deref for AbiRevision {
-    type Target = u64;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 /// Version is a mapping between the supported API level and the ABI revisions.
 ///
 /// See https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0002_platform_versioning for more
@@ -98,7 +148,7 @@ impl std::ops::Deref for AbiRevision {
 pub struct Version {
     /// The API level denotes a set of APIs available when building an application for a given
     /// release of the FUCHSIA IDK.
-    pub api_level: u64,
+    pub api_level: ApiLevel,
 
     /// The ABI revision denotes the semantics of the Fuchsia System Interface that an application
     /// expects the platform to provide.
@@ -140,8 +190,8 @@ pub fn is_supported_abi_revision(abi_revision: AbiRevision) -> bool {
 }
 
 /// Returns a vector of the API levels in SUPPORTED_API_LEVELS.
-pub fn get_supported_api_levels() -> Vec<u64> {
-    let mut api_levels: Vec<u64> = Vec::new();
+pub fn get_supported_api_levels() -> Vec<ApiLevel> {
+    let mut api_levels: Vec<ApiLevel> = Vec::new();
     for version in SUPPORTED_API_LEVELS {
         api_levels.push(version.api_level);
     }
@@ -150,17 +200,17 @@ pub fn get_supported_api_levels() -> Vec<u64> {
 }
 
 /// Returns a vector of the ABI revisions in SUPPORTED_API_LEVELS.
-pub fn get_supported_abi_revisions() -> Vec<u64> {
-    let mut abi_revisions: Vec<u64> = Vec::new();
+pub fn get_supported_abi_revisions() -> Vec<AbiRevision> {
+    let mut abi_revisions: Vec<AbiRevision> = Vec::new();
     for version in SUPPORTED_API_LEVELS {
-        abi_revisions.push(version.abi_revision.0);
+        abi_revisions.push(version.abi_revision);
     }
 
     return abi_revisions;
 }
 
-pub fn get_latest_abi_revision() -> u64 {
-    return LATEST_VERSION.abi_revision.0;
+pub fn get_latest_abi_revision() -> AbiRevision {
+    return LATEST_VERSION.abi_revision;
 }
 
 pub fn check_abi_revision(abi_revision: Option<AbiRevision>) -> Result<(), AbiRevisionError> {
@@ -247,8 +297,8 @@ mod tests {
             .unwrap()
             .into_iter()
             .map(|v| Version {
-                api_level: v.api_level,
-                abi_revision: AbiRevision::new(v.abi_revision.value),
+                api_level: ApiLevel::from_u64(v.api_level),
+                abi_revision: AbiRevision::from_u64(v.abi_revision.value),
                 status: v.status,
             })
             .collect::<Vec<_>>()
@@ -288,9 +338,9 @@ mod tests {
         fn test_invalid_abi_revision(u in any::<u64>().prop_filter("using u64 that isn't in VERSION_HISTORY", |u|
             // The randomly chosen 'abi_revision' must not equal any of the
             // abi_revisions in the VERSION_HISTORY list.
-            VERSION_HISTORY.iter().all(|v| v.abi_revision != AbiRevision::new(*u))
+            VERSION_HISTORY.iter().all(|v| v.abi_revision != AbiRevision::from_u64(*u))
         )) {
-            assert!(!is_valid_abi_revision(AbiRevision::new(u)))
+            assert!(!is_valid_abi_revision(AbiRevision::from_u64(u)))
         }
     }
 }

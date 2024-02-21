@@ -140,7 +140,7 @@ impl FuchsiaBootResolver {
         &self,
         proxy: fio::DirectoryProxy,
         boot_url: BootUrl,
-        abi_revision: Option<u64>,
+        abi_revision: Option<AbiRevision>,
     ) -> Result<fresolution::Component, fresolution::ResolverError> {
         let manifest = boot_url.resource().ok_or(fresolution::ResolverError::InvalidArgs)?;
 
@@ -186,7 +186,7 @@ impl FuchsiaBootResolver {
                 ..Default::default()
             }),
             config_values,
-            abi_revision,
+            abi_revision: abi_revision.map(Into::into),
             ..Default::default()
         })
     }

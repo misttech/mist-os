@@ -1268,7 +1268,7 @@ mod tests {
     fn abi_revision_policy_check_compatibility() -> Result<(), Error> {
         // This test assumes the platform does not support a u64::MAX ABI value
         // and the first entry in VERSION_HISTORY is unsupported.
-        let unknown_abi = AbiRevision(u64::MAX);
+        let unknown_abi = AbiRevision::from_u64(u64::MAX);
         assert!(version_history::version_from_abi_revision(unknown_abi).is_none());
 
         let unsupported_version = version_history::VERSION_HISTORY[0].clone();

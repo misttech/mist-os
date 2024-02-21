@@ -277,7 +277,7 @@ impl HostPipeChild {
         let id_string = format!("{}", id);
 
         // pass the abi revision as a base 10 number so it is easy to parse.
-        let rev: u64 = *version_history::LATEST_VERSION.abi_revision;
+        let rev: u64 = version_history::LATEST_VERSION.abi_revision.as_u64();
         let abi_revision = format!("{}", rev);
         let args =
             vec!["remote_control_runner", "--circuit", &id_string, "--abi-revision", &abi_revision];

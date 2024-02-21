@@ -281,7 +281,7 @@ impl Registry {
             package,
             config_values,
             resolution_context: None,
-            abi_revision,
+            abi_revision: abi_revision.map(Into::into),
             ..Default::default()
         })
     }
@@ -364,7 +364,7 @@ impl Registry {
                 ..Default::default()
             }),
             config_values,
-            abi_revision,
+            abi_revision: abi_revision.map(Into::into),
             ..Default::default()
         })
     }

@@ -123,10 +123,7 @@ pub fn validate_package(manifest: &PackageManifest) -> Result<(), PackageValidat
     if !version_history::is_supported_abi_revision(abi_revision) {
         return Err(PackageValidationError::UnsupportedAbiRevision {
             found: abi_revision,
-            supported: version_history::get_supported_abi_revisions()
-                .iter()
-                .map(AbiRevision::from)
-                .collect(),
+            supported: version_history::get_supported_abi_revisions(),
         });
     }
 

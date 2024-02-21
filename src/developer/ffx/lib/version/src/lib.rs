@@ -68,8 +68,8 @@ fn build_info_impl(raw_version_info: String, raw_build_version: String) -> Versi
         commit_hash: hash_opt,
         commit_timestamp: timestamp,
         build_version: Some(raw_build_version.trim().to_string()),
-        abi_revision: Some(vh.abi_revision.0),
-        api_level: Some(vh.api_level),
+        abi_revision: Some(vh.abi_revision.as_u64()),
+        api_level: Some(vh.api_level.as_u64()),
         exec_path: std::env::current_exe().map(|x| x.to_string_lossy().to_string()).ok(),
         ..Default::default()
     };
@@ -82,8 +82,8 @@ mod test {
     const HASH: &str = "hashyhashhash";
     const TIMESTAMP: u64 = 12345689;
     const FAKE_BUILD_VERSION: &str = "20201118";
-    const ABI_REVISION: u64 = version_history::LATEST_VERSION.abi_revision.0;
-    const API_LEVEL: u64 = version_history::LATEST_VERSION.api_level;
+    const ABI_REVISION: version_history::AbiRevision = version_history::LATEST_VERSION.abi_revision;
+    const API_LEVEL: version_history::ApiLevel = version_history::LATEST_VERSION.api_level;
 
     #[test]
     fn test_valid_string_dirty() {
@@ -96,8 +96,8 @@ mod test {
                 commit_hash: Some(HASH.to_string()),
                 commit_timestamp: Some(TIMESTAMP),
                 build_version: Some(FAKE_BUILD_VERSION.to_string()),
-                abi_revision: Some(ABI_REVISION),
-                api_level: Some(API_LEVEL),
+                abi_revision: Some(ABI_REVISION.as_u64()),
+                api_level: Some(API_LEVEL.as_u64()),
                 exec_path: std::env::current_exe().map(|x| x.to_string_lossy().to_string()).ok(),
                 ..Default::default()
             }
@@ -115,8 +115,8 @@ mod test {
                 commit_hash: Some(HASH.to_string()),
                 commit_timestamp: Some(TIMESTAMP),
                 build_version: Some(FAKE_BUILD_VERSION.to_string()),
-                abi_revision: Some(ABI_REVISION),
-                api_level: Some(API_LEVEL),
+                abi_revision: Some(ABI_REVISION.as_u64()),
+                api_level: Some(API_LEVEL.as_u64()),
                 exec_path: std::env::current_exe().map(|x| x.to_string_lossy().to_string()).ok(),
                 ..Default::default()
             }
@@ -167,8 +167,8 @@ mod test {
                 commit_hash: None,
                 commit_timestamp: Some(TIMESTAMP),
                 build_version: Some(FAKE_BUILD_VERSION.to_string()),
-                abi_revision: Some(ABI_REVISION),
-                api_level: Some(API_LEVEL),
+                abi_revision: Some(ABI_REVISION.as_u64()),
+                api_level: Some(API_LEVEL.as_u64()),
                 exec_path: std::env::current_exe().map(|x| x.to_string_lossy().to_string()).ok(),
                 ..Default::default()
             }

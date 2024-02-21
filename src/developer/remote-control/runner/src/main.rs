@@ -34,12 +34,16 @@ fn zx_socket_from_fd(fd: i32) -> Result<fidl::AsyncSocket> {
 fn print_prelude_info(
     message: String,
     status: CompatibilityState,
-    platform_abi: u64,
+    platform_abi: AbiRevision,
 ) -> Result<()> {
     let ssh_connection = std::env::var("SSH_CONNECTION")?;
     let info = ConnectionInfo {
         ssh_connection: ssh_connection.clone(),
-        compatibility: CompatibilityInfo { status, platform_abi, message: message.clone() },
+        compatibility: CompatibilityInfo {
+            status,
+            platform_abi: platform_abi.as_u64(),
+            message: message.clone(),
+        },
     };
 
     let encoded_message = serde_json::to_string(&info)?;
@@ -73,7 +77,7 @@ async fn main() -> Result<()> {
     let args: Args = argh::from_env();
     // Perform the compatibility checking between the caller (the daemon) and the platform (this program).
     if let Some(abi) = args.abi_revision {
-        let daemon_revision = AbiRevision(abi);
+        let daemon_revision = AbiRevision::from_u64(abi);
         let platform_abi = version_history::get_latest_abi_revision();
         let status: CompatibilityState;
         let message = match check_abi_revision(Some(daemon_revision)) {

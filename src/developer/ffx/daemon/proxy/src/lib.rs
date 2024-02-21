@@ -31,7 +31,7 @@ pub enum DaemonVersionCheck {
     /// spawned by the same overall build.
     SameVersionInfo(VersionInfo),
     /// Checks to see if the API level matches.
-    CheckApiLevel(u64),
+    CheckApiLevel(version_history::ApiLevel),
 }
 
 /// Lock-protected contents of [ProxyState]
@@ -362,7 +362,7 @@ async fn init_daemon_proxy(
             _,
             DaemonVersionCheck::CheckApiLevel(ours),
             VersionInfo { api_level: Some(daemon), .. },
-        ) if ours == daemon => true,
+        ) if ours.as_u64() == daemon => true,
         _ => false,
     };
 

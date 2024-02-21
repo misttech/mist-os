@@ -12,6 +12,11 @@ rustc_macro("version-history-macro") {
 
   sources = [ "src/lib.rs" ]
 
+  visibility = [
+    ":*",
+    "//src/lib/versioning/version-history/rust:*",
+  ]
+
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 

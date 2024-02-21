@@ -200,14 +200,14 @@ pub fn make_package_manifest(
     build_path: &Path,
     subpackages: Vec<(RelativePackageUrl, Hash, PathBuf)>,
 ) -> (PathBuf, PackageManifest) {
-    make_package_manifest_with_api_level(name, build_path, subpackages, 7)
+    make_package_manifest_with_api_level(name, build_path, subpackages, 7.into())
 }
 
 pub fn make_package_manifest_with_api_level(
     name: &str,
     build_path: &Path,
     subpackages: Vec<(RelativePackageUrl, Hash, PathBuf)>,
-    api_level: u64,
+    api_level: version_history::ApiLevel,
 ) -> (PathBuf, PackageManifest) {
     let package_path = build_path.join(name);
 

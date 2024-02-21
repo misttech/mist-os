@@ -62,7 +62,7 @@ pub struct UpdatePackageBuilder {
 
     /// The ABI revision to use when building the packages for the update.
     /// None will default to the latest ABI.
-    abi_revision: Option<u64>,
+    abi_revision: Option<version_history::AbiRevision>,
 
     /// The repository to use for the images packages.
     repository: RepositoryUrl,
@@ -175,7 +175,7 @@ impl UpdatePackageBuilder {
         board_name: impl AsRef<str>,
         version_file: impl AsRef<Path>,
         epoch: EpochFile,
-        abi_revision: Option<u64>,
+        abi_revision: Option<version_history::AbiRevision>,
         outdir: impl AsRef<Utf8Path>,
     ) -> Self {
         Self {
@@ -447,7 +447,7 @@ mod tests {
             "board",
             fake_version.path().to_path_buf(),
             epoch.clone(),
-            Some(0xECDB841C251A8CB9),
+            Some(0xECDB841C251A8CB9.into()),
             &outdir,
         );
 
@@ -596,7 +596,7 @@ mod tests {
             "board",
             fake_version.path().to_path_buf(),
             epoch.clone(),
-            Some(0xECDB841C251A8CB9),
+            Some(0xECDB841C251A8CB9.into()),
             &outdir,
         );
 
@@ -771,7 +771,7 @@ mod tests {
             "board",
             fake_version.path().to_path_buf(),
             epoch.clone(),
-            Some(0xECDB841C251A8CB9),
+            Some(0xECDB841C251A8CB9.into()),
             &outdir,
         );
 
@@ -808,7 +808,7 @@ mod tests {
             "board",
             fake_version.path().to_path_buf(),
             EpochFile::Version1 { epoch: 0 },
-            Some(0xECDB841C251A8CB9),
+            Some(0xECDB841C251A8CB9.into()),
             &outdir,
         );
         builder.set_name("update_2");
@@ -833,7 +833,7 @@ mod tests {
             "board",
             fake_version.path().to_path_buf(),
             EpochFile::Version1 { epoch: 0 },
-            Some(0xECDB841C251A8CB9),
+            Some(0xECDB841C251A8CB9.into()),
             &outdir,
         );
         builder.set_name("update_2");
@@ -864,7 +864,7 @@ mod tests {
             "board",
             fake_version.path().to_path_buf(),
             EpochFile::Version1 { epoch: 0 },
-            Some(0xECDB841C251A8CB9),
+            Some(0xECDB841C251A8CB9.into()),
             &outdir,
         );
 

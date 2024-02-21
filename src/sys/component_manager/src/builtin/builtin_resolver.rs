@@ -54,7 +54,7 @@ impl Resolver for BuiltinResolver {
             decl,
             package: None,
             config_values: None,
-            abi_revision: Some(version_history::AbiRevision(abi_revision)),
+            abi_revision: Some(abi_revision),
         })
     }
 }

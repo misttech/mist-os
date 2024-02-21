@@ -609,7 +609,7 @@ mod tests {
         let pkg_dir = dir.join(&package_name);
 
         let mut builder = PackageBuilder::new(&package_name);
-        builder.api_level(7).unwrap();
+        builder.api_level(7.into()).unwrap();
 
         builder
             .add_contents_as_blob(format!("bin/{package_name}"), content.as_bytes(), &pkg_dir)

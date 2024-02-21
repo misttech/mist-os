@@ -156,7 +156,7 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
     Ok(())
 }
 
-fn get_abi_revision(cmd: &PackageBuildCommand) -> Result<Option<u64>> {
+fn get_abi_revision(cmd: &PackageBuildCommand) -> Result<Option<AbiRevision>> {
     match (cmd.api_level, cmd.abi_revision) {
         (Some(_), Some(_)) => {
             bail!("--api-level and --abi-revision cannot be specified at the same time")
@@ -164,17 +164,16 @@ fn get_abi_revision(cmd: &PackageBuildCommand) -> Result<Option<u64>> {
         (Some(api_level), None) => {
             for version in version_history::VERSION_HISTORY {
                 if api_level == version.api_level {
-                    return Ok(Some(version.abi_revision.into()));
+                    return Ok(Some(version.abi_revision));
                 }
             }
 
             bail!("Unknown API level {}", api_level)
         }
         (None, Some(abi_revision)) => {
-            let abi_revision = AbiRevision::new(abi_revision);
             for version in version_history::VERSION_HISTORY {
                 if version.abi_revision == abi_revision {
-                    return Ok(Some(abi_revision.into()));
+                    return Ok(Some(abi_revision));
                 }
             }
 
@@ -233,7 +232,7 @@ mod test {
         let cmd = PackageBuildCommand {
             package_build_manifest_path: root.join("invalid path"),
             out: Utf8PathBuf::from("out"),
-            api_level: Some(8),
+            api_level: Some(8.into()),
             abi_revision: None,
             repository: None,
             published_name: None,
@@ -258,7 +257,7 @@ mod test {
         let cmd = PackageBuildCommand {
             package_build_manifest_path,
             out,
-            api_level: Some(8),
+            api_level: Some(8.into()),
             abi_revision: None,
             repository: None,
             published_name: None,
@@ -292,7 +291,7 @@ mod test {
         cmd_package_build(PackageBuildCommand {
             package_build_manifest_path,
             out: out.clone(),
-            api_level: Some(8),
+            api_level: Some(8.into()),
             abi_revision: None,
             repository: None,
             published_name: None,
@@ -344,7 +343,7 @@ mod test {
                     "meta/fuchsia.abi/abi-revision".into(),
                     version_history::VERSION_HISTORY
                         .iter()
-                        .find(|v| v.api_level == 8)
+                        .find(|v| v.api_level.as_u64() == 8)
                         .unwrap()
                         .abi_revision
                         .to_string(),
@@ -457,8 +456,8 @@ mod test {
         assert!(cmd_package_build(PackageBuildCommand {
             package_build_manifest_path,
             out: out.clone(),
-            api_level: Some(8),
-            abi_revision: Some(0xA56735A6690E09D8),
+            api_level: Some(8.into()),
+            abi_revision: Some(0xA56735A6690E09D8.into()),
             repository: None,
             published_name: None,
             depfile: false,
@@ -498,7 +497,7 @@ mod test {
         cmd_package_build(PackageBuildCommand {
             package_build_manifest_path,
             out: out.clone(),
-            api_level: Some(8),
+            api_level: Some(8.into()),
             abi_revision: None,
             repository: Some("my-repository".into()),
             published_name: None,
@@ -561,7 +560,7 @@ mod test {
                     "meta/fuchsia.abi/abi-revision".into(),
                     version_history::VERSION_HISTORY
                         .iter()
-                        .find(|v| v.api_level == 8)
+                        .find(|v| v.api_level.as_u64() == 8)
                         .unwrap()
                         .abi_revision
                         .to_string(),
@@ -653,7 +652,7 @@ mod test {
         cmd_package_build(PackageBuildCommand {
             package_build_manifest_path,
             out: out.clone(),
-            api_level: Some(8),
+            api_level: Some(8.into()),
             abi_revision: None,
             repository: None,
             published_name: Some("published-name".into()),
@@ -680,7 +679,7 @@ mod test {
                     "meta/fuchsia.abi/abi-revision".into(),
                     version_history::VERSION_HISTORY
                         .iter()
-                        .find(|v| v.api_level == 8)
+                        .find(|v| v.api_level.as_u64() == 8)
                         .unwrap()
                         .abi_revision
                         .to_string(),

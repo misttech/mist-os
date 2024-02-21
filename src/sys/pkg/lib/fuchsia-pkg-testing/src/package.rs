@@ -23,7 +23,7 @@ use {
         path::{Path, PathBuf},
     },
     tempfile::TempDir,
-    version_history::AbiRevision,
+    version_history::{AbiRevision, ApiLevel},
     walkdir::WalkDir,
 };
 
@@ -543,7 +543,7 @@ impl PackageBuilder {
     /// # Panics
     ///
     /// Panics if API level or ABI Revision has already been set.
-    pub fn api_level(self, api_level: u64) -> Result<Self, Error> {
+    pub fn api_level(self, api_level: ApiLevel) -> Result<Self, Error> {
         for v in version_history::VERSION_HISTORY {
             if v.api_level == api_level {
                 return Ok(self.abi_revision(v.abi_revision));
@@ -562,7 +562,7 @@ impl PackageBuilder {
     pub fn abi_revision(mut self, abi_revision: AbiRevision) -> Self {
         assert_eq!(self.abi_revision, None);
         self.abi_revision = Some(abi_revision);
-        self.builder.abi_revision(abi_revision.0);
+        self.builder.abi_revision(abi_revision);
         self
     }
 
@@ -690,11 +690,11 @@ impl PackageBuilder {
         if self.abi_revision == None {
             let abi_revision = version_history::VERSION_HISTORY
                 .iter()
-                .find(|v| v.api_level == 7)
+                .find(|v| v.api_level.as_u64() == 7)
                 .expect("API Level 7 to exist")
                 .abi_revision;
 
-            self.builder.abi_revision(abi_revision.0);
+            self.builder.abi_revision(abi_revision);
         }
 
         // self.artifacts contains outputs from package creation (manifest.json/meta.far) as well
@@ -922,11 +922,8 @@ mod tests {
                 .unwrap();
 
             fs::create_dir(dir.path().join("meta/fuchsia.abi")).unwrap();
-            fs::write(
-                dir.path().join("meta/fuchsia.abi/abi-revision"),
-                abi_revision.0.to_le_bytes(),
-            )
-            .unwrap();
+            fs::write(dir.path().join("meta/fuchsia.abi/abi-revision"), abi_revision.as_bytes())
+                .unwrap();
 
             fs::write(dir.path().join("data/hello"), "world").unwrap();
 

@@ -182,7 +182,7 @@ async fn resolve_from_package(
             ..Default::default()
         }),
         config_values,
-        abi_revision,
+        abi_revision: abi_revision.map(Into::into),
         ..Default::default()
     })
 }

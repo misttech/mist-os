@@ -6,6 +6,7 @@ use {
     fuchsia_fs::{file::ReadError, node::OpenError},
     fuchsia_zircon_status::Status,
     thiserror::Error,
+    version_history::AbiRevision,
 };
 
 #[derive(Error, Debug)]
@@ -33,7 +34,7 @@ impl From<AbiRevisionFileError> for fresolution::ResolverError {
 pub async fn read_abi_revision_optional(
     dir: &fio::DirectoryProxy,
     path: &str,
-) -> Result<Option<u64>, AbiRevisionFileError> {
+) -> Result<Option<AbiRevision>, AbiRevisionFileError> {
     match read_abi_revision(dir, path).await {
         Ok(abi) => Ok(Some(abi)),
         Err(AbiRevisionFileError::Open(OpenError::OpenError(Status::NOT_FOUND))) => Ok(None),
@@ -46,13 +47,13 @@ pub async fn read_abi_revision_optional(
 async fn read_abi_revision(
     dir: &fio::DirectoryProxy,
     path: &str,
-) -> Result<u64, AbiRevisionFileError> {
+) -> Result<AbiRevision, AbiRevisionFileError> {
     let file = fuchsia_fs::directory::open_file(&dir, path, fio::OpenFlags::RIGHT_READABLE).await?;
     let bytes: [u8; 8] = fuchsia_fs::file::read(&file)
         .await?
         .try_into()
         .map_err(|_| AbiRevisionFileError::Decode)?;
-    Ok(u64::from_le_bytes(bytes))
+    Ok(AbiRevision::from_bytes(bytes))
 }
 
 #[cfg(test)]
@@ -108,11 +109,11 @@ mod tests {
         // Test u64 inputs can be read
         let dir = init_fuchsia_abi_dir("abi-revision", ABI_REV_MAX);
         let res = read_abi_revision_optional(&dir, AbiRevision::PATH).await.unwrap();
-        assert_eq!(res, Some(u64::MAX));
+        assert_eq!(res, Some(u64::MAX.into()));
 
         let dir = init_fuchsia_abi_dir("abi-revision", ABI_REV_ZERO);
         let res = read_abi_revision_optional(&dir, AbiRevision::PATH).await.unwrap();
-        assert_eq!(res, Some(0u64));
+        assert_eq!(res, Some(0u64.into()));
 
         Ok(())
     }
@@ -150,7 +151,7 @@ mod tests {
         let abi_revision = read_abi_revision(&dir_proxy, AbiRevision::PATH)
             .await
             .expect("test package doesn't contain an ABI revision");
-        assert!(version_history::is_valid_abi_revision(AbiRevision(abi_revision)));
+        assert!(version_history::is_valid_abi_revision(abi_revision));
         Ok(())
     }
 }

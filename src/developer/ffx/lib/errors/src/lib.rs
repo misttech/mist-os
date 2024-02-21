@@ -78,7 +78,7 @@ pub enum FfxError {
         TargetConnectionError::FidlCommunicationError => format!("Connection was established to {}, but FIDL communication to the Remote Control Service failed. It may help to try running the command again. If this problem persists, please open a bug at https://fxbug.dev/new/ffx+Users+Bug", target_string(.target, .is_default_target)),
         TargetConnectionError::RcsConnectionError => format!("Connection was established to {}, but the Remote Control Service failed initiating a test connection. It may help to try running the command again. If this problem persists, please open a bug at https://fxbug.dev/new/ffx+Users+Bug", target_string(.target, .is_default_target)),
         TargetConnectionError::FailedToKnockService => format!("Connection was established to {}, but the Remote Control Service test connection was dropped prematurely. It may help to try running the command again. If this problem persists, please open a bug at https://fxbug.dev/new/ffx+Users+Bug", target_string(.target, .is_default_target)),
-        TargetConnectionError::TargetIncompatible => format!("{}.", .logs.as_ref().map(|s| s.as_str()).unwrap_or(format!("ffx revision {:#X} is not compatible with the target. Unable to determine target ABI revision", version_history::LATEST_VERSION.abi_revision.0).as_str())),
+        TargetConnectionError::TargetIncompatible => format!("{}.", .logs.as_ref().map(|s| s.as_str()).unwrap_or(format!("ffx revision {:#X} is not compatible with the target. Unable to determine target ABI revision", version_history::LATEST_VERSION.abi_revision.as_u64()).as_str())),
     })]
     TargetConnectionError {
         err: TargetConnectionError,

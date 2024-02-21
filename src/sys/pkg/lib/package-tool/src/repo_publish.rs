@@ -1206,7 +1206,7 @@ mod tests {
             "packagea",
             packages_path.join("pkgaprime").as_std_path(),
             Vec::new(),
-            5,
+            5.into(),
         );
         serde_json::to_writer(File::create(&pkgaprime_manifest_path).unwrap(), &pkgaprime_manifest)
             .unwrap();

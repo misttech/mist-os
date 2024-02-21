@@ -8,6 +8,7 @@ use {
     fuchsia_component_test::*,
     futures::{channel::mpsc, FutureExt, SinkExt, StreamExt, TryStreamExt},
     std::fmt,
+    version_history::AbiRevision,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -49,12 +50,12 @@ impl ComponentResolver {
     pub fn environment(&self) -> String {
         format!("{}_abi_env", self.target_abi)
     }
-    pub fn abi_revision(&self) -> Option<u64> {
+    pub fn abi_revision(&self) -> Option<AbiRevision> {
         match self.target_abi {
             // Assumes the platform does not support a u64::MAX ABI value.
-            TargetAbi::Unsupported => Some(u64::MAX),
+            TargetAbi::Unsupported => Some(u64::MAX.into()),
             // Assumes the latest version is supported.
-            TargetAbi::Supported => Some(*version_history::LATEST_VERSION.abi_revision),
+            TargetAbi::Supported => Some(version_history::LATEST_VERSION.abi_revision),
             TargetAbi::Absent => None,
         }
     }
@@ -66,7 +67,7 @@ impl ComponentResolver {
             decl: Some(fmem::Data::Bytes(
                 fidl::persist(&fdecl::Component::default().clone()).unwrap(),
             )),
-            abi_revision: self.abi_revision(),
+            abi_revision: self.abi_revision().map(Into::into),
             ..Default::default()
         }
     }
@@ -278,7 +279,7 @@ async fn resolve_components_against_allow_all_policy() {
             test_channel_rx.next().await.expect("resolver failed to return an ABI component");
         assert_eq!(
             resolver_response.abi_revision.unwrap(),
-            *version_history::LATEST_VERSION.abi_revision
+            version_history::LATEST_VERSION.abi_revision.as_u64()
         );
         let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
         assert!(instance.resolved_info.is_some());
@@ -339,7 +340,7 @@ async fn resolve_components_against_enforce_presence_policy() {
             test_channel_rx.next().await.expect("resolver failed to return an ABI component");
         assert_eq!(
             resolver_response.abi_revision.unwrap(),
-            *version_history::LATEST_VERSION.abi_revision
+            version_history::LATEST_VERSION.abi_revision.as_u64()
         );
         let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
         assert!(instance.resolved_info.is_some());
@@ -400,7 +401,7 @@ async fn resolve_components_against_enforce_presence_compatibility_policy() {
             test_channel_rx.next().await.expect("resolver failed to return an ABI component");
         assert_eq!(
             resolver_response.abi_revision.unwrap(),
-            *version_history::LATEST_VERSION.abi_revision
+            version_history::LATEST_VERSION.abi_revision.as_u64()
         );
         let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
         assert!(instance.resolved_info.is_some());

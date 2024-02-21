@@ -14,6 +14,7 @@ rustc_library("fuchsia-repo") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-url",
     "//src/lib/mundane:mundane",
+    "//src/lib/versioning/version-history/rust:version-history",
     "//src/storage/lib/delivery_blob",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",

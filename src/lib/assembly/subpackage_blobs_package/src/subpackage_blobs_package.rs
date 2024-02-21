@@ -132,7 +132,7 @@ mod tests {
         let mut builder = PackageBuilder::new(name);
 
         // Hardcode the ABI so it doesn't change when the ABI revision is bumped.
-        builder.abi_revision(0x57904F5A17FA3B22);
+        builder.abi_revision(0x57904F5A17FA3B22.into());
 
         let blob_name = format!("{}-blob", name);
         builder.add_contents_as_blob(&blob_name, &blob_name, &dir).unwrap();
