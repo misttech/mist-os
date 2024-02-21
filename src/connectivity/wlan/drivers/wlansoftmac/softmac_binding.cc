@@ -365,7 +365,7 @@ void SoftmacBinding::EthernetImplGetBti(zx_handle_t* out_bti) {
 
 zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* rust_softmac_ifc,
                                   zx_handle_t softmac_ifc_bridge_client_handle,
-                                  zx::channel* out_sme_channel) {
+                                  zx::channel* out_sme_channel) const {
   WLAN_TRACE_DURATION();
   debugf("Start");
 
@@ -410,7 +410,7 @@ zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* r
   return ZX_OK;
 }
 
-zx_status_t SoftmacBinding::DeliverEthernet(cpp20::span<const uint8_t> eth_frame) {
+zx_status_t SoftmacBinding::DeliverEthernet(cpp20::span<const uint8_t> eth_frame) const {
   WLAN_TRACE_DURATION();
   if (eth_frame.size() > ETH_FRAME_MAX_SIZE) {
     lerror("Attempted to deliver an ethernet frame of invalid length: %zu", eth_frame.size());
@@ -425,7 +425,7 @@ zx_status_t SoftmacBinding::DeliverEthernet(cpp20::span<const uint8_t> eth_frame
 }
 
 zx_status_t SoftmacBinding::QueueTx(FinalizedBuffer buffer, wlan_tx_info_t tx_info,
-                                    trace_async_id_t async_id) {
+                                    trace_async_id_t async_id) const {
   WLAN_TRACE_DURATION();
   ZX_DEBUG_ASSERT(buffer.written() <= std::numeric_limits<uint16_t>::max());
 
@@ -467,7 +467,7 @@ zx_status_t SoftmacBinding::QueueTx(FinalizedBuffer buffer, wlan_tx_info_t tx_in
   return status;
 }
 
-zx_status_t SoftmacBinding::SetEthernetStatus(uint32_t status) {
+zx_status_t SoftmacBinding::SetEthernetStatus(uint32_t status) const {
   WLAN_TRACE_DURATION();
   std::lock_guard<std::mutex> lock(ethernet_proxy_lock_);
   if (ethernet_proxy_.is_valid()) {

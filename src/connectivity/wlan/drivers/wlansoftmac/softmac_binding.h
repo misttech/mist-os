@@ -50,12 +50,12 @@ class SoftmacBinding : public DeviceInterface {
   // DeviceInterface methods
   zx_status_t Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
                     zx_handle_t softmac_ifc_bridge_client_handle,
-                    zx::channel* out_sme_channel) final;
-  zx_status_t DeliverEthernet(cpp20::span<const uint8_t> eth_frame) final
+                    zx::channel* out_sme_channel) const final;
+  zx_status_t DeliverEthernet(cpp20::span<const uint8_t> eth_frame) const final
       __TA_EXCLUDES(ethernet_proxy_lock_);
   zx_status_t QueueTx(FinalizedBuffer buffer, wlan_tx_info_t tx_info,
-                      trace_async_id_t async_id) final;
-  zx_status_t SetEthernetStatus(uint32_t status) final __TA_EXCLUDES(ethernet_proxy_lock_);
+                      trace_async_id_t async_id) const final;
+  zx_status_t SetEthernetStatus(uint32_t status) const final __TA_EXCLUDES(ethernet_proxy_lock_);
 
  private:
   // Private constructor to require use of New().
@@ -131,7 +131,9 @@ class SoftmacBinding : public DeviceInterface {
           },
   };
 
-  std::mutex ethernet_proxy_lock_;
+  // Mark `ethernet_proxy_lock_` as a mutable member of this class to allow const functions
+  // to acquire it.
+  mutable std::mutex ethernet_proxy_lock_;
   ddk::EthernetIfcProtocolClient ethernet_proxy_ __TA_GUARDED(ethernet_proxy_lock_);
 
   // Manages the lifetime of the protocol struct we pass down to the vendor driver. Actual
@@ -146,7 +148,11 @@ class SoftmacBinding : public DeviceInterface {
   fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
 
   fdf::Dispatcher softmac_ifc_server_dispatcher_;
-  std::unique_ptr<SoftmacIfcBridge> softmac_ifc_bridge_;
+
+  // Mark `softmac_ifc_bridge_` as a mutable member of this class so `Start` can be a const function
+  // that lazy-initializes `softmac_ifc_bridge_`. Note that `softmac_ifc_bridge_` is never mutated
+  // again until its reset upon the framework calling the unbind hook.
+  mutable std::unique_ptr<SoftmacIfcBridge> softmac_ifc_bridge_;
 
   // Record when the framework calls the unbind hook to prevent sta_shutdown_handler() from calling
   // device_async_remove() when an unbind is already in progress.

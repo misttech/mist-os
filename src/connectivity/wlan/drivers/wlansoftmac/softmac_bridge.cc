@@ -57,9 +57,11 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
   auto softmac_bridge =
       std::unique_ptr<SoftmacBridge>(new SoftmacBridge(device, std::move(softmac_client)));
 
+  // Safety: Each of the functions initialized in `wlansoftmac_rust_ops` is safe to call
+  // from any thread as long they are never called concurrently.
   rust_device_interface_t wlansoftmac_rust_ops = {
-      .device = static_cast<void*>(softmac_bridge->device_interface_),
-      .start = [](void* device_interface, const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
+      .device = static_cast<const void*>(softmac_bridge->device_interface_),
+      .start = [](const void* device_interface, const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
                   zx_handle_t softmac_ifc_bridge_client_handle,
                   zx_handle_t* out_sme_channel) -> zx_status_t {
         WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.start");
@@ -69,18 +71,18 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
         *out_sme_channel = channel.release();
         return result;
       },
-      .deliver_eth_frame = [](void* device_interface, const uint8_t* data,
+      .deliver_eth_frame = [](const void* device_interface, const uint8_t* data,
                               size_t len) -> zx_status_t {
         WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.deliver_eth_frame");
         return DeviceInterface::from(device_interface)->DeliverEthernet({data, len});
       },
-      .queue_tx = [](void* device_interface, uint32_t options, void* buffer, size_t written,
+      .queue_tx = [](const void* device_interface, uint32_t options, void* buffer, size_t written,
                      wlan_tx_info_t tx_info, trace_async_id_t async_id) -> zx_status_t {
         WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.queue_tx");
         return DeviceInterface::from(device_interface)
             ->QueueTx(FinalizedBuffer::FromRaw(buffer, written), tx_info, async_id);
       },
-      .set_ethernet_status = [](void* device_interface, uint32_t status) -> zx_status_t {
+      .set_ethernet_status = [](const void* device_interface, uint32_t status) -> zx_status_t {
         WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.set_ethernet_status");
         return DeviceInterface::from(device_interface)->SetEthernetStatus(status);
       },

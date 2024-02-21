@@ -17,7 +17,7 @@ use {
     wlan_common::pointers::SendPtr,
     wlan_mlme::{
         buffer::BufferProvider,
-        device::{completers::StopCompleter, Device, DeviceInterface},
+        device::{completers::StopCompleter, CDeviceInterface, Device},
     },
     wlan_span::CSpan,
     wlan_trace as wtrace,
@@ -71,7 +71,7 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
         status: zx::zx_status_t,
         wlan_softmac_handle: *mut WlanSoftmacHandle,
     ),
-    device: DeviceInterface,
+    device: CDeviceInterface,
     buf_provider: BufferProvider,
     wlan_softmac_bridge_client_handle: zx::sys::zx_handle_t,
 ) -> zx::sys::zx_status_t {
@@ -94,7 +94,7 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
         let channel = fidl::Channel::from(handle);
         fidl_softmac::WlanSoftmacBridgeSynchronousProxy::new(channel)
     };
-    let device = Device::new(device, wlan_softmac_bridge_proxy);
+    let device = Device::new(device.into(), wlan_softmac_bridge_proxy);
 
     let mut executor = LocalExecutor::new();
     executor.run_singlethreaded(async move {

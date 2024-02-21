@@ -32,11 +32,11 @@ include = ["wlan_mlme", "wlan_span", "wlansoftmac_rust"]
 [export]
 include = [
     "BufferProvider",
-    "CSpan",
-    "DeviceInterface",
     "CBuffer",
-    "WlanSoftmacHandle",
+    "CDeviceInterface",
+    "CSpan",
     "TraceId",
+    "WlanSoftmacHandle",
 ]
 
 exclude = [
@@ -65,6 +65,7 @@ exclude = [
 "CSpan" = "wlan_span_t"
 "DeviceInterface" = "rust_device_interface_t"
 "CBuffer" = "wlansoftmac_buffer_t"
+"CDeviceInterface" = "rust_device_interface_t"
 "WlanSoftmacHandle" = "wlansoftmac_handle_t"
 "TraceId" = "trace_async_id_t"
 

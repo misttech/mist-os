@@ -22,7 +22,7 @@ namespace wlan::drivers::wlansoftmac {
 class SoftmacIfcBridge : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmacIfc> {
  public:
   static zx::result<std::unique_ptr<SoftmacIfcBridge>> New(
-      fdf::Dispatcher& softmac_ifc_server_dispatcher,
+      const fdf::Dispatcher& softmac_ifc_server_dispatcher,
       const rust_wlan_softmac_ifc_protocol_copy_t* rust_softmac_ifc,
       fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacIfc>&& server_endpoint,
       fidl::ClientEnd<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>&& bridge_client_endpoint);

@@ -14,7 +14,7 @@ use {
     std::{ffi::c_void, fmt::Display, sync::Arc},
     trace::Id as TraceId,
     tracing::error,
-    wlan_common::{mac::FrameControl, tx_vector, TimeUnit},
+    wlan_common::{mac::FrameControl, pointers::SendPtr, tx_vector, TimeUnit},
     wlan_trace as wtrace,
 };
 
@@ -383,7 +383,9 @@ impl DeviceOps for Device {
     ) -> Result<zx::Handle, zx::Status> {
         let mut out_channel = 0;
         let status = (self.raw_device.start)(
-            self.raw_device.device,
+            // Safety: This is safe because the original will not be used while the copy is still in
+            // scope.
+            unsafe { self.raw_device.device.clone().as_ptr() },
             ifc,
             wlan_softmac_ifc_bridge_client_handle,
             &mut out_channel as *mut u32,
@@ -434,7 +436,9 @@ impl DeviceOps for Device {
 
     fn deliver_eth_frame(&mut self, slice: &[u8]) -> Result<(), zx::Status> {
         let status = (self.raw_device.deliver_eth_frame)(
-            self.raw_device.device,
+            // Safety: This is safe because the original will not be used while the copy
+            // is still in scope.
+            unsafe { self.raw_device.device.clone().as_ptr() },
             slice.as_ptr(),
             slice.len(),
         );
@@ -481,7 +485,9 @@ impl DeviceOps for Device {
         // to the C++ portion of wlansoftmac.
         let (buffer, _free, written) = unsafe { buffer.release() };
         zx::ok((self.raw_device.queue_tx)(
-            self.raw_device.device,
+            // Safety: This is safe because the original will not be used while the copy
+            // is still in scope.
+            unsafe { self.raw_device.device.clone().as_ptr() },
             0,
             buffer,
             written,
@@ -497,7 +503,12 @@ impl DeviceOps for Device {
     }
 
     fn set_ethernet_status(&mut self, status: LinkStatus) -> Result<(), zx::Status> {
-        zx::ok((self.raw_device.set_ethernet_status)(self.raw_device.device, status.0))
+        zx::ok((self.raw_device.set_ethernet_status)(
+            // Safety: This is safe because the original will not be used while the copy
+            // is still in scope.
+            unsafe { self.raw_device.device.clone().as_ptr() },
+            status.0,
+        ))
     }
 
     fn set_channel(&mut self, channel: fidl_common::WlanChannel) -> Result<(), zx::Status> {
@@ -730,26 +741,40 @@ impl<'a> WlanSoftmacIfcProtocol<'a> {
     }
 }
 
-/// A `Device` allows transmitting frames and MLME messages.
+/// Type that represents the FFI from the bridged wlansoftmac to wlansoftmac itself.
+///
+/// Each of the functions in this FFI are safe to call from any thread but not
+/// safe to call concurrently, i.e., they can only be called one at a time.
+///
+/// # Safety
+///
+/// Rust does not support marking a type as unsafe, but initializing this type is
+/// definitely unsafe and deserves documentation. This is because when the bridged
+/// wlansoftmac uses this FFI, it cannot guarantee each of the functions is safe to
+/// call from any thread.
+///
+/// By constructing a value of this type, the constructor promises each of the functions
+/// is safe to call from any thread. And no undefined behavior will occur if the
+/// caller only calls one of them at a time.
 #[repr(C)]
-pub struct DeviceInterface {
-    device: *mut c_void,
+pub struct CDeviceInterface {
+    device: *const c_void,
     /// Start operations on the underlying device and return the SME channel.
     start: extern "C" fn(
-        device: *mut c_void,
+        device: *const c_void,
         ifc: *const WlanSoftmacIfcProtocol<'_>,
         wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
         out_sme_channel: *mut zx::sys::zx_handle_t,
     ) -> i32,
     /// Request to deliver an Ethernet II frame to Fuchsia's Netstack.
-    deliver_eth_frame: extern "C" fn(device: *mut c_void, data: *const u8, len: usize) -> i32,
+    deliver_eth_frame: extern "C" fn(device: *const c_void, data: *const u8, len: usize) -> i32,
     /// Deliver a WLAN frame directly through the firmware.
     ///
     /// The `buffer` and `written` arguments must be from a call to `FinalizedBuffer::release`. The
     /// C++ portion of wlansoftmac will reconstruct an instance of the `FinalizedBuffer` class
     /// defined in buffer_allocator.h.
     queue_tx: extern "C" fn(
-        device: *mut c_void,
+        device: *const c_void,
         options: u32,
         buffer: *mut c_void,
         written: usize,
@@ -757,7 +782,49 @@ pub struct DeviceInterface {
         async_id: TraceId,
     ) -> i32,
     /// Reports the current status to the ethernet driver.
-    set_ethernet_status: extern "C" fn(device: *mut c_void, status: u32) -> i32,
+    set_ethernet_status: extern "C" fn(device: *const c_void, status: u32) -> i32,
+}
+
+/// Type that represents the FFI from the bridged wlansoftmac to wlansoftmac itself.
+///
+/// Each of the functions in this FFI are safe to call from another thread but not
+/// safe to call concurrently, i.e., they can only be called one at a time.
+pub struct DeviceInterface {
+    device: SendPtr<*const c_void>,
+    /// Start operations on the underlying device and return the SME channel.
+    start: extern "C" fn(
+        device: *const c_void,
+        ifc: *const WlanSoftmacIfcProtocol<'_>,
+        wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
+        out_sme_channel: *mut zx::sys::zx_handle_t,
+    ) -> i32,
+    /// Request to deliver an Ethernet II frame to Fuchsia's Netstack.
+    deliver_eth_frame: extern "C" fn(device: *const c_void, data: *const u8, len: usize) -> i32,
+    /// Deliver a WLAN frame directly through the firmware.
+    queue_tx: extern "C" fn(
+        device: *const c_void,
+        options: u32,
+        buffer: *mut c_void,
+        written: usize,
+        tx_info: banjo_wlan_softmac::WlanTxInfo,
+        async_id: TraceId,
+    ) -> i32,
+    /// Reports the current status to the ethernet driver.
+    set_ethernet_status: extern "C" fn(device: *const c_void, status: u32) -> i32,
+}
+
+impl From<CDeviceInterface> for DeviceInterface {
+    fn from(device_interface: CDeviceInterface) -> Self {
+        Self {
+            // Safety: This is safe because `device_interface.device` will never become
+            // any other type than `*const c_void`.
+            device: unsafe { SendPtr::from_always_const_void(device_interface.device) },
+            start: device_interface.start,
+            deliver_eth_frame: device_interface.deliver_eth_frame,
+            queue_tx: device_interface.queue_tx,
+            set_ethernet_status: device_interface.set_ethernet_status,
+        }
+    }
 }
 
 pub mod test_utils {

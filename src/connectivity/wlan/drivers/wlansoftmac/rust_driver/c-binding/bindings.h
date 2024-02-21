@@ -41,19 +41,33 @@ typedef struct {
 } rust_wlan_softmac_ifc_protocol_copy_t;
 
 /**
- * A `Device` allows transmitting frames and MLME messages.
+ * Type that represents the FFI from the bridged wlansoftmac to wlansoftmac itself.
+ *
+ * Each of the functions in this FFI are safe to call from any thread but not
+ * safe to call concurrently, i.e., they can only be called one at a time.
+ *
+ * # Safety
+ *
+ * Rust does not support marking a type as unsafe, but initializing this type is
+ * definitely unsafe and deserves documentation. This is because when the bridged
+ * wlansoftmac uses this FFI, it cannot guarantee each of the functions is safe to
+ * call from any thread.
+ *
+ * By constructing a value of this type, the constructor promises each of the functions
+ * is safe to call from any thread. And no undefined behavior will occur if the
+ * caller only calls one of them at a time.
  */
 typedef struct {
-  void *device;
+  const void *device;
   /**
    * Start operations on the underlying device and return the SME channel.
    */
-  int32_t (*start)(void *device, const rust_wlan_softmac_ifc_protocol_copy_t *ifc,
+  int32_t (*start)(const void *device, const rust_wlan_softmac_ifc_protocol_copy_t *ifc,
                    zx_handle_t wlan_softmac_ifc_bridge_client_handle, zx_handle_t *out_sme_channel);
   /**
    * Request to deliver an Ethernet II frame to Fuchsia's Netstack.
    */
-  int32_t (*deliver_eth_frame)(void *device, const uint8_t *data, uintptr_t len);
+  int32_t (*deliver_eth_frame)(const void *device, const uint8_t *data, uintptr_t len);
   /**
    * Deliver a WLAN frame directly through the firmware.
    *
@@ -61,12 +75,12 @@ typedef struct {
    * C++ portion of wlansoftmac will reconstruct an instance of the `FinalizedBuffer` class
    * defined in buffer_allocator.h.
    */
-  int32_t (*queue_tx)(void *device, uint32_t options, void *buffer, uintptr_t written,
+  int32_t (*queue_tx)(const void *device, uint32_t options, void *buffer, uintptr_t written,
                       wlan_tx_info_t tx_info, trace_async_id_t async_id);
   /**
    * Reports the current status to the ethernet driver.
    */
-  int32_t (*set_ethernet_status)(void *device, uint32_t status);
+  int32_t (*set_ethernet_status)(const void *device, uint32_t status);
 } rust_device_interface_t;
 
 /**

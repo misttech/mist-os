@@ -28,17 +28,19 @@ namespace wlan::drivers {
 class DeviceInterface {
  public:
   virtual ~DeviceInterface() = default;
-  static DeviceInterface* from(void* device) { return static_cast<DeviceInterface*>(device); }
+  static const DeviceInterface* from(const void* device) {
+    return static_cast<const DeviceInterface*>(device);
+  }
 
   virtual zx_status_t Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
                             zx_handle_t softmac_ifc_bridge_client_handle,
-                            zx::channel* out_sme_channel) = 0;
+                            zx::channel* out_sme_channel) const = 0;
 
-  virtual zx_status_t DeliverEthernet(cpp20::span<const uint8_t> eth_frame) = 0;
+  virtual zx_status_t DeliverEthernet(cpp20::span<const uint8_t> eth_frame) const = 0;
   virtual zx_status_t QueueTx(FinalizedBuffer buffer, wlan_tx_info_t tx_info,
-                              trace_async_id_t async_id) = 0;
+                              trace_async_id_t async_id) const = 0;
 
-  virtual zx_status_t SetEthernetStatus(uint32_t status) = 0;
+  virtual zx_status_t SetEthernetStatus(uint32_t status) const = 0;
 };
 
 }  // namespace wlan::drivers
