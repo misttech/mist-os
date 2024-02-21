@@ -94,7 +94,7 @@ struct StartContext {
     scope: ExecutionScope,
     numbered_handles: Vec<fprocess::HandleInfo>,
     encoded_config: Option<fmem::Data>,
-    incoming_dict: Option<Dict>,
+    program_input_dict_additions: Option<Dict>,
 }
 
 async fn do_start(
@@ -142,7 +142,7 @@ async fn do_start(
     let IncomingCapabilities {
         numbered_handles,
         additional_namespace_entries,
-        dict: incoming_dict,
+        dict: program_input_dict_additions,
     } = incoming;
 
     // Create the component's namespace.
@@ -201,7 +201,7 @@ async fn do_start(
         scope,
         numbered_handles,
         encoded_config,
-        incoming_dict,
+        program_input_dict_additions,
     };
 
     start_component(&component, resolved_component.decl, pending_runtime, start_context).await
@@ -236,7 +236,7 @@ async fn start_component(
         numbered_handles,
         scope,
         encoded_config,
-        incoming_dict,
+        program_input_dict_additions,
     } = start_context;
 
     if let Some(runner) = runner {
@@ -273,13 +273,13 @@ async fn start_component(
 
     execution.runtime = Some(pending_runtime);
 
-    // TODO(b/322564390): Move incoming_dict into `ExecutionState`.
+    // TODO(b/322564390): Move program_input_dict_additions into `ExecutionState`.
     {
         let resolved_state = match &mut *state {
             InstanceState::Resolved(resolved_state) => resolved_state,
             _ => panic!("expected component to be resolved"),
         };
-        resolved_state.incoming_dict = incoming_dict;
+        resolved_state.program_input_dict_additions = program_input_dict_additions;
     }
 
     drop(execution);

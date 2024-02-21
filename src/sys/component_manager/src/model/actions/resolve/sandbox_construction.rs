@@ -414,8 +414,8 @@ fn extend_dict_with_use(
 
 /// Builds a router that obtains a capability that the program uses from `parent`.
 ///
-/// The capability is usually an entry in the `component_input.capabilities` dict
-/// unless it is overridden by an eponymous capability in the `incoming_dict` when started.
+/// The capability is usually an entry in the `component_input.capabilities` dict unless it is
+/// overridden by an eponymous capability in the `program_input_dict_additions` when started.
 fn use_from_parent_router(
     component_input: &ComponentInput,
     source_path: impl IterablePath + 'static,
@@ -459,7 +459,7 @@ fn use_from_parent_router(
                 // TODO(https://fxbug.dev/319542502): Convert from the external Router type, once it
                 // exists.
                 state
-                    .incoming_dict
+                    .program_input_dict_additions
                     .as_ref()
                     .and_then(|dict| match dict.get_capability(source_path.iter_segments()) {
                         Some(Capability::Open(o)) => Some(Router::from_routable(o)),

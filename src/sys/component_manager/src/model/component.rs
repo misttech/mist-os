@@ -811,11 +811,11 @@ impl ComponentInstance {
             (was_running, component_stop_result)
         };
 
-        // TODO(b/322564390): Move incoming_dict into `ExecutionState` to avoid locking InstanceState.
+        // TODO(b/322564390): Move program_input_dict_additions into `ExecutionState` to avoid locking InstanceState.
         {
             let mut state = self.lock_state().await;
             if let InstanceState::Resolved(resolved_state) = &mut *state {
-                resolved_state.incoming_dict = None;
+                resolved_state.program_input_dict_additions = None;
             };
         }
 
@@ -1619,7 +1619,7 @@ pub struct ResolvedInstanceState {
 
     /// Dictionary of extra capabilities passed to the component when it is started.
     // TODO(b/322564390): Move this into `ExecutionState` once stop action releases lock on it
-    pub incoming_dict: Option<Dict>,
+    pub program_input_dict_additions: Option<Dict>,
 
     /// Dicts containing the capabilities we want to provide to each collection. Each new
     /// dynamic child gets a clone of one of these inputs (which is potentially extended by
@@ -1680,7 +1680,7 @@ impl ResolvedInstanceState {
             component_output_dict: Dict::new(),
             program_input_dict: Dict::new(),
             program_output_dict: Dict::new(),
-            incoming_dict: None,
+            program_input_dict_additions: None,
             collection_dicts: HashMap::new(),
         };
         state.add_static_children(component).await?;
