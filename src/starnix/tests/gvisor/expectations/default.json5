@@ -43,6 +43,7 @@
                 "Cgroup.AllControllersExplicit",
                 "Cgroup.AllControllersImplicit",
                 "Cgroup.CantRenameControlFile",
+                "Cgroup.CgroupsCannotMountTwice",
                 "Cgroup.ControllersMustBeInUniqueHierarchy",
                 "Cgroup.Create",
                 "Cgroup.CrossDirRenameNotAllowed",
@@ -57,6 +58,7 @@
                 "Cgroup.MoptAllMustBeExclusive",
                 "Cgroup.MountRace",
                 "Cgroup.MountSucceeds",
+                "Cgroup.MountsForAllControllers",
                 "Cgroup.NameMatchButControllersDont",
                 "Cgroup.NamedHierarchies",
                 "Cgroup.NoneExclusiveWithAnyController",
@@ -345,6 +347,7 @@
                 "MountTest.ChangeMountFlags",
                 "MountTest.DetachedMountBindFails",
                 "MountTest.LargeTreePropagationEvent",
+                "MountTest.LockedMountStopsNonRecBind",
                 "MountTest.MaxMounts",
                 "MountTest.MountInfo",
                 "MountTest.MountNamespaceSlavesNewUserNamespace",
@@ -367,6 +370,7 @@
                 "MountTest.TmpfsSizeRoundUpSinglePageSize",
                 "MountTest.TmpfsSymlinkAllocCheck",
                 "MountTest.TmpfsSymlinkUnallocCheck",
+                "MountTest.UmountPropagatedSubtreeFromPrivilegedNS",
                 "MountTest.UmountReparentsCoveredMounts",
 
                 // msgqueue_test
@@ -438,6 +442,8 @@
                 "PivotRootTest.OnRootFS",
                 "PivotRootTest.ChangesCwdForAllProcesses",
                 "PivotRootTest.MovesOldRoot",
+                "PivotRootTest.LockedNewRootFails",
+                "PivotRootTest.OldRootUnlocked",
 
                 // prctl_setuid_test
                 "PrctlKeepCapsSetuidTest.NoKeepCapsAfterNewUserNamespace",
@@ -551,6 +557,11 @@
                 "PtraceTest.ChangeRegSetInOptSyscall",
                 "PtraceTest.Sysemu_PokeUser",
 
+                // pty_test
+                "PtyTest.CanonInputBackspaceMultibyteCharacterWithIUTF8",
+                "PtyTest.CanonInputBackspaceMultibyteCharacterPartialWithIUTF8",
+                "PtyTest.CanonInputWordErase",
+
                 // raw_socket_icmp
                 "RawSocketICMPTest.IPv6ChecksumNotSupported",
                 "RawSocketICMPTest.ICMPv6FilterNotSupported",
@@ -565,6 +576,9 @@
                 // rtsignal_test
                 "RtSignalTest.InvalidCodes",
                 "RtSignalTest.SignoMatch",
+
+                // seccomp_test
+                "SeccompTest.EmptyProgramIsRejected",
 
                 // sigaltstack_test - https://fxbug.dev/42159586
                 "SigaltstackTest.ResetByExecve",
