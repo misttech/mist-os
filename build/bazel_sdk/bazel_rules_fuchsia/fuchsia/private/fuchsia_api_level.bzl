@@ -4,7 +4,7 @@
 
 """ Defines utilities for working with fuchsia api levels. """
 
-load("//:api_version.bzl", "VALID_TARGET_APIS")
+load("//:api_version.bzl", "INTERNAL_ONLY_VALID_TARGET_APIS")
 
 # We define the provider in this file because it is a private implementation
 # detail in this file. It is only made public so that it can be used in tests.
@@ -26,6 +26,32 @@ FUCHSIA_API_LEVEL_ATTRS = {
     ),
 }
 
+FUCHSIA_API_LEVEL_STATUS_SUPPORTED = "supported"
+FUCHSIA_API_LEVEL_STATUS_UNSUPPORTED = "unsupported"
+FUCHSIA_API_LEVEL_STATUS_IN_DEVELOPMENT = "in-development"
+
+def get_fuchsia_api_levels():
+    """ Returns the list of API levels in this SDK.
+
+    Values are returned as a struct with the following fields:
+    struct(
+        abi_revision = "0xED74D73009C2B4E3",
+        api_level = "10",
+        status = "unsupported"
+    )
+
+    The status is not an API to be relied on but the STATUS_* constants can be
+    used.
+    """
+    return INTERNAL_ONLY_VALID_TARGET_APIS + [
+        # Add the HEAD level as an in-development level
+        struct(
+            abi_revision = "",
+            api_level = "HEAD",
+            status = FUCHSIA_API_LEVEL_STATUS_IN_DEVELOPMENT,
+        ),
+    ]
+
 def get_fuchsia_api_level(ctx):
     """ Returns the raw api level to use for building.
 
@@ -37,7 +63,7 @@ def _valid_api_levels(ctx):
     if getattr(ctx.attr, "valid_api_levels_for_test", None):
         levels = ctx.attr.valid_api_levels_for_test
     else:
-        levels = [entry.api_level for entry in VALID_TARGET_APIS]
+        levels = [entry.api_level for entry in get_fuchsia_api_levels()]
 
     # The unset level is still valid since it can indicate that the user did
     # not set the value. If we don't do this then we have no way if the

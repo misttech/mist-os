@@ -319,12 +319,6 @@ def _generate_api_version_rules(ctx, meta, relative_dir, build_file, process_con
 
     fidl_api_level_override = ctx.attr.fuchsia_api_level_override
     clang_api_level_override = ctx.attr.fuchsia_api_level_override
-    if ctx.attr.fuchsia_api_level_override == "HEAD":
-        versions.append(struct(
-            # Do not set abi_revision or status here because they don't really
-            # exist for HEAD and we don't want to silently use them by accident.
-            api_level = "HEAD",
-        ))
 
     _merge_template(
         ctx,

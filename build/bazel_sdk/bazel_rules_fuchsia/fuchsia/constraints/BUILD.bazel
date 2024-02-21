@@ -5,7 +5,7 @@
 # Constraints and platforms for Fuchsia.
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
-load("//:api_version.bzl", "VALID_TARGET_APIS")
+load("//:api_version.bzl", "INTERNAL_ONLY_VALID_TARGET_APIS")
 
 package(
     default_visibility = ["//:__subpackages__"],
@@ -32,7 +32,7 @@ alias(
             "//fuchsia:fuchsia_api_level": target_api.api_level,
         },
     )
-    for target_api in VALID_TARGET_APIS
+    for target_api in INTERNAL_ONLY_VALID_TARGET_APIS
 ]
 
 # CPU based configurations

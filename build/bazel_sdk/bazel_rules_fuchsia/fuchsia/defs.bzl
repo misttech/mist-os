@@ -69,6 +69,11 @@ load(
     _fuchsia_driver_tool = "fuchsia_driver_tool",
 )
 load(
+    "//fuchsia/private:fuchsia_api_level.bzl",
+    _FUCHSIA_API_LEVEL_STATUS_SUPPORTED = "FUCHSIA_API_LEVEL_STATUS_SUPPORTED",
+    _get_fuchsia_api_levels = "get_fuchsia_api_levels",
+)
+load(
     "//fuchsia/private:fuchsia_fidl_bind_library.bzl",
     _fuchsia_fidl_bind_library = "fuchsia_fidl_bind_library",
 )
@@ -159,6 +164,7 @@ fuchsia_select = _fuchsia_select
 fuchsia_cpu_select = _fuchsia_cpu_select
 fuchsia_cpu_filter_dict = _fuchsia_cpu_filter_dict
 get_component_manifests = _get_component_manifests
+get_fuchsia_api_levels = _get_fuchsia_api_levels
 get_driver_component_manifests = _get_driver_component_manifests
 if_fuchsia = _if_fuchsia
 clangd_compilation_database = _clangd_compilation_database
@@ -167,3 +173,6 @@ fuchsia_board_driver = _fuchsia_board_driver
 
 # Platform definitions
 fuchsia_platforms = _fuchsia_platforms
+
+# Constants
+FUCHSIA_API_LEVEL_STATUS_SUPPORTED = _FUCHSIA_API_LEVEL_STATUS_SUPPORTED
