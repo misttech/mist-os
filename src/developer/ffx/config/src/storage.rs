@@ -127,12 +127,18 @@ where
         let parent = path.parent().unwrap_or_else(|| Path::new("."));
         let tmp = tempfile::NamedTempFile::new_in(parent)?;
         let mut writer = MaybeFlushWriter { flush, writer: tmp };
+        tracing::debug!("Calling writer callback");
         f(Some(BufWriter::new(&mut writer)))?;
+        tracing::debug!("Calling persist");
         writer.writer.persist(path)?;
+        tracing::debug!("Persisted");
 
         Ok(())
     } else {
-        f(None)
+        tracing::debug!("Calling writer callback with no persist");
+        let ret = f(None);
+        tracing::debug!("Called writer callback");
+        ret
     }
 }
 
