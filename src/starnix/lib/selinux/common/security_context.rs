@@ -25,6 +25,20 @@ pub struct SecurityContext {
 }
 
 impl SecurityContext {
+    /// Returns a new instance with the specified field values.
+    /// No validation of the supplied values is performed. Contexts are
+    /// typically validated against the loaded policy by the Security Server,
+    /// e.g. when exchanging them for a Security Id.
+    pub fn new(
+        user: String,
+        role: String,
+        type_: String,
+        low_level: SecurityLevel,
+        high_level: Option<SecurityLevel>,
+    ) -> Self {
+        Self { user, role, type_, low_level, high_level }
+    }
+
     /// Returns the user component of the security context.
     pub fn user(&self) -> &str {
         &self.user
@@ -59,6 +73,14 @@ pub struct SecurityLevel {
     categories: Vec<Category>,
 }
 
+impl SecurityLevel {
+    /// Returns a new instance with the specified contents.
+    /// No validation of the supplied values is performed.
+    pub fn new(sensitivity: Sensitivity, categories: Vec<Category>) -> Self {
+        Self { sensitivity, categories }
+    }
+}
+
 impl TryFrom<&str> for SecurityLevel {
     type Error = SecurityContextParseError;
 
@@ -90,6 +112,14 @@ impl TryFrom<&str> for SecurityLevel {
 /// Typed container for a policy-defined sensitivity.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Sensitivity(String);
+
+impl Sensitivity {
+    /// Returns a new instance with the specified contents.
+    /// No validation of the supplied value is performed.
+    pub fn new(name: String) -> Self {
+        Self(name)
+    }
+}
 
 /// Describes an entry in a category specification, which may be an
 /// individual category, or a range.
@@ -154,17 +184,17 @@ impl TryFrom<&str> for SecurityContext {
     }
 }
 
-impl TryFrom<Vec<u8>> for SecurityContext {
+impl TryFrom<&[u8]> for SecurityContext {
     type Error = SecurityContextParseError;
 
-    // Parses a security context from a `Vec<u8>`.
+    // Parses a security context from a `&[u8]`.
     //
-    // The supplied vector of octets is required to contain a valid UTF-8
+    // The supplied array of octets is required to contain a valid UTF-8
     // encoded string, from which a valid Security Context string can be
     // parsed.
-    fn try_from(security_context: Vec<u8>) -> Result<Self, Self::Error> {
-        let as_string = String::from_utf8(security_context).map_err(|_| Self::Error::Invalid)?;
-        Self::try_from(as_string.as_str())
+    fn try_from(security_context: &[u8]) -> Result<Self, Self::Error> {
+        let as_str = std::str::from_utf8(security_context).map_err(|_| Self::Error::Invalid)?;
+        Self::try_from(as_str)
     }
 }
 

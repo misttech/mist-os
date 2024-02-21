@@ -184,7 +184,6 @@ mod tests {
         AutoReleasableTask,
     };
     use selinux::security_server::{Mode, SecurityServer};
-    use selinux_common::security_context::SecurityContext;
     use starnix_uapi::signals::SIGTERM;
     use tests::thread_group_hooks::SeLinuxThreadGroupState;
 
@@ -262,9 +261,9 @@ mod tests {
         let mut task = task;
 
         let security_server = SecurityServer::new(Mode::Fake);
-        let elf_security_context =
-            SecurityContext::try_from("u:object_r:type_t:s0").expect("invalid security context");
-        let elf_sid = security_server.security_context_to_sid(&elf_security_context);
+        let elf_sid = security_server
+            .security_context_to_sid(b"u:object_r:type_t:s0")
+            .expect("invalid security context");
         let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
         assert_eq!(task.thread_group.read().selinux_state.as_ref(), None);
         update_state_on_exec(&mut task, &Some(elf_state));
@@ -279,13 +278,12 @@ mod tests {
         let mut task = task;
         task.thread_group.write().selinux_state = Some(initial_state.clone());
 
-        let elf_security_context =
-            SecurityContext::try_from("u:object_r:type_t:s0").expect("invalid security context");
         let elf_sid = kernel
             .security_server
             .as_ref()
             .expect("missing security server")
-            .security_context_to_sid(&elf_security_context);
+            .security_context_to_sid(b"u:object_r:type_t:s0")
+            .expect("invalid security context");
         let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
         assert_ne!(elf_sid, initial_state.current_sid);
         update_state_on_exec(&mut task, &Some(elf_state));
@@ -304,13 +302,12 @@ mod tests {
         let mut task = task;
         task.thread_group.write().selinux_state = Some(initial_state.clone());
 
-        let elf_security_context =
-            SecurityContext::try_from("u:object_r:type_t:s0").expect("invalid security context");
         let elf_sid = kernel
             .security_server
             .as_ref()
             .expect("missing security server")
-            .security_context_to_sid(&elf_security_context);
+            .security_context_to_sid(b"u:object_r:type_t:s0")
+            .expect("invalid security context");
         let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
         assert_ne!(elf_sid, initial_state.current_sid);
         update_state_on_exec(&mut task, &Some(elf_state));

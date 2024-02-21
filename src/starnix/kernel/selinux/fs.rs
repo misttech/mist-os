@@ -16,7 +16,6 @@ use crate::{
 };
 
 use selinux::security_server::{SecurityServer, SecurityServerStatus as _};
-use selinux_common::security_context::SecurityContext;
 use selinux_policy::SUPPORTED_POLICY_VERSION;
 use starnix_logging::{log_error, log_info, track_stub};
 use starnix_sync::{Locked, Mutex, ReadOps, WriteOps};
@@ -298,15 +297,11 @@ impl SeContext {
 
 impl BytesFileOps for SeContext {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        // Validate that `data` holds a valid UTF-8 encoded Security Context
-        // string.
-        let security_context = SecurityContext::try_from(data).map_err(|_| errno!(EINVAL))?;
-
-        // Validate that the `SecurityContext` refers to principals, types, etc
-        // that actually exist in the current policy, by attempting to create
+        // Validate that the `data` describe valid user, role, type, etc by attempting to create
         // a SID from it.
-        let _sid = self.security_server.security_context_to_sid(&security_context);
-
+        self.security_server
+            .security_context_to_sid(data.as_slice())
+            .map_err(|_| errno!(EINVAL))?;
         Ok(())
     }
 }
@@ -625,10 +620,8 @@ impl BytesFileOps for SeProcAttrNode {
         // Writes that consist of a single NUL or a newline clear the SID.
         let sid = match data.as_slice() {
             b"\x0a" | b"\x00" => None,
-            _ => {
-                let security_context =
-                    SecurityContext::try_from(data).map_err(|_| errno!(EINVAL))?;
-                Some(security_server.security_context_to_sid(&security_context))
+            slice => {
+                Some(security_server.security_context_to_sid(slice).map_err(|_| errno!(EINVAL))?)
             }
         };
 
@@ -676,9 +669,7 @@ impl BytesFileOps for SeProcAttrNode {
                 let security_context =
                     sid.and_then(|sid| security_server.sid_to_security_context(&sid));
 
-                Ok(security_context
-                    .map_or(Vec::new(), |context| format!("{}", context).as_bytes().to_vec())
-                    .into())
+                Ok(security_context.unwrap_or_else(Vec::new).into())
             }
             None => match self.attr {
                 Current => Ok(b"unconfined".to_vec().into()),

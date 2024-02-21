@@ -3481,31 +3481,29 @@ impl BinderDriver {
                 let target_proc = target_proc.ok_or(TransactionError::Dead)?;
                 let weak_task = current_task.get_task(target_proc.pid);
                 let target_task = weak_task.upgrade().ok_or_else(|| TransactionError::Dead)?;
-                let security_context: Option<FsString> = if object
-                    .flags
-                    .contains(BinderObjectFlags::TXN_SECURITY_CTX)
-                {
-                    let security_server = target_task
-                        .kernel()
-                        .security_server
-                        .as_ref()
-                        .expect("SELinux is not enabled");
-                    let sid = target_task
-                        .thread_group
-                        .read()
-                        .selinux_state
-                        .as_ref()
-                        .expect("Using selinux state without SELinux enabled")
-                        .current_sid
-                        .clone();
-                    let mut security_context = security_server
-                        .sid_to_security_context(&sid)
-                        .map_or(FsString::default(), |context| FsString::from(context.to_string()));
-                    security_context.push(b'\0');
-                    Some(security_context)
-                } else {
-                    None
-                };
+                let security_context: Option<FsString> =
+                    if object.flags.contains(BinderObjectFlags::TXN_SECURITY_CTX) {
+                        let security_server = target_task
+                            .kernel()
+                            .security_server
+                            .as_ref()
+                            .expect("SELinux is not enabled");
+                        let sid = target_task
+                            .thread_group
+                            .read()
+                            .selinux_state
+                            .as_ref()
+                            .expect("Using selinux state without SELinux enabled")
+                            .current_sid
+                            .clone();
+                        let mut security_context = security_server
+                            .sid_to_security_context(&sid)
+                            .map_or(FsString::default(), FsString::from);
+                        security_context.push(b'\0');
+                        Some(security_context)
+                    } else {
+                        None
+                    };
 
                 // Copy the transaction data to the target process.
                 let (buffers, mut transaction_state) = self.copy_transaction_buffers(

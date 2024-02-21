@@ -188,24 +188,14 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
 
         // TODO(b/322353836): Implement transitions for `*_transition` rules based on initial
         // `user`, `role`, `type_`, `range` values.
-
-        let security_context_string = match &high_level {
-            Some(high_level) => format!("{}:{}:{}:{}-{}", user, role, type_, low_level, high_level),
-            None => format!("{}:{}:{}:{}", user, role, type_, low_level),
-        };
-
-        SecurityContext::try_from(security_context_string.as_str()).map_err(|error| {
-            NewSecurityContextError::MalformedComputedSecurityContext {
-                source_security_context: source.clone(),
-                target_security_context: target.clone(),
-                computed_user: user.to_string(),
-                computed_role: role.to_string(),
-                computed_type: type_.to_string(),
-                computed_low_level: low_level.to_string(),
-                computed_high_level: high_level.map(|high_level| high_level.to_string()),
-                error,
-            }
-        })
+        // TODO(b/319232900): Ensure that the generated Context has e.g. valid security range.
+        Ok(SecurityContext::new(
+            user.to_string(),
+            role.to_string(),
+            type_.to_string(),
+            low_level,
+            high_level,
+        ))
     }
 
     pub(crate) fn parsed_policy(&self) -> &ParsedPolicy<PS> {
