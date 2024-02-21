@@ -12,8 +12,16 @@
         {
             type: "expect_failure",
             matchers: [
-                "SocketTests/SendIpv6PacketInfoSuccessTest*",
-                "SocketTests/SendIpv6PacketInfoFailureTest*",
+                "SocketTests/SendIpv6PacketInfoSuccessTest.SendAndRecv/NIC1_local_address",
+                "SocketTests/SendIpv6PacketInfoSuccessTest.SendAndRecv/NIC1_local_interface",
+                "SocketTests/SendIpv6PacketInfoSuccessTest.SendAndRecv/NIC1_local_address_and_interface",
+                "SocketTests/SendIpv6PacketInfoSuccessTest.SendAndRecv/NIC2_local_address",
+                "SocketTests/SendIpv6PacketInfoSuccessTest.SendAndRecv/NIC2_local_interface",
+                "SocketTests/SendIpv6PacketInfoSuccessTest.SendAndRecv/NIC2_local_address_and_interface",
+                "SocketTests/SendIpv6PacketInfoFailureTest.CheckError/Local_interface_and_bound_device_mismatch",
+                "SocketTests/SendIpv6PacketInfoFailureTest.CheckError/Local_address_and_bound_device_mismatch",
+                "SocketTests/SendIpv6PacketInfoFailureTest.CheckError/Local_addr_and_interface_mismatch",
+                "SocketTests/SendIpv6PacketInfoFailureTest.CheckError/Bound_address_and_local_interface_mismatch",
             ],
         },
         {
