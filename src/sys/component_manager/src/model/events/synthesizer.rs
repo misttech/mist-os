@@ -270,7 +270,7 @@ mod tests {
             hooks::EventPayload,
             testing::routing_test_helpers::*,
         },
-        cm_rust::{DirectoryDecl, ExposeDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget},
+        cm_rust::{CapabilityDecl, ExposeDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget},
         cm_rust_testing::*,
         fidl_fuchsia_io as fio,
         routing::component_instance::ComponentInstanceInterface,
@@ -358,7 +358,7 @@ mod tests {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .directory(diagnostics_decl())
+                    .capability(diagnostics_decl())
                     .expose(expose_diagnostics_decl())
                     .add_lazy_child("b")
                     .build(),
@@ -366,7 +366,7 @@ mod tests {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .directory(diagnostics_decl())
+                    .capability(diagnostics_decl())
                     .expose(expose_diagnostics_decl())
                     .add_lazy_child("c")
                     .add_lazy_child("d")
@@ -375,14 +375,14 @@ mod tests {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .directory(diagnostics_decl())
+                    .capability(diagnostics_decl())
                     .expose(expose_diagnostics_decl())
                     .build(),
             ),
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .directory(diagnostics_decl())
+                    .capability(diagnostics_decl())
                     .expose(expose_diagnostics_decl())
                     .build(),
             ),
@@ -395,8 +395,8 @@ mod tests {
             .await
     }
 
-    fn diagnostics_decl() -> DirectoryDecl {
-        DirectoryDeclBuilder::new("diagnostics").path("/diagnostics").build()
+    fn diagnostics_decl() -> CapabilityDecl {
+        DirectoryBuilder::new().name("diagnostics").path("/diagnostics").build()
     }
 
     fn expose_diagnostics_decl() -> ExposeDecl {

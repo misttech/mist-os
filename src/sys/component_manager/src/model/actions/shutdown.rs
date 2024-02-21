@@ -874,8 +874,8 @@ mod tests {
         cm_rust::{
             Availability, ChildDecl, ComponentDecl, DependencyType, ExposeDecl, ExposeProtocolDecl,
             ExposeRunnerDecl, ExposeSource, ExposeTarget, OfferDecl, OfferProtocolDecl,
-            OfferResolverDecl, OfferSource, OfferStorageDecl, OfferTarget, ProtocolDecl,
-            StorageDecl, StorageDirectorySource, UseDecl, UseSource,
+            OfferResolverDecl, OfferSource, OfferStorageDecl, OfferTarget, StorageDecl,
+            StorageDirectorySource, UseDecl, UseSource,
         },
         cm_rust_testing::{
             ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder,
@@ -3367,10 +3367,7 @@ mod tests {
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDecl {
-                        name: "serviceD".parse().unwrap(),
-                        source_path: Some("/svc/serviceD".parse().unwrap()),
-                    })
+                    .protocol_default("serviceD")
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceD".parse().unwrap(),
@@ -3533,10 +3530,7 @@ mod tests {
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDecl {
-                        name: "serviceD".parse().unwrap(),
-                        source_path: Some("/svc/serviceD".parse().unwrap()),
-                    })
+                    .protocol_default("serviceD")
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceD".parse().unwrap(),
@@ -3550,10 +3544,7 @@ mod tests {
             (
                 "e",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDecl {
-                        name: "serviceE".parse().unwrap(),
-                        source_path: Some("/svc/serviceE".parse().unwrap()),
-                    })
+                    .protocol_default("serviceE")
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceD".parse().unwrap(),
@@ -3762,10 +3753,7 @@ mod tests {
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDecl {
-                        name: "serviceD".parse().unwrap(),
-                        source_path: Some("/svc/serviceD".parse().unwrap()),
-                    })
+                    .protocol_default("serviceD")
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceD".parse().unwrap(),
@@ -3779,10 +3767,7 @@ mod tests {
             (
                 "e",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDecl {
-                        name: "serviceE".parse().unwrap(),
-                        source_path: Some("/svc/serviceE".parse().unwrap()),
-                    })
+                    .protocol_default("serviceE")
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceE".parse().unwrap(),
@@ -3949,10 +3934,7 @@ mod tests {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDecl {
-                        name: "serviceC".parse().unwrap(),
-                        source_path: Some("/svc/serviceC".parse().unwrap()),
-                    })
+                    .protocol_default("serviceC")
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceC".parse().unwrap(),
@@ -4054,10 +4036,7 @@ mod tests {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDecl {
-                        name: "serviceC".parse().unwrap(),
-                        source_path: Some("/svc/serviceC".parse().unwrap()),
-                    })
+                    .protocol_default("serviceC")
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceC".parse().unwrap(),
@@ -4233,10 +4212,7 @@ mod tests {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDecl {
-                        name: "serviceB".parse().unwrap(),
-                        source_path: Some("/svc/serviceB".parse().unwrap()),
-                    })
+                    .protocol_default("serviceB")
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceB".parse().unwrap(),
@@ -4258,10 +4234,7 @@ mod tests {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDecl {
-                        name: "serviceC".parse().unwrap(),
-                        source_path: Some("/svc/serviceC".parse().unwrap()),
-                    })
+                    .protocol_default("serviceC")
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceC".parse().unwrap(),
@@ -4346,10 +4319,7 @@ mod tests {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .protocol(ProtocolDecl {
-                        name: "serviceC".parse().unwrap(),
-                        source_path: Some("/svc/serviceC".parse().unwrap()),
-                    })
+                    .protocol_default("serviceC")
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceC".parse().unwrap(),

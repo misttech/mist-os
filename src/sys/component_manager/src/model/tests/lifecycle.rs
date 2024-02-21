@@ -26,8 +26,8 @@ use {
     async_trait::async_trait,
     cm_config::AllowlistEntryBuilder,
     cm_rust::{
-        Availability, ComponentDecl, RegistrationSource, RunnerDecl, RunnerRegistration,
-        UseEventStreamDecl, UseSource,
+        Availability, ComponentDecl, RegistrationSource, RunnerRegistration, UseEventStreamDecl,
+        UseSource,
     },
     cm_rust_testing::*,
     cm_types::Name,
@@ -344,10 +344,7 @@ async fn bind_eager_children_reentrant() {
                             .environment("env")
                             .build(),
                     )
-                    .runner(RunnerDecl {
-                        name: "foo".parse().unwrap(),
-                        source_path: Some("/svc/runner".parse().unwrap()),
-                    })
+                    .runner_default("foo")
                     .add_environment(
                         EnvironmentDeclBuilder::new()
                             .extends(fdecl::EnvironmentExtends::Realm)
@@ -371,7 +368,10 @@ async fn bind_eager_children_reentrant() {
     let (runner_service, mut receiver) =
         create_service_directory_entry::<fcrunner::ComponentRunnerMarker>();
     let mut out_dir = OutDir::new();
-    out_dir.add_entry("/svc/runner".parse().unwrap(), runner_service);
+    out_dir.add_entry(
+        format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse().unwrap(),
+        runner_service,
+    );
     mock_runner.add_host_fn("test:///a_resolved", out_dir.host_fn());
 
     // Start the top component, and check that it and the eager components were started.
@@ -515,8 +515,11 @@ async fn on_terminate_stop_triggers_reboot() {
                         .on_terminate(fdecl::OnTerminate::Reboot)
                         .build(),
                 )
-                .protocol(
-                    ProtocolDeclBuilder::new(REBOOT_PROTOCOL).path(&reboot_protocol_path).build(),
+                .capability(
+                    ProtocolBuilder::new()
+                        .name(REBOOT_PROTOCOL)
+                        .path(&reboot_protocol_path)
+                        .build(),
                 )
                 .expose(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Self_,
@@ -570,8 +573,11 @@ async fn on_terminate_exit_triggers_reboot() {
                         .on_terminate(fdecl::OnTerminate::Reboot)
                         .build(),
                 )
-                .protocol(
-                    ProtocolDeclBuilder::new(REBOOT_PROTOCOL).path(&reboot_protocol_path).build(),
+                .capability(
+                    ProtocolBuilder::new()
+                        .name(REBOOT_PROTOCOL)
+                        .path(&reboot_protocol_path)
+                        .build(),
                 )
                 .expose(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Self_,
@@ -621,8 +627,11 @@ async fn reboot_shutdown_does_not_trigger_reboot() {
                         .on_terminate(fdecl::OnTerminate::Reboot)
                         .build(),
                 )
-                .protocol(
-                    ProtocolDeclBuilder::new(REBOOT_PROTOCOL).path(&reboot_protocol_path).build(),
+                .capability(
+                    ProtocolBuilder::new()
+                        .name(REBOOT_PROTOCOL)
+                        .path(&reboot_protocol_path)
+                        .build(),
                 )
                 .expose(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Self_,
@@ -710,8 +719,11 @@ async fn on_terminate_with_failed_reboot_panics() {
                         .on_terminate(fdecl::OnTerminate::Reboot)
                         .build(),
                 )
-                .protocol(
-                    ProtocolDeclBuilder::new(REBOOT_PROTOCOL).path(&reboot_protocol_path).build(),
+                .capability(
+                    ProtocolBuilder::new()
+                        .name(REBOOT_PROTOCOL)
+                        .path(&reboot_protocol_path)
+                        .build(),
                 )
                 .expose(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Self_,

@@ -35,7 +35,7 @@ use {
     assert_matches::assert_matches,
     cm_rust::*,
     cm_rust_testing::*,
-    fidl::endpoints::{ClientEnd, ServerEnd},
+    fidl::endpoints::{ClientEnd, ProtocolMarker, ServerEnd},
     fidl_fidl_examples_routing_echo::{self as echo},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_runner as fcrunner,
@@ -73,12 +73,12 @@ async fn capability_requested_event_at_parent() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .protocol_default("foo")
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Self_,
-                    source_name: "foo_svc".parse().unwrap(),
+                    source_name: "foo".parse().unwrap(),
                     source_dictionary: None,
-                    target_name: "bar_svc".parse().unwrap(),
+                    target_name: "bar".parse().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -89,7 +89,7 @@ async fn capability_requested_event_at_parent() {
                     scope: None,
                     target_path: "/events/capability_requested".parse().unwrap(),
                     filter: Some(btreemap! {
-                        "name".to_string() => DictionaryValue::Str("foo_svc".to_string())
+                        "name".to_string() => DictionaryValue::Str("foo".to_string())
                     }),
                     availability: Availability::Required,
                 }))
@@ -102,7 +102,7 @@ async fn capability_requested_event_at_parent() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
-                    source_name: "bar_svc".parse().unwrap(),
+                    source_name: "bar".parse().unwrap(),
                     source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
                     availability: Availability::Required,
@@ -154,7 +154,7 @@ async fn capability_requested_event_at_parent() {
                     Some(fcomponent::EventPayload::CapabilityRequested(
                         fcomponent::CapabilityRequestedPayload { name: Some(name), .. })), ..}
 
-    if *name == "foo_svc".to_string()
+    if *name == "foo".to_string()
     );
 }
 
@@ -173,8 +173,8 @@ async fn use_in_collection() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
-                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                .protocol_default("foo")
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source_name: "foo_data".parse().unwrap(),
                     source: OfferSource::Self_,
@@ -187,10 +187,10 @@ async fn use_in_collection() {
                     availability: Availability::Required,
                 }))
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source_name: "foo_svc".parse().unwrap(),
+                    source_name: "foo".parse().unwrap(),
                     source: OfferSource::Self_,
                     source_dictionary: None,
-                    target_name: "hippo_svc".parse().unwrap(),
+                    target_name: "hippo".parse().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -221,10 +221,10 @@ async fn use_in_collection() {
                     availability: Availability::Required,
                 }))
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source_name: "hippo_svc".parse().unwrap(),
+                    source_name: "hippo".parse().unwrap(),
                     source: OfferSource::Parent,
                     source_dictionary: None,
-                    target_name: "hippo_svc".parse().unwrap(),
+                    target_name: "hippo".parse().unwrap(),
                     target: OfferTarget::Collection("coll".parse().unwrap()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -253,7 +253,7 @@ async fn use_in_collection() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
-                    source_name: "hippo_svc".parse().unwrap(),
+                    source_name: "hippo".parse().unwrap(),
                     source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
                     availability: Availability::Required,
@@ -314,8 +314,8 @@ async fn use_in_collection_not_offered() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
-                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                .protocol_default("foo")
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source_name: "foo_data".parse().unwrap(),
                     source: OfferSource::Self_,
@@ -328,10 +328,10 @@ async fn use_in_collection_not_offered() {
                     availability: Availability::Required,
                 }))
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source_name: "foo_svc".parse().unwrap(),
+                    source_name: "foo".parse().unwrap(),
                     source: OfferSource::Self_,
                     source_dictionary: None,
-                    target_name: "hippo_svc".parse().unwrap(),
+                    target_name: "hippo".parse().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -369,7 +369,7 @@ async fn use_in_collection_not_offered() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
-                    source_name: "hippo_svc".parse().unwrap(),
+                    source_name: "hippo".parse().unwrap(),
                     source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
                     availability: Availability::Required,
@@ -421,12 +421,12 @@ async fn dynamic_offer_from_parent() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .protocol_default("foo")
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source_name: "foo_svc".parse().unwrap(),
+                    source_name: "foo".parse().unwrap(),
                     source: OfferSource::Self_,
                     source_dictionary: None,
-                    target_name: "hippo_svc".parse().unwrap(),
+                    target_name: "hippo".parse().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -456,7 +456,7 @@ async fn dynamic_offer_from_parent() {
             "c",
             ComponentDeclBuilder::new()
                 .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "hippo_svc".parse().unwrap(),
+                    source_name: "hippo".parse().unwrap(),
                     source: UseSource::Parent,
                     source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
@@ -469,7 +469,7 @@ async fn dynamic_offer_from_parent() {
             "d",
             ComponentDeclBuilder::new()
                 .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "hippo_svc".parse().unwrap(),
+                    source_name: "hippo".parse().unwrap(),
                     source: UseSource::Parent,
                     source_dictionary: None,
                     dependency_type: DependencyType::Strong,
@@ -493,9 +493,9 @@ async fn dynamic_offer_from_parent() {
         },
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
-                source_name: Some("hippo_svc".to_string()),
+                source_name: Some("hippo".to_string()),
                 source: Some(fdecl::Ref::Parent(fdecl::ParentRef)),
-                target_name: Some("hippo_svc".to_string()),
+                target_name: Some("hippo".to_string()),
                 dependency_type: Some(fdecl::DependencyType::Strong),
                 ..Default::default()
             })]),
@@ -561,12 +561,12 @@ async fn dynamic_offer_siblings_same_collection() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .protocol(ProtocolDeclBuilder::new("hippo_svc").path("/svc/foo").build())
+                .protocol_default("hippo")
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source_name: "hippo_svc".parse().unwrap(),
+                    source_name: "hippo".parse().unwrap(),
                     source: ExposeSource::Self_,
                     source_dictionary: None,
-                    target_name: "hippo_svc".parse().unwrap(),
+                    target_name: "hippo".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
@@ -576,7 +576,7 @@ async fn dynamic_offer_siblings_same_collection() {
             "c",
             ComponentDeclBuilder::new()
                 .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "hippo_svc".parse().unwrap(),
+                    source_name: "hippo".parse().unwrap(),
                     source: UseSource::Parent,
                     source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
@@ -614,12 +614,12 @@ async fn dynamic_offer_siblings_same_collection() {
         },
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
-                source_name: Some("hippo_svc".to_string()),
+                source_name: Some("hippo".to_string()),
                 source: Some(fdecl::Ref::Child(fdecl::ChildRef {
                     name: "b".to_string(),
                     collection: Some("coll".to_string()),
                 })),
-                target_name: Some("hippo_svc".to_string()),
+                target_name: Some("hippo".to_string()),
                 dependency_type: Some(fdecl::DependencyType::Strong),
                 ..Default::default()
             })]),
@@ -667,12 +667,12 @@ async fn dynamic_offer_siblings_cross_collection() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .protocol(ProtocolDeclBuilder::new("hippo_svc").path("/svc/foo").build())
+                .protocol_default("hippo")
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source_name: "hippo_svc".parse().unwrap(),
+                    source_name: "hippo".parse().unwrap(),
                     source: ExposeSource::Self_,
                     source_dictionary: None,
-                    target_name: "hippo_svc".parse().unwrap(),
+                    target_name: "hippo".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
@@ -682,7 +682,7 @@ async fn dynamic_offer_siblings_cross_collection() {
             "c",
             ComponentDeclBuilder::new()
                 .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "hippo_svc".parse().unwrap(),
+                    source_name: "hippo".parse().unwrap(),
                     source: UseSource::Parent,
                     source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
@@ -724,9 +724,9 @@ async fn dynamic_offer_siblings_cross_collection() {
                     name: "b".to_string(),
                     collection: Some("source_coll".to_string()),
                 })),
-                source_name: Some("hippo_svc".to_string()),
+                source_name: Some("hippo".to_string()),
                 dependency_type: Some(fdecl::DependencyType::Strong),
-                target_name: Some("hippo_svc".to_string()),
+                target_name: Some("hippo".to_string()),
                 ..Default::default()
             })]),
             ..Default::default()
@@ -770,12 +770,12 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .protocol(ProtocolDeclBuilder::new("hippo_svc").path("/svc/foo").build())
+                .protocol_default("hippo")
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source_name: "hippo_svc".parse().unwrap(),
+                    source_name: "hippo".parse().unwrap(),
                     source: ExposeSource::Self_,
                     source_dictionary: None,
-                    target_name: "hippo_svc".parse().unwrap(),
+                    target_name: "hippo".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
@@ -785,7 +785,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
             "c",
             ComponentDeclBuilder::new()
                 .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "hippo_svc".parse().unwrap(),
+                    source_name: "hippo".parse().unwrap(),
                     source: UseSource::Parent,
                     source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
@@ -823,12 +823,12 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
         },
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
-                source_name: Some("hippo_svc".to_string()),
+                source_name: Some("hippo".to_string()),
                 source: Some(fdecl::Ref::Child(fdecl::ChildRef {
                     name: "b".to_string(),
                     collection: Some("coll".to_string()),
                 })),
-                target_name: Some("hippo_svc".to_string()),
+                target_name: Some("hippo".to_string()),
                 dependency_type: Some(fdecl::DependencyType::Strong),
                 ..Default::default()
             })]),
@@ -897,7 +897,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .directory(DirectoryDeclBuilder::new("hippo_data").path("/data/foo").build())
+                .capability(DirectoryBuilder::new().name("hippo_data").path("/data/foo").build())
                 .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                     source_name: "hippo_data".parse().unwrap(),
                     source: ExposeSource::Self_,
@@ -1029,12 +1029,12 @@ async fn dynamic_offer_to_static_offer() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .protocol(ProtocolDeclBuilder::new("hippo_svc").path("/svc/foo").build())
+                .protocol_default("hippo")
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source_name: "hippo_svc".parse().unwrap(),
+                    source_name: "hippo".parse().unwrap(),
                     source: ExposeSource::Self_,
                     source_dictionary: None,
-                    target_name: "hippo_svc".parse().unwrap(),
+                    target_name: "hippo".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
@@ -1044,10 +1044,10 @@ async fn dynamic_offer_to_static_offer() {
             "c",
             ComponentDeclBuilder::new()
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                    source_name: "hippo_svc".parse().unwrap(),
+                    source_name: "hippo".parse().unwrap(),
                     source: OfferSource::Parent,
                     source_dictionary: None,
-                    target_name: "hippo_svc".parse().unwrap(),
+                    target_name: "hippo".parse().unwrap(),
                     target: OfferTarget::static_child("d".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1059,7 +1059,7 @@ async fn dynamic_offer_to_static_offer() {
             "d",
             ComponentDeclBuilder::new()
                 .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "hippo_svc".parse().unwrap(),
+                    source_name: "hippo".parse().unwrap(),
                     source: UseSource::Parent,
                     source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
@@ -1085,12 +1085,12 @@ async fn dynamic_offer_to_static_offer() {
         },
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
-                source_name: Some("hippo_svc".to_string()),
+                source_name: Some("hippo".to_string()),
                 source: Some(fdecl::Ref::Child(fdecl::ChildRef {
                     name: "b".to_string(),
                     collection: None,
                 })),
-                target_name: Some("hippo_svc".to_string()),
+                target_name: Some("hippo".to_string()),
                 dependency_type: Some(fdecl::DependencyType::Strong),
                 ..Default::default()
             })]),
@@ -1111,8 +1111,8 @@ async fn dynamic_offer_to_static_offer() {
 ///   /
 /// [b]
 ///
-/// a: creates [b], with a dict that contains an Open for `hippo_svc`
-/// [b]: instance in collection, uses the `hippo_svc` protocol.
+/// a: creates [b], with a dict that contains an Open for `hippo`
+/// [b]: instance in collection, uses the `hippo` protocol.
 #[fuchsia::test]
 async fn create_child_with_dict() {
     let components = vec![
@@ -1134,7 +1134,7 @@ async fn create_child_with_dict() {
             "b",
             ComponentDeclBuilder::new()
                 .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "hippo_svc".parse().unwrap(),
+                    source_name: "hippo".parse().unwrap(),
                     source: UseSource::Parent,
                     source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
@@ -1145,7 +1145,7 @@ async fn create_child_with_dict() {
         ),
     ];
 
-    // Create a dictionary with a sender for the `hippo_svc` protocol.
+    // Create a dictionary with a sender for the `hippo` protocol.
     let dict = sandbox::Dict::new();
 
     let (receiver, sender) = sandbox::Receiver::new();
@@ -1168,7 +1168,7 @@ async fn create_child_with_dict() {
     // CreateChild dictionary entries must be Open capabilities.
     // TODO(https://fxbug.dev/319542502): Insert the external Router type, once it exists
     let open: sandbox::Open = sender.into();
-    dict.lock_entries().insert("hippo_svc".to_string(), sandbox::Capability::Open(open));
+    dict.lock_entries().insert("hippo".to_string(), sandbox::Capability::Open(open));
 
     let dictionary_client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
 
@@ -1241,9 +1241,9 @@ async fn destroying_instance_blocks_on_routing() {
             ComponentDeclBuilder::new()
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("c".into()),
-                    source_name: "foo_svc".parse().unwrap(),
+                    source_name: "foo".parse().unwrap(),
                     source_dictionary: None,
-                    target_name: "foo_svc".parse().unwrap(),
+                    target_name: "foo".parse().unwrap(),
                     target: OfferTarget::static_child("b".into()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1268,7 +1268,7 @@ async fn destroying_instance_blocks_on_routing() {
             ComponentDeclBuilder::new()
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Parent,
-                    source_name: "foo_svc".parse().unwrap(),
+                    source_name: "foo".parse().unwrap(),
                     source_dictionary: None,
                     target_path: "/svc/echo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
@@ -1289,13 +1289,13 @@ async fn destroying_instance_blocks_on_routing() {
         (
             "c",
             ComponentDeclBuilder::new()
-                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
-                .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
+                .protocol_default("foo")
+                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source: ExposeSource::Self_,
-                    source_name: "foo_svc".parse().unwrap(),
+                    source_name: "foo".parse().unwrap(),
                     source_dictionary: None,
-                    target_name: "foo_svc".parse().unwrap(),
+                    target_name: "foo".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
@@ -1377,7 +1377,7 @@ async fn destroying_instance_blocks_on_routing() {
 ///   \
 ///    b
 ///
-/// a: declares runner "elf" with service "/svc/runner" from "self".
+/// a: declares runner "elf" with service format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME) from "self".
 /// a: registers runner "elf" from self in environment as "hobbit".
 /// b: uses runner "hobbit".
 #[fuchsia::test]
@@ -1398,10 +1398,7 @@ async fn use_runner_from_parent_environment() {
                         })
                         .build(),
                 )
-                .runner(RunnerDecl {
-                    name: "elf".parse().unwrap(),
-                    source_path: Some("/svc/runner".parse().unwrap()),
-                })
+                .runner_default("elf")
                 .build(),
         ),
         ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
@@ -1412,7 +1409,11 @@ async fn use_runner_from_parent_environment() {
         create_service_directory_entry::<fcrunner::ComponentRunnerMarker>();
     let universe = RoutingTestBuilder::new("a", components)
         // Component "b" exposes a runner service.
-        .add_outgoing_path("a", "/svc/runner".parse().unwrap(), runner_service)
+        .add_outgoing_path(
+            "a",
+            format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse().unwrap(),
+            runner_service,
+        )
         .build()
         .await;
 
@@ -1435,7 +1436,7 @@ async fn use_runner_from_parent_environment() {
 ///   \
 ///   [b]
 ///
-/// a: declares runner "elf" with service "/svc/runner" from "self".
+/// a: declares runner "elf" with service format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME) from "self".
 /// a: registers runner "elf" from self in environment as "hobbit".
 /// b: instance in collection uses runner "hobbit".
 #[fuchsia::test]
@@ -1468,10 +1469,7 @@ async fn use_runner_from_environment_in_collection() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .runner(RunnerDecl {
-                    name: "elf".parse().unwrap(),
-                    source_path: Some("/svc/runner".parse().unwrap()),
-                })
+                .runner_default("elf")
                 .build(),
         ),
         ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
@@ -1482,7 +1480,11 @@ async fn use_runner_from_environment_in_collection() {
         create_service_directory_entry::<fcrunner::ComponentRunnerMarker>();
     let universe = RoutingTestBuilder::new("a", components)
         // Component "a" exposes a runner service.
-        .add_outgoing_path("a", "/svc/runner".parse().unwrap(), runner_service)
+        .add_outgoing_path(
+            "a",
+            format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse().unwrap(),
+            runner_service,
+        )
         .build()
         .await;
     universe
@@ -1521,7 +1523,7 @@ async fn use_runner_from_environment_in_collection() {
 ///      \
 ///       c
 ///
-/// a: declares runner "elf" as service "/svc/runner" from self.
+/// a: declares runner "elf" as service format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME) from self.
 /// a: offers runner "elf" from self to "b" as "dwarf".
 /// b: registers runner "dwarf" from realm in environment as "hobbit".
 /// c: uses runner "hobbit".
@@ -1539,10 +1541,7 @@ async fn use_runner_from_grandparent_environment() {
                     target: OfferTarget::static_child("b".to_string()),
                     target_name: "dwarf".parse().unwrap(),
                 }))
-                .runner(RunnerDecl {
-                    name: "elf".parse().unwrap(),
-                    source_path: Some("/svc/runner".parse().unwrap()),
-                })
+                .runner_default("elf")
                 .build(),
         ),
         (
@@ -1570,7 +1569,11 @@ async fn use_runner_from_grandparent_environment() {
         create_service_directory_entry::<fcrunner::ComponentRunnerMarker>();
     let universe = RoutingTestBuilder::new("a", components)
         // Component "a" exposes a runner service.
-        .add_outgoing_path("a", "/svc/runner".parse().unwrap(), runner_service)
+        .add_outgoing_path(
+            "a",
+            format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse().unwrap(),
+            runner_service,
+        )
         .build()
         .await;
 
@@ -1594,7 +1597,7 @@ async fn use_runner_from_grandparent_environment() {
 /// b   c
 ///
 /// a: registers runner "dwarf" from "b" in environment as "hobbit".
-/// b: exposes runner "elf" as service "/svc/runner" from self as "dwarf".
+/// b: exposes runner "elf" as service format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME) from self as "dwarf".
 /// c: uses runner "hobbit".
 #[fuchsia::test]
 async fn use_runner_from_sibling_environment() {
@@ -1627,10 +1630,7 @@ async fn use_runner_from_sibling_environment() {
                     target: ExposeTarget::Parent,
                     target_name: "dwarf".parse().unwrap(),
                 }))
-                .runner(RunnerDecl {
-                    name: "elf".parse().unwrap(),
-                    source_path: Some("/svc/runner".parse().unwrap()),
-                })
+                .runner_default("elf")
                 .build(),
         ),
         ("c", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
@@ -1641,7 +1641,11 @@ async fn use_runner_from_sibling_environment() {
         create_service_directory_entry::<fcrunner::ComponentRunnerMarker>();
     let universe = RoutingTestBuilder::new("a", components)
         // Component "a" exposes a runner service.
-        .add_outgoing_path("b", "/svc/runner".parse().unwrap(), runner_service)
+        .add_outgoing_path(
+            "b",
+            format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse().unwrap(),
+            runner_service,
+        )
         .build()
         .await;
 
@@ -1666,7 +1670,7 @@ async fn use_runner_from_sibling_environment() {
 ///      \
 ///       c
 ///
-/// a: declares runner "elf" as service "/svc/runner" from self.
+/// a: declares runner "elf" as service format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME) from self.
 /// a: registers runner "elf" from realm in environment as "hobbit".
 /// b: creates environment extending from realm.
 /// c: uses runner "hobbit".
@@ -1688,10 +1692,7 @@ async fn use_runner_from_inherited_environment() {
                         })
                         .build(),
                 )
-                .runner(RunnerDecl {
-                    name: "elf".parse().unwrap(),
-                    source_path: Some("/svc/runner".parse().unwrap()),
-                })
+                .runner_default("elf")
                 .build(),
         ),
         (
@@ -1714,7 +1715,11 @@ async fn use_runner_from_inherited_environment() {
         create_service_directory_entry::<fcrunner::ComponentRunnerMarker>();
     let universe = RoutingTestBuilder::new("a", components)
         // Component "a" exposes a runner service.
-        .add_outgoing_path("a", "/svc/runner".parse().unwrap(), runner_service)
+        .add_outgoing_path(
+            "a",
+            format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse().unwrap(),
+            runner_service,
+        )
         .build()
         .await;
 
@@ -1737,7 +1742,7 @@ async fn use_runner_from_inherited_environment() {
 ///   \
 ///    b
 ///
-/// a: declares runner "runner" with service "/svc/runner" from "self".
+/// a: declares runner "runner" with service format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME) from "self".
 /// a: registers runner "runner" from self in environment as "hobbit".
 /// b: uses runner "runner". Fails due to a FIDL error, conveyed through a Stop after the
 ///    bind succeeds.
@@ -1759,10 +1764,7 @@ async fn use_runner_from_environment_failed() {
                         })
                         .build(),
                 )
-                .runner(RunnerDecl {
-                    name: "runner".parse().unwrap(),
-                    source_path: Some("/svc/runner".parse().unwrap()),
-                })
+                .runner_default("runner")
                 // For Stopped event
                 .use_(UseDecl::EventStream(UseEventStreamDecl {
                     source: UseSource::Parent,
@@ -1785,7 +1787,11 @@ async fn use_runner_from_environment_failed() {
         .set_builtin_capabilities(vec![CapabilityDecl::EventStream(EventStreamDecl {
             name: "stopped".parse().unwrap(),
         })])
-        .add_outgoing_path("a", "/svc/runner".parse().unwrap(), runner_service)
+        .add_outgoing_path(
+            "a",
+            format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse().unwrap(),
+            runner_service,
+        )
         .build()
         .await;
 
@@ -1828,7 +1834,7 @@ async fn use_runner_from_environment_failed() {
 ///   \
 ///    b
 ///
-/// a: declares runner "elf" with service "/svc/runner" from "self".
+/// a: declares runner "elf" with service format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME) from "self".
 /// a: registers runner "elf" from self in environment as "hobbit".
 /// b: uses runner "hobbit". Fails because "hobbit" was not in environment.
 #[fuchsia::test]
@@ -1849,10 +1855,7 @@ async fn use_runner_from_environment_not_found() {
                         })
                         .build(),
                 )
-                .runner(RunnerDecl {
-                    name: "elf".parse().unwrap(),
-                    source_path: Some("/svc/runner".parse().unwrap()),
-                })
+                .runner_default("elf")
                 .build(),
         ),
         ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
@@ -1863,7 +1866,11 @@ async fn use_runner_from_environment_not_found() {
         create_service_directory_entry::<fcrunner::ComponentRunnerMarker>();
     let universe = RoutingTestBuilder::new("a", components)
         // Component "a" exposes a runner service.
-        .add_outgoing_path("a", "/svc/runner".parse().unwrap(), runner_service)
+        .add_outgoing_path(
+            "a",
+            format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse().unwrap(),
+            runner_service,
+        )
         .build()
         .await;
 
@@ -1911,7 +1918,7 @@ async fn use_runner_from_environment_not_found() {
 async fn use_with_destroyed_parent() {
     let use_protocol_decl = UseProtocolDecl {
         source: UseSource::Parent,
-        source_name: "foo_svc".parse().unwrap(),
+        source_name: "foo".parse().unwrap(),
         source_dictionary: None,
         target_path: "/svc/hippo".parse().unwrap(),
         dependency_type: DependencyType::Strong,
@@ -1922,7 +1929,7 @@ async fn use_with_destroyed_parent() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .protocol_default("foo")
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
@@ -1933,9 +1940,9 @@ async fn use_with_destroyed_parent() {
                 }))
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Self_,
-                    source_name: "foo_svc".parse().unwrap(),
+                    source_name: "foo".parse().unwrap(),
                     source_dictionary: None,
-                    target_name: "foo_svc".parse().unwrap(),
+                    target_name: "foo".parse().unwrap(),
                     target: OfferTarget::Collection("coll".parse().unwrap()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1948,9 +1955,9 @@ async fn use_with_destroyed_parent() {
             ComponentDeclBuilder::new()
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Parent,
-                    source_name: "foo_svc".parse().unwrap(),
+                    source_name: "foo".parse().unwrap(),
                     source_dictionary: None,
-                    target_name: "foo_svc".parse().unwrap(),
+                    target_name: "foo".parse().unwrap(),
                     target: OfferTarget::static_child("c".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -2022,9 +2029,9 @@ async fn use_from_destroyed_but_not_removed() {
             ComponentDeclBuilder::new()
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("b".to_string()),
-                    source_name: "bar_svc".parse().unwrap(),
+                    source_name: "bar".parse().unwrap(),
                     source_dictionary: None,
-                    target_name: "baz_svc".parse().unwrap(),
+                    target_name: "baz".parse().unwrap(),
                     target: OfferTarget::static_child("c".to_string()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -2036,13 +2043,13 @@ async fn use_from_destroyed_but_not_removed() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .directory(DirectoryDeclBuilder::new("foo_data").path("/data/foo").build())
-                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                .protocol_default("foo")
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source: ExposeSource::Self_,
-                    source_name: "foo_svc".parse().unwrap(),
+                    source_name: "foo".parse().unwrap(),
                     source_dictionary: None,
-                    target_name: "bar_svc".parse().unwrap(),
+                    target_name: "bar".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
@@ -2053,7 +2060,7 @@ async fn use_from_destroyed_but_not_removed() {
             ComponentDeclBuilder::new()
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Parent,
-                    source_name: "baz_svc".parse().unwrap(),
+                    source_name: "baz".parse().unwrap(),
                     source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
@@ -2124,12 +2131,7 @@ async fn use_resolver_from_parent_environment() {
                     target: ExposeTarget::Parent,
                     target_name: "base".parse().unwrap(),
                 }))
-                .resolver(ResolverDecl {
-                    name: "base".parse().unwrap(),
-                    source_path: Some(
-                        "/svc/fuchsia.component.resolution.Resolver".parse().unwrap(),
-                    ),
-                })
+                .resolver_default("base")
                 .build(),
         ),
     ];
@@ -2223,12 +2225,7 @@ async fn use_resolver_from_grandparent_environment() {
                             scheme: "base".parse().unwrap(),
                         }),
                 )
-                .resolver(ResolverDecl {
-                    name: "base".parse().unwrap(),
-                    source_path: Some(
-                        "/svc/fuchsia.component.resolution.Resolver".parse().unwrap(),
-                    ),
-                })
+                .resolver_default("base")
                 .build(),
         ),
         (
@@ -2326,10 +2323,7 @@ async fn resolver_is_not_available() {
                         scheme: "base".parse().unwrap(),
                     }),
             )
-            .resolver(ResolverDecl {
-                name: "base".parse().unwrap(),
-                source_path: Some("/svc/fuchsia.component.resolution.Resolver".parse().unwrap()),
-            })
+            .resolver_default("base")
             .build(),
     )];
 
@@ -2431,10 +2425,7 @@ async fn resolver_component_decl_is_validated() {
                         scheme: "base".parse().unwrap(),
                     }),
             )
-            .resolver(ResolverDecl {
-                name: "base".parse().unwrap(),
-                source_path: Some("/svc/fuchsia.component.resolution.Resolver".parse().unwrap()),
-            })
+            .resolver_default("base")
             .build(),
     )];
 
@@ -2661,7 +2652,7 @@ async fn offer_service_from_collection() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDeclBuilder::new("foo").path("/svc/foo.service").build())
+                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service").build())
                 .build(),
         )
     }));
@@ -2737,7 +2728,7 @@ async fn offer_service_from_collections() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDeclBuilder::new("foo").path("/svc/foo.service").build())
+                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service").build())
                 .build(),
         )
     }));
@@ -2831,7 +2822,7 @@ async fn offer_service_from_collections_multilevel() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDeclBuilder::new("foo").path("/svc/foo.service").build())
+                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service").build())
                 .build(),
         )
     }));
@@ -2899,7 +2890,7 @@ async fn expose_service_from_collection() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDeclBuilder::new("foo").path("/svc/foo.service").build())
+                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service").build())
                 .build(),
         )
     }));
@@ -2977,7 +2968,7 @@ async fn expose_service_from_collections() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDeclBuilder::new("foo").path("/svc/foo.service").build())
+                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service").build())
                 .build(),
         )
     }));
@@ -3071,7 +3062,7 @@ async fn expose_service_from_collections_multilevel() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDeclBuilder::new("foo").path("/svc/foo.service").build())
+                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service").build())
                 .build(),
         )
     }));
@@ -3143,10 +3134,7 @@ async fn list_service_instances_from_collections() {
                     target_name: "foo".parse().unwrap(),
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDecl {
-                    name: "foo".parse().unwrap(),
-                    source_path: Some("/svc/foo.service".parse().unwrap()),
-                })
+                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service").build())
                 .build(),
         ),
         (
@@ -3160,10 +3148,7 @@ async fn list_service_instances_from_collections() {
                     target_name: "foo".parse().unwrap(),
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDecl {
-                    name: "foo".parse().unwrap(),
-                    source_path: Some("/svc/foo.service".parse().unwrap()),
-                })
+                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service").build())
                 .build(),
         ),
         ("non_service_child", ComponentDeclBuilder::new().build()),
@@ -3321,10 +3306,7 @@ async fn use_service_from_sibling_collection() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDecl {
-                    name: "my.service.Service".parse().unwrap(),
-                    source_path: Some("/svc/my.service.Service".parse().unwrap()),
-                })
+                .service_default("my.service.Service")
                 .build(),
         ),
         (
@@ -3338,10 +3320,7 @@ async fn use_service_from_sibling_collection() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDecl {
-                    name: "my.service.Service".parse().unwrap(),
-                    source_path: Some("/svc/my.service.Service".parse().unwrap()),
-                })
+                .service_default("my.service.Service")
                 .build(),
         ),
         ("baz", ComponentDeclBuilder::new().build()),
@@ -3463,10 +3442,7 @@ async fn use_filtered_service_from_sibling() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDecl {
-                    name: "my.service.Service".parse().unwrap(),
-                    source_path: Some("/svc/my.service.Service".parse().unwrap()),
-                })
+                .service_default("my.service.Service")
                 .build(),
         ),
         (
@@ -3626,10 +3602,7 @@ async fn use_filtered_aggregate_service_from_sibling() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .service(ServiceDecl {
-                    name: "my.service.Service".parse().unwrap(),
-                    source_path: Some("/svc/my.service.Service".parse().unwrap()),
-                })
+                .service_default("my.service.Service")
                 .build(),
         ),
         (
@@ -3724,10 +3697,7 @@ async fn use_anonymized_aggregate_service() {
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
         }))
-        .service(ServiceDecl {
-            name: "my.service.Service".parse().unwrap(),
-            source_path: Some("/svc/my.service.Service".parse().unwrap()),
-        })
+        .service_default("my.service.Service")
         .build();
     let components = vec![
         (
@@ -3743,10 +3713,7 @@ async fn use_anonymized_aggregate_service() {
                     source_instance_filter: None,
                     renamed_instances: None,
                 }))
-                .service(ServiceDecl {
-                    name: "my.service.Service".parse().unwrap(),
-                    source_path: Some("/svc/my.service.Service".parse().unwrap()),
-                })
+                .service_default("my.service.Service")
                 .add_child(ChildDeclBuilder::new_lazy_child("b"))
                 .build(),
         ),
@@ -3793,10 +3760,7 @@ async fn use_anonymized_aggregate_service() {
                     source_instance_filter: None,
                     renamed_instances: None,
                 }))
-                .service(ServiceDecl {
-                    name: "my.service.Service".parse().unwrap(),
-                    source_path: Some("/svc/my.service.Service".parse().unwrap()),
-                })
+                .service_default("my.service.Service")
                 .add_child(ChildDeclBuilder::new_lazy_child("c"))
                 .add_child(ChildDeclBuilder::new_lazy_child("d"))
                 .add_child(ChildDeclBuilder::new_lazy_child("e"))

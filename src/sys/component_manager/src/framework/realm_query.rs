@@ -758,7 +758,7 @@ mod tests {
         },
         assert_matches::assert_matches,
         cm_rust::*,
-        cm_rust_testing::ComponentDeclBuilder,
+        cm_rust_testing::*,
         component_id_index::InstanceId,
         fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream},
         fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -978,17 +978,13 @@ mod tests {
             target_name: "bar".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
-        let capability_decl = ProtocolDecl {
-            name: "bar".parse().unwrap(),
-            source_path: Some("/svc/bar".parse().unwrap()),
-        };
 
         let components = vec![(
             "root",
             ComponentDeclBuilder::new()
                 .use_(use_decl)
                 .expose(expose_decl)
-                .protocol(capability_decl)
+                .protocol_default("bar")
                 .build(),
         )];
 
@@ -1192,24 +1188,26 @@ mod tests {
                 "root",
                 ComponentDeclBuilder::new()
                     .add_lazy_child("a")
-                    .storage(StorageDecl {
-                        name: "data".parse().unwrap(),
-                        source: StorageDirectorySource::Child("a".to_string()),
-                        backing_dir: "fs".parse().unwrap(),
-                        subdir: Some("persistent".into()),
-                        storage_id:
-                            fidl_fuchsia_component_decl::StorageId::StaticInstanceIdOrMoniker,
-                    })
+                    .capability(
+                        StorageBuilder::new()
+                            .name("data")
+                            .backing_dir("fs")
+                            .source(StorageDirectorySource::Child("a".into()))
+                            .subdir("persistent")
+                            .build(),
+                    )
                     .build(),
             ),
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDecl {
-                        name: "fs".parse().unwrap(),
-                        source_path: Some("/fs/data".parse().unwrap()),
-                        rights: fio::Operations::all(),
-                    })
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("fs")
+                            .path("/fs/data")
+                            .rights(fio::Operations::all())
+                            .build(),
+                    )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "fs".parse().unwrap(),
                         target_name: "fs".parse().unwrap(),

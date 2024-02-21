@@ -7,10 +7,10 @@ mod tests {
         crate::routing::RoutingTestBuilderForAnalyzer,
         cm_moniker::InstancedMoniker,
         cm_rust::{
-            Availability, OfferDecl, OfferSource, OfferStorageDecl, OfferTarget, StorageDecl,
+            Availability, OfferDecl, OfferSource, OfferStorageDecl, OfferTarget,
             StorageDirectorySource, UseDecl, UseStorageDecl,
         },
-        cm_rust_testing::{ComponentDeclBuilder, DirectoryDeclBuilder},
+        cm_rust_testing::*,
         component_id_index::InstanceId,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
         fuchsia_zircon_status as zx_status,
@@ -170,19 +170,21 @@ mod tests {
             (
                 "provider",
                 ComponentDeclBuilder::new()
-                    .directory(
-                        DirectoryDeclBuilder::new("data")
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("data")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
-                    .storage(StorageDecl {
-                        name: "cache".parse().unwrap(),
-                        backing_dir: "data".parse().unwrap(),
-                        source: StorageDirectorySource::Self_,
-                        subdir: None,
-                        storage_id: fdecl::StorageId::StaticInstanceId,
-                    })
+                    .capability(
+                        StorageBuilder::new()
+                            .name("cache")
+                            .backing_dir("data")
+                            .source(StorageDirectorySource::Self_)
+                            .storage_id(fdecl::StorageId::StaticInstanceId)
+                            .build(),
+                    )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("consumer".to_string()),

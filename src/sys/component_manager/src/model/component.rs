@@ -2606,14 +2606,13 @@ pub mod tests {
         },
         assert_matches::assert_matches,
         cm_rust::{
-            Availability, CapabilityDecl, ChildRef, DependencyType, ExposeDecl, ExposeProtocolDecl,
-            ExposeSource, ExposeTarget, OfferDecl, OfferDirectoryDecl, OfferProtocolDecl,
-            OfferServiceDecl, OfferSource, OfferTarget, ProtocolDecl, UseEventStreamDecl,
-            UseProtocolDecl, UseSource,
+            Availability, ChildRef, DependencyType, ExposeDecl, ExposeProtocolDecl, ExposeSource,
+            ExposeTarget, OfferDecl, OfferDirectoryDecl, OfferProtocolDecl, OfferServiceDecl,
+            OfferSource, OfferTarget, UseEventStreamDecl, UseProtocolDecl, UseSource,
         },
         cm_rust_testing::{
             ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder,
-            ProtocolDeclBuilder,
+            ProtocolBuilder,
         },
         component_id_index::InstanceId,
         fidl::endpoints::DiscoverableProtocolMarker,
@@ -2842,10 +2841,7 @@ pub mod tests {
             subdir: None,
             availability: Availability::Required,
         });
-        let example_capability = ProtocolDecl {
-            name: "bar".parse().unwrap(),
-            source_path: Some("/svc/bar".parse().unwrap()),
-        };
+        let example_capability = ProtocolBuilder::new().name("bar").build();
         let example_expose = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
             target: ExposeTarget::Parent,
@@ -2881,7 +2877,7 @@ pub mod tests {
             .add_transient_collection("coll")
             .offer(example_offer.clone())
             .expose(example_expose.clone())
-            .protocol(example_capability.clone())
+            .capability(example_capability.clone())
             .use_(example_use.clone())
             .build();
         let components = vec![
@@ -2898,10 +2894,7 @@ pub mod tests {
 
         let root_resolved = root_component.lock_resolved_state().await.expect("resolve failed");
 
-        assert_eq!(
-            vec![CapabilityDecl::Protocol(example_capability)],
-            shutdown::Component::capabilities(&*root_resolved)
-        );
+        assert_eq!(vec![example_capability], shutdown::Component::capabilities(&*root_resolved));
         assert_eq!(vec![example_use], shutdown::Component::uses(&*root_resolved));
         assert_eq!(vec![example_offer], shutdown::Component::offers(&*root_resolved));
         assert_eq!(vec![example_expose], shutdown::Component::exposes(&*root_resolved));
@@ -3715,11 +3708,7 @@ pub mod tests {
             (
                 "root",
                 ComponentDeclBuilder::new()
-                    .protocol(
-                        ProtocolDeclBuilder::new(flogger::LogSinkMarker::PROTOCOL_NAME)
-                            .path("/svc/fuchsia.logger.LogSink")
-                            .build(),
-                    )
+                    .protocol_default(flogger::LogSinkMarker::PROTOCOL_NAME)
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
                         source_name: flogger::LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),

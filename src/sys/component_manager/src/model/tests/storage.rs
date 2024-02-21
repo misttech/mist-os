@@ -23,10 +23,7 @@ use {
     fuchsia_zircon as zx,
     moniker::{Moniker, MonikerBase},
     routing::{error::RoutingError, RouteRequest},
-    std::{
-        convert::TryInto,
-        path::{Path, PathBuf},
-    },
+    std::{convert::TryInto, path::Path},
 };
 
 #[fuchsia::test]
@@ -108,8 +105,9 @@ async fn use_in_collection_from_parent() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .directory(
-                    DirectoryDeclBuilder::new("data")
+                .capability(
+                    DirectoryBuilder::new()
+                        .name("data")
                         .path("/data")
                         .rights(fio::RW_STAR_DIR)
                         .build(),
@@ -153,20 +151,22 @@ async fn use_in_collection_from_parent() {
                     target_name: "cache".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .storage(StorageDecl {
-                    name: "data".parse().unwrap(),
-                    backing_dir: "minfs".parse().unwrap(),
-                    source: StorageDirectorySource::Parent,
-                    subdir: Some(PathBuf::from("data")),
-                    storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                })
-                .storage(StorageDecl {
-                    name: "cache".parse().unwrap(),
-                    backing_dir: "minfs".parse().unwrap(),
-                    source: StorageDirectorySource::Parent,
-                    subdir: Some(PathBuf::from("cache")),
-                    storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                })
+                .capability(
+                    StorageBuilder::new()
+                        .name("data")
+                        .backing_dir("minfs")
+                        .source(StorageDirectorySource::Parent)
+                        .subdir("data")
+                        .build(),
+                )
+                .capability(
+                    StorageBuilder::new()
+                        .name("cache")
+                        .backing_dir("minfs")
+                        .source(StorageDirectorySource::Parent)
+                        .subdir("cache")
+                        .build(),
+                )
                 .add_transient_collection("coll")
                 .build(),
         ),
@@ -265,8 +265,9 @@ async fn use_in_collection_from_grandparent() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .directory(
-                    DirectoryDeclBuilder::new("minfs")
+                .capability(
+                    DirectoryBuilder::new()
+                        .name("minfs")
                         .path("/data")
                         .rights(fio::RW_STAR_DIR)
                         .build(),
@@ -286,20 +287,22 @@ async fn use_in_collection_from_grandparent() {
                     availability: Availability::Required,
                 }))
                 .add_lazy_child("b")
-                .storage(StorageDecl {
-                    name: "data".parse().unwrap(),
-                    backing_dir: "minfs".parse().unwrap(),
-                    source: StorageDirectorySource::Self_,
-                    subdir: Some(PathBuf::from("data")),
-                    storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                })
-                .storage(StorageDecl {
-                    name: "cache".parse().unwrap(),
-                    backing_dir: "minfs".parse().unwrap(),
-                    source: StorageDirectorySource::Self_,
-                    subdir: Some(PathBuf::from("cache")),
-                    storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                })
+                .capability(
+                    StorageBuilder::new()
+                        .name("data")
+                        .backing_dir("minfs")
+                        .source(StorageDirectorySource::Self_)
+                        .subdir("data")
+                        .build(),
+                )
+                .capability(
+                    StorageBuilder::new()
+                        .name("cache")
+                        .backing_dir("minfs")
+                        .source(StorageDirectorySource::Self_)
+                        .subdir("cache")
+                        .build(),
+                )
                 .build(),
         ),
         (
@@ -494,19 +497,21 @@ async fn use_restricted_storage_start_failure() {
         (
             "provider",
             ComponentDeclBuilder::new()
-                .directory(
-                    DirectoryDeclBuilder::new("data")
+                .capability(
+                    DirectoryBuilder::new()
+                        .name("data")
                         .path("/data")
                         .rights(fio::RW_STAR_DIR)
                         .build(),
                 )
-                .storage(StorageDecl {
-                    name: "cache".parse().unwrap(),
-                    backing_dir: "data".parse().unwrap(),
-                    source: StorageDirectorySource::Self_,
-                    subdir: None,
-                    storage_id: fdecl::StorageId::StaticInstanceId,
-                })
+                .capability(
+                    StorageBuilder::new()
+                        .name("cache")
+                        .backing_dir("data")
+                        .source(StorageDirectorySource::Self_)
+                        .storage_id(fdecl::StorageId::StaticInstanceId)
+                        .build(),
+                )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
                     target: OfferTarget::static_child("parent_consumer".to_string()),
@@ -598,19 +603,20 @@ async fn use_restricted_storage_open_failure() {
         (
             "provider",
             ComponentDeclBuilder::new()
-                .directory(
-                    DirectoryDeclBuilder::new("data")
+                .capability(
+                    DirectoryBuilder::new()
+                        .name("data")
                         .path("/data")
                         .rights(fio::RW_STAR_DIR)
                         .build(),
                 )
-                .storage(StorageDecl {
-                    name: "cache".parse().unwrap(),
-                    backing_dir: "data".parse().unwrap(),
-                    source: StorageDirectorySource::Self_,
-                    subdir: None,
-                    storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                })
+                .capability(
+                    StorageBuilder::new()
+                        .name("cache")
+                        .backing_dir("data")
+                        .source(StorageDirectorySource::Self_)
+                        .build(),
+                )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
                     target: OfferTarget::static_child("parent_consumer".to_string()),
@@ -729,19 +735,20 @@ async fn open_storage_subdirectory() {
         (
             "provider",
             ComponentDeclBuilder::new()
-                .directory(
-                    DirectoryDeclBuilder::new("data")
+                .capability(
+                    DirectoryBuilder::new()
+                        .name("data")
                         .path("/data")
                         .rights(fio::RW_STAR_DIR)
                         .build(),
                 )
-                .storage(StorageDecl {
-                    name: "cache".parse().unwrap(),
-                    backing_dir: "data".parse().unwrap(),
-                    source: StorageDirectorySource::Self_,
-                    subdir: None,
-                    storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                })
+                .capability(
+                    StorageBuilder::new()
+                        .name("cache")
+                        .backing_dir("data")
+                        .source(StorageDirectorySource::Self_)
+                        .build(),
+                )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
                     target: OfferTarget::static_child("consumer".to_string()),
@@ -850,19 +857,20 @@ async fn storage_persistence_moniker_path() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .directory(
-                    DirectoryDeclBuilder::new("minfs")
+                .capability(
+                    DirectoryBuilder::new()
+                        .name("minfs")
                         .path("/data")
                         .rights(fio::RW_STAR_DIR)
                         .build(),
                 )
-                .storage(StorageDecl {
-                    name: "data".parse().unwrap(),
-                    backing_dir: "minfs".parse().unwrap(),
-                    source: StorageDirectorySource::Self_,
-                    subdir: None,
-                    storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                })
+                .capability(
+                    StorageBuilder::new()
+                        .name("data")
+                        .backing_dir("minfs")
+                        .source(StorageDirectorySource::Self_)
+                        .build(),
+                )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
                     target: OfferTarget::static_child("b".to_string()),
@@ -1038,19 +1046,20 @@ async fn storage_persistence_instance_id_path() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .directory(
-                    DirectoryDeclBuilder::new("minfs")
+                .capability(
+                    DirectoryBuilder::new()
+                        .name("minfs")
                         .path("/data")
                         .rights(fio::RW_STAR_DIR)
                         .build(),
                 )
-                .storage(StorageDecl {
-                    name: "data".parse().unwrap(),
-                    backing_dir: "minfs".parse().unwrap(),
-                    source: StorageDirectorySource::Self_,
-                    subdir: None,
-                    storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                })
+                .capability(
+                    StorageBuilder::new()
+                        .name("data")
+                        .backing_dir("minfs")
+                        .source(StorageDirectorySource::Self_)
+                        .build(),
+                )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
                     target: OfferTarget::static_child("b".to_string()),
@@ -1230,19 +1239,20 @@ async fn storage_persistence_inheritance() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .directory(
-                    DirectoryDeclBuilder::new("minfs")
+                .capability(
+                    DirectoryBuilder::new()
+                        .name("minfs")
                         .path("/data")
                         .rights(fio::RW_STAR_DIR)
                         .build(),
                 )
-                .storage(StorageDecl {
-                    name: "data".parse().unwrap(),
-                    backing_dir: "minfs".parse().unwrap(),
-                    source: StorageDirectorySource::Self_,
-                    subdir: None,
-                    storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                })
+                .capability(
+                    StorageBuilder::new()
+                        .name("data")
+                        .backing_dir("minfs")
+                        .source(StorageDirectorySource::Self_)
+                        .build(),
+                )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
                     target: OfferTarget::static_child("b".to_string()),
@@ -1485,19 +1495,20 @@ async fn storage_persistence_disablement() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .directory(
-                    DirectoryDeclBuilder::new("minfs")
+                .capability(
+                    DirectoryBuilder::new()
+                        .name("minfs")
                         .path("/data")
                         .rights(fio::RW_STAR_DIR)
                         .build(),
                 )
-                .storage(StorageDecl {
-                    name: "data".parse().unwrap(),
-                    backing_dir: "minfs".parse().unwrap(),
-                    source: StorageDirectorySource::Self_,
-                    subdir: None,
-                    storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                })
+                .capability(
+                    StorageBuilder::new()
+                        .name("data")
+                        .backing_dir("minfs")
+                        .source(StorageDirectorySource::Self_)
+                        .build(),
+                )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
                     target: OfferTarget::static_child("b".to_string()),

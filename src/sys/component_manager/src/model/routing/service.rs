@@ -755,10 +755,7 @@ mod tests {
                 target: ExposeTarget::Parent,
                 availability: cm_rust::Availability::Required,
             }))
-            .service(ServiceDecl {
-                name: "my.service.Service".parse().unwrap(),
-                source_path: Some("/svc/my.service.Service".parse().unwrap()),
-            })
+            .service_default("my.service.Service")
             .build();
         vec![
             (
@@ -1053,10 +1050,7 @@ mod tests {
                 target: ExposeTarget::Parent,
                 availability: cm_rust::Availability::Required,
             }))
-            .service(ServiceDecl {
-                name: "my.service.Service".parse().unwrap(),
-                source_path: Some("/svc/my.service.Service".parse().unwrap()),
-            })
+            .service_default("my.service.Service")
             .build();
         let components = vec![
             (

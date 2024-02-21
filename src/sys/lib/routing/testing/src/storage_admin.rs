@@ -7,7 +7,7 @@ use {
     cm_moniker::InstancedMoniker,
     cm_rust::*,
     cm_rust_testing::*,
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
+    fidl_fuchsia_io as fio,
     moniker::{Moniker, MonikerBase},
     std::{
         convert::{TryFrom, TryInto},
@@ -40,19 +40,20 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .directory(
-                        DirectoryDeclBuilder::new("tmpfs")
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
-                    .storage(StorageDecl {
-                        name: "data".parse().unwrap(),
-                        backing_dir: "tmpfs".parse().unwrap(),
-                        source: StorageDirectorySource::Self_,
-                        subdir: None,
-                        storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                    })
+                    .capability(
+                        StorageBuilder::new()
+                            .name("data")
+                            .backing_dir("tmpfs")
+                            .source(StorageDirectorySource::Self_)
+                            .build(),
+                    )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("b".to_string()),
@@ -128,8 +129,9 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .directory(
-                        DirectoryDeclBuilder::new("data")
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("data")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR)
                             .build(),
@@ -151,13 +153,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .storage(StorageDecl {
-                        name: "storage".parse().unwrap(),
-                        backing_dir: "data".parse().unwrap(),
-                        source: StorageDirectorySource::Parent,
-                        subdir: Some(PathBuf::from("bar")),
-                        storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                    })
+                    .capability(
+                        StorageBuilder::new()
+                            .name("storage")
+                            .backing_dir("data")
+                            .source(StorageDirectorySource::Parent)
+                            .subdir("bar")
+                            .build(),
+                    )
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Capability("storage".parse().unwrap()),
                         source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
@@ -246,19 +249,20 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .directory(
-                        DirectoryDeclBuilder::new("tmpfs")
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
-                    .storage(StorageDecl {
-                        name: "data".parse().unwrap(),
-                        backing_dir: "tmpfs".parse().unwrap(),
-                        source: StorageDirectorySource::Self_,
-                        subdir: None,
-                        storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                    })
+                    .capability(
+                        StorageBuilder::new()
+                            .name("data")
+                            .backing_dir("tmpfs")
+                            .source(StorageDirectorySource::Self_)
+                            .build(),
+                    )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("d".to_string()),
@@ -314,19 +318,20 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .directory(
-                        DirectoryDeclBuilder::new("tmpfs")
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
-                    .storage(StorageDecl {
-                        name: "data".parse().unwrap(),
-                        backing_dir: "tmpfs".parse().unwrap(),
-                        source: StorageDirectorySource::Self_,
-                        subdir: None,
-                        storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                    })
+                    .capability(
+                        StorageBuilder::new()
+                            .name("data")
+                            .backing_dir("tmpfs")
+                            .source(StorageDirectorySource::Self_)
+                            .build(),
+                    )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("b".to_string()),
@@ -385,22 +390,23 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .directory(
-                        DirectoryDeclBuilder::new("tmpfs")
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
-                    .protocol(
-                        ProtocolDeclBuilder::new("unrelated.protocol").path("/svc/foo").build(),
+                    .capability(
+                        ProtocolBuilder::new().name("unrelated.protocol").path("/svc/foo").build(),
                     )
-                    .storage(StorageDecl {
-                        name: "data".parse().unwrap(),
-                        backing_dir: "tmpfs".parse().unwrap(),
-                        source: StorageDirectorySource::Self_,
-                        subdir: None,
-                        storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                    })
+                    .capability(
+                        StorageBuilder::new()
+                            .name("data")
+                            .backing_dir("tmpfs")
+                            .source(StorageDirectorySource::Self_)
+                            .build(),
+                    )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("b".to_string()),
@@ -458,22 +464,23 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .directory(
-                        DirectoryDeclBuilder::new("tmpfs")
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
-                    .protocol(
-                        ProtocolDeclBuilder::new("unrelated.protocol").path("/svc/foo").build(),
+                    .capability(
+                        ProtocolBuilder::new().name("unrelated.protocol").path("/svc/foo").build(),
                     )
-                    .storage(StorageDecl {
-                        name: "data".parse().unwrap(),
-                        backing_dir: "tmpfs".parse().unwrap(),
-                        source: StorageDirectorySource::Self_,
-                        subdir: None,
-                        storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                    })
+                    .capability(
+                        StorageBuilder::new()
+                            .name("data")
+                            .backing_dir("tmpfs")
+                            .source(StorageDirectorySource::Self_)
+                            .build(),
+                    )
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Capability("unrelated.protocol".parse().unwrap()),
                         source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
@@ -563,21 +570,22 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .directory(
-                        DirectoryDeclBuilder::new("tmpfs")
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
-                    .storage(StorageDecl {
-                        name: "data".parse().unwrap(),
-                        backing_dir: "tmpfs".parse().unwrap(),
-                        source: StorageDirectorySource::Self_,
-                        subdir: None,
-                        storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                    })
-                    .protocol(
-                        ProtocolDeclBuilder::new("unrelated.protocol").path("/svc/foo").build(),
+                    .capability(
+                        StorageBuilder::new()
+                            .name("data")
+                            .backing_dir("tmpfs")
+                            .source(StorageDirectorySource::Self_)
+                            .build(),
+                    )
+                    .capability(
+                        ProtocolBuilder::new().name("unrelated.protocol").path("/svc/foo").build(),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -635,22 +643,23 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .directory(
-                        DirectoryDeclBuilder::new("tmpfs")
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
-                    .protocol(
-                        ProtocolDeclBuilder::new("unrelated.protocol").path("/svc/foo").build(),
+                    .capability(
+                        ProtocolBuilder::new().name("unrelated.protocol").path("/svc/foo").build(),
                     )
-                    .storage(StorageDecl {
-                        name: "data".parse().unwrap(),
-                        backing_dir: "tmpfs".parse().unwrap(),
-                        source: StorageDirectorySource::Self_,
-                        subdir: None,
-                        storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                    })
+                    .capability(
+                        StorageBuilder::new()
+                            .name("data")
+                            .backing_dir("tmpfs")
+                            .source(StorageDirectorySource::Self_)
+                            .build(),
+                    )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("b".to_string()),
@@ -707,19 +716,20 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .directory(
-                        DirectoryDeclBuilder::new("tmpfs")
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
-                    .storage(StorageDecl {
-                        name: "data".parse().unwrap(),
-                        backing_dir: "tmpfs".parse().unwrap(),
-                        source: StorageDirectorySource::Self_,
-                        subdir: None,
-                        storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                    })
+                    .capability(
+                        StorageBuilder::new()
+                            .name("data")
+                            .backing_dir("tmpfs")
+                            .source(StorageDirectorySource::Self_)
+                            .build(),
+                    )
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Capability("data".parse().unwrap()),
                         source_name: "unrelated.protocol".parse().unwrap(),
@@ -808,19 +818,20 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .directory(
-                        DirectoryDeclBuilder::new("tmpfs")
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR)
                             .build(),
                     )
-                    .storage(StorageDecl {
-                        name: "data".parse().unwrap(),
-                        backing_dir: "tmpfs".parse().unwrap(),
-                        source: StorageDirectorySource::Self_,
-                        subdir: None,
-                        storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
-                    })
+                    .capability(
+                        StorageBuilder::new()
+                            .name("data")
+                            .backing_dir("tmpfs")
+                            .source(StorageDirectorySource::Self_)
+                            .build(),
+                    )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("d".to_string()),

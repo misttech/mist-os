@@ -430,7 +430,7 @@ mod tests {
         },
         assert_matches::assert_matches,
         cm_rust::*,
-        cm_rust_testing::ComponentDeclBuilder,
+        cm_rust_testing::*,
         fidl::endpoints,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     };
@@ -479,11 +479,6 @@ mod tests {
             availability: cm_rust::Availability::Required,
         });
 
-        let capability_decl = ProtocolDecl {
-            name: "foo.bar".parse().unwrap(),
-            source_path: Some("/svc/foo.bar".parse().unwrap()),
-        };
-
         let components = vec![
             (
                 "root",
@@ -497,7 +492,7 @@ mod tests {
             (
                 "my_child",
                 ComponentDeclBuilder::new()
-                    .protocol(capability_decl)
+                    .protocol_default("foo.bar")
                     .expose(expose_from_self_decl)
                     .build(),
             ),
@@ -755,11 +750,6 @@ mod tests {
             availability: cm_rust::Availability::Required,
         });
 
-        let capability_decl = ProtocolDecl {
-            name: "biz.buz".parse().unwrap(),
-            source_path: Some("/svc/foo.bar".parse().unwrap()),
-        };
-
         let components = vec![
             (
                 "root",
@@ -773,7 +763,7 @@ mod tests {
             (
                 "my_child",
                 ComponentDeclBuilder::new()
-                    .protocol(capability_decl)
+                    .capability(ProtocolBuilder::new().name("biz.buz").path("/svc/foo.bar").build())
                     .expose(expose_from_self_decl)
                     .build(),
             ),
@@ -891,10 +881,7 @@ mod tests {
             target_name: "qax.qux".parse().unwrap(),
         });
 
-        let capability_decl = ResolverDecl {
-            name: "qax.qux".parse().unwrap(),
-            source_path: Some("/svc/qax.qux".parse().unwrap()),
-        };
+        let capability_decl = ResolverBuilder::new().name("qax.qux").path("/svc/qax.qux").build();
 
         let components = vec![
             (
@@ -908,7 +895,7 @@ mod tests {
             (
                 "my_child",
                 ComponentDeclBuilder::new()
-                    .resolver(capability_decl)
+                    .capability(capability_decl)
                     .expose(expose_from_self_decl)
                     .build(),
             ),
@@ -1016,11 +1003,6 @@ mod tests {
             availability: cm_rust::Availability::Required,
         });
 
-        let capability_decl = ProtocolDecl {
-            name: "qax.qux".parse().unwrap(),
-            source_path: Some("/svc/qax.qux".parse().unwrap()),
-        };
-
         let components = vec![
             (
                 "root",
@@ -1037,7 +1019,7 @@ mod tests {
             (
                 "my_child",
                 ComponentDeclBuilder::new()
-                    .protocol(capability_decl)
+                    .protocol_default("qax.qux")
                     .expose(expose_from_self_decl)
                     .build(),
             ),
@@ -1138,10 +1120,7 @@ mod tests {
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
-        let capability_decl = ServiceDecl {
-            name: "my_service".parse().unwrap(),
-            source_path: Some("/svc/foo.bar".parse().unwrap()),
-        };
+        let capability_decl = ServiceBuilder::new().name("my_service").path("/svc/foo.bar").build();
 
         let components = vec![
             (
@@ -1156,14 +1135,14 @@ mod tests {
             (
                 "child_a",
                 ComponentDeclBuilder::new()
-                    .service(capability_decl.clone())
+                    .capability(capability_decl.clone())
                     .expose(expose_from_self_decl.clone())
                     .build(),
             ),
             (
                 "child_b",
                 ComponentDeclBuilder::new()
-                    .service(capability_decl.clone())
+                    .capability(capability_decl.clone())
                     .expose(expose_from_self_decl.clone())
                     .build(),
             ),

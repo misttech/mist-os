@@ -5,7 +5,7 @@
 use {
     crate::{CheckUse, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder},
     cm_rust::*,
-    cm_rust_testing::{ComponentDeclBuilder, DirectoryDeclBuilder},
+    cm_rust_testing::{ComponentDeclBuilder, DirectoryBuilder},
     fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status,
     std::{marker::PhantomData, str::FromStr},
 };
@@ -42,8 +42,9 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .directory(
-                        DirectoryDeclBuilder::new("foo_data")
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("foo_data")
                             .path("/data/foo")
                             .rights(fio::RW_STAR_DIR)
                             .build(),
@@ -108,8 +109,9 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .directory(
-                        DirectoryDeclBuilder::new("foo_data")
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("foo_data")
                             .path("/data/foo")
                             .rights(fio::RW_STAR_DIR)
                             .build(),
@@ -174,8 +176,9 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .directory(
-                        DirectoryDeclBuilder::new("foo_data")
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("foo_data")
                             .path("/data/foo")
                             .rights(fio::RW_STAR_DIR)
                             .build(),
@@ -240,8 +243,9 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .directory(
-                        DirectoryDeclBuilder::new("foo_data")
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("foo_data")
                             .path("/data/foo")
                             .rights(fio::RW_STAR_DIR)
                             .build(),
@@ -306,8 +310,9 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .directory(
-                        DirectoryDeclBuilder::new("foo_data")
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("foo_data")
                             .path("/data/foo")
                             .rights(fio::RW_STAR_DIR)
                             .build(),
@@ -372,8 +377,9 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .directory(
-                        DirectoryDeclBuilder::new("foo_data")
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("foo_data")
                             .path("/data/foo")
                             .rights(fio::W_STAR_DIR)
                             .build(),
@@ -458,12 +464,11 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .build(),
             ),
         ];
-        let namespace_capabilities = vec![CapabilityDecl::Directory(
-            DirectoryDeclBuilder::new("foo_data")
-                .path("/offer_from_cm_namespace/data/foo")
-                .rights(fio::W_STAR_DIR)
-                .build(),
-        )];
+        let namespace_capabilities = vec![DirectoryBuilder::new()
+            .name("foo_data")
+            .path("/offer_from_cm_namespace/data/foo")
+            .rights(fio::W_STAR_DIR)
+            .build()];
         let mut builder = T::new("a", components);
         builder.set_namespace_capabilities(namespace_capabilities);
         let model = builder.build().await;

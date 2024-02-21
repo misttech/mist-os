@@ -1132,7 +1132,7 @@ mod tests {
                 (
                     "system",
                     ComponentDeclBuilder::new()
-                        .protocol(ProtocolDeclBuilder::new("foo").path("/svc/foo").build())
+                        .protocol_default("foo")
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Self_,
                             source_name: "foo".parse().unwrap(),
@@ -1198,7 +1198,7 @@ mod tests {
                 (
                     "system",
                     ComponentDeclBuilder::new()
-                        .protocol(ProtocolDeclBuilder::new("foo").path("/svc/foo").build())
+                        .protocol_default("foo")
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Self_,
                             source_name: "foo".parse().unwrap(),

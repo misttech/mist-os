@@ -543,7 +543,7 @@ mod tests {
         assert_matches::assert_matches,
         cm_moniker::InstancedMoniker,
         cm_rust::*,
-        cm_rust_testing::ComponentDeclBuilder,
+        cm_rust_testing::*,
         component_id_index::InstanceId,
         fidl_fuchsia_io as fio,
         moniker::{Moniker, MonikerBase},
@@ -561,11 +561,13 @@ mod tests {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDecl {
-                        name: "data".parse().unwrap(),
-                        source_path: Some("/data".parse().unwrap()),
-                        rights: fio::RW_STAR_DIR,
-                    })
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR)
+                            .build(),
+                    )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,
@@ -653,11 +655,13 @@ mod tests {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDecl {
-                        name: "data".parse().unwrap(),
-                        source_path: Some("/data".parse().unwrap()),
-                        rights: fio::RW_STAR_DIR,
-                    })
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR)
+                            .build(),
+                    )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,
@@ -776,11 +780,13 @@ mod tests {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDecl {
-                        name: "data".parse().unwrap(),
-                        source_path: Some("/data".parse().unwrap()),
-                        rights: fio::RW_STAR_DIR,
-                    })
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR)
+                            .build(),
+                    )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,
@@ -913,11 +919,13 @@ mod tests {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .directory(DirectoryDecl {
-                        name: "data".parse().unwrap(),
-                        source_path: Some("/data".parse().unwrap()),
-                        rights: fio::RW_STAR_DIR,
-                    })
+                    .capability(
+                        DirectoryBuilder::new()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR)
+                            .build(),
+                    )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,

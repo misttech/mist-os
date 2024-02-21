@@ -5,7 +5,9 @@
 use {
     anyhow::{Context, Error},
     cm_rust::{ComponentDecl, FidlIntoNative},
+    cm_types::{Name, Path, RelativePath},
     cml, fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
+    std::path::PathBuf,
 };
 
 /// Name of the test runner.
@@ -119,46 +121,35 @@ impl ComponentDeclBuilder {
         self
     }
 
-    /// Add a custom protocol declaration.
-    pub fn protocol(mut self, protocol: cm_rust::ProtocolDecl) -> Self {
-        self.result.capabilities.push(cm_rust::CapabilityDecl::Protocol(protocol));
+    /// Add a capability declaration.
+    pub fn capability(mut self, capability: cm_rust::CapabilityDecl) -> Self {
+        self.result.capabilities.push(capability);
         self
     }
 
-    /// Add a custom dictionary declaration.
-    pub fn dictionary(mut self, dictionary: cm_rust::DictionaryDecl) -> Self {
-        self.result.capabilities.push(cm_rust::CapabilityDecl::Dictionary(dictionary));
-        self
+    /// Add a default protocol declaration.
+    pub fn protocol_default(self, name: &str) -> Self {
+        self.capability(ProtocolBuilder::new().name(name).build())
     }
 
-    /// Add a custom directory declaration.
-    pub fn directory(mut self, directory: cm_rust::DirectoryDecl) -> Self {
-        self.result.capabilities.push(cm_rust::CapabilityDecl::Directory(directory));
-        self
+    /// Add a default dictionary declaration.
+    pub fn dictionary_default(self, name: &str) -> Self {
+        self.capability(DictionaryBuilder::new().name(name).build())
     }
 
-    /// Add a custom storage declaration.
-    pub fn storage(mut self, storage: cm_rust::StorageDecl) -> Self {
-        self.result.capabilities.push(cm_rust::CapabilityDecl::Storage(storage));
-        self
+    /// Add a default runner declaration.
+    pub fn runner_default(self, name: &str) -> Self {
+        self.capability(RunnerBuilder::new().name(name).build())
     }
 
-    /// Add a custom runner declaration.
-    pub fn runner(mut self, runner: cm_rust::RunnerDecl) -> Self {
-        self.result.capabilities.push(cm_rust::CapabilityDecl::Runner(runner));
-        self
+    /// Add a default resolver declaration.
+    pub fn resolver_default(self, name: &str) -> Self {
+        self.capability(ResolverBuilder::new().name(name).build())
     }
 
-    /// Add a custom resolver declaration.
-    pub fn resolver(mut self, resolver: cm_rust::ResolverDecl) -> Self {
-        self.result.capabilities.push(cm_rust::CapabilityDecl::Resolver(resolver));
-        self
-    }
-
-    /// Add a custom service declaration.
-    pub fn service(mut self, service: cm_rust::ServiceDecl) -> Self {
-        self.result.capabilities.push(cm_rust::CapabilityDecl::Service(service));
-        self
+    /// Add a default service declaration.
+    pub fn service_default(self, name: &str) -> Self {
+        self.capability(ServiceBuilder::new().name(name).build())
     }
 
     /// Add an environment declaration.
@@ -388,123 +379,306 @@ impl From<EnvironmentDeclBuilder> for cm_rust::EnvironmentDecl {
 }
 
 // A convenience builder for constructing ProtocolDecls.
-#[derive(Debug)]
-pub struct ProtocolDeclBuilder(cm_rust::ProtocolDecl);
+#[derive(Debug, Default)]
+pub struct ProtocolBuilder {
+    name: Option<Name>,
+    path: Option<Path>,
+}
 
-impl ProtocolDeclBuilder {
-    /// Creates a new builder.
-    pub fn new(name: &str) -> Self {
-        Self(cm_rust::ProtocolDecl { name: name.parse().unwrap(), source_path: None })
+impl ProtocolBuilder {
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// Sets the source path.
-    pub fn path(mut self, path: &str) -> Self {
-        self.0.source_path = Some(path.parse().unwrap());
+    /// Defaults `source_path` to `/svc/{name}`.
+    pub fn name(mut self, name: &str) -> Self {
+        self.name = Some(name.parse().unwrap());
+        if self.path.is_none() {
+            self.path = Some(format!("/svc/{name}").parse().unwrap());
+        }
         self
     }
 
-    /// Consumes the builder and returns a ProtocolDecl.
-    pub fn build(self) -> cm_rust::ProtocolDecl {
-        self.0
+    pub fn path(mut self, path: &str) -> Self {
+        self.path = Some(path.parse().unwrap());
+        self
+    }
+
+    pub fn build(self) -> cm_rust::CapabilityDecl {
+        cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
+            name: self.name.expect("name not set"),
+            source_path: Some(self.path.expect("path not set")),
+        })
     }
 }
 
-impl From<ProtocolDeclBuilder> for cm_rust::ProtocolDecl {
-    fn from(builder: ProtocolDeclBuilder) -> Self {
+impl From<ProtocolBuilder> for cm_rust::CapabilityDecl {
+    fn from(builder: ProtocolBuilder) -> Self {
         builder.build()
     }
 }
 
 // A convenience builder for constructing [DictionaryDecl]s.
-#[derive(Debug)]
-pub struct DictionaryDeclBuilder(cm_rust::DictionaryDecl);
+#[derive(Debug, Default)]
+pub struct DictionaryBuilder {
+    name: Option<Name>,
+    source: Option<cm_rust::DictionarySource>,
+    source_dictionary: Option<RelativePath>,
+}
 
-impl DictionaryDeclBuilder {
-    /// Creates a new builder.
-    pub fn new(name: &str) -> Self {
-        Self(cm_rust::DictionaryDecl { name: name.parse().unwrap(), source: None, source_dictionary: None })
+impl DictionaryBuilder {
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// Sets the source dictionary.
-    pub fn source_dictionary(mut self, source: cm_rust::DictionarySource, source_dictionary: &str) -> Self {
-        self.0.source = Some(source);
-        self.0.source_dictionary = Some(source_dictionary.parse().unwrap());
+    pub fn name(mut self, name: &str) -> Self {
+        self.name = Some(name.parse().unwrap());
         self
     }
 
-    /// Consumes the builder and returns a DictionaryDecl.
-    pub fn build(self) -> cm_rust::DictionaryDecl {
-        self.0
+    pub fn source_dictionary(
+        mut self,
+        source: cm_rust::DictionarySource,
+        source_dictionary: &str,
+    ) -> Self {
+        self.source = Some(source);
+        self.source_dictionary = Some(source_dictionary.parse().unwrap());
+        self
+    }
+
+    pub fn build(self) -> cm_rust::CapabilityDecl {
+        cm_rust::CapabilityDecl::Dictionary(cm_rust::DictionaryDecl {
+            name: self.name.expect("name not set"),
+            source: self.source,
+            source_dictionary: self.source_dictionary,
+        })
     }
 }
 
-impl From<DictionaryDeclBuilder> for cm_rust::DictionaryDecl {
-    fn from(builder: DictionaryDeclBuilder) -> Self {
+impl From<DictionaryBuilder> for cm_rust::CapabilityDecl {
+    fn from(builder: DictionaryBuilder) -> Self {
         builder.build()
     }
 }
-// A convenience builder for constructing ServiceDecls.
-#[derive(Debug)]
-pub struct ServiceDeclBuilder(cm_rust::ServiceDecl);
 
-impl ServiceDeclBuilder {
-    /// Creates a new builder.
-    pub fn new(name: &str) -> Self {
-        Self(cm_rust::ServiceDecl { name: name.parse().unwrap(), source_path: None })
+// A convenience builder for constructing ServiceDecls.
+#[derive(Debug, Default)]
+pub struct ServiceBuilder {
+    name: Option<Name>,
+    path: Option<Path>,
+}
+
+impl ServiceBuilder {
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// Sets the source path.
-    pub fn path(mut self, path: &str) -> Self {
-        self.0.source_path = Some(path.parse().unwrap());
+    /// Defaults `source_path` to `/svc/{name}`.
+    pub fn name(mut self, name: &str) -> Self {
+        self.name = Some(name.parse().unwrap());
+        if self.path.is_none() {
+            self.path = Some(format!("/svc/{name}").parse().unwrap());
+        }
         self
     }
 
-    /// Consumes the builder and returns a ServiceDecl.
-    pub fn build(self) -> cm_rust::ServiceDecl {
-        self.0
+    pub fn path(mut self, path: &str) -> Self {
+        self.path = Some(path.parse().unwrap());
+        self
+    }
+
+    pub fn build(self) -> cm_rust::CapabilityDecl {
+        cm_rust::CapabilityDecl::Service(cm_rust::ServiceDecl {
+            name: self.name.expect("name not set"),
+            source_path: Some(self.path.expect("path not set")),
+        })
     }
 }
 
-impl From<ServiceDeclBuilder> for cm_rust::ServiceDecl {
-    fn from(builder: ServiceDeclBuilder) -> Self {
+impl From<ServiceBuilder> for cm_rust::CapabilityDecl {
+    fn from(builder: ServiceBuilder) -> Self {
         builder.build()
     }
 }
 
 // A convenience builder for constructing DirectoryDecls.
-#[derive(Debug)]
-pub struct DirectoryDeclBuilder(cm_rust::DirectoryDecl);
+#[derive(Debug, Default)]
+pub struct DirectoryBuilder {
+    name: Option<Name>,
+    path: Option<Path>,
+    rights: Option<fio::Operations>,
+}
 
-impl DirectoryDeclBuilder {
-    /// Creates a new builder.
-    pub fn new(name: &str) -> Self {
-        Self(cm_rust::DirectoryDecl {
-            name: name.parse().unwrap(),
-            source_path: None,
-            rights: fio::R_STAR_DIR,
-        })
+impl DirectoryBuilder {
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// Sets the source path.
+    pub fn name(mut self, name: &str) -> Self {
+        self.name = Some(name.parse().unwrap());
+        self
+    }
+
     pub fn path(mut self, path: &str) -> Self {
-        self.0.source_path = Some(path.parse().unwrap());
+        self.path = Some(path.parse().unwrap());
         self
     }
 
-    /// Sets the rights.
     pub fn rights(mut self, rights: fio::Operations) -> Self {
-        self.0.rights = rights;
+        self.rights = Some(rights);
         self
     }
 
-    /// Consumes the builder and returns a DirectoryDecl.
-    pub fn build(self) -> cm_rust::DirectoryDecl {
-        self.0
+    pub fn build(self) -> cm_rust::CapabilityDecl {
+        cm_rust::CapabilityDecl::Directory(cm_rust::DirectoryDecl {
+            name: self.name.expect("name not set"),
+            source_path: Some(self.path.expect("path not set")),
+            rights: self.rights.unwrap_or(fio::R_STAR_DIR),
+        })
     }
 }
 
-impl From<DirectoryDeclBuilder> for cm_rust::DirectoryDecl {
-    fn from(builder: DirectoryDeclBuilder) -> Self {
+impl From<DirectoryBuilder> for cm_rust::CapabilityDecl {
+    fn from(builder: DirectoryBuilder) -> Self {
+        builder.build()
+    }
+}
+
+// A convenience builder for constructing StorageDecls.
+#[derive(Debug, Default)]
+pub struct StorageBuilder {
+    name: Option<Name>,
+    backing_dir: Option<Name>,
+    subdir: Option<PathBuf>,
+    source: Option<cm_rust::StorageDirectorySource>,
+    storage_id: Option<fdecl::StorageId>,
+}
+
+impl StorageBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn name(mut self, name: &str) -> Self {
+        self.name = Some(name.parse().unwrap());
+        self
+    }
+
+    pub fn backing_dir(mut self, backing_dir: &str) -> Self {
+        self.backing_dir = Some(backing_dir.parse().unwrap());
+        self
+    }
+
+    pub fn source(mut self, source: cm_rust::StorageDirectorySource) -> Self {
+        self.source = Some(source);
+        self
+    }
+
+    pub fn subdir(mut self, subdir: &str) -> Self {
+        self.subdir = Some(subdir.parse().unwrap());
+        self
+    }
+
+    pub fn storage_id(mut self, storage_id: fdecl::StorageId) -> Self {
+        self.storage_id = Some(storage_id);
+        self
+    }
+
+    pub fn build(self) -> cm_rust::CapabilityDecl {
+        cm_rust::CapabilityDecl::Storage(cm_rust::StorageDecl {
+            name: self.name.expect("name not set"),
+            backing_dir: self.backing_dir.expect("backing_dir not set"),
+            source: self.source.expect("source not set"),
+            subdir: self.subdir,
+            storage_id: self.storage_id.unwrap_or(fdecl::StorageId::StaticInstanceIdOrMoniker),
+        })
+    }
+}
+
+impl From<StorageBuilder> for cm_rust::CapabilityDecl {
+    fn from(builder: StorageBuilder) -> Self {
+        builder.build()
+    }
+}
+
+// A convenience builder for constructing RunnerDecls.
+#[derive(Debug, Default)]
+pub struct RunnerBuilder {
+    name: Option<Name>,
+    path: Option<Path>,
+}
+
+impl RunnerBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Defaults `source_path` to `/svc/fuchsia.component.runner.ComponentRunner`.
+    pub fn name(mut self, name: &str) -> Self {
+        self.name = Some(name.parse().unwrap());
+        if self.path.is_none() {
+            self.path =
+                Some(format!("/svc/fuchsia.component.runner.ComponentRunner").parse().unwrap());
+        }
+        self
+    }
+
+    pub fn path(mut self, path: &str) -> Self {
+        self.path = Some(path.parse().unwrap());
+        self
+    }
+
+    pub fn build(self) -> cm_rust::CapabilityDecl {
+        cm_rust::CapabilityDecl::Runner(cm_rust::RunnerDecl {
+            name: self.name.expect("name not set"),
+            source_path: Some(self.path.expect("path not set")),
+        })
+    }
+}
+
+impl From<RunnerBuilder> for cm_rust::CapabilityDecl {
+    fn from(builder: RunnerBuilder) -> Self {
+        builder.build()
+    }
+}
+
+// A convenience builder for constructing ResolverDecls.
+#[derive(Debug, Default)]
+pub struct ResolverBuilder {
+    name: Option<Name>,
+    path: Option<Path>,
+}
+
+impl ResolverBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Defaults `source_path` to `/svc/fuchsia.component.resolution.Resolver`.
+    pub fn name(mut self, name: &str) -> Self {
+        self.name = Some(name.parse().unwrap());
+        if self.path.is_none() {
+            self.path =
+                Some(format!("/svc/fuchsia.component.resolution.Resolver").parse().unwrap());
+        }
+        self
+    }
+
+    pub fn path(mut self, path: &str) -> Self {
+        self.path = Some(path.parse().unwrap());
+        self
+    }
+
+    pub fn build(self) -> cm_rust::CapabilityDecl {
+        cm_rust::CapabilityDecl::Resolver(cm_rust::ResolverDecl {
+            name: self.name.expect("name not set"),
+            source_path: Some(self.path.expect("path not set")),
+        })
+    }
+}
+
+impl From<ResolverBuilder> for cm_rust::CapabilityDecl {
+    fn from(builder: ResolverBuilder) -> Self {
         builder.build()
     }
 }
