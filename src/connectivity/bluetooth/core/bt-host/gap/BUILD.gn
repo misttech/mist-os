@@ -84,6 +84,7 @@ pw_source_set("gap") {
     "//src/connectivity/bluetooth/core/bt-host/common",
     "//src/connectivity/bluetooth/core/bt-host/gatt",
     "//src/connectivity/bluetooth/core/bt-host/hci",
+    "//src/connectivity/bluetooth/core/bt-host/iso",
     "//src/connectivity/bluetooth/core/bt-host/l2cap",
     "//src/connectivity/bluetooth/core/bt-host/sco",
     "//src/connectivity/bluetooth/core/bt-host/sdp",
