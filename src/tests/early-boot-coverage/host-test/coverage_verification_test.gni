@@ -158,6 +158,7 @@ template("coverage_verification_test") {
                     ":$system_image_label",
                     ":$test_config_host_label",
                     "//src/developer/ffx:test_data",
+                    "//src/developer/ffx/plugins/test:ffx_test_tool_test_data",
                     "//src/tests/early-boot-coverage/host-test:coverage_tools",
                     "//src/tests/early-boot-coverage/host-test:fvm",
                     "//src/tests/early-boot-coverage/host-test:ssh_key",
