@@ -315,6 +315,10 @@ type ImageFormatConstraints = table {
     /// `pixel_format_and_modifiers` is non-empty. In other words, there must be
     /// at least one `PixelFormatAndModifier` per `ImageFormatConstraints`. If
     /// `pixel_format_modifier` is set, this field must also be set.
+    ///
+    /// The participant can specify [`fuchsia.images2/PixelFormat.DO_NOT_CARE`]
+    /// if the participant needs to specify `ImageFormatConstraints` without
+    /// constraining the `pixel_format`.
     1: pixel_format fuchsia.images2.PixelFormat;
 
     /// The pixel format modifier for which the following constraints apply.
@@ -337,6 +341,10 @@ type ImageFormatConstraints = table {
     ///   format modifier is implicitly `FORMAT_MODIFIER_LINEAR`.
     /// * else the pixel format modifier is implicitly
     ///   `FORMAT_MODIFIER_DO_NOT_CARE`.
+    ///
+    /// When set, this value is a specific modifier (not just flags), or
+    /// `FORMAT_MODIFIER_DO_NOT_CARE`, from set of values defined in
+    /// `fuchsia.images2` format_modifier.fidl.
     2: pixel_format_modifier uint64;
 
     /// The (additional) [`fuchsia.sysmem2/PixelFormatAndModifier`]s for which
@@ -408,6 +416,12 @@ type ImageFormatConstraints = table {
 
     /// Empty is an error. Duplicate entries are an error. Arbitrary ordering is
     /// not an error.
+    ///
+    /// The client can specify a single entry
+    /// [fuchsia.sysmem2/ColorSpace.DO_NOT_CARE`] if the client doesn't want to
+    /// constrain which `ColorSpace` is chosen. At least one participant must
+    /// specify at least one `ColorSpace` value other than
+    /// `ColorSpace.DO_NOT_CARE`, or allocation will fail.
     3: color_spaces
             vector<fuchsia.images2.ColorSpace>:MAX_COUNT_IMAGE_FORMAT_CONSTRAINTS_COLOR_SPACES;
 
