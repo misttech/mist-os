@@ -255,13 +255,19 @@ async fn do_shutdown(
     component: &Arc<ComponentInstance>,
     shutdown_type: ShutdownType,
 ) -> Result<(), ActionError> {
+    // Keep logs short to preserve as much as possible in the crash report
+    // NS: Shutdown of {moniker} was no-op
+    // RS: Beginning shutdown of resolved component {moniker}
+    // US: Beginning shutdown of unresolved component {moniker}
+    // FS: Finished shutdown of {moniker}
+    // ES: Errored shutdown of {moniker}
     {
         let state = component.lock_state().await;
         {
             let exec_state = component.lock_execution().await;
             if exec_state.is_shut_down() {
                 if matches!(shutdown_type, ShutdownType::System) {
-                    info!(url=%component.component_url, moniker=%component.moniker, "Shutdown is no-op");
+                    info!("=NS {}", component.moniker);
                 }
                 return Ok(());
             }
@@ -269,16 +275,16 @@ async fn do_shutdown(
         match *state {
             InstanceState::Resolved(ref s) => {
                 if matches!(shutdown_type, ShutdownType::System) {
-                    info!(url=%component.component_url, moniker=%component.moniker, "Shutting down component");
+                    info!("=RS {}", component.moniker);
                 }
                 let mut shutdown_job = ShutdownJob::new(component, s, shutdown_type).await;
                 drop(state);
                 Box::pin(shutdown_job.execute()).await.map_err(|err| {
-                    warn!(err=%err, url=%component.component_url, moniker=%component.moniker, "Shutdown failed");
+                    warn!("=ES {}", component.moniker);
                     err
                 })?;
                 if matches!(shutdown_type, ShutdownType::System) {
-                    info!(url=%component.component_url, moniker=%component.moniker, "Shutdown complete");
+                    info!("=FS {}", component.moniker);
                 }
                 return Ok(());
             }
@@ -290,14 +296,14 @@ async fn do_shutdown(
     // TODO: Put this component in a "shutting down" state so that if it creates new instances
     // after this point, they are created in a shut down state.
     if let ShutdownType::System = shutdown_type {
-        info!(url=%component.component_url, moniker=%component.moniker, "Shutting down unresolved component");
+        info!("=US {}", component.moniker);
     }
     component.stop_instance_internal(true).await.map_err(|err| {
-        warn!(err=%err, url=%component.component_url, moniker=%component.moniker, "Shutdown failed");
+        warn!("=ES {}", component.moniker);
         err
     })?;
     if matches!(shutdown_type, ShutdownType::System) {
-        info!(url=%component.component_url, moniker=%component.moniker, "Shutdown complete");
+        info!("=FS {}", component.moniker);
     }
 
     Ok(())
