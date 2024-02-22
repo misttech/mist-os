@@ -30,6 +30,7 @@
                 "fuchsia.kernel.Stats",
                 "fuchsia.process.Launcher",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
             ],
             from: "parent",
             to: [

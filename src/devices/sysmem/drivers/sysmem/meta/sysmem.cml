@@ -23,6 +23,7 @@
                 "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.MmioResource",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
             ],
         },
         { service: "fuchsia.hardware.platform.device.Service" },

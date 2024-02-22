@@ -21,7 +21,12 @@
             availability: "optional",
         },
         { protocol: "fuchsia.kernel.FramebufferResource" },
-        { protocol: "fuchsia.scheduler.ProfileProvider" },
+        {
+            protocol: [
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
+            ],
+        },
         { protocol: "fuchsia.boot.Arguments" },
     ],
 }

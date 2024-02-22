@@ -28,6 +28,7 @@
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.logger.LogSink",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.vulkan.loader.Loader",

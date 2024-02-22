@@ -50,6 +50,7 @@
                 "fuchsia.net.name.Lookup",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
                 "fuchsia.settings.Display",
 
                 // Tests of the media system change their behavior based on

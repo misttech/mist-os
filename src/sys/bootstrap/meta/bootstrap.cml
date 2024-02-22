@@ -678,6 +678,17 @@
             ],
         },
         {
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
+            from: "#role_manager",
+            to: [
+                "#boot-drivers",
+                "#driver-hosts",
+                "#fshost",
+                "#full-pkg-drivers",
+                "#pkg-drivers",
+            ],
+        },
+        {
             protocol: [ "fuchsia.virtualconsole.SessionManager" ],
             from: "#virtual_console",
             to: [
@@ -771,11 +782,24 @@
             to: "#driver_manager",
         },
         {
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
+            from: "#role_manager",
+            to: "#driver_manager",
+        },
+        {
             protocol: [
                 "fuchsia.kernel.DebugBroker",
                 "fuchsia.scheduler.ProfileProvider",
             ],
             from: "#svchost",
+            to: [
+                "#console-launcher",
+                "#netsvc",
+            ],
+        },
+        {
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
+            from: "#role_manager",
             to: [
                 "#console-launcher",
                 "#netsvc",

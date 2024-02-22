@@ -16,7 +16,12 @@
         fallback: "false",
     },
     use: [
-        { protocol: "fuchsia.scheduler.ProfileProvider" },
+        {
+            protocol: [
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
+            ],
+        },
         { service: "fuchsia.hardware.power.sensor.Service" },
         { service: "fuchsia.hardware.audio.CodecService" },
         { service: "fuchsia.hardware.gpio.Service" },

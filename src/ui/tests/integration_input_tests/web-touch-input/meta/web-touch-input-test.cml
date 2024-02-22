@@ -22,6 +22,7 @@
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.process.Launcher",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysmem.Allocator",
 
                 // Explicitly offer as there is no `vulkan/offer.shard.cml`.

@@ -11,7 +11,10 @@
     ],
     use: [
         {
-            protocol: [ "fuchsia.scheduler.ProfileProvider" ],
+            protocol: [
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
+            ],
         },
     ],
 
@@ -21,6 +24,7 @@
             protocol: [
                 // Needed for real-time tests.
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
             ],
             from: "parent",
             to: "#realm_builder",

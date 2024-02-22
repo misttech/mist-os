@@ -46,6 +46,7 @@
                 "fuchsia.kernel.RootJob",
                 "fuchsia.process.Launcher",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
                 "power-manager-outlives-driver-manager",
             ],
         },

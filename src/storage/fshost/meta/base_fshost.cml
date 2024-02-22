@@ -68,6 +68,7 @@
             protocol: [
                 "fuchsia.logger.LogSink",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
             ],
             from: "parent",
             to: [ "#tmpfs" ],

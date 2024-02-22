@@ -13,6 +13,7 @@
             protocol: [
                 "fuchsia.media.AudioCore",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
             ],
         },
     ],
@@ -34,6 +35,7 @@
             protocol: [
                 "fuchsia.logger.LogSink",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
             ],
             from: "parent",
             to: [ "#audio_consumer" ],

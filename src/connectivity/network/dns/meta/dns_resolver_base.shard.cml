@@ -23,6 +23,7 @@
                 "fuchsia.net.routes.State",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
             ],
         },
     ],

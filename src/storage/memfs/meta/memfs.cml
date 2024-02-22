@@ -15,7 +15,12 @@
         },
     ],
     use: [
-        { protocol: "fuchsia.scheduler.ProfileProvider" },
+        {
+            protocol: [
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
+            ],
+        },
     ],
     expose: [
         {

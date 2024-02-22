@@ -20,6 +20,7 @@
             protocol: [
                 "fuchsia.media.Audio",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
             ],
         },
     ],

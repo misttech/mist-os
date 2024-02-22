@@ -16,7 +16,12 @@
     },
     use: [
         { service: "fuchsia.hardware.gpio.Service" },
-        { protocol: "fuchsia.scheduler.ProfileProvider" },
+        {
+            protocol: [
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
+            ],
+        },
         { service: "fuchsia.hardware.i2c.Service" },
     ],
 }

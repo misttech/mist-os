@@ -35,12 +35,16 @@
             protocol: [
                 "fuchsia.device.NameProvider",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
             ],
             from: "parent",
             to: [ "#netstack" ],
         },
         {
-            protocol: [ "fuchsia.scheduler.ProfileProvider" ],
+            protocol: [
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
+            ],
             from: "parent",
             to: [ "#dns-resolver" ],
         },

@@ -18,7 +18,12 @@
         { service: "fuchsia.hardware.tee.Service" },
     ],
     use: [
-        { protocol: "fuchsia.scheduler.ProfileProvider" },
+        {
+            protocol: [
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
+            ],
+        },
         { service: "fuchsia.hardware.rpmb.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
     ],

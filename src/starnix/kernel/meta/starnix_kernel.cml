@@ -71,6 +71,7 @@
                 "fuchsia.power.broker.Topology",
                 "fuchsia.power.system.ActivityGovernor",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",

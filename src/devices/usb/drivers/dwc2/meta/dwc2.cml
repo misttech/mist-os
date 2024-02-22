@@ -20,7 +20,12 @@
         { service: "fuchsia.hardware.usb.dci.UsbDciService" },
     ],
     use: [
-        { protocol: "fuchsia.scheduler.ProfileProvider" },
+        {
+            protocol: [
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
+            ],
+        },
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.hardware.usb.phy.Service" },
     ],

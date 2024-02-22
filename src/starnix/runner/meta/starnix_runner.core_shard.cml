@@ -63,6 +63,7 @@
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysinfo.SysInfo",
             ],
             from: "parent",

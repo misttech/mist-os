@@ -27,6 +27,7 @@
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.net.http.Loader",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysinfo.SysInfo",
             ],
         },

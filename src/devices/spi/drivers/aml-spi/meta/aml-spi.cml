@@ -16,7 +16,12 @@
         colocate: "true",
     },
     use: [
-        { protocol: "fuchsia.scheduler.ProfileProvider" },
+        {
+            protocol: [
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
+            ],
+        },
         { service: "fuchsia.hardware.gpio.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.hardware.registers.Service" },

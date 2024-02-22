@@ -51,6 +51,7 @@
                 "fuchsia.pkg.rewrite.Engine",
                 "fuchsia.process.Launcher",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.virtualconsole.SessionManager",

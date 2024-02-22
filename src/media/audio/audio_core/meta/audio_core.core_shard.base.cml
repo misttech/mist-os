@@ -42,6 +42,7 @@
             protocol: [
                 "fuchsia.logger.LogSink",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
                 "fuchsia.thermal.ClientStateConnector",
             ],
             from: "parent",

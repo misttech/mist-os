@@ -24,6 +24,7 @@
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
             ],
         },
         {

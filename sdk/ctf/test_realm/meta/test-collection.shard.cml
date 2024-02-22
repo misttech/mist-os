@@ -60,6 +60,7 @@
 
                 // Used for Flatland CTF tests.
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
 
                 // Used for intl settings FCT tests.
                 "fuchsia.settings.Intl",

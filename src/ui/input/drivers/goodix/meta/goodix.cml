@@ -15,7 +15,12 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
     use: [
-        { protocol: "fuchsia.scheduler.ProfileProvider" },
+        {
+            protocol: [
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
+            ],
+        },
         { service: "fuchsia.hardware.gpio.Service" },
         { service: "fuchsia.hardware.i2c.Service" },
     ],

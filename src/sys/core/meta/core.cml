@@ -175,7 +175,10 @@
             ],
         },
         {
-            protocol: [ "fuchsia.scheduler.ProfileProvider" ],
+            protocol: [
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
+            ],
             from: "parent",
             to: [ "#network" ],
         },
@@ -505,6 +508,7 @@
         {
             protocol: [
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysinfo.SysInfo",
             ],
             from: "parent",

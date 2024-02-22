@@ -16,6 +16,7 @@
         {
             protocol: [
                 "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
                 "fuchsia.virtualaudio.Control",
                 "fuchsia.virtualaudio.Device",
             ],
