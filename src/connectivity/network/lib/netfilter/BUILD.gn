@@ -22,8 +22,9 @@ rustc_library("netfilter") {
 
   sources = [
     "src/error.rs",
+    "src/grammar.rs",
     "src/lib.rs",
-    "src/parser.rs",
+    "src/parser_deprecated.rs",
   ]
 }
 

@@ -878,14 +878,15 @@ impl<'a> NetCfg<'a> {
         let FilterConfig { rules, nat_rules, rdr_rules } = config;
 
         if !rules.is_empty() {
-            let rules = netfilter::parser::parse_str_to_rules(&rules.join(""))
+            let rules = netfilter::parser_deprecated::parse_str_to_rules(&rules.join(""))
                 .context("error parsing filter rules")?;
             cas_filter_rules!(self.filter, get_rules, update_rules, rules, FilterUpdateRulesError);
         }
 
         if !nat_rules.is_empty() {
-            let nat_rules = netfilter::parser::parse_str_to_nat_rules(&nat_rules.join(""))
-                .context("error parsing NAT rules")?;
+            let nat_rules =
+                netfilter::parser_deprecated::parse_str_to_nat_rules(&nat_rules.join(""))
+                    .context("error parsing NAT rules")?;
             cas_filter_rules!(
                 self.filter,
                 get_nat_rules,
@@ -896,8 +897,9 @@ impl<'a> NetCfg<'a> {
         }
 
         if !rdr_rules.is_empty() {
-            let rdr_rules = netfilter::parser::parse_str_to_rdr_rules(&rdr_rules.join(""))
-                .context("error parsing RDR rules")?;
+            let rdr_rules =
+                netfilter::parser_deprecated::parse_str_to_rdr_rules(&rdr_rules.join(""))
+                    .context("error parsing RDR rules")?;
             // TODO(https://fxbug.dev/42147284): Change this to cas_filter_rules once update is supported.
             no_update_filter_rules!(
                 self.filter,

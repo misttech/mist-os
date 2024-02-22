@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 mod error;
-pub mod parser;
+mod grammar;
+pub mod parser_deprecated;
 
 pub use error::FidlReturn;

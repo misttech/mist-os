@@ -932,7 +932,7 @@ async fn do_filter_deprecated<C: NetCliDepsConnector, W: std::io::Write>(
         }
         opts::FilterDeprecatedEnum::SetRules(opts::FilterSetRules { rules }) => {
             let (_cur_rules, generation) = filter.get_rules().await?;
-            let rules = netfilter::parser::parse_str_to_rules(&rules)?;
+            let rules = netfilter::parser_deprecated::parse_str_to_rules(&rules)?;
             let () = filter_fidl!(
                 filter.update_rules(&rules, generation),
                 "error setting filter rules"
@@ -946,7 +946,7 @@ async fn do_filter_deprecated<C: NetCliDepsConnector, W: std::io::Write>(
         }
         opts::FilterDeprecatedEnum::SetNatRules(opts::FilterSetNatRules { rules }) => {
             let (_cur_rules, generation) = filter.get_nat_rules().await?;
-            let rules = netfilter::parser::parse_str_to_nat_rules(&rules)?;
+            let rules = netfilter::parser_deprecated::parse_str_to_nat_rules(&rules)?;
             let () = filter_fidl!(
                 filter.update_nat_rules(&rules, generation),
                 "error setting NAT rules"
@@ -960,7 +960,7 @@ async fn do_filter_deprecated<C: NetCliDepsConnector, W: std::io::Write>(
         }
         opts::FilterDeprecatedEnum::SetRdrRules(opts::FilterSetRdrRules { rules }) => {
             let (_cur_rules, generation) = filter.get_rdr_rules().await?;
-            let rules = netfilter::parser::parse_str_to_rdr_rules(&rules)?;
+            let rules = netfilter::parser_deprecated::parse_str_to_rdr_rules(&rules)?;
             let () = filter_fidl!(
                 filter.update_rdr_rules(&rules, generation),
                 "error setting RDR rules"
