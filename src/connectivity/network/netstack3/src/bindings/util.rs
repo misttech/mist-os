@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::{convert::Infallible as Never, num::NonZeroU16};
 use std::{
-    num::NonZeroU64,
+    convert::Infallible as Never,
+    fmt::Debug,
+    num::{NonZeroU16, NonZeroU64},
     ops::Deref,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -21,6 +22,8 @@ use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fidl_fuchsia_net_stack as fidl_net_stack;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
+use fuchsia_async as fasync;
+use fuchsia_zircon as zx;
 use futures::{task::AtomicWaker, FutureExt as _, Stream, StreamExt as _};
 use net_types::{
     ethernet::Mac,
@@ -41,6 +44,7 @@ use netstack3_core::{
     socket::{
         self as core_socket, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
     },
+    sync::{RemoveResourceResult, RemoveResourceResultWithContext},
     types::WorkQueueReport,
 };
 
@@ -273,6 +277,40 @@ pub(crate) async fn yielding_data_notifier_loop<F: FnMut() -> Option<WorkQueueRe
         }
     }
 }
+
+pub(crate) async fn wait_for_resource_removal<T: 'static>(
+    resource_name: &'static str,
+    resource_id: &impl Debug,
+    result: RemoveResourceResultWithContext<T, BindingsCtx>,
+    debug_refs: &impl Debug,
+) -> T {
+    let mut receiver = match result {
+        RemoveResourceResult::Removed(r) => {
+            tracing::debug!("{resource_name} {resource_id:?} removal completed synchronously");
+            return r;
+        }
+        RemoveResourceResult::Deferred(receiver) => receiver,
+    };
+
+    tracing::debug!(
+        "{resource_name} {resource_id:?} removal is pending references: {debug_refs:?}"
+    );
+    // If we get stuck trying to remove the resource, log the remaining refs at a
+    // low frequency to aid debugging.
+    let mut interval_logging = fasync::Interval::new(zx::Duration::from_seconds(30))
+        .map(|()| {
+            tracing::warn!(
+                "{resource_name} {resource_id:?} removal is pending references: {debug_refs:?}"
+            )
+        })
+        .collect::<()>();
+
+    futures::select! {
+        () = interval_logging => unreachable!("interval channel never completes"),
+        r = receiver => r.expect("sender dropped without notifying")
+    }
+}
+
 /// A core type which can be fallibly converted from the FIDL type `F`.
 ///
 /// For all `C: TryFromFidl<F>`, we provide a blanket impl of

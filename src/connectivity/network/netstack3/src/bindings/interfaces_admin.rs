@@ -62,15 +62,14 @@ use netstack3_core::{
         Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError,
         UpdateIpConfigurationError,
     },
-    sync::{RemoveResourceResult, RemoveResourceResultWithContext},
 };
 
 use crate::bindings::{
     devices::{self, StaticCommonInfo},
     netdevice_worker,
     routes::{self, admin::RouteSet},
-    util::{IllegalZeroValueError, IntoCore as _, IntoFidl, TryIntoCore},
-    BindingId, BindingsCtx, Ctx, DeviceIdExt as _, Netstack, StackTime,
+    util::{self, IllegalZeroValueError, IntoCore as _, IntoFidl, TryIntoCore},
+    BindingId, Ctx, DeviceIdExt as _, Netstack, StackTime,
 };
 
 pub(crate) async fn serve(ns: Netstack, req: fnet_interfaces_admin::InstallerRequestStream) {
@@ -678,33 +677,6 @@ async fn dispatch_control_request(
     .map(|()| ControlRequestResult::Continue)
 }
 
-async fn wait_for_device_removal<T: 'static>(
-    id: BindingId,
-    result: RemoveResourceResultWithContext<T, BindingsCtx>,
-    weak_id: &netstack3_core::device::WeakDeviceId<BindingsCtx>,
-) -> T {
-    let mut receiver = match result {
-        RemoveResourceResult::Removed(r) => {
-            tracing::debug!("device {id} removal completed synchronously");
-            return r;
-        }
-        RemoveResourceResult::Deferred(receiver) => receiver,
-    };
-    let debug_refs = weak_id.debug_references();
-
-    tracing::debug!("device {id} removal is pending references: {debug_refs:?}");
-    // If we get stuck trying to remove the device, log the remaining refs at a
-    // low frequency to aid debugging.
-    let mut interval_logging = fasync::Interval::new(zx::Duration::from_seconds(30))
-        .map(|()| tracing::warn!("device {id} removal is pending references: {debug_refs:?}"))
-        .collect::<()>();
-
-    futures::select! {
-        () = interval_logging => unreachable!("interval channel never completes"),
-        r = receiver => r.expect("sender dropped without notifying")
-    }
-}
-
 /// Cleans up and removes the specified NetDevice interface.
 ///
 /// # Panics
@@ -719,6 +691,7 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
             .expect("device was not removed since retrieval");
         // Keep a weak ID around to debug pending destruction.
         let weak_id = core_id.downgrade();
+        let debug_references = weak_id.debug_references();
         match core_id {
             DeviceId::Ethernet(core_id) => {
                 // We want to remove the routes on the device _after_ we mark
@@ -727,7 +700,13 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                 // that device.
                 let result = ctx.api().device().remove_device(core_id);
                 ctx.bindings_ctx().remove_routes_on_device(&weak_id).await;
-                let info = wait_for_device_removal(id, result, &weak_id).await;
+                let info = util::wait_for_resource_removal(
+                    "ethernet device",
+                    &id,
+                    result,
+                    &debug_references,
+                )
+                .await;
                 (info, weak_id)
             }
             DeviceId::Loopback(core_id) => {
@@ -741,7 +720,13 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                     static_common_info: _,
                     dynamic_common_info: _,
                     rx_notifier: _,
-                } = wait_for_device_removal(id, result, &weak_id).await;
+                } = util::wait_for_resource_removal(
+                    "loopback device",
+                    &id,
+                    result,
+                    &debug_references,
+                )
+                .await;
                 // Allow the loopback interface to be removed as part of clean
                 // shutdown, but emit a warning about it.
                 tracing::warn!("loopback interface was removed");
@@ -755,7 +740,13 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                 let result = ctx.api().device().remove_device(core_id);
                 ctx.bindings_ctx().remove_routes_on_device(&weak_id).await;
                 let devices::PureIpDeviceInfo { static_common_info: _, dynamic_common_info: _ } =
-                    wait_for_device_removal(id, result, &weak_id).await;
+                    util::wait_for_resource_removal(
+                        "pure ip device",
+                        &id,
+                        result,
+                        &debug_references,
+                    )
+                    .await;
                 tracing::info!("pure IP device {id:?} removal complete");
                 return;
             }
