@@ -46,9 +46,6 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
         "-Wl,--undefined-version",
         "-Wl,--version-script",
         "$(location @fuchsia_sdk//fuchsia/private:driver.ld)",
-
-        # Include the name of the shared object.
-        "-Wl,-soname={}".format(bin_name),
     ])
 
     # Remove this value because we want to set it on our own. If we don't
