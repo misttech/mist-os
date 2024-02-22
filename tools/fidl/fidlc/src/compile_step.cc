@@ -1189,7 +1189,6 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
       "fidl.test.protocoleventremove.Example.OnOldEvent",
       "fidl.test.protocolmethodadd.Example.NewMethod",
       "fidl.test.protocolmethodremove.Example.OldMethod",
-      "fuchsia.accessibility.semantics.SemanticTree.SendSemanticEvent",
       "fuchsia.camera.Manager.CreateStreamV2",
       "fuchsia.camera3.Device.GetConfigurations",
       "fuchsia.camera3.Device.GetConfigurations2",

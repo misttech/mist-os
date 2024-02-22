@@ -91,7 +91,6 @@ closed protocol SemanticTree {
     /// and does not wait for CommitUpdates(). It is the caller's
     /// responsibility to fire events on nodes that have been already commited.
     /// The return callback is invoked to acknowledge that the event was received.
-    @transitional
     strict SendSemanticEvent(struct {
         semantic_event SemanticEvent;
     }) -> ();

@@ -23,7 +23,7 @@ namespace a11y_testing {
 //
 // This implementation keeps a semantic tree binding open for its lifetime, and
 // responds success unconditionally when clients attempt to commit updates.
-class FakeSemanticTree : public fuchsia::accessibility::semantics::SemanticTree {
+class FakeSemanticTree final : public fuchsia::accessibility::semantics::SemanticTree {
  public:
   explicit FakeSemanticTree(
       fuchsia::accessibility::semantics::SemanticListenerPtr semantic_listener);
@@ -37,6 +37,12 @@ class FakeSemanticTree : public fuchsia::accessibility::semantics::SemanticTree 
 
   // |fuchsia::accessibility::semantics::SemanticTree|
   void DeleteSemanticNodes(std::vector<uint32_t> node_ids) override;
+
+  // |fuchsia::accessibility::semantics::SemanticTree|
+  void SendSemanticEvent(::fuchsia::accessibility::semantics::SemanticEvent semantic_event,
+                         SendSemanticEventCallback callback) override {
+    ZX_PANIC("Not Implemented");
+  }
 
   void Bind(fidl::InterfaceRequest<fuchsia::accessibility::semantics::SemanticTree>
                 semantic_tree_request);
