@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 
+#include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 
 #include <cstdint>
@@ -52,9 +53,23 @@ TEST(DriverImageIdTest, ToBanjoDriverImageId) {
   EXPECT_EQ(INVALID_ID, ToBanjoDriverImageId(kInvalidDriverImageId));
 }
 
+TEST(DriverImageIdTest, ToFidlDriverImageId) {
+  EXPECT_EQ(1u, ToFidlDriverImageId(kOne).value);
+  EXPECT_EQ(2u, ToFidlDriverImageId(kTwo).value);
+  EXPECT_EQ(kLargeIdValue, ToFidlDriverImageId(kLargeId).value);
+  EXPECT_EQ(INVALID_ID, ToFidlDriverImageId(kInvalidDriverImageId).value);
+}
+
 TEST(DriverImageIdTest, ToDriverImageIdWithBanjoValue) {
   EXPECT_EQ(kOne, ToDriverImageId(1));
   EXPECT_EQ(kTwo, ToDriverImageId(2));
+  EXPECT_EQ(kLargeId, ToDriverImageId(kLargeIdValue));
+  EXPECT_EQ(kInvalidDriverImageId, ToDriverImageId(INVALID_ID));
+}
+
+TEST(DriverImageIdTest, ToDriverImageIdWithFidlValue) {
+  EXPECT_EQ(kOne, ToDriverImageId(fuchsia_hardware_display_engine::wire::ImageId{.value = 1}));
+  EXPECT_EQ(kTwo, ToDriverImageId(fuchsia_hardware_display_engine::wire::ImageId{.value = 2}));
   EXPECT_EQ(kLargeId, ToDriverImageId(kLargeIdValue));
   EXPECT_EQ(kInvalidDriverImageId, ToDriverImageId(INVALID_ID));
 }
@@ -64,6 +79,13 @@ TEST(DriverImageIdTest, BanjoConversionRoundtrip) {
   EXPECT_EQ(kTwo, ToDriverImageId(ToBanjoDriverImageId(kTwo)));
   EXPECT_EQ(kLargeId, ToDriverImageId(ToBanjoDriverImageId(kLargeId)));
   EXPECT_EQ(kInvalidDriverImageId, ToDriverImageId(ToBanjoDriverImageId(kInvalidDriverImageId)));
+}
+
+TEST(DriverImageIdTest, FidlConversionRoundtrip) {
+  EXPECT_EQ(kOne, ToDriverImageId(ToFidlDriverImageId(kOne)));
+  EXPECT_EQ(kTwo, ToDriverImageId(ToFidlDriverImageId(kTwo)));
+  EXPECT_EQ(kLargeId, ToDriverImageId(ToFidlDriverImageId(kLargeId)));
+  EXPECT_EQ(kInvalidDriverImageId, ToDriverImageId(ToFidlDriverImageId(kInvalidDriverImageId)));
 }
 
 }  // namespace
