@@ -120,6 +120,14 @@
             url: "fuchsia-boot:///power-manager#meta/power-manager.cm",
         },
         {
+            name: "power-broker",
+            url: "fuchsia-boot:///power-broker#meta/power-broker.cm",
+        },
+        {
+            name: "system-activity-governor",
+            url: "fuchsia-boot:///system-activity-governor#meta/system-activity-governor.cm",
+        },
+        {
             name: "cpu_manager",
             url: "fuchsia-boot:///cpu-manager#meta/cpu-manager.cm",
             on_terminate: "reboot",
@@ -1056,6 +1064,7 @@
                 "#miscsvc",
                 "#netsvc",
                 "#pkg-drivers",
+                "#power-broker",
                 "#power_manager",
                 "#ptysvc",
                 "#pwrbtn-monitor",
@@ -1063,6 +1072,7 @@
                 "#shutdown_shim",
                 "#svchost",
                 "#sysinfo",
+                "#system-activity-governor",
                 "#virtual_console",
             ],
         },
@@ -1208,6 +1218,11 @@
             protocol: "fuchsia.inspect.InspectSink",
             from: "#archivist",
             to: "#full_resolver",
+        },
+        {
+            protocol: [ "fuchsia.power.broker.Topology" ],
+            from: "#power-broker",
+            to: "#system-activity-governor",
         },
 
         // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
@@ -1381,6 +1396,17 @@
                 "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
+        },
+        {
+            protocol: [ "fuchsia.power.broker.Topology" ],
+            from: "#power-broker",
+        },
+        {
+            protocol: [
+                "fuchsia.power.suspend.Stats",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+            from: "#system-activity-governor",
         },
     ],
     environments: [
