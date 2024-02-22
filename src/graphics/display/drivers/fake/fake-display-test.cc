@@ -694,7 +694,7 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
   layer_t layer = CreatePrimaryLayerConfig(framebuffer_config);
 
   constexpr size_t kNumLayers = 1;
-  std::array<layer_t*, kNumLayers> layers = {&layer};
+  std::array<const layer_t*, kNumLayers> layers = {&layer};
 
   // Must match kDisplayId in fake-display.cc.
   // TODO(https://fxbug.dev/42078942): Do not hardcode the display ID.

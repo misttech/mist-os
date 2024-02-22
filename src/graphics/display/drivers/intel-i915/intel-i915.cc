@@ -1547,7 +1547,7 @@ bool Controller::CheckDisplayLimits(
       if (banjo_display_config->layer_list[i]->type != LAYER_TYPE_PRIMARY) {
         continue;
       }
-      primary_layer_t* primary = &banjo_display_config->layer_list[i]->cfg.primary;
+      const primary_layer_t* primary = &banjo_display_config->layer_list[i]->cfg.primary;
       uint32_t src_width, src_height;
       GetPostTransformWidth(*banjo_display_config->layer_list[i], &src_width, &src_height);
 
@@ -1564,7 +1564,7 @@ bool Controller::CheckDisplayLimits(
         if (banjo_display_config->layer_list[j]->type != LAYER_TYPE_PRIMARY) {
           continue;
         }
-        primary_layer_t* primary = &banjo_display_config->layer_list[j]->cfg.primary;
+        const primary_layer_t* primary = &banjo_display_config->layer_list[j]->cfg.primary;
         uint32_t src_width, src_height;
         GetPostTransformWidth(*banjo_display_config->layer_list[j], &src_width, &src_height);
 
@@ -1662,7 +1662,7 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
     for (unsigned j = 0; j < banjo_display_config->layer_count; j++) {
       switch (banjo_display_config->layer_list[j]->type) {
         case LAYER_TYPE_PRIMARY: {
-          primary_layer_t* primary = &banjo_display_config->layer_list[j]->cfg.primary;
+          const primary_layer_t* primary = &banjo_display_config->layer_list[j]->cfg.primary;
           if (primary->transform_mode == FRAME_TRANSFORM_ROT_90 ||
               primary->transform_mode == FRAME_TRANSFORM_ROT_270) {
             // Linear and x tiled images don't support 90/270 rotation

@@ -45,7 +45,7 @@ class GoldfishDisplayTest : public testing::Test {
   void SetUp() override;
   void TearDown() override;
   std::array<std::array<layer_t, kMaxLayerCount>, kNumDisplays> layer_ = {};
-  std::array<layer_t*, kNumDisplays> layer_ptrs = {};
+  std::array<const layer_t*, kNumDisplays> layer_ptrs = {};
 
   std::array<display_config_t, kNumDisplays> configs_ = {};
   std::array<display_config_t*, kNumDisplays> configs_ptrs_ = {};
@@ -66,7 +66,7 @@ void GoldfishDisplayTest::SetUp() {
 
   for (size_t i = 0; i < kNumDisplays; i++) {
     configs_ptrs_[i] = &configs_[i];
-    layer_ptrs[i] = &layer_[i][0];
+    layer_ptrs[i] = layer_[i].data();
     configs_[i].display_id = i + 1;
     configs_[i].layer_list = &layer_ptrs[i];
     configs_[i].layer_count = 1;
@@ -124,7 +124,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerColor) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device
   for (size_t i = 0; i < kNumDisplays; i++) {
-    configs_[i].layer_list[0]->type = LAYER_TYPE_COLOR;
+    layer_[i][0].type = LAYER_TYPE_COLOR;
   }
 
   size_t actual_result_size = 0;
@@ -155,12 +155,12 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerPrimary) {
       .height = 768,
   };
   for (size_t i = 0; i < kNumDisplays; i++) {
-    configs_[i].layer_list[0]->cfg.primary.dest_frame = dest_frame;
-    configs_[i].layer_list[0]->cfg.primary.src_frame = src_frame;
-    configs_[i].layer_list[0]->cfg.primary.image.width = 1024;
-    configs_[i].layer_list[0]->cfg.primary.image.height = 768;
-    configs_[i].layer_list[0]->cfg.primary.alpha_mode = 0;
-    configs_[i].layer_list[0]->cfg.primary.transform_mode = 0;
+    layer_[i][0].cfg.primary.dest_frame = dest_frame;
+    layer_[i][0].cfg.primary.src_frame = src_frame;
+    layer_[i][0].cfg.primary.image.width = 1024;
+    layer_[i][0].cfg.primary.image.height = 768;
+    layer_[i][0].cfg.primary.alpha_mode = 0;
+    layer_[i][0].cfg.primary.transform_mode = 0;
   }
 
   size_t actual_result_size = 0;
@@ -190,10 +190,10 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerDestFrame) {
       .height = 768,
   };
   for (size_t i = 0; i < kNumDisplays; i++) {
-    configs_[i].layer_list[0]->cfg.primary.dest_frame = dest_frame;
-    configs_[i].layer_list[0]->cfg.primary.src_frame = src_frame;
-    configs_[i].layer_list[0]->cfg.primary.image.width = 1024;
-    configs_[i].layer_list[0]->cfg.primary.image.height = 768;
+    layer_[i][0].cfg.primary.dest_frame = dest_frame;
+    layer_[i][0].cfg.primary.src_frame = src_frame;
+    layer_[i][0].cfg.primary.image.width = 1024;
+    layer_[i][0].cfg.primary.image.height = 768;
   }
 
   size_t actual_result_size = 0;
@@ -223,10 +223,10 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerSrcFrame) {
       .height = 768,
   };
   for (size_t i = 0; i < kNumDisplays; i++) {
-    configs_[i].layer_list[0]->cfg.primary.dest_frame = dest_frame;
-    configs_[i].layer_list[0]->cfg.primary.src_frame = src_frame;
-    configs_[i].layer_list[0]->cfg.primary.image.width = 1024;
-    configs_[i].layer_list[0]->cfg.primary.image.height = 768;
+    layer_[i][0].cfg.primary.dest_frame = dest_frame;
+    layer_[i][0].cfg.primary.src_frame = src_frame;
+    layer_[i][0].cfg.primary.image.width = 1024;
+    layer_[i][0].cfg.primary.image.height = 768;
   }
 
   size_t actual_result_size = 0;
@@ -256,11 +256,11 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerAlpha) {
       .height = 768,
   };
   for (size_t i = 0; i < kNumDisplays; i++) {
-    configs_[i].layer_list[0]->cfg.primary.dest_frame = dest_frame;
-    configs_[i].layer_list[0]->cfg.primary.src_frame = src_frame;
-    configs_[i].layer_list[0]->cfg.primary.image.width = 1024;
-    configs_[i].layer_list[0]->cfg.primary.image.height = 768;
-    configs_[i].layer_list[0]->cfg.primary.alpha_mode = ALPHA_HW_MULTIPLY;
+    layer_[i][0].cfg.primary.dest_frame = dest_frame;
+    layer_[i][0].cfg.primary.src_frame = src_frame;
+    layer_[i][0].cfg.primary.image.width = 1024;
+    layer_[i][0].cfg.primary.image.height = 768;
+    layer_[i][0].cfg.primary.alpha_mode = ALPHA_HW_MULTIPLY;
   }
 
   size_t actual_result_size = 0;
@@ -290,11 +290,11 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerTransform) {
       .height = 768,
   };
   for (size_t i = 0; i < kNumDisplays; i++) {
-    configs_[i].layer_list[0]->cfg.primary.dest_frame = dest_frame;
-    configs_[i].layer_list[0]->cfg.primary.src_frame = src_frame;
-    configs_[i].layer_list[0]->cfg.primary.image.width = 1024;
-    configs_[i].layer_list[0]->cfg.primary.image.height = 768;
-    configs_[i].layer_list[0]->cfg.primary.transform_mode = FRAME_TRANSFORM_REFLECT_X;
+    layer_[i][0].cfg.primary.dest_frame = dest_frame;
+    layer_[i][0].cfg.primary.src_frame = src_frame;
+    layer_[i][0].cfg.primary.image.width = 1024;
+    layer_[i][0].cfg.primary.image.height = 768;
+    layer_[i][0].cfg.primary.transform_mode = FRAME_TRANSFORM_REFLECT_X;
   }
 
   size_t actual_result_size = 0;
@@ -324,10 +324,10 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerColorCoversion) {
       .height = 768,
   };
   for (size_t i = 0; i < kNumDisplays; i++) {
-    configs_[i].layer_list[0]->cfg.primary.dest_frame = dest_frame;
-    configs_[i].layer_list[0]->cfg.primary.src_frame = src_frame;
-    configs_[i].layer_list[0]->cfg.primary.image.width = 1024;
-    configs_[i].layer_list[0]->cfg.primary.image.height = 768;
+    layer_[i][0].cfg.primary.dest_frame = dest_frame;
+    layer_[i][0].cfg.primary.src_frame = src_frame;
+    layer_[i][0].cfg.primary.image.width = 1024;
+    layer_[i][0].cfg.primary.image.height = 768;
     configs_[i].cc_flags = COLOR_CONVERSION_POSTOFFSET;
   }
 
@@ -360,12 +360,12 @@ TEST_F(GoldfishDisplayTest, CheckConfigAllFeatures) {
       .height = 768,
   };
   for (size_t i = 0; i < kNumDisplays; i++) {
-    configs_[i].layer_list[0]->cfg.primary.dest_frame = dest_frame;
-    configs_[i].layer_list[0]->cfg.primary.src_frame = src_frame;
-    configs_[i].layer_list[0]->cfg.primary.image.width = 1024;
-    configs_[i].layer_list[0]->cfg.primary.image.height = 768;
-    configs_[i].layer_list[0]->cfg.primary.alpha_mode = ALPHA_HW_MULTIPLY;
-    configs_[i].layer_list[0]->cfg.primary.transform_mode = FRAME_TRANSFORM_ROT_180;
+    layer_[i][0].cfg.primary.dest_frame = dest_frame;
+    layer_[i][0].cfg.primary.src_frame = src_frame;
+    layer_[i][0].cfg.primary.image.width = 1024;
+    layer_[i][0].cfg.primary.image.height = 768;
+    layer_[i][0].cfg.primary.alpha_mode = ALPHA_HW_MULTIPLY;
+    layer_[i][0].cfg.primary.transform_mode = FRAME_TRANSFORM_ROT_180;
     configs_[i].cc_flags = COLOR_CONVERSION_POSTOFFSET;
   }
 

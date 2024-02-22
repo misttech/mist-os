@@ -311,7 +311,7 @@ config_check_result_t SimpleDisplay::DisplayControllerImplCheckConfiguration(
   if (display_configs[0]->layer_count != 1) {
     success = false;
   } else {
-    primary_layer_t* layer = &display_configs[0]->layer_list[0]->cfg.primary;
+    const primary_layer_t* layer = &display_configs[0]->layer_list[0]->cfg.primary;
     frame_t frame = {
         .x_pos = 0,
         .y_pos = 0,

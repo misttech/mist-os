@@ -866,7 +866,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
   }
   const size_t layers_size = std::max(static_cast<size_t>(1), layers_.size());
   const display_config_t* configs[configs_.size()];
-  layer_t* layers[layers_size];
+  const layer_t* layers[layers_size];
 
   // TODO(https://fxbug.dev/42080896): Do not use VLA. We should introduce a limit on
   // totally supported layers instead.
@@ -1033,7 +1033,7 @@ void Client::ApplyConfig() {
 
   bool config_missing_image = false;
   // Clients can apply zero-layer configs. Ensure that the VLA is at least 1 element long.
-  layer_t* layers[layers_.size() + 1];
+  const layer_t* layers[layers_.size() + 1];
   int layer_idx = 0;
 
   // Layers may have pending images, and it is possible that a layer still

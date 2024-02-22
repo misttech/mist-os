@@ -266,7 +266,6 @@ type DisplayConfig = struct {
     cc_coefficients array<array<float32, 3>, 3>;
     cc_postoffsets array<float32, 3>;
 
-    @mutable
     @out_of_line_contents
     layer vector<Layer>:MAX;
 };

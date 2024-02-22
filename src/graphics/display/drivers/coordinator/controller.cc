@@ -94,7 +94,7 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
   // Go through all the display mode timings and record whether or not
   // a basic layer configuration is acceptable.
   layer_t test_layer = {};
-  layer_t* test_layers[] = {&test_layer};
+  const layer_t* test_layers[] = {&test_layer};
   test_layer.type = LAYER_TYPE_PRIMARY;
   display_config_t test_config;
   const display_config_t* test_configs[] = {&test_config};

@@ -568,7 +568,7 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
         // primary type.
         current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
       } else {
-        primary_layer_t* layer = &display_configs[i]->layer_list[0]->cfg.primary;
+        const primary_layer_t* layer = &display_configs[i]->layer_list[0]->cfg.primary;
         // Scaling is allowed if destination frame match display and
         // source frame match image.
         frame_t dest_frame = {
