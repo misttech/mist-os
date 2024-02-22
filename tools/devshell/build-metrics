@@ -196,8 +196,8 @@ case "$action" in
     # Does not require that build-metrics be enabled in advance because
     # the logs and metrics files are always being produced.
     # Scan for log dirs where build/rbe/fuchsia-reproxy-wrap.sh produces them.
-    _logs_dir="${TMPDIR:-/tmp}"
-    "$_upload_script" "${action_args[@]}" "$_logs_dir"/reproxy.*
+    _logs_dir="${FUCHSIA_DIR}"/out/.reproxy_logs
+    "$_upload_script" "${action_args[@]}" "$_logs_dir"/*/reproxy.*
     exit 0
     ;;
 

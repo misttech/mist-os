@@ -35,7 +35,7 @@ _DEFAULT_RECLIENT_BINDIR = glob.glob(
 )[0]
 
 _DEFAULT_REPROXY_LOGS_TABLE = (
-    "fuchsia-engprod-metrics-prod:metrics.rbe_client_command_logs_developer"
+    "fuchsia-engprod-metrics-prod:metrics.rbe_client_command_logs_developer_raw"
 )
 _DEFAULT_RBE_METRICS_TABLE = (
     "fuchsia-engprod-metrics-prod:metrics.rbe_client_metrics_developer_raw"
@@ -234,7 +234,6 @@ def main_upload_metrics(
 
 
 def main_upload_logs(
-    uuid: str,
     reproxy_logdir: Path,
     reclient_bindir: Path,
     bq_logs_table: str,
@@ -259,13 +258,9 @@ def main_upload_logs(
         msg(f"Converting log format to JSON for BQ.")
     converted_log = pb_message_util.proto_message_to_bq_dict(log_dump)
 
-    # Attach build id to log entries
+    # LogRecord already contain an invocation_id.
     log_records = [
-        {
-            "build_id": uuid,
-            "log": record,
-        }
-        for record in converted_log["records"]
+        {"action": json.dumps(record)} for record in converted_log["records"]
     ]
 
     if print_sample:
@@ -352,8 +347,9 @@ def main_single_logdir(
         return exit_code
 
     # Upload remote action logs.
+    # Note: LogRecords already contain the build_id in a invocation_id field,
+    # so we don't have to pass it in again.
     exit_code = main_upload_logs(
-        uuid=build_id,
         reproxy_logdir=reproxy_logdir,
         reclient_bindir=reclient_bindir,  # for logdump utility
         bq_logs_table=logs_table,

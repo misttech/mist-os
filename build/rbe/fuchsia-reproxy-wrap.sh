@@ -326,7 +326,7 @@ shutdown() {
     "$script_dir"/upload_reproxy_logs.sh \
       --reclient-bindir="$reclient_bindir" \
       --uuid="$build_uuid" \
-      --bq-logs-table="$cloud_project:$dataset".rbe_client_command_logs_developer \
+      --bq-logs-table="$cloud_project:$dataset".rbe_client_command_logs_developer_raw \
       --bq-metrics-table="$cloud_project:$dataset".rbe_client_metrics_developer_raw \
       "$reproxy_logdir"
       # The upload exit status does not propagate from inside a trap call.
