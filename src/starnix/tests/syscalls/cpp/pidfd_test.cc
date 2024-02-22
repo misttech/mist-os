@@ -14,12 +14,6 @@
 
 namespace {
 
-// TODO(https://fxbug.dev/42085226): This define will no longer be needed when x64 and arm64 switch to the
-// ubuntu20.04 sysroot too.
-#ifndef __riscv
-#define SYS_pidfd_open 434
-#endif
-
 // Our Linux sysroot doesn't seem to have pidfd_open() and gettid().
 int DoPidFdOpen(pid_t pid) { return static_cast<int>(syscall(SYS_pidfd_open, pid, 0u)); }
 pid_t DoGetTid() { return static_cast<pid_t>(syscall(SYS_gettid)); }

@@ -13,12 +13,8 @@ if (current_os == target_os && target_sysroot != "") {
   import("//zircon/public/sysroot/cpp.gni")
   sysroot = cpp_sysroot_dir
 } else if (is_linux) {
-  # Use an older Linux sysroot to compile host tools.
-  #
-  # TODO(https://fxbug.dev/42085226): Enable ubuntu20.04 for x86_64 and arm64. Currently it
-  # breaks esched demo, which depends on `GL/gl.h`, see
-  # `src/ui/examples/escher/common/demo_harness_glfw.cc`.
-  if (is_host || current_cpu != "riscv64") {
+  if (is_host) {
+    # Use an older Linux sysroot to compile host tools.
     sysroot = "//prebuilt/third_party/sysroot/linux"
   } else {
     sysroot = "//prebuilt/third_party/sysroot/ubuntu20.04"
