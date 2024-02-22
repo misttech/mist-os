@@ -68,6 +68,8 @@ class Service final : fuchsia::bluetooth::gatt2::LocalService {
                  int32_t offset, ReadValueCallback callback) override;
   void WriteValue(fuchsia::bluetooth::gatt2::LocalServiceWriteValueRequest request,
                   WriteValueCallback callback) override;
+  void PeerUpdate(fuchsia::bluetooth::gatt2::LocalServicePeerUpdateRequest request,
+                  PeerUpdateCallback callback) override;
   void ValueChangedCredit(uint8_t additional_credit) override;
 
   std::unique_ptr<HeartModel> heart_model_;

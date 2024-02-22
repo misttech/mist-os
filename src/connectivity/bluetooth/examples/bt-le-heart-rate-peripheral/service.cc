@@ -273,6 +273,12 @@ void Service::WriteValue(fuchsia::bluetooth::gatt2::LocalServiceWriteValueReques
   callback(fpromise::ok());
 }
 
+void Service::PeerUpdate(fuchsia::bluetooth::gatt2::LocalServicePeerUpdateRequest request,
+                         PeerUpdateCallback callback) {
+  // Nothing needs to be done here
+  callback();
+}
+
 void Service::ValueChangedCredit(uint8_t additional_credit) {
   notification_credits_ += additional_credit;
 }
