@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -23,8 +24,6 @@
 #include <bind/fuchsia/hardware/platform/bus/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
-
-#include "src/devices/board/drivers/astro/astro-bind.h"
 
 namespace astro {
 

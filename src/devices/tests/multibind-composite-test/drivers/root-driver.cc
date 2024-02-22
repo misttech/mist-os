@@ -4,14 +4,13 @@
 
 #include "src/devices/tests/multibind-composite-test/drivers/root-driver.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/test/cpp/bind.h>
 #include <bind/multibind/test/cpp/bind.h>
-
-#include "src/devices/tests/multibind-composite-test/drivers/root-driver-bind.h"
 
 namespace root_driver {
 

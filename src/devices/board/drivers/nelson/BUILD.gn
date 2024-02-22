@@ -31,7 +31,6 @@ if (internal_access) {
 
 driver_bind_rules("nelson-bind") {
   rules = "nelson.bind"
-  header_output = "nelson-bind.h"
   tests = "bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.google.platform",
@@ -42,7 +41,6 @@ driver_bind_rules("nelson-bind") {
 
 driver_bind_rules("nelson_aml_video_bind") {
   rules = "bind/nelson_aml_video.bind"
-  header_output = "nelson_aml_video_bind.h"
   bind_output = "nelson_aml_video_bind.bc"
   tests = "bind-tests/nelson_aml_video-test.json"
   deps = [

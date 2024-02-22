@@ -12,7 +12,6 @@ import("//build/zbi/zbi_input.gni")
 
 driver_bind_rules("example-board-bind") {
   rules = "example-board.bind"
-  header_output = "example-board-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.test.platform",

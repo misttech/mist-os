@@ -12,7 +12,6 @@ fidl("fuchsia.board.test") {
 
 driver_bind_rules("test-bus-bind") {
   rules = "test-bus.bind"
-  header_output = "test-bus-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.test.platform",

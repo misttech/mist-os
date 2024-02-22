@@ -8,7 +8,6 @@ import("//src/devices/bus/drivers/pci/pci.gni")
 
 driver_bind_rules("qemu-riscv64_bind") {
   rules = "qemu-riscv64.bind"
-  header_output = "qemu-riscv64_bind.h"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.platform" ]
 }

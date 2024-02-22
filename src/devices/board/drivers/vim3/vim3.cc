@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/gpio/c/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/binding.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -20,8 +21,6 @@
 
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
-
-#include "src/devices/board/drivers/vim3/vim3-bind.h"
 
 namespace vim3 {
 

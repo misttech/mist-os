@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -25,7 +26,6 @@
 
 #include "src/devices/board/drivers/x86/include/acpi.h"
 #include "src/devices/board/drivers/x86/include/sysmem.h"
-#include "src/devices/board/drivers/x86/x64-bind.h"
 #include "src/devices/board/lib/acpi/manager-fuchsia.h"
 #include "src/devices/board/lib/smbios/smbios.h"
 

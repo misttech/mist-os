@@ -31,7 +31,6 @@ config("config") {
 
 driver_bind_rules("x64-bind") {
   rules = "x64.bind"
-  header_output = "x64-bind.h"
   bind_output = "platform-bus-x64.bindbc"
   tests = "bind-tests.json"
   deps = [

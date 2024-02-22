@@ -6,13 +6,13 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/defer.h>
 #include <zircon/status.h>
 
-#include "src/devices/board/drivers/acpi-arm64/acpi-arm64-bind.h"
 #include "src/devices/board/lib/acpi/acpi-impl.h"
 #include "src/devices/board/lib/acpi/pci.h"
 #include "src/devices/board/lib/smbios/smbios.h"

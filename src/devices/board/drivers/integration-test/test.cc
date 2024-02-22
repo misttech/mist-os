@@ -6,6 +6,7 @@
 #include <fidl/fuchsia.board.test/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -27,7 +28,6 @@
 #include <fbl/vector.h>
 
 #include "fidl/fuchsia.hardware.platform.bus/cpp/markers.h"
-#include "src/devices/board/drivers/integration-test/test-bus-bind.h"
 
 namespace board_test {
 namespace fpbus = fuchsia_hardware_platform_bus;

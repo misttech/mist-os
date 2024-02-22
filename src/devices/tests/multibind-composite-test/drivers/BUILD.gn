@@ -23,7 +23,6 @@ bind_library("multibind.test") {
 
 driver_bind_rules("root-driver-bind") {
   rules = "root-driver.bind"
-  header_output = "root-driver-bind.h"
   bind_output = "root-driver.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -50,7 +49,6 @@ fuchsia_driver_component("root") {
 
 driver_bind_rules("legacy-composite-bind") {
   rules = "legacy-composite.bind"
-  header_output = "legacy-composite-bind.h"
   bind_output = "legacy-composite.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -75,7 +73,6 @@ fuchsia_driver_component("legacy-composite") {
 
 driver_bind_rules("spec-composite-1-bind") {
   rules = "spec-composite-1.bind"
-  header_output = "spec-composite-1-bind.h"
   bind_output = "spec-composite-1.bindbc"
   deps = [ ":multibind.test" ]
 }
@@ -100,7 +97,6 @@ fuchsia_driver_component("spec-composite-1") {
 
 driver_bind_rules("spec-composite-2-bind") {
   rules = "spec-composite-2.bind"
-  header_output = "spec-composite-2-bind.h"
   bind_output = "spec-composite-2.bindbc"
   deps = [ ":multibind.test" ]
 }

@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -23,7 +24,6 @@
 #include <zircon/threads.h>
 
 #include "lib/fit/defer.h"
-#include "src/devices/board/drivers/machina/machina_board_bind.h"
 
 namespace machina {
 namespace fpbus = fuchsia_hardware_platform_bus;

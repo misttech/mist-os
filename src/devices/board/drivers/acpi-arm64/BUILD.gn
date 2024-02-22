@@ -8,7 +8,6 @@ import("//src/devices/bus/drivers/pci/pci.gni")
 
 driver_bind_rules("acpi-arm64-bind") {
   rules = "acpi-arm64.bind"
-  header_output = "acpi-arm64-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.arm.platform",
     "//src/devices/bind/fuchsia.platform",

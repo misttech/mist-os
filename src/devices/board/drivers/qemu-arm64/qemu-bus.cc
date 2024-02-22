@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -18,8 +19,6 @@
 #include <zircon/threads.h>
 
 #include <fbl/alloc_checker.h>
-
-#include "src/devices/board/drivers/qemu-arm64/qemu-arm64_bind.h"
 
 namespace board_qemu_arm64 {
 namespace fpbus = fuchsia_hardware_platform_bus;

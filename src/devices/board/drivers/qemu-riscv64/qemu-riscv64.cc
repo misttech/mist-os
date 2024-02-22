@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -22,7 +23,6 @@
 
 #include "fidl/fuchsia.hardware.platform.bus/cpp/natural_types.h"
 #include "lib/fdf/cpp/arena.h"
-#include "src/devices/board/drivers/qemu-riscv64/qemu-riscv64_bind.h"
 
 namespace board_qemu_riscv64 {
 namespace fpbus = fuchsia_hardware_platform_bus;

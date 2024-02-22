@@ -16,7 +16,6 @@ if (internal_access) {
 
 driver_bind_rules("astro-bind") {
   rules = "astro.bind"
-  header_output = "astro-bind.h"
   bind_output = "astro.bindbc"
   tests = "bind-tests.json"
   deps = [
