@@ -1197,7 +1197,6 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
       "fuchsia.camera3.Stream.GetNextFrame2",
       "fuchsia.camera3.Stream.GetProperties",
       "fuchsia.camera3.Stream.GetProperties2",
-      "fuchsia.element.AnnotationController.WatchAnnotations",
       "fuchsia.hardware.display.Coordinator.ApplyConfig2",
       "fuchsia.io.Directory2.AddInotifyFilter",
       "fuchsia.io.Directory2.CreateSymlink",

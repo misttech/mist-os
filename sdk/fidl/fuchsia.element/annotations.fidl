@@ -109,7 +109,6 @@ closed protocol AnnotationController {
     /// previous request to complete, the connection will be closed.
     ///
     /// * error `WatchAnnotationsError` if the annotations could not be returned.
-    @transitional
     strict WatchAnnotations() -> (resource struct {
         annotations Annotations;
     }) error WatchAnnotationsError;
