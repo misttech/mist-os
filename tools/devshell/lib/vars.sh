@@ -528,7 +528,14 @@ function _looks_like_ipv4 {
 }
 
 function _looks_like_ipv6 {
-  [[ "$1" =~ ^\[([0-9a-fA-F:]+(%[0-9a-zA-Z-]{1,})?)\](:[0-9]{1,5})?$ ]] || return 1
+  local expression
+  expression='^\[([0-9a-fA-F:]+(%[0-9a-zA-Z-]{1,})?)\](:[0-9]{1,5})?$'
+  if ! [[ "$1" =~ ${expression} ]]; then
+    # try again but wrap the arg in "[]"
+    local wrapped
+    wrapped="[${1}]"
+    [[ "$1" =~ ${expression} ]] || return 1
+  fi
   local colons="${BASH_REMATCH[1]//[^:]}"
   # validate that there are no more than 7 colons
   [[ "${#colons}" -le 7 ]] || return 1
