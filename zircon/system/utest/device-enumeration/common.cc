@@ -160,10 +160,8 @@ void DeviceEnumerationTest::PrintAllDevices() {
         break;
       }
       for (const fuchsia_driver_development::wire::NodeInfo& info : response.nodes) {
-        ASSERT_TRUE(info.has_versioned_info());
-        ASSERT_TRUE(info.versioned_info().is_v2());
-        ASSERT_TRUE(info.versioned_info().v2().has_moniker());
-        std::cout << info.versioned_info().v2().moniker().get() << std::endl;
+        ASSERT_TRUE(info.has_moniker());
+        std::cout << info.moniker().get() << std::endl;
       }
     }
     std::cout << "END printing all devices (paths in DFv1, monikers in DFv2)." << std::endl;

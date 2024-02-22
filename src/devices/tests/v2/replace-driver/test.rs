@@ -112,7 +112,6 @@ async fn test_replace_target() -> Result<()> {
     // the register flow, they will be available as ephemeral drivers.
     let args = fdt::RealmArgs {
         root_driver: Some("fuchsia-boot:///#meta/root.cm".to_string()),
-        use_driver_framework_v2: Some(true),
         offers: Some(offers),
         driver_disable: Some(vec![
             "fuchsia-boot:///#meta/target_2_replacement.cm".to_string(),
@@ -299,15 +298,7 @@ async fn test_replace_target() -> Result<()> {
     loop {
         let device_infos = get_device_info(&driver_dev, &[], /* exact_match= */ true).await?;
         if !device_infos.iter().any(|info| {
-            let moniker = info
-                .versioned_info
-                .as_ref()
-                .and_then(|info| match &info {
-                    fdd::VersionedNodeInfo::V2(v2_info) => Some(v2_info.moniker.clone()),
-                    _ => None,
-                })
-                .unwrap();
-            let name = moniker.unwrap().split(".").last().unwrap().to_string();
+            let name = info.moniker.clone().unwrap().split(".").last().unwrap().to_string();
             return name == "H".to_string();
         }) {
             break;

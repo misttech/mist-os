@@ -18,7 +18,7 @@ const SAMPLE_DRIVER_URL: &str = "fuchsia-boot:///#meta/sample-driver.cm";
 const PARENT_DRIVER_URL: &str = "fuchsia-boot:///#meta/test-parent-sys.cm";
 const FAKE_DRIVER_URL: &str = "fuchsia-boot:///#meta/driver-test-realm-fake-driver.cm";
 
-fn get_no_protocol_dfv2_property_list() -> Option<[fdf::NodeProperty; 3]> {
+fn get_no_protocol_property_list() -> Option<[fdf::NodeProperty; 3]> {
     Some([
         fdf::NodeProperty {
             key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
@@ -39,7 +39,7 @@ fn get_no_protocol_dfv2_property_list() -> Option<[fdf::NodeProperty; 3]> {
     ])
 }
 
-fn get_test_parent_dfv2_property_list() -> Option<[fdf::NodeProperty; 3]> {
+fn get_test_parent_property_list() -> Option<[fdf::NodeProperty; 3]> {
     Some([
         fdf::NodeProperty {
             key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
@@ -141,19 +141,16 @@ async fn get_driver_info(
     Ok(driver_infos)
 }
 
-async fn set_up_test_driver_realm(use_dfv2: bool) -> Result<(RealmInstance, fdd::ManagerProxy)> {
-    const ROOT_DRIVER_DFV2_URL: &str = PARENT_DRIVER_URL;
+async fn set_up_test_driver_realm() -> Result<(RealmInstance, fdd::ManagerProxy)> {
+    const ROOT_DRIVER_URL: &str = PARENT_DRIVER_URL;
 
     let builder = RealmBuilder::new().await?;
     builder.driver_test_realm_setup().await?;
     let instance = builder.build().await?;
 
     let mut realm_args = fdt::RealmArgs::default();
-    realm_args.use_driver_framework_v2 = Some(use_dfv2);
-    if use_dfv2 {
-        // DriverTestRealm attempts to bind the .cm of test-parent-sys if not explicitly requested otherwise.
-        realm_args.root_driver = Some(ROOT_DRIVER_DFV2_URL.to_owned());
-    }
+    // DriverTestRealm attempts to bind the .cm of test-parent-sys if not explicitly requested otherwise.
+    realm_args.root_driver = Some(ROOT_DRIVER_URL.to_owned());
     instance.driver_test_realm_start(realm_args).await?;
 
     let driver_dev = instance.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
@@ -179,7 +176,7 @@ fn assert_contains_driver_url(driver_infos: &Vec<fdf::DriverInfo>, expected_driv
 // DFv1
 #[fasync::run_singlethreaded(test)]
 async fn test_get_driver_info_no_filter_dfv1() -> Result<()> {
-    let (_instance, driver_dev) = set_up_test_driver_realm(false).await?;
+    let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let driver_infos = get_driver_info(&driver_dev, &[]).await?;
 
     assert_eq!(driver_infos.len(), 3);
@@ -193,7 +190,7 @@ async fn test_get_driver_info_no_filter_dfv1() -> Result<()> {
 async fn test_get_driver_info_with_filter_dfv1() -> Result<()> {
     const DRIVER_FILTER: [&str; 1] = [SAMPLE_DRIVER_URL];
 
-    let (_instance, driver_dev) = set_up_test_driver_realm(false).await?;
+    let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let driver_infos = get_driver_info(&driver_dev, &DRIVER_FILTER).await?;
 
     assert_eq!(driver_infos.len(), 1);
@@ -205,7 +202,7 @@ async fn test_get_driver_info_with_filter_dfv1() -> Result<()> {
 async fn test_get_driver_info_with_mixed_filter_dfv1() -> Result<()> {
     const DRIVER_FILTER: [&str; 2] = ["fuchsia-boot:///#driver/sample-driver.so", "foo"];
 
-    let (_instance, driver_dev) = set_up_test_driver_realm(false).await?;
+    let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let iterator = send_get_driver_info_request(&driver_dev, &DRIVER_FILTER)?;
     let res = iterator.get_next().await.expect_err("A driver should not be returned");
 
@@ -217,7 +214,7 @@ async fn test_get_driver_info_with_mixed_filter_dfv1() -> Result<()> {
 async fn test_get_driver_info_with_incomplete_filter_dfv1() -> Result<()> {
     const DRIVER_FILTER: [&str; 1] = ["fuchsia-boot:///#driver/sample-driver"];
 
-    let (_instance, driver_dev) = set_up_test_driver_realm(false).await?;
+    let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let iterator = send_get_driver_info_request(&driver_dev, &DRIVER_FILTER)?;
     let res = iterator.get_next().await.expect_err("A driver should not be returned");
 
@@ -229,7 +226,7 @@ async fn test_get_driver_info_with_incomplete_filter_dfv1() -> Result<()> {
 async fn test_get_driver_info_not_found_filter_dfv1() -> Result<()> {
     const DRIVER_FILTER: [&str; 1] = ["foo"];
 
-    let (_instance, driver_dev) = set_up_test_driver_realm(false).await?;
+    let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let iterator = send_get_driver_info_request(&driver_dev, &DRIVER_FILTER)?;
     let res = iterator.get_next().await.expect_err("A driver should not be returned");
 
@@ -237,10 +234,9 @@ async fn test_get_driver_info_not_found_filter_dfv1() -> Result<()> {
     Ok(())
 }
 
-// DFv2
 #[fasync::run_singlethreaded(test)]
-async fn test_get_driver_info_no_filter_dfv2() -> Result<()> {
-    let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
+async fn test_get_driver_info_no_filter() -> Result<()> {
+    let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let driver_infos = get_driver_info(&driver_dev, &[]).await?;
 
     assert_eq!(driver_infos.len(), 3);
@@ -251,10 +247,10 @@ async fn test_get_driver_info_no_filter_dfv2() -> Result<()> {
 }
 
 #[fasync::run_singlethreaded(test)]
-async fn test_get_driver_info_with_filter_dfv2() -> Result<()> {
+async fn test_get_driver_info_with_filter() -> Result<()> {
     const DRIVER_FILTER: [&str; 1] = [SAMPLE_DRIVER_URL];
 
-    let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
+    let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let driver_infos = get_driver_info(&driver_dev, &DRIVER_FILTER).await?;
 
     assert_eq!(driver_infos.len(), 1);
@@ -263,10 +259,10 @@ async fn test_get_driver_info_with_filter_dfv2() -> Result<()> {
 }
 
 #[fasync::run_singlethreaded(test)]
-async fn test_get_driver_info_with_duplicate_filter_dfv2() -> Result<()> {
+async fn test_get_driver_info_with_duplicate_filter() -> Result<()> {
     const DRIVER_FILTER: [&str; 2] = [SAMPLE_DRIVER_URL, SAMPLE_DRIVER_URL];
 
-    let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
+    let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let driver_infos = get_driver_info(&driver_dev, &DRIVER_FILTER).await?;
 
     assert_eq!(driver_infos.len(), 1);
@@ -276,10 +272,10 @@ async fn test_get_driver_info_with_duplicate_filter_dfv2() -> Result<()> {
 }
 
 #[fasync::run_singlethreaded(test)]
-async fn test_get_driver_info_with_mixed_filter_dfv2() -> Result<()> {
+async fn test_get_driver_info_with_mixed_filter() -> Result<()> {
     const DRIVER_FILTER: [&str; 2] = [SAMPLE_DRIVER_URL, "foo"];
 
-    let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
+    let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let driver_infos = get_driver_info(&driver_dev, &DRIVER_FILTER).await?;
 
     assert_eq!(driver_infos.len(), 1);
@@ -289,10 +285,10 @@ async fn test_get_driver_info_with_mixed_filter_dfv2() -> Result<()> {
 }
 
 #[fasync::run_singlethreaded(test)]
-async fn test_get_driver_info_with_incomplete_filter_dfv2() -> Result<()> {
+async fn test_get_driver_info_with_incomplete_filter() -> Result<()> {
     const DRIVER_FILTER: [&str; 1] = ["fuchsia-boot:///#meta/sample-driver"];
 
-    let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
+    let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let iterator = send_get_driver_info_request(&driver_dev, &DRIVER_FILTER)?;
     let res = iterator.get_next().await.expect_err("A driver should not be returned");
 
@@ -301,10 +297,10 @@ async fn test_get_driver_info_with_incomplete_filter_dfv2() -> Result<()> {
 }
 
 #[fasync::run_singlethreaded(test)]
-async fn test_get_driver_info_not_found_filter_dfv2() -> Result<()> {
+async fn test_get_driver_info_not_found_filter() -> Result<()> {
     const DRIVER_FILTER: [&str; 1] = ["foo"];
 
-    let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
+    let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let iterator = send_get_driver_info_request(&driver_dev, &DRIVER_FILTER)?;
     let res = iterator.get_next().await.expect_err("A driver should not be returned");
 
@@ -316,7 +312,7 @@ async fn test_get_driver_info_not_found_filter_dfv2() -> Result<()> {
 async fn test_get_device_info_fuzzy_filter() -> Result<()> {
     const DEVICE_FILTER: [&str; 1] = ["sample"];
 
-    let (_instance, driver_dev) = set_up_test_driver_realm(false).await?;
+    let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let device_infos =
         get_device_info(&driver_dev, &DEVICE_FILTER, /* exact_match= */ false).await?;
     assert_eq!(device_infos.len(), 1);
@@ -325,80 +321,63 @@ async fn test_get_device_info_fuzzy_filter() -> Result<()> {
     assert_eq!(device_nodes.len(), 1);
 
     let matched_node = &device_nodes[0];
-    let Some(fdd::VersionedNodeInfo::V2(matched_node_info)) = &matched_node.info.versioned_info
-    else {
-        panic!("wrong info type");
-    };
     assert_eq!(
-        matched_node_info.moniker.as_ref().expect("DFv2 device missing monier"),
+        matched_node.info.moniker.as_ref().expect("device missing monier"),
         "dev.sys.test.sample_driver"
     );
 
     Ok(())
 }
 
-// DFv2
 #[fasync::run_singlethreaded(test)]
-async fn test_get_device_info_no_filter_dfv2() -> Result<()> {
-    let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
+async fn test_get_device_info_no_filter() -> Result<()> {
+    let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let device_infos = get_device_info(&driver_dev, &[], /* exact_match= */ true).await?;
 
     let device_nodes = test_utils::create_device_topology(device_infos);
     assert_eq!(device_nodes.len(), 1);
 
     let root = &device_nodes[0];
-    let Some(fdd::VersionedNodeInfo::V2(root_info)) = &root.info.versioned_info else {
-        panic!("wrong info type");
-    };
 
-    assert_eq!(root_info.moniker.as_ref().expect("DFv2 node missing moniker"), "dev");
+    assert_eq!(root.info.moniker.as_ref().expect("node missing moniker"), "dev");
     assert_eq!(
-        root.info.bound_driver_url.as_ref().expect("DFv2 node missing driver URL"),
+        root.info.bound_driver_url.as_ref().expect("node missing driver URL"),
         PARENT_DRIVER_URL
     );
-    assert!(root_info.node_property_list.is_none());
+    assert!(root.info.node_property_list.is_none());
     assert_eq!(root.num_children, 1);
     assert_eq!(root.child_nodes.len(), 1);
 
     let sys = &root.child_nodes[0];
-    let Some(fdd::VersionedNodeInfo::V2(sys_info)) = &sys.info.versioned_info else {
-        panic!("wrong info type");
-    };
 
-    assert_eq!(sys_info.moniker.as_ref().expect("DFv2 node missing moniker"), "dev.sys");
+    assert_eq!(sys.info.moniker.as_ref().expect("node missing moniker"), "dev.sys");
+    assert_eq!(sys.info.bound_driver_url.as_ref().expect("node missing driver URL"), "unbound");
     assert_eq!(
-        sys.info.bound_driver_url.as_ref().expect("DFv2 node missing driver URL"),
-        "unbound"
-    );
-    assert_eq!(
-        sys_info.node_property_list.as_ref().map(|x| x.as_slice()),
-        get_no_protocol_dfv2_property_list().as_ref().map(|x| x.as_slice())
+        sys.info.node_property_list.as_ref().map(|x| x.as_slice()),
+        get_no_protocol_property_list().as_ref().map(|x| x.as_slice())
     );
     assert_eq!(sys.num_children, 1);
     assert_eq!(sys.child_nodes.len(), 1);
 
     let test = &sys.child_nodes[0];
-    let Some(fdd::VersionedNodeInfo::V2(test_info)) = &test.info.versioned_info else {
-        panic!("wrong info type");
-    };
 
-    assert_eq!(test_info.moniker.as_ref().expect("DFv2 node missing moniker"), "dev.sys.test");
+    assert_eq!(test.info.moniker.as_ref().expect("node missing moniker"), "dev.sys.test");
     assert_eq!(
-        test.info.bound_driver_url.as_ref().expect("DFv2 node missing driver URL"),
+        test.info.bound_driver_url.as_ref().expect("node missing driver URL"),
         SAMPLE_DRIVER_URL
     );
     assert_eq!(
-        test_info.node_property_list.as_ref().map(|x| x.as_slice()),
-        get_test_parent_dfv2_property_list().as_ref().map(|x| x.as_slice())
+        test.info.node_property_list.as_ref().map(|x| x.as_slice()),
+        get_test_parent_property_list().as_ref().map(|x| x.as_slice())
     );
     Ok(())
 }
 
 #[fasync::run_singlethreaded(test)]
-async fn test_get_device_info_with_filter_dfv2() -> Result<()> {
+async fn test_get_device_info_with_filter() -> Result<()> {
     const DEVICE_FILTER: [&str; 1] = ["dev.sys.test"];
 
-    let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
+    let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let device_infos =
         get_device_info(&driver_dev, &DEVICE_FILTER, /* exact_match= */ true).await?;
 
@@ -406,32 +385,25 @@ async fn test_get_device_info_with_filter_dfv2() -> Result<()> {
     assert_eq!(device_nodes.len(), 1);
 
     let root_sys_test = &device_nodes[0];
-    let Some(fdd::VersionedNodeInfo::V2(root_sys_test_info)) = &root_sys_test.info.versioned_info
-    else {
-        panic!("wrong info type");
-    };
 
+    assert_eq!(root_sys_test.info.moniker.as_ref().expect("node missing moniker"), "dev.sys.test");
     assert_eq!(
-        root_sys_test_info.moniker.as_ref().expect("DFv2 node missing moniker"),
-        "dev.sys.test"
-    );
-    assert_eq!(
-        root_sys_test.info.bound_driver_url.as_ref().expect("DFv2 node missing driver URL"),
+        root_sys_test.info.bound_driver_url.as_ref().expect("node missing driver URL"),
         SAMPLE_DRIVER_URL
     );
     assert_eq!(
-        root_sys_test_info.node_property_list.as_ref().map(|x| x.as_slice()),
-        get_test_parent_dfv2_property_list().as_ref().map(|x| x.as_slice())
+        root_sys_test.info.node_property_list.as_ref().map(|x| x.as_slice()),
+        get_test_parent_property_list().as_ref().map(|x| x.as_slice())
     );
     assert!(root_sys_test.child_nodes.is_empty());
     Ok(())
 }
 
 #[fasync::run_singlethreaded(test)]
-async fn test_get_device_info_with_duplicate_filter_dfv2() -> Result<()> {
+async fn test_get_device_info_with_duplicate_filter() -> Result<()> {
     const DEVICE_FILTER: [&str; 2] = ["dev.sys.test", "dev.sys.test"];
 
-    let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
+    let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let device_infos =
         get_device_info(&driver_dev, &DEVICE_FILTER, /* exact_match= */ true).await?;
 
@@ -439,32 +411,25 @@ async fn test_get_device_info_with_duplicate_filter_dfv2() -> Result<()> {
     assert_eq!(device_nodes.len(), 1);
 
     let root_sys_test = &device_nodes[0];
-    let Some(fdd::VersionedNodeInfo::V2(root_sys_test_info)) = &root_sys_test.info.versioned_info
-    else {
-        panic!("wrong info type");
-    };
 
+    assert_eq!(root_sys_test.info.moniker.as_ref().expect("node missing moniker"), "dev.sys.test");
     assert_eq!(
-        root_sys_test_info.moniker.as_ref().expect("DFv2 node missing moniker"),
-        "dev.sys.test"
-    );
-    assert_eq!(
-        root_sys_test.info.bound_driver_url.as_ref().expect("DFv2 node missing driver URL"),
+        root_sys_test.info.bound_driver_url.as_ref().expect("node missing driver URL"),
         SAMPLE_DRIVER_URL
     );
     assert_eq!(
-        root_sys_test_info.node_property_list.as_ref().map(|x| x.as_slice()),
-        get_test_parent_dfv2_property_list().as_ref().map(|x| x.as_slice())
+        root_sys_test.info.node_property_list.as_ref().map(|x| x.as_slice()),
+        get_test_parent_property_list().as_ref().map(|x| x.as_slice())
     );
     assert!(root_sys_test.child_nodes.is_empty());
     Ok(())
 }
 
 #[fasync::run_singlethreaded(test)]
-async fn test_get_device_info_with_incomplete_filter_dfv2() -> Result<()> {
+async fn test_get_device_info_with_incomplete_filter() -> Result<()> {
     const DEVICE_FILTER: [&str; 1] = ["dev.sys.te"];
 
-    let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
+    let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let device_infos =
         get_device_info(&driver_dev, &DEVICE_FILTER, /* exact_match= */ true).await?;
 
@@ -473,10 +438,10 @@ async fn test_get_device_info_with_incomplete_filter_dfv2() -> Result<()> {
 }
 
 #[fasync::run_singlethreaded(test)]
-async fn test_get_device_info_not_found_filter_dfv2() -> Result<()> {
+async fn test_get_device_info_not_found_filter() -> Result<()> {
     const DEVICE_FILTER: [&str; 1] = ["foo"];
 
-    let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
+    let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let device_infos =
         get_device_info(&driver_dev, &DEVICE_FILTER, /* exact_match= */ true).await?;
 
@@ -485,8 +450,8 @@ async fn test_get_device_info_not_found_filter_dfv2() -> Result<()> {
 }
 
 #[fasync::run_singlethreaded(test)]
-async fn test_add_test_node_dfv2() -> Result<()> {
-    let (instance, driver_dev) = set_up_test_driver_realm(true).await?;
+async fn test_add_test_node() -> Result<()> {
+    let (instance, driver_dev) = set_up_test_driver_realm().await?;
 
     driver_dev
         .add_test_node(&fdd::TestNodeAddArgs {

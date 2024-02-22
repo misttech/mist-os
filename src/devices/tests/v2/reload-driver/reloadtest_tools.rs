@@ -42,10 +42,7 @@ pub async fn validate_host_koids(
     should_not_exist: Option<&HashSet<String>>,
 ) -> Result<()> {
     for dev in &device_infos {
-        let fdd::VersionedNodeInfo::V2(info) = dev.versioned_info.as_ref().unwrap() else {
-            panic!("No v2 info");
-        };
-        let key = info.moniker.clone().unwrap().split(".").last().unwrap().to_string();
+        let key = dev.moniker.clone().unwrap().split(".").last().unwrap().to_string();
 
         // Items in changed_or_new are expected to be different so just save that info and move on.
         if changed_or_new.contains_key(&key) {

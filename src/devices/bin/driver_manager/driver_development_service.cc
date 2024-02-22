@@ -57,6 +57,7 @@ zx::result<fdd::wire::NodeInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
   auto v2_info_builder = fuchsia_driver_development::wire::V2NodeInfo::Builder(allocator);
 
   v2_info_builder.moniker(fidl::StringView(allocator, node->MakeComponentMoniker()));
+  device_info.moniker(fidl::StringView(allocator, node->MakeComponentMoniker()));
 
   device_info.bound_driver_url(fidl::StringView(allocator, node->driver_url()));
 
@@ -70,6 +71,7 @@ zx::result<fdd::wire::NodeInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
       };
     }
     v2_info_builder.node_property_list(node_properties);
+    device_info.node_property_list(node_properties);
   }
 
   // TODO(https://fxbug.dev/42172220): Get topological path
@@ -100,6 +102,7 @@ zx::result<fdd::wire::NodeInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
     }
   }
   v2_info_builder.offer_list(offers);
+  device_info.offer_list(offers);
 
   auto versioned_info = fuchsia_driver_development::wire::VersionedNodeInfo::WithV2(
       allocator, v2_info_builder.Build());

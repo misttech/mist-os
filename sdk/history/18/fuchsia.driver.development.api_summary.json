@@ -435,6 +435,24 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.driver.development/NodeInfo.moniker",
+        "ordinal": "7",
+        "type": "string:1024"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.development/NodeInfo.node_property_list",
+        "ordinal": "8",
+        "type": "vector<fuchsia.driver.framework/NodeProperty>:64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.development/NodeInfo.offer_list",
+        "ordinal": "9",
+        "type": "vector<fuchsia.component.decl/Offer>"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.driver.development/NodeInfo.parent_ids",
         "ordinal": "2",
         "type": "vector<uint64>"
