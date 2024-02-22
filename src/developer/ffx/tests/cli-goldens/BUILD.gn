@@ -100,6 +100,8 @@ if (has_board) {
     command_name = "ffx"
     golden_processor_tool = ":ffx_cli_goldens"
     sdk_path = _sdk_path
+    visible_label =
+        get_label_info(":ffx-golden-command-list", "label_no_toolchain")
 
     # Depend on generating the top level command list
     # and the SDK so the command list represents the
@@ -119,6 +121,8 @@ if (has_board) {
       command_name = c
       golden_processor_tool = ":ffx_cli_goldens"
       sdk_path = _sdk_path
+      visible_label =
+          get_label_info(":ffx-golden-command-list", "label_no_toolchain")
 
       # Since we're iterating over the command list to generate
       # these targets, add the command list as dependency

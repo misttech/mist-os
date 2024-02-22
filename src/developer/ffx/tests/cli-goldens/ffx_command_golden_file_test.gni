@@ -11,6 +11,9 @@ template("ffx_command_golden_file_test") {
 
   command_name = invoker.command_name
   golden_processor_tool = invoker.golden_processor_tool
+  if (defined(invoker.visible_label)) {
+    _visible_label = invoker.visible_label
+  }
   _sdk_path = invoker.sdk_path
   visibility = [ ":*" ]
   if (defined(invoker.visibility)) {
@@ -35,6 +38,9 @@ template("ffx_command_golden_file_test") {
 
   golden_files("${_name}-manifest") {
     testonly = true
+    if (defined(_visible_label)) {
+      visible_label = _visible_label
+    }
     comparisons = [
       {
         golden = _golden_filelist
@@ -103,7 +109,9 @@ template("ffx_command_golden_file_test") {
 
   golden_files(target_name) {
     testonly = true
-
+    if (defined(_visible_label)) {
+      visible_label = _visible_label
+    }
     comparisons = _comparisons_file
     deps = [
              ":describe_ffx_${command_name}_cli_goldens",

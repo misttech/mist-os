@@ -82,6 +82,14 @@ import("//build/testing/config.gni")
 #    - Type: string
 #    - Default: No message gets printed
 #
+#  * visible_label
+#    - Optional: If set, this label is used to print a message about which label
+#      should be added to the build to recreate the error. This allows golden
+#      file tests to have non-global visibility, but still have a visible label
+#      to use to run the test.
+#     - Type: string (label)
+#     - Default: Uses the label of the golden_files test.
+#
 #  * visibility, testonly, deps, public_deps
 #    - Optional: Usual GN meanings.
 #
@@ -250,11 +258,21 @@ template("golden_files") {
       rebase_path(stamp_file, root_build_dir),
       "--comparisons",
       rebase_path(comparison_manifest, root_build_dir),
-      "--label",
-      get_label_info(":${target_name}", "label_with_toolchain"),
       "--source-root",
       rebase_path("//", root_build_dir),
     ]
+
+    if (defined(invoker.visible_label)) {
+      args += [
+        "--label",
+        invoker.visible_label,
+      ]
+    } else {
+      args += [
+        "--label",
+        get_label_info(":${target_name}", "label_with_toolchain"),
+      ]
+    }
 
     if (update_goldens) {
       args += [ "--bless" ]
