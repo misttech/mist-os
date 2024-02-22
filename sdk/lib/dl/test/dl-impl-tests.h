@@ -9,6 +9,7 @@
 #include "dl-tests-base.h"
 
 namespace dl::testing {
+
 class DlImplTests : public DlTestsBase {
  public:
   // Error messages in tests can be matched exactly with this test fixture,

@@ -11,6 +11,16 @@
 
 namespace dl::testing {
 
+namespace {
+
+Error ErrorResult() {
+  const char* error_str = dlerror();
+  EXPECT_TRUE(error_str);
+  return Error{error_str};
+}
+
+}  // namespace
+
 fit::result<Error, void*> DlSystemTests::DlOpen(const char* name, int mode) {
   std::filesystem::path path = elfldltl::testing::GetTestDataPath(".") / name;
   void* result = dlopen(path.c_str(), mode);
@@ -18,12 +28,6 @@ fit::result<Error, void*> DlSystemTests::DlOpen(const char* name, int mode) {
     return fit::error{ErrorResult()};
   }
   return fit::ok(result);
-}
-
-Error DlSystemTests::ErrorResult() {
-  const char* error_str = dlerror();
-  EXPECT_TRUE(error_str);
-  return Error{error_str};
 }
 
 }  // namespace dl::testing
