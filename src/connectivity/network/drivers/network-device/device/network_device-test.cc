@@ -155,7 +155,11 @@ class NetworkDeviceTest : public ::testing::Test {
   }
 
   [[nodiscard]] zx_status_t WaitStart(zx::time deadline = TEST_DEADLINE) {
-    return WaitEvents(impl_.events(), kEventStart, deadline);
+    return WaitEvents(impl_.events(), kEventStartCompleted, deadline);
+  }
+
+  [[nodiscard]] zx_status_t WaitStartInitiated(zx::time deadline = TEST_DEADLINE) {
+    return WaitEvents(impl_.events(), kEventStartInitiated, deadline);
   }
 
   [[nodiscard]] zx_status_t WaitStop(zx::time deadline = TEST_DEADLINE) {
@@ -235,6 +239,17 @@ class NetworkDeviceTest : public ::testing::Test {
     if (device.is_ok()) {
       device_ = std::move(device.value());
     }
+
+    // When the device is about to complete startup install a one-time event handler for the RX
+    // queue to trigger the start event. Netdevice is not fully started until it has triggered the
+    // RX queue, AFTER NetworkDeviceImpl::Start has replied with its completer.
+    impl_.SetOnStart([this] {
+      SetEvtRxQueuePacketHandler([this](uint64_t key) {
+        SetEvtRxQueuePacketHandler(nullptr);
+        impl_.events().signal(0, kEventStartCompleted);
+      });
+    });
+
     return device.status_value();
   }
 
@@ -996,8 +1011,8 @@ TEST_F(NetworkDeviceTest, DelayedStart) {
   ASSERT_OK(OpenSession(&session_a));
   ASSERT_OK(AttachSessionPort(session_a, port13_));
   ASSERT_OK(WaitSessionStarted());
-  // we're dealing starting the device, so the start signal must've been triggered.
-  ASSERT_OK(WaitStart());
+  // we're dealing starting the device, so the start must've been initiated.
+  ASSERT_OK(WaitStartInitiated());
   // But we haven't actually called the callback.
   // We should be able to pause and unpause session_a while we're still holding the device.
   // we can send Tx data and it won't reach the device until TriggerStart is called.

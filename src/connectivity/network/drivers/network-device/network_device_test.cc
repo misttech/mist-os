@@ -162,8 +162,8 @@ TEST_F(NetDeviceDriverTest, TestOpenSession) {
   fidl::WireSyncClient<netdev::Device>& netdevice = connect_result.value();
   ASSERT_OK(session.Open(netdevice, "test-session"));
   ASSERT_OK(AttachSessionPort(session, port_impl()));
-  ASSERT_OK(
-      device_impl().events().wait_one(kEventStart, zx::deadline_after(kTestTimeout), nullptr));
+  ASSERT_OK(device_impl().events().wait_one(kEventStartInitiated, zx::deadline_after(kTestTimeout),
+                                            nullptr));
   UnbindAndRelease();
   ASSERT_OK(session.WaitClosed(zx::deadline_after(kTestTimeout)));
   // netdevice should also have been closed after device unbind:

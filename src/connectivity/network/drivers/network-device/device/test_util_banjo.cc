@@ -191,7 +191,10 @@ void FakeNetworkDeviceImpl::NetworkDeviceImplStart(network_device_impl_start_cal
       callback(cookie, ZX_OK);
     };
   }
-  EXPECT_OK(event_.signal(0, kEventStart));
+  // Approximate the behavior of the FIDL counterpart which signals both of these. Since start
+  // completes synchronously in the Banjo case it's safe to also signal that start completed.
+  EXPECT_OK(event_.signal(0, kEventStartInitiated));
+  EXPECT_OK(event_.signal(0, kEventStartCompleted));
 }
 
 void FakeNetworkDeviceImpl::NetworkDeviceImplStop(network_device_impl_stop_callback callback,

@@ -267,6 +267,9 @@ void FakeNetworkDeviceImpl::Start(fdf::Arena& arena, StartCompleter::Sync& compl
     if (auto_start == ZX_OK) {
       device_started_ = true;
     }
+    if (on_start_) {
+      on_start_();
+    }
     completer.buffer(arena).Reply(auto_start);
   } else {
     ZX_ASSERT(!(pending_start_callback_ || pending_stop_callback_));
@@ -274,12 +277,15 @@ void FakeNetworkDeviceImpl::Start(fdf::Arena& arena, StartCompleter::Sync& compl
       {
         fbl::AutoLock lock(&lock_);
         device_started_ = true;
+        if (on_start_) {
+          on_start_();
+        }
       }
       fdf::Arena arena('NETD');
       completer.buffer(arena).Reply(ZX_OK);
     };
   }
-  EXPECT_OK(event_.signal(0, kEventStart));
+  EXPECT_OK(event_.signal(0, kEventStartInitiated));
 }
 
 void FakeNetworkDeviceImpl::Stop(fdf::Arena& arena, StopCompleter::Sync& completer) {

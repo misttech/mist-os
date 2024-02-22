@@ -129,12 +129,12 @@ class RxFidlReturn : public fbl::DoublyLinkedListable<std::unique_ptr<RxFidlRetu
   fuchsia_hardware_network_driver::wire::RxBuffer buffer_{};
 };
 
-constexpr zx_signals_t kEventStart = ZX_USER_SIGNAL_0;
+constexpr zx_signals_t kEventStartInitiated = ZX_USER_SIGNAL_0;
 constexpr zx_signals_t kEventStop = ZX_USER_SIGNAL_1;
 constexpr zx_signals_t kEventTx = ZX_USER_SIGNAL_2;
 constexpr zx_signals_t kEventSessionStarted = ZX_USER_SIGNAL_3;
 constexpr zx_signals_t kEventRxAvailable = ZX_USER_SIGNAL_4;
-constexpr zx_signals_t kEventPortRemoved = ZX_USER_SIGNAL_5;
+constexpr zx_signals_t kEventStartCompleted = ZX_USER_SIGNAL_5;
 constexpr zx_signals_t kEventPortActiveChanged = ZX_USER_SIGNAL_6;
 constexpr zx_signals_t kEventSessionDied = ZX_USER_SIGNAL_7;
 
@@ -360,6 +360,12 @@ class FakeNetworkDeviceImpl
     }
   }
 
+  // Note that |on_start| will be called with the internal lock held, be careful of deadlocks.
+  void SetOnStart(fit::function<void()>&& on_start) __TA_EXCLUDES(lock_) {
+    fbl::AutoLock lock(&lock_);
+    on_start_ = std::move(on_start);
+  }
+
   cpp20::span<const zx::vmo> vmos() { return cpp20::span(vmos_.begin(), vmos_.end()); }
 
  private:
@@ -397,6 +403,7 @@ class FakeNetworkDeviceImpl
   bool device_started_ __TA_GUARDED(lock_) = false;
   fit::function<void()> pending_start_callback_ __TA_GUARDED(lock_);
   fit::function<void()> pending_stop_callback_ __TA_GUARDED(lock_);
+  fit::function<void()> on_start_ __TA_GUARDED(lock_);
   PrepareVmoHandler prepare_vmo_handler_;
 };
 
