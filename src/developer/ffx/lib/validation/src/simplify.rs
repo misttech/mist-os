@@ -19,9 +19,11 @@ use std::{
     ops::ControlFlow::*,
 };
 
-use crate::schema::{InlineValue, Type, ValueType};
+use crate::schema::{Field, InlineValue, StructExtras, Type, ValueType};
 
-use self::compare::{cmp_processed_types, is_sorted_and_deduped_by};
+use self::compare::{
+    cmp_processed_types, is_sorted_and_deduped_by, is_sorted_by, struct_field_ord,
+};
 
 mod compare;
 
@@ -120,6 +122,8 @@ impl<'bump> Ctx<'bump> {
         ProcessUnion.edit(bump, self, ty)?;
         ProcessArray.edit(bump, self, ty)?;
         ProcessMap.edit(bump, self, ty)?;
+        ProcessStruct.edit(bump, self, ty)?;
+        DesugarEnum.edit(bump, self, ty)?;
 
         // No edits occurred
         Continue(())
@@ -452,11 +456,122 @@ impl<'bump> Editor<'bump> for ProcessMap {
     }
 }
 
+/// Processes structs by rewriting field types.
+///
+/// Structs containing required `Type::Void` fields replaced with `Type::Void`, since it will never
+/// match against a value.
+///
+/// Optional `Type::Void` fields are removed since it will never have a value.
+///
+/// If requested, struct fields are sorted by name.
+struct ProcessStruct;
+
+impl<'bump> Editor<'bump> for ProcessStruct {
+    fn edit(
+        &mut self,
+        bump: &'bump Bump,
+        ctx: &mut Ctx<'bump>,
+        ty: &'bump Type<'bump>,
+    ) -> ControlFlow<&'bump Type<'bump>> {
+        let Type::Struct { mut fields, extras } = *ty else { return Continue(()) };
+
+        let mut new_fields = rewrite_slice(
+            bump,
+            ctx,
+            fields,
+            RewriteFns {
+                type_from_item: |f| &mut f.value,
+                // Optional void fields are removed since they'll never be parsed.
+                remove_item_if: |f| matches!(f.value, Type::Void) && f.optional,
+                replace_whole_type_with: |f| {
+                    if matches!(f.value, Type::Void) && !f.optional {
+                        // Required void fields make the entire struct unparsable.
+                        Some(&Type::Void)
+                    } else {
+                        None
+                    }
+                },
+            },
+        )?;
+
+        let extras_changed = match extras {
+            None | Some(StructExtras::Deny) => false,
+            Some(StructExtras::Flatten(_)) => {
+                // TODO(https://fxbug.dev/316035760): Add support for struct flattening when implemented in the macro
+                panic!("Simplification for struct flattening not yet supported")
+            }
+        };
+
+        let compare = |l: &Field<'_>, r: &Field<'_>| struct_field_ord(l).cmp(&struct_field_ord(r));
+        if ctx.sorted && !is_sorted_by(new_fields.as_deref().unwrap_or(fields), compare) {
+            // Sort fields if they're not already sorted.
+            let new_fields = new_fields
+                .get_or_insert_with(|| BumpVec::from_iter_in(fields.iter().copied(), bump));
+            new_fields.sort_by(compare);
+        }
+
+        let changed = new_fields.is_some() || extras_changed;
+
+        if let Some(new_fields) = new_fields {
+            fields = new_fields.into_bump_slice();
+        }
+
+        if changed {
+            // Allocate new type
+            Break(bump.alloc(Type::Struct { fields, extras }))
+        } else {
+            // Keep original type
+            Continue(())
+        }
+    }
+}
+
+/// Desugars an enum to the union type that represents it.
+///
+/// Dataless variants are turned into a `Type::Constant` that matches against the variant's name.
+///
+/// Variants with data are turned into a struct in the form `struct { <name>: <data> }`.
+struct DesugarEnum;
+
+impl<'bump> Editor<'bump> for DesugarEnum {
+    fn edit(
+        &mut self,
+        bump: &'bump Bump,
+        ctx: &mut Ctx<'bump>,
+        ty: &'bump Type<'bump>,
+    ) -> ControlFlow<&'bump Type<'bump>> {
+        let Type::Enum { variants } = *ty else { return Continue(()) };
+
+        let mut tys = BumpVec::with_capacity_in(variants.len(), bump);
+
+        for (name, mut ty) in variants.iter().copied() {
+            ctx.process_type(bump, &mut ty);
+
+            // Turn data-less enums into a simple string constant, otherwise use the traditional
+            // serde enum format.
+            if let Type::Void = ty {
+                tys.push(
+                    &*bump.alloc(Type::Constant { value: bump.alloc(InlineValue::String(name)) }),
+                );
+            } else {
+                tys.push(&*bump.alloc(Type::Struct {
+                    fields: bump.alloc([Field { key: name, value: ty, optional: false }]),
+                    extras: Some(StructExtras::Deny),
+                }));
+            }
+        }
+
+        // Enum variants are not sorted, since the returned union type will be sorted once its
+        // processed.
+        Break(bump.alloc(Type::Union(tys.into_bump_slice())))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use ffx_validation_proc_macro::schema;
 
-    use crate::schema::{json::Any, Field, Nothing, Schema, ValueType};
+    use crate::schema::{json::Any, Field, Nothing, Schema, StructExtras, ValueType};
 
     use super::*;
 
@@ -765,6 +880,213 @@ mod test {
         assert!(matches!(
             ty,
             Type::Array { size: None, ty: Type::Type { ty: ValueType::Integer } }
+        ));
+    }
+
+    #[test]
+    fn test_simplify_struct() {
+        struct StructWithAliases;
+
+        schema! {
+            type StructWithAliases = struct {
+                field_a: u32,
+                field_b: SimpleAlias,
+            };
+        }
+
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = StructWithAliases::TYPE;
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(
+            ty,
+            Type::Struct {
+                fields: [
+                    Field {
+                        key: "field_a",
+                        value: Type::Type { ty: ValueType::Integer },
+                        optional: false
+                    },
+                    Field {
+                        key: "field_b",
+                        value: Type::Type { ty: ValueType::Integer },
+                        optional: false
+                    }
+                ],
+                extras: None
+            }
+        ));
+    }
+
+    #[test]
+    fn test_struct_with_void_required_field_to_void() {
+        struct Struct;
+        schema! {
+            type Struct = struct {
+                field: u32,
+                required_nothing: Nothing,
+            };
+        }
+
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = Struct::TYPE;
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(ty, Type::Void));
+    }
+
+    #[test]
+    fn test_struct_remove_void_optional_field() {
+        struct Struct;
+        schema! {
+            type Struct = struct {
+                field: u32,
+                optional_nothing?: Nothing,
+            };
+        }
+
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = Struct::TYPE;
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(
+            ty,
+            Type::Struct {
+                fields: [Field {
+                    key: "field",
+                    value: Type::Type { ty: ValueType::Integer },
+                    optional: false
+                }],
+                extras: None
+            }
+        ));
+    }
+
+    #[test]
+    fn test_struct_sort_fields() {
+        struct Struct;
+        schema! {
+            type Struct = struct {
+                c: u32,
+                b: u32,
+                a: u32,
+            };
+        }
+
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = Struct::TYPE;
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(
+            ty,
+            Type::Struct {
+                fields: [
+                    Field {
+                        key: "a",
+                        value: Type::Type { ty: ValueType::Integer },
+                        optional: false
+                    },
+                    Field {
+                        key: "b",
+                        value: Type::Type { ty: ValueType::Integer },
+                        optional: false
+                    },
+                    Field {
+                        key: "c",
+                        value: Type::Type { ty: ValueType::Integer },
+                        optional: false
+                    },
+                ],
+                extras: None
+            }
+        ));
+    }
+
+    #[test]
+    fn test_empty_enum_to_void() {
+        struct Enum;
+        schema! {
+            type Enum = enum {};
+        }
+
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+        let mut ty = Enum::TYPE;
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(ty, Type::Void));
+    }
+
+    #[test]
+    fn test_enum_to_union() {
+        struct Enum;
+        schema! {
+            type Enum = enum {
+                A, B, C(String), D { a: u32, b: u32 },
+            };
+        }
+
+        let bump = Bump::new();
+        let mut ctx = Ctx::new();
+
+        // Disable sorting to keep the original union order.
+        ctx.sorted = false;
+
+        let mut ty = Enum::TYPE;
+        let changed = ctx.process_type(&bump, &mut ty);
+        eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
+
+        assert!(changed);
+        assert!(matches!(
+            ty,
+            Type::Union([
+                Type::Constant { value: InlineValue::String("A") },
+                Type::Constant { value: InlineValue::String("B") },
+                Type::Struct {
+                    fields: [Field {
+                        key: "C",
+                        value: Type::Type { ty: ValueType::String },
+                        optional: false,
+                    }],
+                    extras: Some(StructExtras::Deny)
+                },
+                Type::Struct {
+                    fields: [Field {
+                        key: "D",
+                        value: Type::Struct {
+                            fields: [
+                                Field {
+                                    key: "a",
+                                    value: Type::Type { ty: ValueType::Integer },
+                                    optional: false,
+                                },
+                                Field {
+                                    key: "b",
+                                    value: Type::Type { ty: ValueType::Integer },
+                                    optional: false,
+                                }
+                            ],
+                            extras: None
+                        },
+                        optional: false,
+                    }],
+                    extras: Some(StructExtras::Deny)
+                },
+            ])
         ));
     }
 

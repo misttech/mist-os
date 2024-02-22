@@ -45,6 +45,11 @@ pub(super) fn test_all_pairs<T>(slice: &[T], predicate: impl Fn(&T, &T) -> bool)
     slice.windows(2).all(|x| predicate(&x[0], &x[1]))
 }
 
+/// Checks that the given slice is sorted.
+pub(super) fn is_sorted_by<T>(slice: &[T], cmp: impl Fn(&T, &T) -> Ordering) -> bool {
+    test_all_pairs(slice, |a, b| cmp(a, b).is_le())
+}
+
 /// Checks that the given slice is sorted and contains no duplicate values.
 pub(super) fn is_sorted_and_deduped_by<T>(slice: &[T], cmp: impl Fn(&T, &T) -> Ordering) -> bool {
     test_all_pairs(slice, |a, b| cmp(a, b).is_lt())
@@ -245,6 +250,16 @@ mod test {
 
         // 1 == 1, 3 == 3; 3 > 2
         assert_eq!(cmp_sorted_by(&[1, 3, 3], &[1, 2, 3], Ord::cmp), Ordering::Greater);
+    }
+
+    #[test]
+    fn test_is_sorted_by() {
+        assert!(is_sorted_by(&[1, 2, 3, 4], Ord::cmp));
+        assert!(!is_sorted_by(&[1, 2, 4, 3], Ord::cmp));
+
+        // Zero and one length slices are always considered sorted.
+        assert!(is_sorted_by(&[], <i32 as Ord>::cmp));
+        assert!(is_sorted_by(&[1], Ord::cmp));
     }
 
     #[test]
