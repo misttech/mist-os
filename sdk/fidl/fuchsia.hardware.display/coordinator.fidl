@@ -342,7 +342,6 @@ closed protocol Coordinator {
     // TODO(https://fxbug.dev/42072361): `signal_fences` should be renamed. The field
     // should be named to better indicate the timing and semantics when it is
     // signaled by the display driver.
-    @transitional
     strict ApplyConfig2(resource struct {
         signal_fences vector<zx.Handle:EVENT>:APPLY_CONFIG_MAX_SIGNAL_FENCES;
     });
@@ -396,10 +395,6 @@ closed protocol Coordinator {
     ///   to the client once it resumes acknowledgement. Due to limited size of
     ///   buffer, only the most recently received vsyncs will be stored and
     ///   older ones will be dropped.
-    //
-    // TODO(https://fxbug.dev/42152065): Remove "@transitional" tag after implementing
-    // OnVsync on all display clients.
-    //
     strict -> OnVsync(resource struct {
         display_id fuchsia.hardware.display.types.DisplayId;
         timestamp uint64;
