@@ -14,7 +14,6 @@ use std::{
     cmp::max,
     convert::TryFrom,
     fmt::{self, Display, Write},
-    net::IpAddr,
 };
 
 mod schema;
@@ -166,13 +165,7 @@ impl TryFrom<Vec<ffx::TargetInfo>> for AddressesTargetFormatter {
 
 impl TargetFormatter for AddressesTargetFormatter {
     fn lines(&self, _default_nodename: Option<&str>) -> Vec<String> {
-        self.targets
-            .iter()
-            .map(|t| match t.0.ip() {
-                IpAddr::V4(_) => t.0.to_string(),
-                IpAddr::V6(_) => format!("[{}]", t.0.to_string()),
-            })
-            .collect()
+        self.targets.iter().map(|t| t.0.to_string()).collect()
     }
 }
 
