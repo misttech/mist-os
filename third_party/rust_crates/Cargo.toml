@@ -255,16 +255,16 @@ hyper-rustls = { version = "0.22.1", default-features = false }
 lipsum = "0.6.0"
 openat = "0.1.17"
 pretty = "0.5.2"
-rust_icu_common = { version = "4.2.3", default-features = false, features = ["renaming"] }
-rust_icu_sys = { version = "4.2.3", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
-rust_icu_ucal = { version = "4.2.3", default-features = false, features = ["renaming", "icu_version_in_env"] }
-rust_icu_uchar = { version = "4.2.3", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
-rust_icu_udat = { version = "4.2.3", default-features = false, features = ["renaming", "icu_version_in_env"] }
-rust_icu_udata = { version = "4.2.3", default-features = false, features = ["renaming", "icu_version_in_env"] }
-rust_icu_uenum = { version = "4.2.3", default-features = false, features = ["renaming", "icu_version_in_env"] }
-rust_icu_uloc = { version = "4.2.3", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
-rust_icu_unorm2 = { version = "4.2.3", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
-rust_icu_ustring = { version = "4.2.3", default-features = false, features = ["renaming", "icu_version_in_env"] }
+rust_icu_common = { version = "5.0.0", default-features = false, features = ["renaming"] }
+rust_icu_sys = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
+rust_icu_ucal = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env"] }
+rust_icu_uchar = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
+rust_icu_udat = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env"] }
+rust_icu_udata = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env"] }
+rust_icu_uenum = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env"] }
+rust_icu_uloc = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
+rust_icu_unorm2 = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
+rust_icu_ustring = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env"] }
 tokio = { version = "=1.25.2", default-features = false }
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["testing"] }
 trust-dns-resolver = { version = "0.22.0", default-features = false, features = ["testing"] }
@@ -724,34 +724,34 @@ deps = [ "//third_party/rust_crates/compat/ring:ring-core" ]
 
 # Please keep the rust_icu_* crates together in this list.
 # Refer to //build/icu/README.md for the details of the approach.
-[gn.package.rust_icu_common."4.2.3"]
+[gn.package.rust_icu_common."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
 target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
-[gn.package.rust_icu_sys."4.2.3"]
+[gn.package.rust_icu_sys."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
 target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
-[gn.package.rust_icu_ucal."4.2.3"]
+[gn.package.rust_icu_ucal."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
 target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
-[gn.package.rust_icu_uchar."4.2.3"]
+[gn.package.rust_icu_uchar."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
 target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
-[gn.package.rust_icu_udat."4.2.3"]
+[gn.package.rust_icu_udat."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
 target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
-[gn.package.rust_icu_udata."4.2.3"]
+[gn.package.rust_icu_udata."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
 target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
-[gn.package.rust_icu_uenum."4.2.3"]
+[gn.package.rust_icu_uenum."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
 target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
-[gn.package.rust_icu_uloc."4.2.3"]
+[gn.package.rust_icu_uloc."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
 target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
-[gn.package.rust_icu_unorm2."4.2.3"]
+[gn.package.rust_icu_unorm2."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
 target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
-[gn.package.rust_icu_ustring."4.2.3"]
+[gn.package.rust_icu_ustring."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
 target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
 
