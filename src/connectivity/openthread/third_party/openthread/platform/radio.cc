@@ -12,13 +12,9 @@
 
 #include <openthread/platform/radio.h>
 
-#ifdef OPENTHREAD_USE_OLD_SETTING_API
-static ot::Spinel::RadioSpinel<ot::Fuchsia::SpinelFidlInterface, otRadioSpinelContext> sRadioSpinel;
-#else
 static ot::Spinel::RadioSpinel<ot::Fuchsia::SpinelFidlInterface> sRadioSpinel;
 static const otRadioSpinelContext radio_ctx{};
 const void *radio_ctx_ptr = &radio_ctx;
-#endif
 
 extern "C" void otPlatRadioGetIeeeEui64(otInstance *a_instance, uint8_t *a_ieee_eui64) {
   OT_UNUSED_VARIABLE(a_instance);
@@ -54,14 +50,8 @@ extern "C" void otPlatRadioSetPromiscuous(otInstance *a_instance, bool a_enable)
 
 extern "C" void platformRadioInit(const otPlatformConfig *a_platform_config) {
   SuccessOrDie(sRadioSpinel.GetSpinelInterface().Init());
-#ifdef OPENTHREAD_USE_OLD_SETTING_API
-  sRadioSpinel.Init(a_platform_config->reset_rcp,
-                    /* aRestoreDatasetFromNcp */ false,
-                    /* aSkipRcpCompatibilityCheck */ false);
-#else
   sRadioSpinel.Init(a_platform_config->reset_rcp,
                     /* aSkipRcpCompatibilityCheck */ false);
-#endif  // OPENTHREAD_USE_OLD_SETTING_API
 }
 
 extern "C" otError otPlatRadioEnable(otInstance *a_instance) {
@@ -177,12 +167,7 @@ extern "C" int8_t otPlatRadioGetReceiveSensitivity(otInstance *a_instance) {
 
 void platformRadioProcess(otInstance *a_instance) {
   OT_UNUSED_VARIABLE(a_instance);
-#ifdef OPENTHREAD_USE_OLD_SETTING_API
-  otRadioSpinelContext ctx;
-  sRadioSpinel.Process(ctx);
-#else
   sRadioSpinel.Process(radio_ctx_ptr);
-#endif
 }
 
 otError otPlatRadioGetCcaEnergyDetectThreshold(otInstance *a_instance, int8_t *a_threshold) {
