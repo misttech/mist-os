@@ -161,6 +161,30 @@ void DeviceServer::MessageDispatcher::Node::Sync(SyncCompleter::Sync& completer)
   parent_.parent_.controller_.LogError("Unsupported call to Sync");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
+void DeviceServer::MessageDispatcher::Node::ListExtendedAttributes(
+    fuchsia_io::wire::Node2ListExtendedAttributesRequest* request,
+    ListExtendedAttributesCompleter::Sync& completer) {
+  parent_.parent_.controller_.LogError("Unsupported call to ListExtendedAttributes");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+void DeviceServer::MessageDispatcher::Node::GetExtendedAttribute(
+    fuchsia_io::wire::Node2GetExtendedAttributeRequest* request,
+    GetExtendedAttributeCompleter::Sync& completer) {
+  parent_.parent_.controller_.LogError("Unsupported call to GetExtendedAttribute");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+void DeviceServer::MessageDispatcher::Node::SetExtendedAttribute(
+    fuchsia_io::wire::Node2SetExtendedAttributeRequest* request,
+    SetExtendedAttributeCompleter::Sync& completer) {
+  parent_.parent_.controller_.LogError("Unsupported call to SetExtendedAttribute");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+void DeviceServer::MessageDispatcher::Node::RemoveExtendedAttribute(
+    fuchsia_io::wire::Node2RemoveExtendedAttributeRequest* request,
+    RemoveExtendedAttributeCompleter::Sync& completer) {
+  parent_.parent_.controller_.LogError("Unsupported call to RemoveExtendedAttribute");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
 
 DeviceServer::MessageDispatcher::MessageDispatcher(DeviceServer& parent, bool multiplex_node,
                                                    bool multiplex_controller)
@@ -170,9 +194,9 @@ DeviceServer::MessageDispatcher::MessageDispatcher(DeviceServer& parent, bool mu
 
 namespace {
 
-// TODO(https://fxbug.dev/42166376): This target uses uses internal FIDL machinery to ad-hoc compose protocols.
-// Ad-hoc composition of protocols (try to match a method against protocol A, then B, etc.) is not
-// supported by FIDL. We should move to public supported APIs.
+// TODO(https://fxbug.dev/42166376): This target uses uses internal FIDL machinery to ad-hoc compose
+// protocols. Ad-hoc composition of protocols (try to match a method against protocol A, then B,
+// etc.) is not supported by FIDL. We should move to public supported APIs.
 template <typename FidlProtocol>
 fidl::DispatchResult TryDispatch(fidl::WireServer<FidlProtocol>* impl,
                                  fidl::IncomingHeaderAndMessage& msg, fidl::Transaction* txn) {

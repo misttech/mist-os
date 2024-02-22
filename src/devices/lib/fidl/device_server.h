@@ -74,7 +74,14 @@ class DeviceServer {
       void UpdateAttributes(::fuchsia_io::wire::MutableNodeAttributes* request,
                             UpdateAttributesCompleter::Sync& completer) override;
       void Sync(SyncCompleter::Sync& completer) override;
-
+      void ListExtendedAttributes(fuchsia_io::wire::Node2ListExtendedAttributesRequest* request,
+                                  ListExtendedAttributesCompleter::Sync& completer) override;
+      void GetExtendedAttribute(fuchsia_io::wire::Node2GetExtendedAttributeRequest* request,
+                                GetExtendedAttributeCompleter::Sync& completer) override;
+      void SetExtendedAttribute(fuchsia_io::wire::Node2SetExtendedAttributeRequest* request,
+                                SetExtendedAttributeCompleter::Sync& completer) override;
+      void RemoveExtendedAttribute(fuchsia_io::wire::Node2RemoveExtendedAttributeRequest* request,
+                                   RemoveExtendedAttributeCompleter::Sync& completer) override;
       MessageDispatcher& parent_;
     };
 

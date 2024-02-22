@@ -143,7 +143,6 @@ closed protocol Directory2 {
                         /// do forbid directories).
                         1: optional_rights Rights;
                     };
-
                     2: file @generated_name("FileProtocolFlags") flexible bits : uint64 {
                         /// Opens the file in append mode, i.e. the connection
                         /// should seek to the end of the file before every
@@ -259,7 +258,6 @@ closed protocol Directory2 {
     ///
     @available(deprecated=12, removed=13, note="Never fully implemented")
     @selector("fuchsia.io/Directory.AddInotifyFilter")
-    @transitional
     strict AddInotifyFilter(resource struct {
         path Path;
         filter InotifyWatchMask;
@@ -386,7 +384,6 @@ closed protocol Directory2 {
     /// * error `ZX_ERR_NOT_SUPPORTED` if creating symbolic links is not supported by the server.
     @available(added=18)
     @selector("fuchsia.io/Directory.CreateSymlink")
-    @transitional
     strict CreateSymlink(resource struct {
         name Name;
         target SymlinkTarget;

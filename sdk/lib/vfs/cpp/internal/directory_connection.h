@@ -79,6 +79,13 @@ class DirectoryConnection final : public Connection, public fuchsia::io::Directo
     fidl::InterfaceRequest<fuchsia::io::Node>(std::move(object_request))
         .Close(ZX_ERR_NOT_SUPPORTED);
   }
+#if __Fuchsia_API_level__ < 13
+  void AddInotifyFilter(std::string path, fuchsia::io::InotifyWatchMask filter,
+                        uint32_t watch_descriptor, zx::socket socket,
+                        AddInotifyFilterCallback callback) override {
+    ZX_PANIC("Not Implemented");
+  }
+#endif
 #if __Fuchsia_API_level__ >= 18
   void CreateSymlink(std::string name, std::vector<uint8_t> target,
                      fidl::InterfaceRequest<::fuchsia::io::Symlink> connection,

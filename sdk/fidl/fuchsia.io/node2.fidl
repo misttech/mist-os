@@ -335,7 +335,6 @@ closed protocol Node2 {
     /// This method requires the [`Rights.GET_ATTRIBUTES`] right.
     @available(added=18)
     @selector("fuchsia.io/Node.ListExtendedAttributes")
-    @transitional
     strict ListExtendedAttributes(resource struct {
         iterator server_end:ExtendedAttributeIterator;
     });
@@ -348,7 +347,6 @@ closed protocol Node2 {
     /// This method requires the [`Rights.GET_ATTRIBUTES`] right.
     @available(added=18)
     @selector("fuchsia.io/Node.GetExtendedAttribute")
-    @transitional
     strict GetExtendedAttribute(struct {
         name ExtendedAttributeName;
     }) -> (ExtendedAttributeValue) error zx.Status;
@@ -362,7 +360,6 @@ closed protocol Node2 {
     /// This method requires the [`Rights.UPDATE_ATTRIBUTES`] right.
     @available(added=18)
     @selector("fuchsia.io/Node.SetExtendedAttribute")
-    @transitional
     strict SetExtendedAttribute(resource struct {
         name ExtendedAttributeName;
         value ExtendedAttributeValue;
@@ -388,7 +385,6 @@ closed protocol Node2 {
     /// This method requires the [`Rights.UPDATE_ATTRIBUTES`] right.
     @available(added=18)
     @selector("fuchsia.io/Node.RemoveExtendedAttribute")
-    @transitional
     strict RemoveExtendedAttribute(struct {
         name ExtendedAttributeName;
     }) -> () error zx.Status;
