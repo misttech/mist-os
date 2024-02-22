@@ -899,8 +899,8 @@ impl SocketOps for RouteNetlinkSocket {
         _ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
         let RouteNetlinkSocket { inner: _, client: _, message_sender } = self;
-        let data = data.read_all()?;
-        match NetlinkMessage::<RtnlMessage>::deserialize(&data) {
+        let bytes = data.read_all()?;
+        match NetlinkMessage::<RtnlMessage>::deserialize(&bytes) {
             Err(e) => {
                 log_warn!(
                     tag = NETLINK_LOG_TAG,
@@ -910,7 +910,7 @@ impl SocketOps for RouteNetlinkSocket {
                 error!(EINVAL)
             }
             Ok(msg) => match message_sender.unbounded_send(msg) {
-                Ok(()) => Ok(data.len()),
+                Ok(()) => Ok(bytes.len()),
                 Err(e) => {
                     log_warn!(
                         tag = NETLINK_LOG_TAG,
@@ -1202,22 +1202,19 @@ impl SocketOps for GenericNetlinkSocket {
         _dest_address: &mut Option<SocketAddress>,
         _ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
-        let data = data.read_all()?;
-        match NetlinkMessage::<GenericMessage>::deserialize(&data) {
+        let bytes = data.read_all()?;
+        match NetlinkMessage::<GenericMessage>::deserialize(&bytes) {
             Err(e) => {
                 log_warn!("Failed to process write; data could not be deserialized: {:?}", e);
                 error!(EINVAL)
             }
-            Ok(msg) => {
-                let msg_len = msg.buffer_len();
-                match self.message_sender.unbounded_send(msg) {
-                    Ok(()) => Ok(msg_len),
-                    Err(e) => {
-                        log_warn!("Netlink receiver unexpectedly disconnected for socket: {:?}", e);
-                        error!(EPIPE)
-                    }
+            Ok(msg) => match self.message_sender.unbounded_send(msg) {
+                Ok(()) => Ok(bytes.len()),
+                Err(e) => {
+                    log_warn!("Netlink receiver unexpectedly disconnected for socket: {:?}", e);
+                    error!(EPIPE)
                 }
-            }
+            },
         }
     }
 
