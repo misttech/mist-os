@@ -170,6 +170,29 @@ TEST(UnixSocket, ConnectZeroBacklog) {
   ASSERT_EQ(close(server), 0);
 }
 
+TEST(UnixSocket, ConnectLargeSize) {
+  struct sockaddr_un sun;
+  sun.sun_family = AF_UNIX;
+  strcpy(sun.sun_path, "/bogus/path/value");
+  struct sockaddr* addr = reinterpret_cast<struct sockaddr*>(&sun);
+
+  auto client = socket(AF_UNIX, SOCK_STREAM, 0);
+  ASSERT_GT(client, -1);
+  ASSERT_EQ(connect(client, addr, sizeof(struct sockaddr_un) + 1), -1);
+  EXPECT_EQ(errno, EINVAL);
+}
+
+TEST(InetSocket, ConnectLargeSize) {
+  struct sockaddr_in in;
+  in.sin_family = AF_INET;
+  struct sockaddr* addr = reinterpret_cast<struct sockaddr*>(&in);
+
+  auto client = socket(AF_INET, SOCK_STREAM, 0);
+  ASSERT_GT(client, -1);
+  ASSERT_EQ(connect(client, addr, sizeof(struct sockaddr_storage) + 1), -1);
+  EXPECT_EQ(errno, EINVAL);
+}
+
 class UnixSocketTest : public testing::Test {
   // SetUp() - make socket
  protected:

@@ -10,7 +10,7 @@ use crate::{
         socket::{
             new_socket_file, resolve_unix_socket_address, Socket, SocketAddress, SocketDomain,
             SocketFile, SocketMessageFlags, SocketPeer, SocketProtocol, SocketShutdownFlags,
-            SocketType, UnixSocket, SA_FAMILY_SIZE,
+            SocketType, UnixSocket, SA_FAMILY_SIZE, SA_STORAGE_SIZE,
         },
         FdFlags, FdNumber, FileHandle, FsString, LookupContext,
     },
@@ -113,13 +113,13 @@ fn parse_socket_protocol(
 fn parse_socket_address(
     task: &Task,
     user_socket_address: UserAddress,
-    address_length: usize,
+    user_address_length: usize,
 ) -> Result<SocketAddress, Errno> {
-    if address_length < SA_FAMILY_SIZE {
+    if user_address_length < SA_FAMILY_SIZE || user_address_length > SA_STORAGE_SIZE {
         return error!(EINVAL);
     }
 
-    let address = task.read_memory_to_vec(user_socket_address, address_length)?;
+    let address = task.read_memory_to_vec(user_socket_address, user_address_length)?;
 
     SocketAddress::from_bytes(address)
 }
@@ -127,15 +127,15 @@ fn parse_socket_address(
 fn maybe_parse_socket_address(
     task: &Task,
     user_socket_address: UserAddress,
-    address_length: usize,
+    user_address_length: usize,
 ) -> Result<Option<SocketAddress>, Errno> {
-    if address_length > i32::MAX as usize {
+    if user_address_length > i32::MAX as usize {
         return error!(EINVAL);
     }
     Ok(if user_socket_address.is_null() {
         None
     } else {
-        Some(parse_socket_address(task, user_socket_address, address_length)?)
+        Some(parse_socket_address(task, user_socket_address, user_address_length)?)
     })
 }
 
@@ -152,11 +152,11 @@ pub fn sys_bind(
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
-    address_length: usize,
+    user_address_length: usize,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
-    let address = parse_socket_address(current_task, user_socket_address, address_length)?;
+    let address = parse_socket_address(current_task, user_socket_address, user_address_length)?;
     if !address.valid_for_domain(socket.domain) {
         return match socket.domain {
             SocketDomain::Unix
@@ -271,11 +271,11 @@ pub fn sys_connect(
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
-    address_length: usize,
+    user_address_length: usize,
 ) -> Result<(), Errno> {
     let client_file = current_task.files.get(fd)?;
     let client_socket = client_file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
-    let address = parse_socket_address(current_task, user_socket_address, address_length)?;
+    let address = parse_socket_address(current_task, user_socket_address, user_address_length)?;
     let peer = match address {
         SocketAddress::Unspecified => return error!(EAFNOSUPPORT),
         SocketAddress::Unix(ref name) => {
@@ -753,20 +753,23 @@ pub fn sys_sendto(
     current_task: &CurrentTask,
     fd: FdNumber,
     user_buffer: UserAddress,
-    buffer_length: usize,
+    user_buffer_length: usize,
     flags: u32,
     user_dest_address: UserAddress,
-    dest_address_length: socklen_t,
+    user_dest_address_length: socklen_t,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
     if !file.node().is_sock() {
         return error!(ENOTSOCK);
     }
 
-    let dest_address =
-        maybe_parse_socket_address(current_task, user_dest_address, dest_address_length as usize)?;
+    let dest_address = maybe_parse_socket_address(
+        current_task,
+        user_dest_address,
+        user_dest_address_length as usize,
+    )?;
     let mut data =
-        UserBuffersInputBuffer::unified_new_at(current_task, user_buffer, buffer_length)?;
+        UserBuffersInputBuffer::unified_new_at(current_task, user_buffer, user_buffer_length)?;
 
     let flags = SocketMessageFlags::from_bits(flags).ok_or_else(|| errno!(EOPNOTSUPP))?;
     let socket_file = file.downcast_file::<SocketFile>().unwrap();
