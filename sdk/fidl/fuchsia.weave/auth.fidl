@@ -59,7 +59,6 @@ closed protocol Signer {
     /// of a type that is supported by Weave, and must take the standard form
     /// of an ASN.1 DER SEQUENCE. This operation must support SHA1 and SHA256
     /// hash values.
-    @transitional
     strict SignHashWithPrivateKey(struct {
         hash vector<uint8>:32;
         wrapped_private_key PrivateKey;
