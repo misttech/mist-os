@@ -29,7 +29,6 @@ closed protocol CrashReportingProductRegister {
     /// This allows clients to prevent races between filing crash reports and calls to Upsert.
     /// Otherwise if a crash report is filed before the upsert completes, the crash report will be
     /// attributed to the wrong product, leading to potentially incorrect crash data.
-    @transitional
     strict UpsertWithAck(struct {
         // 2083 is the maximum expected component URL length.
         component_url string:2083;
