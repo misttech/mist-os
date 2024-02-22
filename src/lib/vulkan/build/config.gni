@@ -10,12 +10,6 @@ has_prebuilt_vulkan_runtime = current_cpu == "x64" && (is_linux || is_mac)
 declare_args() {
   if (host_os == "linux" && host_cpu == "x64") {
     #
-    # |vulkan_host_sdk_dir| is the path to Vulkan SDK, which contains Vulkan
-    # headers and sources to Vulkan loader, layers and tools.
-    #
-    vulkan_host_sdk_dir = "//prebuilt/third_party/vulkansdk/linux/x86_64"
-
-    #
     # |vulkan_host_runtime_dir| is the path to Vulkan runtime libraries, which
     # contains prebuilt Vulkan loader, Vulkan layers, SwiftShader Vulkan ICD,
     # and descriptor files required to load the libraries.
@@ -24,7 +18,6 @@ declare_args() {
   }
 
   if (host_os == "mac" && host_cpu == "x64") {
-    vulkan_host_sdk_dir = "//prebuilt/third_party/vulkansdk/mac/macOS"
     vulkan_host_runtime_dir = "//prebuilt/third_party/vulkan_runtime/mac-x64"
   }
 

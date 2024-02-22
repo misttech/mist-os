@@ -36,8 +36,11 @@ group("vulkan") {
   # Host target with non-null Vulkan should link against prebuilt
   # Vulkan SDK.
   if (is_host && !use_null_vulkan_on_host) {
-    public_configs += [ ":vulkan_host_config" ]
-    public_deps = [ ":copy_vulkan_runtime" ]
+    public_deps = [
+      ":copy_vulkan_runtime",
+      ":headers",
+      ":vulkan_host_loader",
+    ]
   }
 }
 
@@ -336,10 +339,8 @@ if (is_host && current_cpu == "x64") {
 # This includes headers, loader linkage, and copying of runtime files for host
 # executables.
 #
-config("vulkan_host_config") {
+config("vulkan_host_loader_config") {
   if (current_cpu == "x64" && is_host) {
-    include_dirs = [ "$vulkan_host_sdk_dir/include" ]
-
     # Use the runtime libs instead of the downloaded SDK libs to avoid linking issues.
     # The SDK libs may have dependencies on newer C library symbols (for example from SDK 1.3.268:
     # ld.lld: error: undefined reference due to --no-allow-shlib-undefined: pow@GLIBC_2.29
@@ -347,24 +348,14 @@ config("vulkan_host_config") {
     #)
     _lib_dir = vulkan_host_runtime_sub_dirs.lib
     lib_dirs = [ "$vulkan_host_runtime_dir/$_lib_dir" ]
-    configs = [
-      "//build/config:Wno-bitfield-conversion",
-      "//build/config:Wno-defaulted-function-deleted",
-    ]
 
     # Link Vulkan loader to host executables.
     libs = [ "vulkan" ]
-
-    if (is_mac) {
-      defines = [
-        "VK_USE_PLATFORM_MACOS_MVK",
-        "VK_USE_PLATFORM_METAL_EXT",
-      ]
-    }
-
-    # Needed because of vulkan_hpp_macros.hpp introduced in SDK 1.3.268
-    cflags = [ "-Wno-newline-eof" ]
   }
+}
+
+group("vulkan_host_loader") {
+  public_configs = [ ":vulkan_host_loader_config" ]
 }
 
 group("vulkan_validation_layers") {
