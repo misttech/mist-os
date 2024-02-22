@@ -15,25 +15,25 @@
 namespace vmo_test {
 
 zx::result<PhysVmo> GetTestPhysVmo(size_t size) {
-  // We cannot create any physical VMOs without the root resource.
-  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
-  if (!root_resource->is_valid()) {
+  // We cannot create any physical VMOs without the mmio resource.
+  zx::unowned_resource mmio_resource = maybe_standalone::GetMmioResource();
+  if (!mmio_resource->is_valid()) {
     return zx::error_result(ZX_ERR_NOT_SUPPORTED);
   }
 
-  // Fetch the address of the test reserved RAM region.  Even with the root
+  // Fetch the address of the test reserved RAM region.  Even with the mmio
   // resource, we cannot use zx_vmo_create_physical to create a VMO which
   // points to RAM unless someone passed a kernel command line argument telling
   // the kernel to reserve a chunk of RAM for this purpose.
   //
   // If a chunk of RAM was reserved, the kernel will publish its size and
-  // physical location in the boot options.  If we have access to the root
+  // physical location in the boot options.  If we have access to the mmio
   // resource, it is because we are running in the core-tests.zbi.  The boot
   // options command line arguments should be available to us as a VMO.
   //
-  // This is an all-or-nothing thing.  If we have the root resource, then we
+  // This is an all-or-nothing thing.  If we have the mmio resource, then we
   // should also have some RAM reserved for running these tests.  If we have
-  // the root resource, but _don't_ have any reserved RAM, it should be
+  // the mmio resource, but _don't_ have any reserved RAM, it should be
   // considered a test error.
 
   RamReservation ram;
@@ -54,7 +54,7 @@ zx::result<PhysVmo> GetTestPhysVmo(size_t size) {
   }
 
   // Go ahead and create the VMO itself.
-  zx_status_t res = zx::vmo::create_physical(*root_resource, ret.addr, ret.size, &ret.vmo);
+  zx_status_t res = zx::vmo::create_physical(*mmio_resource, ret.addr, ret.size, &ret.vmo);
   EXPECT_OK(res);
   if (res != ZX_OK) {
     return zx::error_result(res);

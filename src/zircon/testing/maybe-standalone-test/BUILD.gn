@@ -14,7 +14,7 @@ static_library("maybe-standalone-test") {
   testonly = true
   sources = [
     "boot-options.cc",
-    "root-resource.cc",
+    "resource.cc",
   ]
   public_deps = [ ":headers" ]
   deps = [ "//src/zircon/testing/standalone-test:headers" ]
