@@ -353,9 +353,12 @@ zx_status_t VmObjectPaged::CreateContiguous(uint32_t pmm_alloc_flags, uint64_t s
   auto* page_source_ptr = page_source.get();
 
   fbl::RefPtr<VmObjectPaged> vmo;
-  status = CreateWithSourceCommon(ktl::move(page_source), pmm_alloc_flags, kContiguous, size,
+  status = CreateWithSourceCommon(page_source, pmm_alloc_flags, kContiguous, size,
                                   ktl::move(attribution_object), &vmo);
   if (status != ZX_OK) {
+    // Ensure to close the page source we created, as it will not get closed by the VmCowPages since
+    // that creation failed.
+    page_source->Close();
     return status;
   }
 
