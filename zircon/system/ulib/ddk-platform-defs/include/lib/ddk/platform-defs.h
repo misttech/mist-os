@@ -39,7 +39,7 @@
 #define PDEV_DID_CPU_TRACE              0x1D  // CPU tracing driver
 #define PDEV_DID_DW_DSI                 0x1E  // Designware DSI
 #define PDEV_DID_USB_XHCI_COMPOSITE     0x1F  // XHCI USB Controller, as a composite device
-#define PDEV_DID_SSD1306                0x20  // Oled Display
+// PDEV_DID_SSD1306 was 0x20
 #define PDEV_DID_CADENCE_HPNFC          0x22  // Cadence NAND Flash controller
 #define PDEV_DID_OT_RADIO               0x23  // OpenThread radio
 #define PDEV_DID_GOODIX_GTX8X           0x25  // Goodix GTx8X touch controllers

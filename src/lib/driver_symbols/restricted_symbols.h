@@ -163,7 +163,6 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/simple.intel.cm",
     "#meta/simple.nv.cm",
     "#meta/simple.vmware.cm",
-    "#meta/ssd1306_driver.cm",
     "#meta/sysmem.cm",
     "#meta/tas27xx.cm",
     "#meta/tas5707.cm",

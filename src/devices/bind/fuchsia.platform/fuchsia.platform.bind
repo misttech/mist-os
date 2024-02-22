@@ -34,7 +34,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   GPIO_LIGHT = 0x1C,
   CPU_TRACE = 0x1D,
   XHCI = 0x1F,
-  SSD1306 = 0x20,
+  // 0x20 was for SSD1306
   OT_RADIO = 0x23,
   POWER_DOMAIN_COMPOSITE = 0x27,
   PWM_VREG = 0x2B,

@@ -30,7 +30,7 @@ DDK_PROTOCOL_DEF(DEVICE,                  9,    "device", 0)
 DDK_PROTOCOL_DEF(DISPLAY_CAPTURE_IMPL,    10,   "display-capture-impl", PF_NOPUB)
 DDK_PROTOCOL_DEF(DISPLAY_COORDINATOR,     11,   "display-coordinator", 0)
 DDK_PROTOCOL_DEF(DISPLAY_CONTROLLER_IMPL, 12,   "display-controller-impl", PF_NOPUB)
-DDK_PROTOCOL_DEF(DOTMATRIX_DISPLAY,       13,   "dotmatrix-display", 0)
+// 13 was dotmatrix-display
 DDK_PROTOCOL_DEF(ETHERNET,                14,   "ethernet", 0)
 DDK_PROTOCOL_DEF(ETHERNET_IMPL,           15,   "ethernet-impl", 0)
 // FASTBOOT defined as 167 below.

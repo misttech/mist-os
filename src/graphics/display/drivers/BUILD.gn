@@ -14,7 +14,6 @@ group("tests") {
     "goldfish-display:tests",
     "intel-i915:tests",
     "simple:tests",
-    "ssd1306:tests",
     "virtio-guest:tests",
   ]
 }

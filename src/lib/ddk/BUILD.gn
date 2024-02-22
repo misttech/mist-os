@@ -93,7 +93,6 @@ sdk_static_library("ddk") {
   # Please allowlist entire directories rather than individual targets as it
   # requires less allowlist churn over time.
   visibility = [
-    "//examples/drivers/dotmatrix_display:*",
     "//examples/drivers/transport/banjo:*",
     "//examples/drivers/transport/banjo/v1:*",
     "//sdk/banjo/*",
@@ -345,7 +344,6 @@ sdk_static_library("ddk") {
     "//src/graphics/display/drivers/goldfish-display:*",
     "//src/graphics/display/drivers/intel-i915:*",
     "//src/graphics/display/drivers/simple:*",
-    "//src/graphics/display/drivers/ssd1306:*",
     "//src/graphics/display/drivers/virtio-guest/v1:*",
     "//src/graphics/display/lib/designware-dsi:*",
     "//src/graphics/display/lib/designware-hdmi:*",
