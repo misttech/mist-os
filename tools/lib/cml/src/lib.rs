@@ -1026,6 +1026,7 @@ impl Right {
 /// [doc-static-children]: /docs/concepts/components/v2/realms.md#static-children
 /// [doc-collections]: /docs/concepts/components/v2/realms.md#collections
 /// [doc-protocol]: /docs/concepts/components/v2/capabilities/protocol.md
+/// [doc-dictionaries]: /reference/fidl/fuchsia.component.decl#Dictionary
 /// [doc-directory]: /docs/concepts/components/v2/capabilities/directory.md
 /// [doc-storage]: /docs/concepts/components/v2/capabilities/storage.md
 /// [doc-resolvers]: /docs/concepts/components/v2/capabilities/resolver.md
@@ -1034,7 +1035,7 @@ impl Right {
 /// [doc-service]: /docs/concepts/components/v2/capabilities/service.md
 /// [doc-directory-rights]: /docs/concepts/components/v2/capabilities/directory#directory-capability-rights
 ///
-/// ## Top-level keys
+/// ## Top-level keys {#document}
 #[derive(ReferenceDoc, Deserialize, Debug, Default, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Document {
@@ -1167,10 +1168,10 @@ pub struct Document {
     /// A includes B, B includes A.
     /// A cycle such as the above will result in a compile-time error.
     ///
-    /// [`use`]: struct.Document.html#use
-    /// [`offer`]: struct.Document.html#offer
-    /// [`expose`]: struct.Document.html#expose
-    /// [`capabilities`]: struct.Document.html#capabilities
+    /// [`use`]: #use
+    /// [`offer`]: #offer
+    /// [`expose`]: #expose
+    /// [`capabilities`]: #capabilities
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include: Option<Vec<String>>,
 
@@ -1414,7 +1415,7 @@ where
 /// [`include`], where `$self` and `$other` are of type [`Document`] and $field_name is a
 /// capability routing field of [`Document`]: `use`, `offer`, `expose`, or `capabilities`.
 ///
-/// [`include`]: struct.Document.html#include
+/// [`include`]: #include
 /// [`Document`]: struct.Document.html
 macro_rules! merge_from_capability_field {
     ($self:ident, $other:ident, $field_name:ident) => {
@@ -1450,8 +1451,8 @@ macro_rules! merge_from_capability_field {
 /// [`include`], where `$self` and `$other` are of type [`Document`] and $field_name is _not_ a
 /// capability routing field of [`Document`] (`use`, `offer`, `expose`, or `capabilities`).
 ///
-/// [`include`]: struct.Document.html#include
-/// [`Document`]: struct.Document.html
+/// [`include`]: #include
+/// [`Document`]: #document
 macro_rules! merge_from_other_field {
     ($self:ident, $other:ident, $field_name:ident) => {
         if let Some(ref mut ours) = $self.$field_name {
@@ -2764,7 +2765,7 @@ pub struct Use {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filter: Option<Map<String, Value>>,
 
-    /// `dependency` _(optional)_: The type of dependency between the source and
+    /// The type of dependency between the source and
     /// this component, one of:
     /// - `strong`: a strong dependency, which is used to determine shutdown
     ///     ordering. Component manager is guaranteed to stop the target before the
@@ -2776,7 +2777,7 @@ pub struct Use {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dependency: Option<DependencyType>,
 
-    /// `availability` _(optional)_: The expectations around this capability's availability. One
+    /// The expectations around this capability's availability. One
     /// of:
     /// - `required` (default): a required dependency, the component is unable to perform its
     ///     work without this capability.

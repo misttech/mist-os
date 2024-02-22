@@ -27,6 +27,7 @@ A reference string takes the form of `#<name>`, where `<name>` refers to the nam
 [doc-static-children]: /docs/concepts/components/v2/realms.md#static-children
 [doc-collections]: /docs/concepts/components/v2/realms.md#collections
 [doc-protocol]: /docs/concepts/components/v2/capabilities/protocol.md
+[doc-dictionaries]: /reference/fidl/fuchsia.component.decl#Dictionary
 [doc-directory]: /docs/concepts/components/v2/capabilities/directory.md
 [doc-storage]: /docs/concepts/components/v2/capabilities/storage.md
 [doc-resolvers]: /docs/concepts/components/v2/capabilities/resolver.md
@@ -35,7 +36,7 @@ A reference string takes the form of `#<name>`, where `<name>` refers to the nam
 [doc-service]: /docs/concepts/components/v2/capabilities/service.md
 [doc-directory-rights]: /docs/concepts/components/v2/capabilities/directory#directory-capability-rights
 
-## Top-level keys
+## Top-level keys {#document}
 
 ### `include` {#include}
 
@@ -170,10 +171,10 @@ Include paths cannot have cycles. For instance this is invalid:
 A includes B, B includes A.
 A cycle such as the above will result in a compile-time error.
 
-[`use`]: struct.Document.html#use
-[`offer`]: struct.Document.html#offer
-[`expose`]: struct.Document.html#expose
-[`capabilities`]: struct.Document.html#capabilities
+[`use`]: #use
+[`offer`]: #offer
+[`expose`]: #expose
+[`capabilities`]: #capabilities
 
 ### `disable` {#disable}
 
@@ -554,7 +555,7 @@ this component and the capability's source.
 - `filter`: (_optional `object`_) (`event_stream` only) Capability requested event streams require specifying a filter
     referring to the protocol to which the events in the event stream apply. The content of the
     filter will be an object mapping from "name" to the "protocol name".
-- `dependency`: (_optional `string`_) `dependency` _(optional)_: The type of dependency between the source and
+- `dependency`: (_optional `string`_) The type of dependency between the source and
     this component, one of:
     - `strong`: a strong dependency, which is used to determine shutdown
         ordering. Component manager is guaranteed to stop the target before the
@@ -563,7 +564,7 @@ this component and the capability's source.
         stops the parent realm, the source may stop before the clients. Clients of weak
         dependencies must be able to handle these dependencies becoming unavailable.
     This property is disallowed for runner capabilities, which are always a `strong` dependency.
-- `availability`: (_optional `string`_) `availability` _(optional)_: The expectations around this capability's availability. One
+- `availability`: (_optional `string`_) The expectations around this capability's availability. One
     of:
     - `required` (default): a required dependency, the component is unable to perform its
         work without this capability.
