@@ -4,51 +4,106 @@
 
 use crate::TargetInfo;
 use addr::TargetAddr;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
+use camino::{Utf8Path, Utf8PathBuf};
+use home::home_dir;
+use std::path::PathBuf;
 use std::process::Command;
+use thiserror::Error;
+
+const CONTROL_MASTER_PATH: &str = ".ssh/control/funnel_control_master";
+
+const CLEANUP_COMMAND: &'static str = include_str!("cleanup_command");
+
+#[derive(Debug, Error)]
+pub enum TunnelError {
+    #[error("Target {target} did not have any valid Ip Addresses associated with it.")]
+    NoAdressesError { target: String },
+    #[error("There may be a tunnel already running to {remote_host}. Try running `funnel cleanup-tunnel {remote_host}` to clean it up before retrying")]
+    TunnelAlreadyRunning { remote_host: String },
+    #[error("Ssh was terminated by a signal")]
+    SshTerminatedFromSignal,
+    #[error("User's home dir is not valid UTF8: {home_dir}")]
+    InvalidHomeDir { home_dir: PathBuf },
+    #[error("User does not have a Home Dir")]
+    NoHomeDir,
+    #[error("Control master path cannot be at root")]
+    ControlMasterPathCannotBeAtRoot,
+    #[error("Could not create path to control master: {source}")]
+    CannotCreateControlMasterPath { source: std::io::Error },
+    #[error("Ssh Did not start: {0}")]
+    SshDidNotStart(#[from] std::io::Error),
+    #[error("unknown error code during ssh: {0}")]
+    SshError(i32),
+}
 
 pub(crate) fn do_ssh(
     host: String,
     target: TargetInfo,
     repo_port: u32,
     additional_port_forwards: Vec<u32>,
-) -> Result<()> {
+) -> Result<(), TunnelError> {
+    // Set up the control master
+    let home_path = home_dir().ok_or(TunnelError::NoHomeDir)?;
+    let home_path = Utf8PathBuf::from_path_buf(home_path)
+        .map_err(|e| TunnelError::InvalidHomeDir { home_dir: e })?;
+    let funnel_control_path = home_path.join(CONTROL_MASTER_PATH);
+    let funnel_control_path_parent =
+        funnel_control_path.parent().ok_or(TunnelError::ControlMasterPathCannotBeAtRoot)?;
+    match funnel_control_path_parent.try_exists() {
+        Ok(true) => {}
+        Ok(false) => std::fs::create_dir_all(funnel_control_path_parent)
+            .map_err(|e| TunnelError::CannotCreateControlMasterPath { source: e })?,
+        Err(e) => return Err(TunnelError::CannotCreateControlMasterPath { source: e }),
+    };
+
+    // Set up ssh command
     let mut ssh_cmd = &mut Command::new("ssh");
-    for arg in build_ssh_args(target, repo_port, additional_port_forwards)?.iter() {
+    for arg in
+        build_ssh_args(target, funnel_control_path, repo_port, additional_port_forwards)?.iter()
+    {
         ssh_cmd = ssh_cmd.arg(arg);
     }
-    ssh_cmd = ssh_cmd.arg(host);
+    ssh_cmd = ssh_cmd.arg(host.clone());
+    ssh_cmd = ssh_cmd.arg(format!("echo 'Tunnel established' && sleep infinity"));
+
+    // Spawn
     tracing::debug!("About to ssh with command: {:#?}", ssh_cmd);
     let mut ssh = ssh_cmd.spawn()?;
-    ssh.wait()?;
-
-    Ok(())
+    match ssh.wait() {
+        Ok(e) => match e.code() {
+            None => Err(TunnelError::SshTerminatedFromSignal),
+            Some(255) => Err(TunnelError::TunnelAlreadyRunning { remote_host: host.clone() }),
+            Some(0) => Ok(()),
+            Some(i) => Err(TunnelError::SshError(i)),
+        },
+        Err(e) => Err(TunnelError::SshDidNotStart(e)),
+    }
 }
 
 fn build_ssh_args(
     target: TargetInfo,
+    control_master_path: impl AsRef<Utf8Path>,
     repo_port: u32,
     additional_port_forwards: Vec<u32>,
-) -> Result<Vec<String>> {
+) -> Result<Vec<String>, TunnelError> {
     let mut addrs: Vec<TargetAddr> = target.addresses.into_iter().collect::<Vec<TargetAddr>>();
 
     // Flip the sorting so that Ipv6 comes before Ipv4 as we will take the first
     // address, and (generally) Ipv4 addresses from the Target are ephemeral
     addrs.sort_by(|a, b| b.cmp(a));
 
-    let target_ip = addrs
-        .first()
-        .ok_or("target address list was empty")
-        .map_err(|e| anyhow!("Error getting target addresses: {}", e))?;
+    let target_ip =
+        addrs.first().ok_or(TunnelError::NoAdressesError { target: target.nodename })?;
 
     let mut res: Vec<String> = vec![
         // We want ipv6 binds for the port forwards
         "-o AddressFamily inet6".into(),
         // We do not want multiplexing
-        "-o ControlPath none".into(),
-        "-o ControlMaster no".into(),
+        format!("-o ControlPath {}", control_master_path.as_ref()),
+        "-o ControlMaster auto".into(),
         // Disable pseudo-tty allocation for screen based programs over the SSH tunnel.
-        "-o RequestTTY yes".into(),
+        "-o RequestTTY no".into(),
         "-o ExitOnForwardFailure yes".into(),
         "-o StreamLocalBindUnlink yes".into(),
         // Request to a package server on the local host are forwarded to the remote
@@ -80,6 +135,14 @@ fn build_ssh_args(
     Ok(res)
 }
 
+pub(crate) async fn cleanup_remote_sshd(host: String) -> Result<()> {
+    let mut ssh =
+        Command::new("ssh").arg("-o RequestTTY yes").arg(host).arg(CLEANUP_COMMAND).spawn()?;
+    ssh.wait()?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -107,13 +170,13 @@ mod test {
             addresses: vec![src_ipv4.into(), src.into()],
         };
 
-        let got = build_ssh_args(target, 8081, vec![5555])?;
+        let got = build_ssh_args(target, "/foo", 8081, vec![5555])?;
 
         let want: Vec<&str> = vec![
             "-o AddressFamily inet6",
-            "-o ControlPath none",
-            "-o ControlMaster no",
-            "-o RequestTTY yes",
+            "-o ControlPath /foo",
+            "-o ControlMaster auto",
+            "-o RequestTTY no",
             "-o ExitOnForwardFailure yes",
             "-o StreamLocalBindUnlink yes",
             "-o LocalForward *:8081 localhost:8081",
@@ -147,13 +210,13 @@ mod test {
             ..Default::default()
         };
 
-        let got = build_ssh_args(target, 8081, vec![])?;
+        let got = build_ssh_args(target, "/foo", 8081, vec![])?;
 
         let want: Vec<&str> = vec![
             "-o AddressFamily inet6",
-            "-o ControlPath none",
-            "-o ControlMaster no",
-            "-o RequestTTY yes",
+            "-o ControlPath /foo",
+            "-o ControlMaster auto",
+            "-o RequestTTY no",
             "-o ExitOnForwardFailure yes",
             "-o StreamLocalBindUnlink yes",
             "-o LocalForward *:8081 localhost:8081",
@@ -176,18 +239,18 @@ mod test {
         let nodename = "cytherea".to_string();
         {
             let target = TargetInfo { nodename: nodename.clone(), ..Default::default() };
-            let res = build_ssh_args(target, 9091, vec![]);
+            let res = build_ssh_args(target, "/foo", 9091, vec![]);
             assert!(res.is_err());
         }
         {
             let target = TargetInfo { nodename: nodename.clone(), ..Default::default() };
-            let res = build_ssh_args(target, 9091, vec![]);
+            let res = build_ssh_args(target, "/foo", 9091, vec![]);
             assert!(res.is_err());
         }
         {
             let target =
                 TargetInfo { nodename: nodename.clone(), addresses: vec![], ..Default::default() };
-            let res = build_ssh_args(target, 9091, vec![]);
+            let res = build_ssh_args(target, "/foo", 9091, vec![]);
             assert!(res.is_err());
         }
     }
@@ -199,7 +262,7 @@ mod test {
             addresses: vec![],
             ..Default::default()
         };
-        let res = build_ssh_args(target, 9091, vec![]);
+        let res = build_ssh_args(target, "/foo", 9091, vec![]);
         assert!(res.is_err());
     }
 }

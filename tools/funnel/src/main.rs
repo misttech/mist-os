@@ -47,6 +47,7 @@ struct Funnel {
 enum FunnelSubcommands {
     Host(SubCommandHost),
     Update(SubCommandUpdate),
+    Cleanup(SubCommandCleanupRemote),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -83,6 +84,20 @@ struct SubCommandHost {
 /// directory that the `funnel` tool resides in, which is a valid cipd-manifest
 struct SubCommandUpdate {}
 
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "cleanup-remote-host")]
+/// Cleans up a remote host's connections.
+///
+/// This will ssh to the provided remote host and look for sshd processes that
+/// are actively listening to port 8022. If there are any, then it will kill them.
+/// This needs to be run from an interactive shell as it will prompt the user for
+/// their password (sudo).
+struct SubCommandCleanupRemote {
+    /// the remote host to cleanup
+    #[argh(positional)]
+    host: String,
+}
+
 #[fuchsia_async::run_singlethreaded]
 async fn main() -> Result<()> {
     let args: Funnel = argh::from_env();
@@ -92,7 +107,12 @@ async fn main() -> Result<()> {
     match args.nested {
         FunnelSubcommands::Host(host_command) => funnel_main(host_command).await,
         FunnelSubcommands::Update(update_command) => update_main(update_command).await,
+        FunnelSubcommands::Cleanup(cleanup_command) => cleanup_main(cleanup_command).await,
     }
+}
+
+async fn cleanup_main(args: SubCommandCleanupRemote) -> Result<()> {
+    ssh::cleanup_remote_sshd(args.host).await
 }
 
 async fn update_main(_args: SubCommandUpdate) -> Result<()> {
