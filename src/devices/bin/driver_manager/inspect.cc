@@ -113,10 +113,6 @@ DeviceInspect::DeviceInspect(fbl::RefPtr<InspectManager::Info> info, std::string
   device_node_ = info_->devices.CreateChild(name_);
   // Increment device count.
   info_->device_count.Add(1);
-
-  // create properties with default values
-  state_ = device_node_.CreateString("state", "");
-  local_id_ = device_node_.CreateUint("driver_host_local_id", 0);
 }
 
 DeviceInspect::~DeviceInspect() {
@@ -146,14 +142,13 @@ zx::result<> DeviceInspect::Publish() {
 }
 
 void DeviceInspect::SetStaticValues(const std::string& topological_path, uint32_t protocol_id,
-                                    const std::string& type, uint32_t flags,
+                                    const std::string& type,
                                     const cpp20::span<const zx_device_prop_t>& properties,
                                     const std::string& driver_url) {
   protocol_id_ = protocol_id;
   device_node_.CreateString("topological_path", topological_path, &static_values_);
   device_node_.CreateUint("protocol_id", protocol_id, &static_values_);
   device_node_.CreateString("type", type, &static_values_);
-  device_node_.CreateUint("flags", flags, &static_values_);
   device_node_.CreateString("driver", driver_url, &static_values_);
 
   inspect::Node properties_array;

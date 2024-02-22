@@ -1884,7 +1884,7 @@ TEST_F(DriverRunnerTest, StartAndInspectLegacyOffers) {
                                                }));
 
   ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
-                                                   .node_name = {"dfv1_composites"},
+                                                   .node_name = {"legacy_composites"},
                                                }));
 
   StopDriverComponent(std::move(root_driver->controller));
@@ -1963,7 +1963,7 @@ TEST_F(DriverRunnerTest, StartAndInspect) {
                                                }));
 
   ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
-                                                   .node_name = {"dfv1_composites"},
+                                                   .node_name = {"legacy_composites"},
                                                }));
 
   StopDriverComponent(std::move(root_driver->controller));

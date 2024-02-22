@@ -449,9 +449,9 @@ void BindManager::RecordInspect(inspect::Inspector& inspector) const {
   orphans.RecordUint("pending_orphan_rebind_callbacks", pending_orphan_rebind_callbacks_.size());
   inspector.GetRoot().Record(std::move(orphans));
 
-  auto dfv1_composites = inspector.GetRoot().CreateChild("dfv1_composites");
-  legacy_composite_manager_.Inspect(dfv1_composites);
-  inspector.GetRoot().Record(std::move(dfv1_composites));
+  auto legacy_composites = inspector.GetRoot().CreateChild("legacy_composites");
+  legacy_composite_manager_.Inspect(legacy_composites);
+  inspector.GetRoot().Record(std::move(legacy_composites));
 }
 
 std::vector<fdd::wire::CompositeNodeInfo> BindManager::GetCompositeListInfo(

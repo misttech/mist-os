@@ -1245,8 +1245,9 @@ void Node::SetAndPublishInspect() {
   }
 
   inspect_.SetStaticValues(MakeTopologicalPath(), GetProtocolId(properties_),
-                           IsComposite() ? kCompositeDeviceTypeString : kDeviceTypeString, 0,
-                           property_vector, "");
+                           IsComposite() ? kCompositeDeviceTypeString : kDeviceTypeString,
+                           property_vector,
+                           driver_component_.has_value() ? driver_component_->driver_url : "");
   if (zx::result result = inspect_.Publish(); result.is_error()) {
     LOGF(ERROR, "%s: Failed to publish inspect: %s", MakeTopologicalPath().c_str(),
          result.status_string());

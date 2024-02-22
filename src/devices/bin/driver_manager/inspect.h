@@ -92,7 +92,7 @@ class DeviceInspect {
   // Set the values that should not change during the life of the device.
   // This should only be called once, calling it more than once will create duplicate entries.
   void SetStaticValues(const std::string& topological_path, uint32_t protocol_id,
-                       const std::string& type, uint32_t flags,
+                       const std::string& type,
                        const cpp20::span<const zx_device_prop_t>& properties,
                        const std::string& driver_url);
 
