@@ -87,8 +87,8 @@ __EXPORT zx_status_t device_add_metadata(zx_device_t* dev, uint32_t type, const 
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-__EXPORT zx_status_t device_add_composite(zx_device_t* dev, const char* name,
-                                          const composite_device_desc_t* comp_desc) {
+__EXPORT zx_status_t device_add_composite_deprecated(zx_device_t* dev, const char* name,
+                                                     const composite_device_desc_t* comp_desc) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 

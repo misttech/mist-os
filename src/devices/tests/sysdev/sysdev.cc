@@ -135,7 +135,7 @@ zx_status_t Sysdev::MakeComposite() {
       .metadata_count = 0,
   };
 
-  return device_add_composite(zxdev(), "composite", &comp_desc);
+  return device_add_composite_deprecated(zxdev(), "composite", &comp_desc);
 }
 
 static constexpr zx_driver_ops_t driver_ops = []() {

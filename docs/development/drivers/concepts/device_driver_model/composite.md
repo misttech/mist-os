@@ -134,10 +134,10 @@ static const device_fragment_t fragments[] = {
 
 For simple (non-composite) devices, we used **device_add()**.
 
-For composite devices, we use **device_add_composite()**:
+For composite devices, we use **device_add_composite_deprecated()**:
 
 ```c
-zx_status_t device_add_composite(
+zx_status_t device_add_composite_deprecated(
     zx_device_t* dev,
     const char* name,
     const zx_device_prop_t* props,
@@ -167,9 +167,9 @@ the new device should use.
 If you specify `UINT32_MAX`, the device will reside in a new driver host.
 
 > Note that `astro-audio` uses **pbus_composite_device_add()** rather
-> than **device_add_composite()**.
+> than **device_add_composite_deprecated()**.
 > The difference is that **pbus_composite_device_add()** is an API
-> provided by the platform bus driver that wraps **device_add_composite()** and
+> provided by the platform bus driver that wraps **device_add_composite_deprecated()** and
 > inserts an additional fragment for ferrying over direct-access resources
 > such as MMIO, IRQs, and BTIs.
 
@@ -243,7 +243,7 @@ if (status != ZX_OK) {
 
 > The name of fragment supplied to **device_get_fragment_protocol()** and
 > **device_get_fragment_metadata()** is the same as the one in
-> **device_fragment_t** entries supplied to the **device_add_composite()**
+> **device_fragment_t** entries supplied to the **device_add_composite_deprecated()**
 > call by the board driver.
 
 ## Advanced Topics

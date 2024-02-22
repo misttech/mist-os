@@ -80,7 +80,7 @@ zx_status_t AddLegacyComposite(zx_device_t* pci_dev_parent, const char* composit
       .primary_fragment = "pci",
       .spawn_colocated = false,
   };
-  return device_add_composite(pci_dev_parent, composite_name, &desc);
+  return device_add_composite_deprecated(pci_dev_parent, composite_name, &desc);
 }
 
 ddk::CompositeNodeSpec CreateCompositeNodeSpec(const CompositeInfo& info) {

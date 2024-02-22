@@ -92,13 +92,16 @@ fn get_composite_device_desc_t(
     let composite_add_regex =
         Regex::new(r#"device_add_composite\([^,]*,\s*"(?P<name>[^"]*)",\s*[^,]*\)"#).unwrap();
 
-    // Try to get the device name from DdkAddComposite() or device_add_composite().
+    // Try to get the device name from DdkAddCompositeDeprecated() or
+    // device_add_composite_deprecated().
     let device_name = if let Some(ddk_cap) = ddk_add_regex.captures(contents) {
         capture_name(&ddk_cap, "name")?
     } else if let Some(composite_add_cap) = composite_add_regex.captures(contents) {
         capture_name(&composite_add_cap, "name")?
     } else {
-        return Err("Unable to find DdkAddComposite() or device_add_composite()");
+        return Err(
+            "Unable to find DdkAddCompositeDeprecated() or device_add_composite_deprecated()",
+        );
     };
 
     Ok(Some(CompositeDeviceDesc {

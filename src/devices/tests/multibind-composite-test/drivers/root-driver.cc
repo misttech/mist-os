@@ -129,7 +129,7 @@ zx_status_t RootDriver::Bind(void* ctx, zx_device_t* dev) {
       .spawn_colocated = true,
   };
 
-  status = root_dev->DdkAddComposite("legacy_composite_1", &kLegacyCompositeDesc1);
+  status = root_dev->DdkAddCompositeDeprecated("legacy_composite_1", &kLegacyCompositeDesc1);
   if (status != ZX_OK) {
     zxlogf(ERROR, "DdkAddComposite failed: %d ", status);
     return status;
@@ -159,7 +159,7 @@ zx_status_t RootDriver::Bind(void* ctx, zx_device_t* dev) {
       .spawn_colocated = true,
   };
 
-  status = root_dev->DdkAddComposite("legacy_composite_2", &kLegacyCompositeDesc2);
+  status = root_dev->DdkAddCompositeDeprecated("legacy_composite_2", &kLegacyCompositeDesc2);
   if (status != ZX_OK) {
     zxlogf(ERROR, "DdkAddComposite failed: %d ", status);
     return status;

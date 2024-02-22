@@ -373,8 +373,8 @@ typedef struct composite_device_desc {
 //
 // |dev| must be the zx_device_t corresponding to the "sys" device (i.e., the
 // Platform Bus Driver's device).
-zx_status_t device_add_composite(zx_device_t* dev, const char* name,
-                                 const composite_device_desc_t* comp_desc);
+zx_status_t device_add_composite_deprecated(zx_device_t* dev, const char* name,
+                                            const composite_device_desc_t* comp_desc);
 
 // temporary accessor for root resource handle
 zx_handle_t get_root_resource(zx_device_t* dev);
