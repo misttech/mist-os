@@ -9,9 +9,9 @@
 #include "arch-phys-info-asm.h"
 
 // Do the magic instruction.
-.macro do_psci_call
+.macro do_smccc_call
   ldr_global x16, gArchPhysInfo
-  ldrb w16, [x16, #ARCH_PHYS_INFO_PSCI_USE_HVC]
+  ldrb w16, [x16, #ARCH_PHYS_INFO_SMCCC_USE_HVC]
   cbnz w16, 0f
   smc #0
   b 1f
@@ -19,15 +19,15 @@
 1:
 .endm
 
-// extern "C" uint64_t ArmPsciCall(...);
+// extern "C" uint64_t ArmSmcccCall(...);
 //
 // This is called with argument registers x0, x1, x2, and x3 set.
 // It returns only a single uint64_t value in x0.
-.function ArmPsciCall, global
+.function ArmSmcccCall, global
   .prologue.shadow_call_sp
   .prologue.fp
 
-  do_psci_call
+  do_smccc_call
 
   .epilogue.fp
   .epilogue.shadow_call_sp
@@ -43,7 +43,7 @@
 .function ArmPsciReset, global
 
   ldr_global x16, gArchPhysInfo
-  ldrb w17, [x16, #ARCH_PHYS_INFO_PSCI_DISABLED]
+  ldrb w17, [x16, #ARCH_PHYS_INFO_SMCCC_DISABLED]
   cbnz w17, .Lfail
 
   // Reset the exception vector base address registers in hopes that this will
@@ -60,7 +60,7 @@
   ldp x2, x3, [x16, #(ARCH_PHYS_INFO_PSCI_RESET_REGISTERS + 16)]
 
   // Do the call.
-  do_psci_call
+  do_smccc_call
 
   // If it came back there's not much we can do.  Try to crash somehow.
 .Lfail:

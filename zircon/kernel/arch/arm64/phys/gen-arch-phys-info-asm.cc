@@ -11,8 +11,8 @@
 
 int main(int argc, char** argv) {
   return hwreg::AsmHeader()  //
-      .Macro("ARCH_PHYS_INFO_PSCI_USE_HVC", offsetof(ArchPhysInfo, psci_use_hvc))
-      .Macro("ARCH_PHYS_INFO_PSCI_DISABLED", offsetof(ArchPhysInfo, psci_disabled))
+      .Macro("ARCH_PHYS_INFO_SMCCC_USE_HVC", offsetof(ArchPhysInfo, smccc_use_hvc))
+      .Macro("ARCH_PHYS_INFO_SMCCC_DISABLED", offsetof(ArchPhysInfo, smccc_disabled))
       .Macro("ARCH_PHYS_INFO_PSCI_RESET_REGISTERS", offsetof(ArchPhysInfo, psci_reset_registers))
       .Macro("ARCH_PHYS_INFO_PSCI_RESET_REGISTERS_COUNT",
              std::size(ArchPhysInfo{}.psci_reset_registers))
