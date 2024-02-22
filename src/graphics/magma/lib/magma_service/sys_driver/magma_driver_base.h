@@ -10,7 +10,6 @@
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/fit/thread_safety.h>
-#include <lib/inspect/component/cpp/service.h>
 #include <lib/magma/platform/zircon/zircon_platform_logger_dfv2.h>
 #include <lib/magma/platform/zircon/zircon_platform_status.h>
 #include <lib/magma/util/macros.h>
@@ -45,9 +44,7 @@ class MagmaDriverBase : public fdf::DriverBase,
       return result.take_error();
     }
 
-    if (zx::result result = InitializeInspector(); result.is_error()) {
-      return result.take_error();
-    }
+    InitializeInspector();
 
     node_client_.Bind(std::move(node()));
 
@@ -259,22 +256,12 @@ class MagmaDriverBase : public fdf::DriverBase,
     fidl::BindServer(dispatcher(), std::move(server), this);
   }
 
-  zx::result<> InitializeInspector() {
+  void InitializeInspector() {
     std::lock_guard lock(magma_mutex_);
     auto inspector = magma_driver()->DuplicateInspector();
     if (inspector) {
-      auto res = outgoing()->component().template AddUnmanagedProtocolAt<fuchsia_inspect::Tree>(
-          "diagnostics",
-          [inspector = std::move(*inspector)](fidl::ServerEnd<fuchsia_inspect::Tree> server_end) {
-            inspect::TreeServer::StartSelfManagedServer(
-                inspector, {}, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                std::move(server_end));
-          });
-      if (!res.is_ok()) {
-        return res.take_error();
-      }
+      InitInspectorExactlyOnce(inspector.value());
     }
-    return zx::ok();
   }
 
   // DependencyInjection::Owner implementation.

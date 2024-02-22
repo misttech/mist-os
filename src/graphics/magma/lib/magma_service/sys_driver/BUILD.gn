@@ -58,7 +58,6 @@ source_set("magma_driver_base") {
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devfs/cpp",
-    "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/scheduler/cpp",
     "//src/graphics/magma/lib/magma/platform:logger",
     "//src/graphics/magma/lib/magma/platform/zircon:logger_for_dfv2",
