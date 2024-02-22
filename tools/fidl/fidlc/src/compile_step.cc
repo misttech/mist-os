@@ -1225,7 +1225,6 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
       "fuchsia.modular.StoryShell.UpdateSurface",
       "fuchsia.modular.StoryShell.UpdateSurface2",
       "fuchsia.modular.StoryShell.UpdateSurface3",
-      "fuchsia.sysinfo.SysInfo.GetBoardRevision",
       "fuchsia.ui.accessibility.view.Registry.CreateAccessibilityViewport",
       "fuchsia.ui.app.ViewProvider.CreateView2",
       "fuchsia.ui.app.ViewProvider.CreateViewWithViewRef",

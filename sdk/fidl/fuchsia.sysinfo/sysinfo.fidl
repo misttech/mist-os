@@ -40,10 +40,7 @@ closed protocol SysInfo {
         name string:<BOARD_NAME_LEN, optional>;
     });
 
-    // TODO(nealo):  Remove Transitional qualifier after all board bootloaders
-    // provide board serial number, mac address and revision.
     /// Return the board revision for the board we are running on.
-    @transitional("Adding Board Revision")
     strict GetBoardRevision() -> (struct {
         status zx.Status;
         revision uint32;
