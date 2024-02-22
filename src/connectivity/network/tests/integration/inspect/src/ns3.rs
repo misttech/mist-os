@@ -277,7 +277,8 @@ async fn inspect_counters(name: &str) {
                 "Rx": {
                     TotalFrames: 1u64,
                     Malformed: 0u64,
-                    IpDelivered: 1u64,
+                    Ipv4Delivered: 1u64,
+                    Ipv6Delivered: 0u64,
                 },
                 "Tx": {
                     TotalFrames: 1u64,

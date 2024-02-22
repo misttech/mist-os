@@ -407,7 +407,7 @@ impl<BC: BindingsContext> ReceiveDequeFrameContext<LoopbackDevice, BC>
 
         match ethertype {
             EtherType::Ipv4 => {
-                self.increment(|counters: &DeviceCounters| &counters.recv_ip_delivered);
+                self.increment(|counters: &DeviceCounters| &counters.recv_ipv4_delivered);
                 crate::ip::receive_ipv4_packet(
                     self,
                     bindings_ctx,
@@ -417,7 +417,7 @@ impl<BC: BindingsContext> ReceiveDequeFrameContext<LoopbackDevice, BC>
                 )
             }
             EtherType::Ipv6 => {
-                self.increment(|counters: &DeviceCounters| &counters.recv_ip_delivered);
+                self.increment(|counters: &DeviceCounters| &counters.recv_ipv6_delivered);
                 crate::ip::receive_ipv6_packet(
                     self,
                     bindings_ctx,

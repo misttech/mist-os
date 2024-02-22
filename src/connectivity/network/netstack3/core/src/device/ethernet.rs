@@ -1013,7 +1013,7 @@ where
                 }
             }
             Some(EtherType::Ipv4) => {
-                self.increment(|counters: &DeviceCounters| &counters.recv_ip_delivered);
+                self.increment(|counters: &DeviceCounters| &counters.recv_ipv4_delivered);
                 self.receive_frame(
                     bindings_ctx,
                     RecvIpFrameMeta::<_, Ipv4>::new(device_id, Some(frame_dst)),
@@ -1021,7 +1021,7 @@ where
                 )
             }
             Some(EtherType::Ipv6) => {
-                self.increment(|counters: &DeviceCounters| &counters.recv_ip_delivered);
+                self.increment(|counters: &DeviceCounters| &counters.recv_ipv6_delivered);
                 self.receive_frame(
                     bindings_ctx,
                     RecvIpFrameMeta::<_, Ipv6>::new(device_id, Some(frame_dst)),

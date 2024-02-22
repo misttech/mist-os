@@ -152,7 +152,8 @@ where
 fn inspect_device_counters(inspector: &mut impl Inspector, counters: &DeviceCounters) {
     let DeviceCounters {
         recv_frame,
-        recv_ip_delivered,
+        recv_ipv4_delivered,
+        recv_ipv6_delivered,
         recv_parse_error,
         send_dropped_no_queue,
         send_frame,
@@ -165,7 +166,8 @@ fn inspect_device_counters(inspector: &mut impl Inspector, counters: &DeviceCoun
     inspector.record_child("Rx", |inspector| {
         inspector.record_counter("TotalFrames", recv_frame);
         inspector.record_counter("Malformed", recv_parse_error);
-        inspector.record_counter("IpDelivered", recv_ip_delivered);
+        inspector.record_counter("Ipv4Delivered", recv_ipv4_delivered);
+        inspector.record_counter("Ipv6Delivered", recv_ipv6_delivered);
     });
     inspector.record_child("Tx", |inspector| {
         inspector.record_counter("TotalFrames", send_total_frames);

@@ -317,8 +317,10 @@ pub struct DeviceCounters {
     pub recv_frame: Counter,
     /// Count of incoming frames dropped due to a parsing error.
     pub recv_parse_error: Counter,
-    /// Count of incoming frames deliverd to the IP layer.
-    pub recv_ip_delivered: Counter,
+    /// Count of incoming frames containing an IPv4 packet delivered.
+    pub recv_ipv4_delivered: Counter,
+    /// Count of incoming frames containing an IPv6 packet delivered.
+    pub recv_ipv6_delivered: Counter,
     /// Count of sent frames containing an IPv4 packet.
     pub send_ipv4_frame: Counter,
     /// Count of sent frames containing an IPv6 packet.
