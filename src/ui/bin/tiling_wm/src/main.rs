@@ -300,7 +300,12 @@ impl TilingWm {
     ) -> Result<(), Error> {
         let _ = flatland.release_viewport(&tile.viewport_content_id);
         flatland.release_transform(&tile.viewport_transform_id)?;
-        Ok(())
+        // Note: While unlikely, a very quick succession of events may result
+        // in running out of credits. This possibility is not addressed here.
+        Ok(flatland.present(ui_comp::PresentArgs {
+            requested_presentation_time: Some(0),
+            ..Default::default()
+        })?)
     }
 
     fn watch_layout(
