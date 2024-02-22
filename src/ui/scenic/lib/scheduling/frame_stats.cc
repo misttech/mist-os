@@ -9,6 +9,7 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 #include <lib/zx/resource.h>
+#include <lib/zx/time.h>
 #include <math.h>
 
 #include <chrono>
@@ -28,6 +29,10 @@ namespace scheduling {
 namespace {
 uint64_t TimestampsToMinuteKey(const FrameStats::Timestamps& timestamps) {
   return timestamps.latch_point_time.get() / zx::min(1).get();
+}
+
+zx::duration TimestampToTimeElapsedInCurrentMin(const zx::time& timestamp) {
+  return zx::nsec(timestamp.get() % zx::min(1).get());
 }
 }  // anonymous namespace
 
@@ -88,6 +93,7 @@ void FrameStats::RecordDroppedFrame(const Timestamps& timestamps) {
       .key = TimestampsToMinuteKey(timestamps),
       .total_frames = 1,
       .dropped_frames = 1,
+      .timestamp = timestamps.latch_point_time,
   });
 }
 
@@ -105,6 +111,7 @@ void FrameStats::RecordDelayedFrame(const Timestamps& timestamps) {
       .render_time = timestamps.actual_presentation_time - timestamps.latch_point_time,
       .delayed_frame_render_time =
           timestamps.actual_presentation_time - timestamps.latch_point_time,
+      .timestamp = timestamps.latch_point_time,
   });
 }
 
@@ -114,6 +121,7 @@ void FrameStats::RecordOnTimeFrame(const Timestamps& timestamps) {
       .total_frames = 1,
       .rendered_frames = 1,
       .render_time = timestamps.actual_presentation_time - timestamps.latch_point_time,
+      .timestamp = timestamps.latch_point_time,
   });
 }
 
@@ -294,15 +302,21 @@ void FrameStats::ReportStats(inspect::Inspector* insp) const {
     inspect::Node minutes_ago_node = node.CreateChild("minutes_ago");
     size_t minutes_ago = 0;
     HistoryStats total = {};
+    zx::duration total_duration = zx::duration(0);
     for (auto it = history_stats_.rbegin(); it != history_stats_.rend(); ++it, ++minutes_ago) {
       total += *it;
+      // 0 minutes ago is the only period where 1 minute may not completed. Therefore, we take
+      // |time_elapsed_in_current_minute| for it and 1 minute for every other period.
+      const auto duration =
+          minutes_ago > 0 ? zx::min(1) : TimestampToTimeElapsedInCurrentMin(it->timestamp);
+      total_duration += duration;
       inspect::Node cur = minutes_ago_node.CreateChild(std::to_string(minutes_ago));
-      it->RecordToNode(&cur, insp);
+      it->RecordToNode(&cur, insp, duration);
       insp->emplace(std::move(cur));
     }
 
     auto total_node = node.CreateChild("total");
-    total.RecordToNode(&total_node, insp);
+    total.RecordToNode(&total_node, insp, total_duration);
 
     insp->emplace(std::move(total_node));
 

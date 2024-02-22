@@ -9,6 +9,7 @@
 #include <lib/async/cpp/executor.h>
 #include <lib/fit/defer.h>
 #include <lib/fpromise/bridge.h>
+#include <lib/zx/time.h>
 
 #include <thread>
 
@@ -88,6 +89,7 @@ struct FrameStatsHierarchyPointers {
 };
 
 struct FrameHistoryEntryProperties {
+  std::optional<const inspect::DoublePropertyValue*> average_frames_per_second = std::nullopt;
   const inspect::IntPropertyValue* delayed_rendered_frames = nullptr;
   const inspect::IntPropertyValue* delayed_frame_render_time_ns = nullptr;
   const inspect::IntPropertyValue* dropped_frames = nullptr;
@@ -97,13 +99,25 @@ struct FrameHistoryEntryProperties {
   const inspect::UintPropertyValue* minute_key = nullptr;
 
   bool AllPointersPopulated() {
-    return delayed_rendered_frames && delayed_frame_render_time_ns && dropped_frames &&
-           rendered_frames && render_time_ns && total_frames && minute_key;
+    return average_frames_per_second.has_value() && delayed_rendered_frames &&
+           delayed_frame_render_time_ns && dropped_frames && rendered_frames && render_time_ns &&
+           total_frames && minute_key;
   }
 
   static FrameHistoryEntryProperties FromHierarchy(const inspect::Hierarchy* hierarchy) {
     ZX_ASSERT(hierarchy);
     FrameHistoryEntryProperties ret;
+    {
+      const auto& properties = hierarchy->node().properties();
+      if (std::find_if(properties.begin(), properties.end(),
+                       [&](const inspect::PropertyValue& val) {
+                         return val.name() == "average_frames_per_second";
+                       }) != properties.end()) {
+        ret.average_frames_per_second =
+            hierarchy->node().get_property<inspect::DoublePropertyValue>(
+                "average_frames_per_second");
+      }
+    }
     ret.delayed_rendered_frames =
         hierarchy->node().get_property<inspect::IntPropertyValue>("delayed_rendered_frames");
     ret.delayed_frame_render_time_ns =
@@ -202,37 +216,37 @@ TEST_F(FrameStatsTest, SmokeTest_DummyTimestamps) {
       .latch_point_time = zx::time(0) + zx::msec(4),
       .render_start_time = zx::time(0) + zx::msec(6),
       .render_done_time = zx::time(0) + zx::msec(12),
-      .target_presentation_time = zx::time(0) + zx::msec(16),
-      .actual_presentation_time = zx::time(0) + zx::msec(16),
+      .target_presentation_time = zx::time(0) + vsync_interval,
+      .actual_presentation_time = zx::time(0) + vsync_interval,
   };
   for (int i = 0; i < 200; i++) {
     stats.RecordFrame(frame_times, vsync_interval);
 
-    frame_times.latch_point_time += zx::msec(16);
-    frame_times.render_start_time += zx::msec(16);
-    frame_times.render_done_time += zx::msec(16);
-    frame_times.target_presentation_time += zx::msec(16);
-    frame_times.actual_presentation_time += zx::msec(16);
+    frame_times.latch_point_time += vsync_interval;
+    frame_times.render_start_time += vsync_interval;
+    frame_times.render_done_time += vsync_interval;
+    frame_times.target_presentation_time += vsync_interval;
+    frame_times.actual_presentation_time += vsync_interval;
   }
 
   FrameStats::Timestamps dropped_times = {.latch_point_time = zx::time(0) + zx::msec(4),
                                           .render_start_time = zx::time(0) + zx::msec(6),
                                           .render_done_time = zx::time(0) + zx::msec(12),
-                                          .target_presentation_time = zx::time(0) + zx::msec(16),
+                                          .target_presentation_time = zx::time(0) + vsync_interval,
                                           .actual_presentation_time = kTimeDropped};
   for (int i = 0; i < 30; i++) {
     stats.RecordFrame(dropped_times, vsync_interval);
 
-    dropped_times.latch_point_time += zx::msec(16);
-    dropped_times.render_start_time += zx::msec(16);
-    dropped_times.render_done_time += zx::msec(16);
-    dropped_times.target_presentation_time += zx::msec(16);
+    dropped_times.latch_point_time += vsync_interval;
+    dropped_times.render_start_time += vsync_interval;
+    dropped_times.render_done_time += vsync_interval;
+    dropped_times.target_presentation_time += vsync_interval;
   }
 
   FrameStats::Timestamps delayed_times = {.latch_point_time = zx::time(0) + zx::msec(1),
                                           .render_start_time = zx::time(0) + zx::msec(6),
                                           .render_done_time = zx::time(0) + zx::msec(22),
-                                          .target_presentation_time = zx::time(0) + zx::msec(16),
+                                          .target_presentation_time = zx::time(0) + vsync_interval,
                                           .actual_presentation_time = zx::time(0) + zx::msec(32)};
   for (int i = 0; i < 20; i++) {
     stats.RecordFrame(delayed_times, vsync_interval);
@@ -240,7 +254,8 @@ TEST_F(FrameStatsTest, SmokeTest_DummyTimestamps) {
     delayed_times.latch_point_time = delayed_times.actual_presentation_time + zx::msec(1);
     delayed_times.render_start_time = delayed_times.actual_presentation_time + zx::msec(6);
     delayed_times.render_done_time = delayed_times.actual_presentation_time + zx::msec(22);
-    delayed_times.target_presentation_time = delayed_times.actual_presentation_time + zx::msec(16);
+    delayed_times.target_presentation_time =
+        delayed_times.actual_presentation_time + vsync_interval;
     delayed_times.actual_presentation_time += zx::msec(32);
   }
 
@@ -263,6 +278,9 @@ TEST_F(FrameStatsTest, SmokeTest_DummyTimestamps) {
             props.render_time_ns->value());
   // The 20 31ms frames were the delayed ones.
   EXPECT_EQ(20 * zx::msec(31).to_nsecs(), props.delayed_frame_render_time_ns->value());
+  EXPECT_TRUE(props.average_frames_per_second.has_value());
+  EXPECT_EQ(220. / ((zx::msec(4) + vsync_interval * 199) / zx::sec(1)),
+            (*props.average_frames_per_second)->value());
 
   props = FrameHistoryEntryProperties::FromHierarchy(pointers.frame_history_total);
   ASSERT_TRUE(props.AllPointersPopulated());
@@ -275,6 +293,9 @@ TEST_F(FrameStatsTest, SmokeTest_DummyTimestamps) {
             props.render_time_ns->value());
   // The 20 31ms frames were the delayed ones.
   EXPECT_EQ(20 * zx::msec(31).to_nsecs(), props.delayed_frame_render_time_ns->value());
+  EXPECT_TRUE(props.average_frames_per_second.has_value());
+  EXPECT_EQ(220. / ((zx::msec(4) + vsync_interval * 199) / zx::sec(1)),
+            (*props.average_frames_per_second)->value());
 }
 
 TEST_F(FrameStatsTest, HistoryPopulatedOverTime) {
@@ -285,8 +306,8 @@ TEST_F(FrameStatsTest, HistoryPopulatedOverTime) {
       .latch_point_time = zx::time(0) + zx::msec(0),
       .render_start_time = zx::time(0) + zx::msec(2),
       .render_done_time = zx::time(0) + zx::msec(3),
-      .target_presentation_time = zx::time(0) + zx::msec(16),
-      .actual_presentation_time = zx::time(0) + zx::msec(16),
+      .target_presentation_time = zx::time(0) + vsync_interval,
+      .actual_presentation_time = zx::time(0) + vsync_interval,
   };
 
   auto add_time = [&](zx::duration duration) {
@@ -306,22 +327,27 @@ TEST_F(FrameStatsTest, HistoryPopulatedOverTime) {
 
     FrameHistoryEntryProperties props = FrameHistoryEntryProperties::FromHierarchy(
         pointers.frame_history_minutes_ago->GetByPath({"0"}));
-    ASSERT_TRUE(props.AllPointersPopulated());
+    EXPECT_FALSE(props.AllPointersPopulated());
     EXPECT_EQ(1, props.total_frames->value());
     EXPECT_EQ(1, props.rendered_frames->value());
     EXPECT_EQ(0, props.dropped_frames->value());
     EXPECT_EQ(0, props.delayed_rendered_frames->value());
-    EXPECT_EQ(zx::msec(16).to_nsecs(), props.render_time_ns->value());
+    EXPECT_EQ(vsync_interval.to_nsecs(), props.render_time_ns->value());
     EXPECT_EQ(0U, props.minute_key->value());
+    // |latch_point_time| is at 0ms, which gives us 1 frame in 0ms. Since fps calculation for these
+    // values is undefined, but may happen due to the timing of the inspect call and the minute
+    // buckets, we skip reporting.
+    EXPECT_FALSE(props.average_frames_per_second.has_value());
 
     props = FrameHistoryEntryProperties::FromHierarchy(pointers.frame_history_total);
-    ASSERT_TRUE(props.AllPointersPopulated());
+    EXPECT_FALSE(props.AllPointersPopulated());
     EXPECT_EQ(1, props.total_frames->value());
     EXPECT_EQ(1, props.rendered_frames->value());
     EXPECT_EQ(0, props.dropped_frames->value());
     EXPECT_EQ(0, props.delayed_rendered_frames->value());
-    EXPECT_EQ(zx::msec(16).to_nsecs(), props.render_time_ns->value());
+    EXPECT_EQ(vsync_interval.to_nsecs(), props.render_time_ns->value());
     EXPECT_EQ(0U, props.minute_key->value());
+    EXPECT_FALSE(props.average_frames_per_second.has_value());
   }
 
   add_time(zx::min(1));
@@ -341,8 +367,9 @@ TEST_F(FrameStatsTest, HistoryPopulatedOverTime) {
     EXPECT_EQ(2, props.rendered_frames->value());
     EXPECT_EQ(0, props.dropped_frames->value());
     EXPECT_EQ(0, props.delayed_rendered_frames->value());
-    EXPECT_EQ(2 * zx::msec(16).to_nsecs(), props.render_time_ns->value());
+    EXPECT_EQ(2 * vsync_interval.to_nsecs(), props.render_time_ns->value());
     EXPECT_EQ(1U, props.minute_key->value());
+    EXPECT_EQ(2. / (zx::sec(30) / zx::sec(1)), (*props.average_frames_per_second)->value());
 
     props = FrameHistoryEntryProperties::FromHierarchy(
         pointers.frame_history_minutes_ago->GetByPath({"1"}));
@@ -351,8 +378,9 @@ TEST_F(FrameStatsTest, HistoryPopulatedOverTime) {
     EXPECT_EQ(1, props.rendered_frames->value());
     EXPECT_EQ(0, props.dropped_frames->value());
     EXPECT_EQ(0, props.delayed_rendered_frames->value());
-    EXPECT_EQ(zx::msec(16).to_nsecs(), props.render_time_ns->value());
+    EXPECT_EQ(vsync_interval.to_nsecs(), props.render_time_ns->value());
     EXPECT_EQ(0U, props.minute_key->value());
+    EXPECT_EQ(1. / (zx::min(1) / zx::sec(1)), (*props.average_frames_per_second)->value());
 
     props = FrameHistoryEntryProperties::FromHierarchy(pointers.frame_history_total);
     ASSERT_TRUE(props.AllPointersPopulated());
@@ -360,8 +388,10 @@ TEST_F(FrameStatsTest, HistoryPopulatedOverTime) {
     EXPECT_EQ(3, props.rendered_frames->value());
     EXPECT_EQ(0, props.dropped_frames->value());
     EXPECT_EQ(0, props.delayed_rendered_frames->value());
-    EXPECT_EQ(3 * zx::msec(16).to_nsecs(), props.render_time_ns->value());
+    EXPECT_EQ(3 * vsync_interval.to_nsecs(), props.render_time_ns->value());
     EXPECT_EQ(1U, props.minute_key->value());
+    EXPECT_EQ(3. / ((zx::min(1) + zx::sec(30)) / zx::sec(1)),
+              (*props.average_frames_per_second)->value());
   }
 
   const size_t kMinutesToRecord = 100;
@@ -385,8 +415,9 @@ TEST_F(FrameStatsTest, HistoryPopulatedOverTime) {
     EXPECT_EQ(1, props.rendered_frames->value());
     EXPECT_EQ(0, props.dropped_frames->value());
     EXPECT_EQ(0, props.delayed_rendered_frames->value());
-    EXPECT_EQ(zx::msec(16).to_nsecs(), props.render_time_ns->value());
+    EXPECT_EQ(vsync_interval.to_nsecs(), props.render_time_ns->value());
     EXPECT_EQ(kMinutesToRecord + 1, props.minute_key->value());
+    EXPECT_EQ(1. / (zx::sec(30) / zx::sec(1)), (*props.average_frames_per_second)->value());
 
     props = FrameHistoryEntryProperties::FromHierarchy(pointers.frame_history_total);
     ASSERT_TRUE(props.AllPointersPopulated());
@@ -394,8 +425,11 @@ TEST_F(FrameStatsTest, HistoryPopulatedOverTime) {
     EXPECT_EQ(kMaximumMinutes, props.rendered_frames->value());
     EXPECT_EQ(0, props.dropped_frames->value());
     EXPECT_EQ(0, props.delayed_rendered_frames->value());
-    EXPECT_EQ(kMaximumMinutes * zx::msec(16).to_nsecs(), props.render_time_ns->value());
+    EXPECT_EQ(kMaximumMinutes * vsync_interval.to_nsecs(), props.render_time_ns->value());
     EXPECT_EQ(kMinutesToRecord + 1, props.minute_key->value());
+    EXPECT_EQ(static_cast<double>(kMaximumMinutes) /
+                  (((zx::min(kMaximumMinutes - 1) + zx::sec(30)) / zx::sec(1))),
+              (*props.average_frames_per_second)->value());
   }
 }
 
@@ -411,21 +445,21 @@ TEST_F(FrameStatsMetricsTest, LogFrameTimes) {
       .latch_point_time = zx::time(0) + zx::msec(4),
       .render_start_time = zx::time(0) + zx::msec(6),
       .render_done_time = zx::time(0) + zx::msec(12),
-      .target_presentation_time = zx::time(0) + zx::msec(16),
-      .actual_presentation_time = zx::time(0) + zx::msec(16),
+      .target_presentation_time = zx::time(0) + vsync_interval,
+      .actual_presentation_time = zx::time(0) + vsync_interval,
   };
   FrameStats::Timestamps dropped_frame_times = {
       .latch_point_time = zx::time(10) + zx::msec(4),
       .render_start_time = zx::time(10) + zx::msec(6),
       .render_done_time = zx::time(10) + zx::msec(12),
-      .target_presentation_time = zx::time(10) + zx::msec(16),
+      .target_presentation_time = zx::time(10) + vsync_interval,
       .actual_presentation_time = kTimeDropped,
   };
   FrameStats::Timestamps delayed_frame_times = {
       .latch_point_time = zx::time(20) + zx::msec(4),
       .render_start_time = zx::time(20) + zx::msec(6),
       .render_done_time = zx::time(20) + zx::msec(22),
-      .target_presentation_time = zx::time(20) + zx::msec(16),
+      .target_presentation_time = zx::time(20) + vsync_interval,
       .actual_presentation_time = zx::time(20) + zx::msec(32),
   };
 

@@ -37,6 +37,10 @@ class FrameStats {
   // Time interval between each flush is 10 minutes.
   static constexpr zx::duration kCobaltDataCollectionInterval = zx::min(10);
 
+  // Delta being 0 or very close to 0 can happen by chance and skew results. Use a minimum delta
+  // of 5ms when reporting results.
+  static constexpr zx::duration kMinTimeElapsedInCurrentMin = zx::msec(5);
+
  private:
   typedef std::unordered_map<uint32_t, uint32_t> CobaltFrameHistogram;
   static constexpr size_t kNumFramesToReport = 200;
@@ -69,6 +73,9 @@ class FrameStats {
     // The total number of frames that were dropped during the interval.
     uint64_t dropped_frames;
 
+    // The latest frame's timestamp.
+    zx::time timestamp;
+
     HistoryStats& operator+=(const HistoryStats& other) {
       key = std::max(key, other.key);
       total_frames += other.total_frames;
@@ -77,12 +84,13 @@ class FrameStats {
       render_time += other.render_time;
       delayed_frame_render_time += other.delayed_frame_render_time;
       dropped_frames += other.dropped_frames;
+      timestamp = std::max(timestamp, other.timestamp);
 
       return *this;
     }
 
     template <typename T>
-    void RecordToNode(inspect::Node* node, T* list) const {
+    void RecordToNode(inspect::Node* node, T* list, zx::duration duration) const {
       node->CreateUint("minute_key", key, list);
       node->CreateInt("total_frames", total_frames, list);
       node->CreateInt("rendered_frames", rendered_frames, list);
@@ -91,14 +99,19 @@ class FrameStats {
       node->CreateInt("delayed_frame_render_time_ns", delayed_frame_render_time.get(), list);
       node->CreateInt("dropped_frames", dropped_frames, list);
       if (rendered_frames) {
-        node->CreateInt("Average Time Per Frame (ms)", render_time.to_msecs() / rendered_frames,
-                        list);
-        node->CreateInt("Average Frames Per Second", zx::sec(1) / (render_time / rendered_frames),
+        node->CreateInt("average_time_per_frame_ms", render_time.to_msecs() / rendered_frames,
                         list);
       }
       if (delayed_rendered_frames) {
-        node->CreateInt("Average Time Per Delayed Frame (ms)",
+        node->CreateInt("average_time_per_delayed_frame_ms",
                         delayed_frame_render_time.to_msecs() / delayed_rendered_frames, list);
+      }
+      // Skip recording skewed fps results.
+      if (duration > kMinTimeElapsedInCurrentMin) {
+        node->CreateDouble(
+            "average_frames_per_second",
+            static_cast<double>(rendered_frames) / static_cast<double>(duration / zx::sec(1)),
+            list);
       }
     }
   };
