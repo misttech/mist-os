@@ -3,18 +3,11 @@
 // found in the LICENSE file.
 library fuchsia.sensors;
 
-type SensorId = struct {
-    id int32;
-};
-
-type Sensor = table {
-    1: id SensorId;
-    2: name string:MAX;
-};
+using fuchsia.sensors.types as types;
 
 @discoverable
 open protocol Manager {
-    flexible GetSensorsInfo() -> (struct {
-        sensors vector<Sensor>:MAX;
+    flexible GetSensorsList() -> (struct {
+        sensors vector<types.SensorInfo>:MAX;
     });
 };

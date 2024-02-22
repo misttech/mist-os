@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 use {
     anyhow::{Context as _, Error},
-    fidl_fuchsia_sensors as sensors_fidl,
+    fidl_fuchsia_sensors as sensors_fidl, fidl_fuchsia_sensors_types as sensors_types_fidl,
     fuchsia_component::server::ServiceFs,
     futures_util::{StreamExt, TryStreamExt},
     sensors_fidl::ManagerRequest,
@@ -12,15 +12,15 @@ use {
 };
 
 #[derive(Clone, Debug)]
-pub struct Sensor {
+pub struct SensorInfo {
     id: i32,
     name: String,
 }
 
-impl Sensor {
-    pub fn to_fidl(&mut self) -> sensors_fidl::Sensor {
-        sensors_fidl::Sensor {
-            id: Some(sensors_fidl::SensorId { id: self.id.clone() }),
+impl SensorInfo {
+    pub fn to_fidl(&mut self) -> sensors_types_fidl::SensorInfo {
+        sensors_types_fidl::SensorInfo {
+            sensor_id: Some(self.id.clone()),
             name: Some(self.name.clone()),
             ..Default::default()
         }
@@ -29,7 +29,7 @@ impl Sensor {
 
 #[derive(Debug)]
 pub struct SensorManager {
-    sensors: HashMap<i32, Sensor>,
+    sensors: HashMap<i32, SensorInfo>,
 }
 
 enum IncomingRequest {
@@ -38,10 +38,10 @@ enum IncomingRequest {
 
 async fn handle_sensors_request(
     request: ManagerRequest,
-    sensors: HashMap<i32, Sensor>,
+    sensors: HashMap<i32, SensorInfo>,
 ) -> anyhow::Result<()> {
     match request {
-        ManagerRequest::GetSensorsInfo { responder } => {
+        ManagerRequest::GetSensorsList { responder } => {
             let fidl_sensors =
                 sensors.values().map(|sensor| sensor.clone().to_fidl()).collect::<Vec<_>>();
             let _ = responder.send(fidl_sensors.as_slice());
@@ -55,7 +55,7 @@ async fn handle_sensors_request(
 
 async fn handle_sensor_manager_request_stream(
     mut stream: sensors_fidl::ManagerRequestStream,
-    sensors: HashMap<i32, Sensor>,
+    sensors: HashMap<i32, SensorInfo>,
 ) -> Result<(), Error> {
     while let Some(request) =
         stream.try_next().await.context("Error handling SensorManager events")?
@@ -99,7 +99,7 @@ mod tests {
     use {super::*, fidl_fuchsia_sensors as sensors_fidl};
 
     #[fuchsia::test]
-    async fn test_handle_get_sensor_info() {
+    async fn test_handle_get_sensors_list() {
         let manager = SensorManager::new();
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<sensors_fidl::ManagerMarker>().unwrap();
@@ -111,7 +111,7 @@ mod tests {
         })
         .detach();
 
-        let fidl_sensors = proxy.get_sensors_info().await.unwrap();
+        let fidl_sensors = proxy.get_sensors_list().await.unwrap();
         assert!(fidl_sensors.is_empty());
     }
 }

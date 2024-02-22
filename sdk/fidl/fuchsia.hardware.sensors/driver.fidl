@@ -1,0 +1,73 @@
+// Copyright 2024 The Fuchsia Authors.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.hardware.sensors;
+
+using fuchsia.sensors.types as types;
+using zx;
+
+/// Errors that may be returned by Driver::ActivateSensor.
+type ActivateSensorError = flexible enum : uint32 {
+    /// The provided SensorId does not correspond to an actual sensor.
+    INVALID_SENSOR_ID = 1;
+};
+
+/// Errors that may be returned by Driver::DeactivateSensor.
+type DectivateSensorError = flexible enum : uint32 {
+    /// The provided SensorId does not correspond to an actual sensor.
+    INVALID_SENSOR_ID = 1;
+};
+
+/// Rate configuration given to Driver::ConfigureSensorRate.
+type SensorRateConfig = table {
+    /// The desired time period between samples arriving from the hardware.
+    ///
+    /// Required.
+    1: sampling_period_ns zx.Duration;
+
+    /// How long a sensor value may be buffered before it is emitted. A value of
+    /// zero will result in no buffering.
+    ///
+    /// Required.
+    2: max_reporting_latency_ns zx.Duration;
+};
+
+/// Errors that may be returned by Driver::ConfigureSensorRate.
+type ConfigureSensorRateError = flexible enum : uint32 {
+    /// The provided sensor SensorId does not correspond to an actual sensor.
+    INVALID_SENSOR_ID = 1;
+
+    /// The rate configuration was missing fields or contained an unsupported
+    /// sample rate and/or maximum reporting latency.
+    INVALID_CONFIG = 2;
+};
+
+/// Implemented by drivers which talk to one or more pieces of sensor hardware.
+@discoverable
+protocol Driver {
+    /// Retrieve the details of all the sensors managed by this driver.
+    GetSensorsList() -> (struct {
+        sensor_list vector<types.SensorInfo>:MAX;
+    });
+
+    /// Activate the specified sensor.
+    ActivateSensor(struct {
+        sensor_id types.SensorId;
+    }) -> () error ActivateSensorError;
+
+    /// Deactivate the specified sensor.
+    DeactivateSensor(struct {
+        sensor_id types.SensorId;
+    }) -> () error DeactivateSensorError;
+
+    /// Set the output rate for the specified sensor.
+    ConfigureSensorRate(struct {
+        sensor_id types.SensorId;
+        sensor_rate_config SensorRateConfig;
+    }) -> () error ConfigureSensorRateError;
+
+    /// The stream of sensor samples from all activated sensors.
+    -> OnSensorEvent(struct {
+        event types.SensorEvent;
+    });
+};
