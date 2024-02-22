@@ -59,6 +59,9 @@ def get_fuchsia_api_level(ctx):
 """
     return ctx.attr._fuchsia_api_level[FuchsiaAPILevelInfo].level
 
+def fail_missing_api_level(name):
+    fail("'{}' does not have a valid API level set. Valid API levels are {}".format(name, [l.api_level for l in get_fuchsia_api_levels()]))
+
 def _valid_api_levels(ctx):
     if getattr(ctx.attr, "valid_api_levels_for_test", None):
         levels = ctx.attr.valid_api_levels_for_test
@@ -66,7 +69,7 @@ def _valid_api_levels(ctx):
         levels = [entry.api_level for entry in get_fuchsia_api_levels()]
 
     # The unset level is still valid since it can indicate that the user did
-    # not set the value. If we don't do this then we have no way if the
+    # not set the value. If we don't do this then we have no way of knowing if the
     # user passed the flag along or not.
     return levels + [""]
 

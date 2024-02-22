@@ -144,4 +144,5 @@ def fuchsia_archivist_pipeline_test(name, pipeline_name, inspect = [], expect_di
     fuchsia_test_package(
         name = name,
         test_components = [":" + component_name],
+        fuchsia_api_level = "HEAD",
     )

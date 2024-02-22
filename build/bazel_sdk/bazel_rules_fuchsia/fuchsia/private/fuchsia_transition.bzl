@@ -4,9 +4,8 @@
 
 """Utilities for changing the build configuration to fuchsia."""
 
-load("//:api_version.bzl", "DEFAULT_TARGET_API")
 load("//fuchsia/constraints/platforms:supported_platforms.bzl", "ALL_SUPPORTED_PLATFORMS", "fuchsia_platforms")
-load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_TARGET_NAME")
+load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_TARGET_NAME", "fail_missing_api_level")
 
 NATIVE_CPU_ALIASES = {
     "darwin": "x86_64",
@@ -46,19 +45,13 @@ def _update_fuchsia_api_level(settings, attr):
     # 3. Check the repository_default_fuchsia_api_level flag
     repo_default_api_level = settings[_REPO_DEFAULT_API_LEVEL_TARGET_NAME]
 
-    # TODO(b/303683945): Remove this fallback once users are setting their API level.
-    # 4. Use the highest api specified by IDK metadata versions.json.
-    temporary_fallback_api_level = str(DEFAULT_TARGET_API)
-
     return (
         manually_specified_api_level
     ) or (
         target_specified_api_level
     ) or (
         repo_default_api_level
-    ) or (
-        temporary_fallback_api_level
-    ) or fail("Packages must be built against an API level.")
+    ) or fail_missing_api_level(attr.package_name)
 
 def _package_supplied_platform(attr):
     # We should be pulling the platform off of the package but we need to clean

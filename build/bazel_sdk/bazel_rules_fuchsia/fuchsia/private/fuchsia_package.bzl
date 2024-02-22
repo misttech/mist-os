@@ -252,9 +252,12 @@ def _build_fuchsia_package_impl(ctx):
     # The Fuchsia target API level of this package
     api_level = get_fuchsia_api_level(ctx)
 
-    # ffx package does not support stamping with HEAD so we fall back to the in-development
-    # api level.
-    api_level_input = ["--api-level", str(sdk.default_api_level) if api_level == "HEAD" else api_level]
+    # ffx package does not support stamping with HEAD so we skipping the stamp and let
+    # ffx do the right thing if we are not using a valid API level.
+    if api_level == "HEAD":
+        api_level_input = []
+    else:
+        api_level_input = ["--api-level", api_level]
 
     # All of the resources that will go into the package
     package_resources = [

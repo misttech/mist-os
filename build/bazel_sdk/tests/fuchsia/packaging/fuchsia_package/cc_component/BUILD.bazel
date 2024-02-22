@@ -21,6 +21,7 @@ fuchsia_package(
     name = "pkg_with_subpkg",
     package_name = "pkg_with_subpkg_for_test",
     components = [":empty_component"],
+    fuchsia_api_level = "HEAD",
     subpackages = [":pkg"],
     visibility = ["//visibility:public"],
 )

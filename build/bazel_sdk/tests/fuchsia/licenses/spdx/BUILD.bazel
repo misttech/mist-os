@@ -73,6 +73,7 @@ fuchsia_package(
         ":component_a",
         ":component_b",
     ],
+    fuchsia_api_level = "HEAD",
 )
 
 fuchsia_licenses_collection(
