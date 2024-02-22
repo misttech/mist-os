@@ -40,7 +40,9 @@ TEST_P(VulkanImageExtensionTest, BufferCollectionNV12_1026) {
   ASSERT_TRUE(Initialize());
   // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
-  if (UseVirtualGpu())
+  // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
+  // supported on Lavapipe.
+  if (UseVirtualGpu() || UseCpuGpu())
     GTEST_SKIP();
 
   ASSERT_TRUE(Exec(VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, 1026, 64, GetParam(), false));
@@ -60,7 +62,9 @@ TEST_P(VulkanImageExtensionTest, BufferCollectionNV12) {
   ASSERT_TRUE(Initialize());
   // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
-  if (UseVirtualGpu())
+  // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
+  // supported on Lavapipe.
+  if (UseVirtualGpu() || UseCpuGpu())
     GTEST_SKIP();
 
   ASSERT_TRUE(Exec(VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, 64, 64, GetParam(), false));
@@ -70,7 +74,9 @@ TEST_P(VulkanImageExtensionTest, BufferCollectionI420) {
   ASSERT_TRUE(Initialize());
   // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
-  if (UseVirtualGpu())
+  // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
+  // supported on Lavapipe.
+  if (UseVirtualGpu() || UseCpuGpu())
     GTEST_SKIP();
 
   ASSERT_TRUE(Exec(VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM, 64, 64, GetParam(), false));
@@ -80,7 +86,9 @@ TEST_P(VulkanImageExtensionTest, BufferCollectionNV12_1280_546) {
   ASSERT_TRUE(Initialize());
   // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
-  if (UseVirtualGpu())
+  // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
+  // supported on Lavapipe.
+  if (UseVirtualGpu() || UseCpuGpu())
     GTEST_SKIP();
 
   ASSERT_TRUE(Exec(VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, 8192, 546, GetParam(), false));
@@ -108,6 +116,11 @@ TEST_P(VulkanImageExtensionTest, BufferCollectionMultipleFormats) {
       {fuchsia::sysmem::FORMAT_MODIFIER_INTEL_I915_X_TILED}};
   std::vector<fuchsia::sysmem::ImageFormatConstraints> all_constraints{
       nv12_image_constraints, bgra_image_constraints, bgra_tiled_image_constraints};
+
+  // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
+  // supported on Lavapipe.
+  if (UseCpuGpu())
+    GTEST_SKIP();
 
   if (!UseVirtualGpu()) {
     ASSERT_TRUE(
@@ -396,7 +409,9 @@ TEST_P(VulkanImageExtensionTest, YUVProperties) {
   ASSERT_TRUE(Initialize());
   // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
-  if (UseVirtualGpu())
+  // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
+  // supported on Lavapipe.
+  if (UseVirtualGpu() || UseCpuGpu())
     GTEST_SKIP();
   auto [vulkan_token] = MakeSharedCollection<1>();
 
@@ -446,7 +461,9 @@ TEST_P(VulkanImageExtensionTest, MultiFormat) {
   ASSERT_TRUE(Initialize());
   // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
-  if (UseVirtualGpu())
+  // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
+  // supported on Lavapipe.
+  if (UseVirtualGpu() || UseCpuGpu())
     GTEST_SKIP();
   auto tokens = MakeSharedCollection(2u);
 
@@ -521,7 +538,9 @@ TEST_P(VulkanImageExtensionTest, MaxBufferCountCheck) {
   ASSERT_TRUE(Initialize());
   // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
-  if (UseVirtualGpu())
+  // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
+  // supported on Lavapipe.
+  if (UseVirtualGpu() || UseCpuGpu())
     GTEST_SKIP();
   auto tokens = MakeSharedCollection(2u);
 
@@ -566,7 +585,9 @@ TEST_P(VulkanImageExtensionTest, ManyIdenticalFormats) {
   ASSERT_TRUE(Initialize());
   // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
-  if (UseVirtualGpu())
+  // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
+  // supported on Lavapipe.
+  if (UseVirtualGpu() || UseCpuGpu())
     GTEST_SKIP();
   auto [token] = MakeSharedCollection<1>();
 
@@ -605,7 +626,9 @@ TEST_P(VulkanImageExtensionTest, ColorSpaceSubset) {
   ASSERT_TRUE(Initialize());
   // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
-  if (UseVirtualGpu())
+  // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
+  // supported on Lavapipe.
+  if (UseVirtualGpu() || UseCpuGpu())
     GTEST_SKIP();
   auto tokens = MakeSharedCollection(2u);
 
@@ -667,11 +690,14 @@ TEST_P(VulkanImageExtensionTest, WeirdFormat) {
   ASSERT_TRUE(Initialize());
   // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
-  if (UseVirtualGpu())
+  // TODO(https://fxbug.dev/321072153): Enable the test when YUV sysmem images are
+  // supported on Lavapipe.
+  if (UseVirtualGpu() || UseCpuGpu())
     GTEST_SKIP();
   auto [token] = MakeSharedCollection<1>();
 
   bool linear = GetParam();
+
   auto nv12_create_info = GetDefaultImageCreateInfo(false, VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,
                                                     kDefaultWidth, kDefaultHeight, linear);
   // Currently there's no sysmem format corresponding to R16G16B16, so this format should just be
@@ -838,8 +864,10 @@ TEST_F(VulkanExtensionTest, BadRequiredFormatFeatures2) {
 
   auto [vulkan_token] = MakeSharedCollection<1>();
 
-  const VkFormat kFormat =
-      UseVirtualGpu() ? VK_FORMAT_R8G8B8A8_UNORM : VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
+  // TODO(fxbug.dev/321072153): Lavapipe doesn't support `VK_FORMAT_G8_B8R8_2PLANE_420_UNORM`, so
+  // we use RGBA when Lavapipe is detected via `UseCpuGpu()`.
+  const VkFormat kFormat = UseVirtualGpu() || UseCpuGpu() ? VK_FORMAT_R8G8B8A8_UNORM
+                                                          : VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
   bool is_yuv = kFormat == VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
   constexpr bool kLinear = false;
   auto image_create_info =

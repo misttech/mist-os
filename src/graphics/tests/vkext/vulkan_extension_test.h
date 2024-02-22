@@ -43,6 +43,11 @@ class VulkanExtensionTest : public testing::Test {
     return properties.deviceType == vk::PhysicalDeviceType::eVirtualGpu;
   }
 
+  bool UseCpuGpu() {
+    auto properties = ctx_->physical_device().getProperties();
+    return properties.deviceType == vk::PhysicalDeviceType::eCpu;
+  }
+
   VulkanContext &vulkan_context() { return *ctx_; }
 
   bool IsMemoryTypeCoherent(uint32_t memoryTypeIndex);
