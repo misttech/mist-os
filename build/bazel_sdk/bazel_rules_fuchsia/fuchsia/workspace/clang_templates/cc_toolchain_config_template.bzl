@@ -98,7 +98,6 @@ def _cc_toolchain_config_impl(ctx):
         cc_target_os = "fuchsia",
         features = [
             features.default_compile_flags,
-            features.default_link_flags,
             features.dbg,
             features.opt,
             features.target_system_name(target_system_name),

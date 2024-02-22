@@ -300,16 +300,12 @@ _default_compile_flags_feature = feature(
             ]),
             with_features = _apply_if("opt"),
         ),
-    ],
-    enabled = True,
-    implies = [
-        "fuchsia_target_system_name",
-    ],
-)
 
-_default_link_flags_feature = feature(
-    name = "default_link_flags",
-    flag_sets = [
+        # Begin link Actions:
+        # Note: The link actions must be added to the 'default_compile_flags' feature.
+        # Bazel will move all of these to the top of the command linke which makes it
+        # possible for users to override certain flags.
+
         # These are ldflags that are applied to all builds
         flag_set(
             actions = _all_link_actions,
@@ -468,7 +464,6 @@ _no_runtime_library_search_directories_feature = feature(
 
 features = struct(
     default_compile_flags = _default_compile_flags_feature,
-    default_link_flags = _default_link_flags_feature,
     dbg = _dbg_feature,
     opt = _opt_feature,
     target_system_name = _target_system_name_feature,
