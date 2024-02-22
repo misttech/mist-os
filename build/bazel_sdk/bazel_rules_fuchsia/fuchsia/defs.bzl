@@ -15,6 +15,11 @@ load(
     _clangd_compilation_database = "clangd_compilation_database",
 )
 load(
+    "//fuchsia/private:fuchsia_api_level.bzl",
+    _FUCHSIA_API_LEVEL_STATUS_SUPPORTED = "FUCHSIA_API_LEVEL_STATUS_SUPPORTED",
+    _get_fuchsia_api_levels = "get_fuchsia_api_levels",
+)
+load(
     "//fuchsia/private:fuchsia_archivist_pipeline_test.bzl",
     _fuchsia_archivist_pipeline_test = "fuchsia_archivist_pipeline_test",
     _fuchsia_archivist_pipeline_test_manifest = "fuchsia_archivist_pipeline_test_manifest",
@@ -26,6 +31,10 @@ load(
 load(
     "//fuchsia/private:fuchsia_bind_library.bzl",
     _fuchsia_bind_library = "fuchsia_bind_library",
+)
+load(
+    "//fuchsia/private:fuchsia_board_driver.bzl",
+    _fuchsia_board_driver = "fuchsia_board_driver",
 )
 load(
     "//fuchsia/private:fuchsia_cc.bzl",
@@ -69,21 +78,12 @@ load(
     _fuchsia_driver_tool = "fuchsia_driver_tool",
 )
 load(
-    "//fuchsia/private:fuchsia_api_level.bzl",
-    _FUCHSIA_API_LEVEL_STATUS_SUPPORTED = "FUCHSIA_API_LEVEL_STATUS_SUPPORTED",
-    _get_fuchsia_api_levels = "get_fuchsia_api_levels",
-)
-load(
     "//fuchsia/private:fuchsia_fidl_bind_library.bzl",
     _fuchsia_fidl_bind_library = "fuchsia_fidl_bind_library",
 )
 load(
     "//fuchsia/private:fuchsia_fidl_library.bzl",
     _fuchsia_fidl_library = "fuchsia_fidl_library",
-)
-load(
-    "//fuchsia/private:fuchsia_board_driver.bzl",
-    _fuchsia_board_driver = "fuchsia_board_driver",
 )
 load(
     "//fuchsia/private:fuchsia_package.bzl",
