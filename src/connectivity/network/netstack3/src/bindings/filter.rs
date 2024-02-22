@@ -564,6 +564,9 @@ pub(crate) async fn serve_deprecated(
                 FilterRequest::UpdateRdrRules { .. } => {
                     todo!("https://fxbug.dev/42182576: implement filtering support");
                 }
+                FilterRequest::CheckPresence { responder } => {
+                    responder.send().unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                }
             };
             Ok(())
         })

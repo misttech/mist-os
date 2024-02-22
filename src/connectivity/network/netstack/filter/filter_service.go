@@ -71,3 +71,7 @@ func (*filterImpl) GetRdrRules(fidl.Context) ([]filter.Rdr, uint32, error) {
 func (*filterImpl) UpdateRdrRules(fidl.Context, []filter.Rdr, uint32) (filter.FilterUpdateRdrRulesResult, error) {
 	return filter.FilterUpdateRdrRulesResultWithErr(filter.FilterUpdateRdrRulesErrorNotSupported), nil
 }
+
+func (*filterImpl) CheckPresence(fidl.Context) error {
+	return nil
+}

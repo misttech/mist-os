@@ -511,6 +511,10 @@ pub mod test {
         ) -> Self::UpdateRdrRulesResponseFut {
             unreachable!();
         }
+        type CheckPresenceResponseFut = future::Ready<Result<(), fidl::Error>>;
+        fn check_presence(&self) -> Self::CheckPresenceResponseFut {
+            unreachable!();
+        }
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

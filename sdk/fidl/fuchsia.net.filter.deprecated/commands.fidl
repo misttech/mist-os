@@ -132,4 +132,13 @@ closed protocol Filter {
         // TODO(https://fxbug.dev/42147284): Implement RDR API using gvisor iptables.
         NOT_SUPPORTED = 1;
     };
+
+    /// No-op method that allows checking for presence.
+    ///
+    /// It's not currently possible for a client with an optionally-provided
+    /// protocol to check whether there's someone on the other end without
+    /// making a FIDL call (https://fxbug.dev/296283299). This method provides a
+    /// workaround by giving a client a two-way method that it can call to check
+    /// for liveness.
+    strict CheckPresence() -> ();
 };
