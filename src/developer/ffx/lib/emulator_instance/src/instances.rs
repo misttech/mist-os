@@ -98,8 +98,12 @@ pub async fn read_from_disk(instance_name: &str) -> Result<EngineOption> {
     if filepath.exists() {
         let file = File::open(&filepath)
             .context(format!("Unable to open file {:?} for deserialization", filepath))?;
-        let value: EmulatorInstanceData = serde_json::from_reader(file)
-            .context(format!("Invalid JSON syntax in {:?}", filepath))?;
+        let res: Result<EmulatorInstanceData> =
+            serde_json::from_reader(file).context(format!("Invalid JSON syntax in {:?}", filepath));
+        if res.is_err() {
+            tracing::warn!("Failed to parse emulator instance: {res:?}");
+        }
+        let value = res?;
         Ok(EngineOption::DoesExist(value))
     } else {
         Ok(EngineOption::DoesNotExist(instance_name.to_string()))

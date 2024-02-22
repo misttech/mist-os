@@ -5,7 +5,8 @@
 use addr::TargetAddr;
 use anyhow::{anyhow, Result};
 use bitflags::bitflags;
-use futures::channel::mpsc::{unbounded, UnboundedReceiver};
+use fuchsia_async::Task;
+use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::Stream;
 use manual_targets::watcher::{
     recommended_watcher as manual_recommended_watcher, ManualTargetEvent, ManualTargetState,
@@ -98,6 +99,33 @@ pub enum TargetEvent {
     Removed(TargetHandle),
 }
 
+struct EmulatorWatcher {
+    // Task for the drain loop
+    drain_task: Option<Task<()>>,
+}
+
+impl EmulatorWatcher {
+    fn new(
+        mut watcher: emulator_instance::EmulatorWatcher,
+        sender: UnboundedSender<Result<TargetEvent>>,
+    ) -> Self {
+        let mut res = Self { drain_task: None };
+
+        let task = Task::local(async move {
+            loop {
+                if let Some(act) = watcher.emulator_target_detected().await {
+                    let event = act.try_into();
+                    if let Ok(e) = event {
+                        let _ = sender.unbounded_send(Ok(e));
+                    }
+                }
+            }
+        });
+        res.drain_task.replace(task);
+        res
+    }
+}
+
 #[allow(dead_code)]
 /// A stream of new devices as they appear on the bus. See [`wait_for_devices`].
 pub struct TargetStream {
@@ -111,6 +139,9 @@ pub struct TargetStream {
 
     /// Watches for ManualTarget events
     manual_targets_watcher: Option<ManualTargetWatcher>,
+
+    /// Watches for Emulator events
+    emulator_watcher: Option<EmulatorWatcher>,
 
     /// This is where results from the various watchers are published.
     queue: UnboundedReceiver<Result<TargetEvent>>,
@@ -140,10 +171,10 @@ bitflags! {
         const MDNS = 1 << 0;
         const USB = 1 << 1;
         const MANUAL = 1 << 2;
-        // TODO(b/319923485): Emulator
+        const EMULATOR = 1 << 3;
     }
 }
-pub fn wait_for_devices<F>(
+pub async fn wait_for_devices<F>(
     filter: F,
     notify_added: bool,
     notify_removed: bool,
@@ -209,6 +240,13 @@ where
         None
     };
 
+    let emulator_watcher = if sources.contains(DiscoverySources::EMULATOR) {
+        let emulator_sender = sender.clone();
+        let watcher = emulator_instance::start_emulator_watching().await?;
+        Some(EmulatorWatcher::new(watcher, emulator_sender))
+    } else {
+        None
+    };
     Ok(TargetStream {
         filter: Some(Box::new(filter)),
         queue,
@@ -217,6 +255,7 @@ where
         mdns_watcher,
         fastboot_usb_watcher,
         manual_targets_watcher,
+        emulator_watcher,
     })
 }
 
@@ -255,6 +294,23 @@ impl TryFrom<ffx::MdnsEventType> for TargetEvent {
             }
             ffx::MdnsEventType::SocketBound(_) => {
                 anyhow::bail!("SocketBound events are not supported")
+            }
+        }
+    }
+}
+
+impl TryFrom<emulator_instance::EmulatorTargetAction> for TargetEvent {
+    type Error = anyhow::Error;
+
+    fn try_from(event: emulator_instance::EmulatorTargetAction) -> Result<Self, Self::Error> {
+        match event {
+            emulator_instance::EmulatorTargetAction::Add(info) => {
+                let handle: TargetHandle = info.try_into()?;
+                Ok(TargetEvent::Added(handle))
+            }
+            emulator_instance::EmulatorTargetAction::Remove(info) => {
+                let handle: TargetHandle = info.try_into()?;
+                Ok(TargetEvent::Removed(handle))
             }
         }
     }
@@ -325,10 +381,8 @@ impl From<ManualTargetEvent> for TargetEvent {
                     }),
                 };
 
-                let handle = TargetHandle {
-                    node_name: Some(manual_target.addr().to_string()),
-                    state: state,
-                };
+                let handle =
+                    TargetHandle { node_name: Some(manual_target.addr().to_string()), state };
                 TargetEvent::Added(handle)
             }
             ManualTargetEvent::Lost(manual_target) => {
@@ -393,6 +447,7 @@ mod test {
     use manual_targets::watcher::ManualTarget;
     use pretty_assertions::assert_eq;
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV6};
+    use std::str::FromStr;
 
     #[test]
     fn test_from_fastbootevent_for_targetevent() -> Result<()> {
@@ -594,6 +649,44 @@ mod test {
     }
 
     #[test]
+    fn test_from_emulatoreventtype_for_targetevent() -> Result<()> {
+        let addr = TargetAddr::from_str("127.0.0.1:8080")?;
+        {
+            let addr_info: ffx::TargetAddrInfo = addr.into();
+            let info = ffx::TargetInfo {
+                nodename: Some("foo".to_string()),
+                addresses: Some(vec![addr_info]),
+                ..Default::default()
+            };
+            let emulator_event = emulator_instance::EmulatorTargetAction::Add(info);
+            assert_eq!(
+                TargetEvent::try_from(emulator_event)?,
+                TargetEvent::Added(TargetHandle {
+                    node_name: Some("foo".to_string()),
+                    state: TargetState::Product(addr)
+                })
+            );
+        }
+        {
+            let addr_info: ffx::TargetAddrInfo = addr.into();
+            let info = ffx::TargetInfo {
+                nodename: Some("foo".to_string()),
+                addresses: Some(vec![addr_info]),
+                ..Default::default()
+            };
+            let emulator_event = emulator_instance::EmulatorTargetAction::Remove(info);
+            assert_eq!(
+                TargetEvent::try_from(emulator_event)?,
+                TargetEvent::Removed(TargetHandle {
+                    node_name: Some("foo".to_string()),
+                    state: TargetState::Product(addr)
+                })
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn test_from_manual_target_event_for_target_event() -> Result<()> {
         {
             let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
@@ -683,6 +776,7 @@ mod test {
             mdns_watcher: None,
             fastboot_usb_watcher: None,
             manual_targets_watcher: None,
+            emulator_watcher: None,
             queue,
             notify_added: true,
             notify_removed: true,
@@ -727,6 +821,7 @@ mod test {
             mdns_watcher: None,
             fastboot_usb_watcher: None,
             manual_targets_watcher: None,
+            emulator_watcher: None,
             queue,
             notify_added: false,
             notify_removed: true,
@@ -763,6 +858,7 @@ mod test {
             mdns_watcher: None,
             fastboot_usb_watcher: None,
             manual_targets_watcher: None,
+            emulator_watcher: None,
             queue,
             notify_added: true,
             notify_removed: false,
@@ -799,6 +895,7 @@ mod test {
             mdns_watcher: None,
             fastboot_usb_watcher: None,
             manual_targets_watcher: None,
+            emulator_watcher: None,
             queue,
             notify_added: true,
             notify_removed: true,
@@ -825,6 +922,87 @@ mod test {
                 state: TargetState::Zedboot
             })
         );
+
+        Ok(())
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_target_stream_produces_emulator() -> Result<()> {
+        use emulator_instance::EmulatorInstanceInfo;
+        use std::io::Write;
+        use tempfile::tempdir;
+
+        let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
+
+        // Create the emulator instance dir
+        let temp = tempdir().expect("cannot get tempdir");
+        let instance_dir = temp.path().to_path_buf();
+        let emu_instance_name = String::from("new-emu-instance");
+        let new_instance_dir = instance_dir.join(emu_instance_name.clone());
+        if !new_instance_dir.exists() {
+            std::fs::create_dir_all(&new_instance_dir)?;
+        }
+        let new_instance_engine_file = new_instance_dir.join("engine.json");
+        ffx_config::query(emulator_instance::EMU_INSTANCE_ROOT_DIR)
+            .level(Some(ffx_config::ConfigLevel::User))
+            .set(instance_dir.to_str().into())
+            .await
+            .unwrap();
+
+        // Start watching the directory
+        let mut stream =
+            wait_for_devices(true_target_filter, true, true, DiscoverySources::EMULATOR).await?;
+
+        // Build the expected config JSON contents
+        let mut instance_data = emulator_instance::EmulatorInstanceData::new_with_state(
+            "emu-data-instance",
+            emulator_instance::EngineState::Running,
+        );
+        instance_data.set_pid(std::process::id());
+        let config = instance_data.get_emulator_configuration_mut();
+        config.host.networking = emulator_instance::NetworkingMode::User;
+        config.host.port_map.insert(
+            String::from("ssh"),
+            emulator_instance::PortMapping { guest: 22, host: Some(3322) },
+        );
+        let emu_config = serde_json::to_string(&instance_data)?;
+
+        // Create an emulator file
+        let mut config_file = std::fs::File::create(&new_instance_engine_file)?;
+        config_file.write_all(emu_config.as_bytes())?;
+
+        // Assert that the emulator is discovered
+        let next = stream.next().await.unwrap();
+        let next = next.expect("Getting emulator event failed");
+        assert_eq!(
+            next,
+            // The node_name and the state both have to match the contents of the emu_config above.
+            TargetEvent::Added(TargetHandle {
+                // Name must correspond to "runtime:name" value in config
+                node_name: Some("emu-data-instance".to_string()),
+                // Addr must correspond to "host:port_map:sh:host" value in config
+                state: TargetState::Product(TargetAddr::from_str("127.0.0.1:3322")?),
+            })
+        );
+        drop(config_file);
+        std::fs::remove_dir_all(&new_instance_dir)?;
+        // TODO(325325761) -- re-enable when emulator Remove events are generated
+        // correctly.
+        // let next = stream
+        //     .next()
+        //     .await
+        //     .unwrap();
+        // let next = next.expect("Getting emulator event failed");
+        // assert_eq!(
+        //     next,
+        //     // The node_name and the state both have to match the contents of the emu_config above.
+        //     TargetEvent::Removed(TargetHandle {
+        //         // Name must correspond to "runtime:name" value in config
+        //         node_name: Some("fuchsia-emulator".to_string()),
+        //         // Addr must correspond to "host:port_map:sh:host" value in config
+        //         state: TargetState::Product(TargetAddr::from_str("127.0.0.1:33881")?),
+        //     })
+        // );
 
         Ok(())
     }
