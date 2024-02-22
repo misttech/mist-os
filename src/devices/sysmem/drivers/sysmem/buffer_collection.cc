@@ -534,6 +534,13 @@ void BufferCollection::V2::SetWeakOk(SetWeakOkRequest& request,
   parent_.SetWeakOkImplV2(request, completer);
 }
 
+void BufferCollection::V2::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_sysmem2::BufferCollection> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  parent_.FailSync(FROM_HERE, completer, ZX_ERR_NOT_SUPPORTED,
+                   "BufferCollection unknown method - ordinal: %" PRIx64, metadata.method_ordinal);
+}
+
 void BufferCollection::V1::Close(CloseCompleter::Sync& completer) { parent_.CloseImpl(completer); }
 
 void BufferCollection::V2::Close(CloseCompleter::Sync& completer) { parent_.CloseImpl(completer); }

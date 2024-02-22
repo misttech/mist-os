@@ -112,6 +112,10 @@ class BufferCollectionTokenGroup : public Node {
                             CreateChildrenSyncCompleter::Sync& completer) override;
     void AllChildrenPresent(AllChildrenPresentCompleter::Sync& completer) override;
 
+    void handle_unknown_method(
+        fidl::UnknownMethodMetadata<fuchsia_sysmem2::BufferCollectionTokenGroup> metadata,
+        fidl::UnknownMethodCompleter::Sync& completer) override;
+
     BufferCollectionTokenGroup& parent_;
   };
 

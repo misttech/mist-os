@@ -316,6 +316,13 @@ void BufferCollectionTokenGroup::V2::AllChildrenPresent(
   parent_.CommonAllChildrenPresent(completer);
 }
 
+void BufferCollectionTokenGroup::V2::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_sysmem2::BufferCollectionTokenGroup> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  parent_.FailSync(FROM_HERE, completer, ZX_ERR_NOT_SUPPORTED,
+                   "token group unknown method - ordinal: %" PRIx64, metadata.method_ordinal);
+}
+
 BufferCollectionTokenGroup& BufferCollectionTokenGroup::EmplaceInTree(
     fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection,
     NodeProperties* new_node_properties, const GroupServerEnd& server_end) {

@@ -332,4 +332,12 @@ void Allocator::V2::GetVmoInfo(GetVmoInfoRequest& request, GetVmoInfoCompleter::
   completer.Reply(fit::ok(std::move(response)));
 }
 
+void Allocator::V2::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_sysmem2::Allocator> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  allocator_->LogError(FROM_HERE, "token group unknown method - ordinal: %" PRIx64,
+                       metadata.method_ordinal);
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
 }  // namespace sysmem_driver

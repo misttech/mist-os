@@ -8,7 +8,7 @@ using zx;
 /// Allocates system memory buffers.
 @available(added=HEAD)
 @discoverable
-closed protocol Allocator {
+open protocol Allocator {
     /// Allocates a buffer collection on behalf of a single client (aka
     /// initiator) who is also the only participant (from the point of view of
     /// sysmem).
@@ -24,7 +24,7 @@ closed protocol Allocator {
     ///
     /// + request `collection_request` The server end of the
     ///   [`fuchsia.sysmem2/BufferCollection`].
-    strict AllocateNonSharedCollection(resource table {
+    flexible AllocateNonSharedCollection(resource table {
         1: collection_request server_end:BufferCollection;
     });
 
@@ -51,7 +51,7 @@ closed protocol Allocator {
     /// [`fuchsia.sysmem2/BufferCollection.SetDispensable`] and
     /// [`fuchsia.sysmem2/BufferCollection.AttachToken`] for ways to create
     /// separate failure domains within a buffer collection.
-    strict AllocateSharedCollection(resource table {
+    flexible AllocateSharedCollection(resource table {
         1: token_request server_end:BufferCollectionToken;
     });
 
@@ -83,7 +83,7 @@ closed protocol Allocator {
     ///   connection to the logical buffer collection. Typically there will be
     ///   other participants with their own `BufferCollection` channel to the
     ///   logical buffer collection.
-    strict BindSharedCollection(resource table {
+    flexible BindSharedCollection(resource table {
         1: token client_end:BufferCollectionToken;
         2: buffer_collection_request server_end:BufferCollection;
     });
@@ -131,7 +131,7 @@ closed protocol Allocator {
     ///   of the sender to sync with sysmem to ensure that previously
     ///   created/duplicated token(s) are known to sysmem, before sending the
     ///   token(s) to other participants.
-    strict ValidateBufferCollectionToken(table {
+    flexible ValidateBufferCollectionToken(table {
         1: token_server_koid zx.Koid;
     }) -> (table {
         1: is_known bool;
@@ -163,7 +163,7 @@ closed protocol Allocator {
     ///   process name (see `fsl::GetCurrentProcessName`) is a good default.
     /// + request `id` This can be an arbitrary id, but the current process ID
     ///   (see `fsl::GetCurrentProcessKoid`) is a good default.
-    strict SetDebugClientInfo(table {
+    flexible SetDebugClientInfo(table {
         1: name string:MAX_CLIENT_NAME_LENGTH;
         2: id uint64;
     });
@@ -215,7 +215,7 @@ closed protocol Allocator {
     /// * error `ZX_ERR_INTERNAL` The request failed for an unspecified reason.
     /// * error `ZX_ERR_INVALID_ARGS` The vmo field wasn't set, or there was
     ///   some other problem with the request field(s).
-    strict GetVmoInfo(resource table {
+    flexible GetVmoInfo(resource table {
         /// `vmo` is required to be set; ownership is transferred to the server
         /// so in most cases a client will duplicate a handle and transfer the
         /// duplicate via this field.

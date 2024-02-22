@@ -162,6 +162,10 @@ class BufferCollection : public Node {
                                 AttachLifetimeTrackingCompleter::Sync& completer) override;
     void SetWeakOk(SetWeakOkRequest& request, SetWeakOkCompleter::Sync& completer) override;
 
+    void handle_unknown_method(
+        fidl::UnknownMethodMetadata<fuchsia_sysmem2::BufferCollection> metadata,
+        fidl::UnknownMethodCompleter::Sync& completer) override;
+
     BufferCollection& parent_;
   };
 

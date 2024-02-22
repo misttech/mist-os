@@ -33,7 +33,7 @@ const MAX_CLIENT_NAME_LENGTH int32 = 256;
 // [`fuchsia.sysmem2/BufferCollectionToken`](s) which have since been converted
 // to a [`fuchsia.sysmem2/BufferCollection`] channel.
 @available(added=HEAD)
-closed protocol Node {
+open protocol Node {
     /// Ensure that previous messages have been received server side. This is
     /// particularly useful after previous messages that created new tokens,
     /// because a token must be known to the sysmem server before sending the
@@ -67,7 +67,7 @@ closed protocol Node {
     /// [`fuchsia.sysmem2/Allocator.BindSharedCollection`], or using
     /// [`fuchsia.sysmem2/BufferCollectionToken.DuplicateSync`] which includes
     /// the sync step and can create multiple tokens at once.
-    strict Sync() -> ();
+    flexible Sync() -> ();
 
     /// ###### On a [`fuchsia.sysmem2/BufferCollectionToken`] channel:
     ///
@@ -129,7 +129,7 @@ closed protocol Node {
     /// from failure of the failure domain. Such failure domains can be nested,
     /// in which case only the inner-most failure domain in which the `Node`
     /// resides fails.
-    strict Close();
+    flexible Close();
 
     /// Set a name for VMOs in this buffer collection. The name may be truncated
     /// shorter. The name only affects VMOs allocated after the name is set;
@@ -143,7 +143,7 @@ closed protocol Node {
     ///   or if `priority` is greater than any previous `priority` value in
     ///   prior `SetName` calls across all `Node`(s) of this buffer collection.
     /// + request `name` The name for VMOs created under this buffer collection.
-    strict SetName(table {
+    flexible SetName(table {
         1: priority uint32;
         2: name string:64;
     });
@@ -177,7 +177,7 @@ closed protocol Node {
     ///   process name (see `fsl::GetCurrentProcessName`) is a good default.
     /// + request `id` This can be an arbitrary id, but the current process ID
     ///   (see `fsl::GetCurrentProcessKoid`) is a good default.
-    strict SetDebugClientInfo(table {
+    flexible SetDebugClientInfo(table {
         1: name string:MAX_CLIENT_NAME_LENGTH;
         2: id uint64;
     });
@@ -196,7 +196,7 @@ closed protocol Node {
     ///
     /// + request `deadline` The time at which sysmem will start trying to log
     ///   the warning, unless all constraints are with sysmem by then.
-    strict SetDebugTimeoutLogDeadline(table {
+    flexible SetDebugTimeoutLogDeadline(table {
         1: deadline zx.Time;
     });
 
@@ -226,7 +226,7 @@ closed protocol Node {
     /// point of view, under the assumption that verbose logging is only enabled
     /// on a low number of buffer collections. If we're not tracking down a bug,
     /// we shouldn't send this message.
-    strict SetVerboseLogging();
+    flexible SetVerboseLogging();
 
     /// This gets a handle that can be used as a parameter to
     /// [`fuchsia.sysmem2/Node.IsAlternateFor`] called on any
@@ -244,7 +244,7 @@ closed protocol Node {
     /// - response `node_ref` This handle can be sent via `IsAlternateFor` on a
     ///   different `Node` channel, to prove that the client obtained the handle
     ///   from this `Node`.
-    strict GetNodeRef() -> (resource table {
+    flexible GetNodeRef() -> (resource table {
         1: node_ref zx.Handle:EVENT;
     });
 
@@ -310,7 +310,7 @@ closed protocol Node {
     /// * No other failing status codes are returned by this call.  However,
     ///   sysmem may add additional codes in future, so the client should have
     ///   sensible default handling for any failing status code.
-    strict IsAlternateFor(resource table {
+    flexible IsAlternateFor(resource table {
         1: node_ref zx.Handle:EVENT;
     }) -> (table {
         1: is_alternate bool;
@@ -345,7 +345,7 @@ closed protocol Node {
     /// - response `buffer_collection_id` This ID is unique per buffer
     ///   collection per boot. Each buffer is uniquely identified by the
     ///   `buffer_collection_id` and `buffer_index` together.
-    strict GetBufferCollectionId() -> (table {
+    flexible GetBufferCollectionId() -> (table {
         1: buffer_collection_id uint64;
     });
 
@@ -383,7 +383,7 @@ closed protocol Node {
     /// This implies [`fuchsia.sysmem2/Node.SetWeakOk`] as well, but does not
     /// imply `SetWeakOk` with `for_children_also` true, which can be sent
     /// separately as appropriate.
-    strict SetWeak();
+    flexible SetWeak();
 
     /// This indicates to sysmem that the client is prepared to pay attention to
     /// `close_weak_asap`.
@@ -434,7 +434,7 @@ closed protocol Node {
     ///   `Node` when converted directly from a sysmem2 token to a sysmem(1)
     ///   token, which will fail allocation unless an ancestor of this `Node`
     ///   specified `for_child_nodes_also` true.
-    strict SetWeakOk(resource table {
+    flexible SetWeakOk(resource table {
         1: for_child_nodes_also bool;
     });
 };
@@ -450,7 +450,7 @@ closed protocol Node {
 /// participant failing mid-create.
 // LINT.IfChange
 @available(added=HEAD)
-closed protocol BufferCollectionToken {
+open protocol BufferCollectionToken {
     compose Node;
 
     /// Create additional [`fuchsia.sysmem2/BufferCollectionToken`](s) from this
@@ -495,7 +495,7 @@ closed protocol BufferCollectionToken {
     ///   The value `ZX_RIGHT_SAME_RIGHTS` can be used to specify that no
     ///   attenuation should be applied.
     /// - response `tokens` The client ends of each newly created token.
-    strict DuplicateSync(table {
+    flexible DuplicateSync(table {
         1: rights_attenuation_masks vector<zx.Rights>:MAX_COUNT_DUPLICATES;
     }) -> (resource table {
         1: tokens vector<client_end:BufferCollectionToken>:MAX_COUNT_DUPLICATES;
@@ -551,7 +551,7 @@ closed protocol BufferCollectionToken {
     /// + request `token_request` is the server end of a `BufferCollectionToken`
     ///   channel. The client end of this channel acts as another participant in
     ///   the shared buffer collection.
-    strict Duplicate(resource table {
+    flexible Duplicate(resource table {
         1: rights_attenuation_mask uint32;
         2: token_request server_end:BufferCollectionToken;
     });
@@ -632,7 +632,7 @@ closed protocol BufferCollectionToken {
     /// dispensable token.
     ///
     /// `SetDispensable` on an already-dispensable token is idempotent.
-    strict SetDispensable();
+    flexible SetDispensable();
 
     /// Create a logical OR among a set of tokens, called a
     /// [`fuchsia.sysmem2/BufferCollectionTokenGroup`].
@@ -668,7 +668,7 @@ closed protocol BufferCollectionToken {
     ///
     /// + request `group_request` The server end of a
     ///   `BufferCollectionTokenGroup` channel to be served by sysmem.
-    strict CreateBufferCollectionTokenGroup(resource table {
+    flexible CreateBufferCollectionTokenGroup(resource table {
         1: group_request server_end:BufferCollectionTokenGroup;
     });
 };
@@ -694,7 +694,7 @@ closed protocol BufferCollectionToken {
 /// initiator can tell when enough buffers of the buffer collection have been
 /// fully deallocated prior to the initiator allocating a new buffer collection.
 @available(added=HEAD)
-closed protocol BufferCollection {
+open protocol BufferCollection {
     compose Node;
 
     /// Provide [`fuchsia.sysmem2/BufferCollectionConstraints`] to the buffer
@@ -716,7 +716,7 @@ closed protocol BufferCollection {
     ///   `constraints` field won't receive any VMO handles, but can still find
     ///   out how many buffers were allocated and can still refer to buffers by
     ///   their `buffer_index`.
-    strict SetConstraints(resource table {
+    flexible SetConstraints(resource table {
         1: constraints BufferCollectionConstraints;
     });
 
@@ -746,7 +746,7 @@ closed protocol BufferCollection {
     /// * error `ZX_ERR_INVALID_ARGS` The request is malformed.
     /// * error `ZX_ERR_NOT_SUPPORTED` The request is valid but cannot be
     ///   satisfied, perhaps due to hardware limitations.
-    strict WaitForAllBuffersAllocated() -> (resource table {
+    flexible WaitForAllBuffersAllocated() -> (resource table {
         1: buffer_collection_info BufferCollectionInfo;
     }) error zx.Status;
 
@@ -761,7 +761,7 @@ closed protocol BufferCollection {
     /// * error `ZX_ERR_UNAVAILABLE` The buffer collection hasn't attempted
     ///   allocation yet. This means that WaitForAllBuffersAllocated would not
     ///   respond quickly.
-    strict CheckAllBuffersAllocated() -> () error zx.Status;
+    flexible CheckAllBuffersAllocated() -> () error zx.Status;
 
     /// Create a new token to add a new participant to an existing logical
     /// buffer collection, if the existing collection's buffer counts,
@@ -862,7 +862,7 @@ closed protocol BufferCollection {
     ///   + 0xFFFFFFFF (this is reasonable when an attenuation mask is computed)
     /// + requesst `token_request` The server end of the `BufferCollectionToken`
     ///   channel. The client retains the client end.
-    strict AttachToken(resource table {
+    flexible AttachToken(resource table {
         1: rights_attenuation_mask uint32;
         2: token_request server_end:BufferCollectionToken;
     });
@@ -934,7 +934,7 @@ closed protocol BufferCollection {
     ///   outside the scope of the `BufferCollection` interface (at least for
     ///   now) to determine how many buffers may be held without closing, but
     ///   it'll typically be in the range 0-2.
-    strict AttachLifetimeTracking(resource table {
+    flexible AttachLifetimeTracking(resource table {
         1: server_end zx.Handle:EVENTPAIR;
         2: buffers_remaining uint32;
     });
@@ -1028,7 +1028,7 @@ closed protocol BufferCollection {
 /// `BufferCollectionTokenGroup` is part of a subtree under such a node that
 /// doesn't propagate failure to its parent).
 @available(added=HEAD)
-closed protocol BufferCollectionTokenGroup {
+open protocol BufferCollectionTokenGroup {
     compose Node;
 
     /// Create a child [`fuchsia.sysmem2/BufferCollectionToken`]. Only one child
@@ -1051,7 +1051,7 @@ closed protocol BufferCollectionTokenGroup {
     ///   bits ensuring those rights are attentuated, so 0xFFFFFFFF is a synonym
     ///   for ZX_RIGHT_SAME_RIGHTS. The value 0 is not allowed and intentionally
     ///   causes subtree failure.
-    strict CreateChild(resource table {
+    flexible CreateChild(resource table {
         /// Must be set.
         1: token_request server_end:BufferCollectionToken;
 
@@ -1084,7 +1084,7 @@ closed protocol BufferCollectionTokenGroup {
     ///   The value 0xFFFFFFFF is a synonym for ZX_RIGHT_SAME_RIGHTS. For any
     ///   other value, each 0 bit in the mask attenuates that right.
     /// - response `tokens` The created child tokens.
-    strict CreateChildrenSync(table {
+    flexible CreateChildrenSync(table {
         1: rights_attenuation_masks vector<zx.Rights>:MAX_COUNT_CREATE_CHILDREN;
     }) -> (resource table {
         1: tokens vector<client_end:BufferCollectionToken>:MAX_COUNT_CREATE_CHILDREN;
@@ -1102,5 +1102,5 @@ closed protocol BufferCollectionTokenGroup {
     /// triggered. This is intentionally not analogous to how `Close` without
     /// prior [`fuchsia.sysmem2/BufferCollection.SetConstraints`] doesn't cause
     /// subtree failure.
-    strict AllChildrenPresent();
+    flexible AllChildrenPresent();
 };

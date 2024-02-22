@@ -65,6 +65,9 @@ class Allocator : public LoggingMixin {
                             SetDebugClientInfoCompleter::Sync& completer) override;
     void GetVmoInfo(GetVmoInfoRequest& request, GetVmoInfoCompleter::Sync& completer) override;
 
+    void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_sysmem2::Allocator> metadata,
+                               fidl::UnknownMethodCompleter::Sync& completer) override;
+
     std::unique_ptr<Allocator> allocator_;
   };
 

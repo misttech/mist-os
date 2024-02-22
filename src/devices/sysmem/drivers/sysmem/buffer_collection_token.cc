@@ -365,6 +365,13 @@ void BufferCollectionToken::CombinedTokenServer::SetDispensableV2(
   parent_.SetDispensableInternal();
 }
 
+void BufferCollectionToken::CombinedTokenServer::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_sysmem2_internal::CombinedBufferCollectionToken> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  parent_.FailSync(FROM_HERE, completer, ZX_ERR_NOT_SUPPORTED,
+                   "token unknown method - ordinal: %" PRIx64, metadata.method_ordinal);
+}
+
 void BufferCollectionToken::SetDispensableInternal() {
   if (node_properties().error_propagation_mode() <
       ErrorPropagationMode::kPropagateBeforeAllocation) {
