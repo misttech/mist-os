@@ -3,11 +3,8 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
-#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <fidl/fuchsia.scheduler/cpp/wire.h>
 #include <fuchsia/hardware/spiimpl/cpp/banjo.h>
-#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/mmio/mmio.h>
@@ -18,17 +15,47 @@
 
 #include <optional>
 
+#include <ddktl/device.h>
 #include <fbl/array.h>
 #include <fbl/mutex.h>
 #include <soc/aml-common/aml-spi.h>
 
-#include "sdk/lib/driver/compat/cpp/device_server.h"
 #include "src/lib/vmo_store/vmo_store.h"
 
 namespace spi {
 
-class AmlSpi : public ddk::SpiImplProtocol<AmlSpi> {
+class AmlSpi;
+using DeviceType = ddk::Device<AmlSpi, ddk::Unbindable>;
+
+class AmlSpi : public DeviceType, public ddk::SpiImplProtocol<AmlSpi, ddk::base_protocol> {
  public:
+  // Spawns device node.
+  static zx_status_t Create(void* ctx, zx_device_t* device);
+
+  // Device protocol implementation.
+  void DdkRelease();
+
+  void DdkUnbind(ddk::UnbindTxn txn);
+
+  uint32_t SpiImplGetChipSelectCount() { return static_cast<uint32_t>(chips_.size()); }
+  zx_status_t SpiImplExchange(uint32_t cs, const uint8_t* txdata, size_t txdata_size,
+                              uint8_t* out_rxdata, size_t rxdata_size, size_t* out_rxdata_actual);
+
+  zx_status_t SpiImplRegisterVmo(uint32_t chip_select, uint32_t vmo_id, zx::vmo vmo,
+                                 uint64_t offset, uint64_t size, uint32_t rights);
+  zx_status_t SpiImplUnregisterVmo(uint32_t chip_select, uint32_t vmo_id, zx::vmo* out_vmo);
+  void SpiImplReleaseRegisteredVmos(uint32_t chip_select);
+  zx_status_t SpiImplTransmitVmo(uint32_t chip_select, uint32_t vmo_id, uint64_t offset,
+                                 uint64_t size);
+  zx_status_t SpiImplReceiveVmo(uint32_t chip_select, uint32_t vmo_id, uint64_t offset,
+                                uint64_t size);
+  zx_status_t SpiImplExchangeVmo(uint32_t chip_select, uint32_t tx_vmo_id, uint64_t tx_offset,
+                                 uint32_t rx_vmo_id, uint64_t rx_offset, uint64_t size);
+
+  zx_status_t SpiImplLockBus(uint32_t chip_select) { return ZX_ERR_NOT_SUPPORTED; }
+  zx_status_t SpiImplUnlockBus(uint32_t chip_select) { return ZX_ERR_NOT_SUPPORTED; }
+
+ private:
   struct OwnedVmoInfo {
     uint64_t offset;
     uint64_t size;
@@ -54,14 +81,14 @@ class AmlSpi : public ddk::SpiImplProtocol<AmlSpi> {
     fzl::VmoMapper mapped;
   };
 
-  AmlSpi(fdf::MmioBuffer mmio, fidl::ClientEnd<fuchsia_hardware_registers::Device> reset,
-         fidl::ClientEnd<fuchsia_scheduler::ProfileProvider> profile_provider, uint32_t reset_mask,
+  AmlSpi(zx_device_t* device, fdf::MmioBuffer mmio,
+         fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset, uint32_t reset_mask,
          fbl::Array<ChipInfo> chips, zx::interrupt interrupt,
          const amlogic_spi::amlspi_config_t& config, zx::bti bti, DmaBuffer tx_buffer,
          DmaBuffer rx_buffer)
-      : mmio_(std::move(mmio)),
+      : DeviceType(device),
+        mmio_(std::move(mmio)),
         reset_(std::move(reset)),
-        profile_provider_(std::move(profile_provider)),
         reset_mask_(reset_mask),
         chips_(std::move(chips)),
         interrupt_(std::move(interrupt)),
@@ -70,31 +97,7 @@ class AmlSpi : public ddk::SpiImplProtocol<AmlSpi> {
         tx_buffer_(std::move(tx_buffer)),
         rx_buffer_(std::move(rx_buffer)) {}
 
-  spi_impl_protocol_ops_t* ops() { return &spi_impl_protocol_ops_; }
-
-  void InitRegisters();
-
-  void Shutdown();
-
-  uint32_t SpiImplGetChipSelectCount() { return static_cast<uint32_t>(chips_.size()); }
-  zx_status_t SpiImplExchange(uint32_t cs, const uint8_t* txdata, size_t txdata_size,
-                              uint8_t* out_rxdata, size_t rxdata_size, size_t* out_rxdata_actual);
-
-  zx_status_t SpiImplRegisterVmo(uint32_t chip_select, uint32_t vmo_id, zx::vmo vmo,
-                                 uint64_t offset, uint64_t size, uint32_t rights);
-  zx_status_t SpiImplUnregisterVmo(uint32_t chip_select, uint32_t vmo_id, zx::vmo* out_vmo);
-  void SpiImplReleaseRegisteredVmos(uint32_t chip_select);
-  zx_status_t SpiImplTransmitVmo(uint32_t chip_select, uint32_t vmo_id, uint64_t offset,
-                                 uint64_t size);
-  zx_status_t SpiImplReceiveVmo(uint32_t chip_select, uint32_t vmo_id, uint64_t offset,
-                                uint64_t size);
-  zx_status_t SpiImplExchangeVmo(uint32_t chip_select, uint32_t tx_vmo_id, uint64_t tx_offset,
-                                 uint32_t rx_vmo_id, uint64_t rx_offset, uint64_t size);
-
-  zx_status_t SpiImplLockBus(uint32_t chip_select) { return ZX_ERR_NOT_SUPPORTED; }
-  zx_status_t SpiImplUnlockBus(uint32_t chip_select) { return ZX_ERR_NOT_SUPPORTED; }
-
- private:
+  static fbl::Array<ChipInfo> InitChips(amlogic_spi::amlspi_config_t* config, zx_device_t* device);
   void DumpState() TA_REQ(bus_lock_);
 
   void Exchange8(const uint8_t* txdata, uint8_t* out_rxdata, size_t size) TA_REQ(bus_lock_);
@@ -105,7 +108,7 @@ class AmlSpi : public ddk::SpiImplProtocol<AmlSpi> {
   void WaitForTransferComplete() TA_REQ(bus_lock_);
   void WaitForDmaTransferComplete() TA_REQ(bus_lock_);
 
-  void InitRegistersLocked() TA_REQ(bus_lock_);
+  void InitRegisters() TA_REQ(bus_lock_);
 
   // Checks size against the registered VMO size and returns a Span with offset applied. Returns a
   // Span with data set to nullptr if vmo_id wasn't found. Returns a Span with size set to zero if
@@ -121,6 +124,8 @@ class AmlSpi : public ddk::SpiImplProtocol<AmlSpi> {
 
   bool UseDma(size_t size) const TA_REQ(bus_lock_);
 
+  void Shutdown();
+
   // Shims to support thread annotations on ChipInfo members.
   const fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>& gpio(uint32_t chip_select)
       TA_REQ(bus_lock_) {
@@ -133,7 +138,6 @@ class AmlSpi : public ddk::SpiImplProtocol<AmlSpi> {
 
   fdf::MmioBuffer mmio_ TA_GUARDED(bus_lock_);
   fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset_;
-  fidl::WireSyncClient<fuchsia_scheduler::ProfileProvider> profile_provider_;
   const uint32_t reset_mask_;
   const fbl::Array<ChipInfo> chips_;
   bool need_reset_ TA_GUARDED(bus_lock_) = false;
@@ -148,36 +152,6 @@ class AmlSpi : public ddk::SpiImplProtocol<AmlSpi> {
   DmaBuffer tx_buffer_ TA_GUARDED(bus_lock_);
   DmaBuffer rx_buffer_ TA_GUARDED(bus_lock_);
   bool shutdown_ TA_GUARDED(bus_lock_) = false;
-};
-
-// AmlSpiDriver is a helper class that is responsible for acquiring resources on behalf of AmlSpi so
-// that it can support RAII in DFv2. It implements the driver Start hook, and forwards Stop to the
-// AmlSpi instance.
-class AmlSpiDriver : public fdf::DriverBase {
- public:
-  AmlSpiDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
-      : fdf::DriverBase("aml-spi", std::move(start_args), std::move(dispatcher)) {}
-
-  zx::result<> Start() override;
-  void Stop() override {
-    if (device_) {
-      device_->Shutdown();
-    }
-  }
-
- protected:
-  // MapMmio can be overridden by a test in order to provide an fdf::MmioBuffer backed by a fake.
-  virtual zx::result<fdf::MmioBuffer> MapMmio(
-      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t mmio_id);
-
- private:
-  fbl::Array<AmlSpi::ChipInfo> InitChips(amlogic_spi::amlspi_config_t* config);
-  zx::result<compat::DeviceServer::GenericProtocol> GetBanjoProto(compat::BanjoProtoId id);
-
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_;
-  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
-  compat::SyncInitializedDeviceServer compat_server_;
-  std::unique_ptr<AmlSpi> device_;
 };
 
 }  // namespace spi
