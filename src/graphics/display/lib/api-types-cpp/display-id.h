@@ -17,16 +17,12 @@ namespace display {
 // More useful representation of `fuchsia.hardware.display.types/DisplayId`.
 DEFINE_STRONG_INT(DisplayId, uint64_t);
 
-constexpr inline DisplayId ToDisplayId(uint64_t banjo_display_id) {
-  return DisplayId(banjo_display_id);
-}
-constexpr inline DisplayId ToDisplayId(
-    fuchsia_hardware_display_types::wire::DisplayId fidl_display_id) {
+constexpr DisplayId ToDisplayId(uint64_t banjo_display_id) { return DisplayId(banjo_display_id); }
+constexpr DisplayId ToDisplayId(fuchsia_hardware_display_types::wire::DisplayId fidl_display_id) {
   return DisplayId(fidl_display_id.value);
 }
-constexpr inline uint64_t ToBanjoDisplayId(DisplayId display_id) { return display_id.value(); }
-constexpr inline fuchsia_hardware_display_types::wire::DisplayId ToFidlDisplayId(
-    DisplayId display_id) {
+constexpr uint64_t ToBanjoDisplayId(DisplayId display_id) { return display_id.value(); }
+constexpr fuchsia_hardware_display_types::wire::DisplayId ToFidlDisplayId(DisplayId display_id) {
   return {.value = display_id.value()};
 }
 

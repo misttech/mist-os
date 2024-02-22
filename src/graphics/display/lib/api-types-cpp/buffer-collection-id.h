@@ -19,11 +19,11 @@ namespace display {
 // BufferCollections imported to display drivers.
 DEFINE_STRONG_INT(BufferCollectionId, uint64_t);
 
-constexpr inline BufferCollectionId ToBufferCollectionId(
+constexpr BufferCollectionId ToBufferCollectionId(
     fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id) {
   return BufferCollectionId(fidl_buffer_collection_id.value);
 }
-constexpr inline fuchsia_hardware_display::wire::BufferCollectionId ToFidlBufferCollectionId(
+constexpr fuchsia_hardware_display::wire::BufferCollectionId ToFidlBufferCollectionId(
     BufferCollectionId buffer_collection_id) {
   return {.value = buffer_collection_id.value()};
 }

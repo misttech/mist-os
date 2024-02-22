@@ -19,10 +19,10 @@ namespace display {
 // coordinator and the display drivers.
 DEFINE_STRONG_INT(ImageId, uint64_t);
 
-constexpr inline ImageId ToImageId(fuchsia_hardware_display::wire::ImageId fidl_image_id) {
+constexpr ImageId ToImageId(fuchsia_hardware_display::wire::ImageId fidl_image_id) {
   return ImageId(fidl_image_id.value);
 }
-constexpr inline fuchsia_hardware_display::wire::ImageId ToFidlImageId(ImageId image_id) {
+constexpr fuchsia_hardware_display::wire::ImageId ToFidlImageId(ImageId image_id) {
   return {.value = image_id.value()};
 }
 

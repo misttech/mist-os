@@ -20,10 +20,10 @@ namespace display {
 // coordinator and the display drivers.
 DEFINE_STRONG_INT(LayerId, uint64_t);
 
-constexpr inline LayerId ToLayerId(fuchsia_hardware_display::wire::LayerId fidl_layer_id) {
+constexpr LayerId ToLayerId(fuchsia_hardware_display::wire::LayerId fidl_layer_id) {
   return LayerId(fidl_layer_id.value);
 }
-constexpr inline fuchsia_hardware_display::wire::LayerId ToFidlLayerId(LayerId layer_id) {
+constexpr fuchsia_hardware_display::wire::LayerId ToFidlLayerId(LayerId layer_id) {
   return {.value = layer_id.value()};
 }
 constexpr LayerId kInvalidLayerId(fuchsia_hardware_display_types::wire::kInvalidDispId);

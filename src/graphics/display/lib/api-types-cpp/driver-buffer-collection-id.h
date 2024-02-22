@@ -22,11 +22,11 @@ namespace display {
 // via display Controller FIDL API.
 DEFINE_STRONG_INT(DriverBufferCollectionId, uint64_t);
 
-constexpr inline DriverBufferCollectionId ToDriverBufferCollectionId(
+constexpr DriverBufferCollectionId ToDriverBufferCollectionId(
     uint64_t banjo_driver_buffer_collection_id) {
   return DriverBufferCollectionId(banjo_driver_buffer_collection_id);
 }
-constexpr inline uint64_t ToBanjoDriverBufferCollectionId(
+constexpr uint64_t ToBanjoDriverBufferCollectionId(
     DriverBufferCollectionId driver_buffer_collection_id) {
   return driver_buffer_collection_id.value();
 }

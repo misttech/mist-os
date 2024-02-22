@@ -416,7 +416,7 @@ constexpr int32_t DisplayTiming::vertical_field_refresh_rate_millihertz() const 
   return static_cast<int32_t>(vertical_field_refresh_rate_millihertz);
 }
 
-constexpr inline bool operator==(const DisplayTiming& lhs, const DisplayTiming& rhs) {
+constexpr bool operator==(const DisplayTiming& lhs, const DisplayTiming& rhs) {
   return lhs.horizontal_active_px == rhs.horizontal_active_px &&
          lhs.horizontal_front_porch_px == rhs.horizontal_front_porch_px &&
          lhs.horizontal_sync_width_px == rhs.horizontal_sync_width_px &&
@@ -432,7 +432,7 @@ constexpr inline bool operator==(const DisplayTiming& lhs, const DisplayTiming& 
          lhs.pixel_repetition == rhs.pixel_repetition;
 }
 
-constexpr inline bool operator!=(const DisplayTiming& lhs, const DisplayTiming& rhs) {
+constexpr bool operator!=(const DisplayTiming& lhs, const DisplayTiming& rhs) {
   return !(lhs == rhs);
 }
 

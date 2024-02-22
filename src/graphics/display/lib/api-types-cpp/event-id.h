@@ -16,10 +16,10 @@ namespace display {
 // More useful representation of `fuchsia.hardware.display/EventId`.
 DEFINE_STRONG_INT(EventId, uint64_t);
 
-constexpr inline EventId ToEventId(fuchsia_hardware_display::wire::EventId fidl_event_id) {
+constexpr EventId ToEventId(fuchsia_hardware_display::wire::EventId fidl_event_id) {
   return EventId(fidl_event_id.value);
 }
-constexpr inline fuchsia_hardware_display::wire::EventId ToFidlEventId(EventId event_id) {
+constexpr fuchsia_hardware_display::wire::EventId ToFidlEventId(EventId event_id) {
   return {.value = event_id.value()};
 }
 

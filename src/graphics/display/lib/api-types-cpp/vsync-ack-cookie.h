@@ -16,10 +16,10 @@ namespace display {
 // More useful representation of `fuchsia.hardware.display/VsyncAckCookie`.
 DEFINE_STRONG_INT(VsyncAckCookie, uint64_t);
 
-constexpr inline VsyncAckCookie ToVsyncAckCookie(uint64_t fidl_vsync_ack_cookie_value) {
+constexpr VsyncAckCookie ToVsyncAckCookie(uint64_t fidl_vsync_ack_cookie_value) {
   return VsyncAckCookie(fidl_vsync_ack_cookie_value);
 }
-constexpr inline uint64_t ToFidlVsyncAckCookieValue(VsyncAckCookie vsync_ack_cookie) {
+constexpr uint64_t ToFidlVsyncAckCookieValue(VsyncAckCookie vsync_ack_cookie) {
   return vsync_ack_cookie.value();
 }
 

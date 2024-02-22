@@ -26,10 +26,10 @@ namespace display {
 // when unifying image ID namespaces.
 DEFINE_STRONG_INT(DriverImageId, uint64_t);
 
-constexpr inline DriverImageId ToDriverImageId(uint64_t banjo_driver_image_id) {
+constexpr DriverImageId ToDriverImageId(uint64_t banjo_driver_image_id) {
   return DriverImageId(banjo_driver_image_id);
 }
-constexpr inline uint64_t ToBanjoDriverImageId(DriverImageId driver_image_id) {
+constexpr uint64_t ToBanjoDriverImageId(DriverImageId driver_image_id) {
   return driver_image_id.value();
 }
 

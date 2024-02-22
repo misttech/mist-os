@@ -23,8 +23,7 @@ struct BufferId {
   uint32_t buffer_index;
 };
 
-constexpr inline BufferId ToBufferId(
-    const fuchsia_hardware_display::wire::BufferId fidl_buffer_id) {
+constexpr BufferId ToBufferId(const fuchsia_hardware_display::wire::BufferId fidl_buffer_id) {
   ZX_DEBUG_ASSERT(fidl_buffer_id.buffer_index >= 0);
   ZX_DEBUG_ASSERT(fidl_buffer_id.buffer_index <= std::numeric_limits<uint32_t>::max());
   return BufferId{
@@ -32,7 +31,7 @@ constexpr inline BufferId ToBufferId(
       .buffer_index = fidl_buffer_id.buffer_index,
   };
 }
-constexpr inline fuchsia_hardware_display::wire::BufferId ToFidlBufferId(BufferId buffer_id) {
+constexpr fuchsia_hardware_display::wire::BufferId ToFidlBufferId(BufferId buffer_id) {
   ZX_DEBUG_ASSERT(buffer_id.buffer_index >= 0);
   ZX_DEBUG_ASSERT(buffer_id.buffer_index <= std::numeric_limits<uint32_t>::max());
   return {

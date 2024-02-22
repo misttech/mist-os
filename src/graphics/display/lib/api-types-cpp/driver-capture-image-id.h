@@ -22,12 +22,10 @@ namespace display {
 // TODO(https://fxbug.dev/42079544): Remove this type when unifying image ID namespaces.
 DEFINE_STRONG_INT(DriverCaptureImageId, uint64_t);
 
-constexpr inline DriverCaptureImageId ToDriverCaptureImageId(
-    uint64_t banjo_driver_capture_image_id) {
+constexpr DriverCaptureImageId ToDriverCaptureImageId(uint64_t banjo_driver_capture_image_id) {
   return DriverCaptureImageId(banjo_driver_capture_image_id);
 }
-constexpr inline uint64_t ToBanjoDriverCaptureImageId(
-    DriverCaptureImageId driver_capture_image_id) {
+constexpr uint64_t ToBanjoDriverCaptureImageId(DriverCaptureImageId driver_capture_image_id) {
   return driver_capture_image_id.value();
 }
 

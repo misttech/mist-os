@@ -17,17 +17,17 @@ namespace display {
 // More useful representation of `fuchsia.hardware.display.types/ConfigStampValue`.
 DEFINE_STRONG_INT(ConfigStamp, uint64_t);
 
-constexpr inline ConfigStamp ToConfigStamp(config_stamp_t banjo_config_stamp) {
+constexpr ConfigStamp ToConfigStamp(config_stamp_t banjo_config_stamp) {
   return ConfigStamp(banjo_config_stamp.value);
 }
-constexpr inline ConfigStamp ToConfigStamp(
+constexpr ConfigStamp ToConfigStamp(
     fuchsia_hardware_display_types::wire::ConfigStamp fidl_config_stamp) {
   return ConfigStamp(fidl_config_stamp.value);
 }
-constexpr inline config_stamp_t ToBanjoConfigStamp(ConfigStamp config_stamp) {
+constexpr config_stamp_t ToBanjoConfigStamp(ConfigStamp config_stamp) {
   return config_stamp_t{.value = config_stamp.value()};
 }
-constexpr inline fuchsia_hardware_display_types::wire::ConfigStamp ToFidlConfigStamp(
+constexpr fuchsia_hardware_display_types::wire::ConfigStamp ToFidlConfigStamp(
     ConfigStamp config_stamp) {
   return fuchsia_hardware_display_types::wire::ConfigStamp{.value = config_stamp.value()};
 }
