@@ -77,7 +77,6 @@ closed protocol NavigationController {
     /// empty entry if no content is being displayed.
     @deprecated("Use a NavigationEventListener to receive state changes, instead.")
     @available(removed=10)
-    @transitional
     strict GetVisibleEntry() -> (resource struct {
         entry NavigationState;
     });
