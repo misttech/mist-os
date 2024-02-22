@@ -11,6 +11,16 @@
 #include <zircon/types.h>
 
 #include "src/graphics/display/drivers/amlogic-display/initcodes-inl.h"
+#include "src/graphics/display/drivers/amlogic-display/panel/boe-tv070wsm-fitipower-jd9364-astro.h"
+#include "src/graphics/display/drivers/amlogic-display/panel/boe-tv070wsm-fitipower-jd9364-nelson.h"
+#include "src/graphics/display/drivers/amlogic-display/panel/boe-tv070wsm-fitipower-jd9365.h"
+#include "src/graphics/display/drivers/amlogic-display/panel/boe-tv101wxm-fitipower-jd9364.h"
+#include "src/graphics/display/drivers/amlogic-display/panel/boe-tv101wxm-fitipower-jd9365.h"
+#include "src/graphics/display/drivers/amlogic-display/panel/innolux-p070acb-fitipower-jd9364.h"
+#include "src/graphics/display/drivers/amlogic-display/panel/innolux-p101dez-fitipower-jd9364.h"
+#include "src/graphics/display/drivers/amlogic-display/panel/kd-kd070d82-fitipower-jd9364.h"
+#include "src/graphics/display/drivers/amlogic-display/panel/kd-kd070d82-fitipower-jd9365.h"
+#include "src/graphics/display/drivers/amlogic-display/panel/microtech-mtf050fhdi03-novatek-nt35596.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace amlogic_display {
