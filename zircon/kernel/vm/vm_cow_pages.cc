@@ -363,7 +363,34 @@ void VmCowPages::DeadTransition(Guard<CriticalMutex>& guard) {
   if (!is_hidden_locked()) {
     if (parent_) {
       parent_locked().RemoveChildLocked(this);
+    }
 
+    // Before potentially dropping the lock to perform any long running deletions over our parents
+    // clear out our page list. Any page (or reference) that links back to us is linking back to a
+    // VMO that is partially dead (our parent_ pointer still exists, but our parent does not link
+    // back to us, etc).
+
+    {
+      // We stack-own loaned pages between removing the page from PageQueues and freeing the page
+      // via call to FreePagesLocked().
+      __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
+
+      // Cleanup page lists and page sources.
+      list_node_t list;
+      list_initialize(&list);
+
+      __UNINITIALIZED BatchPQRemove page_remover(&list);
+      // free all of the pages attached to us
+      page_list_.RemoveAllContent([&page_remover](VmPageOrMarker&& p) {
+        ASSERT(!p.IsPage() || p.Page()->object.pin_count == 0);
+        page_remover.PushContent(&p);
+      });
+      page_remover.Flush();
+
+      FreePagesLocked(&list, /*freeing_owned_pages=*/true);
+    }
+
+    if (parent_) {
       // We removed a child from the parent, and so it may also need to be cleaned.
       // Avoid recursing destructors and dead transitions when we delete our parent by using the
       // deferred deletion method. See common in parent else branch for why we can avoid this on a
@@ -409,24 +436,7 @@ void VmCowPages::DeadTransition(Guard<CriticalMutex>& guard) {
     }
   }
 
-  // We stack-own loaned pages between removing the page from PageQueues and freeing the page via
-  // call to FreePagesLocked().
-  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
-
-  // Cleanup page lists and page sources.
-  list_node_t list;
-  list_initialize(&list);
-
-  __UNINITIALIZED BatchPQRemove page_remover(&list);
-  // free all of the pages attached to us
-  page_list_.RemoveAllContent([&page_remover](VmPageOrMarker&& p) {
-    ASSERT(!p.IsPage() || p.Page()->object.pin_count == 0);
-    page_remover.PushContent(&p);
-  });
-  page_remover.Flush();
-
-  FreePagesLocked(&list, /*freeing_owned_pages=*/true);
-
+  DEBUG_ASSERT(page_list_.HasNoPageOrRef());
   // We must Close() after removing pages, so that all pages will be loaned by the time
   // PhysicalPageProvider::OnClose() calls pmm_delete_lender() on the whole physical range.
   if (page_source_) {
@@ -1002,6 +1012,11 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
     parent_locked().ReplaceChildLocked(this, child);
   }
   child->parent_ = ktl::move(parent_);
+  // We have lost our parent which, if we had a parent, could lead us to now be violating the
+  // invariant that parent_limit_ being non-zero implies we have a parent. Although this generally
+  // should not matter, we have not transitioned to being dead yet, so we should maintain the
+  // correct invariants.
+  parent_offset_ = parent_limit_ = parent_start_limit_ = 0;
 
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 }
