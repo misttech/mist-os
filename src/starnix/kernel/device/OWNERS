@@ -1,3 +1,0 @@
-per-file input.rs = file:/src/ui/lib/input_pipeline/OWNERS
-per-file uinput.rs = file:/src/ui/lib/input_pipeline/OWNERS
-per-file input_event_conversion.rs = file:/src/ui/lib/input_pipeline/OWNERS
