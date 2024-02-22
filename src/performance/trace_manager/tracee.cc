@@ -35,16 +35,13 @@ fuchsia::tracing::BufferingMode EngineBufferingModeToProviderMode(trace_bufferin
 }
 }  // namespace
 
-Tracee::Tracee(std::shared_ptr<const BufferForwarder> output, const TraceProviderBundle* bundle)
-    : output_(std::move(output)), bundle_(bundle), wait_(this), weak_ptr_factory_(this) {}
-
-Tracee::~Tracee() {
-  if (dispatcher_) {
-    wait_.Cancel();
-    wait_.set_object(ZX_HANDLE_INVALID);
-    dispatcher_ = nullptr;
-  }
-}
+Tracee::Tracee(async::Executor& executor, std::shared_ptr<const BufferForwarder> output,
+               const TraceProviderBundle* bundle)
+    : output_(std::move(output)),
+      bundle_(bundle),
+      executor_(executor),
+      wait_(this),
+      weak_ptr_factory_(this) {}
 
 bool Tracee::operator==(TraceProviderBundle* bundle) const { return bundle_ == bundle; }
 
@@ -104,8 +101,7 @@ bool Tracee::Initialize(fidl::VectorPtr<std::string> categories, size_t buffer_s
 
   wait_.set_object(fifo_.get());
   wait_.set_trigger(ZX_FIFO_READABLE | ZX_FIFO_PEER_CLOSED);
-  dispatcher_ = async_get_default_dispatcher();
-  status = wait_.Begin(dispatcher_);
+  status = wait_.Begin(executor_.dispatcher());
   FX_CHECK(status == ZX_OK) << "Failed to add handler: status=" << status;
 
   TransitionToState(State::kInitialized);
@@ -180,7 +176,6 @@ void Tracee::OnHandleReady(async_dispatcher_t* dispatcher, async::WaitBase* wait
 
   FX_DCHECK(pending & ZX_FIFO_PEER_CLOSED);
   wait_.set_object(ZX_HANDLE_INVALID);
-  dispatcher_ = nullptr;
   TransitionToState(State::kTerminated);
   fit::closure terminate_callback = std::move(terminate_callback_);
   FX_DCHECK(terminate_callback);
@@ -234,7 +229,7 @@ void Tracee::OnFifoReadable(async_dispatcher_t* dispatcher, async::WaitBase* wai
         FX_LOGS(INFO) << "Buffer save request from " << *bundle_
                       << ", wrapped_count=" << wrapped_count << ", durable_data_end=0x" << std::hex
                       << durable_data_end;
-        async::PostTask(dispatcher_,
+        async::PostTask(executor_.dispatcher(),
                         [weak = weak_ptr_factory_.GetWeakPtr(), wrapped_count, durable_data_end] {
                           if (weak) {
                             weak->TransferBuffer(wrapped_count, durable_data_end);
@@ -287,7 +282,6 @@ void Tracee::OnHandleError(zx_status_t status) {
   FX_DCHECK(status == ZX_ERR_CANCELED);
   FX_DCHECK(state_ != State::kReady && state_ != State::kTerminated);
   wait_.set_object(ZX_HANDLE_INVALID);
-  dispatcher_ = nullptr;
   TransitionToState(State::kTerminated);
 }
 

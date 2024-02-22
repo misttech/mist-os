@@ -5,6 +5,7 @@
 #ifndef SRC_PERFORMANCE_TRACE_MANAGER_TRACEE_H_
 #define SRC_PERFORMANCE_TRACE_MANAGER_TRACEE_H_
 
+#include <lib/async/cpp/executor.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/fidl/cpp/string.h>
 #include <lib/fidl/cpp/vector.h>
@@ -54,8 +55,9 @@ class Tracee {
   // The size of the initialization record.
   static constexpr size_t kInitRecordSizeBytes = 16;
 
-  explicit Tracee(std::shared_ptr<const BufferForwarder> output, const TraceProviderBundle* bundle);
-  ~Tracee();
+  explicit Tracee(async::Executor& executor, std::shared_ptr<const BufferForwarder> output,
+                  const TraceProviderBundle* bundle);
+  ~Tracee() = default;
 
   bool operator==(TraceProviderBundle* bundle) const;
 
@@ -135,7 +137,7 @@ class Tracee {
   TerminateCallback terminate_callback_;
   AlertCallback alert_callback_;
 
-  async_dispatcher_t* dispatcher_ = nullptr;
+  async::Executor& executor_;
   async::WaitMethod<Tracee, &Tracee::OnHandleReady> wait_;
 
   uint32_t last_wrapped_count_ = 0u;

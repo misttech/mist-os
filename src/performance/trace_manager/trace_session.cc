@@ -4,6 +4,7 @@
 
 #include "src/performance/trace_manager/trace_session.h"
 
+#include <lib/async/cpp/executor.h>
 #include <lib/async/default.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/fields.h>
@@ -15,13 +16,15 @@
 
 namespace tracing {
 
-TraceSession::TraceSession(zx::socket destination, std::vector<std::string> enabled_categories,
+TraceSession::TraceSession(async::Executor& executor, zx::socket destination,
+                           std::vector<std::string> enabled_categories,
                            size_t buffer_size_megabytes,
                            fuchsia::tracing::BufferingMode buffering_mode,
                            TraceProviderSpecMap&& provider_specs, zx::duration start_timeout,
                            zx::duration stop_timeout, fit::closure abort_handler,
                            AlertCallback alert_callback)
-    : buffer_forwarder_(std::make_shared<BufferForwarder>(std::move(destination))),
+    : executor_(executor),
+      buffer_forwarder_(std::make_shared<BufferForwarder>(std::move(destination))),
       enabled_categories_(std::move(enabled_categories)),
       buffer_size_megabytes_(buffer_size_megabytes),
       buffering_mode_(buffering_mode),
@@ -61,7 +64,7 @@ void TraceSession::AddProvider(TraceProviderBundle* provider) {
   FX_LOGS(DEBUG) << "Adding provider " << *provider << ", buffer size " << buffer_size_megabytes
                  << "MB";
 
-  tracees_.emplace_back(std::make_unique<Tracee>(buffer_forwarder_, provider));
+  tracees_.emplace_back(std::make_unique<Tracee>(executor_, buffer_forwarder_, provider));
   std::vector<std::string> categories_clone(provider_specific_categories.begin(),
                                             provider_specific_categories.end());
   if (!tracees_.back()->Initialize(
@@ -127,7 +130,7 @@ void TraceSession::Terminate(fit::function<void(controller::TerminateResult)> ca
     tracee->Terminate();
   }
 
-  session_terminate_timeout_.PostDelayed(async_get_default_dispatcher(), stop_timeout_);
+  session_terminate_timeout_.PostDelayed(executor_.dispatcher(), stop_timeout_);
   TerminateSessionIfEmpty();
 }
 
@@ -147,7 +150,7 @@ void TraceSession::Start(fuchsia::tracing::BufferDisposition buffer_disposition,
   }
 
   start_callback_ = std::move(callback);
-  session_start_timeout_.PostDelayed(async_get_default_dispatcher(), start_timeout_);
+  session_start_timeout_.PostDelayed(executor_.dispatcher(), start_timeout_);
 
   // Clear out any old trace stats before starting a new session.
   trace_stats_.clear();
@@ -179,7 +182,7 @@ void TraceSession::Stop(bool write_results, fit::closure callback) {
     force_clear_buffer_contents_ = true;
   }
 
-  session_stop_timeout_.PostDelayed(async_get_default_dispatcher(), stop_timeout_);
+  session_stop_timeout_.PostDelayed(executor_.dispatcher(), stop_timeout_);
   CheckAllProvidersStopped();
 
   // Clear out, must be respecified for each Start() request.

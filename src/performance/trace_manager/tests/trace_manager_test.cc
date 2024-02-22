@@ -6,12 +6,13 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include <memory>
 #include <utility>
 
 namespace tracing {
 namespace test {
 
-TraceManagerTest::TraceManagerTest() {
+TraceManagerTest::TraceManagerTest() : executor_(dispatcher()) {
   controller_.events().OnSessionStateChange = [this](controller::SessionState state) {
     FidlOnSessionStateChange(state);
   };
@@ -23,8 +24,8 @@ void TraceManagerTest::SetUp() {
   Config config;
   ASSERT_TRUE(config.ReadFrom(kConfigFile));
 
-  std::unique_ptr<sys::ComponentContext> context{context_provider_.TakeContext()};
-  app_.reset(new TraceManagerApp(std::move(context), std::move(config), dispatcher()));
+  app_ = std::make_unique<TraceManagerApp>(context_provider_.TakeContext(), std::move(config),
+                                           executor_);
 }
 
 void TraceManagerTest::TearDown() {

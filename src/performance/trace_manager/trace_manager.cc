@@ -56,8 +56,8 @@ using KnownCategoryVector = std::vector<fuchsia::tracing::KnownCategory>;
 
 }  // namespace
 
-TraceManager::TraceManager(TraceManagerApp* app, Config config, async_dispatcher_t* dispatcher)
-    : app_(app), config_(std::move(config)), executor_(dispatcher) {}
+TraceManager::TraceManager(TraceManagerApp* app, Config config, async::Executor& executor)
+    : app_(app), config_(std::move(config)), executor_(executor) {}
 
 TraceManager::~TraceManager() = default;
 
@@ -161,7 +161,7 @@ void TraceManager::InitializeTracing(controller::TraceConfig config, zx::socket 
   }
 
   session_ = std::make_unique<TraceSession>(
-      std::move(output), std::move(categories), default_buffer_size_megabytes,
+      executor_, std::move(output), std::move(categories), default_buffer_size_megabytes,
       tracing_buffering_mode, std::move(provider_specs), start_timeout, kStopTimeout,
       [this]() { session_.reset(); },
       [this](const std::string& alert_name) { OnAlert(alert_name); });

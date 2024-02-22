@@ -32,7 +32,7 @@ class TraceManagerApp;
 
 class TraceManager : public controller::Controller, public provider::Registry {
  public:
-  TraceManager(TraceManagerApp* app, Config config, async_dispatcher_t* dispatcher);
+  TraceManager(TraceManagerApp* app, Config config, async::Executor& executor);
   ~TraceManager() override;
 
   // For testing.
@@ -74,7 +74,7 @@ class TraceManager : public controller::Controller, public provider::Registry {
   std::list<TraceProviderBundle> providers_;
   std::queue<std::string> alerts_;
   std::queue<WatchAlertCallback> watch_alert_callbacks_;
-  async::Executor executor_;
+  async::Executor& executor_;
 
   TraceManager(const TraceManager&) = delete;
   TraceManager(TraceManager&&) = delete;

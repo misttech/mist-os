@@ -11,8 +11,8 @@
 namespace tracing {
 
 TraceManagerApp::TraceManagerApp(std::unique_ptr<sys::ComponentContext> context, Config config,
-                                 async_dispatcher_t* dispatcher)
-    : context_(std::move(context)), trace_manager_(this, std::move(config), dispatcher) {
+                                 async::Executor& executor)
+    : context_(std::move(context)), trace_manager_(this, std::move(config), executor) {
   [[maybe_unused]] zx_status_t status;
 
   status = context_->outgoing()->AddPublicService(

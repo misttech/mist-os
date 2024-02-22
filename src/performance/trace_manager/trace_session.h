@@ -8,6 +8,7 @@
 #include <fuchsia/tracing/controller/cpp/fidl.h>
 #include <fuchsia/tracing/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
+#include <lib/async/cpp/executor.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/string.h>
 #include <lib/fidl/cpp/vector.h>
@@ -63,8 +64,9 @@ class TraceSession {
   //
   // |abort_handler| is invoked whenever the session encounters
   // unrecoverable errors that render the session dead.
-  TraceSession(zx::socket destination, std::vector<std::string> categories,
-               size_t buffer_size_megabytes, fuchsia::tracing::BufferingMode buffering_mode,
+  TraceSession(async::Executor& executor, zx::socket destination,
+               std::vector<std::string> categories, size_t buffer_size_megabytes,
+               fuchsia::tracing::BufferingMode buffering_mode,
                TraceProviderSpecMap&& provider_specs, zx::duration start_timeout,
                zx::duration stop_timeout, fit::closure abort_handler, AlertCallback alert_callback);
 
@@ -154,6 +156,7 @@ class TraceSession {
 
   void TransitionToState(State state);
 
+  async::Executor& executor_;
   State state_ = State::kReady;
   std::shared_ptr<BufferForwarder> buffer_forwarder_;
   fidl::VectorPtr<std::string> enabled_categories_;

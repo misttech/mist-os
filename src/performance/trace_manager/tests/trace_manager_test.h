@@ -209,6 +209,7 @@ class TraceManagerTest : public gtest::TestLoopFixture {
   // The last recorded session state, for verification purposes.
   controller::SessionState last_session_state_event_{};
 
+  async::Executor executor_;
   // Socket for communication with controller.
   zx::socket destination_;
 
