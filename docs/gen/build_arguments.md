@@ -2439,7 +2439,7 @@ created at "$dir_pw_third_party/fuzztest".
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/third_party/fuzztest/fuzztest.gni:22
+From //third_party/pigweed/src/third_party/fuzztest/fuzztest.gni:23
 
 ### dir_pw_third_party_googletest
 
