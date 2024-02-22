@@ -5,7 +5,7 @@
 #ifndef EXAMPLES_DRIVERS_SIMPLE_DFV2_SIMPLE_DRIVER_H_
 #define EXAMPLES_DRIVERS_SIMPLE_DFV2_SIMPLE_DRIVER_H_
 
-#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 
 namespace simple {
