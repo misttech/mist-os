@@ -195,6 +195,12 @@ template("core_tests") {
                              "device_types",
                              "timeout",
                            ])
+    if (!defined(timeout)) {
+      # We've observed the ASAN variant of core-tests take as long as 701
+      # seconds when booted via firmware on certain types of hardware.  Leave a
+      # little buffer for growth.
+      timeout = 840
+    }
   }
 }
 
@@ -251,13 +257,9 @@ if (is_fuchsia) {
 }
 
 boot_tests = [ ":core-tests" ]
+
 core_tests("core-tests") {
   device_types = kernel_test_device_types
-
-  # We've observed the ASAN variant of core-tests take as long as 701 seconds
-  # when booted via firmware on certain types of hardware.  Leave a little buffer
-  # for growth.
-  timeout = 840
 }
 
 # If we are building for x64, make sure to run the core tests on a system which
@@ -267,12 +269,18 @@ if (current_cpu == "x64") {
   core_tests("core-tests-hpet") {
     args = [ "kernel.wallclock=hpet" ]
     device_types = [ "Intel NUC Kit NUC7i5DNHE" ]
-
-    # Using an HPET-based clock substantially increases the run-time.
-    timeout = 600
   }
 
   boot_tests += [ ":core-tests-hpet" ]
+}
+
+if (current_cpu == "arm64") {
+  core_tests("core-tests-alternate-vbar") {
+    args = [ "kernel.arm64.alternate-vbar" ]
+    device_types = kernel_test_device_types
+  }
+
+  boot_tests += [ ":core-tests-alternate-vbar" ]
 }
 
 # TODO(https://fxbug.dev/42170495): Remove once migration is complete.

@@ -1057,6 +1057,13 @@ This enables use of the MMU and caches during the kernel's early boot phase.
 
 This enables use of ASIDs. True by default if the underlying hardware supports 16-bit ASIDs.
 
+### kernel.arm64.alternate-vbar=\<bool>
+
+**Default:** `false`
+
+**TODO(https://fxbug.dev/322202704): This is a temporary switch for testing.**
+This selects the alternate exception vector implementation.
+
 
 ## Options available only on riscv64 machines
 

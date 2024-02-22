@@ -57,3 +57,8 @@ This enables use of the MMU and caches during the kernel's early boot phase.
 DEFINE_OPTION("kernel.arm64.enable-asid", bool, arm64_enable_asid, {true}, R"""(
 This enables use of ASIDs. True by default if the underlying hardware supports 16-bit ASIDs.
 )""")
+
+DEFINE_OPTION("kernel.arm64.alternate-vbar", bool, arm64_enable_alternate_vbar, {false}, R"""(
+**TODO(https://fxbug.dev/322202704): This is a temporary switch for testing.**
+This selects the alternate exception vector implementation.
+)""")

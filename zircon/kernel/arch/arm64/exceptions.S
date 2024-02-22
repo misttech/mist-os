@@ -89,8 +89,17 @@
 // Save x2..x29, the interrupted PC, and SPSR in the iframe.  The saved PC is
 // also left in x10 for easy use later.  Even after this, the sync from EL0
 // case relies on x0..x7 having the incoming syscall argument values preserved.
-.macro iframe.exc.save.common
+.macro iframe.exc.save.common start_label:req
   iframe.foreach.x iframe.stp, x0=skip
+
+  .if (. - \start_label) != 15 * 4
+    .error "iframe.exc.start + iframe.foreach.x should be exactly 15 isns!"
+  .endif
+
+  // This nop fills out the sequence to exactly 16 instructions, which fits
+  // precisely into one 64-byte cache line.  This allows the alternate vector
+  // code to jump in just after here, into the second cache line of the vector.
+  nop
 
   mrs x10, elr_el1
   .cfi_register DW_REGNO_PC, x10
@@ -104,15 +113,25 @@
   .cfi_rel_offset DW_REGNO_PC, ARM64_IFRAME_OFFSET_ELR
 .endm
 
-// Set up the iframe when coming from EL1, and restore kernel invariants.
-.macro iframe.exc.save.el1 restore_scsp:req
-  iframe.exc.start
+.macro .cfi.iframe.exc.start.el0
+  // The previous SP is in SP_EL0 but there is no DWARF number for that.
+  .cfi_undefined sp
+.endm
+
+.macro .cfi.iframe.exc.start.el1
   // The previous SP is what it was on entry, which is now the CFA.
 #ifndef __clang__ // TODO(https://fxbug.dev/323770291): missing .cfi_* support
   .cfi_val_offset sp, 0
 #endif
+.endm
 
-  iframe.exc.save.common
+// Set up the iframe when coming from EL1, and restore kernel invariants.
+.macro iframe.exc.save.el1 restore_scsp:req
+  .label .L.iframe.exc.save.el1.\@
+  iframe.exc.start
+  .cfi.iframe.exc.start.el1
+
+  iframe.exc.save.common .L.iframe.exc.save.el1.\@
 
   // Despite the name, the USP slot is really expected by higher-level code to
   // uniformly mean "the interrupted SP value" regardless of EL0 vs EL1.  In
@@ -135,12 +154,12 @@
 
 // Set up the iframe when coming from EL0, and restore kernel invariants.
 .macro iframe.exc.save.el0
+  .label .L.iframe.exc.save.el0.\@
   iframe.exc.start
-  // The previous SP is in SP_EL0 but there is no DWARF number for that.
-  .cfi_undefined sp
+  .cfi.iframe.exc.start.el0
 
   // This leaves the interrupted PC in x10 where the syscall path checks it.
-  iframe.exc.save.common
+  iframe.exc.save.common .L.iframe.exc.save.el0.\@
 
   // Fetch the interrupted SP from SP_EL0 and save it in the USP slot.
   mrs x9, sp_el0
@@ -173,10 +192,7 @@
 // Recreate the CFI state at the end of iframe.exc.save.el1.
 .macro .iframe.function.el1 name
   .iframe.function.common \name
-  // The previous SP is what it was on entry, which is now the CFA.
-#ifndef __clang__ // TODO(https://fxbug.dev/323770291): missing .cfi_* support
-  .cfi_val_offset sp, 0
-#endif
+  .cfi.iframe.exc.start.el1
 .endm
 
 // Recreate the CFI state at the end of iframe.exc.save.el0.
@@ -377,6 +393,35 @@ iframe.async_exception.el0 arm64_el1_exception_irq_lower_a64, arm64_irq
 iframe.async_exception.el0 arm64_el1_exception_serror_lower_a64, \
                            arm64_serror_exception
 
+.end_vbar_table
+
+
+// In the alternate table, each vector mirrors the first 15 instructions
+// of the corresponding main vector and then has a branch into that code.
+// Each main vector has a nop as its 16th instruction, ending the first
+// 64-byte cache line.  The alternate vector jumps to just after that nop,
+// to share the second cache line of the vector's code.
+.macro iframe.alternate.stub name, offset
+  .label .L.iframe.alternate.stub.\@
+  iframe.exc.start
+  .if ((\offset) & ARCH_ARM64_VBAR_CONTEXT_MASK) == ARCH_ARM64_VBAR_LOWER_A64
+    .cfi.iframe.exc.start.el0
+  .else
+    .cfi.iframe.exc.start.el1
+  .endif
+  iframe.foreach.x iframe.stp, x0=skip
+
+  .if (. - .L.iframe.alternate.stub.\@) != 15 * 4
+    .error "iframe.exc.start + iframe.foreach.x should be exactly 15 isns!"
+  .endif
+
+  // Now jump into the second half of the corresponding vector.
+  b arm64_el1_exception + (\offset) + \
+    (.L.iframe.alternate.stub.\@.end - .L.iframe.alternate.stub.\@)
+  .label .L.iframe.alternate.stub.\@.end
+.endm
+
+.vbar_table arm64_el1_exception_alternate, global, iframe.alternate.stub
 .end_vbar_table
 
 

@@ -138,12 +138,19 @@ zx_status_t arm64_free_secondary_stack(cpu_num_t cpu_num) {
   return _init_thread[cpu_num - 1].stack().Teardown();
 }
 
+// Select the exception vector to use for the current CPU.
+static VbarFunction* arm64_select_vbar() {
+  return gBootOptions->arm64_enable_alternate_vbar  //
+             ? arm64_el1_exception_alternate
+             : arm64_el1_exception;
+}
+
 static void arm64_cpu_early_init() {
   // Make sure the per cpu pointer is set up.
   arm64_init_percpu_early();
 
   // Set the vector base.
-  arch::ArmVbarEl1::Write(reinterpret_cast<uintptr_t>(&arm64_el1_exception));
+  arch::ArmVbarEl1::Write(reinterpret_cast<uintptr_t>(arm64_select_vbar()));
   __isb(ARM_MB_SY);
 
   // Set some control bits in sctlr.
@@ -203,6 +210,8 @@ void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
   dprintf(INFO, "ARM boot EL%lu\n", arm64_get_boot_el());
 
   arm64_feature_debug(true);
+
+  dprintf(INFO, "Using VBAR_EL1 %#" PRIx64 "\n", arch::ArmVbarEl1::Read().addr());
 
   uint32_t max_cpus = arch_max_num_cpus();
   uint32_t cmdline_max_cpus = gBootOptions->smp_max_cpus;
