@@ -16,6 +16,7 @@
 #include <asm/stat.h>
 #include <asm/statfs.h>
 #include <asm/ucontext.h>
+#include <linux/aio_abi.h>
 #include <linux/android/binder.h>
 #include <linux/ashmem.h>
 #include <linux/audit.h>

@@ -27,7 +27,7 @@ use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{LockBefore, Locked, Mutex, ReadOps, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
-    __kernel_fd_set,
+    __kernel_fd_set, aio_context_t,
     auth::{CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, CAP_WAKE_ALARM, PTRACE_MODE_ATTACH_REALCREDS},
     device_type::DeviceType,
     errno, error,
@@ -36,7 +36,7 @@ use starnix_uapi::{
     f_owner_ex,
     file_mode::{Access, FileMode},
     inotify_mask::InotifyMask,
-    itimerspec,
+    io_event, iocb, itimerspec,
     mount_flags::MountFlags,
     off_t,
     open_flags::OpenFlags,
@@ -2635,6 +2635,56 @@ pub fn sys_readahead(
     // but GVisor tests require `readahead()` to fail in this case.
     let offset: usize = offset.try_into().map_err(|_| errno!(EINVAL))?;
     file.readahead(current_task, offset, length)
+}
+
+pub fn sys_io_setup(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &CurrentTask,
+    _nr_events: u32,
+    _ctx_idp: UserRef<aio_context_t>,
+) -> Result<(), Errno> {
+    track_stub!(TODO("https://fxbug.dev/297433877"), "io_setup");
+    return error!(ENOSYS);
+}
+pub fn sys_io_submit(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &CurrentTask,
+    _ctx_id: aio_context_t,
+    _nr: i64,
+    _control_blocks: UserAddress,
+) -> Result<i32, Errno> {
+    track_stub!(TODO("https://fxbug.dev/297433877"), "io_submit");
+    return error!(ENOSYS);
+}
+pub fn sys_io_getevents(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &CurrentTask,
+    _ctx_id: aio_context_t,
+    _min_nr: i64,
+    _nr: i64,
+    _events: UserRef<io_event>,
+    _timeout: UserRef<timespec>,
+) -> Result<i32, Errno> {
+    track_stub!(TODO("https://fxbug.dev/297433877"), "io_getevents");
+    return error!(ENOSYS);
+}
+pub fn sys_io_cancel(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &CurrentTask,
+    _ctx_id: aio_context_t,
+    _control_block: UserRef<iocb>,
+    _result: UserRef<io_event>,
+) -> Result<(), Errno> {
+    track_stub!(TODO("https://fxbug.dev/297433877"), "io_cancel");
+    return error!(ENOSYS);
+}
+pub fn sys_io_destroy(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &CurrentTask,
+    _ctx_id: aio_context_t,
+) -> Result<(), Errno> {
+    track_stub!(TODO("https://fxbug.dev/297433877"), "io_destroy");
+    return error!(ENOSYS);
 }
 
 #[cfg(test)]
