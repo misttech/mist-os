@@ -577,7 +577,7 @@ impl std::fmt::Display for BorderRoutingPrefixTableEntry {
 impl BorderRoutingPrefixTableEntry {
     /// Returns a reference to the IPv6 address.
     pub fn router_address(&self) -> &Ip6Address {
-        Ip6Address::ref_from_ot_ref(&self.0.mRouterAddress)
+        Ip6Address::ref_from_ot_ref(&self.0.mRouter.mAddress)
     }
 
     /// Returns the prefix.

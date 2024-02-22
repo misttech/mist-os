@@ -246,7 +246,7 @@ impl Platform {
             //         must also only be called from the main OpenThread thread,
             //         which is a guarantee of this method.
             unsafe {
-                platformRadioProcess(instance_ptr);
+                platformRadioProcess(instance_ptr, std::ptr::null());
             }
         }
     }
