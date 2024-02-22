@@ -6,12 +6,10 @@
 
 #include <endian.h>
 #include <fuchsia/hardware/spiimpl/c/banjo.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/thread.h>
 #include <string.h>
@@ -26,6 +24,8 @@
 #include <fbl/auto_lock.h>
 
 #include "registers.h"
+#include "sdk/lib/driver/compat/cpp/metadata.h"
+#include "src/devices/spi/drivers/aml-spi/aml-spi-bind.h"
 
 namespace spi {
 
@@ -41,17 +41,7 @@ constexpr size_t kReset6RegisterOffset = 0x1c;
 constexpr uint32_t kSpi0ResetMask = 1 << 1;
 constexpr uint32_t kSpi1ResetMask = 1 << 6;
 
-void AmlSpi::DdkRelease() {
-  Shutdown();
-  delete this;
-}
-
-void AmlSpi::DdkUnbind(ddk::UnbindTxn txn) {
-  Shutdown();
-  txn.Reply();
-}
-
-#define dump_reg(reg) zxlogf(ERROR, "%-21s (+%02x): %08x", #reg, reg, mmio_.Read32(reg))
+#define dump_reg(reg) FDF_LOG(ERROR, "%-21s (+%02x): %08x", #reg, reg, mmio_.Read32(reg))
 
 void AmlSpi::DumpState() {
   // skip registers with side-effects
@@ -208,11 +198,27 @@ void AmlSpi::SetThreadProfile() {
     applied_scheduler_role_ = true;
     // Set profile for bus transaction thread.
     const char* role_name = "fuchsia.devices.spi.drivers.aml-spi.transaction";
-    const zx_status_t status = device_set_profile_by_role(
-        zxdev(), thrd_get_zx_handle(thrd_current()), role_name, strlen(role_name));
+
+    if (!profile_provider_) {
+      FDF_LOG(WARNING, "No profile provider, can't apply scheduler profile");
+      return;
+    }
+
+    zx::thread duplicate_thread;
+    zx_status_t status = zx::thread::self()->duplicate(ZX_RIGHT_TRANSFER | ZX_RIGHT_MANAGE_THREAD,
+                                                       &duplicate_thread);
     if (status != ZX_OK) {
-      zxlogf(WARNING, "Failed to apply role to transaction thread: %s",
-             zx_status_get_string(status));
+      FDF_LOG(WARNING, "Failed to duplicate thread");
+      return;
+    }
+
+    auto result = profile_provider_->SetProfileByRole(std::move(duplicate_thread),
+                                                      fidl::StringView::FromExternal(role_name));
+    if (!result.ok()) {
+      FDF_LOG(WARNING, "Call to apply scheduler profile failed: %s", result.status_string());
+    } else if (result->status != ZX_OK) {
+      FDF_LOG(WARNING, "Failed to apply scheduler profile: %s",
+              zx_status_get_string(result->status));
     }
   }
 }
@@ -243,6 +249,11 @@ void AmlSpi::WaitForDmaTransferComplete() {
 }
 
 void AmlSpi::InitRegisters() {
+  fbl::AutoLock lock(&bus_lock_);
+  InitRegistersLocked();
+}
+
+void AmlSpi::InitRegistersLocked() {
   ConReg::Get().FromValue(0).WriteTo(&mmio_);
 
   TestReg::Get().FromValue(0).set_dlyctl(config_.delay_control).set_clk_free_en(1).WriteTo(&mmio_);
@@ -302,10 +313,10 @@ zx_status_t AmlSpi::SpiImplExchange(uint32_t cs, const uint8_t* txdata, size_t t
   if (need_reset_ && reset_ && !use_dma && exchange_size >= sizeof(uint64_t)) {
     auto result = reset_->WriteRegister32(kReset6RegisterOffset, reset_mask_, reset_mask_);
     if (!result.ok() || result.value().is_error()) {
-      zxlogf(WARNING, "Failed to reset SPI controller");
+      FDF_LOG(WARNING, "Failed to reset SPI controller");
     }
 
-    InitRegisters();  // The registers must be reinitialized after resetting the IP.
+    InitRegistersLocked();  // The registers must be reinitialized after resetting the IP.
     need_reset_ = false;
   } else {
     // reset both fifos
@@ -492,14 +503,14 @@ zx_status_t AmlSpi::ExchangeDma(const uint8_t* txdata, uint8_t* out_rxdata, uint
 
   zx_status_t status = tx_buffer_.vmo.op_range(ZX_VMO_OP_CACHE_CLEAN, 0, size, nullptr, 0);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to clean cache: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to clean cache: %s", zx_status_get_string(status));
     return status;
   }
 
   if (out_rxdata) {
     status = rx_buffer_.vmo.op_range(ZX_VMO_OP_CACHE_CLEAN, 0, size, nullptr, 0);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to clean cache: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "Failed to clean cache: %s", zx_status_get_string(status));
       return status;
     }
   }
@@ -542,7 +553,7 @@ zx_status_t AmlSpi::ExchangeDma(const uint8_t* txdata, uint8_t* out_rxdata, uint
   if (out_rxdata) {
     status = rx_buffer_.vmo.op_range(ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, 0, size, nullptr, 0);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to invalidate cache: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "Failed to invalidate cache: %s", zx_status_get_string(status));
       return status;
     }
 
@@ -600,9 +611,8 @@ bool AmlSpi::UseDma(size_t size) const {
          size <= rx_buffer_.mapped.size();
 }
 
-fbl::Array<AmlSpi::ChipInfo> AmlSpi::InitChips(amlogic_spi::amlspi_config_t* config,
-                                               zx_device_t* device) {
-  fbl::Array<ChipInfo> chips(new ChipInfo[config->cs_count], config->cs_count);
+fbl::Array<AmlSpi::ChipInfo> AmlSpiDriver::InitChips(amlogic_spi::amlspi_config_t* config) {
+  fbl::Array<AmlSpi::ChipInfo> chips(new AmlSpi::ChipInfo[config->cs_count], config->cs_count);
   if (!chips) {
     return chips;
   }
@@ -615,11 +625,10 @@ fbl::Array<AmlSpi::ChipInfo> AmlSpi::InitChips(amlogic_spi::amlspi_config_t* con
 
     char fragment_name[32] = {};
     snprintf(fragment_name, 32, "gpio-cs-%d", index);
-    zx::result client = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
-        device, fragment_name);
+    zx::result client = incoming()->Connect<fuchsia_hardware_gpio::Service::Device>(fragment_name);
     if (client.is_error()) {
-      zxlogf(ERROR, "Failed to get GPIO fragment %u", i);
-      return fbl::Array<ChipInfo>();
+      FDF_LOG(ERROR, "Failed to connect to GPIO device: %s", client.status_string());
+      return fbl::Array<AmlSpi::ChipInfo>();
     }
     chips[i].gpio = fidl::WireSyncClient(std::move(*client));
   }
@@ -627,137 +636,193 @@ fbl::Array<AmlSpi::ChipInfo> AmlSpi::InitChips(amlogic_spi::amlspi_config_t* con
   return chips;
 }
 
-zx_status_t AmlSpi::Create(void* ctx, zx_device_t* device) {
-  auto pdev = ddk::PDevFidl::FromFragment(device);
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "Failed to get platform device fragment");
-    return ZX_ERR_NO_RESOURCES;
+zx::result<> AmlSpiDriver::Start() {
+  parent_.Bind(std::move(node()));
+
+  {
+    compat::DeviceServer::BanjoConfig banjo_config{
+        .default_proto_id = ZX_PROTOCOL_SPI_IMPL,
+        .generic_callback = fit::bind_member<&AmlSpiDriver::GetBanjoProto>(this),
+    };
+
+    zx::result result = compat_server_.Initialize(
+        incoming(), outgoing(), node_name(), component::kDefaultInstance,
+        compat::ForwardMetadata::Some({DEVICE_METADATA_SPI_CHANNELS}), std::move(banjo_config));
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to initialize compat server: %s", result.status_string());
+      return result.take_error();
+    }
   }
 
-  std::optional<fdf::MmioBuffer> mmio;
-  zx_status_t status = pdev.MapMmio(0, &mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map MMIO: %d", status);
-    return status;
+  zx::result pdev_client =
+      incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
+  if (pdev_client.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to platform device: %s", pdev_client.status_string());
+    return pdev_client.take_error();
+  }
+
+  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev(*std::move(pdev_client));
+
+  zx::result mmio = MapMmio(pdev, 0);
+  if (mmio.is_error()) {
+    return mmio.take_error();
   }
 
   // Stop DMA in case the driver is restarting and didn't shut down cleanly.
   DmaReg::Get().FromValue(0).WriteTo(&(*mmio));
   ConReg::Get().FromValue(0).WriteTo(&(*mmio));
 
-  size_t actual;
-  amlogic_spi::amlspi_config_t config = {};
-  status =
-      device_get_metadata(device, DEVICE_METADATA_AMLSPI_CONFIG, &config, sizeof config, &actual);
-  if ((status != ZX_OK) || (actual != sizeof config)) {
-    zxlogf(ERROR, "Failed to read config metadata");
-    return status;
+  zx::result config = compat::GetMetadata<amlogic_spi::amlspi_config_t>(
+      incoming(), DEVICE_METADATA_AMLSPI_CONFIG, "pdev");
+  if (config.is_error()) {
+    FDF_LOG(ERROR, "Failed to read config metadata: %s", config.status_string());
+    return config.take_error();
   }
 
   const uint32_t max_clock_div_reg_value =
-      config.use_enhanced_clock_mode ? EnhanceCntl::kEnhanceClkDivMax : ConReg::kDataRateMax;
-  if (config.clock_divider_register_value > max_clock_div_reg_value) {
-    zxlogf(ERROR, "Metadata clock divider value is too large: %u",
-           config.clock_divider_register_value);
-    return ZX_ERR_INVALID_ARGS;
+      config->use_enhanced_clock_mode ? EnhanceCntl::kEnhanceClkDivMax : ConReg::kDataRateMax;
+  if (config->clock_divider_register_value > max_clock_div_reg_value) {
+    FDF_LOG(ERROR, "Metadata clock divider value is too large: %u",
+            config->clock_divider_register_value);
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   zx::result reset_register_client =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_registers::Service::Device>(device, "reset");
-  fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset_fidl_client;
-  if (reset_register_client.is_ok() && reset_register_client.value().is_valid()) {
-    reset_fidl_client.Bind(std::move(reset_register_client.value()));
-  } else {
-    zxlogf(WARNING, "Did not bind the reset register client.");
+      incoming()->Connect<fuchsia_hardware_registers::Service::Device>("reset");
+  if (reset_register_client.is_error()) {
+    FDF_LOG(WARNING, "Did not bind the reset register client.");
+  }
+
+  zx::result profile_provider = incoming()->Connect<fuchsia_scheduler::ProfileProvider>();
+  if (profile_provider.is_error()) {
+    FDF_LOG(WARNING, "Failed to connect to ProfileProvider");
   }
 
   zx::interrupt interrupt;
-  if ((status = pdev.GetInterrupt(0, 0, &interrupt)) != ZX_OK) {
-    zxlogf(ERROR, "Failed to get SPI interrupt: %d", status);
-    return status;
+  if (auto result = pdev->GetInterruptById(0, 0); !result.ok()) {
+    FDF_LOG(ERROR, "Call to get SPI interrupt failed: %s", result.status_string());
+    return zx::error(result.status());
+  } else if (result->is_error()) {
+    FDF_LOG(ERROR, "Failed to get SPI interrupt: %s", zx_status_get_string(result->error_value()));
+    return result->take_error();
+  } else {
+    interrupt = std::move(result->value()->irq);
   }
 
   zx::bti bti;
-  status = pdev.GetBti(0, &bti);  // Supplying a BTI is optional.
+  AmlSpi::DmaBuffer tx_buffer, rx_buffer;
+  // Supplying a BTI is optional.
+  if (auto result = pdev->GetBtiById(0); result.ok() && result->is_ok()) {
+    bti = std::move(result->value()->bti);
 
-  DmaBuffer tx_buffer, rx_buffer;
-  if (status == ZX_OK) {
     // DMA was stopped above, so it's safe to release any quarantined pages.
     bti.release_quarantine();
 
-    if ((status = DmaBuffer::Create(bti, kDmaBufferSize, &tx_buffer)) != ZX_OK) {
-      return status;
+    zx_status_t status;
+    if ((status = AmlSpi::DmaBuffer::Create(bti, kDmaBufferSize, &tx_buffer)) != ZX_OK) {
+      return zx::error(status);
     }
-    if ((status = DmaBuffer::Create(bti, kDmaBufferSize, &rx_buffer)) != ZX_OK) {
-      return status;
+    if ((status = AmlSpi::DmaBuffer::Create(bti, kDmaBufferSize, &rx_buffer)) != ZX_OK) {
+      return zx::error(status);
     }
-    zxlogf(DEBUG, "Got BTI and contiguous buffers, DMA may be used");
+    FDF_LOG(DEBUG, "Got BTI and contiguous buffers, DMA may be used");
   }
 
-  fbl::Array<ChipInfo> chips = InitChips(&config, device);
+  fbl::Array<AmlSpi::ChipInfo> chips = InitChips(config.value().get());
   if (!chips) {
-    return ZX_ERR_NO_RESOURCES;
+    return zx::error(ZX_ERR_NO_RESOURCES);
   }
   if (chips.size() == 0) {
-    return ZX_OK;
+    return zx::ok();
   }
 
   const uint32_t reset_mask =
-      config.bus_id == 0 ? kSpi0ResetMask : (config.bus_id == 1 ? kSpi1ResetMask : 0);
+      config->bus_id == 0 ? kSpi0ResetMask : (config->bus_id == 1 ? kSpi1ResetMask : 0);
 
   fbl::AllocChecker ac;
-  std::unique_ptr<AmlSpi> spi(new (&ac) AmlSpi(
-      device, *std::move(mmio), std::move(reset_fidl_client), reset_mask, std::move(chips),
-      std::move(interrupt), config, std::move(bti), std::move(tx_buffer), std::move(rx_buffer)));
+  device_.reset(new (&ac) AmlSpi(*std::move(mmio), *std::move(reset_register_client),
+                                 *std::move(profile_provider), reset_mask, std::move(chips),
+                                 std::move(interrupt), **config, std::move(bti),
+                                 std::move(tx_buffer), std::move(rx_buffer)));
   if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  {
-    fbl::AutoLock lock(&spi->bus_lock_);
-    spi->InitRegisters();
+  device_->InitRegisters();
+
+  zx::result controller_endpoints =
+      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  if (!controller_endpoints.is_ok()) {
+    FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
+            controller_endpoints.status_string());
+    return controller_endpoints.take_error();
   }
+
+  controller_.Bind(std::move(controller_endpoints->client));
 
   char devname[32];
-  sprintf(devname, "aml-spi-%u", config.bus_id);
+  sprintf(devname, "aml-spi-%u", config->bus_id);
 
-  status = spi->DdkAdd(
-      ddk::DeviceAddArgs(devname).forward_metadata(device, DEVICE_METADATA_SPI_CHANNELS));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "DdkAdd failed for SPI%u: %d", config.bus_id, status);
-    return status;
+  fidl::Arena arena;
+
+  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
+  properties[0] = fdf::MakeProperty(arena, BIND_PROTOCOL, ZX_PROTOCOL_SPI_IMPL);
+
+  std::vector offers = compat_server_.CreateOffers2(arena);
+  const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                        .name(arena, devname)
+                        .offers2(arena, std::move(offers))
+                        .properties(properties)
+                        .Build();
+
+  auto result = parent_->AddChild(args, std::move(controller_endpoints->server), {});
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
+    return zx::error(result.status());
   }
 
-  [[maybe_unused]] auto* _ = spi.release();
-
-  return ZX_OK;
+  return zx::ok();
 }
 
 zx_status_t AmlSpi::DmaBuffer::Create(const zx::bti& bti, size_t size, DmaBuffer* out_dma_buffer) {
   zx_status_t status;
   if ((status = zx::vmo::create_contiguous(bti, size, 0, &out_dma_buffer->vmo)) != ZX_OK) {
-    zxlogf(ERROR, "Failed to create DMA VMO: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to create DMA VMO: %s", zx_status_get_string(status));
     return status;
   }
 
   status = out_dma_buffer->pinned.Pin(out_dma_buffer->vmo, bti,
                                       ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE | ZX_BTI_CONTIGUOUS);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to pin DMA VMO: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to pin DMA VMO: %s", zx_status_get_string(status));
     return status;
   }
   if (out_dma_buffer->pinned.region_count() != 1) {
-    zxlogf(ERROR, "Invalid region count for contiguous VMO: %u",
-           out_dma_buffer->pinned.region_count());
+    FDF_LOG(ERROR, "Invalid region count for contiguous VMO: %u",
+            out_dma_buffer->pinned.region_count());
     return status;
   }
 
   if ((status = out_dma_buffer->mapped.Map(out_dma_buffer->vmo)) != ZX_OK) {
-    zxlogf(ERROR, "Failed to map DMA VMO: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to map DMA VMO: %s", zx_status_get_string(status));
     return status;
   }
 
   return ZX_OK;
+}
+
+zx::result<compat::DeviceServer::GenericProtocol> AmlSpiDriver::GetBanjoProto(
+    compat::BanjoProtoId id) {
+  ZX_DEBUG_ASSERT(device_);
+
+  if (id != ZX_PROTOCOL_SPI_IMPL) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  return zx::ok(compat::DeviceServer::GenericProtocol{
+      .ops = device_->ops(),
+      .ctx = device_.get(),
+  });
 }
 
 void AmlSpi::Shutdown() {
@@ -775,13 +840,29 @@ void AmlSpi::Shutdown() {
   rx_buffer_.pinned.Unpin();
 }
 
-static zx_driver_ops_t driver_ops = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = AmlSpi::Create;
-  return ops;
-}();
+zx::result<fdf::MmioBuffer> AmlSpiDriver::MapMmio(
+    const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t mmio_id) {
+  auto result = pdev->GetMmioById(mmio_id);
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Call to get MMIO %u failed: %s", mmio_id, result.status_string());
+    return zx::error(result.status());
+  }
+  if (result->is_error()) {
+    FDF_LOG(ERROR, "Failed to get MMIO %u: %s", mmio_id,
+            zx_status_get_string(result->error_value()));
+    return result->take_error();
+  }
+
+  auto& mmio = *result->value();
+  if (!mmio.has_offset() || !mmio.has_size() || !mmio.has_vmo()) {
+    FDF_LOG(ERROR, "Invalid MMIO returned for ID %u", mmio_id);
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  return fdf::MmioBuffer::Create(mmio.offset(), mmio.size(), std::move(mmio.vmo()),
+                                 ZX_CACHE_POLICY_UNCACHED_DEVICE);
+}
 
 }  // namespace spi
 
-ZIRCON_DRIVER(aml_spi, spi::driver_ops, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(spi::AmlSpiDriver);

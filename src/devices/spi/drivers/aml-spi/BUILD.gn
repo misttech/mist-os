@@ -11,6 +11,7 @@ driver_bind_rules("aml_spi_bind") {
   rules = "aml_spi.bind"
   bind_output = "aml-spi.bindbc"
   tests = "bind_tests.json"
+  header_output = "aml-spi-bind.h"
 
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
@@ -25,14 +26,18 @@ group("common") {
     ":aml_spi_bind",
     "//sdk/banjo/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/lib/amlogic",
-    "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//src/lib/ddk:ddk_metadata",
     "//src/lib/vmo_store",
+    "//zircon/system/ulib/ddk-platform-defs",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/sync",
@@ -50,15 +55,12 @@ test("aml-spi-test-bin") {
   deps = [
     ":common",
     "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/registers/testing/mock-registers",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/fake-mmio-reg",
-    "//src/devices/testing/mock-ddk",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zxtest",
   ]
 

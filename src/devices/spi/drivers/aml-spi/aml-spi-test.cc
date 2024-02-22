@@ -5,18 +5,16 @@
 #include "aml-spi.h"
 
 #include <endian.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/testing/cpp/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fake-bti/bti.h>
-#include <lib/fzl/vmo-mapper.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/vmo.h>
 #include <zircon/errors.h>
-
-#include <memory>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <zxtest/zxtest.h>
@@ -25,28 +23,74 @@
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/registers/testing/mock-registers/mock-registers.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace spi {
 
+class TestAmlSpiDriver : public AmlSpiDriver {
+ public:
+  TestAmlSpiDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : AmlSpiDriver(std::move(start_args), std::move(dispatcher)),
+        mmio_region_(sizeof(uint32_t), 17) {}
+
+  static DriverRegistration GetDriverRegistration() {
+    // Use a custom DriverRegistration to create the DUT. Without this, the non-test implementation
+    // will be used by default.
+    return FUCHSIA_DRIVER_REGISTRATION_V1(fdf_internal::DriverServer<TestAmlSpiDriver>::initialize,
+                                          fdf_internal::DriverServer<TestAmlSpiDriver>::destroy);
+  }
+
+  ddk_fake::FakeMmioRegRegion& mmio() { return mmio_region_; }
+
+  uint32_t conreg() const { return conreg_; }
+  uint32_t enhance_cntl() const { return enhance_cntl_; }
+  uint32_t testreg() const { return testreg_; }
+
+ protected:
+  zx::result<fdf::MmioBuffer> MapMmio(
+      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev,
+      uint32_t mmio_id) override {
+    // Set the transfer complete bit so the driver doesn't get stuck waiting on the interrupt.
+    mmio_region_[AML_SPI_STATREG].SetReadCallback(
+        []() { return StatReg::Get().FromValue(0).set_tc(1).set_te(1).set_rr(1).reg_value(); });
+
+    mmio_region_[AML_SPI_CONREG].SetWriteCallback([this](uint32_t value) { conreg_ = value; });
+    mmio_region_[AML_SPI_CONREG].SetReadCallback([this]() { return conreg_; });
+    mmio_region_[AML_SPI_ENHANCE_CNTL].SetWriteCallback(
+        [this](uint32_t value) { enhance_cntl_ = value; });
+    mmio_region_[AML_SPI_TESTREG].SetWriteCallback([this](uint32_t value) { testreg_ = value; });
+
+    return zx::ok(mmio_region_.GetMmioBuffer());
+  }
+
+ private:
+  ddk_fake::FakeMmioRegRegion mmio_region_;
+  uint32_t conreg_{};
+  uint32_t enhance_cntl_{};
+  uint32_t testreg_{};
+};
+
 struct IncomingNamespace {
+  explicit IncomingNamespace(const fdf::UnownedSynchronizedDispatcher& dispatcher)
+      : registers(dispatcher->async_dispatcher()),
+        node_server("root", dispatcher->async_dispatcher()),
+        test_environment(dispatcher->get()) {}
+
   fake_pdev::FakePDevFidl pdev_server;
-  mock_registers::MockRegisters registers{async_get_default_dispatcher()};
+  mock_registers::MockRegisters registers;
   std::queue<std::pair<zx_status_t, uint8_t>> gpio_writes;
   fake_gpio::FakeGpio gpio;
-  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+  fdf_testing::TestNode node_server;
+  fdf_testing::TestEnvironment test_environment;
+  compat::DeviceServer compat;
 };
 
 class AmlSpiTest : public zxtest::Test {
  public:
-  AmlSpiTest() : mmio_region_(sizeof(uint32_t), 17), root_(MockDevice::FakeRootParent()) {}
-
-  ~AmlSpiTest() {
-    incoming_.~TestDispatcherBound<IncomingNamespace>();
-    libsync::Completion completion;
-    async::PostTask(incoming_loop_.dispatcher(), [&]() { completion.Signal(); });
-    completion.Wait();
-  }
+  AmlSpiTest()
+      : background_dispatcher_(runtime_.StartBackgroundDispatcher()),
+        incoming_(background_dispatcher_->async_dispatcher(), std::in_place,
+                  background_dispatcher_->borrow()),
+        dut_(TestAmlSpiDriver::GetDriverRegistration()) {}
 
   virtual void SetUpInterrupt(fake_pdev::FakePDevFidl::Config& config) {
     ASSERT_OK(zx::interrupt::create({}, 0, ZX_INTERRUPT_VIRTUAL, &interrupt_));
@@ -60,6 +104,16 @@ class AmlSpiTest : public zxtest::Test {
 
   virtual bool SetupResetRegister() { return true; }
 
+  virtual amlogic_spi::amlspi_config_t GetAmlSpiMetadata() {
+    return amlogic_spi::amlspi_config_t{
+        .bus_id = 0,
+        .cs_count = 3,
+        .cs = {5, 3, amlogic_spi::amlspi_config_t::kCsClientManaged},
+        .clock_divider_register_value = 0,
+        .use_enhanced_clock_mode = false,
+    };
+  }
+
   void SetUp() override {
     fake_pdev::FakePDevFidl::Config config;
     config.device_info = pdev_device_info_t{
@@ -67,89 +121,87 @@ class AmlSpiTest : public zxtest::Test {
         .irq_count = 1u,
     };
 
-    ASSERT_OK(
-        mmio_mapper_.CreateAndMap(0x100, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, nullptr, &mmio_));
-    zx::vmo dup;
-    ASSERT_OK(mmio_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
-    config.mmios[0] = mmio().GetMmioBuffer();
     SetUpInterrupt(config);
     SetUpBti(config);
 
-    zx::result pdev_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(pdev_endpoints);
-    zx::result registers_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(registers_endpoints);
-    zx::result gpio_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(gpio_endpoints);
-    zx::result gpio_endpoints2 = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(gpio_endpoints2);
-    zx::result gpio_endpoints3 = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(gpio_endpoints3);
-    ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
-    incoming_.SyncCall(
-        [config = std::move(config), pdev_server = std::move(pdev_endpoints->server),
-         registers_server = std::move(registers_endpoints->server),
-         gpio_server = std::move(gpio_endpoints->server),
-         gpio_server2 = std::move(gpio_endpoints2->server),
-         gpio_server3 = std::move(gpio_endpoints3->server)](IncomingNamespace* incoming) mutable {
-          incoming->pdev_server.SetConfig(std::move(config));
-          ASSERT_OK(incoming->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
-              incoming->pdev_server.GetInstanceHandler()));
-          ASSERT_OK(incoming->outgoing.AddService<fuchsia_hardware_registers::Service>(
-              incoming->registers.GetInstanceHandler()));
-          ASSERT_OK(incoming->outgoing.AddService<fuchsia_hardware_gpio::Service>(
-              incoming->gpio.CreateInstanceHandler()));
-          ASSERT_OK(incoming->outgoing.Serve(std::move(pdev_server)));
-          ASSERT_OK(incoming->outgoing.Serve(std::move(registers_server)));
-          ASSERT_OK(incoming->outgoing.Serve(std::move(gpio_server)));
-          ASSERT_OK(incoming->outgoing.Serve(std::move(gpio_server2)));
-          ASSERT_OK(incoming->outgoing.Serve(std::move(gpio_server3)));
+    incoming_.SyncCall([this, config = std::move(config)](IncomingNamespace* incoming) mutable {
+      zx::result start_args = incoming->node_server.CreateStartArgsAndServe();
+      ASSERT_TRUE(start_args.is_ok());
 
-          incoming->gpio.SetCurrentState(
-              fake_gpio::State{.polarity = fuchsia_hardware_gpio::GpioPolarity::kHigh,
-                               .sub_state = fake_gpio::WriteSubState{.value = 0}});
-          incoming->gpio.SetWriteCallback([incoming](fake_gpio::FakeGpio& gpio) {
-            if (incoming->gpio_writes.empty()) {
-              EXPECT_FALSE(incoming->gpio_writes.empty());
-              return ZX_ERR_INTERNAL;
-            }
-            auto [status, value] = incoming->gpio_writes.front();
-            incoming->gpio_writes.pop();
-            if (status != ZX_OK) {
-              EXPECT_EQ(value, gpio.GetWriteValue());
-            }
-            return status;
-          });
-        });
+      driver_outgoing_ = std::move(start_args->outgoing_directory_client);
+
+      ASSERT_TRUE(
+          incoming->test_environment.Initialize(std::move(start_args->incoming_directory_server))
+              .is_ok());
+
+      start_args_ = std::move(start_args->start_args);
+
+      incoming->pdev_server.SetConfig(std::move(config));
+
+      auto& directory = incoming->test_environment.incoming_directory();
+
+      auto result = directory.AddService<fuchsia_hardware_platform_device::Service>(
+          incoming->pdev_server.GetInstanceHandler(background_dispatcher_->async_dispatcher()),
+          "pdev");
+      ASSERT_TRUE(result.is_ok());
+
+      const auto metadata = GetAmlSpiMetadata();
+      EXPECT_OK(
+          incoming->compat.AddMetadata(DEVICE_METADATA_AMLSPI_CONFIG, &metadata, sizeof(metadata)));
+      incoming->compat.Init("pdev", {});
+      EXPECT_OK(incoming->compat.Serve(background_dispatcher_->async_dispatcher(), &directory));
+
+      result = directory.AddService<fuchsia_hardware_gpio::Service>(
+          incoming->gpio.CreateInstanceHandler(), "gpio-cs-2");
+      ASSERT_TRUE(result.is_ok());
+
+      result = directory.AddService<fuchsia_hardware_gpio::Service>(
+          incoming->gpio.CreateInstanceHandler(), "gpio-cs-3");
+      ASSERT_TRUE(result.is_ok());
+
+      result = directory.AddService<fuchsia_hardware_gpio::Service>(
+          incoming->gpio.CreateInstanceHandler(), "gpio-cs-5");
+      ASSERT_TRUE(result.is_ok());
+
+      incoming->gpio.SetCurrentState(
+          fake_gpio::State{.polarity = fuchsia_hardware_gpio::GpioPolarity::kHigh,
+                           .sub_state = fake_gpio::WriteSubState{.value = 0}});
+      incoming->gpio.SetWriteCallback([incoming](fake_gpio::FakeGpio& gpio) {
+        if (incoming->gpio_writes.empty()) {
+          EXPECT_FALSE(incoming->gpio_writes.empty());
+          return ZX_ERR_INTERNAL;
+        }
+        auto [status, value] = incoming->gpio_writes.front();
+        incoming->gpio_writes.pop();
+        if (status != ZX_OK) {
+          EXPECT_EQ(value, gpio.GetWriteValue());
+        }
+        return status;
+      });
+    });
     ASSERT_NO_FATAL_FAILURE();
-    root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
-                          std::move(pdev_endpoints->client), "pdev");
 
     if (SetupResetRegister()) {
-      root_->AddFidlService(fuchsia_hardware_registers::Service::Name,
-                            std::move(registers_endpoints->client), "reset");
+      incoming_.SyncCall([](IncomingNamespace* incoming) {
+        auto result = incoming->test_environment.incoming_directory()
+                          .AddService<fuchsia_hardware_registers::Service>(
+                              incoming->registers.GetInstanceHandler(), "reset");
+        ASSERT_TRUE(result.is_ok());
+      });
+      ASSERT_NO_FATAL_FAILURE();
     }
-
-    root_->AddFidlService(fuchsia_hardware_gpio::Service::Name, std::move(gpio_endpoints->client),
-                          "gpio-cs-2");
-    root_->AddFidlService(fuchsia_hardware_gpio::Service::Name, std::move(gpio_endpoints2->client),
-                          "gpio-cs-3");
-    root_->AddFidlService(fuchsia_hardware_gpio::Service::Name, std::move(gpio_endpoints3->client),
-                          "gpio-cs-5");
-
-    root_->SetMetadata(DEVICE_METADATA_AMLSPI_CONFIG, kSpiConfig, sizeof(kSpiConfig));
 
     incoming_.SyncCall([](IncomingNamespace* incoming) {
       incoming->registers.ExpectWrite<uint32_t>(0x1c, 1 << 1, 1 << 1);
     });
     ASSERT_NO_FATAL_FAILURE();
-
-    // Set the transfer complete bit so the driver doesn't get stuck waiting on the interrupt.
-    mmio_region_[AML_SPI_STATREG].SetReadCallback(
-        []() { return StatReg::Get().FromValue(0).set_tc(1).set_te(1).set_rr(1).reg_value(); });
   }
 
-  MockDevice* root() { return root_.get(); }
+  void TearDown() override {
+    zx::result prepare_stop_result = runtime_.RunToCompletion(dut_.PrepareStop());
+    EXPECT_OK(prepare_stop_result.status_value());
+    EXPECT_TRUE(dut_.Stop().is_ok());
+  }
 
   void ExpectGpioWrite(zx_status_t status, uint8_t value) {
     incoming_.SyncCall(
@@ -163,7 +215,7 @@ class AmlSpiTest : public zxtest::Test {
     });
   }
 
-  ddk_fake::FakeMmioRegRegion& mmio() { return mmio_region_; }
+  ddk_fake::FakeMmioRegRegion& mmio() { return dut_->mmio(); }
   bool ControllerReset() {
     zx_status_t status;
     incoming_.SyncCall([&status](IncomingNamespace* incoming) {
@@ -178,25 +230,55 @@ class AmlSpiTest : public zxtest::Test {
     return status == ZX_OK;
   }
 
+ protected:
+  ddk::SpiImplProtocolClient GetBanjoClient() {
+    ddk::SpiImplProtocolClient client{};
+
+    const auto path = std::string("svc/") +
+                      component::MakeServiceMemberPath<fuchsia_driver_compat::Service::Device>(
+                          component::kDefaultInstance);
+
+    runtime_.PerformBlockingWork([&]() {
+      auto client_end = component::ConnectAt<fuchsia_driver_compat::Device>(driver_outgoing_, path);
+      ASSERT_TRUE(client_end.is_ok());
+
+      fidl::WireSyncClient<fuchsia_driver_compat::Device> compat(*std::move(client_end));
+
+      zx_info_handle_basic_t basic;
+      ASSERT_OK(zx::process::self()->get_info(ZX_INFO_HANDLE_BASIC, &basic, sizeof(basic), nullptr,
+                                              nullptr));
+
+      auto banjo_client = compat->GetBanjoProtocol(ZX_PROTOCOL_SPI_IMPL, basic.koid);
+      ASSERT_TRUE(banjo_client.ok());
+      ASSERT_TRUE(banjo_client->is_ok());
+
+      const spi_impl_protocol_t proto{
+          .ops = reinterpret_cast<spi_impl_protocol_ops_t*>(banjo_client->value()->ops),
+          .ctx = reinterpret_cast<void*>(banjo_client->value()->context),
+      };
+      client = ddk::SpiImplProtocolClient(&proto);
+    });
+
+    return client;
+  }
+
+  fdf_testing::DriverRuntime runtime_;
+  fdf::UnownedSynchronizedDispatcher background_dispatcher_;
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
+  fdf_testing::DriverUnderTest<TestAmlSpiDriver> dut_;
+  fuchsia_driver_framework::DriverStartArgs start_args_;
+
  private:
-  static constexpr amlogic_spi::amlspi_config_t kSpiConfig[] = {
-      {
-          .bus_id = 0,
-          .cs_count = 3,
-          .cs = {5, 3, amlogic_spi::amlspi_config_t::kCsClientManaged},
-          .clock_divider_register_value = 0,
-          .use_enhanced_clock_mode = false,
-      },
+  static constexpr amlogic_spi::amlspi_config_t kSpiConfig = {
+      .bus_id = 0,
+      .cs_count = 3,
+      .cs = {5, 3, amlogic_spi::amlspi_config_t::kCsClientManaged},
+      .clock_divider_register_value = 0,
+      .use_enhanced_clock_mode = false,
   };
 
-  ddk_fake::FakeMmioRegRegion mmio_region_;  // Must be destructed after root_.
-  std::shared_ptr<MockDevice> root_;
-  zx::vmo mmio_;
-  fzl::VmoMapper mmio_mapper_;
-  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
-  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
-                                                                   std::in_place};
   zx::interrupt interrupt_;
+  fidl::ClientEnd<fuchsia_io::Directory> driver_outgoing_;
 };
 
 zx_koid_t GetVmoKoid(const zx::vmo& vmo) {
@@ -211,26 +293,34 @@ zx_koid_t GetVmoKoid(const zx::vmo& vmo) {
 }
 
 TEST_F(AmlSpiTest, DdkLifecycle) {
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
-  ASSERT_EQ(root()->child_count(), 1);
-  // Note, children will be cleaned up by mock-ddk.
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
+
+  incoming_.SyncCall([](IncomingNamespace* incoming) {
+    ASSERT_NE(incoming->node_server.children().find("aml-spi-0"),
+              incoming->node_server.children().cend());
+  });
 }
 
 TEST_F(AmlSpiTest, ChipSelectCount) {
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi0 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
-  EXPECT_EQ(spi0->SpiImplGetChipSelectCount(), 3);
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
+
+  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
+  ASSERT_TRUE(spi0.is_valid());
+
+  EXPECT_EQ(spi0.GetChipSelectCount(), 3);
 }
 
 TEST_F(AmlSpiTest, Exchange) {
   constexpr uint8_t kTxData[] = {0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12};
   constexpr uint8_t kExpectedRxData[] = {0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab};
 
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi0 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
+  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
+  ASSERT_TRUE(spi0.is_valid());
 
   mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return kExpectedRxData[0]; });
 
@@ -242,7 +332,7 @@ TEST_F(AmlSpiTest, Exchange) {
 
   uint8_t rxbuf[sizeof(kTxData)] = {};
   size_t rx_actual;
-  EXPECT_OK(spi0->SpiImplExchange(0, kTxData, sizeof(kTxData), rxbuf, sizeof(rxbuf), &rx_actual));
+  EXPECT_OK(spi0.Exchange(0, kTxData, sizeof(kTxData), rxbuf, sizeof(rxbuf), &rx_actual));
 
   EXPECT_EQ(rx_actual, sizeof(rxbuf));
   EXPECT_BYTES_EQ(rxbuf, kExpectedRxData, rx_actual);
@@ -257,10 +347,11 @@ TEST_F(AmlSpiTest, ExchangeCsManagedByClient) {
   constexpr uint8_t kTxData[] = {0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12};
   constexpr uint8_t kExpectedRxData[] = {0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab};
 
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi0 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
+  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
+  ASSERT_TRUE(spi0.is_valid());
 
   mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return kExpectedRxData[0]; });
 
@@ -269,7 +360,7 @@ TEST_F(AmlSpiTest, ExchangeCsManagedByClient) {
 
   uint8_t rxbuf[sizeof(kTxData)] = {};
   size_t rx_actual;
-  EXPECT_OK(spi0->SpiImplExchange(2, kTxData, sizeof(kTxData), rxbuf, sizeof(rxbuf), &rx_actual));
+  EXPECT_OK(spi0.Exchange(2, kTxData, sizeof(kTxData), rxbuf, sizeof(rxbuf), &rx_actual));
 
   EXPECT_EQ(rx_actual, sizeof(rxbuf));
   EXPECT_BYTES_EQ(rxbuf, kExpectedRxData, rx_actual);
@@ -282,10 +373,11 @@ TEST_F(AmlSpiTest, ExchangeCsManagedByClient) {
 }
 
 TEST_F(AmlSpiTest, RegisterVmo) {
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi1 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
+  ddk::SpiImplProtocolClient spi1 = GetBanjoClient();
+  ASSERT_TRUE(spi1.is_valid());
 
   zx::vmo test_vmo;
   EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &test_vmo));
@@ -295,34 +387,35 @@ TEST_F(AmlSpiTest, RegisterVmo) {
   {
     zx::vmo vmo;
     EXPECT_OK(test_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
-    EXPECT_OK(spi1->SpiImplRegisterVmo(0, 1, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
+    EXPECT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
   }
 
   {
     zx::vmo vmo;
     EXPECT_OK(test_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
-    EXPECT_NOT_OK(spi1->SpiImplRegisterVmo(0, 1, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
+    EXPECT_NOT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
   }
 
   {
     zx::vmo vmo;
-    EXPECT_OK(spi1->SpiImplUnregisterVmo(0, 1, &vmo));
+    EXPECT_OK(spi1.UnregisterVmo(0, 1, &vmo));
     EXPECT_EQ(test_vmo_koid, GetVmoKoid(vmo));
   }
 
   {
     zx::vmo vmo;
-    EXPECT_NOT_OK(spi1->SpiImplUnregisterVmo(0, 1, &vmo));
+    EXPECT_NOT_OK(spi1.UnregisterVmo(0, 1, &vmo));
   }
 }
 
 TEST_F(AmlSpiTest, Transmit) {
   constexpr uint8_t kTxData[] = {0xa5, 0xa5, 0xa5, 0xa5, 0xa5, 0xa5, 0xa5};
 
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi1 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
+  ddk::SpiImplProtocolClient spi1 = GetBanjoClient();
+  ASSERT_TRUE(spi1.is_valid());
 
   zx::vmo test_vmo;
   EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &test_vmo));
@@ -330,8 +423,7 @@ TEST_F(AmlSpiTest, Transmit) {
   {
     zx::vmo vmo;
     EXPECT_OK(test_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
-    EXPECT_OK(
-        spi1->SpiImplRegisterVmo(0, 1, std::move(vmo), 256, PAGE_SIZE - 256, SPI_VMO_RIGHT_READ));
+    EXPECT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 256, PAGE_SIZE - 256, SPI_VMO_RIGHT_READ));
   }
 
   ExpectGpioWrite(ZX_OK, 0);
@@ -342,7 +434,7 @@ TEST_F(AmlSpiTest, Transmit) {
   uint64_t tx_data = 0;
   mmio()[AML_SPI_TXDATA].SetWriteCallback([&tx_data](uint64_t value) { tx_data = value; });
 
-  EXPECT_OK(spi1->SpiImplTransmitVmo(0, 1, 256, sizeof(kTxData)));
+  EXPECT_OK(spi1.TransmitVmo(0, 1, 256, sizeof(kTxData)));
 
   EXPECT_EQ(tx_data, kTxData[0]);
 
@@ -354,10 +446,11 @@ TEST_F(AmlSpiTest, Transmit) {
 TEST_F(AmlSpiTest, ReceiveVmo) {
   constexpr uint8_t kExpectedRxData[] = {0x78, 0x78, 0x78, 0x78, 0x78, 0x78, 0x78};
 
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi1 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
+  ddk::SpiImplProtocolClient spi1 = GetBanjoClient();
+  ASSERT_TRUE(spi1.is_valid());
 
   zx::vmo test_vmo;
   EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &test_vmo));
@@ -365,8 +458,8 @@ TEST_F(AmlSpiTest, ReceiveVmo) {
   {
     zx::vmo vmo;
     EXPECT_OK(test_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
-    EXPECT_OK(spi1->SpiImplRegisterVmo(0, 1, std::move(vmo), 256, PAGE_SIZE - 256,
-                                       SPI_VMO_RIGHT_READ | SPI_VMO_RIGHT_WRITE));
+    EXPECT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 256, PAGE_SIZE - 256,
+                               SPI_VMO_RIGHT_READ | SPI_VMO_RIGHT_WRITE));
   }
 
   mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return kExpectedRxData[0]; });
@@ -374,7 +467,7 @@ TEST_F(AmlSpiTest, ReceiveVmo) {
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi1->SpiImplReceiveVmo(0, 1, 512, sizeof(kExpectedRxData)));
+  EXPECT_OK(spi1.ReceiveVmo(0, 1, 512, sizeof(kExpectedRxData)));
 
   uint8_t rx_buffer[sizeof(kExpectedRxData)];
   EXPECT_OK(test_vmo.read(rx_buffer, 768, sizeof(rx_buffer)));
@@ -389,10 +482,11 @@ TEST_F(AmlSpiTest, ExchangeVmo) {
   constexpr uint8_t kTxData[] = {0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef};
   constexpr uint8_t kExpectedRxData[] = {0x78, 0x78, 0x78, 0x78, 0x78, 0x78, 0x78};
 
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi1 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
+  ddk::SpiImplProtocolClient spi1 = GetBanjoClient();
+  ASSERT_TRUE(spi1.is_valid());
 
   zx::vmo test_vmo;
   EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &test_vmo));
@@ -400,8 +494,8 @@ TEST_F(AmlSpiTest, ExchangeVmo) {
   {
     zx::vmo vmo;
     EXPECT_OK(test_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
-    EXPECT_OK(spi1->SpiImplRegisterVmo(0, 1, std::move(vmo), 256, PAGE_SIZE - 256,
-                                       SPI_VMO_RIGHT_READ | SPI_VMO_RIGHT_WRITE));
+    EXPECT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 256, PAGE_SIZE - 256,
+                               SPI_VMO_RIGHT_READ | SPI_VMO_RIGHT_WRITE));
   }
 
   mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return kExpectedRxData[0]; });
@@ -414,7 +508,7 @@ TEST_F(AmlSpiTest, ExchangeVmo) {
 
   EXPECT_OK(test_vmo.write(kTxData, 512, sizeof(kTxData)));
 
-  EXPECT_OK(spi1->SpiImplExchangeVmo(0, 1, 256, 1, 512, sizeof(kTxData)));
+  EXPECT_OK(spi1.ExchangeVmo(0, 1, 256, 1, 512, sizeof(kTxData)));
 
   uint8_t rx_buffer[sizeof(kExpectedRxData)];
   EXPECT_OK(test_vmo.read(rx_buffer, 768, sizeof(rx_buffer)));
@@ -428,10 +522,11 @@ TEST_F(AmlSpiTest, ExchangeVmo) {
 }
 
 TEST_F(AmlSpiTest, TransfersOutOfRange) {
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi0 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
+  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
+  ASSERT_TRUE(spi0.is_valid());
 
   zx::vmo test_vmo;
   EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &test_vmo));
@@ -439,47 +534,48 @@ TEST_F(AmlSpiTest, TransfersOutOfRange) {
   {
     zx::vmo vmo;
     EXPECT_OK(test_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
-    EXPECT_OK(spi0->SpiImplRegisterVmo(1, 1, std::move(vmo), PAGE_SIZE - 4, 4,
-                                       SPI_VMO_RIGHT_READ | SPI_VMO_RIGHT_WRITE));
+    EXPECT_OK(spi0.RegisterVmo(1, 1, std::move(vmo), PAGE_SIZE - 4, 4,
+                               SPI_VMO_RIGHT_READ | SPI_VMO_RIGHT_WRITE));
   }
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi0->SpiImplExchangeVmo(1, 1, 0, 1, 2, 2));
-  EXPECT_NOT_OK(spi0->SpiImplExchangeVmo(1, 1, 0, 1, 3, 2));
-  EXPECT_NOT_OK(spi0->SpiImplExchangeVmo(1, 1, 3, 1, 0, 2));
-  EXPECT_NOT_OK(spi0->SpiImplExchangeVmo(1, 1, 0, 1, 2, 3));
+  EXPECT_OK(spi0.ExchangeVmo(1, 1, 0, 1, 2, 2));
+  EXPECT_NOT_OK(spi0.ExchangeVmo(1, 1, 0, 1, 3, 2));
+  EXPECT_NOT_OK(spi0.ExchangeVmo(1, 1, 3, 1, 0, 2));
+  EXPECT_NOT_OK(spi0.ExchangeVmo(1, 1, 0, 1, 2, 3));
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi0->SpiImplTransmitVmo(1, 1, 0, 4));
-  EXPECT_NOT_OK(spi0->SpiImplTransmitVmo(1, 1, 0, 5));
-  EXPECT_NOT_OK(spi0->SpiImplTransmitVmo(1, 1, 3, 2));
-  EXPECT_NOT_OK(spi0->SpiImplTransmitVmo(1, 1, 4, 1));
-  EXPECT_NOT_OK(spi0->SpiImplTransmitVmo(1, 1, 5, 1));
+  EXPECT_OK(spi0.TransmitVmo(1, 1, 0, 4));
+  EXPECT_NOT_OK(spi0.TransmitVmo(1, 1, 0, 5));
+  EXPECT_NOT_OK(spi0.TransmitVmo(1, 1, 3, 2));
+  EXPECT_NOT_OK(spi0.TransmitVmo(1, 1, 4, 1));
+  EXPECT_NOT_OK(spi0.TransmitVmo(1, 1, 5, 1));
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
-  EXPECT_OK(spi0->SpiImplReceiveVmo(1, 1, 0, 4));
+  EXPECT_OK(spi0.ReceiveVmo(1, 1, 0, 4));
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
-  EXPECT_OK(spi0->SpiImplReceiveVmo(1, 1, 3, 1));
+  EXPECT_OK(spi0.ReceiveVmo(1, 1, 3, 1));
 
-  EXPECT_NOT_OK(spi0->SpiImplReceiveVmo(1, 1, 3, 2));
-  EXPECT_NOT_OK(spi0->SpiImplReceiveVmo(1, 1, 4, 1));
-  EXPECT_NOT_OK(spi0->SpiImplReceiveVmo(1, 1, 5, 1));
+  EXPECT_NOT_OK(spi0.ReceiveVmo(1, 1, 3, 2));
+  EXPECT_NOT_OK(spi0.ReceiveVmo(1, 1, 4, 1));
+  EXPECT_NOT_OK(spi0.ReceiveVmo(1, 1, 5, 1));
 
   ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
 
 TEST_F(AmlSpiTest, VmoBadRights) {
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi1 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
+  ddk::SpiImplProtocolClient spi1 = GetBanjoClient();
+  ASSERT_TRUE(spi1.is_valid());
 
   zx::vmo test_vmo;
   EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &test_vmo));
@@ -487,23 +583,23 @@ TEST_F(AmlSpiTest, VmoBadRights) {
   {
     zx::vmo vmo;
     EXPECT_OK(test_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
-    EXPECT_OK(spi1->SpiImplRegisterVmo(0, 1, std::move(vmo), 0, 256, SPI_VMO_RIGHT_READ));
+    EXPECT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 0, 256, SPI_VMO_RIGHT_READ));
   }
 
   {
     zx::vmo vmo;
     EXPECT_OK(test_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
-    EXPECT_OK(spi1->SpiImplRegisterVmo(0, 2, std::move(vmo), 0, 256,
-                                       SPI_VMO_RIGHT_READ | SPI_VMO_RIGHT_WRITE));
+    EXPECT_OK(
+        spi1.RegisterVmo(0, 2, std::move(vmo), 0, 256, SPI_VMO_RIGHT_READ | SPI_VMO_RIGHT_WRITE));
   }
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi1->SpiImplExchangeVmo(0, 1, 0, 2, 128, 128));
-  EXPECT_EQ(spi1->SpiImplExchangeVmo(0, 2, 0, 1, 128, 128), ZX_ERR_ACCESS_DENIED);
-  EXPECT_EQ(spi1->SpiImplExchangeVmo(0, 1, 0, 1, 128, 128), ZX_ERR_ACCESS_DENIED);
-  EXPECT_EQ(spi1->SpiImplReceiveVmo(0, 1, 0, 128), ZX_ERR_ACCESS_DENIED);
+  EXPECT_OK(spi1.ExchangeVmo(0, 1, 0, 2, 128, 128));
+  EXPECT_EQ(spi1.ExchangeVmo(0, 2, 0, 1, 128, 128), ZX_ERR_ACCESS_DENIED);
+  EXPECT_EQ(spi1.ExchangeVmo(0, 1, 0, 1, 128, 128), ZX_ERR_ACCESS_DENIED);
+  EXPECT_EQ(spi1.ReceiveVmo(0, 1, 0, 128), ZX_ERR_ACCESS_DENIED);
 
   ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
@@ -518,10 +614,11 @@ TEST_F(AmlSpiTest, Exchange64BitWords) {
       0xea, 0x2b, 0x8f, 0x8f, 0xea, 0x2b, 0x8f, 0x8f, 0xea, 0x2b, 0x8f, 0x8f,
   };
 
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi0 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
+  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
+  ASSERT_TRUE(spi0.is_valid());
 
   // First (and only) word of kExpectedRxData with bytes swapped.
   mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return 0xea2b'8f8f; });
@@ -534,7 +631,7 @@ TEST_F(AmlSpiTest, Exchange64BitWords) {
 
   uint8_t rxbuf[sizeof(kTxData)] = {};
   size_t rx_actual;
-  EXPECT_OK(spi0->SpiImplExchange(0, kTxData, sizeof(kTxData), rxbuf, sizeof(rxbuf), &rx_actual));
+  EXPECT_OK(spi0.Exchange(0, kTxData, sizeof(kTxData), rxbuf, sizeof(rxbuf), &rx_actual));
 
   EXPECT_EQ(rx_actual, sizeof(rxbuf));
   EXPECT_BYTES_EQ(rxbuf, kExpectedRxData, rx_actual);
@@ -556,10 +653,11 @@ TEST_F(AmlSpiTest, Exchange64Then8BitWords) {
       0xea, 0x00, 0x00, 0x00, 0xea, 0xea, 0xea, 0xea, 0xea, 0xea,
   };
 
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi0 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
+  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
+  ASSERT_TRUE(spi0.is_valid());
 
   mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return 0xea; });
 
@@ -571,7 +669,7 @@ TEST_F(AmlSpiTest, Exchange64Then8BitWords) {
 
   uint8_t rxbuf[sizeof(kTxData)] = {};
   size_t rx_actual;
-  EXPECT_OK(spi0->SpiImplExchange(0, kTxData, sizeof(kTxData), rxbuf, sizeof(rxbuf), &rx_actual));
+  EXPECT_OK(spi0.Exchange(0, kTxData, sizeof(kTxData), rxbuf, sizeof(rxbuf), &rx_actual));
 
   EXPECT_EQ(rx_actual, sizeof(rxbuf));
   EXPECT_BYTES_EQ(rxbuf, kExpectedRxData, rx_actual);
@@ -583,17 +681,18 @@ TEST_F(AmlSpiTest, Exchange64Then8BitWords) {
 }
 
 TEST_F(AmlSpiTest, ExchangeResetsController) {
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi0 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
+  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
+  ASSERT_TRUE(spi0.is_valid());
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
   uint8_t buf[17] = {};
   size_t rx_actual;
-  EXPECT_OK(spi0->SpiImplExchange(0, buf, 17, buf, 17, &rx_actual));
+  EXPECT_OK(spi0.Exchange(0, buf, 17, buf, 17, &rx_actual));
   EXPECT_EQ(rx_actual, 17);
   EXPECT_FALSE(ControllerReset());
 
@@ -602,28 +701,28 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
 
   // Controller should be reset because a 64-bit transfer was preceded by a transfer of an odd
   // number of bytes.
-  EXPECT_OK(spi0->SpiImplExchange(0, buf, 16, buf, 16, &rx_actual));
+  EXPECT_OK(spi0.Exchange(0, buf, 16, buf, 16, &rx_actual));
   EXPECT_EQ(rx_actual, 16);
   EXPECT_TRUE(ControllerReset());
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi0->SpiImplExchange(0, buf, 3, buf, 3, &rx_actual));
+  EXPECT_OK(spi0.Exchange(0, buf, 3, buf, 3, &rx_actual));
   EXPECT_EQ(rx_actual, 3);
   EXPECT_FALSE(ControllerReset());
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi0->SpiImplExchange(0, buf, 6, buf, 6, &rx_actual));
+  EXPECT_OK(spi0.Exchange(0, buf, 6, buf, 6, &rx_actual));
   EXPECT_EQ(rx_actual, 6);
   EXPECT_FALSE(ControllerReset());
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi0->SpiImplExchange(0, buf, 8, buf, 8, &rx_actual));
+  EXPECT_OK(spi0.Exchange(0, buf, 8, buf, 8, &rx_actual));
   EXPECT_EQ(rx_actual, 8);
   EXPECT_TRUE(ControllerReset());
 
@@ -631,85 +730,77 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
 }
 
 TEST_F(AmlSpiTest, ReleaseVmos) {
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi1 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
+  ddk::SpiImplProtocolClient spi1 = GetBanjoClient();
+  ASSERT_TRUE(spi1.is_valid());
 
   {
     zx::vmo vmo;
     EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &vmo));
-    EXPECT_OK(spi1->SpiImplRegisterVmo(0, 1, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
+    EXPECT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
 
     EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &vmo));
-    EXPECT_OK(spi1->SpiImplRegisterVmo(0, 2, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
+    EXPECT_OK(spi1.RegisterVmo(0, 2, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
   }
 
   {
     zx::vmo vmo;
-    EXPECT_OK(spi1->SpiImplUnregisterVmo(0, 2, &vmo));
+    EXPECT_OK(spi1.UnregisterVmo(0, 2, &vmo));
   }
 
   // Release VMO 1 and make sure that a subsequent call to unregister it fails.
-  spi1->SpiImplReleaseRegisteredVmos(0);
+  spi1.ReleaseRegisteredVmos(0);
 
   {
     zx::vmo vmo;
-    EXPECT_NOT_OK(spi1->SpiImplUnregisterVmo(0, 1, &vmo));
+    EXPECT_NOT_OK(spi1.UnregisterVmo(0, 1, &vmo));
   }
 
   {
     zx::vmo vmo;
     EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &vmo));
-    EXPECT_OK(spi1->SpiImplRegisterVmo(0, 1, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
+    EXPECT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
 
     EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &vmo));
-    EXPECT_OK(spi1->SpiImplRegisterVmo(0, 2, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
+    EXPECT_OK(spi1.RegisterVmo(0, 2, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
   }
 
   // Release both VMOs and make sure that they can be registered again.
-  spi1->SpiImplReleaseRegisteredVmos(0);
+  spi1.ReleaseRegisteredVmos(0);
 
   {
     zx::vmo vmo;
     EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &vmo));
-    EXPECT_OK(spi1->SpiImplRegisterVmo(0, 1, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
+    EXPECT_OK(spi1.RegisterVmo(0, 1, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
 
     EXPECT_OK(zx::vmo::create(PAGE_SIZE, 0, &vmo));
-    EXPECT_OK(spi1->SpiImplRegisterVmo(0, 2, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
+    EXPECT_OK(spi1.RegisterVmo(0, 2, std::move(vmo), 0, PAGE_SIZE, SPI_VMO_RIGHT_READ));
   }
 }
 
-TEST_F(AmlSpiTest, NormalClockMode) {
-  constexpr amlogic_spi::amlspi_config_t kTestSpiConfig[] = {
-      {
-          .bus_id = 0,
-          .cs_count = 2,
-          .cs = {5, 3},
-          .clock_divider_register_value = 0x5,
-          .use_enhanced_clock_mode = false,
-      },
-  };
+class AmlSpiNormalClockModeTest : public AmlSpiTest {
+ public:
+  amlogic_spi::amlspi_config_t GetAmlSpiMetadata() override {
+    return amlogic_spi::amlspi_config_t{
+        .bus_id = 0,
+        .cs_count = 2,
+        .cs = {5, 3},
+        .clock_divider_register_value = 0x5,
+        .use_enhanced_clock_mode = false,
 
-  // Must outlive spi device.
-  auto conreg = ConReg::Get().FromValue(0);
-  auto enhanced_cntl = EnhanceCntl::Get().FromValue(0);
-  auto testreg = TestReg::Get().FromValue(0);
+    };
+  }
+};
 
-  root()->SetMetadata(DEVICE_METADATA_AMLSPI_CONFIG, kTestSpiConfig, sizeof(kTestSpiConfig));
+TEST_F(AmlSpiNormalClockModeTest, Test) {
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  mmio()[AML_SPI_CONREG].SetWriteCallback(
-      [&conreg](uint32_t value) { conreg.set_reg_value(value); });
-
-  mmio()[AML_SPI_CONREG].SetReadCallback([&conreg]() { return conreg.reg_value(); });
-
-  mmio()[AML_SPI_ENHANCE_CNTL].SetWriteCallback(
-      [&enhanced_cntl](uint32_t value) { enhanced_cntl.set_reg_value(value); });
-
-  mmio()[AML_SPI_TESTREG].SetWriteCallback(
-      [&testreg](uint32_t value) { testreg.set_reg_value(value); });
-
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  auto conreg = ConReg::Get().FromValue(dut_->conreg());
+  auto enhanced_cntl = EnhanceCntl::Get().FromValue(dut_->enhance_cntl());
+  auto testreg = TestReg::Get().FromValue(dut_->testreg());
 
   EXPECT_EQ(conreg.data_rate(), 0x5);
   EXPECT_EQ(conreg.drctl(), 0);
@@ -723,46 +814,29 @@ TEST_F(AmlSpiTest, NormalClockMode) {
 
   EXPECT_EQ(testreg.dlyctl(), 0x15);
   EXPECT_EQ(testreg.clk_free_en(), 1);
-
-  // Manually releasing here before stack frame is removed.
-  EXPECT_EQ(root()->child_count(), 1);
-  auto* mock_dev = root()->GetLatestChild();
-  mock_dev->GetDeviceContext<AmlSpi>()->DdkAsyncRemove();
-  mock_dev->WaitUntilAsyncRemoveCalled();
-  EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(root()));
 }
 
-TEST_F(AmlSpiTest, EnhancedClockMode) {
-  constexpr amlogic_spi::amlspi_config_t kTestSpiConfig[] = {
-      {
-          .bus_id = 0,
-          .cs_count = 2,
-          .cs = {5, 3},
-          .clock_divider_register_value = 0xa5,
-          .use_enhanced_clock_mode = true,
-          .delay_control = 0b00'11'00,
-      },
-  };
+class AmlSpiEnhancedClockModeTest : public AmlSpiTest {
+ public:
+  amlogic_spi::amlspi_config_t GetAmlSpiMetadata() override {
+    return amlogic_spi::amlspi_config_t{
+        .bus_id = 0,
+        .cs_count = 2,
+        .cs = {5, 3},
+        .clock_divider_register_value = 0xa5,
+        .use_enhanced_clock_mode = true,
+        .delay_control = 0b00'11'00,
+    };
+  }
+};
 
-  // Must outlive spi device.
-  auto conreg = ConReg::Get().FromValue(0);
-  auto enhanced_cntl = EnhanceCntl::Get().FromValue(0);
-  auto testreg = TestReg::Get().FromValue(0);
+TEST_F(AmlSpiEnhancedClockModeTest, Test) {
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  root()->SetMetadata(DEVICE_METADATA_AMLSPI_CONFIG, kTestSpiConfig, sizeof(kTestSpiConfig));
-
-  mmio()[AML_SPI_CONREG].SetWriteCallback(
-      [&conreg](uint32_t value) { conreg.set_reg_value(value); });
-
-  mmio()[AML_SPI_CONREG].SetReadCallback([&conreg]() { return conreg.reg_value(); });
-
-  mmio()[AML_SPI_ENHANCE_CNTL].SetWriteCallback(
-      [&enhanced_cntl](uint32_t value) { enhanced_cntl.set_reg_value(value); });
-
-  mmio()[AML_SPI_TESTREG].SetWriteCallback(
-      [&testreg](uint32_t value) { testreg.set_reg_value(value); });
-
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  auto conreg = ConReg::Get().FromValue(dut_->conreg());
+  auto enhanced_cntl = EnhanceCntl::Get().FromValue(dut_->enhance_cntl());
+  auto testreg = TestReg::Get().FromValue(dut_->testreg());
 
   EXPECT_EQ(conreg.data_rate(), 0);
   EXPECT_EQ(conreg.drctl(), 0);
@@ -783,45 +857,42 @@ TEST_F(AmlSpiTest, EnhancedClockMode) {
 
   EXPECT_EQ(testreg.dlyctl(), 0b00'11'00);
   EXPECT_EQ(testreg.clk_free_en(), 1);
-
-  // Manually releasing here before stack frame is removed.
-  EXPECT_EQ(root()->child_count(), 1);
-  auto* mock_dev = root()->GetLatestChild();
-  mock_dev->GetDeviceContext<AmlSpi>()->DdkAsyncRemove();
-  mock_dev->WaitUntilAsyncRemoveCalled();
-  EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(root()));
 }
 
-TEST_F(AmlSpiTest, NormalClockModeInvalidDivider) {
-  constexpr amlogic_spi::amlspi_config_t kTestSpiConfig[] = {
-      {
-          .bus_id = 0,
-          .cs_count = 2,
-          .cs = {5, 3},
-          .clock_divider_register_value = 0xa5,
-          .use_enhanced_clock_mode = false,
-      },
-  };
+class AmlSpiNormalClockModeInvalidDividerTest : public AmlSpiTest {
+ public:
+  amlogic_spi::amlspi_config_t GetAmlSpiMetadata() override {
+    return amlogic_spi::amlspi_config_t{
+        .bus_id = 0,
+        .cs_count = 2,
+        .cs = {5, 3},
+        .clock_divider_register_value = 0xa5,
+        .use_enhanced_clock_mode = false,
+    };
+  }
+};
 
-  root()->SetMetadata(DEVICE_METADATA_AMLSPI_CONFIG, kTestSpiConfig, sizeof(kTestSpiConfig));
-
-  EXPECT_EQ(AmlSpi::Create(nullptr, root()), ZX_ERR_INVALID_ARGS);
+TEST_F(AmlSpiNormalClockModeInvalidDividerTest, Test) {
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  EXPECT_TRUE(start_result.is_error());
 }
 
-TEST_F(AmlSpiTest, EnhancedClockModeInvalidDivider) {
-  constexpr amlogic_spi::amlspi_config_t kTestSpiConfig[] = {
-      {
-          .bus_id = 0,
-          .cs_count = 2,
-          .cs = {5, 3},
-          .clock_divider_register_value = 0x1a5,
-          .use_enhanced_clock_mode = true,
-      },
-  };
+class AmlSpiEnhancedClockModeInvalidDividerTest : public AmlSpiTest {
+ public:
+  amlogic_spi::amlspi_config_t GetAmlSpiMetadata() override {
+    return amlogic_spi::amlspi_config_t{
+        .bus_id = 0,
+        .cs_count = 2,
+        .cs = {5, 3},
+        .clock_divider_register_value = 0x1a5,
+        .use_enhanced_clock_mode = true,
+    };
+  }
+};
 
-  root()->SetMetadata(DEVICE_METADATA_AMLSPI_CONFIG, kTestSpiConfig, sizeof(kTestSpiConfig));
-
-  EXPECT_EQ(AmlSpi::Create(nullptr, root()), ZX_ERR_INVALID_ARGS);
+TEST_F(AmlSpiEnhancedClockModeInvalidDividerTest, Test) {
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  EXPECT_TRUE(start_result.is_error());
 }
 
 class AmlSpiBtiPaddrTest : public AmlSpiTest {
@@ -866,10 +937,11 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
     memcpy(reversed_expected_rx_data + i, &tmp, sizeof(tmp));
   }
 
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi0 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
+  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
+  ASSERT_TRUE(spi0.is_valid());
 
   fake_bti_pinned_vmo_info_t dma_vmos[2] = {};
   size_t actual_vmos = 0;
@@ -897,7 +969,7 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
   memcpy(buf, kTxData, sizeof(buf));
 
   size_t rx_actual;
-  EXPECT_OK(spi0->SpiImplExchange(0, buf, sizeof(buf), buf, sizeof(buf), &rx_actual));
+  EXPECT_OK(spi0.Exchange(0, buf, sizeof(buf), buf, sizeof(buf), &rx_actual));
   EXPECT_EQ(rx_actual, sizeof(buf));
   EXPECT_BYTES_EQ(kExpectedRxData, buf, sizeof(buf));
 
@@ -932,10 +1004,11 @@ TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
       0xea, 0x2b, 0x8f, 0x8f, 0xea, 0x2b, 0x8f, 0x8f, 0x8f, 0x8f, 0x8f, 0x8f, 0x8f, 0x8f, 0x8f,
   };
 
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi0 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
+  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
+  ASSERT_TRUE(spi0.is_valid());
 
   fake_bti_pinned_vmo_info_t dma_vmos[2] = {};
   size_t actual_vmos = 0;
@@ -961,7 +1034,7 @@ TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
   memcpy(buf, kTxData, sizeof(buf));
 
   size_t rx_actual;
-  EXPECT_OK(spi0->SpiImplExchange(0, buf, sizeof(buf), buf, sizeof(buf), &rx_actual));
+  EXPECT_OK(spi0.Exchange(0, buf, sizeof(buf), buf, sizeof(buf), &rx_actual));
   EXPECT_EQ(rx_actual, sizeof(buf));
   EXPECT_BYTES_EQ(kExpectedRxData, buf, sizeof(buf));
   EXPECT_EQ(tx_data, kTxData[14]);
@@ -973,7 +1046,21 @@ TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
   EXPECT_FALSE(ControllerReset());
 }
 
-TEST_F(AmlSpiBtiPaddrTest, ExchangeDmaClientReversesBuffer) {
+class AmlSpiExchangeDmaClientReversesBufferTest : public AmlSpiBtiPaddrTest {
+ public:
+  amlogic_spi::amlspi_config_t GetAmlSpiMetadata() override {
+    return amlogic_spi::amlspi_config_t{
+        .bus_id = 0,
+        .cs_count = 3,
+        .cs = {5, 3, amlogic_spi::amlspi_config_t::kCsClientManaged},
+        .clock_divider_register_value = 0,
+        .use_enhanced_clock_mode = false,
+        .client_reverses_dma_transfers = true,
+    };
+  }
+};
+
+TEST_F(AmlSpiExchangeDmaClientReversesBufferTest, Test) {
   constexpr uint8_t kTxData[24] = {
       0x3c, 0xa7, 0x5f, 0xc8, 0x4b, 0x0b, 0xdf, 0xef, 0xb9, 0xa0, 0xcb, 0xbd,
       0xd4, 0xcf, 0xa8, 0xbf, 0x85, 0xf2, 0x6a, 0xe3, 0xba, 0xf1, 0x49, 0x00,
@@ -983,22 +1070,11 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDmaClientReversesBuffer) {
       0xea, 0x2b, 0x8f, 0x8f, 0xea, 0x2b, 0x8f, 0x8f, 0xea, 0x2b, 0x8f, 0x8f,
   };
 
-  constexpr amlogic_spi::amlspi_config_t kSpiConfig[] = {
-      {
-          .bus_id = 0,
-          .cs_count = 3,
-          .cs = {5, 3, amlogic_spi::amlspi_config_t::kCsClientManaged},
-          .clock_divider_register_value = 0,
-          .use_enhanced_clock_mode = false,
-          .client_reverses_dma_transfers = true,
-      },
-  };
-  root()->SetMetadata(DEVICE_METADATA_AMLSPI_CONFIG, kSpiConfig, sizeof(kSpiConfig));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
-
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi0 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
+  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
+  ASSERT_TRUE(spi0.is_valid());
 
   fake_bti_pinned_vmo_info_t dma_vmos[2] = {};
   size_t actual_vmos = 0;
@@ -1024,7 +1100,7 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDmaClientReversesBuffer) {
   memcpy(buf, kTxData, sizeof(buf));
 
   size_t rx_actual;
-  EXPECT_OK(spi0->SpiImplExchange(0, buf, sizeof(buf), buf, sizeof(buf), &rx_actual));
+  EXPECT_OK(spi0.Exchange(0, buf, sizeof(buf), buf, sizeof(buf), &rx_actual));
   EXPECT_EQ(rx_actual, sizeof(buf));
   EXPECT_BYTES_EQ(kExpectedRxData, buf, sizeof(buf));
 
@@ -1038,22 +1114,29 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDmaClientReversesBuffer) {
   EXPECT_FALSE(ControllerReset());
 }
 
-TEST_F(AmlSpiTest, Shutdown) {
+class AmlSpiShutdownTest : public AmlSpiTest {
+ public:
+  // Override teardown so that the test case itself can call PrepareStop/Stop.
+  void TearDown() override {}
+};
+
+TEST_F(AmlSpiShutdownTest, Shutdown) {
   // Must outlive AmlSpi device.
   bool dmareg_cleared = false;
   bool conreg_cleared = false;
 
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi0 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
+  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
+  ASSERT_TRUE(spi0.is_valid());
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
   uint8_t buf[16] = {};
   size_t rx_actual;
-  EXPECT_OK(spi0->SpiImplExchange(0, buf, sizeof(buf), buf, sizeof(buf), &rx_actual));
+  EXPECT_OK(spi0.Exchange(0, buf, sizeof(buf), buf, sizeof(buf), &rx_actual));
 
   mmio()[AML_SPI_DMAREG].SetWriteCallback(
       [&dmareg_cleared](uint64_t value) { dmareg_cleared = value == 0; });
@@ -1061,11 +1144,9 @@ TEST_F(AmlSpiTest, Shutdown) {
   mmio()[AML_SPI_CONREG].SetWriteCallback(
       [&conreg_cleared](uint64_t value) { conreg_cleared = value == 0; });
 
-  // The device must be torn down manually since it uses stack state.
-  auto* mock_dev = root()->GetLatestChild();
-  spi0->DdkAsyncRemove();
-  mock_dev->WaitUntilAsyncRemoveCalled();
-  mock_ddk::ReleaseFlaggedDevices(root());
+  zx::result prepare_stop_result = runtime_.RunToCompletion(dut_.PrepareStop());
+  EXPECT_OK(prepare_stop_result.status_value());
+  EXPECT_TRUE(dut_.Stop().is_ok());
 
   EXPECT_TRUE(dmareg_cleared);
   EXPECT_TRUE(conreg_cleared);
@@ -1083,17 +1164,18 @@ class AmlSpiNoResetFragmentTest : public AmlSpiTest {
 };
 
 TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
-  EXPECT_OK(AmlSpi::Create(nullptr, root()));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  ASSERT_TRUE(start_result.is_ok());
 
-  ASSERT_EQ(root()->child_count(), 1);
-  auto* spi0 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
+  ddk::SpiImplProtocolClient spi0 = GetBanjoClient();
+  ASSERT_TRUE(spi0.is_valid());
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
   uint8_t buf[17] = {};
   size_t rx_actual;
-  EXPECT_OK(spi0->SpiImplExchange(0, buf, 17, buf, 17, &rx_actual));
+  EXPECT_OK(spi0.Exchange(0, buf, 17, buf, 17, &rx_actual));
   EXPECT_EQ(rx_actual, 17);
   EXPECT_FALSE(ControllerReset());
 
@@ -1101,28 +1183,28 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
   ExpectGpioWrite(ZX_OK, 1);
 
   // Controller should not be reset because no reset fragment was provided.
-  EXPECT_OK(spi0->SpiImplExchange(0, buf, 16, buf, 16, &rx_actual));
+  EXPECT_OK(spi0.Exchange(0, buf, 16, buf, 16, &rx_actual));
   EXPECT_EQ(rx_actual, 16);
   EXPECT_FALSE(ControllerReset());
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi0->SpiImplExchange(0, buf, 3, buf, 3, &rx_actual));
+  EXPECT_OK(spi0.Exchange(0, buf, 3, buf, 3, &rx_actual));
   EXPECT_EQ(rx_actual, 3);
   EXPECT_FALSE(ControllerReset());
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi0->SpiImplExchange(0, buf, 6, buf, 6, &rx_actual));
+  EXPECT_OK(spi0.Exchange(0, buf, 6, buf, 6, &rx_actual));
   EXPECT_EQ(rx_actual, 6);
   EXPECT_FALSE(ControllerReset());
 
   ExpectGpioWrite(ZX_OK, 0);
   ExpectGpioWrite(ZX_OK, 1);
 
-  EXPECT_OK(spi0->SpiImplExchange(0, buf, 8, buf, 8, &rx_actual));
+  EXPECT_OK(spi0.Exchange(0, buf, 8, buf, 8, &rx_actual));
   EXPECT_EQ(rx_actual, 8);
   EXPECT_FALSE(ControllerReset());
 
@@ -1136,7 +1218,8 @@ class AmlSpiNoIrqTest : public AmlSpiTest {
 
 TEST_F(AmlSpiNoIrqTest, InterruptRequired) {
   // Bind should fail if no interrupt was provided.
-  EXPECT_NOT_OK(AmlSpi::Create(nullptr, root()));
+  zx::result start_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args_)));
+  EXPECT_TRUE(start_result.is_error());
 }
 
 }  // namespace spi
