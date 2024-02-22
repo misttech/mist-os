@@ -48,6 +48,7 @@ enum FunnelSubcommands {
     Host(SubCommandHost),
     Update(SubCommandUpdate),
     Cleanup(SubCommandCleanupRemote),
+    CloseLocalTunnel(SubCommandCloseLocalTunnel),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -98,6 +99,17 @@ struct SubCommandCleanupRemote {
     host: String,
 }
 
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "close-local-tunnel")]
+/// Closes the local tunnel if it exists.
+///
+/// Instructs the ControlMaster running for funnel to exit
+struct SubCommandCloseLocalTunnel {
+    /// the remote host to cleanup
+    #[argh(positional)]
+    host: String,
+}
+
 #[fuchsia_async::run_singlethreaded]
 async fn main() -> Result<()> {
     let args: Funnel = argh::from_env();
@@ -108,7 +120,14 @@ async fn main() -> Result<()> {
         FunnelSubcommands::Host(host_command) => funnel_main(host_command).await,
         FunnelSubcommands::Update(update_command) => update_main(update_command).await,
         FunnelSubcommands::Cleanup(cleanup_command) => cleanup_main(cleanup_command).await,
+        FunnelSubcommands::CloseLocalTunnel(close_existing_tunnel) => {
+            close_existing_tunnel_main(close_existing_tunnel).await
+        }
     }
+}
+
+async fn close_existing_tunnel_main(args: SubCommandCloseLocalTunnel) -> Result<()> {
+    ssh::close_existing_tunnel(args.host).await
 }
 
 async fn cleanup_main(args: SubCommandCleanupRemote) -> Result<()> {

@@ -37,13 +37,7 @@ pub enum TunnelError {
     SshError(i32),
 }
 
-pub(crate) fn do_ssh(
-    host: String,
-    target: TargetInfo,
-    repo_port: u32,
-    additional_port_forwards: Vec<u32>,
-) -> Result<(), TunnelError> {
-    // Set up the control master
+fn get_control_path() -> Result<Utf8PathBuf, TunnelError> {
     let home_path = home_dir().ok_or(TunnelError::NoHomeDir)?;
     let home_path = Utf8PathBuf::from_path_buf(home_path)
         .map_err(|e| TunnelError::InvalidHomeDir { home_dir: e })?;
@@ -56,7 +50,17 @@ pub(crate) fn do_ssh(
             .map_err(|e| TunnelError::CannotCreateControlMasterPath { source: e })?,
         Err(e) => return Err(TunnelError::CannotCreateControlMasterPath { source: e }),
     };
+    Ok(funnel_control_path)
+}
 
+pub(crate) fn do_ssh(
+    host: String,
+    target: TargetInfo,
+    repo_port: u32,
+    additional_port_forwards: Vec<u32>,
+) -> Result<(), TunnelError> {
+    // Set up the control master
+    let funnel_control_path = get_control_path()?;
     // Set up ssh command
     let mut ssh_cmd = &mut Command::new("ssh");
     for arg in
@@ -140,6 +144,20 @@ pub(crate) async fn cleanup_remote_sshd(host: String) -> Result<()> {
         Command::new("ssh").arg("-o RequestTTY yes").arg(host).arg(CLEANUP_COMMAND).spawn()?;
     ssh.wait()?;
 
+    Ok(())
+}
+
+pub(crate) async fn close_existing_tunnel(host: String) -> Result<()> {
+    let funnel_control_path = get_control_path()?;
+    let args = vec![
+        "-o".to_string(),
+        format!("ControlPath {}", funnel_control_path),
+        "-O".to_string(),
+        "exit".to_string(),
+        host,
+    ];
+    let mut ssh = Command::new("ssh").args(args).spawn()?;
+    ssh.wait()?;
     Ok(())
 }
 
