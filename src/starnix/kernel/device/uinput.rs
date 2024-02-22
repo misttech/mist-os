@@ -22,11 +22,7 @@ use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsIoctl, Locked, Mutex, ReadOps, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
-    device_type, error,
-    errors::Errno,
-    open_flags::OpenFlags,
-    uapi,
-    user_address::{UserAddress, UserRef},
+    device_type, errno, error, errors::Errno, open_flags::OpenFlags, uapi, user_address::UserRef,
 };
 use std::sync::{
     atomic::{AtomicU32, Ordering},
@@ -123,17 +119,11 @@ impl UinputDevice {
     fn ui_get_version(
         &self,
         current_task: &CurrentTask,
-        arg: SyscallArg,
+        user_version: UserRef<u32>,
     ) -> Result<SyscallResult, Errno> {
-        let user_arg = UserAddress::from(arg);
-        if user_arg.is_null() {
-            return error!(EFAULT);
-        }
         let response: u32 = UINPUT_VERSION;
-        match current_task.write_object(UserRef::new(user_arg), &response) {
-            Ok(_) => Ok(SUCCESS),
-            Err(e) => Err(e),
-        }
+        current_task.write_object(user_version, &response)?;
+        Ok(SUCCESS)
     }
 
     /// UI_DEV_SETUP set the name of device and input_id (bustype, vendor id,
@@ -141,15 +131,9 @@ impl UinputDevice {
     fn ui_dev_setup(
         &self,
         current_task: &CurrentTask,
-        arg: SyscallArg,
+        user_uinput_setup: UserRef<uapi::uinput_setup>,
     ) -> Result<SyscallResult, Errno> {
-        let user_arg = UserAddress::from(arg);
-        if user_arg.is_null() {
-            return error!(EFAULT);
-        }
-        let uinput_setup = current_task
-            .read_object::<uapi::uinput_setup>(UserRef::new(user_arg))
-            .expect("read object");
+        let uinput_setup = current_task.read_object(user_uinput_setup)?;
         self.inner.lock().input_id = Some(uinput_setup.id);
         Ok(SUCCESS)
     }
@@ -286,7 +270,7 @@ impl FileOps for Arc<UinputDevice> {
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         match request {
-            uapi::UI_GET_VERSION => self.ui_get_version(current_task, arg),
+            uapi::UI_GET_VERSION => self.ui_get_version(current_task, arg.into()),
             uapi::UI_SET_EVBIT => self.ui_set_evbit(arg),
             // `fuchsia.ui.test.input.Registry` does not use some uinput ioctl
             // request, just ignore the request and return SUCCESS, even args
@@ -295,7 +279,7 @@ impl FileOps for Arc<UinputDevice> {
             | uapi::UI_SET_ABSBIT
             | uapi::UI_SET_PHYS
             | uapi::UI_SET_PROPBIT => Ok(SUCCESS),
-            uapi::UI_DEV_SETUP => self.ui_dev_setup(current_task, arg),
+            uapi::UI_DEV_SETUP => self.ui_dev_setup(current_task, arg.into()),
             uapi::UI_DEV_CREATE => self.ui_dev_create(current_task),
             uapi::UI_DEV_DESTROY => self.ui_dev_destroy(current_task),
             // default_ioctl() handles file system related requests and reject
@@ -316,8 +300,7 @@ impl FileOps for Arc<UinputDevice> {
         data: &mut dyn vfs::buffers::InputBuffer,
     ) -> Result<usize, Errno> {
         let content = data.read_all()?;
-        let event = uapi::input_event::read_from(&content)
-            .expect("UInput could not create input_event from InputBuffer data.");
+        let event = uapi::input_event::read_from(&content).ok_or_else(|| errno!(EINVAL))?;
 
         let mut inner = self.inner.lock();
 
