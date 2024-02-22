@@ -561,6 +561,7 @@
                 "PtyTest.CanonInputBackspaceMultibyteCharacterWithIUTF8",
                 "PtyTest.CanonInputBackspaceMultibyteCharacterPartialWithIUTF8",
                 "PtyTest.CanonInputWordErase",
+                "JobControlTest.ControllingProcessPersistsAfterChildExists",
 
                 // raw_socket_icmp
                 "RawSocketICMPTest.IPv6ChecksumNotSupported",
