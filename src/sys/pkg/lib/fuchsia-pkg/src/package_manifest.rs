@@ -272,7 +272,8 @@ impl PackageManifest {
                 let contents = archive_reader.read_file(&path)?;
                 let mut tmp = tempfile::NamedTempFile::new_in(blobs_dir)?;
                 tmp.write_all(&contents)?;
-                tmp.persist_if_changed(&blob_path)?;
+                tmp.persist_if_changed(&blob_path)
+                    .map_err(|err| PackageManifestError::Persist { cause: err, path: blob_path })?;
             }
         }
 
@@ -282,7 +283,8 @@ impl PackageManifest {
         let meta_far_path = blobs_dir.join(meta_far_hash.to_string());
         let mut tmp = tempfile::NamedTempFile::new_in(blobs_dir)?;
         tmp.write_all(&meta_far)?;
-        tmp.persist_if_changed(meta_far_path)?;
+        tmp.persist_if_changed(&meta_far_path)
+            .map_err(|err| PackageManifestError::Persist { cause: err, path: meta_far_path })?;
 
         PackageManifest::from_blobs_dir(blobs_dir, meta_far_hash, out_manifest_dir)
     }
@@ -567,7 +569,8 @@ impl PackageManifestV1 {
             };
 
             serde_json::to_writer(&mut tmp, &versioned_manifest)?;
-            tmp.persist_if_changed(manifest_path)?;
+            tmp.persist_if_changed(&manifest_path)
+                .with_context(|| format!("failed to persist package manifest: {manifest_path}"))?;
 
             Ok(manifest)
         }

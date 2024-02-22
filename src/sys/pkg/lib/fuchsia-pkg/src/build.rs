@@ -9,13 +9,13 @@ use crate::{
 use fuchsia_merkle::{Hash, MerkleTree};
 use std::collections::{btree_map, BTreeMap};
 use std::io::{Seek, SeekFrom};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::{fs, io};
 use tempfile::NamedTempFile;
 
 pub(crate) fn build(
     creation_manifest: &PackageBuildManifest,
-    meta_far_path: impl AsRef<Path>,
+    meta_far_path: impl Into<PathBuf>,
     published_name: impl AsRef<str>,
     subpackages: Vec<SubpackageEntry>,
     repository: Option<String>,
@@ -55,18 +55,21 @@ impl FileSystem<'_> for ActualFileSystem {
 
 pub(crate) fn build_with_file_system<'a>(
     creation_manifest: &PackageBuildManifest,
-    meta_far_path: impl AsRef<Path>,
+    meta_far_path: impl Into<PathBuf>,
     published_name: impl AsRef<str>,
     subpackages: Vec<SubpackageEntry>,
     repository: Option<String>,
     file_system: &'a impl FileSystem<'a>,
 ) -> Result<PackageManifest, BuildError> {
+    let meta_far_path = meta_far_path.into();
+    let published_name = published_name.as_ref();
+
     if creation_manifest.far_contents().get("meta/package").is_none() {
         return Err(BuildError::MetaPackage(MetaPackageError::MetaPackageMissing));
     };
 
     let mut package_builder =
-        Package::builder(published_name.as_ref().parse().map_err(BuildError::PackageName)?);
+        Package::builder(published_name.parse().map_err(BuildError::PackageName)?);
 
     for SubpackageEntry { name, merkle, package_manifest_path } in subpackages.into_iter() {
         package_builder.add_subpackage(name, merkle, package_manifest_path);
@@ -95,7 +98,7 @@ pub(crate) fn build_with_file_system<'a>(
     for (resource_path, source_path) in creation_manifest.far_contents() {
         far_contents.insert(
             resource_path,
-            file_system.read(source_path).map_err(|e| (e, source_path.to_string()))?,
+            file_system.read(source_path).map_err(|e| (e, source_path.into()))?,
         );
     }
 
@@ -118,7 +121,7 @@ pub(crate) fn build_with_file_system<'a>(
     }
 
     // Write the meta-far to a temporary file.
-    let mut meta_far_file = if let Some(parent) = meta_far_path.as_ref().parent() {
+    let mut meta_far_file = if let Some(parent) = meta_far_path.parent() {
         NamedTempFile::new_in(parent)?
     } else {
         NamedTempFile::new()?
@@ -133,15 +136,12 @@ pub(crate) fn build_with_file_system<'a>(
     let meta_far_size = meta_far_file.as_file().metadata()?.len();
 
     // Replace the existing meta-far with the new file.
-    meta_far_file.persist(&meta_far_path).map_err(|err| err.error)?;
+    if let Err(err) = meta_far_file.persist(&meta_far_path) {
+        return Err(BuildError::IoErrorWithPath { cause: err.error, path: meta_far_path });
+    }
 
     // Add the meta-far as an entry to the package.
-    package_builder.add_entry(
-        "meta/".to_string(),
-        meta_far_merkle,
-        meta_far_path.as_ref().to_path_buf(),
-        meta_far_size,
-    );
+    package_builder.add_entry("meta/".to_string(), meta_far_merkle, meta_far_path, meta_far_size);
 
     let package = package_builder.build()?;
     let package_manifest = PackageManifest::from_package(package, repository)?;
@@ -162,7 +162,7 @@ fn get_external_content_infos<'a, 'b>(
         .iter()
         .map(|(resource_path, source_path)| -> Result<(String, ExternalContentInfo<'_>), BuildError> {
             let file = file_system.open(source_path)
-                .map_err(|e| (e, source_path.to_string()))?;
+                .map_err(|e| (e, source_path.into()))?;
             Ok((
                 resource_path.clone(),
                 ExternalContentInfo {

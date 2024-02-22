@@ -47,7 +47,7 @@ pub enum PackageBuildManifestError {
     EmptyResourcePath,
 
     #[error("manifest contains an invalid file path '{}'.", path.display())]
-    InvalidFileType { path: std::path::PathBuf },
+    InvalidFileType { path: PathBuf },
 
     #[error("file directory collision at: {:?}", path)]
     FileDirectoryCollision { path: String },
@@ -82,8 +82,12 @@ pub enum PackageManifestError {
     #[error("writing to relative path failed: {}", _0)]
     RelativeWrite(#[from] anyhow::Error),
 
-    #[error("persisting to file failed: {}", _0)]
-    Persist(#[from] PersistError),
+    #[error("persisting to file failed: '{path}'")]
+    Persist {
+        #[source]
+        cause: PersistError,
+        path: PathBuf,
+    },
 }
 
 #[derive(Debug, Error)]
@@ -156,8 +160,8 @@ pub enum BuildError {
     #[error("io: {}", _0)]
     IoError(#[from] io::Error),
 
-    #[error("{}: '{}'", cause, path)]
-    IoErrorWithPath { cause: io::Error, path: String },
+    #[error("{cause}: '{path}'")]
+    IoErrorWithPath { cause: io::Error, path: PathBuf },
 
     #[error("meta contents")]
     MetaContents(#[from] MetaContentsError),
@@ -184,8 +188,8 @@ pub enum BuildError {
     ArchiveWrite(#[from] fuchsia_archive::Error),
 }
 
-impl From<(io::Error, String)> for BuildError {
-    fn from(pair: (io::Error, String)) -> Self {
+impl From<(io::Error, PathBuf)> for BuildError {
+    fn from(pair: (io::Error, PathBuf)) -> Self {
         Self::IoErrorWithPath { cause: pair.0, path: pair.1 }
     }
 }
