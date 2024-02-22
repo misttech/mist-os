@@ -163,7 +163,15 @@ void TraceManager::InitializeTracing(controller::TraceConfig config, zx::socket 
   session_ = std::make_unique<TraceSession>(
       executor_, std::move(output), std::move(categories), default_buffer_size_megabytes,
       tracing_buffering_mode, std::move(provider_specs), start_timeout, kStopTimeout,
-      [this]() { session_.reset(); },
+      [this]() {
+        if (session_->state() != TraceSession::State::kTerminating) {
+          FX_LOGS(INFO) << "Aborting and terminating trace";
+          session_->Terminate([this](controller::TerminateResult result) {
+            FX_LOGS(INFO) << "Terminated trace";
+            session_.reset();
+          });
+        }
+      },
       [this](const std::string& alert_name) { OnAlert(alert_name); });
 
   // The trace header is written now to ensure it appears first, and to avoid
@@ -185,6 +193,11 @@ void TraceManager::TerminateTracing(controller::TerminateOptions options,
     FX_LOGS(DEBUG) << "Ignoring terminate request, tracing not initialized";
     controller::TerminateResult result;
     terminate_callback(std::move(result));
+    return;
+  }
+
+  if (session_->state() == TraceSession::State::kTerminating) {
+    FX_LOGS(INFO) << "Ignoring terminate request. Already terminating";
     return;
   }
 

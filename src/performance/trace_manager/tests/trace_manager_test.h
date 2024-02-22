@@ -162,6 +162,8 @@ class TraceManagerTest : public gtest::TestLoopFixture {
     gtest::TestLoopFixture::RunLoopFor(std::move(duration));
   }
 
+  void DropSocket() { destination_.reset(); }
+
  private:
   // For communication between |BeginStart(),FinishStart()|.
   // This value is only valid between those calls.

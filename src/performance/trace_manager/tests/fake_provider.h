@@ -41,7 +41,6 @@ class FakeProvider : public provider::Provider {
     // Have received |Terminate()| but have not terminated yet.
     kTerminating,
     // Provider has terminated tracing.
-    // There is no transition from |kTerminated| to |kReady| in the tests.
     kTerminated,
   };
 

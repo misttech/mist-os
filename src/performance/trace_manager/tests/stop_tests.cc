@@ -26,6 +26,60 @@ TEST_F(TraceManagerTest, StopUninitialize) {
   EXPECT_TRUE(stop_completed);
 }
 
+TEST_F(TraceManagerTest, RetryAfterFailedStop) {
+  ConnectToControllerService();
+
+  EXPECT_TRUE(AddFakeProvider(kProvider1Pid, kProvider1Name));
+
+  ASSERT_TRUE(InitializeSession());
+
+  ASSERT_TRUE(StartSession());
+
+  controller::StopOptions stop_options{GetDefaultStopOptions()};
+  controller()->StopTracing(std::move(stop_options), []() {});
+  RunLoopUntilIdle();
+  ASSERT_EQ(GetSessionState(), SessionState::kStopping);
+
+  // Drop the socket before marking all providers stopped. This causes
+  // an error while writing the buffer to the socket. Trace session should
+  // abort and terminate.
+  DropSocket();
+  MarkAllProvidersStopped();
+  RunLoopUntilIdle();
+  ASSERT_EQ(GetSessionState(), SessionState::kTerminating);
+  MarkAllProvidersTerminated();
+  RunLoopUntilIdle();
+  ASSERT_EQ(GetSessionState(), SessionState::kNonexistent);
+
+  // Initialize a new session and verify that everything works fine
+  zx::socket our_socket, their_socket;
+  zx_status_t status = zx::socket::create(0u, &our_socket, &their_socket);
+  ASSERT_EQ(status, ZX_OK);
+
+  controller::TraceConfig config{GetDefaultTraceConfig()};
+  controller()->InitializeTracing(std::move(config), std::move(their_socket));
+  RunLoopUntilIdle();
+  ASSERT_EQ(GetSessionState(), SessionState::kInitialized);
+  RunLoopUntilIdle();
+
+  controller::StartOptions start_options{GetDefaultStartOptions()};
+  bool start_completed = false;
+  controller()->StartTracing(
+      std::move(start_options),
+      [this, &start_completed](controller::Controller_StartTracing_Result in_result) {
+        start_completed = true;
+        QuitLoop();
+      });
+  RunLoopUntilIdle();
+  MarkAllProvidersStarted();
+  RunLoopUntilIdle();
+  ASSERT_EQ(GetSessionState(), SessionState::kStarted);
+
+  ASSERT_TRUE(StopSession());
+
+  ASSERT_TRUE(TerminateSession());
+}
+
 template <typename T>
 void TryExtraStop(TraceManagerTest* fixture, const T& interface_ptr) {
   controller::StopOptions stop_options{fixture->GetDefaultStopOptions()};

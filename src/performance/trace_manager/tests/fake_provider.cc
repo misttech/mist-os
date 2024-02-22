@@ -28,7 +28,7 @@ void FakeProvider::Initialize(provider::ProviderConfig config) {
     return;
   }
 
-  if (state_ != State::kReady) {
+  if (state_ != State::kReady && state_ != State::kTerminated) {
     FX_LOGS(DEBUG) << "Can't initialize, state is " << state_;
     return;
   }

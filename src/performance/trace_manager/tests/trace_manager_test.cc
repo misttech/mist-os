@@ -216,7 +216,7 @@ bool TraceManagerTest::StartSession(controller::StartOptions options) {
 // static
 controller::StopOptions TraceManagerTest::GetDefaultStopOptions() {
   controller::StopOptions options;
-  options.set_write_results(false);
+  options.set_write_results(true);
   return options;
 }
 

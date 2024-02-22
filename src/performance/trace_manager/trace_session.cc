@@ -455,8 +455,7 @@ bool TraceSession::WriteProviderData(Tracee* tracee) {
 
 void TraceSession::Abort() {
   FX_LOGS(DEBUG) << "Fatal error occurred, aborting session";
-
-  tracees_.clear();
+  write_results_on_terminate_ = false;
   abort_handler_();
 }
 
