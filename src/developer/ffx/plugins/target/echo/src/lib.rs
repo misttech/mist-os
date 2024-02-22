@@ -36,22 +36,33 @@ async fn echo_impl<W: Write>(
     // This outer loop retries connecting to the target every time the
     // connection fails. If we only connect once it only runs once.
     loop {
-        // Get a connection to the target. This will fail with a timeout if the
-        // target isn't there in time, so the loop will still break if the
-        // target goes missing, but it should always connect to the daemon as it
-        // has the power to start the daemon if it is missing.
+        // Get a connection to the target. If the target isn't there, this will
+        // wait for it to appear. The closure is called just before that wait so
+        // we can log what's happening before blocking a long time.
         //
-        // If the daemon is disabled from auto-starting with `daemon.autostart =
-        // false` then this will still fail and exit the tool. Workflows that
-        // need tools to auto-reconnect but still need to manually manage the
-        // daemon aren't known to us at this time.
+        // If the daemon isn't available, we simply start it. If the daemon is
+        // disabled from auto-starting with `daemon.autostart = false` then this
+        // will still fail and exit the tool. Workflows that need tools to
+        // auto-reconnect but still need to manually manage the daemon aren't
+        // known to us at this time.
         //
         // Daemonless workflows should behave as though the daemon is always
         // reachable as far as this command is concerned, but daemonless is
         // experimental/unimplemented as of now so this isn't tested.
-        let rcs_proxy = rcs_proxy_connector.try_connect().await?;
+        let rcs_proxy = rcs_proxy_connector
+            .try_connect(|target| {
+                if let Some(target) = &target {
+                    writeln!(writer, "Waiting for target {target} to return")
+                        .map_err(|e| fho::Error::User(e.into()))?;
+                } else {
+                    writeln!(writer, "Waiting for target to return")
+                        .map_err(|e| fho::Error::User(e.into()))?;
+                }
+                Ok(())
+            })
+            .await?;
 
-        // The inner loop handles the repetition part of the --repeat argument.
+        // This inner loop handles the repetition part of the --repeat argument.
         // If that argument wasn't specified then this too only runs once.
         loop {
             match rcs_proxy.echo_string(&echo_text).await {

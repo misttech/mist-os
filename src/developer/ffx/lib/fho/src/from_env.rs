@@ -131,9 +131,70 @@ pub struct Connector<T: TryFromEnv> {
 }
 
 impl<T: TryFromEnv> Connector<T> {
-    /// Try to get a `T` from the environment.
-    pub async fn try_connect(&self) -> Result<T> {
-        T::try_from_env(&self.env).await
+    pub const OPEN_TARGET_TIMEOUT: Duration = Duration::from_millis(500);
+    pub const KNOCK_TARGET_TIMEOUT: Duration = Duration::from_millis(500);
+
+    /// Try to get a `T` from the environment. Will wait for the target to
+    /// appear if it is non-responsive. If that occurs, `log_target_wait` will
+    /// be called prior to waiting.
+    pub async fn try_connect(
+        &self,
+        mut log_target_wait: impl FnMut(&Option<String>) -> Result<()>,
+    ) -> Result<T> {
+        loop {
+            return match T::try_from_env(&self.env).await {
+                Err(ffx_command::Error::User(e)) => {
+                    match e.downcast::<errors::FfxError>() {
+                        Ok(errors::FfxError::DaemonError {
+                            err: ffx_fidl::DaemonError::Timeout,
+                            target,
+                            ..
+                        }) => {
+                            let Ok(daemon_proxy) = self.env.injector.daemon_factory().await else {
+                                // Let the initial try_from_env detect this error.
+                                continue;
+                            };
+                            let (tc_proxy, server_end) =
+                                fidl::endpoints::create_proxy::<ffx_fidl::TargetCollectionMarker>()
+                                    .expect("Could not create FIDL proxy");
+                            let Ok(Ok(())) = daemon_proxy
+                                .connect_to_protocol(
+                                    ffx_fidl::TargetCollectionMarker::PROTOCOL_NAME,
+                                    server_end.into_channel(),
+                                )
+                                .await
+                            else {
+                                // Let the rcs_proxy_connector detect this error too.
+                                continue;
+                            };
+                            log_target_wait(&target)?;
+                            loop {
+                                match ffx_target::knock_target_by_name(
+                                    &target,
+                                    &tc_proxy,
+                                    Self::OPEN_TARGET_TIMEOUT,
+                                    Self::KNOCK_TARGET_TIMEOUT,
+                                )
+                                .await
+                                {
+                                    Ok(()) => break,
+                                    Err(ffx_target::KnockError::CriticalError(e)) => {
+                                        return Err(e.into())
+                                    }
+                                    Err(ffx_target::KnockError::NonCriticalError(_)) => {
+                                        // Should we log the error? It'll spam like hell.
+                                    }
+                                };
+                            }
+                            continue;
+                        }
+                        Ok(other) => return Err(other.into()),
+                        Err(e) => return Err(e.into()),
+                    }
+                }
+                other => other,
+            };
+        }
     }
 }
 
