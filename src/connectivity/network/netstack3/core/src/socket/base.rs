@@ -5,11 +5,8 @@
 //! General-purpose socket utilities common to device layer and IP layer
 //! sockets.
 
-use core::{
-    convert::Infallible as Never, fmt::Debug, hash::Hash, marker::PhantomData, num::NonZeroUsize,
-};
+use core::{convert::Infallible as Never, fmt::Debug, hash::Hash, marker::PhantomData};
 
-use dense_map::{collection::DenseMapCollectionKey, EntryKey};
 use derivative::Derivative;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6},
@@ -502,33 +499,6 @@ pub(crate) enum RemoveResult {
 pub(crate) enum SocketId<S: SocketMapStateSpec> {
     Listener(S::ListenerId),
     Connection(S::ConnId),
-}
-
-impl<S: SocketMapStateSpec> SocketId<S> {
-    const LISTENER_VARIANT: usize = 0;
-    const CONNECTION_VARIANT: usize = 0;
-}
-
-// TODO(https://fxbug.dev/42076891): Remove this when it is no longer used for
-// TCP socket lookup.
-impl<S: SocketMapStateSpec> DenseMapCollectionKey for SocketId<S>
-where
-    S::ListenerId: EntryKey,
-    S::ConnId: EntryKey,
-{
-    const VARIANT_COUNT: NonZeroUsize = const_unwrap::const_unwrap_option(NonZeroUsize::new(2));
-    fn get_id(&self) -> usize {
-        match self {
-            Self::Listener(l) => l.get_key_index(),
-            Self::Connection(c) => c.get_key_index(),
-        }
-    }
-    fn get_variant(&self) -> usize {
-        match self {
-            Self::Listener(_) => Self::LISTENER_VARIANT,
-            Self::Connection(_) => Self::CONNECTION_VARIANT,
-        }
-    }
 }
 
 /// A map from socket addresses to sockets.
