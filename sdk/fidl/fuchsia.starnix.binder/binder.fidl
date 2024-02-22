@@ -53,7 +53,6 @@ open protocol ProcessAccessor {
     /// the associated errno will be then returned.
     /// The implementator of this protocol should handle these requests as best
     /// it can so that a failure doesn't have visible side-effects.
-    @transitional
     flexible FileRequest(@generated_name("FileRequest") resource table {
         /// The list of file descriptor the client must close.
         1: close_requests vector<Fd>:MAX_REQUEST_COUNT;
