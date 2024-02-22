@@ -414,7 +414,7 @@ async fn package_cache_get() {
                 "fuchsia.pkg.PackageCache": {
                     "get": {
                         "0" : contains {
-                            "known_remaining": remaining,
+                            "known-remaining": remaining,
                             "open": open,
                             "written": written,
                         }

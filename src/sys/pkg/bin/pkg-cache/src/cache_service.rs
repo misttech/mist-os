@@ -566,7 +566,7 @@ async fn handle_open_blobs(
     node: &finspect::Node,
 ) -> Result<(), ServeNeededBlobsError> {
     let known_remaining_counter =
-        node.create_uint("known_remaining", missing_blobs.count_not_cached() as u64);
+        node.create_uint("known-remaining", missing_blobs.count_not_cached() as u64);
     let mut open_blobs = HashSet::new();
     let open_counter = node.create_uint("open", 0);
     let written_counter = node.create_uint("written", 0);
