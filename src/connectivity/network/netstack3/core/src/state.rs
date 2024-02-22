@@ -9,7 +9,10 @@ use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6};
 use crate::{
     api::CoreApi,
     context::{ContextProvider, CtxPair},
-    device::{arp::ArpCounters, DeviceCounters, DeviceId, DeviceLayerState, WeakDeviceId},
+    device::{
+        arp::ArpCounters, DeviceCounters, DeviceId, DeviceLayerState, EthernetDeviceCounters,
+        WeakDeviceId,
+    },
     ip::{
         self,
         device::nud::NudCounters,
@@ -118,6 +121,10 @@ impl<BT: BindingsTypes> StackState<BT> {
 
     pub(crate) fn device_counters(&self) -> &DeviceCounters {
         &self.device.counters()
+    }
+
+    pub(crate) fn ethernet_device_counters(&self) -> &EthernetDeviceCounters {
+        &self.device.ethernet_counters()
     }
 
     pub(crate) fn arp_counters(&self) -> &ArpCounters {

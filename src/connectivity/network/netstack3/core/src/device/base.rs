@@ -265,6 +265,7 @@ pub(crate) struct DeviceLayerState<BT: DeviceLayerTypes> {
     pub(super) origin: OriginTracker,
     pub(super) shared_sockets: HeldSockets<BT>,
     pub(super) counters: DeviceCounters,
+    pub(super) ethernet_counters: EthernetDeviceCounters,
     pub(super) nud_v4_counters: NudCounters<Ipv4>,
     pub(super) nud_v6_counters: NudCounters<Ipv6>,
     pub(super) arp_counters: ArpCounters,
@@ -275,6 +276,10 @@ impl<BT: DeviceLayerTypes> DeviceLayerState<BT> {
         &self.counters
     }
 
+    pub(crate) fn ethernet_counters(&self) -> &EthernetDeviceCounters {
+        &self.ethernet_counters
+    }
+
     pub(crate) fn nud_counters<I: Ip>(&self) -> &NudCounters<I> {
         I::map_ip((), |()| &self.nud_v4_counters, |()| &self.nud_v6_counters)
     }
@@ -282,6 +287,18 @@ impl<BT: DeviceLayerTypes> DeviceLayerState<BT> {
     pub(crate) fn arp_counters(&self) -> &ArpCounters {
         &self.arp_counters
     }
+}
+
+/// Counters for ethernet devices.
+#[derive(Default)]
+pub struct EthernetDeviceCounters {
+    /// Count of incoming frames dropped because the destination address was for
+    /// another device.
+    pub recv_ethernet_other_dest: Counter,
+    /// Count of incoming frames dropped due to an unsupported ethertype.
+    pub recv_unsupported_ethertype: Counter,
+    /// Count of incoming frames dropped due to an empty ethertype.
+    pub recv_no_ethertype: Counter,
 }
 
 /// Device layer counters.
@@ -302,21 +319,12 @@ pub struct DeviceCounters {
     pub recv_parse_error: Counter,
     /// Count of incoming frames deliverd to the IP layer.
     pub recv_ip_delivered: Counter,
-    /// Count of incoming frames dropped due to an unsupported ethertype.
-    pub recv_unsupported_ethertype: Counter,
     /// Count of sent frames containing an IPv4 packet.
     pub send_ipv4_frame: Counter,
     /// Count of sent frames containing an IPv6 packet.
     pub send_ipv6_frame: Counter,
     /// Count of frames that failed to send because there was no Tx queue.
     pub send_dropped_no_queue: Counter,
-    /// Count of incoming frames dropped because the destination address was for
-    /// another device.
-    pub recv_ethernet_other_dest: Counter,
-    /// Count of incoming ethernet frames deliverd to the ARP layer.
-    pub recv_arp_delivered: Counter,
-    /// Count of incoming frames dropped due to an empty ethertype.
-    pub recv_no_ethertype: Counter,
 }
 
 impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::DeviceCounters> for StackState<BC> {
@@ -409,6 +417,7 @@ impl<BC: DeviceLayerTypes + socket::DeviceSocketBindingsContext<DeviceId<BC>>>
             origin: OriginTracker::new(),
             shared_sockets: Default::default(),
             counters: Default::default(),
+            ethernet_counters: EthernetDeviceCounters::default(),
             nud_v4_counters: Default::default(),
             nud_v6_counters: Default::default(),
             arp_counters: Default::default(),

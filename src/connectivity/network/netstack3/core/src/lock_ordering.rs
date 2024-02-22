@@ -136,6 +136,8 @@ pub struct NudCounters<I>(PhantomData<I>, Never);
 pub enum NdpCounters {}
 // Provides unlocked access of DeviceCounters.
 pub enum DeviceCounters {}
+// Provides unlocked access of EthernetDeviceCounters.
+pub enum EthernetDeviceCounters {}
 // Provides unlocked access of ArpCounters.
 pub enum ArpCounters {}
 // Provides unlocked access of UdpCounters.

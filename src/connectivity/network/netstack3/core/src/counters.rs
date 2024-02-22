@@ -10,7 +10,7 @@ use net_types::ip::{Ip, Ipv4, Ipv6};
 use crate::{
     base::ContextPair,
     context::CounterContext,
-    device::{arp::ArpCounters, DeviceCounters},
+    device::{arp::ArpCounters, DeviceCounters, EthernetDeviceCounters},
     inspect::Inspector,
     ip::{
         device::nud::{NudCounters, NudCountersInner},
@@ -71,7 +71,8 @@ where
         + CounterContext<NudCounters<Ipv6>>
         + CounterContext<NdpCounters>
         + CounterContext<ArpCounters>
-        + CounterContext<DeviceCounters>,
+        + CounterContext<DeviceCounters>
+        + CounterContext<EthernetDeviceCounters>,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
         let Self(pair) = self;
@@ -82,6 +83,11 @@ where
     pub fn inspect_stack_counters<I: Inspector>(&mut self, inspector: &mut I) {
         inspector.record_child("Device", |inspector| {
             self.core_ctx().with_counters(|device| inspect_device_counters(inspector, device));
+            inspector.record_child("Ethernet", |inspector| {
+                self.core_ctx().with_counters(|ethernet_device| {
+                    inspect_ethernet_device_counters(inspector, ethernet_device)
+                });
+            });
         });
         inspector.record_child("Arp", |inspector| {
             self.core_ctx().with_counters(|arp| inspect_arp_counters(inspector, arp));
@@ -145,17 +151,13 @@ where
 
 fn inspect_device_counters(inspector: &mut impl Inspector, counters: &DeviceCounters) {
     let DeviceCounters {
-        recv_arp_delivered,
         recv_frame,
         recv_ip_delivered,
-        recv_no_ethertype,
-        recv_ethernet_other_dest,
         recv_parse_error,
-        recv_unsupported_ethertype,
+        send_dropped_no_queue,
         send_frame,
         send_ipv4_frame,
         send_ipv6_frame,
-        send_dropped_no_queue,
         send_queue_full,
         send_serialize_error,
         send_total_frames,
@@ -163,10 +165,6 @@ fn inspect_device_counters(inspector: &mut impl Inspector, counters: &DeviceCoun
     inspector.record_child("Rx", |inspector| {
         inspector.record_counter("TotalFrames", recv_frame);
         inspector.record_counter("Malformed", recv_parse_error);
-        inspector.record_counter("NonLocalDstAddr", recv_ethernet_other_dest);
-        inspector.record_counter("NoEthertype", recv_no_ethertype);
-        inspector.record_counter("UnsupportedEthertype", recv_unsupported_ethertype);
-        inspector.record_counter("ArpDelivered", recv_arp_delivered);
         inspector.record_counter("IpDelivered", recv_ip_delivered);
     });
     inspector.record_child("Tx", |inspector| {
@@ -177,6 +175,22 @@ fn inspect_device_counters(inspector: &mut impl Inspector, counters: &DeviceCoun
         inspector.record_counter("NoQueue", send_dropped_no_queue);
         inspector.record_counter("QueueFull", send_queue_full);
         inspector.record_counter("SerializeError", send_serialize_error);
+    });
+}
+
+fn inspect_ethernet_device_counters(
+    inspector: &mut impl Inspector,
+    counters: &EthernetDeviceCounters,
+) {
+    let EthernetDeviceCounters {
+        recv_ethernet_other_dest,
+        recv_no_ethertype,
+        recv_unsupported_ethertype,
+    } = counters;
+    inspector.record_child("Rx", |inspector| {
+        inspector.record_counter("NonLocalDstAddr", recv_ethernet_other_dest);
+        inspector.record_counter("NoEthertype", recv_no_ethertype);
+        inspector.record_counter("UnsupportedEthertype", recv_unsupported_ethertype);
     });
 }
 

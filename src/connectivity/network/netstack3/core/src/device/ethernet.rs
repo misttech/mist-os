@@ -60,8 +60,8 @@ use crate::{
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
         Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
-        DeviceReceiveFrameSpec, DeviceSendFrameError, EthernetDeviceId, FrameDestination,
-        RecvIpFrameMeta,
+        DeviceReceiveFrameSpec, DeviceSendFrameError, EthernetDeviceCounters, EthernetDeviceId,
+        FrameDestination, RecvIpFrameMeta,
     },
     ip::{
         device::nud::{
@@ -413,7 +413,7 @@ where
         + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
         + CounterContext<DeviceCounters>,
 {
-    core_ctx.increment(|counters| &counters.send_total_frames);
+    core_ctx.increment(|counters: &DeviceCounters| &counters.send_total_frames);
     match TransmitQueueHandler::<EthernetLinkDevice, _>::queue_tx_frame(
         core_ctx,
         bindings_ctx,
@@ -422,20 +422,20 @@ where
         frame,
     ) {
         Ok(()) => {
-            core_ctx.increment(|counters| &counters.send_frame);
+            core_ctx.increment(|counters: &DeviceCounters| &counters.send_frame);
             Ok(())
         }
         Err(TransmitQueueFrameError::NoQueue(e)) => {
-            core_ctx.increment(|counters| &counters.send_dropped_no_queue);
+            core_ctx.increment(|counters: &DeviceCounters| &counters.send_dropped_no_queue);
             tracing::error!("device {device_id:?} not ready to send frame: {e:?}");
             Ok(())
         }
         Err(TransmitQueueFrameError::QueueFull(s)) => {
-            core_ctx.increment(|counters| &counters.send_queue_full);
+            core_ctx.increment(|counters: &DeviceCounters| &counters.send_queue_full);
             Err(s)
         }
         Err(TransmitQueueFrameError::SerializeError(s)) => {
-            core_ctx.increment(|counters| &counters.send_serialize_error);
+            core_ctx.increment(|counters: &DeviceCounters| &counters.send_serialize_error);
             Err(s)
         }
     }
@@ -880,7 +880,7 @@ where
     S::Buffer: BufferMut,
     A::Version: EthernetIpExt,
 {
-    core_ctx.with_counters(|counters| {
+    core_ctx.with_counters(|counters: &DeviceCounters| {
         let () = A::Version::map_ip(
             (),
             |()| counters.send_ipv4_frame.increment(),
@@ -933,7 +933,8 @@ where
         + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv6>>
         + ArpPacketHandler<EthernetLinkDevice, BC>
         + DeviceSocketHandler<EthernetLinkDevice, BC>
-        + CounterContext<DeviceCounters>,
+        + CounterContext<DeviceCounters>
+        + CounterContext<EthernetDeviceCounters>,
 {
     fn receive_frame<B: BufferMut>(
         &mut self,
@@ -944,7 +945,7 @@ where
         trace_duration!(bindings_ctx, c"device::ethernet::receive_frame");
         let RecvEthernetFrameMeta { device_id } = metadata;
         trace!("ethernet::receive_frame: device_id = {:?}", device_id);
-        self.increment(|counters| &counters.recv_frame);
+        self.increment(|counters: &DeviceCounters| &counters.recv_frame);
         // NOTE(joshlf): We do not currently validate that the Ethernet frame
         // satisfies the minimum length requirement. We expect that if this
         // requirement is necessary (due to requirements of the physical medium),
@@ -958,7 +959,7 @@ where
         {
             frame
         } else {
-            self.increment(|counters| &counters.recv_parse_error);
+            self.increment(|counters: &DeviceCounters| &counters.recv_parse_error);
             trace!("ethernet::receive_frame: failed to parse ethernet frame");
             return;
         };
@@ -971,7 +972,9 @@ where
 
         let frame_dst = match frame_dest {
             None => {
-                self.increment(|counters| &counters.recv_ethernet_other_dest);
+                self.increment(|counters: &EthernetDeviceCounters| {
+                    &counters.recv_ethernet_other_dest
+                });
                 trace!(
                     "ethernet::receive_frame: destination mac {:?} not for device {:?}",
                     dst,
@@ -999,7 +1002,6 @@ where
                 };
                 match types {
                     (ArpHardwareType::Ethernet, ArpNetworkType::Ipv4) => {
-                        self.increment(|counters| &counters.recv_arp_delivered);
                         ArpPacketHandler::handle_packet(
                             self,
                             bindings_ctx,
@@ -1011,7 +1013,7 @@ where
                 }
             }
             Some(EtherType::Ipv4) => {
-                self.increment(|counters| &counters.recv_ip_delivered);
+                self.increment(|counters: &DeviceCounters| &counters.recv_ip_delivered);
                 self.receive_frame(
                     bindings_ctx,
                     RecvIpFrameMeta::<_, Ipv4>::new(device_id, Some(frame_dst)),
@@ -1019,7 +1021,7 @@ where
                 )
             }
             Some(EtherType::Ipv6) => {
-                self.increment(|counters| &counters.recv_ip_delivered);
+                self.increment(|counters: &DeviceCounters| &counters.recv_ip_delivered);
                 self.receive_frame(
                     bindings_ctx,
                     RecvIpFrameMeta::<_, Ipv6>::new(device_id, Some(frame_dst)),
@@ -1027,10 +1029,12 @@ where
                 )
             }
             Some(EtherType::Other(_)) => {
-                self.increment(|counters| &counters.recv_unsupported_ethertype);
+                self.increment(|counters: &EthernetDeviceCounters| {
+                    &counters.recv_unsupported_ethertype
+                });
             }
             None => {
-                self.increment(|counters| &counters.recv_no_ethertype);
+                self.increment(|counters: &EthernetDeviceCounters| &counters.recv_no_ethertype);
             }
         }
     }
@@ -1506,6 +1510,7 @@ mod tests {
         dynamic_state: DynamicEthernetDeviceState,
         tx_queue: TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>,
         counters: DeviceCounters,
+        ethernet_counters: EthernetDeviceCounters,
         arp_counters: ArpCounters,
     }
 
@@ -1516,6 +1521,7 @@ mod tests {
                 dynamic_state: DynamicEthernetDeviceState::new(max_frame_size),
                 tx_queue: Default::default(),
                 counters: Default::default(),
+                ethernet_counters: Default::default(),
                 arp_counters: Default::default(),
             }
         }
@@ -1558,6 +1564,18 @@ mod tests {
     impl CounterContext<DeviceCounters> for FakeInnerCtx {
         fn with_counters<O, F: FnOnce(&DeviceCounters) -> O>(&self, cb: F) -> O {
             cb(&self.state.counters)
+        }
+    }
+
+    impl CounterContext<EthernetDeviceCounters> for FakeCoreCtx {
+        fn with_counters<O, F: FnOnce(&EthernetDeviceCounters) -> O>(&self, cb: F) -> O {
+            cb(&self.as_ref().state.ethernet_counters)
+        }
+    }
+
+    impl CounterContext<EthernetDeviceCounters> for FakeInnerCtx {
+        fn with_counters<O, F: FnOnce(&EthernetDeviceCounters) -> O>(&self, cb: F) -> O {
+            cb(&self.state.ethernet_counters)
         }
     }
 

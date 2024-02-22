@@ -34,9 +34,9 @@ use crate::{
         state::{DeviceStateSpec, IpLinkDeviceState},
         AnyDevice, BaseDeviceId, DeviceCollectionContext, DeviceCounters, DeviceId,
         DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerState, DeviceLayerTypes, Devices,
-        DevicesIter, EthernetDeviceId, EthernetPrimaryDeviceId, EthernetWeakDeviceId,
-        Ipv6DeviceLinkLayerAddr, OriginTracker, OriginTrackerContext, RecvIpFrameMeta,
-        WeakDeviceId,
+        DevicesIter, EthernetDeviceCounters, EthernetDeviceId, EthernetPrimaryDeviceId,
+        EthernetWeakDeviceId, Ipv6DeviceLinkLayerAddr, OriginTracker, OriginTrackerContext,
+        RecvIpFrameMeta, WeakDeviceId,
     },
     error::{ExistsError, NotFoundError},
     for_any_device_id,
@@ -1217,5 +1217,22 @@ where
     ) -> O {
         // Loopback doesn't support NUD.
         f(None)
+    }
+}
+
+impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceCounters>
+    for StackState<BC>
+{
+    type Data = EthernetDeviceCounters;
+    type Guard<'l> = &'l EthernetDeviceCounters where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        self.ethernet_device_counters()
+    }
+}
+
+impl<BC: BindingsContext, L> CounterContext<EthernetDeviceCounters> for CoreCtx<'_, BC, L> {
+    fn with_counters<O, F: FnOnce(&EthernetDeviceCounters) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::EthernetDeviceCounters>())
     }
 }

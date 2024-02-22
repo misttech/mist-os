@@ -47,7 +47,7 @@ use crate::{
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
         Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
-        DeviceReceiveFrameSpec, DeviceSendFrameError, FrameDestination,
+        DeviceReceiveFrameSpec, DeviceSendFrameError, EthernetDeviceCounters, FrameDestination,
     },
     BindingsContext, BindingsTypes, CoreCtx,
 };
@@ -399,7 +399,7 @@ impl<BC: BindingsContext> ReceiveDequeFrameContext<LoopbackDevice, BC>
         let ethertype = match ethertype {
             Some(e) => e,
             None => {
-                self.increment(|counters: &DeviceCounters| &counters.recv_no_ethertype);
+                self.increment(|counters: &EthernetDeviceCounters| &counters.recv_no_ethertype);
                 trace!("dropping ethernet frame without ethertype");
                 return;
             }
@@ -427,7 +427,9 @@ impl<BC: BindingsContext> ReceiveDequeFrameContext<LoopbackDevice, BC>
                 )
             }
             ethertype @ EtherType::Arp | ethertype @ EtherType::Other(_) => {
-                self.increment(|counters: &DeviceCounters| &counters.recv_unsupported_ethertype);
+                self.increment(|counters: &EthernetDeviceCounters| {
+                    &counters.recv_unsupported_ethertype
+                });
                 trace!("not handling loopback frame of type {:?}", ethertype)
             }
         }

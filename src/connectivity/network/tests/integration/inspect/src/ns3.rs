@@ -277,10 +277,6 @@ async fn inspect_counters(name: &str) {
                 "Rx": {
                     TotalFrames: 1u64,
                     Malformed: 0u64,
-                    NonLocalDstAddr: 0u64,
-                    NoEthertype: 0u64,
-                    UnsupportedEthertype: 0u64,
-                    ArpDelivered: 0u64,
                     IpDelivered: 1u64,
                 },
                 "Tx": {
@@ -291,6 +287,13 @@ async fn inspect_counters(name: &str) {
                     NoQueue: 0u64,
                     QueueFull: 0u64,
                     SerializeError: 0u64,
+                },
+                "Ethernet": {
+                    "Rx": {
+                        NoEthertype: 0u64,
+                        NonLocalDstAddr: 0u64,
+                        UnsupportedEthertype: 0u64,
+                    },
                 },
             },
             "Arp": {
