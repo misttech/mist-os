@@ -18,8 +18,9 @@ use {
         error::{ComponentInstanceError, RoutingError},
     },
     cm_rust::{self, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon},
-    cm_types::{IterablePath, Name},
-    futures::future::FutureExt,
+    cm_types::{IterablePath, Name, SeparatedPath},
+    fidl_fuchsia_component_decl as fdecl,
+    futures::FutureExt,
     moniker::{ChildName, ChildNameBase, MonikerBase},
     sandbox::{Capability, Dict, Unit},
     std::{collections::HashMap, iter, sync::Arc},
@@ -29,7 +30,11 @@ use {
 /// The dicts a component receives from its parent.
 #[derive(Default, Clone)]
 pub struct ComponentInput {
+    /// Capabilities offered to a component by its parent.
     capabilities: Dict,
+
+    /// Capabilities available to a component through its environment.
+    environment: ComponentEnvironment,
 }
 
 impl ComponentInput {
@@ -37,8 +42,36 @@ impl ComponentInput {
         Self::default()
     }
 
-    pub fn new(capabilities: Dict) -> Self {
-        Self { capabilities }
+    pub fn new(
+        capabilities: Dict,
+        default_environment: &ComponentEnvironment,
+        environments: &HashMap<Name, ComponentEnvironment>,
+        environment_name: Option<Name>,
+    ) -> Self {
+        let environment = if let Some(environment_name) = environment_name {
+            environments
+                .get(&environment_name)
+                .expect("child references nonexistent environment, this should be prevented in manifest validation")
+                .clone()
+        } else {
+            default_environment.clone()
+        };
+        Self { capabilities, environment }
+    }
+
+    /// Creates a new ComponentInput with entries cloned from this ComponentInput.
+    ///
+    /// This is a shallow copy. Values are cloned, not copied, so are new references to the same
+    /// underlying data.
+    pub fn shallow_copy(&self) -> Self {
+        Self {
+            capabilities: self.capabilities.copy(),
+            environment: self.environment.shallow_copy(),
+        }
+    }
+
+    pub fn environment(&self) -> &ComponentEnvironment {
+        &self.environment
     }
 
     pub fn insert_capability<'a>(
@@ -47,6 +80,23 @@ impl ComponentInput {
         capability: Capability,
     ) {
         self.capabilities.insert_capability(path, capability.into())
+    }
+}
+
+/// The capabilities a component has in its environment.
+#[derive(Default, Clone)]
+pub struct ComponentEnvironment {
+    /// Capabilities listed in the `debug_capabilities` portion of its environment.
+    debug_capabilities: Dict,
+}
+
+impl ComponentEnvironment {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn shallow_copy(&self) -> Self {
+        Self { debug_capabilities: self.debug_capabilities.copy() }
     }
 }
 
@@ -68,13 +118,33 @@ pub fn build_component_sandbox(
     program_input_dict: &Dict,
     program_output_dict: &Dict,
     collection_dicts: &mut HashMap<Name, Dict>,
+    environments: &mut HashMap<Name, ComponentEnvironment>,
 ) -> ComponentSandbox {
     let mut output = ComponentSandbox::default();
     let declared_dictionaries = Dict::new();
 
+    for environment_decl in &decl.environments {
+        environments.insert(
+            Name::new(&environment_decl.name).unwrap(),
+            build_environment(
+                component,
+                children,
+                component_input,
+                program_output_dict,
+                environment_decl,
+            ),
+        );
+    }
+
     for child in &decl.children {
+        let mut child_input = ComponentInput::empty();
+        if let Some(environment_name) = &child.environment {
+            child_input.environment = environments.get(&Name::new(environment_name.clone()).unwrap()).expect("child references nonexistent environment, this should be prevented in manifest validation").clone();
+        } else {
+            child_input.environment = component_input.environment.clone();
+        }
         let child_name = Name::new(&child.name).unwrap();
-        output.child_inputs.insert(child_name, ComponentInput::empty());
+        output.child_inputs.insert(child_name, child_input);
     }
 
     for collection in &decl.collections {
@@ -255,6 +325,54 @@ fn extend_dict_with_dictionary(
     program_output_dict.insert_capability(iter::once(decl.name.as_str()), router.into());
 }
 
+fn build_environment(
+    component: &Arc<ComponentInstance>,
+    children: &HashMap<ChildName, Arc<ComponentInstance>>,
+    component_input: &ComponentInput,
+    program_output_dict: &Dict,
+    environment_decl: &cm_rust::EnvironmentDecl,
+) -> ComponentEnvironment {
+    let mut environment = ComponentEnvironment::new();
+    if environment_decl.extends == fdecl::EnvironmentExtends::Realm {
+        environment = component_input.environment.shallow_copy();
+    }
+    for debug_registration in &environment_decl.debug_capabilities {
+        let cm_rust::DebugRegistration::Protocol(debug_protocol) = debug_registration;
+        let source_path =
+            SeparatedPath { dirname: None, basename: debug_protocol.source_name.to_string() };
+        let router = match &debug_protocol.source {
+            cm_rust::RegistrationSource::Parent => {
+                use_from_parent_router(component_input, source_path, component.as_weak())
+            }
+            cm_rust::RegistrationSource::Self_ => {
+                let Some(router) = program_output_dict.get_router(source_path.iter_segments())
+                else {
+                    continue;
+                };
+                router
+            }
+            cm_rust::RegistrationSource::Child(child_name) => {
+                let child_name = ChildName::parse(child_name).expect("invalid child name");
+                let Some(child) = children.get(&child_name) else { continue };
+                let weak_child = WeakComponentInstance::new(child);
+                new_forwarding_router_to_child(
+                    weak_child,
+                    source_path,
+                    RoutingError::use_from_child_expose_not_found(
+                        child.moniker.leaf().unwrap(),
+                        &child.moniker.parent().unwrap(),
+                        debug_protocol.source_name.clone(),
+                    ),
+                )
+            }
+        };
+        environment
+            .debug_capabilities
+            .insert_capability(iter::once(debug_protocol.target_name.as_str()), router.into());
+    }
+    environment
+}
+
 /// Returns a [Router] that returns a [Dict].
 /// The first time this router is called, it calls `source_dict_router` to get another [Dict],
 /// and combines those entries with `dict``.
@@ -400,8 +518,18 @@ fn extend_dict_with_use(
             )
             .into_router()
         }
-        // Unimplemented
-        cm_rust::UseSource::Debug | cm_rust::UseSource::Environment => return,
+        cm_rust::UseSource::Debug => {
+            let Some(router) = component_input
+                .environment
+                .debug_capabilities
+                .get_router(iter::once(use_protocol.source_name.as_str()))
+            else {
+                return;
+            };
+            router
+        }
+        // UseSource::Environment is not used for protocol capabilities
+        cm_rust::UseSource::Environment => return,
     };
     program_input_dict.insert_capability(
         use_protocol.target_path.iter_segments(),

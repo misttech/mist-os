@@ -8,7 +8,8 @@ use {
     crate::model::{
         actions::{
             resolve::sandbox_construction::{
-                self, build_component_sandbox, extend_dict_with_offers, ComponentInput,
+                self, build_component_sandbox, extend_dict_with_offers, ComponentEnvironment,
+                ComponentInput,
             },
             shutdown, start, ActionSet, DestroyAction, DiscoverAction, ResolveAction,
             ShutdownAction, ShutdownType, StartAction, StopAction, UnresolveAction,
@@ -610,12 +611,11 @@ impl ComponentInstance {
             dynamic_capabilities
         };
 
-        let collection_dict = state
+        let child_dict = state
             .collection_dicts
             .get(&Name::new(&collection_name).unwrap())
-            .expect("dict missing for declared collection");
-
-        let child_dict = collection_dict.copy();
+            .expect("dict missing for declared collection")
+            .copy();
 
         // Merge `ChildArgs.dictionary` entries into the child sandbox.
         if let Some(dictionary_client_end) = child_args.dictionary {
@@ -638,7 +638,8 @@ impl ComponentInstance {
                 // Currently there is no way to create a Rotuer externally, so assume these
                 // are Open capabilities and convert them to Router here.
                 //
-                // TODO(https://fxbug.dev/319542502): Consider using the external Router type, once it exists
+                // TODO(https://fxbug.dev/319542502): Consider using the external Router type, once
+                // it exists
                 let router = match value {
                     Capability::Open(o) => Router::from_capability(o.into()),
                     _ => return Err(AddDynamicChildError::InvalidDictionary),
@@ -653,7 +654,12 @@ impl ComponentInstance {
             }
         }
 
-        let child_input = ComponentInput::new(child_dict);
+        let child_input = ComponentInput::new(
+            child_dict,
+            state.component_input.environment(),
+            &state.bedrock_environments,
+            child_decl.environment.as_ref().map(|n| Name::new(n.clone()).unwrap()),
+        );
 
         let (child, discover_fut) = state
             .add_child(
@@ -1626,6 +1632,9 @@ pub struct ResolvedInstanceState {
     /// dynamic child gets a clone of one of these inputs (which is potentially extended by
     /// dynamic offers).
     collection_dicts: HashMap<Name, Dict>,
+
+    /// The environments declared by this component.
+    bedrock_environments: HashMap<Name, ComponentEnvironment>,
 }
 
 impl ResolvedInstanceState {
@@ -1683,6 +1692,7 @@ impl ResolvedInstanceState {
             program_output_dict: Dict::new(),
             program_input_dict_additions: None,
             collection_dicts: HashMap::new(),
+            bedrock_environments: HashMap::new(),
         };
         state.add_static_children(component).await?;
 
@@ -1695,6 +1705,7 @@ impl ResolvedInstanceState {
             &state.program_input_dict,
             &state.program_output_dict,
             &mut state.collection_dicts,
+            &mut state.bedrock_environments,
         );
         state.discover_static_children(component_sandbox.child_inputs).await;
         Ok(state)
