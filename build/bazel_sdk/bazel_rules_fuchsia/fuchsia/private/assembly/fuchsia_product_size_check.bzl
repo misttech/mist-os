@@ -6,6 +6,7 @@
 
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load(":providers.bzl", "FuchsiaProductImageInfo", "FuchsiaSizeCheckerInfo")
+load("@bazel_skylib//lib:paths.bzl", "paths")
 
 # Command for running ffx assembly size-check product.
 _SIZE_CHECKER_RUNNER_SH = """
@@ -33,29 +34,41 @@ def _fuchsia_product_size_check_impl(ctx):
 
     size_file = ctx.actions.declare_file(ctx.label.name + "_size_breakdown.txt")
     size_report_product_file = ctx.actions.declare_file(ctx.label.name + "_size_report_product.json")
-    visualization_dir = ctx.actions.declare_file(ctx.label.name + "_visualization")
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
+
+    visualization_outputs = [
+        ctx.actions.declare_file(paths.join(ctx.label.name + "_visualization", p))
+        for p in (
+            "data.js",
+            "index.html",
+            "D3BlobTreeMap.js",
+            paths.join("d3_v3", "d3.js"),
+            paths.join("d3_v3", "LICENSE"),
+        )
+    ]
+    visualization_dir_path = visualization_outputs[0].dirname
+
+    final_outputs = [size_file, size_report_product_file] + visualization_outputs
 
     ctx.actions.run_shell(
         inputs = ctx.files.product_image + get_ffx_assembly_inputs(fuchsia_toolchain),
-        outputs = [size_file, visualization_dir, ffx_isolate_dir, size_report_product_file],
+        outputs = final_outputs + [ffx_isolate_dir],
         command = _SIZE_CHECKER_RUNNER_SH,
         env = {
             "FFX": fuchsia_toolchain.ffx.path,
             "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
             "IMAGES_PATH": images_out.path + "/images.json",
             "SIZE_FILE": size_file.path,
-            "VISUALIZATION_DIR": visualization_dir.path,
+            "VISUALIZATION_DIR": visualization_dir_path,
             "SIZE_REPORT_PRODUCT_FILE": size_report_product_file.path,
             "CREEP_LIMIT": str(ctx.attr.blobfs_creep_limit),
             "PLATFORM_RESOURCES_BUDGET": str(ctx.attr.platform_resources_budget),
         },
         progress_message = "Size checking for %s" % ctx.label.name,
     )
-    deps = [size_file, visualization_dir, size_report_product_file]
 
     return [
-        DefaultInfo(files = depset(direct = deps)),
+        DefaultInfo(files = depset(direct = final_outputs)),
         FuchsiaSizeCheckerInfo(
             size_report = size_report_product_file,
         ),
