@@ -524,3 +524,9 @@
   available_in_git: 'cc1b532c420edb4dfa938192fc729a3089858189'
   areas: ['ACPI']
   path: '/src/devices/board/drivers/x86/acpi-dev/dev-pwrbtn.cc'
+- short_description: 'Solomon Systech SSD1306 dot-matrix display driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '992530'
+  available_in_git: '113eb21a73d7a3ff94961eab2ebe90d5c1cc8426'
+  areas: ['Display']
+  path: '/src/graphics/display/drivers/ssd1306'
