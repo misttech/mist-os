@@ -496,6 +496,16 @@ unsafe extern "C" fn otPlatTrelSend(
     );
 }
 
+#[no_mangle]
+#[cfg(openthread_240214)]
+unsafe extern "C" fn otPlatTrelGetCounters(_instance: *mut otInstance) -> otPlatTrelCounters {
+    otPlatTrelCounters { mTxPackets: 0, mTxBytes: 0, mTxFailure: 0, mRxPackets: 0, mRxBytes: 0 }
+}
+
+#[no_mangle]
+#[cfg(openthread_240214)]
+unsafe extern "C" fn otPlatTrelResetCounters(_instance: *mut otInstance) {}
+
 #[cfg(test)]
 mod test {
     use super::*;

@@ -9218,6 +9218,32 @@ extern "C" {
     #[doc = " Is a callback from platform to notify of a received TREL UDP packet.\n\n @note The buffer content (up to its specified length) may get changed during processing by OpenThread core (e.g.,\n decrypted in place), so the platform implementation should expect that after returning from this function the\n @p aBuffer content may have been altered.\n\n @param[in] aInstance        The OpenThread instance structure.\n @param[in] aBuffer          A buffer containing the received UDP payload.\n @param[in] aLength          UDP payload length (number of bytes).\n"]
     pub fn otPlatTrelHandleReceived(aInstance: *mut otInstance, aBuffer: *mut u8, aLength: u16);
 }
+#[doc = " Represents a group of TREL related counters in the platform layer.\n"]
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+#[cfg(openthread_240214)]
+pub struct otPlatTrelCounters {
+    #[doc = "< Number of packets successfully transmitted through TREL."]
+    pub mTxPackets: u64,
+    #[doc = "< Sum of size of packets successfully transmitted through TREL."]
+    pub mTxBytes: u64,
+    #[doc = "< Number of packet transmission failures through TREL."]
+    pub mTxFailure: u64,
+    #[doc = "< Number of packets received through TREL."]
+    pub mRxPackets: u64,
+    #[doc = "< Sum of size of packets received through TREL."]
+    pub mRxBytes: u64,
+}
+extern "C" {
+    #[doc = " Gets the pointer to the TREL counters in the platform layer.\n\n @param[in] aInstance        The OpenThread instance structure.\n"]
+    #[cfg(openthread_240214)]
+    pub fn otPlatTrelGetCounters(aInstance: *mut otInstance) -> *const otPlatTrelCounters;
+}
+extern "C" {
+    #[doc = " Resets the TREL counters in the platform layer.\n\n @param[in] aInstance        The OpenThread instance structure.\n"]
+    #[cfg(openthread_240214)]
+    pub fn otPlatTrelResetCounters(aInstance: *mut otInstance);
+}
 #[doc = " This callback allows OpenThread to provide specific handlers for certain UDP messages.\n\n @retval  true    The message is handled by this receiver and should not be further processed.\n @retval  false   The message is not handled by this receiver.\n"]
 pub type otUdpHandler = ::std::option::Option<
     unsafe extern "C" fn(

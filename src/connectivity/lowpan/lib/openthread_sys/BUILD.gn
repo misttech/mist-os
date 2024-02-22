@@ -4,6 +4,11 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
+import("//third_party/openthread/openthread_upstream_version.gni")
+
+config("openthread_240214") {
+  rustflags = [ "--cfg=openthread_240214" ]
+}
 
 rustc_library("openthread_sys") {
   edition = "2021"
@@ -13,6 +18,11 @@ rustc_library("openthread_sys") {
     "src/spinel.rs",
   ]
   with_unit_tests = false
+
+  if (openthread_upstream_version ==
+      "49c59ec519cc8b49dd58978d1bc80b7ae7ba88d0") {
+    configs += [ ":openthread_240214" ]
+  }
 
   deps = []
 
