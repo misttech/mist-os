@@ -1,11 +1,11 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use anyhow::{Context, Result};
-use emulator_instance::{
+use crate::{
     get_all_instances, EmulatorInstanceData, EmulatorInstanceInfo, EngineOption, NetworkingMode,
     EMU_INSTANCE_ROOT_DIR,
 };
+use anyhow::{Context, Result};
 use ffx::TargetAddrInfo;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_net::{IpAddress, Ipv4Address};
@@ -45,7 +45,7 @@ use notify::PollWatcher as RecommendedWatcher;
 use notify::RecommendedWatcher;
 /// Config key to emulator instance data
 #[derive(Debug)]
-pub(crate) struct EmulatorWatcher {
+pub struct EmulatorWatcher {
     emu_instance_rx: Receiver<EmulatorInstanceEvent>,
     emu_instance_tx: Sender<EmulatorInstanceEvent>,
     // Hold a reference here to the watcher to keep it in scope.
@@ -65,7 +65,7 @@ pub(crate) enum EmulatorInstanceEvent {
 /// emulator instance. Either Add/Update it
 /// or Remove it.
 #[derive(Debug, PartialEq)]
-pub(crate) enum EmulatorTargetAction {
+pub enum EmulatorTargetAction {
     Add(ffx::TargetInfo),
     Remove(ffx::TargetInfo),
 }
@@ -85,7 +85,7 @@ struct EmulatorWatcherHandler {
     cutoff: Duration,
 }
 #[tracing::instrument()]
-pub(crate) async fn start_emulator_watching() -> Result<EmulatorWatcher> {
+pub async fn start_emulator_watching() -> Result<EmulatorWatcher> {
     let instance_dir: PathBuf =
         ffx_config::get(EMU_INSTANCE_ROOT_DIR).await.context("Reading emu instance config")?;
     let (emu_instance_tx, emu_instance_rx) = mpsc::channel::<EmulatorInstanceEvent>(100);
@@ -215,12 +215,12 @@ impl notify::EventHandler for EmulatorWatcherHandler {
 impl EmulatorWatcher {
     /// Returns the action to take with the provided targetInfo for the emulator instance,
     ///  or None if it is not needed.
-    pub(crate) async fn emulator_target_detected(&mut self) -> Option<EmulatorTargetAction> {
+    pub async fn emulator_target_detected(&mut self) -> Option<EmulatorTargetAction> {
         if let Some(event) = self.emu_instance_rx.next().await {
             tracing::trace!("checking instance {:?}", event);
             match event {
                 EmulatorInstanceEvent::Name(instance_name, kind) => {
-                    match emulator_instance::read_from_disk(&instance_name).await {
+                    match crate::read_from_disk(&instance_name).await {
                         Ok(EngineOption::DoesExist(emu_instance)) => {
                             if let Some(target_info) = Self::handle_instance(&emu_instance) {
                                 return Some(EmulatorTargetAction::Add(target_info));
@@ -267,7 +267,7 @@ impl EmulatorWatcher {
         }
         None
     }
-    pub(crate) async fn check_all_instances(&mut self) -> Result<()> {
+    pub async fn check_all_instances(&mut self) -> Result<()> {
         let instances = get_all_instances().await?;
         for emu in instances {
             self.emu_instance_tx.send(EmulatorInstanceEvent::Data(emu)).await?;
@@ -323,7 +323,7 @@ impl EmulatorWatcher {
 #[cfg(test)]
 mod tests {
     pub(crate) use super::*;
-    use emulator_instance::EngineState;
+    use crate::EngineState;
     use notify::{
         event::{CreateKind, EventAttributes, ModifyKind, RemoveKind},
         EventHandler, EventKind,
@@ -537,14 +537,14 @@ mod tests {
             EmulatorInstanceData::new_with_state("emu-data-instance", EngineState::Running);
         instance_data.set_pid(process::id());
         let mut config = instance_data.get_emulator_configuration_mut();
-        config.host.networking = emulator_instance::NetworkingMode::User;
-        config.host.port_map.insert(
-            String::from("ssh"),
-            emulator_instance::PortMapping { guest: 22, host: Some(3322) },
-        );
+        config.host.networking = crate::NetworkingMode::User;
+        config
+            .host
+            .port_map
+            .insert(String::from("ssh"), crate::PortMapping { guest: 22, host: Some(3322) });
         let mut tap_instance_data = instance_data.clone();
         config = tap_instance_data.get_emulator_configuration_mut();
-        config.host.networking = emulator_instance::NetworkingMode::Tap;
+        config.host.networking = crate::NetworkingMode::Tap;
         let ip = IpAddress::Ipv4(Ipv4Address { addr: [127, 0, 0, 1] });
         let loopback = TargetAddrInfo::IpPort(ffx::TargetIpPort { ip, scope_id: 0, port: 3322 });
         let ssh_address = Some(loopback.clone());

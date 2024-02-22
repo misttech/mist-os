@@ -14,6 +14,7 @@ use std::{
 
 mod enumerations;
 mod instances;
+pub mod targets;
 
 pub use enumerations::{
     AccelerationMode, ConsoleType, CpuArchitecture, EngineState, EngineType, GpuType, LogLevel,
@@ -24,6 +25,8 @@ pub use instances::{
     clean_up_instance_dir, get_all_instances, get_instance_dir, read_from_disk,
     read_from_disk_untyped, write_to_disk, EMU_INSTANCE_ROOT_DIR,
 };
+
+pub use targets::{start_emulator_watching, EmulatorTargetAction, EmulatorWatcher};
 
 /// Holds a single mapping from a host port to the guest.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]

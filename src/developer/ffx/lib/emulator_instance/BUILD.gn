@@ -13,12 +13,17 @@ rustc_library("lib") {
     "src/enumerations.rs",
     "src/instances.rs",
     "src/lib.rs",
+    "src/targets.rs",
   ]
   deps = [
     "//build/sdk/meta:rust",
+    "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:nix",
+    "//third_party/rust_crates:notify",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tracing",

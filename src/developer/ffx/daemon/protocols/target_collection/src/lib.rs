@@ -6,7 +6,8 @@ use crate::target_handle::TargetHandle;
 use addr::TargetAddr;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use emulator_targets::EmulatorTargetAction;
+use emulator_instance::targets as emulator_targets;
+use emulator_instance::targets::EmulatorTargetAction;
 use ffx_daemon_events::{FastbootInterface, TargetConnectionState};
 use ffx_daemon_target::{
     target::{
@@ -32,7 +33,6 @@ use std::{
 };
 use tasks::TaskManager;
 
-mod emulator_targets;
 mod reboot;
 mod target_handle;
 
