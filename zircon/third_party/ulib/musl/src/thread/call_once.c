@@ -12,6 +12,12 @@ enum {
 
 static_assert(STATE_INIT == ONCE_FLAG_INIT, "");
 
+// This implementation uses memory_order_seq_cst for all access
+// to |control|. This is stronger than this use case requires -
+// if we update the code to use C's atomic library directly instead
+// of the compatibility wrappers like a_cas_shim we could relax this
+// to use memory_order_acq_rel.
+
 static void once_full(once_flag* control, void (*init)(void)) {
   for (;;)
     switch (a_cas_shim(control, STATE_INIT, STATE_WAIT)) {
@@ -33,10 +39,7 @@ static void once_full(once_flag* control, void (*init)(void)) {
 }
 
 void call_once(once_flag* control, void (*init)(void)) {
-  /* Return immediately if init finished before, but ensure that
-   * effects of the init routine are visible to the caller. */
   if (atomic_load(control) == STATE_DONE) {
-    atomic_thread_fence(memory_order_seq_cst);
     return;
   }
   once_full(control, init);
