@@ -9,7 +9,9 @@ import("//build/testing/golden_files.gni")
 import("//src/developer/ffx/config.gni")
 import("ffx_command_golden_file_test.gni")
 
-if (is_host && has_board) {
+assert(is_host, "ffx cli-golden tests are only valid with the host toolchain.")
+
+if (has_board) {
   rustc_binary("ffx_cli_goldens") {
     edition = "2021"
     testonly = true
@@ -128,23 +130,27 @@ if (is_host && has_board) {
     }
     command_test_deps += [ ":${c}_ffx_command_golden_file_test" ]
   }
-}
 
-group("tests") {
-  testonly = true
+  group("tests") {
+    testonly = true
 
-  # TODO(https://fxbug.dev/42075360): Support product bundle for testing on mac
-  # For now, just test on linux.
-  # Also check for has_board, since this test cannot run on a configuration without a
-  # board.
-  # TODO(b/287779902) Also check that dual mode as subtools aren't enabled,
-  # because that produces an incomplete SDK.
-  if (is_host && is_linux && has_board) {
-    if (!ffx_build_dual_mode_plugins_as_subtools) {
-      deps = [ ":ffx-golden-command-list" ] + command_test_deps
-    } else {
-      print(
-          "Warning! ffx command golden file tests are disabled because this build has ffx_build_dual_mode_plugins_as_subtools = true.")
+    # TODO(https://fxbug.dev/42075360): Support product bundle for testing on mac
+    # For now, just test on linux.
+    # Also check for has_board, since this test cannot run on a configuration without a
+    # board.
+    # TODO(b/287779902) Also check that dual mode as subtools aren't enabled,
+    # because that produces an incomplete SDK.
+    if (is_linux) {
+      if (!ffx_build_dual_mode_plugins_as_subtools) {
+        deps = [ ":ffx-golden-command-list" ] + command_test_deps
+      } else {
+        print(
+            "Warning! ffx command golden file tests are disabled because this build has ffx_build_dual_mode_plugins_as_subtools = true.")
+      }
     }
+  }
+} else {
+  # no board, so no tests
+  group("tests") {
   }
 }
