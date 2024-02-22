@@ -8,15 +8,14 @@ use errors::FfxError;
 use ffx_target::KnockError;
 use ffx_wait_args::WaitCommand;
 use fho::{daemon_protocol, FfxMain, FfxTool, SimpleWriter};
-use fidl::endpoints::create_proxy;
-use fidl_fuchsia_developer_ffx::{DaemonError, TargetCollectionProxy, TargetMarker, TargetQuery};
+use fidl_fuchsia_developer_ffx::{DaemonError, TargetCollectionProxy};
 use fuchsia_async::WakeupTime;
 use futures::future::Either;
 use std::time::Duration;
 
 const DOWN_REPOLL_DELAY_MS: u64 = 500;
-const OPEN_TARGET_TIMEOUT_MS: u64 = 500;
-const KNOCK_TARGET_TIMEOUT_MS: u64 = 500;
+const OPEN_TARGET_TIMEOUT: Duration = Duration::from_millis(500);
+const KNOCK_TARGET_TIMEOUT: Duration = Duration::from_millis(500);
 
 #[derive(FfxTool)]
 pub struct WaitTool {
@@ -39,9 +38,17 @@ impl FfxMain for WaitTool {
 
 async fn wait_for_device(target_collection: TargetCollectionProxy, cmd: WaitCommand) -> Result<()> {
     let ffx: ffx_command::Ffx = argh::from_env();
+    let default_target = ffx.target().await?;
     let knock_fut = async {
         loop {
-            break match knock_target(&ffx, &target_collection).await {
+            break match ffx_target::knock_target_by_name(
+                &default_target,
+                &target_collection,
+                OPEN_TARGET_TIMEOUT,
+                KNOCK_TARGET_TIMEOUT,
+            )
+            .await
+            {
                 Err(KnockError::CriticalError(e)) => Err(e),
                 Err(KnockError::NonCriticalError(e)) => {
                     if cmd.down {
@@ -81,44 +88,6 @@ async fn wait_for_device(target_collection: TargetCollectionProxy, cmd: WaitComm
         Either::Left((left, _)) => left,
         Either::Right(_) => Err(timeout_err.into()),
     }
-}
-
-async fn knock_target(
-    ffx: &ffx_command::Ffx,
-    target_collection_proxy: &TargetCollectionProxy,
-) -> Result<(), KnockError> {
-    let default_target = ffx.target().await?;
-    let (target_proxy, target_remote) =
-        create_proxy::<TargetMarker>().map_err(|e| KnockError::NonCriticalError(e.into()))?;
-    // If you are reading this plugin for example code, this is an example of what you
-    // should generally not be doing to connect to a daemon protocol. This is maintained
-    // by the FFX team directly.
-
-    timeout::timeout(
-        Duration::from_millis(OPEN_TARGET_TIMEOUT_MS),
-        target_collection_proxy.open_target(
-            &TargetQuery { string_matcher: default_target.clone(), ..Default::default() },
-            target_remote,
-        ),
-    )
-    .await
-    .map_err(|_e| {
-        KnockError::NonCriticalError(errors::ffx_error!("Timeout opening target.").into())
-    })?
-    .map_err(|e| {
-        KnockError::CriticalError(
-            errors::ffx_error!("Lost connection to the Daemon. Full context:\n{}", e).into(),
-        )
-    })?
-    .map_err(|e| {
-        KnockError::CriticalError(errors::ffx_error!("Error opening target: {:?}", e).into())
-    })?;
-    // Knock with sub-second timing so we can react appropriately if the users's timeout is 1 second
-    ffx_target::knock_target_with_timeout(
-        &target_proxy,
-        Duration::from_millis(KNOCK_TARGET_TIMEOUT_MS),
-    )
-    .await
 }
 
 #[cfg(test)]
@@ -233,7 +202,15 @@ mod tests {
         let _env = ffx_config::test_init().await.unwrap();
         let ffx: ffx_command::Ffx = argh::from_env();
         let tc_proxy = setup_fake_target_collection_server_auto_close();
-        match knock_target(&ffx, &tc_proxy).await.unwrap_err() {
+        match ffx_target::knock_target_by_name(
+            &ffx.target().await.unwrap(),
+            &tc_proxy,
+            OPEN_TARGET_TIMEOUT,
+            KNOCK_TARGET_TIMEOUT,
+        )
+        .await
+        .unwrap_err()
+        {
             KnockError::CriticalError(_) => {}
             KnockError::NonCriticalError(e) => {
                 panic!("should not have received non-critical error, but did: {:?}", e)

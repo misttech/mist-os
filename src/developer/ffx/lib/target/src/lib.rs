@@ -217,6 +217,41 @@ pub async fn knock_target_with_timeout(
         .map_err(|e| KnockError::NonCriticalError(anyhow::anyhow!("{e:?}")))
 }
 
+/// Same as `knock_target_with_timeout` but takes a `TargetCollection` and an
+/// optional target name and finds the target to knock. Uses the configured
+/// default target if `target_name` is `None`.
+pub async fn knock_target_by_name(
+    target_name: &Option<String>,
+    target_collection_proxy: &TargetCollectionProxy,
+    open_timeout: Duration,
+    rcs_timeout: Duration,
+) -> Result<(), KnockError> {
+    let (target_proxy, target_remote) =
+        create_proxy::<TargetMarker>().map_err(|e| KnockError::NonCriticalError(e.into()))?;
+
+    timeout::timeout(
+        open_timeout,
+        target_collection_proxy.open_target(
+            &TargetQuery { string_matcher: target_name.clone(), ..Default::default() },
+            target_remote,
+        ),
+    )
+    .await
+    .map_err(|_e| {
+        KnockError::NonCriticalError(errors::ffx_error!("Timeout opening target.").into())
+    })?
+    .map_err(|e| {
+        KnockError::CriticalError(
+            errors::ffx_error!("Lost connection to the Daemon. Full context:\n{}", e).into(),
+        )
+    })?
+    .map_err(|e| {
+        KnockError::CriticalError(errors::ffx_error!("Error opening target: {:?}", e).into())
+    })?;
+
+    knock_target_with_timeout(&target_proxy, rcs_timeout).await
+}
+
 /// Get the default target.  This uses the normal config mechanism which
 /// supports flexible config values: it can be a string naming the target, or
 /// a list of strings, in which case the first valid entry is used. (The most
