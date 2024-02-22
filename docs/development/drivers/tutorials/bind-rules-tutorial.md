@@ -36,8 +36,8 @@ With the new bind system, VIDs can be potentially represented by string values o
 The command `ffx driver list-devices -v` prints the properties of every device in the tree in the format:
 
 ```
-Name     : acpi-_TZ_
-Moniker  : root.sys.platform.pt.acpi.acpi-_TZ_
+Name     : _TZ_
+Moniker  : root.sys.platform.pt.acpi._TZ_
 Driver   : None
 5 Properties
 [ 1/  5] : Key fuchsia.BIND_PROTOCOL Value 0x1F
@@ -191,8 +191,8 @@ The same process is used for composite bind rules. For each node you want to wri
 Say you want to write composite bind rules that contain a node that binds to the above example and another node that binds to the following:
 
 ```
-Name     : acpi-I2C2
-Moniker  : root.sys.platform.pt.acpi.acpi-I2C2
+Name     : I2C2
+Moniker  : root.sys.platform.pt.acpi.I2C2
 Driver   : None
 6 Properties
 [ 1/  6] : Key fuchsia.BIND_ACPI_ID           Value 0x000034

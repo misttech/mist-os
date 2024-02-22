@@ -100,7 +100,7 @@ class DeviceBuilder {
   }
 
   static DeviceBuilder MakeRootDevice(ACPI_HANDLE handle, zx_device_t* acpi_root) {
-    DeviceBuilder builder("acpi-root", handle, nullptr, false, 0);
+    DeviceBuilder builder("root", handle, nullptr, false, 0);
     builder.zx_device_ = acpi_root;
     return builder;
   }

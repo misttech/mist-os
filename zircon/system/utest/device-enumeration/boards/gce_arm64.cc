@@ -11,7 +11,7 @@ TEST_F(DeviceEnumerationTest, GceArm64Test) {
   static const char* kDevicePaths[] = {
       // TODO(https://fxbug.dev/42052364): Once we use userspace PCI, add PCI devices we expect to see.
       "sys/platform/pt/acpi",
-      "sys/platform/pt/acpi/acpi-_SB_",
+      "sys/platform/pt/acpi/_SB_",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));

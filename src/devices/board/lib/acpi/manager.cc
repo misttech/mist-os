@@ -209,8 +209,7 @@ acpi::status<bool> Manager::DiscoverDevice(ACPI_HANDLE handle) {
     return result.take_error();
   }
   UniquePtr<ACPI_DEVICE_INFO> info = std::move(result.value());
-  std::string name =
-      "acpi-" + std::string(reinterpret_cast<char*>(&info->Name), sizeof(info->Name));
+  std::string name(reinterpret_cast<char*>(&info->Name), sizeof(info->Name));
 
   // TODO(https://fxbug.dev/42160841): newer versions of ACPICA return this from GetObjectInfo().
   auto state_result = acpi_->EvaluateObject(handle, "_STA", std::nullopt);

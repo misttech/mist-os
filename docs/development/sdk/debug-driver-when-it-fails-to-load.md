@@ -177,8 +177,8 @@ This command prints output similar to the following:
 ```none {:.devsite-disable-click-to-copy}
 $ ffx driver list-devices -v
 ...
-Name : acpi-I2C2
-Moniker : root.sys.platform.pt.acpi.acpi-I2C2
+Name : I2C2
+Moniker : root.sys.platform.pt.acpi.I2C2
 Driver : None
 6 Properties
 [ 1/ 6] : Key fuchsia.BIND_ACPI_ID Value 0x000034

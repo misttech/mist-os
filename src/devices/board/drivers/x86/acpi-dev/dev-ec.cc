@@ -96,7 +96,7 @@ zx_status_t EcDevice::Init() {
   // Start query thread now that we're fully ready to service queries.
   query_thread_ = std::thread([this]() { QueryThread(); });
 
-  status = DdkAdd(ddk::DeviceAddArgs("acpi-ec")
+  status = DdkAdd(ddk::DeviceAddArgs("ec")
                       .set_proto_id(ZX_PROTOCOL_MISC)
                       .set_inspect_vmo(inspect_.DuplicateVmo()));
   return status;
