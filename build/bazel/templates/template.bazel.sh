@@ -62,12 +62,13 @@ logrotate3 "${{_LOG_DIR}}/workspace-events.log"
 proxy_overrides=()
 for arg in "$@"
 do
+  # Check for infra and non-infra config variations to allow for local testing.
   case "$arg" in
-    --config=sponge) # Sponge build event service
+    --config=sponge | --config=sponge_infra) # Sponge build event service
       [[ "${{BAZEL_sponge_socket_path-NOT_SET}}" == "NOT_SET" ]] ||
         proxy_overrides+=( "--bes_proxy=unix://$BAZEL_sponge_socket_path" )
       ;;
-    --config=resultstore) # Resultstore build event service
+    --config=resultstore | --config=resultstore_infra) # Resultstore build event service
       [[ "${{BAZEL_resultstore_socket_path-NOT_SET}}" == "NOT_SET" ]] ||
         proxy_overrides+=( "--bes_proxy=unix://$BAZEL_resultstore_socket_path" )
       ;;
