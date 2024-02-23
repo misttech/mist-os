@@ -9,9 +9,7 @@ use crate::{
         fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps,
     },
 };
-use fuchsia_runtime::zx_utc_reference_get;
-use fuchsia_zircon as zx;
-use fuchsia_zircon::{AsHandleRef, Clock, Unowned};
+use fuchsia_zircon::{self as zx, AsHandleRef};
 use starnix_logging::track_stub;
 use starnix_sync::{Locked, Mutex, ReadOps, WriteOps};
 use starnix_uapi::{
@@ -119,17 +117,9 @@ impl TimerFile {
                             TODO("https://fxbug.dev/297433837"),
                             "realtime timer, TFD_TIMER_CANCEL_ON_SET"
                         );
-
-                        let utc_clock: Unowned<'static, Clock> = unsafe {
-                            let handle = zx_utc_reference_get();
-                            Unowned::from_raw_handle(handle)
-                        };
-                        let utc_details = utc_clock
-                            .get_details()
-                            .map_err(|status| from_status_like_fdio!(status))?;
-                        utc_details
-                            .mono_to_synthetic
-                            .apply_inverse(time_from_timespec(timer_spec.it_value)?)
+                        crate::time::utc::estimate_monotonic_deadline_from_utc(time_from_timespec(
+                            timer_spec.it_value,
+                        )?)
                     }
                     TimerFileClock::Monotonic => time_from_timespec(timer_spec.it_value)?,
                 }

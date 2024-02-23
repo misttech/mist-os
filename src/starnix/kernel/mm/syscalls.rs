@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_runtime::duplicate_utc_clock_handle;
 use fuchsia_zircon as zx;
 use starnix_sync::{Locked, Unlocked};
 
@@ -356,13 +355,6 @@ pub fn sys_membarrier(
     }
 }
 
-fn realtime_deadline_to_monotonic(deadline: timespec) -> Result<zx::Time, Errno> {
-    let utc_clock = duplicate_utc_clock_handle(zx::Rights::READ).map_err(|_| errno!(EACCES))?;
-    let details = utc_clock.get_details().map_err(|_| errno!(EACCES))?;
-    let utc_time = time_from_timespec(deadline)?;
-    Ok(details.mono_to_synthetic.apply_inverse(utc_time))
-}
-
 fn do_futex<Key: FutexKey>(
     current_task: &CurrentTask,
     futexes: &FutexTable<Key>,
@@ -405,7 +397,10 @@ fn do_futex<Key: FutexKey>(
             let deadline = if utime.is_null() {
                 zx::Time::INFINITE
             } else if is_realtime {
-                realtime_deadline_to_monotonic(current_task.read_object(utime)?)?
+                let timespec = current_task.read_object(utime)?;
+                crate::time::utc::estimate_monotonic_deadline_from_utc(time_from_timespec(
+                    timespec,
+                )?)
             } else {
                 let deadline = current_task.read_object(utime)?;
                 time_from_timespec(deadline)?
