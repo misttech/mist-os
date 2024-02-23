@@ -52,7 +52,7 @@ std::map<uint64_t, TestGttRegionImpl> region_map;
 PixelFormatAndModifier GetPixelFormat(const image_t* image) {
   return PixelFormatAndModifier(
       fuchsia_images2::PixelFormat::kB8G8R8A8,
-      /*pixel_format_modifier_param=*/fuchsia_images2::kFormatModifierLinear);
+      /*pixel_format_modifier_param=*/fuchsia_images2::PixelFormatModifier::kLinear);
 }
 
 const GttRegion& GetGttImageHandle(const image_t* image, uint32_t rotation) {

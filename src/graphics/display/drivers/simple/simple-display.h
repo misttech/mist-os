@@ -137,7 +137,8 @@ class SimpleDisplay : public DeviceType,
   const uint32_t stride_;
   const fuchsia_images2::wire::PixelFormat format_;
 
-  const uint64_t kFormatModifier = fuchsia_images2::wire::kFormatModifierLinear;
+  const fuchsia_images2::wire::PixelFormatModifier kFormatModifier =
+      fuchsia_images2::wire::PixelFormatModifier::kLinear;
 
   // Only used on the vsync thread.
   zx::time next_vsync_time_;

@@ -37,6 +37,16 @@ using safemath::CheckDiv;
 using safemath::CheckMul;
 using safemath::CheckSub;
 
+#if __Fuchsia_API_level__ >= 19
+#define FORMAT_MODIFIER_TYPE fuchsia_images2::PixelFormatModifier
+#define FORMAT_MODIFIER(x) (fuchsia_images2::PixelFormatModifier::k##x)
+#define FORMAT_MODIFIER_TO_UNDERLYING(x) fidl::ToUnderlying((x))
+#else
+#define FORMAT_MODIFIER_TYPE uint64_t
+#define FORMAT_MODIFIER(x) (fuchsia_images2::kFormatModifier##x)
+#define FORMAT_MODIFIER_TO_UNDERLYING(x) (x)
+#endif
+
 namespace sysmem {
 
 #if __Fuchsia_API_level__ < FUCHSIA_HEAD
@@ -451,18 +461,18 @@ fuchsia_images2::PixelFormat V2CopyFromV1PixelFormatType(
   return static_cast<fuchsia_images2::PixelFormat>(static_cast<uint32_t>(v1));
 }
 
-uint64_t V2ConvertFromV1PixelFormatModifier(uint64_t v1_pixel_format_modifier) {
+FORMAT_MODIFIER_TYPE V2ConvertFromV1PixelFormatModifier(uint64_t v1_pixel_format_modifier) {
   if (v1_pixel_format_modifier == fuchsia_sysmem::kFormatModifierGoogleGoldfishOptimal) {
-    return fuchsia_images2::kFormatModifierGoogleGoldfishOptimal;
+    return FORMAT_MODIFIER(GoogleGoldfishOptimal);
   }
-  return v1_pixel_format_modifier;
+  return static_cast<FORMAT_MODIFIER_TYPE>(v1_pixel_format_modifier);
 }
 
-uint64_t V1ConvertFromV2PixelFormatModifier(uint64_t v2_pixel_format_modifier) {
-  if (v2_pixel_format_modifier == fuchsia_images2::kFormatModifierGoogleGoldfishOptimal) {
+uint64_t V1ConvertFromV2PixelFormatModifier(FORMAT_MODIFIER_TYPE v2_pixel_format_modifier) {
+  if (v2_pixel_format_modifier == FORMAT_MODIFIER(GoogleGoldfishOptimal)) {
     return fuchsia_sysmem::kFormatModifierGoogleGoldfishOptimal;
   }
-  return v2_pixel_format_modifier;
+  return FORMAT_MODIFIER_TO_UNDERLYING(v2_pixel_format_modifier);
 }
 
 PixelFormatAndModifier V2CopyFromV1PixelFormat(const fuchsia_sysmem::PixelFormat& v1) {

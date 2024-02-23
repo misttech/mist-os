@@ -18,11 +18,11 @@ TEST(ImageFormat, LinearComparison_V2) {
 
   PixelFormatAndModifier linear;
   linear.pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
-  linear.pixel_format_modifier = fuchsia_images2::kFormatModifierLinear;
+  linear.pixel_format_modifier = fuchsia_images2::PixelFormatModifier::kLinear;
 
   PixelFormatAndModifier x_tiled;
   x_tiled.pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
-  x_tiled.pixel_format_modifier = fuchsia_images2::kFormatModifierIntelI915XTiled;
+  x_tiled.pixel_format_modifier = fuchsia_images2::PixelFormatModifier::kIntelI915XTiled;
 
   EXPECT_TRUE(ImageFormatIsPixelFormatEqual(plain, plain));
   EXPECT_TRUE(ImageFormatIsPixelFormatEqual(linear, linear));
@@ -43,11 +43,11 @@ TEST(ImageFormat, LinearComparison_V2_wire) {
 
   PixelFormatAndModifier linear;
   linear.pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
-  linear.pixel_format_modifier = fuchsia_images2::wire::kFormatModifierLinear;
+  linear.pixel_format_modifier = fuchsia_images2::wire::PixelFormatModifier::kLinear;
 
   PixelFormatAndModifier x_tiled;
   x_tiled.pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
-  x_tiled.pixel_format_modifier = fuchsia_images2::wire::kFormatModifierIntelI915XTiled;
+  x_tiled.pixel_format_modifier = fuchsia_images2::wire::PixelFormatModifier::kIntelI915XTiled;
 
   EXPECT_TRUE(ImageFormatIsPixelFormatEqual(plain, plain));
   EXPECT_TRUE(ImageFormatIsPixelFormatEqual(linear, linear));
@@ -96,7 +96,7 @@ TEST(ImageFormat, LinearComparison_V1_wire) {
 TEST(ImageFormat, LinearRowBytes_V2) {
   sysmem_v2::ImageFormatConstraints constraints;
   constraints.pixel_format() = fuchsia_images2::PixelFormat::kB8G8R8A8;
-  constraints.pixel_format_modifier() = fuchsia_images2::kFormatModifierLinear;
+  constraints.pixel_format_modifier() = fuchsia_images2::PixelFormatModifier::kLinear;
   constraints.min_size() = {12u, 1u};
   constraints.max_size() = {100u, 0xFFFFFFFF};
   constraints.bytes_per_row_divisor().emplace(4u * 8u);
@@ -201,12 +201,12 @@ TEST(ImageFormat, L8AndY8PermitRgbAndYuv) {
   fuchsia_images2::ColorSpace color_space_yuv = fuchsia_images2::ColorSpace::kRec709;
 
   auto pixel_format_L8 = PixelFormatAndModifier(fuchsia_images2::PixelFormat::kL8,
-                                                fuchsia_images2::kFormatModifierLinear);
+                                                fuchsia_images2::PixelFormatModifier::kLinear);
   EXPECT_TRUE(ImageFormatIsSupportedColorSpaceForPixelFormat(color_space_rgb, pixel_format_L8));
   EXPECT_TRUE(ImageFormatIsSupportedColorSpaceForPixelFormat(color_space_yuv, pixel_format_L8));
 
   auto pixel_format_R8 = PixelFormatAndModifier(fuchsia_images2::PixelFormat::kR8,
-                                                fuchsia_images2::kFormatModifierLinear);
+                                                fuchsia_images2::PixelFormatModifier::kLinear);
   EXPECT_TRUE(ImageFormatIsSupportedColorSpaceForPixelFormat(color_space_rgb, pixel_format_R8));
   EXPECT_TRUE(ImageFormatIsSupportedColorSpaceForPixelFormat(color_space_yuv, pixel_format_R8));
 }
@@ -295,7 +295,7 @@ TEST(ImageFormat, ZbiPixelFormatV2) {
 TEST(ImageFormat, PlaneByteOffset_V2) {
   sysmem_v2::ImageFormatConstraints constraints;
   constraints.pixel_format() = fuchsia_images2::PixelFormat::kB8G8R8A8;
-  constraints.pixel_format_modifier() = fuchsia_images2::kFormatModifierLinear;
+  constraints.pixel_format_modifier() = fuchsia_images2::PixelFormatModifier::kLinear;
   constraints.min_size() = {12u, 12u};
   constraints.max_size() = {100u, 100u};
   constraints.bytes_per_row_divisor().emplace(4u * 8u);
@@ -444,12 +444,12 @@ TEST(ImageFormat, PlaneByteOffset_V1_wire) {
 TEST(ImageFormat, TransactionEliminationFormats_V2) {
   PixelFormatAndModifier format;
   format.pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
-  format.pixel_format_modifier = fuchsia_images2::kFormatModifierLinear;
+  format.pixel_format_modifier = fuchsia_images2::PixelFormatModifier::kLinear;
 
   EXPECT_TRUE(ImageFormatCompatibleWithProtectedMemory(format));
 
   auto format2 = format;
-  format2.pixel_format_modifier = fuchsia_images2::kFormatModifierArmLinearTe;
+  format2.pixel_format_modifier = fuchsia_images2::PixelFormatModifier::kArmLinearTe;
 
   EXPECT_FALSE(ImageFormatCompatibleWithProtectedMemory(format2));
 
@@ -489,12 +489,12 @@ TEST(ImageFormat, TransactionEliminationFormats_V2_wire) {
   fidl::Arena allocator;
   PixelFormatAndModifier format;
   format.pixel_format = fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
-  format.pixel_format_modifier = fuchsia_images2::wire::kFormatModifierLinear;
+  format.pixel_format_modifier = fuchsia_images2::wire::PixelFormatModifier::kLinear;
 
   EXPECT_TRUE(ImageFormatCompatibleWithProtectedMemory(format));
 
   auto format2 = format;
-  format2.pixel_format_modifier = fuchsia_images2::wire::kFormatModifierArmLinearTe;
+  format2.pixel_format_modifier = fuchsia_images2::wire::PixelFormatModifier::kArmLinearTe;
 
   EXPECT_FALSE(ImageFormatCompatibleWithProtectedMemory(format2));
 
@@ -807,7 +807,7 @@ TEST(ImageFormat, GoldfishOptimal_V2) {
   fuchsia_images2::ImageFormat goldfish_optimal_image_format_bgra32;
   goldfish_optimal_image_format_bgra32.pixel_format() = fuchsia_images2::PixelFormat::kB8G8R8A8;
   goldfish_optimal_image_format_bgra32.pixel_format_modifier() =
-      fuchsia_images2::kFormatModifierGoogleGoldfishOptimal;
+      fuchsia_images2::PixelFormatModifier::kGoogleGoldfishOptimal;
   goldfish_optimal_image_format_bgra32.size() = {kWidth, kHeight};
   goldfish_optimal_image_format_bgra32.bytes_per_row().emplace(kStride);
   EXPECT_EQ(ImageFormatImageSize(linear_image_format_bgra32),
@@ -883,7 +883,7 @@ TEST(ImageFormat, CorrectModifiers_wire) {
 TEST(ImageFormat, RoundUpWidthForCallers) {
   sysmem_v2::ImageFormatConstraints constraints;
   constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
-  constraints.pixel_format_modifier() = fuchsia_images2::kFormatModifierLinear;
+  constraints.pixel_format_modifier() = fuchsia_images2::PixelFormatModifier::kLinear;
   constraints.min_size() = {12u, 1u};
   constraints.max_size() = {100u, 0xFFFFFFFF};
 

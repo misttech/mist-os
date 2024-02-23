@@ -268,7 +268,15 @@ type PixelFormatAndModifier = struct {
     pixel_format fuchsia.images2.PixelFormat;
     /// Specific modifier (not just flags), or `FORMAT_MODIFIER_DO_NOT_CARE`,
     /// from set of values defined in `fuchsia.images2` format_modifier.fidl.
+    //
+    // Re. changing the type, in this particular case we'll change any impacted
+    // client code that needs to compile with < 19 and >= 19 SDK to make sure it
+    // compiles either way. The old/new types are wire compatible and there's no
+    // change to any defined/permitted values.
+    @available(added=12, replaced=19)
     pixel_format_modifier uint64;
+    @available(added=19)
+    pixel_format_modifier fuchsia.images2.PixelFormatModifier;
 };
 
 /// Describes constraints on layout of image data in buffers.
@@ -345,7 +353,15 @@ type ImageFormatConstraints = table {
     /// When set, this value is a specific modifier (not just flags), or
     /// `FORMAT_MODIFIER_DO_NOT_CARE`, from set of values defined in
     /// `fuchsia.images2` format_modifier.fidl.
+    //
+    // Re. changing the type, in this particular case we'll change any impacted
+    // client code that needs to compile with < 19 and >= 19 SDK to make sure it
+    // compiles either way. The old/new types are wire compatible and there's no
+    // change to any defined/permitted values.
+    @available(added=12, replaced=19)
     2: pixel_format_modifier uint64;
+    @available(added=19)
+    2: pixel_format_modifier fuchsia.images2.PixelFormatModifier;
 
     /// The (additional) [`fuchsia.sysmem2/PixelFormatAndModifier`]s for which
     /// the following constraints apply.

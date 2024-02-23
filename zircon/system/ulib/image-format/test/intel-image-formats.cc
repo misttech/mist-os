@@ -17,7 +17,7 @@ namespace sysmem_v2 = fuchsia_sysmem2;
 TEST(ImageFormat, IntelYTiledFormat_V2) {
   sysmem_v2::ImageFormatConstraints constraints;
   constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
-  constraints.pixel_format_modifier() = fuchsia_images2::kFormatModifierIntelI915YTiled;
+  constraints.pixel_format_modifier() = fuchsia_images2::PixelFormatModifier::kIntelI915YTiled;
   constraints.min_size() = {128u, 32u};
 
   auto image_format_result = ImageConstraintsToFormat(constraints, 3440u, 1440u);

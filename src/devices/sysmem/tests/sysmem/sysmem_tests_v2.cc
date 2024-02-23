@@ -385,10 +385,10 @@ void set_specific_constraints_v2(fidl::SyncClient<v2::BufferCollection>& collect
 
 struct Format {
   Format(std::optional<fuchsia_images2::PixelFormat> pixel_format,
-         std::optional<uint64_t> pixel_format_modifier)
+         std::optional<fuchsia_images2::PixelFormatModifier> pixel_format_modifier)
       : pixel_format(pixel_format), pixel_format_modifier(pixel_format_modifier) {}
   std::optional<fuchsia_images2::PixelFormat> pixel_format;
-  std::optional<uint64_t> pixel_format_modifier;
+  std::optional<fuchsia_images2::PixelFormatModifier> pixel_format_modifier;
 };
 
 void set_pixel_format_modifier_constraints_v2(fidl::SyncClient<v2::BufferCollection>& collection,
@@ -2018,10 +2018,11 @@ TEST(Sysmem, ComplicatedFormatModifiersV2) {
       fuchsia_sysmem::wire::kCpuUsageReadOften | fuchsia_sysmem::wire::kCpuUsageWriteOften;
   constraints_1.min_buffer_count_for_camping() = 1;
 
-  constexpr uint64_t kFormatModifiers[] = {
-      fuchsia_images2::kFormatModifierLinear, fuchsia_images2::kFormatModifierIntelI915XTiled,
-      fuchsia_images2::kFormatModifierArmAfbc16X16SplitBlockSparseYuvTeTiledHeader,
-      fuchsia_images2::kFormatModifierArmAfbc16X16Te};
+  constexpr fuchsia_images2::PixelFormatModifier kFormatModifiers[] = {
+      fuchsia_images2::PixelFormatModifier::kLinear,
+      fuchsia_images2::PixelFormatModifier::kIntelI915XTiled,
+      fuchsia_images2::PixelFormatModifier::kArmAfbc16X16SplitBlockSparseYuvTeTiledHeader,
+      fuchsia_images2::PixelFormatModifier::kArmAfbc16X16Te};
   constraints_1.image_format_constraints().emplace(std::size(kFormatModifiers));
 
   for (uint32_t i = 0; i < std::size(kFormatModifiers); i++) {
@@ -2499,7 +2500,7 @@ TEST(Sysmem, CloseWithOutstandingWaitV2) {
   auto& image_constraints_1 = constraints_1.image_format_constraints()->at(0);
 
   image_constraints_1.pixel_format() = fuchsia_images2::PixelFormat::kR8G8B8A8;
-  image_constraints_1.pixel_format_modifier() = fuchsia_images2::kFormatModifierLinear;
+  image_constraints_1.pixel_format_modifier() = fuchsia_images2::PixelFormatModifier::kLinear;
   image_constraints_1.color_spaces().emplace(1);
   image_constraints_1.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kSrgb;
 
@@ -6361,11 +6362,11 @@ TEST(Sysmem, SetDebugClientInfo_NoIdIsFine) {
 
 TEST(Sysmem, PixelFormatModifier_DoNotCare) {
   // These modifiers should succeed, in either accumulation order.
-  std::vector<uint64_t> modifiers;
+  std::vector<fuchsia_images2::PixelFormatModifier> modifiers;
   // explicit kFormatModifierDoNotCare, with usage
-  modifiers.emplace_back(fuchsia_images2::kFormatModifierDoNotCare);
+  modifiers.emplace_back(fuchsia_images2::PixelFormatModifier::kDoNotCare);
   // specific pixel_format_modifier, with usage
-  modifiers.emplace_back(fuchsia_images2::kFormatModifierIntelI915XTiled);
+  modifiers.emplace_back(fuchsia_images2::PixelFormatModifier::kIntelI915XTiled);
 
   for (uint32_t iteration = 0; iteration < 2; ++iteration) {
     if (iteration == 1) {
@@ -6392,7 +6393,7 @@ TEST(Sysmem, PixelFormatModifier_DoNotCare) {
         *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
     ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
     ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
-              fuchsia_images2::kFormatModifierIntelI915XTiled);
+              fuchsia_images2::PixelFormatModifier::kIntelI915XTiled);
   }
 }
 
@@ -6407,7 +6408,8 @@ TEST(Sysmem, PixelFormatModifier_NoUsageDefaultDoNotCare) {
       parent_collection, {{fuchsia_images2::PixelFormat::kR8G8B8A8, std::nullopt}}, false);
   set_pixel_format_modifier_constraints_v2(
       child_collection,
-      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8,
+        fuchsia_images2::PixelFormatModifier::kIntelI915XTiled}},
       true);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
@@ -6419,7 +6421,7 @@ TEST(Sysmem, PixelFormatModifier_NoUsageDefaultDoNotCare) {
       *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
   ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
   ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
-            fuchsia_images2::kFormatModifierIntelI915XTiled);
+            fuchsia_images2::PixelFormatModifier::kIntelI915XTiled);
 }
 
 TEST(Sysmem, PixelFormatModifier_PixelFormatDoNotCareButConstrainPixelFormatModifier) {
@@ -6431,10 +6433,12 @@ TEST(Sysmem, PixelFormatModifier_PixelFormatDoNotCareButConstrainPixelFormatModi
 
   set_pixel_format_modifier_constraints_v2(
       parent_collection,
-      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierDoNotCare}}, true);
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::PixelFormatModifier::kDoNotCare}},
+      true);
   set_pixel_format_modifier_constraints_v2(
       child_collection,
-      {{fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      {{fuchsia_images2::PixelFormat::kDoNotCare,
+        fuchsia_images2::PixelFormatModifier::kIntelI915XTiled}},
       true);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
@@ -6446,7 +6450,7 @@ TEST(Sysmem, PixelFormatModifier_PixelFormatDoNotCareButConstrainPixelFormatModi
       *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
   ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
   ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
-            fuchsia_images2::kFormatModifierIntelI915XTiled);
+            fuchsia_images2::PixelFormatModifier::kIntelI915XTiled);
 }
 
 TEST(Sysmem, PixelFormatModifier_PixelFormatDoNotCareImpliesModifierDefaultDoNotCare) {
@@ -6460,13 +6464,15 @@ TEST(Sysmem, PixelFormatModifier_PixelFormatDoNotCareImpliesModifierDefaultDoNot
 
   set_pixel_format_modifier_constraints_v2(
       parent_collection,
-      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierDoNotCare}}, true);
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::PixelFormatModifier::kDoNotCare}},
+      true);
   // pixel_format DoNotCare implies modifier default DoNotCare, despite usage
   set_pixel_format_modifier_constraints_v2(
       child_collection, {{fuchsia_images2::PixelFormat::kDoNotCare, std::nullopt}}, true);
   set_pixel_format_modifier_constraints_v2(
       child2_collection,
-      {{fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      {{fuchsia_images2::PixelFormat::kDoNotCare,
+        fuchsia_images2::PixelFormatModifier::kIntelI915XTiled}},
       true);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
@@ -6480,7 +6486,7 @@ TEST(Sysmem, PixelFormatModifier_PixelFormatDoNotCareImpliesModifierDefaultDoNot
       *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
   ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
   ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
-            fuchsia_images2::kFormatModifierIntelI915XTiled);
+            fuchsia_images2::PixelFormatModifier::kIntelI915XTiled);
 }
 
 TEST(Sysmem, PixelFormatModifier_SpecificPixelFormatWithUsageDefaultsToLinear) {
@@ -6492,7 +6498,8 @@ TEST(Sysmem, PixelFormatModifier_SpecificPixelFormatWithUsageDefaultsToLinear) {
 
   set_pixel_format_modifier_constraints_v2(
       parent_collection,
-      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierDoNotCare}}, true);
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::PixelFormatModifier::kDoNotCare}},
+      true);
   // specific pixel_format with usage defaults to pixel_format_modifier linear
   set_pixel_format_modifier_constraints_v2(
       child_collection, {{fuchsia_images2::PixelFormat::kR8G8B8A8, std::nullopt}}, true);
@@ -6506,7 +6513,7 @@ TEST(Sysmem, PixelFormatModifier_SpecificPixelFormatWithUsageDefaultsToLinear) {
       *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
   ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
   ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
-            fuchsia_images2::kFormatModifierLinear);
+            fuchsia_images2::PixelFormatModifier::kLinear);
 }
 
 TEST(Sysmem, PixelFormatModifier_SpecificPixelFormatWithoutUsageDefaultsToModifierDoNotCare) {
@@ -6518,7 +6525,8 @@ TEST(Sysmem, PixelFormatModifier_SpecificPixelFormatWithoutUsageDefaultsToModifi
 
   set_pixel_format_modifier_constraints_v2(
       parent_collection,
-      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8,
+        fuchsia_images2::PixelFormatModifier::kIntelI915XTiled}},
       true);
   // specific pixel_format without usage defaults to pixel_format_modifier DoNotCare
   set_pixel_format_modifier_constraints_v2(
@@ -6533,7 +6541,7 @@ TEST(Sysmem, PixelFormatModifier_SpecificPixelFormatWithoutUsageDefaultsToModifi
       *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
   ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
   ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
-            fuchsia_images2::kFormatModifierIntelI915XTiled);
+            fuchsia_images2::PixelFormatModifier::kIntelI915XTiled);
 }
 
 TEST(Sysmem, VectorPixelFormatAndModifier) {
@@ -6545,13 +6553,13 @@ TEST(Sysmem, VectorPixelFormatAndModifier) {
 
   set_pixel_format_modifier_constraints_v2(
       parent_collection,
-      {{fuchsia_images2::PixelFormat::kB8G8R8, fuchsia_images2::kFormatModifierLinear},
-       {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierLinear}},
+      {{fuchsia_images2::PixelFormat::kB8G8R8, fuchsia_images2::PixelFormatModifier::kLinear},
+       {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::PixelFormatModifier::kLinear}},
       true);
   set_pixel_format_modifier_constraints_v2(
       child_collection,
-      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierLinear},
-       {fuchsia_images2::PixelFormat::kB8G8R8A8, fuchsia_images2::kFormatModifierLinear}},
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::PixelFormatModifier::kLinear},
+       {fuchsia_images2::PixelFormat::kB8G8R8A8, fuchsia_images2::PixelFormatModifier::kLinear}},
       true);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
@@ -6563,7 +6571,7 @@ TEST(Sysmem, VectorPixelFormatAndModifier) {
       *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
   ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
   ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
-            fuchsia_images2::kFormatModifierLinear);
+            fuchsia_images2::PixelFormatModifier::kLinear);
 }
 
 TEST(Sysmem, VectorPixelFormatAndModifier_SingleEntry) {
@@ -6575,12 +6583,13 @@ TEST(Sysmem, VectorPixelFormatAndModifier_SingleEntry) {
 
   set_pixel_format_modifier_constraints_v2(
       parent_collection,
-      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8,
+        fuchsia_images2::PixelFormatModifier::kIntelI915XTiled}},
       true, true);
-  set_pixel_format_modifier_constraints_v2(
-      child_collection,
-      {{fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierDoNotCare}}, true,
-      true);
+  set_pixel_format_modifier_constraints_v2(child_collection,
+                                           {{fuchsia_images2::PixelFormat::kDoNotCare,
+                                             fuchsia_images2::PixelFormatModifier::kDoNotCare}},
+                                           true, true);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
   ASSERT_TRUE(parent_wait_result.is_ok());
@@ -6591,7 +6600,7 @@ TEST(Sysmem, VectorPixelFormatAndModifier_SingleEntry) {
       *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
   ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
   ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
-            fuchsia_images2::kFormatModifierIntelI915XTiled);
+            fuchsia_images2::PixelFormatModifier::kIntelI915XTiled);
 }
 
 TEST(Sysmem, VectorPixelFormatAndModifier_NoPixelFormatFails) {
@@ -6603,13 +6612,16 @@ TEST(Sysmem, VectorPixelFormatAndModifier_NoPixelFormatFails) {
 
   set_pixel_format_modifier_constraints_v2(
       parent_collection,
-      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled},
-       {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915YTiled}},
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8,
+        fuchsia_images2::PixelFormatModifier::kIntelI915XTiled},
+       {fuchsia_images2::PixelFormat::kR8G8B8A8,
+        fuchsia_images2::PixelFormatModifier::kIntelI915YTiled}},
       true);
   set_pixel_format_modifier_constraints_v2(
       child_collection,
-      {{std::nullopt, fuchsia_images2::kFormatModifierIntelI915XTiled},
-       {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierArmAfbc16X16}},
+      {{std::nullopt, fuchsia_images2::PixelFormatModifier::kIntelI915XTiled},
+       {fuchsia_images2::PixelFormat::kR8G8B8A8,
+        fuchsia_images2::PixelFormatModifier::kArmAfbc16X16}},
       true);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
@@ -6630,13 +6642,17 @@ TEST(Sysmem, VectorPixelFormatAndModifier_MultipleInVector) {
 
   set_pixel_format_modifier_constraints_v2(
       parent_collection,
-      {{fuchsia_images2::PixelFormat::kB8G8R8A8, fuchsia_images2::kFormatModifierArmAfbc16X16},
-       {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      {{fuchsia_images2::PixelFormat::kB8G8R8A8,
+        fuchsia_images2::PixelFormatModifier::kArmAfbc16X16},
+       {fuchsia_images2::PixelFormat::kR8G8B8A8,
+        fuchsia_images2::PixelFormatModifier::kIntelI915XTiled}},
       true, true);
   set_pixel_format_modifier_constraints_v2(
       child_collection,
-      {{fuchsia_images2::PixelFormat::kB8G8R8A8, fuchsia_images2::kFormatModifierIntelI915YTiled},
-       {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      {{fuchsia_images2::PixelFormat::kB8G8R8A8,
+        fuchsia_images2::PixelFormatModifier::kIntelI915YTiled},
+       {fuchsia_images2::PixelFormat::kR8G8B8A8,
+        fuchsia_images2::PixelFormatModifier::kIntelI915XTiled}},
       true, true);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
@@ -6648,7 +6664,7 @@ TEST(Sysmem, VectorPixelFormatAndModifier_MultipleInVector) {
       *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
   ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
   ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
-            fuchsia_images2::kFormatModifierIntelI915XTiled);
+            fuchsia_images2::PixelFormatModifier::kIntelI915XTiled);
 }
 
 TEST(Sysmem, PixelFormatAndModifier_SeparateDuplicatedFormatFails) {
@@ -6657,7 +6673,7 @@ TEST(Sysmem, PixelFormatAndModifier_SeparateDuplicatedFormatFails) {
     auto collection = convert_token_to_collection_v2(std::move(token));
 
     auto format = Format{fuchsia_images2::PixelFormat::kR8G8B8A8,
-                         fuchsia_images2::kFormatModifierIntelI915XTiled};
+                         fuchsia_images2::PixelFormatModifier::kIntelI915XTiled};
     auto formats = std::vector<Format>{{format}};
     if (is_failure_case) {
       // another instance of same format will cause failure below
@@ -6697,7 +6713,7 @@ TEST(Sysmem, PixelFormatAndModifier_TogetherDuplicatedFormatFails) {
     auto collection = convert_token_to_collection_v2(std::move(token));
 
     auto format = Format{fuchsia_images2::PixelFormat::kR8G8B8A8,
-                         fuchsia_images2::kFormatModifierIntelI915XTiled};
+                         fuchsia_images2::PixelFormatModifier::kIntelI915XTiled};
     auto formats = std::vector<Format>{{format}};
     if (is_failure_case) {
       // another instance of same format will cause failure below
@@ -6742,10 +6758,12 @@ TEST(Sysmem, PixelFormatDoNotCareCombinedWithPixelFormatModifierDoNotCare) {
 
   set_pixel_format_modifier_constraints_v2(
       parent_collection,
-      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierDoNotCare}}, true);
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::PixelFormatModifier::kDoNotCare}},
+      true);
   set_pixel_format_modifier_constraints_v2(
       child_collection,
-      {{fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      {{fuchsia_images2::PixelFormat::kDoNotCare,
+        fuchsia_images2::PixelFormatModifier::kIntelI915XTiled}},
       true);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
@@ -6757,7 +6775,7 @@ TEST(Sysmem, PixelFormatDoNotCareCombinedWithPixelFormatModifierDoNotCare) {
       *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
   ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
   ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
-            fuchsia_images2::kFormatModifierIntelI915XTiled);
+            fuchsia_images2::PixelFormatModifier::kIntelI915XTiled);
 }
 
 TEST(Sysmem, RedundantMorePickyPixelFormatFails) {
@@ -6769,12 +6787,15 @@ TEST(Sysmem, RedundantMorePickyPixelFormatFails) {
 
   set_pixel_format_modifier_constraints_v2(
       parent_collection,
-      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierDoNotCare}}, true);
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::PixelFormatModifier::kDoNotCare}},
+      true);
   // Not allowed to specify two entries where one covers the other.
   set_pixel_format_modifier_constraints_v2(
       child_collection,
-      {{fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierIntelI915XTiled},
-       {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      {{fuchsia_images2::PixelFormat::kDoNotCare,
+        fuchsia_images2::PixelFormatModifier::kIntelI915XTiled},
+       {fuchsia_images2::PixelFormat::kR8G8B8A8,
+        fuchsia_images2::PixelFormatModifier::kIntelI915XTiled}},
       true);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
@@ -6793,12 +6814,14 @@ TEST(Sysmem, RedundantMorePickyPixelFormatModifierFails) {
   // Not allowed to specify two entries where one covers the other.
   set_pixel_format_modifier_constraints_v2(
       parent_collection,
-      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierDoNotCare},
-       {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::PixelFormatModifier::kDoNotCare},
+       {fuchsia_images2::PixelFormat::kR8G8B8A8,
+        fuchsia_images2::PixelFormatModifier::kIntelI915XTiled}},
       true);
   set_pixel_format_modifier_constraints_v2(
       child_collection,
-      {{fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      {{fuchsia_images2::PixelFormat::kDoNotCare,
+        fuchsia_images2::PixelFormatModifier::kIntelI915XTiled}},
       true);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
@@ -6815,8 +6838,9 @@ TEST(Sysmem, RedundantMorePickyFormatFails) {
   // Not allowed to specify two entries where one covers the other.
   set_pixel_format_modifier_constraints_v2(
       parent_collection,
-      {{fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierDoNotCare},
-       {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      {{fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::PixelFormatModifier::kDoNotCare},
+       {fuchsia_images2::PixelFormat::kR8G8B8A8,
+        fuchsia_images2::PixelFormatModifier::kIntelI915XTiled}},
       true);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
@@ -6834,12 +6858,13 @@ TEST(Sysmem, ImpliedNonSupportedFormatDoesNotForceFailure) {
   // specific format during DoNotCare processing, it gets filtered out instead of forcing failure.
   set_pixel_format_modifier_constraints_v2(
       parent_collection,
-      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierDoNotCare},
-       {fuchsia_images2::PixelFormat::kMjpeg, fuchsia_images2::kFormatModifierDoNotCare}},
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::PixelFormatModifier::kDoNotCare},
+       {fuchsia_images2::PixelFormat::kMjpeg, fuchsia_images2::PixelFormatModifier::kDoNotCare}},
       true);
   set_pixel_format_modifier_constraints_v2(
       child_collection,
-      {{fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      {{fuchsia_images2::PixelFormat::kDoNotCare,
+        fuchsia_images2::PixelFormatModifier::kIntelI915XTiled}},
       true);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
@@ -6851,7 +6876,7 @@ TEST(Sysmem, ImpliedNonSupportedFormatDoesNotForceFailure) {
       *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
   ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
   ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
-            fuchsia_images2::kFormatModifierIntelI915XTiled);
+            fuchsia_images2::PixelFormatModifier::kIntelI915XTiled);
 }
 
 TEST(Sysmem, ImpliedNonSupportedColorspaceDoesNotForceFailure) {
@@ -6869,7 +6894,7 @@ TEST(Sysmem, ImpliedNonSupportedColorspaceDoesNotForceFailure) {
     constraints.image_format_constraints().emplace(1);
     auto& ifc = constraints.image_format_constraints()->at(0);
     ifc.pixel_format() = fuchsia_images2::PixelFormat::kR8G8B8A8;
-    ifc.pixel_format_modifier() = fuchsia_images2::kFormatModifierDoNotCare;
+    ifc.pixel_format_modifier() = fuchsia_images2::PixelFormatModifier::kDoNotCare;
     ifc.min_size() = {64, 64};
     ifc.color_spaces() = {fuchsia_images2::ColorSpace::kSrgb};
     fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -6887,7 +6912,7 @@ TEST(Sysmem, ImpliedNonSupportedColorspaceDoesNotForceFailure) {
     constraints.image_format_constraints().emplace(1);
     auto& ifc = constraints.image_format_constraints()->at(0);
     ifc.pixel_format() = fuchsia_images2::PixelFormat::kDoNotCare;
-    ifc.pixel_format_modifier() = fuchsia_images2::kFormatModifierIntelI915XTiled;
+    ifc.pixel_format_modifier() = fuchsia_images2::PixelFormatModifier::kIntelI915XTiled;
     ifc.min_size() = {64, 64};
     // kRec2020 isn't supported with kR8G8B8A8, but because this ifc entry has a DoNotCare, the
     // server will filter out the unsupported color space when combining with kR8G8B8A8 from other
@@ -6910,7 +6935,7 @@ TEST(Sysmem, ImpliedNonSupportedColorspaceDoesNotForceFailure) {
       *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
   ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
   ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
-            fuchsia_images2::kFormatModifierIntelI915XTiled);
+            fuchsia_images2::PixelFormatModifier::kIntelI915XTiled);
 }
 
 TEST(Sysmem, CombineableFormatsFromSingleParticipantFails) {
@@ -6921,8 +6946,9 @@ TEST(Sysmem, CombineableFormatsFromSingleParticipantFails) {
   // Not allowed to specify two entries where one covers the other.
   set_pixel_format_modifier_constraints_v2(
       parent_collection,
-      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierDoNotCare},
-       {fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::PixelFormatModifier::kDoNotCare},
+       {fuchsia_images2::PixelFormat::kDoNotCare,
+        fuchsia_images2::PixelFormatModifier::kIntelI915XTiled}},
       true);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();

@@ -53,7 +53,8 @@ namespace display_test {
 Image::Image(uint32_t width, uint32_t height, int32_t stride,
              fuchsia_images2::wire::PixelFormat format,
              display::BufferCollectionId buffer_collection_id, void* buf, Pattern pattern,
-             uint32_t fg_color, uint32_t bg_color, uint64_t modifier)
+             uint32_t fg_color, uint32_t bg_color,
+             fuchsia_images2::wire::PixelFormatModifier modifier)
     : width_(width),
       height_(height),
       stride_(stride),
@@ -67,7 +68,8 @@ Image::Image(uint32_t width, uint32_t height, int32_t stride,
 
 Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t width,
                      uint32_t height, fuchsia_images2::wire::PixelFormat format, Pattern pattern,
-                     uint32_t fg_color, uint32_t bg_color, uint64_t modifier) {
+                     uint32_t fg_color, uint32_t bg_color,
+                     fuchsia_images2::wire::PixelFormatModifier modifier) {
   zx::result client_end = component::Connect<fuchsia_sysmem::Allocator>();
   if (client_end.is_error()) {
     fprintf(stderr, "Failed to connect to sysmem: %s\n", client_end.status_string());
@@ -186,7 +188,7 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t 
     return nullptr;
   }
   image_constraints.pixel_format.has_format_modifier = true;
-  image_constraints.pixel_format.format_modifier.value = modifier;
+  image_constraints.pixel_format.format_modifier.value = fidl::ToUnderlying(modifier);
 
   image_constraints.min_coded_width = width;
   image_constraints.max_coded_width = width;
@@ -247,7 +249,7 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t 
   for (unsigned i = 0; i < buffer_size / sizeof(uint32_t); i++) {
     ptr[i] = bg_color;
   }
-  if (modifier == fuchsia_sysmem::wire::kFormatModifierArmAfbc16X16) {
+  if (modifier == fuchsia_images2::wire::PixelFormatModifier::kArmAfbc16X16) {
     uint32_t width_in_tiles = (width + kAfbcTilePixelWidth - 1) / kAfbcTilePixelWidth;
     uint32_t height_in_tiles = (height + kAfbcTilePixelHeight - 1) / kAfbcTilePixelHeight;
     uint32_t tile_count = width_in_tiles * height_in_tiles;
@@ -294,7 +296,7 @@ void Image::Render(int32_t prev_step, int32_t step_num) {
         return color;
       };
 
-      if (modifier_ == fuchsia_sysmem::wire::kFormatModifierLinear) {
+      if (modifier_ == fuchsia_images2::wire::PixelFormatModifier::kLinear) {
         RenderLinear(pixel_generator, start, end);
       } else {
         RenderTiled(pixel_generator, start, end);
@@ -307,7 +309,7 @@ void Image::Render(int32_t prev_step, int32_t step_num) {
         return color;
       };
 
-      if (modifier_ == fuchsia_sysmem::wire::kFormatModifierLinear) {
+      if (modifier_ == fuchsia_images2::wire::PixelFormatModifier::kLinear) {
         RenderLinear(pixel_generator, start, end);
       } else {
         RenderTiled(pixel_generator, start, end);
@@ -370,13 +372,13 @@ void Image::RenderTiled(T pixel_generator, uint32_t start_y, uint32_t end_y) {
   uint8_t* body = nullptr;
   uint32_t width_in_tiles = 0;
   switch (modifier_) {
-    case fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled: {
+    case fuchsia_images2::wire::PixelFormatModifier::kIntelI915YTiled: {
       tile_pixel_width = kIntelTilePixelWidth;
       tile_pixel_height = kIntelTilePixelHeight;
       body = static_cast<uint8_t*>(buf_);
       width_in_tiles = (stride_ + tile_pixel_width - 1) / tile_pixel_width;
     } break;
-    case fuchsia_sysmem::wire::kFormatModifierArmAfbc16X16: {
+    case fuchsia_images2::wire::PixelFormatModifier::kArmAfbc16X16: {
       tile_pixel_width = kAfbcTilePixelWidth;
       tile_pixel_height = kAfbcTilePixelHeight;
       width_in_tiles = (width_ + tile_pixel_width - 1) / tile_pixel_width;
@@ -405,7 +407,7 @@ void Image::RenderTiled(T pixel_generator, uint32_t start_y, uint32_t end_y) {
         uint32_t tile_idx = (y / tile_pixel_height) * width_in_tiles + (x / tile_pixel_width);
         ptr += (tile_num_pixels * tile_idx);
         switch (modifier_) {
-          case fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled: {
+          case fuchsia_images2::wire::PixelFormatModifier::kIntelI915YTiled: {
             constexpr uint32_t kSubtileColumnWidth = 4u;
             // Add the offset within the pixel's tile
             uint32_t subtile_column_offset =
@@ -414,7 +416,7 @@ void Image::RenderTiled(T pixel_generator, uint32_t start_y, uint32_t end_y) {
                 (subtile_column_offset + (y % tile_pixel_height)) * kSubtileColumnWidth;
             ptr += subtile_line_offset + (x % kSubtileColumnWidth);
           } break;
-          case fuchsia_sysmem::wire::kFormatModifierArmAfbc16X16: {
+          case fuchsia_images2::wire::PixelFormatModifier::kArmAfbc16X16: {
             constexpr uint32_t kAfbcSubtileOffset[4][4] = {
                 {2u, 1u, 14u, 13u},
                 {3u, 0u, 15u, 12u},
@@ -445,7 +447,7 @@ void Image::RenderTiled(T pixel_generator, uint32_t start_y, uint32_t end_y) {
       zx_cache_flush(body + offset, tile_num_bytes, ZX_CACHE_FLUSH_DATA);
 
       // We also need to update block header when using AFBC.
-      if (modifier_ == fuchsia_sysmem::wire::kFormatModifierArmAfbc16X16) {
+      if (modifier_ == fuchsia_images2::wire::PixelFormatModifier::kArmAfbc16X16) {
         unsigned hdr_offset = kAfbcBytesPerBlockHeader * (j * width_in_tiles + i);
         uint8_t* hdr_ptr = reinterpret_cast<uint8_t*>(buf_) + hdr_offset;
         // Store offset of uncompressed tile memory in byte 0-3.
@@ -466,7 +468,7 @@ void Image::RenderTiled(T pixel_generator, uint32_t start_y, uint32_t end_y) {
 void Image::GetConfig(fhdt::wire::ImageConfig* config_out) const {
   config_out->height = height_;
   config_out->width = width_;
-  if (modifier_ != fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled) {
+  if (modifier_ != fuchsia_images2::wire::PixelFormatModifier::kIntelI915YTiled) {
     config_out->type = IMAGE_TYPE_SIMPLE;
   } else {
     config_out->type = 2;  // IMAGE_TYPE_Y_LEGACY

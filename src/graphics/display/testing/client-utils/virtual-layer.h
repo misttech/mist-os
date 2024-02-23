@@ -143,7 +143,7 @@ class PrimaryLayer : public VirtualLayer {
   void SetImageFormat(fuchsia_images2::wire::PixelFormat image_format) {
     image_format_ = image_format;
   }
-  void SetFormatModifier(uint64_t modifier) { modifier_ = modifier; }
+  void SetFormatModifier(fuchsia_images2::PixelFormatModifier modifier) { modifier_ = modifier; }
 
   bool Init(const fidl::WireSyncClient<Coordinator>& dc) override;
   void StepLayout(int32_t frame_num) override;
@@ -189,7 +189,8 @@ class PrimaryLayer : public VirtualLayer {
   bool alpha_enable_ = false;
   float alpha_val_ = 0.f;
   bool scaling_ = false;
-  uint64_t modifier_ = fuchsia_sysmem::wire::kFormatModifierLinear;
+  fuchsia_images2::wire::PixelFormatModifier modifier_ =
+      fuchsia_images2::wire::PixelFormatModifier::kLinear;
   bool mirrors_ = false;
 
   bool alt_image_ = false;

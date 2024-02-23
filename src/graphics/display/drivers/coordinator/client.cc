@@ -551,7 +551,7 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
 
   uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(PixelFormatAndModifier(
       request->pixel_format,
-      /*pixel_format_modifier_param=*/fuchsia_images2::wire::kFormatModifierLinear));
+      /*pixel_format_modifier_param=*/fuchsia_images2::wire::PixelFormatModifier::kLinear));
   if (request->color_bytes.count() != bytes_per_pixel) {
     zxlogf(ERROR, "SetLayerColorConfig with invalid color bytes");
     TearDown();

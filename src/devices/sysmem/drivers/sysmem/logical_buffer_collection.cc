@@ -275,7 +275,7 @@ fit::result<zx_status_t, bool> IsColorSpaceArrayDoNotCare(
 // true iff either field is DoNotCare
 [[nodiscard]] bool IsPixelFormatAndModifierAtLeastPartlyDoNotCare(const PixelFormatAndModifier& a) {
   return a.pixel_format == fuchsia_images2::PixelFormat::kDoNotCare ||
-         a.pixel_format_modifier == fuchsia_images2::kFormatModifierDoNotCare;
+         a.pixel_format_modifier == fuchsia_images2::PixelFormatModifier::kDoNotCare;
 }
 
 [[nodiscard]] PixelFormatAndModifier CombinePixelFormatAndModifier(
@@ -285,7 +285,7 @@ fit::result<zx_status_t, bool> IsColorSpaceArrayDoNotCare(
     // Can be a specific value, or kDoNotCare.
     result.pixel_format = b.pixel_format;
   }
-  if (result.pixel_format_modifier == fuchsia_images2::kFormatModifierDoNotCare) {
+  if (result.pixel_format_modifier == fuchsia_images2::PixelFormatModifier::kDoNotCare) {
     // Can be a specific value, or kFormatModifierDoNotCare
     result.pixel_format_modifier = b.pixel_format_modifier;
   }
@@ -318,8 +318,8 @@ fit::result<zx_status_t, bool> IsColorSpaceArrayDoNotCare(
                                      b.pixel_format == fuchsia_images2::PixelFormat::kDoNotCare;
   bool is_pixel_format_and_modifier_combineable =
       a.pixel_format_modifier == b.pixel_format_modifier ||
-      a.pixel_format_modifier == fuchsia_images2::kFormatModifierDoNotCare ||
-      b.pixel_format_modifier == fuchsia_images2::kFormatModifierDoNotCare;
+      a.pixel_format_modifier == fuchsia_images2::PixelFormatModifier::kDoNotCare ||
+      b.pixel_format_modifier == fuchsia_images2::PixelFormatModifier::kDoNotCare;
   if (!is_pixel_format_combineable || !is_pixel_format_and_modifier_combineable) {
     return false;
   }
@@ -421,7 +421,7 @@ fit::result<zx_status_t, bool> IsColorSpaceArrayDoNotCare(
           LOG(INFO,
               "omitting DoNotCare fanout format because zero remaining color spaces supported with format: %u 0x%" PRIx64,
               static_cast<uint32_t>(combined_pixel_format_and_modifier.pixel_format),
-              combined_pixel_format_and_modifier.pixel_format_modifier);
+              fidl::ToUnderlying(combined_pixel_format_and_modifier.pixel_format_modifier));
           continue;
         }
       }
@@ -2551,7 +2551,9 @@ bool LogicalBufferCollection::CheckSanitizeBufferCollectionConstraints(
                 "per-PixelFormat, at least one participant must specify ColorSpaceType != "
                 "kDoNotCare - removing: pixel_format: %u pixel_format_modifier: 0x%" PRIx64,
                 *ifc.pixel_format(),
-                ifc.pixel_format_modifier().has_value() ? *ifc.pixel_format_modifier() : 0ull);
+                ifc.pixel_format_modifier().has_value()
+                    ? fidl::ToUnderlying(*ifc.pixel_format_modifier())
+                    : 0ull);
 
         // Remove by moving down last PixelFormat to this index and processing this index again,
         // if this isn't already the last PixelFormat.
@@ -2617,9 +2619,9 @@ bool LogicalBufferCollection::CheckSanitizeBufferCollectionConstraints(
           // Printing all four values is a bit redundant but perhaps more convincing.
           LogError(FROM_HERE, "image formats are identical: %u 0x%" PRIx64 " and %u 0x%" PRIx64,
                    static_cast<uint32_t>(i_pixel_format_and_modifier.pixel_format),
-                   i_pixel_format_and_modifier.pixel_format_modifier,
+                   fidl::ToUnderlying(i_pixel_format_and_modifier.pixel_format_modifier),
                    static_cast<uint32_t>(j_pixel_format_and_modifier.pixel_format),
-                   j_pixel_format_and_modifier.pixel_format_modifier);
+                   fidl::ToUnderlying(j_pixel_format_and_modifier.pixel_format_modifier));
           return false;
         }
 
@@ -2651,9 +2653,9 @@ bool LogicalBufferCollection::CheckSanitizeBufferCollectionConstraints(
               "not permitted for two formats from the same participant to be combine-able: %u 0x%" PRIx64
               " and %u 0x%" PRIx64,
               static_cast<uint32_t>(i_pixel_format_and_modifier.pixel_format),
-              i_pixel_format_and_modifier.pixel_format_modifier,
+              fidl::ToUnderlying(i_pixel_format_and_modifier.pixel_format_modifier),
               static_cast<uint32_t>(j_pixel_format_and_modifier.pixel_format),
-              j_pixel_format_and_modifier.pixel_format_modifier);
+              fidl::ToUnderlying(j_pixel_format_and_modifier.pixel_format_modifier));
           return false;
         }
       }
@@ -2715,7 +2717,7 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
     return false;
   }
 
-  if (*constraints.pixel_format_modifier() == fuchsia_images2::kFormatModifierInvalid) {
+  if (*constraints.pixel_format_modifier() == fuchsia_images2::PixelFormatModifier::kInvalid) {
     // kFormatModifierInvalid not allowed; see kFormatModifierDoNotCare if that is the intent.
     LogError(FROM_HERE, "pixel_format_modifier kFormatModifierInvalid not allowed");
     return false;
@@ -2771,7 +2773,7 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
       LogError(FROM_HERE,
                "Unsupported pixel format - pixel_format: %u pixel_format_modifier: 0x%" PRIx64,
                static_cast<uint32_t>(pixel_format_and_modifier.pixel_format),
-               pixel_format_and_modifier.pixel_format_modifier);
+               fidl::ToUnderlying(pixel_format_and_modifier.pixel_format_modifier));
       return false;
     }
     if (constraints.min_size()->width() > 0) {
@@ -2900,7 +2902,7 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
                  "color_space: %u pixel_format: %u pixel_format_modifier: 0x%" PRIx64,
                  sysmem::fidl_underlying_cast(color_space),
                  sysmem::fidl_underlying_cast(*constraints.pixel_format()),
-                 *constraints.pixel_format_modifier());
+                 fidl::ToUnderlying(*constraints.pixel_format_modifier()));
         return false;
       }
     }
@@ -3711,8 +3713,9 @@ LogicalBufferCollection::Allocate(const fuchsia_sysmem2::BufferCollectionConstra
                              sysmem::fidl_underlying_cast(*image_format_constraints.pixel_format()),
                              &vmo_properties_);
     if (image_format_constraints.pixel_format_modifier().has_value()) {
-      inspect_node_.CreateUint("pixel_format_modifier",
-                               *image_format_constraints.pixel_format_modifier(), &vmo_properties_);
+      inspect_node_.CreateUint(
+          "pixel_format_modifier",
+          fidl::ToUnderlying(*image_format_constraints.pixel_format_modifier()), &vmo_properties_);
     }
     if (image_format_constraints.min_size()->width() > 0) {
       inspect_node_.CreateUint("min_size_width", image_format_constraints.min_size()->width(),
@@ -3947,7 +3950,8 @@ int32_t LogicalBufferCollection::CompareImageFormatConstraintsTieBreaker(
   }
 
   if (a.pixel_format_modifier().has_value() && b.pixel_format_modifier().has_value()) {
-    result = clamp_difference(*a.pixel_format_modifier(), *b.pixel_format_modifier());
+    result = clamp_difference(fidl::ToUnderlying(*a.pixel_format_modifier()),
+                              fidl::ToUnderlying(*b.pixel_format_modifier()));
   }
 
   return result;
@@ -4580,17 +4584,17 @@ bool LogicalBufferCollection::FlattenPixelFormatAndModifiers(
         // pixel_format kDoNotCare and un-set pixel_format_modifier implies
         // kFormatModifierDoNotCare. A client that wants to constrain pixel_format_modifier can set
         // the pixel_format_modifier field.
-        FIELD_DEFAULT(ifc, pixel_format_modifier, fuchsia_images2::kFormatModifierDoNotCare);
+        FIELD_DEFAULT(ifc, pixel_format_modifier, fuchsia_images2::PixelFormatModifier::kDoNotCare);
       } else if (IsAnyUsage(buffer_usage)) {
         // When pixel_format != kDoNotCare, kFormatModifierNone / kFormatModifierLinear is the
         // default when there is any usage. A client with usage which doesn't care what the pixel
         // format modifier is (what tiling is used) can explicitly specify kFormatModifierDoNotCare
         // instead of leaving pixel_format_modifier un-set..
-        FIELD_DEFAULT_ZERO_64_BIT(ifc, pixel_format_modifier);
+        FIELD_DEFAULT(ifc, pixel_format_modifier, fuchsia_images2::PixelFormatModifier::kLinear);
       } else {
         // A client with no usage, which also doesn't set pixel_format_modifier, doesn't prevent
         // using a tiled format.
-        FIELD_DEFAULT(ifc, pixel_format_modifier, fuchsia_images2::kFormatModifierDoNotCare);
+        FIELD_DEFAULT(ifc, pixel_format_modifier, fuchsia_images2::PixelFormatModifier::kDoNotCare);
       }
     }
 

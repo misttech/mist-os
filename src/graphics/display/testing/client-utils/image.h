@@ -37,7 +37,8 @@ class Image {
 
   static Image* Create(const fidl::WireSyncClient<fuchsia_hardware_display::Coordinator>& dc,
                        uint32_t width, uint32_t height, fuchsia_images2::wire::PixelFormat format,
-                       Pattern pattern, uint32_t fg_color, uint32_t bg_color, uint64_t modifier);
+                       Pattern pattern, uint32_t fg_color, uint32_t bg_color,
+                       fuchsia_images2::wire::PixelFormatModifier modifier);
 
   void Render(int32_t prev_step, int32_t step_num);
 
@@ -46,7 +47,7 @@ class Image {
   uint32_t height() { return height_; }
   uint32_t stride() { return stride_; }
   fuchsia_images2::wire::PixelFormat format() { return format_; }
-  uint64_t modifier() const { return modifier_; }
+  fuchsia_images2::wire::PixelFormatModifier modifier() const { return modifier_; }
 
   void GetConfig(fuchsia_hardware_display_types::wire::ImageConfig* config_out) const;
   bool Import(const fidl::WireSyncClient<fuchsia_hardware_display::Coordinator>& dc,
@@ -55,7 +56,7 @@ class Image {
  private:
   Image(uint32_t width, uint32_t height, int32_t stride, fuchsia_images2::wire::PixelFormat format,
         display::BufferCollectionId buffer_collection_id, void* buf, Pattern pattern,
-        uint32_t fg_color, uint32_t bg_color, uint64_t modifier);
+        uint32_t fg_color, uint32_t bg_color, fuchsia_images2::wire::PixelFormatModifier modifier);
 
   void RenderNv12(int32_t prev_step, int32_t step_num);
 
@@ -76,7 +77,7 @@ class Image {
   const Pattern pattern_;
   uint32_t fg_color_;
   uint32_t bg_color_;
-  uint64_t modifier_;
+  fuchsia_images2::PixelFormatModifier modifier_;
 };
 
 }  // namespace display_test

@@ -37,34 +37,70 @@ struct PixelFormatAndModifier {
   // Inits fields to zero when default-constructed.
   PixelFormatAndModifier()
       : pixel_format(fuchsia_images2::PixelFormat::kInvalid),
-        pixel_format_modifier(fuchsia_images2::kFormatModifierNone) {
-    static_assert(fuchsia_images2::kFormatModifierLinear == fuchsia_images2::kFormatModifierNone);
+        pixel_format_modifier(
+#if __Fuchsia_API_level__ >= 19
+            fuchsia_images2::PixelFormatModifier::kLinear
+#else
+            fuchsia_images2::kFormatModifierLinear
+#endif
+        ) {
   }
   PixelFormatAndModifier(fuchsia_images2::PixelFormat pixel_format_param,
-                         uint64_t pixel_format_modifier_param)
-      : pixel_format(pixel_format_param), pixel_format_modifier(pixel_format_modifier_param) {}
+#if __Fuchsia_API_level__ >= 19
+                         fuchsia_images2::PixelFormatModifier
+#else
+                         uint64_t
+#endif
+                             pixel_format_modifier_param)
+      : pixel_format(pixel_format_param), pixel_format_modifier(pixel_format_modifier_param) {
+  }
 
   fuchsia_images2::PixelFormat pixel_format;
-  uint64_t pixel_format_modifier;
+#if __Fuchsia_API_level__ >= 19
+  fuchsia_images2::PixelFormatModifier
+#else
+  uint64_t
+#endif
+      pixel_format_modifier;
 };
 
 inline PixelFormatAndModifier PixelFormatAndModifierFromConstraints(
     const fuchsia_sysmem2::ImageFormatConstraints& constraints) {
   ZX_ASSERT(constraints.pixel_format().has_value());
-  static_assert(fuchsia_images2::kFormatModifierLinear == fuchsia_images2::kFormatModifierNone);
-  uint64_t pixel_format_modifier = constraints.pixel_format_modifier().has_value()
-                                       ? *constraints.pixel_format_modifier()
-                                       : fuchsia_images2::kFormatModifierNone;
+#if __Fuchsia_API_level__ >= 19
+  fuchsia_images2::PixelFormatModifier
+#else
+  uint64_t
+#endif
+      pixel_format_modifier = constraints.pixel_format_modifier().has_value()
+                                  ? *constraints.pixel_format_modifier()
+                                  :
+#if __Fuchsia_API_level__ >= 19
+                                  fuchsia_images2::PixelFormatModifier::kLinear
+#else
+                                  fuchsia_images2::kFormatModifierLinear
+#endif
+      ;
   return PixelFormatAndModifier(*constraints.pixel_format(), pixel_format_modifier);
 }
 
 inline PixelFormatAndModifier PixelFormatAndModifierFromImageFormat(
     const fuchsia_images2::ImageFormat& image_format) {
   ZX_ASSERT(image_format.pixel_format().has_value());
-  static_assert(fuchsia_images2::kFormatModifierLinear == fuchsia_images2::kFormatModifierNone);
-  uint64_t pixel_format_modifier = image_format.pixel_format_modifier().has_value()
-                                       ? *image_format.pixel_format_modifier()
-                                       : fuchsia_images2::kFormatModifierNone;
+#if __Fuchsia_API_level__ >= 19
+  fuchsia_images2::PixelFormatModifier
+#else
+  uint64_t
+#endif
+      pixel_format_modifier = image_format.pixel_format_modifier().has_value()
+                                  ? *image_format.pixel_format_modifier()
+                                  :
+#if __Fuchsia_API_level__ >= 19
+                                  fuchsia_images2::PixelFormatModifier::kLinear
+#else
+                                  fuchsia_images2::kFormatModifierLinear
+#endif
+      ;
   return PixelFormatAndModifier(*image_format.pixel_format(), pixel_format_modifier);
 }
 
@@ -74,9 +110,9 @@ inline PixelFormatAndModifier PixelFormatAndModifierFromImageFormat(
   ZX_ASSERT(image_format.has_pixel_format());
   static_assert(fuchsia_images2::wire::kFormatModifierLinear ==
                 fuchsia_images2::wire::kFormatModifierNone);
-  uint64_t pixel_format_modifier = image_format.has_pixel_format_modifier()
-                                       ? image_format.pixel_format_modifier()
-                                       : fuchsia_images2::wire::kFormatModifierNone;
+  fuchsia_images2::PixelFormatModifier pixel_format_modifier =
+      image_format.has_pixel_format_modifier() ? image_format.pixel_format_modifier()
+                                               : fuchsia_images2::PixelFormatModifier::kLinear;
   return PixelFormatAndModifier(image_format.pixel_format(), pixel_format_modifier);
 }
 #endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
@@ -222,7 +258,8 @@ static_assert(2 == fidl_underlying_cast(static_cast<fuchsia_sysmem2::HeapType>(2
 [[nodiscard]] PixelFormatAndModifier V2CopyFromV1PixelFormat(
     const fuchsia_sysmem::wire::PixelFormat& v1);
 
-[[nodiscard]] uint64_t V2ConvertFromV1PixelFormatModifier(uint64_t v1_pixel_format_modifier);
+[[nodiscard]] fuchsia_images2::PixelFormatModifier V2ConvertFromV1PixelFormatModifier(
+    uint64_t v1_pixel_format_modifier);
 
 [[nodiscard]] fuchsia_images2::ColorSpace V2CopyFromV1ColorSpace(
     const fuchsia_sysmem::ColorSpace& v1);
@@ -315,7 +352,8 @@ V1CopyFromV2BufferMemorySettings(const fuchsia_sysmem2::wire::BufferMemorySettin
 [[nodiscard]] fuchsia_sysmem::PixelFormatType V1CopyFromV2PixelFormatType(
     const fuchsia_images2::PixelFormat& v2);
 
-[[nodiscard]] uint64_t V1ConvertFromV2PixelFormatModifier(uint64_t v2_pixel_format_modifier);
+[[nodiscard]] uint64_t V1ConvertFromV2PixelFormatModifier(
+    fuchsia_images2::PixelFormatModifier v2_pixel_format_modifier);
 
 [[nodiscard]] fuchsia_sysmem::ColorSpace V1CopyFromV2ColorSpace(
     const fuchsia_images2::ColorSpace& v2);

@@ -90,13 +90,14 @@ struct PlatformCostsEntry {
   const std::list<const UsagePixelFormatCostEntry>& costs;
 };
 
-static void AddRgbaPixelFormat(fidl::AnyArena& allocator, uint64_t format_modifier, double cost,
+static void AddRgbaPixelFormat(fidl::AnyArena& allocator,
+                               fuchsia_images2::PixelFormatModifier format_modifier, double cost,
                                std::list<const UsagePixelFormatCostEntry>& result) {
   // Both RGBA and BGRA versions have similar cost, if they're supported.
   for (auto format :
        {fuchsia_images2::PixelFormat::kB8G8R8A8, fuchsia_images2::PixelFormat::kR8G8B8A8}) {
     fuchsia_images2::PixelFormat pixel_format = format;
-    uint64_t pixel_format_modifier = format_modifier;
+    fuchsia_images2::PixelFormatModifier pixel_format_modifier = format_modifier;
     fuchsia_sysmem2::BufferUsage buffer_usage;
     buffer_usage.none().emplace(0u);
     buffer_usage.cpu().emplace(0u);
@@ -133,37 +134,39 @@ const std::list<const UsagePixelFormatCostEntry> kArm_Mali_Cost_Entries = [] {
   constexpr double kNonTeCost = 2000.0;
   // Non-16X16 can have large advantages for the display, but it's much worse for the GPU.
   constexpr double kNon16X16Cost = 4000.0;
-  uint64_t modifiers[] = {
-      fuchsia_images2::kFormatModifierArmAfbc16X16SplitBlockSparseYuvTeTiledHeader,
-      fuchsia_images2::kFormatModifierArmAfbc16X16Te,
-      fuchsia_images2::kFormatModifierArmAfbc32X8Te,
-      fuchsia_images2::kFormatModifierArmAfbc16X16SplitBlockSparseYuvTe,
-      fuchsia_images2::kFormatModifierArmAfbc16X16SplitBlockSparseYuvTiledHeader,
-      fuchsia_images2::kFormatModifierArmAfbc16X16SplitBlockSparseYuv,
-      fuchsia_images2::kFormatModifierArmAfbc16X16YuvTiledHeader,
-      fuchsia_images2::kFormatModifierArmAfbc16X16,
-      fuchsia_images2::kFormatModifierArmAfbc32X8};
+  fuchsia_images2::PixelFormatModifier modifiers[] = {
+      fuchsia_images2::PixelFormatModifier::kArmAfbc16X16SplitBlockSparseYuvTeTiledHeader,
+      fuchsia_images2::PixelFormatModifier::kArmAfbc16X16Te,
+      fuchsia_images2::PixelFormatModifier::kArmAfbc32X8Te,
+      fuchsia_images2::PixelFormatModifier::kArmAfbc16X16SplitBlockSparseYuvTe,
+      fuchsia_images2::PixelFormatModifier::kArmAfbc16X16SplitBlockSparseYuvTiledHeader,
+      fuchsia_images2::PixelFormatModifier::kArmAfbc16X16SplitBlockSparseYuv,
+      fuchsia_images2::PixelFormatModifier::kArmAfbc16X16YuvTiledHeader,
+      fuchsia_images2::PixelFormatModifier::kArmAfbc16X16,
+      fuchsia_images2::PixelFormatModifier::kArmAfbc32X8};
   for (auto modifier : modifiers) {
     double cost = 0.0;
-    if (!(modifier & fuchsia_images2::kFormatModifierArmYuvBit))
+    uint64_t modifier_as_bits = fidl::ToUnderlying(modifier);
+    if (!(modifier_as_bits & fuchsia_images2::kFormatModifierArmYuvBit))
       cost += kNonYuvCost;
-    if (!(modifier & fuchsia_images2::kFormatModifierArmTiledHeaderBit))
+    if (!(modifier_as_bits & fuchsia_images2::kFormatModifierArmTiledHeaderBit))
       cost += kNonTiledHeaderCost;
-    if (modifier & fuchsia_images2::kFormatModifierArmTiledHeaderBit)
+    if (modifier_as_bits & fuchsia_images2::kFormatModifierArmTiledHeaderBit)
       cost += kSplitCost;
-    if (!(modifier & fuchsia_images2::kFormatModifierArmSparseBit))
+    if (!(modifier_as_bits & fuchsia_images2::kFormatModifierArmSparseBit))
       cost += kNonSparseCost;
-    if (!(modifier & fuchsia_images2::kFormatModifierArmTeBit))
+    if (!(modifier_as_bits & fuchsia_images2::kFormatModifierArmTeBit))
       cost += kNonTeCost;
 
     constexpr uint64_t kAfbcTypeMask = 0xf;
-    if ((modifier & kAfbcTypeMask) !=
+    if ((modifier_as_bits & kAfbcTypeMask) !=
         (fuchsia_images2::kFormatModifierArmAfbc16X16 & kAfbcTypeMask))
       cost += kNon16X16Cost;
     AddRgbaPixelFormat(allocator, modifier, cost, result);
   }
   // Should be higher cost than all AFBC formats.
-  AddRgbaPixelFormat(allocator, fuchsia_images2::kFormatModifierArmLinearTe, 30000.0, result);
+  AddRgbaPixelFormat(allocator, fuchsia_images2::PixelFormatModifier::kArmLinearTe, 30000.0,
+                     result);
   return result;
 }();
 
@@ -186,7 +189,7 @@ const std::list<const UsagePixelFormatCostEntry> kAmlogic_Generic_Cost_Entries =
   buffer_usage.video().emplace(fuchsia_sysmem2::kVideoUsageHwDecoder);
   result.emplace_back(UsagePixelFormatCostEntry{
       .pixel_format_and_modifier =
-          PixelFormatAndModifier(pixel_format, fuchsia_images2::kFormatModifierNone),
+          PixelFormatAndModifier(pixel_format, fuchsia_images2::PixelFormatModifier::kLinear),
       .required_buffer_usage_bits = std::move(buffer_usage),
       .cost = 100.0L,
   });
@@ -196,11 +199,16 @@ const std::list<const UsagePixelFormatCostEntry> kAmlogic_Generic_Cost_Entries =
 // These costs are expected to be true on every platform.
 const std::list<const UsagePixelFormatCostEntry> kGeneric_Cost_Entries = [] {
   std::list<const UsagePixelFormatCostEntry> result;
-  AddRgbaPixelFormat(allocator, fuchsia_images2::kFormatModifierIntelI915YfTiledCcs, 500.0, result);
-  AddRgbaPixelFormat(allocator, fuchsia_images2::kFormatModifierIntelI915YTiledCcs, 600.0, result);
-  AddRgbaPixelFormat(allocator, fuchsia_images2::kFormatModifierIntelI915YfTiled, 1000.0, result);
-  AddRgbaPixelFormat(allocator, fuchsia_images2::kFormatModifierIntelI915YTiled, 2000.0, result);
-  AddRgbaPixelFormat(allocator, fuchsia_images2::kFormatModifierIntelI915XTiled, 3000.0, result);
+  AddRgbaPixelFormat(allocator, fuchsia_images2::PixelFormatModifier::kIntelI915YfTiledCcs, 500.0,
+                     result);
+  AddRgbaPixelFormat(allocator, fuchsia_images2::PixelFormatModifier::kIntelI915YTiledCcs, 600.0,
+                     result);
+  AddRgbaPixelFormat(allocator, fuchsia_images2::PixelFormatModifier::kIntelI915YfTiled, 1000.0,
+                     result);
+  AddRgbaPixelFormat(allocator, fuchsia_images2::PixelFormatModifier::kIntelI915YTiled, 2000.0,
+                     result);
+  AddRgbaPixelFormat(allocator, fuchsia_images2::PixelFormatModifier::kIntelI915XTiled, 3000.0,
+                     result);
   // LOG(INFO, "usage_pixel_format_cost.cc - allocator.debug_needed_buffer_size(): %zu",
   //    allocator.inner_allocator().debug_needed_buffer_size());
   return result;

@@ -22,7 +22,15 @@ type ImageFormat = table {
     1: pixel_format PixelFormat;
 
     /// Vendor-specific pixel format modifier. See format_modifier.fidl.
+    //
+    // Re. changing the type, in this particular case we'll change any impacted
+    // client code that needs to compile with < 19 and >= 19 SDK to make sure it
+    // compiles either way. The old/new types are wire compatible and there's no
+    // change to any defined/permitted values.
+    @available(added=12, replaced=19)
     2: pixel_format_modifier uint64;
+    @available(added=19)
+    2: pixel_format_modifier PixelFormatModifier;
 
     /// Indicates the color space used to interpret pixel values.
     3: color_space ColorSpace;
