@@ -4,8 +4,8 @@
 # found in the LICENSE file.
 """Mobly test for Tracing affordance."""
 
-import logging
 import json
+import logging
 import os
 import subprocess
 import tempfile
@@ -93,7 +93,7 @@ class TracingAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
             ps = subprocess.Popen(
                 [TRACE2JSON], stdin=subprocess.PIPE, stdout=subprocess.PIPE
             )
-            trace_data: bytes = []
+            trace_data: bytes = bytes([])
             with open(res, "rb") as trace_file:
                 trace_data = trace_file.read()
             js, _ = ps.communicate(input=trace_data)
@@ -104,7 +104,6 @@ class TracingAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
                 js_obj.get("traceEvents") is not None,
                 "Expected traceEvents to be present",
             )
-            kernel_syscall_found = False
             # The general schema of the trace file looks like:
             #
             # {

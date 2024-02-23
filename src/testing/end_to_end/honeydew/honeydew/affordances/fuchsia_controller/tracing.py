@@ -12,7 +12,6 @@ from datetime import datetime
 import fidl.fuchsia_tracing as f_tracing
 import fidl.fuchsia_tracing_controller as f_tracingcontroller
 import fuchsia_controller_py as fc
-
 from fidl import AsyncSocket
 
 from honeydew import errors
