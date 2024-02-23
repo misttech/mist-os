@@ -675,8 +675,11 @@ void ConsoleContext::DidCreateProcess(Process* process, uint64_t timestamp) {
       out.Append("Launched ");
       break;
   }
-  out.Append(FormatTarget(this, process->GetTarget()));
-  Console::get()->Output(out);
+
+  if (GetConsoleMode() == ClientSettings::System::kConsoleMode_Shell) {
+    out.Append(FormatTarget(this, process->GetTarget()));
+    Console::get()->Output(out);
+  }
 }
 
 void ConsoleContext::DidLoadAllModuleSymbols(Process* process) {
@@ -721,12 +724,17 @@ void ConsoleContext::WillDestroyProcess(Process* process, DestroyReason reason, 
       break;
   }
 
+  if (GetConsoleMode() == ClientSettings::System::kConsoleMode_Shell)
+    console->Output(msg);
+
   MaybeReturnToEmbeddedMode(process);
-  console->Output(msg);
 }
 
 void ConsoleContext::WillLoadModuleSymbols(Process* process, int num_modules) {
   if (!process)
+    return;
+
+  if (GetConsoleMode() != ClientSettings::System::kConsoleMode_Shell)
     return;
 
   Console* console = Console::get();
