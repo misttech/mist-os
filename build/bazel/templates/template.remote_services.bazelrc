@@ -16,22 +16,30 @@ build:remote --google_default_credentials=true
 # Only accept outputs from remote execution on the back-end (remote workers).
 build:remote --noremote_upload_local_results
 
+# Build event protocol (BEP) streaming
+build:_bes_common --google_auth_scopes=https://www.googleapis.com/auth/cloud-platform
+build:_bes_common --google_default_credentials=true
+build:_bes_common --bes_instance_name={rbe_project}
+build:_bes_common --bes_header=X-Goog-User-Project={rbe_project}
+build:_bes_common --bes_keywords=fuchsia
+
 # Setup sponge (go/sponge-bazel)
-build:sponge --bes_backend=buildeventservice-pa.googleapis.com
-build:sponge --google_auth_scopes=https://www.googleapis.com/auth/cloud-platform
-build:sponge --google_default_credentials=true
-build:sponge --bes_instance_name={rbe_project}
-build:sponge --bes_header=X-Goog-User-Project={rbe_project}
-build:sponge --bes_results_url=http://sponge2/
-build:sponge --bes_keywords=fuchsia
+build:_sponge --config=_bes_common
+build:_sponge --bes_backend=buildeventservice-pa.googleapis.com
+build:_sponge --bes_results_url=http://sponge2/
+
+# This variant is suitable for developers.
+build:sponge --config=_sponge
+# This variant is suitable for infra.
+build:sponge_infra --config=_sponge
 
 # Setup ResultStore
-build:resultstore --bes_backend=buildeventservice.googleapis.com
-build:resultstore --google_auth_scopes=https://www.googleapis.com/auth/cloud-platform
-build:resultstore --google_default_credentials=true
-build:resultstore --bes_instance_name={rbe_project}
-build:resultstore --bes_header=X-Goog-User-Project={rbe_project}
-build:resultstore --bes_results_url=https://source.cloud.google.com/results/invocations/
-build:resultstore --bes_keywords=fuchsia
-build:resultstore --remote_instance_name=projects/{rbe_project}/instances/default
+build:_resultstore --config=_bes_common
+build:_resultstore --bes_backend=buildeventservice.googleapis.com
+build:_resultstore --bes_results_url=https://source.cloud.google.com/results/invocations/
+build:_resultstore --remote_instance_name=projects/{rbe_project}/instances/default
 
+# This variant is suitable for developers.
+build:resultstore --config=_resultstore
+# This variant is suitable for infra.
+build:resultstore_infra --config=_resultstore
