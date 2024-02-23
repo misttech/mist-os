@@ -18,8 +18,6 @@ product_assembly_configuration("minimal") {
       # minimal is headless, so ostensibly does not need fonts.
       enabled = false
     }
-    setui = {
-    }
     ui = {
       supported_input_devices = [
         "button",

@@ -8,13 +8,14 @@ use assembly_config_schema::platform_config::setui_config::{ICUType, SetUiConfig
 use assembly_util::FileEntry;
 
 pub(crate) struct SetUiSubsystem;
-impl DefineSubsystemConfiguration<Option<SetUiConfig>> for SetUiSubsystem {
+impl DefineSubsystemConfiguration<SetUiConfig> for SetUiSubsystem {
     fn define_configuration(
-        _: &ConfigurationContext<'_>,
-        config: &Option<SetUiConfig>,
+        context: &ConfigurationContext<'_>,
+        config: &SetUiConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> Result<()> {
-        if let Some(ref config) = config {
+        // setui is always added to Standard feature set level system.
+        if *context.feature_set_level == FeatureSupportLevel::Standard {
             let bundle_name = if config.with_camera { "setui_with_camera" } else { "setui" };
             match config.use_icu {
                 ICUType::Flavored => {

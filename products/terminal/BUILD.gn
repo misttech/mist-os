@@ -68,9 +68,6 @@ product_assembly_configuration("terminal") {
       }
     }
 
-    setui = {
-    }
-
     fonts = {
       # See base_packages below.
       font_collection = "open-fonts-collection"

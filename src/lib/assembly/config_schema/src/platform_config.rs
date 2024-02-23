@@ -153,8 +153,9 @@ pub struct PlatformConfig {
 
     /// SetUi configuration.
     ///
-    /// If not specified, SetUI is not added to the platform config.
-    pub setui: Option<setui_config::SetUiConfig>,
+    /// SetUI is added to the platform config on all Standard systems.
+    #[serde(default)]
+    pub setui: setui_config::SetUiConfig,
 
     /// Assembly option triggering the inclusion of test AIBs
     ///
