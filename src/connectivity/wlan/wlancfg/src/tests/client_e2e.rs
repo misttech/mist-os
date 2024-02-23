@@ -544,6 +544,12 @@ fn prepare_client_interface(
         }
     );
 
+    // Ensure the disconnect is fully processed by our state machine
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+
     // Check for a response to the Policy API start client connections request
     let start_connections_resp = run_while(
         exec,
@@ -597,7 +603,9 @@ fn get_client_state_update<BackgroundFut>(
 ) -> fidl_policy::ClientStateSummary
 where
     BackgroundFut: Future + Unpin,
+    <BackgroundFut as futures::Future>::Output: std::fmt::Debug,
 {
+    // Get the next update
     let next_update_req = run_while(exec, background_tasks, client_listener_update_requests.next());
     let update_request = assert_variant!(
         next_update_req,
@@ -606,7 +614,11 @@ where
         }
     );
     let (update, responder) = update_request.into_on_client_state_update().unwrap();
+
+    // Send ack and ensure it is processed
     let _ = responder.send();
+    assert_variant!(exec.run_until_stalled(background_tasks), Poll::Pending);
+
     update
 }
 
@@ -934,7 +946,6 @@ fn test_save_and_connect(
 #[test_case(Saved::Wpa3, Scanned::Wpa2PersonalTkipOnly, TEST_CREDS.wpa_pass_max.clone())]
 #[fuchsia::test(add_test_attr = false)]
 /// Tests saving and connecting across various security types, where the connection is expected to fail
-#[ignore] // TODO(https://fxbug.dev/324986229): Fix ordering issue
 fn test_save_and_fail_to_connect(
     saved_security: fidl_policy::SecurityType,
     scanned_security: fidl_sme::Protection,
@@ -1112,7 +1123,6 @@ fn test_fail_to_save(
 
 // Tests the connect request path to a new network while already connected.
 #[fuchsia::test]
-#[ignore] // TODO(https://fxbug.dev/324986229): Fix ordering issue
 fn test_connect_to_new_network() {
     let mut exec = fasync::TestExecutor::new();
     let mut test_values = test_setup(&mut exec);
