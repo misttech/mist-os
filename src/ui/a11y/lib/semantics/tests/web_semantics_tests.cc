@@ -190,6 +190,7 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::kernel::RootJobForInspect::Name_},
                                         Protocol{fuchsia::kernel::Stats::Name_},
                                         Protocol{fuchsia::scheduler::ProfileProvider::Name_},
+                                        Protocol{fuchsia::scheduler::RoleManager::Name_},
                                         Protocol{fuchsia::tracing::provider::Registry::Name_}},
                        .source = ParentRef(),
                        .targets = {ChildRef{kMemoryPressureProvider}}});
