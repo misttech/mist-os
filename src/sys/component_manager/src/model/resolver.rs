@@ -258,7 +258,9 @@ mod tests {
                 decl: cm_rust::ComponentDecl::default(),
                 package: None,
                 config_values: None,
-                abi_revision: Some(version_history::LATEST_VERSION.abi_revision.clone()),
+                abi_revision: Some(
+                    version_history::HISTORY.get_example_supported_version_for_tests().abi_revision,
+                ),
             })
         }
     }
@@ -344,7 +346,9 @@ mod tests {
                 decl: cm_rust::ComponentDecl::default(),
                 package: None,
                 config_values: None,
-                abi_revision: Some(version_history::LATEST_VERSION.abi_revision.clone()),
+                abi_revision: Some(
+                    version_history::HISTORY.get_example_supported_version_for_tests().abi_revision,
+                ),
             })
         }
     }

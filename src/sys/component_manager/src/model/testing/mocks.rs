@@ -118,7 +118,9 @@ impl MockResolver {
             decl: decl.clone(),
             package: Some(ResolvedPackage { url: "pkg".to_string(), directory: client }),
             config_values,
-            abi_revision: Some(version_history::LATEST_VERSION.abi_revision.clone()),
+            abi_revision: Some(
+                version_history::HISTORY.get_example_supported_version_for_tests().abi_revision,
+            ),
         })
     }
 

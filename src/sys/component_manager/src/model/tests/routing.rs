@@ -2174,7 +2174,10 @@ async fn use_resolver_from_parent_environment() {
                                 // this test only resolves one component_url
                                 resolution_context: None,
                                 abi_revision: Some(
-                                    version_history::LATEST_VERSION.abi_revision.into(),
+                                    version_history::HISTORY
+                                        .get_example_supported_version_for_tests()
+                                        .abi_revision
+                                        .into(),
                                 ),
                                 ..Default::default()
                             }))
@@ -2274,7 +2277,10 @@ async fn use_resolver_from_grandparent_environment() {
                                 // this test only resolves one component_url
                                 resolution_context: None,
                                 abi_revision: Some(
-                                    version_history::LATEST_VERSION.abi_revision.into(),
+                                    version_history::HISTORY
+                                        .get_example_supported_version_for_tests()
+                                        .abi_revision
+                                        .into(),
                                 ),
                                 ..Default::default()
                             }))
@@ -2378,7 +2384,10 @@ async fn resolver_is_not_available() {
                                 // this test only resolves one component_url
                                 resolution_context: None,
                                 abi_revision: Some(
-                                    version_history::LATEST_VERSION.abi_revision.into(),
+                                    version_history::HISTORY
+                                        .get_example_supported_version_for_tests()
+                                        .abi_revision
+                                        .into(),
                                 ),
                                 ..Default::default()
                             }))
@@ -2488,7 +2497,10 @@ async fn resolver_component_decl_is_validated() {
                                 // this test only resolves one component_url
                                 resolution_context: None,
                                 abi_revision: Some(
-                                    version_history::LATEST_VERSION.abi_revision.into(),
+                                    version_history::HISTORY
+                                        .get_example_supported_version_for_tests()
+                                        .abi_revision
+                                        .into(),
                                 ),
                                 ..Default::default()
                             }))

@@ -44,8 +44,9 @@ impl Resolver for BuiltinResolver {
         }?;
         let decl = resolver::read_and_validate_manifest_bytes(cm)?;
 
-        // Unpackaged components built into component_manager are assigned the latest abi revision.
-        let abi_revision = version_history::get_latest_abi_revision();
+        // Unpackaged components built into component_manager are assigned the
+        // platform abi revision.
+        let abi_revision = version_history::HISTORY.get_abi_revision_for_platform_components();
 
         Ok(ResolvedComponent {
             resolved_by: SCHEME.to_string(),

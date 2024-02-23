@@ -22,7 +22,7 @@ use {
     },
     thiserror::Error,
     tracing::warn,
-    version_history::{check_abi_revision, AbiRevision, AbiRevisionError},
+    version_history::{AbiRevision, AbiRevisionError, VersionHistory},
 };
 
 /// Runtime configuration options.
@@ -341,6 +341,14 @@ pub enum CapabilityAllowlistSource {
     Void,
 }
 
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
+pub enum CompatibilityCheckError {
+    #[error("Component did not present an ABI revision")]
+    AbiRevisionAbsent,
+    #[error(transparent)]
+    AbiRevisionInvalid(#[from] AbiRevisionError),
+}
+
 /// The enforcement and validation policy to apply to component target ABI revisions.
 /// Defaults to `AllowAll`
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -370,10 +378,22 @@ impl AbiRevisionPolicy {
     /// ABI revision is missing or not supported by the platform.
     pub fn check_compatibility(
         &self,
+        version_history: &VersionHistory,
         moniker: &Moniker,
         abi_revision: Option<AbiRevision>,
-    ) -> Result<(), AbiRevisionError> {
-        let Err(abi_error) = check_abi_revision(abi_revision) else { return Ok(()) };
+    ) -> Result<(), CompatibilityCheckError> {
+        let Some(abi_revision) = abi_revision else {
+            return if let AbiRevisionPolicy::AllowAll = self {
+                warn!("Ignoring missing ABI revision in {} due to AllowAll policy.", moniker);
+                Ok(())
+            } else {
+                Err(CompatibilityCheckError::AbiRevisionAbsent)
+            };
+        };
+
+        let Err(abi_error) = version_history.check_abi_revision_for_runtime(abi_revision) else {
+            return Ok(());
+        };
 
         match self {
             AbiRevisionPolicy::AllowAll => {
@@ -383,17 +403,16 @@ impl AbiRevisionPolicy {
                 );
                 Ok(())
             }
-            AbiRevisionPolicy::EnforcePresenceOnly => match abi_error {
-                AbiRevisionError::Absent => Err(AbiRevisionError::Absent),
-                _ => {
-                    warn!(
-                        "Ignoring AbiRevisionError in {} due to EnforcePresenceOnly policy: {}",
-                        moniker, abi_error
-                    );
-                    Ok(())
-                }
-            },
-            AbiRevisionPolicy::EnforcePresenceAndCompatibility => Err(abi_error),
+            AbiRevisionPolicy::EnforcePresenceOnly => {
+                warn!(
+                    "Ignoring AbiRevisionError in {} due to EnforcePresenceOnly policy: {}",
+                    moniker, abi_error
+                );
+                Ok(())
+            }
+            AbiRevisionPolicy::EnforcePresenceAndCompatibility => {
+                Err(CompatibilityCheckError::AbiRevisionInvalid(abi_error))
+            }
         }
     }
 }
@@ -807,7 +826,13 @@ impl TryFrom<component_internal::SecurityPolicy> for SecurityPolicy {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, cm_types::ParseError, fidl_fuchsia_io as fio};
+    use {
+        super::*,
+        assert_matches::assert_matches,
+        cm_types::ParseError,
+        fidl_fuchsia_io as fio,
+        version_history::{ApiLevel, Version},
+    };
 
     const FOO_PKG_URL: &str = "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm";
 
@@ -1266,63 +1291,67 @@ mod tests {
 
     #[test]
     fn abi_revision_policy_check_compatibility() -> Result<(), Error> {
-        // This test assumes the platform does not support a u64::MAX ABI value
-        // and the first entry in VERSION_HISTORY is unsupported.
-        let unknown_abi = AbiRevision::from_u64(u64::MAX);
-        assert!(version_history::version_from_abi_revision(unknown_abi).is_none());
+        const UNKNOWN_ABI: AbiRevision = AbiRevision::from_u64(0x404);
+        const UNSUPPORTED_ABI: AbiRevision = AbiRevision::from_u64(0x15);
+        const SUPPORTED_ABI: AbiRevision = AbiRevision::from_u64(0x16);
 
-        let unsupported_version = version_history::VERSION_HISTORY[0].clone();
-        assert!(!unsupported_version.is_supported());
-
-        let supported_version = version_history::LATEST_VERSION.clone();
-        assert!(supported_version.is_supported());
+        const VERSIONS: &[Version] = &[
+            Version {
+                api_level: ApiLevel::from_u64(5),
+                abi_revision: UNSUPPORTED_ABI,
+                status: version_history::Status::Unsupported,
+            },
+            Version {
+                api_level: ApiLevel::from_u64(6),
+                abi_revision: SUPPORTED_ABI,
+                status: version_history::Status::Supported,
+            },
+        ];
+        let version_history = VersionHistory::new_for_testing(&VERSIONS);
 
         let test_scenarios = vec![
             (AbiRevisionPolicy::AllowAll, None, Ok(())),
-            (AbiRevisionPolicy::AllowAll, Some(unknown_abi), Ok(())),
-            (AbiRevisionPolicy::AllowAll, Some(unsupported_version.abi_revision), Ok(())),
-            (AbiRevisionPolicy::AllowAll, Some(supported_version.abi_revision), Ok(())),
-            (AbiRevisionPolicy::EnforcePresenceOnly, None, Err(AbiRevisionError::Absent)),
-            (AbiRevisionPolicy::EnforcePresenceOnly, Some(unknown_abi), Ok(())),
+            (AbiRevisionPolicy::AllowAll, Some(UNKNOWN_ABI), Ok(())),
+            (AbiRevisionPolicy::AllowAll, Some(UNSUPPORTED_ABI), Ok(())),
+            (AbiRevisionPolicy::AllowAll, Some(SUPPORTED_ABI), Ok(())),
             (
                 AbiRevisionPolicy::EnforcePresenceOnly,
-                Some(unsupported_version.abi_revision),
-                Ok(()),
+                None,
+                Err(CompatibilityCheckError::AbiRevisionAbsent),
             ),
-            (AbiRevisionPolicy::EnforcePresenceOnly, Some(supported_version.abi_revision), Ok(())),
+            (AbiRevisionPolicy::EnforcePresenceOnly, Some(UNKNOWN_ABI), Ok(())),
+            (AbiRevisionPolicy::EnforcePresenceOnly, Some(UNSUPPORTED_ABI), Ok(())),
+            (AbiRevisionPolicy::EnforcePresenceOnly, Some(SUPPORTED_ABI), Ok(())),
             (
                 AbiRevisionPolicy::EnforcePresenceAndCompatibility,
                 None,
-                Err(AbiRevisionError::Absent),
+                Err(CompatibilityCheckError::AbiRevisionAbsent),
             ),
             (
                 AbiRevisionPolicy::EnforcePresenceAndCompatibility,
-                Some(unknown_abi),
-                Err(AbiRevisionError::Unknown {
-                    abi_revision: unknown_abi,
-                    supported_versions: version_history::SUPPORTED_API_LEVELS.to_vec(),
-                }),
+                Some(UNKNOWN_ABI),
+                Err(CompatibilityCheckError::AbiRevisionInvalid(AbiRevisionError::Unknown {
+                    abi_revision: UNKNOWN_ABI,
+                    supported_versions: vec![VERSIONS[1].clone()],
+                })),
             ),
             (
                 AbiRevisionPolicy::EnforcePresenceAndCompatibility,
-                Some(unsupported_version.abi_revision),
-                Err(AbiRevisionError::Unsupported {
-                    version: unsupported_version,
-                    supported_versions: version_history::SUPPORTED_API_LEVELS.to_vec(),
-                }),
+                Some(UNSUPPORTED_ABI),
+                Err(CompatibilityCheckError::AbiRevisionInvalid(AbiRevisionError::Unsupported {
+                    version: VERSIONS[0].clone(),
+                    supported_versions: vec![VERSIONS[1].clone()],
+                })),
             ),
-            (
-                AbiRevisionPolicy::EnforcePresenceAndCompatibility,
-                Some(supported_version.abi_revision),
-                Ok(()),
-            ),
+            (AbiRevisionPolicy::EnforcePresenceAndCompatibility, Some(SUPPORTED_ABI), Ok(())),
         ];
         for (policy, abi, expected_res) in test_scenarios {
             println!(
                 "Test {:?} policy against the ABI revision {:?} produces {:?} result",
                 policy, abi, expected_res
             );
-            let res = policy.check_compatibility(&"/foo".try_into().unwrap(), abi);
+            let res =
+                policy.check_compatibility(&version_history, &"/foo".try_into().unwrap(), abi);
             assert_eq!(res, expected_res);
         }
         Ok(())

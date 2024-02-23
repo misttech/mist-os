@@ -4731,13 +4731,17 @@ mod tests {
         // Please see comment in `resolver::load_fragment_only_url()` for more information.
         let res = registry.resolve("realm-builder://0/a#meta/a.cm").await.unwrap();
         let abi_revision = res.abi_revision.expect("abi revision should be set in test package");
-        assert!(version_history::is_valid_abi_revision(abi_revision.into()));
+        version_history::HISTORY
+            .check_abi_revision_for_runtime(abi_revision.into())
+            .expect("ABI revision should be supported");
 
         // Exercise the code path for `resolver::load_absolute_url()`
         // load component 'b' identified by its absolute path
         let res = registry.resolve("realm-builder://1/b").await.unwrap();
         let abi_revision = res.abi_revision.expect("abi revision should be set in test package");
-        assert!(version_history::is_valid_abi_revision(abi_revision.into()));
+        version_history::HISTORY
+            .check_abi_revision_for_runtime(abi_revision.into())
+            .expect("ABI revision should be supported");
     }
 
     // TODO(https://fxbug.dev/42169660): The following test is impossible to write until sub-realms are supported

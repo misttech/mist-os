@@ -13,6 +13,7 @@ use {
         resolving::ResolverError,
     },
     clonable_error::ClonableError,
+    cm_config::CompatibilityCheckError,
     cm_moniker::{InstancedExtendedMoniker, InstancedMoniker},
     cm_rust::UseDecl,
     cm_types::Name,
@@ -21,7 +22,6 @@ use {
     sandbox::ConversionError,
     std::path::PathBuf,
     thiserror::Error,
-    version_history::AbiRevisionError,
 };
 
 /// Errors produced by `Model`.
@@ -519,7 +519,7 @@ pub enum ResolveActionError {
     AbiCompatibilityError {
         url: String,
         #[source]
-        err: AbiRevisionError,
+        err: CompatibilityCheckError,
     },
     #[error(transparent)]
     Policy(#[from] PolicyError),
