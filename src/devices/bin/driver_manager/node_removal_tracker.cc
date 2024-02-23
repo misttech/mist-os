@@ -9,7 +9,7 @@
 
 #include <src/devices/lib/log/log.h>
 
-namespace dfv2 {
+namespace driver_manager {
 
 namespace {
 
@@ -96,4 +96,4 @@ void NodeRemovalTracker::FinishEnumeration() {
   CheckRemovalDone();
 }
 
-}  // namespace dfv2
+}  // namespace driver_manager

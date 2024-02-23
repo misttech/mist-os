@@ -10,7 +10,7 @@ namespace fdd = fuchsia_driver_development;
 namespace fdi = fuchsia_driver_index;
 namespace fdl = fuchsia_driver_legacy;
 
-namespace dfv2 {
+namespace driver_manager {
 
 void BindNodeSet::StartNextBindProcess() {
   if (is_bind_ongoing_) {
@@ -354,7 +354,7 @@ zx::result<CompositeParents> BindManager::BindNodeToSpec(fidl::AnyArena& arena, 
   }
 
   for (auto& composite : result.value().completed_node_and_drivers) {
-    auto weak_composite_node = std::get<std::weak_ptr<dfv2::Node>>(composite.node);
+    auto weak_composite_node = std::get<std::weak_ptr<driver_manager::Node>>(composite.node);
     std::shared_ptr composite_node = weak_composite_node.lock();
     ZX_ASSERT(composite_node);
     auto start_result = bridge_->StartDriver(*composite_node, composite.driver.driver_info());
@@ -460,4 +460,4 @@ std::vector<fdd::wire::CompositeNodeInfo> BindManager::GetCompositeListInfo(
   return legacy_composite_manager_.GetCompositeListInfo(arena);
 }
 
-}  // namespace dfv2
+}  // namespace driver_manager

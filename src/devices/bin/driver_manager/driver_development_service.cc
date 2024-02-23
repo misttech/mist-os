@@ -24,7 +24,7 @@ namespace driver_manager {
 namespace {
 
 zx::result<fdd::wire::NodeInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
-                                                 const dfv2::Node* node) {
+                                                 const driver_manager::Node* node) {
   auto device_info = fdd::wire::NodeInfo::Builder(allocator);
 
   device_info.id(reinterpret_cast<uint64_t>(node));
@@ -113,7 +113,7 @@ zx::result<fdd::wire::NodeInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
 
 }  // namespace
 
-DriverDevelopmentService::DriverDevelopmentService(dfv2::DriverRunner& driver_runner,
+DriverDevelopmentService::DriverDevelopmentService(driver_manager::DriverRunner& driver_runner,
                                                    async_dispatcher_t* dispatcher)
     : driver_runner_(driver_runner), dispatcher_(dispatcher) {}
 
@@ -128,8 +128,8 @@ void DriverDevelopmentService::GetNodeInfo(GetNodeInfoRequestView request,
   auto arena = std::make_unique<fidl::Arena<512>>();
   std::vector<fdd::wire::NodeInfo> device_infos;
 
-  std::unordered_set<const dfv2::Node*> unique_nodes;
-  std::queue<const dfv2::Node*> remaining_nodes;
+  std::unordered_set<const driver_manager::Node*> unique_nodes;
+  std::queue<const driver_manager::Node*> remaining_nodes;
   remaining_nodes.push(driver_runner_.root_node().get());
   while (!remaining_nodes.empty()) {
     auto node = remaining_nodes.front();
@@ -317,9 +317,9 @@ void DriverDevelopmentService::AddTestNode(AddTestNodeRequestView request,
 
   driver_runner_.root_node()->AddChild(
       std::move(args), /* controller */ {}, /* node */ {},
-      [this, completer = completer.ToAsync()](
-          fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<dfv2::Node>>
-              result) mutable {
+      [this, completer = completer.ToAsync()](fit::result<fuchsia_driver_framework::wire::NodeError,
+                                                          std::shared_ptr<driver_manager::Node>>
+                                                  result) mutable {
         if (result.is_error()) {
           completer.Reply(result.take_error());
         } else {
@@ -345,7 +345,7 @@ void DriverDevelopmentService::RemoveTestNode(RemoveTestNodeRequestView request,
     return;
   }
 
-  node->Remove(dfv2::RemovalSet::kAll, nullptr);
+  node->Remove(driver_manager::RemovalSet::kAll, nullptr);
   test_nodes_.erase(name);
   completer.ReplySuccess();
 }

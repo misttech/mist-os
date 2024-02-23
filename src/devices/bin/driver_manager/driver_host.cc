@@ -17,7 +17,7 @@ namespace frunner = fuchsia_component_runner;
 namespace fdf {
 using namespace fuchsia_driver_framework;
 }  // namespace fdf
-namespace dfv2 {
+namespace driver_manager {
 
 namespace {
 std::unique_ptr<vfs::PseudoFile> CreateReadonlyFile(
@@ -200,4 +200,4 @@ zx::result<> DriverHostComponent::InstallLoader(
   return zx::ok();
 }
 
-}  // namespace dfv2
+}  // namespace driver_manager

@@ -14,29 +14,34 @@
 #include "src/devices/bin/driver_manager/tests/driver_manager_test_base.h"
 
 // Test class to expose protected functions.
-class TestBindManager : public dfv2::BindManager {
+class TestBindManager : public driver_manager::BindManager {
  public:
-  TestBindManager(dfv2::BindManagerBridge* bridge, dfv2::NodeManager* node_manager,
-                  async_dispatcher_t* dispatcher)
+  TestBindManager(driver_manager::BindManagerBridge* bridge,
+                  driver_manager::NodeManager* node_manager, async_dispatcher_t* dispatcher)
       : BindManager(bridge, node_manager, dispatcher) {}
 
-  std::unordered_map<std::string, std::weak_ptr<dfv2::Node>> GetOrphanedNodes() const {
+  std::unordered_map<std::string, std::weak_ptr<driver_manager::Node>> GetOrphanedNodes() const {
     return bind_node_set().CurrentOrphanedNodes();
   }
 
-  std::unordered_map<std::string, std::weak_ptr<dfv2::Node>> GetMultibindNodes() const {
+  std::unordered_map<std::string, std::weak_ptr<driver_manager::Node>> GetMultibindNodes() const {
     return bind_node_set().CurrentMultibindNodes();
   }
 
   bool IsBindOngoing() const { return bind_node_set().is_bind_ongoing(); }
 
-  std::vector<dfv2::BindRequest> GetPendingRequests() const { return pending_bind_requests(); }
+  std::vector<driver_manager::BindRequest> GetPendingRequests() const {
+    return pending_bind_requests();
+  }
 
-  const std::vector<dfv2::NodeBindingInfoResultCallback>& GetPendingOrphanRebindCallbacks() const {
+  const std::vector<driver_manager::NodeBindingInfoResultCallback>&
+  GetPendingOrphanRebindCallbacks() const {
     return pending_orphan_rebind_callbacks();
   }
 
-  dfv2::CompositeDeviceManager& GetLegacyCompositeManager() { return legacy_composite_manager(); }
+  driver_manager::CompositeDeviceManager& GetLegacyCompositeManager() {
+    return legacy_composite_manager();
+  }
 };
 
 class TestDriverIndex final : public fidl::WireServer<fuchsia_driver_index::DriverIndex> {
@@ -68,10 +73,11 @@ class TestDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
   async_dispatcher_t* dispatcher_;
 };
 
-class TestBindManagerBridge final : public dfv2::BindManagerBridge, public CompositeManagerBridge {
+class TestBindManagerBridge final : public driver_manager::BindManagerBridge,
+                                    public CompositeManagerBridge {
  public:
   struct CompositeNodeSpecData {
-    dfv2::CompositeNodeSpecV2* spec;
+    driver_manager::CompositeNodeSpecV2* spec;
     fuchsia_driver_framework::CompositeInfo fidl_info;
   };
 
@@ -81,14 +87,14 @@ class TestBindManagerBridge final : public dfv2::BindManagerBridge, public Compo
 
   // BindManagerBridge implementation:
   zx::result<BindSpecResult> BindToParentSpec(fidl::AnyArena& arena,
-                                              dfv2::CompositeParents composite_parents,
-                                              std::weak_ptr<dfv2::Node> node,
+                                              driver_manager::CompositeParents composite_parents,
+                                              std::weak_ptr<driver_manager::Node> node,
                                               bool enable_multibind) override {
     return composite_manager_.BindParentSpec(arena, composite_parents, node, enable_multibind);
   }
 
   zx::result<std::string> StartDriver(
-      dfv2::Node& node, fuchsia_driver_framework::wire::DriverInfo driver_info) override {
+      driver_manager::Node& node, fuchsia_driver_framework::wire::DriverInfo driver_info) override {
     return zx::ok("");
   }
 
@@ -107,7 +113,7 @@ class TestBindManagerBridge final : public dfv2::BindManagerBridge, public Compo
 
   void AddCompositeNodeSpec(std::string composite, std::vector<std::string> parent_names,
                             std::vector<fuchsia_driver_framework::ParentSpec> parents,
-                            std::unique_ptr<dfv2::CompositeNodeSpecV2> spec);
+                            std::unique_ptr<driver_manager::CompositeNodeSpecV2> spec);
 
   const std::unordered_map<std::string, CompositeNodeSpecData>& specs() const { return specs_; }
 
@@ -124,7 +130,8 @@ class TestBindManagerBridge final : public dfv2::BindManagerBridge, public Compo
 
 class TestNodeManager : public TestNodeManagerBase {
  public:
-  void Bind(dfv2::Node& node, std::shared_ptr<dfv2::BindResultTracker> result_tracker) override {
+  void Bind(driver_manager::Node& node,
+            std::shared_ptr<driver_manager::BindResultTracker> result_tracker) override {
     bind_manager_->Bind(node, {}, std::move(result_tracker));
   }
 
@@ -146,7 +153,7 @@ class BindManagerTestBase : public DriverManagerTestBase {
   void SetUp() override;
   void TearDown() override;
 
-  dfv2::NodeManager* GetNodeManager() override { return &node_manager_; }
+  driver_manager::NodeManager* GetNodeManager() override { return &node_manager_; }
 
   BindManagerData CurrentBindManagerData() const;
   void VerifyBindManagerData(BindManagerData expected);
@@ -155,17 +162,19 @@ class BindManagerTestBase : public DriverManagerTestBase {
   // Should only be called when there's no ongoing bind. The node should not
   // already exist.
   void AddAndOrphanNode(std::string name, bool enable_multibind = false,
-                        std::shared_ptr<dfv2::BindResultTracker> tracker = nullptr);
+                        std::shared_ptr<driver_manager::BindResultTracker> tracker = nullptr);
 
   // Create a node and invoke Bind() for it.
   // If EXPECT_BIND_START, the function verifies that it started a new bind process.
   // If EXPECT_QUEUED, the function verifies that it queued new bind request.
   void AddAndBindNode(std::string name, bool enable_multibind = false,
-                      std::shared_ptr<dfv2::BindResultTracker> tracker = nullptr);
-  void AddAndBindNode_EXPECT_BIND_START(std::string name, bool enable_multibind = false,
-                                        std::shared_ptr<dfv2::BindResultTracker> tracker = nullptr);
-  void AddAndBindNode_EXPECT_QUEUED(std::string name, bool enable_multibind = false,
-                                    std::shared_ptr<dfv2::BindResultTracker> tracker = nullptr);
+                      std::shared_ptr<driver_manager::BindResultTracker> tracker = nullptr);
+  void AddAndBindNode_EXPECT_BIND_START(
+      std::string name, bool enable_multibind = false,
+      std::shared_ptr<driver_manager::BindResultTracker> tracker = nullptr);
+  void AddAndBindNode_EXPECT_QUEUED(
+      std::string name, bool enable_multibind = false,
+      std::shared_ptr<driver_manager::BindResultTracker> tracker = nullptr);
 
   // Adds a legacy composite.
   // If EXPECT_QUEUED, the function verifies that it queues a TryBindAllAvailable callback.
@@ -181,11 +190,12 @@ class BindManagerTestBase : public DriverManagerTestBase {
   // Invoke Bind() for the node with the given |name|. The node should already exist.
   // If EXPECT_BIND_START, the function verifies that it started a new bind process.
   // If EXPECT_QUEUED, the function verifies that it queued new bind request.
-  void InvokeBind(std::string name, std::shared_ptr<dfv2::BindResultTracker> tracker = nullptr);
-  void InvokeBind_EXPECT_BIND_START(std::string name,
-                                    std::shared_ptr<dfv2::BindResultTracker> tracker = nullptr);
-  void InvokeBind_EXPECT_QUEUED(std::string name,
-                                std::shared_ptr<dfv2::BindResultTracker> tracker = nullptr);
+  void InvokeBind(std::string name,
+                  std::shared_ptr<driver_manager::BindResultTracker> tracker = nullptr);
+  void InvokeBind_EXPECT_BIND_START(
+      std::string name, std::shared_ptr<driver_manager::BindResultTracker> tracker = nullptr);
+  void InvokeBind_EXPECT_QUEUED(
+      std::string name, std::shared_ptr<driver_manager::BindResultTracker> tracker = nullptr);
 
   // Invoke TryBindAllAvailable().
   // If EXPECT_BIND_START, the function verifies that it started a new bind process.
@@ -222,11 +232,13 @@ class BindManagerTestBase : public DriverManagerTestBase {
   void VerifyPendingBindRequestCount(size_t expected);
 
  protected:
-  std::unordered_map<std::string, std::shared_ptr<dfv2::Node>> nodes() const { return nodes_; }
+  std::unordered_map<std::string, std::shared_ptr<driver_manager::Node>> nodes() const {
+    return nodes_;
+  }
   std::unordered_map<std::string, uint32_t> instance_ids() const { return instance_ids_; }
 
  private:
-  std::shared_ptr<dfv2::Node> CreateNode(const std::string name, bool enable_multibind);
+  std::shared_ptr<driver_manager::Node> CreateNode(const std::string name, bool enable_multibind);
 
   // Gets the instance ID for |node_name| from |instance_ids_|. Adds a new entry with a
   // unique instance ID if it's missing.
@@ -237,7 +249,7 @@ class BindManagerTestBase : public DriverManagerTestBase {
   TestNodeManager node_manager_;
   std::unique_ptr<TestBindManager> bind_manager_;
 
-  std::unordered_map<std::string, std::shared_ptr<dfv2::Node>> nodes_;
+  std::unordered_map<std::string, std::shared_ptr<driver_manager::Node>> nodes_;
 
   // Maps each node to a unique instance id. The instance id is used to the node's
   // property for binding.

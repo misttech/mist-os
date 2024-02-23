@@ -23,7 +23,7 @@ using namespace fuchsia_driver_framework;
 namespace fdecl = fuchsia_component_decl;
 namespace fcomponent = fuchsia_component;
 
-namespace dfv2 {
+namespace driver_manager {
 
 namespace {
 
@@ -1339,4 +1339,4 @@ Devnode::Target Node::CreateDevfsPassthrough(
       });
 }
 
-}  // namespace dfv2
+}  // namespace driver_manager

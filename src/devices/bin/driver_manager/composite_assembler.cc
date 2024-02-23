@@ -17,7 +17,7 @@ namespace fdd = fuchsia_driver_development;
 namespace fdl = fuchsia_driver_legacy;
 namespace fdm = fuchsia_device_manager;
 
-namespace dfv2 {
+namespace driver_manager {
 
 namespace {
 
@@ -385,4 +385,4 @@ void CompositeDeviceManager::AddCompositeDevice(AddCompositeDeviceRequest& reque
   completer.Reply(zx::make_result(status));
 }
 
-}  // namespace dfv2
+}  // namespace driver_manager

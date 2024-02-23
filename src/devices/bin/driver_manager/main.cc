@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
 
   auto loader_service =
       DriverHostLoaderService::Create(loader_loop.dispatcher(), std::move(lib_fd));
-  dfv2::DriverRunner driver_runner(
+  driver_manager::DriverRunner driver_runner(
       std::move(realm_result.value()), std::move(driver_index_result.value()), inspect_manager,
       [loader_service]() -> zx::result<fidl::ClientEnd<fuchsia_ldsvc::Loader>> {
         zx::result client = loader_service->Connect();
@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
   driver_development_service.Publish(outgoing);
   driver_runner.ScheduleWatchForDriverLoad();
 
-  dfv2::ShutdownManager shutdown_manager(&driver_runner, loop.dispatcher());
+  driver_manager::ShutdownManager shutdown_manager(&driver_runner, loop.dispatcher());
   shutdown_manager.Publish(outgoing);
 
   // TODO(https://fxbug.dev/42181480) Remove this when this issue is fixed.

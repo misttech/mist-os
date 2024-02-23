@@ -40,9 +40,9 @@ namespace frunner = fuchsia_component_runner;
 namespace fcomponent = fuchsia_component;
 namespace fdecl = fuchsia_component_decl;
 
-using InspectStack = std::stack<std::pair<inspect::Node*, const dfv2::Node*>>;
+using InspectStack = std::stack<std::pair<inspect::Node*, const driver_manager::Node*>>;
 
-namespace dfv2 {
+namespace driver_manager {
 
 namespace {
 
@@ -199,7 +199,7 @@ Collection GetHighestRankingCollection(const Node& node, Collection collection) 
 // The return value of the visitor function is a boolean for whether the children of the node
 // should be visited. If it returns false, the children will be skipped.
 void PerformBFS(const std::shared_ptr<Node>& starting_node,
-                fit::function<bool(const std::shared_ptr<dfv2::Node>&)> visitor) {
+                fit::function<bool(const std::shared_ptr<driver_manager::Node>&)> visitor) {
   std::unordered_set<std::shared_ptr<const Node>> visited;
   std::queue<std::shared_ptr<Node>> node_queue;
   visited.insert(starting_node);
@@ -442,7 +442,7 @@ void DriverRunner::RebindComposite(std::string spec, std::optional<std::string> 
   composite_node_spec_manager_.Rebind(spec, driver_url, std::move(callback));
 }
 
-void DriverRunner::DestroyDriverComponent(dfv2::Node& node,
+void DriverRunner::DestroyDriverComponent(driver_manager::Node& node,
                                           DestroyDriverComponentCallback callback) {
   auto name = node.MakeComponentMoniker();
   fdecl::wire::ChildRef child_ref{
@@ -622,30 +622,30 @@ zx::result<uint32_t> DriverRunner::RestartNodesColocatedWithDriverUrl(
   // This node will by definition have colocated set to false, so when we call StartDriver
   // on this node we will always create a new driver host. The old driver host will go away
   // on its own asynchronously since it is drained from all of its drivers.
-  PerformBFS(root_node_,
-             [this, &driver_hosts, rematch_flags, url](const std::shared_ptr<dfv2::Node>& current) {
-               if (driver_hosts.find(current->driver_host()) == driver_hosts.end()) {
-                 // Not colocated with one of the restarting hosts. Continue to visit the children.
-                 return true;
-               }
+  PerformBFS(root_node_, [this, &driver_hosts, rematch_flags,
+                          url](const std::shared_ptr<driver_manager::Node>& current) {
+    if (driver_hosts.find(current->driver_host()) == driver_hosts.end()) {
+      // Not colocated with one of the restarting hosts. Continue to visit the children.
+      return true;
+    }
 
-               if (current->EvaluateRematchFlags(rematch_flags, url)) {
-                 if (current->type() == dfv2::NodeType::kComposite) {
-                   // Composites need to go through a different flow that will fully remove the
-                   // node and empty out the composite spec management layer.
-                   RebindComposite(current->name(), std::nullopt, [](zx::result<>) {});
-                   return false;
-                 }
+    if (current->EvaluateRematchFlags(rematch_flags, url)) {
+      if (current->type() == driver_manager::NodeType::kComposite) {
+        // Composites need to go through a different flow that will fully remove the
+        // node and empty out the composite spec management layer.
+        RebindComposite(current->name(), std::nullopt, [](zx::result<>) {});
+        return false;
+      }
 
-                 // Legacy composites and plain nodes both use the restart with rematch flow.
-                 current->RestartNodeWithRematch();
-                 return false;
-               }
+      // Legacy composites and plain nodes both use the restart with rematch flow.
+      current->RestartNodeWithRematch();
+      return false;
+    }
 
-               // Not rematching, plain node restart.
-               current->RestartNode();
-               return false;
-             });
+    // Not rematching, plain node restart.
+    current->RestartNode();
+    return false;
+  });
 
   return zx::ok(static_cast<uint32_t>(driver_hosts.size()));
 }
@@ -655,14 +655,15 @@ std::unordered_set<const DriverHost*> DriverRunner::DriverHostsWithDriverUrl(std
 
   // Perform a BFS over the node topology, if the current node's driver url is the url we are
   // interested in, add the driver host it is in to the result set.
-  PerformBFS(root_node_, [&result_hosts, url](const std::shared_ptr<dfv2::Node>& current) {
-    if (current->driver_url() == url) {
-      result_hosts.insert(current->driver_host());
-    }
-    return true;
-  });
+  PerformBFS(root_node_,
+             [&result_hosts, url](const std::shared_ptr<driver_manager::Node>& current) {
+               if (current->driver_url() == url) {
+                 result_hosts.insert(current->driver_host());
+               }
+               return true;
+             });
 
   return result_hosts;
 }
 
-}  // namespace dfv2
+}  // namespace driver_manager

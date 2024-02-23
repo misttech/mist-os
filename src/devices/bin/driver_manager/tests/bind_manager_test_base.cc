@@ -75,10 +75,10 @@ void TestBindManagerBridge::AddSpecToDriverIndex(
   callback(zx::ok());
 }
 
-void TestBindManagerBridge::AddCompositeNodeSpec(std::string composite,
-                                                 std::vector<std::string> parent_names,
-                                                 std::vector<fdf::ParentSpec> parents,
-                                                 std::unique_ptr<dfv2::CompositeNodeSpecV2> spec) {
+void TestBindManagerBridge::AddCompositeNodeSpec(
+    std::string composite, std::vector<std::string> parent_names,
+    std::vector<fdf::ParentSpec> parents,
+    std::unique_ptr<driver_manager::CompositeNodeSpecV2> spec) {
   fidl::Arena arena;
   auto fidl_spec = fdf::CompositeNodeSpec{{.name = composite, .parents = std::move(parents)}};
   specs_.emplace(composite, CompositeNodeSpecData{
@@ -141,15 +141,16 @@ void BindManagerTestBase::VerifyBindManagerData(BindManagerTestBase::BindManager
             bind_manager_->GetPendingOrphanRebindCallbacks().size());
 }
 
-std::shared_ptr<dfv2::Node> BindManagerTestBase::CreateNode(const std::string name,
-                                                            bool enable_multibind) {
+std::shared_ptr<driver_manager::Node> BindManagerTestBase::CreateNode(const std::string name,
+                                                                      bool enable_multibind) {
   std::shared_ptr new_node = DriverManagerTestBase::CreateNode(name);
   new_node->set_can_multibind_composites(enable_multibind);
   return new_node;
 }
 
-void BindManagerTestBase::AddAndBindNode(std::string name, bool enable_multibind,
-                                         std::shared_ptr<dfv2::BindResultTracker> tracker) {
+void BindManagerTestBase::AddAndBindNode(
+    std::string name, bool enable_multibind,
+    std::shared_ptr<driver_manager::BindResultTracker> tracker) {
   // This function should only be called for a new node.
   ASSERT_EQ(nodes_.find(name), nodes_.end());
 
@@ -164,8 +165,9 @@ void BindManagerTestBase::AddAndBindNode(std::string name, bool enable_multibind
 // Adds a new node and invoke Bind(). Then complete the bind request with
 // no matches. The ongoing bind flag should reset to false and the node
 // should be added in the orphaned nodes.
-void BindManagerTestBase::AddAndOrphanNode(std::string name, bool enable_multibind,
-                                           std::shared_ptr<dfv2::BindResultTracker> tracker) {
+void BindManagerTestBase::AddAndOrphanNode(
+    std::string name, bool enable_multibind,
+    std::shared_ptr<driver_manager::BindResultTracker> tracker) {
   VerifyNoOngoingBind();
 
   size_t current_orphan_count = bind_manager_->NumOrphanedNodes();
@@ -183,10 +185,10 @@ void BindManagerTestBase::AddAndOrphanNode(std::string name, bool enable_multibi
 }
 
 void BindManagerTestBase::InvokeBind(std::string name,
-                                     std::shared_ptr<dfv2::BindResultTracker> tracker) {
+                                     std::shared_ptr<driver_manager::BindResultTracker> tracker) {
   ASSERT_NE(nodes_.find(name), nodes_.end());
   if (tracker == nullptr) {
-    tracker = std::make_shared<dfv2::BindResultTracker>(
+    tracker = std::make_shared<driver_manager::BindResultTracker>(
         1, [](fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> info) {});
   }
   bind_manager_->Bind(*nodes_[name], "", tracker);
@@ -194,14 +196,14 @@ void BindManagerTestBase::InvokeBind(std::string name,
 }
 
 void BindManagerTestBase::InvokeBind_EXPECT_BIND_START(
-    std::string name, std::shared_ptr<dfv2::BindResultTracker> tracker) {
+    std::string name, std::shared_ptr<driver_manager::BindResultTracker> tracker) {
   VerifyNoOngoingBind();
   InvokeBind(name, std::move(tracker));
   ASSERT_TRUE(bind_manager_->IsBindOngoing());
 }
 
 void BindManagerTestBase::InvokeBind_EXPECT_QUEUED(
-    std::string name, std::shared_ptr<dfv2::BindResultTracker> tracker) {
+    std::string name, std::shared_ptr<driver_manager::BindResultTracker> tracker) {
   auto expected_data = CurrentBindManagerData();
   expected_data.pending_bind_count += 1;
   InvokeBind(name, std::move(tracker));
@@ -209,7 +211,8 @@ void BindManagerTestBase::InvokeBind_EXPECT_QUEUED(
 }
 
 void BindManagerTestBase::AddAndBindNode_EXPECT_BIND_START(
-    std::string name, bool enable_multibind, std::shared_ptr<dfv2::BindResultTracker> tracker) {
+    std::string name, bool enable_multibind,
+    std::shared_ptr<driver_manager::BindResultTracker> tracker) {
   VerifyNoOngoingBind();
   // Bind process should begin and send a match request to the Driver Index.
   AddAndBindNode(name, enable_multibind, std::move(tracker));
@@ -217,7 +220,8 @@ void BindManagerTestBase::AddAndBindNode_EXPECT_BIND_START(
 }
 
 void BindManagerTestBase::AddAndBindNode_EXPECT_QUEUED(
-    std::string name, bool enable_multibind, std::shared_ptr<dfv2::BindResultTracker> tracker) {
+    std::string name, bool enable_multibind,
+    std::shared_ptr<driver_manager::BindResultTracker> tracker) {
   ASSERT_TRUE(bind_manager_->IsBindOngoing());
   auto expected_data = CurrentBindManagerData();
   expected_data.pending_bind_count += 1;
@@ -271,7 +275,7 @@ void BindManagerTestBase::AddCompositeNodeSpec(std::string composite,
          .properties = {fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id)}}});
   }
 
-  auto spec = std::make_unique<dfv2::CompositeNodeSpecV2>(
+  auto spec = std::make_unique<driver_manager::CompositeNodeSpecV2>(
       CompositeNodeSpecCreateInfo{
           .name = composite,
           .size = parents.size(),

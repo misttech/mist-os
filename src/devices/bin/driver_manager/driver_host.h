@@ -11,7 +11,7 @@
 
 #include <fbl/intrusive_double_list.h>
 
-namespace dfv2 {
+namespace driver_manager {
 
 class DriverHost {
  public:
@@ -59,6 +59,6 @@ zx::result<> SetEncodedConfig(
     fidl::WireTableBuilder<fuchsia_driver_framework::wire::DriverStartArgs>& args,
     fuchsia_component_runner::wire::ComponentStartInfo& start_info);
 
-}  // namespace dfv2
+}  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_DRIVER_HOST_H_

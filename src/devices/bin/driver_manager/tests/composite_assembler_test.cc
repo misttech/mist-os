@@ -19,23 +19,25 @@ constexpr std::string_view kFragmentName2 = "child-2";
 
 class TestNodeManager : public TestNodeManagerBase {
  public:
-  explicit TestNodeManager(fit::function<void(dfv2::Node&)> cb) : callback(std::move(cb)) {}
+  explicit TestNodeManager(fit::function<void(driver_manager::Node&)> cb)
+      : callback(std::move(cb)) {}
 
-  void Bind(dfv2::Node& node, std::shared_ptr<dfv2::BindResultTracker> result_tracker) override {
+  void Bind(driver_manager::Node& node,
+            std::shared_ptr<driver_manager::BindResultTracker> result_tracker) override {
     callback(node);
   }
 
-  fit::function<void(dfv2::Node&)> callback;
+  fit::function<void(driver_manager::Node&)> callback;
 };
 
 class CompositeAssemblerTest : public DriverManagerTestBase {
  public:
-  dfv2::NodeManager* GetNodeManager() override { return &node_manager; }
+  driver_manager::NodeManager* GetNodeManager() override { return &node_manager; }
 
   bool bind_was_called = false;
   TestNodeManager node_manager{
       [&bind_was_called = this->bind_was_called](auto& node) { bind_was_called = true; }};
-  dfv2::CompositeDeviceManager manager{&node_manager, dispatcher(), []() {}};
+  driver_manager::CompositeDeviceManager manager{&node_manager, dispatcher(), []() {}};
 };
 
 TEST_F(CompositeAssemblerTest, EmptyManager) { ASSERT_TRUE(manager.BindNode(root()).empty()); }

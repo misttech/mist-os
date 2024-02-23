@@ -21,9 +21,9 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpec::BindParent(
   const std::optional<DeviceOrNode>& current_at_index = parent_specs_[node_index];
   if (current_at_index.has_value()) {
     const DeviceOrNode& existing = current_at_index.value();
-    const std::weak_ptr<dfv2::Node>* existing_node =
-        std::get_if<std::weak_ptr<dfv2::Node>>(&existing);
-    // If the dfv2::Node no longer exists (for example because of a reload) then we don't
+    const std::weak_ptr<driver_manager::Node>* existing_node =
+        std::get_if<std::weak_ptr<driver_manager::Node>>(&existing);
+    // If the driver_manager::Node no longer exists (for example because of a reload) then we don't
     // want to return an ALREADY_BOUND error.
     if (!existing_node || !existing_node->expired()) {
       return zx::error(ZX_ERR_ALREADY_BOUND);

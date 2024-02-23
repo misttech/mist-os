@@ -9,9 +9,9 @@
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 struct NodeBank {
-  NodeBank(dfv2::NodeRemovalTracker *tracker) : tracker_(tracker) {}
-  void AddNode(dfv2::Collection collection, dfv2::NodeState state) {
-    ids_.insert(tracker_->RegisterNode(dfv2::NodeRemovalTracker::Node{
+  NodeBank(driver_manager::NodeRemovalTracker *tracker) : tracker_(tracker) {}
+  void AddNode(driver_manager::Collection collection, driver_manager::NodeState state) {
+    ids_.insert(tracker_->RegisterNode(driver_manager::NodeRemovalTracker::Node{
         .name = "node",
         .collection = collection,
         .state = state,
@@ -19,42 +19,42 @@ struct NodeBank {
   }
 
   void NotifyRemovalComplete() {
-    for (dfv2::NodeId id : ids_) {
-      tracker_->Notify(id, dfv2::NodeState::kStopped);
+    for (driver_manager::NodeId id : ids_) {
+      tracker_->Notify(id, driver_manager::NodeState::kStopped);
     }
   }
 
-  std::set<dfv2::NodeId> ids_;
-  dfv2::NodeRemovalTracker *tracker_;
+  std::set<driver_manager::NodeId> ids_;
+  driver_manager::NodeRemovalTracker *tracker_;
 };
 
 class NodeRemovalTrackerTest : public gtest::TestLoopFixture {};
 
 TEST_F(NodeRemovalTrackerTest, RegisterOneNode) {
-  dfv2::NodeRemovalTracker tracker(dispatcher());
-  dfv2::NodeId id = tracker.RegisterNode(dfv2::NodeRemovalTracker::Node{
+  driver_manager::NodeRemovalTracker tracker(dispatcher());
+  driver_manager::NodeId id = tracker.RegisterNode(driver_manager::NodeRemovalTracker::Node{
       .name = "node",
-      .collection = dfv2::Collection::kBoot,
-      .state = dfv2::NodeState::kRunning,
+      .collection = driver_manager::Collection::kBoot,
+      .state = driver_manager::NodeState::kRunning,
   });
   int package_callbacks = 0;
   int all_callbacks = 0;
   tracker.set_pkg_callback([&package_callbacks]() { package_callbacks++; });
   tracker.set_all_callback([&all_callbacks]() { all_callbacks++; });
   tracker.FinishEnumeration();
-  tracker.Notify(id, dfv2::NodeState::kStopped);
+  tracker.Notify(id, driver_manager::NodeState::kStopped);
 
   EXPECT_EQ(package_callbacks, 1);
   EXPECT_EQ(all_callbacks, 1);
 }
 
 TEST_F(NodeRemovalTrackerTest, RegisterManyNodes) {
-  dfv2::NodeRemovalTracker tracker(dispatcher());
+  driver_manager::NodeRemovalTracker tracker(dispatcher());
   NodeBank node_bank(&tracker);
-  node_bank.AddNode(dfv2::Collection::kBoot, dfv2::NodeState::kRunning);
-  node_bank.AddNode(dfv2::Collection::kBoot, dfv2::NodeState::kRunning);
-  node_bank.AddNode(dfv2::Collection::kPackage, dfv2::NodeState::kRunning);
-  node_bank.AddNode(dfv2::Collection::kPackage, dfv2::NodeState::kRunning);
+  node_bank.AddNode(driver_manager::Collection::kBoot, driver_manager::NodeState::kRunning);
+  node_bank.AddNode(driver_manager::Collection::kBoot, driver_manager::NodeState::kRunning);
+  node_bank.AddNode(driver_manager::Collection::kPackage, driver_manager::NodeState::kRunning);
+  node_bank.AddNode(driver_manager::Collection::kPackage, driver_manager::NodeState::kRunning);
   int package_callbacks = 0;
   int all_callbacks = 0;
   tracker.set_pkg_callback([&package_callbacks]() { package_callbacks++; });
@@ -71,12 +71,14 @@ TEST_F(NodeRemovalTrackerTest, RegisterManyNodes) {
 // Make sure package callback is only called when package drivers stop
 // and all callback is only called when all drivers stop
 TEST_F(NodeRemovalTrackerTest, CallbacksCallOrder) {
-  dfv2::NodeRemovalTracker tracker(dispatcher());
+  driver_manager::NodeRemovalTracker tracker(dispatcher());
   NodeBank boot_node_bank(&tracker), package_node_bank(&tracker);
-  boot_node_bank.AddNode(dfv2::Collection::kBoot, dfv2::NodeState::kRunning);
-  boot_node_bank.AddNode(dfv2::Collection::kBoot, dfv2::NodeState::kRunning);
-  package_node_bank.AddNode(dfv2::Collection::kPackage, dfv2::NodeState::kRunning);
-  package_node_bank.AddNode(dfv2::Collection::kPackage, dfv2::NodeState::kRunning);
+  boot_node_bank.AddNode(driver_manager::Collection::kBoot, driver_manager::NodeState::kRunning);
+  boot_node_bank.AddNode(driver_manager::Collection::kBoot, driver_manager::NodeState::kRunning);
+  package_node_bank.AddNode(driver_manager::Collection::kPackage,
+                            driver_manager::NodeState::kRunning);
+  package_node_bank.AddNode(driver_manager::Collection::kPackage,
+                            driver_manager::NodeState::kRunning);
   int package_callbacks = 0;
   int all_callbacks = 0;
   tracker.set_pkg_callback([&package_callbacks]() { package_callbacks++; });
@@ -99,11 +101,11 @@ TEST_F(NodeRemovalTrackerTest, CallbacksCallOrder) {
 // This tests verifies that set_all_callback can be called
 // during the pkg_callback without causing a deadlock.
 TEST_F(NodeRemovalTrackerTest, CallbackDeadlock) {
-  dfv2::NodeRemovalTracker tracker(dispatcher());
-  dfv2::NodeId id = tracker.RegisterNode(dfv2::NodeRemovalTracker::Node{
+  driver_manager::NodeRemovalTracker tracker(dispatcher());
+  driver_manager::NodeId id = tracker.RegisterNode(driver_manager::NodeRemovalTracker::Node{
       .name = "node",
-      .collection = dfv2::Collection::kBoot,
-      .state = dfv2::NodeState::kRunning,
+      .collection = driver_manager::Collection::kBoot,
+      .state = driver_manager::NodeState::kRunning,
   });
   int package_callbacks = 0;
   int all_callbacks = 0;
@@ -112,7 +114,7 @@ TEST_F(NodeRemovalTrackerTest, CallbackDeadlock) {
     tracker.set_all_callback([&all_callbacks]() { all_callbacks++; });
   });
   tracker.FinishEnumeration();
-  tracker.Notify(id, dfv2::NodeState::kStopped);
+  tracker.Notify(id, driver_manager::NodeState::kStopped);
 
   EXPECT_EQ(package_callbacks, 1);
   EXPECT_EQ(all_callbacks, 1);
@@ -120,12 +122,12 @@ TEST_F(NodeRemovalTrackerTest, CallbackDeadlock) {
 
 // Make sure callbacks are not called until FinishEnumeration is called
 TEST_F(NodeRemovalTrackerTest, FinishEnumeration) {
-  dfv2::NodeRemovalTracker tracker(dispatcher());
+  driver_manager::NodeRemovalTracker tracker(dispatcher());
   NodeBank node_bank(&tracker);
-  node_bank.AddNode(dfv2::Collection::kBoot, dfv2::NodeState::kRunning);
-  node_bank.AddNode(dfv2::Collection::kBoot, dfv2::NodeState::kRunning);
-  node_bank.AddNode(dfv2::Collection::kPackage, dfv2::NodeState::kRunning);
-  node_bank.AddNode(dfv2::Collection::kPackage, dfv2::NodeState::kRunning);
+  node_bank.AddNode(driver_manager::Collection::kBoot, driver_manager::NodeState::kRunning);
+  node_bank.AddNode(driver_manager::Collection::kBoot, driver_manager::NodeState::kRunning);
+  node_bank.AddNode(driver_manager::Collection::kPackage, driver_manager::NodeState::kRunning);
+  node_bank.AddNode(driver_manager::Collection::kPackage, driver_manager::NodeState::kRunning);
   int package_callbacks = 0;
   int all_callbacks = 0;
   tracker.set_pkg_callback([&package_callbacks]() { package_callbacks++; });

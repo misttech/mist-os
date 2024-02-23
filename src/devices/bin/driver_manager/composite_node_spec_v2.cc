@@ -6,7 +6,7 @@
 
 namespace fdd = fuchsia_driver_development;
 
-namespace dfv2 {
+namespace driver_manager {
 
 CompositeNodeSpecV2::CompositeNodeSpecV2(CompositeNodeSpecCreateInfo create_info,
                                          async_dispatcher_t* dispatcher, NodeManager* node_manager)
@@ -18,7 +18,7 @@ CompositeNodeSpecV2::CompositeNodeSpecV2(CompositeNodeSpecCreateInfo create_info
 zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV2::BindParentImpl(
     fuchsia_driver_framework::wire::CompositeParent composite_parent,
     const DeviceOrNode& device_or_node) {
-  auto node_ptr = std::get_if<std::weak_ptr<dfv2::Node>>(&device_or_node);
+  auto node_ptr = std::get_if<std::weak_ptr<driver_manager::Node>>(&device_or_node);
   ZX_ASSERT(node_ptr);
   ZX_ASSERT(composite_parent.has_index());
 
@@ -105,7 +105,7 @@ fdd::wire::CompositeNodeInfo CompositeNodeSpecV2::GetCompositeInfo(fidl::AnyAren
 
   composite_info.parent_topological_paths(parent_set_collector_->GetParentTopologicalPaths(arena));
 
-  std::optional<std::weak_ptr<dfv2::Node>> composite_node =
+  std::optional<std::weak_ptr<driver_manager::Node>> composite_node =
       parent_set_collector_->completed_composite_node();
   if (composite_node) {
     if (auto node_ptr = composite_node->lock(); node_ptr) {
@@ -115,4 +115,4 @@ fdd::wire::CompositeNodeInfo CompositeNodeSpecV2::GetCompositeInfo(fidl::AnyAren
   return composite_info.Build();
 }
 
-}  // namespace dfv2
+}  // namespace driver_manager

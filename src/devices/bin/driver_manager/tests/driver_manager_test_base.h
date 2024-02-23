@@ -8,16 +8,17 @@
 #include "src/devices/bin/driver_manager/node.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
-class TestNodeManagerBase : public dfv2::NodeManager {
+class TestNodeManagerBase : public driver_manager::NodeManager {
  public:
-  void Bind(dfv2::Node& node, std::shared_ptr<dfv2::BindResultTracker> result_tracker) override {}
+  void Bind(driver_manager::Node& node,
+            std::shared_ptr<driver_manager::BindResultTracker> result_tracker) override {}
 
   void DestroyDriverComponent(
-      dfv2::Node& node,
+      driver_manager::Node& node,
       fit::callback<void(fidl::WireUnownedResult<fuchsia_component::Realm::DestroyChild>& result)>
           callback) override {}
 
-  zx::result<dfv2::DriverHost*> CreateDriverHost() override {
+  zx::result<driver_manager::DriverHost*> CreateDriverHost() override {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 };
@@ -26,19 +27,20 @@ class DriverManagerTestBase : public gtest::TestLoopFixture {
  public:
   void SetUp() override;
 
-  virtual dfv2::NodeManager* GetNodeManager() = 0;
+  virtual driver_manager::NodeManager* GetNodeManager() = 0;
 
  protected:
-  std::shared_ptr<dfv2::Node> CreateNode(const std::string name);
+  std::shared_ptr<driver_manager::Node> CreateNode(const std::string name);
 
   // Creates a DFv2 node and add it to the given parent.
-  std::shared_ptr<dfv2::Node> CreateNode(const std::string name, std::weak_ptr<dfv2::Node> parent);
+  std::shared_ptr<driver_manager::Node> CreateNode(const std::string name,
+                                                   std::weak_ptr<driver_manager::Node> parent);
 
-  std::shared_ptr<dfv2::Node> CreateCompositeNode(std::string_view name,
-                                                  std::vector<std::weak_ptr<dfv2::Node>> parents,
-                                                  bool is_legacy, uint32_t primary_index = 0);
+  std::shared_ptr<driver_manager::Node> CreateCompositeNode(
+      std::string_view name, std::vector<std::weak_ptr<driver_manager::Node>> parents,
+      bool is_legacy, uint32_t primary_index = 0);
 
-  std::shared_ptr<dfv2::Node> root() const { return root_; }
+  std::shared_ptr<driver_manager::Node> root() const { return root_; }
 
   Devfs* devfs() const { return devfs_.get(); }
 
@@ -46,7 +48,7 @@ class DriverManagerTestBase : public gtest::TestLoopFixture {
   InspectManager inspect_{dispatcher()};
 
   std::unique_ptr<Devfs> devfs_;
-  std::shared_ptr<dfv2::Node> root_;
+  std::shared_ptr<driver_manager::Node> root_;
   std::optional<Devnode> root_devnode_;
 };
 

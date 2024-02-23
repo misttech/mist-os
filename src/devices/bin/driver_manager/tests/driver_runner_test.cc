@@ -32,13 +32,13 @@ namespace fdi = fuchsia_driver_index;
 namespace fcomponent = fuchsia_component;
 namespace fdecl = fuchsia_component_decl;
 
-using dfv2::BindResultTracker;
-using dfv2::Collection;
-using dfv2::CompositeNodeSpecV2;
-using dfv2::CreateCompositeServiceOffer;
-using dfv2::DriverRunner;
-using dfv2::Node;
-using dfv2::NodeType;
+using driver_manager::BindResultTracker;
+using driver_manager::Collection;
+using driver_manager::CompositeNodeSpecV2;
+using driver_manager::CreateCompositeServiceOffer;
+using driver_manager::DriverRunner;
+using driver_manager::Node;
+using driver_manager::NodeType;
 using testing::ElementsAre;
 
 const std::string root_driver_url = "fuchsia-boot:///#meta/root-driver.cm";

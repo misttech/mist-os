@@ -8,7 +8,7 @@
 #include "src/devices/bin/driver_manager/node_removal_tracker.h"
 #include "src/devices/bin/driver_manager/tests/driver_manager_test_base.h"
 
-using namespace dfv2;
+using namespace driver_manager;
 
 class TestRealm final : public fidl::WireServer<fuchsia_component::Realm> {
  public:

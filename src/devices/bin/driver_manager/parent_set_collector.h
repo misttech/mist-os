@@ -9,7 +9,7 @@
 
 #include "src/devices/bin/driver_manager/node.h"
 
-namespace dfv2 {
+namespace driver_manager {
 
 // |ParentSetCollector| wraps functionality for collecting multiple parent nodes for composites.
 // The parent set starts out empty and gets nodes added to it until it is complete. Once complete
@@ -39,7 +39,7 @@ class ParentSetCollector {
 
   uint32_t primary_index() const { return primary_index_; }
 
-  std::optional<std::weak_ptr<dfv2::Node>> completed_composite_node() const {
+  std::optional<std::weak_ptr<driver_manager::Node>> completed_composite_node() const {
     return completed_composite_node_;
   }
 
@@ -55,9 +55,9 @@ class ParentSetCollector {
   uint32_t primary_index_;
 
   // Contains a weak pointer to the composite node when the parent set is assembled.
-  std::optional<std::weak_ptr<dfv2::Node>> completed_composite_node_;
+  std::optional<std::weak_ptr<driver_manager::Node>> completed_composite_node_;
 };
 
-}  // namespace dfv2
+}  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_PARENT_SET_COLLECTOR_H_

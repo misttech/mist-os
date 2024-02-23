@@ -11,35 +11,36 @@ void DriverManagerTestBase::SetUp() {
   root_->AddToDevfsForTesting(root_devnode_.value());
 }
 
-std::shared_ptr<dfv2::Node> DriverManagerTestBase::CreateNode(const std::string name) {
-  auto node =
-      std::make_shared<dfv2::Node>(name, std::vector<std::weak_ptr<dfv2::Node>>(), GetNodeManager(),
-                                   dispatcher(), inspect_.CreateDevice(name, zx::vmo(), 0));
+std::shared_ptr<driver_manager::Node> DriverManagerTestBase::CreateNode(const std::string name) {
+  auto node = std::make_shared<driver_manager::Node>(
+      name, std::vector<std::weak_ptr<driver_manager::Node>>(), GetNodeManager(), dispatcher(),
+      inspect_.CreateDevice(name, zx::vmo(), 0));
   node->AddToDevfsForTesting(root_devnode_.value());
   node->devfs_device().publish();
   return node;
 }
 
-std::shared_ptr<dfv2::Node> DriverManagerTestBase::CreateNode(const std::string name,
-                                                              std::weak_ptr<dfv2::Node> parent) {
-  std::vector<std::weak_ptr<dfv2::Node>> parents = {parent};
-  auto node = std::make_shared<dfv2::Node>(name, parents, GetNodeManager(), dispatcher(),
-                                           inspect_.CreateDevice(name, zx::vmo(), 0));
+std::shared_ptr<driver_manager::Node> DriverManagerTestBase::CreateNode(
+    const std::string name, std::weak_ptr<driver_manager::Node> parent) {
+  std::vector<std::weak_ptr<driver_manager::Node>> parents = {parent};
+  auto node = std::make_shared<driver_manager::Node>(name, parents, GetNodeManager(), dispatcher(),
+                                                     inspect_.CreateDevice(name, zx::vmo(), 0));
   node->AddToDevfsForTesting(root_devnode_.value());
   node->devfs_device().publish();
   node->AddToParents();
   return node;
 }
 
-std::shared_ptr<dfv2::Node> DriverManagerTestBase::CreateCompositeNode(
-    std::string_view name, std::vector<std::weak_ptr<dfv2::Node>> parents, bool is_legacy,
+std::shared_ptr<driver_manager::Node> DriverManagerTestBase::CreateCompositeNode(
+    std::string_view name, std::vector<std::weak_ptr<driver_manager::Node>> parents, bool is_legacy,
     uint32_t primary_index) {
   std::vector<std::string> parent_names;
   parent_names.reserve(parents.size());
   for (auto& parent : parents) {
     parent_names.push_back(parent.lock()->name());
   }
-  return dfv2::Node::CreateCompositeNode(name, parents, std::move(parent_names), {},
-                                         GetNodeManager(), dispatcher(), is_legacy, primary_index)
+  return driver_manager::Node::CreateCompositeNode(name, parents, std::move(parent_names), {},
+                                                   GetNodeManager(), dispatcher(), is_legacy,
+                                                   primary_index)
       .value();
 }

@@ -13,7 +13,7 @@
 
 #include "src/devices/bin/driver_manager/node.h"
 
-namespace dfv2 {
+namespace driver_manager {
 class NodeRemovalTracker {
  public:
   struct Node {
@@ -61,5 +61,5 @@ class NodeRemovalTracker {
       handle_timeout_task_{this};
 };
 
-}  // namespace dfv2
+}  // namespace driver_manager
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_NODE_REMOVAL_TRACKER_H_

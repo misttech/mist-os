@@ -38,7 +38,7 @@
 // Note, all of the logic here assumes we are operating on a single-threaded
 // dispatcher. It is not safe to use a multi-threaded dispatcher with this code.
 
-namespace dfv2 {
+namespace driver_manager {
 
 class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager>,
                      public BindManagerBridge,
@@ -187,6 +187,6 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
 
 Collection ToCollection(const Node& node, fuchsia_driver_framework::DriverPackageType package_type);
 
-}  // namespace dfv2
+}  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_DRIVER_RUNNER_H_

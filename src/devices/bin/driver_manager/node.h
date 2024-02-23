@@ -22,7 +22,7 @@
 #include "src/devices/bin/driver_manager/inspect.h"
 #include "src/devices/bin/driver_manager/shutdown_helper.h"
 
-namespace dfv2 {
+namespace driver_manager {
 
 // This function creates a composite offer based on a service offer.
 std::optional<fuchsia_component_decl::wire::Offer> CreateCompositeServiceOffer(
@@ -442,6 +442,6 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   fidl::ServerBindingGroup<fuchsia_device::Controller> dev_controller_bindings_;
 };
 
-}  // namespace dfv2
+}  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_NODE_H_

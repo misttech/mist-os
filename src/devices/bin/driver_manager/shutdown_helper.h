@@ -14,7 +14,7 @@
 #include <string>
 #include <utility>
 
-namespace dfv2 {
+namespace driver_manager {
 
 class Node;
 class NodeRemovalTracker;
@@ -163,6 +163,6 @@ class ShutdownHelper {
   async_patterns::TaskScope tasks_;
 };
 
-}  // namespace dfv2
+}  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_HELPER_H_

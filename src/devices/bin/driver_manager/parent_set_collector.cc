@@ -6,7 +6,7 @@
 
 #include "src/devices/lib/log/log.h"
 
-namespace dfv2 {
+namespace driver_manager {
 
 zx::result<> ParentSetCollector::AddNode(uint32_t index, std::weak_ptr<Node> node) {
   ZX_ASSERT(index < parents_.size());
@@ -56,4 +56,4 @@ fidl::VectorView<fidl::StringView> ParentSetCollector::GetParentTopologicalPaths
   return parent_topological_paths;
 }
 
-}  // namespace dfv2
+}  // namespace driver_manager

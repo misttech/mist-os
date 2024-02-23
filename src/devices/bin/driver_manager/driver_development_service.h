@@ -15,7 +15,7 @@ namespace driver_manager {
 
 class DriverDevelopmentService : public fidl::WireServer<fuchsia_driver_development::Manager> {
  public:
-  explicit DriverDevelopmentService(dfv2::DriverRunner& driver_runner,
+  explicit DriverDevelopmentService(driver_manager::DriverRunner& driver_runner,
                                     async_dispatcher_t* dispatcher);
 
   void Publish(component::OutgoingDirectory& outgoing);
@@ -43,9 +43,9 @@ class DriverDevelopmentService : public fidl::WireServer<fuchsia_driver_developm
       fidl::UnknownMethodMetadata<fuchsia_driver_development::Manager> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  dfv2::DriverRunner& driver_runner_;
+  driver_manager::DriverRunner& driver_runner_;
   // A map of the test nodes that have been created.
-  std::map<std::string, std::weak_ptr<dfv2::Node>> test_nodes_;
+  std::map<std::string, std::weak_ptr<driver_manager::Node>> test_nodes_;
   fidl::ServerBindingGroup<fuchsia_driver_development::Manager> bindings_;
   async_dispatcher_t* const dispatcher_;
 };

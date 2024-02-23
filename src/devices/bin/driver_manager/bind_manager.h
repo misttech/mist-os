@@ -14,7 +14,7 @@
 #include "src/devices/bin/driver_manager/composite_assembler.h"
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec_manager.h"
 
-namespace dfv2 {
+namespace driver_manager {
 
 using CompositeParents = fidl::VectorView<fuchsia_driver_framework::wire::CompositeParent>;
 using OwnedCompositeParents = std::vector<fuchsia_driver_framework::CompositeParent>;
@@ -226,6 +226,6 @@ class BindManager {
   BindManagerBridge* bridge_;
 };
 
-}  // namespace dfv2
+}  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_BIND_MANAGER_H_

@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.driver.development/cpp/fidl.h>
 #include <lib/zircon-internal/thread_annotations.h>
 
-namespace dfv2 {
+namespace driver_manager {
 
 using NodeBindingInfoResultCallback =
     fit::callback<void(fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo>)>;
@@ -37,6 +37,6 @@ class BindResultTracker {
   std::vector<fuchsia_driver_development::wire::NodeBindingInfo> results_;
 };
 
-}  // namespace dfv2
+}  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_BIND_RESULT_TRACKER_H_

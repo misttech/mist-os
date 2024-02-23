@@ -8,7 +8,7 @@
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec.h"
 #include "src/devices/bin/driver_manager/parent_set_collector.h"
 
-namespace dfv2 {
+namespace driver_manager {
 
 class CompositeNodeSpecV2 : public CompositeNodeSpec {
  public:
@@ -18,7 +18,7 @@ class CompositeNodeSpecV2 : public CompositeNodeSpec {
 
   ~CompositeNodeSpecV2() override = default;
 
-  std::optional<std::weak_ptr<dfv2::Node>> completed_composite_node() {
+  std::optional<std::weak_ptr<driver_manager::Node>> completed_composite_node() {
     return parent_set_collector_ ? parent_set_collector_->completed_composite_node() : std::nullopt;
   }
 
@@ -48,6 +48,6 @@ class CompositeNodeSpecV2 : public CompositeNodeSpec {
   std::optional<fuchsia_driver_framework::CompositeInfo> composite_info_ = std::nullopt;
 };
 
-}  // namespace dfv2
+}  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_NODE_SPEC_V2_H_

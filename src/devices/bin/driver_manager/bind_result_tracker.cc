@@ -4,7 +4,7 @@
 
 #include "src/devices/bin/driver_manager/bind_result_tracker.h"
 
-namespace dfv2 {
+namespace driver_manager {
 
 BindResultTracker::BindResultTracker(size_t expected_result_count,
                                      NodeBindingInfoResultCallback result_callback)
@@ -71,4 +71,4 @@ void BindResultTracker::Complete(size_t current) {
   }
 }
 
-}  // namespace dfv2
+}  // namespace driver_manager

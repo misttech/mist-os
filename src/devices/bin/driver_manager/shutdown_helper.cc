@@ -8,7 +8,7 @@
 #include "src/devices/bin/driver_manager/node_removal_tracker.h"
 #include "src/devices/lib/log/log.h"
 
-namespace dfv2 {
+namespace driver_manager {
 
 namespace {
 
@@ -278,4 +278,4 @@ std::optional<uint32_t> ShutdownHelper::GenerateTestDelayMs() {
   return std::nullopt;
 }
 
-}  // namespace dfv2
+}  // namespace driver_manager

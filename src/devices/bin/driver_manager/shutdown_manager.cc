@@ -20,7 +20,7 @@
 #include <src/lib/fsl/vmo/sized_vmo.h>
 #include <src/lib/fsl/vmo/vector.h>
 
-namespace dfv2 {
+namespace driver_manager {
 namespace {
 
 struct MexecVmos {
@@ -381,4 +381,4 @@ void ShutdownManager::SystemExecute() {
   LOGF(WARNING, "%s: %s", what, zx_status_get_string(status));
 }
 
-}  // namespace dfv2
+}  // namespace driver_manager

@@ -10,11 +10,12 @@
 
 struct DeviceV1Wrapper;
 
-namespace dfv2 {
+namespace driver_manager {
 class Node;
-}  // namespace dfv2
+}  // namespace driver_manager
 
-using DeviceOrNode = std::variant<std::weak_ptr<DeviceV1Wrapper>, std::weak_ptr<dfv2::Node>>;
+using DeviceOrNode =
+    std::variant<std::weak_ptr<DeviceV1Wrapper>, std::weak_ptr<driver_manager::Node>>;
 
 using RemoveCompositeNodeCallback = fit::callback<void(zx::result<>)>;
 

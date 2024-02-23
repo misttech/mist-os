@@ -18,7 +18,7 @@
 
 #include "src/devices/bin/driver_manager/node_remover.h"
 
-namespace dfv2 {
+namespace driver_manager {
 using fuchsia_device_manager::SystemPowerState;
 
 // Theory of operation of ShutdownManager:
@@ -179,5 +179,5 @@ class ShutdownManager : public fidl::WireServer<fuchsia_device_manager::Administ
   bool lifecycle_stop_ = false;
 };
 
-}  // namespace dfv2
+}  // namespace driver_manager
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_MANAGER_H_

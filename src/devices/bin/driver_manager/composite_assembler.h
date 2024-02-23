@@ -14,7 +14,7 @@
 #include "src/devices/bin/driver_manager/binding.h"
 #include "src/devices/bin/driver_manager/node.h"
 
-namespace dfv2 {
+namespace driver_manager {
 
 // This class represents a single fragment of a composite device. It will
 // match one node.
@@ -143,6 +143,6 @@ class CompositeDeviceManager
   std::vector<std::unique_ptr<CompositeDeviceAssembler>> assemblers_;
 };
 
-}  // namespace dfv2
+}  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_ASSEMBLER_H_
