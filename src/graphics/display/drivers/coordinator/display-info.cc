@@ -27,7 +27,6 @@
 #include <fbl/string_printf.h>
 #include <pretty/hexdump.h>
 
-#include "src/devices/lib/audio/audio.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
@@ -49,6 +48,16 @@ edid::ddc_i2c_transact ddc_tx = [](void* ctx, edid::ddc_i2c_msg_t* msgs, uint32_
   }
   return i2c->Transact(ops, count) == ZX_OK;
 };
+
+inline void audio_stream_format_fidl_from_banjo(const audio_types_audio_stream_format_range_t& source,
+                                         audio_stream_format_range* destination) {
+  destination->sample_formats = source.sample_formats;
+  destination->min_frames_per_second = source.min_frames_per_second;
+  destination->max_frames_per_second = source.max_frames_per_second;
+  destination->min_channels = source.min_channels;
+  destination->max_channels = source.max_channels;
+  destination->flags = source.flags;
+}
 
 }  // namespace
 
@@ -150,7 +159,7 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
     zxlogf(DEBUG, "Supported audio formats:");
     for (auto range : out->edid->audio) {
       audio_stream_format_range temp_range;
-      audio::audio_stream_format_fidl_from_banjo(range, &temp_range);
+      audio_stream_format_fidl_from_banjo(range, &temp_range);
       for (auto rate : audio::utils::FrameRateEnumerator(temp_range)) {
         zxlogf(DEBUG, "  rate=%d, channels=[%d, %d], sample=%x", rate, range.min_channels,
                range.max_channels, range.sample_formats);

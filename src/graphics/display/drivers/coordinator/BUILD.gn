@@ -82,7 +82,6 @@ source_set("shared") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/lib/fidl",
     "//sdk/lib/zbi-format",
-    "//src/devices/lib/audio",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
     "//src/graphics/display/lib/api-types-cpp",
