@@ -18,7 +18,6 @@
 #include <fbl/macros.h>
 
 #include "ram-nand.h"
-#include "src/devices/lib/nand/nand.h"
 
 namespace {
 
@@ -40,10 +39,21 @@ class RamNandCtl : public RamNandCtlDeviceType {
   DISALLOW_COPY_ASSIGN_AND_MOVE(RamNandCtl);
 };
 
+void nand_banjo_from_fidl(const fuchsia_hardware_nand::wire::Info& source,
+                          nand_info_t* destination) {
+  destination->page_size = source.page_size;
+  destination->pages_per_block = source.pages_per_block;
+  destination->num_blocks = source.num_blocks;
+  destination->ecc_bits = source.ecc_bits;
+  destination->oob_size = source.oob_size;
+  destination->nand_class = static_cast<nand_class_t>(source.nand_class);
+  memcpy(&destination->partition_guid, source.partition_guid.data(), NAND_GUID_LEN);
+}
+
 void RamNandCtl::CreateDevice(CreateDeviceRequestView request,
                               CreateDeviceCompleter::Sync& completer) {
   nand_info_t temp_info;
-  nand::nand_banjo_from_fidl(request->info.nand_info, &temp_info);
+  nand_banjo_from_fidl(request->info.nand_info, &temp_info);
   const auto& params = static_cast<const NandParams>(temp_info);
   fbl::AllocChecker checker;
   std::unique_ptr<NandDevice> device(new (&checker) NandDevice(params, zxdev()));

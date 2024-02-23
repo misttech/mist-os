@@ -18,9 +18,18 @@
 #include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
 
-#include "src/devices/lib/nand/nand.h"
-
 namespace {
+
+void nand_fidl_from_banjo(const nand_info_t& source,
+                          fuchsia_hardware_nand::wire::Info* destination) {
+  destination->page_size = source.page_size;
+  destination->pages_per_block = source.pages_per_block;
+  destination->num_blocks = source.num_blocks;
+  destination->ecc_bits = source.ecc_bits;
+  destination->oob_size = source.oob_size;
+  destination->nand_class = static_cast<fuchsia_hardware_nand::wire::Class>(source.nand_class);
+  memcpy(destination->partition_guid.data(), &source.partition_guid, NAND_GUID_LEN);
+}
 
 // Wrapper for a nand_operation_t.
 class Operation {
@@ -123,7 +132,7 @@ zx_status_t Broker::Bind() {
 zx_status_t Broker::Query(fuchsia_hardware_nand::wire::Info* info) {
   nand_info_t temp_info;
   nand_.Query(&temp_info, &op_size_);
-  nand::nand_fidl_from_banjo(temp_info, info);
+  nand_fidl_from_banjo(temp_info, info);
   return ZX_OK;
 }
 

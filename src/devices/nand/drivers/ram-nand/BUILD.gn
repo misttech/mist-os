@@ -31,7 +31,6 @@ fuchsia_driver("ram-nand-driver") {
     "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_cpp",
     "//sdk/lib/fidl",
     "//src/devices/lib/driver",
-    "//src/devices/lib/nand",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
