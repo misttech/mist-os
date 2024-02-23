@@ -8,13 +8,10 @@
 use crate::{
     directory::{
         connection::{BaseConnection, ConnectionState, DerivedConnection},
-        entry::DirectoryEntry,
         entry_container,
-        mutable::entry_constructor::NewEntryType,
     },
     execution_scope::ExecutionScope,
     node::OpenNode,
-    path::Path,
     ObjectRequestRef, ProtocolsExt,
 };
 
@@ -68,14 +65,4 @@ impl ImmutableConnection {
 impl DerivedConnection for ImmutableConnection {
     type Directory = dyn entry_container::Directory;
     const MUTABLE: bool = false;
-
-    fn create_entry(
-        _scope: ExecutionScope,
-        _parent: Arc<dyn DirectoryEntry>,
-        _entry_type: NewEntryType,
-        _name: &str,
-        _path: &Path,
-    ) -> Result<Arc<dyn DirectoryEntry>, Status> {
-        Err(Status::NOT_SUPPORTED)
-    }
 }

@@ -8,7 +8,6 @@ use crate::{
         common::check_child_connection_flags,
         entry::DirectoryEntry,
         entry_container::{Directory, DirectoryWatcher},
-        mutable::entry_constructor::NewEntryType,
         read_dirents,
         traversal_position::TraversalPosition,
         DirectoryOptions,
@@ -26,7 +25,7 @@ use {
     fidl_fuchsia_io as fio,
     fuchsia_zircon_status::Status,
     futures::future::poll_fn,
-    std::{convert::TryInto as _, default::Default, sync::Arc, task::Poll},
+    std::{convert::TryInto as _, default::Default, task::Poll},
     storage_trace::{self as trace, TraceFutureExt},
 };
 
@@ -45,15 +44,6 @@ pub trait DerivedConnection: Send + Sync {
 
     /// Whether these connections support mutable connections.
     const MUTABLE: bool;
-
-    /// Creates entry of the specified type `NewEntryType`.
-    fn create_entry(
-        scope: ExecutionScope,
-        parent: Arc<dyn DirectoryEntry>,
-        entry_type: NewEntryType,
-        name: &str,
-        path: &Path,
-    ) -> Result<Arc<dyn DirectoryEntry>, Status>;
 }
 
 async fn yield_to_executor() {

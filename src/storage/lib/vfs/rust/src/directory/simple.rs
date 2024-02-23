@@ -108,8 +108,14 @@ where
                     return Err(Status::NOT_FOUND);
                 }
                 let entry_type = NewEntryType::from_flags(flags, path.is_dir())?;
-                let entry =
-                    Connection::create_entry(scope.clone(), self.clone(), entry_type, name, path)?;
+                let entry = create_entry(
+                    Connection::MUTABLE,
+                    scope.clone(),
+                    self.clone(),
+                    entry_type,
+                    name,
+                    path,
+                )?;
 
                 let name: Name = name.to_string().try_into()?;
                 let _ = this.entries.insert(name, entry.clone());
@@ -145,7 +151,14 @@ where
                         return Err(Status::NOT_FOUND);
                     }
                     let entry_type = NewEntryType::from_protocols(node_protocols)?;
-                    Connection::create_entry(scope.clone(), self.clone(), entry_type, name, path)?
+                    create_entry(
+                        Connection::MUTABLE,
+                        scope.clone(),
+                        self.clone(),
+                        entry_type,
+                        name,
+                        path,
+                    )?
                 } else {
                     return Err(Status::INVALID_ARGS);
                 };
@@ -597,6 +610,22 @@ where
 
         let _ = this.entries.insert(dst, entry);
         Ok(())
+    }
+}
+
+fn create_entry(
+    mutable: bool,
+    scope: ExecutionScope,
+    parent: Arc<dyn DirectoryEntry>,
+    entry_type: NewEntryType,
+    name: &str,
+    path: &Path,
+) -> Result<Arc<dyn DirectoryEntry>, Status> {
+    if mutable {
+        let entry_constructor = scope.entry_constructor().ok_or(Status::NOT_SUPPORTED)?;
+        entry_constructor.create_entry(parent, entry_type, name, path)
+    } else {
+        Err(Status::NOT_SUPPORTED)
     }
 }
 

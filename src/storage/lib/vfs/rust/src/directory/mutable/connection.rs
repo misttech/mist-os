@@ -11,9 +11,7 @@ use crate::{
     },
     directory::{
         connection::{BaseConnection, ConnectionState, DerivedConnection},
-        entry::DirectoryEntry,
         entry_container::MutableDirectory,
-        mutable::entry_constructor::NewEntryType,
     },
     execution_scope::ExecutionScope,
     name::validate_name,
@@ -42,17 +40,6 @@ pub struct MutableConnection {
 impl DerivedConnection for MutableConnection {
     type Directory = dyn MutableDirectory;
     const MUTABLE: bool = true;
-
-    fn create_entry(
-        scope: ExecutionScope,
-        parent: Arc<dyn DirectoryEntry>,
-        entry_type: NewEntryType,
-        name: &str,
-        path: &Path,
-    ) -> Result<Arc<dyn DirectoryEntry>, Status> {
-        let entry_constructor = scope.entry_constructor().ok_or(Status::NOT_SUPPORTED)?;
-        entry_constructor.create_entry(parent, entry_type, name, path)
-    }
 }
 
 impl MutableConnection {
