@@ -34,7 +34,7 @@ use net_declare::{fidl_ip, fidl_ip_v4, fidl_subnet, net_ip_v6, net_subnet_v6, st
 use net_types::{ethernet::Mac, ip as net_types_ip};
 use netemul::{RealmTcpListener, RealmTcpStream};
 use netstack_testing_common::{
-    interfaces,
+    interfaces::{self, TestInterfaceExt as _},
     realms::{
         KnownServiceProvider, ManagementAgent, Manager, ManagerConfig, NetCfgVersion, Netstack,
         TestRealmExt as _, TestSandboxExt,
@@ -1569,11 +1569,13 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
         .await
         .expect("install interface in client netstack");
     client_iface.add_address_and_subnet_route(client_subnet).await.expect("configure address");
+    client_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
     let server_iface = server
         .join_network(&server_net, "server-ep")
         .await
         .expect("install interface in server nestack");
     server_iface.add_address_and_subnet_route(server_subnet).await.expect("configure address");
+    server_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     let router_client_iface = router
         .join_network(&client_net, "client-router-ep")
@@ -1583,6 +1585,7 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
         .add_address_and_subnet_route(router_client_ip)
         .await
         .expect("configure address");
+    router_client_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
     let router_server_iface = router
         .join_network(&server_net, "server-router-ep")
         .await
@@ -1591,12 +1594,12 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
         .add_address_and_subnet_route(router_server_ip)
         .await
         .expect("configure address");
+    router_server_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     async fn add_default_gateway(
         realm: &netemul::TestRealm<'_>,
         interface: &netemul::TestInterface<'_>,
         gateway: fnet::IpAddress,
-        gateway_interface: &netemul::TestInterface<'_>,
     ) {
         let unspecified_address = fnet_ext::IpAddress(match gateway {
             fnet::IpAddress::Ipv4(_) => std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED),
@@ -1615,26 +1618,9 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
             .await
             .expect("call add forwarding entry")
             .expect("add forwarding entry");
-
-        // Make sure that the caller passed the right interface for the gateway
-        // (otherwise the static neighbor entry we're adding is wrong) by
-        // checking that the gateway IP address is installed on the interface.
-        let gateway_iface_addrs = gateway_interface
-            .get_addrs(fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
-            .await
-            .expect("get_addrs");
-        assert!(gateway_iface_addrs.iter().any(
-            |fnet_interfaces_ext::Address { addr: fnet::Subnet { addr, .. }, .. }| {
-                addr == &gateway
-            }
-        ));
-        realm
-            .add_neighbor_entry(interface.id(), gateway, gateway_interface.mac().await)
-            .await
-            .expect("add neighbor entry");
     }
-    add_default_gateway(&client, &client_iface, client_gateway, &router_client_iface).await;
-    add_default_gateway(&server, &server_iface, server_gateway, &router_server_iface).await;
+    add_default_gateway(&client, &client_iface, client_gateway).await;
+    add_default_gateway(&server, &server_iface, server_gateway).await;
 
     async fn enable_forwarding(
         interface: &fnet_interfaces_ext::admin::Control,
