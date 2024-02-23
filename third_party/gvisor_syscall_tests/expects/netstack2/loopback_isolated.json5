@@ -86,6 +86,7 @@
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/UDP",
 
                 // Flakey in Fuchsia's CQ, as shown in https://fxbug.dev/325265624.
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4Any_ConnectV4Loopback",
                 "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4Any_ConnectV4MappedLoopback",
                 "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4Loopback_ConnectV4Loopback",
                 "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4Loopback_ConnectV4MappedLoopback",
