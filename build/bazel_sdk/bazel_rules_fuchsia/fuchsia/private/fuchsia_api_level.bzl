@@ -60,7 +60,7 @@ def get_fuchsia_api_level(ctx):
     return ctx.attr._fuchsia_api_level[FuchsiaAPILevelInfo].level
 
 def fail_missing_api_level(name):
-    fail("'{}' does not have a valid API level set. Valid API levels are {}".format(name, [l.api_level for l in get_fuchsia_api_levels()]))
+    fail("'{}' does not have a valid API level set. Valid API levels are {}".format(name, [lvl.api_level for lvl in get_fuchsia_api_levels()]))
 
 def _valid_api_levels(ctx):
     if getattr(ctx.attr, "valid_api_levels_for_test", None):
