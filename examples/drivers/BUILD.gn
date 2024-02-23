@@ -5,22 +5,21 @@
 group("drivers") {
   deps = [
     "bindlib_codegen",
+    "demo-number:component",
     "driver_test_realm/sample-driver",
     "fidl_bindlib_codegen",
     "simple/dfv2:pkg",
     "skeleton:pkg",
     "transport",
-    "v2/demo-libc:component",
-    "v2/demo-number:component",
   ]
 }
 
 group("hermetic_tests") {
   testonly = true
   deps = [
+    "demo-number:hermetic_tests",
     "driver_test_realm:hermetic_tests",
     "simple/dfv2/tests:simple-driver-hermetic-test-pkg",
     "transport:hermetic_tests",
-    "v2/demo-number:hermetic_tests",
   ]
 }

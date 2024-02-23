@@ -530,3 +530,15 @@
   available_in_git: '113eb21a73d7a3ff94961eab2ebe90d5c1cc8426'
   areas: ['Display']
   path: '/src/graphics/display/drivers/ssd1306'
+- short_description: 'Example FIFO driver'
+  deletion_reason: 'Deprecated'
+  gerrit_change_id: '993161'
+  available_in_git: 'bb5c9f153220d19234a0ab272c80c87bb986c2e4'
+  areas: ['Driver SDK']
+  path: 'examples/drivers/fifo'
+- short_description: 'Example demo-libc driver'
+  deletion_reason: 'Made redundant by other examples'
+  gerrit_change_id: '993161'
+  available_in_git: 'bb5c9f153220d19234a0ab272c80c87bb986c2e4'
+  areas: ['Driver SDK']
+  path: 'examples/drivers/v2/demo_libc'
