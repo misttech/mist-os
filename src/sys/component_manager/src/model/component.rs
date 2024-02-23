@@ -551,10 +551,6 @@ impl ComponentInstance {
         child_decl: &ChildDecl,
         child_args: fcomponent::CreateChildArgs,
     ) -> Result<(), AddDynamicChildError> {
-        if child_decl.startup == fdecl::StartupMode::Eager {
-            return Err(AddDynamicChildError::EagerStartupUnsupported);
-        }
-
         let mut state = self.lock_resolved_state().await?;
         let collection_decl = state
             .decl()
@@ -564,13 +560,19 @@ impl ComponentInstance {
             })?
             .clone();
         let is_single_run_collection = collection_decl.durability == fdecl::Durability::SingleRun;
+        // Start the child if it's created in a `SingleRun` collection or it's eager.
+        let maybe_start_reason = if is_single_run_collection {
+            Some(StartReason::SingleRun)
+        } else if child_decl.startup == fdecl::StartupMode::Eager {
+            Some(StartReason::Eager)
+        } else {
+            None
+        };
 
         // Specifying numbered handles is only allowed if the component is started in
         // a single-run collection.
-        if child_args.numbered_handles.is_some()
-            && !child_args.numbered_handles.as_ref().unwrap().is_empty()
-            && !is_single_run_collection
-        {
+        let numbered_handles = child_args.numbered_handles.unwrap_or_default();
+        if !is_single_run_collection && !numbered_handles.is_empty() {
             return Err(AddDynamicChildError::NumberedHandleNotInSingleRunCollection);
         }
 
@@ -679,14 +681,13 @@ impl ComponentInstance {
         // Wait for the Discover action to finish.
         discover_fut.await?;
 
-        // Start the child if it's created in a `SingleRun` collection.
-        if is_single_run_collection {
+        if let Some(start_reason) = maybe_start_reason {
             child
                 .start(
-                    &StartReason::SingleRun,
+                    &start_reason,
                     None,
                     IncomingCapabilities {
-                        numbered_handles: child_args.numbered_handles.unwrap_or_default(),
+                        numbered_handles,
                         additional_namespace_entries: vec![],
                         dict: None,
                     },

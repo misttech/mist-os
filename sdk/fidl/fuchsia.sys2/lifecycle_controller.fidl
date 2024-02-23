@@ -98,6 +98,7 @@ type CreateError = flexible enum {
     // The specified collection does not allow dynamic offers.
     DYNAMIC_OFFERS_FORBIDDEN = 8;
     // The specified collection does not allow eager startup.
+    @available(removed=19)
     EAGER_STARTUP_FORBIDDEN = 9;
     // The specified collection does not allow numbered handles.
     NUMBERED_HANDLES_FORBIDDEN = 10;

@@ -171,11 +171,11 @@ async fn child_args() {
             .expect("fidl error in create_child")
             .expect("failed to create_child");
 
-        // NOTE: Although we specified StartupMode::Lazy above, which is the only supported mode for
-        // dynamic components. |create_child| will actually start the component immediately without
-        // the need to manually bind it, because "the instances in a single run collection are
-        // started when they are created" (see //docs/concepts/components/v2/realms.md).
-        // https://fxbug.dev/42171498 discusses the idea to remove the startup parameter.
+        // NOTE: Although we specified StartupMode::Lazy above, |create_child| will actually start
+        // the component immediately without the need to manually bind it, because "the instances
+        // in a single run collection are started when they are created" (see
+        // //docs/concepts/components/v2/realms.md). https://fxbug.dev/42171498 discusses the idea
+        // to remove the startup parameter.
 
         fasync::OnSignals::new(&our_socket, zx::Signals::SOCKET_READABLE)
             .await
@@ -233,6 +233,30 @@ async fn child_args() {
             .await
             .expect("OBJECT_PEER_CLOSED should be signaled after the child exits");
     }
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn eager() {
+    let realm = client::connect_to_protocol::<fcomponent::RealmMarker>().unwrap();
+
+    let collection_ref = fdecl::CollectionRef { name: "eager".to_string() };
+    let child_decl = fdecl::Child {
+        name: Some("a".into()),
+        url: Some("#meta/trigger_a.cm".into()),
+        startup: Some(fdecl::StartupMode::Eager),
+        ..Default::default()
+    };
+    let (controller_proxy, server_end) =
+        endpoints::create_proxy::<fcomponent::ControllerMarker>().unwrap();
+    let child_args =
+        fcomponent::CreateChildArgs { controller: Some(server_end), ..Default::default() };
+    realm.create_child(&collection_ref, &child_decl, child_args).await.unwrap().unwrap();
+
+    // [create_child] blocks for eager children to start so it should be started already.
+    assert_eq!(controller_proxy.is_started().await.unwrap().unwrap(), true);
+
+    let child_ref = new_child_ref("a", "eager");
+    realm.destroy_child(&child_ref).await.unwrap().unwrap();
 }
 
 fn new_child_ref(name: &str, collection: &str) -> fdecl::ChildRef {

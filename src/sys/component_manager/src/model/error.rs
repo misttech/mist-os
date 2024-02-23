@@ -217,8 +217,6 @@ impl OpenOutgoingDirError {
 
 #[derive(Debug, Error, Clone)]
 pub enum AddDynamicChildError {
-    #[error("dynamic children cannot have eager startup")]
-    EagerStartupUnsupported,
     #[error("component collection not found with name {}", name)]
     CollectionNotFound { name: String },
     #[error(
@@ -257,7 +255,6 @@ impl Into<fcomponent::Error> for AddDynamicChildError {
             AddDynamicChildError::NumberedHandleNotInSingleRunCollection => {
                 fcomponent::Error::Unsupported
             }
-            AddDynamicChildError::EagerStartupUnsupported => fcomponent::Error::Unsupported,
             AddDynamicChildError::AddChildError {
                 err: AddChildError::InstanceAlreadyExists { .. },
             } => fcomponent::Error::InstanceAlreadyExists,
@@ -287,9 +284,6 @@ impl Into<fsys::CreateError> for AddDynamicChildError {
         match self {
             AddDynamicChildError::CollectionNotFound { .. } => {
                 fsys::CreateError::CollectionNotFound
-            }
-            AddDynamicChildError::EagerStartupUnsupported => {
-                fsys::CreateError::EagerStartupForbidden
             }
             AddDynamicChildError::AddChildError {
                 err: AddChildError::InstanceAlreadyExists { .. },

@@ -62,6 +62,11 @@ closed protocol Realm {
     /// The environment of the child instance is determined by the environment
     /// of the collection. `decl` must not set `environment`.
     ///
+    /// If `decl.startup == EAGER`, or `collection.durability == SINGLE_RUN`,
+    /// [CreateChild] will start the component and return once the component is
+    /// started. Otherwise, [CreateChild] will return immediately after creating
+    /// the component and will not start or resolve it.
+    ///
     /// Errors:
     /// - `INVALID_ARGUMENTS`: `collection` is not a valid reference or `child`
     ///   is not a valid declaration.

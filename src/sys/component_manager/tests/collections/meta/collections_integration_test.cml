@@ -23,6 +23,10 @@
             durability: "transient",
         },
         {
+            name: "eager",
+            durability: "transient",
+        },
+        {
             name: "single_run",
             durability: "single_run",
         },

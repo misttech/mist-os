@@ -442,27 +442,29 @@ mod tests {
                         )
                         .build(),
                 ),
+                // Eagerly launched so it needs a definition
+                ("b", ComponentDeclBuilder::new().build()),
             ],
             vec!["system"].try_into().unwrap(),
         )
         .await;
 
-        let (_event_source, mut event_stream) =
-            test.new_event_stream(vec![EventType::Discovered.into()]).await;
+        let (_event_source, mut event_stream) = test
+            .new_event_stream(vec![EventType::Discovered.into(), EventType::Started.into()])
+            .await;
 
         // Test that a dynamic child with a long name can also be created.
         let long_name = &"c".repeat(cm_types::MAX_LONG_NAME_LENGTH);
 
-        // Create children "a", "b", and "<long_name>" in collection. Expect a Discovered event for each.
+        // Create children "a", "b", and "<long_name>" in collection. Expect a Discovered event for
+        // each.
         let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
-        for (name, moniker) in
-            [("a", "coll:a"), ("b", "coll:b"), (long_name, &format!("coll:{}", long_name))]
         {
             // Create a child
             test.realm_proxy
                 .create_child(
                     &collection_ref,
-                    &child_decl(name),
+                    &child_decl("a"),
                     fcomponent::CreateChildArgs::default(),
                 )
                 .await
@@ -471,7 +473,48 @@ mod tests {
 
             // Ensure that an event exists for the new child
             event_stream
-                .wait_until(EventType::Discovered, vec!["system", moniker].try_into().unwrap())
+                .wait_until(EventType::Discovered, "system/coll:a".try_into().unwrap())
+                .await
+                .unwrap();
+        }
+        {
+            // Create a child (eager)
+            let mut child_decl = child_decl("b");
+            child_decl.startup = Some(fdecl::StartupMode::Eager);
+            test.realm_proxy
+                .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
+                .await
+                .unwrap()
+                .unwrap();
+
+            // Ensure that an event exists for the new child
+            event_stream
+                .wait_until(EventType::Discovered, "system/coll:b".try_into().unwrap())
+                .await
+                .unwrap();
+            event_stream
+                .wait_until(EventType::Started, "system/coll:b".try_into().unwrap())
+                .await
+                .unwrap();
+        }
+        {
+            // Create a child (long name)
+            test.realm_proxy
+                .create_child(
+                    &collection_ref,
+                    &child_decl(long_name),
+                    fcomponent::CreateChildArgs::default(),
+                )
+                .await
+                .unwrap()
+                .unwrap();
+
+            // Ensure that an event exists for the new child
+            event_stream
+                .wait_until(
+                    EventType::Discovered,
+                    format!("system/coll:{long_name}").as_str().try_into().unwrap(),
+                )
                 .await
                 .unwrap();
         }
@@ -550,6 +593,7 @@ mod tests {
                 .expect_err("unexpected success");
             assert_eq!(err, fcomponent::Error::InvalidArguments);
         }
+
         // Long dynamic child name violations.
         {
             // Name exceeds MAX_NAME_LENGTH when `allow_long_names` is not set.
@@ -631,25 +675,6 @@ mod tests {
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
             assert_eq!(err, fcomponent::Error::CollectionNotFound);
-        }
-
-        // Unsupported.
-        {
-            let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
-            let child_decl = fdecl::Child {
-                name: Some("b".to_string()),
-                url: Some("test:///b".to_string()),
-                startup: Some(fdecl::StartupMode::Eager),
-                environment: None,
-                ..Default::default()
-            };
-            let err = test
-                .realm_proxy
-                .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
-                .await
-                .expect("fidl call failed")
-                .expect_err("unexpected success");
-            assert_eq!(err, fcomponent::Error::Unsupported);
         }
 
         fn sample_offer_from(source: fdecl::Ref) -> fdecl::Offer {
