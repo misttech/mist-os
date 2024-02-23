@@ -15,7 +15,7 @@ use {
             volume::{FxVolume, RootDir},
         },
     },
-    anyhow::{bail, ensure, Error},
+    anyhow::{anyhow, bail, ensure, Error},
     async_trait::async_trait,
     fidl::endpoints::{create_proxy, ClientEnd, Proxy as _, ServerEnd},
     fidl_fuchsia_fxfs::{
@@ -302,7 +302,20 @@ impl BlobDirectory {
     ) -> Result<Arc<dyn FxNode>, Error> {
         let volume = self.volume();
         match volume.cache().get_or_reserve(object_id).await {
-            GetResult::Node(node) => Ok(node),
+            GetResult::Node(node) => {
+                // Protecting against the scenario where a directory entry points to another node
+                // which has already been loaded and verified with the correct hash. We need to
+                // verify that the hash for the blob that is cached here matches the requested hash.
+                let blob = node.into_any().downcast::<FxBlob>().map_err(|_| {
+                    anyhow!(FxfsError::Inconsistent).context("Loaded non-blob from cache")
+                })?;
+                ensure!(
+                    blob.root() == id.hash,
+                    anyhow!(FxfsError::Inconsistent)
+                        .context("Loaded blob by node that did not match the given hash")
+                );
+                Ok(blob as Arc<dyn FxNode>)
+            }
             GetResult::Placeholder(placeholder) => {
                 let object =
                     ObjectStore::open_object(volume, object_id, HandleOptions::default(), None)
@@ -539,10 +552,11 @@ impl From<object_store::Directory<FxVolume>> for BlobDirectory {
 mod tests {
     use {
         super::*,
-        crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture},
+        crate::fuchsia::fxblob::testing::{new_blob_fixture, open_blob_fixture, BlobFixture},
         assert_matches::assert_matches,
         blob_writer::BlobWriter,
         delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
+        fidl_fuchsia_fxfs::BlobReaderMarker,
         fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _},
         fuchsia_component::client::connect_to_protocol_at_dir_svc,
         fuchsia_fs::directory::{
@@ -749,6 +763,54 @@ mod tests {
             .expect("FIDL failed");
         assert_eq!(Status::from_raw(status), Status::NOT_SUPPORTED);
 
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn test_verify_cached_hash_node() {
+        let fixture = new_blob_fixture().await;
+
+        let data = vec![];
+        let hash = fixture.write_blob(&data, CompressionMode::Never).await;
+        let evil_hash =
+            Hash::from_str("2222222222222222222222222222222222222222222222222222222222222222")
+                .unwrap();
+
+        // Create a malicious link to the existing blob. This shouldn't be possible without special
+        // access either via internal apis or modifying the disk image.
+        {
+            let root = fixture
+                .volume()
+                .root()
+                .clone()
+                .as_node()
+                .into_any()
+                .downcast::<BlobDirectory>()
+                .unwrap()
+                .directory()
+                .clone();
+            root.clone()
+                .link(evil_hash.to_string(), root, &hash.to_string())
+                .await
+                .expect("Linking file");
+        }
+        let device = fixture.close().await;
+
+        let fixture = open_blob_fixture(device).await;
+        {
+            // Hold open a ref to keep it in the node cache.
+            let _vmo = fixture.get_blob_vmo(hash).await;
+
+            // Open the malicious link
+            let blob_reader =
+                connect_to_protocol_at_dir_svc::<BlobReaderMarker>(fixture.volume_out_dir())
+                    .expect("failed to connect to the BlobReader service");
+            blob_reader
+                .get_vmo(&evil_hash.into())
+                .await
+                .expect("transport error on BlobReader.GetVmo")
+                .expect_err("Hashes should mismatch");
+        }
         fixture.close().await;
     }
 }
