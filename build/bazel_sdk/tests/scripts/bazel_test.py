@@ -15,6 +15,7 @@ and experimentation.
 """
 
 import argparse
+import errno
 import json
 import os
 import platform
@@ -31,6 +32,19 @@ _VERBOSE = False
 # Type alias for string or Path type.
 # NOTE: With python 3.10+, it is possible to use 'str | Path' directly.
 StrOrPath = Union[str, Path]
+
+
+def _force_symlink(target_path: Path, link_path: Path):
+    link_path.parent.mkdir(parents=True, exist_ok=True)
+    target_path = os.path.relpath(target_path, link_path.parent)
+    try:
+        link_path.symlink_to(target_path)
+    except OSError as e:
+        if e.errno == errno.EEXIST:
+            link_path.unlink()
+            link_path.symlink_to(target_path)
+        else:
+            raise
 
 
 def _generate_command_string(
@@ -467,15 +481,9 @@ def main():
         if not source_path.exists():
             return None
 
-        dst_file = workspace_dir / ".versions" / name
-        if not dst_file.exists():
-            dst_file.parent.mkdir(parents=True, exist_ok=True)
-            if dst_file.exists():
-                dst_file.unlink()
-            target = os.path.relpath(source_path, dst_file.parent)
-            dst_file.symlink_to(target)
-
-        return ".versions/" + name
+        dst_path = f".versions/{name}"
+        _force_symlink(source_path, workspace_dir / dst_path)
+        return dst_path
 
     python_prebuilt_dir = (
         fuchsia_source_dir / "prebuilt" / "third_party" / "python3" / host_tag
