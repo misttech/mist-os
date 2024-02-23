@@ -44,7 +44,6 @@ constexpr uint32_t kAmlSdmmcSramDescOffset = 0x200;
 constexpr uint32_t kAmlSdmmcPingOffset = 0x400;
 constexpr uint32_t kAmlSdmmcPongOffset = 0x600;
 
-// Safe to use with V3 or V2 -- bits that are not common have been removed.
 class AmlSdmmcClock : public hwreg::RegisterBase<AmlSdmmcClock, uint32_t> {
  public:
   static constexpr uint32_t kCtsOscinClkFreq = 24000000;  // 24MHz
@@ -65,20 +64,8 @@ class AmlSdmmcClock : public hwreg::RegisterBase<AmlSdmmcClock, uint32_t> {
   static constexpr uint32_t kMaxClkDiv = 63;
   static constexpr uint32_t kMaxClkPhase = 3;
   static constexpr uint32_t kMaxDelay = 63;
-  static constexpr uint32_t kMaxDelayV2 = 15;
 
   static auto Get() { return hwreg::RegisterAddr<AmlSdmmcClock>(kAmlSdmmcClockOffset); }
-
-  DEF_FIELD(5, 0, cfg_div);
-  DEF_FIELD(7, 6, cfg_src);
-  DEF_FIELD(9, 8, cfg_co_phase);
-  DEF_FIELD(11, 10, cfg_tx_phase);
-  DEF_FIELD(13, 12, cfg_rx_phase);
-};
-
-class AmlSdmmcClockV3 : public hwreg::RegisterBase<AmlSdmmcClockV3, uint32_t> {
- public:
-  static auto Get() { return hwreg::RegisterAddr<AmlSdmmcClockV3>(kAmlSdmmcClockOffset); }
 
   DEF_FIELD(5, 0, cfg_div);
   DEF_FIELD(7, 6, cfg_src);
@@ -92,22 +79,6 @@ class AmlSdmmcClockV3 : public hwreg::RegisterBase<AmlSdmmcClockV3, uint32_t> {
   DEF_BIT(29, cfg_irq_sdio_sleep);
   DEF_BIT(30, cfg_irq_sdio_sleep_ds);
   DEF_BIT(31, cfg_nand);
-};
-
-class AmlSdmmcClockV2 : public hwreg::RegisterBase<AmlSdmmcClockV2, uint32_t> {
- public:
-  static auto Get() { return hwreg::RegisterAddr<AmlSdmmcClockV2>(kAmlSdmmcClockOffset); }
-
-  DEF_FIELD(5, 0, cfg_div);
-  DEF_FIELD(7, 6, cfg_src);
-  DEF_FIELD(9, 8, cfg_co_phase);
-  DEF_FIELD(11, 10, cfg_tx_phase);
-  DEF_FIELD(13, 12, cfg_rx_phase);
-  DEF_FIELD(19, 16, cfg_tx_delay);
-  DEF_FIELD(23, 20, cfg_rx_delay);
-  DEF_BIT(24, cfg_always_on);
-  DEF_BIT(25, cfg_irq_sdio_sleep);
-  DEF_BIT(26, cfg_irq_sdio_sleep_ds);
 };
 
 class AmlSdmmcCfg : public hwreg::RegisterBase<AmlSdmmcCfg, uint32_t> {
@@ -168,8 +139,8 @@ class AmlSdmmcStatus : public hwreg::RegisterBase<AmlSdmmcStatus, uint32_t> {
 
 class AmlSdmmcCmdCfg : public hwreg::RegisterBase<AmlSdmmcCmdCfg, uint32_t> {
  public:
-  static constexpr uint32_t kDefaultCmdTimeout = 0xc;  // 2^12 ms.
-  static constexpr uint32_t kMaxBlockSize = 512;       // 9 bits
+  static constexpr uint32_t kDefaultCmdTimeout = 0xc;       // 2^12 ms.
+  static constexpr uint32_t kMaxBlockSize = 512;            // 9 bits
   static constexpr uint32_t kMaxBlockCount = (1 << 9) - 1;  // 9 bits
   static constexpr uint32_t kDataAddrAlignment = 4;
 
@@ -223,20 +194,6 @@ class AmlSdmmcCmdResp2 : public hwreg::RegisterBase<AmlSdmmcCmdResp2, uint32_t> 
 class AmlSdmmcCmdResp3 : public hwreg::RegisterBase<AmlSdmmcCmdResp3, uint32_t> {
  public:
   static auto Get() { return hwreg::RegisterAddr<AmlSdmmcCmdResp3>(kAmlSdmmcCmdResp3Offset); }
-};
-
-class AmlSdmmcDelayV2 : public hwreg::RegisterBase<AmlSdmmcDelayV2, uint32_t> {
- public:
-  static auto Get() { return hwreg::RegisterAddr<AmlSdmmcDelayV2>(kAmlSdmmcDelayV2Offset); }
-
-  DEF_FIELD(3, 0, dly_0);
-  DEF_FIELD(7, 4, dly_1);
-  DEF_FIELD(11, 8, dly_2);
-  DEF_FIELD(15, 12, dly_3);
-  DEF_FIELD(19, 16, dly_4);
-  DEF_FIELD(23, 20, dly_5);
-  DEF_FIELD(27, 24, dly_6);
-  DEF_FIELD(31, 28, dly_7);
 };
 
 class AmlSdmmcDelay1 : public hwreg::RegisterBase<AmlSdmmcDelay1, uint32_t> {
@@ -333,20 +290,6 @@ class AmlSdmmcStart : public hwreg::RegisterBase<AmlSdmmcStart, uint32_t> {
 class AmlSdmmcAdjust : public hwreg::RegisterBase<AmlSdmmcAdjust, uint32_t> {
  public:
   static auto Get() { return hwreg::RegisterAddr<AmlSdmmcAdjust>(kAmlSdmmcAdjustOffset); }
-  DEF_FIELD(11, 8, cali_sel);
-  DEF_BIT(12, cali_enable);
-  DEF_BIT(13, adj_fixed);
-  DEF_BIT(14, cali_rise);
-  DEF_BIT(15, ds_enable);
-  DEF_FIELD(21, 16, adj_delay);
-  DEF_BIT(22, adj_auto);
-};
-
-class AmlSdmmcAdjustV2 : public hwreg::RegisterBase<AmlSdmmcAdjustV2, uint32_t> {
- public:
-  static auto Get() { return hwreg::RegisterAddr<AmlSdmmcAdjustV2>(kAmlSdmmcAdjustV2Offset); }
-  DEF_FIELD(3, 0, dly_8);
-  DEF_FIELD(7, 4, dly_9);
   DEF_FIELD(11, 8, cali_sel);
   DEF_BIT(12, cali_enable);
   DEF_BIT(13, adj_fixed);

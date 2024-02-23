@@ -230,8 +230,6 @@ class AmlSdmmc : public fdf::DriverBase,
   void SetTuneSettings(const TuneSettings& settings) TA_REQ(lock_);
   TuneSettings GetTuneSettings() TA_REQ(lock_);
 
-  uint32_t max_delay() const;
-
   void ConfigureDefaultRegs() TA_REQ(lock_);
   aml_sdmmc_desc_t* SetupCmdDesc(const sdmmc_req_t& req) TA_REQ(lock_);
   // Returns a pointer to the LAST descriptor used.

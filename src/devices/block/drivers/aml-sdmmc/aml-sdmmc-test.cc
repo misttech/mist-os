@@ -228,7 +228,6 @@ class AmlSdmmcTest : public zxtest::Test {
     aml_sdmmc_config_t metadata = {
         .min_freq = 400000,
         .max_freq = 120000000,
-        .version_3 = true,
         .prefs = 0,
     };
     incoming_.SyncCall([&, bti = std::move(bti)](IncomingNamespace* incoming) mutable {
@@ -282,7 +281,6 @@ class AmlSdmmcTest : public zxtest::Test {
     dut_->set_board_config({
         .min_freq = 400000,
         .max_freq = 120000000,
-        .version_3 = true,
         .prefs = 0,
     });
 
@@ -358,13 +356,12 @@ class AmlSdmmcTest : public zxtest::Test {
   void* descs_ = nullptr;
 };
 
-TEST_F(AmlSdmmcTest, InitV3) {
+TEST_F(AmlSdmmcTest, Init) {
   StartDriver();
 
   dut_->set_board_config({
       .min_freq = 400000,
       .max_freq = 120000000,
-      .version_3 = true,
       .prefs = 0,
   });
 
@@ -372,7 +369,7 @@ TEST_F(AmlSdmmcTest, InitV3) {
 
   ASSERT_OK(dut_->Init({}));
 
-  EXPECT_EQ(AmlSdmmcClock::Get().ReadFrom(&*mmio_).reg_value(), AmlSdmmcClockV3::Get()
+  EXPECT_EQ(AmlSdmmcClock::Get().ReadFrom(&*mmio_).reg_value(), AmlSdmmcClock::Get()
                                                                     .FromValue(0)
                                                                     .set_cfg_div(60)
                                                                     .set_cfg_src(0)
@@ -383,32 +380,7 @@ TEST_F(AmlSdmmcTest, InitV3) {
                                                                     .reg_value());
 }
 
-TEST_F(AmlSdmmcTest, InitV2) {
-  StartDriver();
-
-  dut_->set_board_config({
-      .min_freq = 400000,
-      .max_freq = 120000000,
-      .version_3 = false,
-      .prefs = 0,
-  });
-
-  AmlSdmmcClock::Get().FromValue(0).WriteTo(&*mmio_);
-
-  ASSERT_OK(dut_->Init({}));
-
-  EXPECT_EQ(AmlSdmmcClock::Get().ReadFrom(&*mmio_).reg_value(), AmlSdmmcClockV2::Get()
-                                                                    .FromValue(0)
-                                                                    .set_cfg_div(60)
-                                                                    .set_cfg_src(0)
-                                                                    .set_cfg_co_phase(2)
-                                                                    .set_cfg_tx_phase(0)
-                                                                    .set_cfg_rx_phase(0)
-                                                                    .set_cfg_always_on(1)
-                                                                    .reg_value());
-}
-
-TEST_F(AmlSdmmcTest, TuningV3) {
+TEST_F(AmlSdmmcTest, Tuning) {
   StartDriver();
 
   ASSERT_OK(dut_->Init({}));
@@ -417,48 +389,15 @@ TEST_F(AmlSdmmcTest, TuningV3) {
   AmlSdmmcCfg::Get().ReadFrom(&*mmio_).set_bus_width(AmlSdmmcCfg::kBusWidth4Bit).WriteTo(&*mmio_);
 
   auto adjust = AmlSdmmcAdjust::Get().FromValue(0);
-  auto adjust_v2 = AmlSdmmcAdjustV2::Get().FromValue(0);
 
   adjust.set_adj_fixed(0).set_adj_delay(0x3f).WriteTo(&*mmio_);
-  adjust_v2.set_adj_fixed(0).set_adj_delay(0x3f).WriteTo(&*mmio_);
 
   EXPECT_OK(dut_->SdmmcPerformTuning(SD_SEND_TUNING_BLOCK));
 
   adjust.ReadFrom(&*mmio_);
-  adjust_v2.ReadFrom(&*mmio_);
 
   EXPECT_EQ(adjust.adj_fixed(), 1);
   EXPECT_EQ(adjust.adj_delay(), 0);
-}
-
-TEST_F(AmlSdmmcTest, TuningV2) {
-  StartDriver();
-
-  dut_->set_board_config({
-      .min_freq = 400000,
-      .max_freq = 120000000,
-      .version_3 = false,
-      .prefs = 0,
-  });
-
-  ASSERT_OK(dut_->Init({}));
-
-  AmlSdmmcClock::Get().FromValue(0).set_cfg_div(10).WriteTo(&*mmio_);
-  AmlSdmmcCfg::Get().ReadFrom(&*mmio_).set_bus_width(AmlSdmmcCfg::kBusWidth4Bit).WriteTo(&*mmio_);
-
-  auto adjust = AmlSdmmcAdjust::Get().FromValue(0);
-  auto adjust_v2 = AmlSdmmcAdjustV2::Get().FromValue(0);
-
-  adjust.set_adj_fixed(0).set_adj_delay(0x3f).WriteTo(&*mmio_);
-  adjust_v2.set_adj_fixed(0).set_adj_delay(0x3f).WriteTo(&*mmio_);
-
-  EXPECT_OK(dut_->SdmmcPerformTuning(SD_SEND_TUNING_BLOCK));
-
-  adjust.ReadFrom(&*mmio_);
-  adjust_v2.ReadFrom(&*mmio_);
-
-  EXPECT_EQ(adjust_v2.adj_fixed(), 1);
-  EXPECT_EQ(adjust_v2.adj_delay(), 0);
 }
 
 TEST_F(AmlSdmmcTest, DelayLineTuningAllPass) {
@@ -467,7 +406,6 @@ TEST_F(AmlSdmmcTest, DelayLineTuningAllPass) {
   dut_->set_board_config({
       .min_freq = 400000,
       .max_freq = 120000000,
-      .version_3 = true,
       .prefs = 0,
   });
   ASSERT_OK(dut_->Init({}));
@@ -527,7 +465,6 @@ TEST_F(AmlSdmmcTest, DelayLineTuningFailingPoint) {
   dut_->set_board_config({
       .min_freq = 400000,
       .max_freq = 120000000,
-      .version_3 = true,
       .prefs = 0,
   });
   ASSERT_OK(dut_->Init({}));
@@ -587,7 +524,6 @@ TEST_F(AmlSdmmcTest, DelayLineTuningEvenDivider) {
   dut_->set_board_config({
       .min_freq = 400000,
       .max_freq = 120000000,
-      .version_3 = true,
       .prefs = 0,
   });
   ASSERT_OK(dut_->Init({}));
@@ -646,7 +582,6 @@ TEST_F(AmlSdmmcTest, DelayLineTuningOddDivider) {
   dut_->set_board_config({
       .min_freq = 400000,
       .max_freq = 120000000,
-      .version_3 = true,
       .prefs = 0,
   });
   ASSERT_OK(dut_->Init({}));
@@ -700,7 +635,6 @@ TEST_F(AmlSdmmcTest, DelayLineTuningCorrectFailingWindowIfLastOne) {
   dut_->set_board_config({
       .min_freq = 400000,
       .max_freq = 120000000,
-      .version_3 = true,
       .prefs = 0,
   });
   ASSERT_OK(dut_->Init({}));

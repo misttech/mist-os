@@ -690,29 +690,16 @@ zx_status_t AmlSdmmc::ResumePower() {
 }
 
 void AmlSdmmc::ConfigureDefaultRegs() {
-  if (board_config_.version_3) {
-    uint32_t clk_val = AmlSdmmcClockV3::Get()
-                           .FromValue(0)
-                           .set_cfg_div(AmlSdmmcClock::kDefaultClkDiv)
-                           .set_cfg_src(AmlSdmmcClock::kDefaultClkSrc)
-                           .set_cfg_co_phase(AmlSdmmcClock::kDefaultClkCorePhase)
-                           .set_cfg_tx_phase(AmlSdmmcClock::kDefaultClkTxPhase)
-                           .set_cfg_rx_phase(AmlSdmmcClock::kDefaultClkRxPhase)
-                           .set_cfg_always_on(1)
-                           .reg_value();
-    AmlSdmmcClockV3::Get().ReadFrom(&*mmio_).set_reg_value(clk_val).WriteTo(&*mmio_);
-  } else {
-    uint32_t clk_val = AmlSdmmcClockV2::Get()
-                           .FromValue(0)
-                           .set_cfg_div(AmlSdmmcClock::kDefaultClkDiv)
-                           .set_cfg_src(AmlSdmmcClock::kDefaultClkSrc)
-                           .set_cfg_co_phase(AmlSdmmcClock::kDefaultClkCorePhase)
-                           .set_cfg_tx_phase(AmlSdmmcClock::kDefaultClkTxPhase)
-                           .set_cfg_rx_phase(AmlSdmmcClock::kDefaultClkRxPhase)
-                           .set_cfg_always_on(1)
-                           .reg_value();
-    AmlSdmmcClockV2::Get().ReadFrom(&*mmio_).set_reg_value(clk_val).WriteTo(&*mmio_);
-  }
+  uint32_t clk_val = AmlSdmmcClock::Get()
+                         .FromValue(0)
+                         .set_cfg_div(AmlSdmmcClock::kDefaultClkDiv)
+                         .set_cfg_src(AmlSdmmcClock::kDefaultClkSrc)
+                         .set_cfg_co_phase(AmlSdmmcClock::kDefaultClkCorePhase)
+                         .set_cfg_tx_phase(AmlSdmmcClock::kDefaultClkTxPhase)
+                         .set_cfg_rx_phase(AmlSdmmcClock::kDefaultClkRxPhase)
+                         .set_cfg_always_on(1)
+                         .reg_value();
+  AmlSdmmcClock::Get().ReadFrom(&*mmio_).set_reg_value(clk_val).WriteTo(&*mmio_);
 
   uint32_t config_val = AmlSdmmcCfg::Get()
                             .FromValue(0)
@@ -732,14 +719,9 @@ void AmlSdmmc::ConfigureDefaultRegs() {
       .WriteTo(&*mmio_);
 
   // Zero out any delay line or sampling settings that may have come from the bootloader.
-  if (board_config_.version_3) {
-    AmlSdmmcAdjust::Get().FromValue(0).WriteTo(&*mmio_);
-    AmlSdmmcDelay1::Get().FromValue(0).WriteTo(&*mmio_);
-    AmlSdmmcDelay2::Get().FromValue(0).WriteTo(&*mmio_);
-  } else {
-    AmlSdmmcAdjustV2::Get().FromValue(0).WriteTo(&*mmio_);
-    AmlSdmmcDelayV2::Get().FromValue(0).WriteTo(&*mmio_);
-  }
+  AmlSdmmcAdjust::Get().FromValue(0).WriteTo(&*mmio_);
+  AmlSdmmcDelay1::Get().FromValue(0).WriteTo(&*mmio_);
+  AmlSdmmcDelay2::Get().FromValue(0).WriteTo(&*mmio_);
 }
 
 void AmlSdmmc::HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) {
@@ -1212,7 +1194,7 @@ bool AmlSdmmc::TuningTestSettings(const TuneContext& context) {
 AmlSdmmc::TuneWindow AmlSdmmc::GetFailingWindow(TuneResults results) {
   TuneWindow largest_window, current_window;
 
-  for (uint32_t delay = 0; delay <= max_delay(); delay++, results.results >>= 1) {
+  for (uint32_t delay = 0; delay <= AmlSdmmcClock::kMaxDelay; delay++, results.results >>= 1) {
     if (results.results & 1) {
       if (current_window.size > largest_window.size) {
         largest_window = current_window;
@@ -1227,7 +1209,7 @@ AmlSdmmc::TuneWindow AmlSdmmc::GetFailingWindow(TuneResults results) {
   if (current_window.start == 0) {
     // The best window will not have been set if no values failed. If that happens the current
     // window start will still be set to zero -- check for that case and update the best window.
-    largest_window = {.start = 0, .size = max_delay() + 1};
+    largest_window = {.start = 0, .size = AmlSdmmcClock::kMaxDelay + 1};
   } else if (current_window.size > largest_window.size) {
     // If the final value passed then the last (and current) window was never checked against the
     // best window. Make the last window the best window if it is larger than the previous best.
@@ -1240,7 +1222,7 @@ AmlSdmmc::TuneWindow AmlSdmmc::GetFailingWindow(TuneResults results) {
 AmlSdmmc::TuneResults AmlSdmmc::TuneDelayLines(const TuneContext& context) {
   TuneResults results = {};
   TuneContext local_context = context;
-  for (uint32_t i = 0; i <= max_delay(); i++) {
+  for (uint32_t i = 0; i <= AmlSdmmcClock::kMaxDelay; i++) {
     local_context.new_settings.delay = i;
     if (TuningTestSettings(local_context)) {
       results.results |= 1ULL << i;
@@ -1250,66 +1232,34 @@ AmlSdmmc::TuneResults AmlSdmmc::TuneDelayLines(const TuneContext& context) {
 }
 
 void AmlSdmmc::SetTuneSettings(const TuneSettings& settings) {
-  if (board_config_.version_3) {
-    AmlSdmmcAdjust::Get()
-        .ReadFrom(&*mmio_)
-        .set_adj_delay(settings.adj_delay)
-        .set_adj_fixed(1)
-        .WriteTo(&*mmio_);
-    AmlSdmmcDelay1::Get()
-        .ReadFrom(&*mmio_)
-        .set_dly_0(settings.delay)
-        .set_dly_1(settings.delay)
-        .set_dly_2(settings.delay)
-        .set_dly_3(settings.delay)
-        .set_dly_4(settings.delay)
-        .WriteTo(&*mmio_);
-    AmlSdmmcDelay2::Get()
-        .ReadFrom(&*mmio_)
-        .set_dly_5(settings.delay)
-        .set_dly_6(settings.delay)
-        .set_dly_7(settings.delay)
-        .set_dly_8(settings.delay)
-        .set_dly_9(settings.delay)
-        .WriteTo(&*mmio_);
-  } else {
-    AmlSdmmcAdjustV2::Get()
-        .ReadFrom(&*mmio_)
-        .set_adj_delay(settings.adj_delay)
-        .set_adj_fixed(1)
-        .set_dly_8(settings.delay)
-        .set_dly_9(settings.delay)
-        .WriteTo(&*mmio_);
-    AmlSdmmcDelayV2::Get()
-        .ReadFrom(&*mmio_)
-        .set_dly_0(settings.delay)
-        .set_dly_1(settings.delay)
-        .set_dly_2(settings.delay)
-        .set_dly_3(settings.delay)
-        .set_dly_4(settings.delay)
-        .set_dly_5(settings.delay)
-        .set_dly_6(settings.delay)
-        .set_dly_7(settings.delay)
-        .WriteTo(&*mmio_);
-  }
+  AmlSdmmcAdjust::Get()
+      .ReadFrom(&*mmio_)
+      .set_adj_delay(settings.adj_delay)
+      .set_adj_fixed(1)
+      .WriteTo(&*mmio_);
+  AmlSdmmcDelay1::Get()
+      .ReadFrom(&*mmio_)
+      .set_dly_0(settings.delay)
+      .set_dly_1(settings.delay)
+      .set_dly_2(settings.delay)
+      .set_dly_3(settings.delay)
+      .set_dly_4(settings.delay)
+      .WriteTo(&*mmio_);
+  AmlSdmmcDelay2::Get()
+      .ReadFrom(&*mmio_)
+      .set_dly_5(settings.delay)
+      .set_dly_6(settings.delay)
+      .set_dly_7(settings.delay)
+      .set_dly_8(settings.delay)
+      .set_dly_9(settings.delay)
+      .WriteTo(&*mmio_);
 }
 
 AmlSdmmc::TuneSettings AmlSdmmc::GetTuneSettings() {
   TuneSettings settings{};
-
-  if (board_config_.version_3) {
-    settings.adj_delay = AmlSdmmcAdjust::Get().ReadFrom(&*mmio_).adj_delay();
-    settings.delay = AmlSdmmcDelay1::Get().ReadFrom(&*mmio_).dly_0();
-  } else {
-    settings.adj_delay = AmlSdmmcAdjustV2::Get().ReadFrom(&*mmio_).adj_delay();
-    settings.delay = AmlSdmmcDelayV2::Get().ReadFrom(&*mmio_).dly_0();
-  }
-
+  settings.adj_delay = AmlSdmmcAdjust::Get().ReadFrom(&*mmio_).adj_delay();
+  settings.delay = AmlSdmmcDelay1::Get().ReadFrom(&*mmio_).dly_0();
   return settings;
-}
-
-uint32_t AmlSdmmc::max_delay() const {
-  return board_config_.version_3 ? AmlSdmmcClock::kMaxDelay : AmlSdmmcClock::kMaxDelayV2;
 }
 
 inline uint32_t AbsDifference(uint32_t a, uint32_t b) { return a > b ? a - b : b - a; }
@@ -1317,8 +1267,8 @@ inline uint32_t AbsDifference(uint32_t a, uint32_t b) { return a > b ? a - b : b
 uint32_t AmlSdmmc::DistanceToFailingPoint(TuneSettings point,
                                           cpp20::span<const TuneResults> adj_delay_results) {
   uint64_t results = adj_delay_results[point.adj_delay].results;
-  uint32_t min_distance = max_delay();
-  for (uint32_t i = 0; i <= max_delay(); i++, results >>= 1) {
+  uint32_t min_distance = AmlSdmmcClock::kMaxDelay;
+  for (uint32_t i = 0; i <= AmlSdmmcClock::kMaxDelay; i++, results >>= 1) {
     if ((results & 1) == 0) {
       const uint32_t distance = AbsDifference(i, point.delay);
       if (distance < min_distance) {
@@ -1395,7 +1345,7 @@ zx_status_t AmlSdmmc::SdmmcPerformTuning(uint32_t tuning_cmd_idx) {
     context.new_settings.adj_delay = i;
     adj_delay_results[i] = TuneDelayLines(context);
 
-    const std::string results = adj_delay_results[i].ToString(max_delay());
+    const std::string results = adj_delay_results[i].ToString(AmlSdmmcClock::kMaxDelay);
 
     inspect::Node node = inspect_.root.CreateChild(property_name);
     inspect_.tuning_results.push_back(node.CreateString("tuning_results", results));
@@ -1691,7 +1641,7 @@ zx_status_t AmlSdmmc::Init(const pdev_device_info_t& device_info) {
   min_freq_ = board_config_.min_freq;
 
   inspect_.Init(device_info, inspector().root());
-  inspect_.max_delay.Set(max_delay() + 1);
+  inspect_.max_delay.Set(AmlSdmmcClock::kMaxDelay + 1);
 
   return ZX_OK;
 }

@@ -30,7 +30,6 @@ typedef struct {
 typedef struct {
   uint32_t min_freq;
   uint32_t max_freq;
-  bool version_3;
   uint32_t prefs;
 } aml_sdmmc_config_t;
 

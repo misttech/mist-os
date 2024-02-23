@@ -59,7 +59,6 @@ static const std::vector<fpbus::Bti> emmc_btis{
 static aml_sdmmc_config_t config = {
     .min_freq = 400000,
     .max_freq = 120000000,
-    .version_3 = true,
     .prefs = SDMMC_HOST_PREFS_DISABLE_HS400,
 };
 
