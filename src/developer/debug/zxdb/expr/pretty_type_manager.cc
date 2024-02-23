@@ -412,7 +412,7 @@ void PrettyTypeManager::AddDefaultRustPrettyTypes() {
 
   // A BinaryHeap is a wrapper around a "Vec" named "data".
   rust_.emplace_back(InternalGlob("alloc::collections::binary_heap::BinaryHeap<*>"),
-                     std::make_unique<PrettyArray>("data.buf.ptr.pointer", "data.len",
+                     std::make_unique<PrettyArray>("data.buf.ptr.pointer.pointer", "data.len",
                                                    GetterList{{"len", "data.len"},
                                                               {"capacity", "data.buf.cap"},
                                                               {"is_empty", "data.len == 0"}}));
@@ -439,7 +439,7 @@ void PrettyTypeManager::AddDefaultRustPrettyTypes() {
   rust_.emplace_back(InternalGlob("core::sync::atomic::AtomicBool"),
                      std::make_unique<PrettyWrappedValue>("AtomicBool", "{", "}", "(bool)v.value"));
   rust_.emplace_back(InternalGlob("core::sync::atomic::AtomicPtr<*>"),
-                     std::make_unique<PrettyWrappedValue>("AtomicPtr", "{", "}", "v.value"));
+                     std::make_unique<PrettyWrappedValue>("AtomicPtr", "{", "}", "p.value"));
 
   // Remove the type annotations and ancillary data for some common wrapper objects. UnsafeCell is
   // used for many internal mutable values. ArcInner is what alloc::sync::Arc holds a reference to.
