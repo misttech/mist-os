@@ -107,7 +107,6 @@ class Nelson : public NelsonType {
   zx_status_t ButtonsInit();
   zx_status_t CanvasInit();
   zx_status_t ClkInit();
-  zx_status_t DsiInit();
   zx_status_t EmmcInit();
   zx_status_t GpioInit();
   zx_status_t I2cInit();

@@ -69,7 +69,6 @@ fuchsia_driver("nelson-module-driver") {
     "nelson-canvas.cc",
     "nelson-clk.cc",
     "nelson-cpu.cc",
-    "nelson-dsi.cc",
     "nelson-emmc.cc",
     "nelson-gpio.cc",
     "nelson-i2c.cc",
