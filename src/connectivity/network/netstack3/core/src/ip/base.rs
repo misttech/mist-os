@@ -47,6 +47,7 @@ use crate::{
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
     device::{AnyDevice, DeviceId, DeviceIdContext, FrameDestination, Id, StrongId, WeakDeviceId},
+    filter::FilterBindingsTypes,
     inspect::{Inspectable, Inspector},
     ip::{
         device::{
@@ -56,10 +57,11 @@ use crate::{
         forwarding::{ForwardingTable, IpForwardingDeviceContext},
         icmp::{
             self,
-            socket::{IcmpSocketId, IcmpSocketSet, IcmpSocketState},
-            IcmpErrorHandler, IcmpHandlerIpExt, IcmpIpExt, IcmpIpTransportContext, Icmpv4Error,
-            Icmpv4ErrorCode, Icmpv4ErrorKind, Icmpv4State, Icmpv4StateBuilder, Icmpv6ErrorCode,
-            Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder, InnerIcmpContext,
+            socket::{IcmpEchoBindingsTypes, IcmpSocketId, IcmpSocketSet, IcmpSocketState},
+            IcmpBindingsTypes, IcmpErrorHandler, IcmpHandlerIpExt, IcmpIpExt,
+            IcmpIpTransportContext, Icmpv4Error, Icmpv4ErrorCode, Icmpv4ErrorKind, Icmpv4State,
+            Icmpv4StateBuilder, Icmpv6ErrorCode, Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder,
+            InnerIcmpContext,
         },
         ipv6,
         ipv6::Ipv6PacketAction,
@@ -75,7 +77,7 @@ use crate::{
     sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     transport::{tcp::socket::TcpIpTransportContext, udp::UdpIpTransportContext},
     uninstantiable::UninstantiableWrapper,
-    BindingsContext, BindingsTypes, CoreCtx, Instant, StackState,
+    BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
 /// Default IPv4 TTL.
@@ -465,8 +467,8 @@ pub enum Ipv6PresentAddressStatus {
 /// An extension trait providing IP layer properties.
 pub trait IpLayerIpExt: IpExt {
     type AddressStatus;
-    type State<I: Instant, StrongDeviceId: StrongId, DeviceClass>: AsRef<
-        IpStateInner<Self, I, StrongDeviceId>,
+    type State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>: AsRef<
+        IpStateInner<Self, BT::Instant, StrongDeviceId>,
     >;
     type PacketIdState;
     type PacketId;
@@ -476,8 +478,7 @@ pub trait IpLayerIpExt: IpExt {
 
 impl IpLayerIpExt for Ipv4 {
     type AddressStatus = Ipv4PresentAddressStatus;
-    type State<I: Instant, StrongDeviceId: StrongId, DeviceClass> =
-        Ipv4State<I, StrongDeviceId, DeviceClass>;
+    type State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> = Ipv4State<StrongDeviceId, BT>;
     type PacketIdState = AtomicU16;
     type PacketId = u16;
     type RxCounters = Ipv4RxCounters;
@@ -493,8 +494,7 @@ impl IpLayerIpExt for Ipv4 {
 
 impl IpLayerIpExt for Ipv6 {
     type AddressStatus = Ipv6PresentAddressStatus;
-    type State<I: Instant, StrongDeviceId: StrongId, DeviceClass> =
-        Ipv6State<I, StrongDeviceId, DeviceClass>;
+    type State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> = Ipv6State<StrongDeviceId, BT>;
     type PacketIdState = ();
     type PacketId = ();
     type RxCounters = Ipv6RxCounters;
@@ -620,6 +620,10 @@ impl<
     > IpLayerBindingsContext<I, DeviceId> for BC
 {
 }
+
+/// A marker trait for bindings types at the IP layer.
+pub trait IpLayerBindingsTypes: FilterBindingsTypes + IcmpBindingsTypes {}
+impl<BT: FilterBindingsTypes + IcmpBindingsTypes> IpLayerBindingsTypes for BT {}
 
 /// The execution context for the IP layer.
 pub trait IpLayerContext<
@@ -1116,9 +1120,9 @@ impl Ipv4StateBuilder {
         &mut self.icmp
     }
 
-    pub(crate) fn build<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass>(
+    pub(crate) fn build<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>(
         self,
-    ) -> Ipv4State<Instant, StrongDeviceId, DeviceClass> {
+    ) -> Ipv4State<StrongDeviceId, BT> {
         let Ipv4StateBuilder { icmp } = self;
 
         Ipv4State {
@@ -1137,9 +1141,9 @@ pub(crate) struct Ipv6StateBuilder {
 }
 
 impl Ipv6StateBuilder {
-    pub(crate) fn build<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass>(
+    pub(crate) fn build<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>(
         self,
-    ) -> Ipv6State<Instant, StrongDeviceId, DeviceClass> {
+    ) -> Ipv6State<StrongDeviceId, BT> {
         let Ipv6StateBuilder { icmp } = self;
 
         Ipv6State {
@@ -1151,33 +1155,31 @@ impl Ipv6StateBuilder {
     }
 }
 
-pub struct Ipv4State<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass> {
-    pub(super) inner: IpStateInner<Ipv4, Instant, StrongDeviceId>,
-    pub(super) icmp: Icmpv4State<Instant, StrongDeviceId::Weak>,
+pub struct Ipv4State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> {
+    pub(super) inner: IpStateInner<Ipv4, BT::Instant, StrongDeviceId>,
+    pub(super) icmp: Icmpv4State<StrongDeviceId::Weak, BT>,
     pub(super) next_packet_id: AtomicU16,
-    pub(super) filter: RwLock<crate::filter::ValidState<Ipv4, DeviceClass>>,
+    pub(super) filter: RwLock<crate::filter::ValidState<Ipv4, BT::DeviceClass>>,
 }
 
-impl<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass>
-    Ipv4State<Instant, StrongDeviceId, DeviceClass>
-{
-    pub fn filter(&self) -> &RwLock<crate::filter::ValidState<Ipv4, DeviceClass>> {
+impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv4State<StrongDeviceId, BT> {
+    pub fn filter(&self) -> &RwLock<crate::filter::ValidState<Ipv4, BT::DeviceClass>> {
         &self.filter
     }
 
-    pub(crate) fn inner(&self) -> &IpStateInner<Ipv4, Instant, StrongDeviceId> {
+    pub(crate) fn inner(&self) -> &IpStateInner<Ipv4, BT::Instant, StrongDeviceId> {
         &self.inner
     }
 
-    pub(crate) fn icmp(&self) -> &Icmpv4State<Instant, StrongDeviceId::Weak> {
+    pub(crate) fn icmp(&self) -> &Icmpv4State<StrongDeviceId::Weak, BT> {
         &self.icmp
     }
 }
 
-impl<I: Instant, StrongDeviceId: StrongId, DeviceClass> AsRef<IpStateInner<Ipv4, I, StrongDeviceId>>
-    for Ipv4State<I, StrongDeviceId, DeviceClass>
+impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>
+    AsRef<IpStateInner<Ipv4, BT::Instant, StrongDeviceId>> for Ipv4State<StrongDeviceId, BT>
 {
-    fn as_ref(&self) -> &IpStateInner<Ipv4, I, StrongDeviceId> {
+    fn as_ref(&self) -> &IpStateInner<Ipv4, BT::Instant, StrongDeviceId> {
         &self.inner
     }
 }
@@ -1188,37 +1190,35 @@ pub(super) fn gen_ip_packet_id<I: IpLayerIpExt, BC, CC: IpDeviceStateContext<I, 
     core_ctx.with_next_packet_id(|state| I::next_packet_id_from_state(state))
 }
 
-pub struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass> {
-    pub(super) inner: IpStateInner<Ipv6, Instant, StrongDeviceId>,
-    pub(super) icmp: Icmpv6State<Instant, StrongDeviceId::Weak>,
+pub struct Ipv6State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> {
+    pub(super) inner: IpStateInner<Ipv6, BT::Instant, StrongDeviceId>,
+    pub(super) icmp: Icmpv6State<StrongDeviceId::Weak, BT>,
     pub(super) slaac_counters: SlaacCounters,
-    pub(super) filter: RwLock<crate::filter::ValidState<Ipv6, DeviceClass>>,
+    pub(super) filter: RwLock<crate::filter::ValidState<Ipv6, BT::DeviceClass>>,
 }
 
-impl<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass>
-    Ipv6State<Instant, StrongDeviceId, DeviceClass>
-{
+impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv6State<StrongDeviceId, BT> {
     pub(crate) fn slaac_counters(&self) -> &SlaacCounters {
         &self.slaac_counters
     }
 
-    pub fn filter(&self) -> &RwLock<crate::filter::ValidState<Ipv6, DeviceClass>> {
+    pub fn filter(&self) -> &RwLock<crate::filter::ValidState<Ipv6, BT::DeviceClass>> {
         &self.filter
     }
 
-    pub(crate) fn inner(&self) -> &IpStateInner<Ipv6, Instant, StrongDeviceId> {
+    pub(crate) fn inner(&self) -> &IpStateInner<Ipv6, BT::Instant, StrongDeviceId> {
         &self.inner
     }
 
-    pub(crate) fn icmp(&self) -> &Icmpv6State<Instant, StrongDeviceId::Weak> {
+    pub(crate) fn icmp(&self) -> &Icmpv6State<StrongDeviceId::Weak, BT> {
         &self.icmp
     }
 }
 
-impl<I: Instant, StrongDeviceId: StrongId, DeviceClass> AsRef<IpStateInner<Ipv6, I, StrongDeviceId>>
-    for Ipv6State<I, StrongDeviceId, DeviceClass>
+impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>
+    AsRef<IpStateInner<Ipv6, BT::Instant, StrongDeviceId>> for Ipv6State<StrongDeviceId, BT>
 {
-    fn as_ref(&self) -> &IpStateInner<Ipv6, I, StrongDeviceId> {
+    fn as_ref(&self) -> &IpStateInner<Ipv6, BT::Instant, StrongDeviceId> {
         &self.inner
     }
 }
@@ -1272,7 +1272,7 @@ where
     I: datagram::DualStackIpExt,
     BT: BindingsTypes,
 {
-    type Data = icmp::socket::BoundSockets<I, WeakDeviceId<BT>>;
+    type Data = icmp::socket::BoundSockets<I, WeakDeviceId<BT>, BT>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
@@ -1284,10 +1284,10 @@ where
     }
 }
 
-impl<I: datagram::DualStackIpExt, D: crate::device::WeakId>
-    RwLockFor<crate::lock_ordering::IcmpSocketState<I>> for IcmpSocketId<I, D>
+impl<I: datagram::DualStackIpExt, D: crate::device::WeakId, BT: IcmpEchoBindingsTypes>
+    RwLockFor<crate::lock_ordering::IcmpSocketState<I>> for IcmpSocketId<I, D, BT>
 {
-    type Data = IcmpSocketState<I, D>;
+    type Data = IcmpSocketState<I, D, BT>;
 
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Self::Data>
     where
@@ -1310,7 +1310,7 @@ where
     I: datagram::DualStackIpExt,
     BT: BindingsTypes,
 {
-    type Data = IcmpSocketSet<I, WeakDeviceId<BT>>;
+    type Data = IcmpSocketSet<I, WeakDeviceId<BT>, BT>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
@@ -2866,7 +2866,7 @@ impl<
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut icmp::socket::BoundSockets<Ipv4, Self::WeakDeviceId>,
+            &mut icmp::socket::BoundSockets<Ipv4, Self::WeakDeviceId, BC>,
         ) -> O,
     >(
         &mut self,
@@ -2959,7 +2959,7 @@ impl<
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut icmp::socket::BoundSockets<Ipv6, Self::WeakDeviceId>,
+            &mut icmp::socket::BoundSockets<Ipv6, Self::WeakDeviceId, BC>,
         ) -> O,
     >(
         &mut self,
@@ -2991,7 +2991,7 @@ impl<
 {
     type SocketStateCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IcmpSocketState<I>>;
 
-    fn with_all_sockets_mut<O, F: FnOnce(&mut IcmpSocketSet<I, Self::WeakDeviceId>) -> O>(
+    fn with_all_sockets_mut<O, F: FnOnce(&mut IcmpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
@@ -3000,10 +3000,10 @@ impl<
 
     fn with_socket_state<
         O,
-        F: FnOnce(&mut Self::SocketStateCtx<'_>, &IcmpSocketState<I, Self::WeakDeviceId>) -> O,
+        F: FnOnce(&mut Self::SocketStateCtx<'_>, &IcmpSocketState<I, Self::WeakDeviceId, BC>) -> O,
     >(
         &mut self,
-        id: &IcmpSocketId<I, Self::WeakDeviceId>,
+        id: &IcmpSocketId<I, Self::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
         let mut locked = self.adopt(id);
@@ -3015,10 +3015,10 @@ impl<
 
     fn with_socket_state_mut<
         O,
-        F: FnOnce(&mut Self::SocketStateCtx<'_>, &mut IcmpSocketState<I, Self::WeakDeviceId>) -> O,
+        F: FnOnce(&mut Self::SocketStateCtx<'_>, &mut IcmpSocketState<I, Self::WeakDeviceId, BC>) -> O,
     >(
         &mut self,
-        id: &IcmpSocketId<I, Self::WeakDeviceId>,
+        id: &IcmpSocketId<I, Self::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
         let mut locked = self.adopt(id);

@@ -73,7 +73,7 @@ use netstack3_core::{
     },
     error::NetstackError,
     filter::FilterBindingsTypes,
-    icmp::{IcmpEchoBindingsContext, IcmpSocketId},
+    icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId},
     inspect::{InspectableValue, Inspector},
     ip::{
         AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
@@ -543,7 +543,7 @@ impl<I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho> + Ip
 {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
-        conn: &IcmpSocketId<I, WeakDeviceId<BindingsCtx>>,
+        conn: &IcmpSocketId<I, WeakDeviceId<BindingsCtx>, BindingsCtx>,
         device: &DeviceId<BindingsCtx>,
         src_ip: I::Addr,
         dst_ip: I::Addr,
@@ -554,6 +554,10 @@ impl<I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho> + Ip
             c.receive_icmp_echo_reply(conn, device, src_ip, dst_ip, id, data)
         })
     }
+}
+
+impl IcmpEchoBindingsTypes for BindingsCtx {
+    type ExternalData<I: Ip> = ();
 }
 
 impl<I> UdpReceiveBindingsContext<I, DeviceId<BindingsCtx>> for BindingsCtx

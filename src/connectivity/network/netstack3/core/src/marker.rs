@@ -26,7 +26,7 @@ use crate::{
             nud::{NudBindingsContext, NudContext},
             IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
         },
-        icmp::IcmpBindingsContext,
+        icmp::{IcmpBindingsContext, IcmpBindingsTypes},
         socket::IpSocketContext,
         IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
     },
@@ -115,12 +115,16 @@ where
 /// A marker trait for all the types stored in core objects that are specified
 /// by bindings.
 pub trait BindingsTypes:
-    InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes + FilterBindingsTypes
+    InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes + FilterBindingsTypes + IcmpBindingsTypes
 {
 }
 
 impl<O> BindingsTypes for O where
-    O: InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes + FilterBindingsTypes
+    O: InstantBindingsTypes
+        + DeviceLayerTypes
+        + TcpBindingsTypes
+        + FilterBindingsTypes
+        + IcmpBindingsTypes
 {
 }
 

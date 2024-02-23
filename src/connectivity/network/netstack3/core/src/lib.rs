@@ -128,7 +128,9 @@ pub mod inspect {
 
 /// Methods for dealing with ICMP sockets.
 pub mod icmp {
-    pub use crate::ip::icmp::socket::{IcmpEchoBindingsContext, IcmpSocketId, SocketInfo};
+    pub use crate::ip::icmp::socket::{
+        IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId, SocketInfo,
+    };
 }
 
 /// The Internet Protocol, versions 4 and 6.

@@ -64,8 +64,8 @@ impl StackStateBuilder {
 /// The state associated with the network stack.
 pub struct StackState<BT: BindingsTypes> {
     pub(crate) transport: TransportLayerState<BT>,
-    pub(crate) ipv4: Ipv4State<BT::Instant, DeviceId<BT>, BT::DeviceClass>,
-    pub(crate) ipv6: Ipv6State<BT::Instant, DeviceId<BT>, BT::DeviceClass>,
+    pub(crate) ipv4: Ipv4State<DeviceId<BT>, BT>,
+    pub(crate) ipv6: Ipv6State<DeviceId<BT>, BT>,
     pub(crate) device: DeviceLayerState<BT>,
 }
 
@@ -147,7 +147,7 @@ impl<BT: BindingsTypes> StackState<BT> {
 
     pub(crate) fn inner_icmp_state<I: ip::IpExt + datagram::DualStackIpExt>(
         &self,
-    ) -> &IcmpState<I, BT::Instant, WeakDeviceId<BT>> {
+    ) -> &IcmpState<I, WeakDeviceId<BT>, BT> {
         I::map_ip((), |()| &self.ipv4.icmp().inner, |()| &self.ipv6.icmp().inner)
     }
 }

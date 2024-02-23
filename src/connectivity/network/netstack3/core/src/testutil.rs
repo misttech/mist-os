@@ -81,7 +81,7 @@ use crate::{
             nud::{self, LinkResolutionContext, LinkResolutionNotifier},
             IpDeviceEvent,
         },
-        icmp::socket::{IcmpEchoBindingsContext, IcmpSocketId},
+        icmp::socket::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId},
         types::{AddableEntry, AddableMetric, RawMetric},
         IpLayerEvent,
     },
@@ -532,8 +532,10 @@ pub(crate) mod benchmarks {
 #[derive(Default)]
 /// Bindings context state held by [`FakeBindingsCtx`].
 pub struct FakeBindingsCtxState {
-    icmpv4_replies: HashMap<IcmpSocketId<Ipv4, WeakDeviceId<FakeBindingsCtx>>, Vec<Vec<u8>>>,
-    icmpv6_replies: HashMap<IcmpSocketId<Ipv6, WeakDeviceId<FakeBindingsCtx>>, Vec<Vec<u8>>>,
+    icmpv4_replies:
+        HashMap<IcmpSocketId<Ipv4, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>, Vec<Vec<u8>>>,
+    icmpv6_replies:
+        HashMap<IcmpSocketId<Ipv6, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>, Vec<Vec<u8>>>,
     udpv4_received: HashMap<UdpSocketId<Ipv4, WeakDeviceId<FakeBindingsCtx>>, Vec<Vec<u8>>>,
     udpv6_received: HashMap<UdpSocketId<Ipv6, WeakDeviceId<FakeBindingsCtx>>, Vec<Vec<u8>>>,
     pub(crate) rx_available: Vec<LoopbackDeviceId<FakeBindingsCtx>>,
@@ -683,7 +685,7 @@ impl FakeBindingsCtx {
     #[cfg(test)]
     pub(crate) fn take_icmp_replies<I: crate::IpExt>(
         &mut self,
-        conn: &IcmpSocketId<I, WeakDeviceId<FakeBindingsCtx>>,
+        conn: &IcmpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>,
     ) -> Vec<Vec<u8>> {
         I::map_ip::<_, IpInvariant<Option<Vec<_>>>>(
             (IpInvariant(self), conn),
@@ -1485,7 +1487,7 @@ impl<I: crate::IpExt> UdpReceiveBindingsContext<I, DeviceId<Self>> for FakeBindi
 impl<I: crate::IpExt> IcmpEchoBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
-        conn: &IcmpSocketId<I, WeakDeviceId<FakeBindingsCtx>>,
+        conn: &IcmpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>,
         _device: &DeviceId<Self>,
         _src_ip: I::Addr,
         _dst_ip: I::Addr,
@@ -1504,6 +1506,10 @@ impl<I: crate::IpExt> IcmpEchoBindingsContext<I, DeviceId<Self>> for FakeBinding
             },
         )
     }
+}
+
+impl IcmpEchoBindingsTypes for FakeBindingsCtx {
+    type ExternalData<I: Ip> = ();
 }
 
 impl crate::device::socket::DeviceSocketTypes for FakeBindingsCtx {

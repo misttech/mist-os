@@ -32,7 +32,7 @@ use net_types::{
 use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
     error::{LocalAddressError, NotSupportedError, SocketError},
-    icmp::{self, IcmpEchoBindingsContext, IcmpSocketId},
+    icmp,
     ip::{IpSockCreateAndSendError, IpSockSendError},
     socket::{
         self as core_socket, ConnectError, ExpectedConnError, ExpectedUnboundError,
@@ -606,10 +606,12 @@ impl<I: IpExt> UdpReceiveBindingsContext<I, DeviceId<BindingsCtx>> for SocketCol
 #[derive(Debug)]
 pub(crate) enum IcmpEcho {}
 
+type IcmpSocketId<I> = icmp::IcmpSocketId<I, WeakDeviceId<BindingsCtx>, BindingsCtx>;
+
 impl<I: IpExt> Transport<I> for IcmpEcho {
     const PROTOCOL: DatagramProtocol = DatagramProtocol::IcmpEcho;
     const SUPPORTS_DUALSTACK: bool = false;
-    type SocketId = IcmpSocketId<I, WeakDeviceId<BindingsCtx>>;
+    type SocketId = IcmpSocketId<I>;
 }
 
 impl OptionFromU16 for u16 {
@@ -888,10 +890,10 @@ impl<E> IntoErrno for core_socket::SendToError<E> {
     }
 }
 
-impl<I: IpExt> IcmpEchoBindingsContext<I, DeviceId<BindingsCtx>> for SocketCollection<I, IcmpEcho> {
-    fn receive_icmp_echo_reply<B: BufferMut>(
+impl<I: IpExt> SocketCollection<I, IcmpEcho> {
+    pub(crate) fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
-        conn: &IcmpSocketId<I, WeakDeviceId<BindingsCtx>>,
+        conn: &IcmpSocketId<I>,
         device: &DeviceId<BindingsCtx>,
         src_ip: I::Addr,
         dst_ip: I::Addr,
