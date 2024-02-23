@@ -48,6 +48,7 @@ def fuchsia_package(
         resources = [],
         tools = [],
         subpackages = [],
+        subpackages_to_flatten = [],
         **kwargs):
     """Builds a fuchsia package.
 
@@ -85,6 +86,9 @@ def fuchsia_package(
           resources will not have debug symbols stripped.
         tools: Additional tools that should be added to this package.
         subpackages: Additional subpackages that should be added to this package.
+        subpackages_to_flatten: The list of subpackages included in this package.
+          The packages included in this list will be cracked open and all the
+          components included will be include in the parent package.
         package_name: An optional name to use for this package, defaults to name.
         archive_name: An option name for the far file.
         fuchsia_api_level: The API level to build for.
@@ -107,6 +111,7 @@ def fuchsia_package(
         resources = resources,
         tools = tools,
         subpackages = subpackages,
+        subpackages_to_flatten = subpackages_to_flatten,
         package_name = package_name or name,
         archive_name = archive_name,
         fuchsia_api_level = fuchsia_api_level,
@@ -135,6 +140,7 @@ def _fuchsia_test_package(
         _test_component_mapping,
         _components = [],
         subpackages = [],
+        subpackages_to_flatten = [],
         test_realm = None,
         **kwargs):
     """Defines test variants of fuchsia_package.
@@ -152,6 +158,7 @@ def _fuchsia_test_package(
         components = _components,
         resources = resources,
         subpackages = subpackages,
+        subpackages_to_flatten = subpackages_to_flatten,
         package_name = package_name or name,
         archive_name = archive_name,
         fuchsia_api_level = fuchsia_api_level,
@@ -174,6 +181,7 @@ def fuchsia_test_package(
         name,
         test_components = [],
         components = [],
+        subpackages_to_flatten = [],
         fuchsia_api_level = None,
         platform = None,
         **kwargs):
@@ -186,6 +194,7 @@ def fuchsia_test_package(
         _components = components,
         fuchsia_api_level = fuchsia_api_level,
         platform = platform,
+        subpackages_to_flatten = subpackages_to_flatten,
         **kwargs
     )
 
@@ -198,6 +207,7 @@ def fuchsia_unittest_package(
         platform = None,
         resources = [],
         subpackages = [],
+        subpackages_to_flatten = [],
         unit_tests,
         **kwargs):
     # buildifier: disable=function-docstring-args
@@ -222,6 +232,7 @@ def fuchsia_unittest_package(
         archive_name = archive_name,
         resources = resources,
         subpackages = subpackages,
+        subpackages_to_flatten = subpackages_to_flatten,
         fuchsia_api_level = fuchsia_api_level,
         platform = platform,
         _test_component_mapping = test_component_mapping,
@@ -317,11 +328,50 @@ def _build_fuchsia_package_impl(ctx):
     stripped_resources, _debug_info = strip_resources(ctx, resources_to_strip, build_id_path = build_id_path)
     package_resources.extend(stripped_resources)
 
-    # Write our package_manifest file
-    ctx.actions.write(
-        output = manifest,
-        content = "\n".join(["%s=%s" % (r.dest, r.src.path) for r in package_resources]),
-    )
+    # Write our package_manifest file. If we have subpackage to flatten, we will
+    # parse the subpackages contents, and append them into package manifest of
+    # parent package.
+    content = "\n".join(["%s=%s" % (r.dest, r.src.path) for r in package_resources])
+    meta_content_inputs = []
+    if ctx.attr.subpackages_to_flatten:
+        subpackage_manfiests = []
+        for package in ctx.attr.subpackages_to_flatten:
+            meta_content_inputs.extend(package[FuchsiaPackageInfo].files)
+            subpackage_manfiests.append(package[FuchsiaPackageInfo].package_manifest.path)
+
+        meta_contents_dir = ctx.actions.declare_directory(pkg_dir + "_meta_contents_dir")
+        ffx_meta_extract_dir = ctx.actions.declare_directory(pkg_dir + "_extract_archive.ffx")
+
+        ctx.actions.run(
+            executable = ctx.executable._meta_content_append_tool,
+            arguments = [
+                "--ffx",
+                sdk.ffx_package.path,
+                "--ffx-isolate-dir",
+                ffx_meta_extract_dir.path,
+                "--manifest-path",
+                manifest.path,
+                "--original-content",
+                content,
+                "--meta-contents-dir",
+                meta_contents_dir.path,
+                "--subpackage-manifests",
+            ] + subpackage_manfiests,
+            inputs = meta_content_inputs + [sdk.ffx_package],
+            outputs = [
+                manifest,
+                meta_contents_dir,
+                ffx_meta_extract_dir,
+            ],
+            progress_message = "Building manifest for %s" % ctx.label,
+        )
+        meta_content_inputs.append(meta_contents_dir)
+
+    else:
+        ctx.actions.write(
+            output = manifest,
+            content = content,
+        )
 
     # Create the meta/package file
     ctx.actions.write(
@@ -378,7 +428,7 @@ def _build_fuchsia_package_impl(ctx):
             "--published-name",  # name of package
             ctx.attr.package_name,
         ] + subpackages_args + api_level_input + repo_name_args,
-        inputs = build_inputs + subpackages_inputs,
+        inputs = build_inputs + subpackages_inputs + meta_content_inputs,
         outputs = [
             output_package_manifest,
             meta_far,
@@ -391,7 +441,7 @@ def _build_fuchsia_package_impl(ctx):
     artifact_inputs = [r.src for r in package_resources] + [
         output_package_manifest,
         meta_far,
-    ] + subpackages_inputs
+    ] + subpackages_inputs + meta_content_inputs
 
     # Create the far file.
     ctx.actions.run(
@@ -494,6 +544,14 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
             doc = "The list of subpackages included in this package",
             providers = [FuchsiaPackageInfo],
         ),
+        "subpackages_to_flatten": attr.label_list(
+            doc = """The list of subpackages included in this package.
+
+            The packages included in this list will be cracked open and all the
+            components included will be include in the parent package.
+            """,
+            providers = [FuchsiaPackageInfo],
+        ),
         "fuchsia_api_level": attr.string(
             doc = """The Fuchsia API level to use when building this package.
 
@@ -514,6 +572,11 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
         ),
         "_elf_strip_tool": attr.label(
             default = "//fuchsia/tools:elf_strip",
+            executable = True,
+            cfg = "exec",
+        ),
+        "_meta_content_append_tool": attr.label(
+            default = "//fuchsia/tools:meta_content_append",
             executable = True,
             cfg = "exec",
         ),
