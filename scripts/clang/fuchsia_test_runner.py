@@ -55,6 +55,21 @@ def check_call_with_logging(
     return subprocess.CompletedProcess(process.args, retcode)
 
 
+def atomic_link(link: Path, target: Path):
+    link_dir = link.parent
+    os.makedirs(link_dir, exist_ok=True)
+    link_file = link.name
+    tmp_file = link_dir.joinpath(link_file + "_tmp")
+    os.link(target, tmp_file)
+    try:
+        os.rename(tmp_file, link)
+    except Exception as e:
+        raise e
+    finally:
+        if tmp_file.exists():
+            os.remove(tmp_file)
+
+
 @dataclass
 class TestEnvironment:
     build_dir: str
@@ -157,6 +172,40 @@ class TestEnvironment:
             if note_section["Name"] == ".note.gnu.build-id":
                 return note_section["Note"]["Build ID"]
         raise Exception(f"Build ID not found for binary {binary}")
+
+    def generate_buildid_dir(
+        self,
+        binary: Path,
+        build_id_dir: Path,
+        build_id: str,
+        log_handler: logging.Logger,
+    ):
+        os.makedirs(build_id_dir, exist_ok=True)
+        # TODO: change suffix to something else for binaries without debug
+        # info.
+        suffix = ".debug"
+        # Hardlink the original binary
+        build_id_prefix_dir = build_id_dir.joinpath(build_id[:2])
+        unstripped_binary = build_id_prefix_dir.joinpath(build_id[2:] + suffix)
+        build_id_prefix_dir.mkdir(parents=True, exist_ok=True)
+        atomic_link(unstripped_binary, binary)
+        assert unstripped_binary.exists()
+        stripped_binary = unstripped_binary.with_suffix("")
+        llvm_objcopy = Path(self.toolchain_dir).joinpath("bin", "llvm-objcopy")
+        # TODO: Verify shared libs used in unit tests can be stripped
+        # with "--strip-sections".
+        strip_mode = "--strip-sections"
+        check_call_with_logging(
+            [
+                llvm_objcopy,
+                strip_mode,
+                unstripped_binary,
+                stripped_binary,
+            ],
+            stdout_handler=log_handler.info,
+            stderr_handler=log_handler.error,
+        )
+        return stripped_binary
 
     def write_to_file(self):
         with open(self.env_file_path(), "w", encoding="utf-8") as f:
@@ -578,7 +627,8 @@ class TestEnvironment:
 
         base_name = os.path.basename(os.path.dirname(args.bin_path))
         exe_name = base_name.lower().replace(".", "_")
-        package_name = f"{exe_name}_{self.build_id(bin_path)}"
+        build_id = self.build_id(bin_path)
+        package_name = f"{exe_name}_{build_id}"
 
         package_dir = self.packages_dir.joinpath(package_name)
         cml_path = package_dir.joinpath("meta", f"{package_name}.cml")
@@ -610,6 +660,16 @@ class TestEnvironment:
         # TODO: setup output file and stdout
         runner_logger.info(f"Bin path: {bin_path}")
         runner_logger.info("Setting up package...")
+
+        # Link binary to build-id dir and strip it.
+        build_id_dir = self.tmp_dir().joinpath(".build-id")
+        stripped_binary = self.generate_buildid_dir(
+            binary=bin_path,
+            build_id_dir=build_id_dir,
+            build_id=build_id,
+            log_handler=runner_logger,
+        )
+        runner_logger.info(f"Stripped Bin path: {stripped_binary}")
 
         # Set up package
         check_call_with_logging(
@@ -682,7 +742,7 @@ class TestEnvironment:
         with open(manifest_path, "w", encoding="utf-8") as manifest:
             manifest.write(
                 self.MANIFEST_TEMPLATE.format(
-                    bin_path=bin_path,
+                    bin_path=stripped_binary,
                     exe_name=exe_name,
                     package_dir=package_dir,
                     package_name=package_name,
@@ -695,8 +755,15 @@ class TestEnvironment:
                 )
             )
             for shared_lib in shared_libs_paths:
+                shared_lib_build_id = self.build_id(shared_lib)
+                stripped_shared_lib = self.generate_buildid_dir(
+                    binary=shared_lib,
+                    build_id_dir=build_id_dir,
+                    build_id=shared_lib_build_id,
+                    log_handler=runner_logger,
+                )
                 manifest.write(
-                    f"lib/{os.path.basename(shared_lib)}={shared_lib}\n"
+                    f"lib/{os.path.basename(shared_lib)}={stripped_shared_lib}\n"
                 )
         runner_logger.info("Compiling and archiving manifest...")
 
@@ -888,7 +955,7 @@ class TestEnvironment:
             log_path = os.path.join(self.output_dir, test_dir, "log")
             self.env_logger.debug(f"\n---- Logs for test '{test_dir}' ----\n")
             if os.path.exists(log_path):
-                with open(log_path, encoding="utf-8") as log:
+                with open(log_path, encoding="utf-8", errors="ignore") as log:
                     self.env_logger.debug(log.read())
             else:
                 self.env_logger.debug("No logs found")
