@@ -448,17 +448,16 @@ sdk_molecule("core_bindlib") {
 }
 
 sdk_molecule("core_packages") {
-  deps =
-      [ "//src/graphics/magma/tests/integration:magma_conformance_tests_sdk" ]
+  deps = [
+    "//src/graphics/magma/tests/integration:magma_conformance_tests_sdk",
+    "//src/performance/memory/heapdump/collector:collector_sdk",
+  ]
 }
 
 # TODO(b/309679524): Move the contents of this target to ":core_packages"
 # once they build at individual API levels.
 sdk_molecule("core_packages_built_at_head") {
-  deps = [
-    "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk",
-    "//src/performance/memory/heapdump/collector:collector_sdk",
-  ]
+  deps = [ "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk" ]
 }
 
 sdk_molecule("core_data") {

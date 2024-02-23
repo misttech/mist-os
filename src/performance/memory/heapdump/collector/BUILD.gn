@@ -61,7 +61,7 @@ sdk_fuchsia_package("collector_sdk") {
   package_label = ":collector"
   category = "partner"
   expected_files_exact = [ "meta/heapdump-collector.cm" ]
-  api_level_added = 15
+  api_level_added = 18
 }
 
 fuchsia_unittest_package("tests") {
