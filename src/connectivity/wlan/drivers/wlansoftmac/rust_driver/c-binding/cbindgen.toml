@@ -16,13 +16,7 @@ style = "type"
 sys_includes = [
     "zircon/types.h",
     "lib/trace/event.h",
-
-    # Banjo types.
-    "fuchsia/wlan/softmac/c/banjo.h",   # wlan_softmac_query_response_t, wlan_hw_scan_config_t,
-                                                 # wlan_softmac_passive_scan_args_t, wlan_rx_info_t
-    "fuchsia/wlan/common/c/banjo.h",   # wlan_channel_t
-    "fuchsia/wlan/internal/c/banjo.h",   # join_bss_request_t
-    "fuchsia/wlan/ieee80211/c/banjo.h",   # cssid_t
+    "fuchsia/wlan/softmac/c/banjo.h",
 ]
 
 [parse]
@@ -30,24 +24,8 @@ parse_deps = true
 include = ["wlan_mlme", "wlan_span", "wlansoftmac_rust"]
 
 [export]
-include = [
-    "BufferProvider",
-    "CBuffer",
-    "CDeviceInterface",
-    "CSpan",
-    "TraceId",
-    "WlanSoftmacHandle",
-]
-
 exclude = [
     # Banjo types.
-    "BssConfig",
-    "CSsid",
-    "WlanSoftmacStartActiveScanRequest",
-    "WlanSoftmacStartPassiveScanRequest",
-    "WlanIndication",
-    "WlanKeyConfig",
-    "WlanSoftmacQueryResponse",
     "WlanRxInfo",
     "WlanTxInfo",
     "WlanTxPacket",
@@ -61,36 +39,28 @@ exclude = [
 ]
 
 [export.rename]
-"BufferProvider" = "wlansoftmac_buffer_provider_ops_t"
-"CSpan" = "wlan_span_t"
-"DeviceInterface" = "rust_device_interface_t"
-"CBuffer" = "wlansoftmac_buffer_t"
-"CDeviceInterface" = "rust_device_interface_t"
-"WlanSoftmacHandle" = "wlansoftmac_handle_t"
-"TraceId" = "trace_async_id_t"
-
-# Banjo types.
-"JoinBssRequest" = "join_bss_request_t"
-"CSsid" = "cssid_t"
-"DiscoverySupport" = "discovery_support_t"
-"MacSublayerSupport" = "mac_sublayer_support_t"
-"SpectrumManagementSupport" = "spectrum_management_support_t"
-"WlanSoftmacStartActiveScanRequest" = "wlan_softmac_start_active_scan_request_t"
-"WlanSoftmacStartPassiveScanRequest" = "wlan_softmac_start_passive_scan_request_t"
-"CWlanSoftmacIfcProtocol" = "rust_wlan_softmac_ifc_protocol_copy_t"
-"CWlanSoftmacIfcProtocolOps" = "rust_wlan_softmac_ifc_protocol_ops_copy_t"
-"WlanSoftmacQueryResponse" = "wlan_softmac_query_response_t"
-"WlanIndication" = "wlan_indication_t"
-"WlanKeyConfiguration" = "wlan_key_configuration_t"
+# fuchsia.wlan.softmac Banjo types
 "WlanRxPacket" = "wlan_rx_packet_t"
 "WlanRxInfo" = "wlan_rx_info_t"
 "WlanTxPacket" = "wlan_tx_packet_t"
 "WlanTxInfo" = "wlan_tx_info_t"
 "WlanTxResult" = "wlan_tx_result_t"
-"WlanWmmParams" = "wlan_wmm_params_t"
 
-# fuchsia-zircon types
-"Vmo" = "zx_handle_t"
+# wlansoftmac-rust types
+"WlanSoftmacHandle" = "wlansoftmac_handle_t"
+
+# wlan-mlme types
+"BufferProvider" = "wlansoftmac_buffer_provider_ops_t"
+"CBuffer" = "wlansoftmac_buffer_t"
+"CDeviceInterface" = "rust_device_interface_t"
+"CWlanSoftmacIfcProtocol" = "rust_wlan_softmac_ifc_protocol_copy_t"
+"CWlanSoftmacIfcProtocolOps" = "rust_wlan_softmac_ifc_protocol_ops_copy_t"
+
+# wlan-span types
+"CSpan" = "wlan_span_t"
+
+# fuchsia-trace types
+"TraceId" = "trace_async_id_t"
 
 # This struct is used for void* context fields in protocol ops.
 "DriverEventSink" = "void"
