@@ -382,17 +382,20 @@ Configure bazel to stream build events and results to a service.
 This is useful for sharing build results and invocation details
 for reproducing and triaging issues.
 This option uses direct network access and requires authentication.
+The _infra variants are intended for use in build infrastructure.
 More information can be found at:
 https://bazel.build/remote/bep#build-event-service
 
 Valid options:
   "": do not stream (default)
-  "sponge": uploads to Sponge2
-  "resultstore": uploads to ResultStore
+  "sponge": uploads to Sponge2 (for users)
+  "sponge_infra": uploads to Sponge2 (for infra)
+  "resultstore": uploads to ResultStore (for users)
+  "resultstore_infra": uploads to ResultStore (for infra)
 
 **Current value (from the default):** `""`
 
-From //build/bazel/remote_services.gni:27
+From //build/bazel/remote_services.gni:30
 
 ### bless_goldens
 
@@ -4645,13 +4648,21 @@ Enable backbone router functionality
 
 From //third_party/openthread/etc/gn/openthread.gni:85
 
+### openthread_config_ble_tcat_enable
+
+Enable BLE based commissioning functionality
+
+**Current value (from the default):** `false`
+
+From //third_party/openthread/etc/gn/openthread.gni:88
+
 ### openthread_config_border_agent_enable
 
 Enable border agent support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:88
+From //third_party/openthread/etc/gn/openthread.gni:91
 
 ### openthread_config_border_agent_id_enable
 
@@ -4659,7 +4670,7 @@ Enable border agent ID
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:91
+From //third_party/openthread/etc/gn/openthread.gni:94
 
 ### openthread_config_border_router_enable
 
@@ -4667,7 +4678,7 @@ Enable border router support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:94
+From //third_party/openthread/etc/gn/openthread.gni:97
 
 ### openthread_config_border_routing_enable
 
@@ -4675,7 +4686,7 @@ Enable border routing support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:97
+From //third_party/openthread/etc/gn/openthread.gni:100
 
 ### openthread_config_channel_manager_enable
 
@@ -4683,7 +4694,7 @@ Enable channel manager support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:100
+From //third_party/openthread/etc/gn/openthread.gni:103
 
 ### openthread_config_channel_monitor_enable
 
@@ -4691,7 +4702,7 @@ Enable channel monitor support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:103
+From //third_party/openthread/etc/gn/openthread.gni:106
 
 ### openthread_config_child_supervision_enable
 
@@ -4699,7 +4710,7 @@ Enable child supervision support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:106
+From //third_party/openthread/etc/gn/openthread.gni:109
 
 ### openthread_config_coap_api_enable
 
@@ -4707,7 +4718,7 @@ Enable coap api support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:109
+From //third_party/openthread/etc/gn/openthread.gni:112
 
 ### openthread_config_coap_observe_api_enable
 
@@ -4715,7 +4726,7 @@ Enable coap observe (RFC7641) api support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:115
+From //third_party/openthread/etc/gn/openthread.gni:118
 
 ### openthread_config_coap_secure_api_enable
 
@@ -4723,7 +4734,7 @@ Enable secure coap api support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:112
+From //third_party/openthread/etc/gn/openthread.gni:115
 
 ### openthread_config_coexistence_enable
 
@@ -4731,7 +4742,7 @@ Enable radio coexistence
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:242
+From //third_party/openthread/etc/gn/openthread.gni:245
 
 ### openthread_config_commissioner_enable
 
@@ -4739,7 +4750,7 @@ Enable commissioner support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:118
+From //third_party/openthread/etc/gn/openthread.gni:121
 
 ### openthread_config_deps
 
@@ -4755,7 +4766,7 @@ Enable DHCP6 client support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:124
+From //third_party/openthread/etc/gn/openthread.gni:127
 
 ### openthread_config_dhcp6_server_enable
 
@@ -4763,7 +4774,7 @@ Enable DHCP6 server support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:127
+From //third_party/openthread/etc/gn/openthread.gni:130
 
 ### openthread_config_diag_enable
 
@@ -4771,7 +4782,7 @@ Enable diagnostic support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:130
+From //third_party/openthread/etc/gn/openthread.gni:133
 
 ### openthread_config_dns_client_enable
 
@@ -4779,7 +4790,7 @@ Enable DNS client support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:133
+From //third_party/openthread/etc/gn/openthread.gni:136
 
 ### openthread_config_dnssd_server_enable
 
@@ -4787,7 +4798,7 @@ Enable DNS-SD server support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:136
+From //third_party/openthread/etc/gn/openthread.gni:139
 
 ### openthread_config_dua_enable
 
@@ -4795,7 +4806,7 @@ Enable Domain Unicast Address feature for Thread 1.2
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:142
+From //third_party/openthread/etc/gn/openthread.gni:145
 
 ### openthread_config_ecdsa_enable
 
@@ -4803,13 +4814,13 @@ Enable ECDSA support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:139
+From //third_party/openthread/etc/gn/openthread.gni:142
 
 ### openthread_config_enable_builtin_mbedtls_management
 
 **Current value (from the default):** `true`
 
-From //third_party/openthread/etc/gn/openthread.gni:239
+From //third_party/openthread/etc/gn/openthread.gni:242
 
 ### openthread_config_file
 
@@ -4825,7 +4836,7 @@ Enable full logs
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:226
+From //third_party/openthread/etc/gn/openthread.gni:229
 
 ### openthread_config_heap_external_enable
 
@@ -4833,7 +4844,7 @@ Enable external heap support
 
 **Current value (from the default):** `true`
 
-From //third_party/openthread/etc/gn/openthread.gni:148
+From //third_party/openthread/etc/gn/openthread.gni:151
 
 ### openthread_config_ip6_fragmentation_enable
 
@@ -4841,7 +4852,7 @@ Enable ipv6 fragmentation support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:151
+From //third_party/openthread/etc/gn/openthread.gni:154
 
 ### openthread_config_ip6_slaac_enable
 
@@ -4849,7 +4860,7 @@ Enable support for adding of auto-configured SLAAC addresses by OpenThread
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:205
+From //third_party/openthread/etc/gn/openthread.gni:208
 
 ### openthread_config_jam_detection_enable
 
@@ -4857,7 +4868,7 @@ Enable jam detection support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:154
+From //third_party/openthread/etc/gn/openthread.gni:157
 
 ### openthread_config_joiner_enable
 
@@ -4865,7 +4876,7 @@ Enable joiner support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:157
+From //third_party/openthread/etc/gn/openthread.gni:160
 
 ### openthread_config_legacy_enable
 
@@ -4873,7 +4884,7 @@ Enable legacy network support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:160
+From //third_party/openthread/etc/gn/openthread.gni:163
 
 ### openthread_config_link_metrics_initiator_enable
 
@@ -4881,7 +4892,7 @@ Enable link metrics initiator
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:163
+From //third_party/openthread/etc/gn/openthread.gni:166
 
 ### openthread_config_link_metrics_subject_enable
 
@@ -4889,7 +4900,7 @@ Enable link metrics subject
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:166
+From //third_party/openthread/etc/gn/openthread.gni:169
 
 ### openthread_config_link_raw_enable
 
@@ -4897,7 +4908,7 @@ Enable link raw service
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:169
+From //third_party/openthread/etc/gn/openthread.gni:172
 
 ### openthread_config_log_level_dynamic_enable
 
@@ -4905,7 +4916,7 @@ Enable dynamic log level control
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:172
+From //third_party/openthread/etc/gn/openthread.gni:175
 
 ### openthread_config_log_output
 
@@ -4921,7 +4932,7 @@ Enable csl receiver
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:121
+From //third_party/openthread/etc/gn/openthread.gni:124
 
 ### openthread_config_mac_filter_enable
 
@@ -4929,7 +4940,7 @@ Enable mac filter support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:175
+From //third_party/openthread/etc/gn/openthread.gni:178
 
 ### openthread_config_message_use_heap
 
@@ -4937,7 +4948,7 @@ Enable use built-in heap for message buffers
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:178
+From //third_party/openthread/etc/gn/openthread.gni:181
 
 ### openthread_config_mle_long_routes_enable
 
@@ -4945,7 +4956,7 @@ Enable MLE long routes extension (experimental, breaks Thread conformance]
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:181
+From //third_party/openthread/etc/gn/openthread.gni:184
 
 ### openthread_config_mlr_enable
 
@@ -4953,7 +4964,7 @@ Enable Multicast Listener Registration feature for Thread 1.2
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:145
+From //third_party/openthread/etc/gn/openthread.gni:148
 
 ### openthread_config_multiple_instance_enable
 
@@ -4961,7 +4972,7 @@ Enable multiple instances
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:187
+From //third_party/openthread/etc/gn/openthread.gni:190
 
 ### openthread_config_ncp_hdlc_enable
 
@@ -4969,7 +4980,7 @@ Enable NCP HDLC support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:235
+From //third_party/openthread/etc/gn/openthread.gni:238
 
 ### openthread_config_ncp_spi_enable
 
@@ -4977,7 +4988,7 @@ Enable NCP SPI support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:232
+From //third_party/openthread/etc/gn/openthread.gni:235
 
 ### openthread_config_otns_enable
 
@@ -4985,7 +4996,7 @@ Enable OTNS support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:229
+From //third_party/openthread/etc/gn/openthread.gni:232
 
 ### openthread_config_ping_sender
 
@@ -4993,7 +5004,7 @@ Enable ping sender support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:217
+From //third_party/openthread/etc/gn/openthread.gni:220
 
 ### openthread_config_platform_netif_enable
 
@@ -5001,7 +5012,7 @@ Enable platform netif support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:190
+From //third_party/openthread/etc/gn/openthread.gni:193
 
 ### openthread_config_platform_udp_enable
 
@@ -5009,7 +5020,7 @@ Enable platform UDP support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:193
+From //third_party/openthread/etc/gn/openthread.gni:196
 
 ### openthread_config_reference_device_enable
 
@@ -5017,7 +5028,7 @@ Enable Thread Test Harness reference device support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:196
+From //third_party/openthread/etc/gn/openthread.gni:199
 
 ### openthread_config_sntp_client_enable
 
@@ -5025,7 +5036,7 @@ Enable SNTP Client support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:208
+From //third_party/openthread/etc/gn/openthread.gni:211
 
 ### openthread_config_srp_client_enable
 
@@ -5033,7 +5044,7 @@ Enable SRP Client support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:211
+From //third_party/openthread/etc/gn/openthread.gni:214
 
 ### openthread_config_srp_server_enable
 
@@ -5041,7 +5052,7 @@ Enable SRP Server support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:214
+From //third_party/openthread/etc/gn/openthread.gni:217
 
 ### openthread_config_thread_version
 
@@ -5057,7 +5068,7 @@ Enable the time synchronization service feature
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:220
+From //third_party/openthread/etc/gn/openthread.gni:223
 
 ### openthread_config_tmf_netdata_service_enable
 
@@ -5065,7 +5076,7 @@ Enable support for injecting Service entries into the Thread Network Data
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:199
+From //third_party/openthread/etc/gn/openthread.gni:202
 
 ### openthread_config_tmf_netdiag_client_enable
 
@@ -5073,7 +5084,7 @@ Enable TMF network diagnostics client
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:184
+From //third_party/openthread/etc/gn/openthread.gni:187
 
 ### openthread_config_udp_forward_enable
 
@@ -5081,7 +5092,7 @@ Enable UDP forward support
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:223
+From //third_party/openthread/etc/gn/openthread.gni:226
 
 ### openthread_core_config_deps
 
@@ -5161,7 +5172,7 @@ Enable volatile-only storage of settings
 
 **Current value (from the default):** `false`
 
-From //third_party/openthread/etc/gn/openthread.gni:202
+From //third_party/openthread/etc/gn/openthread.gni:205
 
 ### optimize
 
@@ -8185,7 +8196,7 @@ This argument will affect all vulkan_{executable/test} build targets.
 
 **Current value (from the default):** `true`
 
-From //src/lib/vulkan/build/config.gni:40
+From //src/lib/vulkan/build/config.gni:33
 
 ### use_oz
 
@@ -8256,7 +8267,7 @@ it only works when use_null_vulkan_on_host is set to false.
 
 **Current value (from the default):** `true`
 
-From //src/lib/vulkan/build/config.gni:49
+From //src/lib/vulkan/build/config.gni:42
 
 ### use_thinlto
 
@@ -8449,18 +8460,7 @@ and descriptor files required to load the libraries.
 
 **Current value (from the default):** `"//prebuilt/third_party/vulkan_runtime/linux-x64"`
 
-From //src/lib/vulkan/build/config.gni:23
-
-### vulkan_host_sdk_dir
-
-
-|vulkan_host_sdk_dir| is the path to Vulkan SDK, which contains Vulkan
-headers and sources to Vulkan loader, layers and tools.
-
-
-**Current value (from the default):** `"//prebuilt/third_party/vulkansdk/linux/x86_64"`
-
-From //src/lib/vulkan/build/config.gni:16
+From //src/lib/vulkan/build/config.gni:17
 
 ### vulkan_sdk
 
