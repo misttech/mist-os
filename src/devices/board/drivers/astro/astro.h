@@ -101,7 +101,6 @@ class Astro : public AstroType {
   zx_status_t ThermistorInit();
   zx_status_t UsbInit();
   zx_status_t VideoInit();
-  zx_status_t DsiInit();
   zx_status_t AddPostInitDevice();
   int Thread();
 

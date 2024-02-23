@@ -39,7 +39,6 @@ fuchsia_driver("astro-driver") {
     "astro-canvas.cc",
     "astro-clk.cc",
     "astro-cpu.cc",
-    "astro-dsi.cc",
     "astro-gpio.cc",
     "astro-i2c.cc",
     "astro-light.cc",
