@@ -91,7 +91,7 @@ pub(crate) trait SocketWorkerHandler: Send + 'static {
     /// This is called when the last stream for the managed socket is closed,
     /// and should be used to free up any resources in `netstack3_core` for the
     /// socket.
-    fn close(self, ctx: &mut Ctx);
+    async fn close(self, ctx: &mut Ctx);
 }
 
 /// Abstraction over the "close" behavior for a socket.
@@ -262,7 +262,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
         };
 
         let Self { mut ctx, data } = self;
-        data.close(&mut ctx);
+        data.close(&mut ctx).await;
 
         // Join all tasks created by this socket.
         std::mem::drop(spawners);

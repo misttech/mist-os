@@ -34,7 +34,6 @@ common_deps = [
   "//src/lib/async-utils",
   "//src/lib/const-unwrap",
   "//src/lib/debug/rust",
-  "//src/lib/dense-map",
   "//src/lib/diagnostics/inspect/rust",
   "//src/lib/diagnostics/log/rust",
   "//src/lib/fidl/rust/fidl",

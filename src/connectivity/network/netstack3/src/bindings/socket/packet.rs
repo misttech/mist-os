@@ -249,7 +249,7 @@ impl worker::SocketWorkerHandler for BindingData {
         RequestHandler { ctx, data: self }.handle_request(request)
     }
 
-    fn close(self, ctx: &mut Ctx) {
+    async fn close(self, ctx: &mut Ctx) {
         let Self { peer_event: _, id } = self;
         ctx.api().device_socket().remove(id)
     }

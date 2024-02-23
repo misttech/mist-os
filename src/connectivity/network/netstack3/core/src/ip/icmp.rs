@@ -46,7 +46,7 @@ use tracing::{debug, error, trace};
 use zerocopy::ByteSlice;
 
 use crate::{
-    context::{CounterContext, InstantContext, RngContext},
+    context::{CounterContext, InstantContext, ReferenceNotifiers, RngContext},
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
     device::{self, AnyDevice, DeviceIdContext, FrameDestination},
@@ -690,12 +690,15 @@ impl<
 
 /// A marker for all the contexts provided by bindings require by the ICMP
 /// module.
-pub trait IcmpBindingsContext<I: IcmpIpExt, D>:
-    InstantContext + IcmpEchoBindingsContext<I, D> + RngContext
+pub trait IcmpBindingsContext<I: socket::IpExt, D: device::StrongId>:
+    InstantContext + IcmpEchoBindingsContext<I, D> + RngContext + ReferenceNotifiers
 {
 }
-impl<I: IcmpIpExt, BC: InstantContext + IcmpEchoBindingsContext<I, D> + RngContext, D>
-    IcmpBindingsContext<I, D> for BC
+impl<
+        I: socket::IpExt,
+        BC: InstantContext + IcmpEchoBindingsContext<I, D> + RngContext + ReferenceNotifiers,
+        D: device::StrongId,
+    > IcmpBindingsContext<I, D> for BC
 {
 }
 
@@ -713,7 +716,7 @@ pub trait IcmpStateContext {}
 ///
 /// Unlike [`IcmpEchoBindingsContext`], `InnerIcmpContext` is not exposed outside of
 /// this crate.
-pub trait InnerIcmpContext<I: IcmpIpExt + IpExt, BC: IcmpBindingsContext<I, Self::DeviceId>>:
+pub trait InnerIcmpContext<I: socket::IpExt, BC: IcmpBindingsContext<I, Self::DeviceId>>:
     IpSocketHandler<I, BC> + DeviceIdContext<AnyDevice>
 {
     type DualStackContext: datagram::DualStackDatagramBoundStateContext<
@@ -772,13 +775,6 @@ pub trait InnerIcmpContext<I: IcmpIpExt + IpExt, BC: IcmpBindingsContext<I, Self
         err: I::ErrorCode,
     );
 
-    /// Calls the function with an immutable reference to ICMP sockets.
-    #[allow(dead_code)]
-    fn with_icmp_sockets<O, F: FnOnce(&BoundSockets<I, Self::WeakDeviceId>) -> O>(
-        &mut self,
-        cb: F,
-    ) -> O;
-
     /// Calls the function with a mutable reference to `IpSocketsCtx` and
     /// a mutable reference to ICMP sockets.
     fn with_icmp_ctx_and_sockets_mut<
@@ -822,7 +818,7 @@ impl<
         BC: BindingsContext,
         L: LockBefore<crate::lock_ordering::IcmpBoundMap<Ipv4>>
             + LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv4>>
-            + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>,
+            + LockBefore<crate::lock_ordering::UdpAllSocketsSet<Ipv4>>,
     > InnerIcmpv4Context<BC> for CoreCtx<'_, BC, L>
 {
     fn should_send_timestamp_reply(&self) -> bool {
@@ -880,7 +876,7 @@ macro_rules! try_send_error {
 pub(crate) enum IcmpIpTransportContext {}
 
 fn receive_ip_transport_icmp_error<
-    I: IcmpIpExt + IpExt,
+    I: socket::IpExt,
     CC: InnerIcmpContext<I, BC> + CounterContext<IcmpRxCounters<I>>,
     BC: IcmpBindingsContext<I, CC::DeviceId>,
 >(
@@ -1914,7 +1910,6 @@ fn send_icmp_reply<I, BC, CC, S, F>(
     get_body_from_src_ip: F,
 ) where
     I: crate::ip::IpExt,
-    BC: IcmpBindingsContext<I, CC::DeviceId>,
     CC: IpSocketHandler<I, BC> + DeviceIdContext<AnyDevice> + CounterContext<IcmpTxCounters<I>>,
     S: Serializer,
     S::Buffer: BufferMut,
@@ -2931,7 +2926,7 @@ fn is_icmp_error_message<I: IcmpIpExt>(proto: I::Proto, buf: &[u8]) -> bool {
 
 /// Common logic for receiving an ICMP echo reply.
 fn receive_icmp_echo_reply<
-    I: IcmpIpExt + IpExt,
+    I: socket::IpExt,
     B: BufferMut,
     BC: IcmpBindingsContext<I, CC::DeviceId>,
     CC: InnerIcmpContext<I, BC>,
@@ -3027,7 +3022,13 @@ fn receive_icmp_echo_reply<
 #[cfg(test)]
 mod tests {
     use alloc::{vec, vec::Vec};
-    use core::{convert::TryInto, fmt::Debug, num::NonZeroU16, time::Duration};
+    use core::{
+        convert::TryInto,
+        fmt::Debug,
+        num::NonZeroU16,
+        ops::{Deref, DerefMut},
+        time::Duration,
+    };
 
     use net_types::{
         ip::{Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
@@ -3061,7 +3062,9 @@ mod tests {
                 route_discovery::Ipv6DiscoveredRoute, state::IpDeviceStateIpExt, IpDeviceAddr,
                 IpDeviceHandler,
             },
-            icmp::socket::{IcmpEchoSocketApi, IcmpSocketId, SocketsState, StateContext},
+            icmp::socket::{
+                IcmpEchoSocketApi, IcmpSocketId, IcmpSocketSet, IcmpSocketState, StateContext,
+            },
             path_mtu::testutil::FakePmtuState,
             socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
             testutil::DualStackSendIpPacketMeta,
@@ -3152,7 +3155,7 @@ mod tests {
 
     /// `FakeCoreCtx` specialized for ICMP.
     type FakeIcmpCoreCtx<I> =
-        Wrapped<SocketsState<I, FakeWeakDeviceId<FakeDeviceId>>, FakeIcmpInnerCoreCtx<I>>;
+        Wrapped<IcmpSocketSet<I, FakeWeakDeviceId<FakeDeviceId>>, FakeIcmpInnerCoreCtx<I>>;
 
     type FakeIcmpInnerCoreCtx<I> =
         Wrapped<FakeIcmpInnerCoreCtxState<I, FakeWeakDeviceId<FakeDeviceId>>, FakeBufferCoreCtx>;
@@ -3166,14 +3169,14 @@ mod tests {
     pub(super) type FakeIcmpCtx<I> =
         FakeCtxWithCoreCtx<FakeIcmpCoreCtx<I>, (), (), FakeIcmpBindingsCtxState<I>>;
 
-    pub(super) struct FakeIcmpInnerCoreCtxState<I: IpExt, D: device::WeakId> {
+    pub(super) struct FakeIcmpInnerCoreCtxState<I: socket::IpExt, D: device::WeakId> {
         bound_socket_map_and_allocator: BoundSockets<I, D>,
         error_send_bucket: TokenBucket<FakeInstant>,
         receive_icmp_error: Vec<I::ErrorCode>,
         pmtu_state: FakePmtuState<I::Addr>,
     }
 
-    impl<I: IpExt, D: device::WeakId> FakeIcmpInnerCoreCtxState<I, D> {
+    impl<I: socket::IpExt, D: device::WeakId> FakeIcmpInnerCoreCtxState<I, D> {
         fn with_errors_per_second(errors_per_second: u64) -> Self {
             Self {
                 bound_socket_map_and_allocator: Default::default(),
@@ -3184,7 +3187,7 @@ mod tests {
         }
     }
 
-    impl<I: TestIpExt> Default for FakeIcmpInnerCoreCtx<I> {
+    impl<I: TestIpExt + socket::IpExt> Default for FakeIcmpInnerCoreCtx<I> {
         fn default() -> Self {
             Wrapped::with_inner_and_outer_state(
                 FakeDualStackIpSocketCtx::new(core::iter::once(FakeDeviceConfig {
@@ -3231,14 +3234,6 @@ mod tests {
             }
         }
 
-        fn with_icmp_sockets<O, F: FnOnce(&BoundSockets<I, Self::WeakDeviceId>) -> O>(
-            &mut self,
-            cb: F,
-        ) -> O {
-            let Self { outer, inner: _ } = self;
-            cb(&outer.bound_socket_map_and_allocator)
-        }
-
         fn with_icmp_ctx_and_sockets_mut<
             O,
             F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut BoundSockets<I, Self::WeakDeviceId>) -> O,
@@ -3259,31 +3254,49 @@ mod tests {
         }
     }
 
+    /// Utilities for accessing locked internal state in tests.
+    impl<I: socket::IpExt, D: device::WeakId> IcmpSocketId<I, D> {
+        fn get(&self) -> impl Deref<Target = IcmpSocketState<I, D>> + '_ {
+            self.state_for_locking().read()
+        }
+
+        fn get_mut(&self) -> impl DerefMut<Target = IcmpSocketState<I, D>> + '_ {
+            self.state_for_locking().write()
+        }
+    }
+
     impl<I: datagram::IpExt + IpDeviceStateIpExt> StateContext<I, FakeIcmpBindingsCtx<I>>
         for FakeIcmpCoreCtx<I>
     {
         type SocketStateCtx<'a> = FakeIcmpInnerCoreCtx<I>;
 
-        fn with_sockets_state<
-            O,
-            F: FnOnce(&mut Self::SocketStateCtx<'_>, &SocketsState<I, Self::WeakDeviceId>) -> O,
-        >(
+        fn with_all_sockets_mut<O, F: FnOnce(&mut IcmpSocketSet<I, Self::WeakDeviceId>) -> O>(
             &mut self,
             cb: F,
         ) -> O {
-            let Self { outer, inner } = self;
-            cb(inner, outer)
+            cb(&mut self.outer)
         }
 
-        fn with_sockets_state_mut<
+        fn with_socket_state<
             O,
-            F: FnOnce(&mut Self::SocketStateCtx<'_>, &mut SocketsState<I, Self::WeakDeviceId>) -> O,
+            F: FnOnce(&mut Self::SocketStateCtx<'_>, &IcmpSocketState<I, Self::WeakDeviceId>) -> O,
         >(
             &mut self,
+            id: &IcmpSocketId<I, Self::WeakDeviceId>,
             cb: F,
         ) -> O {
-            let Self { outer, inner } = self;
-            cb(inner, outer)
+            cb(&mut self.inner, &id.get())
+        }
+
+        fn with_socket_state_mut<
+            O,
+            F: FnOnce(&mut Self::SocketStateCtx<'_>, &mut IcmpSocketState<I, Self::WeakDeviceId>) -> O,
+        >(
+            &mut self,
+            id: &IcmpSocketId<I, Self::WeakDeviceId>,
+            cb: F,
+        ) -> O {
+            cb(&mut self.inner, &mut id.get_mut())
         }
 
         fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketStateCtx<'_>) -> O>(
@@ -3294,11 +3307,11 @@ mod tests {
         }
     }
 
-    impl<I: IcmpIpExt, D> IcmpEchoBindingsContext<I, D> for FakeIcmpBindingsCtx<I> {
+    impl<I: socket::IpExt> IcmpEchoBindingsContext<I, FakeDeviceId> for FakeIcmpBindingsCtx<I> {
         fn receive_icmp_echo_reply<B: BufferMut>(
             &mut self,
-            conn: &IcmpSocketId<I>,
-            _device_id: &D,
+            conn: &IcmpSocketId<I, FakeWeakDeviceId<FakeDeviceId>>,
+            _device_id: &FakeDeviceId,
             src_ip: I::Addr,
             dst_ip: I::Addr,
             id: u16,
@@ -3965,8 +3978,8 @@ mod tests {
 
     // The arguments to `BufferIcmpContext::receive_icmp_echo_reply`.
     #[allow(unused)] // TODO(joshlf): Remove once we access these fields.
-    struct ReceiveIcmpEchoReply<I: Ip> {
-        conn: IcmpSocketId<I>,
+    struct ReceiveIcmpEchoReply<I: socket::IpExt> {
+        conn: IcmpSocketId<I, FakeWeakDeviceId<FakeDeviceId>>,
         src_ip: I::Addr,
         dst_ip: I::Addr,
         id: u16,
@@ -3974,7 +3987,7 @@ mod tests {
     }
 
     #[derive(Default)]
-    pub(super) struct FakeIcmpBindingsCtxState<I: IcmpIpExt> {
+    pub(super) struct FakeIcmpBindingsCtxState<I: socket::IpExt> {
         receive_icmp_echo_reply: Vec<ReceiveIcmpEchoReply<I>>,
     }
 
@@ -4204,12 +4217,6 @@ mod tests {
             let mut socket_api = IcmpEchoSocketApi::<Ipv4, _>::new(ctx.as_mut());
 
             let conn = socket_api.create();
-            // NOTE: This assertion is not a correctness requirement. It's just
-            // that the rest of this test assumes that the new connection has ID
-            // 0. If this assertion fails in the future, that isn't necessarily
-            // evidence of a bug; we may just have to update this test to
-            // accommodate whatever new ID allocation scheme is being used.
-            assert_eq!(conn, IcmpSocketId::new(0));
             socket_api.bind(&conn, None, NonZeroU16::new(ICMP_ID)).unwrap();
             socket_api
                 .connect(&conn, Some(ZonedAddr::Unzoned(FAKE_CONFIG_V4.remote_ip)), REMOTE_ID)
@@ -4503,12 +4510,6 @@ mod tests {
             let mut ctx = FakeIcmpCtx::<Ipv6>::default();
             let mut socket_api = IcmpEchoSocketApi::<Ipv6, _>::new(ctx.as_mut());
             let conn = socket_api.create();
-            // NOTE: This assertion is not a correctness requirement. It's just
-            // that the rest of this test assumes that the new connection has ID
-            // 0. If this assertion fails in the future, that isn't necessarily
-            // evidence of a bug; we may just have to update this test to
-            // accommodate whatever new ID allocation scheme is being used.
-            assert_eq!(conn, IcmpSocketId::new(0));
             socket_api.bind(&conn, None, NonZeroU16::new(ICMP_ID)).unwrap();
             socket_api
                 .connect(&conn, Some(ZonedAddr::Unzoned(FAKE_CONFIG_V6.remote_ip)), REMOTE_ID)

@@ -7,11 +7,11 @@ use lock_order::{
     relation::LockBefore,
     wrap::prelude::*,
 };
-use net_types::ip::{Ipv4, Ipv6};
+use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
 
 use crate::{
-    device::WeakDeviceId,
-    socket::MaybeDualStack,
+    device::{self, WeakDeviceId},
+    socket::{datagram, MaybeDualStack},
     transport::{
         tcp::{
             self,
@@ -19,10 +19,10 @@ use crate::{
                 isn::IsnGenerator, TcpSocketId, TcpSocketSet, TcpSocketState, WeakTcpSocketId,
             },
         },
-        udp::{self},
+        udp::{self, UdpSocketId, UdpSocketSet, UdpSocketState},
     },
     uninstantiable::{Uninstantiable, UninstantiableWrapper},
-    BindingsContext, CoreCtx, StackState,
+    BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
 impl<I, L, BC> tcp::socket::TcpDemuxContext<I, WeakDeviceId<BC>, BC> for CoreCtx<'_, BC, L>
@@ -239,47 +239,66 @@ impl<L, BC: BindingsContext> tcp::socket::TcpDualStackContext<Ipv6> for CoreCtx<
     }
 }
 
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>>
-    udp::StateContext<Ipv4, BC> for CoreCtx<'_, BC, L>
+#[netstack3_macros::instantiate_ip_impl_block(I)]
+impl<I: Ip, BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpAllSocketsSet<I>>>
+    udp::StateContext<I, BC> for CoreCtx<'_, BC, L>
 {
-    type SocketStateCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::UdpSocketsTable<Ipv4>>;
-
-    fn with_sockets_state<
-        O,
-        F: FnOnce(&mut Self::SocketStateCtx<'_>, &udp::SocketsState<Ipv4, Self::WeakDeviceId>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let (socket_state, mut locked) =
-            self.read_lock_and::<crate::lock_ordering::UdpSocketsTable<Ipv4>>();
-        cb(&mut locked, &socket_state)
-    }
-
-    fn with_sockets_state_mut<
-        O,
-        F: FnOnce(
-            &mut Self::SocketStateCtx<'_>,
-            &mut udp::SocketsState<Ipv4, Self::WeakDeviceId>,
-        ) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let (mut socket_state, mut locked) =
-            self.write_lock_and::<crate::lock_ordering::UdpSocketsTable<Ipv4>>();
-        cb(&mut locked, &mut socket_state)
-    }
+    type SocketStateCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::UdpSocketState<I>>;
 
     fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketStateCtx<'_>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
-        cb(&mut self.cast_locked())
+        cb(&mut self.cast_locked::<crate::lock_ordering::UdpSocketState<I>>())
+    }
+
+    fn with_all_sockets_mut<O, F: FnOnce(&mut UdpSocketSet<I, Self::WeakDeviceId>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        cb(&mut self.write_lock::<crate::lock_ordering::UdpAllSocketsSet<I>>())
+    }
+
+    fn with_socket_state<
+        O,
+        F: FnOnce(&mut Self::SocketStateCtx<'_>, &UdpSocketState<I, Self::WeakDeviceId>) -> O,
+    >(
+        &mut self,
+        id: &UdpSocketId<I, Self::WeakDeviceId>,
+        cb: F,
+    ) -> O {
+        let mut locked = self.adopt(id);
+        let (socket_state, mut restricted) =
+            locked.read_lock_with_and::<crate::lock_ordering::UdpSocketState<I>, _>(|c| c.right());
+        let mut restricted = restricted.cast_core_ctx();
+        cb(&mut restricted, &socket_state)
+    }
+
+    fn with_socket_state_mut<
+        O,
+        F: FnOnce(&mut Self::SocketStateCtx<'_>, &mut UdpSocketState<I, Self::WeakDeviceId>) -> O,
+    >(
+        &mut self,
+        id: &UdpSocketId<I, Self::WeakDeviceId>,
+        cb: F,
+    ) -> O {
+        let mut locked = self.adopt(id);
+        let (mut socket_state, mut restricted) =
+            locked.write_lock_with_and::<crate::lock_ordering::UdpSocketState<I>, _>(|c| c.right());
+        let mut restricted = restricted.cast_core_ctx();
+        cb(&mut restricted, &mut socket_state)
     }
 
     fn should_send_port_unreachable(&mut self) -> bool {
-        self.cast_with(|s| &s.transport.udpv4.send_port_unreachable).copied()
+        self.cast_with(|s| {
+            let IpInvariant(send_port_unreachable) = I::map_ip(
+                (),
+                |()| IpInvariant(&s.transport.udpv4.send_port_unreachable),
+                |()| IpInvariant(&s.transport.udpv6.send_port_unreachable),
+            );
+            send_port_unreachable
+        })
+        .copied()
     }
 }
 
@@ -325,50 +344,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>
         cb: F,
     ) -> O {
         cb(&mut self.cast_locked())
-    }
-}
-
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>>
-    udp::StateContext<Ipv6, BC> for CoreCtx<'_, BC, L>
-{
-    type SocketStateCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::UdpSocketsTable<Ipv6>>;
-
-    fn with_sockets_state<
-        O,
-        F: FnOnce(&mut Self::SocketStateCtx<'_>, &udp::SocketsState<Ipv6, Self::WeakDeviceId>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let (socket_state, mut locked) =
-            self.read_lock_and::<crate::lock_ordering::UdpSocketsTable<Ipv6>>();
-        cb(&mut locked, &socket_state)
-    }
-
-    fn with_sockets_state_mut<
-        O,
-        F: FnOnce(
-            &mut Self::SocketStateCtx<'_>,
-            &mut udp::SocketsState<Ipv6, Self::WeakDeviceId>,
-        ) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let (mut socket_state, mut locked) =
-            self.write_lock_and::<crate::lock_ordering::UdpSocketsTable<Ipv6>>();
-        cb(&mut locked, &mut socket_state)
-    }
-
-    fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketStateCtx<'_>) -> O>(
-        &mut self,
-        cb: F,
-    ) -> O {
-        cb(&mut self.cast_locked())
-    }
-
-    fn should_send_port_unreachable(&mut self) -> bool {
-        self.cast_with(|s| &s.transport.udpv6.send_port_unreachable).copied()
     }
 }
 
@@ -517,5 +492,56 @@ impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: BindingsContext>
 
     fn access(&self) -> Self::Guard<'_> {
         &self.transport.tcp_state::<I>().isn_generator
+    }
+}
+
+impl<I: datagram::IpExt, D: device::WeakId> RwLockFor<crate::lock_ordering::UdpSocketState<I>>
+    for UdpSocketId<I, D>
+{
+    type Data = UdpSocketState<I, D>;
+
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Self::Data>
+    where
+        Self: 'l ;
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Self::Data>
+    where
+        Self: 'l ;
+
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
+        self.state_for_locking().read()
+    }
+
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
+        self.state_for_locking().write()
+    }
+}
+
+impl<I: datagram::IpExt, BT: BindingsTypes> RwLockFor<crate::lock_ordering::UdpBoundMap<I>>
+    for StackState<BT>
+{
+    type Data = udp::BoundSockets<I, WeakDeviceId<BT>>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Self::Data> where Self: 'l;
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Self::Data> where Self: 'l;
+
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
+        self.transport.udp_state::<I>().sockets.bound.read()
+    }
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
+        self.transport.udp_state::<I>().sockets.bound.write()
+    }
+}
+
+impl<I: datagram::IpExt, BT: BindingsTypes> RwLockFor<crate::lock_ordering::UdpAllSocketsSet<I>>
+    for StackState<BT>
+{
+    type Data = UdpSocketSet<I, WeakDeviceId<BT>>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Self::Data> where Self: 'l;
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Self::Data> where Self: 'l;
+
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
+        self.transport.udp_state::<I>().sockets.all_sockets.read()
+    }
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
+        self.transport.udp_state::<I>().sockets.all_sockets.write()
     }
 }

@@ -109,7 +109,8 @@ use core::{convert::Infallible as Never, marker::PhantomData};
 use lock_order::{impl_lock_after, relation::LockAfter};
 use net_types::ip::{Ipv4, Ipv6};
 
-pub struct IcmpSocketsTable<I>(PhantomData<I>, Never);
+pub struct IcmpAllSocketsSet<I>(PhantomData<I>, Never);
+pub struct IcmpSocketState<I>(PhantomData<I>, Never);
 pub struct IcmpBoundMap<I>(PhantomData<I>, Never);
 
 pub struct IcmpTokenBucket<I>(PhantomData<I>, Never);
@@ -119,8 +120,8 @@ pub struct TcpAllSocketsSet<I>(PhantomData<I>, Never);
 pub struct TcpSocketState<I>(PhantomData<I>, Never);
 pub struct TcpDemux<I>(PhantomData<I>, Never);
 pub struct TcpIsnGenerator<I>(PhantomData<I>, Never);
-
-pub struct UdpSocketsTable<I>(PhantomData<I>, Never);
+pub struct UdpAllSocketsSet<I>(PhantomData<I>, Never);
+pub struct UdpSocketState<I>(PhantomData<I>, Never);
 pub struct UdpBoundMap<I>(PhantomData<I>, Never);
 
 pub enum Ipv4StateNextPacketId {}
@@ -212,11 +213,13 @@ impl_lock_after!(EthernetTxDequeue => PureIpDeviceTxDequeue);
 impl_lock_after!(PureIpDeviceTxDequeue => LoopbackRxDequeue);
 impl_lock_after!(LoopbackRxDequeue => EthernetRxDequeue);
 impl_lock_after!(EthernetRxDequeue => PureIpDeviceRxDequeue);
-impl_lock_after!(PureIpDeviceRxDequeue => IcmpSocketsTable<Ipv4>);
-impl_lock_after!(IcmpSocketsTable<Ipv4> => IcmpBoundMap<Ipv4>);
+impl_lock_after!(PureIpDeviceRxDequeue => IcmpAllSocketsSet<Ipv4>);
+impl_lock_after!(IcmpAllSocketsSet<Ipv4> => IcmpAllSocketsSet<Ipv6>);
+impl_lock_after!(IcmpAllSocketsSet<Ipv6> => IcmpSocketState<Ipv4>);
+impl_lock_after!(IcmpSocketState<Ipv4> => IcmpBoundMap<Ipv4>);
 impl_lock_after!(IcmpBoundMap<Ipv4> => IcmpTokenBucket<Ipv4>);
-impl_lock_after!(IcmpTokenBucket<Ipv4> => IcmpSocketsTable<Ipv6>);
-impl_lock_after!(IcmpSocketsTable<Ipv6> => IcmpBoundMap<Ipv6>);
+impl_lock_after!(IcmpTokenBucket<Ipv4> => IcmpSocketState<Ipv6>);
+impl_lock_after!(IcmpSocketState<Ipv6> => IcmpBoundMap<Ipv6>);
 impl_lock_after!(IcmpBoundMap<Ipv6> => IcmpTokenBucket<Ipv6>);
 impl_lock_after!(IcmpTokenBucket<Ipv6> => TcpAllSocketsSet<Ipv4>);
 
@@ -229,9 +232,11 @@ impl_lock_after!(TcpAllSocketsSet<Ipv6> => TcpSocketState<Ipv4>);
 impl_lock_after!(TcpSocketState<Ipv4> => TcpSocketState<Ipv6>);
 impl_lock_after!(TcpSocketState<Ipv6> => TcpDemux<Ipv4>);
 impl_lock_after!(TcpDemux<Ipv4> => TcpDemux<Ipv6>);
-impl_lock_after!(TcpDemux<Ipv6> => UdpSocketsTable<Ipv4>);
-impl_lock_after!(UdpSocketsTable<Ipv4> => UdpSocketsTable<Ipv6>);
-impl_lock_after!(UdpSocketsTable<Ipv6> => UdpBoundMap<Ipv4>);
+impl_lock_after!(TcpDemux<Ipv6> => UdpAllSocketsSet<Ipv4>);
+impl_lock_after!(UdpAllSocketsSet<Ipv4> => UdpAllSocketsSet<Ipv6>);
+impl_lock_after!(UdpAllSocketsSet<Ipv6> => UdpSocketState<Ipv4>);
+impl_lock_after!(UdpSocketState<Ipv4> => UdpSocketState<Ipv6>);
+impl_lock_after!(UdpSocketState<Ipv6> => UdpBoundMap<Ipv4>);
 impl_lock_after!(UdpBoundMap<Ipv4> => UdpBoundMap<Ipv6>);
 impl_lock_after!(UdpBoundMap<Ipv6> => IpDeviceConfiguration<Ipv4>);
 impl_lock_after!(IpDeviceConfiguration<Ipv4> => IpDeviceConfiguration<Ipv6>);

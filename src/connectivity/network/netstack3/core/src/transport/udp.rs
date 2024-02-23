@@ -6,6 +6,7 @@
 
 use alloc::{collections::hash_map::DefaultHasher, vec::Vec};
 use core::{
+    borrow::Borrow,
     fmt::Debug,
     hash::{Hash, Hasher},
     num::{NonZeroU16, NonZeroU8, NonZeroUsize},
@@ -13,7 +14,6 @@ use core::{
 };
 use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
 
-use dense_map::EntryKey;
 use derivative::Derivative;
 use either::Either;
 use net_types::{
@@ -31,18 +31,19 @@ use packet_formats::{
 use thiserror::Error;
 use tracing::{debug, trace};
 
-pub(crate) use crate::socket::datagram::IpExt;
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl, ProtocolFlowId},
     base::ContextPair,
-    context::{CounterContext, InstantContext, NonTestCtxMarker, RngContext, TracingContext},
+    context::{
+        CounterContext, InstantContext, NonTestCtxMarker, ReferenceNotifiers, RngContext,
+        TracingContext,
+    },
     convert::BidirectionalConverter,
     counters::Counter,
     data_structures::socketmap::{IterShadows as _, SocketMap, Tagged},
     device::{self, AnyDevice, DeviceIdContext},
     error::{LocalAddressError, SocketError, ZonedAddressError},
     ip::{
-        icmp::IcmpIpExt,
         socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
         HopLimits, IpTransportContext, MulticastMembershipHandler, TransportIpContext,
         TransportReceiveError,
@@ -56,13 +57,13 @@ use crate::{
             self, AddrEntry, BoundSocketState as DatagramBoundSocketState,
             BoundSocketStateType as DatagramBoundSocketStateType,
             BoundSockets as DatagramBoundSockets, ConnectError, DatagramBoundStateContext,
-            DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSpec, DatagramStateContext,
-            DualStackConnState, DualStackDatagramBoundStateContext, DualStackIpExt, EitherIpSocket,
-            ExpectedConnError, ExpectedUnboundError, FoundSockets, InUseError, IpOptions,
-            LocalIdentifierAllocator, MulticastMembershipInterfaceSelector,
-            NonDualStackDatagramBoundStateContext, SendError as DatagramSendError,
-            SetMulticastMembershipError, SocketHopLimits, SocketInfo as DatagramSocketInfo,
-            SocketState as DatagramSocketState, SocketsState as DatagramSocketsState,
+            DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec,
+            DatagramStateContext, DualStackConnState, DualStackDatagramBoundStateContext,
+            DualStackIpExt, EitherIpSocket, ExpectedConnError, ExpectedUnboundError, FoundSockets,
+            InUseError, IpExt, IpOptions, LocalIdentifierAllocator,
+            MulticastMembershipInterfaceSelector, NonDualStackDatagramBoundStateContext,
+            SendError as DatagramSendError, SetMulticastMembershipError, SocketHopLimits,
+            SocketInfo as DatagramSocketInfo, SocketState as DatagramSocketState,
             WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
         },
         AddrVec, Bound, IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack,
@@ -70,7 +71,7 @@ use crate::{
         SocketAddrType, SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapConflictPolicy,
         SocketMapStateSpec,
     },
-    sync::RwLock,
+    sync::{RemoveResourceResultWithContext, RwLock, StrongRc},
     trace_duration, transport, CoreCtx, StackState,
 };
 
@@ -134,19 +135,21 @@ pub struct BoundSockets<I: IpExt, D: device::WeakId> {
     lazy_port_alloc: Option<PortAlloc<UdpBoundSocketMap<I, D>>>,
 }
 
-pub type SocketsState<I, D> = DatagramSocketsState<I, D, Udp>;
-
 /// A collection of UDP sockets.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub(crate) struct Sockets<I: Ip + IpExt, D: device::WeakId> {
-    pub(crate) sockets_state: RwLock<SocketsState<I, D>>,
     pub(crate) bound: RwLock<BoundSockets<I, D>>,
+    // Destroy all_sockets last so the strong references in the demux are
+    // dropped before the primary references in the set.
+    pub(crate) all_sockets: RwLock<UdpSocketSet<I, D>>,
 }
 
 /// The state associated with the UDP protocol.
 ///
 /// `D` is the device ID type.
+#[derive(GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 pub(crate) struct UdpState<I: IpExt, D: device::WeakId> {
     pub(crate) sockets: Sockets<I, D>,
     pub(crate) send_port_unreachable: bool,
@@ -478,9 +481,9 @@ impl SocketMapAddrSpec for Udp {
     type LocalIdentifier = NonZeroU16;
 }
 
-impl<I: IpExt, D: device::Id> SocketMapStateSpec for (Udp, I, D) {
-    type ListenerId = I::DualStackBoundSocketId<Udp>;
-    type ConnId = I::DualStackBoundSocketId<Udp>;
+impl<I: IpExt, D: device::WeakId> SocketMapStateSpec for (Udp, I, D) {
+    type ListenerId = I::DualStackBoundSocketId<D, Udp>;
+    type ConnId = I::DualStackBoundSocketId<D, Udp>;
 
     type AddrVecTag = AddrVecTag;
 
@@ -547,12 +550,12 @@ pub enum UdpSerializeError {
 
 impl DatagramSocketSpec for Udp {
     type AddrSpec = Self;
-    type SocketId<I: IpExt> = UdpSocketId<I>;
+    type SocketId<I: IpExt, D: device::WeakId> = UdpSocketId<I, D>;
     type OtherStackIpOptions<I: IpExt> = I::OtherStackIpOptions<DualStackSocketState>;
     type ListenerIpAddr<I: IpExt> = I::DualStackListenerIpAddr<NonZeroU16>;
     type ConnIpAddr<I: IpExt> = I::DualStackConnIpAddr<Self>;
     type ConnStateExtra = ();
-    type ConnState<I: IpExt, D: Debug + Eq + Hash> = I::DualStackConnState<D, Self>;
+    type ConnState<I: IpExt, D: Debug + Eq + Hash + Send + Sync> = I::DualStackConnState<D, Self>;
     type SocketMapSpec<I: IpExt, D: device::WeakId> = (Self, I, D);
     type SharingState = Sharing;
 
@@ -564,8 +567,8 @@ impl DatagramSocketSpec for Udp {
     }
 
     fn make_bound_socket_map_id<I: IpExt, D: device::WeakId>(
-        s: &Self::SocketId<I>,
-    ) -> I::DualStackBoundSocketId<Udp> {
+        s: &Self::SocketId<I, D>,
+    ) -> I::DualStackBoundSocketId<D, Udp> {
         I::into_dual_stack_bound_socket_id(s.clone())
     }
 
@@ -593,7 +596,7 @@ impl DatagramSocketSpec for Udp {
         try_alloc_listen_port::<I, D>(rng, is_available)
     }
 
-    fn conn_addr_from_state<I: IpExt, D: Clone + Debug + Eq + Hash>(
+    fn conn_addr_from_state<I: IpExt, D: Clone + Debug + Eq + Hash + Send + Sync>(
         state: &Self::ConnState<I, D>,
     ) -> ConnAddr<Self::ConnIpAddr<I>, D> {
         I::conn_addr_from_state(state)
@@ -601,16 +604,16 @@ impl DatagramSocketSpec for Udp {
 }
 
 impl<I: IpExt, D: device::WeakId> DatagramSocketMapSpec<I, D, Udp> for (Udp, I, D) {
-    type BoundSocketId = I::DualStackBoundSocketId<Udp>;
+    type BoundSocketId = I::DualStackBoundSocketId<D, Udp>;
 }
 
-enum LookupResult<'a, I: IpExt, D: device::Id> {
+enum LookupResult<'a, I: IpExt, D: device::WeakId> {
     Conn(
-        &'a I::DualStackBoundSocketId<Udp>,
+        &'a I::DualStackBoundSocketId<D, Udp>,
         ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, UdpRemotePort>, D>,
     ),
     Listener(
-        &'a I::DualStackBoundSocketId<Udp>,
+        &'a I::DualStackBoundSocketId<D, Udp>,
         ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
     ),
 }
@@ -1035,31 +1038,104 @@ impl<A: IpAddress, D> From<NonZeroU16> for ListenerInfo<A, D> {
     }
 }
 
-/// A unique identifier for a UDP socket.
-#[derive(Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
+/// A UDP socket.
+#[derive(Eq, PartialEq, Hash, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 
-pub struct UdpSocketId<I: Ip>(usize, IpVersionMarker<I>);
+pub struct UdpSocketId<I: IpExt, D: device::WeakId>(datagram::StrongRc<I, D, Udp>);
 
-impl<I: Ip> From<usize> for UdpSocketId<I> {
-    fn from(value: usize) -> Self {
-        Self(value, IpVersionMarker::default())
+impl<I: IpExt, D: device::WeakId> Clone for UdpSocketId<I, D> {
+    #[cfg_attr(feature = "instrumented", track_caller)]
+    fn clone(&self) -> Self {
+        let Self(rc) = self;
+        Self(StrongRc::clone(rc))
     }
 }
 
-impl<I: Ip> EntryKey for UdpSocketId<I> {
-    fn get_key_index(&self) -> usize {
-        let Self(index, _marker) = self;
-        *index
+impl<I: IpExt, D: device::WeakId> From<datagram::StrongRc<I, D, Udp>> for UdpSocketId<I, D> {
+    fn from(value: datagram::StrongRc<I, D, Udp>) -> Self {
+        Self(value)
     }
 }
+
+impl<I: IpExt, D: device::WeakId> Borrow<datagram::StrongRc<I, D, Udp>> for UdpSocketId<I, D> {
+    fn borrow(&self) -> &datagram::StrongRc<I, D, Udp> {
+        let Self(rc) = self;
+        rc
+    }
+}
+
+impl<I: IpExt, D: device::WeakId> PartialEq<WeakUdpSocketId<I, D>> for UdpSocketId<I, D> {
+    fn eq(&self, other: &WeakUdpSocketId<I, D>) -> bool {
+        let Self(rc) = self;
+        let WeakUdpSocketId(weak) = other;
+        StrongRc::weak_ptr_eq(rc, weak)
+    }
+}
+
+impl<I: IpExt, D: device::WeakId> Debug for UdpSocketId<I, D> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self(rc) = self;
+        f.debug_tuple("UdpSocketId").field(&StrongRc::ptr_debug(rc)).finish()
+    }
+}
+
+impl<I: IpExt, D: device::WeakId> UdpSocketId<I, D> {
+    /// Returns the inner state for this socket, to be used in conjunction with
+    /// lock ordering mechanisms.
+    pub(crate) fn state_for_locking(&self) -> &RwLock<UdpSocketState<I, D>> {
+        let Self(rc) = self;
+        &rc.state
+    }
+
+    /// Returns a means to debug outstanding references to this socket.
+    pub fn debug_references(&self) -> impl Debug {
+        let Self(rc) = self;
+        StrongRc::debug_references(rc)
+    }
+
+    /// Downgrades this ID to a weak reference.
+    pub fn downgrade(&self) -> WeakUdpSocketId<I, D> {
+        let Self(rc) = self;
+        WeakUdpSocketId(StrongRc::downgrade(rc))
+    }
+}
+
+/// A weak reference to a UDP socket.
+#[derive(Clone, Eq, PartialEq, Hash, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+pub struct WeakUdpSocketId<I: IpExt, D: device::WeakId>(datagram::WeakRc<I, D, Udp>);
+
+impl<I: IpExt, D: device::WeakId> PartialEq<UdpSocketId<I, D>> for WeakUdpSocketId<I, D> {
+    fn eq(&self, other: &UdpSocketId<I, D>) -> bool {
+        PartialEq::eq(other, self)
+    }
+}
+
+impl<I: IpExt, D: device::WeakId> Debug for WeakUdpSocketId<I, D> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self(rc) = self;
+        f.debug_tuple("WeakUdpSocketId").field(&rc.ptr_debug()).finish()
+    }
+}
+
+impl<I: IpExt, D: device::WeakId> WeakUdpSocketId<I, D> {
+    #[cfg_attr(feature = "instrumented", track_caller)]
+    pub fn upgrade(&self) -> Option<UdpSocketId<I, D>> {
+        let Self(rc) = self;
+        rc.upgrade().map(UdpSocketId)
+    }
+}
+
+pub(crate) type UdpSocketSet<I, D> = DatagramSocketSet<I, D, Udp>;
+pub(crate) type UdpSocketState<I, D> = DatagramSocketState<I, D, Udp>;
 
 /// An execution context for the UDP protocol.
-pub trait UdpBindingsContext<I: IcmpIpExt, D> {
+pub trait UdpBindingsContext<I: IpExt, D: device::StrongId> {
     /// Receives a UDP packet on a socket.
     fn receive_udp<B: BufferMut>(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpSocketId<I, D::Weak>,
         device_id: &D,
         dst_addr: (I::Addr, NonZeroU16),
         src_addr: (I::Addr, Option<NonZeroU16>),
@@ -1068,12 +1144,19 @@ pub trait UdpBindingsContext<I: IcmpIpExt, D> {
 }
 
 /// The bindings context for UDP.
-pub trait UdpStateBindingsContext<I: IpExt, D>:
-    InstantContext + RngContext + TracingContext + UdpBindingsContext<I, D>
+pub trait UdpStateBindingsContext<I: IpExt, D: device::StrongId>:
+    InstantContext + RngContext + TracingContext + UdpBindingsContext<I, D> + ReferenceNotifiers
 {
 }
-impl<I: IpExt, BC: InstantContext + RngContext + TracingContext + UdpBindingsContext<I, D>, D>
-    UdpStateBindingsContext<I, D> for BC
+impl<
+        I: IpExt,
+        BC: InstantContext
+            + RngContext
+            + TracingContext
+            + UdpBindingsContext<I, D>
+            + ReferenceNotifiers,
+        D: device::StrongId,
+    > UdpStateBindingsContext<I, D> for BC
 {
 }
 
@@ -1139,20 +1222,9 @@ pub trait StateContext<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + UdpStateContext;
 
-    /// Calls the function with an immutable reference to a socket's state.
-    fn with_sockets_state<
-        O,
-        F: FnOnce(&mut Self::SocketStateCtx<'_>, &SocketsState<I, Self::WeakDeviceId>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O;
-
-    /// Calls the function with a mutable reference to UDP sockets.
-    fn with_sockets_state_mut<
-        O,
-        F: FnOnce(&mut Self::SocketStateCtx<'_>, &mut SocketsState<I, Self::WeakDeviceId>) -> O,
-    >(
+    /// Calls the function with mutable access to the set with all UDP
+    /// sockets.
+    fn with_all_sockets_mut<O, F: FnOnce(&mut UdpSocketSet<I, Self::WeakDeviceId>) -> O>(
         &mut self,
         cb: F,
     ) -> O;
@@ -1160,6 +1232,27 @@ pub trait StateContext<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>>
     /// Calls the function without access to UDP socket state.
     fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketStateCtx<'_>) -> O>(
         &mut self,
+        cb: F,
+    ) -> O;
+
+    /// Calls the function with an immutable reference to the given socket's
+    /// state.
+    fn with_socket_state<
+        O,
+        F: FnOnce(&mut Self::SocketStateCtx<'_>, &UdpSocketState<I, Self::WeakDeviceId>) -> O,
+    >(
+        &mut self,
+        id: &UdpSocketId<I, Self::WeakDeviceId>,
+        cb: F,
+    ) -> O;
+
+    /// Calls the function with a mutable reference to the given socket's state.
+    fn with_socket_state_mut<
+        O,
+        F: FnOnce(&mut Self::SocketStateCtx<'_>, &mut UdpSocketState<I, Self::WeakDeviceId>) -> O,
+    >(
+        &mut self,
+        id: &UdpSocketId<I, Self::WeakDeviceId>,
         cb: F,
     ) -> O;
 
@@ -1348,7 +1441,7 @@ fn try_deliver<
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    id: &UdpSocketId<I>,
+    id: &UdpSocketId<I, CC::WeakDeviceId>,
     device: &CC::DeviceId,
     (dst_ip, dst_port): (I::Addr, NonZeroU16),
     (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
@@ -1394,7 +1487,7 @@ fn try_dual_stack_deliver<
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    socket: I::DualStackBoundSocketId<Udp>,
+    socket: I::DualStackBoundSocketId<CC::WeakDeviceId, Udp>,
     device: &CC::DeviceId,
     (dst_ip, dst_port): (I::Addr, NonZeroU16),
     (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
@@ -1402,23 +1495,23 @@ fn try_dual_stack_deliver<
 ) -> bool {
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
-    struct Inputs<I: IpExt> {
+    struct Inputs<I: IpExt, D: device::WeakId> {
         src_ip: I::Addr,
         dst_ip: I::Addr,
-        socket: I::DualStackBoundSocketId<Udp>,
+        socket: I::DualStackBoundSocketId<D, Udp>,
     }
 
-    struct Outputs<I: IpExt> {
+    struct Outputs<I: IpExt, D: device::WeakId> {
         src_ip: I::Addr,
         dst_ip: I::Addr,
-        socket: UdpSocketId<I>,
+        socket: UdpSocketId<I, D>,
     }
 
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
-    enum DualStackOutputs<I: DualStackIpExt> {
-        CurrentStack(Outputs<I>),
-        OtherStack(Outputs<I::OtherVersion>),
+    enum DualStackOutputs<I: DualStackIpExt, D: device::WeakId> {
+        CurrentStack(Outputs<I, D>),
+        OtherStack(Outputs<I::OtherVersion, D>),
     }
 
     let dual_stack_outputs = I::map_ip(
@@ -1541,6 +1634,13 @@ impl<I: Ip, C> UdpApi<I, C> {
     }
 }
 
+/// A local alias for [`UdpSocketId`] for use in [`UdpApi`].
+///
+/// TODO(https://github.com/rust-lang/rust/issues/8995): Make this an inherent
+/// associated type.
+type UdpApiSocketId<I, C> =
+    UdpSocketId<I, <<C as ContextPair>::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>;
+
 impl<I, C> UdpApi<I, C>
 where
     I: IpExt,
@@ -1562,7 +1662,7 @@ where
     /// Creates an unbound UDP socket.
     ///
     /// `create` creates a new UDP socket and returns an identifier for it.
-    pub fn create(&mut self) -> UdpSocketId<I> {
+    pub fn create(&mut self) -> UdpApiSocketId<I, C> {
         datagram::create(self.core_ctx())
     }
 
@@ -1590,7 +1690,7 @@ where
     /// `connect` panics if `id` is not a valid [`SocketId`].
     pub fn connect(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpApiSocketId<I, C>,
         remote_ip: Option<
             ZonedAddr<
                 SpecifiedAddr<I::Addr>,
@@ -1614,7 +1714,7 @@ where
     /// Panics if `id` is not a valid [`UdpSocketId`].
     pub fn set_device(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpApiSocketId<I, C>,
         device_id: Option<&<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
     ) -> Result<(), SocketError> {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -1628,7 +1728,7 @@ where
     /// Panics if `id` is not a valid socket ID.
     pub fn get_bound_device(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpApiSocketId<I, C>,
     ) -> Option<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::get_bound_device(core_ctx, bindings_ctx, id)
@@ -1648,7 +1748,7 @@ where
     /// Panics if `id` is not a valid `UdpSocketId`.
     pub fn set_dual_stack_enabled(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpApiSocketId<I, C>,
         enabled: bool,
     ) -> Result<(), SetDualStackEnabledError> {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -1693,7 +1793,7 @@ where
     /// Panics if `id` is not a valid `UdpSocketId`.
     pub fn get_dual_stack_enabled(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpApiSocketId<I, C>,
     ) -> Result<bool, NotDualStackCapableError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::with_other_stack_ip_options(core_ctx, bindings_ctx, id, |other_stack| {
@@ -1719,7 +1819,7 @@ where
     /// panics if `id` is not a valid `UdpSocketId`.
     pub fn set_posix_reuse_port(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpApiSocketId<I, C>,
         reuse_port: bool,
     ) -> Result<(), ExpectedUnboundError> {
         datagram::update_sharing(
@@ -1734,7 +1834,7 @@ where
     /// # Panics
     ///
     /// Panics if `id` is not a valid `UdpSocketId`.
-    pub fn get_posix_reuse_port(&mut self, id: &UdpSocketId<I>) -> bool {
+    pub fn get_posix_reuse_port(&mut self, id: &UdpApiSocketId<I, C>) -> bool {
         datagram::get_sharing(self.core_ctx(), id).is_reuse_port()
     }
 
@@ -1747,7 +1847,7 @@ where
     /// the existing socket state.
     pub fn set_multicast_membership(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpApiSocketId<I, C>,
         multicast_group: MulticastAddr<I::Addr>,
         interface: MulticastMembershipInterfaceSelector<
             I::Addr,
@@ -1777,7 +1877,7 @@ where
     /// `ip_version` of [`IpVersion::V6`].
     pub fn set_unicast_hop_limit(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpApiSocketId<I, C>,
         unicast_hop_limit: Option<NonZeroU8>,
         ip_version: IpVersion,
     ) -> Result<(), NotDualStackCapableError> {
@@ -1816,7 +1916,7 @@ where
     /// `ip_version` of [`IpVersion::V6`].
     pub fn set_multicast_hop_limit(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpApiSocketId<I, C>,
         multicast_hop_limit: Option<NonZeroU8>,
         ip_version: IpVersion,
     ) -> Result<(), NotDualStackCapableError> {
@@ -1855,7 +1955,7 @@ where
     /// `ip_version` of [`IpVersion::V6`].
     pub fn get_unicast_hop_limit(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpApiSocketId<I, C>,
         ip_version: IpVersion,
     ) -> Result<NonZeroU8, NotDualStackCapableError> {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -1898,7 +1998,7 @@ where
     /// `ip_version` of [`IpVersion::V6`].
     pub fn get_multicast_hop_limit(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpApiSocketId<I, C>,
         ip_version: IpVersion,
     ) -> Result<NonZeroU8, NotDualStackCapableError> {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -1932,12 +2032,12 @@ where
     }
 
     /// Gets the transparent option.
-    pub fn get_transparent(&mut self, id: &UdpSocketId<I>) -> bool {
+    pub fn get_transparent(&mut self, id: &UdpApiSocketId<I, C>) -> bool {
         crate::socket::datagram::get_ip_transparent(self.core_ctx(), id)
     }
 
     /// Sets the transparent option.
-    pub fn set_transparent(&mut self, id: &UdpSocketId<I>, value: bool) {
+    pub fn set_transparent(&mut self, id: &UdpApiSocketId<I, C>, value: bool) {
         crate::socket::datagram::set_ip_transparent(self.core_ctx(), id, value)
     }
 
@@ -1953,7 +2053,7 @@ where
     /// # Panics
     ///
     /// Panics if `id` is not a valid `UdpSocketId`.
-    pub fn disconnect(&mut self, id: &UdpSocketId<I>) -> Result<(), ExpectedConnError> {
+    pub fn disconnect(&mut self, id: &UdpApiSocketId<I, C>) -> Result<(), ExpectedConnError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::disconnect_connected(core_ctx, bindings_ctx, id)
     }
@@ -1969,7 +2069,7 @@ where
     /// Panics if `id` is not a valid `UdpSocketId`.
     pub fn shutdown(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpApiSocketId<I, C>,
         which: ShutdownType,
     ) -> Result<(), ExpectedConnError> {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -1984,7 +2084,7 @@ where
     /// # Panics
     ///
     /// Panics if `id` is not a valid `UdpSocketId`.
-    pub fn get_shutdown(&mut self, id: &UdpSocketId<I>) -> Option<ShutdownType> {
+    pub fn get_shutdown(&mut self, id: &UdpApiSocketId<I, C>) -> Option<ShutdownType> {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::get_shutdown_connected(core_ctx, bindings_ctx, id)
     }
@@ -1996,10 +2096,10 @@ where
     /// Panics if `id` is not a valid [`UdpSocketId`].
     pub fn close(
         &mut self,
-        id: UdpSocketId<I>,
-    ) -> SocketInfo<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
+        id: UdpApiSocketId<I, C>,
+    ) -> RemoveResourceResultWithContext<(), C::BindingsContext> {
         let (core_ctx, bindings_ctx) = self.contexts();
-        datagram::close(core_ctx, bindings_ctx, id).into()
+        datagram::close(core_ctx, bindings_ctx, id)
     }
 
     /// Gets the [`SocketInfo`] associated with the UDP socket referenced by
@@ -2010,7 +2110,7 @@ where
     /// `get_udp_info` panics if `id` is not a valid `UdpSocketId`.
     pub fn get_info(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpApiSocketId<I, C>,
     ) -> SocketInfo<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::get_info(core_ctx, bindings_ctx, id).into()
@@ -2038,7 +2138,7 @@ where
     /// `listen_udp` panics if `id` is not a valid [`UdpSocketId`].
     pub fn listen(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpApiSocketId<I, C>,
         addr: Option<
             ZonedAddr<
                 SpecifiedAddr<I::Addr>,
@@ -2064,7 +2164,7 @@ where
     /// Panics if `id` is not a valid UDP socket identifier.
     pub fn send<B: BufferMut>(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpApiSocketId<I, C>,
         body: B,
     ) -> Result<(), Either<SendError, ExpectedConnError>> {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -2098,7 +2198,7 @@ where
     /// Panics if `id` is not a valid UDP socket identifier.
     pub fn send_to<B: BufferMut>(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpApiSocketId<I, C>,
         remote_ip: Option<
             ZonedAddr<
                 SpecifiedAddr<I::Addr>,
@@ -2163,30 +2263,33 @@ impl<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>, CC: StateContext<
 {
     type SocketsStateCtx<'a> = CC::SocketStateCtx<'a>;
 
-    fn with_sockets_state<
-        O,
-        F: FnOnce(
-            &mut Self::SocketsStateCtx<'_>,
-            &DatagramSocketsState<I, Self::WeakDeviceId, Udp>,
-        ) -> O,
-    >(
+    fn with_all_sockets_mut<O, F: FnOnce(&mut UdpSocketSet<I, Self::WeakDeviceId>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
-        self.with_sockets_state(|core_ctx, sockets_state| cb(core_ctx, sockets_state))
+        StateContext::with_all_sockets_mut(self, cb)
     }
 
-    fn with_sockets_state_mut<
+    fn with_socket_state<
         O,
-        F: FnOnce(
-            &mut Self::SocketsStateCtx<'_>,
-            &mut DatagramSocketsState<I, Self::WeakDeviceId, Udp>,
-        ) -> O,
+        F: FnOnce(&mut Self::SocketsStateCtx<'_>, &UdpSocketState<I, Self::WeakDeviceId>) -> O,
     >(
         &mut self,
+        id: &UdpSocketId<I, Self::WeakDeviceId>,
         cb: F,
     ) -> O {
-        self.with_sockets_state_mut(|core_ctx, sockets_state| cb(core_ctx, sockets_state))
+        StateContext::with_socket_state(self, id, cb)
+    }
+
+    fn with_socket_state_mut<
+        O,
+        F: FnOnce(&mut Self::SocketsStateCtx<'_>, &mut UdpSocketState<I, Self::WeakDeviceId>) -> O,
+    >(
+        &mut self,
+        id: &UdpSocketId<I, Self::WeakDeviceId>,
+        cb: F,
+    ) -> O {
+        StateContext::with_socket_state_mut(self, id, cb)
     }
 }
 
@@ -2279,7 +2382,10 @@ impl<
         *addr.to_ipv6_mapped()
     }
 
-    fn to_other_bound_socket_id(&self, id: &UdpSocketId<Ipv6>) -> EitherIpSocket<Udp> {
+    fn to_other_bound_socket_id(
+        &self,
+        id: &UdpSocketId<Ipv6, CC::WeakDeviceId>,
+    ) -> EitherIpSocket<CC::WeakDeviceId, Udp> {
         EitherIpSocket::V6(id.clone())
     }
 
@@ -2393,7 +2499,11 @@ mod tests {
         vec::Vec,
     };
     use const_unwrap::const_unwrap_option;
-    use core::convert::TryInto as _;
+    use core::{
+        borrow::BorrowMut,
+        convert::TryInto as _,
+        ops::{Deref, DerefMut},
+    };
 
     use assert_matches::assert_matches;
 
@@ -2434,7 +2544,7 @@ mod tests {
     /// A packet received on a socket.
     #[derive(Debug, Derivative, PartialEq)]
     #[derivative(Default(bound = ""))]
-    struct SocketReceived<I: IcmpIpExt> {
+    struct SocketReceived<I: Ip> {
         packets: Vec<ReceivedPacket<I>>,
     }
 
@@ -2480,7 +2590,7 @@ mod tests {
     }
 
     /// `FakeCtx` specialized for UDP.
-    type FakeUdpCtx<D> = FakeCtxWithCoreCtx<FakeUdpCoreCtx<D>, (), (), FakeBindingsCtxState>;
+    type FakeUdpCtx<D> = FakeCtxWithCoreCtx<FakeUdpCoreCtx<D>, (), (), FakeBindingsCtxState<D>>;
 
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
@@ -2509,23 +2619,11 @@ mod tests {
         }
     }
 
-    impl<I: IpExt, D: device::WeakId> AsRef<Self> for SocketsState<I, D> {
-        fn as_ref(&self) -> &Self {
-            self
-        }
-    }
-
-    impl<I: IpExt, D: device::WeakId> AsMut<Self> for SocketsState<I, D> {
-        fn as_mut(&mut self) -> &mut Self {
-            self
-        }
-    }
-
     type FakeUdpInnerCoreCtx<D> =
         Wrapped<FakeBoundSockets<FakeWeakDeviceId<D>>, FakeBufferCoreCtx<D>>;
 
     /// `FakeBindingsCtx` specialized for UDP.
-    type FakeUdpBindingsCtx = FakeBindingsCtx<(), (), FakeBindingsCtxState>;
+    type FakeUdpBindingsCtx<D> = FakeBindingsCtx<(), (), FakeBindingsCtxState<D>>;
 
     /// The FakeCoreCtx held as the inner state of the [`WrappedFakeCoreCtx`] that
     /// is [`FakeUdpCoreCtx`].
@@ -2535,24 +2633,22 @@ mod tests {
     type UdpFakeDeviceCtx = FakeUdpCtx<FakeDeviceId>;
     type UdpFakeDeviceCoreCtx = FakeUdpCoreCtx<FakeDeviceId>;
 
-    #[track_caller]
-    fn assert_state_removed<I: IpExt, D: crate::device::WeakId>(
-        id: &UdpSocketId<I>,
-        state: &SocketsState<I, D>,
-    ) {
-        assert_matches!(state.get(id.get_key_index()), None)
-    }
-    #[derive(Default)]
-    struct FakeBindingsCtxState {
-        received_v4: HashMap<UdpSocketId<Ipv4>, SocketReceived<Ipv4>>,
-        received_v6: HashMap<UdpSocketId<Ipv6>, SocketReceived<Ipv6>>,
+    #[derive(Derivative)]
+    #[derivative(Default(bound = ""))]
+    struct FakeBindingsCtxState<D: device::StrongId> {
+        received_v4: HashMap<WeakUdpSocketId<Ipv4, D::Weak>, SocketReceived<Ipv4>>,
+        received_v6: HashMap<WeakUdpSocketId<Ipv6, D::Weak>, SocketReceived<Ipv6>>,
     }
 
-    impl FakeBindingsCtxState {
-        fn received<I: TestIpExt>(&self) -> &HashMap<UdpSocketId<I>, SocketReceived<I>> {
+    impl<D: device::StrongId> FakeBindingsCtxState<D> {
+        fn received<I: TestIpExt>(
+            &self,
+        ) -> &HashMap<WeakUdpSocketId<I, D::Weak>, SocketReceived<I>> {
             #[derive(GenericOverIp)]
             #[generic_over_ip(I, Ip)]
-            struct Wrap<'a, I: TestIpExt>(&'a HashMap<UdpSocketId<I>, SocketReceived<I>>);
+            struct Wrap<'a, I: TestIpExt, D: device::WeakId>(
+                &'a HashMap<WeakUdpSocketId<I, D>, SocketReceived<I>>,
+            );
             let Wrap(map) = I::map_ip(
                 IpInvariant(self),
                 |IpInvariant(state)| Wrap(&state.received_v4),
@@ -2561,12 +2657,14 @@ mod tests {
             map
         }
 
-        fn received_mut<I: IcmpIpExt>(
+        fn received_mut<I: IpExt>(
             &mut self,
-        ) -> &mut HashMap<UdpSocketId<I>, SocketReceived<I>> {
+        ) -> &mut HashMap<WeakUdpSocketId<I, D::Weak>, SocketReceived<I>> {
             #[derive(GenericOverIp)]
             #[generic_over_ip(I, Ip)]
-            struct Wrap<'a, I: IcmpIpExt>(&'a mut HashMap<UdpSocketId<I>, SocketReceived<I>>);
+            struct Wrap<'a, I: IpExt, D: device::WeakId>(
+                &'a mut HashMap<WeakUdpSocketId<I, D>, SocketReceived<I>>,
+            );
             let Wrap(map) = I::map_ip(
                 IpInvariant(self),
                 |IpInvariant(state)| Wrap(&mut state.received_v4),
@@ -2575,7 +2673,7 @@ mod tests {
             map
         }
 
-        fn socket_data<I: TestIpExt>(&self) -> HashMap<UdpSocketId<I>, Vec<&'_ [u8]>> {
+        fn socket_data<I: TestIpExt>(&self) -> HashMap<WeakUdpSocketId<I, D::Weak>, Vec<&'_ [u8]>> {
             self.received::<I>()
                 .iter()
                 .map(|(id, SocketReceived { packets })| {
@@ -2588,16 +2686,16 @@ mod tests {
         }
     }
 
-    impl<I: IcmpIpExt, D> UdpBindingsContext<I, D> for FakeUdpBindingsCtx {
+    impl<I: IpExt, D: device::StrongId> UdpBindingsContext<I, D> for FakeUdpBindingsCtx<D> {
         fn receive_udp<B: BufferMut>(
             &mut self,
-            id: &UdpSocketId<I>,
+            id: &UdpSocketId<I, D::Weak>,
             _device: &D,
             (dst_ip, _dst_port): (I::Addr, NonZeroU16),
             (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
             body: &B,
         ) {
-            self.state_mut().received_mut::<I>().entry(id.clone()).or_default().packets.push(
+            self.state_mut().received_mut::<I>().entry(id.downgrade()).or_default().packets.push(
                 ReceivedPacket {
                     addr: ReceivedPacketAddrs { src_ip, dst_ip, src_port },
                     body: body.as_ref().to_owned(),
@@ -2606,35 +2704,53 @@ mod tests {
         }
     }
 
+    /// Utilities for accessing locked internal state in tests.
+    impl<I: IpExt, D: device::WeakId> UdpSocketId<I, D> {
+        fn get(&self) -> impl Deref<Target = UdpSocketState<I, D>> + '_ {
+            self.state_for_locking().read()
+        }
+
+        fn get_mut(&self) -> impl DerefMut<Target = UdpSocketState<I, D>> + '_ {
+            self.state_for_locking().write()
+        }
+    }
+
     impl<
             I: TestIpExt,
             D: FakeStrongDeviceId,
-            Outer: AsRef<SocketsState<I, FakeWeakDeviceId<D>>>
-                + AsMut<SocketsState<I, FakeWeakDeviceId<D>>>,
-        > StateContext<I, FakeUdpBindingsCtx> for Wrapped<Outer, FakeUdpInnerCoreCtx<D>>
+            Outer: Borrow<UdpSocketSet<I, FakeWeakDeviceId<D>>>
+                + BorrowMut<UdpSocketSet<I, FakeWeakDeviceId<D>>>,
+        > StateContext<I, FakeUdpBindingsCtx<D>> for Wrapped<Outer, FakeUdpInnerCoreCtx<D>>
     {
         type SocketStateCtx<'a> = FakeUdpInnerCoreCtx<D>;
 
-        fn with_sockets_state<
-            O,
-            F: FnOnce(&mut Self::SocketStateCtx<'_>, &SocketsState<I, Self::WeakDeviceId>) -> O,
-        >(
+        fn with_all_sockets_mut<O, F: FnOnce(&mut UdpSocketSet<I, Self::WeakDeviceId>) -> O>(
             &mut self,
             cb: F,
         ) -> O {
-            let Self { outer, inner } = self;
-            cb(inner, outer.as_ref())
+            cb(self.outer.borrow_mut())
         }
 
-        fn with_sockets_state_mut<
+        fn with_socket_state<
             O,
-            F: FnOnce(&mut Self::SocketStateCtx<'_>, &mut SocketsState<I, Self::WeakDeviceId>) -> O,
+            F: FnOnce(&mut Self::SocketStateCtx<'_>, &UdpSocketState<I, Self::WeakDeviceId>) -> O,
         >(
             &mut self,
+            id: &UdpSocketId<I, Self::WeakDeviceId>,
             cb: F,
         ) -> O {
-            let Self { outer, inner } = self;
-            cb(inner, outer.as_mut())
+            cb(&mut self.inner, &id.get())
+        }
+
+        fn with_socket_state_mut<
+            O,
+            F: FnOnce(&mut Self::SocketStateCtx<'_>, &mut UdpSocketState<I, Self::WeakDeviceId>) -> O,
+        >(
+            &mut self,
+            id: &UdpSocketId<I, Self::WeakDeviceId>,
+            cb: F,
+        ) -> O {
+            cb(&mut self.inner, &mut id.get_mut())
         }
 
         fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketStateCtx<'_>) -> O>(
@@ -2650,7 +2766,7 @@ mod tests {
         }
     }
 
-    impl<I: TestIpExt, D: FakeStrongDeviceId> BoundStateContext<I, FakeUdpBindingsCtx>
+    impl<I: TestIpExt, D: FakeStrongDeviceId> BoundStateContext<I, FakeUdpBindingsCtx<D>>
         for FakeUdpInnerCoreCtx<D>
     {
         type IpSocketsCtx<'a> = FakeBufferCoreCtx<D>;
@@ -2714,12 +2830,12 @@ mod tests {
 
     impl<D: FakeStrongDeviceId + 'static> UdpStateContext for FakeUdpInnerCoreCtx<D> {}
 
-    impl<D: FakeStrongDeviceId> NonDualStackBoundStateContext<Ipv4, FakeUdpBindingsCtx>
+    impl<D: FakeStrongDeviceId> NonDualStackBoundStateContext<Ipv4, FakeUdpBindingsCtx<D>>
         for FakeUdpInnerCoreCtx<D>
     {
     }
 
-    impl<D: FakeStrongDeviceId> DualStackBoundStateContext<Ipv6, FakeUdpBindingsCtx>
+    impl<D: FakeStrongDeviceId> DualStackBoundStateContext<Ipv6, FakeUdpBindingsCtx<D>>
         for FakeUdpInnerCoreCtx<D>
     {
         type IpSocketsCtx<'a> = FakeBufferCoreCtx<D>;
@@ -2763,11 +2879,11 @@ mod tests {
 
     /// Ip packet delivery for the [`FakeUdpCoreCtx`].
     impl<I: IpExt + IpDeviceStateIpExt + TestIpExt, D: FakeStrongDeviceId>
-        IpTransportContext<I, FakeUdpBindingsCtx, FakeUdpCoreCtx<D>> for UdpIpTransportContext
+        IpTransportContext<I, FakeUdpBindingsCtx<D>, FakeUdpCoreCtx<D>> for UdpIpTransportContext
     {
         fn receive_icmp_error(
             _core_ctx: &mut FakeUdpCoreCtx<D>,
-            _bindings_ctx: &mut FakeUdpBindingsCtx,
+            _bindings_ctx: &mut FakeUdpBindingsCtx<D>,
             _device: &D,
             _original_src_ip: Option<SpecifiedAddr<I::Addr>>,
             _original_dst_ip: SpecifiedAddr<I::Addr>,
@@ -2779,7 +2895,7 @@ mod tests {
 
         fn receive_ip_packet<B: BufferMut>(
             core_ctx: &mut FakeUdpCoreCtx<D>,
-            bindings_ctx: &mut FakeUdpBindingsCtx,
+            bindings_ctx: &mut FakeUdpBindingsCtx<D>,
             device: &D,
             src_ip: I::RecvSrcAddr,
             dst_ip: SpecifiedAddr<I::Addr>,
@@ -2816,15 +2932,25 @@ mod tests {
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
     struct DualStackSocketsState<D: device::WeakId> {
-        v4: SocketsState<Ipv4, D>,
-        v6: SocketsState<Ipv6, D>,
+        v4: UdpSocketSet<Ipv4, D>,
+        v6: UdpSocketSet<Ipv6, D>,
         udpv4_counters: UdpCounters<Ipv4>,
         udpv6_counters: UdpCounters<Ipv6>,
     }
 
-    impl<I: IpExt, D: device::WeakId> AsRef<SocketsState<I, D>> for DualStackSocketsState<D> {
-        fn as_ref(&self) -> &SocketsState<I, D> {
+    impl<I: IpExt, D: device::WeakId> Borrow<UdpSocketSet<I, D>> for DualStackSocketsState<D> {
+        fn borrow(&self) -> &UdpSocketSet<I, D> {
             I::map_ip(IpInvariant(self), |IpInvariant(dual)| &dual.v4, |IpInvariant(dual)| &dual.v6)
+        }
+    }
+
+    impl<I: IpExt, D: device::WeakId> BorrowMut<UdpSocketSet<I, D>> for DualStackSocketsState<D> {
+        fn borrow_mut(&mut self) -> &mut UdpSocketSet<I, D> {
+            I::map_ip(
+                IpInvariant(self),
+                |IpInvariant(dual)| &mut dual.v4,
+                |IpInvariant(dual)| &mut dual.v6,
+            )
         }
     }
 
@@ -2834,16 +2960,6 @@ mod tests {
                 IpInvariant(self),
                 |IpInvariant(dual)| &dual.udpv4_counters,
                 |IpInvariant(dual)| &dual.udpv6_counters,
-            )
-        }
-    }
-
-    impl<I: IpExt, D: device::WeakId> AsMut<SocketsState<I, D>> for DualStackSocketsState<D> {
-        fn as_mut(&mut self) -> &mut SocketsState<I, D> {
-            I::map_ip(
-                IpInvariant(self),
-                |IpInvariant(dual)| &mut dual.v4,
-                |IpInvariant(dual)| &mut dual.v6,
             )
         }
     }
@@ -2867,9 +2983,9 @@ mod tests {
 
     trait TestIpExt: crate::testutil::TestIpExt + IpExt + IpDeviceStateIpExt {
         type UdpDualStackBoundStateContext<D: FakeStrongDeviceId + 'static>:
-            DualStackDatagramBoundStateContext<Self, FakeUdpBindingsCtx, Udp, DeviceId=D, WeakDeviceId=D::Weak>;
+            DualStackDatagramBoundStateContext<Self, FakeUdpBindingsCtx<D>, Udp, DeviceId=D, WeakDeviceId=D::Weak>;
         type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static>:
-            NonDualStackDatagramBoundStateContext<Self, FakeUdpBindingsCtx, Udp, DeviceId=D, WeakDeviceId=D::Weak>;
+            NonDualStackDatagramBoundStateContext<Self, FakeUdpBindingsCtx<D>, Udp, DeviceId=D, WeakDeviceId=D::Weak>;
         fn try_into_recv_src_addr(addr: Self::Addr) -> Option<Self::RecvSrcAddr>;
     }
 
@@ -2903,7 +3019,7 @@ mod tests {
         CC: DeviceIdContext<AnyDevice, DeviceId = D>,
     >(
         core_ctx: &mut CC,
-        bindings_ctx: &mut FakeUdpBindingsCtx,
+        bindings_ctx: &mut FakeUdpBindingsCtx<D>,
         device: D,
         src_ip: A,
         dst_ip: A,
@@ -2912,7 +3028,7 @@ mod tests {
         body: &[u8],
     ) where
         A::Version: TestIpExt,
-        UdpIpTransportContext: IpTransportContext<A::Version, FakeUdpBindingsCtx, CC>,
+        UdpIpTransportContext: IpTransportContext<A::Version, FakeUdpBindingsCtx<D>, CC>,
     {
         let builder =
             UdpPacketBuilder::new(src_ip, dst_ip, NonZeroU16::new(src_port.into()), dst_port);
@@ -3052,7 +3168,7 @@ mod tests {
         assert_eq!(
             bindings_ctx.state().received::<I>(),
             &HashMap::from([(
-                socket.clone(),
+                socket.downgrade(),
                 SocketReceived {
                     packets: vec![ReceivedPacket {
                         body: body.into(),
@@ -3167,7 +3283,7 @@ mod tests {
 
         assert_eq!(
             bindings_ctx.state().socket_data(),
-            HashMap::from([(socket.clone(), vec![&body[..]])])
+            HashMap::from([(socket.downgrade(), vec![&body[..]])])
         );
 
         // Now try to send something over this new connection.
@@ -3673,7 +3789,7 @@ mod tests {
 
         assert_eq!(
             bindings_ctx.state().socket_data(),
-            HashMap::from([(socket.clone(), vec![&packet[..]])])
+            HashMap::from([(socket.downgrade(), vec![&packet[..]])])
         );
         api.shutdown(&socket, which).expect("is connected");
         let (core_ctx, bindings_ctx) = api.contexts();
@@ -3689,7 +3805,7 @@ mod tests {
         );
         assert_eq!(
             bindings_ctx.state().socket_data(),
-            HashMap::from([(socket.clone(), vec![&packet[..]])])
+            HashMap::from([(socket.downgrade(), vec![&packet[..]])])
         );
 
         // Calling shutdown for the send direction doesn't change anything.
@@ -3707,7 +3823,7 @@ mod tests {
         );
         assert_eq!(
             bindings_ctx.state().socket_data(),
-            HashMap::from([(socket, vec![&packet[..]])])
+            HashMap::from([(socket.downgrade(), vec![&packet[..]])])
         );
     }
 
@@ -3752,7 +3868,7 @@ mod tests {
         let wildcard_list = api.create();
         api.listen(&wildcard_list, None, Some(local_port_c)).expect("listen_udp failed");
 
-        let mut expectations = HashMap::<UdpSocketId<I>, SocketReceived<I>>::new();
+        let mut expectations = HashMap::<WeakUdpSocketId<I, _>, SocketReceived<I>>::new();
         // Now inject UDP packets that each of the created connections should
         // receive.
         let body_conn1 = [1, 1, 1, 1];
@@ -3767,7 +3883,7 @@ mod tests {
             local_port_d,
             &body_conn1[..],
         );
-        expectations.entry(conn1).or_default().packets.push(ReceivedPacket {
+        expectations.entry(conn1.downgrade()).or_default().packets.push(ReceivedPacket {
             body: body_conn1.into(),
             addr: ReceivedPacketAddrs {
                 src_ip: remote_ip_a.get(),
@@ -3788,7 +3904,7 @@ mod tests {
             local_port_d,
             &body_conn2[..],
         );
-        expectations.entry(conn2).or_default().packets.push(ReceivedPacket {
+        expectations.entry(conn2.downgrade()).or_default().packets.push(ReceivedPacket {
             addr: ReceivedPacketAddrs {
                 src_ip: remote_ip_b.get(),
                 dst_ip: local_ip.get(),
@@ -3809,7 +3925,7 @@ mod tests {
             local_port_a,
             &body_list1[..],
         );
-        expectations.entry(list1).or_default().packets.push(ReceivedPacket {
+        expectations.entry(list1.downgrade()).or_default().packets.push(ReceivedPacket {
             addr: ReceivedPacketAddrs {
                 src_ip: remote_ip_a.get(),
                 dst_ip: local_ip.get(),
@@ -3830,7 +3946,7 @@ mod tests {
             local_port_b,
             &body_list2[..],
         );
-        expectations.entry(list2).or_default().packets.push(ReceivedPacket {
+        expectations.entry(list2.downgrade()).or_default().packets.push(ReceivedPacket {
             body: body_list2.into(),
             addr: ReceivedPacketAddrs {
                 src_ip: remote_ip_a.get(),
@@ -3851,7 +3967,7 @@ mod tests {
             local_port_c,
             &body_wildcard_list[..],
         );
-        expectations.entry(wildcard_list).or_default().packets.push(ReceivedPacket {
+        expectations.entry(wildcard_list.downgrade()).or_default().packets.push(ReceivedPacket {
             addr: ReceivedPacketAddrs {
                 src_ip: remote_ip_a.get(),
                 dst_ip: local_ip.get(),
@@ -3903,7 +4019,7 @@ mod tests {
         assert_eq!(
             bindings_ctx.state().received::<I>(),
             &HashMap::from([(
-                listener,
+                listener.downgrade(),
                 SocketReceived {
                     packets: vec![
                         ReceivedPacket {
@@ -3955,7 +4071,7 @@ mod tests {
         assert_eq!(
             bindings_ctx.state().received(),
             &HashMap::from([(
-                listener,
+                listener.downgrade(),
                 SocketReceived {
                     packets: vec![ReceivedPacket {
                         body: vec![],
@@ -3989,7 +4105,7 @@ mod tests {
         // Check that we received the packet on the listener.
         assert_eq!(
             bindings_ctx.state().socket_data(),
-            HashMap::from([(listener, vec![&body[..]])])
+            HashMap::from([(listener.downgrade(), vec![&body[..]])])
         );
     }
 
@@ -4086,16 +4202,16 @@ mod tests {
         assert_eq!(
             bindings_ctx.state().socket_data(),
             HashMap::from([
-                (specific_listeners[0].clone(), vec![[1].as_slice(), &[2]]),
-                (specific_listeners[1].clone(), vec![&[1], &[2]]),
-                (any_listener, vec![&[1], &[2], &[3]]),
+                (specific_listeners[0].downgrade(), vec![[1].as_slice(), &[2]]),
+                (specific_listeners[1].downgrade(), vec![&[1], &[2]]),
+                (any_listener.downgrade(), vec![&[1], &[2], &[3]]),
             ]),
         );
     }
 
     type UdpMultipleDevicesCtx = FakeUdpCtx<MultipleDevicesId>;
     type UdpMultipleDevicesCoreCtx = FakeUdpCoreCtx<MultipleDevicesId>;
-    type UdpMultipleDevicesBindingsCtx = FakeUdpBindingsCtx;
+    type UdpMultipleDevicesBindingsCtx = FakeUdpBindingsCtx<MultipleDevicesId>;
 
     impl FakeUdpCoreCtx<MultipleDevicesId> {
         fn new_multiple_devices<I: TestIpExt>() -> Self {
@@ -4171,8 +4287,8 @@ mod tests {
         assert_eq!(
             bindings_ctx.state().socket_data(),
             HashMap::from([
-                (bound_first_device, vec![&body[..]]),
-                (bound_second_device, vec![&body[..]])
+                (bound_first_device.downgrade(), vec![&body[..]]),
+                (bound_second_device.downgrade(), vec![&body[..]])
             ])
         );
     }
@@ -4405,10 +4521,10 @@ mod tests {
 
         let per_socket_data = bindings_ctx.state().socket_data();
         for (device, listener) in bound_on_devices {
-            assert_eq!(per_socket_data[&listener], vec![&[index_for_device(device)]]);
+            assert_eq!(per_socket_data[&listener.downgrade()], vec![&[index_for_device(device)]]);
         }
         let expected_listener_data = &MultipleDevicesId::all().map(|d| vec![index_for_device(d)]);
-        assert_eq!(&per_socket_data[&listener], expected_listener_data);
+        assert_eq!(&per_socket_data[&listener.downgrade()], expected_listener_data);
     }
 
     /// Tests establishing a UDP connection without providing a local IP
@@ -4487,7 +4603,7 @@ mod tests {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
 
-        let listen_unbound = |api: &mut UdpApi<_, _>, socket: &UdpSocketId<_>| {
+        let listen_unbound = |api: &mut UdpApi<_, _>, socket: &UdpSocketId<_, _>| {
             api.listen(socket, Some(ZonedAddr::Unzoned(local_ip::<I>())), Some(LOCAL_PORT))
         };
 
@@ -4505,7 +4621,7 @@ mod tests {
 
         // Once the first listener is removed, the second socket can be
         // connected.
-        let _: SocketInfo<I::Addr, _> = api.close(listener);
+        api.close(listener).into_removed();
 
         listen_unbound(&mut api, &unbound).expect("listen should succeed");
     }
@@ -4583,7 +4699,10 @@ mod tests {
     #[test_case(bind_as_listener)]
     #[test_case(bind_as_connected)]
     fn test_set_unset_reuse_port_bound<I: Ip + TestIpExt>(
-        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &UdpSocketId<I>),
+        set_up_socket: impl FnOnce(
+            &mut UdpMultipleDevicesCtx,
+            &UdpSocketId<I, FakeWeakDeviceId<MultipleDevicesId>>,
+        ),
     ) {
         let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
             UdpMultipleDevicesCoreCtx::new_multiple_devices::<I>(),
@@ -4610,18 +4729,7 @@ mod tests {
         let socket = api.create();
         api.listen(&socket, Some(local_ip), Some(LOCAL_PORT)).unwrap();
         api.connect(&socket, Some(remote_ip), REMOTE_PORT.into()).expect("connect failed");
-        let info = api.close(socket.clone());
-        let info = assert_matches!(info, SocketInfo::Connected(info) => info);
-        // Assert that the info gotten back matches what was expected.
-        assert_eq!(info.local_ip.into_inner(), local_ip.map_zone(FakeWeakDeviceId));
-        assert_eq!(info.local_port, LOCAL_PORT);
-        assert_eq!(info.remote_ip.into_inner(), remote_ip.map_zone(FakeWeakDeviceId));
-        assert_eq!(info.remote_port, REMOTE_PORT.into());
-
-        // Assert that that connection id was removed from the connections
-        // state.
-        let Wrapped { outer: sockets_state, inner: _ } = api.core_ctx();
-        assert_state_removed(&socket, sockets_state.as_ref());
+        api.close(socket).into_removed();
     }
 
     /// Tests [`remove_udp`]
@@ -4634,29 +4742,22 @@ mod tests {
         // Test removing a specified listener.
         let specified = api.create();
         api.listen(&specified, Some(local_ip), Some(LOCAL_PORT)).expect("listen_udp failed");
-        let info = api.close(specified.clone());
-        let info = assert_matches!(info, SocketInfo::Listener(info) => info);
-        assert_eq!(info.local_ip.unwrap().into_inner(), local_ip.map_zone(FakeWeakDeviceId));
-        assert_eq!(info.local_port, LOCAL_PORT);
-        let Wrapped { outer: sockets_state, inner: _ } = api.core_ctx();
-        assert_state_removed(&specified, sockets_state.as_ref());
+        api.close(specified).into_removed();
 
         // Test removing a wildcard listener.
         let wildcard = api.create();
         api.listen(&wildcard, None, Some(LOCAL_PORT)).expect("listen_udp failed");
-        let info = api.close(wildcard.clone());
-        let info = assert_matches!(info, SocketInfo::Listener(info) => info);
-        assert_eq!(info.local_ip, None);
-        assert_eq!(info.local_port, LOCAL_PORT);
-        let Wrapped { outer: sockets_state, inner: _ } = api.core_ctx();
-        assert_state_removed(&wildcard, sockets_state.as_ref());
+        api.close(wildcard).into_removed();
     }
 
     fn try_join_leave_multicast<I: Ip + TestIpExt>(
         mcast_addr: MulticastAddr<I::Addr>,
         interface: MulticastMembershipInterfaceSelector<I::Addr, MultipleDevicesId>,
         set_up_ctx: impl FnOnce(&mut UdpMultipleDevicesCtx),
-        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &UdpSocketId<I>),
+        set_up_socket: impl FnOnce(
+            &mut UdpMultipleDevicesCtx,
+            &UdpSocketId<I, FakeWeakDeviceId<MultipleDevicesId>>,
+        ),
     ) -> (
         Result<(), SetMulticastMembershipError>,
         HashMap<(MultipleDevicesId, MulticastAddr<I::Addr>), NonZeroUsize>,
@@ -4685,15 +4786,25 @@ mod tests {
         (result, memberships_snapshot)
     }
 
-    fn leave_unbound<I: TestIpExt>(_ctx: &mut UdpMultipleDevicesCtx, _unbound: &UdpSocketId<I>) {}
+    fn leave_unbound<I: TestIpExt>(
+        _ctx: &mut UdpMultipleDevicesCtx,
+        _unbound: &UdpSocketId<I, FakeWeakDeviceId<MultipleDevicesId>>,
+    ) {
+    }
 
-    fn bind_as_listener<I: TestIpExt>(ctx: &mut UdpMultipleDevicesCtx, unbound: &UdpSocketId<I>) {
+    fn bind_as_listener<I: TestIpExt>(
+        ctx: &mut UdpMultipleDevicesCtx,
+        unbound: &UdpSocketId<I, FakeWeakDeviceId<MultipleDevicesId>>,
+    ) {
         UdpApi::<I, _>::new(ctx.as_mut())
             .listen(unbound, Some(ZonedAddr::Unzoned(local_ip::<I>())), Some(LOCAL_PORT))
             .expect("listen should succeed")
     }
 
-    fn bind_as_connected<I: TestIpExt>(ctx: &mut UdpMultipleDevicesCtx, unbound: &UdpSocketId<I>) {
+    fn bind_as_connected<I: TestIpExt>(
+        ctx: &mut UdpMultipleDevicesCtx,
+        unbound: &UdpSocketId<I, FakeWeakDeviceId<MultipleDevicesId>>,
+    ) {
         UdpApi::<I, _>::new(ctx.as_mut())
             .connect(
                 unbound,
@@ -4729,7 +4840,10 @@ mod tests {
         "any_interface_connected")]
     fn test_join_leave_multicast_succeeds<I: Ip + TestIpExt>(
         interface: MulticastMembershipInterfaceSelector<I::Addr, MultipleDevicesId>,
-        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &UdpSocketId<I>),
+        set_up_socket: impl FnOnce(
+            &mut UdpMultipleDevicesCtx,
+            &UdpSocketId<I, FakeWeakDeviceId<MultipleDevicesId>>,
+        ),
     ) {
         let mcast_addr = I::get_multicast_addr(3);
 
@@ -4765,7 +4879,10 @@ mod tests {
     #[test_case(bind_as_listener::<I>; "listener")]
     #[test_case(bind_as_connected::<I>; "connected")]
     fn test_join_multicast_fails_without_route<I: Ip + TestIpExt>(
-        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &UdpSocketId<I>),
+        set_up_socket: impl FnOnce(
+            &mut UdpMultipleDevicesCtx,
+            &UdpSocketId<I, FakeWeakDeviceId<MultipleDevicesId>>,
+        ),
     ) {
         let mcast_addr = I::get_multicast_addr(3);
 
@@ -4791,7 +4908,10 @@ mod tests {
     fn test_join_leave_multicast_interface_inferred_from_bound_device<I: Ip + TestIpExt>(
         bound_device: MultipleDevicesId,
         interface_addr: Option<SpecifiedAddr<I::Addr>>,
-        set_up_socket: impl FnOnce(&mut UdpMultipleDevicesCtx, &UdpSocketId<I>),
+        set_up_socket: impl FnOnce(
+            &mut UdpMultipleDevicesCtx,
+            &UdpSocketId<I, FakeWeakDeviceId<MultipleDevicesId>>,
+        ),
         expected_result: Result<(), SetMulticastMembershipError>,
     ) {
         let mcast_addr = I::get_multicast_addr(3);
@@ -4877,7 +4997,7 @@ mod tests {
             )])
         );
 
-        let _: SocketInfo<I::Addr, _> = api.close(unbound);
+        api.close(unbound).into_removed();
         assert_eq!(
             api.core_ctx().inner.inner.get_ref().multicast_memberships::<I>(),
             HashMap::default()
@@ -4921,7 +5041,7 @@ mod tests {
             ])
         );
 
-        let _: SocketInfo<I::Addr, _> = api.close(socket);
+        api.close(socket).into_removed();
         assert_eq!(
             api.core_ctx().inner.inner.get_ref().multicast_memberships::<I>(),
             HashMap::default()
@@ -4970,7 +5090,7 @@ mod tests {
             ])
         );
 
-        let _: SocketInfo<I::Addr, _> = api.close(socket);
+        api.close(socket).into_removed();
         assert_eq!(
             api.core_ctx().inner.inner.get_ref().multicast_memberships::<I>(),
             HashMap::default()
@@ -5048,7 +5168,7 @@ mod tests {
 
         api.listen(&first, Some(ZonedAddr::Unzoned(local_ip::<I>())), None).expect("listen failed");
         assert_eq!(api.get_posix_reuse_port(&first), true);
-        let _: SocketInfo<_, _> = api.close(first);
+        api.close(first).into_removed();
 
         let second = api.create();
         api.set_posix_reuse_port(&second, true).expect("is unbound");
@@ -5653,10 +5773,7 @@ mod tests {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let unbound = api.create();
-        let _: SocketInfo<_, _> = api.close(unbound.clone());
-
-        let Wrapped { outer: sockets_state, inner: _ } = api.core_ctx();
-        assert_state_removed(&unbound, sockets_state.as_ref());
+        api.close(unbound).into_removed();
     }
 
     #[ip_test]
@@ -5783,7 +5900,7 @@ mod tests {
         assert_eq!(
             bindings_ctx.state().received::<Ipv6>(),
             &HashMap::from([(
-                listener,
+                listener.downgrade(),
                 SocketReceived {
                     packets: vec![ReceivedPacket {
                         body: BODY.into(),
@@ -6031,17 +6148,11 @@ mod tests {
                 .expect("can set dual-stack enabled");
             let bind_addr = SpecifiedAddr::new(bind_addr);
             assert_eq!(
-                api.listen(&listener, bind_addr.map(|a| ZonedAddr::Unzoned(a)), Some(LOCAL_PORT),),
+                api.listen(&listener, bind_addr.map(|a| ZonedAddr::Unzoned(a)), Some(LOCAL_PORT)),
                 Ok(())
             );
 
-            assert_eq!(
-                api.close(listener),
-                SocketInfo::Listener(ListenerInfo {
-                    local_ip: bind_addr.map(StrictlyZonedAddr::new_unzoned_or_panic),
-                    local_port: LOCAL_PORT,
-                })
-            );
+            api.close(listener).into_removed();
         };
 
         // The first time should succeed because the state is empty.
@@ -6077,16 +6188,7 @@ mod tests {
                 Ok(())
             );
 
-            assert_matches!(
-                api.close(socket),
-                SocketInfo::Connected(ConnInfo{
-                    local_ip: _,
-                    local_port: _,
-                    remote_ip: found_remote_ip,
-                    remote_port: found_remote_port,
-                }) if found_remote_ip.addr() == remote_ip &&
-                    found_remote_port == REMOTE_PORT.into()
-            );
+            api.close(socket).into_removed();
         };
 
         // The first time should succeed because the state is empty.
@@ -6384,17 +6486,26 @@ mod tests {
         spec: C,
         expected: Result<(), InsertError>,
     ) {
+        let mut primary_ids = Vec::new();
+
+        let mut create_socket = || {
+            let primary = datagram::create_primary_id();
+            let id = UdpSocketId(crate::sync::PrimaryRc::clone_strong(&primary));
+            primary_ids.push(primary);
+            id
+        };
+
         let mut map = FakeBoundSocketMap::<Ipv4>::default();
-        let mut spec = spec.into_iter().enumerate().peekable();
-        let mut try_insert = |(index, (addr, options))| match addr {
+        let mut spec = spec.into_iter().peekable();
+        let mut try_insert = |(addr, options)| match addr {
             AddrVec::Conn(c) => map
                 .conns_mut()
-                .try_insert(c, options, EitherIpSocket::V4(UdpSocketId::from(index)))
+                .try_insert(c, options, EitherIpSocket::V4(create_socket()))
                 .map(|_| ())
                 .map_err(|(e, _)| e),
             AddrVec::Listen(l) => map
                 .listeners_mut()
-                .try_insert(l, options, EitherIpSocket::V4(UdpSocketId::from(index)))
+                .try_insert(l, options, EitherIpSocket::V4(create_socket()))
                 .map(|_| ())
                 .map_err(|(e, _)| e),
         };
@@ -6428,21 +6539,30 @@ mod tests {
         I: IntoIterator<Item = (AddrVec<Ipv4, FakeWeakDeviceId<FakeDeviceId>, Udp>, Sharing)>,
         I::IntoIter: ExactSizeIterator,
     {
-        enum Socket<A: IpAddress, D, LI, RI> {
-            Listener(UdpSocketId<A::Version>, ListenerAddr<ListenerIpAddr<A, LI>, D>),
-            Conn(UdpSocketId<A::Version>, ConnAddr<ConnIpAddr<A, LI, RI>, D>),
+        enum Socket<I: IpExt, D: device::WeakId, LI, RI> {
+            Listener(UdpSocketId<I, D>, ListenerAddr<ListenerIpAddr<I::Addr, LI>, D>),
+            Conn(UdpSocketId<I, D>, ConnAddr<ConnIpAddr<I::Addr, LI, RI>, D>),
         }
         let spec = spec.into_iter();
         let spec_len = spec.len();
+
+        let mut primary_ids = Vec::new();
+
+        let mut create_socket = || {
+            let primary = datagram::create_primary_id();
+            let id = UdpSocketId(crate::sync::PrimaryRc::clone_strong(&primary));
+            primary_ids.push(primary);
+            id
+        };
+
         for spec in spec.permutations(spec_len) {
             let mut map = FakeBoundSocketMap::<Ipv4>::default();
             let sockets = spec
                 .into_iter()
-                .enumerate()
-                .map(|(socket_index, (addr, options))| match addr {
+                .map(|(addr, options)| match addr {
                     AddrVec::Conn(c) => map
                         .conns_mut()
-                        .try_insert(c, options, EitherIpSocket::V4(UdpSocketId::from(socket_index)))
+                        .try_insert(c, options, EitherIpSocket::V4(create_socket()))
                         .map(|entry| {
                             Socket::Conn(
                                 assert_matches!(entry.id(), EitherIpSocket::V4(id) => id.clone()),
@@ -6452,7 +6572,7 @@ mod tests {
                         .expect("insert_failed"),
                     AddrVec::Listen(l) => map
                         .listeners_mut()
-                        .try_insert(l, options, EitherIpSocket::V4(UdpSocketId::from(socket_index)))
+                        .try_insert(l, options, EitherIpSocket::V4(create_socket()))
                         .map(|entry| {
                             Socket::Listener(
                                 assert_matches!(entry.id(), EitherIpSocket::V4(id) => id.clone()),
@@ -6522,10 +6642,10 @@ mod tests {
         // socket map should allow a looped back packet to be delivered despite
         // it being bound to a device other than loopback.
         if bind_to_device {
-            assert_matches!(&ctx.bindings_ctx.take_udp_received(socket)[..], []);
+            assert_matches!(&ctx.bindings_ctx.take_udp_received(&socket)[..], []);
         } else {
             assert_matches!(
-                &ctx.bindings_ctx.take_udp_received(socket)[..],
+                &ctx.bindings_ctx.take_udp_received(&socket)[..],
                 [packet] => assert_eq!(packet, HELLO)
             );
         }
@@ -6538,7 +6658,7 @@ mod tests {
     }
 
     impl OriginalSocketState {
-        fn create_socket<I, C>(&self, api: &mut UdpApi<I, C>) -> UdpSocketId<I>
+        fn create_socket<I, C>(&self, api: &mut UdpApi<I, C>) -> UdpApiSocketId<I, C>
         where
             I: TestIpExt,
             C: ContextPair,

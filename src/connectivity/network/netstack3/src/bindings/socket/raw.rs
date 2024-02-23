@@ -68,7 +68,7 @@ impl SocketWorkerHandler for BindingData {
         RequestHandler { ctx, data: self }.handle_request(request)
     }
 
-    fn close(self, _ctx: &mut Ctx) {}
+    async fn close(self, _ctx: &mut Ctx) {}
 }
 
 struct RequestHandler<'a> {

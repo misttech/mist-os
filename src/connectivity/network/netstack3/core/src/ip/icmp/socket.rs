@@ -5,11 +5,12 @@
 //! ICMP Echo Sockets.
 
 use core::{
+    borrow::Borrow,
     fmt::Debug,
+    hash::Hash,
     num::{NonZeroU16, NonZeroU8},
 };
 
-use dense_map::EntryKey;
 use derivative::Derivative;
 use either::Either;
 
@@ -33,43 +34,125 @@ use crate::{
     ip::{
         icmp::{IcmpAddr, IcmpBindingsContext, IcmpIpExt, IcmpStateContext, InnerIcmpContext},
         socket::IpSock,
-        IpExt,
     },
     socket::{
         self,
         address::{ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr},
         datagram::{
             self, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
-            DatagramSocketSpec, DatagramStateContext, ExpectedUnboundError, SocketHopLimits,
+            DatagramSocketSet, DatagramSocketSpec, DatagramStateContext, ExpectedUnboundError,
+            SocketHopLimits,
         },
         AddrVec, IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack, ShutdownType,
         SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
     },
-    sync::RwLock,
+    sync::{RemoveResourceResultWithContext, RwLock, StrongRc},
 };
 
-pub type SocketsState<I, D> = datagram::SocketsState<I, D, Icmp>;
+/// A marker trait for all IP extensions required by ICMP sockets.
+pub trait IpExt: datagram::IpExt + IcmpIpExt {}
+impl<O: datagram::IpExt + IcmpIpExt> IpExt for O {}
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct IcmpSockets<I: IpExt + datagram::DualStackIpExt, D: device::WeakId> {
-    // This will be used to store state for unbound sockets, like socket
-    // options.
-    pub(crate) state: RwLock<SocketsState<I, D>>,
+pub(crate) struct IcmpSockets<I: IpExt, D: device::WeakId> {
     pub(crate) bound_and_id_allocator: RwLock<BoundSockets<I, D>>,
+    // Destroy all_sockets last so the strong references in the demux are
+    // dropped before the primary references in the set.
+    pub(crate) all_sockets: RwLock<IcmpSocketSet<I, D>>,
 }
 
-/// An identifier for an ICMP socket.
-#[derive(Clone, Debug, Eq, PartialEq, Hash, GenericOverIp)]
+/// An ICMP socket.
+#[derive(Eq, PartialEq, Hash, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-pub struct IcmpSocketId<I: Ip>(usize, IpVersionMarker<I>);
 
-impl<I: Ip> Into<usize> for IcmpSocketId<I> {
-    fn into(self) -> usize {
-        let Self(id, _marker) = self;
-        id
+pub struct IcmpSocketId<I: IpExt, D: device::WeakId>(datagram::StrongRc<I, D, Icmp>);
+
+impl<I: IpExt, D: device::WeakId> Clone for IcmpSocketId<I, D> {
+    #[cfg_attr(feature = "instrumented", track_caller)]
+    fn clone(&self) -> Self {
+        let Self(rc) = self;
+        Self(StrongRc::clone(rc))
     }
 }
+
+impl<I: IpExt, D: device::WeakId> From<datagram::StrongRc<I, D, Icmp>> for IcmpSocketId<I, D> {
+    fn from(value: datagram::StrongRc<I, D, Icmp>) -> Self {
+        Self(value)
+    }
+}
+
+impl<I: IpExt, D: device::WeakId> Borrow<datagram::StrongRc<I, D, Icmp>> for IcmpSocketId<I, D> {
+    fn borrow(&self) -> &datagram::StrongRc<I, D, Icmp> {
+        let Self(rc) = self;
+        rc
+    }
+}
+
+impl<I: IpExt, D: device::WeakId> PartialEq<WeakIcmpSocketId<I, D>> for IcmpSocketId<I, D> {
+    fn eq(&self, other: &WeakIcmpSocketId<I, D>) -> bool {
+        let Self(rc) = self;
+        let WeakIcmpSocketId(weak) = other;
+        StrongRc::weak_ptr_eq(rc, weak)
+    }
+}
+
+impl<I: IpExt, D: device::WeakId> Debug for IcmpSocketId<I, D> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self(rc) = self;
+        f.debug_tuple("IcmpSocketId").field(&StrongRc::ptr_debug(rc)).finish()
+    }
+}
+
+impl<I: IpExt, D: device::WeakId> IcmpSocketId<I, D> {
+    /// Returns the inner state for this socket, to be used in conjunction with
+    /// lock ordering mechanisms.
+    pub(crate) fn state_for_locking(&self) -> &RwLock<IcmpSocketState<I, D>> {
+        let Self(rc) = self;
+        &rc.state
+    }
+
+    /// Returns a means to debug outstanding references to this socket.
+    pub fn debug_references(&self) -> impl Debug {
+        let Self(rc) = self;
+        StrongRc::debug_references(rc)
+    }
+
+    /// Downgrades this ID to a weak reference.
+    pub fn downgrade(&self) -> WeakIcmpSocketId<I, D> {
+        let Self(rc) = self;
+        WeakIcmpSocketId(StrongRc::downgrade(rc))
+    }
+}
+
+/// A weak reference to an ICMP socket.
+#[derive(Clone, Eq, PartialEq, Hash, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+pub struct WeakIcmpSocketId<I: IpExt, D: device::WeakId>(datagram::WeakRc<I, D, Icmp>);
+
+impl<I: IpExt, D: device::WeakId> PartialEq<IcmpSocketId<I, D>> for WeakIcmpSocketId<I, D> {
+    fn eq(&self, other: &IcmpSocketId<I, D>) -> bool {
+        PartialEq::eq(other, self)
+    }
+}
+
+impl<I: IpExt, D: device::WeakId> Debug for WeakIcmpSocketId<I, D> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self(rc) = self;
+        f.debug_tuple("WeakIcmpSocketId").field(&rc.ptr_debug()).finish()
+    }
+}
+
+impl<I: IpExt, D: device::WeakId> WeakIcmpSocketId<I, D> {
+    #[cfg_attr(feature = "instrumented", track_caller)]
+    pub fn upgrade(&self) -> Option<IcmpSocketId<I, D>> {
+        let Self(rc) = self;
+        rc.upgrade().map(IcmpSocketId)
+    }
+}
+
+pub(crate) type IcmpSocketSet<I, D> = DatagramSocketSet<I, D, Icmp>;
+pub(crate) type IcmpSocketState<I, D> = datagram::SocketState<I, D, Icmp>;
 
 #[derive(Clone)]
 pub(crate) struct IcmpConn<S> {
@@ -92,11 +175,11 @@ where
 
 /// The context required by the ICMP layer in order to deliver events related to
 /// ICMP sockets.
-pub trait IcmpEchoBindingsContext<I: IcmpIpExt, D> {
+pub trait IcmpEchoBindingsContext<I: IpExt, D: device::StrongId> {
     /// Receives an ICMP echo reply.
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
-        conn: &IcmpSocketId<I>,
+        conn: &IcmpSocketId<I, D::Weak>,
         device_id: &D,
         src_ip: I::Addr,
         dst_ip: I::Addr,
@@ -113,20 +196,9 @@ pub trait StateContext<I: IcmpIpExt + IpExt, BC: IcmpBindingsContext<I, Self::De
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + IcmpStateContext;
 
-    /// Calls the function with an immutable reference to a socket's state.
-    fn with_sockets_state<
-        O,
-        F: FnOnce(&mut Self::SocketStateCtx<'_>, &SocketsState<I, Self::WeakDeviceId>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O;
-
-    /// Calls the function with a mutable reference to ICMP sockets.
-    fn with_sockets_state_mut<
-        O,
-        F: FnOnce(&mut Self::SocketStateCtx<'_>, &mut SocketsState<I, Self::WeakDeviceId>) -> O,
-    >(
+    /// Calls the function with mutable access to the set with all ICMP
+    /// sockets.
+    fn with_all_sockets_mut<O, F: FnOnce(&mut IcmpSocketSet<I, Self::WeakDeviceId>) -> O>(
         &mut self,
         cb: F,
     ) -> O;
@@ -134,6 +206,27 @@ pub trait StateContext<I: IcmpIpExt + IpExt, BC: IcmpBindingsContext<I, Self::De
     /// Calls the function without access to ICMP socket state.
     fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketStateCtx<'_>) -> O>(
         &mut self,
+        cb: F,
+    ) -> O;
+
+    /// Calls the function with an immutable reference to the given socket's
+    /// state.
+    fn with_socket_state<
+        O,
+        F: FnOnce(&mut Self::SocketStateCtx<'_>, &IcmpSocketState<I, Self::WeakDeviceId>) -> O,
+    >(
+        &mut self,
+        id: &IcmpSocketId<I, Self::WeakDeviceId>,
+        cb: F,
+    ) -> O;
+
+    /// Calls the function with a mutable reference to the given socket's state.
+    fn with_socket_state_mut<
+        O,
+        F: FnOnce(&mut Self::SocketStateCtx<'_>, &mut IcmpSocketState<I, Self::WeakDeviceId>) -> O,
+    >(
+        &mut self,
+        id: &IcmpSocketId<I, Self::WeakDeviceId>,
         cb: F,
     ) -> O;
 }
@@ -144,7 +237,7 @@ pub enum Icmp {}
 impl DatagramSocketSpec for Icmp {
     type AddrSpec = IcmpAddrSpec;
 
-    type SocketId<I: datagram::IpExt> = IcmpSocketId<I>;
+    type SocketId<I: datagram::IpExt, D: device::WeakId> = IcmpSocketId<I, D>;
 
     type OtherStackIpOptions<I: datagram::IpExt> = ();
 
@@ -158,7 +251,7 @@ impl DatagramSocketSpec for Icmp {
     }
 
     fn make_bound_socket_map_id<I: datagram::IpExt, D: device::WeakId>(
-        s: &Self::SocketId<I>,
+        s: &Self::SocketId<I, D>,
     ) -> <Self::SocketMapSpec<I, D> as datagram::DatagramSocketMapSpec<
         I,
         D,
@@ -221,14 +314,14 @@ impl DatagramSocketSpec for Icmp {
         <Self::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     >;
 
-    type ConnState<I: datagram::IpExt, D: Debug + Eq + core::hash::Hash> =
+    type ConnState<I: datagram::IpExt, D: Debug + Eq + Hash + Send + Sync> =
         datagram::ConnState<I, I, D, Self>;
     // Store the remote port/id set by `connect`. This does not participate in
     // demuxing, so not part of the socketmap, but we need to store it so that
     // it can be reported later.
     type ConnStateExtra = u16;
 
-    fn conn_addr_from_state<I: datagram::IpExt, D: Clone + Debug + Eq + core::hash::Hash>(
+    fn conn_addr_from_state<I: datagram::IpExt, D: Clone + Debug + Eq + Hash + Send + Sync>(
         state: &Self::ConnState<I, D>,
     ) -> ConnAddr<Self::ConnIpAddr<I>, D> {
         let datagram::ConnState { addr, .. } = state;
@@ -375,32 +468,39 @@ where
 {
     type SocketsStateCtx<'a> = CC::SocketStateCtx<'a>;
 
-    /// Calls the function with an immutable reference to the datagram sockets.
-    fn with_sockets_state<
-        O,
-        F: FnOnce(&mut Self::SocketsStateCtx<'_>, &SocketsState<I, Self::WeakDeviceId>) -> O,
-    >(
+    fn with_all_sockets_mut<O, F: FnOnce(&mut IcmpSocketSet<I, Self::WeakDeviceId>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
-        StateContext::with_sockets_state(self, cb)
+        StateContext::with_all_sockets_mut(self, cb)
     }
 
-    /// Calls the function with a mutable reference to the datagram sockets.
-    fn with_sockets_state_mut<
+    fn with_socket_state<
         O,
-        F: FnOnce(&mut Self::SocketsStateCtx<'_>, &mut SocketsState<I, Self::WeakDeviceId>) -> O,
+        F: FnOnce(&mut Self::SocketsStateCtx<'_>, &IcmpSocketState<I, Self::WeakDeviceId>) -> O,
     >(
         &mut self,
+        id: &IcmpSocketId<I, Self::WeakDeviceId>,
         cb: F,
     ) -> O {
-        StateContext::with_sockets_state_mut(self, cb)
+        StateContext::with_socket_state(self, id, cb)
+    }
+
+    fn with_socket_state_mut<
+        O,
+        F: FnOnce(&mut Self::SocketsStateCtx<'_>, &mut IcmpSocketState<I, Self::WeakDeviceId>) -> O,
+    >(
+        &mut self,
+        id: &IcmpSocketId<I, Self::WeakDeviceId>,
+        cb: F,
+    ) -> O {
+        StateContext::with_socket_state_mut(self, id, cb)
     }
 }
 
-impl<I: IpExt, D: device::Id> SocketMapStateSpec for (Icmp, I, D) {
-    type ListenerId = IcmpSocketId<I>;
-    type ConnId = IcmpSocketId<I>;
+impl<I: IpExt, D: device::WeakId> SocketMapStateSpec for (Icmp, I, D) {
+    type ListenerId = IcmpSocketId<I, D>;
+    type ConnId = IcmpSocketId<I, D>;
 
     type AddrVecTag = ();
 
@@ -421,7 +521,7 @@ impl<I: IpExt, D: device::Id> SocketMapStateSpec for (Icmp, I, D) {
     }
 }
 
-impl<I: IpExt> SocketMapAddrStateSpec for IcmpSocketId<I> {
+impl<I: IpExt, D: device::WeakId> SocketMapAddrStateSpec for IcmpSocketId<I, D> {
     type Id = Self;
 
     type SharingState = ();
@@ -458,7 +558,7 @@ impl<I: IpExt> SocketMapAddrStateSpec for IcmpSocketId<I> {
 }
 
 impl<I: IpExt, D: device::WeakId> DatagramSocketMapSpec<I, D, IcmpAddrSpec> for (Icmp, I, D) {
-    type BoundSocketId = IcmpSocketId<I>;
+    type BoundSocketId = IcmpSocketId<I, D>;
 }
 
 impl<AA, I: IpExt, D: device::WeakId> SocketMapConflictPolicy<AA, (), I, D, IcmpAddrSpec>
@@ -489,19 +589,6 @@ where
     }
 }
 
-impl<I: Ip> From<usize> for IcmpSocketId<I> {
-    fn from(value: usize) -> Self {
-        Self(value, IpVersionMarker::default())
-    }
-}
-
-impl<I: Ip> EntryKey for IcmpSocketId<I> {
-    fn get_key_index(&self) -> usize {
-        let Self(index, _marker) = self;
-        *index
-    }
-}
-
 /// The ICMP Echo sockets API.
 pub struct IcmpEchoSocketApi<I: Ip, C>(C, IpVersionMarker<I>);
 
@@ -510,6 +597,13 @@ impl<I: Ip, C> IcmpEchoSocketApi<I, C> {
         Self(ctx, IpVersionMarker::new())
     }
 }
+
+/// A local alias for [`IcmpSocketId`] for use in [`IcmpEchoSocketApi`].
+///
+/// TODO(https://github.com/rust-lang/rust/issues/8995): Make this an inherent
+/// associated type.
+type IcmpApiSocketId<I, C> =
+    IcmpSocketId<I, <<C as ContextPair>::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>;
 
 impl<I, C> IcmpEchoSocketApi<I, C>
 where
@@ -530,7 +624,7 @@ where
     }
 
     /// Creates a new unbound ICMP socket.
-    pub fn create(&mut self) -> IcmpSocketId<I> {
+    pub fn create(&mut self) -> IcmpApiSocketId<I, C> {
         datagram::create(self.core_ctx())
     }
 
@@ -539,7 +633,7 @@ where
     /// If the socket is never bound, an local ID will be allocated.
     pub fn connect(
         &mut self,
-        id: &IcmpSocketId<I>,
+        id: &IcmpApiSocketId<I, C>,
         remote_ip: Option<
             ZonedAddr<
                 SpecifiedAddr<I::Addr>,
@@ -558,7 +652,7 @@ where
     /// assumed; When the ID is missing, it will be allocated.
     pub fn bind(
         &mut self,
-        id: &IcmpSocketId<I>,
+        id: &IcmpApiSocketId<I, C>,
         local_ip: Option<
             ZonedAddr<
                 SpecifiedAddr<I::Addr>,
@@ -574,47 +668,44 @@ where
     /// Gets the information about an ICMP socket.
     pub fn get_info(
         &mut self,
-        id: &IcmpSocketId<I>,
+        id: &IcmpApiSocketId<I, C>,
     ) -> SocketInfo<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
-        StateContext::with_sockets_state(self.core_ctx(), |_core_ctx, state| {
-            match state.get(id.get_key_index()).expect("invalid socket ID") {
-                datagram::SocketState::Unbound(_) => SocketInfo::Unbound,
-                datagram::SocketState::Bound(datagram::BoundSocketState {
-                    socket_type,
-                    original_bound_addr: _,
-                }) => match socket_type {
-                    datagram::BoundSocketStateType::Listener { state, sharing: _ } => {
-                        let datagram::ListenerState {
-                            addr: ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device },
-                            ip_options: _,
-                        } = state;
-                        SocketInfo::Bound {
-                            local_ip: addr.map(Into::into),
-                            id: *identifier,
-                            device: device.clone(),
-                        }
+        StateContext::with_socket_state(self.core_ctx(), id, |_core_ctx, state| match state {
+            datagram::SocketState::Unbound(_) => SocketInfo::Unbound,
+            datagram::SocketState::Bound(datagram::BoundSocketState {
+                socket_type,
+                original_bound_addr: _,
+            }) => match socket_type {
+                datagram::BoundSocketStateType::Listener { state, sharing: _ } => {
+                    let datagram::ListenerState {
+                        addr: ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device },
+                        ip_options: _,
+                    } = state;
+                    SocketInfo::Bound {
+                        local_ip: addr.map(Into::into),
+                        id: *identifier,
+                        device: device.clone(),
                     }
-                    datagram::BoundSocketStateType::Connected { state, sharing: _ } => {
-                        let datagram::ConnState {
-                            addr:
-                                ConnAddr {
-                                    ip:
-                                        ConnIpAddr { local: (local_ip, id), remote: (remote_ip, ()) },
-                                    device,
-                                },
-                            extra: remote_id,
-                            ..
-                        } = state;
-                        SocketInfo::Connected {
-                            remote_ip: (*remote_ip).into(),
-                            local_ip: (*local_ip).into(),
-                            id: *id,
-                            device: device.clone(),
-                            remote_id: *remote_id,
-                        }
+                }
+                datagram::BoundSocketStateType::Connected { state, sharing: _ } => {
+                    let datagram::ConnState {
+                        addr:
+                            ConnAddr {
+                                ip: ConnIpAddr { local: (local_ip, id), remote: (remote_ip, ()) },
+                                device,
+                            },
+                        extra: remote_id,
+                        ..
+                    } = state;
+                    SocketInfo::Connected {
+                        remote_ip: (*remote_ip).into(),
+                        local_ip: (*local_ip).into(),
+                        id: *id,
+                        device: device.clone(),
+                        remote_id: *remote_id,
                     }
-                },
-            }
+                }
+            },
         })
     }
 
@@ -625,7 +716,7 @@ where
     /// port, the device will be used when binding.
     pub fn set_device(
         &mut self,
-        id: &IcmpSocketId<I>,
+        id: &IcmpApiSocketId<I, C>,
         device_id: Option<&<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
     ) -> Result<(), SocketError> {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -635,14 +726,17 @@ where
     /// Gets the device the specified socket is bound to.
     pub fn get_bound_device(
         &mut self,
-        id: &IcmpSocketId<I>,
+        id: &IcmpApiSocketId<I, C>,
     ) -> Option<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::get_bound_device(core_ctx, bindings_ctx, id)
     }
 
     /// Disconnects an ICMP socket.
-    pub fn disconnect(&mut self, id: &IcmpSocketId<I>) -> Result<(), datagram::ExpectedConnError> {
+    pub fn disconnect(
+        &mut self,
+        id: &IcmpApiSocketId<I, C>,
+    ) -> Result<(), datagram::ExpectedConnError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::disconnect_connected(core_ctx, bindings_ctx, id)
     }
@@ -650,7 +744,7 @@ where
     /// Shuts down an ICMP socket.
     pub fn shutdown(
         &mut self,
-        id: &IcmpSocketId<I>,
+        id: &IcmpApiSocketId<I, C>,
         shutdown_type: ShutdownType,
     ) -> Result<(), datagram::ExpectedConnError> {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -658,31 +752,38 @@ where
     }
 
     /// Gets the current shutdown state of an ICMP socket.
-    pub fn get_shutdown(&mut self, id: &IcmpSocketId<I>) -> Option<ShutdownType> {
+    pub fn get_shutdown(&mut self, id: &IcmpApiSocketId<I, C>) -> Option<ShutdownType> {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::get_shutdown_connected(core_ctx, bindings_ctx, id)
     }
 
     /// Closes an ICMP socket.
-    pub fn close(&mut self, id: IcmpSocketId<I>) {
+    pub fn close(
+        &mut self,
+        id: IcmpApiSocketId<I, C>,
+    ) -> RemoveResourceResultWithContext<(), C::BindingsContext> {
         let (core_ctx, bindings_ctx) = self.contexts();
-        let _: datagram::SocketInfo<_, _, _> = datagram::close(core_ctx, bindings_ctx, id);
+        datagram::close(core_ctx, bindings_ctx, id)
     }
 
     /// Gets unicast IP hop limit for ICMP sockets.
-    pub fn get_unicast_hop_limit(&mut self, id: &IcmpSocketId<I>) -> NonZeroU8 {
+    pub fn get_unicast_hop_limit(&mut self, id: &IcmpApiSocketId<I, C>) -> NonZeroU8 {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::get_ip_hop_limits(core_ctx, bindings_ctx, id).unicast
     }
 
     /// Gets multicast IP hop limit for ICMP sockets.
-    pub fn get_multicast_hop_limit(&mut self, id: &IcmpSocketId<I>) -> NonZeroU8 {
+    pub fn get_multicast_hop_limit(&mut self, id: &IcmpApiSocketId<I, C>) -> NonZeroU8 {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::get_ip_hop_limits(core_ctx, bindings_ctx, id).multicast
     }
 
     /// Sets unicast IP hop limit for ICMP sockets.
-    pub fn set_unicast_hop_limit(&mut self, id: &IcmpSocketId<I>, hop_limit: Option<NonZeroU8>) {
+    pub fn set_unicast_hop_limit(
+        &mut self,
+        id: &IcmpApiSocketId<I, C>,
+        hop_limit: Option<NonZeroU8>,
+    ) {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::update_ip_hop_limit(
             core_ctx,
@@ -693,7 +794,11 @@ where
     }
 
     /// Sets multicast IP hop limit for ICMP sockets.
-    pub fn set_multicast_hop_limit(&mut self, id: &IcmpSocketId<I>, hop_limit: Option<NonZeroU8>) {
+    pub fn set_multicast_hop_limit(
+        &mut self,
+        id: &IcmpApiSocketId<I, C>,
+        hop_limit: Option<NonZeroU8>,
+    ) {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::update_ip_hop_limit(
             core_ctx,
@@ -708,7 +813,7 @@ where
     /// The socket must be connected in order for the operation to succeed.
     pub fn send<B: BufferMut>(
         &mut self,
-        id: &IcmpSocketId<I>,
+        id: &IcmpApiSocketId<I, C>,
         body: B,
     ) -> Result<(), datagram::SendError<packet_formats::error::ParseError>> {
         let (core_ctx, bindings_ctx) = self.contexts();
@@ -720,7 +825,7 @@ where
     /// The socket doesn't need to be connected.
     pub fn send_to<B: BufferMut>(
         &mut self,
-        id: &IcmpSocketId<I>,
+        id: &IcmpApiSocketId<I, C>,
         remote_ip: Option<
             ZonedAddr<
                 SpecifiedAddr<I::Addr>,
@@ -790,12 +895,6 @@ mod tests {
         ip::icmp::tests::FakeIcmpCtx,
         testutil::{TestIpExt, DEFAULT_INTERFACE_METRIC},
     };
-
-    impl<I: Ip> IcmpSocketId<I> {
-        pub(crate) fn new(id: usize) -> IcmpSocketId<I> {
-            IcmpSocketId(id, IpVersionMarker::default())
-        }
-    }
 
     const REMOTE_ID: u16 = 1;
 
@@ -908,7 +1007,7 @@ mod tests {
                 .get(),
             1
         );
-        let replies = net.bindings_ctx(LOCAL_CTX_NAME).take_icmp_replies(conn);
+        let replies = net.bindings_ctx(LOCAL_CTX_NAME).take_icmp_replies(&conn);
         let expected = Buf::new(echo_body, ..)
             .encapsulate(IcmpPacketBuilder::<I, _>::new(
                 *config.local_ip,

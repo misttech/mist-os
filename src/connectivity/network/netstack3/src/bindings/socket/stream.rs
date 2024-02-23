@@ -510,7 +510,7 @@ impl<I: IpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I> {
         RequestHandler { ctx, data: self }.handle_request(request, spawners)
     }
 
-    fn close(self, ctx: &mut Ctx) {
+    async fn close(self, ctx: &mut Ctx) {
         let Self { id, peer: _, local_socket_and_watcher: _, send_task_abort } = self;
         ctx.api().tcp().close(id);
         if let Some(send_task_abort) = send_task_abort {

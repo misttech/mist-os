@@ -313,7 +313,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
     }
 }
 
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv6>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<Ipv6>>>
     NudIcmpContext<Ipv6, EthernetLinkDevice, BC> for CoreCtx<'_, BC, L>
 {
     fn send_icmp_dest_unreachable(
@@ -1297,7 +1297,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
     }
 }
 
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>>
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<Ipv4>>>
     NudIcmpContext<Ipv4, EthernetLinkDevice, BC> for CoreCtx<'_, BC, L>
 {
     fn send_icmp_dest_unreachable(

@@ -5,8 +5,10 @@
 //! Datagram socket bindings.
 
 use std::{
+    collections::HashMap,
     convert::{Infallible as Never, TryInto as _},
     fmt::Debug,
+    hash::Hash,
     marker::PhantomData,
     num::{NonZeroU16, NonZeroU64, NonZeroU8, TryFromIntError},
     ops::ControlFlow,
@@ -19,7 +21,6 @@ use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
 
 use assert_matches::assert_matches;
-use dense_map::{DenseMap, EntryKey};
 use derivative::Derivative;
 use explicit::ResultExt as _;
 use fidl::endpoints::RequestStream as _;
@@ -52,7 +53,7 @@ use crate::bindings::{
     },
     trace_duration,
     util::{
-        DeviceNotFoundError, IntoCore as _, IntoFidl, TryFromFidlWithContext, TryIntoCore,
+        self, DeviceNotFoundError, IntoCore as _, IntoFidl, TryFromFidlWithContext, TryIntoCore,
         TryIntoCoreWithContext, TryIntoFidl, TryIntoFidlWithContext,
     },
     BindingId, BindingsCtx, Ctx,
@@ -75,7 +76,7 @@ pub(crate) trait Transport<I: Ip>: Debug + Sized + Send + Sync + 'static {
     const PROTOCOL: DatagramProtocol;
     /// Whether the Transport Protocol supports dualstack sockets.
     const SUPPORTS_DUALSTACK: bool;
-    type SocketId: Debug + EntryKey + Send + Sync;
+    type SocketId: Hash + Eq + Debug + Send + Sync + Clone;
 
     /// Match Linux and implicitly map IPv4 addresses to IPv6 addresses for
     /// dual-stack capable protocols.
@@ -104,10 +105,12 @@ pub(crate) trait Transport<I: Ip>: Debug + Sized + Send + Sync + 'static {
 /// where Core is waiting for a `MessageQueue` to be available and some bindings
 /// code here holds the `MessageQueue` and attempts to lock Core state via a
 /// `netstack3_core` call.
+// TODO(https://fxbug.dev/42076297): Remove this struct when we move bindings
+// data to core.
 #[derive(Derivative)]
 #[derivative(Default(bound = "I: Ip"))]
-pub(crate) struct SocketCollection<I: Ip, T> {
-    received: DenseMap<Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>>,
+pub(crate) struct SocketCollection<I: Ip, T: Transport<I>> {
+    received: HashMap<T::SocketId, Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>>,
 }
 
 pub(crate) struct SocketCollectionPair<T>
@@ -275,7 +278,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
 
     fn get_socket_info(ctx: &mut Ctx, id: &Self::SocketId) -> Self::SocketInfo;
 
-    fn close(ctx: &mut Ctx, id: Self::SocketId);
+    async fn close(ctx: &mut Ctx, id: Self::SocketId);
 
     fn set_socket_device(
         ctx: &mut Ctx,
@@ -366,10 +369,10 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
 #[derive(Debug)]
 pub(crate) enum Udp {}
 
-impl<I: Ip> Transport<I> for Udp {
+impl<I: IpExt> Transport<I> for Udp {
     const PROTOCOL: DatagramProtocol = DatagramProtocol::Udp;
     const SUPPORTS_DUALSTACK: bool = true;
-    type SocketId = UdpSocketId<I>;
+    type SocketId = UdpSocketId<I, WeakDeviceId<BindingsCtx>>;
 }
 
 impl OptionFromU16 for NonZeroU16 {
@@ -439,8 +442,16 @@ where
         ctx.api().udp().get_info(id)
     }
 
-    fn close(ctx: &mut Ctx, id: Self::SocketId) {
-        let _: Self::SocketInfo = ctx.api().udp().close(id);
+    async fn close(ctx: &mut Ctx, id: Self::SocketId) {
+        let debug_references = id.debug_references();
+        let weak = id.downgrade();
+        util::wait_for_resource_removal(
+            "udp socket",
+            &weak,
+            ctx.api().udp().close(id),
+            &debug_references,
+        )
+        .await;
     }
 
     fn set_socket_device(
@@ -573,13 +584,13 @@ where
 impl<I: IpExt> UdpBindingsContext<I, DeviceId<BindingsCtx>> for SocketCollection<I, Udp> {
     fn receive_udp<B: BufferMut>(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpSocketId<I, WeakDeviceId<BindingsCtx>>,
         device_id: &DeviceId<BindingsCtx>,
         (dst_ip, dst_port): (<I>::Addr, NonZeroU16),
         (src_ip, src_port): (<I>::Addr, Option<NonZeroU16>),
         body: &B,
     ) {
-        let queue = self.received.get(id.get_key_index()).unwrap();
+        let queue = self.received.get(id).unwrap();
         queue.lock().receive(AvailableMessage {
             interface_id: device_id.bindings_id().id,
             source_addr: src_ip,
@@ -595,10 +606,10 @@ impl<I: IpExt> UdpBindingsContext<I, DeviceId<BindingsCtx>> for SocketCollection
 #[derive(Debug)]
 pub(crate) enum IcmpEcho {}
 
-impl<I: Ip> Transport<I> for IcmpEcho {
+impl<I: IpExt> Transport<I> for IcmpEcho {
     const PROTOCOL: DatagramProtocol = DatagramProtocol::IcmpEcho;
     const SUPPORTS_DUALSTACK: bool = false;
-    type SocketId = IcmpSocketId<I>;
+    type SocketId = IcmpSocketId<I, WeakDeviceId<BindingsCtx>>;
 }
 
 impl OptionFromU16 for u16 {
@@ -671,8 +682,16 @@ where
         ctx.api().icmp_echo().get_info(id)
     }
 
-    fn close(ctx: &mut Ctx, id: Self::SocketId) {
-        ctx.api().icmp_echo().close(id)
+    async fn close(ctx: &mut Ctx, id: Self::SocketId) {
+        let debug_references = id.debug_references();
+        let weak = id.downgrade();
+        util::wait_for_resource_removal(
+            "icmp socket",
+            &weak,
+            ctx.api().icmp_echo().close(id),
+            &debug_references,
+        )
+        .await;
     }
 
     fn set_socket_device(
@@ -872,7 +891,7 @@ impl<E> IntoErrno for core_socket::SendToError<E> {
 impl<I: IpExt> IcmpEchoBindingsContext<I, DeviceId<BindingsCtx>> for SocketCollection<I, IcmpEcho> {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
-        conn: &IcmpSocketId<I>,
+        conn: &IcmpSocketId<I, WeakDeviceId<BindingsCtx>>,
         device: &DeviceId<BindingsCtx>,
         src_ip: I::Addr,
         dst_ip: I::Addr,
@@ -880,7 +899,7 @@ impl<I: IpExt> IcmpEchoBindingsContext<I, DeviceId<BindingsCtx>> for SocketColle
         data: B,
     ) {
         tracing::debug!("Received ICMP echo reply in binding: {:?}, id: {id}", I::VERSION);
-        let queue = self.received.get(conn.get_key_index()).unwrap();
+        let queue = self.received.get(conn).unwrap();
         queue.lock().receive(AvailableMessage {
             source_addr: src_ip,
             source_port: 0,
@@ -992,7 +1011,7 @@ where
         assert_matches!(
             I::with_collection_mut(ctx.bindings_ctx(), |c| c
                 .received
-                .insert(id.get_key_index(), messages.clone())),
+                .insert(id.clone(), messages.clone())),
             None
         );
 
@@ -1119,11 +1138,10 @@ where
         RequestHandler { ctx, data: self }.handle_request(request)
     }
 
-    fn close(self, ctx: &mut Ctx) {
+    async fn close(self, ctx: &mut Ctx) {
         let id = self.info.id;
-        let _: Option<_> =
-            I::with_collection_mut(ctx.bindings_ctx(), |c| c.received.remove(id.get_key_index()));
-        T::close(ctx, id);
+        let _: Option<_> = I::with_collection_mut(ctx.bindings_ctx(), |c| c.received.remove(&id));
+        T::close(ctx, id).await;
     }
 }
 
@@ -1826,7 +1844,7 @@ where
                 },
         } = self;
         let front = I::with_collection(ctx.bindings_ctx(), |c| {
-            let messages = c.received.get(id.get_key_index()).expect("has queue");
+            let messages = c.received.get(id).expect("has queue");
             let mut messages = messages.lock();
             if recv_flags.contains(fposix_socket::RecvMsgFlags::PEEK) {
                 messages.peek().cloned()
@@ -3207,10 +3225,7 @@ mod tests {
                         <A::AddrType as IpAddress>::Version::with_collection(
                             ctx.bindings_ctx(),
                             |SocketCollection { received }| {
-                                assert_matches!(
-                                    received.key_ordered_iter().collect::<Vec<_>>()[..],
-                                    [_]
-                                );
+                                assert_matches!(received.keys().collect::<Vec<_>>()[..], [_]);
                             },
                         )
                     });
@@ -3235,10 +3250,7 @@ mod tests {
                         <A::AddrType as IpAddress>::Version::with_collection(
                             ctx.bindings_ctx(),
                             |SocketCollection { received }| {
-                                assert_matches!(
-                                    received.key_ordered_iter().collect::<Vec<_>>()[..],
-                                    []
-                                );
+                                assert_matches!(received.keys().collect::<Vec<_>>()[..], []);
                             },
                         )
                     });
@@ -3291,7 +3303,7 @@ mod tests {
             <A::AddrType as IpAddress>::Version::with_collection(
                 ctx.bindings_ctx(),
                 |SocketCollection { received }| {
-                    assert_matches!(received.key_ordered_iter().collect::<Vec<_>>()[..], [_]);
+                    assert_matches!(received.keys().collect::<Vec<_>>()[..], [_]);
                 },
             )
         });
@@ -3306,7 +3318,7 @@ mod tests {
             <A::AddrType as IpAddress>::Version::with_collection(
                 ctx.bindings_ctx(),
                 |SocketCollection { received }| {
-                    assert_matches!(received.key_ordered_iter().collect::<Vec<_>>()[..], []);
+                    assert_matches!(received.keys().collect::<Vec<_>>()[..], []);
                 },
             )
         });
@@ -3344,7 +3356,7 @@ mod tests {
             <A::AddrType as IpAddress>::Version::with_collection(
                 ctx.bindings_ctx(),
                 |SocketCollection { received }| {
-                    assert_matches!(received.key_ordered_iter().collect::<Vec<_>>()[..], []);
+                    assert_matches!(received.keys().collect::<Vec<_>>()[..], []);
                 },
             )
         });
@@ -3378,7 +3390,7 @@ mod tests {
             <A::AddrType as IpAddress>::Version::with_collection(
                 ctx.bindings_ctx(),
                 |SocketCollection { received }| {
-                    assert_matches!(received.key_ordered_iter().collect::<Vec<_>>()[..], []);
+                    assert_matches!(received.keys().collect::<Vec<_>>()[..], []);
                 },
             )
         });
@@ -3563,7 +3575,7 @@ mod tests {
                     |SocketCollection { received }| {
                         // Check the lone socket to see if the packets were
                         // received.
-                        let (_index, messages) = received.key_ordered_iter().next().unwrap();
+                        let messages = received.values().next().unwrap();
                         has_all_delivered(&messages.lock())
                     },
                 )

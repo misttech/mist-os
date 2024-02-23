@@ -207,9 +207,9 @@ pub(crate) fn specify_unspecified_remote<I: SocketIpExt, A: From<SocketIpAddr<I:
 /// identifiers for a protocol.
 pub trait SocketMapAddrSpec {
     /// The local identifier portion of a socket address.
-    type LocalIdentifier: Copy + Clone + Debug + Hash + Eq;
+    type LocalIdentifier: Copy + Clone + Debug + Send + Sync + Hash + Eq;
     /// The remote identifier portion of a socket address.
-    type RemoteIdentifier: Copy + Clone + Debug + Hash + Eq;
+    type RemoteIdentifier: Copy + Clone + Debug + Send + Sync + Hash + Eq;
 }
 
 pub struct ListenerAddrInfo {

@@ -60,7 +60,6 @@ pub(crate) mod tcp;
 pub(crate) mod udp;
 
 use derivative::Derivative;
-use lock_order::lock::RwLockFor;
 use net_types::{
     ip::{Ip, IpAddress, Ipv4, Ipv6},
     ScopeableAddress, SpecifiedAddr, ZonedAddr,
@@ -71,12 +70,12 @@ use crate::{
     device::WeakDeviceId,
     error::ZonedAddressError,
     ip::EitherDeviceId,
-    sync::{RwLockReadGuard, RwLockWriteGuard},
+    socket::datagram,
     transport::{
         tcp::TcpState,
         udp::{UdpCounters, UdpState, UdpStateBuilder},
     },
-    BindingsContext, BindingsTypes, StackState,
+    BindingsContext, BindingsTypes,
 };
 
 /// A builder for transport layer state.
@@ -120,60 +119,12 @@ impl<BT: BindingsTypes> TransportLayerState<BT> {
         I::map_ip((), |()| &self.tcpv4, |()| &self.tcpv6)
     }
 
+    fn udp_state<I: datagram::IpExt>(&self) -> &UdpState<I, WeakDeviceId<BT>> {
+        I::map_ip((), |()| &self.udpv4, |()| &self.udpv6)
+    }
+
     pub(crate) fn udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
         I::map_ip((), |()| &self.udpv4.counters, |()| &self.udpv6.counters)
-    }
-}
-
-impl<BT: BindingsTypes> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv4>> for StackState<BT> {
-    type Data = udp::BoundSockets<Ipv4, WeakDeviceId<BT>>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.transport.udpv4.sockets.bound.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.transport.udpv4.sockets.bound.write()
-    }
-}
-
-impl<BT: BindingsTypes> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv6>> for StackState<BT> {
-    type Data = udp::BoundSockets<Ipv6, WeakDeviceId<BT>>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.transport.udpv6.sockets.bound.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.transport.udpv6.sockets.bound.write()
-    }
-}
-
-impl<BT: BindingsTypes> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv4>> for StackState<BT> {
-    type Data = udp::SocketsState<Ipv4, WeakDeviceId<BT>>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.transport.udpv4.sockets.sockets_state.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.transport.udpv4.sockets.sockets_state.write()
-    }
-}
-
-impl<BT: BindingsTypes> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv6>> for StackState<BT> {
-    type Data = udp::SocketsState<Ipv6, WeakDeviceId<BT>>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.transport.udpv6.sockets.sockets_state.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.transport.udpv6.sockets.sockets_state.write()
     }
 }
 

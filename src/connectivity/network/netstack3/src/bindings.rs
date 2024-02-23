@@ -69,6 +69,7 @@ use netstack3_core::{
     device::{
         DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
         EthernetDeviceId, LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId,
+        WeakDeviceId,
     },
     error::NetstackError,
     filter::FilterBindingsTypes,
@@ -542,7 +543,7 @@ impl<I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho> + Ip
 {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
-        conn: &IcmpSocketId<I>,
+        conn: &IcmpSocketId<I, WeakDeviceId<BindingsCtx>>,
         device: &DeviceId<BindingsCtx>,
         src_ip: I::Addr,
         dst_ip: I::Addr,
@@ -561,7 +562,7 @@ where
 {
     fn receive_udp<B: BufferMut>(
         &mut self,
-        id: &UdpSocketId<I>,
+        id: &UdpSocketId<I, WeakDeviceId<BindingsCtx>>,
         device: &DeviceId<BindingsCtx>,
         dst_addr: (<I>::Addr, NonZeroU16),
         src_addr: (<I>::Addr, Option<NonZeroU16>),
