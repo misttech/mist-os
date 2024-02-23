@@ -7,12 +7,15 @@
 #ifndef ZIRCON_KERNEL_ARCH_ARM64_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_
 #define ZIRCON_KERNEL_ARCH_ARM64_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_
 
+#include <lib/arch/arm64/smccc.h>
 #include <lib/zbi-format/driver-config.h>
 
 #include <ktl/optional.h>
 #include <ktl/variant.h>
 
-struct ArchPatchInfo {};
+struct ArchPatchInfo {
+  arch::ArmSmcccFunction smccc_arch_workaround{};
+};
 
 struct ZbiAmlogicRng {
   enum class Version {
@@ -49,6 +52,9 @@ struct ArchPhysHandoff {
 
   // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_MOTMOT_POWER) payload.
   bool motmot_power_driver = false;
+
+  // See ArchPatchInfo, above.
+  arch::ArmSmcccFunction smccc_arch_workaround{};
 };
 
 // This must match what the kernel's page-table bootstrapping actually uses as

@@ -19,6 +19,15 @@ enum class Arm64PhysPsciReset {
   kRebootRecovery,
 };
 
-#define ARM64_OPTION_TYPES(OPTION_TYPE) OPTION_TYPE(Arm64PhysPsciReset);
+enum class Arm64AlternateVbar {
+  kNone,
+  kArchWorkaround3,
+  kArchWorkaround1,
+  kPsciVersion,
+};
+
+#define ARM64_OPTION_TYPES(OPTION_TYPE) \
+  OPTION_TYPE(Arm64PhysPsciReset);      \
+  OPTION_TYPE(Arm64AlternateVbar);
 
 #endif  // ZIRCON_KERNEL_LIB_BOOT_OPTIONS_INCLUDE_LIB_BOOT_OPTIONS_ARM64_H_

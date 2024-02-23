@@ -4,24 +4,54 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/boot-options/boot-options.h>
 #include <lib/code-patching/code-patches.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/zbi.h>
 #include <zircon/assert.h>
 
 #include <ktl/byte.h>
+#include <ktl/optional.h>
 #include <ktl/span.h>
 #include <ktl/variant.h>
 #include <phys/arch/arch-handoff.h>
+#include <phys/arch/arch-phys-info.h>
 #include <phys/handoff.h>
+#include <phys/main.h>
 
 #include "handoff-prep.h"
+#include "smccc.h"
 
 #include <ktl/enforce.h>
 
-ArchPatchInfo ArchPreparePatchInfo() { return {}; }
+namespace {
 
-void HandoffPrep::ArchHandoff(const ArchPatchInfo& patch_info) {}
+arch::ArmSmcccFunction GetAlternateVbar() {
+  switch (gBootOptions->arm64_alternate_vbar) {
+    case Arm64AlternateVbar::kNone:
+      break;
+    case Arm64AlternateVbar::kArchWorkaround3:
+      return arch::ArmSmcccFunction::kSmcccArchWorkaround3;
+    case Arm64AlternateVbar::kArchWorkaround1:
+      return arch::ArmSmcccFunction::kSmcccArchWorkaround1;
+    case Arm64AlternateVbar::kPsciVersion:
+      return arch::ArmSmcccFunction::kPsciPsciVersion;
+  }
+  return {};
+}
+
+}  // namespace
+
+ArchPatchInfo ArchPreparePatchInfo() {
+  return ArchPatchInfo{.smccc_arch_workaround = GetAlternateVbar()};
+}
+
+void HandoffPrep::ArchHandoff(const ArchPatchInfo& patch_info) {
+  ZX_DEBUG_ASSERT(handoff_);
+  ArchPhysHandoff& arch_handoff = handoff_->arch_handoff;
+
+  arch_handoff.smccc_arch_workaround = patch_info.smccc_arch_workaround;
+}
 
 void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
                                            ktl::span<const ktl::byte> payload) {

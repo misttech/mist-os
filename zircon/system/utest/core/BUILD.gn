@@ -275,12 +275,37 @@ if (current_cpu == "x64") {
 }
 
 if (current_cpu == "arm64") {
-  core_tests("core-tests-alternate-vbar") {
-    args = [ "kernel.arm64.alternate-vbar" ]
-    device_types = kernel_test_device_types
+  _smccc11_device_types = [
+    "AEMU",
+    "Astro",
+    "QEMU",
+    "Sherlock",
+  ]
+  foreach(alternate,
+          [
+            {
+              option = "auto"
+              device_types = kernel_test_device_types
+            },
+            {
+              option = "arch3"
+              device_types = _smccc11_device_types
+            },
+            {
+              option = "arch1"
+              device_types = _smccc11_device_types
+            },
+            {
+              option = "psci"
+              device_types = _smccc11_device_types
+            },
+          ]) {
+    core_tests("core-tests-workaround-${alternate.option}") {
+      args = [ "kernel.arm64.alternate-vbar=${alternate.option}" ]
+      device_types = alternate.device_types
+    }
+    boot_tests += [ ":core-tests-workaround-${alternate.option}" ]
   }
-
-  boot_tests += [ ":core-tests-alternate-vbar" ]
 }
 
 # TODO(https://fxbug.dev/42170495): Remove once migration is complete.

@@ -10,6 +10,7 @@
 #include <bits.h>
 #include <debug.h>
 #include <inttypes.h>
+#include <lib/arch/arm64/smccc.h>
 #include <lib/arch/arm64/system.h>
 #include <lib/arch/intrin.h>
 #include <lib/arch/sysreg.h>
@@ -35,8 +36,12 @@
 #include <kernel/mp.h>
 #include <kernel/thread.h>
 #include <ktl/atomic.h>
+#include <ktl/bit.h>
 #include <lk/init.h>
 #include <lk/main.h>
+#include <phys/handoff.h>
+
+#include "smccc.h"
 
 #include <ktl/enforce.h>
 
@@ -140,18 +145,38 @@ zx_status_t arm64_free_secondary_stack(cpu_num_t cpu_num) {
 
 // Select the exception vector to use for the current CPU.
 static VbarFunction* arm64_select_vbar() {
-  return gBootOptions->arm64_enable_alternate_vbar  //
-             ? arm64_el1_exception_alternate
-             : arm64_el1_exception;
+  ZX_ASSERT(gPhysHandoff);
+  switch (gPhysHandoff->arch_handoff.smccc_arch_workaround) {
+    // TODO(https://fxbug.dev/322202704): per-CPU auto-selection logic
+    case arch::ArmSmcccFunction::kSmcccArchWorkaround3:
+    case arch::ArmSmcccFunction::kSmcccArchWorkaround1:
+    case arch::ArmSmcccFunction::kPsciPsciVersion:
+      dprintf(INFO, "CPU %u using SMCCC_ARCH_WORKAROUND function %#" PRIx32 "\n",
+              arch_curr_cpu_num(),
+              static_cast<uint32_t>(gPhysHandoff->arch_handoff.smccc_arch_workaround));
+      return arm64_el1_exception_smccc_workaround;
+    default:
+      // TODO(https://fxbug.dev/322202704): fall back to branch loop?
+      // Just panic on known cores with issues when firmware is lacking?
+      dprintf(INFO, "CPU %u has no SMCCC workaround function configured\n", arch_curr_cpu_num());
+      break;
+  }
+  return arm64_el1_exception;
+}
+
+// Set the vector base.
+static void arm64_install_vbar(VbarFunction* table) {
+  arch::ArmVbarEl1::Write(reinterpret_cast<uintptr_t>(table));
+  __isb(ARM_MB_SY);
 }
 
 static void arm64_cpu_early_init() {
   // Make sure the per cpu pointer is set up.
   arm64_init_percpu_early();
 
-  // Set the vector base.
-  arch::ArmVbarEl1::Write(reinterpret_cast<uintptr_t>(arm64_select_vbar()));
-  __isb(ARM_MB_SY);
+  // Initially use the primary vector table.
+  // arch_late_init_percpu may change its mind.
+  arm64_install_vbar(arm64_el1_exception);
 
   // Set some control bits in sctlr.
   arch::ArmSctlrEl1::Modify([](auto& sctlr) {
@@ -211,8 +236,6 @@ void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
 
   arm64_feature_debug(true);
 
-  dprintf(INFO, "Using VBAR_EL1 %#" PRIx64 "\n", arch::ArmVbarEl1::Read().addr());
-
   uint32_t max_cpus = arch_max_num_cpus();
   uint32_t cmdline_max_cpus = gBootOptions->smp_max_cpus;
   if (cmdline_max_cpus > max_cpus || cmdline_max_cpus <= 0) {
@@ -234,6 +257,12 @@ void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
 void arch_late_init_percpu(void) {
   arm64_read_percpu_ptr()->should_invalidate_bp_on_context_switch =
       !gBootOptions->arm64_disable_spec_mitigations && arm64_uarch_needs_spectre_v2_mitigation();
+
+  // Decide if this CPU needs an alternative exception vector table.
+  VbarFunction* vector_table = arm64_select_vbar();
+  if (vector_table != arm64_el1_exception) {
+    arm64_install_vbar(vector_table);
+  }
 }
 
 void arch_idle_enter(zx_duration_t max_latency) { __asm__ volatile("wfi"); }

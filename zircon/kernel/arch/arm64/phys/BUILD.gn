@@ -71,6 +71,7 @@ if (toolchain_environment == "kernel.phys" ||
   source_set("arch-handoff-prep") {
     sources = [ "arch-handoff-prep.cc" ]
     deps = [
+      ":arch-phys-info",
       "//sdk/lib/zbi-format",
       "//zircon/kernel/lib/code-patching",
       "//zircon/kernel/lib/ktl",
@@ -102,6 +103,7 @@ config("includes") {
 source_set("arch-phys-info") {
   visibility = [
     "./*",
+    "//zircon/kernel/arch/arm64/code-patches/*",
     "//zircon/kernel/phys/*",
   ]
   public = [ "include/phys/arch/arch-phys-info.h" ]

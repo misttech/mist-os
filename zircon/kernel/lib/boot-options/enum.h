@@ -30,14 +30,14 @@ constexpr auto Enum<TestEnum> = [](auto&& Switch) {
 #endif
 
 template <>
-constexpr auto Enum<OomBehavior> = [](auto&& Switch) {
+inline constexpr auto Enum<OomBehavior> = [](auto&& Switch) {
   return Switch  //
       .Case("reboot", OomBehavior::kReboot)
       .Case("jobkill", OomBehavior::kJobKill);
 };
 
 template <>
-constexpr auto Enum<PageTableEvictionPolicy> = [](auto&& Switch) {
+inline constexpr auto Enum<PageTableEvictionPolicy> = [](auto&& Switch) {
   return Switch  //
       .Case("always", PageTableEvictionPolicy::kAlways)
       .Case("never", PageTableEvictionPolicy::kNever)
@@ -45,14 +45,14 @@ constexpr auto Enum<PageTableEvictionPolicy> = [](auto&& Switch) {
 };
 
 template <>
-constexpr auto Enum<EntropyTestSource> = [](auto&& Switch) {
+inline constexpr auto Enum<EntropyTestSource> = [](auto&& Switch) {
   return Switch  //
       .Case("hw_rng", EntropyTestSource::kHwRng)
       .Case("jitterentropy", EntropyTestSource::kJitterEntropy);
 };
 
 template <>
-constexpr auto Enum<SerialDebugSyscalls> = [](auto&& Switch) {
+inline constexpr auto Enum<SerialDebugSyscalls> = [](auto&& Switch) {
   return Switch  //
       .Case("false", SerialDebugSyscalls::kDisabled)
       .Case("true", SerialDebugSyscalls::kEnabled)
@@ -60,14 +60,14 @@ constexpr auto Enum<SerialDebugSyscalls> = [](auto&& Switch) {
 };
 
 template <>
-constexpr auto Enum<GfxConsoleFont> = [](auto&& Switch) {
+inline constexpr auto Enum<GfxConsoleFont> = [](auto&& Switch) {
   return Switch  //
       .Case("9x16", GfxConsoleFont::k9x16)
       .Case("18x32", GfxConsoleFont::k18x32);
 };
 
 template <>
-constexpr auto Enum<RootJobBehavior> = [](auto&& Switch) {
+inline constexpr auto Enum<RootJobBehavior> = [](auto&& Switch) {
   return Switch  //
       .Case("halt", RootJobBehavior::kHalt)
       .Case("reboot", RootJobBehavior::kReboot)
@@ -77,7 +77,7 @@ constexpr auto Enum<RootJobBehavior> = [](auto&& Switch) {
 };
 
 template <>
-constexpr auto Enum<WallclockType> = [](auto&& Switch) {
+inline constexpr auto Enum<WallclockType> = [](auto&& Switch) {
   return Switch  //
       .Case("auto", WallclockType::kAutoDetect)
       .Case("tsc", WallclockType::kTsc)
@@ -86,7 +86,7 @@ constexpr auto Enum<WallclockType> = [](auto&& Switch) {
 };
 
 template <>
-constexpr auto Enum<ScannerLruAction> = [](auto&& Switch) {
+inline constexpr auto Enum<ScannerLruAction> = [](auto&& Switch) {
   return Switch  //
       .Case("none", ScannerLruAction::kNone)
       .Case("evict_only", ScannerLruAction::kEvictOnly)
@@ -95,14 +95,14 @@ constexpr auto Enum<ScannerLruAction> = [](auto&& Switch) {
 };
 
 template <>
-constexpr auto Enum<CompressionStrategy> = [](auto&& Switch) {
+inline constexpr auto Enum<CompressionStrategy> = [](auto&& Switch) {
   return Switch  //
       .Case("none", CompressionStrategy::kNone)
       .Case("lz4", CompressionStrategy::kLz4);
 };
 
 template <>
-constexpr auto Enum<CompressionStorageStrategy> = [](auto&& Switch) {
+inline constexpr auto Enum<CompressionStorageStrategy> = [](auto&& Switch) {
   return Switch  //
       .Case("none", CompressionStorageStrategy::kNone)
       .Case("tri_page", CompressionStorageStrategy::kTriPage);
@@ -111,7 +111,7 @@ constexpr auto Enum<CompressionStorageStrategy> = [](auto&& Switch) {
 #if BOOT_OPTIONS_GENERATOR || defined(__aarch64__)
 
 template <>
-constexpr auto Enum<Arm64PhysPsciReset> = [](auto&& Switch) {
+inline constexpr auto Enum<Arm64PhysPsciReset> = [](auto&& Switch) {
   return Switch  //
       .Case("disabled", Arm64PhysPsciReset::kDisabled)
       .Case("shutdown", Arm64PhysPsciReset::kShutdown)
@@ -120,12 +120,21 @@ constexpr auto Enum<Arm64PhysPsciReset> = [](auto&& Switch) {
       .Case("reboot-recovery", Arm64PhysPsciReset::kRebootRecovery);
 };
 
+template <>
+inline constexpr auto Enum<Arm64AlternateVbar> = [](auto&& Switch) {
+  return Switch  //
+      .Case("none", Arm64AlternateVbar::kNone)
+      .Case("arch3", Arm64AlternateVbar::kArchWorkaround3)
+      .Case("arch1", Arm64AlternateVbar::kArchWorkaround1)
+      .Case("psci", Arm64AlternateVbar::kPsciVersion);
+};
+
 #endif  // BOOT_OPTIONS_GENERATOR || defined(__x86_64__)
 
 #if BOOT_OPTIONS_GENERATOR || defined(__x86_64__)
 
 template <>
-constexpr auto Enum<IntelHwpPolicy> = [](auto&& Switch) {
+inline constexpr auto Enum<IntelHwpPolicy> = [](auto&& Switch) {
   return Switch  //
       .Case("bios-specified", IntelHwpPolicy::kBiosSpecified)
       .Case("performance", IntelHwpPolicy::kPerformance)

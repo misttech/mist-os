@@ -16,6 +16,14 @@ enum class CodePatchId : uint32_t {
   // the kernel was booted, `nop`ing out a trap among the kernel's earliest
   // instructions.
   kSelfTest,
+
+  // The patched area is the one instruction that acts as the SMCCC conduit.
+  // It is initially `smc #0` but may be replaced with `hvc #0`.
+  kSmcccConduit,
+
+  // The patched area is a single `mov w0, #...` instruction.  It gets patched
+  // with the SMCCC function number used for SMCCC_ARCH_WORKAROUND_3.
+  kSmcccWorkaroundFunction,
 };
 
 // The callback accepts an initializer-list of something constructible with
@@ -25,6 +33,8 @@ enum class CodePatchId : uint32_t {
 inline constexpr auto WithCodePatchNames = [](auto&& callback) {
   return callback({
       {CodePatchId::kSelfTest, "SELF_TEST"},
+      {CodePatchId::kSmcccConduit, "SMCCC_CONDUIT"},
+      {CodePatchId::kSmcccWorkaroundFunction, "SMCCC_WORKAROUND_FUNCTION"},
   });
 };
 

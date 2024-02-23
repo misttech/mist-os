@@ -4,8 +4,11 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/arch/asm.h>
 #include <arch/arm64/asm.h>
 #include <arch/asm_macros.h>
+
+#include "smccc.h"
 
 // The ARM SMCCC v1.0 calling convention provides the following guarantees about registers:
 //
@@ -47,3 +50,16 @@ END_FUNCTION(arm_smccc_smc_internal)
 FUNCTION(arm_smccc_hvc_internal)
     smccc_call hvc
 END_FUNCTION(arm_smccc_hvc_internal)
+
+// Same as above, but code-patched.  The conventions require that firmware save
+// the shadow_call_sp (x18) and fp (x29) registers, but we add a frame just for
+// the benefit of backtraces or whatnot since this is not used in hot paths.
+.function ArmSmcccCall, global
+  .prologue.shadow_call_sp
+  .prologue.fp
+  smccc_conduit
+  .epilogue.fp
+  .epilogue.shadow_call_sp
+  ret
+  speculation_postfence
+.end_function

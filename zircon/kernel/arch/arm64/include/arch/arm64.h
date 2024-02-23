@@ -71,7 +71,7 @@ struct arch_exception_context {
 // Register state layout used by arm64_context_switch().
 struct arm64_context_switch_frame {
   uint64_t r19;
-  uint64_t zero; // slot where x20 (percpu pointer) would be saved if it were
+  uint64_t zero;  // slot where x20 (percpu pointer) would be saved if it were
   uint64_t r21;
   uint64_t r22;
   uint64_t r23;
@@ -89,8 +89,8 @@ struct Thread;
 // Implemented in or called from assembly.
 extern "C" {
 #if __has_feature(shadow_call_stack)
-void arm64_context_switch(vaddr_t* old_sp, vaddr_t new_sp, vaddr_t new_tpidr,
-                          uintptr_t** old_scsp, uintptr_t* new_scsp);
+void arm64_context_switch(vaddr_t* old_sp, vaddr_t new_sp, vaddr_t new_tpidr, uintptr_t** old_scsp,
+                          uintptr_t* new_scsp);
 void arm64_uspace_entry(iframe_t* iframe, vaddr_t kstack, vaddr_t scsp) __NO_RETURN;
 #else
 void arm64_context_switch(vaddr_t* old_sp, vaddr_t new_sp, vaddr_t new_tpidr);
@@ -100,12 +100,12 @@ void arm64_uspace_entry(iframe_t* iframe, vaddr_t kstack) __NO_RETURN;
 // These are not actually functions, but special code addresses.
 using VbarFunction = void();
 VbarFunction arm64_el1_exception;
-VbarFunction arm64_el1_exception_alternate;
+VbarFunction arm64_el1_exception_smccc_workaround;
 
 void arm64_sync_exception(iframe_t* iframe, uint exception_flags, uint32_t esr);
 
 void platform_irq(iframe_t* frame);
-} // extern C
+}  // extern C
 
 arm64_context_switch_frame* arm64_get_context_switch_frame(Thread* thread);
 
