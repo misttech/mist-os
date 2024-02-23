@@ -124,7 +124,8 @@ impl std::io::Read for BufferCursor {
 const BLOCK_HEADER_SIZE: usize = 2;
 const BLOCK_SEEK_ENTRY_SIZE: usize = 2;
 
-struct Iterator<'iter, K: Key, V: Value> {
+// A key-only iterator, used while seeking through the tree.
+struct KeyOnlyIterator<'iter, K: Key, V: Value> {
     // Allocated out of |layer|.
     buffer: BufferCursor,
 
@@ -139,31 +140,94 @@ struct Iterator<'iter, K: Key, V: Value> {
     // The number of items in the current block.
     item_count: u16,
 
-    // The current item.
-    item: Option<Item<K, V>>,
+    // The current key.
+    key: Option<K>,
+
+    // The type information for the value is needed for `Self::scan_to_block_item`.
+    _value_type: PhantomData<V>,
+
+    // Set by a wrapping iterator once the value has been deserialized, so the KeyOnlyIterator knows
+    // whether it is pointing at the next key or not.
+    value_deserialized: bool,
 }
 
-impl<K: Key, V: Value> Iterator<'_, K, V> {
-    fn new<'iter>(layer: &'iter SimplePersistentLayer, pos: u64) -> Iterator<'iter, K, V> {
+impl<K: Key, V: Value> KeyOnlyIterator<'_, K, V> {
+    fn new<'iter>(layer: &'iter SimplePersistentLayer, pos: u64) -> KeyOnlyIterator<'iter, K, V> {
         assert!(pos % layer.layer_info.block_size == 0);
-        Iterator {
+        KeyOnlyIterator {
             layer,
             buffer: BufferCursor { chunk: None, pos: pos as usize % CHUNK_SIZE },
             pos,
             item_index: 0,
             item_count: 0,
-            item: None,
+            key: None,
+            _value_type: PhantomData::default(),
+            value_deserialized: false,
         }
+    }
+
+    // Like `seek_to_block_item`, but ineffeciently scans through each record to get to the desired
+    // record.  Exists for backwards compatibility prior to PER_BLOCK_SEEK_VERSION.
+    fn scan_to_block_item(&mut self, index: u16) -> Result<(), Error> {
+        debug_assert!(self.layer.layer_info.key_value_version < PER_BLOCK_SEEK_VERSION);
+        ensure!(index < self.item_count, FxfsError::OutOfRange);
+        let old_pos = self.buffer.pos;
+        if index < self.item_index {
+            // Reset to the start of the block and scan forward from there.
+            self.item_index = 0;
+            self.buffer.pos = BLOCK_HEADER_SIZE
+                + round_down(self.buffer.pos, self.layer.layer_info.block_size as usize);
+        } else if !self.value_deserialized {
+            // Scan forward from the current position when possible.
+            let _v = V::deserialize_from_version(
+                self.buffer.by_ref(),
+                self.layer.layer_info.key_value_version,
+            )
+            .context("Corrupt layer (value)")?;
+            let _sequence =
+                self.buffer.read_u64::<LittleEndian>().context("Corrupt layer (seq)")?;
+            self.value_deserialized = true;
+        }
+        while self.item_index < index {
+            let _k = K::deserialize_from_version(
+                self.buffer.by_ref(),
+                self.layer.layer_info.key_value_version,
+            )
+            .context("Corrupt layer (key)")?;
+            let _v = V::deserialize_from_version(
+                self.buffer.by_ref(),
+                self.layer.layer_info.key_value_version,
+            )
+            .context("Corrupt layer (value)")?;
+            let _sequence =
+                self.buffer.read_u64::<LittleEndian>().context("Corrupt layer (seq)")?;
+            self.item_index += 1;
+            self.value_deserialized = true;
+        }
+        debug_assert!(
+            round_down(self.buffer.pos, self.layer.layer_info.block_size as usize)
+                == round_down(old_pos, self.layer.layer_info.block_size as usize)
+        );
+        Ok(())
     }
 
     // Repositions the iterator to point to the `index`'th item in the current block.
     // Returns an error if the index is out of range or the resulting offset contains an obviously
     // invalid value.
     fn seek_to_block_item(&mut self, index: u16) -> Result<(), Error> {
+        if self.layer.layer_info.key_value_version < PER_BLOCK_SEEK_VERSION {
+            return self.scan_to_block_item(index);
+        }
         ensure!(index < self.item_count, FxfsError::OutOfRange);
+        if index == self.item_index && self.value_deserialized {
+            // Fast-path when we are seeking in a linear manner, as is the case when advancing a
+            // wrapping iterator that also deserializes the values.
+            return Ok(());
+        }
         let offset_in_block = if index == 0 {
-            // First entry isn't actually recorded, it is at the start of the block.
-            0
+            // First entry isn't actually recorded, it is at the start of the block after the item
+            // count.
+            BLOCK_HEADER_SIZE
         } else {
             let old_buffer_pos = self.buffer.pos;
             self.buffer.pos = round_up(self.buffer.pos, self.layer.layer_info.block_size as usize)
@@ -189,7 +253,7 @@ impl<K: Key, V: Value> Iterator<'_, K, V> {
     async fn advance(&mut self) -> Result<(), Error> {
         if self.item_index >= self.item_count {
             if self.pos >= self.layer.size {
-                self.item = None;
+                self.key = None;
                 return Ok(());
             }
             if self.buffer.chunk.is_none() || self.pos as usize % CHUNK_SIZE == 0 {
@@ -218,33 +282,84 @@ impl<K: Key, V: Value> Iterator<'_, K, V> {
             }
             self.pos += self.layer.layer_info.block_size;
             self.item_index = 0;
+            self.value_deserialized = true;
         }
-        self.item = Some(Item {
-            key: K::deserialize_from_version(
+        self.seek_to_block_item(self.item_index)?;
+        self.key = Some(
+            K::deserialize_from_version(
                 self.buffer.by_ref(),
                 self.layer.layer_info.key_value_version,
             )
             .context("Corrupt layer (key)")?,
-            value: V::deserialize_from_version(
-                self.buffer.by_ref(),
-                self.layer.layer_info.key_value_version,
-            )
-            .context("Corrupt layer (value)")?,
-            sequence: self.buffer.read_u64::<LittleEndian>().context("Corrupt layer (seq)")?,
-        });
+        );
         self.item_index += 1;
+        self.value_deserialized = false;
         Ok(())
+    }
+
+    fn get(&self) -> Option<&K> {
+        self.key.as_ref()
+    }
+}
+
+struct Iterator<'iter, K: Key, V: Value> {
+    inner: KeyOnlyIterator<'iter, K, V>,
+    // The current item.
+    item: Option<Item<K, V>>,
+}
+
+impl<'iter, K: Key, V: Value> Iterator<'iter, K, V> {
+    fn new(mut seek_iterator: KeyOnlyIterator<'iter, K, V>) -> Result<Self, Error> {
+        let key = std::mem::take(&mut seek_iterator.key);
+        let item = if let Some(key) = key {
+            seek_iterator.value_deserialized = true;
+            Some(Item {
+                key,
+                value: V::deserialize_from_version(
+                    seek_iterator.buffer.by_ref(),
+                    seek_iterator.layer.layer_info.key_value_version,
+                )
+                .context("Corrupt layer (value)")?,
+                sequence: seek_iterator
+                    .buffer
+                    .read_u64::<LittleEndian>()
+                    .context("Corrupt layer (seq)")?,
+            })
+        } else {
+            None
+        };
+        Ok(Self { inner: seek_iterator, item })
     }
 }
 
 #[async_trait]
 impl<'iter, K: Key, V: Value> LayerIterator<K, V> for Iterator<'iter, K, V> {
     async fn advance(&mut self) -> Result<(), Error> {
-        self.advance().await
+        self.inner.advance().await?;
+        let key = std::mem::take(&mut self.inner.key);
+        self.item = if let Some(key) = key {
+            self.inner.value_deserialized = true;
+            Some(Item {
+                key,
+                value: V::deserialize_from_version(
+                    self.inner.buffer.by_ref(),
+                    self.inner.layer.layer_info.key_value_version,
+                )
+                .context("Corrupt layer (value)")?,
+                sequence: self
+                    .inner
+                    .buffer
+                    .read_u64::<LittleEndian>()
+                    .context("Corrupt layer (seq)")?,
+            })
+        } else {
+            None
+        };
+        Ok(())
     }
 
     fn get(&self) -> Option<ItemRef<'_, K, V>> {
-        return self.item.as_ref().map(<&Item<K, V>>::into);
+        self.item.as_ref().map(<&Item<K, V>>::into)
     }
 }
 
@@ -382,7 +497,7 @@ impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
         let first_block_offset = self.layer_info.block_size;
         let (key, excluded) = match bound {
             Bound::Unbounded => {
-                let mut iterator = Iterator::new(self, first_block_offset);
+                let mut iterator = Iterator::new(KeyOnlyIterator::new(self, first_block_offset))?;
                 iterator.advance().await.context("Unbounded seek advance")?;
                 return Ok(Box::new(iterator));
             }
@@ -416,32 +531,32 @@ impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
                 round_up(self.size, self.layer_info.block_size).unwrap(),
             ),
         };
-        let mut left = Iterator::new(self, left_offset);
+        let mut left = KeyOnlyIterator::new(self, left_offset);
         left.advance().await.context("Initial seek advance")?;
         match left.get() {
-            None => return Ok(Box::new(left)),
-            Some(item) => match item.key.cmp_upper_bound(key) {
-                Ordering::Greater => return Ok(Box::new(left)),
+            None => return Ok(Box::new(Iterator::new(left)?)),
+            Some(left_key) => match left_key.cmp_upper_bound(key) {
+                Ordering::Greater => return Ok(Box::new(Iterator::new(left)?)),
                 Ordering::Equal => {
                     if excluded {
                         left.advance().await?;
                     }
-                    return Ok(Box::new(left));
+                    return Ok(Box::new(Iterator::new(left)?));
                 }
                 Ordering::Less => {}
             },
         }
-        let mut right = Iterator::new(self, right_offset);
+        let mut right = KeyOnlyIterator::new(self, right_offset);
         while right_offset - left_offset > self.layer_info.block_size as u64 {
             // Pick a block midway.
             let mid_offset = round_down(
                 left_offset + (right_offset - left_offset) / 2,
                 self.layer_info.block_size,
             );
-            let mut iterator = Iterator::new(self, mid_offset);
+            let mut iterator = KeyOnlyIterator::new(self, mid_offset);
             iterator.advance().await?;
-            let item: ItemRef<'_, K, V> = iterator.get().unwrap();
-            match item.key.cmp_upper_bound(key) {
+            let iter_key: &K = iterator.get().unwrap();
+            match iter_key.cmp_upper_bound(key) {
                 Ordering::Greater => {
                     right_offset = mid_offset;
                     right = iterator;
@@ -450,7 +565,7 @@ impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
                     if excluded {
                         iterator.advance().await?;
                     }
-                    return Ok(Box::new(iterator));
+                    return Ok(Box::new(Iterator::new(iterator)?));
                 }
                 Ordering::Less => {
                     left_offset = mid_offset;
@@ -468,39 +583,16 @@ impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
                 let mid_index = left_index + ((right_index - left_index) / 2);
                 left.seek_to_block_item(mid_index)
                     .context("Read index offset for binary search")?;
-                left.item_index = u16::try_from(mid_index).unwrap();
-                // Only deserialize the key while searching.
-                let current_key = K::deserialize_from_version(
-                    left.buffer.by_ref(),
-                    left.layer.layer_info.key_value_version,
-                )
-                .context("Corrupt layer (key)")?;
-                match current_key.cmp_upper_bound(key) {
+                left.advance().await?;
+                match left.get().unwrap().cmp_upper_bound(key) {
                     Ordering::Greater => {
                         right_index = mid_index;
                     }
                     Ordering::Equal => {
-                        // Already deserialized the key, get the rest of the item.
-                        let current_value = V::deserialize_from_version(
-                            left.buffer.by_ref(),
-                            left.layer.layer_info.key_value_version,
-                        )
-                        .context("Corrupt layer (value)")?;
-                        let current_sequence = left
-                            .buffer
-                            .read_u64::<LittleEndian>()
-                            .context("Corrupt layer (seq)")?;
-                        left.item_index += 1;
                         if excluded {
                             left.advance().await?;
-                        } else {
-                            left.item = Some(Item {
-                                key: current_key,
-                                value: current_value,
-                                sequence: current_sequence,
-                            });
                         }
-                        return Ok(Box::new(left));
+                        return Ok(Box::new(Iterator::new(left)?));
                     }
                     Ordering::Less => {
                         left_index = mid_index;
@@ -516,28 +608,27 @@ impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
                 right
                     .seek_to_block_item(right_index)
                     .context("Read index for offset of right pointer")?;
-                right.item_index = u16::try_from(right_index).unwrap();
                 right.advance().await?;
-            } else if right.item.is_none() {
+            } else if right.key.is_none() {
                 // This is cheap if we're actually off the end, but otherwise it catches when we
                 // need to look inside the next block.
                 right.advance().await.context("Seek to start of next block")?;
             }
-            return Ok(Box::new(right));
+            return Ok(Box::new(Iterator::new(right)?));
         } else {
             // At this point, we know that left_key < key and right_key >= key, so we have to
             // iterate through left_key to find the key we want.
             loop {
                 left.advance().await?;
                 match left.get() {
-                    None => return Ok(Box::new(left)),
-                    Some(item) => match item.key.cmp_upper_bound(key) {
-                        Ordering::Greater => return Ok(Box::new(left)),
+                    None => return Ok(Box::new(Iterator::new(left)?)),
+                    Some(left_key) => match left_key.cmp_upper_bound(key) {
+                        Ordering::Greater => return Ok(Box::new(Iterator::new(left)?)),
                         Ordering::Equal => {
                             if excluded {
                                 left.advance().await?;
                             }
-                            return Ok(Box::new(left));
+                            return Ok(Box::new(Iterator::new(left)?));
                         }
                         Ordering::Less => {}
                     },
