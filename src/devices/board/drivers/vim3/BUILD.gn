@@ -30,7 +30,6 @@ fuchsia_driver("vim3-driver") {
     "vim3-clk.cc",
     "vim3-cpu.cc",
     "vim3-display.cc",
-    "vim3-dsi.cc",
     "vim3-emmc.cc",
     "vim3-eth.cc",
     "vim3-gpio.cc",

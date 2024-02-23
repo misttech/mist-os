@@ -86,7 +86,6 @@ class Vim3 : public Vim3Type {
   zx_status_t CanvasInit();
   zx_status_t ClkInit();
   zx_status_t CpuInit();
-  zx_status_t DsiInit();
   zx_status_t DisplayInit();
   zx_status_t EmmcInit();
   zx_status_t EthInit();
