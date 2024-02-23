@@ -7,10 +7,12 @@
 
 #include <fuchsia/ui/policy/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
+#include <lib/syslog/cpp/log_settings.h>
+#include <lib/syslog/cpp/macros.h>
 
 namespace camera {
 
-class FakeDeviceListenerRegistry : public fuchsia::ui::policy::DeviceListenerRegistry {
+class FakeDeviceListenerRegistry final : public fuchsia::ui::policy::DeviceListenerRegistry {
  public:
   explicit FakeDeviceListenerRegistry(async_dispatcher_t* dispatcher);
   fidl::InterfaceRequestHandler<fuchsia::ui::policy::DeviceListenerRegistry> GetHandler();
@@ -23,7 +25,13 @@ class FakeDeviceListenerRegistry : public fuchsia::ui::policy::DeviceListenerReg
   void RegisterListener(
       fuchsia::ui::policy::MediaButtonsListenerHandle listener,
       fuchsia::ui::policy::DeviceListenerRegistry::RegisterListenerCallback callback) override;
-
+  void RegisterMediaButtonsListener(
+      ::fidl::InterfaceHandle<::fuchsia::ui::policy::MediaButtonsListener> listener) override {
+    FX_LOGS(ERROR) << "OnMediaButtonsEvent not implemented";
+#ifndef NDEBUG
+    ZX_PANIC("Not Implemented: OnMediaButtonsEvent");
+#endif
+  }
   async_dispatcher_t* dispatcher_;
   fidl::BindingSet<fuchsia::ui::policy::DeviceListenerRegistry> bindings_;
   std::map<uint32_t, fuchsia::ui::policy::MediaButtonsListenerPtr> listeners_;

@@ -28,7 +28,7 @@
 namespace camera {
 
 // Represents a physical camera device, and serves multiple clients of the camera3.Device protocol.
-class DeviceImpl : public fuchsia::ui::policy::MediaButtonsListener {
+class DeviceImpl final : public fuchsia::ui::policy::MediaButtonsListener {
  public:
   // Creates a DeviceImpl using the given |controller|.
   //
@@ -92,7 +92,12 @@ class DeviceImpl : public fuchsia::ui::policy::MediaButtonsListener {
   // |fuchsia::ui::policy::MediaButtonsListener|
   void OnEvent(fuchsia::ui::input::MediaButtonsEvent event,
                fuchsia::ui::policy::MediaButtonsListener::OnEventCallback callback) override;
-
+  void OnMediaButtonsEvent(fuchsia::ui::input::MediaButtonsEvent event) override {
+    FX_LOGS(ERROR) << "OnMediaButtonsEvent not implemented";
+#ifndef NDEBUG
+    ZX_PANIC("Not Implemented: OnMediaButtonsEvent");
+#endif
+  }
   // Represents a single client connection to the DeviceImpl class.
   class Client : public fuchsia::camera3::Device {
    public:
