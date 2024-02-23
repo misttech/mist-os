@@ -146,16 +146,10 @@ type PixelFormatModifier = flexible enum : uint64 {
 // bitfield values (in contrast to complete values) will remain below here after
 // deprecation / removal of complete values below here is done.
 //
-
-/// DEPRECATED
 @available(added=12, deprecated=19)
 const FORMAT_MODIFIER_NONE uint64 = 0x0000000000000000;
 
 // Per-vendor upper byte vendor-codes.
-
-/// DEPRECATED
-@available(added=HEAD)
-const FORMAT_MODIFIER_VENDOR_NONE uint64 = 0x0000000000000000;
 @available(added=HEAD)
 const FORMAT_MODIFIER_VENDOR_INTEL uint64 = 0x0100000000000000;
 @available(added=HEAD)
@@ -186,19 +180,6 @@ const FORMAT_MODIFIER_VENDOR_AMLOGIC uint64 = 0x0a00000000000000;
 @available(added=HEAD)
 const FORMAT_MODIFIER_VENDOR_GOOGLE uint64 = 0x6700000000000000;
 
-/// DEPRECATED
-@available(added=HEAD)
-const FORMAT_MODIFIER_VALUE_RESERVED uint64 = 0x00FFFFFFFFFFFFFF;
-
-/// DEPRECATED
-@available(added=HEAD)
-const FORMAT_MODIFIER_DO_NOT_CARE uint64 = 0x00FFFFFFFFFFFFFE;
-
-/// DEPRECATED
-@available(added=HEAD)
-const FORMAT_MODIFIER_INVALID uint64 = FORMAT_MODIFIER_VALUE_RESERVED;
-
-/// DEPRECATED
 @available(added=12, deprecated=19)
 const FORMAT_MODIFIER_LINEAR uint64 = 0x0000000000000000;
 
@@ -211,20 +192,15 @@ const FORMAT_MODIFIER_LINEAR uint64 = 0x0000000000000000;
 /// Format has a color control surface after the tile data
 @available(added=12, deprecated=19)
 const FORMAT_MODIFIER_INTEL_CCS_BIT uint64 = 0x1000000;
-/// DEPRECATED
 @available(added=12, deprecated=19)
 const FORMAT_MODIFIER_INTEL_I915_X_TILED uint64 = 0x0100000000000001;
-/// DEPRECATED
 @available(added=12, deprecated=19)
 const FORMAT_MODIFIER_INTEL_I915_Y_TILED uint64 = 0x0100000000000002;
-/// DEPRECATED
 @available(added=12, deprecated=19)
 const FORMAT_MODIFIER_INTEL_I915_YF_TILED uint64 = 0x0100000000000003;
 
-/// DEPRECATED
 @available(added=12, deprecated=19)
 const FORMAT_MODIFIER_INTEL_I915_Y_TILED_CCS uint64 = 0x0100000001000002;
-/// DEPRECATED
 @available(added=12, deprecated=19)
 const FORMAT_MODIFIER_INTEL_I915_YF_TILED_CCS uint64 = 0x0100000001000003;
 
@@ -262,47 +238,15 @@ const FORMAT_MODIFIER_ARM_TILED_HEADER_BIT uint64 = 0x2000;
 // Not all values are equally useful, so we only have format modifiers for some particularly interesting ones.
 
 // To make the variants with bits set more consistent 0x0800000000000000 is reserved for linear.
-//
-/// DEPRECATED
 @available(added=12, deprecated=19)
 const FORMAT_MODIFIER_ARM_AFBC_16X16 uint64 = 0x0800000000000001;
-/// DEPRECATED
 @available(added=12, deprecated=19)
 const FORMAT_MODIFIER_ARM_AFBC_32X8 uint64 = 0x0800000000000002;
+
 // Variations with transaction elimination support 0x1000 should be set for these formats.
-//
-/// DEPRECATED
 @available(added=12, deprecated=19)
 const FORMAT_MODIFIER_ARM_LINEAR_TE uint64 = 0x0800000000001000;
-/// DEPRECATED
-@available(added=HEAD)
-const FORMAT_MODIFIER_ARM_AFBC_16X16_TE uint64 = 0x0800000000001001;
-/// DEPRECATED
-@available(added=HEAD)
-const FORMAT_MODIFIER_ARM_AFBC_32X8_TE uint64 = 0x0800000000001002;
-
-/// DEPRECATED
-@available(added=HEAD)
-const FORMAT_MODIFIER_ARM_AFBC_16X16_YUV_TILED_HEADER uint64 = 0x0800000000002011;
-
-/// DEPRECATED
-@available(added=HEAD)
-const FORMAT_MODIFIER_ARM_AFBC_16X16_SPLIT_BLOCK_SPARSE_YUV uint64 = 0x0800000000000071;
-/// DEPRECATED
-@available(added=HEAD)
-const FORMAT_MODIFIER_ARM_AFBC_16X16_SPLIT_BLOCK_SPARSE_YUV_TE uint64 = 0x0800000000001071;
-
-/// DEPRECATED
-@available(added=HEAD)
-const FORMAT_MODIFIER_ARM_AFBC_16X16_SPLIT_BLOCK_SPARSE_YUV_TILED_HEADER uint64
-        = 0x0800000000002071;
-/// DEPRECATED
-@available(added=HEAD)
-const FORMAT_MODIFIER_ARM_AFBC_16X16_SPLIT_BLOCK_SPARSE_YUV_TE_TILED_HEADER uint64
-        = 0x0800000000003071;
 
 // GOOGLE format modifier bitfield values / masks
-//
-/// DEPRECATED
 @available(added=12, deprecated=19)
 const FORMAT_MODIFIER_GOOGLE_GOLDFISH_OPTIMAL uint64 = 0x6700000000000001;
