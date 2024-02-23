@@ -42,7 +42,6 @@ template("sherlock_driver") {
       "sherlock-canvas.cc",
       "sherlock-clk.cc",
       "sherlock-cpu.cc",
-      "sherlock-dsi.cc",
       "sherlock-emmc.cc",
       "sherlock-gpio.cc",
       "sherlock-hevc-enc.cc",

@@ -97,7 +97,6 @@ class Sherlock : public SherlockType {
   zx_status_t RamCtlInit();
   zx_status_t CpuInit();
   zx_status_t ThermistorInit();
-  zx_status_t DsiInit();
   zx_status_t AddPostInitDevice();
   int Thread();
 
