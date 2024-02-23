@@ -127,7 +127,7 @@ zx::result<> PostInit::InitDisplay() {
     fpbus::Node dev = {};
     dev.name() = "display";
     dev.vid() = PDEV_VID_AMLOGIC;
-    dev.pid() = PDEV_PID_AMLOGIC_S905D2;
+    dev.pid() = PDEV_PID_AMLOGIC_T931;
     dev.did() = PDEV_DID_AMLOGIC_DISPLAY;
     dev.metadata() = std::move(display_panel_metadata);
     dev.mmio() = display_mmios;
