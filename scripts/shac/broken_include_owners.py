@@ -20,10 +20,12 @@ def main():
     broken_includes = []
 
     for line_number, line in enumerate(lines, start=1):
-        # TODO(danikay): Support "file:" keyword for importing OWNERS file
-        if line.startswith("include"):
-            # Use regex to parse path and strip the leading slash
-            include_path = re.search(r"include\s+(\S+)", line).group(1)
+        include_path = None
+        # Search for "file:" or "include" keyword for importing OWNERS file
+        match = re.search(r"(include\s|file:)\s*(\S+)", line)
+        if match:
+            include_path = match.group(2)
+
             if include_path.startswith("/"):
                 include_path = include_path.lstrip("/")
                 abs_path = os.path.abspath(include_path)
