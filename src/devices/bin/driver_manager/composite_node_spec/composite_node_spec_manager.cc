@@ -8,6 +8,7 @@
 
 #include "src/devices/lib/log/log.h"
 
+namespace driver_manager {
 namespace fdd = fuchsia_driver_development;
 namespace fdfw = fuchsia_driver_framework;
 
@@ -211,3 +212,4 @@ void CompositeNodeSpecManager::OnRequestRebindComplete(
         completer(zx::ok());
       });
 }
+}  // namespace driver_manager

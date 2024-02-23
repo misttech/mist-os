@@ -42,14 +42,14 @@ class DriverManagerTestBase : public gtest::TestLoopFixture {
 
   std::shared_ptr<driver_manager::Node> root() const { return root_; }
 
-  Devfs* devfs() const { return devfs_.get(); }
+  driver_manager::Devfs* devfs() const { return devfs_.get(); }
 
  private:
-  InspectManager inspect_{dispatcher()};
+  driver_manager::InspectManager inspect_{dispatcher()};
 
-  std::unique_ptr<Devfs> devfs_;
+  std::unique_ptr<driver_manager::Devfs> devfs_;
   std::shared_ptr<driver_manager::Node> root_;
-  std::optional<Devnode> root_devnode_;
+  std::optional<driver_manager::Devnode> root_devnode_;
 };
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_TESTS_DRIVER_MANAGER_TEST_BASE_H_

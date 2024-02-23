@@ -4,6 +4,8 @@
 
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec.h"
 
+namespace driver_manager {
+
 CompositeNodeSpec::CompositeNodeSpec(CompositeNodeSpecCreateInfo create_info)
     : name_(create_info.name) {
   parent_specs_ = std::vector<std::optional<DeviceOrNode>>(create_info.size, std::nullopt);
@@ -42,3 +44,5 @@ void CompositeNodeSpec::Remove(RemoveCompositeNodeCallback callback) {
   std::fill(parent_specs_.begin(), parent_specs_.end(), std::nullopt);
   RemoveImpl(std::move(callback));
 }
+
+}  // namespace driver_manager

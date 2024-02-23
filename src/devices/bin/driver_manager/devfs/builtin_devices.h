@@ -12,6 +12,8 @@
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
+namespace driver_manager {
+
 constexpr char kNullDevName[] = "null";
 constexpr char kZeroDevName[] = "zero";
 
@@ -32,5 +34,7 @@ class BuiltinDevVnode : public fs::Vnode {
  private:
   const bool null_;
 };
+
+}  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_DEVFS_BUILTIN_DEVICES_H_

@@ -71,7 +71,8 @@ void TestDriverIndex::VerifyRequestCount(uint32_t id, size_t expected_count) {
 }
 
 void TestBindManagerBridge::AddSpecToDriverIndex(
-    fuchsia_driver_framework::wire::CompositeNodeSpec spec, AddToIndexCallback callback) {
+    fuchsia_driver_framework::wire::CompositeNodeSpec spec,
+    driver_manager::AddToIndexCallback callback) {
   callback(zx::ok());
 }
 
@@ -276,7 +277,7 @@ void BindManagerTestBase::AddCompositeNodeSpec(std::string composite,
   }
 
   auto spec = std::make_unique<driver_manager::CompositeNodeSpecV2>(
-      CompositeNodeSpecCreateInfo{
+      driver_manager::CompositeNodeSpecCreateInfo{
           .name = composite,
           .size = parents.size(),
       },

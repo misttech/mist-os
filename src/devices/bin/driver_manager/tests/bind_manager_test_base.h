@@ -74,7 +74,7 @@ class TestDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
 };
 
 class TestBindManagerBridge final : public driver_manager::BindManagerBridge,
-                                    public CompositeManagerBridge {
+                                    public driver_manager::CompositeManagerBridge {
  public:
   struct CompositeNodeSpecData {
     driver_manager::CompositeNodeSpecV2* spec;
@@ -86,10 +86,9 @@ class TestBindManagerBridge final : public driver_manager::BindManagerBridge,
   ~TestBindManagerBridge() = default;
 
   // BindManagerBridge implementation:
-  zx::result<BindSpecResult> BindToParentSpec(fidl::AnyArena& arena,
-                                              driver_manager::CompositeParents composite_parents,
-                                              std::weak_ptr<driver_manager::Node> node,
-                                              bool enable_multibind) override {
+  zx::result<driver_manager::BindSpecResult> BindToParentSpec(
+      fidl::AnyArena& arena, driver_manager::CompositeParents composite_parents,
+      std::weak_ptr<driver_manager::Node> node, bool enable_multibind) override {
     return composite_manager_.BindParentSpec(arena, composite_parents, node, enable_multibind);
   }
 
@@ -102,7 +101,7 @@ class TestBindManagerBridge final : public driver_manager::BindManagerBridge,
   void BindNodesForCompositeNodeSpec() override { bind_manager_->TryBindAllAvailable(); }
 
   void AddSpecToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
-                            AddToIndexCallback callback) override;
+                            driver_manager::AddToIndexCallback callback) override;
 
   void RequestMatchFromDriverIndex(
       fuchsia_driver_index::wire::MatchDriverArgs args,
@@ -122,7 +121,7 @@ class TestBindManagerBridge final : public driver_manager::BindManagerBridge,
  private:
   fidl::WireClient<fuchsia_driver_index::DriverIndex> client_;
 
-  CompositeNodeSpecManager composite_manager_;
+  driver_manager::CompositeNodeSpecManager composite_manager_;
   std::unordered_map<std::string, CompositeNodeSpecData> specs_;
 
   TestBindManager* bind_manager_;

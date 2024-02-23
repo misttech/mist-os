@@ -28,15 +28,17 @@ namespace fdh = fuchsia_driver_host;
 namespace fio = fuchsia_io;
 namespace fprocess = fuchsia_process;
 namespace frunner = fuchsia_component_runner;
-namespace fdi = fuchsia_driver_index;
 namespace fcomponent = fuchsia_component;
 namespace fdecl = fuchsia_component_decl;
 
 using driver_manager::BindResultTracker;
 using driver_manager::Collection;
+using driver_manager::CompositeNodeSpecCreateInfo;
 using driver_manager::CompositeNodeSpecV2;
 using driver_manager::CreateCompositeServiceOffer;
+using driver_manager::Devfs;
 using driver_manager::DriverRunner;
+using driver_manager::InspectManager;
 using driver_manager::Node;
 using driver_manager::NodeType;
 using testing::ElementsAre;

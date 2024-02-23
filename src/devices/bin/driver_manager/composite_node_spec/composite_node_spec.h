@@ -12,7 +12,6 @@ struct DeviceV1Wrapper;
 
 namespace driver_manager {
 class Node;
-}  // namespace driver_manager
 
 using DeviceOrNode =
     std::variant<std::weak_ptr<DeviceV1Wrapper>, std::weak_ptr<driver_manager::Node>>;
@@ -73,5 +72,7 @@ class CompositeNodeSpec {
   std::string name_;
   std::vector<std::optional<DeviceOrNode>> parent_specs_;
 };
+
+}  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_NODE_SPEC_COMPOSITE_NODE_SPEC_H_

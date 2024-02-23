@@ -5,10 +5,14 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_DEVFS_ALLOWLIST_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_DEVFS_ALLOWLIST_H_
 
-#include <string>
+#include <string_view>
+
+namespace driver_manager {
 
 // This takes in a class name and returns true iff the entries in `/dev/class/{class_name}` should
 // have fuchsia.io/Node multiplexed on the channel.
 bool AllowMultiplexingNode(std::string_view class_name);
+
+}  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_DEVFS_ALLOWLIST_H_

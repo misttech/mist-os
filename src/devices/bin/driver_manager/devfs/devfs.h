@@ -12,13 +12,14 @@
 #include <lib/component/incoming/cpp/clone.h>
 
 #include <random>
-#include <variant>
 
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
 
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
+
+namespace driver_manager {
 
 class Devfs;
 class PseudoDir;
@@ -246,5 +247,7 @@ class Devfs {
   // TODO(https://fxbug.dev/42064970): Unbox the unique_ptr when ProtoNode is no longer abstract.
   std::unordered_map<uint32_t, std::unique_ptr<ProtoNode>> proto_info_nodes;
 };
+
+}  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_DEVFS_DEVFS_H_

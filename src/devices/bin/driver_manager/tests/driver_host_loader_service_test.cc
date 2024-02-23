@@ -17,7 +17,7 @@ using namespace loader::test;
 namespace fldsvc = fuchsia_ldsvc;
 
 TEST_F(LoaderServiceTest, LoadObject) {
-  std::shared_ptr<DriverHostLoaderService> loader;
+  std::shared_ptr<driver_manager::DriverHostLoaderService> loader;
   std::vector<TestDirectoryEntry> config = {
       {"libfdio.so", "fdio", true},
       {"libother.so", "not allowed", true},

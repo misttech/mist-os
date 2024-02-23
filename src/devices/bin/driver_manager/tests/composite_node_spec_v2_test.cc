@@ -17,14 +17,14 @@ class CompositeNodeSpecV2Test : public DriverManagerTestBase {
 
   driver_manager::CompositeNodeSpecV2 CreateCompositeNodeSpec(std::string name, size_t size) {
     return driver_manager::CompositeNodeSpecV2(
-        CompositeNodeSpecCreateInfo{
+        driver_manager::CompositeNodeSpecCreateInfo{
             .name = name,
             .size = size,
         },
         dispatcher(), &node_manager);
   }
 
-  zx::result<std::optional<DeviceOrNode>> MatchAndBindParentSpec(
+  zx::result<std::optional<driver_manager::DeviceOrNode>> MatchAndBindParentSpec(
       driver_manager::CompositeNodeSpecV2& spec, std::weak_ptr<driver_manager::Node> parent_node,
       std::vector<std::string> parent_names, uint32_t node_index, uint32_t primary_index = 0) {
     fuchsia_driver_framework::CompositeParent matched_parent({

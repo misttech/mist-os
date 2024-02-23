@@ -9,6 +9,7 @@
 #include "src/devices/lib/log/log.h"
 #include "src/lib/files/path.h"
 
+namespace driver_manager {
 namespace {
 
 // TODO(https://fxbug.dev/42155836): Read this list from a config file instead of having an array.
@@ -65,3 +66,5 @@ zx::result<zx::vmo> DriverHostLoaderService::LoadObjectImpl(std::string path) {
   }
   return LoaderService::LoadObjectImpl(path);
 }
+
+}  // namespace driver_manager

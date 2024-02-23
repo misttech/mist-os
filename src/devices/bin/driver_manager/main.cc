@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   auto outgoing = component::OutgoingDirectory(loop.dispatcher());
-  InspectManager inspect_manager(loop.dispatcher());
+  driver_manager::InspectManager inspect_manager(loop.dispatcher());
 
   // Launch DriverRunner for DFv2 drivers.
   auto realm_result = component::Connect<fuchsia_component::Realm>();
@@ -110,7 +110,7 @@ int main(int argc, char** argv) {
   loader_loop.StartThread("loader-loop");
 
   auto loader_service =
-      DriverHostLoaderService::Create(loader_loop.dispatcher(), std::move(lib_fd));
+      driver_manager::DriverHostLoaderService::Create(loader_loop.dispatcher(), std::move(lib_fd));
   driver_manager::DriverRunner driver_runner(
       std::move(realm_result.value()), std::move(driver_index_result.value()), inspect_manager,
       [loader_service]() -> zx::result<fidl::ClientEnd<fuchsia_ldsvc::Loader>> {
@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
       loop.dispatcher(), config.enable_test_shutdown_delays());
 
   // Setup devfs.
-  std::optional<Devfs> devfs;
+  std::optional<driver_manager::Devfs> devfs;
   driver_runner.root_node()->SetupDevfsForRootNode(devfs);
   driver_runner.PublishComponentRunner(outgoing);
 

@@ -12,14 +12,16 @@
 
 #include <zxtest/zxtest.h>
 
+#include <memory>
+#include <utility>
+#include <utility>
+
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec.h"
 #include "src/devices/bin/driver_manager/node.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
 }  // namespace fdf
-
-namespace fdi = fuchsia_driver_index;
 
 struct DeviceV1Wrapper {};
 
@@ -47,15 +49,15 @@ fdf::CompositeParent MakeCompositeNodeSpecInfo(std::string spec_name, uint32_t i
 
 }  // namespace
 
-class FakeCompositeNodeSpec : public CompositeNodeSpec {
+class FakeCompositeNodeSpec : public driver_manager::CompositeNodeSpec {
  public:
-  explicit FakeCompositeNodeSpec(CompositeNodeSpecCreateInfo create_info)
-      : CompositeNodeSpec(std::move(create_info)) {}
+  explicit FakeCompositeNodeSpec(driver_manager::CompositeNodeSpecCreateInfo create_info)
+      : driver_manager::CompositeNodeSpec(std::move(create_info)) {}
 
-  zx::result<std::optional<DeviceOrNode>> BindParentImpl(
+  zx::result<std::optional<driver_manager::DeviceOrNode>> BindParentImpl(
       fuchsia_driver_framework::wire::CompositeParent composite_parent,
-      const DeviceOrNode& device_or_node) override {
-    return zx::ok(std::shared_ptr<DeviceV1Wrapper>(new DeviceV1Wrapper{}));
+      const driver_manager::DeviceOrNode& device_or_node) override {
+    return zx::ok(std::make_shared<DeviceV1Wrapper>(DeviceV1Wrapper{}));
   }
 
   fuchsia_driver_development::wire::CompositeNodeInfo GetCompositeInfo(
@@ -63,7 +65,7 @@ class FakeCompositeNodeSpec : public CompositeNodeSpec {
     return fuchsia_driver_development::wire::CompositeNodeInfo::Builder(arena).Build();
   }
 
-  void RemoveImpl(RemoveCompositeNodeCallback callback) override {
+  void RemoveImpl(driver_manager::RemoveCompositeNodeCallback callback) override {
     remove_invoked_ = true;
     callback(zx::ok());
   }
@@ -74,12 +76,12 @@ class FakeCompositeNodeSpec : public CompositeNodeSpec {
   bool remove_invoked_ = false;
 };
 
-class FakeDeviceManagerBridge : public CompositeManagerBridge {
+class FakeDeviceManagerBridge : public driver_manager::CompositeManagerBridge {
  public:
   // CompositeManagerBridge:
   void BindNodesForCompositeNodeSpec() override {}
   void AddSpecToDriverIndex(fdf::wire::CompositeNodeSpec spec,
-                            AddToIndexCallback callback) override {
+                            driver_manager::AddToIndexCallback callback) override {
     callback(zx::ok());
   }
 
@@ -92,20 +94,21 @@ class FakeDeviceManagerBridge : public CompositeManagerBridge {
 class CompositeNodeSpecManagerTest : public zxtest::Test {
  public:
   void SetUp() override {
-    composite_node_spec_manager_ = std::make_unique<CompositeNodeSpecManager>(&bridge_);
+    composite_node_spec_manager_ =
+        std::make_unique<driver_manager::CompositeNodeSpecManager>(&bridge_);
   }
 
   fdf::ParentSpec MakeParentSpec(std::vector<fdf::BindRule> bind_rules,
                                  std::vector<fdf::NodeProperty> properties) {
     return fdf::ParentSpec{{
-        .bind_rules = bind_rules,
-        .properties = properties,
+        .bind_rules = std::move(bind_rules),
+        .properties = std::move(properties),
     }};
   }
 
   fit::result<fuchsia_driver_framework::CompositeNodeSpecError> AddSpec(
       fidl::AnyArena& arena, std::string name, std::vector<fdf::ParentSpec> parents) {
-    auto spec = std::make_unique<FakeCompositeNodeSpec>(CompositeNodeSpecCreateInfo{
+    auto spec = std::make_unique<FakeCompositeNodeSpec>(driver_manager::CompositeNodeSpecCreateInfo{
         .name = name,
         .size = parents.size(),
     });
@@ -133,12 +136,12 @@ class CompositeNodeSpecManagerTest : public zxtest::Test {
     ASSERT_EQ(expected, specs_[name]->remove_invoked());
   }
 
-  std::unique_ptr<CompositeNodeSpecManager> composite_node_spec_manager_;
+  std::unique_ptr<driver_manager::CompositeNodeSpecManager> composite_node_spec_manager_;
 
   std::unordered_map<std::string, FakeCompositeNodeSpec*> specs_;
   FakeDeviceManagerBridge bridge_;
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  InspectManager inspect_ = InspectManager(loop_.dispatcher());
+  driver_manager::InspectManager inspect_{loop_.dispatcher()};
 };
 
 TEST_F(CompositeNodeSpecManagerTest, TestAddMatchCompositeNodeSpec) {

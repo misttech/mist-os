@@ -6,6 +6,8 @@
 
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
+namespace driver_manager {
+
 zx_status_t BuiltinDevVnode::Read(void* data, size_t len, size_t off, size_t* out_actual) {
   // /dev/null implementation.
   if (null_) {
@@ -36,3 +38,5 @@ zx_status_t BuiltinDevVnode::GetAttributes(fs::VnodeAttributes* a) {
 }
 
 fs::VnodeProtocolSet BuiltinDevVnode::GetProtocols() const { return fs::VnodeProtocol::kFile; }
+
+}  // namespace driver_manager

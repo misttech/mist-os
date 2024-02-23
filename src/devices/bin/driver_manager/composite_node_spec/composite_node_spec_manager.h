@@ -12,6 +12,7 @@
 
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_manager_bridge.h"
 
+namespace driver_manager {
 struct CompositeNodeAndDriver {
   fuchsia_driver_framework::wire::CompositeDriverInfo driver;
   DeviceOrNode node;
@@ -75,5 +76,7 @@ class CompositeNodeSpecManager {
   // CompositeNodeSpecManager.
   CompositeManagerBridge* bridge_;
 };
+
+}  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_NODE_SPEC_COMPOSITE_NODE_SPEC_MANAGER_H_

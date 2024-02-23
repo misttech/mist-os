@@ -17,6 +17,10 @@
 
 namespace {
 
+using driver_manager::Devfs;
+using driver_manager::DevfsDevice;
+using driver_manager::Devnode;
+
 class Connecter : public fidl::WireServer<fuchsia_device_fs::Connector> {
  public:
  private:

@@ -6,6 +6,7 @@
 
 #include <unordered_set>
 
+namespace driver_manager {
 bool AllowMultiplexingNode(std::string_view class_name) {
   // TODO(https://fxbug.dev/42063787): Remove entries from this list.
   static const std::unordered_set<std::string_view> classes_that_include_node({
@@ -16,3 +17,4 @@ bool AllowMultiplexingNode(std::string_view class_name) {
   });
   return classes_that_include_node.find(class_name) != classes_that_include_node.end();
 }
+}  // namespace driver_manager

@@ -7,6 +7,7 @@
 
 #include "src/lib/loader_service/loader_service.h"
 
+namespace driver_manager {
 // A loader service for driver_hosts that restricts access to dynamic libraries by applying an
 // allowlist, but then otherwise simply loads them from the given lib directory.
 class DriverHostLoaderService : public loader::LoaderService {
@@ -21,5 +22,6 @@ class DriverHostLoaderService : public loader::LoaderService {
 
   virtual zx::result<zx::vmo> LoadObjectImpl(std::string path) override;
 };
+}  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_DRIVER_HOST_LOADER_SERVICE_H_

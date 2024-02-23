@@ -17,6 +17,7 @@
 
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 
+namespace driver_manager {
 struct ProtocolInfo {
   const char* name;
   fbl::RefPtr<fs::PseudoDir> devnode;
@@ -125,5 +126,7 @@ class DeviceInspect {
   std::string name_;
   std::string link_name_;
 };
+
+}  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_INSPECT_H_

@@ -7,6 +7,7 @@
 
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec.h"
 
+namespace driver_manager {
 using AddToIndexCallback = fit::callback<void(zx::result<>)>;
 
 // Bridge class for the composite device handling in DFv1 and DFv2.
@@ -28,5 +29,6 @@ class CompositeManagerBridge {
     callback(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 };
+}  // namespace driver_manager
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_NODE_SPEC_COMPOSITE_MANAGER_BRIDGE_H_

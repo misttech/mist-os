@@ -21,7 +21,6 @@
 #include <memory>
 #include <random>
 #include <unordered_set>
-#include <variant>
 
 #include <fbl/ref_ptr.h>
 
@@ -31,22 +30,11 @@
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
-#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
-#include "src/storage/lib/vfs/cpp/remote_dir.h"
 #include "src/storage/lib/vfs/cpp/service.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
+namespace driver_manager {
 namespace {
-
-// Helpers from the reference documentation for std::visit<>, to allow
-// visit-by-overload of the std::variant<> returned by GetLastReference():
-template <class... Ts>
-struct overloaded : Ts... {
-  using Ts::operator()...;
-};
-// explicit deduction guide (not needed as of C++20)
-template <class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
 
 struct ProtocolInfo {
   std::string_view name;
@@ -564,3 +552,4 @@ zx_status_t Devnode::export_dir(Devnode::Target target,
 
   return ZX_OK;
 }
+}  // namespace driver_manager

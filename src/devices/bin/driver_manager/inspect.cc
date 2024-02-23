@@ -14,6 +14,7 @@
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
+namespace driver_manager {
 namespace {
 const char* BindParamName(uint32_t param_num) {
   switch (param_num) {
@@ -176,3 +177,5 @@ void DeviceInspect::SetStaticValues(const std::string& topological_path, uint32_
     static_values_.emplace(std::move(properties_array));
   }
 }
+
+}  // namespace driver_manager
