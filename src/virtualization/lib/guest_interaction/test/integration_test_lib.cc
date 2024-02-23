@@ -76,6 +76,7 @@ void GuestInteractionTest::SetUp() {
                               Protocol{fuchsia::sysmem::Allocator::Name_},
                               Protocol{fuchsia::tracing::provider::Registry::Name_},
                               Protocol{fuchsia::scheduler::ProfileProvider::Name_},
+                              Protocol{fuchsia::scheduler::RoleManager::Name_},
                           },
                       .source = {ParentRef()},
                       .targets = {ChildRef{kGuestManagerName}}})
