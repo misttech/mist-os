@@ -40,8 +40,7 @@ use netstack3_core::{
         SetDualStackEnabledError, SetMulticastMembershipError, ShutdownType,
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
-    udp::{self, UdpReceiveBindingsContext, UdpSocketId},
-    IpExt,
+    udp, IpExt,
 };
 use packet::{Buf, BufferMut};
 use tracing::{error, trace, warn};
@@ -369,10 +368,12 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
 #[derive(Debug)]
 pub(crate) enum Udp {}
 
+type UdpSocketId<I> = udp::UdpSocketId<I, WeakDeviceId<BindingsCtx>, BindingsCtx>;
+
 impl<I: IpExt> Transport<I> for Udp {
     const PROTOCOL: DatagramProtocol = DatagramProtocol::Udp;
     const SUPPORTS_DUALSTACK: bool = true;
-    type SocketId = UdpSocketId<I, WeakDeviceId<BindingsCtx>>;
+    type SocketId = UdpSocketId<I>;
 }
 
 impl OptionFromU16 for NonZeroU16 {
@@ -581,10 +582,10 @@ where
     }
 }
 
-impl<I: IpExt> UdpReceiveBindingsContext<I, DeviceId<BindingsCtx>> for SocketCollection<I, Udp> {
-    fn receive_udp<B: BufferMut>(
+impl<I: IpExt> SocketCollection<I, Udp> {
+    pub(crate) fn receive_udp<B: BufferMut>(
         &mut self,
-        id: &UdpSocketId<I, WeakDeviceId<BindingsCtx>>,
+        id: &UdpSocketId<I>,
         device_id: &DeviceId<BindingsCtx>,
         (dst_ip, dst_port): (<I>::Addr, NonZeroU16),
         (src_ip, src_port): (<I>::Addr, Option<NonZeroU16>),

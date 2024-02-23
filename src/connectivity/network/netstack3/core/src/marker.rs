@@ -34,7 +34,7 @@ use crate::{
     transport::{
         self,
         tcp::socket::{TcpBindingsContext, TcpBindingsTypes, TcpContext},
-        udp::{UdpBindingsContext, UdpCounters},
+        udp::{UdpBindingsContext, UdpBindingsTypes, UdpCounters},
     },
     TimerId,
 };
@@ -115,7 +115,12 @@ where
 /// A marker trait for all the types stored in core objects that are specified
 /// by bindings.
 pub trait BindingsTypes:
-    InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes + FilterBindingsTypes + IcmpBindingsTypes
+    InstantBindingsTypes
+    + DeviceLayerTypes
+    + TcpBindingsTypes
+    + FilterBindingsTypes
+    + IcmpBindingsTypes
+    + UdpBindingsTypes
 {
 }
 
@@ -125,6 +130,7 @@ impl<O> BindingsTypes for O where
         + TcpBindingsTypes
         + FilterBindingsTypes
         + IcmpBindingsTypes
+        + UdpBindingsTypes
 {
 }
 

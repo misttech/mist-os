@@ -252,7 +252,7 @@ impl<I: Ip, BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpAllSocke
         cb(&mut self.cast_locked::<crate::lock_ordering::UdpSocketState<I>>())
     }
 
-    fn with_all_sockets_mut<O, F: FnOnce(&mut UdpSocketSet<I, Self::WeakDeviceId>) -> O>(
+    fn with_all_sockets_mut<O, F: FnOnce(&mut UdpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
@@ -261,10 +261,10 @@ impl<I: Ip, BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpAllSocke
 
     fn with_socket_state<
         O,
-        F: FnOnce(&mut Self::SocketStateCtx<'_>, &UdpSocketState<I, Self::WeakDeviceId>) -> O,
+        F: FnOnce(&mut Self::SocketStateCtx<'_>, &UdpSocketState<I, Self::WeakDeviceId, BC>) -> O,
     >(
         &mut self,
-        id: &UdpSocketId<I, Self::WeakDeviceId>,
+        id: &UdpSocketId<I, Self::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
         let mut locked = self.adopt(id);
@@ -276,10 +276,10 @@ impl<I: Ip, BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpAllSocke
 
     fn with_socket_state_mut<
         O,
-        F: FnOnce(&mut Self::SocketStateCtx<'_>, &mut UdpSocketState<I, Self::WeakDeviceId>) -> O,
+        F: FnOnce(&mut Self::SocketStateCtx<'_>, &mut UdpSocketState<I, Self::WeakDeviceId, BC>) -> O,
     >(
         &mut self,
-        id: &UdpSocketId<I, Self::WeakDeviceId>,
+        id: &UdpSocketId<I, Self::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
         let mut locked = self.adopt(id);
@@ -311,7 +311,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>
 
     fn with_bound_sockets<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &udp::BoundSockets<Ipv4, Self::WeakDeviceId>) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &udp::BoundSockets<Ipv4, Self::WeakDeviceId, BC>) -> O,
     >(
         &mut self,
         cb: F,
@@ -323,7 +323,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>
 
     fn with_bound_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut udp::BoundSockets<Ipv4, Self::WeakDeviceId>) -> O,
+        F: FnOnce(
+            &mut Self::IpSocketsCtx<'_>,
+            &mut udp::BoundSockets<Ipv4, Self::WeakDeviceId, BC>,
+        ) -> O,
     >(
         &mut self,
         cb: F,
@@ -356,7 +359,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>
 
     fn with_bound_sockets<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &udp::BoundSockets<Ipv6, Self::WeakDeviceId>) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &udp::BoundSockets<Ipv6, Self::WeakDeviceId, BC>) -> O,
     >(
         &mut self,
         cb: F,
@@ -368,7 +371,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>
 
     fn with_bound_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut udp::BoundSockets<Ipv6, Self::WeakDeviceId>) -> O,
+        F: FnOnce(
+            &mut Self::IpSocketsCtx<'_>,
+            &mut udp::BoundSockets<Ipv6, Self::WeakDeviceId, BC>,
+        ) -> O,
     >(
         &mut self,
         cb: F,
@@ -403,8 +409,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut udp::BoundSockets<Ipv6, Self::WeakDeviceId>,
-            &mut udp::BoundSockets<Ipv4, Self::WeakDeviceId>,
+            &mut udp::BoundSockets<Ipv6, Self::WeakDeviceId, BC>,
+            &mut udp::BoundSockets<Ipv4, Self::WeakDeviceId, BC>,
         ) -> O,
     >(
         &mut self,
@@ -419,7 +425,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>
 
     fn with_other_bound_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut udp::BoundSockets<Ipv4, Self::WeakDeviceId>) -> O,
+        F: FnOnce(
+            &mut Self::IpSocketsCtx<'_>,
+            &mut udp::BoundSockets<Ipv4, Self::WeakDeviceId, BC>,
+        ) -> O,
     >(
         &mut self,
         cb: F,
@@ -495,10 +504,10 @@ impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: BindingsContext>
     }
 }
 
-impl<I: datagram::IpExt, D: device::WeakId> RwLockFor<crate::lock_ordering::UdpSocketState<I>>
-    for UdpSocketId<I, D>
+impl<I: datagram::IpExt, D: device::WeakId, BT: BindingsTypes>
+    RwLockFor<crate::lock_ordering::UdpSocketState<I>> for UdpSocketId<I, D, BT>
 {
-    type Data = UdpSocketState<I, D>;
+    type Data = UdpSocketState<I, D, BT>;
 
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Self::Data>
     where
@@ -519,7 +528,7 @@ impl<I: datagram::IpExt, D: device::WeakId> RwLockFor<crate::lock_ordering::UdpS
 impl<I: datagram::IpExt, BT: BindingsTypes> RwLockFor<crate::lock_ordering::UdpBoundMap<I>>
     for StackState<BT>
 {
-    type Data = udp::BoundSockets<I, WeakDeviceId<BT>>;
+    type Data = udp::BoundSockets<I, WeakDeviceId<BT>, BT>;
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
@@ -534,7 +543,7 @@ impl<I: datagram::IpExt, BT: BindingsTypes> RwLockFor<crate::lock_ordering::UdpB
 impl<I: datagram::IpExt, BT: BindingsTypes> RwLockFor<crate::lock_ordering::UdpAllSocketsSet<I>>
     for StackState<BT>
 {
-    type Data = UdpSocketSet<I, WeakDeviceId<BT>>;
+    type Data = UdpSocketSet<I, WeakDeviceId<BT>, BT>;
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 

@@ -253,8 +253,8 @@ pub mod types {
 /// Methods for dealing with UDP sockets.
 pub mod udp {
     pub use crate::transport::udp::{
-        ConnInfo, ListenerInfo, SendError, SendToError, SocketInfo, UdpReceiveBindingsContext,
-        UdpRemotePort, UdpSocketId,
+        ConnInfo, ListenerInfo, SendError, SendToError, SocketInfo, UdpBindingsTypes,
+        UdpReceiveBindingsContext, UdpRemotePort, UdpSocketId,
     };
 }
 

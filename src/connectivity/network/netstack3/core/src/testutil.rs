@@ -97,7 +97,7 @@ use crate::{
             socket::TcpBindingsTypes,
             BufferSizes,
         },
-        udp::{UdpReceiveBindingsContext, UdpSocketId},
+        udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId},
     },
     BindingsTypes,
 };
@@ -536,8 +536,10 @@ pub struct FakeBindingsCtxState {
         HashMap<IcmpSocketId<Ipv4, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>, Vec<Vec<u8>>>,
     icmpv6_replies:
         HashMap<IcmpSocketId<Ipv6, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>, Vec<Vec<u8>>>,
-    udpv4_received: HashMap<UdpSocketId<Ipv4, WeakDeviceId<FakeBindingsCtx>>, Vec<Vec<u8>>>,
-    udpv6_received: HashMap<UdpSocketId<Ipv6, WeakDeviceId<FakeBindingsCtx>>, Vec<Vec<u8>>>,
+    udpv4_received:
+        HashMap<UdpSocketId<Ipv4, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>, Vec<Vec<u8>>>,
+    udpv6_received:
+        HashMap<UdpSocketId<Ipv6, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>, Vec<Vec<u8>>>,
     pub(crate) rx_available: Vec<LoopbackDeviceId<FakeBindingsCtx>>,
     pub(crate) tx_available: Vec<DeviceId<FakeBindingsCtx>>,
 }
@@ -545,11 +547,15 @@ pub struct FakeBindingsCtxState {
 impl FakeBindingsCtxState {
     pub(crate) fn udp_state_mut<I: crate::IpExt>(
         &mut self,
-    ) -> &mut HashMap<UdpSocketId<I, WeakDeviceId<FakeBindingsCtx>>, Vec<Vec<u8>>> {
+    ) -> &mut HashMap<UdpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>, Vec<Vec<u8>>>
+    {
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
         struct Wrapper<'a, I: crate::IpExt>(
-            &'a mut HashMap<UdpSocketId<I, WeakDeviceId<FakeBindingsCtx>>, Vec<Vec<u8>>>,
+            &'a mut HashMap<
+                UdpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>,
+                Vec<Vec<u8>>,
+            >,
         );
         let Wrapper(map) = I::map_ip::<_, Wrapper<'_, I>>(
             IpInvariant(self),
@@ -699,7 +705,7 @@ impl FakeBindingsCtx {
     #[cfg(test)]
     pub(crate) fn take_udp_received<I: crate::IpExt>(
         &mut self,
-        conn: &UdpSocketId<I, WeakDeviceId<FakeBindingsCtx>>,
+        conn: &UdpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>,
     ) -> Vec<Vec<u8>> {
         self.state_mut().udp_state_mut::<I>().remove(conn).unwrap_or_else(Vec::default)
     }
@@ -1471,7 +1477,7 @@ impl FakeNetworkContext for FakeCtx {
 impl<I: crate::IpExt> UdpReceiveBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
     fn receive_udp<B: BufferMut>(
         &mut self,
-        id: &UdpSocketId<I, WeakDeviceId<Self>>,
+        id: &UdpSocketId<I, WeakDeviceId<Self>, FakeBindingsCtx>,
         _device: &DeviceId<Self>,
         _dst_addr: (<I>::Addr, core::num::NonZeroU16),
         _src_addr: (<I>::Addr, Option<core::num::NonZeroU16>),
@@ -1482,6 +1488,10 @@ impl<I: crate::IpExt> UdpReceiveBindingsContext<I, DeviceId<Self>> for FakeBindi
             (&mut *state).udp_state_mut::<I>().entry(id.clone()).or_insert_with(Vec::default);
         received.push(body.as_ref().to_owned());
     }
+}
+
+impl UdpBindingsTypes for FakeBindingsCtx {
+    type ExternalData<I: Ip> = ();
 }
 
 impl<I: crate::IpExt> IcmpEchoBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {

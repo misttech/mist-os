@@ -82,7 +82,7 @@ use netstack3_core::{
     },
     neighbor,
     routes::RawMetric,
-    udp::{UdpReceiveBindingsContext, UdpSocketId},
+    udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId},
     EventContext, InstantBindingsTypes, InstantContext, IpExt, RngContext, StackState,
     TimerContext, TimerId, TracingContext,
 };
@@ -566,7 +566,7 @@ where
 {
     fn receive_udp<B: BufferMut>(
         &mut self,
-        id: &UdpSocketId<I, WeakDeviceId<BindingsCtx>>,
+        id: &UdpSocketId<I, WeakDeviceId<BindingsCtx>, BindingsCtx>,
         device: &DeviceId<BindingsCtx>,
         dst_addr: (<I>::Addr, NonZeroU16),
         src_addr: (<I>::Addr, Option<NonZeroU16>),
@@ -574,6 +574,10 @@ where
     ) {
         I::with_collection_mut(self, |c| c.receive_udp(id, device, dst_addr, src_addr, body))
     }
+}
+
+impl UdpBindingsTypes for BindingsCtx {
+    type ExternalData<I: Ip> = ();
 }
 
 impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>> for BindingsCtx {

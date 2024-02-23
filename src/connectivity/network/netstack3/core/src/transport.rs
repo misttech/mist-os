@@ -108,8 +108,8 @@ impl TransportStateBuilder {
 
 /// The state associated with the transport layer.
 pub(crate) struct TransportLayerState<BT: BindingsTypes> {
-    udpv4: UdpState<Ipv4, WeakDeviceId<BT>>,
-    udpv6: UdpState<Ipv6, WeakDeviceId<BT>>,
+    udpv4: UdpState<Ipv4, WeakDeviceId<BT>, BT>,
+    udpv6: UdpState<Ipv6, WeakDeviceId<BT>, BT>,
     tcpv4: TcpState<Ipv4, WeakDeviceId<BT>, BT>,
     tcpv6: TcpState<Ipv6, WeakDeviceId<BT>, BT>,
 }
@@ -119,7 +119,7 @@ impl<BT: BindingsTypes> TransportLayerState<BT> {
         I::map_ip((), |()| &self.tcpv4, |()| &self.tcpv6)
     }
 
-    fn udp_state<I: datagram::IpExt>(&self) -> &UdpState<I, WeakDeviceId<BT>> {
+    fn udp_state<I: datagram::IpExt>(&self) -> &UdpState<I, WeakDeviceId<BT>, BT> {
         I::map_ip((), |()| &self.udpv4, |()| &self.udpv6)
     }
 
