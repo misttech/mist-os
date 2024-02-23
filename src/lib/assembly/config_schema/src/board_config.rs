@@ -114,17 +114,21 @@ pub struct BoardInputBundle {
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct BoardProvidedConfig {
+    /// Configuration for the cpu-manager service
+    #[file_relative_paths]
+    pub cpu_manager: Option<FileRelativePathBuf>,
+
     /// Configuration for the power-manager service
     #[file_relative_paths]
     pub power_manager: Option<FileRelativePathBuf>,
 
-    /// Thermal configuration for the power-manager service
-    #[file_relative_paths]
-    pub thermal: Option<FileRelativePathBuf>,
-
     /// Configuration for the power metrics recorder service
     #[file_relative_paths]
     pub power_metrics_recorder: Option<FileRelativePathBuf>,
+
+    /// Thermal configuration for the power-manager service
+    #[file_relative_paths]
+    pub thermal: Option<FileRelativePathBuf>,
 }
 
 #[cfg(test)]

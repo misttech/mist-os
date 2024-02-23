@@ -57,7 +57,9 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #    input bundle.  All are optional.
 #
 #    Fields:
+#    - cpu_manager: configuration for the cpu_manager system.
 #    - power_manager: configuration for the power_manager system.
+#    - power_metrics_recorder: configuration for power_metrics_recorder system.
 #    - thermal: configuration of the thermal management system.
 #
 #  Outputs
@@ -244,6 +246,14 @@ template("board_input_bundle") {
   if (defined(invoker.configuration)) {
     configuration = invoker.configuration
 
+    if (defined(configuration.cpu_manager)) {
+      creation_inputs += [ configuration.cpu_manager ]
+      creation_args += [
+        "--cpu-manager-config",
+        rebase_path(configuration.cpu_manager),
+      ]
+    }
+
     if (defined(configuration.power_manager)) {
       creation_inputs += [ configuration.power_manager ]
       creation_args += [
@@ -252,19 +262,19 @@ template("board_input_bundle") {
       ]
     }
 
-    if (defined(configuration.thermal)) {
-      creation_inputs += [ configuration.thermal ]
-      creation_args += [
-        "--thermal-config",
-        rebase_path(configuration.thermal),
-      ]
-    }
-
     if (defined(configuration.power_metrics_recorder)) {
       creation_inputs += [ configuration.power_metrics_recorder ]
       creation_args += [
         "--power-metrics-recorder-config",
         rebase_path(configuration.power_metrics_recorder),
+      ]
+    }
+
+    if (defined(configuration.thermal)) {
+      creation_inputs += [ configuration.thermal ]
+      creation_args += [
+        "--thermal-config",
+        rebase_path(configuration.thermal),
       ]
     }
   }

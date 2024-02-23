@@ -47,6 +47,8 @@ pub enum BootfsDestination {
     ComponentIdIndex,
     /// The component manager policy for the Component subsystem.
     ComponentManagerConfig,
+    /// The cpu manager node config.
+    CpuManagerNodeConfig,
     /// The fshost structured config file for the Storage subsystem.
     FshostConfig,
     /// The fshost component manifest for the Storage subsystem.
@@ -76,6 +78,7 @@ impl std::fmt::Display for BootfsDestination {
                 Self::BootfsPackageIndex => "data/bootfs_packages",
                 Self::ComponentIdIndex => "config/component_id_index",
                 Self::ComponentManagerConfig => "config/component_manager",
+                Self::CpuManagerNodeConfig => "config/cpu_manager/node_config.json",
                 Self::FshostConfig => "meta/fshost.cvf",
                 Self::FshostManifest => "meta/fshost.cm",
                 Self::PowerManagerNodeConfig => "config/power_manager/node_config.json",
@@ -403,6 +406,7 @@ mod tests {
             "config/additional_boot_args",
             "config/component_id_index",
             "config/component_manager",
+            "config/cpu_manager/node_config.json",
             "config/driver_index/base_driver_manifest",
             "config/driver_index/boot_driver_manifest",
             "config/power_manager/node_config.json",

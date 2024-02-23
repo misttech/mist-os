@@ -74,6 +74,18 @@
     {
       "kind": {
         "Option": {
+          "arg_name": "cpu-manager-config"
+        }
+      },
+      "optionality": "optional",
+      "long": "--cpu-manager-config",
+      "short": null,
+      "description": "cpu-manager configuration",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
           "arg_name": "kernel-boot-args"
         }
       },
@@ -98,18 +110,6 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "thermal-config"
-        }
-      },
-      "optionality": "optional",
-      "long": "--thermal-config",
-      "short": null,
-      "description": "thermal management configuration",
-      "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
           "arg_name": "power-metrics-recorder-config"
         }
       },
@@ -117,6 +117,18 @@
       "long": "--power-metrics-recorder-config",
       "short": null,
       "description": "power metrics recorder configuration",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "thermal-config"
+        }
+      },
+      "optionality": "optional",
+      "long": "--thermal-config",
+      "short": null,
+      "description": "thermal management configuration",
       "hidden": false
     }
   ],

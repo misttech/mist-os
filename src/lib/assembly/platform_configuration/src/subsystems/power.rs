@@ -15,6 +15,16 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
         config: &PowerConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
+        if let Some(cpu_manager_config) = &context.board_info.configuration.cpu_manager {
+            builder
+                .bootfs()
+                .file(FileEntry {
+                    source: cpu_manager_config.as_utf8_pathbuf().into(),
+                    destination: BootfsDestination::CpuManagerNodeConfig,
+                })
+                .context("Adding cpu_manager config file")?;
+        }
+
         if let Some(power_manager_config) = &context.board_info.configuration.power_manager {
             builder
                 .bootfs()

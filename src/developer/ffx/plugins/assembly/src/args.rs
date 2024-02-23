@@ -375,6 +375,10 @@ pub struct BoardInputBundleArgs {
     #[argh(option)]
     pub bootfs_packages: Vec<Utf8PathBuf>,
 
+    /// cpu-manager configuration
+    #[argh(option)]
+    pub cpu_manager_config: Option<Utf8PathBuf>,
+
     /// arguments to pass to the kernel on boot
     #[argh(option)]
     pub kernel_boot_args: Vec<String>,
@@ -383,11 +387,11 @@ pub struct BoardInputBundleArgs {
     #[argh(option)]
     pub power_manager_config: Option<Utf8PathBuf>,
 
-    /// thermal management configuration
-    #[argh(option)]
-    pub thermal_config: Option<Utf8PathBuf>,
-
     /// power metrics recorder configuration
     #[argh(option)]
     pub power_metrics_recorder_config: Option<Utf8PathBuf>,
+
+    /// thermal management configuration
+    #[argh(option)]
+    pub thermal_config: Option<Utf8PathBuf>,
 }
