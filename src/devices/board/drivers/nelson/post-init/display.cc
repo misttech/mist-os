@@ -12,7 +12,6 @@
 
 #include <bind/fuchsia/amlogic/platform/s905d3/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/display/dsi/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
@@ -190,14 +189,6 @@ zx::result<> PostInit::InitDisplay() {
   display_dev.bti() = display_btis;
 
   // Composite binding rules for display driver.
-  std::vector<fuchsia_driver_framework::BindRule> dsi_bind_rules{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_display_dsi::BIND_PROTOCOL_IMPL),
-  };
-
-  std::vector<fuchsia_driver_framework::NodeProperty> dsi_properties{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_display_dsi::BIND_PROTOCOL_IMPL),
-  };
-
   std::vector<fuchsia_driver_framework::BindRule> gpio_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                               bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
@@ -231,10 +222,6 @@ zx::result<> PostInit::InitDisplay() {
   };
 
   std::vector<fuchsia_driver_framework::ParentSpec> parents = {
-      {{
-          .bind_rules = dsi_bind_rules,
-          .properties = dsi_properties,
-      }},
       {{
           .bind_rules = gpio_bind_rules,
           .properties = gpio_properties,
