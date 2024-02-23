@@ -160,9 +160,27 @@ pub unsafe trait Boxable: Sized {
     /// pointer to a reference. When calling, care must be taken to ensure
     /// the following is true:
     ///
-    /// 1. The given pointer points to a valid instance of `Self::OtType`.
-    /// 2. The given pointer is not `NULL`.
+    /// 1. The given pointer points to a valid instance of `Self::OtType` for the
+    ///    given lifetime.
     unsafe fn ref_from_ot_ptr<'a>(ptr: *mut Self::OtType) -> Option<&'a Self> {
+        if ptr.is_null() {
+            None
+        } else {
+            Some(&*(ptr as *const Self))
+        }
+    }
+
+    /// Creates a reference to a safe wrapper object from an OpenThread const pointer.
+    ///
+    /// ## Safety ##
+    ///
+    /// This method is unsafe because it allows you to cast an arbitrary
+    /// pointer to a reference. When calling, care must be taken to ensure
+    /// the following is true:
+    ///
+    /// 1. The given pointer points to a valid instance of `Self::OtType` for the
+    ///    given lifetime.
+    unsafe fn ref_from_ot_const_ptr<'a>(ptr: *const Self::OtType) -> Option<&'a Self> {
         if ptr.is_null() {
             None
         } else {

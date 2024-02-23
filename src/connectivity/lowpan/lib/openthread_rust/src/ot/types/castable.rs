@@ -50,8 +50,8 @@ pub unsafe trait OtCastable: Sized {
     /// to references is generally unsafe. The following assumptions
     /// need to be verified to avoid undefined behavior:
     ///
-    /// 1. `ptr` MUST NOT be `NULL`.
-    /// 2. `ptr` MUST point to a valid instance of [`Self::OtType`].
+    /// 1. `ptr` MUST point to a valid instance of [`Self::OtType`] that will
+    ///    remain valid over the given lifetime.
     unsafe fn ref_from_ot_ptr<'a>(ptr: *const Self::OtType) -> Option<&'a Self>;
 
     /// Creates a mut reference from a mut pointer to an [`Self::OtType`].
@@ -62,8 +62,8 @@ pub unsafe trait OtCastable: Sized {
     /// to references is generally unsafe. The following assumptions
     /// need to be verified to avoid undefined behavior:
     ///
-    /// 1. `ptr` MUST NOT be `NULL`.
-    /// 2. `ptr` MUST point to a valid instance of [`Self::OtType`].
+    /// 1. `ptr` MUST point to a valid instance of [`Self::OtType`] that will
+    ///    remain valid over the given lifetime.
     unsafe fn mut_from_ot_mut_ptr<'a>(ptr: *mut Self::OtType) -> Option<&'a mut Self>;
 
     /// Casts a reference to the original OpenThread type to a reference to `Self`.
