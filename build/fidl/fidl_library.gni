@@ -223,10 +223,12 @@ template("fidl_library") {
     }
   }
 
-  # Enforce compatibility checks for all published SDK FIDLs in the Fuchsia
-  # namespace.
+  # Enforce compatibility checks for all FIDL libraries included in the IDK with
+  # platform `fuchsia`.
   if (requires_compatibility_tests) {
     # The current level might be a supported level. Don't double count it.
+    #
+    # TODO: https://fxbug.dev/305961460 - Replace with more definite logic.
     current_level = platform_version.in_development_api_level
     policy_for_current_level = "ack_changes"
 
@@ -241,7 +243,7 @@ template("fidl_library") {
       api_levels += [ "$next_level" ]
     }
 
-    foreach(supported_level, platform_version.supported_fuchsia_api_levels) {
+    foreach(supported_level, platform_version.frozen_api_levels) {
       if (supported_level == current_level) {
         policy_for_current_level = "no_changes"
       } else {

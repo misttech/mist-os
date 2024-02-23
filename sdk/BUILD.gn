@@ -107,7 +107,7 @@ idk("final_fuchsia_idk.exported") {
   output_name = "fuchsia_idk"
   sdk_collection_label = ":core"
   target_cpus = idk_target_cpus
-  api_levels = platform_version.supported_fuchsia_api_levels
+  api_levels = platform_version.build_time_supported_api_levels
 
   # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders
   # are too slow to enable this setting, and therefore the mac IDK won't have
@@ -750,7 +750,7 @@ idk("firmware.exported") {
   output_name = "firmware"
   sdk_collection_label = ":firmware_collection"
   target_cpus = idk_target_cpus
-  api_levels = platform_version.supported_fuchsia_api_levels
+  api_levels = platform_version.build_time_supported_api_levels
 }
 
 idk_archive("firmware.archive") {

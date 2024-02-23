@@ -4,8 +4,10 @@
 
 import("//build/config/fuchsia/platform_version.gni")
 
+# TODO: https://fxbug.dev/42070336: Reconsider whether this is the right API
+# level to be targeting.
 max_supported_api_level = 0
-foreach(level, platform_version.supported_fuchsia_api_levels) {
+foreach(level, platform_version.frozen_api_levels) {
   if (level > max_supported_api_level) {
     max_supported_api_level = level
   }

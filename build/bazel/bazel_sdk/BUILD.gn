@@ -26,7 +26,7 @@ idk("idk") {
   target_cpus = _fuchsia_sdk_target_cpus
 
   if (bazel_fuchsia_sdk_content == "core") {
-    api_levels = platform_version.supported_fuchsia_api_levels
+    api_levels = platform_version.build_time_supported_api_levels
   } else {
     # Never include binaries from previous API levels when not using the
     # "core" set of SDK atom collections to generate this IDK. This is

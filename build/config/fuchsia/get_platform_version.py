@@ -13,7 +13,7 @@ import sys
 from typing import Any, Dict
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         "Processes version_history.json to return list of supported and in-development API levels."
     )
@@ -24,22 +24,13 @@ def main():
     )
 
     args = parser.parse_args()
-
-    try:
-        versions = get_supported_versions(args.version_history_path)
-    except FileNotFoundError as e:
-        print(f"Error: {e}")
-        return 1
-
-    if not versions:
-        return 1
-
-    print(json.dumps(versions))
+    print(json.dumps(get_gn_variables(args.version_history_path)))
     return 0
 
 
-def get_supported_versions(version_history_path: Path) -> Dict[str, Any]:
-    """Reads from version_history.json to get supported and in-development API levels."""
+def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
+    """Reads from version_history.json to generate some data to expose to the GN
+    build graph."""
 
     try:
         with open(version_history_path) as file:
@@ -51,34 +42,48 @@ def get_supported_versions(version_history_path: Path) -> Dict[str, Any]:
             ),
             file=sys.stderr,
         )
-        return None
+        raise
 
     api_levels = data["data"]["api_levels"]
-    in_development_api_level = None
-    supported_fuchsia_api_levels = []
 
-    for api_level, info in api_levels.items():
-        status = info["status"]
-        if status == "in-development":
-            in_development_api_level = int(api_level)
-        elif status == "supported":
-            supported_fuchsia_api_levels.append(int(api_level))
+    supported_api_levels: list[int] = [
+        int(level)
+        for level in api_levels
+        if api_levels[level]["status"] == "supported"
+    ]
+    in_development_api_levels: list[int] = [
+        int(level)
+        for level in api_levels
+        if api_levels[level]["status"] == "in-development"
+    ]
+
+    assert (
+        len(in_development_api_levels) < 2
+    ), f"Should be at most one in-development API level. Found: {in_development_api_levels}"
 
     # Sometimes, there actually *isn't* an "in development" API level, and GN
     # doesn't support null values. As a hack, if there's no in-development API
     # level, just say that the greatest supported level is "in-development",
     # even though it isn't.
     #
-    # TODO(b/305961460): Remove this special case.
-    if not in_development_api_level:
-        in_development_api_level = max(supported_fuchsia_api_levels)
+    # TODO: https://fxbug.dev/305961460 - Remove this special case.
+    if not in_development_api_levels:
+        in_development_api_level: int = max(supported_api_levels)
+    else:
+        in_development_api_level = in_development_api_levels[0]
 
-    result = {
+    return {
+        # TODO: https://fxbug.dev/305961460 - Remove this.
         "in_development_api_level": in_development_api_level,
-        "supported_fuchsia_api_levels": supported_fuchsia_api_levels,
+        # API levels that the IDK supports targeting.
+        "build_time_supported_api_levels": (
+            supported_api_levels + in_development_api_levels
+        ),
+        # API levels whose contents should not change anymore.
+        "frozen_api_levels": supported_api_levels,
+        # DEPRECATED. Remove once petals no longer reference this.
+        "supported_fuchsia_api_levels": supported_api_levels,
     }
-
-    return result
 
 
 if __name__ == "__main__":
