@@ -131,7 +131,6 @@ if (toolchain_environment == "physmem" ||
     deps = [
       ":boot-mmu",
       ":tests",
-      "code-patches:headers",
       "user-copy",
       "//sdk/lib/fit",
       "//zircon/kernel/dev/coresight",

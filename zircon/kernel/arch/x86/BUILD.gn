@@ -161,7 +161,6 @@ zx_library("x86") {
   deps = [
     ":syscall",
     ":tests",
-    "code-patches:headers",
     "cpuid",
     "retpoline",
     "user-copy",
@@ -235,7 +234,6 @@ group("zbi-kernel-image") {
 source_set("syscall") {
   sources = [ "syscall.S" ]
   deps = [
-    "code-patches:headers",
     "//zircon/kernel/lib/code-patching:headers",
     "//zircon/kernel/lib/syscalls",
   ]

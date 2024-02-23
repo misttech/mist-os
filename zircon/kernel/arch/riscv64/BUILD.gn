@@ -86,13 +86,13 @@ if (toolchain_base_environment == "kernel") {
     ]
     deps = [
       ":boot-mmu",
-      "code-patches:headers",
       "//sdk/lib/zbi-format",
       "//zircon/kernel/dev/iommu/dummy",
       "//zircon/kernel/dev/pdev/power",
       "//zircon/kernel/dev/pdev/timer",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/boot-options",
+      "//zircon/kernel/lib/code-patching",
       "//zircon/kernel/lib/console",
       "//zircon/kernel/lib/counters",
       "//zircon/kernel/lib/crashlog",

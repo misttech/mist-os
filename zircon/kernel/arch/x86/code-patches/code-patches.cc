@@ -10,17 +10,14 @@
 #include <lib/code-patching/code-patches.h>
 #include <zircon/assert.h>
 
-#include <cstdint>
-#include <cstdio>
-
-#include <arch/code-patches/case-id.h>
 #include <arch/x86/cstring/selection.h>
 #include <arch/x86/retpoline/selection.h>
 #include <arch/x86/user-copy/selection.h>
 #include <hwreg/x86msr.h>
 
 // Declared in <lib/code-patching/code-patches.h>.
-bool ArchPatchCode(code_patching::Patcher& patcher, ktl::span<ktl::byte> insns, CodePatchId case_id,
+bool ArchPatchCode(code_patching::Patcher& patcher, const ArchPatchInfo& patch_info,
+                   ktl::span<ktl::byte> insns, CodePatchId case_id,
                    fit::inline_function<void(ktl::initializer_list<ktl::string_view>)> print) {
   arch::BootCpuidIo cpuid;
   hwreg::X86MsrIo msr;

@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/code-patching/code-patches.h>
 #include <lib/zbi-format/graphics.h>
 #include <lib/zbi-format/zbi.h>
 #include <zircon/assert.h>
@@ -17,7 +18,9 @@
 
 #include <ktl/enforce.h>
 
-void HandoffPrep::ArchHandoff() {}
+ArchPatchInfo ArchPreparePatchInfo() { return {}; }
+
+void HandoffPrep::ArchHandoff(const ArchPatchInfo& patch_info) {}
 
 void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
                                            ktl::span<const ktl::byte> payload) {

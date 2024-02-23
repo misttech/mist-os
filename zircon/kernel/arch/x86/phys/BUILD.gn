@@ -318,6 +318,7 @@ if (current_toolchain == default_toolchain) {
     sources = [ "arch-handoff-prep.cc" ]
     deps = [
       "//sdk/lib/zbi-format",
+      "//zircon/kernel/lib/code-patching",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/phys:handoff",
       "//zircon/kernel/phys:handoff-prep.h",

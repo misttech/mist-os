@@ -214,6 +214,7 @@ void HandoffPrep::SetVersionString(KernelStorage::Bootfs kernel_package) {
 
 [[noreturn]] void HandoffPrep::DoHandoff(UartDriver& uart, ktl::span<ktl::byte> zbi,
                                          const KernelStorage::Bootfs& kernel_package,
+                                         const ArchPatchInfo& patch_info,
                                          fit::inline_function<void(PhysHandoff*)> boot) {
   // Hand off the boot options first, which don't really change.  But keep a
   // mutable reference to update boot_options.serial later to include live
@@ -228,7 +229,7 @@ void HandoffPrep::SetVersionString(KernelStorage::Bootfs kernel_package) {
   SummarizeMiscZbiItems(zbi);
   gBootTimes.SampleNow(PhysBootTimes::kZbiDone);
 
-  ArchHandoff();
+  ArchHandoff(patch_info);
 
   SetInstrumentation();
 

@@ -12,13 +12,15 @@ if (toolchain_environment == "kernel.phys") {
     sources = [ "code-patches.cc" ]
     deps = [
       "//zircon/kernel/lib/code-patching",
+      "//zircon/kernel/phys:handoff",
       "//zircon/kernel/phys:symbolize",
     ]
     public_deps = [ ":headers" ]
   }
 }
 
+# //zircon/kernel/lib/code-patching:headers has this in public_deps because
+# <lib/code-patching/code-patches.h> uses <arch/code-patches/case-id.h>.
 library_headers("headers") {
   headers = [ "arch/code-patches/case-id.h" ]
-  public_deps = [ "//zircon/kernel/lib/code-patching:headers" ]
 }

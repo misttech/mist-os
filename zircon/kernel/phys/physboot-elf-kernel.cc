@@ -36,21 +36,22 @@ namespace {
 
 constexpr ktl::string_view kElfPhysKernel = "physzircon";
 
-fit::result<ElfImage::Error> ApplyKernelPatch(code_patching::Patcher& patcher, CodePatchId id,
-                                              ktl::span<ktl::byte> code_to_patch,
-                                              ElfImage::PrintPatchFunction print) {
-  if (ArchPatchCode(patcher, code_to_patch, id, ktl::move(print))) {
-    return fit::ok();
-  }
-  print({"unrecognized patch case ID"});
-  ZX_PANIC("%s: code-patching: unrecognized patch case ID %" PRIu32, gSymbolize->name(),
-           static_cast<uint32_t>(id));
-}
+void PatchElfKernel(ElfImage& elf_kernel, const ArchPatchInfo& patch_info) {
+  auto apply_patch = [&patch_info](
+                         code_patching::Patcher& patcher, CodePatchId id,
+                         ktl::span<ktl::byte> code_to_patch,
+                         ElfImage::PrintPatchFunction print) -> fit::result<ElfImage::Error> {
+    if (ArchPatchCode(patcher, patch_info, code_to_patch, id, ktl::move(print))) {
+      return fit::ok();
+    }
+    print({"unrecognized patch case ID"});
+    ZX_PANIC("%s: code-patching: unrecognized patch case ID %" PRIu32, gSymbolize->name(),
+             static_cast<uint32_t>(id));
+  };
 
-void PatchElfKernel(ElfImage& elf_kernel) {
   debugf("%s: Applying %zu patches...\n", gSymbolize->name(), elf_kernel.patch_count());
   // Apply patches to the kernel image.
-  auto result = elf_kernel.ForEachPatch<CodePatchId>(ApplyKernelPatch);
+  auto result = elf_kernel.ForEachPatch<CodePatchId>(apply_patch);
   if (result.is_error()) {
     zbitl::PrintBootfsError(result.error_value());
     abort();
@@ -108,7 +109,8 @@ PhysBootTimes gBootTimes;
   Allocation loaded_elf_kernel =
       elf_kernel.Load(kernel_vaddr, true, BootZbi::kKernelBootAllocReserve);
 
-  PatchElfKernel(elf_kernel);
+  const ArchPatchInfo patch_info = ArchPreparePatchInfo();
+  PatchElfKernel(elf_kernel, patch_info);
 
   RelocateElfKernel(elf_kernel);
 
@@ -145,5 +147,5 @@ PhysBootTimes gBootTimes;
 #endif
     elf_kernel.Handoff<void(PhysHandoff*)>(handoff);
   };
-  prep.DoHandoff(uart, kernel_storage.zbi().storage(), package, start_elf_kernel);
+  prep.DoHandoff(uart, kernel_storage.zbi().storage(), package, patch_info, start_elf_kernel);
 }

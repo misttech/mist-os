@@ -26,6 +26,7 @@
 #include <phys/uart.h>
 #include <phys/zbitl-allocation.h>
 
+struct ArchPatchInfo;
 struct BootOptions;
 class PhysBootTimes;
 class ElfImage;
@@ -88,6 +89,7 @@ class HandoffPrep {
   // must have been called first.
   [[noreturn]] void DoHandoff(UartDriver& uart, ktl::span<ktl::byte> zbi,
                               const KernelStorage::Bootfs& kernel_package,
+                              const ArchPatchInfo& patch_info,
                               fit::inline_function<void(PhysHandoff*)> boot);
 
   // Add a generic VMO to be simply published to userland.  The kernel proper
@@ -122,7 +124,7 @@ class HandoffPrep {
   void SaveForMexec(const zbi_header_t& header, ktl::span<const ktl::byte> payload);
 
   // General arch-specific data that isn't drawn from a ZBI item.
-  void ArchHandoff();
+  void ArchHandoff(const ArchPatchInfo&);
 
   // The arch-specific protocol for a given item.
   // Defined in //zircon/kernel/arch/$cpu/phys/arch-handoff-prep-zbi.cc.

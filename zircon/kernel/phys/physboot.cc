@@ -47,7 +47,7 @@ namespace {
 // allocation before decoding the header and probably not need to relocate.
 constexpr uint64_t kKernelBssEstimate = 1024 * 1024 * 2;
 
-ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
+ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs, const ArchPatchInfo& patch_info) {
   // Now we select our kernel ZBI.
   debugf("%s: Locating ZBI file in kernel package...\n", gSymbolize->name());
   auto it = kernelfs.find(kKernelZbiName);
@@ -74,6 +74,7 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
     code_patching::PrintPatcherError(result.error_value());
     abort();
   }
+
   debugf("%s: Applying %zu patches...\n", gSymbolize->name(), patcher.patches().size());
 
   // There's always the self-test patch, so there should never be none.
@@ -95,7 +96,7 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
              patch.range_start + patch.range_size);
     };
 
-    if (!ArchPatchCode(patcher, insns, static_cast<CodePatchId>(patch.id), print)) {
+    if (!ArchPatchCode(patcher, patch_info, insns, static_cast<CodePatchId>(patch.id), print)) {
       ZX_PANIC("%s: code-patching: unrecognized patch case ID: %" PRIu32 ": [%#" PRIx64
                ", %#" PRIx64 ")",
                ProgramName(), patch.id, patch.range_start, patch.range_start + patch.range_size);
@@ -125,7 +126,8 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
 
 [[noreturn]] void BootZircon(UartDriver& uart, KernelStorage kernel_storage) {
   KernelStorage::Bootfs package = kernel_storage.GetKernelPackage();
-  ChainBoot boot = LoadZirconZbi(package);
+  const ArchPatchInfo patch_info = ArchPreparePatchInfo();
+  ChainBoot boot = LoadZirconZbi(package, patch_info);
 
   // Repurpose the storage item as a place to put the handoff payload.
   KernelStorage::Zbi::iterator handoff_item = kernel_storage.item();
@@ -177,7 +179,7 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
   HandoffPrep prep;
   prep.Init(handoff_item->payload);
 
-  prep.DoHandoff(uart, zbi, package, [&boot](PhysHandoff* handoff) {
+  prep.DoHandoff(uart, zbi, package, patch_info, [&boot](PhysHandoff* handoff) {
     // Even though the kernel is still a ZBI and mostly using the ZBI protocol
     // for booting, the PhysHandoff pointer (physical address) is now the
     // argument to the kernel, not the data ZBI address.

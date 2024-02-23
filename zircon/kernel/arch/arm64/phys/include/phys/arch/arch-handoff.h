@@ -12,6 +12,8 @@
 #include <ktl/optional.h>
 #include <ktl/variant.h>
 
+struct ArchPatchInfo {};
+
 struct ZbiAmlogicRng {
   enum class Version {
     kV1,  // ZBI_KERNEL_DRIVER_AMLOGIC_RNG_V1

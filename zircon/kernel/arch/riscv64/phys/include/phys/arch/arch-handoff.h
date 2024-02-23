@@ -14,6 +14,8 @@
 #include <ktl/optional.h>
 #include <ktl/variant.h>
 
+struct ArchPatchInfo {};
+
 // This holds (or points to) all riscv64-specific data that is handed off from
 // physboot to the kernel proper at boot time.
 struct ArchPhysHandoff {

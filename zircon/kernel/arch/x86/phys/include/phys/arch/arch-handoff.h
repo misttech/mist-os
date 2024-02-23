@@ -11,6 +11,8 @@
 
 #include <ktl/optional.h>
 
+struct ArchPatchInfo {};
+
 // This holds (or points to) all x86-specific data that is handed off from
 // physboot to the kernel proper at boot time.
 struct ArchPhysHandoff {

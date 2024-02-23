@@ -6,6 +6,7 @@
 
 #include <zircon/assert.h>
 
+#include <phys/arch/arch-handoff.h>
 #include <phys/arch/arch-phys-info.h>
 #include <phys/main.h>
 
@@ -13,7 +14,9 @@
 
 #include <ktl/enforce.h>
 
-void HandoffPrep::ArchHandoff() {
+ArchPatchInfo ArchPreparePatchInfo() { return {}; }
+
+void HandoffPrep::ArchHandoff(const ArchPatchInfo& patch_info) {
   ZX_DEBUG_ASSERT(handoff_);
   ArchPhysHandoff& arch_handoff = handoff_->arch_handoff;
 
