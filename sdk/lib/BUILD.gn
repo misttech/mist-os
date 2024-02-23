@@ -22,6 +22,7 @@ group("tests") {
     "inspect:tests",
     "iob:tests",
     "ld:tests",
+    "scheduler:tests",
     "stdcompat:tests",
     "sys/component:tests",
     "sys/cpp:tests",

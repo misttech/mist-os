@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/scheduler/role.h>
+#include <lib/zx/result.h>
 
 #include <shared_mutex>
 
@@ -11,101 +12,132 @@
 
 namespace {
 
+using fuchsia_scheduler::wire::Parameter;
+using fuchsia_scheduler::wire::RoleName;
+using fuchsia_scheduler::wire::RoleTarget;
+
 class RoleClient {
  public:
   RoleClient() = default;
-  zx::result<std::shared_ptr<fidl::WireSyncClient<fuchsia_scheduler::ProfileProvider>>> Connect();
+  zx::result<std::shared_ptr<fidl::WireSyncClient<fuchsia_scheduler::RoleManager>>> Connect();
   void Disconnect();
 
  private:
-  // Keeps track of a synchronous connection to the ProfileProvider service.
+  // Keeps track of a synchronous connection to the RoleManager service.
   // This shared pointer is set to nullptr if the connection has been terminated.
-  std::shared_ptr<fidl::WireSyncClient<fuchsia_scheduler::ProfileProvider>> profile_provider_;
+  std::shared_ptr<fidl::WireSyncClient<fuchsia_scheduler::RoleManager>> role_manager_;
   std::shared_mutex mutex_;
 };
 
-zx::result<std::shared_ptr<fidl::WireSyncClient<fuchsia_scheduler::ProfileProvider>>>
+zx::result<std::shared_ptr<fidl::WireSyncClient<fuchsia_scheduler::RoleManager>>>
 RoleClient::Connect() {
-  // Check if we already have a connection to the profile provider, and return it if we do.
+  // Check if we already have a connection to the role manager, and return it if we do.
   // This requires acquiring the read lock.
   {
     std::shared_lock lock(mutex_);
-    if (profile_provider_ != nullptr) {
-      return zx::ok(profile_provider_);
+    if (role_manager_ != nullptr) {
+      return zx::ok(role_manager_);
     }
   }
 
-  // At this point, we don't have an existing connection to the profile provider, so we need to
+  // At this point, we don't have an existing connection to the role manager, so we need to
   // create one. This requires the following set of operations to happen in order.
   // 1. Acquire the write lock. This will prevent concurrent connection attempts.
   // 2. Make sure that another thread didn't already connect the client by the time we got the write
   //    lock.
   // 3. Establish the connection.
   std::unique_lock lock(mutex_);
-  if (profile_provider_ != nullptr) {
-    return zx::ok(profile_provider_);
+  if (role_manager_ != nullptr) {
+    return zx::ok(role_manager_);
   }
-  auto client_end_result = component::Connect<fuchsia_scheduler::ProfileProvider>();
+  auto client_end_result = component::Connect<fuchsia_scheduler::RoleManager>();
   if (!client_end_result.is_ok()) {
     return client_end_result.take_error();
   }
-  profile_provider_ = std::make_shared<fidl::WireSyncClient<fuchsia_scheduler::ProfileProvider>>(
+  role_manager_ = std::make_shared<fidl::WireSyncClient<fuchsia_scheduler::RoleManager>>(
       fidl::WireSyncClient(std::move(*client_end_result)));
-  return zx::ok(profile_provider_);
+  return zx::ok(role_manager_);
 }
 
 void RoleClient::Disconnect() {
   std::unique_lock lock(mutex_);
-  profile_provider_ = nullptr;
+  role_manager_ = nullptr;
 }
 
-// Stores a persistent connection to the ProfileProvider that reconnects on disconnect.
+// Stores a persistent connection to the RoleManager that reconnects on disconnect.
 static RoleClient role_client{};
 
-zx_status_t SetRole(const zx_handle_t borrowed_handle, std::string_view role) {
+zx::result<fidl::VectorView<Parameter>> SetRoleCommon(RoleTarget target, std::string_view role,
+                                                      std::vector<Parameter> input_parameters) {
 // TODO(https://fxbug.dev/323262398): Remove this check once the necessary API is in the SDK.
 #if __Fuchsia_API_level__ < FUCHSIA_HEAD
   return ZX_ERR_NOT_SUPPORTED;
 #endif  // #if __Fuchsia_API_level__ < FUCHSIA_HEAD
   zx::result client = role_client.Connect();
   if (!client.is_ok()) {
-    return client.error_value();
+    return client.take_error();
   }
 
-  zx::handle handle;
-  const zx_status_t dup_status =
-      zx_handle_duplicate(borrowed_handle, ZX_RIGHT_SAME_RIGHTS, handle.reset_and_get_address());
-  if (dup_status != ZX_OK) {
-    return dup_status;
-  }
+  fidl::Arena arena;
+  auto builder = fuchsia_scheduler::wire::RoleManagerSetRoleRequest::Builder(arena);
+  builder.target(std::move(target))
+      .role(RoleName{fidl::StringView::FromExternal(role)})
+      .input_parameters(input_parameters);
 
-  fidl::WireResult result =
-      (*(*client))->SetProfileByRole(std::move(handle), fidl::StringView::FromExternal(role));
+  fidl::WireResult result = (*(*client))->SetRole(builder.Build());
   if (!result.ok()) {
     // If the service closed the connection, disconnect the client. This will ensure that future
-    // callers of SetRole reconnect to the ProfileProvider service.
+    // callers of SetRole reconnect to the RoleManager service.
     if (result.status() == ZX_ERR_PEER_CLOSED) {
       role_client.Disconnect();
     }
-    return result.status();
+    return zx::error(result.status());
   }
-  return result->status;
+  if (!result.value().is_ok()) {
+    return result.value().take_error();
+  }
+
+  return zx::ok(result.value()->output_parameters());
 }
 
 }  // anonymous namespace
 
 namespace fuchsia_scheduler {
 
+zx::result<fidl::VectorView<wire::Parameter>> SetRoleForVmarWithParams(
+    zx::unowned_vmar borrowed_vmar, std::string_view role,
+    std::vector<wire::Parameter> input_parameters) {
+  zx::vmar vmar;
+  zx_status_t status = borrowed_vmar->duplicate(ZX_RIGHT_SAME_RIGHTS, &vmar);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  return SetRoleCommon(wire::RoleTarget::WithVmar(std::move(vmar)), role, input_parameters);
+}
+
 zx_status_t SetRoleForVmar(zx::unowned_vmar vmar, std::string_view role) {
-  return SetRole(vmar->get(), role);
+  return SetRoleForVmarWithParams(vmar->borrow(), role, std::vector<wire::Parameter>())
+      .status_value();
+}
+
+zx::result<fidl::VectorView<wire::Parameter>> SetRoleForThreadWithParams(
+    zx::unowned_thread borrowed_thread, std::string_view role,
+    std::vector<wire::Parameter> input_parameters) {
+  zx::thread thread;
+  zx_status_t status = borrowed_thread->duplicate(ZX_RIGHT_SAME_RIGHTS, &thread);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  return SetRoleCommon(wire::RoleTarget::WithThread(std::move(thread)), role, input_parameters);
 }
 
 zx_status_t SetRoleForThread(zx::unowned_thread thread, std::string_view role) {
-  return SetRole(thread->get(), role);
+  return SetRoleForThreadWithParams(thread->borrow(), role, std::vector<wire::Parameter>())
+      .status_value();
 }
 
 zx_status_t SetRoleForThisThread(std::string_view role) {
-  return SetRole(zx::thread::self()->get(), role);
+  return SetRoleForThread(zx::thread::self()->borrow(), role);
 }
 
 }  // namespace fuchsia_scheduler

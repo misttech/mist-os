@@ -18,9 +18,8 @@ namespace {
 TEST(RoleApi, SetRole) {
   // Test setting a role on the current thread.
   {
-    EXPECT_OK(fuchsia_scheduler::SetRoleForThisThread("fuchsia.test-role:ok"));
-    EXPECT_EQ(ZX_ERR_NOT_FOUND,
-              fuchsia_scheduler::SetRoleForThisThread("fuchsia.test-role:not-found"));
+    EXPECT_OK(fuchsia_scheduler::SetRoleForThisThread("test.core.a"));
+    EXPECT_EQ(ZX_ERR_NOT_FOUND, fuchsia_scheduler::SetRoleForThisThread("test.nonexistent.role"));
   }
 
   // Test setting a role on another thread.
@@ -36,9 +35,9 @@ TEST(RoleApi, SetRole) {
 
     const zx::unowned_thread thread_handle{native_thread_get_zx_handle(thread.native_handle())};
 
-    EXPECT_OK(fuchsia_scheduler::SetRoleForThread(thread_handle->borrow(), "fuchsia.test-role:ok"));
+    EXPECT_OK(fuchsia_scheduler::SetRoleForThread(thread_handle->borrow(), "test.core.a"));
     EXPECT_EQ(ZX_ERR_NOT_FOUND, fuchsia_scheduler::SetRoleForThread(thread_handle->borrow(),
-                                                                    "fuchsia.test-role:not-found"));
+                                                                    "test.nonexistent.role"));
 
     {
       std::unique_lock<std::mutex> guard{lock};

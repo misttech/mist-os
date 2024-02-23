@@ -8,10 +8,7 @@ import("//build/test.gni")
 
 test("profile") {
   output_name = "profile-test"
-  sources = [
-    "profile.cc",
-    "role-api.cc",
-  ]
+  sources = [ "profile.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/lib/fdio",
