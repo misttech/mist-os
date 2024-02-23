@@ -2197,8 +2197,19 @@ impl JournalingObject for ObjectStore {
     }
 
     fn write_mutation(&self, mutation: &Mutation, mut writer: journal::Writer<'_>) {
+        // Intentionally enumerating all variants to force a decision on any new variants. Encrypt
+        // all mutations that could affect an encrypted object store contents or the `StoreInfo` of
+        // the encrypted object store. During `unlock()` any mutations which haven't been encrypted
+        // won't be replayed after reading `StoreInfo`.
         match mutation {
-            // Encrypt all mutations that could be related to a volume object store.
+            // Whilst CreateInternalDir is a mutation for `StoreInfo`, which isn't encrypted, we
+            // still choose to encrypt the mutation because it makes it easier to deal with replay.
+            // When we replay mutations for an encrypted store, the only thing we keep in memory are
+            // the encrypted mutations; we don't keep `StoreInfo` or changes to it in memory. So, by
+            // encrypting the CreateInternalDir mutation here, it means we don't have to track both
+            // encrypted mutations bound for the LSM tree and unencrypted mutations for `StoreInfo`
+            // to use in `unlock()`. It'll just bundle CreateInternalDir mutations with the other
+            // encrypted mutations and handled them all in sequence during `unlock()`.
             Mutation::ObjectStore(_) | Mutation::CreateInternalDir(_) => {
                 let mut cipher = self.mutations_cipher.lock().unwrap();
                 if let Some(cipher) = cipher.as_mut() {
@@ -2223,7 +2234,21 @@ impl JournalingObject for ObjectStore {
                     return;
                 }
             }
-            _ => {}
+            // `EncryptedObjectStore` and `UpdateMutationsKey` are both obviously associated with
+            // encrypted object stores, but are either the encrypted mutation data itself or
+            // metadata governing how the data will be encrypted. They should only be produced here.
+            Mutation::EncryptedObjectStore(_) | Mutation::UpdateMutationsKey(_) => {
+                debug_assert!(false, "Only this method should generate encrypted mutations");
+            }
+            // `BeginFlush` and `EndFlush` are not needed during `unlock()` and are needed during
+            // the initial journal replay, so should not be encrypted. `Allocator`, `DeleteVolume`,
+            // `UpdateBorrowed` mutations are never associated with an encrypted store as we do not
+            // encrypt the allocator or root/root-parent stores so we can avoid the locking.
+            Mutation::Allocator(_)
+            | Mutation::BeginFlush
+            | Mutation::EndFlush
+            | Mutation::DeleteVolume
+            | Mutation::UpdateBorrowed(_) => {}
         }
         writer.write(mutation.clone());
     }
