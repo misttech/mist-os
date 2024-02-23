@@ -35,7 +35,7 @@ __BEGIN_CDECLS
 /*
     Maps the hiu register block (containing all the pll controls).
 */
-zx_status_t s905d2_hiu_init(zx_handle_t root_resource, fdf::MmioBuffer* device);
+zx_status_t s905d2_hiu_init(zx_handle_t mmio_resource, fdf::MmioBuffer* device);
 
 /*
     Initializes the fdf::MmioBuffer struct assuming the register block is already

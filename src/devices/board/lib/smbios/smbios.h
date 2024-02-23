@@ -15,7 +15,7 @@ namespace smbios {
 
 class SmbiosInfo {
  public:
-  zx_status_t Load(zx::unowned_resource root_resource);
+  zx_status_t Load(zx::unowned_resource mmio_resource);
 
   const std::string& board_name() const { return board_name_; }
   const std::string& vendor() const { return vendor_; }

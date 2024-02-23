@@ -130,7 +130,7 @@ class SystemRamMemoryAllocator : public MemoryAllocator {
 
 class ContiguousSystemRamMemoryAllocator : public MemoryAllocator {
  public:
-  explicit ContiguousSystemRamMemoryAllocator(zx::unowned_resource root_resource,
+  explicit ContiguousSystemRamMemoryAllocator(zx::unowned_resource info_resource,
                                               Owner* parent_device)
       : MemoryAllocator(BuildHeapPropertiesWithCoherencyDomainSupport(
             /*cpu_supported=*/true, /*ram_supported=*/true,
@@ -144,7 +144,7 @@ class ContiguousSystemRamMemoryAllocator : public MemoryAllocator {
             // domain, this should probably remain true).
             /*need_clear=*/false, /*need_flush=*/true)),
         parent_device_(parent_device),
-        root_resource_(std::move(root_resource)) {
+        info_resource_(std::move(info_resource)) {
     node_ = parent_device_->heap_node()->CreateChild("ContiguousSystemRamMemoryAllocator");
     node_.CreateUint("id", id(), &properties_);
   }
@@ -168,7 +168,7 @@ class ContiguousSystemRamMemoryAllocator : public MemoryAllocator {
       DRIVER_ERROR("zx::vmo::create_contiguous() failed - size_bytes: %" PRIu64 " status: %d", size,
                    status);
       zx_info_kmem_stats_t kmem_stats;
-      status = zx_object_get_info(root_resource_->get(), ZX_INFO_KMEM_STATS, &kmem_stats,
+      status = zx_object_get_info(info_resource_->get(), ZX_INFO_KMEM_STATS, &kmem_stats,
                                   sizeof(kmem_stats), nullptr, nullptr);
       if (status == ZX_OK) {
         DRIVER_ERROR(
@@ -196,7 +196,7 @@ class ContiguousSystemRamMemoryAllocator : public MemoryAllocator {
 
  private:
   Owner* const parent_device_;
-  zx::unowned_resource root_resource_;
+  zx::unowned_resource info_resource_;
   inspect::Node node_;
   inspect::ValueList properties_;
 };
