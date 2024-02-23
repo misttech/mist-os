@@ -3,19 +3,24 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Error,
+    anyhow::{format_err, Error},
+    fidl::endpoints::{ProtocolMarker, Proxy},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_sme as fidl_sme,
-    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_async as fasync,
+    fidl_fuchsia_wlan_softmac as fidl_softmac,
+    fuchsia_async::{Duration, Task},
     fuchsia_inspect::{self, Inspector, Node as InspectNode},
     fuchsia_inspect_contrib::auto_persist,
     fuchsia_trace as ftrace,
     fuchsia_zircon::{self as zx, HandleBased},
     futures::{
-        channel::{mpsc, oneshot},
+        channel::{
+            mpsc,
+            oneshot::{self, Canceled},
+        },
         Future, FutureExt, StreamExt,
     },
     std::pin::Pin,
-    tracing::{error, info},
+    tracing::{error, info, warn},
     wlan_mlme::{
         buffer::CBufferProvider,
         device::{
@@ -69,13 +74,22 @@ impl WlanSoftmacHandle {
 
 /// Run the Rust portion of wlansoftmac which includes the following three futures:
 ///
+///   - WlanSoftmacIfcBridge server
 ///   - MLME server
 ///   - SME server
 ///
-/// This function calls init_completer() when either MLME initialization completes successfully or an error
-/// occurs before MLME initialization completes. The Ok() value passed by init_completer() is a
-/// WlanSoftmacHandle which contains the FFI for calling WlanSoftmacIfc methods from the C++ portion of
-/// wlansoftmac.
+/// The WlanSoftmacIfcBridge server future executes on a parallel thread because otherwise
+/// synchronous calls from the MLME server into the vendor driver could deadlock if the vendor
+/// driver calls a WlanSoftmacIfcBridge method before returning from a synchronous call. For
+/// example, when the MLME server synchronously calls WlanSoftmac.StartActiveScan(), the vendor
+/// driver may call WlanSoftmacIfc.NotifyScanComplete() before returning from
+/// WlanSoftmac.StartActiveScan(). This can occur when the scan request results in immediate
+/// cancellation despite the request having valid arguments.
+///
+/// This function calls init_completer() when either MLME initialization completes successfully or
+/// an error occurs before MLME initialization completes. The Ok() value passed by init_completer()
+/// is a WlanSoftmacHandle which contains the FFI for calling WlanSoftmacIfc methods from the C++
+/// portion of wlansoftmac.
 ///
 /// The return value of this function is distinct from the value passed in init_completer(). This
 /// function returns in one of four cases:
@@ -85,8 +99,9 @@ impl WlanSoftmacHandle {
 ///   - An error occurred during shutdown.
 ///   - Shutdown completed successfully.
 ///
-/// Generally, errors during initializations will be returned immediately after this function calls init_completer()
-/// with the same error. Later errors can be returned after this functoin calls init_completer().
+/// Generally, errors during initializations will be returned immediately after this function calls
+/// init_completer() with the same error. Later errors can be returned after this functoin calls
+/// init_completer().
 pub async fn start_and_serve<D: DeviceOps + Send + 'static>(
     init_completer: impl FnOnce(Result<WlanSoftmacHandle, zx::Status>) + Send + 'static,
     device: D,
@@ -100,9 +115,9 @@ pub async fn start_and_serve<D: DeviceOps + Send + 'static>(
     });
 
     let (mlme_init_sender, mlme_init_receiver) = oneshot::channel();
-    let StartedDriver { mlme, sme } = match start(
+    let StartedDriver { softmac_ifc_bridge_request_stream, mlme, sme } = match start(
         mlme_init_sender,
-        driver_event_sink,
+        driver_event_sink.clone(),
         driver_event_stream,
         device,
         buffer_provider,
@@ -116,13 +131,21 @@ pub async fn start_and_serve<D: DeviceOps + Send + 'static>(
         Ok(x) => x,
     };
 
-    serve(init_completer, mlme_init_receiver, mlme, sme).await
+    serve(
+        init_completer,
+        mlme_init_receiver,
+        driver_event_sink,
+        softmac_ifc_bridge_request_stream,
+        mlme,
+        sme,
+    )
+    .await
 }
 
-#[derive(Debug)]
-struct StartedDriver<F1, F2> {
-    pub mlme: F1,
-    pub sme: F2,
+struct StartedDriver<Mlme, Sme> {
+    pub softmac_ifc_bridge_request_stream: fidl_softmac::WlanSoftmacIfcBridgeRequestStream,
+    pub mlme: Mlme,
+    pub sme: Sme,
 }
 
 /// Start the bridged wlansoftmac driver by creating components to run two futures:
@@ -130,8 +153,8 @@ struct StartedDriver<F1, F2> {
 ///   - MLME server
 ///   - SME server
 ///
-/// This function will use the provided |device| to make various calls into the vendor driver necessary to
-/// configure and create the components to run the futures.
+/// This function will use the provided |device| to make various calls into the vendor driver
+/// necessary to configure and create the components to run the futures.
 async fn start<D: DeviceOps + Send + 'static>(
     mlme_init_sender: oneshot::Sender<Result<(), zx::Status>>,
     driver_event_sink: DriverEventSink,
@@ -147,9 +170,21 @@ async fn start<D: DeviceOps + Send + 'static>(
 > {
     wtrace::duration!(c"rust_driver::start");
 
+    let (softmac_ifc_bridge_proxy, softmac_ifc_bridge_request_stream) =
+        fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>()
+            .map_err(|e| {
+                // Failure to unwrap indicates a critical failure in the driver init thread.
+                error!(
+                    "Failed to get {} server stream: {}",
+                    fidl_softmac::WlanSoftmacIfcBridgeMarker::DEBUG_NAME,
+                    e
+                );
+                zx::Status::INTERNAL
+            })?;
+
     // Bootstrap USME
     let BootstrappedGenericSme { generic_sme_request_stream, legacy_privacy_support, inspect_node } =
-        bootstrap_generic_sme(&mut device, driver_event_sink).await?;
+        bootstrap_generic_sme(&mut device, driver_event_sink, softmac_ifc_bridge_proxy).await?;
 
     // Make a series of queries to gather device information from the vendor driver.
     let softmac_info = device.wlan_softmac_query_response()?;
@@ -190,7 +225,8 @@ async fn start<D: DeviceOps + Send + 'static>(
         wpa1_supported: legacy_privacy_support.wpa1_supported,
     };
 
-    // TODO(https://fxbug.dev/42077094): The MLME event stream should be moved out of DeviceOps entirely.
+    // TODO(https://fxbug.dev/42077094): The MLME event stream should be moved out of DeviceOps
+    // entirely.
     let mlme_event_stream = match device.take_mlme_event_stream() {
         Some(mlme_event_stream) => mlme_event_stream,
         None => {
@@ -223,7 +259,7 @@ async fn start<D: DeviceOps + Send + 'static>(
         fidl_common::WlanMacRole::Client => {
             info!("Running wlansoftmac with client role");
             let config = wlan_mlme::client::ClientConfig {
-                ensure_on_channel_time: fasync::Duration::from_millis(500).into_nanos(),
+                ensure_on_channel_time: Duration::from_millis(500).into_nanos(),
             };
             Box::pin(wlan_mlme::mlme_main_loop::<wlan_mlme::client::ClientMlme<D>>(
                 mlme_init_sender,
@@ -259,26 +295,48 @@ async fn start<D: DeviceOps + Send + 'static>(
         }
     };
 
-    Ok(StartedDriver { mlme, sme })
+    Ok(StartedDriver { softmac_ifc_bridge_request_stream, mlme, sme })
 }
 
 /// Await on futures hosting the following three servers:
 ///
+///   - WlanSoftmacIfcBridge server
 ///   - MLME server
 ///   - SME server
 ///
-/// Upon receiving a DriverEvent::Stop, the MLME server will shut down first. Then this function will await
-/// the completion of the SME server. Both will shut down as a consequence of MLME server shut down.
-async fn serve<InitFn>(
-    init_completer: InitCompleter<InitFn>,
+/// The WlanSoftmacIfcBridge server runs on a parallel thread but will be shut down before this
+/// function returns. This is true even if this function exits with an error.
+///
+/// Upon receiving a DriverEvent::Stop, the MLME server will shut down first. Then this function
+/// will await the completion of WlanSoftmacIfcBridge server and SME server. Both will shut down as
+/// a consequence of MLME server shut down.
+async fn serve<F>(
+    init_completer: InitCompleter<F>,
     mlme_init_receiver: oneshot::Receiver<Result<(), zx::Status>>,
+    driver_event_sink: DriverEventSink,
+    softmac_ifc_bridge_request_stream: fidl_softmac::WlanSoftmacIfcBridgeRequestStream,
     mlme: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>,
     sme: Pin<Box<impl Future<Output = Result<(), Error>>>>,
 ) -> Result<(), zx::Status>
 where
-    InitFn: FnOnce(Result<(), zx::Status>) + Send,
+    F: FnOnce(Result<(), zx::Status>) + Send,
 {
     wtrace::duration_begin_scope!(c"rust_driver::serve");
+
+    // Create a oneshot::channel to signal to this executor when WlanSoftmacIfcBridge
+    // server exits.
+    let (bridge_exit_sender, bridge_exit_receiver) = oneshot::channel();
+    // Spawn a Task to host the WlanSoftmacIfcBridge server.
+    let bridge = Task::spawn(async move {
+        let _: Result<(), ()> = bridge_exit_sender
+            .send(
+                serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream)
+                    .await,
+            )
+            .map_err(|result| {
+                error!("Failed to send serve_wlan_softmac_ifc_bridge() result: {:?}", result)
+            });
+    });
 
     let mut mlme = mlme.fuse();
     let mut sme = sme.fuse();
@@ -287,6 +345,7 @@ where
     // to get the right behavior in the select!().
     //
     // See https://github.com/rust-lang/futures-rs/issues/2455 for more details.
+    let mut bridge_exit_receiver = bridge_exit_receiver.fuse();
     let mut mlme_init_receiver = mlme_init_receiver.fuse();
 
     // Run the MLME server and wait for the MLME to signal initialization completion.
@@ -299,6 +358,7 @@ where
                     Err(e) => {
                         error!("mlme_init_receiver interrupted: {}", e);
                         let status = zx::Status::INTERNAL;
+                    bridge.cancel().await;
                         init_completer.complete(Err(status));
                         return Err(status);
                     }
@@ -308,6 +368,7 @@ where
                         init_completer.complete(Ok(())),
                     Err(status) => {
                         error!("Failed to initialize MLME: {}", status);
+                    bridge.cancel().await;
                         init_completer.complete(Err(status));
                         return Err(status);
                     }
@@ -316,6 +377,7 @@ where
             mlme_result = mlme => {
                 error!("MLME future completed before signaling init_sender: {:?}", mlme_result);
                 let status = zx::Status::INTERNAL;
+                bridge.cancel().await;
                 init_completer.complete(Err(status));
                 return Err(status);
             }
@@ -326,35 +388,62 @@ where
     let server_shutdown_result = {
         wtrace::duration_begin_scope!(c"run MLME and SME");
         futures::select! {
-            mlme_result = mlme => {
-                match mlme_result {
-                    Ok(()) => {
-                        info!("MLME shut down gracefully.");
-                        Ok(())
-                    },
-                    Err(e) => {
-                        error!("MLME shut down with error: {}", e);
-                        Err(zx::Status::INTERNAL)
-                    }
+        mlme_result = mlme => {
+            match mlme_result {
+                Ok(()) => {
+                    info!("MLME shut down gracefully.");
+                    Ok(())
+                },
+                Err(e) => {
+                    error!("MLME shut down with error: {}", e);
+                    Err(zx::Status::INTERNAL)
                 }
             }
-            sme_result = sme => {
-                error!("SME shut down before MLME: {:?}", sme_result);
-                Err(zx::Status::INTERNAL)
-            }
+        }
+        bridge_result = bridge_exit_receiver => {
+            error!("SoftmacIfcBridge server shut down before MLME: {:?}", bridge_result);
+            Err(zx::Status::INTERNAL)
+        }
+        sme_result = sme => {
+            error!("SME shut down before MLME: {:?}", sme_result);
+            Err(zx::Status::INTERNAL)
+        }}
+    };
+
+    // If any future returns an error, return with the same error without waiting for other futures
+    // to complete.
+    server_shutdown_result?;
+
+    // At this point, the `bridge` Task should not report a result because the WlanSoftmacIfcBridge
+    // server is still running. This cancellation should cause `bridge_exit_receiver` to be dropped.
+    bridge
+        .cancel()
+        .await
+        .map(|()| warn!("SoftmacIfcBridge server task completed before cancelation."));
+    let bridge_result: Result<(), ()> = match bridge_exit_receiver.await {
+        Err(Canceled) => {
+            // This is the expected case because when MLME shuts down, the SoftmacIfcBridge server
+            // task should still be running.
+            info!("SoftmacIfcBridge server shut down gracefully");
+            Ok(())
+        }
+        Ok(result) => {
+            warn!(
+                "SoftmacIfcBridge server task completed without canceling bridge_exit_receiver.\n\
+                   This indicates the server was already shut down before its task was canceled."
+            );
+            result.map_err(|e| error!("SoftmacIfcBridge server shut down with error: {}", e))
         }
     };
 
-    // If any future returns an error, return immediately with the same error without waiting
-    // for other futures to complete.
-    server_shutdown_result?;
+    // Since the MLME server is shut down at this point, the SME server will shut down soon because
+    // the SME server always shuts down when it loses connection with the MLME server.
+    let sme_result: Result<(), ()> = sme
+        .await
+        .map(|()| info!("SME shut down gracefully"))
+        .map_err(|e| error!("SME shut down with error: {}", e));
 
-    // Since the MLME server is shut down at this point, the SME server will shut down soon because the SME
-    // server always shuts down when it loses connection with the MLME server.
-    sme.await.map(|()| info!("SME shut down gracefully")).map_err(|e| {
-        error!("SME shut down with error: {}", e);
-        zx::Status::INTERNAL
-    })
+    bridge_result.and(sme_result).map_err(|()| zx::Status::INTERNAL)
 }
 
 struct BootstrappedGenericSme {
@@ -366,30 +455,41 @@ struct BootstrappedGenericSme {
 /// Call WlanSoftmac.Start() to retrieve the server end of UsmeBootstrap channel and wait
 /// for a UsmeBootstrap.Start() message to provide the server end of a GenericSme channel.
 ///
-/// Any errors encountered in this function are fatal for the wlansoftmac driver. Failure to bootstrap
-/// GenericSme request stream will result in a driver no other component can communicate with.
+/// Any errors encountered in this function are fatal for the wlansoftmac driver. Failure to
+/// bootstrap GenericSme request stream will result in a driver no other component can communicate
+/// with.
 async fn bootstrap_generic_sme<D: DeviceOps>(
     device: &mut D,
     driver_event_sink: DriverEventSink,
+    softmac_ifc_bridge_proxy: fidl_softmac::WlanSoftmacIfcBridgeProxy,
 ) -> Result<BootstrappedGenericSme, zx::Status> {
     wtrace::duration!(c"rust_driver::bootstrap_generic_sme");
 
-    let (softmac_ifc_bridge_client, _softmac_ifc_bridge_server) =
-        fidl::endpoints::create_endpoints::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
+    let wlan_softmac_ifc_bridge_client_handle = zx::Handle::from(
+        softmac_ifc_bridge_proxy
+            .into_channel()
+            .map_err(|_| {
+                error!(
+                    "Failed to convert {} into channel.",
+                    fidl_softmac::WlanSoftmacIfcBridgeMarker::DEBUG_NAME
+                );
+                zx::Status::INTERNAL
+            })?
+            .into_zx_channel(),
+    )
+    .into_raw();
 
-    // Calling WlanSoftmac.Start() indicates to the vendor driver that this driver (wlansoftmac) is ready to
-    // receive WlanSoftmacIfc messages. wlansoftmac will buffer all WlanSoftmacIfc messages in an
-    // mpsc::UnboundedReceiver<DriverEvent> sink until the MLME server drains them.
-    let usme_bootstrap_handle_via_iface_creation = match device.start(
-        driver_event_sink,
-        zx::Handle::from(softmac_ifc_bridge_client.into_channel()).into_raw(),
-    ) {
-        Ok(handle) => handle,
-        Err(status) => {
-            error!("Failed to receive a UsmeBootstrap handle: {}", status);
-            return Err(status);
-        }
-    };
+    // Calling WlanSoftmac.Start() indicates to the vendor driver that this driver (wlansoftmac) is
+    // ready to receive WlanSoftmacIfc messages. wlansoftmac will buffer all WlanSoftmacIfc messages
+    // in an mpsc::UnboundedReceiver<DriverEvent> sink until the MLME server drains them.
+    let usme_bootstrap_handle_via_iface_creation =
+        match device.start(driver_event_sink, wlan_softmac_ifc_bridge_client_handle) {
+            Ok(handle) => handle,
+            Err(status) => {
+                error!("Failed to receive a UsmeBootstrap handle: {}", status);
+                return Err(status);
+            }
+        };
     let channel = zx::Channel::from(usme_bootstrap_handle_via_iface_creation);
     let server = fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(channel);
     let mut usme_bootstrap_stream = match server.into_stream() {
@@ -446,6 +546,24 @@ async fn bootstrap_generic_sme<D: DeviceOps>(
     Ok(BootstrappedGenericSme { generic_sme_request_stream, legacy_privacy_support, inspect_node })
 }
 
+async fn serve_wlan_softmac_ifc_bridge(
+    _driver_event_sink: DriverEventSink,
+    mut softmac_ifc_bridge_request_stream: fidl_softmac::WlanSoftmacIfcBridgeRequestStream,
+) -> Result<(), anyhow::Error> {
+    loop {
+        let _request = match softmac_ifc_bridge_request_stream.next().await {
+            Some(Ok(request)) => request,
+            Some(Err(e)) => {
+                return Err(format_err!("WlanSoftmacIfcBridge server stream failed: {}", e));
+            }
+            None => {
+                info!("WlanSoftmacIfcBridge stream terminated");
+                return Ok(());
+            }
+        };
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {
@@ -453,6 +571,7 @@ mod tests {
         anyhow::format_err,
         diagnostics_assertions::assert_data_tree,
         fidl::endpoints::Proxy,
+        fuchsia_async::TestExecutor,
         fuchsia_inspect::InspectorConfig,
         futures::{channel::oneshot, stream::FuturesUnordered, task::Poll},
         pin_utils::pin_mut,
@@ -468,7 +587,7 @@ mod tests {
 
     #[test]
     fn bootstrap_generic_sme_fails_to_retrieve_usme_bootstrap_handle() {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (mut fake_device, _fake_device_state) = FakeDevice::new_with_config(
             &exec,
             FakeDeviceConfig::default().with_mock_start_result(Err(zx::Status::INTERRUPTED_RETRY)),
@@ -476,8 +595,12 @@ mod tests {
 
         // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
         let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
+        let (softmac_ifc_bridge_proxy, _softmac_ifc_bridge_request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>()
+                .unwrap();
 
-        let fut = bootstrap_generic_sme(&mut fake_device, driver_event_sink);
+        let fut =
+            bootstrap_generic_sme(&mut fake_device, driver_event_sink, softmac_ifc_bridge_proxy);
         pin_mut!(fut);
         match exec.run_until_stalled(&mut fut) {
             Poll::Ready(Err(zx::Status::INTERRUPTED_RETRY)) => (),
@@ -489,14 +612,18 @@ mod tests {
 
     #[test]
     fn boostrap_generic_sme_fails_on_error_from_bootstrap_stream() {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (mut fake_device, fake_device_state) =
             FakeDevice::new_with_config(&exec, FakeDeviceConfig::default());
 
         // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
         let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
+        let (softmac_ifc_bridge_proxy, _softmac_ifc_bridge_request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>()
+                .unwrap();
 
-        let fut = bootstrap_generic_sme(&mut fake_device, driver_event_sink);
+        let fut =
+            bootstrap_generic_sme(&mut fake_device, driver_event_sink, softmac_ifc_bridge_proxy);
         pin_mut!(fut);
         assert!(matches!(exec.run_until_stalled(&mut fut), Poll::Pending));
 
@@ -510,14 +637,18 @@ mod tests {
 
     #[test]
     fn boostrap_generic_sme_fails_on_closed_bootstrap_stream() {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (mut fake_device, fake_device_state) =
             FakeDevice::new_with_config(&exec, FakeDeviceConfig::default());
 
         // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
         let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
+        let (softmac_ifc_bridge_proxy, _softmac_ifc_bridge_request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>()
+                .unwrap();
 
-        let fut = bootstrap_generic_sme(&mut fake_device, driver_event_sink);
+        let fut =
+            bootstrap_generic_sme(&mut fake_device, driver_event_sink, softmac_ifc_bridge_proxy);
         pin_mut!(fut);
         assert!(matches!(exec.run_until_stalled(&mut fut), Poll::Pending));
 
@@ -529,14 +660,18 @@ mod tests {
 
     #[test]
     fn boostrap_generic_sme_succeeds() {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (mut fake_device, fake_device_state) =
             FakeDevice::new_with_config(&exec, FakeDeviceConfig::default());
 
         // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
         let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
+        let (softmac_ifc_bridge_proxy, _softmac_ifc_bridge_request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>()
+                .unwrap();
 
-        let bootstrap_generic_sme_fut = bootstrap_generic_sme(&mut fake_device, driver_event_sink);
+        let bootstrap_generic_sme_fut =
+            bootstrap_generic_sme(&mut fake_device, driver_event_sink, softmac_ifc_bridge_proxy);
         pin_mut!(bootstrap_generic_sme_fut);
         assert!(matches!(exec.run_until_stalled(&mut bootstrap_generic_sme_fut), Poll::Pending));
 
@@ -613,7 +748,7 @@ mod tests {
                     zx::Status,
                 >,
             >,
-            StartTestHarness,
+            Self,
         ) {
             let (mlme_init_sender, mlme_init_receiver) = oneshot::channel();
             let (driver_event_sink, driver_event_stream) = DriverEventSink::new();
@@ -627,17 +762,14 @@ mod tests {
                     fake_device,
                     fake_buffer_provider,
                 )),
-                StartTestHarness {
-                    mlme_init_receiver: Box::pin(mlme_init_receiver),
-                    driver_event_sink,
-                },
+                Self { mlme_init_receiver: Box::pin(mlme_init_receiver), driver_event_sink },
             )
         }
     }
 
     #[test]
     fn start_fails_on_bad_bootstrap() {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (fake_device, _fake_device_state) = FakeDevice::new_with_config(
             &exec,
             FakeDeviceConfig::default().with_mock_start_result(Err(zx::Status::INTERRUPTED_RETRY)),
@@ -674,7 +806,7 @@ mod tests {
         fake_device_config: FakeDeviceConfig,
         expected_status: zx::Status,
     ) {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (fake_device, fake_device_state) =
             FakeDevice::new_with_config(&exec, fake_device_config);
         let (mut start_fut, _harness) = StartTestHarness::new(fake_device);
@@ -693,7 +825,7 @@ mod tests {
 
     #[test]
     fn start_fail_on_dropped_mlme_event_stream() {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let (mut start_fut, _harness) = StartTestHarness::new(fake_device);
 
@@ -712,7 +844,7 @@ mod tests {
 
     #[test]
     fn start_succeeds() {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (fake_device, fake_device_state) = FakeDevice::new_with_config(
             &exec,
             FakeDeviceConfig::default()
@@ -726,16 +858,19 @@ mod tests {
         let (generic_sme_proxy, _inspect_vmo_fut) =
             bootstrap_generic_sme_proxy_and_inspect_vmo(usme_bootstrap_client_end);
 
-        let StartedDriver { mlme: mut mlme_fut, sme: sme_fut } =
-            match exec.run_until_stalled(&mut start_fut) {
-                Poll::Ready(Ok(x)) => x,
-                Poll::Ready(Err(status)) => {
-                    panic!("start_fut unexpectedly failed; {}", status)
-                }
-                Poll::Pending => panic!("start_fut still pending!"),
-            };
+        let StartedDriver {
+            softmac_ifc_bridge_request_stream: _softmac_ifc_bridge_request_stream,
+            mut mlme,
+            sme,
+        } = match exec.run_until_stalled(&mut start_fut) {
+            Poll::Ready(Ok(x)) => x,
+            Poll::Ready(Err(status)) => {
+                panic!("start_fut unexpectedly failed; {}", status)
+            }
+            Poll::Pending => panic!("start_fut still pending!"),
+        };
 
-        assert_variant!(exec.run_until_stalled(&mut mlme_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut mlme), Poll::Pending);
         assert!(matches!(
             exec.run_until_stalled(&mut harness.mlme_init_receiver),
             Poll::Ready(Ok(Ok(())))
@@ -745,9 +880,9 @@ mod tests {
         pin_mut!(resp_fut);
         assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
 
-        let sme_and_mlme_fut = [sme_fut, mlme_fut].into_iter().collect::<FuturesUnordered<_>>();
-        pin_mut!(sme_and_mlme_fut);
-        assert!(matches!(exec.run_until_stalled(&mut sme_and_mlme_fut.next()), Poll::Pending));
+        let sme_and_mlme = [sme, mlme].into_iter().collect::<FuturesUnordered<_>>();
+        pin_mut!(sme_and_mlme);
+        assert!(matches!(exec.run_until_stalled(&mut sme_and_mlme.next()), Poll::Pending));
 
         assert!(matches!(
             exec.run_until_stalled(&mut resp_fut),
@@ -758,9 +893,48 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn serve_wlansoftmac_ifc_bridge_fails_on_request_stream_error() {
+        let mut exec = TestExecutor::new();
+        let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
+        let (softmac_ifc_bridge_client, softmac_ifc_bridge_server) =
+            fidl::endpoints::create_endpoints::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
+        let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream().unwrap();
+        let softmac_ifc_bridge_channel = softmac_ifc_bridge_client.into_channel();
+
+        let server_fut =
+            serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);
+        pin_mut!(server_fut);
+        assert_variant!(exec.run_until_stalled(&mut server_fut), Poll::Pending);
+
+        softmac_ifc_bridge_channel.write(&[], &mut []).unwrap();
+        assert_variant!(exec.run_until_stalled(&mut server_fut), Poll::Ready(Err(_)));
+    }
+
+    #[test]
+    fn serve_wlansoftmac_ifc_bridge_exits_on_request_stream_end() {
+        let mut exec = TestExecutor::new();
+        let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
+        let (softmac_ifc_bridge_client, softmac_ifc_bridge_server) =
+            fidl::endpoints::create_endpoints::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
+        let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream().unwrap();
+
+        let server_fut =
+            serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);
+        pin_mut!(server_fut);
+        assert_variant!(exec.run_until_stalled(&mut server_fut), Poll::Pending);
+
+        drop(softmac_ifc_bridge_client);
+        assert_variant!(exec.run_until_stalled(&mut server_fut), Poll::Ready(Ok(())));
+    }
+
     struct ServeTestHarness {
         pub init_complete_receiver: Pin<Box<oneshot::Receiver<Result<(), zx::Status>>>>,
         pub mlme_init_sender: oneshot::Sender<Result<(), zx::Status>>,
+        #[allow(dead_code)]
+        pub driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
+        #[allow(dead_code)]
+        pub softmac_ifc_bridge_proxy: fidl_softmac::WlanSoftmacIfcBridgeProxy,
         pub complete_mlme_sender: oneshot::Sender<Result<(), anyhow::Error>>,
         pub complete_sme_sender: oneshot::Sender<Result<(), anyhow::Error>>,
     }
@@ -772,16 +946,31 @@ mod tests {
                 init_complete_sender.send(result).unwrap();
             });
             let (mlme_init_sender, mlme_init_receiver) = oneshot::channel();
+            let (driver_event_sink, driver_event_stream) = DriverEventSink::new();
+            let (softmac_ifc_bridge_proxy, softmac_ifc_bridge_server) =
+                fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>()
+                    .unwrap();
+            let softmac_ifc_bridge_request_stream =
+                softmac_ifc_bridge_server.into_stream().unwrap();
             let (complete_mlme_sender, complete_mlme_receiver) = oneshot::channel();
-            let mlme_fut = Box::pin(async { complete_mlme_receiver.await.unwrap() });
+            let mlme = Box::pin(async { complete_mlme_receiver.await.unwrap() });
             let (complete_sme_sender, complete_sme_receiver) = oneshot::channel();
-            let sme_fut = Box::pin(async { complete_sme_receiver.await.unwrap() });
+            let sme = Box::pin(async { complete_sme_receiver.await.unwrap() });
 
             (
-                Box::pin(serve(init_completer, mlme_init_receiver, mlme_fut, sme_fut)),
+                Box::pin(serve(
+                    init_completer,
+                    mlme_init_receiver,
+                    driver_event_sink,
+                    softmac_ifc_bridge_request_stream,
+                    mlme,
+                    sme,
+                )),
                 ServeTestHarness {
                     init_complete_receiver: Box::pin(init_complete_receiver),
                     mlme_init_sender,
+                    driver_event_stream,
+                    softmac_ifc_bridge_proxy,
                     complete_mlme_sender,
                     complete_sme_sender,
                 },
@@ -791,7 +980,7 @@ mod tests {
 
     #[test]
     fn serve_exits_with_error_if_mlme_init_sender_dropped() {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (mut serve_fut, mut harness) = ServeTestHarness::new();
 
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -809,7 +998,7 @@ mod tests {
 
     #[test]
     fn serve_exits_with_error_on_init_failure() {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (mut serve_fut, mut harness) = ServeTestHarness::new();
 
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -827,7 +1016,7 @@ mod tests {
     #[test_case(Ok(()))]
     #[test_case(Err(format_err!("")))]
     fn serve_exits_with_error_if_mlme_completes_before_init(early_mlme_result: Result<(), Error>) {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (mut serve_fut, mut harness) = ServeTestHarness::new();
 
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -845,7 +1034,7 @@ mod tests {
     #[test_case(Ok(()))]
     #[test_case(Err(format_err!("")))]
     fn serve_exits_with_error_if_sme_shuts_down_before_mlme(early_sme_result: Result<(), Error>) {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (mut serve_fut, mut harness) = ServeTestHarness::new();
 
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -864,7 +1053,7 @@ mod tests {
 
     #[test]
     fn serve_exits_with_error_if_mlme_completes_with_error() {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (mut serve_fut, mut harness) = ServeTestHarness::new();
 
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -880,7 +1069,7 @@ mod tests {
 
     #[test]
     fn serve_exits_with_error_if_sme_shuts_down_with_error() {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (mut serve_fut, mut harness) = ServeTestHarness::new();
 
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -896,8 +1085,8 @@ mod tests {
     }
 
     #[test]
-    fn serve_ends_with_graceful_shutdown() {
-        let mut exec = fasync::TestExecutor::new();
+    fn serve_shuts_down_gracefully() {
+        let mut exec = TestExecutor::new();
         let (mut serve_fut, mut harness) = ServeTestHarness::new();
 
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -935,7 +1124,7 @@ mod tests {
     /// An Err value will be returned if start_and_serve() encounters an error completing the bootstrap
     /// of the SME server.
     fn start_and_serve_with_device(
-        exec: &mut fasync::TestExecutor,
+        exec: &mut TestExecutor,
         fake_device: FakeDevice,
     ) -> Result<StartAndServeTestHarness<impl Future<Output = Result<(), zx::Status>>>, zx::Status>
     {
@@ -1009,7 +1198,7 @@ mod tests {
 
     #[test]
     fn start_and_serve_fails_on_dropped_usme_bootstrap_client() {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         fake_device_state.lock().usme_bootstrap_client_end = None;
         match start_and_serve_with_device(&mut exec, fake_device.clone()) {
@@ -1023,7 +1212,7 @@ mod tests {
     // Exhaustive feature tests are unit tested on start()
     #[test]
     fn start_and_serve_fails_with_wrong_mac_implementation_type() {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (fake_device, _fake_device_state) = FakeDevice::new_with_config(
             &exec,
             FakeDeviceConfig::default()
@@ -1040,7 +1229,7 @@ mod tests {
 
     #[test]
     fn start_and_serve_fails_on_dropped_mlme_event_stream() {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (mut fake_device, _fake_device_state) = FakeDevice::new(&exec);
         let _ = fake_device.take_mlme_event_stream();
         match start_and_serve_with_device(&mut exec, fake_device.clone()) {
@@ -1053,7 +1242,7 @@ mod tests {
 
     #[test]
     fn start_and_serve_fails_on_dropped_generic_sme_client() {
-        let mut exec = fasync::TestExecutor::new();
+        let mut exec = TestExecutor::new();
         let (fake_device, _fake_device_state) = FakeDevice::new(&exec);
         let StartAndServeTestHarness {
             mut start_and_serve_fut,
@@ -1073,46 +1262,33 @@ mod tests {
     }
 
     #[test]
-    fn start_and_serve_responds_to_generic_sme_requests() {
-        let mut exec = fasync::TestExecutor::new();
+    fn start_and_serve_shuts_down_gracefully() {
+        let mut exec = TestExecutor::new();
         let (fake_device, _fake_device_state) = FakeDevice::new(&exec);
         let StartAndServeTestHarness {
             mut start_and_serve_fut,
             mut softmac_handle_receiver,
-            generic_sme_proxy,
+            generic_sme_proxy: _generic_sme_proxy,
         } = start_and_serve_with_device(&mut exec, fake_device)
             .expect("Failed to initiate wlansoftmac setup.");
-        let _handle = assert_variant!(exec.run_until_stalled(&mut softmac_handle_receiver), Poll::Ready(Ok(Ok(handle))) => handle);
-
-        let (_sme_telemetry_proxy, sme_telemetry_server) =
-            fidl::endpoints::create_proxy().expect("Failed to create_proxy");
-        let (_client_sme_proxy, client_sme_server) =
-            fidl::endpoints::create_proxy().expect("Failed to create_proxy");
-
-        let resp_fut = generic_sme_proxy.get_sme_telemetry(sme_telemetry_server);
-        pin_mut!(resp_fut);
-
-        // First poll `get_sme_telemetry` to send a `GetSmeTelemetry` request to the SME server, and then
-        // poll the SME server process it. Finally, expect `get_sme_telemetry` to complete with `Ok(())`.
-        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
         assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Ready(Ok(Ok(()))));
+        let handle = assert_variant!(exec.run_until_stalled(&mut softmac_handle_receiver), Poll::Ready(Ok(Ok(handle))) => handle);
 
-        let resp_fut = generic_sme_proxy.get_client_sme(client_sme_server);
-        pin_mut!(resp_fut);
-
-        // First poll `get_client_sme` to send a `GetClientSme` request to the SME server, and then poll the
-        // SME server process it. Finally, expect `get_client_sme` to complete with `Ok(())`.
-        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
-        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
-        exec.run_singlethreaded(resp_fut)
-            .expect("Generic SME proxy failed")
-            .expect("Client SME request failed");
+        let (shutdown_sender, shutdown_receiver) = oneshot::channel::<()>();
+        handle.stop(StopCompleter::new(Box::new(move || {
+            shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
+        })));
+        assert_variant!(
+            exec.run_singlethreaded(async {
+                futures::join!(start_and_serve_fut, shutdown_receiver)
+            }),
+            (Ok(()), Ok(()))
+        );
     }
 
     #[test]
-    fn start_and_serve_shuts_down_gracefully() {
-        let mut exec = fasync::TestExecutor::new();
+    fn start_and_serve_responds_to_generic_sme_requests() {
+        let mut exec = TestExecutor::new();
         let (fake_device, _fake_device_state) = FakeDevice::new(&exec);
         let StartAndServeTestHarness {
             mut start_and_serve_fut,
@@ -1120,12 +1296,12 @@ mod tests {
             generic_sme_proxy,
         } = start_and_serve_with_device(&mut exec, fake_device)
             .expect("Failed to initiate wlansoftmac setup.");
+        let handle = assert_variant!(exec.run_until_stalled(&mut softmac_handle_receiver), Poll::Ready(Ok(Ok(handle))) => handle);
+
         let (sme_telemetry_proxy, sme_telemetry_server) =
             fidl::endpoints::create_proxy().expect("Failed to create_proxy");
         let (client_sme_proxy, client_sme_server) =
             fidl::endpoints::create_proxy().expect("Failed to create_proxy");
-        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
-        let handle = assert_variant!(exec.run_until_stalled(&mut softmac_handle_receiver), Poll::Ready(Ok(Ok(handle))) => handle);
 
         let resp_fut = generic_sme_proxy.get_sme_telemetry(sme_telemetry_server);
         pin_mut!(resp_fut);
