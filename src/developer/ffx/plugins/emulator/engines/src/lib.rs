@@ -10,7 +10,6 @@ mod qemu_based;
 pub mod serialization;
 mod show_output;
 
-use anyhow::{bail, Context, Result};
 pub use arg_templates::process_flag_template;
 use emulator_instance::{
     get_instance_dir, read_from_disk, DeviceConfig, EmulatorConfiguration, EmulatorInstanceData,
@@ -18,6 +17,7 @@ use emulator_instance::{
     RuntimeConfig,
 };
 use ffx_emulator_config::EmulatorEngine;
+use fho::{bug, return_user_error, Result};
 use qemu_based::{femu::FemuEngine, qemu::QemuEngine};
 
 /// The EngineBuilder is used to create and configure an EmulatorEngine, while ensuring the
@@ -102,12 +102,11 @@ impl EngineBuilder {
     /// Create from an existing EmulatorInstanceData,
     /// Does not validate or perform any configuration steps. Call
     /// |build| for those steps to be performed.
-    pub fn from_data(data: EmulatorInstanceData) -> Result<Box<dyn EmulatorEngine>> {
-        let engine: Box<dyn EmulatorEngine> = match data.get_engine_type() {
+    pub fn from_data(data: EmulatorInstanceData) -> Box<dyn EmulatorEngine> {
+        match data.get_engine_type() {
             EngineType::Femu => Box::new(FemuEngine::new(data)),
             EngineType::Qemu => Box::new(QemuEngine::new(data)),
-        };
-        Ok(engine)
+        }
     }
 
     /// Finalize and validate the configuration, set up the engine's instance directory,
@@ -122,7 +121,7 @@ impl EngineBuilder {
         // Make sure we don't overwrite an existing instance.
         if let Ok(EngineOption::DoesExist(instance_data)) = read_from_disk(name).await {
             if instance_data.is_running() {
-                bail!(
+                return_user_error!(
                     "An emulator named {} is already running. \
                     Use a different name, or run `ffx emu stop {}` \
                     to stop the running emulator.",
@@ -139,19 +138,14 @@ impl EngineBuilder {
             EngineState::Configured,
         );
 
-        let mut engine: Box<dyn EmulatorEngine> = Self::from_data(instance_data)?;
+        let mut engine: Box<dyn EmulatorEngine> = Self::from_data(instance_data);
         engine.configure()?;
 
-        engine.load_emulator_binary().await.with_context(|| {
-            format!("Failed to load the emulator binary path for {}", self.engine_type)
-        })?;
+        engine.load_emulator_binary().await?;
 
         engine.emu_config_mut().flags = process_flag_template(engine.emu_config())
-            .context("Failed to process the flags template file.")?;
-        engine
-            .save_to_disk()
-            .await
-            .context("Failed to write the emulation configuration file to disk.")?;
+            .map_err(|e| bug!("Failed to process the flags template file: {e}"))?;
+        engine.save_to_disk().await?;
 
         Ok(engine)
     }
@@ -161,4 +155,5 @@ impl EngineBuilder {
 // the template into a FlagData object.
 pub fn process_flags_from_str(text: &str, emu_config: &EmulatorConfiguration) -> Result<FlagData> {
     arg_templates::process_flags_from_str(text, emu_config)
+        .map_err(|e| bug!("Error processing flags: {e}"))
 }

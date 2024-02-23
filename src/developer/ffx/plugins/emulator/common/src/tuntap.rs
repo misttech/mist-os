@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{bail, Result};
 use cfg_if::cfg_if;
+use fho::{return_bug, return_user_error, Result};
 use mockall::automock;
 use nix::ifaddrs::{getifaddrs, InterfaceAddress, InterfaceAddressIterator};
 use nix::net::if_::InterfaceFlags;
@@ -64,7 +64,7 @@ pub(crate) mod tap {
             // instead.
             match getifaddrs() {
                 Ok(iff) => Ok(iff),
-                Err(e) => bail!("Failed to get interface addresses: {}", e),
+                Err(e) => return_bug!("Failed to get interface addresses: {e}"),
             }
         }
 
@@ -83,7 +83,7 @@ pub(crate) mod tap {
                 // clone() is needed to take ownership of the data.
                 Ok(interface.clone())
             } else {
-                bail!(format!(
+                return_user_error!(format!(
                     "Couldn't find an interface named '{}'. \
                     Configure Tun/Tap on your host or try --net user.\n\
                     To use emu with Tun/Tap networking on Linux, run:\n    \
@@ -122,7 +122,7 @@ pub fn tap_ready() -> Result<()> {
 fn tap_inner(tap: &QemuTunTap, check_for_ready: bool) -> Result<()> {
     // Mac's don't include the "ip" program by default.
     if tap.host_is_mac() {
-        bail!("Tun/Tap isn't supported on MacOS.")
+        return_user_error!("Tun/Tap isn't supported on MacOS.")
     }
 
     // Make sure we have an interface named TAP_INTERFACE_NAME.
@@ -130,30 +130,25 @@ fn tap_inner(tap: &QemuTunTap, check_for_ready: bool) -> Result<()> {
 
     // It's there, now make sure it's tap.
     if !tap.interface_is_tap(&interface) {
-        bail!(format!(
-            "The '{}' interface exists, but it's not a Tun/Tap interface.",
-            TAP_INTERFACE_NAME,
-        ))
+        return_user_error!(
+            "The '{TAP_INTERFACE_NAME}' interface exists, but it's not a Tun/Tap interface."
+        )
     }
 
     // We don't check for ready when resolving --net auto, only during validation.
     if check_for_ready {
         if !tap.interface_is_up(&interface) {
-            bail!(format!(
-                "The Tun/Tap interface '{}' exists, but it's currently DOWN.\n\
+            return_user_error!(
+                "The Tun/Tap interface '{TAP_INTERFACE_NAME}' exists, but it's currently DOWN.\n\
                 To bring it up, you can run:\n    \
-                    sudo ip link set {} up",
-                TAP_INTERFACE_NAME, TAP_INTERFACE_NAME
-            ))
+                    sudo ip link set {TAP_INTERFACE_NAME} up"
+            )
         }
     }
 
     // Also check for busy-ness.
     if tap.interface_is_in_use(&interface) {
-        bail!(format!(
-            "The Tun/Tap interface '{}' exists, but it's in use by another process.",
-            TAP_INTERFACE_NAME,
-        ))
+        return_user_error!("The Tun/Tap interface '{TAP_INTERFACE_NAME}' exists, but it's in use by another process.")
     }
     Ok(())
 }
@@ -270,7 +265,7 @@ mod tests {
     }
 
     #[test]
-    fn test_interface_is_up() -> Result<()> {
+    fn test_interface_is_up() {
         let tap = tap::QemuTunTap::default();
         assert!(tap.interface_is_up(&loopback()), "{:#?}", loopback().flags);
         assert!(tap.interface_is_up(&tap_up()), "{:#?}", tap_up().flags);
@@ -278,12 +273,11 @@ mod tests {
         assert!(!tap.interface_is_up(&tap_down()), "{:#?}", tap_down().flags);
         assert!(tap.interface_is_up(&wrong_name()), "{:#?}", wrong_name().flags);
         assert!(tap.interface_is_up(&connected()), "{:#?}", connected().flags);
-        Ok(())
     }
 
     #[cfg(not(target_os = "macos"))]
     #[test]
-    fn test_interface_is_tap() -> Result<()> {
+    fn test_interface_is_tap() {
         let tap = tap::QemuTunTap::default();
         assert!(!tap.interface_is_tap(&loopback()), "{:#?}", loopback().flags);
         assert!(tap.interface_is_tap(&tap_up()), "{:#?}", tap_up().flags);
@@ -291,11 +285,10 @@ mod tests {
         assert!(tap.interface_is_tap(&tap_down()), "{:#?}", tap_down().flags);
         assert!(tap.interface_is_tap(&wrong_name()), "{:#?}", wrong_name().flags);
         assert!(tap.interface_is_tap(&connected()), "{:#?}", connected().flags);
-        Ok(())
     }
 
     #[test]
-    fn test_interface_is_in_use() -> Result<()> {
+    fn test_interface_is_in_use() {
         let tap = tap::QemuTunTap::default();
         assert!(tap.interface_is_in_use(&loopback()), "{:#?}", loopback().flags);
         assert!(!tap.interface_is_in_use(&tap_up()), "{:#?}", tap_up().flags);
@@ -303,11 +296,10 @@ mod tests {
         assert!(!tap.interface_is_in_use(&tap_down()), "{:#?}", tap_down().flags);
         assert!(!tap.interface_is_in_use(&wrong_name()), "{:#?}", wrong_name().flags);
         assert!(tap.interface_is_in_use(&connected()), "{:#?}", connected().flags);
-        Ok(())
     }
 
     #[test]
-    fn test_tap_inner() -> Result<()> {
+    fn test_tap_inner() {
         let mut tap = QemuTunTap::default();
         let real_thing = tap::QemuTunTap::default();
         let clone1 = real_thing.clone();
@@ -326,7 +318,7 @@ mod tests {
             .returning(|| Ok(unsafe { std::mem::transmute(TestInterfaceAddressIterator::new()) }));
 
         // Error condition means no interface.
-        tap.expect_parse_interface_from_details().returning(|_| bail!("error")).times(2);
+        tap.expect_parse_interface_from_details().returning(|_| return_bug!("error")).times(2);
         let result = tap_inner(&tap, false);
         assert!(result.is_err());
         let result = tap_inner(&tap, true);
@@ -375,7 +367,5 @@ mod tests {
         assert!(result.is_err());
         let result = tap_inner(&tap, true);
         assert!(result.is_err());
-
-        Ok(())
     }
 }

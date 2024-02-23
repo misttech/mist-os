@@ -10,7 +10,6 @@ use crate::{
     qemu_based::comms::{spawn_pipe_thread, QemuSocket},
     show_output,
 };
-use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use cfg_if::cfg_if;
 use emulator_instance::{
@@ -27,6 +26,7 @@ use ffx_emulator_common::{
 };
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use ffx_ssh::SshKeyFiles;
+use fho::{bug, return_bug, return_user_error, Result};
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::Timer;
 use serde_json::{json, Deserializer, Value};
@@ -55,7 +55,7 @@ mod modules {
 
     pub(crate) async fn get_host_tool(name: &str) -> Result<PathBuf> {
         let sdk = ffx_config::global_env_context()
-            .context("loading global environment context")?
+            .ok_or_else(|| bug!("loading global environment context"))?
             .get_sdk()
             .await?;
 
@@ -73,19 +73,19 @@ mod modules {
                     error
                 );
                 let mut ffx_path = std::env::current_exe()
-                    .context(format!("getting current ffx exe path for host tool {}", name))?;
+                    .map_err(|e| bug!("getting current ffx exe path for host tool {name}: {e}"))?;
                 ffx_path = std::fs::canonicalize(ffx_path.clone())
-                    .context(format!("canonicalizing ffx path {:?}", ffx_path))?;
+                    .map_err(|e| bug!("canonicalizing ffx path {ffx_path:?}: {e}"))?;
 
                 let tool_path = ffx_path
                     .parent()
-                    .context(format!("ffx path missing parent {:?}", ffx_path))?
+                    .ok_or_else(|| bug!("ffx path missing parent {ffx_path:?}"))?
                     .join(name);
 
                 if tool_path.exists() {
                     Ok(tool_path)
                 } else {
-                    bail!("Host tool '{}' not found after checking in `ffx` directory.", name);
+                    return_bug!("Host tool '{name}' not found after checking in `ffx` directory.")
                 }
             }
         }
@@ -127,14 +127,14 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         let disk_image_path = &guest.disk_image;
 
         if !kernel_path.exists() {
-            bail!("kernel file {:?} does not exist.", kernel_path);
+            return_bug!("kernel file {:?} does not exist.", kernel_path);
         }
         if !zbi_path.exists() {
-            bail!("zbi file {:?} does not exist.", zbi_path);
+            return_bug!("zbi file {:?} does not exist.", zbi_path);
         }
         if let Some(file_path) = disk_image_path.as_ref() {
             if !file_path.exists() {
-                bail!("disk image file {:?} does not exist.", file_path);
+                return_bug!("disk image file {:?} does not exist.", file_path);
             }
         }
         Ok(())
@@ -153,20 +153,23 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         let mut updated_guest = emu_config.guest.clone();
 
         // Create the data directory if needed.
-        let mut instance_root: PathBuf =
-            ffx_config::query(config::EMU_INSTANCE_ROOT_DIR).get_file().await?;
+        let mut instance_root: PathBuf = ffx_config::query(config::EMU_INSTANCE_ROOT_DIR)
+            .get_file()
+            .await
+            .map_err(|e| bug!("Error reading config for instance root: {e}"))?;
         instance_root.push(instance_name);
-        fs::create_dir_all(&instance_root)?;
+        fs::create_dir_all(&instance_root)
+            .map_err(|e| bug!("Error creating {instance_root:?}: {e}"))?;
 
         let kernel_name = emu_config.guest.kernel_image.file_name().ok_or_else(|| {
-            anyhow!("cannot read kernel file name '{:?}'", emu_config.guest.kernel_image)
-        });
-        let kernel_path = instance_root.join(kernel_name?);
+            bug!("cannot read kernel file name '{:?}'", emu_config.guest.kernel_image)
+        })?;
+        let kernel_path = instance_root.join(kernel_name);
         if kernel_path.exists() && reuse {
             tracing::debug!("Using existing file for {:?}", kernel_path.file_name().unwrap());
         } else {
             fs::copy(&emu_config.guest.kernel_image, &kernel_path)
-                .context("cannot stage kernel file")?;
+                .map_err(|e| bug!("cannot stage kernel file: {e}"))?;
         }
 
         let zbi_path = instance_root.join(
@@ -174,7 +177,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 .guest
                 .zbi_image
                 .file_name()
-                .ok_or_else(|| anyhow!("cannot read zbi file name"))?,
+                .ok_or_else(|| bug!("cannot read zbi file name"))?,
         );
 
         if zbi_path.exists() && reuse {
@@ -188,19 +191,19 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             // the guest.
             Self::embed_boot_data(&emu_config.guest.zbi_image, &zbi_path)
                 .await
-                .context("cannot embed boot data")?;
+                .map_err(|e| bug!("cannot embed boot data: {e}"))?;
         }
 
         if let Some(disk_image) = &emu_config.guest.disk_image {
             let src_path = disk_image.as_ref();
             let dest_path = instance_root.join(
-                src_path.file_name().ok_or_else(|| anyhow!("cannot read disk image file name"))?,
+                src_path.file_name().ok_or_else(|| bug!("cannot read disk image file name"))?,
             );
 
             if dest_path.exists() && reuse {
                 tracing::debug!("Using existing file for {:?}", dest_path.file_name().unwrap());
             } else {
-                let original_size: u64 = src_path.metadata()?.len();
+                let original_size: u64 = src_path.metadata().map_err(|e| bug!("{e}"))?.len();
 
                 tracing::debug!("Disk image original size: {}", original_size);
                 tracing::debug!(
@@ -225,22 +228,23 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 // The method of resizing is different, depending on the type of the disk image.
                 match disk_image {
                     DiskImage::Fvm(_) => {
-                        fs::copy(src_path, &dest_path).context("cannot stage disk image file")?;
+                        fs::copy(src_path, &dest_path)
+                            .map_err(|e| bug!("cannot stage disk image file: {e}"))?;
                         Self::fvm_extend(&dest_path, target_size).await?;
                     }
                     DiskImage::Fxfs(_) => {
-                        let tmp = NamedTempFile::new_in(&instance_root)?;
-                        fs::copy(src_path, tmp.path()).context("cannot stage Fxfs image")?;
+                        let tmp = NamedTempFile::new_in(&instance_root).map_err(|e| bug!("{e}"))?;
+                        fs::copy(src_path, tmp.path())
+                            .map_err(|e| bug!("cannot stage Fxfs image: {e}"))?;
                         if original_size < target_size {
                             // Resize the image if needed.
-                            tmp.as_file()
-                                .set_len(target_size)
-                                .context(format!("Failed to temp file to {} bytes", target_size))?;
+                            tmp.as_file().set_len(target_size).map_err(|e| {
+                                bug!("Failed to temp file to {target_size} bytes: {e}")
+                            })?;
                         }
-                        tmp.persist(&dest_path).context(format!(
-                            "Failed to persist temp Fxfs image to {:?}",
-                            dest_path
-                        ))?;
+                        tmp.persist(&dest_path).map_err(|e| {
+                            bug!("Failed to persist temp Fxfs image to {dest_path:?}: {e}")
+                        })?;
                     }
                 };
             }
@@ -260,19 +264,23 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
     }
 
     async fn fvm_extend(dest_path: &Path, target_size: u64) -> Result<()> {
-        let fvm_tool =
-            get_host_tool(config::FVM_HOST_TOOL).await.context("cannot locate fvm tool")?;
+        let fvm_tool = get_host_tool(config::FVM_HOST_TOOL)
+            .await
+            .map_err(|e| bug!("cannot locate fvm tool: {e}"))?;
         let mut resize_command = Command::new(fvm_tool);
 
         resize_command.arg(&dest_path).arg("extend").arg("--length").arg(target_size.to_string());
         tracing::debug!("FVM Running command to resize: {:?}", &resize_command);
 
-        let resize_result = resize_command.output()?;
+        let resize_result = resize_command.output().map_err(|e| bug!("{e}"))?;
 
         tracing::debug!("FVM command result: {resize_result:?}");
 
         if !resize_result.status.success() {
-            bail!("Error resizing fvm: {}", str::from_utf8(&resize_result.stderr)?);
+            bug!(
+                "Error resizing fvm: {}",
+                str::from_utf8(&resize_result.stderr).map_err(|e| bug!("{e}"))?
+            );
         }
         Ok(())
     }
@@ -281,15 +289,24 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
     /// If mdns_info is Some(), it is also added. This mdns configuration is
     /// read by Fuchsia mdns service and used instead of the default configuration.
     async fn embed_boot_data(src: &PathBuf, dest: &PathBuf) -> Result<()> {
-        let zbi_tool = get_host_tool(config::ZBI_HOST_TOOL).await.context("ZBI tool is missing")?;
-        let ssh_keys = SshKeyFiles::load().await.context("finding ssh authorized_keys file.")?;
-        ssh_keys.create_keys_if_needed().context("create ssh keys if needed")?;
+        let zbi_tool = get_host_tool(config::ZBI_HOST_TOOL)
+            .await
+            .map_err(|e| bug!("ZBI tool is missing: {e}"))?;
+        let ssh_keys = SshKeyFiles::load()
+            .await
+            .map_err(|e| bug!("Error finding ssh authorized_keys file: {e}"))?;
+        ssh_keys
+            .create_keys_if_needed()
+            .map_err(|e| bug!("Error creating ssh keys if needed: {e}"))?;
         let auth_keys = ssh_keys.authorized_keys.display().to_string();
         if !ssh_keys.authorized_keys.exists() {
-            bail!("No authorized_keys found to configure emulator. {} does not exist.", auth_keys);
+            return_bug!(
+                "No authorized_keys found to configure emulator. {} does not exist.",
+                auth_keys
+            );
         }
         if src == dest {
-            return Err(anyhow!("source and dest zbi paths cannot be the same."));
+            return_bug!("source and dest zbi paths cannot be the same.");
         }
 
         let replace_str = format!("data/ssh/authorized_keys={}", auth_keys);
@@ -300,10 +317,13 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         // added last.
         zbi_command.arg("--type=entropy:64").arg("/dev/urandom");
 
-        let zbi_command_output = zbi_command.output()?;
+        let zbi_command_output = zbi_command.output().map_err(|e| bug!("{e}"))?;
 
         if !zbi_command_output.status.success() {
-            bail!("Error embedding boot data: {}", str::from_utf8(&zbi_command_output.stderr)?);
+            return_bug!(
+                "Error embedding boot data: {}",
+                str::from_utf8(&zbi_command_output.stderr).map_err(|e| bug!("{e}"))?
+            );
         }
         Ok(())
     }
@@ -313,7 +333,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             NetworkingMode::None => {
                 // Check for console/monitor.
                 if emu_config.runtime.console == ConsoleType::None {
-                    bail!(
+                    return_user_error!(
                         "Running without networking enabled and no interactive console;\n\
                         there will be no way to communicate with this emulator.\n\
                         Restart with --console/--monitor or with networking enabled to proceed."
@@ -322,7 +342,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             }
             NetworkingMode::Auto => {
                 // Shouldn't be possible to land here.
-                bail!("Networking mode is unresolved after configuration.");
+                return_bug!("Networking mode is unresolved after configuration.");
             }
             NetworkingMode::Tap => {
                 // Officially, MacOS tun/tap is unsupported. tap_ready() uses the "ip" command to
@@ -353,17 +373,17 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
 
         emu_config.guest = Self::stage_image_files(&name, emu_config, reuse)
             .await
-            .context("could not stage image files")?;
+            .map_err(|e| bug!("could not stage image files: {e}"))?;
 
         // This is done to avoid running emu in the same directory as the kernel or other files
         // that are used by qemu. If the multiboot.bin file is in the current directory, it does
         // not start correctly. This probably could be temporary until we know the images loaded
         // do not have files directly in $sdk_root.
         env::set_current_dir(emu_config.runtime.instance_directory.parent().unwrap())
-            .context("problem changing directory to instance dir")?;
+            .map_err(|e| bug!("problem changing directory to instance dir: {e}"))?;
 
         emu_config.flags = process_flag_template(emu_config)
-            .context("Failed to process the flags template file.")?;
+            .map_err(|e| bug!("Failed to process the flags template file: {e}."))?;
 
         Ok(())
     }
@@ -374,11 +394,12 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         proxy: &ffx::TargetCollectionProxy,
     ) -> Result<i32> {
         if self.emu_config().runtime.console == ConsoleType::None {
-            let stdout = File::create(&self.emu_config().host.log)
-                .context(format!("Couldn't open log file {:?}", &self.emu_config().host.log))?;
-            let stderr = stdout
-                .try_clone()
-                .context("Failed trying to clone stdout for the emulator process.")?;
+            let stdout = File::create(&self.emu_config().host.log).map_err(|e| {
+                bug!("Couldn't open log file {:?}: {e}", &self.emu_config().host.log)
+            })?;
+            let stderr = stdout.try_clone().map_err(|e| {
+                bug!("Failed trying to clone stdout for the emulator process: {e}.")
+            })?;
             emulator_cmd.stdout(stdout).stderr(stderr);
             println!("Logging to {:?}", &self.emu_config().host.log);
         }
@@ -391,17 +412,18 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             let status = Command::new(script)
                 .arg(TAP_INTERFACE_NAME)
                 .status()
-                .context(format!("Problem running upscript '{}'", &script.display()))?;
+                .map_err(|e| bug!("Problem running upscript '{}': {e}", &script.display()))?;
             if !status.success() {
-                return Err(anyhow!(
+                return_user_error!(
                     "Upscript {} returned non-zero exit code {}",
                     script.display(),
                     status.code().map_or("None".to_string(), |v| format!("{}", v))
-                ));
+                );
             }
         }
 
-        let shared_process = SharedChild::spawn(&mut emulator_cmd)?;
+        let shared_process = SharedChild::spawn(&mut emulator_cmd)
+            .map_err(|e| bug!("Cannot spawn emulator: {e}"))?;
         let child_arc = Arc::new(shared_process);
 
         self.set_pid(child_arc.id());
@@ -414,9 +436,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             let elapsed_ms = now.elapsed().as_millis();
             tracing::debug!("reading port mappings took {elapsed_ms}ms");
         } else {
-            self.save_to_disk()
-                .await
-                .context("Failed to write the emulation configuration file to disk.")?;
+            self.save_to_disk().await?;
         }
 
         if self.emu_config().runtime.debugger {
@@ -491,9 +511,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                         Err(e) => eprintln!("Couldn't print the log: {:?}", e),
                     };
                     self.set_engine_state(EngineState::Staged);
-                    self.save_to_disk()
-                        .await
-                        .context("Failed to write the emulation configuration file to disk.")?;
+                    self.save_to_disk().await?;
 
                     return Ok(1);
                 }
@@ -523,7 +541,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                         NetworkingMode::Tap => "use tun/tap-based",
                         NetworkingMode::User => "use user-mode/port-mapped",
                         NetworkingMode::None => "disable all",
-                        NetworkingMode::Auto => bail!(
+                        NetworkingMode::Auto => return_bug!(
                             "Auto Networking mode should not be possible after staging \
                             is complete. Configuration is corrupt; bailing out."
                         ),
@@ -606,17 +624,23 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
     fn attach_to(&self, path: &Path, console: EngineConsoleType) -> Result<()> {
         let console_path = self.get_path_for_console_type(path, console);
         let mut socket = QemuSocket::new(&console_path);
-        socket.connect().context("Connecting to console.")?;
-        let stream = socket.stream().ok_or_else(|| anyhow!("No socket connected."))?;
+        socket.connect().map_err(|e| bug!("Error connecting to console: {e}"))?;
+        let stream = socket.stream().ok_or_else(|| bug!("No socket connected."))?;
         let (tx, rx) = channel();
 
-        let _t1 = spawn_pipe_thread(std::io::stdin(), stream.try_clone()?, tx.clone());
-        let _t2 = spawn_pipe_thread(stream.try_clone()?, std::io::stdout(), tx);
+        let _t1 = spawn_pipe_thread(
+            std::io::stdin(),
+            stream.try_clone().map_err(|e| bug!("{e}"))?,
+            tx.clone(),
+        );
+        let _t2 =
+            spawn_pipe_thread(stream.try_clone().map_err(|e| bug!("{e}"))?, std::io::stdout(), tx);
 
         // Now that the threads are reading and writing, we wait for one to send back an error.
-        let error = rx.recv()?;
-        eprintln!("{:?}", error);
-        stream.shutdown(Shutdown::Both).context("Shutting down stream.")?;
+        let error = rx.recv().map_err(|e| bug!("recv error: {e}"));
+        tracing::debug!("{error:?}");
+        eprintln!("{error:?}");
+        stream.shutdown(Shutdown::Both).map_err(|e| bug!("Error shutting down stream: {e}"))?;
         Ok(())
     }
 
@@ -665,13 +689,14 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         let start = Instant::now();
         let mut qmp_stream = self.open_socket(&mut socket, &max_elapsed).await?;
         let mut response_iter =
-            Deserializer::from_reader(qmp_stream.try_clone()?).into_iter::<Value>();
+            Deserializer::from_reader(qmp_stream.try_clone().map_err(|e| bug!("{e}"))?)
+                .into_iter::<Value>();
 
         // Loop reading the responses on the socket, and send the request to get the
         // user network information.
         loop {
             if start.elapsed() > max_elapsed {
-                bail!("Reading port mappings timed out");
+                return_bug!("Reading port mappings timed out");
             }
 
             match response_iter.next() {
@@ -703,9 +728,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                             && !self.emu_config().host.port_map.values().any(|m| m.host.is_none())
                         {
                             tracing::debug!("Writing updated mappings");
-                            self.save_to_disk().await.context(
-                                "Failed to write the emulation configuration file to disk.",
-                            )?;
+                            self.save_to_disk().await?;
                             return Ok(());
                         }
                     } else {
@@ -727,14 +750,16 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             Timer::new(Duration::from_millis(100)).await;
             // Send { "execute": "human-monitor-command", "arguments": { "command-line": "info usernet" } }
             tracing::debug!("writing info usernet command");
-            qmp_stream.write_fmt(format_args!(
-                "{}\n",
-                json!({
-                    "execute": "human-monitor-command",
-                    "arguments": { "command-line": "info usernet"}
-                })
-                .to_string()
-            ))?;
+            qmp_stream
+                .write_fmt(format_args!(
+                    "{}\n",
+                    json!({
+                        "execute": "human-monitor-command",
+                        "arguments": { "command-line": "info usernet"}
+                    })
+                    .to_string()
+                ))
+                .map_err(|e| bug!("Error writing info usernet: {e}"))?;
         }
     }
 
@@ -760,8 +785,10 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 }
                 [protocol_state, _, _, host_port, _, guest_port, _, _] => {
                     if protocol_state == "TCP[HOST_FORWARD]" {
-                        let guest: u16 = guest_port.parse()?;
-                        let host: u16 = host_port.parse()?;
+                        let guest: u16 =
+                            guest_port.parse().map_err(|e| bug!("error parsing: {e}"))?;
+                        let host: u16 =
+                            host_port.parse().map_err(|e| bug!("error parsing: {e}"))?;
                         pairs.push(PortPair { guest, host });
                     } else {
                         tracing::debug!("Skipping non host-forward row: {l}");
@@ -789,18 +816,20 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         let start = Instant::now();
         loop {
             if start.elapsed() > *max_elapsed {
-                bail!("Reading port mappings timed out");
+                return_bug!("Reading port mappings timed out");
             }
             if !self.is_running().await {
-                bail!("Emulator instance is not running.");
+                return_user_error!("Emulator instance is not running.");
             }
             // Wait for being able to connect to the socket.
-            match socket.connect().context("Connecting to console.") {
+            match socket.connect() {
                 Ok(()) => {
                     match socket.stream() {
                         Some(mut qmp_stream) => {
                             // Send the qmp_capabilities command to initialize the conversation.
-                            qmp_stream.write_all(b"{ \"execute\": \"qmp_capabilities\" }\n")?;
+                            qmp_stream
+                                .write_all(b"{ \"execute\": \"qmp_capabilities\" }\n")
+                                .map_err(|e| bug!("Error writing qmp_capabilities: {e}"))?;
                             return Ok(qmp_stream);
                         }
                         None => {
@@ -896,17 +925,17 @@ mod tests {
             .write(true)
             .create(true)
             .open(&kernel_path)
-            .context("cannot create test kernel file")?;
+            .map_err(|e| bug!("Cannot create test kernel file: {e}"))?;
         let _ = fs::File::options()
             .write(true)
             .create(true)
             .open(&zbi_path)
-            .context("cannot create test zbi file")?;
+            .map_err(|e| bug!("cannot create test zbi file: {e}"))?;
         let _ = fs::File::options()
             .write(true)
             .create(true)
             .open(&*disk_image_path)
-            .context("cannot create test disk image file")?;
+            .map_err(|e| bug!("cannot create test disk image file: {e}"))?;
 
         env.query(config::EMU_INSTANCE_ROOT_DIR)
             .level(Some(ConfigLevel::User))
@@ -935,16 +964,16 @@ mod tests {
         let mut file = File::options()
             .write(true)
             .open(path)
-            .context(format!("cannot open existing file for write: {}", path.display()))?;
+            .map_err(|e| bug!("cannot open existing file for write: {}: {e}", path.display()))?;
         File::write(&mut file, value.as_bytes())
-            .context(format!("cannot write buffer to file: {}", path.display()))?;
+            .map_err(|e| bug!("cannot write buffer to file: {}: {e}", path.display()))?;
 
         Ok(())
     }
 
     async fn test_staging_no_reuse_common(disk_image_format: DiskImageFormat) -> Result<()> {
         let env = ffx_config::test_init().await?;
-        let temp = tempdir().context("cannot get tempdir")?;
+        let temp = tempdir().map_err(|e| bug!("cannot get tempdir: {e}"))?;
         let instance_name = "test-instance";
         let mut emu_config = EmulatorConfiguration::default();
         emu_config.device.storage = DataAmount { quantity: 32, units: DataUnits::Bytes };
@@ -955,9 +984,9 @@ mod tests {
         ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
 
         write_to(&emu_config.guest.kernel_image, ORIGINAL)
-            .context("cannot write original value to kernel file")?;
+            .map_err(|e| bug!("cannot write original value to kernel file: {e}"))?;
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), ORIGINAL)
-            .context("cannot write original value to disk image file")?;
+            .map_err(|e| bug!("cannot write original value to disk image file: {e}"))?;
 
         let updated =
             <TestEngine as QemuBasedEngine>::stage_image_files(instance_name, &emu_config, false)
@@ -965,7 +994,7 @@ mod tests {
 
         assert!(updated.is_ok(), "expected OK got {:?}", updated.unwrap_err());
 
-        let actual = updated.context("cannot get updated guest config")?;
+        let actual = updated.map_err(|e| bug!("cannot get updated guest config: {e}"))?;
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
             zbi_image: root.join(instance_name).join("zbi"),
@@ -978,9 +1007,9 @@ mod tests {
 
         // Test no reuse when old files exist. The original files should be overwritten.
         write_to(&emu_config.guest.kernel_image, UPDATED)
-            .context("cannot write updated value to kernel file")?;
+            .map_err(|e| bug!("cannot write updated value to kernel file: {e}"))?;
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), UPDATED)
-            .context("cannot write updated value to disk image file")?;
+            .map_err(|e| bug!("cannot write updated value to disk image file: {e}"))?;
 
         let updated =
             <TestEngine as QemuBasedEngine>::stage_image_files(instance_name, &emu_config, false)
@@ -988,7 +1017,7 @@ mod tests {
 
         assert!(updated.is_ok(), "expected OK got {:?}", updated.unwrap_err());
 
-        let actual = updated.context("cannot get updated guest config, reuse")?;
+        let actual = updated.map_err(|e| bug!("cannot get updated guest config, reuse: {e}"))?;
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
             zbi_image: root.join(instance_name).join("zbi"),
@@ -1002,19 +1031,19 @@ mod tests {
         println!("Reading contents from {}", actual.kernel_image.display());
         println!("Reading contents from {}", actual.disk_image.as_ref().unwrap().display());
         let mut kernel = File::open(&actual.kernel_image)
-            .context("cannot open overwritten kernel file for read")?;
+            .map_err(|e| bug!("cannot open overwritten kernel file for read: {e}"))?;
         let mut disk_image = File::open(&*actual.disk_image.unwrap())
-            .context("cannot open overwritten disk image file for read")?;
+            .map_err(|e| bug!("cannot open overwritten disk image file for read: {e}"))?;
 
         let mut kernel_contents = String::new();
         let mut fvm_contents = String::new();
 
         kernel
             .read_to_string(&mut kernel_contents)
-            .context("cannot read contents of reused kernel file")?;
+            .map_err(|e| bug!("cannot read contents of reused kernel file: {e}"))?;
         disk_image
             .read_to_string(&mut fvm_contents)
-            .context("cannot read contents of reused disk image file")?;
+            .map_err(|e| bug!("cannot read contents of reused disk image file: {e}"))?;
 
         assert_eq!(kernel_contents, UPDATED);
 
@@ -1040,7 +1069,7 @@ mod tests {
 
     async fn test_staging_with_reuse_common(disk_image_format: DiskImageFormat) -> Result<()> {
         let env = ffx_config::test_init().await?;
-        let temp = tempdir().context("cannot get tempdir")?;
+        let temp = tempdir().expect("cannot get tempdir");
         let instance_name = "test-instance";
         let mut emu_config = EmulatorConfiguration::default();
         emu_config.device.storage = DataAmount { quantity: 32, units: DataUnits::Bytes };
@@ -1052,9 +1081,9 @@ mod tests {
 
         // This checks if --reuse is true, but the directory isn't there to reuse; should succeed.
         write_to(&emu_config.guest.kernel_image, ORIGINAL)
-            .context("cannot write original value to kernel file")?;
+            .expect("cannot write original value to kernel file");
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), ORIGINAL)
-            .context("cannot write original value to disk image file")?;
+            .expect("cannot write original value to disk image file");
 
         let updated: Result<GuestConfig> =
             <TestEngine as QemuBasedEngine>::stage_image_files(instance_name, &emu_config, true)
@@ -1062,7 +1091,7 @@ mod tests {
 
         assert!(updated.is_ok(), "expected OK got {:?}", updated.unwrap_err());
 
-        let actual = updated.context("cannot get updated guest config")?;
+        let actual = updated.expect("cannot get updated guest config");
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
             zbi_image: root.join(instance_name).join("zbi"),
@@ -1076,9 +1105,9 @@ mod tests {
         // Test reuse. Note that the ZBI file isn't actually copied in the test, since we replace
         // the ZBI tool with an "echo" command.
         write_to(&emu_config.guest.kernel_image, UPDATED)
-            .context("cannot write updated value to kernel file")?;
+            .expect("cannot write updated value to kernel file");
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), UPDATED)
-            .context("cannot write updated value to disk image file")?;
+            .expect("cannot write updated value to disk image file");
 
         let updated =
             <TestEngine as QemuBasedEngine>::stage_image_files(instance_name, &emu_config, true)
@@ -1086,7 +1115,7 @@ mod tests {
 
         assert!(updated.is_ok(), "expected OK got {:?}", updated.unwrap_err());
 
-        let actual = updated.context("cannot get updated guest config, reuse")?;
+        let actual = updated.expect("cannot get updated guest config, reuse");
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
             zbi_image: root.join(instance_name).join("zbi"),
@@ -1099,17 +1128,17 @@ mod tests {
 
         println!("Reading contents from {}", actual.kernel_image.display());
         let mut kernel =
-            File::open(&actual.kernel_image).context("cannot open reused kernel file for read")?;
-        let mut fvm = File::open(&*actual.disk_image.unwrap())
-            .context("cannot open reused fvm file for read")?;
+            File::open(&actual.kernel_image).expect("cannot open reused kernel file for read");
+        let mut fvm =
+            File::open(&*actual.disk_image.unwrap()).expect("cannot open reused fvm file for read");
 
         let mut kernel_contents = String::new();
         let mut fvm_contents = String::new();
 
         kernel
             .read_to_string(&mut kernel_contents)
-            .context("cannot read contents of reused kernel file")?;
-        fvm.read_to_string(&mut fvm_contents).context("cannot read contents of reused fvm file")?;
+            .expect("cannot read contents of reused kernel file");
+        fvm.read_to_string(&mut fvm_contents).expect("cannot read contents of reused fvm file");
 
         assert_eq!(kernel_contents, ORIGINAL);
 
@@ -1139,7 +1168,7 @@ mod tests {
 
     async fn test_staging_resize_fxfs() -> Result<()> {
         let env = ffx_config::test_init().await?;
-        let temp = tempdir().context("cannot get tempdir")?;
+        let temp = tempdir().expect("cannot get tempdir");
         let instance_name = "test-instance";
         let mut emu_config = EmulatorConfiguration::default();
         let root = setup(&env.context, &mut emu_config.guest, &temp, DiskImageFormat::Fxfs).await?;
@@ -1149,15 +1178,16 @@ mod tests {
 
         const EXPECTED_DATA: &[u8] = b"hello, world";
 
-        std::fs::write(&emu_config.guest.kernel_image, "whatever")?;
-        std::fs::write(emu_config.guest.disk_image.as_ref().unwrap(), EXPECTED_DATA)?;
+        std::fs::write(&emu_config.guest.kernel_image, "whatever").expect("writing kernel image");
+        std::fs::write(emu_config.guest.disk_image.as_ref().unwrap(), EXPECTED_DATA)
+            .expect("writing guest image");
 
         emu_config.device.storage = DataAmount { units: DataUnits::Kilobytes, quantity: 4 };
 
         let config =
             <TestEngine as QemuBasedEngine>::stage_image_files(instance_name, &emu_config, false)
                 .await
-                .context("Failed to get guest config")?;
+                .expect("Failed to get guest config");
 
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
@@ -1167,11 +1197,11 @@ mod tests {
         };
         assert_eq!(config, expected);
 
-        let mut disk_image = File::open(&*config.disk_image.unwrap())?;
+        let mut disk_image = File::open(&*config.disk_image.unwrap()).expect("disk image");
         let mut disk_contents = vec![];
         disk_image
             .read_to_end(&mut disk_contents)
-            .context("cannot read contents of reused disk image file")?;
+            .expect("cannot read contents of reused disk image file");
 
         assert_eq!(disk_contents.len(), 4096);
         assert_eq!(&disk_contents[..EXPECTED_DATA.len()], EXPECTED_DATA);
@@ -1183,7 +1213,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_embed_boot_data() -> Result<()> {
         let env = ffx_config::test_init().await?;
-        let temp = tempdir().context("cannot get tempdir")?;
+        let temp = tempdir().expect("cannot get tempdir");
         let mut emu_config = EmulatorConfiguration::default();
 
         let root = setup(&env.context, &mut emu_config.guest, &temp, DiskImageFormat::Fvm).await?;
@@ -1249,7 +1279,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_read_port_mappings() -> Result<()> {
         let env = ffx_config::test_init().await?;
-        let temp = tempdir().context("cannot get tempdir")?;
+        let temp = tempdir().expect("cannot get tempdir");
         let mut data: EmulatorInstanceData =
             EmulatorInstanceData::new_with_state("test-instance", EngineState::New);
         let root = setup(
@@ -1260,7 +1290,8 @@ mod tests {
         )
         .await?;
         data.set_instance_directory(&root.join("test-instance").to_string_lossy());
-        fs::create_dir_all(&data.get_emulator_configuration().runtime.instance_directory)?;
+        fs::create_dir_all(&data.get_emulator_configuration().runtime.instance_directory)
+            .expect("creating instance dir");
 
         data.get_emulator_configuration_mut()
             .host
@@ -1283,16 +1314,18 @@ mod tests {
 
         // Change the working directory to handle long path names to the socket while opening it,
         // then change back.
-        let cwd = env::current_dir()?;
+        let cwd = env::current_dir().expect("getting current dir");
         // Set up a socket that behaves like QMP
-        env::set_current_dir(engine.emu_config().runtime.instance_directory.clone())?;
-        let listener = UnixListener::bind(MACHINE_CONSOLE)?;
-        env::set_current_dir(&cwd)?;
+        env::set_current_dir(engine.emu_config().runtime.instance_directory.clone())
+            .expect("setting current dir");
+        let listener = UnixListener::bind(MACHINE_CONSOLE).expect("binding machine console");
+        env::set_current_dir(&cwd).expect("setting current dir");
 
         // Helper function for this test to be the QEMU side of the QMP socket.
         fn do_qmp(mut stream: UnixStream) -> Result<()> {
             let mut request_iter =
-                Deserializer::from_reader(stream.try_clone()?).into_iter::<Value>();
+                Deserializer::from_reader(stream.try_clone().map_err(|e| bug!("{e}"))?)
+                    .into_iter::<Value>();
 
             // Responses to the `info usernet` request. The last response should end the interaction
             // because if fulfills all the port mappings which are being looked for.
@@ -1325,10 +1358,12 @@ mod tests {
                                     if let Some(arguments) = cmd.arguments {
                                         assert_eq!(arguments.command_line, "info usernet");
                                     }
-                                    stream.write_fmt(format_args!(
-                                        "{}\n",
-                                        responses[index].to_string()
-                                    ))?;
+                                    stream
+                                        .write_fmt(format_args!(
+                                            "{}\n",
+                                            responses[index].to_string()
+                                        ))
+                                        .map_err(|e| bug!("Error writing {e}"))?;
                                     index += 1;
                                 }
                                 "qmp_capabilities" => {
@@ -1350,15 +1385,15 @@ mod tests {
                                         )
                                         .to_string()
                                         .as_bytes(),
-                                    )?;
+                                    ).map_err(|e| bug!("Error writing {e}"))?;
                                 }
-                                _ => bail!("unknown request is here! {cmd:?}"),
+                                _ => return_bug!("unknown request is here! {cmd:?}"),
                             }
                         } else {
-                            bail!("Unknown message {data:?}");
+                            return_bug!("Unknown message {data:?}");
                         }
                     }
-                    Some(Err(e)) => bail!("Error reading QMP request: {e:?}"),
+                    Some(Err(e)) => return_bug!("Error reading QMP request: {e:?}"),
                     None => (),
                 }
             }
@@ -1378,7 +1413,7 @@ mod tests {
                     }
                     Err(err) => {
                         /* connection failed */
-                        bail!("{err:?}");
+                        return_bug!("Error connecting incoming: {err:?}");
                     }
                 }
             }
@@ -1407,7 +1442,7 @@ mod tests {
                     "mismatch for {:?}",
                     &engine.emu_config().host.port_map
                 ),
-                _ => bail!("Unexpected port mapping: {name} {mapping:?}"),
+                _ => return_bug!("Unexpected port mapping: {name} {mapping:?}"),
             };
         }
 

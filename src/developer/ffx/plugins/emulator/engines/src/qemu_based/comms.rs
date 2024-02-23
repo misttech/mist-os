@@ -12,8 +12,7 @@
 //! on an emulator launched with `ffx emu`. As we shift other functionality to the consoles
 //! (e.g. status queries, shutdown commands, etc.), this is where that functionality will be
 //! exposed.
-
-use anyhow::{Context, Result};
+use fho::{bug, return_bug, Result};
 use fidl_fuchsia_developer_ffx::MAX_PATH;
 use nix::NixPath;
 use std::env;
@@ -54,7 +53,7 @@ impl QemuSocket {
         if self.socket.is_none() {
             match <Self as CommsBackend<UnixStream>>::connect(&self.socket_path) {
                 Ok(s) => self.socket = Some(s),
-                Err(e) => return Err(e.context("Connecting to the backend.")),
+                Err(e) => return_bug!("Error connecting to the backend: {e}"),
             }
         }
         Ok(())
@@ -78,8 +77,11 @@ impl CommsBackend<UnixStream> for QemuSocket {
         // access it with a relative "./socket" path instead of the absolute path stored in the
         // configuration.
 
-        let stream_result = if absolute_socket_path.len() > MAX_PATH.try_into()? {
-            let cwd = env::current_dir().context("Getting current working directory.")?;
+        let stream_result = if absolute_socket_path.len()
+            > MAX_PATH.try_into().map_err(|e| bug!("Getting Max Path: {e}."))?
+        {
+            let cwd =
+                env::current_dir().map_err(|e| bug!("Getting current working directory: {e}."))?;
 
             // This ensures we are running in the right location relative to the socket file. If the
             // socket_path has no parent, we stay in the current directory.
@@ -94,8 +96,9 @@ impl CommsBackend<UnixStream> for QemuSocket {
             eprintln!("{msg_start}");
             tracing::warn!("{msg_start}");
             let path = absolute_socket_path.parent().unwrap_or(&cwd);
-            env::set_current_dir(path)
-                .context(format!("Changing to instance directory {}.", path.display()))?;
+            env::set_current_dir(path).map_err(|e| {
+                bug!("Error changing to instance directory {}: {e}.", path.display())
+            })?;
 
             // Connect to the indicated socket. If the path has no filename component, the connect call
             // will fail and the error will be returned to the caller along with the invalid path.
@@ -104,7 +107,8 @@ impl CommsBackend<UnixStream> for QemuSocket {
 
             // Reset the working directory before dealing with the result of the connect() call. This
             // way, even if we failed to connect to the socket, we revert the CWD every time.
-            env::set_current_dir(cwd).context("Returning to original working directory.")?;
+            env::set_current_dir(cwd)
+                .map_err(|e| bug!("Returning to original working directory: {e}"))?;
 
             eprintln!("{msg_restored}");
             tracing::warn!("{msg_restored}");
@@ -113,10 +117,9 @@ impl CommsBackend<UnixStream> for QemuSocket {
             UnixStream::connect(absolute_socket_path)
         };
 
-        let stream = stream_result.context(format!(
-            "Connecting to socket backend at {}.",
-            absolute_socket_path.display()
-        ))?;
+        let stream = stream_result.map_err(|e| {
+            bug!("Connecting to socket backend at {}: {e}.", absolute_socket_path.display())
+        })?;
 
         Ok(stream)
     }
@@ -163,6 +166,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fho::bug;
     use std::fs::create_dir_all;
     use std::os::unix::net::UnixListener;
     use tempfile::tempdir;
@@ -172,11 +176,11 @@ mod tests {
     #[test]
     fn test_socket_connect() -> Result<()> {
         // Set up a temporary directory.
-        let temp = tempdir()?.path().to_path_buf();
-        create_dir_all(&temp)?;
+        let temp = tempdir().expect("tempdir").path().to_path_buf();
+        create_dir_all(&temp).expect("create temp");
 
         let socket_path = temp.join(TEST_CONSOLE);
-        assert!(socket_path.len() < MAX_PATH.try_into()?);
+        assert!(socket_path.len() < MAX_PATH.try_into().expect("type conversion"));
 
         // Set up a structure to hold the connection.
         let mut socket = QemuSocket::new(&socket_path);
@@ -185,10 +189,10 @@ mod tests {
         assert!(socket.connect().is_err());
         assert!(socket.stream().is_none());
 
-        let listener = UnixListener::bind(&socket_path)?;
+        let listener = UnixListener::bind(&socket_path).expect("bind socket");
         // Set up a side thread that will accept an incoming connection and then exit.
         std::thread::spawn(move || -> Result<()> {
-            let _ = listener.accept()?;
+            let _ = listener.accept().map_err(|e| bug!("{e}"));
             Ok(())
         });
 

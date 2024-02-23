@@ -41,10 +41,7 @@ pub async fn get_engine_by_name(
     // If we got this far, name is set to either what the user asked for, or the only one running.
     if let Some(local_name) = name {
         match read_from_disk(&local_name).await? {
-            EngineOption::DoesExist(data) => {
-                let engine = EngineBuilder::from_data(data)?;
-                Ok(Some(engine))
-            }
+            EngineOption::DoesExist(data) => Ok(Some(EngineBuilder::from_data(data))),
             EngineOption::DoesNotExist(_) => Ok(None),
         }
     } else {

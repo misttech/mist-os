@@ -3,19 +3,15 @@
 // found in the LICENSE file.
 
 use crate::EngineBuilder;
-use anyhow::{bail, Result};
 use emulator_instance::{read_from_disk, EngineOption};
 use ffx_emulator_config::EmulatorEngine;
+use fho::{return_bug, return_user_error, Result};
 
 pub async fn read_engine_from_disk(name: &str) -> Result<Box<dyn EmulatorEngine>> {
     match read_from_disk(name).await {
-        Ok(EngineOption::DoesExist(data)) => {
-            let engine: Box<dyn EmulatorEngine> = EngineBuilder::from_data(data)?;
-
-            Ok(engine)
-        }
-        Ok(EngineOption::DoesNotExist(_)) => bail!("{name} instance does not exist"),
-        Err(e) => bail!("Could not read engine from disk: {e:?}"),
+        Ok(EngineOption::DoesExist(data)) => Ok(EngineBuilder::from_data(data)),
+        Ok(EngineOption::DoesNotExist(_)) => return_user_error!("{name} instance does not exist"),
+        Err(e) => return_bug!("Could not read engine {name} from disk: {e}"),
     }
 }
 
@@ -97,10 +93,10 @@ mod tests {
         {
             // stage the instance data since we can't write it via the emulator_instance API.
 
-            let instance_path = get_instance_dir(name, true).await?;
+            let instance_path = get_instance_dir(name, true).await.expect("get instance dir");
             let data_path = instance_path.join("engine.json");
-            let mut file = File::create(&data_path)?;
-            write!(file, "{}", &unknown_engine_type)?;
+            let mut file = File::create(&data_path).expect("create data file");
+            write!(file, "{}", &unknown_engine_type).expect("writing unknown engine type");
         }
 
         let box_engine = read_from_disk(name).await;

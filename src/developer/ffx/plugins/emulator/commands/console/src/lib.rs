@@ -39,7 +39,7 @@ fn get_console_type(cmd: &ConsoleCommand) -> Result<EngineConsoleType> {
 }
 
 #[ffx_plugin("emu.console.enabled")]
-pub async fn console(mut cmd: ConsoleCommand) -> Result<()> {
+pub async fn console(mut cmd: ConsoleCommand) -> fho::Result<()> {
     let console = match get_console_type(&cmd) {
         Ok(c) => c,
         Err(e) => ffx_bail!("{:?}", e),

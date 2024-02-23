@@ -18,6 +18,7 @@ if (is_host) {
       "//build/sdk/meta:rust",
       "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
       "//src/developer/ffx/lib/emulator_instance:lib",
+      "//src/developer/ffx/lib/fho:lib",
       "//src/lib/assembly/assembly_manifest",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-trait",

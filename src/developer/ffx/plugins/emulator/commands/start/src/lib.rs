@@ -79,7 +79,6 @@ impl EngineOperations for EngineOperationsData {
             .engine_type(engine_type)
             .build()
             .await
-            .map_err(|e| e.into())
     }
 
     async fn load_product_bundle(
@@ -160,10 +159,7 @@ impl<T: EngineOperations> FfxMain for EmuStartTool<T> {
         if self.cmd.config.is_none() && !self.cmd.reuse && !self.cmd.dry_run {
             // We don't stage files for custom configurations, because the EmulatorConfiguration
             // doesn't hold valid paths to the system images.
-            engine
-                .stage()
-                .await
-                .user_message("Error staging the emulator's instance directory.")?;
+            engine.stage().await?;
 
             if self.cmd.stage {
                 if self.cmd.verbose {
@@ -176,9 +172,7 @@ impl<T: EngineOperations> FfxMain for EmuStartTool<T> {
         }
 
         if self.cmd.edit {
-            self.engine_operations
-                .edit_configuration(engine.emu_config_mut())
-                .user_message("Problem editing configuration.")?;
+            self.engine_operations.edit_configuration(engine.emu_config_mut())?;
         }
 
         let emulator_cmd = engine.build_emulator_cmd();
@@ -192,7 +186,7 @@ impl<T: EngineOperations> FfxMain for EmuStartTool<T> {
             match engine.start(emulator_cmd, &self.target_collection).await {
                 Ok(0) => Ok(()),
                 Ok(_) => ffx_bail!("Non zero return code"),
-                Err(e) => ffx_bail!("{:?}", e.context("The emulator failed to start.")),
+                Err(e) => return Err(e),
             }
         } else {
             Ok(())
@@ -229,11 +223,8 @@ impl<T: EngineOperations> EmuStartTool<T> {
                 }
             } else {
                 tracing::debug!("No existing instance to check as reusable.");
-                engine = self
-                    .engine_operations
-                    .new_engine(&emulator_configuration, engine_type)
-                    .await
-                    .user_message("Error creating new engine")?;
+                engine =
+                    self.engine_operations.new_engine(&emulator_configuration, engine_type).await?;
                 let config = engine.emu_config_mut();
                 Self::save_disk_hashes(config)?;
             }
@@ -272,8 +263,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
                     engine = self
                         .engine_operations
                         .new_engine(&emulator_configuration, engine_type)
-                        .await
-                        .user_message("Error creating new engine")?
+                        .await?
                 }
             } else {
                 engine = if !emulator_configuration.runtime.config_override
@@ -281,10 +271,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
                 {
                     existing_engine.expect("existing engine instance")
                 } else {
-                    self.engine_operations
-                        .new_engine(&emulator_configuration, engine_type)
-                        .await
-                        .user_message("Error creating new engine")?
+                    self.engine_operations.new_engine(&emulator_configuration, engine_type).await?
                 }
             }
         }
@@ -488,17 +475,17 @@ mod tests {
 
     #[async_trait]
     impl EmulatorEngine for TestEngine {
-        async fn save_to_disk(&self) -> anyhow::Result<()> {
+        async fn save_to_disk(&self) -> fho::Result<()> {
             Ok(())
         }
         fn build_emulator_cmd(&self) -> Command {
             Command::new(self.config.runtime.name.clone())
         }
-        async fn stage(&mut self) -> anyhow::Result<()> {
+        async fn stage(&mut self) -> fho::Result<()> {
             self.did_stage = true;
             (self.stage_test_fn)(&mut self.config)?;
             if !self.do_stage {
-                anyhow::bail!("Test called stage() when it wasn't supposed to.")
+                fho::return_bug!("Test called stage() when it wasn't supposed to.")
             }
             Ok(())
         }
@@ -506,11 +493,11 @@ mod tests {
             &mut self,
             emulator_cmd: Command,
             _proxy: &TargetCollectionProxy,
-        ) -> anyhow::Result<i32> {
+        ) -> fho::Result<i32> {
             self.did_start = true;
             (self.start_test_fn)(emulator_cmd)?;
             if !self.do_start {
-                anyhow::bail!("Test called start() when it wasn't supposed to.")
+                fho::return_bug!("Test called start() when it wasn't supposed to.")
             }
             Ok(0)
         }

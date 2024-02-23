@@ -7,7 +7,6 @@
 
 use super::get_host_tool;
 use crate::qemu_based::QemuBasedEngine;
-use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use emulator_instance::{
     get_instance_dir, EmulatorConfiguration, EmulatorInstanceData, EmulatorInstanceInfo,
@@ -15,6 +14,7 @@ use emulator_instance::{
 };
 use ffx_emulator_common::config;
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
+use fho::{bug, return_bug, Result};
 use fidl_fuchsia_developer_ffx as ffx;
 use std::process::Command;
 
@@ -58,7 +58,7 @@ impl EmulatorEngine for FemuEngine {
             }
             Err(e) => {
                 self.data.set_engine_state(EngineState::Error);
-                self.save_to_disk().await.with_context(|| format!("{:?}", &e)).and(Err(e))
+                self.save_to_disk().await.and(Err(e))
             }
         }
     }
@@ -153,17 +153,16 @@ impl EmulatorEngine for FemuEngine {
     /// Get the AEMU binary path from the SDK manifest and verify it exists.
     async fn load_emulator_binary(&mut self) -> Result<()> {
         let emulator_binary = match get_host_tool(config::FEMU_TOOL).await {
-            Ok(aemu_path) => aemu_path.canonicalize().context(format!(
-                "Failed to canonicalize the path to the emulator binary: {:?}",
-                aemu_path
-            ))?,
+            Ok(aemu_path) => aemu_path.canonicalize().map_err(|e| {
+                bug!("Failed to canonicalize the path to the emulator binary: {aemu_path:?}: {e}")
+            })?,
             Err(e) => {
-                bail!("Cannot find {} in the SDK: {:?}", config::FEMU_TOOL, e);
+                return_bug!("Cannot find {} in the SDK: {:?}", config::FEMU_TOOL, e);
             }
         };
 
         if !emulator_binary.exists() || !emulator_binary.is_file() {
-            bail!("Giving up finding emulator binary. Tried {:?}", emulator_binary)
+            return_bug!("Giving up finding emulator binary. Tried {:?}", emulator_binary)
         }
         self.data.set_emulator_binary(emulator_binary);
         Ok(())
@@ -182,6 +181,7 @@ impl EmulatorEngine for FemuEngine {
             &self.data,
             &get_instance_dir(self.data.get_name(), true).await?,
         )
+        .map_err(|e| bug!("Error saving instance to disk: {e}"))
     }
 }
 

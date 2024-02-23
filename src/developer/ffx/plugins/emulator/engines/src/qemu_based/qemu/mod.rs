@@ -9,7 +9,6 @@
 
 use super::get_host_tool;
 use crate::qemu_based::QemuBasedEngine;
-use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use emulator_instance::{
     get_instance_dir, write_to_disk, CpuArchitecture, EmulatorConfiguration, EmulatorInstanceData,
@@ -17,6 +16,7 @@ use emulator_instance::{
 };
 use ffx_emulator_common::config::QEMU_TOOL;
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
+use fho::{bug, return_bug, Result};
 use fidl_fuchsia_developer_ffx as ffx;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -70,7 +70,7 @@ impl EmulatorEngine for QemuEngine {
             }
             Err(e) => {
                 self.data.set_engine_state(EngineState::Error);
-                self.save_to_disk().await.with_context(|| format!("{:?}", &e)).and(Err(e))
+                self.save_to_disk().await.and(Err(e))
             }
         }
     }
@@ -163,11 +163,10 @@ impl EmulatorEngine for QemuEngine {
         };
 
         let qemu_x64_path = match get_host_tool(QEMU_TOOL).await {
-            Ok(qemu_path) => qemu_path.canonicalize().context(format!(
-                "Failed to canonicalize the path to the emulator binary: {:?}",
-                qemu_path
-            ))?,
-            Err(e) => bail!("Cannot find {} in the SDK: {:?}", QEMU_TOOL, e),
+            Ok(qemu_path) => qemu_path.canonicalize().map_err(|e| {
+                bug!("Failed to canonicalize the path to the emulator binary: {qemu_path:?}: {e}")
+            })?,
+            Err(e) => return_bug!("Cannot find {QEMU_TOOL} in the SDK: {e}"),
         };
 
         // If we need to, replace the executable name.
@@ -182,7 +181,7 @@ impl EmulatorEngine for QemuEngine {
         };
 
         if !emulator_binary.exists() || !emulator_binary.is_file() {
-            bail!("Giving up finding emulator binary. Tried {:?}", emulator_binary)
+            return_bug!("Giving up finding emulator binary. Tried {:?}", emulator_binary)
         }
         self.data.set_emulator_binary(emulator_binary);
 
@@ -204,6 +203,7 @@ impl EmulatorEngine for QemuEngine {
                 .await
                 .unwrap_or_else(|_| panic!("instance directory for {}", self.data.get_name())),
         )
+        .map_err(|e| bug!("Error saving instance to disk: {e}"))
     }
 }
 
