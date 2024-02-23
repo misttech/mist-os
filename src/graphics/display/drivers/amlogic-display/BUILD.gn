@@ -40,7 +40,7 @@ group("bind_rules") {
   if (board_name == "astro") {
     public_deps += [ ":amlogic_display_without_dsi_bind" ]
   } else if (board_name == "sherlock") {
-    public_deps += [ ":amlogic_display_bind" ]
+    public_deps += [ ":amlogic_display_without_dsi_bind" ]
   } else if (board_name == "nelson") {
     public_deps += [ ":amlogic_display_without_dsi_bind" ]
   } else if (board_name == "vim3") {

@@ -21,7 +21,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:00:10/aml-canvas",
       "sys/platform/05:04:a/aml_thermal_pll/thermal",
       "sys/platform/00:00:1e/dw-dsi",
-      "sys/platform/00:00:1e/dw-dsi/display/amlogic-display/display-coordinator",
+      "sys/platform/05:04:d/display/amlogic-display/display-coordinator",
       "sys/platform/05:00:18/aml_usb_phy_v2",
 
       // XHCI driver will not be loaded if we are in USB peripheral mode.
