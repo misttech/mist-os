@@ -49,6 +49,10 @@ impl Symbolize for NoOpSymoblizer {
     async fn symbolize(&self, entry: LogEntry) -> LogEntry {
         entry
     }
+
+    fn supports_transactions(&self) -> bool {
+        true
+    }
 }
 
 fho::embedded_plugin!(LogTool);

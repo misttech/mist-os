@@ -30,6 +30,10 @@ where
     async fn symbolize(&self, entry: LogEntry) -> LogEntry {
         self.symbolize_message(entry).await
     }
+
+    fn supports_transactions(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Error, Debug)]

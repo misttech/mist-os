@@ -99,6 +99,16 @@ impl Display for LogEntry {
 #[async_trait(?Send)]
 pub trait Symbolize {
     async fn symbolize(&self, entry: LogEntry) -> LogEntry;
+
+    /// Returns true if this symbolizer supports transactions, false otherwise.
+    /// If this is false, it is invalid to attempt transactions on this symbolizer.
+    /// A symbolizer supports transactions if it can handle multiple calls to symbolize
+    /// in parallel. Transactional symbolizers must guarantee in-order delivery
+    /// of completions to callers. Futures are guaranteed to complete in the order
+    /// in which they were queued. Callers are expected to poll all returned futures
+    /// in order to make further progress on symbolization, even if prior ones
+    /// haven't yet completed.
+    fn supports_transactions(&self) -> bool;
 }
 
 async fn handle_value<F, S>(
@@ -470,6 +480,10 @@ impl Symbolize for NoOpSymbolizer {
     async fn symbolize(&self, entry: LogEntry) -> LogEntry {
         entry
     }
+
+    fn supports_transactions(&self) -> bool {
+        true
+    }
 }
 
 /// Trait for formatting logs one at a time.
@@ -530,6 +544,10 @@ mod test {
                 ),
                 timestamp: entry.timestamp,
             }
+        }
+
+        fn supports_transactions(&self) -> bool {
+            return true;
         }
     }
 

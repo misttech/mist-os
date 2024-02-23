@@ -44,6 +44,10 @@ impl Symbolize for Symbolizer {
     async fn symbolize(&self, entry: LogEntry) -> LogEntry {
         entry
     }
+
+    fn supports_transactions(&self) -> bool {
+        return true;
+    }
 }
 
 #[fuchsia_async::run_singlethreaded]
