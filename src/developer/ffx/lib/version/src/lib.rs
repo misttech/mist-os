@@ -6,38 +6,34 @@ use std::ffi::CString;
 
 pub use fidl_fuchsia_developer_ffx::VersionInfo;
 
-#[cfg(target_os = "macos")]
+type VersionBuf = [u8; 64];
+
 #[used]
 #[no_mangle]
 // mach-o section specifiers require a segment and section separated by a comma.
-#[link_section = ".FFX_VERSION,.ffx_version"]
-static VERSION_INFO: [u8; 64] = ['v' as u8; 64];
+#[cfg_attr(target_os = "macos", link_section = ".FFX_VERSION,.ffx_version")]
+#[cfg_attr(not(target_os = "macos"), link_section = ".ffx_version")]
+static VERSION_INFO: VersionBuf = ['v' as u8; 64];
 
-#[cfg(not(target_os = "macos"))]
 #[used]
 #[no_mangle]
-#[link_section = ".ffx_version"]
-static VERSION_INFO: [u8; 64] = ['v' as u8; 64];
-
-#[cfg(target_os = "macos")]
-#[used]
-#[no_mangle]
-// mach-o section specifiers require a segment and section separated by a comma.
-#[link_section = ".FFX_BUILD,.ffx_build"]
-static BUILD_VERSION: [u8; 64] = ['v' as u8; 64];
-
-#[cfg(not(target_os = "macos"))]
-#[used]
-#[no_mangle]
-#[link_section = ".ffx_build"]
-static BUILD_VERSION: [u8; 64] = ['v' as u8; 64];
+#[cfg_attr(target_os = "macos", link_section = ".FFX_BUILD,.ffx_build")]
+#[cfg_attr(not(target_os = "macos"), link_section = ".ffx_build")]
+static BUILD_VERSION: VersionBuf = ['v' as u8; 64];
 
 pub fn build_info() -> VersionInfo {
+    // SAFETY: We're using read_volatile to prevent the compiler from optimizing
+    // on the value of the statics provided in this file, since it will be
+    // overridden in a later build step. The values we read are the same type as
+    // the original statics.
+    let version_info = &unsafe { (VERSION_INFO.as_ptr() as *const VersionBuf).read_volatile() };
+    let build_version = &unsafe { (BUILD_VERSION.as_ptr() as *const VersionBuf).read_volatile() };
+
     let null_char = |b: &u8| *b == 0;
     let version_info =
-        &VERSION_INFO[..VERSION_INFO.iter().position(null_char).unwrap_or(VERSION_INFO.len())];
+        &version_info[..version_info.iter().position(null_char).unwrap_or(version_info.len())];
     let build_version =
-        &BUILD_VERSION[..BUILD_VERSION.iter().position(null_char).unwrap_or(BUILD_VERSION.len())];
+        &build_version[..build_version.iter().position(null_char).unwrap_or(build_version.len())];
     build_info_impl(
         CString::new(version_info)
             .expect("ffx build error: invalid version string format embedded")
