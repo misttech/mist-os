@@ -5,9 +5,12 @@
 use diagnostics_message::MonikerWithUrl;
 use flyweights::FlyStr;
 use moniker::ExtendedMoniker;
-use std::string::ToString;
+use std::{
+    hash::{Hash, Hasher},
+    string::ToString,
+};
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Debug)]
 pub struct ComponentIdentity {
     /// Moniker of the component that this artifacts container is representing.
     pub moniker: ExtendedMoniker,
@@ -15,6 +18,25 @@ pub struct ComponentIdentity {
     /// The url with which the associated component was launched.
     pub url: FlyStr,
 }
+
+// Just use the moniker when hashing and checking equality. That's the unique ID we need. The URL
+// is just used for metadata purposes. Typically both can be used and we can
+// derive(ComponentIdentity), but as long as we have the workaround for netstack2 diagnostics we
+// should just use the moniker as we don't know the runtime URL for this component.
+// TODO(https://fxbug.dev/324494668): consider just derive(Hash) when Netstack2 is gone.
+impl Hash for ComponentIdentity {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.moniker.hash(state);
+    }
+}
+
+impl PartialEq for ComponentIdentity {
+    fn eq(&self, other: &Self) -> bool {
+        self.moniker == other.moniker
+    }
+}
+
+impl Eq for ComponentIdentity {}
 
 impl ComponentIdentity {
     pub fn new(moniker: ExtendedMoniker, url: impl Into<FlyStr>) -> Self {
