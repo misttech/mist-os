@@ -76,6 +76,11 @@ rustc_library("lib") {
     "src/storage.rs",
   ]
 
+  inputs = [
+    "test_data/sdk/meta/manifest.json",
+    "test_data/sdk/tools/x64/a_host_tool-meta.json",
+  ]
+
   _domains_test_data_path =
       rebase_path("//src/developer/ffx/config/domain/test_data",
                   "$root_out_dir/..")

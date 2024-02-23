@@ -279,6 +279,9 @@ impl Sdk {
             .max_by_key(|tool| tool.specificity_score)
     }
 
+    /// Returns the path to the tool with the given name based on the SDK contents.
+    /// A preferred alternative to this method is ffx_config::get_host_tool() which
+    /// also considers configured overrides for the tools.
     pub fn get_host_tool(&self, name: &str) -> Result<PathBuf> {
         self.get_host_tool_relative_path(name).map(|path| self.path_prefix.join(path))
     }

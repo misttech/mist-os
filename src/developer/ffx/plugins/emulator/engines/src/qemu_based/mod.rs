@@ -64,7 +64,7 @@ mod modules {
         // for its existence in `ffx`'s directory.
         // TODO(https://fxbug.dev/42181753): When issues around including aemu in the sdk are resolved, this
         // hack can be removed.
-        match sdk.get_host_tool(name) {
+        match ffx_config::get_host_tool(&sdk, name).await {
             Ok(path) => Ok(path),
             Err(error) => {
                 tracing::warn!(
@@ -85,7 +85,7 @@ mod modules {
                 if tool_path.exists() {
                     Ok(tool_path)
                 } else {
-                    return_bug!("Host tool '{name}' not found after checking in `ffx` directory.")
+                    return_bug!("{error}. Host tool '{name}' not found after checking in `ffx` directory as stopgap.")
                 }
             }
         }

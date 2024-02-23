@@ -8,8 +8,8 @@ use crate::api::{
     ConfigError,
 };
 use analytics::{is_opted_in, set_opt_in_status};
-use anyhow::{Context, Result};
-use std::{convert::From, io::Write, sync::Mutex};
+use anyhow::{anyhow, Context, Result};
+use std::{convert::From, io::Write, path::PathBuf, sync::Mutex};
 
 pub mod api;
 pub mod environment;
@@ -164,6 +164,29 @@ where
     query(with).get().await
 }
 
+pub const SDK_OVERRIDE_KEY_PREFIX: &str = "sdk.overrides";
+
+/// Returns the path to the tool with the given name by first
+/// checking for configured override with the key of `sdk.override.{name}`,
+/// and no override is found, sdk.get_host_tool() is called.
+pub async fn get_host_tool(sdk: &Sdk, name: &str) -> Result<PathBuf> {
+    // Check for configured override for the host tool.
+    let override_key = format!("{SDK_OVERRIDE_KEY_PREFIX}.{name}");
+    let override_result: Result<PathBuf, ConfigError> = query(&override_key).get().await;
+
+    if let Ok(tool_path) = override_result {
+        if tool_path.exists() {
+            tracing::info!("Using configured override for {name}: {tool_path:?}");
+            return Ok(tool_path);
+        } else {
+            return Err(anyhow!(
+                "Override path for {name} set to {tool_path:?}, but does not exist"
+            ));
+        }
+    }
+    sdk.get_host_tool(name)
+}
+
 pub async fn print_config<W: Write>(ctx: &EnvironmentContext, mut writer: W) -> Result<()> {
     let config = ctx.load().await?.config_from_cache(None).await?;
     let read_guard = config.read().await;
@@ -221,7 +244,7 @@ mod test {
     use crate::ConfigLevel;
     use crate::{self as ffx_config};
     use serde_json::{json, Value};
-    use std::{collections::HashSet, path::PathBuf};
+    use std::{collections::HashSet, fs, path::PathBuf};
 
     #[test]
     fn test_config_levels_make_sense_from_first() {
@@ -350,5 +373,101 @@ mod test {
 
         // This should just compile and drop without panicking is all.
         let _ignore = TestEmptyBackedStruct {};
+    }
+
+    /// Writes the file to $root, with the path $path, from the source tree prefix $prefix
+    /// (relative to this source file)
+    macro_rules! put_file {
+        ($root:expr, $prefix:literal, $name:literal) => {{
+            fs::create_dir_all($root.join($name).parent().unwrap()).unwrap();
+            fs::File::create($root.join($name))
+                .unwrap()
+                .write_all(include_bytes!(concat!($prefix, "/", $name)))
+                .unwrap();
+        }};
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_get_host_tool() {
+        let env = ffx_config::test_init().await.expect("create test config");
+        let sdk_root = env.isolate_root.path().join("sdk");
+        env.context
+            .query("sdk.root")
+            .level(Some(ConfigLevel::User))
+            .set(sdk_root.to_string_lossy().into())
+            .await
+            .expect("creating temp sdk root");
+
+        put_file!(sdk_root, "../test_data/sdk", "meta/manifest.json");
+        put_file!(sdk_root, "../test_data/sdk", "tools/x64/a_host_tool-meta.json");
+
+        let sdk = env.context.get_sdk().await.expect("test sdk");
+
+        let result = get_host_tool(&sdk, "a_host_tool").await.expect("a_host_tool");
+        assert_eq!(result, sdk_root.join("tools/x64/a-host-tool"));
+    }
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_get_host_tool_override() {
+        let env = ffx_config::test_init().await.expect("create test config");
+        let sdk_root = env.isolate_root.path().join("sdk");
+        env.context
+            .query("sdk.root")
+            .level(Some(ConfigLevel::User))
+            .set(sdk_root.to_string_lossy().into())
+            .await
+            .expect("creating temp sdk root");
+
+        put_file!(sdk_root, "../test_data/sdk", "meta/manifest.json");
+        put_file!(sdk_root, "../test_data/sdk", "tools/x64/a_host_tool-meta.json");
+
+        // Override the path via config
+        let override_path = env.isolate_root.path().join("a_override_host_tool");
+        fs::write(&override_path, "a_override_tool_contents").expect("override file written");
+        env.context
+            .query(&format!("{SDK_OVERRIDE_KEY_PREFIX}.a_host_tool"))
+            .level(Some(ConfigLevel::User))
+            .set(override_path.to_string_lossy().into())
+            .await
+            .expect("setting override");
+
+        let sdk = env.context.get_sdk().await.expect("test sdk");
+
+        let result = get_host_tool(&sdk, "a_host_tool").await.expect("a_host_tool");
+        assert_eq!(result, override_path);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_get_host_tool_override_no_exists() {
+        let env = ffx_config::test_init().await.expect("create test config");
+        let sdk_root = env.isolate_root.path().join("sdk");
+        env.context
+            .query("sdk.root")
+            .level(Some(ConfigLevel::User))
+            .set(sdk_root.to_string_lossy().into())
+            .await
+            .expect("creating temp sdk root");
+
+        put_file!(sdk_root, "../test_data/sdk", "meta/manifest.json");
+        put_file!(sdk_root, "../test_data/sdk", "tools/x64/a_host_tool-meta.json");
+
+        // Override the path via config
+        let override_path = env.isolate_root.path().join("a_override_host_tool");
+
+        // do not create file, this should report an error.
+
+        env.context
+            .query(&format!("{SDK_OVERRIDE_KEY_PREFIX}.a_host_tool"))
+            .level(Some(ConfigLevel::User))
+            .set(override_path.to_string_lossy().into())
+            .await
+            .expect("setting override");
+
+        let sdk = env.context.get_sdk().await.expect("test sdk");
+
+        let result = get_host_tool(&sdk, "a_host_tool").await;
+        assert_eq!(
+            result.err().unwrap().to_string(),
+            format!("Override path for a_host_tool set to {override_path:?}, but does not exist")
+        );
     }
 }
