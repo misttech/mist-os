@@ -113,7 +113,7 @@ From //build/images/args.gni:141
 
 **Current value (from the default):** `true`
 
-From //build/config/fuchsia/platform_version.gni:58
+From //build/config/fuchsia/platform_version.gni:61
 
 ### archivist_max_cached_logs_bytes
 
@@ -3876,7 +3876,7 @@ platform-version-roller when the API level is incremented.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:57
+From //build/config/fuchsia/platform_version.gni:60
 
 ### include_shell_commands_package
 
