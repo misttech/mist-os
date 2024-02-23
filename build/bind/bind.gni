@@ -368,9 +368,6 @@ template("bindc") {
       rebase_path(response_file, root_build_dir),
       "--depfile",
       rebase_path(depfile, root_build_dir),
-      "--disable-fragment-gen",
-      "--output-bytecode",
-      "--use-new-bytecode",
     ]
     if (defined(invoker.disable_autobind) && invoker.disable_autobind) {
       args += [ "--disable-autobind" ]

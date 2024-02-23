@@ -9,11 +9,7 @@ mod generate;
 mod rust_generator;
 
 use anyhow::{anyhow, Context, Error};
-use bind::bytecode_encoder::encode_v1::encode_to_string_v1;
-use bind::compiler::{
-    self, BindRules, CompiledBindRules, CompositeBindRules, CompositeNode, SymbolicInstruction,
-    SymbolicInstructionInfo,
-};
+use bind::compiler::{self, CompiledBindRules};
 use bind::debugger::offline_debugger;
 use bind::test;
 use fidl_ir_lib::fidl::*;
@@ -72,18 +68,6 @@ enum Command {
         /// request.
         #[structopt(short = "a", long = "disable-autobind")]
         disable_autobind: bool,
-
-        /// Output a bytecode file, instead of a C header file.
-        #[structopt(short = "b", long = "output-bytecode")]
-        output_bytecode: bool,
-
-        /// Encode the bytecode in the new format if true. Otherwise, encode to the old format.
-        #[structopt(short = "n", long = "use-new-bytecode")]
-        use_new_bytecode: bool,
-
-        /// Disable generating device_fragment_t data structures in the C++ header.
-        #[structopt(long = "disable-fragment-gen")]
-        disable_fragment_gen: bool,
     },
     #[structopt(name = "debug")]
     Debug {
@@ -157,10 +141,6 @@ fn main() {
     }
 }
 
-fn convert_to_var_name(node_name: &String) -> String {
-    node_name.replace("-", "_")
-}
-
 fn write_depfile(
     output: &PathBuf,
     input: &Option<PathBuf>,
@@ -181,97 +161,6 @@ fn write_depfile(
     let mut out = String::new();
     writeln!(&mut out, "{}: {}", output_str, deps.join(" "))?;
     Ok(out)
-}
-
-fn write_bind_template<'a>(bind_rules: BindRules<'a>) -> Result<String, Error> {
-    let mut output = String::new();
-    if bind_rules.use_new_bytecode {
-        output
-            .write_fmt(format_args!(
-                include_str!("templates/bind_v2.h.template"),
-                composite_fragment_definition = "",
-            ))
-            .context("Failed to format output")?;
-    } else {
-        output
-            .write_fmt(format_args!(include_str!("templates/bind_v1.h.template"),))
-            .context("Failed to format output")?;
-    }
-    Ok(output)
-}
-
-fn write_fragment_template<'a>(
-    device_name: &String,
-    node: CompositeNode<'a>,
-) -> Result<String, Error> {
-    let mut output = String::new();
-    let mut instructions_str = encode_to_string_v1(node.instructions)?;
-    instructions_str.push_str(&encode_to_string_v1(vec![SymbolicInstructionInfo {
-        location: None,
-        instruction: SymbolicInstruction::UnconditionalBind,
-    }])?);
-
-    output
-        .write_fmt(format_args!(
-            include_str!("templates/fragment.template"),
-            var_name = convert_to_var_name(&node.name),
-            name = node.name,
-            device_name = device_name,
-            instructions = instructions_str,
-        ))
-        .context("Failed to format output")?;
-    Ok(output)
-}
-
-fn write_fragment_array_template<'a>(bind_rules: CompositeBindRules<'a>) -> Result<String, Error> {
-    let mut fragment_list = format!(
-        "{}_{}_fragment",
-        &bind_rules.device_name,
-        convert_to_var_name(&bind_rules.primary_node.name)
-    );
-    let mut fragment_definition =
-        write_fragment_template(&bind_rules.device_name, bind_rules.primary_node)?;
-
-    for node in bind_rules.additional_nodes {
-        fragment_list.push_str(&format!(
-            ", {}_{}_fragment",
-            &bind_rules.device_name,
-            convert_to_var_name(&node.name)
-        ));
-        fragment_definition
-            .push_str(&format!("\n{}", write_fragment_template(&bind_rules.device_name, node)?));
-    }
-
-    let mut output = String::new();
-    output
-        .write_fmt(format_args!(
-            include_str!("templates/fragment_array.template"),
-            device_name = bind_rules.device_name,
-            fragment_definition = fragment_definition,
-            fragment_list = fragment_list,
-        ))
-        .context("Failed to format output")?;
-    Ok(output)
-}
-
-fn write_composite_bind_template<'a>(
-    bind_rules: CompositeBindRules<'a>,
-    disable_fragment_gen: bool,
-) -> Result<String, Error> {
-    let fragment_definition = if disable_fragment_gen {
-        "".to_string()
-    } else {
-        write_fragment_array_template(bind_rules)?
-    };
-
-    let mut output = String::new();
-    output
-        .write_fmt(format_args!(
-            include_str!("templates/bind_v2.h.template"),
-            composite_fragment_definition = fragment_definition,
-        ))
-        .context("Failed to format output")?;
-    Ok(output)
 }
 
 fn read_file(path: &PathBuf) -> Result<String, Error> {
@@ -343,27 +232,9 @@ fn handle_command(command: Command) -> Result<(), Error> {
             }
             Ok(())
         }
-        Command::Compile {
-            options,
-            output,
-            depfile,
-            disable_autobind,
-            output_bytecode,
-            use_new_bytecode,
-            disable_fragment_gen,
-        } => {
+        Command::Compile { options, output, depfile, disable_autobind } => {
             let includes = handle_includes(options.include, options.include_file)?;
-            handle_compile(
-                options.input,
-                includes,
-                disable_autobind,
-                output_bytecode,
-                use_new_bytecode,
-                disable_fragment_gen,
-                options.lint,
-                output,
-                depfile,
-            )
+            handle_compile(options.input, includes, disable_autobind, options.lint, output, depfile)
         }
         Command::GenerateBind { input, output } => handle_generate_bind(input, output),
         Command::GenerateCpp { input, lint, output } => {
@@ -396,9 +267,6 @@ fn handle_compile(
     input: Option<PathBuf>,
     includes: Vec<PathBuf>,
     disable_autobind: bool,
-    output_bytecode: bool,
-    use_new_bytecode: bool,
-    disable_fragment_gen: bool,
     lint: bool,
     output: Option<PathBuf>,
     depfile: Option<PathBuf>,
@@ -421,38 +289,20 @@ fn handle_compile(
         let input = input.ok_or(anyhow!("An input is required when disable_autobind is false."))?;
         rules_str = read_file(&input)?;
         let includes = includes.iter().map(read_file).collect::<Result<Vec<String>, _>>()?;
-        compiler::compile(&rules_str, &includes, lint, disable_autobind, use_new_bytecode, false)?
+        compiler::compile(&rules_str, &includes, lint, disable_autobind, true, false)?
     } else if let Some(input) = input {
         // Autobind is disabled but there are some bind rules for manual binding.
         rules_str = read_file(&input)?;
         let includes = includes.iter().map(read_file).collect::<Result<Vec<String>, _>>()?;
-        let compiled_bind_rules = compiler::compile(
-            &rules_str,
-            &includes,
-            lint,
-            disable_autobind,
-            use_new_bytecode,
-            false,
-        )?;
+        let compiled_bind_rules =
+            compiler::compile(&rules_str, &includes, lint, disable_autobind, true, false)?;
         compiled_bind_rules
     } else {
-        CompiledBindRules::empty_bind_rules(disable_autobind, use_new_bytecode, false)
+        CompiledBindRules::empty_bind_rules(disable_autobind, true, false)
     };
 
-    if output_bytecode {
-        let bytecode = compiled_bind_rules.encode_to_bytecode()?;
-        output_writer.write_all(bytecode.as_slice()).context("Failed to write to output file")?;
-    } else {
-        let template = match compiled_bind_rules {
-            CompiledBindRules::Bind(bind_rules) => write_bind_template(bind_rules),
-            CompiledBindRules::CompositeBind(bind_rules) => {
-                write_composite_bind_template(bind_rules, disable_fragment_gen)
-            }
-        }?;
-        output_writer.write_all(template.as_bytes()).context("Failed to write to output file")?;
-    };
-
-    Ok(())
+    let bytecode = compiled_bind_rules.encode_to_bytecode()?;
+    output_writer.write_all(bytecode.as_slice()).context("Failed to write to output file")
 }
 
 /// Converts the name of a protocol to a bind library enum for its transport method.
@@ -523,60 +373,11 @@ fn handle_generate_bind(input: PathBuf, output: Option<PathBuf>) -> Result<(), E
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
-    use bind::compiler::{SymbolicInstruction, SymbolicInstructionInfo};
+    use bind::compiler::{BindRules, SymbolicInstruction, SymbolicInstructionInfo};
     use std::collections::HashMap;
 
     #[test]
-    fn zero_instructions_v1() {
-        let bind_rules = CompiledBindRules::Bind(BindRules {
-            instructions: vec![],
-            symbol_table: HashMap::new(),
-            use_new_bytecode: false,
-            enable_debug: false,
-        });
-
-        let bytecode = bind_rules.encode_to_bytecode().unwrap();
-        assert!(bytecode.is_empty());
-
-        let bind_rules = BindRules {
-            instructions: vec![],
-            symbol_table: HashMap::new(),
-            use_new_bytecode: false,
-            enable_debug: false,
-        };
-        let _ = write_bind_template(bind_rules).unwrap();
-    }
-
-    #[test]
-    fn one_instruction_v1() {
-        let bind_rules = CompiledBindRules::Bind(BindRules {
-            instructions: vec![SymbolicInstructionInfo {
-                location: None,
-                instruction: SymbolicInstruction::UnconditionalBind,
-            }],
-            symbol_table: HashMap::new(),
-            use_new_bytecode: false,
-            enable_debug: false,
-        });
-
-        let bytecode = bind_rules.encode_to_bytecode().unwrap();
-        assert_eq!(bytecode, vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]);
-
-        let bind_rules = BindRules {
-            instructions: vec![SymbolicInstructionInfo {
-                location: None,
-                instruction: SymbolicInstruction::UnconditionalBind,
-            }],
-            symbol_table: HashMap::new(),
-            use_new_bytecode: false,
-            enable_debug: false,
-        };
-        let _ = write_bind_template(bind_rules).unwrap();
-    }
-
-    #[test]
-    fn zero_instructions_v2() {
+    fn zero_instructions() {
         let bind_rules = CompiledBindRules::Bind(BindRules {
             instructions: vec![],
             symbol_table: HashMap::new(),
@@ -590,18 +391,10 @@ mod tests {
                 0
             ]
         );
-
-        let bind_rules = BindRules {
-            instructions: vec![],
-            symbol_table: HashMap::new(),
-            use_new_bytecode: true,
-            enable_debug: false,
-        };
-        let _ = write_bind_template(bind_rules).unwrap();
     }
 
     #[test]
-    fn one_instruction_v2() {
+    fn one_instruction() {
         let bind_rules = CompiledBindRules::Bind(BindRules {
             instructions: vec![SymbolicInstructionInfo {
                 location: None,
@@ -618,50 +411,6 @@ mod tests {
                 0, 48
             ]
         );
-
-        let bind_rules = BindRules {
-            instructions: vec![SymbolicInstructionInfo {
-                location: None,
-                instruction: SymbolicInstruction::UnconditionalAbort,
-            }],
-            symbol_table: HashMap::new(),
-            use_new_bytecode: true,
-            enable_debug: false,
-        };
-        let _ = write_bind_template(bind_rules).unwrap();
-    }
-
-    #[test]
-    fn disable_autobind() {
-        let bind_rules = CompiledBindRules::Bind(BindRules {
-            instructions: vec![
-                SymbolicInstructionInfo::disable_autobind(),
-                SymbolicInstructionInfo {
-                    location: None,
-                    instruction: SymbolicInstruction::UnconditionalBind,
-                },
-            ],
-            symbol_table: HashMap::new(),
-            use_new_bytecode: false,
-            enable_debug: false,
-        });
-
-        let bytecode = bind_rules.encode_to_bytecode().unwrap();
-        assert_eq!(bytecode[..12], [2, 0, 0, 0x20, 0, 0, 0, 0, 0, 0, 0, 0]);
-
-        let bind_rules = BindRules {
-            instructions: vec![
-                SymbolicInstructionInfo::disable_autobind(),
-                SymbolicInstructionInfo {
-                    location: None,
-                    instruction: SymbolicInstruction::UnconditionalBind,
-                },
-            ],
-            symbol_table: HashMap::new(),
-            use_new_bytecode: false,
-            enable_debug: false,
-        };
-        let _ = write_bind_template(bind_rules).unwrap();
     }
 
     #[test]
@@ -694,91 +443,6 @@ mod tests {
         assert!(result.contains("/a/input"));
         assert!(result.contains("/a/include"));
         assert!(result.contains("/b/include"));
-    }
-
-    #[test]
-    fn composite_bind() {
-        let composite_bind_rules = "composite wallcreeper;
-            primary node \"wagtail\" {
-                fuchsia.BIND_PROTOCOL == 1;
-            }
-            node \"redpoll\" {
-                fuchsia.BIND_PROTOCOL == 2;
-            }";
-
-        let compiled_bind_rules =
-            compiler::compile(&composite_bind_rules, &vec![], false, false, true, false).unwrap();
-
-        assert_eq!(
-            compiled_bind_rules.encode_to_bytecode().unwrap(),
-            vec![
-                0x42, 0x49, 0x4e, 0x44, 0x02, 0x00, 0x00, 0x00, // BIND header
-                0x00, // debug_flag byte
-                0x53, 0x59, 0x4e, 0x42, 0x28, 0x00, 0x00, 0x00, // SYMB header
-                0x01, 0x00, 0x00, 0x00, // "wallcreeper" ID
-                0x77, 0x61, 0x6c, 0x6c, 0x63, 0x72, 0x65, 0x65, // "wallcree"
-                0x70, 0x65, 0x72, 0x00, // "per"
-                0x02, 0x00, 0x00, 0x00, // "wagtail" ID
-                0x77, 0x61, 0x67, 0x74, 0x61, 0x69, 0x6c, 0x00, // "wagtail"
-                0x03, 0x00, 0x00, 0x00, // "redpoll" ID
-                0x72, 0x65, 0x64, 0x70, 0x6f, 0x6c, 0x6c, 0x00, // "redpoll"
-                0x43, 0x4f, 0x4d, 0x50, 0x2c, 0x00, 0x00, 0x00, // COMP header
-                0x01, 0x00, 0x00, 0x00, // Device name ID
-                0x50, 0x02, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x00, 0x00, // Primary node header
-                0x01, 0x01, 0x01, 0x00, 0x00, 0x00, // BIND_PROTOCOL ==
-                0x01, 0x01, 0x00, 0x00, 0x00, // 1
-                0x51, 0x03, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x00, 0x00, // Node header
-                0x01, 0x01, 0x01, 0x00, 0x00, 0x00, // // BIND_PROTOCOL ==
-                0x01, 0x02, 0x00, 0x00, 0x00 // 2
-            ]
-        );
-
-        let compiled_bind_rules =
-            compiler::compile(&composite_bind_rules, &vec![], false, false, true, false).unwrap();
-
-        assert_matches!(compiled_bind_rules, CompiledBindRules::CompositeBind(_));
-        if let CompiledBindRules::CompositeBind(bind_rules) = compiled_bind_rules {
-            assert_eq!(
-                include_str!("tests/expected_composite_code"),
-                write_composite_bind_template(bind_rules, false).unwrap()
-            );
-        }
-    }
-
-    #[test]
-    fn composite_bind_with_node_name_dashes() {
-        let composite_bind_rules = "composite grey_lourie;
-            primary node \"go-away-bird\" {
-                fuchsia.BIND_PROTOCOL == 1;
-            }";
-
-        let compiled_bind_rules =
-            compiler::compile(&composite_bind_rules, &vec![], false, false, true, false).unwrap();
-        assert_matches!(compiled_bind_rules, CompiledBindRules::CompositeBind(_));
-        if let CompiledBindRules::CompositeBind(bind_rules) = compiled_bind_rules {
-            assert_eq!(
-                include_str!("tests/expected_composite_code_w_dashes"),
-                write_composite_bind_template(bind_rules, false).unwrap()
-            );
-        }
-    }
-
-    #[test]
-    fn composite_bind_with_disabled_fragment_gen() {
-        let composite_bind_rules = "composite grey_lourie;
-            primary node \"go-away-bird\" {
-                fuchsia.BIND_PROTOCOL == 1;
-            }";
-
-        let compiled_bind_rules =
-            compiler::compile(&composite_bind_rules, &vec![], false, false, true, false).unwrap();
-        assert_matches!(compiled_bind_rules, CompiledBindRules::CompositeBind(_));
-        if let CompiledBindRules::CompositeBind(bind_rules) = compiled_bind_rules {
-            assert_eq!(
-                include_str!("tests/expected_composite_code_w_disabled_fragments"),
-                write_composite_bind_template(bind_rules, true).unwrap()
-            );
-        }
     }
 
     #[test]

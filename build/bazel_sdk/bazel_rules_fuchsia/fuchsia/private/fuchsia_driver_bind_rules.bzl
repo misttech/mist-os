@@ -56,8 +56,6 @@ def _fuchsia_driver_bind_bytecode_impl(context):
         executable = sdk.bindc,
         arguments = [
                         "compile",
-                        "--output-bytecode",
-                        "--use-new-bytecode",
                     ] + args["include_filepaths"] +
                     [
                         "--output",
@@ -118,36 +116,3 @@ fuchsia_driver_bind_bytecode = rule(
         ),
     },
 )
-
-def fuchsia_driver_bind_header(name, rules, output = None, deps = None, tags = None, **kwargs):
-    """Generates cc_library() for the given bind rules.
-
-    Args:
-      name: Target name. Required.
-      rules: Bind rules file. Required.
-      output: Name of generated header file. Defaults to name + ".h".
-      deps: Additional dependencies.
-      tags: Optional tags.
-      **kwargs: Remaining args.
-    """
-
-    if not output:
-        output = "%s.h" % name
-    gen_name = "%s_gen" % name
-
-    _bind_rules_header(
-        name = gen_name,
-        output = output,
-        rules = rules,
-        deps = deps,
-        visibility = ["//visibility:private"],
-    )
-
-    native.cc_library(
-        tags = tags,
-        name = name,
-        hdrs = [
-            ":%s" % gen_name,
-        ],
-        **kwargs
-    )
