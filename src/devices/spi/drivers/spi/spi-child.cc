@@ -22,7 +22,7 @@ inline zx_status_t FidlStatus(const T& result) {
 }
 
 void SpiChild::OpenSession(OpenSessionRequestView request, OpenSessionCompleter::Sync& completer) {
-  Bind(dispatcher_, std::move(request->session));
+  Bind(std::move(request->session));
 }
 
 void SpiChild::TransmitVector(TransmitVectorRequestView request,
@@ -314,15 +314,14 @@ void SpiChild::DeassertCs(DeassertCsCompleter::Sync& completer) {
           }));
 }
 
-void SpiChild::Bind(async_dispatcher_t* dispatcher,
-                    fidl::ServerEnd<fuchsia_hardware_spi::Device> server_end) {
+void SpiChild::Bind(fidl::ServerEnd<fuchsia_hardware_spi::Device> server_end) {
   if (binding_.has_value()) {
     server_end.Close(ZX_ERR_ALREADY_BOUND);
     return;
   }
   binding_ = Binding{
       .binding = fidl::BindServer(
-          dispatcher, std::move(server_end), this,
+          fidl_dispatcher_->async_dispatcher(), std::move(server_end), this,
           [](SpiChild* self, fidl::UnbindInfo, fidl::ServerEnd<fuchsia_hardware_spi::Device>) {
             std::optional opt = std::exchange(self->binding_, {});
             ZX_ASSERT(opt.has_value());
@@ -341,31 +340,37 @@ void SpiChild::Bind(async_dispatcher_t* dispatcher,
 }
 
 void SpiChild::DdkUnbind(ddk::UnbindTxn txn) {
-  if (binding_.has_value()) {
-    Binding& binding = binding_.value();
-    ZX_ASSERT(!binding.unbind_txn.has_value());
-    binding.unbind_txn.emplace(std::move(txn));
-    binding.binding.Unbind();
-  } else {
-    txn.Reply();
-  }
+  async::PostTask(fidl_dispatcher_->async_dispatcher(), [this, txn = std::move(txn)]() mutable {
+    // The release hook must run synchronously on the main driver dispatcher, so destroy any objects
+    // that live on the FIDL dispatcher during unbind instead.
+    outgoing_.reset();
+
+    if (binding_.has_value()) {
+      Binding& binding = binding_.value();
+      ZX_ASSERT(!binding.unbind_txn.has_value());
+      binding.unbind_txn.emplace(std::move(txn));
+      binding.binding.Unbind();
+    } else {
+      txn.Reply();
+    }
+  });
 }
 
 void SpiChild::DdkRelease() { delete this; }
 
 zx_status_t SpiChild::ServeOutgoingDirectory(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
-  zx::result status = outgoing_.AddService<fuchsia_hardware_spi::Service>(
+  zx::result status = outgoing_->AddService<fuchsia_hardware_spi::Service>(
       fuchsia_hardware_spi::Service::InstanceHandler({
           .device =
               [this](fidl::ServerEnd<fuchsia_hardware_spi::Device> server_end) {
-                Bind(dispatcher_, std::move(server_end));
+                Bind(std::move(server_end));
               },
       }));
   if (status.is_error()) {
     return status.status_value();
   }
 
-  return outgoing_.Serve(std::move(server_end)).status_value();
+  return outgoing_->Serve(std::move(server_end)).status_value();
 }
 
 }  // namespace spi

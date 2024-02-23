@@ -27,13 +27,13 @@ class SpiBanjoChild : public SpiBanjoChildType,
   using ClientType = BanjoSpiImplClient*;
 
   SpiBanjoChild(zx_device_t* parent, BanjoSpiImplClient* spi, uint32_t chip_select,
-                bool has_siblings, async_dispatcher_t* dispatcher)
+                bool has_siblings, fdf::UnownedDispatcher fidl_dispatcher)
       : SpiBanjoChildType(parent),
         spi_(spi),
         cs_(chip_select),
         has_siblings_(has_siblings),
-        dispatcher_(dispatcher),
-        outgoing_(dispatcher) {}
+        fidl_dispatcher_(std::move(fidl_dispatcher)),
+        outgoing_(fidl_dispatcher_->async_dispatcher()) {}
 
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
@@ -65,8 +65,7 @@ class SpiBanjoChild : public SpiBanjoChildType,
   zx_status_t SpiExchange(const uint8_t* txdata_list, size_t txdata_count, uint8_t* out_rxdata_list,
                           size_t rxdata_count, size_t* out_rxdata_actual);
 
-  void Bind(async_dispatcher_t* dispatcher,
-            fidl::ServerEnd<fuchsia_hardware_spi::Device> server_end);
+  void Bind(fidl::ServerEnd<fuchsia_hardware_spi::Device> server_end);
 
   zx_status_t ServeOutgoingDirectory(fidl::ServerEnd<fuchsia_io::Directory> server_end);
 
@@ -75,14 +74,17 @@ class SpiBanjoChild : public SpiBanjoChildType,
   const uint32_t cs_;
   // False if this child is the only device on the bus.
   const bool has_siblings_;
-  async_dispatcher_t* const dispatcher_;
+  const fdf::UnownedDispatcher fidl_dispatcher_;
 
   using Binding = struct {
     fidl::ServerBindingRef<fuchsia_hardware_spi::Device> binding;
     std::optional<ddk::UnbindTxn> unbind_txn;
   };
+
+  // These objects can only be accessed on the FIDL dispatcher. Making them optional allows them to
+  // be destroyed manually in our unbind hook.
   std::optional<Binding> binding_;
-  component::OutgoingDirectory outgoing_;
+  std::optional<component::OutgoingDirectory> outgoing_;
 };
 
 }  // namespace spi

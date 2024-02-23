@@ -18,6 +18,7 @@
         { service: 'fuchsia.hardware.spi.Service' },
     ],
     use: [
+        { protocol: "fuchsia.scheduler.ProfileProvider" },
         { service: "fuchsia.hardware.spiimpl.Service" },
     ],
     expose: [

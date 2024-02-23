@@ -9,6 +9,9 @@
 #include <fidl/fuchsia.hardware.spi/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.spiimpl/cpp/driver/wire.h>
 #include <fuchsia/hardware/spiimpl/cpp/banjo.h>
+#include <lib/fdf/cpp/dispatcher.h>
+
+#include <optional>
 
 #include <ddktl/device.h>
 
@@ -21,10 +24,13 @@ using SpiDeviceType = ddk::Device<SpiDevice, ddk::Unbindable>;
 
 class SpiDevice : public SpiDeviceType {
  public:
-  SpiDevice(zx_device_t* parent, uint32_t bus_id) : SpiDeviceType(parent), bus_id_(bus_id) {}
+  SpiDevice(zx_device_t* parent, uint32_t bus_id)
+      : SpiDeviceType(parent),
+        bus_id_(bus_id),
+        driver_dispatcher_(fdf::Dispatcher::GetCurrent()->borrow()) {}
 
-  static zx_status_t Create(void* ctx, zx_device_t* parent, fdf_dispatcher_t* dispatcher);
-  zx_status_t Init(fdf_dispatcher_t* dispatcher);
+  static zx_status_t Create(void* ctx, zx_device_t* parent);
+  zx_status_t Init();
 
   void DdkRelease();
   void DdkUnbind(ddk::UnbindTxn txn);
@@ -34,16 +40,26 @@ class SpiDevice : public SpiDeviceType {
   using BanjoClientType = BanjoSpiImplClient;
 
   template <typename T>
-  void AddChildren(async_dispatcher_t* dispatcher,
-                   const fuchsia_hardware_spi_businfo::wire::SpiBusMetadata& metadata,
+  void AddChildren(const fuchsia_hardware_spi_businfo::wire::SpiBusMetadata& metadata,
                    typename T::ClientType client);
 
   void FidlClientTeardownHandler();
+  void DispatcherShutdownHandler(fdf_dispatcher_t* dispatcher);
+
+  fdf::UnownedDispatcher fidl_dispatcher() const {
+    if (fidl_dispatcher_) {
+      return fdf::UnownedDispatcher{fidl_dispatcher_->get()};
+    }
+    return driver_dispatcher_->borrow();
+  }
 
   const uint32_t bus_id_;
+  const fdf::UnownedDispatcher driver_dispatcher_;
+  std::optional<fdf::SynchronizedDispatcher> fidl_dispatcher_;
   std::variant<std::nullopt_t, FidlClientType, BanjoClientType> spi_impl_ = std::nullopt;
   std::optional<ddk::UnbindTxn> unbind_txn_;
   bool fidl_client_teardown_complete_ = false;
+  bool dispatcher_shutdown_complete_ = false;
 };
 
 }  // namespace spi

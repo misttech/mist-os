@@ -5,6 +5,7 @@
 #include "spi.h"
 
 #include <fidl/fuchsia.hardware.spiimpl/cpp/driver/wire.h>
+#include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
@@ -213,7 +214,7 @@ class SpiDeviceTest : public zxtest::Test {
   void CreateSpiDevice() {
     std::latch done(1);
     async::PostTask(dispatcher_->async_dispatcher(), [&]() {
-      SpiDevice::Create(nullptr, parent_.get(), dispatcher_->get());
+      SpiDevice::Create(nullptr, parent_.get());
       done.count_down();
     });
     done.wait();
@@ -275,6 +276,7 @@ class SpiDeviceTest : public zxtest::Test {
   void AssertCsNoSiblingTest();
   void OneClient();
   void DdkLifecycle();
+  void DdkLifecycleWithDispatcher();
 
   fdf::UnownedSynchronizedDispatcher incoming_dispatcher_;
   struct IncomingNamespace {
@@ -289,6 +291,7 @@ void SpiDeviceTest<FakeSpiImplClass>::SpiTest() {
   CreateSpiDevice();
   auto* const spi_bus = parent_->GetLatestChild();
   ASSERT_NOT_NULL(spi_bus);
+  runtime_->RunUntil([&]() { return spi_bus->child_count() == std::size(kSpiChannels); });
   EXPECT_EQ(spi_bus->child_count(), std::size(kSpiChannels));
 
   // test it
@@ -328,6 +331,7 @@ void SpiDeviceTest<FakeSpiImplClass>::SpiFidlVmoTest() {
   CreateSpiDevice();
   auto* const spi_bus = parent_->GetLatestChild();
   ASSERT_NOT_NULL(spi_bus);
+  runtime_->RunUntil([&]() { return spi_bus->child_count() == std::size(kSpiChannels); });
   EXPECT_EQ(spi_bus->child_count(), std::size(kSpiChannels));
 
   fidl::WireSharedClient<fuchsia_hardware_spi::Device> cs0_client, cs1_client;
@@ -437,6 +441,7 @@ void SpiDeviceTest<FakeSpiImplClass>::SpiFidlVectorTest() {
   CreateSpiDevice();
   auto* const spi_bus = parent_->GetLatestChild();
   ASSERT_NOT_NULL(spi_bus);
+  runtime_->RunUntil([&]() { return spi_bus->child_count() == std::size(kSpiChannels); });
   EXPECT_EQ(spi_bus->child_count(), std::size(kSpiChannels));
 
   {
@@ -496,6 +501,7 @@ void SpiDeviceTest<FakeSpiImplClass>::SpiFidlVectorErrorTest() {
   CreateSpiDevice();
   auto* const spi_bus = parent_->GetLatestChild();
   ASSERT_NOT_NULL(spi_bus);
+  runtime_->RunUntil([&]() { return spi_bus->child_count() == std::size(kSpiChannels); });
   EXPECT_EQ(spi_bus->child_count(), std::size(kSpiChannels));
 
   {
@@ -555,6 +561,7 @@ void SpiDeviceTest<FakeSpiImplClass>::AssertCsWithSiblingTest() {
   CreateSpiDevice();
   auto* const spi_bus = parent_->GetLatestChild();
   ASSERT_NOT_NULL(spi_bus);
+  runtime_->RunUntil([&]() { return spi_bus->child_count() == std::size(kSpiChannels); });
   EXPECT_EQ(spi_bus->child_count(), std::size(kSpiChannels));
 
   {
@@ -620,6 +627,7 @@ void SpiDeviceTest<FakeSpiImplClass>::AssertCsNoSiblingTest() {
   CreateSpiDevice();
   auto* const spi_bus = parent_->GetLatestChild();
   ASSERT_NOT_NULL(spi_bus);
+  runtime_->RunUntil([&]() { return spi_bus->child_count() == 1; });
   EXPECT_EQ(spi_bus->child_count(), 1);
 
   {
@@ -660,6 +668,7 @@ void SpiDeviceTest<FakeSpiImplClass>::OneClient() {
   CreateSpiDevice();
   auto* const spi_bus = parent_->GetLatestChild();
   ASSERT_NOT_NULL(spi_bus);
+  runtime_->RunUntil([&]() { return spi_bus->child_count() == 1; });
   EXPECT_EQ(spi_bus->child_count(), 1);
 
   std::shared_ptr<MockDevice> spi_child = nullptr;
@@ -689,7 +698,7 @@ void SpiDeviceTest<FakeSpiImplClass>::OneClient() {
     zx::result client = BindServer(spi_child);
     ASSERT_OK(client);
     fidl::WireSyncClient cs0_client_1(std::move(client.value()));
-    EXPECT_STATUS(cs0_client_1->CanAssertCs().status(), ZX_ERR_PEER_CLOSED);
+    EXPECT_STATUS(cs0_client_1->UnregisterVmo(1).status(), ZX_ERR_PEER_CLOSED);
   }
 
   EXPECT_FALSE(vmos_released_since_last_call());
@@ -704,7 +713,12 @@ void SpiDeviceTest<FakeSpiImplClass>::OneClient() {
     ASSERT_OK(client);
     cs0_client.Bind(std::move(client.value()));
 
-    auto result = cs0_client->CanAssertCs();
+    // By the time this connection succeeds, the SPI device has already called to its parent to
+    // release registered VMOs. UnregisterVmo will then make a synchronous call to the parent, so
+    // waiting for the UnregisterVmo response is sufficient to guarantee that the first call to the
+    // parent (the fake spiimpl device) has been processed, and that vmos_released_since_last_call
+    // will return the correct value.
+    auto result = cs0_client->UnregisterVmo(1);
     if (result.ok()) {
       break;
     }
@@ -744,7 +758,7 @@ void SpiDeviceTest<FakeSpiImplClass>::OneClient() {
       zx::result server = fidl::CreateEndpoints<fuchsia_hardware_spi::Device>(&device);
       ASSERT_OK(server);
       ASSERT_OK(fidl::WireCall(controller)->OpenSession(std::move(server.value())));
-      auto result = fidl::WireCall(device)->CanAssertCs();
+      auto result = fidl::WireCall(device)->UnregisterVmo(1);
       if (result.ok()) {
         break;
       }
@@ -785,11 +799,12 @@ void SpiDeviceTest<FakeSpiImplClass>::OneClient() {
     ASSERT_OK(client);
     cs0_client.Bind(std::move(client.value()));
 
-    auto result = cs0_client->CanAssertCs();
+    auto result = cs0_client->UnregisterVmo(1);
     if (result.ok()) {
       break;
     }
 
+    EXPECT_STATUS(result.status(), ZX_ERR_PEER_CLOSED);
     cs0_client = {};
   }
 
@@ -808,6 +823,60 @@ void SpiDeviceTest<FakeSpiImplClass>::DdkLifecycle() {
   CreateSpiDevice();
   auto* const spi_bus = parent_->GetLatestChild();
   ASSERT_NOT_NULL(spi_bus);
+  runtime_->RunUntil([&]() { return spi_bus->child_count() == 1; });
+  EXPECT_EQ(spi_bus->child_count(), 1);
+
+  {
+    const auto& child0 = spi_bus->children().front();
+    zx::result client = BindServer(child0);
+    ASSERT_OK(client);
+    cs0_client.Bind(std::move(client.value()));
+  }
+
+  {
+    auto result = cs0_client->AssertCs();
+    ASSERT_OK(result.status());
+    EXPECT_OK(result.value().status);
+  }
+
+  RemoveDevice(spi_bus->children().front().get());
+  EXPECT_EQ(spi_bus->descendant_count(), 0);
+
+  {
+    auto result = cs0_client->DeassertCs();
+    EXPECT_STATUS(result.status(), ZX_ERR_PEER_CLOSED);
+  }
+
+  RemoveDevice(spi_bus);
+  EXPECT_EQ(parent_->descendant_count(), 0);
+
+  {
+    auto result = cs0_client->DeassertCs();
+    // The parent has stopped its loop, this should now fail.
+    EXPECT_STATUS(result.status(), ZX_ERR_PEER_CLOSED);
+  }
+}
+
+template <class FakeSpiImplClass>
+void SpiDeviceTest<FakeSpiImplClass>::DdkLifecycleWithDispatcher() {
+  SetSpiChannelMetadata(0, kSpiChannels, 1);
+
+  {
+    // Add scheduler role metadata that will cause the core driver to create a new driver
+    // dispatcher. Verify that FIDL calls can still be made, and that dispatcher shutdown using the
+    // unbind hook works.
+    fuchsia_scheduler::RoleName role("no.such.scheduler.role");
+    const auto result = fidl::Persist(role);
+    ASSERT_TRUE(result.is_ok());
+    parent_->SetMetadata(DEVICE_METADATA_SCHEDULER_ROLE_NAME, result->data(), result->size());
+  }
+
+  fidl::WireSyncClient<fuchsia_hardware_spi::Device> cs0_client;
+
+  CreateSpiDevice();
+  auto* const spi_bus = parent_->GetLatestChild();
+  ASSERT_NOT_NULL(spi_bus);
+  runtime_->RunUntil([&]() { return spi_bus->child_count() == 1; });
   EXPECT_EQ(spi_bus->child_count(), 1);
 
   {
@@ -910,6 +979,7 @@ TEST_F(BanjoSpiDeviceTest, AssertCsWithSiblingTest) { AssertCsWithSiblingTest();
 TEST_F(BanjoSpiDeviceTest, AssertCsNoSiblingTest) { AssertCsNoSiblingTest(); }
 TEST_F(BanjoSpiDeviceTest, OneClient) { OneClient(); }
 TEST_F(BanjoSpiDeviceTest, DdkLifecycle) { DdkLifecycle(); }
+TEST_F(BanjoSpiDeviceTest, DdkLifecycleWithDispatcher) { DdkLifecycleWithDispatcher(); }
 
 }  // namespace
 
@@ -1074,6 +1144,7 @@ TEST_F(FidlSpiDeviceTest, AssertCsWithSiblingTest) { AssertCsWithSiblingTest(); 
 TEST_F(FidlSpiDeviceTest, AssertCsNoSiblingTest) { AssertCsNoSiblingTest(); }
 TEST_F(FidlSpiDeviceTest, OneClient) { OneClient(); }
 TEST_F(FidlSpiDeviceTest, DdkLifecycle) { DdkLifecycle(); }
+TEST_F(FidlSpiDeviceTest, DdkLifecycleWithDispatcher) { DdkLifecycleWithDispatcher(); }
 
 }  // namespace
 
