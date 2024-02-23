@@ -15,27 +15,67 @@ namespace display {
 
 namespace {
 
-TEST(DriverBufferCollectionId, Equality) {
-  constexpr DriverBufferCollectionId kOne(1);
-  constexpr DriverBufferCollectionId kAnotherOne(1);
-  constexpr DriverBufferCollectionId kTwo(2);
+constexpr DriverBufferCollectionId kOne(1);
+constexpr DriverBufferCollectionId kAnotherOne(1);
+constexpr DriverBufferCollectionId kTwo(2);
 
+constexpr uint64_t kLargeIdValue = uint64_t{1} << 63;
+constexpr DriverBufferCollectionId kLargeId(kLargeIdValue);
+
+TEST(DriverBufferCollectionIdTest, EqualityIsReflexive) {
   EXPECT_EQ(kOne, kOne);
-  EXPECT_EQ(kOne, kAnotherOne);
-  EXPECT_NE(kOne, kTwo);
+  EXPECT_EQ(kAnotherOne, kAnotherOne);
+  EXPECT_EQ(kTwo, kTwo);
 }
 
-TEST(DriverBufferCollectionId, BanjoConversion) {
-  EXPECT_EQ(ToDriverBufferCollectionId(1), DriverBufferCollectionId(1));
-  EXPECT_EQ(ToDriverBufferCollectionId(1).value(), uint64_t{1});
-  EXPECT_EQ(ToBanjoDriverBufferCollectionId(DriverBufferCollectionId(1)), uint64_t{1});
+TEST(DriverBufferCollectionIdTest, EqualityIsSymmetric) {
+  EXPECT_EQ(kOne, kAnotherOne);
+  EXPECT_EQ(kAnotherOne, kOne);
+}
 
-  const uint64_t kLargeBufferCollectionIdValue = uint64_t{1} << 63;
-  EXPECT_EQ(ToDriverBufferCollectionId(kLargeBufferCollectionIdValue).value(),
-            kLargeBufferCollectionIdValue);
-  EXPECT_EQ(
-      ToBanjoDriverBufferCollectionId(DriverBufferCollectionId(kLargeBufferCollectionIdValue)),
-      kLargeBufferCollectionIdValue);
+TEST(DriverBufferCollectionIdTest, EqualityForDifferentValues) {
+  EXPECT_NE(kOne, kTwo);
+  EXPECT_NE(kAnotherOne, kTwo);
+  EXPECT_NE(kTwo, kOne);
+  EXPECT_NE(kTwo, kAnotherOne);
+}
+
+TEST(DriverBufferCollectionIdTest, ToBanjoDriverBufferCollectionId) {
+  EXPECT_EQ(1u, ToBanjoDriverBufferCollectionId(kOne));
+  EXPECT_EQ(2u, ToBanjoDriverBufferCollectionId(kTwo));
+  EXPECT_EQ(kLargeIdValue, ToBanjoDriverBufferCollectionId(kLargeId));
+}
+
+TEST(DriverBufferCollectionIdTest, ToFidlDriverBufferCollectionId) {
+  EXPECT_EQ(1u, ToFidlDriverBufferCollectionId(kOne).value);
+  EXPECT_EQ(2u, ToFidlDriverBufferCollectionId(kTwo).value);
+  EXPECT_EQ(kLargeIdValue, ToFidlDriverBufferCollectionId(kLargeId).value);
+}
+
+TEST(DriverBufferCollectionIdTest, ToDriverBufferCollectionIdWithBanjoValue) {
+  EXPECT_EQ(kOne, ToDriverBufferCollectionId(1));
+  EXPECT_EQ(kTwo, ToDriverBufferCollectionId(2));
+  EXPECT_EQ(kLargeId, ToDriverBufferCollectionId(kLargeIdValue));
+}
+
+TEST(DriverBufferCollectionIdTest, ToDriverBufferCollectionIdWithFidlValue) {
+  EXPECT_EQ(kOne, ToDriverBufferCollectionId(
+                      fuchsia_hardware_display_engine::wire::BufferCollectionId{.value = 1}));
+  EXPECT_EQ(kTwo, ToDriverBufferCollectionId(
+                      fuchsia_hardware_display_engine::wire::BufferCollectionId{.value = 2}));
+  EXPECT_EQ(kLargeId, ToDriverBufferCollectionId(kLargeIdValue));
+}
+
+TEST(DriverBufferCollectionIdTest, BanjoConversionRoundtrip) {
+  EXPECT_EQ(kOne, ToDriverBufferCollectionId(ToBanjoDriverBufferCollectionId(kOne)));
+  EXPECT_EQ(kTwo, ToDriverBufferCollectionId(ToBanjoDriverBufferCollectionId(kTwo)));
+  EXPECT_EQ(kLargeId, ToDriverBufferCollectionId(ToBanjoDriverBufferCollectionId(kLargeId)));
+}
+
+TEST(DriverBufferCollectionIdTest, FidlConversionRoundtrip) {
+  EXPECT_EQ(kOne, ToDriverBufferCollectionId(ToFidlDriverBufferCollectionId(kOne)));
+  EXPECT_EQ(kTwo, ToDriverBufferCollectionId(ToFidlDriverBufferCollectionId(kTwo)));
+  EXPECT_EQ(kLargeId, ToDriverBufferCollectionId(ToFidlDriverBufferCollectionId(kLargeId)));
 }
 
 }  // namespace
