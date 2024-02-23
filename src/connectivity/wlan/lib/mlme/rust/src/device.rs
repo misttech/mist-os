@@ -893,7 +893,7 @@ pub mod test_utils {
     use {
         super::*,
         crate::{
-            buffer::{BufferProvider, FakeBufferProvider},
+            buffer::{CBufferProvider, FakeCBufferProvider},
             ddk_converter,
             error::Error,
         },
@@ -1203,7 +1203,7 @@ pub mod test_utils {
         pub beacon_config: Option<(Vec<u8>, usize, TimeUnit)>,
         pub link_status: LinkStatus,
         pub assocs: std::collections::HashMap<MacAddr, fidl_softmac::WlanAssociationConfig>,
-        pub buffer_provider: BufferProvider,
+        pub buffer_provider: CBufferProvider,
         pub install_key_results: VecDeque<Result<(), zx::Status>>,
         pub captured_update_wmm_parameters_request:
             Option<fidl_softmac::WlanSoftmacBaseUpdateWmmParametersRequest>,
@@ -1247,7 +1247,7 @@ pub mod test_utils {
                 beacon_config: None,
                 link_status: LinkStatus::DOWN,
                 assocs: std::collections::HashMap::new(),
-                buffer_provider: FakeBufferProvider::new(),
+                buffer_provider: FakeCBufferProvider::new(),
                 install_key_results: VecDeque::new(),
                 captured_update_wmm_parameters_request: None,
             }));

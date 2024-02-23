@@ -9,7 +9,7 @@ mod remote_client;
 
 use {
     crate::{
-        buffer::{Buffer, BufferProvider},
+        buffer::{Buffer, CBufferProvider},
         ddk_converter,
         device::{self, DeviceOps},
         error::Error,
@@ -135,13 +135,13 @@ impl<D: DeviceOps> crate::MlmeImpl for Ap<D> {
     fn new(
         config: Self::Config,
         device: D,
-        buf_provider: BufferProvider,
+        buffer_provider: CBufferProvider,
         timer: Timer<TimedEvent>,
     ) -> Result<Self, anyhow::Error>
     where
         Self: Sized,
     {
-        Ok(Self::new(device, buf_provider, timer, config))
+        Ok(Self::new(device, buffer_provider, timer, config))
     }
     fn handle_mlme_request(&mut self, req: wlan_sme::MlmeRequest) -> Result<(), anyhow::Error> {
         Self::handle_mlme_req(self, req).map_err(|e| e.into())
@@ -176,11 +176,11 @@ impl<D: DeviceOps> crate::MlmeImpl for Ap<D> {
 impl<D> Ap<D> {
     pub fn new(
         device: D,
-        buf_provider: BufferProvider,
+        buffer_provider: CBufferProvider,
         timer: Timer<TimedEvent>,
         bssid: Bssid,
     ) -> Self {
-        Self { ctx: Context::new(device, buf_provider, timer, bssid), bss: None }
+        Self { ctx: Context::new(device, buffer_provider, timer, bssid), bss: None }
     }
 
     fn handle_sme_list_minstrel_peers(
@@ -467,7 +467,7 @@ mod tests {
     use {
         super::*,
         crate::{
-            buffer::FakeBufferProvider,
+            buffer::FakeCBufferProvider,
             device::{test_utils, FakeDevice, FakeDeviceConfig, FakeDeviceState},
             test_utils::MockWlanRxInfo,
         },
@@ -483,7 +483,7 @@ mod tests {
             assert_variant, big_endian::BigEndianU16, test_utils::fake_frames::fake_wpa2_rsne,
             timer,
         },
-        wlan_frame_writer::write_frame_with_dynamic_buf,
+        wlan_frame_writer::write_frame_with_dynamic_buffer,
         wlan_sme::responder::Responder,
     };
 
@@ -499,7 +499,7 @@ mod tests {
         protocol_id: u16,
         body: &[u8],
     ) -> Vec<u8> {
-        let (mut buf, bytes_written) = write_frame_with_dynamic_buf!(vec![], {
+        let (mut buffer, written) = write_frame_with_dynamic_buffer!(vec![], {
             headers: {
                 mac::EthernetIIHdr: &mac::EthernetIIHdr {
                     da: dst_addr,
@@ -510,8 +510,8 @@ mod tests {
             payload: body,
         })
         .expect("writing to vec always succeeds");
-        buf.truncate(bytes_written);
-        buf
+        buffer.truncate(written);
+        buffer
     }
 
     fn make_ap(
@@ -525,7 +525,7 @@ mod tests {
                 .with_mock_sta_addr((*BSSID).to_array()),
         );
         (
-            Ap::new(fake_device, FakeBufferProvider::new(), timer, *BSSID),
+            Ap::new(fake_device, FakeCBufferProvider::new(), timer, *BSSID),
             fake_device_state,
             time_stream,
         )

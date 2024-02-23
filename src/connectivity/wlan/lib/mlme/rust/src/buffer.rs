@@ -17,7 +17,7 @@ use {
 };
 
 #[repr(C)]
-pub struct BufferProvider {
+pub struct CBufferProvider {
     /// Allocate and take ownership of a buffer allocated by the C++ portion of wlansoftmac
     /// with at least `min_capacity` bytes of capacity.
     ///
@@ -37,7 +37,7 @@ pub struct BufferProvider {
     get_buffer: unsafe extern "C" fn(min_capacity: usize) -> CBuffer,
 }
 
-impl BufferProvider {
+impl CBufferProvider {
     pub fn get_buffer(&self, min_capacity: usize) -> Result<Buffer, Error> {
         // Safety: This call is safe because this function checks if `buffer` contains
         // a null pointer and calls `mem::forget(buffer)` to prevent calling the `Drop`
@@ -255,11 +255,11 @@ impl Deref for FinalizedBuffer {
     }
 }
 
-pub struct FakeBufferProvider;
+pub struct FakeCBufferProvider;
 
-impl FakeBufferProvider {
-    pub fn new() -> BufferProvider {
-        BufferProvider { get_buffer: Self::get_buffer }
+impl FakeCBufferProvider {
+    pub fn new() -> CBufferProvider {
+        CBufferProvider { get_buffer: Self::get_buffer }
     }
 
     /// # Safety
@@ -319,7 +319,7 @@ mod tests {
 
     #[test]
     fn successful_conversion_into_buffer() {
-        let _ = Buffer::try_from(FakeBufferProvider::get_buffer(10)).unwrap();
+        let _ = Buffer::try_from(FakeCBufferProvider::get_buffer(10)).unwrap();
     }
 
     #[test_case(ptr::null_mut(), 754 as *mut u8, 20)]
@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn successful_modification_of_buffer() {
-        let mut buffer = Buffer::try_from(FakeBufferProvider::get_buffer(10)).unwrap();
+        let mut buffer = Buffer::try_from(FakeCBufferProvider::get_buffer(10)).unwrap();
         assert_eq!(buffer.len(), 10);
         let buffer_copy = buffer.to_vec();
         assert_eq!(&buffer[..], &buffer_copy[..]);

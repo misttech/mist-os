@@ -14,7 +14,7 @@ use {
     tracing::error,
     wlan_common::pointers::SendPtr,
     wlan_mlme::{
-        buffer::BufferProvider,
+        buffer::CBufferProvider,
         device::{completers::StopCompleter, CDeviceInterface, Device},
     },
     wlan_span::CSpan,
@@ -70,7 +70,7 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
         wlan_softmac_handle: *mut WlanSoftmacHandle,
     ),
     device: CDeviceInterface,
-    buf_provider: BufferProvider,
+    buffer_provider: CBufferProvider,
     wlan_softmac_bridge_client_handle: zx::sys::zx_handle_t,
 ) -> zx::sys::zx_status_t {
     // The Fuchsia syslog must not be initialized from Rust more than once per process. In the case
@@ -129,7 +129,7 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
             }
         },
         device,
-        buf_provider,
+        buffer_provider,
     ));
     zx::Status::from(result).into_raw()
 }

@@ -189,7 +189,7 @@ extern "C" zx_status_t start_and_run_bridged_wlansoftmac(
     void *init_completer,
     void (*run_init_completer)(void *init_completer, zx_status_t status,
                                wlansoftmac_handle_t *wlan_softmac_handle),
-    rust_device_interface_t device, wlansoftmac_buffer_provider_ops_t buf_provider,
+    rust_device_interface_t device, wlansoftmac_buffer_provider_ops_t buffer_provider,
     zx_handle_t wlan_softmac_bridge_client_handle);
 
 /**

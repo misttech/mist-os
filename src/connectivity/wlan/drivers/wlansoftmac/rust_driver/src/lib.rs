@@ -17,7 +17,7 @@ use {
     std::pin::Pin,
     tracing::{error, info},
     wlan_mlme::{
-        buffer::BufferProvider,
+        buffer::CBufferProvider,
         device::{
             completers::{InitCompleter, StopCompleter},
             DeviceOps,
@@ -90,7 +90,7 @@ impl WlanSoftmacHandle {
 pub async fn start_and_serve<D: DeviceOps + Send + 'static>(
     init_completer: impl FnOnce(Result<WlanSoftmacHandle, zx::Status>) + Send + 'static,
     device: D,
-    buf_provider: BufferProvider,
+    buffer_provider: CBufferProvider,
 ) -> Result<(), zx::Status> {
     wtrace::duration_begin_scope!(c"rust_driver::start_and_serve");
     let (driver_event_sink, driver_event_stream) = DriverEventSink::new();
@@ -100,16 +100,21 @@ pub async fn start_and_serve<D: DeviceOps + Send + 'static>(
     });
 
     let (mlme_init_sender, mlme_init_receiver) = oneshot::channel();
-    let StartedDriver { mlme, sme } =
-        match start(mlme_init_sender, driver_event_sink, driver_event_stream, device, buf_provider)
-            .await
-        {
-            Err(status) => {
-                init_completer.complete(Err(status));
-                return Err(status);
-            }
-            Ok(x) => x,
-        };
+    let StartedDriver { mlme, sme } = match start(
+        mlme_init_sender,
+        driver_event_sink,
+        driver_event_stream,
+        device,
+        buffer_provider,
+    )
+    .await
+    {
+        Err(status) => {
+            init_completer.complete(Err(status));
+            return Err(status);
+        }
+        Ok(x) => x,
+    };
 
     serve(init_completer, mlme_init_receiver, mlme, sme).await
 }
@@ -132,7 +137,7 @@ async fn start<D: DeviceOps + Send + 'static>(
     driver_event_sink: DriverEventSink,
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
     mut device: D,
-    buf_provider: BufferProvider,
+    buffer_provider: CBufferProvider,
 ) -> Result<
     StartedDriver<
         Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>,
@@ -224,7 +229,7 @@ async fn start<D: DeviceOps + Send + 'static>(
                 mlme_init_sender,
                 config,
                 device,
-                buf_provider,
+                buffer_provider,
                 mlme_request_stream,
                 driver_event_stream,
             ))
@@ -243,7 +248,7 @@ async fn start<D: DeviceOps + Send + 'static>(
                 mlme_init_sender,
                 config,
                 device,
-                buf_provider,
+                buffer_provider,
                 mlme_request_stream,
                 driver_event_stream,
             ))
@@ -612,7 +617,7 @@ mod tests {
         ) {
             let (mlme_init_sender, mlme_init_receiver) = oneshot::channel();
             let (driver_event_sink, driver_event_stream) = DriverEventSink::new();
-            let fake_buf_provider = wlan_mlme::buffer::FakeBufferProvider::new();
+            let fake_buffer_provider = wlan_mlme::buffer::FakeCBufferProvider::new();
 
             (
                 Box::pin(start(
@@ -620,7 +625,7 @@ mod tests {
                     driver_event_sink.clone(),
                     driver_event_stream,
                     fake_device,
-                    fake_buf_provider,
+                    fake_buffer_provider,
                 )),
                 StartTestHarness {
                     mlme_init_receiver: Box::pin(mlme_init_receiver),
@@ -934,7 +939,7 @@ mod tests {
         fake_device: FakeDevice,
     ) -> Result<StartAndServeTestHarness<impl Future<Output = Result<(), zx::Status>>>, zx::Status>
     {
-        let fake_buf_provider = wlan_mlme::buffer::FakeBufferProvider::new();
+        let fake_buffer_provider = wlan_mlme::buffer::FakeCBufferProvider::new();
         let (softmac_handle_sender, mut softmac_handle_receiver) =
             oneshot::channel::<Result<WlanSoftmacHandle, zx::Status>>();
         let start_and_serve_fut = start_and_serve(
@@ -944,7 +949,7 @@ mod tests {
                     .expect("Failed to signal initialization complete.")
             },
             fake_device.clone(),
-            fake_buf_provider,
+            fake_buffer_provider,
         );
         let mut start_and_serve_fut = Box::pin(start_and_serve_fut);
 

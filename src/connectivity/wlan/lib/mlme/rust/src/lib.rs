@@ -120,7 +120,7 @@ pub trait MlmeImpl {
     fn new(
         config: Self::Config,
         device: Self::Device,
-        buf_provider: buffer::BufferProvider,
+        buffer_provider: buffer::CBufferProvider,
         scheduler: common::timer::Timer<Self::TimerEvent>,
     ) -> Result<Self, Error>
     where
@@ -247,7 +247,7 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
     init_sender: oneshot::Sender<Result<(), zx::Status>>,
     config: T::Config,
     mut device: T::Device,
-    buf_provider: buffer::BufferProvider,
+    buffer_provider: buffer::CBufferProvider,
     mlme_request_stream: mpsc::UnboundedReceiver<wlan_sme::MlmeRequest>,
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
 ) -> Result<(), Error> {
@@ -271,7 +271,7 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
 
     // Failure to create MLME likely indicates a problem querying the device. There is no recovery
     // path if this occurs.
-    let mlme_impl = T::new(config, device, buf_provider, timer).expect("Failed to create MLME.");
+    let mlme_impl = T::new(config, device, buffer_provider, timer).expect("Failed to create MLME.");
 
     // Signal init is complete.
     init_sender.send(Ok(())).map_err(|_| format_err!("Failed to signal init complete."))?;
@@ -383,7 +383,7 @@ pub mod test_utils {
         fn new(
             _config: Self::Config,
             device: Self::Device,
-            _buf_provider: buffer::BufferProvider,
+            _buffer_provider: buffer::CBufferProvider,
             _scheduler: wlan_common::timer::Timer<Self::TimerEvent>,
         ) -> Result<Self, Error> {
             Ok(Self { device })
@@ -500,7 +500,7 @@ pub mod test_utils {
 #[cfg(test)]
 mod tests {
     use {
-        super::{buffer::FakeBufferProvider, device::FakeDevice, test_utils::FakeMlme, *},
+        super::{buffer::FakeCBufferProvider, device::FakeDevice, test_utils::FakeMlme, *},
         fuchsia_async::TestExecutor,
         futures::channel::{mpsc, oneshot},
         std::task::Poll,
@@ -581,7 +581,7 @@ mod tests {
     fn start_and_stop_main_loop() {
         let mut exec = TestExecutor::new();
         let (fake_device, _fake_device_state) = FakeDevice::new(&exec);
-        let buf_provider = FakeBufferProvider::new();
+        let buffer_provider = FakeCBufferProvider::new();
         let (device_sink, device_stream) = mpsc::unbounded();
         let (_mlme_request_sink, mlme_request_stream) = mpsc::unbounded();
         let (init_sender, mut init_receiver) = oneshot::channel::<Result<(), zx::Status>>();
@@ -590,7 +590,7 @@ mod tests {
             init_sender,
             (),
             fake_device,
-            buf_provider,
+            buffer_provider,
             mlme_request_stream,
             device_stream,
         ));

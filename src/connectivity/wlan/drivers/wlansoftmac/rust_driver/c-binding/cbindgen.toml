@@ -50,7 +50,7 @@ exclude = [
 "WlanSoftmacHandle" = "wlansoftmac_handle_t"
 
 # wlan-mlme types
-"BufferProvider" = "wlansoftmac_buffer_provider_ops_t"
+"CBufferProvider" = "wlansoftmac_buffer_provider_ops_t"
 "CBuffer" = "wlansoftmac_buffer_t"
 "CDeviceInterface" = "rust_device_interface_t"
 "CWlanSoftmacIfcProtocol" = "rust_wlan_softmac_ifc_protocol_copy_t"

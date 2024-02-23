@@ -50,7 +50,7 @@ impl Appendable for FixedSizedTestBuffer {
     }
 
     fn bytes_written(&self) -> usize {
-        self.0.bytes_written()
+        self.0.len()
     }
 
     fn can_append(&self, bytes: usize) -> bool {

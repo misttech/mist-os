@@ -4,8 +4,8 @@
 
 use {crate::error::Error, anyhow::format_err, wlan_common::mac, zerocopy::Ref};
 
-pub fn set_more_data(buf: &mut [u8]) -> Result<(), Error> {
-    let (frame_ctrl, _) = Ref::<&mut [u8], mac::FrameControl>::new_from_prefix(buf)
+pub fn set_more_data(buffer: &mut [u8]) -> Result<(), Error> {
+    let (frame_ctrl, _) = Ref::<&mut [u8], mac::FrameControl>::new_from_prefix(buffer)
         .ok_or(format_err!("could not parse frame control header"))?;
     let frame_ctrl = frame_ctrl.into_mut();
     frame_ctrl.set_more_data(true);
@@ -18,7 +18,7 @@ mod tests {
 
     #[test]
     fn more_data() {
-        let mut buf = vec![
+        let mut buffer = vec![
             // Mgmt header
             0b00001000, 0b00000010, // Frame Control
             0, 0, // Duration
@@ -32,7 +32,7 @@ mod tests {
             // Data
             1, 2, 3, 4, 5,
         ];
-        set_more_data(&mut buf[..]).expect("expected set more data OK");
+        set_more_data(&mut buffer[..]).expect("expected set more data OK");
         assert_eq!(
             &[
                 // Mgmt header
@@ -48,7 +48,7 @@ mod tests {
                 // Data
                 1, 2, 3, 4, 5,
             ][..],
-            &buf[..]
+            &buffer[..]
         );
     }
 }

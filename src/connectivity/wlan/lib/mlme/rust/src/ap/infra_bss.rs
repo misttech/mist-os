@@ -102,8 +102,8 @@ impl InfraBss {
 
         // TODO(https://fxbug.dev/42113580): Support DTIM.
 
-        let (in_buf, _, beacon_offload_params) = bss.make_beacon_frame(ctx)?;
-        let mac_frame = in_buf.to_vec();
+        let (in_buffer, _, beacon_offload_params) = bss.make_beacon_frame(ctx)?;
+        let mac_frame = in_buffer.to_vec();
         let tim_ele_offset = u64::try_from(beacon_offload_params.tim_ele_offset).map_err(|_| {
             Error::Internal(format_err!(
                 "failed to convert TIM offset for beacon frame packet template"
@@ -625,7 +625,7 @@ mod tests {
         super::*,
         crate::{
             ap::remote_client::{ClientEvent, ClientRejection},
-            buffer::FakeBufferProvider,
+            buffer::FakeCBufferProvider,
             device::{FakeDevice, FakeDeviceConfig, FakeDeviceState},
         },
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_async as fasync,
@@ -654,7 +654,7 @@ mod tests {
         fake_device: FakeDevice,
     ) -> (Context<FakeDevice>, timer::EventStream<TimedEvent>) {
         let (timer, time_stream) = create_timer();
-        (Context::new(fake_device, FakeBufferProvider::new(), timer, *BSSID), time_stream)
+        (Context::new(fake_device, FakeCBufferProvider::new(), timer, *BSSID), time_stream)
     }
 
     fn make_infra_bss(ctx: &mut Context<FakeDevice>) -> InfraBss {

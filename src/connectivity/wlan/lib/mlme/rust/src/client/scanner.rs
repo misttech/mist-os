@@ -23,7 +23,7 @@ use {
         mgmt_writer,
         time::TimeUnit,
     },
-    wlan_frame_writer::write_frame_with_dynamic_buf,
+    wlan_frame_writer::write_frame_with_dynamic_buffer,
 };
 
 // TODO(https://fxbug.dev/42171393): Currently hardcoded until parameters supported.
@@ -236,7 +236,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
     ) -> Result<OngoingScan, Error> {
         let ssids_list = req.ssid_list.iter().map(cssid_from_ssid_unchecked).collect::<Vec<_>>();
 
-        let (mac_header, _) = write_frame_with_dynamic_buf!(vec![], {
+        let (mac_header, _) = write_frame_with_dynamic_buffer!(vec![], {
             headers: {
                 mac::MgmtHdr: &self.probe_request_mac_header(),
             },
@@ -493,7 +493,7 @@ fn active_scan_request_series(
             mac_header: Some(mac_header.clone()),
             // Exclude the SSID IE because the device driver will generate using ssids_list.
             ies: Some(
-                write_frame_with_dynamic_buf!(vec![], {
+                write_frame_with_dynamic_buffer!(vec![], {
                 ies: {
                     supported_rates: supported_rates,
                     extended_supported_rates: {/* continue rates */},
@@ -535,7 +535,7 @@ mod tests {
     use {
         super::*,
         crate::{
-            buffer::FakeBufferProvider,
+            buffer::FakeCBufferProvider,
             client::TimedEvent,
             device::{FakeDevice, FakeDeviceState},
             test_utils::{fake_wlan_channel, MockWlanRxInfo},
@@ -1169,7 +1169,7 @@ mod tests {
             Context {
                 _config: Default::default(),
                 device: self.fake_device.clone(),
-                buf_provider: FakeBufferProvider::new(),
+                buffer_provider: FakeCBufferProvider::new(),
                 timer: self.timer.take().unwrap(),
                 seq_mgr: SequenceManager::new(),
             }

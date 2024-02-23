@@ -1369,35 +1369,35 @@ mod free_function_tests {
 
     #[test]
     fn test_extract_ht_vht_op_success() {
-        let mut buf = Vec::<u8>::new();
-        ie::write_ht_operation(&mut buf, &ie::fake_ht_operation()).expect("valid HT Op");
-        ie::write_vht_operation(&mut buf, &ie::fake_vht_operation()).expect("valid VHT Op");
-        let (ht_operation, vht_operation) = extract_ht_vht_op(&buf[..]);
+        let mut buffer = Vec::<u8>::new();
+        ie::write_ht_operation(&mut buffer, &ie::fake_ht_operation()).expect("valid HT Op");
+        ie::write_vht_operation(&mut buffer, &ie::fake_vht_operation()).expect("valid VHT Op");
+        let (ht_operation, vht_operation) = extract_ht_vht_op(&buffer[..]);
         assert_eq!(ht_operation.unwrap().read(), ie::fake_ht_operation());
         assert_eq!(vht_operation.unwrap().read(), ie::fake_vht_operation());
     }
 
     #[test]
     fn test_extract_ht_op_too_short() {
-        let mut buf = Vec::<u8>::new();
-        ie::write_ht_operation(&mut buf, &ie::fake_ht_operation()).expect("valid HT Op");
-        buf[1] -= 1; // Make length shorter
-        buf.truncate(buf.len() - 1);
-        ie::write_vht_operation(&mut buf, &ie::fake_vht_operation()).expect("valid VHT Op");
-        let (ht_operation, vht_operation) = extract_ht_vht_op(&buf[..]);
+        let mut buffer = Vec::<u8>::new();
+        ie::write_ht_operation(&mut buffer, &ie::fake_ht_operation()).expect("valid HT Op");
+        buffer[1] -= 1; // Make length shorter
+        buffer.truncate(buffer.len() - 1);
+        ie::write_vht_operation(&mut buffer, &ie::fake_vht_operation()).expect("valid VHT Op");
+        let (ht_operation, vht_operation) = extract_ht_vht_op(&buffer[..]);
         assert_eq!(ht_operation, None);
         assert_eq!(vht_operation.unwrap().read(), ie::fake_vht_operation());
     }
 
     #[test]
     fn test_extract_vht_op_too_short() {
-        let mut buf = Vec::<u8>::new();
-        ie::write_ht_operation(&mut buf, &ie::fake_ht_operation()).expect("valid HT Op");
-        let ht_end = buf.len();
-        ie::write_vht_operation(&mut buf, &ie::fake_vht_operation()).expect("valid VHT Op");
-        buf[ht_end + 1] -= 1; // Make VHT operation shorter.
-        buf.truncate(buf.len() - 1);
-        let (ht_operation, vht_operation) = extract_ht_vht_op(&buf[..]);
+        let mut buffer = Vec::<u8>::new();
+        ie::write_ht_operation(&mut buffer, &ie::fake_ht_operation()).expect("valid HT Op");
+        let ht_end = buffer.len();
+        ie::write_vht_operation(&mut buffer, &ie::fake_vht_operation()).expect("valid VHT Op");
+        buffer[ht_end + 1] -= 1; // Make VHT operation shorter.
+        buffer.truncate(buffer.len() - 1);
+        let (ht_operation, vht_operation) = extract_ht_vht_op(&buffer[..]);
         assert_eq!(ht_operation.unwrap().read(), ie::fake_ht_operation());
         assert_eq!(vht_operation, None);
     }
@@ -1409,7 +1409,7 @@ mod tests {
         super::*,
         crate::{
             block_ack::{write_addba_req_body, ADDBA_REQ_FRAME_LEN},
-            buffer::FakeBufferProvider,
+            buffer::FakeCBufferProvider,
             client::{
                 channel_switch::ChannelState, scanner::Scanner, test_utils::drain_timeouts, Client,
                 Context, ParsedConnectRequest, TimedEventClass,
@@ -1439,7 +1439,7 @@ mod tests {
             },
             timer::{self, create_timer, Timer},
         },
-        wlan_frame_writer::write_frame_with_dynamic_buf,
+        wlan_frame_writer::write_frame_with_dynamic_buffer,
         wlan_statemachine as statemachine,
     };
 
@@ -1498,7 +1498,7 @@ mod tests {
             Context {
                 _config: Default::default(),
                 device: self.fake_device.clone(),
-                buf_provider: FakeBufferProvider::new(),
+                buffer_provider: FakeCBufferProvider::new(),
                 timer: self.timer.take().unwrap(),
                 seq_mgr: SequenceManager::new(),
             }
@@ -2001,7 +2001,7 @@ mod tests {
         let frame = {
             let mut buffer = [0u8; ADDBA_REQ_FRAME_LEN];
             let writer = BufferWriter::new(&mut buffer[..]);
-            let (mut writer, _) = write_frame_with_dynamic_buf!(
+            let (mut writer, _) = write_frame_with_dynamic_buffer!(
                 writer,
                 {
                     headers: {

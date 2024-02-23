@@ -8,34 +8,34 @@ use {
 };
 
 pub struct BufferWriter<B> {
-    buf: B,
-    bytes_written: usize,
+    buffer: B,
+    written: usize,
 }
 
 impl<B: ByteSliceMut> BufferWriter<B> {
-    pub fn new(buf: B) -> Self {
-        Self { buf, bytes_written: 0 }
+    pub fn new(buffer: B) -> Self {
+        Self { buffer, written: 0 }
     }
 
-    pub fn bytes_remaining(&self) -> usize {
-        self.buf.len() - self.bytes_written
+    pub fn remaining(&self) -> usize {
+        self.buffer.len() - self.written
     }
 
-    pub fn bytes_written(&self) -> usize {
-        self.bytes_written
+    pub fn written(&self) -> usize {
+        self.written
     }
 
     pub fn into_written(self) -> B {
-        let (written, _remaining) = self.buf.split_at(self.bytes_written);
+        let (written, _remaining) = self.buffer.split_at(self.written);
         written
     }
 
     fn next_mut_slice(&mut self, len: usize) -> Result<&mut [u8], BufferTooSmall> {
-        if self.bytes_written + len > self.buf.len() {
+        if self.written + len > self.buffer.len() {
             return Err(BufferTooSmall);
         }
-        let ret = &mut self.buf[self.bytes_written..self.bytes_written + len];
-        self.bytes_written += len;
+        let ret = &mut self.buffer[self.written..self.written + len];
+        self.written += len;
         Ok(ret)
     }
 }
@@ -55,11 +55,11 @@ impl<B: ByteSliceMut> Appendable for BufferWriter<B> {
     }
 
     fn bytes_written(&self) -> usize {
-        self.bytes_written
+        self.written
     }
 
     fn can_append(&self, bytes: usize) -> bool {
-        self.bytes_remaining() >= bytes
+        self.remaining() >= bytes
     }
 }
 
@@ -76,36 +76,36 @@ mod tests {
 
     #[test]
     fn append_value_zeroed() {
-        let mut buf = [1u8; 5];
-        let mut w = BufferWriter::new(&mut buf[..]);
+        let mut buffer = [1u8; 5];
+        let mut w = BufferWriter::new(&mut buffer[..]);
         let mut data = w.append_value_zeroed::<[u8; 3]>().expect("failed writing buffer");
         data[0] = 42;
         // Don't write `data[1]`: BufferWriter should zero this byte.
         data[2] = 43;
 
-        assert_eq!(3, w.bytes_written());
-        assert_eq!(2, w.bytes_remaining());
-        assert_eq!([42, 0, 43, 1, 1], buf);
+        assert_eq!(3, w.written());
+        assert_eq!(2, w.remaining());
+        assert_eq!([42, 0, 43, 1, 1], buffer);
     }
 
     #[test]
     fn append_bytes() {
-        let mut buf = [1u8; 5];
-        let mut w = BufferWriter::new(&mut buf[..]);
+        let mut buffer = [1u8; 5];
+        let mut w = BufferWriter::new(&mut buffer[..]);
         w.append_byte(42).expect("failed writing buffer");
         w.append_byte(43).expect("failed writing buffer");
         w.append_bytes(&[2, 3]).expect("failed writing buffer");
 
-        assert_eq!(4, w.bytes_written());
-        assert_eq!(1, w.bytes_remaining());
+        assert_eq!(4, w.written());
+        assert_eq!(1, w.remaining());
         assert_eq!(&[42, 43, 2, 3], w.into_written());
-        assert_eq!([42, 43, 2, 3, 1], buf);
+        assert_eq!([42, 43, 2, 3, 1], buffer);
     }
 
     #[test]
     fn can_append() {
-        let mut buf = [1u8; 5];
-        let mut w = BufferWriter::new(&mut buf[..]);
+        let mut buffer = [1u8; 5];
+        let mut w = BufferWriter::new(&mut buffer[..]);
         assert!(w.can_append(0));
         assert!(w.can_append(4));
         assert!(w.can_append(5));

@@ -951,9 +951,9 @@ impl RemoteClient {
                         ie::Id::RSNE => {
                             rsne = Some({
                                 // TODO(https://fxbug.dev/42117156): Stop passing RSNEs around like this.
-                                let mut buf =
+                                let mut buffer =
                                     vec![0; std::mem::size_of::<ie::Header>() + ie_body.len()];
-                                let mut w = BufferWriter::new(&mut buf[..]);
+                                let mut w = BufferWriter::new(&mut buffer[..]);
                                 w.append_value(&ie::Header {
                                     id: ie::Id::RSNE,
                                     body_len: ie_body.len() as u8,
@@ -961,7 +961,7 @@ impl RemoteClient {
                                 .expect("expected enough room in buffer for IE header");
                                 w.append_bytes(ie_body)
                                     .expect("expected enough room in buffer for IE body");
-                                buf
+                                buffer
                             });
                         }
                         _ => {}
@@ -1110,7 +1110,7 @@ impl RemoteClient {
 mod tests {
     use {
         super::*,
-        crate::{ap::TimedEvent, buffer::FakeBufferProvider, device::FakeDevice},
+        crate::{ap::TimedEvent, buffer::FakeCBufferProvider, device::FakeDevice},
         fuchsia_async as fasync,
         ieee80211::Bssid,
         lazy_static::lazy_static,
@@ -1137,7 +1137,7 @@ mod tests {
         fake_device: FakeDevice,
     ) -> (Context<FakeDevice>, timer::EventStream<TimedEvent>) {
         let (timer, time_stream) = create_timer();
-        (Context::new(fake_device, FakeBufferProvider::new(), timer, *AP_ADDR), time_stream)
+        (Context::new(fake_device, FakeCBufferProvider::new(), timer, *AP_ADDR), time_stream)
     }
 
     #[test]

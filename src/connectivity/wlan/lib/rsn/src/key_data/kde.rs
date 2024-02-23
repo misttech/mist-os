@@ -209,17 +209,13 @@ named_args!(parse_igtk(data_len: usize) <Igtk>,
 );
 
 /// KDE Writer to assist with writing key data elements.
-pub struct Writer<A: Appendable> {
+pub struct Writer<A> {
     buf: A,
 }
 
 impl<A: Appendable> Writer<A> {
     pub fn new(buf: A) -> Self {
         Self { buf }
-    }
-
-    pub fn bytes_written(&self) -> usize {
-        self.buf.bytes_written()
     }
 
     pub fn write_protection(&mut self, protection: &ProtectionInfo) -> Result<(), BufferTooSmall> {
@@ -277,7 +273,7 @@ impl<A: Appendable> Writer<A> {
         // See IEEE Std 802.11-2016, 12.7.2 j)
         // Padding is added to extend the key data field to a minimum size of 16 octets or
         // otherwise be a multiple of 8 octets.
-        let written = self.bytes_written();
+        let written = self.buf.bytes_written();
         let padding_len =
             if written < 16 { 16 - written } else { ((written + 7) / 8) * 8 - written };
         if !self.buf.can_append(padding_len) {

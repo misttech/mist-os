@@ -5,7 +5,7 @@
 use {
     crate::{
         ap::TimedEvent,
-        buffer::{Buffer, BufferProvider},
+        buffer::{Buffer, CBufferProvider},
         device::DeviceOps,
         disconnect::LocallyInitiated,
         error::Error,
@@ -24,7 +24,7 @@ use {
         timer::{EventId, Timer},
         wmm, TimeUnit,
     },
-    wlan_frame_writer::{write_frame, write_frame_with_fixed_buf},
+    wlan_frame_writer::{write_frame, write_frame_with_fixed_buffer},
 };
 
 /// BeaconParams contains parameters that may be used to offload beaconing to the hardware.
@@ -35,7 +35,7 @@ pub struct BeaconOffloadParams {
 
 pub struct Context<D> {
     pub device: D,
-    pub buffer_provider: BufferProvider,
+    pub buffer_provider: CBufferProvider,
     pub timer: Timer<TimedEvent>,
     pub seq_mgr: SequenceManager,
     pub bssid: Bssid,
@@ -44,7 +44,7 @@ pub struct Context<D> {
 impl<D> Context<D> {
     pub fn new(
         device: D,
-        buffer_provider: BufferProvider,
+        buffer_provider: CBufferProvider,
         timer: Timer<TimedEvent>,
         bssid: Bssid,
     ) -> Self {
@@ -501,7 +501,7 @@ impl<D: DeviceOps> Context<D> {
         protocol_id: u16,
         body: &[u8],
     ) -> Result<(), Error> {
-        let (buffer, written) = write_frame_with_fixed_buf!([0u8; mac::MAX_ETH_FRAME_LEN], {
+        let (buffer, written) = write_frame_with_fixed_buffer!([0u8; mac::MAX_ETH_FRAME_LEN], {
             headers: {
                 mac::EthernetIIHdr: &mac::EthernetIIHdr {
                     da: dst_addr,
@@ -522,7 +522,7 @@ impl<D: DeviceOps> Context<D> {
 mod test {
     use {
         super::*,
-        crate::{ap::ClientEvent, buffer::FakeBufferProvider, device::FakeDevice},
+        crate::{ap::ClientEvent, buffer::FakeCBufferProvider, device::FakeDevice},
         fuchsia_async as fasync,
         lazy_static::lazy_static,
         std::convert::TryFrom,
@@ -542,7 +542,7 @@ mod test {
         fake_device: FakeDevice,
     ) -> (Context<FakeDevice>, timer::EventStream<TimedEvent>) {
         let (timer, time_stream) = create_timer();
-        (Context::new(fake_device, FakeBufferProvider::new(), timer, *BSSID), time_stream)
+        (Context::new(fake_device, FakeCBufferProvider::new(), timer, *BSSID), time_stream)
     }
 
     #[test]

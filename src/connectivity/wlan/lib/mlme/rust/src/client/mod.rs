@@ -14,7 +14,7 @@ use {
     crate::{
         akm_algorithm,
         block_ack::BlockAckTx,
-        buffer::{BufferProvider, FinalizedBuffer},
+        buffer::{CBufferProvider, FinalizedBuffer},
         ddk_converter,
         device::{self, DeviceOps},
         disconnect::LocallyInitiated,
@@ -46,7 +46,9 @@ use {
         timer::{EventId, Timer},
         wmm,
     },
-    wlan_frame_writer::{write_frame, write_frame_with_dynamic_buf, write_frame_with_fixed_buf},
+    wlan_frame_writer::{
+        write_frame, write_frame_with_dynamic_buffer, write_frame_with_fixed_buffer,
+    },
     wlan_sme, wlan_trace as wtrace,
     zerocopy::ByteSlice,
 };
@@ -98,7 +100,7 @@ pub struct ClientConfig {
 pub struct Context<D> {
     _config: ClientConfig,
     device: D,
-    buf_provider: BufferProvider,
+    buffer_provider: CBufferProvider,
     timer: Timer<TimedEvent>,
     seq_mgr: SequenceManager,
 }
@@ -117,10 +119,10 @@ impl<D: DeviceOps> crate::MlmeImpl for ClientMlme<D> {
     fn new(
         config: Self::Config,
         device: Self::Device,
-        buf_provider: BufferProvider,
+        buffer_provider: CBufferProvider,
         timer: Timer<TimedEvent>,
     ) -> Result<Self, anyhow::Error> {
-        Self::new(config, device, buf_provider, timer).map_err(From::from)
+        Self::new(config, device, buffer_provider, timer).map_err(From::from)
     }
     fn handle_mlme_request(&mut self, req: wlan_sme::MlmeRequest) -> Result<(), anyhow::Error> {
         Self::handle_mlme_req(self, req).map_err(From::from)
@@ -208,7 +210,7 @@ impl<D: DeviceOps> ClientMlme<D> {
     pub fn new(
         config: ClientConfig,
         mut device: D,
-        buf_provider: BufferProvider,
+        buffer_provider: CBufferProvider,
         timer: Timer<TimedEvent>,
     ) -> Result<Self, Error> {
         let iface_mac = device::try_query_iface_mac(&mut device)?;
@@ -217,7 +219,7 @@ impl<D: DeviceOps> ClientMlme<D> {
             ctx: Context {
                 _config: config,
                 device,
-                buf_provider,
+                buffer_provider,
                 timer,
                 seq_mgr: SequenceManager::new(),
             },
@@ -600,7 +602,7 @@ impl Client {
         ctx: &mut Context<D>,
         state: PowerState,
     ) -> Result<(), Error> {
-        let (buffer, written) = write_frame!(&mut ctx.buf_provider, {
+        let (buffer, written) = write_frame!(&mut ctx.buffer_provider, {
             headers: {
                 mac::FixedDataHdrFields: &mac::FixedDataHdrFields {
                     frame_ctrl: mac::FrameControl(0)
@@ -683,7 +685,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     fn deliver_msdu<B: ByteSlice>(&mut self, msdu: mac::Msdu<B>) -> Result<(), Error> {
         let mac::Msdu { dst_addr, src_addr, llc_frame } = msdu;
 
-        let (buf, bytes_written) = write_frame_with_fixed_buf!([0u8; mac::MAX_ETH_FRAME_LEN], {
+        let (buffer, written) = write_frame_with_fixed_buffer!([0u8; mac::MAX_ETH_FRAME_LEN], {
             headers: {
                 mac::EthernetIIHdr: &mac::EthernetIIHdr {
                     da: dst_addr,
@@ -693,7 +695,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             },
             payload: &llc_frame.body,
         })?;
-        let (written, _remaining) = buf.split_at(bytes_written);
+        let (written, _remaining) = buffer.split_at(written);
         self.ctx
             .device
             .deliver_eth_frame(written)
@@ -707,7 +709,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         result_code: mac::StatusCode,
         auth_content: &[u8],
     ) -> Result<(), Error> {
-        let (buffer, written) = write_frame!(&mut self.ctx.buf_provider, {
+        let (buffer, written) = write_frame!(&mut self.ctx.buffer_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_to_ap(
                     mac::FrameControl(0)
@@ -751,7 +753,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         let vht_cap = cap.vht_cap;
         let security_ie = self.sta.connect_req.security_ie.clone();
 
-        let (buffer, written) = write_frame!(&mut self.ctx.buf_provider, {
+        let (buffer, written) = write_frame!(&mut self.ctx.buffer_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_to_ap(
                     mac::FrameControl(0)
@@ -790,7 +792,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     // be some investigation, whether these "keep alive" frames are the right way of keeping a
     // client associated to legacy APs.
     fn send_keep_alive_resp_frame(&mut self) -> Result<(), Error> {
-        let (buffer, written) = write_frame!(&mut self.ctx.buf_provider, {
+        let (buffer, written) = write_frame!(&mut self.ctx.buffer_provider, {
             headers: {
                 mac::FixedDataHdrFields: &data_writer::data_hdr_client_to_ap(
                     mac::FrameControl(0)
@@ -810,7 +812,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     }
 
     pub fn send_deauth_frame(&mut self, reason_code: mac::ReasonCode) -> Result<(), Error> {
-        let (buffer, written) = write_frame!(&mut self.ctx.buf_provider, {
+        let (buffer, written) = write_frame!(&mut self.ctx.buffer_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_to_ap(
                     mac::FrameControl(0)
@@ -883,7 +885,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         };
         let addr4 = if from_ds && to_ds { Some(src) } else { None };
 
-        let (buffer, written) = write_frame!(&mut self.ctx.buf_provider, {
+        let (buffer, written) = write_frame!(&mut self.ctx.buffer_provider, {
             headers: {
                 mac::FixedDataHdrFields: &mac::FixedDataHdrFields {
                     frame_ctrl: mac::FrameControl(0)
@@ -989,7 +991,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     pub fn send_ps_poll_frame(&mut self, aid: Aid) -> Result<(), Error> {
         const PS_POLL_ID_MASK: u16 = 0b11000000_00000000;
 
-        let (buffer, written) = write_frame!(&mut self.ctx.buf_provider, {
+        let (buffer, written) = write_frame!(&mut self.ctx.buffer_provider, {
             headers: {
                 mac::FrameControl: &mac::FrameControl(0)
                     .with_frame_type(mac::FrameType::CTRL)
@@ -1237,7 +1239,7 @@ impl<'a, D: DeviceOps> BlockAckTx for BoundClient<'a, D> {
     ///
     /// BlockAck frames are described by 802.11-2016, section 9.6.5.2, 9.6.5.3, and 9.6.5.4.
     fn send_block_ack_frame(&mut self, n: usize, body: &[u8]) -> Result<(), Error> {
-        let mut buffer = self.ctx.buf_provider.get_buffer(n)?;
+        let mut buffer = self.ctx.buffer_provider.get_buffer(n)?;
         let mut writer = BufferWriter::new(&mut buffer[..]);
         write_block_ack_hdr(
             &mut writer,
@@ -1265,7 +1267,7 @@ fn write_block_ack_hdr<B: Appendable>(
     // The management header differs for APs and clients. The frame control and management header
     // are constructed here, but AP and client STAs share the code that constructs the body. See
     // the `block_ack` module.
-    write_frame_with_dynamic_buf!(
+    write_frame_with_dynamic_buffer!(
         buffer,
         {
             headers: {
@@ -1290,7 +1292,7 @@ mod tests {
         super::{state::DEFAULT_AUTO_DEAUTH_TIMEOUT_BEACON_COUNT, *},
         crate::{
             block_ack::{self, BlockAckState, Closed, ADDBA_REQ_FRAME_LEN, ADDBA_RESP_FRAME_LEN},
-            buffer::FakeBufferProvider,
+            buffer::FakeCBufferProvider,
             client::{lost_bss::LostBssCounter, test_utils::drain_timeouts},
             device::{test_utils, FakeDevice, FakeDeviceConfig, FakeDeviceState, LinkStatus},
             test_utils::{fake_wlan_channel, MockWlanRxInfo},
@@ -1373,7 +1375,7 @@ mod tests {
             let mut mlme = ClientMlme::new(
                 Default::default(),
                 self.fake_device.clone(),
-                FakeBufferProvider::new(),
+                FakeCBufferProvider::new(),
                 self.timer.take().unwrap(),
             )
             .expect("Failed to create client MLME.");

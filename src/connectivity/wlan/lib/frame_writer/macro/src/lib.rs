@@ -16,23 +16,23 @@ mod ie;
 /// The buffer and amount of bytes written will be returned to the caller.
 ///
 /// # Buffer Source
-/// A buffer can be provided through either a `BufferProvider` or an expression.
-/// * `write_frame!` requires a `BufferProvider`:
+/// A buffer can be provided through either a `CBufferProvider` or an expression.
+/// * `write_frame!` requires a `CBufferProvider`:
 ///   ```
-///   let (buf, bytes_written) = write_frame!(my_buffer_provider, { ... })?;
-///   let (buf, bytes_written) = write_frame!(make_buffer_provider(), { ... })?;
-///   let (buf, bytes_written) = write_frame!(self.buf_provider, { ... })?;
+///   let (buffer, written) = write_frame!(my_buffer_provider, { ... })?;
+///   let (buffer, written) = write_frame!(make_buffer_provider(), { ... })?;
+///   let (buffer, written) = write_frame!(self.buffer_provider, { ... })?;
 ///   ```
-///   Note: the `BufferProvider` can be any struct which provides a
+///   Note: the `CBufferProvider` can be any struct which provides a
 ///   `get_buffer(usize) -> Result<_, Error>` implementation. The returned buffer type must
 ///   implement the `Appendable` trait.
-/// * `write_frame_with_dynamic_buf!` works with dynamically sized buffers. Such buffers can grow
+/// * `write_frame_with_dynamic_buffer!` works with dynamically sized buffers. Such buffers can grow
 ///   in size and must implement the `Appendable` trait.
-/// * `write_frame_with_fixed_buf!` works with fixed sized buffers. Such buffers must implement the
+/// * `write_frame_with_fixed_buffer!` works with fixed sized buffers. Such buffers must implement the
 ///   `AsMut<[u8]>` trait.
 ///   ```
-///   let (buf, bytes_written) = write_frame_with_fixed_buf!([0u8; 20], { ... })?;
-///   let (buf, bytes_written) = write_frame_with_dynamic_buf!(vec![], { ... })?;
+///   let (buffer, written) = write_frame_with_fixed_buffer!([0u8; 20], { ... })?;
+///   let (buffer, written) = write_frame_with_dynamic_buffer!(vec![], { ... })?;
 ///   ```
 ///
 /// # Headers
@@ -99,7 +99,7 @@ mod ie;
 /// One can emit the offset at which a particular IE is written at.
 /// ```
 /// let mut offset = 0;
-/// let (buf, bytes_written) = write_frame!(buf_provider, {
+/// let (buffer, written) = write_frame!(buffer_provider, {
 ///     ...
 ///     ies: {
 ///         ssid: ssid,
@@ -119,8 +119,8 @@ mod ie;
 /// of a compatible type.
 ///
 /// # Return type
-/// The macro returns a `Result<(Inbuf, usize), Error>`. If the frame was written successfully,
-/// `Ok((buffer, bytes_written))` is returned, `Err(_)` otherwise.
+/// The macro returns a `Result<(Inbuffer, usize), Error>`. If the frame was written successfully,
+/// `Ok((buffer, written))` is returned, `Err(_)` otherwise.
 ///
 /// # Constraints
 /// The macro early returns with an error if the writing to the buffer failed, thus, the caller must
@@ -130,7 +130,7 @@ mod ie;
 ///
 /// # Examples
 /// ```
-/// let (buf, bytes_written) = write_frame!(&mut self.ctx.buf_provider, {
+/// let (buffer, written) = write_frame!(&mut self.ctx.buffer_provider, {
 ///     headers: {
 ///         mac::MgmtHdr: &mac::MgmtHdr {
 ///             frame_ctrl: mac::FrameControl(0)
@@ -161,15 +161,15 @@ mod ie;
 /// ```
 #[proc_macro]
 pub fn write_frame(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    frame_writer::process_with_buf_provider(input)
+    frame_writer::process_with_buffer_provider(input)
 }
 
 #[proc_macro]
-pub fn write_frame_with_fixed_buf(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    frame_writer::process_with_fixed_buf(input)
+pub fn write_frame_with_fixed_buffer(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    frame_writer::process_with_fixed_buffer(input)
 }
 
 #[proc_macro]
-pub fn write_frame_with_dynamic_buf(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    frame_writer::process_with_dynamic_buf(input)
+pub fn write_frame_with_dynamic_buffer(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    frame_writer::process_with_dynamic_buffer(input)
 }
