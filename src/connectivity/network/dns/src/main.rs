@@ -1175,8 +1175,7 @@ pub async fn main() -> Result<(), Error> {
     // Failing to apply a scheduling role is not fatal. Issue a warning in case
     // DNS latency is important to a product and running at default priority is
     // insufficient.
-    match fuchsia_scheduler::set_role_for_this_thread("fuchsia.networking.dns.resolver.main").await
-    {
+    match fuchsia_scheduler::set_role_for_this_thread("fuchsia.networking.dns.resolver.main") {
         Ok(_) => info!("Applied scheduling role"),
         Err(err) => warn!("Failed to apply scheduling role: {}", err),
     };

@@ -260,7 +260,7 @@ async fn main() -> Result<(), Error> {
 
     // Failing to apply a deadline profile is not fatal (e.g., it may happen in tests),
     // but warn because performance may suffer.
-    match fuchsia_scheduler::set_role_for_this_thread("fuchsia.virtualization.virtio_sound").await {
+    match fuchsia_scheduler::set_role_for_this_thread("fuchsia.virtualization.virtio_sound") {
         Ok(_) => tracing::info!("Applied deadline profile"),
         Err(err) => tracing::warn!("Failed to apply deadline profile: {}", err),
     };
