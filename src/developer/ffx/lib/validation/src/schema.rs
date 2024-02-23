@@ -33,7 +33,7 @@ pub enum Type<'a> {
     Union(&'a [&'a Type<'a>]),
     /// A named type alias that allows for recursion and deduplication.
     // TODO: Once type_name and TypeId are allowed in const contexts remove these function wrappers
-    Alias { name: fn() -> &'a str, id: fn() -> TypeId, ty: &'a Type<'a> },
+    Alias { name: fn() -> &'a str, id: fn() -> TypeId, ty: RecursiveType<'a> },
     /// A structural type consisting of named fields.
     ///
     /// For special behavior for unknown fields, specify a [StructExtras] option.
@@ -56,6 +56,16 @@ pub enum Type<'a> {
     Any,
     /// A JSON value constant, which must match 1:1.
     Constant { value: &'a InlineValue<'a> },
+}
+
+/// Workaround to allow recursive types to be referenced in const contexts.
+///
+/// When building types at runtime [`RecursiveType::Plain`] can be used for types by-reference,
+/// while [`RecursiveType::Fn`] is used in const contexts.
+#[derive(Copy, Clone)]
+pub enum RecursiveType<'a> {
+    Plain(&'a Type<'a>),
+    Fn(fn() -> &'static Type<'static>),
 }
 
 // This custom Debug impl is needed to skip traversal into aliases, which are allowed to recurse.
@@ -141,6 +151,41 @@ impl<'a> Type<'a> {
             | Type::Tuple { .. }
             | Type::Array { .. }
             | Type::Map { .. } => false,
+        }
+    }
+}
+
+impl<'a> std::fmt::Debug for RecursiveType<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.as_ref().fmt(f)
+    }
+}
+
+impl<'a> From<RecursiveType<'a>> for &'a Type<'a> {
+    fn from(value: RecursiveType<'a>) -> Self {
+        match value {
+            RecursiveType::Plain(ty) => ty,
+            RecursiveType::Fn(f) => (f)(),
+        }
+    }
+}
+
+impl<'a> AsRef<Type<'a>> for RecursiveType<'a> {
+    fn as_ref(&self) -> &'a Type<'a> {
+        match *self {
+            Self::Plain(ty) => ty,
+            Self::Fn(f) => (f)(),
+        }
+    }
+}
+
+impl<'a> std::ops::Deref for RecursiveType<'a> {
+    type Target = Type<'a>;
+
+    fn deref(&self) -> &'a Self::Target {
+        match *self {
+            Self::Plain(ty) => ty,
+            Self::Fn(f) => (f)(),
         }
     }
 }

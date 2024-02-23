@@ -274,6 +274,7 @@ struct SchemaEnumVariant {
 struct ImplItemAttr {
     transparent: bool,
     foreign: Option<Type>,
+    recursive: bool,
 }
 
 struct SchemaImplItem {
@@ -359,6 +360,11 @@ impl ImplItemAttr {
                 if let Err(err) = res {
                     errors.push(err);
                 }
+
+                false
+            } else if attr.path.is_ident("recursive") {
+                // #[recursive]
+                out.recursive = true;
 
                 false
             } else {
@@ -469,9 +475,19 @@ impl Parse for SchemaItem {
 fn maybe_wrap_alias(
     ty: Option<impl quote::ToTokens>,
     schema_ty: &SchemaType,
+    attr: &ImplItemAttr,
 ) -> proc_macro2::TokenStream {
     if let Some(ty) = ty {
-        let body = schema_ty.build();
+        let mut body = schema_ty.build();
+        if attr.recursive {
+            body = quote! {
+                #CRATE_SCHEMA::RecursiveType::Fn(|| #body)
+            };
+        } else {
+            body = quote! {
+                #CRATE_SCHEMA::RecursiveType::Plain(#body)
+            };
+        }
         quote! {
             &#TYPE::Alias {
                 name: ::std::any::type_name::<#ty>,
@@ -501,6 +517,7 @@ impl SchemaImplItem {
                 )
             },
             ty,
+            attr,
         );
 
         quote! {

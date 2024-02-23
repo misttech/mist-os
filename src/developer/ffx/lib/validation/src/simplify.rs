@@ -571,7 +571,7 @@ impl<'bump> Editor<'bump> for DesugarEnum {
 mod test {
     use ffx_validation_proc_macro::schema;
 
-    use crate::schema::{json::Any, Field, Nothing, Schema, StructExtras, ValueType};
+    use crate::schema::{json, json::Any, Field, Nothing, Schema, StructExtras, ValueType};
 
     use super::*;
 
@@ -596,27 +596,22 @@ mod test {
     #[test]
     fn test_recursive_alias() {
         struct RecursiveAlias;
+        schema! {
+            #[recursive]
+            type RecursiveAlias = (json::Any, RecursiveAlias);
+        }
 
         let bump = Bump::new();
         let mut ctx = Ctx::new();
 
-        // TODO(https://fxbug.dev/323967119): Replace this with schema macro once recursive type
-        // aliases are fixed.
-        // Equivalent to `schema! { type RecursiveAlias = (json::Any, RecursiveAlias);`
-        static SCHEMA: Type<'static> = Type::Alias {
-            name: std::any::type_name::<RecursiveAlias>,
-            id: std::any::TypeId::of::<RecursiveAlias>,
-            ty: &Type::Tuple { fields: &[&Type::Any, &SCHEMA] },
-        };
-
-        let mut ty = &SCHEMA;
+        let mut ty = RecursiveAlias::TYPE;
 
         let changed = ctx.process_type(&bump, &mut ty);
         eprintln!("Type changed? {changed:?}\nType is now {ty:?}");
 
         // Since the alias contains itself, the alias should not be removed.
         assert!(!changed);
-        assert!(std::ptr::eq(ty, &SCHEMA));
+        assert!(std::ptr::eq(ty, RecursiveAlias::TYPE));
     }
 
     #[test]

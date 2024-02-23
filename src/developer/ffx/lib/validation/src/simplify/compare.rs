@@ -224,6 +224,7 @@ pub(super) fn cmp_processed_types<'a>(lhs: &'a Type<'a>, rhs: &'a Type<'a>) -> O
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::schema::RecursiveType;
 
     #[test]
     fn test_cmp_sorted_by() {
@@ -344,7 +345,7 @@ mod test {
             Type::Alias {
                 name: std::any::type_name::<()>,
                 id: std::any::TypeId::of::<()>,
-                ty: &Type::Void,
+                ty: RecursiveType::Plain(&Type::Void),
             },
             Type::Type { ty: ValueType::Null },
             Type::Type { ty: ValueType::Bool },

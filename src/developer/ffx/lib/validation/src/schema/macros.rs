@@ -46,6 +46,8 @@ mod test {
 
     struct Enum;
 
+    struct RecursiveAlias;
+
     // Schema macro syntax tests.
     schema! {
         type RustType = Option<u32>;
@@ -70,17 +72,20 @@ mod test {
         type Enum = enum {
             A, B, C(String), D { a: u32, b: u32 },
         };
+
+        #[recursive]
+        type RecursiveAlias = (u32, RecursiveAlias);
     }
 
     #[test]
     fn test_rust_type() {
         // Should introduce a type alias
-        let_assert!(Type::Alias { name, id, ty } = RustType::TYPE);
+        let_assert!(&Type::Alias { name, id, ty } = RustType::TYPE);
         assert_eq!((name)(), std::any::type_name::<RustType>());
         assert_eq!((id)(), std::any::TypeId::of::<RustType>());
 
         // For Option<u32>, which is a union between u32 & null
-        let_assert!(Type::Union([ty, null]) = *ty);
+        let_assert!(Type::Union([ty, null]) = &*ty);
         let_assert!(Type::Type { ty: ValueType::Integer } = ty);
         let_assert!(Type::Type { ty: ValueType::Null } = null);
     }
@@ -88,12 +93,12 @@ mod test {
     #[test]
     fn test_optional() {
         // Should introduce a type alias
-        let_assert!(Type::Alias { name, id, ty } = Optional::TYPE);
+        let_assert!(&Type::Alias { name, id, ty } = Optional::TYPE);
         assert_eq!((name)(), std::any::type_name::<Optional>());
         assert_eq!((id)(), std::any::TypeId::of::<Optional>());
 
         // For a union between String & null
-        let_assert!(Type::Union([ty, null]) = *ty);
+        let_assert!(Type::Union([ty, null]) = &*ty);
         let_assert!(Type::Type { ty: ValueType::String } = ty);
         let_assert!(Type::Type { ty: ValueType::Null } = null);
     }
@@ -101,12 +106,12 @@ mod test {
     #[test]
     fn test_inline_struct() {
         // Should introduce a type alias
-        let_assert!(Type::Alias { name, id, ty } = InlineStruct::TYPE);
+        let_assert!(&Type::Alias { name, id, ty } = InlineStruct::TYPE);
         assert_eq!((name)(), std::any::type_name::<InlineStruct>());
         assert_eq!((id)(), std::any::TypeId::of::<InlineStruct>());
 
         // For a struct with four integer fields, the last one being optional
-        let_assert!(Type::Struct { fields: [a, b, c, d], extras: None } = ty);
+        let_assert!(Type::Struct { fields: [a, b, c, d], extras: None } = &*ty);
 
         let_assert!(Field { key: "a", value: ty, optional: false } = a);
         let_assert!(Type::Type { ty: ValueType::Integer } = ty);
@@ -124,12 +129,12 @@ mod test {
     #[test]
     fn test_tuple() {
         // Should introduce a type alias
-        let_assert!(Type::Alias { name, id, ty } = Tuple::TYPE);
+        let_assert!(&Type::Alias { name, id, ty } = Tuple::TYPE);
         assert_eq!((name)(), std::any::type_name::<Tuple>());
         assert_eq!((id)(), std::any::TypeId::of::<Tuple>());
 
         // For a tuple with three fields
-        let_assert!(Type::Tuple { fields: &[ty_1, ty_2, ty_3] } = *ty);
+        let_assert!(Type::Tuple { fields: &[ty_1, ty_2, ty_3] } = &*ty);
 
         assert_exact(ty_1, RustType::TYPE);
         assert_exact(ty_2, Optional::TYPE);
@@ -139,12 +144,12 @@ mod test {
     #[test]
     fn test_union() {
         // Should introduce a type alias
-        let_assert!(Type::Alias { name, id, ty } = Union::TYPE);
+        let_assert!(&Type::Alias { name, id, ty } = Union::TYPE);
         assert_eq!((name)(), std::any::type_name::<Union>());
         assert_eq!((id)(), std::any::TypeId::of::<Union>());
 
         // For a union with three fields
-        let_assert!(Type::Union(&[ty_1, ty_2, ty_3]) = ty);
+        let_assert!(Type::Union(&[ty_1, ty_2, ty_3]) = &*ty);
 
         assert_exact(ty_1, RustType::TYPE);
         assert_exact(ty_2, Optional::TYPE);
@@ -158,12 +163,12 @@ mod test {
             Generic<T>: Schema,
         {
             // Should introduce a type alias
-            let_assert!(Type::Alias { name, id, ty } = Generic::<T>::TYPE);
+            let_assert!(&Type::Alias { name, id, ty } = Generic::<T>::TYPE);
             assert_eq!((name)(), std::any::type_name::<Generic<T>>());
             assert_eq!((id)(), std::any::TypeId::of::<Generic<T>>());
 
             // That aliases directly to the give type
-            assert_exact(*ty, V::TYPE);
+            assert_exact::<Type<'_>>(&*ty, V::TYPE);
         }
 
         check::<u32, u32>();
@@ -181,12 +186,12 @@ mod test {
     #[test]
     fn test_foreign_type() {
         // Should introduce a type alias for the foreign type (not the marker)
-        let_assert!(Type::Alias { name, id, ty } = ForeignTypeMarker::TYPE);
+        let_assert!(&Type::Alias { name, id, ty } = ForeignTypeMarker::TYPE);
         assert_eq!((name)(), std::any::type_name::<ForeignType>());
         assert_eq!((id)(), std::any::TypeId::of::<ForeignType>());
 
         // For a tuple with three fields
-        let_assert!(Type::Tuple { fields: &[ty_1, ty_2, ty_3] } = *ty);
+        let_assert!(Type::Tuple { fields: &[ty_1, ty_2, ty_3] } = &*ty);
 
         assert_exact(ty_1, i32::TYPE);
         assert_exact(ty_2, i32::TYPE);
@@ -196,7 +201,7 @@ mod test {
     #[test]
     fn test_enum() {
         // Should introduce a type alias
-        let_assert!(Type::Alias { name, id, ty } = Enum::TYPE);
+        let_assert!(&Type::Alias { name, id, ty } = Enum::TYPE);
         assert_eq!((name)(), std::any::type_name::<Enum>());
         assert_eq!((id)(), std::any::TypeId::of::<Enum>());
 
@@ -204,7 +209,7 @@ mod test {
         let_assert!(
             Type::Enum {
                 variants: &[("A", variant_a), ("B", variant_b), ("C", variant_c), ("D", variant_d)]
-            } = *ty
+            } = &*ty
         );
 
         // Variant A and B do not hold any data
@@ -224,6 +229,22 @@ mod test {
         assert_exact(ty, u32::TYPE);
     }
 
+    #[test]
+    fn test_recursive_alias() {
+        // Should introduce a type alias
+        let_assert!(&Type::Alias { name, id, ty } = RecursiveAlias::TYPE);
+        assert_eq!((name)(), std::any::type_name::<RecursiveAlias>());
+        assert_eq!((id)(), std::any::TypeId::of::<RecursiveAlias>());
+
+        // For a tuple with two fields, one being recursive.
+        let_assert!(Type::Tuple { fields: &[ty_1, ty_2] } = ty.as_ref());
+
+        let_assert!(Type::Type { ty: ValueType::Integer } = ty_1);
+        let_assert!(Type::Alias { name, id, ty: _ } = ty_2);
+        assert_eq!((name)(), std::any::type_name::<RecursiveAlias>());
+        assert_eq!((id)(), std::any::TypeId::of::<RecursiveAlias>());
+    }
+
     // Schema derive macro syntax tests
 
     #[derive(Schema)]
@@ -237,12 +258,12 @@ mod test {
     #[test]
     fn test_derive_struct() {
         // Should introduce a type alias
-        let_assert!(Type::Alias { name, id, ty } = DeriveStruct::TYPE);
+        let_assert!(&Type::Alias { name, id, ty } = DeriveStruct::TYPE);
         assert_eq!((name)(), std::any::type_name::<DeriveStruct>());
         assert_eq!((id)(), std::any::TypeId::of::<DeriveStruct>());
 
         // For a struct with three fields
-        let_assert!(Type::Struct { fields: [a, b, c], extras: None } = ty);
+        let_assert!(Type::Struct { fields: [a, b, c], extras: None } = &*ty);
 
         let_assert!(Field { key: "a", value: ty, optional: false } = a);
         let_assert!(Type::Type { ty: ValueType::Integer } = ty);
@@ -262,12 +283,12 @@ mod test {
     #[test]
     fn test_derive_struct_unit() {
         // Should introduce a type alias
-        let_assert!(Type::Alias { name, id, ty } = DeriveStructUnit::TYPE);
+        let_assert!(&Type::Alias { name, id, ty } = DeriveStructUnit::TYPE);
         assert_eq!((name)(), std::any::type_name::<DeriveStructUnit>());
         assert_eq!((id)(), std::any::TypeId::of::<DeriveStructUnit>());
 
         // For a null value
-        let_assert!(Type::Type { ty: ValueType::Null } = ty);
+        let_assert!(Type::Type { ty: ValueType::Null } = &*ty);
     }
 
     #[derive(Schema)]
@@ -277,12 +298,12 @@ mod test {
     #[test]
     fn test_derive_struct_unnamed() {
         // Should introduce a type alias
-        let_assert!(Type::Alias { name, id, ty } = DeriveStructUnnamed::TYPE);
+        let_assert!(&Type::Alias { name, id, ty } = DeriveStructUnnamed::TYPE);
         assert_eq!((name)(), std::any::type_name::<DeriveStructUnnamed>());
         assert_eq!((id)(), std::any::TypeId::of::<DeriveStructUnnamed>());
 
         // For a tuple with three fields
-        let_assert!(Type::Tuple { fields: &[ty_1, ty_2, ty_3] } = *ty);
+        let_assert!(Type::Tuple { fields: &[ty_1, ty_2, ty_3] } = &*ty);
 
         assert_exact(ty_1, u32::TYPE);
         assert_exact(ty_2, String::TYPE);
@@ -296,12 +317,12 @@ mod test {
     #[test]
     fn test_derive_struct_new_type() {
         // Should introduce a type alias
-        let_assert!(Type::Alias { name, id, ty } = DeriveStructNewType::TYPE);
+        let_assert!(&Type::Alias { name, id, ty } = DeriveStructNewType::TYPE);
         assert_eq!((name)(), std::any::type_name::<DeriveStructNewType>());
         assert_eq!((id)(), std::any::TypeId::of::<DeriveStructNewType>());
 
         // Wrapping a u32
-        assert_exact(*ty, u32::TYPE);
+        assert_exact::<Type<'_>>(&*ty, u32::TYPE);
     }
 
     #[derive(Schema)]
@@ -311,12 +332,12 @@ mod test {
     #[test]
     fn test_derive_struct_empty_unnamed() {
         // Should introduce a type alias
-        let_assert!(Type::Alias { name, id, ty } = DeriveStructEmptyUnnamed::TYPE);
+        let_assert!(&Type::Alias { name, id, ty } = DeriveStructEmptyUnnamed::TYPE);
         assert_eq!((name)(), std::any::type_name::<DeriveStructEmptyUnnamed>());
         assert_eq!((id)(), std::any::TypeId::of::<DeriveStructEmptyUnnamed>());
 
         // For an empty tuple
-        let_assert!(Type::Tuple { fields: &[] } = *ty);
+        let_assert!(Type::Tuple { fields: &[] } = &*ty);
     }
 
     #[derive(Schema)]
@@ -334,12 +355,12 @@ mod test {
     fn test_derive_struct_generic() {
         fn check<T: 'static + Schema + Copy>() {
             // Should introduce a type alias
-            let_assert!(Type::Alias { name, id, ty } = DeriveStructGeneric::<T>::TYPE);
+            let_assert!(&Type::Alias { name, id, ty } = DeriveStructGeneric::<T>::TYPE);
             assert_eq!((name)(), std::any::type_name::<DeriveStructGeneric<T>>());
             assert_eq!((id)(), std::any::TypeId::of::<DeriveStructGeneric<T>>());
 
             // For a struct with three fields
-            let_assert!(Type::Struct { fields: [a, b, c], extras: None } = ty);
+            let_assert!(Type::Struct { fields: [a, b, c], extras: None } = &*ty);
 
             let_assert!(Field { key: "a", value: ty, optional: false } = *a);
             assert_exact(ty, T::TYPE);
@@ -366,7 +387,7 @@ mod test {
     #[test]
     fn test_derive_enum() {
         // Should introduce a type alias
-        let_assert!(Type::Alias { name, id, ty } = DeriveEnum::TYPE);
+        let_assert!(&Type::Alias { name, id, ty } = DeriveEnum::TYPE);
         assert_eq!((name)(), std::any::type_name::<DeriveEnum>());
         assert_eq!((id)(), std::any::TypeId::of::<DeriveEnum>());
 
@@ -374,7 +395,7 @@ mod test {
         let_assert!(
             Type::Enum {
                 variants: &[("One", variant_1), ("Two", variant_2), ("Three", variant_3)]
-            } = *ty
+            } = &*ty
         );
 
         let_assert!(Type::Void = variant_1);
@@ -395,7 +416,7 @@ mod test {
     #[test]
     fn test_derive_data_enum() {
         // Should introduce a type alias
-        let_assert!(Type::Alias { name, id, ty } = DeriveDataEnum::TYPE);
+        let_assert!(&Type::Alias { name, id, ty } = DeriveDataEnum::TYPE);
         assert_eq!((name)(), std::any::type_name::<DeriveDataEnum>());
         assert_eq!((id)(), std::any::TypeId::of::<DeriveDataEnum>());
 
@@ -409,7 +430,7 @@ mod test {
                     ("Str", string),
                     ("Both", both)
                 ]
-            } = *ty
+            } = &*ty
         );
 
         // Neither expects no data
@@ -449,13 +470,13 @@ mod test {
     #[test]
     fn test_derive_strange_enum() {
         // Should introduce a type alias
-        let_assert!(Type::Alias { name, id, ty } = DeriveStrangeEnum::TYPE);
+        let_assert!(&Type::Alias { name, id, ty } = DeriveStrangeEnum::TYPE);
         assert_eq!((name)(), std::any::type_name::<DeriveStrangeEnum>());
         assert_eq!((id)(), std::any::TypeId::of::<DeriveStrangeEnum>());
 
         // For an enum with three variants
         let_assert!(
-            Type::Enum { variants: &[("A", variant_a), ("B", variant_b), ("C", variant_c)] } = *ty
+            Type::Enum { variants: &[("A", variant_a), ("B", variant_b), ("C", variant_c)] } = &*ty
         );
 
         let_assert!(Type::Void = variant_a);
