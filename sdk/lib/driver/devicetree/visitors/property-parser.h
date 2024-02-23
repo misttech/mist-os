@@ -57,12 +57,22 @@ class Property {
   virtual ~Property() = default;
 
   virtual zx::result<std::vector<PropertyValue>> Parse(Node& node,
-                                                       devicetree::ByteView bytes) const = 0;
+                                                       devicetree::ByteView bytes) const;
 
   PropertyName name() const { return name_; }
 
  private:
   PropertyName name_;
+};
+
+class BoolProperty : public Property {
+ public:
+  explicit BoolProperty(PropertyName name) : Property(std::move(name)) {}
+};
+
+class Uint32Property : public Property {
+ public:
+  explicit Uint32Property(PropertyName name) : Property(std::move(name)) {}
 };
 
 // Property of uint32 array type.

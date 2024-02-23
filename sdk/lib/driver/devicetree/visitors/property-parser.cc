@@ -33,6 +33,12 @@ zx::result<PropertyValues> PropertyParser::Parse(Node& node) {
   return zx::ok(std::move(all_values));
 }
 
+zx::result<std::vector<PropertyValue>> Property::Parse(Node& node,
+                                                       devicetree::ByteView bytes) const {
+  std::vector<PropertyValue> value = {PropertyValue(bytes)};
+  return zx::ok(std::move(value));
+}
+
 zx::result<std::vector<PropertyValue>> Uint32ArrayProperty::Parse(
     Node& node, devicetree::ByteView bytes) const {
   if (bytes.size() % sizeof(uint32_t) != 0) {
