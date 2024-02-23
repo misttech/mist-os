@@ -13,7 +13,6 @@
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/amlogic/platform/s905d2/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/display/dsi/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
@@ -129,14 +128,6 @@ zx::result<> PostInit::InitDisplay() {
     return dev;
   }();
 
-  std::vector<fuchsia_driver_framework::BindRule> dsi_bind_rules{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_display_dsi::BIND_PROTOCOL_IMPL),
-  };
-
-  std::vector<fuchsia_driver_framework::NodeProperty> dsi_properties{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_display_dsi::BIND_PROTOCOL_IMPL),
-  };
-
   std::vector<fuchsia_driver_framework::BindRule> gpio_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                               bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
@@ -171,10 +162,6 @@ zx::result<> PostInit::InitDisplay() {
 
   std::vector<fuchsia_driver_framework::ParentSpec> parents = {
       {{
-          .bind_rules = dsi_bind_rules,
-          .properties = dsi_properties,
-      }},
-      {{
           .bind_rules = gpio_bind_rules,
           .properties = gpio_properties,
       }},
@@ -190,8 +177,6 @@ zx::result<> PostInit::InitDisplay() {
 
   fuchsia_driver_framework::CompositeNodeSpec node_group{{.name = "display", .parents = parents}};
 
-  // TODO(payamm): Change from "dsi" to nullptr to separate DSI and Display into two different
-  // driver hosts once support for it lands.
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('DISP');
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, display_dev),

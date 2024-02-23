@@ -25,7 +25,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       // "xhci/xhci/usb-bus",
 
       "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
-      "sys/platform/00:00:1e/dw-dsi/display/amlogic-display/display-coordinator",
+      "sys/platform/05:03:d/display/amlogic-display/display-coordinator",
       "sys/platform/00:00:1e/dw-dsi",
       "sys/platform/05:00:10/aml-canvas",
       "sys/platform/00:00:e/tee/optee",
