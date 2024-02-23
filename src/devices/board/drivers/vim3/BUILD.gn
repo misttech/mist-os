@@ -85,7 +85,6 @@ fuchsia_driver("vim3-driver") {
     "//src/devices/bind/fuchsia.broadcom.platform.sdio:fuchsia.broadcom.platform.sdio_cpp",
     "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
     "//src/devices/bind/fuchsia.designware.platform:fuchsia.designware.platform_cpp",
-    "//src/devices/bind/fuchsia.display.dsi:fuchsia.display.dsi_cpp",
     "//src/devices/bind/fuchsia.ethernet:fuchsia.ethernet_cpp",
     "//src/devices/bind/fuchsia.focaltech.platform:fuchsia.focaltech.platform_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",

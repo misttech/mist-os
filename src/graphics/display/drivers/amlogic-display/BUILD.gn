@@ -44,7 +44,7 @@ group("bind_rules") {
   } else if (board_name == "nelson") {
     public_deps += [ ":amlogic_display_without_dsi_bind" ]
   } else if (board_name == "vim3") {
-    public_deps += [ ":amlogic_display_bind" ]
+    public_deps += [ ":amlogic_display_without_dsi_bind" ]
   } else {
     # Unsupported board.
   }

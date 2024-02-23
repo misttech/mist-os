@@ -17,7 +17,6 @@
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/display/dsi/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
@@ -148,14 +147,6 @@ zx_status_t Vim3::DisplayInit() {
     return dev;
   }();
 
-  std::vector<fuchsia_driver_framework::BindRule> dsi_bind_rules{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_display_dsi::BIND_PROTOCOL_IMPL),
-  };
-
-  std::vector<fuchsia_driver_framework::NodeProperty> dsi_properties{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_display_dsi::BIND_PROTOCOL_IMPL),
-  };
-
   std::vector<fuchsia_driver_framework::BindRule> gpio_lcd_reset_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                               bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
@@ -200,10 +191,6 @@ zx_status_t Vim3::DisplayInit() {
   };
 
   std::vector<fuchsia_driver_framework::ParentSpec> parents{
-      {{
-          .bind_rules = dsi_bind_rules,
-          .properties = dsi_properties,
-      }},
       {{
           .bind_rules = gpio_lcd_reset_bind_rules,
           .properties = gpio_lcd_reset_properties,
