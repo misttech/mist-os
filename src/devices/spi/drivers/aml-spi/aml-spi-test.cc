@@ -46,20 +46,21 @@ class TestAmlSpiDriver : public AmlSpiDriver {
   uint32_t testreg() const { return testreg_; }
 
  protected:
-  zx::result<fdf::MmioBuffer> MapMmio(
-      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev,
-      uint32_t mmio_id) override {
-    // Set the transfer complete bit so the driver doesn't get stuck waiting on the interrupt.
-    mmio_region_[AML_SPI_STATREG].SetReadCallback(
-        []() { return StatReg::Get().FromValue(0).set_tc(1).set_te(1).set_rr(1).reg_value(); });
+  fpromise::promise<fdf::MmioBuffer, zx_status_t> MapMmio(
+      fidl::WireClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t mmio_id) override {
+    return fpromise::make_promise([this]() -> fpromise::result<fdf::MmioBuffer, zx_status_t> {
+      // Set the transfer complete bit so the driver doesn't get stuck waiting on the interrupt.
+      mmio_region_[AML_SPI_STATREG].SetReadCallback(
+          []() { return StatReg::Get().FromValue(0).set_tc(1).set_te(1).set_rr(1).reg_value(); });
 
-    mmio_region_[AML_SPI_CONREG].SetWriteCallback([this](uint32_t value) { conreg_ = value; });
-    mmio_region_[AML_SPI_CONREG].SetReadCallback([this]() { return conreg_; });
-    mmio_region_[AML_SPI_ENHANCE_CNTL].SetWriteCallback(
-        [this](uint32_t value) { enhance_cntl_ = value; });
-    mmio_region_[AML_SPI_TESTREG].SetWriteCallback([this](uint32_t value) { testreg_ = value; });
+      mmio_region_[AML_SPI_CONREG].SetWriteCallback([this](uint32_t value) { conreg_ = value; });
+      mmio_region_[AML_SPI_CONREG].SetReadCallback([this]() { return conreg_; });
+      mmio_region_[AML_SPI_ENHANCE_CNTL].SetWriteCallback(
+          [this](uint32_t value) { enhance_cntl_ = value; });
+      mmio_region_[AML_SPI_TESTREG].SetWriteCallback([this](uint32_t value) { testreg_ = value; });
 
-    return zx::ok(mmio_region_.GetMmioBuffer());
+      return fpromise::ok(mmio_region_.GetMmioBuffer());
+    });
   }
 
  private:

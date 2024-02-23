@@ -7,7 +7,9 @@
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
 #include <fidl/fuchsia.scheduler/cpp/wire.h>
 #include <fuchsia/hardware/spiimpl/cpp/banjo.h>
+#include <lib/async/cpp/executor.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/fpromise/promise.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/mmio/mmio.h>
@@ -61,7 +63,8 @@ class AmlSpi : public ddk::SpiImplProtocol<AmlSpi> {
          DmaBuffer rx_buffer)
       : mmio_(std::move(mmio)),
         reset_(std::move(reset)),
-        profile_provider_(std::move(profile_provider)),
+        dispatcher_(fdf::Dispatcher::GetCurrent()),
+        profile_provider_(std::move(profile_provider), dispatcher_->async_dispatcher()),
         reset_mask_(reset_mask),
         chips_(std::move(chips)),
         interrupt_(std::move(interrupt)),
@@ -133,13 +136,14 @@ class AmlSpi : public ddk::SpiImplProtocol<AmlSpi> {
 
   fdf::MmioBuffer mmio_ TA_GUARDED(bus_lock_);
   fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset_;
-  fidl::WireSyncClient<fuchsia_scheduler::ProfileProvider> profile_provider_;
+  fdf::UnownedDispatcher dispatcher_;
+  fidl::WireClient<fuchsia_scheduler::ProfileProvider> profile_provider_;
   const uint32_t reset_mask_;
   const fbl::Array<ChipInfo> chips_;
   bool need_reset_ TA_GUARDED(bus_lock_) = false;
   zx::interrupt interrupt_;
   const amlogic_spi::amlspi_config_t config_;
-  bool applied_scheduler_role_ = false;
+  bool apply_scheduler_role_ = true;
   // Protects mmio_, need_reset_, and the DMA buffers.
   fbl::Mutex bus_lock_;
   // Protects registered_vmos members of chips_.
@@ -156,9 +160,10 @@ class AmlSpi : public ddk::SpiImplProtocol<AmlSpi> {
 class AmlSpiDriver : public fdf::DriverBase {
  public:
   AmlSpiDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
-      : fdf::DriverBase("aml-spi", std::move(start_args), std::move(dispatcher)) {}
+      : fdf::DriverBase("aml-spi", std::move(start_args), std::move(dispatcher)),
+        executor_(fdf::DriverBase::dispatcher()) {}
 
-  zx::result<> Start() override;
+  void Start(fdf::StartCompleter completer) override;
   void Stop() override {
     if (device_) {
       device_->Shutdown();
@@ -167,17 +172,28 @@ class AmlSpiDriver : public fdf::DriverBase {
 
  protected:
   // MapMmio can be overridden by a test in order to provide an fdf::MmioBuffer backed by a fake.
-  virtual zx::result<fdf::MmioBuffer> MapMmio(
-      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t mmio_id);
+  virtual fpromise::promise<fdf::MmioBuffer, zx_status_t> MapMmio(
+      fidl::WireClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t mmio_id);
 
  private:
-  fbl::Array<AmlSpi::ChipInfo> InitChips(amlogic_spi::amlspi_config_t* config);
+  void OnCompatServerInitialized(fdf::StartCompleter completer);
+  void AddNode(fdf::MmioBuffer mmio, const amlogic_spi::amlspi_config_t& config,
+               zx::interrupt interrupt, zx::bti bti, fdf::StartCompleter completer);
+
+  fpromise::promise<amlogic_spi::amlspi_config_t, zx_status_t> GetConfig();
+  fpromise::promise<zx::interrupt, zx_status_t> GetInterrupt();
+  fpromise::promise<zx::bti, zx_status_t> GetBti();
+
+  fbl::Array<AmlSpi::ChipInfo> InitChips(const amlogic_spi::amlspi_config_t& config);
   zx::result<compat::DeviceServer::GenericProtocol> GetBanjoProto(compat::BanjoProtoId id);
 
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_;
-  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
-  compat::SyncInitializedDeviceServer compat_server_;
+  fidl::WireClient<fuchsia_driver_framework::Node> parent_;
+  fidl::WireClient<fuchsia_driver_framework::NodeController> controller_;
+  fidl::WireClient<fuchsia_hardware_platform_device::Device> pdev_;
+  fidl::WireClient<fuchsia_driver_compat::Device> compat_;
+  compat::AsyncInitializedDeviceServer compat_server_;
   std::unique_ptr<AmlSpi> device_;
+  async::Executor executor_;
 };
 
 }  // namespace spi
