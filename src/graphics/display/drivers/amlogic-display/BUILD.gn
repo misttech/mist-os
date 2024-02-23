@@ -22,6 +22,34 @@ driver_bind_rules("amlogic_display_bind") {
   ]
 }
 
+driver_bind_rules("amlogic_display_without_dsi_bind") {
+  rules = "amlogic-display-without-dsi.bind"
+  bind_output = "amlogic-display.bindbc"
+  tests = "amlogic-display-without-dsi-bind_tests.json"
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.sysmem",
+  ]
+}
+
+group("bind_rules") {
+  public_deps = []
+  if (board_name == "astro") {
+    public_deps += [ ":amlogic_display_bind" ]
+  } else if (board_name == "sherlock") {
+    public_deps += [ ":amlogic_display_bind" ]
+  } else if (board_name == "nelson") {
+    public_deps += [ ":amlogic_display_bind" ]
+  } else if (board_name == "vim3") {
+    public_deps += [ ":amlogic_display_bind" ]
+  } else {
+    # Unsupported board.
+  }
+}
+
 source_set("common_srcs") {
   configs += [
     "//build/config:all_source",
@@ -90,7 +118,6 @@ source_set("common_srcs") {
     "vpu.h",
   ]
   public_deps = [
-    ":amlogic_display_bind",
     "//sdk/banjo/fuchsia.hardware.display.clamprgb:fuchsia.hardware.display.clamprgb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.dsiimpl:fuchsia.hardware.dsiimpl_banjo_cpp",
@@ -134,7 +161,10 @@ source_set("common_srcs") {
 
 fuchsia_driver("amlogic-display-driver") {
   output_name = "amlogic-display"
-  deps = [ ":common_srcs" ]
+  deps = [
+    ":bind_rules",
+    ":common_srcs",
+  ]
 }
 
 fuchsia_driver_component("amlogic-display") {
@@ -182,6 +212,10 @@ test("amlogic-display-test") {
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fzl",
   ]
+  assert_no_deps = [
+    ":amlogic_display_bind",
+    ":amlogic_display_without_dsi_bind",
+  ]
 }
 
 group("tests") {
@@ -189,6 +223,7 @@ group("tests") {
   deps = [
     ":amlogic-display-test-package",
     ":amlogic_display_bind_test",
+    ":amlogic_display_without_dsi_bind_test",
   ]
 }
 
