@@ -212,7 +212,8 @@ void RunVerbAttach(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
 
   if (cmd.HasSwitch(kSwitchExact)) {
     filter->SetType(debug_ipc::Filter::Type::kProcessName);
-    filter->SetPattern(TrimToZirconMaxNameLength(pattern));
+    pattern = TrimToZirconMaxNameLength(pattern);
+    filter->SetPattern(pattern);
   } else if (debug::StringStartsWith(pattern, "fuchsia-pkg://") ||
              debug::StringStartsWith(pattern, "fuchsia-boot://")) {
     filter->SetType(debug_ipc::Filter::Type::kComponentUrl);
@@ -228,7 +229,8 @@ void RunVerbAttach(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
     filter->SetPattern(pattern);
   } else {
     filter->SetType(debug_ipc::Filter::Type::kProcessNameSubstr);
-    filter->SetPattern(TrimToZirconMaxNameLength(pattern));
+    pattern = TrimToZirconMaxNameLength(pattern);
+    filter->SetPattern(pattern);
   }
 
   console_context->SetActiveFilter(filter);

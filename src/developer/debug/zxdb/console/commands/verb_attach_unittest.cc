@@ -10,6 +10,7 @@
 #include <gtest/gtest.h>
 
 #include "src/developer/debug/zxdb/console/console_test.h"
+#include "src/lib/fxl/strings/string_printf.h"
 
 namespace zxdb {
 
@@ -140,11 +141,25 @@ TEST_F(VerbAttach, Filter) {
   EXPECT_EQ(debug_ipc::Filter::Type::kProcessName, GetLastFilter().type);
   EXPECT_EQ("/pkg/bin/true", GetLastFilter().pattern);
 
-  // Extra long filter case with an exact name.
+  console().FlushOutputEvents();
+  // Extra long filter case with an exact name. Even with --exact, this will be trimmed since it
+  // will never exactly match if it is longer than the max name length.
   const std::string kSuperLongName = "super_long_name_with_over_32_characters";
+  const std::string kTrimmedLongName = kSuperLongName.substr(0, kZirconMaxNameLength);
   console().ProcessInputLine("attach --exact " + kSuperLongName);
   EXPECT_EQ(debug_ipc::Filter::Type::kProcessName, GetLastFilter().type);
-  EXPECT_EQ(kSuperLongName.substr(0, kZirconMaxNameLength), GetLastFilter().pattern);
+  EXPECT_EQ(kTrimmedLongName, GetLastFilter().pattern);
+  event = console().GetOutputEvent();
+  EXPECT_EQ(MockConsole::OutputEvent::Type::kOutput, event.type);
+  ASSERT_EQ(
+      "The filter is trimmed to 31 characters because it's the maximum length for a process name in Zircon.",
+      event.output.AsString());
+  event = console().GetOutputEvent();
+  EXPECT_EQ(MockConsole::OutputEvent::Type::kOutput, event.type);
+  ASSERT_EQ(fxl::StringPrintf("Waiting for process matching \"%s\".\n"
+                              "Type \"filter\" to see the current filters.",
+                              kTrimmedLongName.c_str()),
+            event.output.AsString());
 
   // Component URL.
   const std::string kComponentUrl = "fuchsia-pkg://devhost/package#meta/component.cm";
