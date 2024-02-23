@@ -547,6 +547,7 @@ class FFX(ffx_interface.FFX):
         timeout: float | None = ffx_interface.TIMEOUTS["FFX_CLI"],
         exceptions_to_skip: Iterable[type[Exception]] | None = None,
         capture_output: bool = True,
+        log_output: bool = True,
     ) -> str:
         """Executes and returns the output of `ffx -t {target} {cmd}`.
 
@@ -558,6 +559,9 @@ class FFX(ffx_interface.FFX):
                 captured and returned. When False, the output of the command
                 will be streamed to stdout/err accordingly and it won't be
                 returned. Defaults to True.
+            log_output: When True, logs the output in DEBUG level. Callers
+                may set this to False when expecting particularly large
+                or spammy output.
 
         Returns:
             Output of `ffx -t {target} {cmd}` when capture_output is set to True, otherwise an
@@ -577,7 +581,10 @@ class FFX(ffx_interface.FFX):
                 output: str = subprocess.check_output(
                     ffx_cmd, stderr=subprocess.STDOUT, timeout=timeout
                 ).decode()
-                _LOGGER.debug("`%s` returned: %s", " ".join(ffx_cmd), output)
+                if log_output:
+                    _LOGGER.debug(
+                        "`%s` returned: %s", " ".join(ffx_cmd), output
+                    )
                 return output
             else:
                 subprocess.check_call(ffx_cmd, timeout=timeout)

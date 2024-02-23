@@ -145,6 +145,7 @@ class FFX(abc.ABC):
         timeout: float | None = TIMEOUTS["FFX_CLI"],
         exceptions_to_skip: Iterable[type[Exception]] | None = None,
         capture_output: bool = True,
+        log_output: bool = True,
     ) -> str:
         """Executes and returns the output of `ffx -t {target} {cmd}`.
 
@@ -156,7 +157,9 @@ class FFX(abc.ABC):
                 captured and returned. When False, the output of the command
                 will be streamed to stdout/err accordingly and it won't be
                 returned. Defaults to True.
-
+            log_output: When True, logs the output in DEBUG level. Callers
+                may set this to False when expecting particularly large
+                or spammy output.
         Returns:
             Output of `ffx -t {target} {cmd}` when capture_output is set to True, otherwise an
             empty string.
