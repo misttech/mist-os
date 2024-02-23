@@ -102,6 +102,7 @@ source_set("common_srcs") {
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
     "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/designware-dsi:dsi-host-controller",
     "//src/graphics/display/lib/designware-hdmi:hdmi-transmitter-controller-impl",
     "//src/graphics/display/lib/device-protocol-display",
     "//src/graphics/display/lib/mipi-dsi",

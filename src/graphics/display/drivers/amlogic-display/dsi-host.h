@@ -25,6 +25,7 @@
 #include "src/graphics/display/drivers/amlogic-display/mipi-phy.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
+#include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
 
 namespace amlogic_display {
 
@@ -49,15 +50,15 @@ class DsiHost {
   // region. It must be a valid MMIO buffer.
   // `hhi_mmio` is the HHI (HIU) MMIO register region. It must be a valid
   // MMIO buffer.
-  // `dsiimpl` must be valid.
   // `lcd_reset_gpio` is the LCD RESET GPIO pin and must be valid.
-  // `lcd` must not be nullptr.
-  // `phy` must not be nullptr.
-  explicit DsiHost(uint32_t panel_type, const PanelConfig* panel_config,
-                   fdf::MmioBuffer mipi_dsi_top_mmio, fdf::MmioBuffer hhi_mmio,
-                   ddk::DsiImplProtocolClient dsiimpl,
-                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio,
-                   std::unique_ptr<Lcd> lcd, std::unique_ptr<MipiPhy> phy, bool enabled);
+  // `designware_dsi_host_controller` must not be nullptr.
+  // `lcd` must not be nullptr. It may depend on `designware_dsi_host_controller`.
+  // `phy` must not be nullptr. It may depend on `designware_dsi_host_controller`.
+  explicit DsiHost(
+      uint32_t panel_type, const PanelConfig* panel_config, fdf::MmioBuffer mipi_dsi_top_mmio,
+      fdf::MmioBuffer hhi_mmio, fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio,
+      std::unique_ptr<designware_dsi::DsiHostController> designware_dsi_host_controller,
+      std::unique_ptr<Lcd> lcd, std::unique_ptr<MipiPhy> phy, bool enabled);
 
   ~DsiHost() = default;
 
@@ -101,14 +102,15 @@ class DsiHost {
   fdf::MmioBuffer mipi_dsi_top_mmio_;
   fdf::MmioBuffer hhi_mmio_;
 
-  ddk::DsiImplProtocolClient dsiimpl_;
-
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio_;
 
   uint32_t panel_type_;
   const PanelConfig& panel_config_;
 
   bool enabled_ = false;
+
+  // Must outlive `lcd_` and `phy_`.
+  std::unique_ptr<designware_dsi::DsiHostController> designware_dsi_host_controller_;
 
   std::unique_ptr<Lcd> lcd_;
   std::unique_ptr<MipiPhy> phy_;

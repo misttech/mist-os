@@ -17,26 +17,51 @@
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
+#include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
 
 namespace amlogic_display {
 
+namespace {
+
+zx::result<std::unique_ptr<designware_dsi::DsiHostController>> CreateDesignwareDsiHostController(
+    ddk::PDevFidl& pdev) {
+  zx::result<fdf::MmioBuffer> dsi_host_mmio_result =
+      MapMmio(MmioResourceIndex::kDsiHostController, pdev);
+  if (dsi_host_mmio_result.is_error()) {
+    return dsi_host_mmio_result.take_error();
+  }
+  fdf::MmioBuffer dsi_host_mmio = std::move(dsi_host_mmio_result).value();
+
+  fbl::AllocChecker alloc_checker;
+  auto designware_dsi_host_controller = fbl::make_unique_checked<designware_dsi::DsiHostController>(
+      &alloc_checker, std::move(dsi_host_mmio));
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "Failed to allocate memory for designware_dsi::DsiHostController");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  return zx::ok(std::move(designware_dsi_host_controller));
+}
+
+}  // namespace
+
 DsiHost::DsiHost(uint32_t panel_type, const PanelConfig* panel_config,
                  fdf::MmioBuffer mipi_dsi_top_mmio, fdf::MmioBuffer hhi_mmio,
-                 ddk::DsiImplProtocolClient dsiimpl,
                  fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio,
+                 std::unique_ptr<designware_dsi::DsiHostController> designware_dsi_host_controller,
                  std::unique_ptr<Lcd> lcd, std::unique_ptr<MipiPhy> phy, bool enabled)
     : mipi_dsi_top_mmio_(std::move(mipi_dsi_top_mmio)),
       hhi_mmio_(std::move(hhi_mmio)),
-      dsiimpl_(std::move(dsiimpl)),
       lcd_reset_gpio_(std::move(lcd_reset_gpio)),
       panel_type_(std::move(panel_type)),
       panel_config_(*panel_config),
       enabled_(enabled),
+      designware_dsi_host_controller_(std::move(designware_dsi_host_controller)),
       lcd_(std::move(lcd)),
       phy_(std::move(phy)) {
   ZX_DEBUG_ASSERT(panel_config != nullptr);
-  ZX_DEBUG_ASSERT(dsiimpl_.is_valid());
   ZX_DEBUG_ASSERT(lcd_reset_gpio_.is_valid());
+  ZX_DEBUG_ASSERT(designware_dsi_host_controller_ != nullptr);
   ZX_DEBUG_ASSERT(lcd_ != nullptr);
   ZX_DEBUG_ASSERT(phy_ != nullptr);
 }
@@ -45,15 +70,6 @@ DsiHost::DsiHost(uint32_t panel_type, const PanelConfig* panel_config,
 zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32_t panel_type,
                                                      const PanelConfig* panel_config) {
   ZX_DEBUG_ASSERT(panel_config != nullptr);
-
-  static constexpr char kDsiFragmentName[] = "dsi";
-  ddk::DsiImplProtocolClient dsiimpl;
-  zx_status_t status =
-      device_get_fragment_protocol(parent, kDsiFragmentName, ZX_PROTOCOL_DSI_IMPL, &dsiimpl);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get the DsiImpl banjo protocol: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
 
   static const char kLcdGpioFragmentName[] = "gpio-lcd-reset";
   zx::result lcd_reset_gpio_result =
@@ -86,8 +102,19 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
   }
   fdf::MmioBuffer hhi_mmio = std::move(hhi_mmio_result).value();
 
+  zx::result<std::unique_ptr<designware_dsi::DsiHostController>>
+      designware_dsi_host_controller_result = CreateDesignwareDsiHostController(pdev);
+  if (designware_dsi_host_controller_result.is_error()) {
+    zxlogf(ERROR, "Failed to Create Designware DsiHostController: %s",
+           designware_dsi_host_controller_result.status_string());
+    return designware_dsi_host_controller_result.take_error();
+  }
+  std::unique_ptr<designware_dsi::DsiHostController> designware_dsi_host_controller =
+      std::move(designware_dsi_host_controller_result).value();
+
   zx::result<std::unique_ptr<Lcd>> lcd_result =
-      Lcd::Create(parent, panel_type, panel_config, kBootloaderDisplayEnabled);
+      Lcd::Create(parent, panel_type, panel_config, designware_dsi_host_controller.get(),
+                  kBootloaderDisplayEnabled);
   if (lcd_result.is_error()) {
     zxlogf(ERROR, "Failed to Create Lcd: %s", lcd_result.status_string());
     return lcd_result.take_error();
@@ -95,7 +122,7 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
   std::unique_ptr<Lcd> lcd = std::move(lcd_result).value();
 
   zx::result<std::unique_ptr<MipiPhy>> mipi_phy_result =
-      MipiPhy::Create(parent, kBootloaderDisplayEnabled);
+      MipiPhy::Create(parent, designware_dsi_host_controller.get(), kBootloaderDisplayEnabled);
   if (mipi_phy_result.is_error()) {
     zxlogf(ERROR, "Failed to Create MipiPhy: %s", mipi_phy_result.status_string());
     return mipi_phy_result.take_error();
@@ -105,7 +132,8 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
   fbl::AllocChecker alloc_checker;
   auto dsi_host = fbl::make_unique_checked<DsiHost>(
       &alloc_checker, panel_type, panel_config, std::move(mipi_dsi_top_mmio), std::move(hhi_mmio),
-      std::move(dsiimpl), std::move(lcd_reset_gpio), std::move(lcd), std::move(phy),
+      std::move(lcd_reset_gpio), std::move(designware_dsi_host_controller), std::move(lcd),
+      std::move(phy),
       /*enabled=*/kBootloaderDisplayEnabled);
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for DsiHost");
@@ -245,7 +273,7 @@ zx::result<> DsiHost::ConfigureDsiHostController() {
   dw_cfg.auto_clklane = 1;
   dsi_cfg.vendor_config_buffer = reinterpret_cast<uint8_t*>(&dw_cfg);
 
-  dsiimpl_.Config(&dsi_cfg);
+  designware_dsi_host_controller_->Config(&dsi_cfg);
 
   return zx::ok();
 }
@@ -272,7 +300,7 @@ void DsiHost::Disable() {
   }
 
   // Place dsi in command mode first
-  dsiimpl_.SetMode(DSI_MODE_COMMAND);
+  designware_dsi_host_controller_->SetMode(DSI_MODE_COMMAND);
   fit::callback<zx::result<>()> power_off = [this]() -> zx::result<> {
     zx::result<> result = lcd_->Disable();
     if (!result.is_ok()) {
@@ -334,7 +362,7 @@ zx::result<> DsiHost::Enable(uint32_t bitrate) {
     zx::nanosleep(zx::deadline_after(zx::msec(10)));
 
     // Initialize host in command mode first
-    dsiimpl_.SetMode(DSI_MODE_COMMAND);
+    designware_dsi_host_controller_->SetMode(DSI_MODE_COMMAND);
     zx::result<> dsi_host_config_result = ConfigureDsiHostController();
     if (!dsi_host_config_result.is_ok()) {
       zxlogf(ERROR, "Failed to configure the MIPI DSI Host Controller: %s",
@@ -357,7 +385,7 @@ zx::result<> DsiHost::Enable(uint32_t bitrate) {
     }
 
     // switch to video mode
-    dsiimpl_.SetMode(DSI_MODE_VIDEO);
+    designware_dsi_host_controller_->SetMode(DSI_MODE_VIDEO);
     return zx::ok();
   };
 

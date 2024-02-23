@@ -19,6 +19,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/dsi.h"
+#include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
 
 namespace amlogic_display {
 
@@ -26,13 +27,18 @@ class MipiPhy {
  public:
   // Factory method intended for production use.
   //
+  // `designware_dsi_host_controller` must be non-null and outlive the `MipiPhy`
+  // instance.
+  //
   // `enabled` is true iff the driver adopts an already initialized MIPI D-PHY
   // controller.
   //
   // Creating an MipiPhy instance doesn't change the hardware state, and is
   // therefore safe to use when adopting a device previously initialized by
   // the bootloader or another driver.
-  static zx::result<std::unique_ptr<MipiPhy>> Create(zx_device_t* parent, bool enabled);
+  static zx::result<std::unique_ptr<MipiPhy>> Create(
+      zx_device_t* parent, designware_dsi::DsiHostController* designware_dsi_host_controller,
+      bool enabled);
 
   // Production code should prefer using the `Create()` factory method.
   //
@@ -40,8 +46,12 @@ class MipiPhy {
   // as "MIPI_DSI_PHY" in the "Memory Map" Section of Amlogic datasheets).
   // It must be a valid MMIO buffer.
   //
+  // `designware_dsi_host_controller` must be non-null and outlive the `MipiPhy`
+  // instance.
+  //
   // `dsiimpl` must be valid.
-  explicit MipiPhy(fdf::MmioBuffer d_phy_mmio, ddk::DsiImplProtocolClient dsiimpl, bool enabled);
+  explicit MipiPhy(fdf::MmioBuffer d_phy_mmio,
+                   designware_dsi::DsiHostController* designware_dsi_host_controller, bool enabled);
 
   MipiPhy(const MipiPhy&) = delete;
   MipiPhy& operator=(const MipiPhy&) = delete;
@@ -80,7 +90,7 @@ class MipiPhy {
 
   fdf::MmioBuffer dsi_phy_mmio_;
   DsiPhyConfig dsi_phy_cfg_;
-  ddk::DsiImplProtocolClient dsiimpl_;
+  designware_dsi::DsiHostController& designware_dsi_host_controller_;
 
   bool phy_enabled_ = false;
 };

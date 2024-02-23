@@ -12,6 +12,7 @@
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
+#include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
 
 namespace amlogic_display {
 
@@ -162,7 +163,7 @@ void MipiPhy::Shutdown() {
   }
 
   // Power down DSI
-  dsiimpl_.PowerDown();
+  designware_dsi_host_controller_.PowerDown();
   dsi_phy_mmio_.Write32(0x1f, MIPI_DSI_CHAN_CTRL);
   dsi_phy_mmio_.Write32(
       SetFieldValue32(dsi_phy_mmio_.Read32(MIPI_DSI_PHY_CTRL), /*field_begin_bit=*/7,
@@ -177,23 +178,23 @@ zx::result<> MipiPhy::Startup() {
   }
 
   // Power up DSI
-  dsiimpl_.PowerUp();
+  designware_dsi_host_controller_.PowerUp();
 
   // Setup Parameters of DPHY
   // Below we are sending test code 0x44 with parameter 0x74. This means
   // we are setting up the phy to operate in 1050-1099 Mbps mode
   // TODO(payamm): Find out why 0x74 was selected
-  dsiimpl_.PhySendCode(0x00010044, 0x00000074);
+  designware_dsi_host_controller_.PhySendCode(0x00010044, 0x00000074);
 
   // Power up D-PHY
-  dsiimpl_.PhyPowerUp();
+  designware_dsi_host_controller_.PhyPowerUp();
 
   // Setup PHY Timing parameters
   PhyInit();
 
   // Wait for PHY to be read
-  zx_status_t status;
-  if ((status = dsiimpl_.PhyWaitForReady()) != ZX_OK) {
+  zx_status_t status = designware_dsi_host_controller_.PhyWaitForReady();
+  if (status != ZX_OK) {
     // no need to print additional info.
     return zx::error(status);
   }
@@ -209,17 +210,10 @@ zx::result<> MipiPhy::Startup() {
 }
 
 // static
-zx::result<std::unique_ptr<MipiPhy>> MipiPhy::Create(zx_device_t* parent, bool enabled) {
+zx::result<std::unique_ptr<MipiPhy>> MipiPhy::Create(
+    zx_device_t* parent, designware_dsi::DsiHostController* designware_dsi_host_controller,
+    bool enabled) {
   ZX_DEBUG_ASSERT(parent != nullptr);
-
-  static constexpr char kDsiFragmentName[] = "dsi";
-  ddk::DsiImplProtocolClient dsiimpl;
-  zx_status_t status =
-      device_get_fragment_protocol(parent, kDsiFragmentName, ZX_PROTOCOL_DSI_IMPL, &dsiimpl);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get the DsiImpl banjo protocol: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
 
   static constexpr char kPdevFragmentName[] = "pdev";
   zx::result<ddk::PDevFidl> pdev_result = ddk::PDevFidl::Create(parent, kPdevFragmentName);
@@ -237,7 +231,7 @@ zx::result<std::unique_ptr<MipiPhy>> MipiPhy::Create(zx_device_t* parent, bool e
 
   fbl::AllocChecker alloc_checker;
   auto mipi_phy = fbl::make_unique_checked<MipiPhy>(&alloc_checker, std::move(d_phy_mmio),
-                                                    std::move(dsiimpl), enabled);
+                                                    designware_dsi_host_controller, enabled);
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Lcd");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -246,9 +240,12 @@ zx::result<std::unique_ptr<MipiPhy>> MipiPhy::Create(zx_device_t* parent, bool e
   return zx::ok(std::move(mipi_phy));
 }
 
-MipiPhy::MipiPhy(fdf::MmioBuffer d_phy_mmio, ddk::DsiImplProtocolClient dsiimpl, bool enabled)
-    : dsi_phy_mmio_(std::move(d_phy_mmio)), dsiimpl_(std::move(dsiimpl)), phy_enabled_(enabled) {
-  ZX_DEBUG_ASSERT(dsiimpl.is_valid());
+MipiPhy::MipiPhy(fdf::MmioBuffer d_phy_mmio,
+                 designware_dsi::DsiHostController* designware_dsi_host_controller, bool enabled)
+    : dsi_phy_mmio_(std::move(d_phy_mmio)),
+      designware_dsi_host_controller_(*designware_dsi_host_controller),
+      phy_enabled_(enabled) {
+  ZX_DEBUG_ASSERT(designware_dsi_host_controller != nullptr);
 }
 
 void MipiPhy::Dump() {

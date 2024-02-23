@@ -19,6 +19,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
+#include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
 
 namespace amlogic_display {
 
@@ -46,7 +47,8 @@ constexpr int IsDsiCommandPayloadSizeValid(uint8_t cmd_type, int payload_size) {
 
 constexpr int kReadRegisterMaximumValueCount = 4;
 
-zx_status_t CheckDsiDeviceRegister(ddk::DsiImplProtocolClient* dsiimpl, uint8_t reg, size_t count) {
+zx_status_t CheckDsiDeviceRegister(
+    designware_dsi::DsiHostController& designware_dsi_host_controller, uint8_t reg, size_t count) {
   ZX_DEBUG_ASSERT(count > 0);
   ZX_DEBUG_ASSERT(count <= kReadRegisterMaximumValueCount);
 
@@ -66,7 +68,7 @@ zx_status_t CheckDsiDeviceRegister(ddk::DsiImplProtocolClient* dsiimpl, uint8_t 
       .flags = MIPI_DSI_CMD_FLAGS_ACK | MIPI_DSI_CMD_FLAGS_SET_MAX,
   };
 
-  zx_status_t status = dsiimpl->SendCmd(&cmd, 1);
+  zx_status_t status = designware_dsi_host_controller.SendCmd(&cmd, 1);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not read register %d", reg);
     return status;
@@ -77,7 +79,8 @@ zx_status_t CheckDsiDeviceRegister(ddk::DsiImplProtocolClient* dsiimpl, uint8_t 
 // Reads the display hardware ID from the MIPI-DSI interface.
 //
 // `dsiimpl` must be configured in DSI command mode.
-zx::result<uint32_t> GetMipiDsiDisplayId(ddk::DsiImplProtocolClient dsiimpl) {
+zx::result<uint32_t> GetMipiDsiDisplayId(
+    designware_dsi::DsiHostController& designware_dsi_host_controller) {
   // TODO(https://fxbug.dev/322450952): The Read Display Identification
   // Information (0x04) command is not guaranteed to be available on all
   // display driver ICs. The response size and the actual meaning of the
@@ -107,7 +110,7 @@ zx::result<uint32_t> GetMipiDsiDisplayId(ddk::DsiImplProtocolClient dsiimpl) {
       .flags = MIPI_DSI_CMD_FLAGS_ACK | MIPI_DSI_CMD_FLAGS_SET_MAX,
   };
 
-  zx_status_t status = dsiimpl.SendCmd(&cmd, 1);
+  zx_status_t status = designware_dsi_host_controller.SendCmd(&cmd, 1);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to read out Display ID: %s", zx_status_get_string(status));
     return zx::error(status);
@@ -120,19 +123,12 @@ zx::result<uint32_t> GetMipiDsiDisplayId(ddk::DsiImplProtocolClient dsiimpl) {
 }  // namespace
 
 // static
-zx::result<std::unique_ptr<Lcd>> Lcd::Create(zx_device_t* parent, uint32_t panel_type,
-                                             const PanelConfig* panel_config, bool enabled) {
+zx::result<std::unique_ptr<Lcd>> Lcd::Create(
+    zx_device_t* parent, uint32_t panel_type, const PanelConfig* panel_config,
+    designware_dsi::DsiHostController* designware_dsi_host_controller, bool enabled) {
   ZX_DEBUG_ASSERT(parent != nullptr);
   ZX_DEBUG_ASSERT(panel_config != nullptr);
-
-  static constexpr char kDsiFragmentName[] = "dsi";
-  ddk::DsiImplProtocolClient dsiimpl;
-  zx_status_t status =
-      device_get_fragment_protocol(parent, kDsiFragmentName, ZX_PROTOCOL_DSI_IMPL, &dsiimpl);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get the DsiImpl banjo protocol: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
+  ZX_DEBUG_ASSERT(designware_dsi_host_controller != nullptr);
 
   static constexpr char kLcdGpioFragmentName[] = "gpio-lcd-reset";
   zx::result<fidl::ClientEnd<fuchsia_hardware_gpio::Gpio>> lcd_reset_gpio_result =
@@ -144,9 +140,9 @@ zx::result<std::unique_ptr<Lcd>> Lcd::Create(zx_device_t* parent, uint32_t panel
   }
 
   fbl::AllocChecker alloc_checker;
-  auto lcd =
-      fbl::make_unique_checked<Lcd>(&alloc_checker, panel_type, panel_config, std::move(dsiimpl),
-                                    std::move(lcd_reset_gpio_result).value(), enabled);
+  auto lcd = fbl::make_unique_checked<Lcd>(&alloc_checker, panel_type, panel_config,
+                                           designware_dsi_host_controller,
+                                           std::move(lcd_reset_gpio_result).value(), enabled);
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Lcd");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -155,14 +151,15 @@ zx::result<std::unique_ptr<Lcd>> Lcd::Create(zx_device_t* parent, uint32_t panel
   return zx::ok(std::move(lcd));
 }
 
-Lcd::Lcd(uint32_t panel_type, const PanelConfig* panel_config, ddk::DsiImplProtocolClient dsiimpl,
+Lcd::Lcd(uint32_t panel_type, const PanelConfig* panel_config,
+         designware_dsi::DsiHostController* designware_dsi_host_controller,
          fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio, bool enabled)
     : panel_type_(panel_type),
       panel_config_(*panel_config),
-      dsiimpl_(std::move(dsiimpl)),
+      designware_dsi_host_controller_(*designware_dsi_host_controller),
       lcd_reset_gpio_(std::move(lcd_reset_gpio)) {
   ZX_DEBUG_ASSERT(panel_config != nullptr);
-  ZX_DEBUG_ASSERT(dsiimpl_.is_valid());
+  ZX_DEBUG_ASSERT(designware_dsi_host_controller != nullptr);
   ZX_DEBUG_ASSERT(lcd_reset_gpio_.is_valid());
 }
 
@@ -249,7 +246,7 @@ zx::result<> Lcd::PerformDisplayInitCommandSequence(cpp20::span<const uint8_t> e
         }
 
         zxlogf(TRACE, "Read MIPI-DSI register: address=0x%02x count=%d", address, count);
-        status = CheckDsiDeviceRegister(&dsiimpl_, address, count);
+        status = CheckDsiDeviceRegister(designware_dsi_host_controller_, address, count);
         if (status != ZX_OK) {
           zxlogf(ERROR, "Error reading MIPI-DSI register 0x%02x: %s", address,
                  zx_status_get_string(status));
@@ -286,7 +283,7 @@ zx::result<> Lcd::PerformDisplayInitCommandSequence(cpp20::span<const uint8_t> e
             .flags = 0,
         };
 
-        status = dsiimpl_.SendCmd(&cmd, 1);
+        status = designware_dsi_host_controller_.SendCmd(&cmd, 1);
         if (status != ZX_OK) {
           zxlogf(ERROR, "Failed to send command to the MIPI-DSI peripheral: %s",
                  zx_status_get_string(status));
@@ -342,7 +339,7 @@ zx::result<> Lcd::Enable() {
   }
 
   // Check LCD initialization status by reading the display hardware ID.
-  zx::result<uint32_t> display_id_result = GetMipiDsiDisplayId(dsiimpl_);
+  zx::result<uint32_t> display_id_result = GetMipiDsiDisplayId(designware_dsi_host_controller_);
   if (!display_id_result.is_ok()) {
     zxlogf(ERROR, "Failed to communicate with LCD Panel to get the display hardware ID: %s",
            display_id_result.status_string());
