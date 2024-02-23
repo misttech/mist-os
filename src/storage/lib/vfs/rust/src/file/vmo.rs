@@ -23,9 +23,9 @@ use {
     async_trait::async_trait,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
-    fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _, Status, Vmo},
-    futures::lock::{MappedMutexGuard, Mutex, MutexGuard},
-    std::sync::Arc,
+    fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _, Status},
+    once_cell::sync::OnceCell,
+    std::{cell::UnsafeCell, sync::Arc},
 };
 
 /// Create new read-only `VmoFile` which serves constant content.
@@ -47,7 +47,7 @@ where
     VmoFile::new_lazy(
         move || {
             let bytes: &[u8] = bytes.as_ref().as_ref();
-            let vmo = Vmo::create(bytes.len().try_into().unwrap())?;
+            let vmo = zx::Vmo::create(bytes.len().try_into().unwrap())?;
             vmo.write(&bytes, 0)?;
             Ok(vmo)
         },
@@ -81,7 +81,7 @@ where
     let content = Arc::new(content);
     VmoFile::new_lazy(
         move || {
-            let vmo = Vmo::create(capacity)?;
+            let vmo = zx::Vmo::create(capacity)?;
             // Write up to `content_size` bytes from `content`, and set the VMO's content size.
             let content: &[u8] = &(*content).as_ref()[..content_size.try_into().unwrap()];
             vmo.write(&content, 0)?;
@@ -92,11 +92,6 @@ where
         /*writable*/ true,
         /*executable*/ false,
     )
-}
-
-enum VmoOrInit {
-    Vmo(Vmo),
-    Init(Box<dyn Fn() -> Result<Vmo, Status> + Send + Sync + 'static>),
 }
 
 /// Implementation of a VMO-backed file in a virtual file system. Supports lazy construction of the
@@ -122,8 +117,13 @@ pub struct VmoFile {
 
     /// Vmo that backs the file. If constructed as None, will be initialized on first connection
     /// using [`Self::init_vmo`].
-    vmo: Mutex<VmoOrInit>,
+    vmo: OnceCell<zx::Vmo>,
+
+    /// The init function for the vmo.
+    init_fn: UnsafeCell<Option<Box<dyn Fn() -> Result<zx::Vmo, Status> + Send + Sync + 'static>>>,
 }
+
+unsafe impl Sync for VmoFile {}
 
 impl VmoFile {
     /// Create a new VmoFile which is backed by an existing Vmo.
@@ -134,7 +134,7 @@ impl VmoFile {
     /// * `readable` - If true, allow connections with OpenFlags::RIGHT_READABLE.
     /// * `writable` - If true, allow connections with OpenFlags::RIGHT_WRITABLE.
     /// * `executable` - If true, allow connections with OpenFlags::RIGHT_EXECUTABLE.
-    pub fn new(vmo: Vmo, readable: bool, writable: bool, executable: bool) -> Arc<Self> {
+    pub fn new(vmo: zx::Vmo, readable: bool, writable: bool, executable: bool) -> Arc<Self> {
         Self::new_with_inode(vmo, readable, writable, executable, fio::INO_UNKNOWN)
     }
 
@@ -148,7 +148,7 @@ impl VmoFile {
     /// * `executable` - If true, allow connections with OpenFlags::RIGHT_EXECUTABLE.
     /// * `inode` - Inode value to report when getting the VmoFile's attributes.
     pub fn new_with_inode(
-        vmo: Vmo,
+        vmo: zx::Vmo,
         readable: bool,
         writable: bool,
         executable: bool,
@@ -159,7 +159,8 @@ impl VmoFile {
             writable,
             executable,
             inode,
-            vmo: Mutex::new(VmoOrInit::Vmo(vmo)),
+            vmo: vmo.into(),
+            init_fn: UnsafeCell::new(None),
         })
     }
 
@@ -174,7 +175,7 @@ impl VmoFile {
     /// * `writable` - If true, allow connections with OpenFlags::RIGHT_WRITABLE.
     /// * `executable` - If true, allow connections with OpenFlags::RIGHT_EXECUTABLE.
     pub fn new_lazy(
-        init_vmo: impl Fn() -> Result<Vmo, Status> + Send + Sync + 'static,
+        init_vmo: impl Fn() -> Result<zx::Vmo, Status> + Send + Sync + 'static,
         readable: bool,
         writable: bool,
         executable: bool,
@@ -184,14 +185,18 @@ impl VmoFile {
             writable,
             executable,
             inode: fio::INO_UNKNOWN,
-            vmo: Mutex::new(VmoOrInit::Init(Box::new(init_vmo))),
+            vmo: OnceCell::new(),
+            init_fn: UnsafeCell::new(Some(Box::new(init_vmo))),
         })
     }
 
-    async fn vmo(&self) -> MappedMutexGuard<'_, VmoOrInit, Vmo> {
-        MutexGuard::map(self.vmo.lock().await, |vmo_or_init| match vmo_or_init {
-            VmoOrInit::Vmo(vmo) => vmo,
-            VmoOrInit::Init(_) => panic!("The VMO was not initialized"),
+    fn vmo(&self) -> Result<&zx::Vmo, Status> {
+        self.vmo.get_or_try_init(|| {
+            // SAFETY: This is safe because `get_or_try_init` ensures exclusivity.
+            let init_fn = unsafe { &mut *self.init_fn.get() };
+            let vmo = init_fn.as_ref().unwrap()()?;
+            *init_fn = None;
+            Ok(vmo)
         })
     }
 }
@@ -215,12 +220,7 @@ impl DirectoryEntry for VmoFile {
 
             object_request.take().spawn(&scope.clone(), move |object_request| {
                 Box::pin(async move {
-                    {
-                        let mut guard = self.vmo.lock().await;
-                        if let VmoOrInit::Init(init) = &mut *guard {
-                            *guard = VmoOrInit::Vmo(init()?);
-                        }
-                    }
+                    self.vmo()?;
                     object_request.create_connection(scope, self, flags, FidlIoConnection::create)
                 })
             });
@@ -247,12 +247,7 @@ impl DirectoryEntry for VmoFile {
 
         object_request.take().spawn(&scope.clone(), move |object_request| {
             Box::pin(async move {
-                {
-                    let mut guard = self.vmo.lock().await;
-                    if let VmoOrInit::Init(init) = &mut *guard {
-                        *guard = VmoOrInit::Vmo(init()?);
-                    }
-                }
+                self.vmo()?;
                 object_request.create_connection(scope, self, protocols, FidlIoConnection::create)
             })
         });
@@ -313,7 +308,7 @@ impl Node for VmoFile {
 
 impl FileIo for VmoFile {
     async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, Status> {
-        let vmo = self.vmo().await;
+        let vmo = self.vmo()?;
         let content_size = vmo.get_content_size()?;
         if offset >= content_size {
             return Ok(0u64);
@@ -328,7 +323,7 @@ impl FileIo for VmoFile {
         if content.is_empty() {
             return Ok(0u64);
         }
-        let vmo = self.vmo().await;
+        let vmo = self.vmo()?;
         let capacity = vmo.get_size()?;
         if offset >= capacity {
             return Err(Status::OUT_OF_RANGE);
@@ -366,7 +361,7 @@ impl File for VmoFile {
     }
 
     async fn truncate(&self, length: u64) -> Result<(), Status> {
-        let vmo = self.vmo().await;
+        let vmo = self.vmo()?;
         let capacity = vmo.get_size()?;
 
         if length > capacity {
@@ -387,7 +382,7 @@ impl File for VmoFile {
         Ok(())
     }
 
-    async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<Vmo, Status> {
+    async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
         // The only sharing mode we support that disallows the VMO size to change currently
         // is PRIVATE_CLONE (`get_as_private`), so we require that to be set explicitly.
         if flags.contains(fio::VmoFlags::WRITE) && !flags.contains(fio::VmoFlags::PRIVATE_CLONE) {
@@ -401,7 +396,7 @@ impl File for VmoFile {
             return Err(zx::Status::NOT_SUPPORTED);
         }
 
-        let vmo = self.vmo().await;
+        let vmo = self.vmo()?;
 
         // Logic here matches fuchsia.io requirements and matches what works for memfs.
         // Shared requests are satisfied by duplicating an handle, and private shares are
@@ -417,7 +412,7 @@ impl File for VmoFile {
     }
 
     async fn get_size(&self) -> Result<u64, Status> {
-        Ok(self.vmo().await.get_content_size()?)
+        Ok(self.vmo()?.get_content_size()?)
     }
 
     // TODO(https://fxbug.dev/42152303)
@@ -442,13 +437,13 @@ impl File for VmoFile {
     }
 }
 
-fn get_as_shared(vmo: &Vmo, mut rights: zx::Rights) -> Result<Vmo, zx::Status> {
+fn get_as_shared(vmo: &zx::Vmo, mut rights: zx::Rights) -> Result<zx::Vmo, zx::Status> {
     // Add set of basic rights to include in shared mode before duplicating the VMO handle.
     rights |= zx::Rights::BASIC | zx::Rights::MAP | zx::Rights::GET_PROPERTY;
     vmo.as_handle_ref().duplicate(rights).map(Into::into)
 }
 
-fn get_as_private(vmo: &Vmo, mut rights: zx::Rights) -> Result<Vmo, zx::Status> {
+fn get_as_private(vmo: &zx::Vmo, mut rights: zx::Rights) -> Result<zx::Vmo, zx::Status> {
     // Add set of basic rights to include in private mode, ensuring we provide SET_PROPERTY.
     rights |=
         zx::Rights::BASIC | zx::Rights::MAP | zx::Rights::GET_PROPERTY | zx::Rights::SET_PROPERTY;
