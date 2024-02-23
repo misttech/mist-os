@@ -361,6 +361,26 @@ type Nat64Info = table {
     3: nat64_error_counters Nat64ErrorCounters;
 };
 
+/// Represents a group of TREL related counters in the platform layer.
+///
+/// Derived from [`otPlatTrelCounters`](https://openthread.io/reference/struct/ot-plat-trel-counters).
+type TrelCounters = table {
+    /// Sum of size of packets received through TREL.
+    1: rx_bytes uint64;
+
+    /// Number of packets received through TREL.
+    2: rx_packets uint64;
+
+    /// Sum of size of packets successfully transmitted through TREL.
+    3: tx_bytes uint64;
+
+    /// Number of packet transmission failures through TREL.
+    4: tx_failure uint64;
+
+    /// Number of packets successfully transmitted through TREL.
+    5: tx_packets uint64;
+};
+
 /// LoWPAN Interface Telemetry Information.
 ///
 /// The fields in this table are used for providing low-level telemetry and information about the
@@ -454,4 +474,9 @@ type Telemetry = table {
     ///
     /// Only present on Thread networks.
    19: nat64_info Nat64Info;
+
+    /// Information about the TREL interface, if available.
+    ///
+    /// Only present on Thread networks.
+   20: trel_counters TrelCounters;
 };
