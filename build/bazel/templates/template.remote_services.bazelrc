@@ -15,6 +15,7 @@ build:remote --incompatible_strict_action_env=true
 build:remote --google_default_credentials=true
 # Only accept outputs from remote execution on the back-end (remote workers).
 build:remote --noremote_upload_local_results
+# --remote_proxy may be passed at run time, with a pointer to a temporary socket.
 
 # Build event protocol (BEP) streaming
 build:_bes_common --google_auth_scopes=https://www.googleapis.com/auth/cloud-platform
@@ -23,15 +24,22 @@ build:_bes_common --bes_instance_name={rbe_project}
 build:_bes_common --bes_header=X-Goog-User-Project={rbe_project}
 build:_bes_common --bes_keywords=fuchsia
 
+# Start with a long retry delay to tolerate usage spikes that run into the (per-minute) quota.
+build:_bes_infra --experimental_build_event_upload_retry_minimum_delay=30s
+# --bes_proxy may be passed at run time, with a pointer to a temporary socket.
+
+# Users and infra share the same service, but users are less patient, hence a smaller delay.
+build:_bes_user --experimental_build_event_upload_retry_minimum_delay=10s
+
 # Setup sponge (go/sponge-bazel)
 build:_sponge --config=_bes_common
 build:_sponge --bes_backend=buildeventservice-pa.googleapis.com
 build:_sponge --bes_results_url=http://sponge2/
 
 # This variant is suitable for developers.
-build:sponge --config=_sponge
+build:sponge --config=_sponge --config=_bes_user
 # This variant is suitable for infra.
-build:sponge_infra --config=_sponge
+build:sponge_infra --config=_sponge --config=_bes_infra
 
 # Setup ResultStore
 build:_resultstore --config=_bes_common
@@ -40,6 +48,6 @@ build:_resultstore --bes_results_url=https://source.cloud.google.com/results/inv
 build:_resultstore --remote_instance_name=projects/{rbe_project}/instances/default
 
 # This variant is suitable for developers.
-build:resultstore --config=_resultstore
+build:resultstore --config=_resultstore --config=_bes_user
 # This variant is suitable for infra.
-build:resultstore_infra --config=_resultstore
+build:resultstore_infra --config=_resultstore --config=_bes_infra
