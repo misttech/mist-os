@@ -42,7 +42,6 @@ ffx_plugin("ffx_scrutiny_verify") {
     "src/lib.rs",
     "src/pre_signing.rs",
     "src/route_sources.rs",
-    "src/routes/allowlist.rs",
     "src/routes/mod.rs",
     "src/static_pkgs.rs",
     "src/structured_config.rs",

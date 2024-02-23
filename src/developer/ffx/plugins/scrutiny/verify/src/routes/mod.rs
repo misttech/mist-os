@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod allowlist;
-
-use allowlist::{AllowlistFilter, UnversionedAllowlist, V0Allowlist, V1Allowlist};
 use anyhow::{Context, Result};
 use errors::ffx_bail;
 use ffx_scrutiny_verify_args::routes::{default_capability_types, Command};
@@ -12,13 +9,12 @@ use scrutiny_config::{ConfigBuilder, ModelConfig};
 use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
 use scrutiny_plugins::verify::{CapabilityRouteResults, ResultsForCapabilityType};
 use serde_json;
-use std::{collections::HashSet, fs, io::Read, path::PathBuf};
+use std::{collections::HashSet, path::PathBuf};
 
 struct Query {
     capability_types: Vec<String>,
     response_level: String,
     product_bundle: PathBuf,
-    allowlist_paths: Vec<PathBuf>,
     component_tree_config_path: Option<PathBuf>,
     tmp_dir_path: Option<PathBuf>,
 }
@@ -46,32 +42,10 @@ impl From<&Command> for Query {
             capability_types,
             response_level: cmd.response_level.clone().into(),
             product_bundle: cmd.product_bundle.clone(),
-            allowlist_paths: cmd.allowlist.clone(),
             component_tree_config_path: cmd.component_tree_config.clone(),
             tmp_dir_path: None,
         }
     }
-}
-
-fn load_allowlist(allowlist_paths: &Vec<PathBuf>) -> Result<Box<dyn AllowlistFilter>> {
-    let builders = vec![UnversionedAllowlist::new(), V0Allowlist::new(), V1Allowlist::new()];
-    let mut err = None;
-
-    for mut builder in builders.into_iter() {
-        for path in allowlist_paths.iter() {
-            let reader: Box<dyn Read> =
-                Box::new(fs::File::open(path).context("Failed to open allowlist fragment")?);
-            if let Err(load_err) = builder.load(reader) {
-                err = Some(load_err);
-                break;
-            }
-        }
-        if err.is_none() {
-            return Ok(builder.build());
-        }
-    }
-
-    Err(err.unwrap())
 }
 
 pub async fn verify(
@@ -102,28 +76,21 @@ pub async fn verify(
     config.runtime.logging.silent_mode = true;
 
     let results = launcher::launch_from_config(config).context("Failed to launch scrutiny")?;
-    let route_analysis: CapabilityRouteResults = serde_json::from_str(&results)
+    let mut route_analysis: CapabilityRouteResults = serde_json::from_str(&results)
         .context(format!("Failed to deserialize verify routes results: {}", results))?;
 
-    let allowlist_filter = load_allowlist(&query.allowlist_paths)
-        .context("Failed to parse all allowlist fragments from supported format")?;
-
-    // Capability type-bucketed errors, warnings, and/or info.
-    let mut filtered_analysis = allowlist_filter.filter_analysis(route_analysis.results);
-
-    // Human-readable messages associated with errors and warnings drawn from `filtered_analysis`.
+    // Human-readable messages associated with errors and warnings drawn from `route_analysis`.
     let mut human_readable_errors = vec![];
 
-    // Human-readable messages associated with info drawn from `filtered_analysis`.
+    // Human-readable messages associated with info drawn from `route_analysis`.
     let mut human_readable_messages = vec![];
 
-    // Clean `filtered_analysis.results` to contain only error and warning data relevant to
-    // allowlist entries, and populate human-readable collections.
+    // Populate human-readable collections with content from `route_analysis.results`.
     let mut ok_analysis = vec![];
-    for entry in filtered_analysis.iter_mut() {
+    for entry in route_analysis.results.iter_mut() {
         // If there are any errors, produce the human-readable version of each.
         for error in entry.results.errors.iter_mut() {
-            // Remove all route segments so they don't show up in allowlist JSON snippet.
+            // Remove all route segments so they don't show up in JSON snippet.
             let mut context: Vec<String> = error
                 .route
                 .drain(..)
@@ -152,7 +119,7 @@ pub async fn verify(
         }
 
         for warning in entry.results.warnings.iter_mut() {
-            // Remove all route segments so they don't show up in allowlist JSON snippet.
+            // Remove all route segments so they don't show up in JSON snippet.
             let mut context: Vec<String> = warning
                 .route
                 .drain(..)
@@ -242,17 +209,13 @@ The route verifier failed to verify all capability routes in this build.
 
 See https://fuchsia.dev/go/components/static-analysis-errors
 
-If the broken route is required for a transition it can be temporarily added
-to the JSON allowlist located at: {:?}
-
 >>>>>> START OF JSON SNIPPET
 {}
 <<<<<< END OF JSON SNIPPET
 
-Alternatively, attempt to fix the following errors:
+Please fix the following errors:
 {}",
-            query.allowlist_paths,
-            serde_json::to_string_pretty(&filtered_analysis).unwrap(),
+            serde_json::to_string_pretty(&route_analysis.results).unwrap(),
             human_readable_errors.join("\n\n")
         );
     }

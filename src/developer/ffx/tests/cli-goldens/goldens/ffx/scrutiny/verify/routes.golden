@@ -2,7 +2,7 @@
   "name": "routes",
   "description": "Verifies capability routes in the component tree",
   "examples": [
-    "To verify routes on your current build:\n\n    $ ffx scrutiny verify routes \\\n        --product-bundle $(fx get-build-dir)/obj/build/images/fuchsia/product_bundle \\\n        --allowlist ../../src/security/policy/build/verify_routes_exceptions_allowlist.json5"
+    "To verify routes on your current build:\n\n    $ ffx scrutiny verify routes \\\n        --product-bundle $(fx get-build-dir)/obj/build/images/fuchsia/product_bundle"
   ],
   "flags": [
     {
@@ -47,18 +47,6 @@
       "long": "--product-bundle",
       "short": null,
       "description": "absolute or working directory-relative path to a product bundle.",
-      "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
-          "arg_name": "allowlist"
-        }
-      },
-      "optionality": "repeating",
-      "long": "--allowlist",
-      "short": null,
-      "description": "absolute or working directory-relative path(s) to allowlist(s) used to verify routes.",
       "hidden": false
     },
     {

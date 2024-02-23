@@ -75,8 +75,7 @@ pub fn default_capability_types() -> Vec<CapabilityType> {
     example = r#"To verify routes on your current build:
 
     $ ffx scrutiny verify routes \
-        --product-bundle $(fx get-build-dir)/obj/build/images/fuchsia/product_bundle \
-        --allowlist ../../src/security/policy/build/verify_routes_exceptions_allowlist.json5"#
+        --product-bundle $(fx get-build-dir)/obj/build/images/fuchsia/product_bundle"#
 )]
 pub struct Command {
     /// capability types to verify.
@@ -88,9 +87,6 @@ pub struct Command {
     /// absolute or working directory-relative path to a product bundle.
     #[argh(option)]
     pub product_bundle: PathBuf,
-    /// absolute or working directory-relative path(s) to allowlist(s) used to verify routes.
-    #[argh(option)]
-    pub allowlist: Vec<PathBuf>,
     /// absolute or working path-relative path to component tree configuration file that affects
     /// how component tree data is gathered.
     #[argh(option)]
