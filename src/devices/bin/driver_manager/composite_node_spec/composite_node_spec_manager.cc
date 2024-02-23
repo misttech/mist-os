@@ -157,15 +157,6 @@ zx::result<BindSpecResult> CompositeNodeSpecManager::BindParentSpec(
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
-zx::result<> CompositeNodeSpecManager::BindParentSpec(
-    std::vector<fuchsia_driver_framework::CompositeParent> composite_parents,
-    const DeviceOrNode &device_or_node, bool enable_multibind) {
-  fidl::Arena<> arena;
-  return zx::make_result(BindParentSpec(arena, fidl::ToWire(arena, std::move(composite_parents)),
-                                        device_or_node, enable_multibind)
-                             .status_value());
-}
-
 void CompositeNodeSpecManager::Rebind(std::string spec_name,
                                       std::optional<std::string> restart_driver_url_suffix,
                                       fit::callback<void(zx::result<>)> rebind_spec_completer) {

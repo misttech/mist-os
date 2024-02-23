@@ -48,14 +48,6 @@ class CompositeNodeSpecManager {
       fidl::VectorView<fuchsia_driver_framework::wire::CompositeParent> composite_parents,
       const DeviceOrNode& device_or_node, bool enable_multibind = false);
 
-  // Same as |BindParentSpec| but it takes in a natural typed |composite_parents|.
-  // Does not return the |BindSpecResult| like the wire type variant as the data in
-  // |BindSpecResult| will not outlive the call since the allocator used for them is
-  // local to this call.
-  zx::result<> BindParentSpec(
-      std::vector<fuchsia_driver_framework::CompositeParent> composite_parents,
-      const DeviceOrNode& device_or_node, bool enable_multibind = false);
-
   void Rebind(std::string spec_name, std::optional<std::string> restart_driver_url_suffix,
               fit::callback<void(zx::result<>)> rebind_spec_completer);
 
