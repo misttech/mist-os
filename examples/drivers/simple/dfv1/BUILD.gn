@@ -1,0 +1,35 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bind/bind.gni")
+import("//build/components.gni")
+import("//build/drivers.gni")
+
+driver_bind_rules("bind") {
+  rules = "simple_driver.bind"
+  bind_output = "simple_driver.bindbc"
+  deps = [ "//examples/drivers/bind_library:gizmo.example" ]
+}
+
+fuchsia_driver("driver") {
+  output_name = "simple_dfv1"
+  sources = [ "simple_driver.cc" ]
+  deps = [
+    ":bind",
+    "//src/devices/lib/driver",
+    "//src/lib/ddktl",
+  ]
+}
+
+fuchsia_driver_component("component") {
+  component_name = "simple_dfv1"
+  deps = [ ":driver" ]
+  info = "simple-info.json"
+  colocate = true
+}
+
+fuchsia_driver_package("pkg") {
+  package_name = "simple_dfv1"
+  driver_components = [ ":component" ]
+}

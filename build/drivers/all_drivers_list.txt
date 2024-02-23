@@ -1,4 +1,5 @@
 //examples/drivers/driver_test_realm/sample-driver:driver
+//examples/drivers/simple/dfv1:driver
 //examples/drivers/simple/dfv2:driver
 //examples/drivers/skeleton:driver
 //examples/drivers/transport/banjo/v1:child_driver
