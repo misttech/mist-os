@@ -116,6 +116,7 @@ impl PublishOptions {
 /// * Failing to convert a FIDL endpoint for `fuchsia.inspect.Tree`'s `TreeMarker` into a stream
 /// * Failing to connect to the `InspectSink` protocol
 /// * Failing to send the connection over the wire
+#[must_use]
 pub fn publish(inspector: &Inspector, options: PublishOptions) -> Option<fasync::Task<()>> {
     let PublishOptions { vmo_preference, tree_name, inspect_sink_client } = options;
     let (server_task, tree) = match service::spawn_tree_server(inspector.clone(), vmo_preference) {
