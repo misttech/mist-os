@@ -99,6 +99,7 @@ async fn listen_for_syslog_routed_stdio() {
         .connect_to_protocol::<ArchiveAccessorMarker>()
         .await
         .expect("ArchiveAccessor unavailable");
+    info!("Connected to Accessor");
 
     let mut reader = ArchiveReader::new();
     reader.with_archive(accessor);
@@ -110,13 +111,16 @@ async fn listen_for_syslog_routed_stdio() {
     });
 
     let puppet = test_topology::connect_to_puppet(&realm_proxy, "stdio-puppet").await.unwrap();
+    info!("Connected to puppet");
 
     let msg = format!("logger_integration_rust test_klog stdout {}", rand::random::<u64>());
     puppet.println(&msg).unwrap();
+    info!("printed '{msg}' to stdout");
     logs.by_ref().filter(|m| futures::future::ready(m.msg().unwrap() == msg)).next().await;
 
     let msg = format!("logger_integration_rust test_klog stderr {}", rand::random::<u64>());
     puppet.eprintln(&msg).unwrap();
+    info!("Printed '{msg}' to stderr");
     logs.filter(|m| futures::future::ready(m.msg().unwrap() == msg)).next().await;
 
     // TODO(https://fxbug.dev/42126316): add test for multiline log once behavior is defined.
