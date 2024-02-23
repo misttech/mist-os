@@ -136,6 +136,15 @@ class ConsoleContext : public ProcessObserver,
   std::string GetEmbeddedModeContext();
   void SetConsoleMode(std::string mode);
 
+  // If the current console mode is EmbeddedInteractive, return to Embedded mode (i.e. disable input
+  // and hide zxdb output). If the console mode is Shell, do nothing.
+  //
+  // |process| may be a process that should be filtered from all running processes the frontend
+  // knows about. This is because the notification we receive for a process that has been
+  // detached/exited/killed/etc comes _before_ the process object is actually destructed. If null,
+  // then the presence of any running process will keep interactive mode.
+  void MaybeReturnToEmbeddedMode(Process* process);
+
   // SessionObserver implementation:
   void HandleNotification(NotificationType, const std::string&) override;
   void HandlePreviousConnectedProcesses(const std::vector<debug_ipc::ProcessRecord>&) override;

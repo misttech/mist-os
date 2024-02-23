@@ -79,6 +79,10 @@ class MockRemoteAPI : public RemoteAPI {
                      fit::callback<void(const Err&, debug_ipc::ReadRegistersReply)> cb) override;
   void WriteRegisters(const debug_ipc::WriteRegistersRequest& request,
                       fit::callback<void(const Err&, debug_ipc::WriteRegistersReply)> cb) override;
+  void Detach(const debug_ipc::DetachRequest& request,
+              fit::callback<void(const Err&, debug_ipc::DetachReply)> cb) override;
+  void Kill(const debug_ipc::KillRequest& request,
+            fit::callback<void(const Err&, debug_ipc::KillReply)> cb) override;
 
   // No-op for now.
   // TODO(donosoc): The client will detect underlying exceptions by analyzing the threads it

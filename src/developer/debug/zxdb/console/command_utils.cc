@@ -23,6 +23,7 @@
 #include "src/developer/debug/zxdb/client/target.h"
 #include "src/developer/debug/zxdb/client/thread.h"
 #include "src/developer/debug/zxdb/common/err.h"
+#include "src/developer/debug/zxdb/common/join_callbacks.h"
 #include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/developer/debug/zxdb/console/async_output_buffer.h"
 #include "src/developer/debug/zxdb/console/command.h"
@@ -644,12 +645,18 @@ ErrOr<Target*> GetRunnableTarget(ConsoleContext* context, const Command& cmd) {
   return new_target;
 }
 
-Err VerifySystemHasRunningProcess(System* system) {
+std::vector<Process*> GetRunningProcesses(System* system) {
+  std::vector<Process*> running_processes;
   for (const Target* target : system->GetTargets()) {
-    if (target->GetProcess())
-      return Err();
+    if (target->GetState() != Target::State::kNone && target->GetProcess())
+      running_processes.push_back(target->GetProcess());
   }
-  return Err("No processes are running.");
+
+  return running_processes;
+}
+
+Err VerifySystemHasRunningProcess(System* system) {
+  return GetRunningProcesses(system).empty() ? Err("No processes are running.") : Err();
 }
 
 void ProcessCommandCallback(fxl::WeakPtr<Target> target, bool display_message_on_success,

@@ -165,6 +165,11 @@ class System : public ClientObject, public SessionObserver, public SettingStoreO
   // Add a symbol server for testing purposes.
   void InjectSymbolServerForTesting(std::unique_ptr<SymbolServer> server);
 
+  // Returns the next available Target for a test, which might be created on the fly. This is
+  // effectively exposing the private method |GetNextTarget| to tests, which is helpful for creating
+  // multiple processes.
+  TargetImpl* GetNextTargetForTesting();
+
   // Sync filters to debug_agent.
   void SyncFilters();
 
@@ -174,6 +179,10 @@ class System : public ClientObject, public SessionObserver, public SettingStoreO
   // Searches through for an open slot (Target without an attached process) or creates another one
   // if none is found. Calls attach on that target, passing |callback| into it.
   void AttachToProcess(uint64_t pid, Target::CallbackWithTimestamp callback);
+
+  // Detach from all targets, and delete the now unused Target objects. This can be called by user
+  // commands (e.g. "detach *", or "quit" when in embedded mode).
+  void DetachFromAllTargets(fit::callback<void(int)> cb);
 
  private:
   void AddNewTarget(std::unique_ptr<TargetImpl> target);

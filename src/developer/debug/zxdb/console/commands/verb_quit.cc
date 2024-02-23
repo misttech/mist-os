@@ -5,7 +5,9 @@
 #include "src/developer/debug/zxdb/console/commands/verb_quit.h"
 
 #include "src/developer/debug/zxdb/client/session.h"
+#include "src/developer/debug/zxdb/client/setting_schema_definition.h"
 #include "src/developer/debug/zxdb/console/command.h"
+#include "src/developer/debug/zxdb/console/command_utils.h"
 #include "src/developer/debug/zxdb/console/console.h"
 #include "src/developer/debug/zxdb/console/console_context.h"
 #include "src/developer/debug/zxdb/console/output_buffer.h"
@@ -28,18 +30,32 @@ Options
 
   -f
   --force
-      Quit without prompting, even in a process is attached.
+      Quit without prompting, even if a process is attached or in embedded mode.
 )";
 
 void RunVerbQuit(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
+  if (cmd.HasSwitch(kForceQuitSwitch)) {
+    cmd_context->console()->Quit();
+    return;
+  }
+
+  // When we're in embedded mode, we don't want to actually quit until the streaming fd is closed.
+  // Detach from everything and go back to embedded mode.
+  if (cmd_context->GetConsoleContext()->GetConsoleMode() ==
+      ClientSettings::System::kConsoleMode_EmbeddedInteractive) {
+    cmd_context->GetConsoleContext()->session()->system().DetachFromAllTargets(
+        [cmd_context](int) {});
+    return;
+  }
+
   int running_processes = 0;
   for (Target* t : cmd_context->GetConsoleContext()->session()->system().GetTargets()) {
     if (t->GetState() != Target::kNone)
       running_processes++;
   }
 
-  if (running_processes == 0 || cmd.HasSwitch(kForceQuitSwitch)) {
-    // Nothing running or force quit requested, quit immediately.
+  if (running_processes == 0) {
+    // Nothing running, quit immediately.
     cmd_context->console()->Quit();
     return;
   }

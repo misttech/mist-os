@@ -8,7 +8,6 @@
 #include "src/developer/debug/zxdb/client/process.h"
 #include "src/developer/debug/zxdb/client/remote_api.h"
 #include "src/developer/debug/zxdb/client/session.h"
-#include "src/developer/debug/zxdb/common/join_callbacks.h"
 #include "src/developer/debug/zxdb/console/command.h"
 #include "src/developer/debug/zxdb/console/command_utils.h"
 #include "src/developer/debug/zxdb/console/console.h"
@@ -67,46 +66,10 @@ Examples
   process 4 detach
       Detaches from process context 4.
 
+  detach *
   process * detach
       Detaches from all currently attached processes.
 )";
-
-void DetachFromAllTargets(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
-  auto& system = cmd_context->GetConsoleContext()->session()->system();
-
-  struct PackedJoinType {
-    fxl::WeakPtr<Target> target;
-    Err err;
-  };
-
-  auto joiner = fxl::MakeRefCounted<JoinCallbacks<PackedJoinType>>();
-
-  for (auto target : system.GetTargets()) {
-    target->Detach(
-        [cb = joiner->AddCallback()](fxl::WeakPtr<Target> target, const Err& err) mutable {
-          PackedJoinType pack{std::move(target), err};
-          cb(pack);
-        });
-  }
-
-  auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
-  joiner->Ready([out, &system](const std::vector<PackedJoinType>& results) {
-    for (const auto& result : results) {
-      FX_DCHECK(result.err.ok());
-      // Ignore this return value. The last one will always have a warning since one target must
-      // always be present. |DeleteTarget| handles that logic for us.
-      system.DeleteTarget(result.target.get()).ok();
-    }
-
-    // The default, always existing target is an implementation detail that we hide from the user.
-    // Tell them we detached from everything even though we didn't.
-    out->Append("Detached from ");
-    out->Append(std::to_string(results.size()));
-    out->Complete(" processes.");
-  });
-
-  cmd_context->Output(out);
-}
 
 // Returns nullptr if there is no target attached to |process_koid|.
 Target* SearchForAttachedTarget(ConsoleContext* context, uint64_t process_koid) {
@@ -155,13 +118,22 @@ void RunVerbDetach(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
 
   uint64_t process_koid = 0;
 
+  auto detach_from_all_callback = [cmd_context](int num_detached) {
+    OutputBuffer out;
+    // The default, always existing target is an implementation detail that we hide from the
+    // user. Tell them we detached from everything even though there's still one target remaining.
+    out.Append(fxl::StringPrintf("Detached from %d processes.", num_detached));
+    cmd_context->Output(out);
+  };
+
   if (cmd.args().size() == 1) {
     if (cmd.HasNoun(Noun::kProcess)) {
       return cmd_context->ReportError(
           Err(ErrType::kInput, "You can only specify PIDs without context."));
     } else if (cmd.args()[0] == "*") {
       // "detach *".
-      DetachFromAllTargets(cmd, cmd_context);
+      cmd_context->GetConsoleContext()->session()->system().DetachFromAllTargets(
+          detach_from_all_callback);
       return;
     }
 
@@ -172,7 +144,8 @@ void RunVerbDetach(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
 
   if (cmd.HasNoun(Noun::kProcess) && cmd.GetNounIndex(Noun::kProcess) == Command::kWildcard) {
     // "pr * detach".
-    DetachFromAllTargets(cmd, cmd_context);
+    cmd_context->GetConsoleContext()->session()->system().DetachFromAllTargets(
+        detach_from_all_callback);
     return;
   }
 

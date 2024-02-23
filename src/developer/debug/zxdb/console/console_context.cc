@@ -461,6 +461,27 @@ void ConsoleContext::SetConsoleMode(std::string mode) {
   // If the mode changes, we will get notified via SettingStoreObserver.
 }
 
+void ConsoleContext::MaybeReturnToEmbeddedMode(Process* process) {
+  auto running_processes = GetRunningProcesses(&session()->system());
+
+  // If |process| is null, then the presence of any running process indicates that we should not
+  // transition to embedded mode. If |process| is the only running process, then we will return to
+  // embedded mode.
+  bool has_other_running_process = !running_processes.empty();
+  if (process) {
+    has_other_running_process = !std::all_of(
+        running_processes.begin(), running_processes.end(),
+        [process](const Process* running) { return running->GetKoid() == process->GetKoid(); });
+  }
+
+  // We return to embedded mode if there are no other running targets or if the previous command was
+  // executed against all targets (indicating the user doesn't want to debug them).
+  if (GetConsoleMode() == ClientSettings::System::kConsoleMode_EmbeddedInteractive &&
+      !has_other_running_process) {
+    SetConsoleMode(ClientSettings::System::kConsoleMode_Embedded);
+  }
+}
+
 void ConsoleContext::InitConsoleMode() {
   std::string mode = GetConsoleMode();
   Console* console = Console::get();
@@ -700,6 +721,7 @@ void ConsoleContext::WillDestroyProcess(Process* process, DestroyReason reason, 
       break;
   }
 
+  MaybeReturnToEmbeddedMode(process);
   console->Output(msg);
 }
 

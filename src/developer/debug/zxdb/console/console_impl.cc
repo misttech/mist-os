@@ -66,7 +66,16 @@ ConsoleImpl::ConsoleImpl(Session* session, line_input::ModalLineInput::Factory l
   });
 
   // EOF (ctrl-d) should exit gracefully.
-  line_input_.SetEofCallback([this]() { Quit(); });
+  line_input_.SetEofCallback([this]() {
+    // If we're in embedded mode, we don't actually want to quit until the streaming fd has been
+    // closed. Detach the active process to try to return to embedded mode. The console context
+    // object is watching for detach notifications and will make the transition if appropriate.
+    if (context().GetConsoleMode() == ClientSettings::System::kConsoleMode_EmbeddedInteractive) {
+      context().session()->system().DetachFromAllTargets([](int) {});
+    } else {
+      Quit();
+    }
+  });
 
   // Set stdin to async mode or OnStdinReadable will block.
   fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL, 0) | O_NONBLOCK);

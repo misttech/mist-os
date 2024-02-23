@@ -104,15 +104,6 @@ void RunVerbContinue(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context
       return cmd_context->ReportError(err);
     }
     console_context->session()->system().Continue(forward);
-
-    // If we're embedded in another tool's output stream and we're continuing
-    // everything, switch back to the embedded console mode so that we don't
-    // show the zxdb prompt while the program continues running. The prompt
-    // will re-appear when we hit another breakpoint.
-    if (console_context->GetConsoleMode() ==
-        ClientSettings::System::kConsoleMode_EmbeddedInteractive) {
-      console_context->SetConsoleMode(ClientSettings::System::kConsoleMode_Embedded);
-    }
   }
 }
 

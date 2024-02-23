@@ -59,8 +59,8 @@ class RemoteAPITest : public TestWithLoop {
   // given address. If the load address is 0, an arbitrary one will be generated.
   fxl::RefPtr<MockModuleSymbols> InjectMockModule(Process* process, uint64_t load_address = 0);
 
-  // Makes the target have a fake running process with the given KOID. This assumes there is only
-  // one target in the system and that it is not currently running.
+  // Makes the target have a fake running process with the given KOID. The process has a
+  // deterministic name, "process-" followed by the given koid in hex.
   Process* InjectProcess(uint64_t process_koid);
 
   // Sends a "thread created" notifications to the client for the given fake KOID. The thread will

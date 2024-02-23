@@ -15,6 +15,7 @@
 #include "src/developer/debug/zxdb/client/system.h"
 #include "src/developer/debug/zxdb/client/target_impl.h"
 #include "src/developer/debug/zxdb/client/thread_impl.h"
+#include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/developer/debug/zxdb/symbols/mock_module_symbols.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -69,17 +70,10 @@ fxl::RefPtr<MockModuleSymbols> RemoteAPITest::InjectMockModule(Process* process,
 }
 
 Process* RemoteAPITest::InjectProcess(uint64_t process_koid) {
-  auto targets = session().system().GetTargetImpls();
-  if (targets.size() != 1u) {
-    ADD_FAILURE();
-    return nullptr;
-  }
-  if (targets[0]->GetState() != Target::State::kNone) {
-    ADD_FAILURE();
-    return nullptr;
-  }
-  targets[0]->CreateProcessForTesting(process_koid, "test");
-  return targets[0]->GetProcess();
+  auto target = session().system().GetNextTargetForTesting();
+  target->CreateProcessForTesting(
+      process_koid, fxl::StringPrintf("process-%s", to_hex_string(process_koid).c_str()));
+  return target->GetProcess();
 }
 
 Thread* RemoteAPITest::InjectThread(uint64_t process_koid, uint64_t thread_koid) {

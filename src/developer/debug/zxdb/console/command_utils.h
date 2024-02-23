@@ -151,6 +151,11 @@ std::string FormatConsoleString(const std::string& input);
 // returned target should be used instead of the one from the command (it may be a new one).
 ErrOr<Target*> GetRunnableTarget(ConsoleContext* context, const Command& cmd);
 
+// Get all the currently running processes. This means that the Target's state is not None and the
+// underlying Process object is alive, but may not have any actively running threads (they could be
+// suspended, in an exception state or any other valid state).
+std::vector<Process*> GetRunningProcesses(System* system);
+
 // If the system has at least one running process, returns no error. If not, returns an error
 // describing that there must be a process running.
 //

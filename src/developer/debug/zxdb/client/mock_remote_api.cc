@@ -131,4 +131,15 @@ void MockRemoteAPI::WriteRegisters(
   });
 }
 
+void MockRemoteAPI::Detach(const debug_ipc::DetachRequest& request,
+                           fit::callback<void(const Err&, debug_ipc::DetachReply)> cb) {
+  debug::MessageLoop::Current()->PostTask(
+      FROM_HERE, [cb = std::move(cb)]() mutable { cb(Err(), debug_ipc::DetachReply()); });
+}
+
+void MockRemoteAPI::Kill(const debug_ipc::KillRequest& request,
+                         fit::callback<void(const Err&, debug_ipc::KillReply)> cb) {
+  debug::MessageLoop::Current()->PostTask(
+      FROM_HERE, [cb = std::move(cb)]() mutable { cb(Err(), debug_ipc::KillReply()); });
+}
 }  // namespace zxdb

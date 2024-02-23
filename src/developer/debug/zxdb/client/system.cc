@@ -421,6 +421,8 @@ Err System::DeleteTarget(Target* t) {
   return Err();
 }
 
+TargetImpl* System::GetNextTargetForTesting() { return static_cast<TargetImpl*>(GetNextTarget()); }
+
 Breakpoint* System::CreateNewBreakpoint() {
   auto owning = std::make_unique<BreakpointImpl>(session(), false);
   uint32_t id = owning->backend_id();
@@ -795,4 +797,37 @@ void System::AddSymbolServer(std::unique_ptr<SymbolServer> unique_server) {
   });
 }
 
+void System::DetachFromAllTargets(fit::callback<void(int)> cb) {
+  struct PackedJoinType {
+    fxl::WeakPtr<Target> target;
+    Err err;
+  };
+
+  auto joiner = fxl::MakeRefCounted<JoinCallbacks<PackedJoinType>>();
+
+  for (auto target : GetTargets()) {
+    if (target->GetState() != Target::State::kNone) {
+      target->Detach(
+          [cb = joiner->AddCallback()](fxl::WeakPtr<Target> target, const Err& err) mutable {
+            PackedJoinType pack{std::move(target), err};
+            cb(pack);
+          });
+    }
+  }
+
+  joiner->Ready([weak_this = GetWeakPtr(),
+                 cb = std::move(cb)](const std::vector<PackedJoinType>& results) mutable {
+    if (!weak_this)
+      return;
+
+    for (const auto& result : results) {
+      FX_DCHECK(result.err.ok());
+      // Ignore this return value. The last one will always have a warning since one target must
+      // always be present. |DeleteTarget| handles that logic for us.
+      weak_this->DeleteTarget(result.target.get());
+    }
+
+    cb(results.size());
+  });
+}
 }  // namespace zxdb
