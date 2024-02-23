@@ -5,15 +5,17 @@
 use serde::{Deserialize, Serialize};
 
 /// The type if intl configuration to be used.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Type {
     /// Intl services are not used at all. Some very basic configurations such
     /// as bringup don't need internationalization support.
-    #[default]
     None,
+
     /// The default intl services bundle is used.
+    #[default]
     Default,
+
     /// The special small footprint intl services bundle is used.
     ///
     /// Some small footprint deployments need to be extra conscious of the
@@ -41,9 +43,11 @@ impl std::fmt::Display for Type {
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct IntlConfig {
-    /// The intl configuration type in use.
+    /// The intl configuration type in use.  If unspecified, the Type::Default
+    /// will be used on Standard systems, and Type::None on Utility and Bootstrp
+    /// systems.
     #[serde(default)]
-    pub config_type: Type,
+    pub config_type: Option<Type>,
 
     /// Should assembly include the zoneinfo files, in addition to the
     /// "regular" ICU time zone data.

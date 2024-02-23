@@ -68,10 +68,6 @@ product_assembly_configuration("terminal") {
       }
     }
 
-    intl = {
-      config_type = "default"
-    }
-
     setui = {
     }
 

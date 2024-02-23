@@ -31,9 +31,6 @@ workbench_platform_config = {
             "low_memory": True,
         },
     },
-    "intl": {
-        "config_type": "default",
-    },
     "setui": {
     },
     "timekeeper": {

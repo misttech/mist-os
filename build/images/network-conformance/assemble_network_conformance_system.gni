@@ -49,6 +49,9 @@ template("assemble_network_conformance_system") {
   product_assembly_configuration(labels.product_config) {
     platform = {
       build_type = "eng"
+      intl = {
+        config_type = "none"
+      }
       storage = {
         configure_fshost = true
         filesystems = {
@@ -69,6 +72,9 @@ template("assemble_network_conformance_system") {
   product_assembly_configuration(labels.product_config_fxfs) {
     platform = {
       build_type = "eng"
+      intl = {
+        config_type = "none"
+      }
       storage = {
         configure_fshost = true
         filesystems = {

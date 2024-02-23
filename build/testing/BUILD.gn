@@ -30,6 +30,10 @@ template("cuckoo_product_assembly_config") {
     testonly = true
     platform = {
       build_type = "eng"
+      intl = {
+        # A fake intl_services will be injected
+        config_type = "none"
+      }
       storage = {
         configure_fshost = true
         filesystems = invoker.filesystems

@@ -15,7 +15,7 @@ impl DefineSubsystemConfiguration<IntlConfig> for IntlSubsystem {
     ) -> Result<()> {
         // These settings require a core realm.
         if *context.feature_set_level != FeatureSupportLevel::Standard {
-            if config.config_type != Type::None {
+            if config.config_type.is_some() {
                 return Err(anyhow!(concat!(
                     "setting config_type for `intl` is only supported",
                     " on `standard` feature support level"
@@ -29,30 +29,31 @@ impl DefineSubsystemConfiguration<IntlConfig> for IntlSubsystem {
             }
         }
 
-        // If, however we are able to configure...
-        match config.config_type {
-            Type::Default => {
-                builder
-                    .icu_platform_bundle("intl_services")
-                    .context("while configuring the 'Intl' subsystem")?;
+        // Only perform configuration in the standard feature set level
+        if *context.feature_set_level == FeatureSupportLevel::Standard {
+            match config.config_type.clone().unwrap_or_default() {
+                Type::Default => {
+                    builder
+                        .icu_platform_bundle("intl_services")
+                        .context("while configuring the 'Intl' subsystem")?;
+                }
+                Type::Small => {
+                    builder
+                        .icu_platform_bundle("intl_services_small")
+                        .context("while configuring the 'small Intl' subsystem")?;
+                }
+                Type::SmallWithTimezone => {
+                    builder
+                        .icu_platform_bundle("intl_services_small_with_timezone")
+                        .context("while configuring the 'small Intl with timezone' subsystem")?;
+                }
+                Type::None => { /* Skip the bundle altogether. */ }
             }
-            Type::Small => {
-                builder
-                    .icu_platform_bundle("intl_services_small")
-                    .context("while configuring the 'small Intl' subsystem")?;
-            }
-            Type::SmallWithTimezone => {
-                builder
-                    .icu_platform_bundle("intl_services_small_with_timezone")
-                    .context("while configuring the 'small Intl with timezone' subsystem")?;
-            }
-            Type::None => { /* Skip the bundle altogether. */ }
-        }
 
-        if config.include_zoneinfo_files {
-            builder.icu_platform_bundle("zoneinfo").context("while configuring `zoneinfo`")?;
+            if config.include_zoneinfo_files {
+                builder.icu_platform_bundle("zoneinfo").context("while configuring `zoneinfo`")?;
+            }
         }
-
         Ok(())
     }
 }
