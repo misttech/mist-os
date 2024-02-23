@@ -7,8 +7,7 @@ use linux_uapi::{fsverity_enable_arg, FS_IOC_ENABLE_VERITY, FS_VERITY_HASH_ALG_S
 use std::os::fd::AsRawFd;
 use std::time::Instant;
 
-pub const SMALL_VERITY_SIZE: u64 = 2 * 1024 * 1024; // 2MiB
-pub const LARGE_VERITY_SIZE: u64 = 10 * 1024 * 1024; // 10 MiB
+pub const VERITY_FILE_SIZES: [u64; 5] = [4096, 24576, 262144, 2097152, 10485760];
 pub const SAMPLES: u64 = 5;
 pub const ENABLE_BENCHMARK_NAME: &str = "Enable";
 pub const READ_BENCHMARK_NAME: &str = "Read";
@@ -24,7 +23,7 @@ pub fn results_file_name(benchmark_name: &str) -> String {
 
 pub fn run_benchmark(benchmark: fn(u64, u64) -> u64, benchmark_name: &str) {
     let mut results = vec![];
-    for size in [SMALL_VERITY_SIZE, LARGE_VERITY_SIZE] {
+    for size in VERITY_FILE_SIZES {
         let mut values = vec![];
         for count in 0..SAMPLES {
             values.push(benchmark(size, count) as f64);
