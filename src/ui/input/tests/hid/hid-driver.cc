@@ -41,11 +41,6 @@ class HidDriverTest : public zxtest::Test {
     fuchsia::driver::test::Realm_Start_Result realm_result;
 
     auto args = fuchsia::driver::test::RealmArgs();
-#ifdef DFV2
-    args.set_use_driver_framework_v2(true);
-#else
-    args.set_use_driver_framework_v2(false);
-#endif
 
     ASSERT_OK(driver_test_realm->Start(std::move(args), &realm_result));
     ASSERT_FALSE(realm_result.is_err());

@@ -18,7 +18,6 @@ async fn test_devfs_exporter() -> Result<()> {
     // Start the DriverTestRealm.
     let args = fidl_fuchsia_driver_test::RealmArgs {
         root_driver: Some("#meta/root.cm".to_string()),
-        use_driver_framework_v2: Some(true),
         ..Default::default()
     };
     instance.driver_test_realm_start(args).await?;

@@ -361,11 +361,8 @@ impl TestEnvBuilder {
         let realm_instance = realm_builder.build().await.expect("Failed to build RealmInstance");
 
         // Start driver test realm
-        let args = fdt::RealmArgs {
-            root_driver: Some("#meta/root.cm".to_string()),
-            use_driver_framework_v2: Some(true),
-            ..Default::default()
-        };
+        let args =
+            fdt::RealmArgs { root_driver: Some("#meta/root.cm".to_string()), ..Default::default() };
 
         realm_instance
             .driver_test_realm_start(args)

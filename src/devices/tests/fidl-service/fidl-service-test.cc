@@ -24,37 +24,8 @@ TEST_F(FidlServiceTest, ChildBinds) {
   fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
   ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
   fuchsia::driver::test::Realm_Start_Result realm_result;
-  ASSERT_EQ(ZX_OK, driver_test_realm->Start(fuchsia::driver::test::RealmArgs(), &realm_result));
-  ASSERT_FALSE(realm_result.is_err());
-
-  // Connect to dev.
-  fidl::InterfaceHandle<fuchsia::io::Node> dev;
-  zx_status_t status = realm.component().Connect("dev-topological", dev.NewRequest().TakeChannel());
-  ASSERT_EQ(status, ZX_OK);
-
-  fbl::unique_fd root_fd;
-  status = fdio_fd_create(dev.TakeChannel().release(), root_fd.reset_and_get_address());
-  ASSERT_EQ(status, ZX_OK);
-
-  // Wait for the child device to bind and appear. The child driver should bind with its string
-  // properties. It will then make a call via FIDL and wait for the response before adding the child
-  // device.
-  zx::result channel = device_watcher::RecursiveWaitForFile(root_fd.get(), "sys/test/parent/child");
-  ASSERT_EQ(channel.status_value(), ZX_OK);
-}
-
-TEST_F(FidlServiceTest, ChildBindsV2) {
-  auto realm_builder = component_testing::RealmBuilder::Create();
-  driver_test_realm::Setup(realm_builder);
-  auto realm = realm_builder.Build(dispatcher());
-
-  // Start DriverTestRealm.
-  fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
-  ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
-  fuchsia::driver::test::Realm_Start_Result realm_result;
 
   auto args = fuchsia::driver::test::RealmArgs();
-  args.set_use_driver_framework_v2(true);
   args.set_root_driver("fuchsia-boot:///#meta/test-parent-sys.cm");
   ASSERT_EQ(ZX_OK, driver_test_realm->Start(std::move(args), &realm_result));
   ASSERT_FALSE(realm_result.is_err());

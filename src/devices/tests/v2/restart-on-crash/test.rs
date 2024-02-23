@@ -85,7 +85,6 @@ async fn test_restart_on_crash() -> Result<()> {
     // Start the DriverTestRealm.
     let args = fdt::RealmArgs {
         root_driver: Some("#meta/crasher.cm".to_string()),
-        use_driver_framework_v2: Some(true),
         exposes: Some(exposes),
         ..Default::default()
     };

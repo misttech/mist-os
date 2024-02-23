@@ -61,7 +61,6 @@ async fn test_dynamic_offers() -> Result<()> {
     // Start the DriverTestRealm.
     let args = fdt::RealmArgs {
         root_driver: Some("#meta/root.cm".to_string()),
-        use_driver_framework_v2: Some(true),
         offers: Some(offers),
         ..Default::default()
     };

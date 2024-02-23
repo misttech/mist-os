@@ -29,20 +29,16 @@ const EPHEMERAL_FAKE_DRIVER_URL: &str =
     "fuchsia-pkg://fuchsia.com/driver-test-realm-fake-driver#meta/driver-test-realm-fake-driver.cm";
 
 async fn set_up_test_driver_realm(
-    use_dfv2: bool,
 ) -> Result<(RealmInstance, fdd::ManagerProxy, fdr::DriverRegistrarProxy)> {
-    const ROOT_DRIVER_DFV2_URL: &str = PARENT_DRIVER_URL;
+    const ROOT_DRIVER_URL: &str = PARENT_DRIVER_URL;
 
     let builder = RealmBuilder::new().await?;
     builder.driver_test_realm_setup().await?;
     let instance = builder.build().await?;
 
     let mut realm_args = fdt::RealmArgs::default();
-    realm_args.use_driver_framework_v2 = Some(use_dfv2);
-    if use_dfv2 {
-        // DriverTestRealm attempts to bind the .so of test-parent-sys if not explicitly requested otherwise.
-        realm_args.root_driver = Some(ROOT_DRIVER_DFV2_URL.to_owned());
-    }
+    // DriverTestRealm attempts to bind the .so of test-parent-sys if not explicitly requested otherwise.
+    realm_args.root_driver = Some(ROOT_DRIVER_URL.to_owned());
     instance.driver_test_realm_start(realm_args).await?;
 
     let driver_dev = instance.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
@@ -98,7 +94,7 @@ fn assert_contains_driver_url(driver_infos: &Vec<fdf::DriverInfo>, expected_driv
 
 #[fasync::run_singlethreaded(test)]
 async fn test_register_driver() -> Result<()> {
-    let (_instance, driver_dev, driver_registrar) = set_up_test_driver_realm(true).await?;
+    let (_instance, driver_dev, driver_registrar) = set_up_test_driver_realm().await?;
     let driver_infos = get_driver_info(&driver_dev, &[]).await?;
 
     // Before register we should have 3 drivers, the ones in bootfs.

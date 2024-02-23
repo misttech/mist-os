@@ -39,10 +39,6 @@ class LifecycleTest : public zxtest::Test {
   void SetUp() override {
     IsolatedDevmgr::Args args;
 
-#ifdef DFV2
-    args.use_driver_framework_v2 = true;
-#endif
-
     board_test::DeviceEntry dev = {};
     dev.vid = PDEV_VID_TEST;
     dev.pid = PDEV_PID_LIFECYCLE_TEST;

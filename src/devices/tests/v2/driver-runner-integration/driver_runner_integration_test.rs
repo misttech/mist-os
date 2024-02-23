@@ -44,7 +44,6 @@ async fn driver_runner_test() -> Result<(), anyhow::Error> {
     let instance = builder.build().await?;
 
     let args = fdt::RealmArgs {
-        use_driver_framework_v2: Some(true),
         root_driver: Some(
             "fuchsia-pkg://fuchsia.com/driver_runner_integration_test#meta/packaged_driver.cm"
                 .to_string(),

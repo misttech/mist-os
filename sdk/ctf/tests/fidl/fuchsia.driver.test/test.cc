@@ -18,9 +18,7 @@ TEST(DriverTestRealmCts, DriverWasLoaded) {
   fidl::SyncClient<fuchsia_driver_test::Realm> dtr_client(std::move(dtr_client_result.value()));
 
   // Start the DriverTestRealm.
-  fuchsia_driver_test::RealmArgs args{{
-      .use_driver_framework_v2 = true,
-  }};
+  fuchsia_driver_test::RealmArgs args{};
   fidl::Result<fuchsia_driver_test::Realm::Start> start_result = dtr_client->Start(std::move(args));
   ASSERT_TRUE(start_result.is_ok());
 
@@ -53,8 +51,7 @@ TEST(DriverTestRealmCts, DriverWasLoaded) {
     // Since we filtered for an exact match, there should only be 1 when it is found.
     if (node_info_result.value().nodes().size() == 1) {
       // Makes sure the filtering was correct.
-      ASSERT_EQ(node_info_result.value().nodes()[0].versioned_info()->v2()->moniker().value(),
-                "dev.sys.test");
+      ASSERT_EQ(node_info_result.value().nodes()[0].moniker().value(), "dev.sys.test");
       break;
     }
   }

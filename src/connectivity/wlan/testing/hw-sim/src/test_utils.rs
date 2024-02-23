@@ -110,7 +110,6 @@ impl TestRealmContext {
 
         driver_test_realm_proxy
             .start(fidl_driver_test::RealmArgs {
-                use_driver_framework_v2: Some(true),
                 pkg: Some(pkg_client),
                 driver_urls: Some(vec!["fuchsia-pkg://fuchsia.com/#meta/wlantap.cm".to_string()]),
                 ..Default::default()

@@ -65,7 +65,6 @@ async fn test_compat_nodegroup() -> Result<()> {
     // Start the DriverTestRealm.
     let args = fdt::RealmArgs {
         root_driver: Some("fuchsia-boot:///#meta/test-parent-sys.cm".to_string()),
-        use_driver_framework_v2: Some(true),
         offers: Some(offers),
         ..Default::default()
     };

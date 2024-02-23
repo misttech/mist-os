@@ -18,12 +18,7 @@ async fn testcontroller_init_test() -> Result<()> {
 
     let realm = builder.build().await?;
 
-    realm
-        .driver_test_realm_start(fdt::RealmArgs {
-            use_driver_framework_v2: Some(true),
-            ..Default::default()
-        })
-        .await?;
+    realm.driver_test_realm_start(fdt::RealmArgs { ..Default::default() }).await?;
 
     let devfs = realm.driver_test_realm_connect_to_dev()?;
     let _controller = device_watcher::recursive_wait_and_open::<TestControllerMarker>(

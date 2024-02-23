@@ -59,7 +59,6 @@ async fn main() -> anyhow::Result<()> {
 
     let args = fdt::RealmArgs {
         root_driver: Some("#meta/cpp_driver_receiver.cm".to_string()),
-        use_driver_framework_v2: Some(true),
         exposes: Some(exposes),
         ..Default::default()
     };

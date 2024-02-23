@@ -18,7 +18,6 @@ async fn test_init() {
 
     let args = fdt::RealmArgs {
         root_driver: Some("fuchsia-boot:///#meta/test-parent-sys.cm".to_string()),
-        use_driver_framework_v2: Some(true),
         ..Default::default()
     };
 

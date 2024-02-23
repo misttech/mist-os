@@ -3,10 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/drivers/driver_compat_test.gni")
 import("//build/test.gni")
 
-driver_compat_test("hid-driver-test") {
+test("hid-driver-test") {
   sources = [ "hid-driver.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_hlcpp",
@@ -28,19 +27,12 @@ driver_compat_test("hid-driver-test") {
   ]
 }
 
-fuchsia_unittest_component("hid-driver-test-dfv1") {
-  deps = [ ":hid-driver-test_dfv1" ]
-}
-
-fuchsia_unittest_component("hid-driver-test-dfv2") {
-  deps = [ ":hid-driver-test_dfv2" ]
+fuchsia_unittest_component("hid-driver-test-component") {
+  deps = [ ":hid-driver-test" ]
 }
 
 fuchsia_test_package("hidctl-integration-test") {
-  test_components = [
-    ":hid-driver-test-dfv1",
-    ":hid-driver-test-dfv2",
-  ]
+  test_components = [ ":hid-driver-test-component" ]
   deps = [
     "//src/devices/misc/drivers/test-parent",
     "//src/ui/input/drivers/hid",
@@ -49,8 +41,8 @@ fuchsia_test_package("hidctl-integration-test") {
   ]
 }
 
-fuchsia_test_package("hid-driver-test-dfv2-package") {
-  test_components = [ ":hid-driver-test-dfv2" ]
+fuchsia_test_package("hid-driver-test-package") {
+  test_components = [ ":hid-driver-test-component" ]
   deps = [
     "//src/devices/misc/drivers/test-parent",
     "//src/ui/input/drivers/hid",
@@ -62,7 +54,7 @@ fuchsia_test_package("hid-driver-test-dfv2-package") {
 group("tests") {
   testonly = true
   deps = [
-    ":hid-driver-test-dfv2-package",
+    ":hid-driver-test-package",
     ":hidctl-integration-test",
   ]
 }

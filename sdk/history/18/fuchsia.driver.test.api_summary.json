@@ -86,12 +86,6 @@
         "type": "string"
     },
     {
-        "kind": "table/member",
-        "name": "fuchsia.driver.test/RealmArgs.use_driver_framework_v2",
-        "ordinal": "3",
-        "type": "bool"
-    },
-    {
         "kind": "table",
         "name": "fuchsia.driver.test/RealmArgs",
         "resourceness": "resource"

@@ -50,6 +50,7 @@ type RealmArgs = resource table {
 
     /// If this is true, then DriverManager will load DFv2 drivers.
     /// Default: false
+    @available(removed=18)
     3: use_driver_framework_v2 bool;
 
     /// If this is true, then DriverManager will enable the unit tests

@@ -30,7 +30,6 @@ TEST(DriverTransportTest, ParentChildExists) {
 
   fuchsia::driver::test::Realm_Start_Result realm_result;
   fuchsia::driver::test::RealmArgs args;
-  args.set_use_driver_framework_v2(false);
   ASSERT_EQ(ZX_OK, driver_test_realm->Start(std::move(args), &realm_result));
   ASSERT_FALSE(realm_result.is_err());
 

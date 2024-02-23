@@ -9,41 +9,27 @@ use {
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
 };
 
-async fn do_test(dfv2: bool) -> Result<(), Error> {
+#[fuchsia::test]
+async fn toplogy_test() -> Result<(), Error> {
     let builder = RealmBuilder::new().await?;
     builder.driver_test_realm_setup().await?;
 
     let instance = builder.build().await?;
-    let root_driver = match dfv2 {
-        true => "fuchsia-boot:///#meta/test-parent-sys.cm",
-        false => "fuchsia-boot:///#meta/test-parent-sys.cm",
-    };
     instance
         .driver_test_realm_start(fdt::RealmArgs {
-            use_driver_framework_v2: Some(dfv2),
-            root_driver: Some(root_driver.to_string()),
+            root_driver: Some("fuchsia-boot:///#meta/test-parent-sys.cm".to_string()),
             ..Default::default()
         })
         .await?;
 
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    println!("dfv2: {}, wait for grandparent", dfv2);
+    println!("wait for grandparent");
     device_watcher::recursive_wait(&dev, "sys/test/topology-grandparent").await?;
-    println!("dfv2: {}, wait for child 1", dfv2);
+    println!("wait for child 1");
     device_watcher::recursive_wait(&dev, "sys/test/topology-grandparent/parent1/child").await?;
-    println!("dfv2: {}, wait for child 2", dfv2);
+    println!("wait for child 2");
     device_watcher::recursive_wait(&dev, "sys/test/topology-grandparent/parent2/child").await?;
-    println!("dfv2: {}, all done!", dfv2);
+    println!("all done!");
 
     Ok(())
-}
-
-#[fuchsia::test]
-async fn toplogy_test() -> Result<(), Error> {
-    do_test(false).await
-}
-
-#[fuchsia::test]
-async fn toplogy_test_dfv2() -> Result<(), Error> {
-    do_test(true).await
 }

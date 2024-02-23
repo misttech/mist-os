@@ -74,7 +74,6 @@ async fn test_basic_driver() -> Result<()> {
 
     let realm_options = ftest::RealmOptions {
         driver_test_realm_start_args: Some(fdt::RealmArgs {
-            use_driver_framework_v2: Some(true),
             pkg: Some(pkg_client),
             offers: Some(vec![fdt::Offer {
                 protocol_name: ctf::WaiterMarker::PROTOCOL_NAME.to_string(),

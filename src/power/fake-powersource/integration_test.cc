@@ -30,7 +30,6 @@ class FakeBatteryRealmTest : public gtest::TestLoopFixture {
     zx::result dtr = realm_->component().Connect<fuchsia_driver_test::Realm>();
     fuchsia_driver_test::RealmArgs args{{
         .root_driver = "fuchsia-boot:///platform-bus#meta/platform-bus.cm",
-        .use_driver_framework_v2 = true,
     }};
     fidl::Result result = fidl::Call(*dtr)->Start(std::move(args));
     ASSERT_TRUE(result.is_ok()) << result.error_value();

@@ -9,7 +9,7 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "test/inspect-test_dfv2",
+        binary: "test/inspect-test",
     },
     use: [
         { protocol: "fuchsia.diagnostics.ArchiveAccessor" },

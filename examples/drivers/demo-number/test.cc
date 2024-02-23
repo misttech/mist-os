@@ -29,7 +29,6 @@ TEST(DriverTestRealmTest, DriversExist) {
   ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
 
   auto args = fuchsia::driver::test::RealmArgs();
-  args.set_use_driver_framework_v2(true);
   args.set_root_driver("fuchsia-boot:///#meta/test-parent-sys.cm");
 
   fuchsia::driver::test::Realm_Start_Result realm_result;
