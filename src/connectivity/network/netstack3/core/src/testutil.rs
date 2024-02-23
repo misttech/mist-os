@@ -97,7 +97,7 @@ use crate::{
             socket::TcpBindingsTypes,
             BufferSizes,
         },
-        udp::{UdpBindingsContext, UdpSocketId},
+        udp::{UdpReceiveBindingsContext, UdpSocketId},
     },
     BindingsTypes,
 };
@@ -1466,7 +1466,7 @@ impl FakeNetworkContext for FakeCtx {
     }
 }
 
-impl<I: crate::IpExt> UdpBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
+impl<I: crate::IpExt> UdpReceiveBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
     fn receive_udp<B: BufferMut>(
         &mut self,
         id: &UdpSocketId<I, WeakDeviceId<Self>>,

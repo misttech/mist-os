@@ -34,7 +34,7 @@ use crate::{
     transport::{
         self,
         tcp::socket::{TcpBindingsContext, TcpBindingsTypes, TcpContext},
-        udp::{UdpCounters, UdpStateBindingsContext},
+        udp::{UdpBindingsContext, UdpCounters},
     },
     TimerId,
 };
@@ -128,7 +128,7 @@ impl<O> BindingsTypes for O where
 pub trait IpBindingsContext<I: IpExt>:
     BindingsTypes
     + RngContext
-    + UdpStateBindingsContext<I, DeviceId<Self>>
+    + UdpBindingsContext<I, DeviceId<Self>>
     + TcpBindingsContext<I, WeakDeviceId<Self>>
     + IcmpBindingsContext<I, DeviceId<Self>>
     + IpDeviceBindingsContext<I, DeviceId<Self>>
@@ -147,7 +147,7 @@ where
     I: IpExt,
     BC: BindingsTypes
         + RngContext
-        + UdpStateBindingsContext<I, DeviceId<Self>>
+        + UdpBindingsContext<I, DeviceId<Self>>
         + TcpBindingsContext<I, WeakDeviceId<Self>>
         + IcmpBindingsContext<I, DeviceId<Self>>
         + IpDeviceBindingsContext<I, DeviceId<Self>>

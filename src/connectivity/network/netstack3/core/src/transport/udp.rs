@@ -1133,8 +1133,8 @@ impl<I: IpExt, D: device::WeakId> WeakUdpSocketId<I, D> {
 pub(crate) type UdpSocketSet<I, D> = DatagramSocketSet<I, D, Udp>;
 pub(crate) type UdpSocketState<I, D> = DatagramSocketState<I, D, Udp>;
 
-/// An execution context for the UDP protocol.
-pub trait UdpBindingsContext<I: IpExt, D: device::StrongId> {
+/// The bindings context handling received UDP frames.
+pub trait UdpReceiveBindingsContext<I: IpExt, D: device::StrongId> {
     /// Receives a UDP packet on a socket.
     fn receive_udp<B: BufferMut>(
         &mut self,
@@ -1147,8 +1147,8 @@ pub trait UdpBindingsContext<I: IpExt, D: device::StrongId> {
 }
 
 /// The bindings context for UDP.
-pub trait UdpStateBindingsContext<I: IpExt, D: device::StrongId>:
-    InstantContext + RngContext + TracingContext + UdpBindingsContext<I, D> + ReferenceNotifiers
+pub trait UdpBindingsContext<I: IpExt, D: device::StrongId>:
+    InstantContext + RngContext + TracingContext + UdpReceiveBindingsContext<I, D> + ReferenceNotifiers
 {
 }
 impl<
@@ -1156,15 +1156,15 @@ impl<
         BC: InstantContext
             + RngContext
             + TracingContext
-            + UdpBindingsContext<I, D>
+            + UdpReceiveBindingsContext<I, D>
             + ReferenceNotifiers,
         D: device::StrongId,
-    > UdpStateBindingsContext<I, D> for BC
+    > UdpBindingsContext<I, D> for BC
 {
 }
 
 /// An execution context for the UDP protocol which also provides access to state.
-pub trait BoundStateContext<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>>:
+pub trait BoundStateContext<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice> + UdpStateContext
 {
     /// The core context passed to the callback provided to methods.
@@ -1217,7 +1217,7 @@ pub trait BoundStateContext<I: IpExt, BC: UdpStateBindingsContext<I, Self::Devic
     ) -> O;
 }
 
-pub trait StateContext<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>>:
+pub trait StateContext<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
     /// The core context passed to the callback.
@@ -1273,10 +1273,8 @@ pub trait StateContext<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>>
 pub trait UdpStateContext {}
 
 /// An execution context for UDP dual-stack operations.
-pub(crate) trait DualStackBoundStateContext<
-    I: IpExt,
-    BC: UdpStateBindingsContext<I, Self::DeviceId>,
->: DeviceIdContext<AnyDevice>
+pub(crate) trait DualStackBoundStateContext<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>>:
+    DeviceIdContext<AnyDevice>
 {
     /// The core context passed to the callbacks to methods.
     type IpSocketsCtx<'a>: TransportIpContext<I, BC>
@@ -1319,10 +1317,8 @@ pub(crate) trait DualStackBoundStateContext<
 }
 
 /// An execution context for UDP non-dual-stack operations.
-pub(crate) trait NonDualStackBoundStateContext<
-    I: IpExt,
-    BC: UdpStateBindingsContext<I, Self::DeviceId>,
->: DeviceIdContext<AnyDevice>
+pub(crate) trait NonDualStackBoundStateContext<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>>:
+    DeviceIdContext<AnyDevice>
 {
 }
 
@@ -1332,8 +1328,7 @@ pub(crate) enum UdpIpTransportContext {}
 fn receive_ip_packet<
     I: IpExt,
     B: BufferMut,
-    BC: UdpStateBindingsContext<I, CC::DeviceId>
-        + UdpStateBindingsContext<I::OtherVersion, CC::DeviceId>,
+    BC: UdpBindingsContext<I, CC::DeviceId> + UdpBindingsContext<I::OtherVersion, CC::DeviceId>,
     CC: StateContext<I, BC> + StateContext<I::OtherVersion, BC> + CounterContext<UdpCounters<I>>,
 >(
     core_ctx: &mut CC,
@@ -1439,7 +1434,7 @@ fn receive_ip_packet<
 fn try_deliver<
     I: IpExt,
     CC: StateContext<I, BC>,
-    BC: UdpStateBindingsContext<I, CC::DeviceId>,
+    BC: UdpBindingsContext<I, CC::DeviceId>,
     B: BufferMut,
 >(
     core_ctx: &mut CC,
@@ -1484,8 +1479,7 @@ fn try_deliver<
 fn try_dual_stack_deliver<
     I: IpExt,
     B: BufferMut,
-    BC: UdpStateBindingsContext<I, CC::DeviceId>
-        + UdpStateBindingsContext<I::OtherVersion, CC::DeviceId>,
+    BC: UdpBindingsContext<I, CC::DeviceId> + UdpBindingsContext<I::OtherVersion, CC::DeviceId>,
     CC: StateContext<I, BC> + StateContext<I::OtherVersion, BC>,
 >(
     core_ctx: &mut CC,
@@ -1558,8 +1552,7 @@ fn try_dual_stack_deliver<
 
 impl<
         I: IpExt,
-        BC: UdpStateBindingsContext<I, CC::DeviceId>
-            + UdpStateBindingsContext<I::OtherVersion, CC::DeviceId>,
+        BC: UdpBindingsContext<I, CC::DeviceId> + UdpBindingsContext<I::OtherVersion, CC::DeviceId>,
         CC: StateContext<I, BC>
             + StateContext<I::OtherVersion, BC>
             + NonTestCtxMarker
@@ -1650,7 +1643,7 @@ where
     C: ContextPair,
     C::CoreContext: StateContext<I, C::BindingsContext> + CounterContext<UdpCounters<I>>,
     C::BindingsContext:
-        UdpStateBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+        UdpBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
         let Self(pair, IpVersionMarker { .. }) = self;
@@ -2261,7 +2254,7 @@ pub enum SendError {
     RemotePortUnset,
 }
 
-impl<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>, CC: StateContext<I, BC>>
+impl<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>, CC: StateContext<I, BC>>
     DatagramStateContext<I, BC, Udp> for CC
 {
     type SocketsStateCtx<'a> = CC::SocketStateCtx<'a>;
@@ -2298,7 +2291,7 @@ impl<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>, CC: StateContext<
 
 impl<
         I: IpExt,
-        BC: UdpStateBindingsContext<I, Self::DeviceId>,
+        BC: UdpBindingsContext<I, Self::DeviceId>,
         CC: BoundStateContext<I, BC> + UdpStateContext,
     > DatagramBoundStateContext<I, BC, Udp> for CC
 {
@@ -2359,7 +2352,7 @@ impl<
 }
 
 impl<
-        BC: UdpStateBindingsContext<Ipv6, CC::DeviceId> + UdpStateBindingsContext<Ipv4, CC::DeviceId>,
+        BC: UdpBindingsContext<Ipv6, CC::DeviceId> + UdpBindingsContext<Ipv4, CC::DeviceId>,
         CC: DualStackBoundStateContext<Ipv6, BC> + UdpStateContext,
     > DualStackDatagramBoundStateContext<Ipv6, BC, Udp> for CC
 {
@@ -2446,7 +2439,7 @@ impl<
 }
 
 impl<
-        BC: UdpStateBindingsContext<Ipv4, CC::DeviceId>,
+        BC: UdpBindingsContext<Ipv4, CC::DeviceId>,
         CC: BoundStateContext<Ipv4, BC> + NonDualStackBoundStateContext<Ipv4, BC> + UdpStateContext,
     > NonDualStackDatagramBoundStateContext<Ipv4, BC, Udp> for CC
 {
@@ -2456,7 +2449,7 @@ impl<
     }
 }
 
-impl<I: IpExt, BC: UdpStateBindingsContext<I, D::Strong>, D: device::WeakId>
+impl<I: IpExt, BC: UdpBindingsContext<I, D::Strong>, D: device::WeakId>
     LocalIdentifierAllocator<I, D, UdpAddrSpec, BC, (Udp, I, D)>
     for Option<PortAlloc<UdpBoundSocketMap<I, D>>>
 {
@@ -2694,7 +2687,7 @@ mod tests {
         }
     }
 
-    impl<I: IpExt, D: device::StrongId> UdpBindingsContext<I, D> for FakeUdpBindingsCtx<D> {
+    impl<I: IpExt, D: device::StrongId> UdpReceiveBindingsContext<I, D> for FakeUdpBindingsCtx<D> {
         fn receive_udp<B: BufferMut>(
             &mut self,
             id: &UdpSocketId<I, D::Weak>,
@@ -6673,10 +6666,8 @@ mod tests {
             I: TestIpExt,
             C: ContextPair,
             C::CoreContext: StateContext<I, C::BindingsContext> + CounterContext<UdpCounters<I>>,
-            C::BindingsContext: UdpStateBindingsContext<
-                I,
-                <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
-            >,
+            C::BindingsContext:
+                UdpBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
         {
             let socket = api.create();
             match self {

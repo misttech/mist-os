@@ -40,7 +40,7 @@ use netstack3_core::{
         SetDualStackEnabledError, SetMulticastMembershipError, ShutdownType,
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
-    udp::{self, UdpBindingsContext, UdpSocketId},
+    udp::{self, UdpReceiveBindingsContext, UdpSocketId},
     IpExt,
 };
 use packet::{Buf, BufferMut};
@@ -99,7 +99,7 @@ pub(crate) trait Transport<I: Ip>: Debug + Sized + Send + Sync + 'static {
 ///
 /// Receive queues are shared between the collections here and the tasks
 /// handling socket requests. Since `SocketCollection` implements
-/// [`UdpBindingsContext`] whose trait methods may be called from within Core
+/// [`UdpReceiveBindingsContext`] whose trait methods may be called from within Core
 /// in a locked context, once one of the [`MessageQueue`]s is locked, no calls
 /// may be made into [`netstack3_core`]. This prevents a potential deadlock
 /// where Core is waiting for a `MessageQueue` to be available and some bindings
@@ -581,7 +581,7 @@ where
     }
 }
 
-impl<I: IpExt> UdpBindingsContext<I, DeviceId<BindingsCtx>> for SocketCollection<I, Udp> {
+impl<I: IpExt> UdpReceiveBindingsContext<I, DeviceId<BindingsCtx>> for SocketCollection<I, Udp> {
     fn receive_udp<B: BufferMut>(
         &mut self,
         id: &UdpSocketId<I, WeakDeviceId<BindingsCtx>>,

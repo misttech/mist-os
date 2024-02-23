@@ -82,7 +82,7 @@ use netstack3_core::{
     },
     neighbor,
     routes::RawMetric,
-    udp::{UdpBindingsContext, UdpSocketId},
+    udp::{UdpReceiveBindingsContext, UdpSocketId},
     EventContext, InstantBindingsTypes, InstantContext, IpExt, RngContext, StackState,
     TimerContext, TimerId, TracingContext,
 };
@@ -556,7 +556,7 @@ impl<I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho> + Ip
     }
 }
 
-impl<I> UdpBindingsContext<I, DeviceId<BindingsCtx>> for BindingsCtx
+impl<I> UdpReceiveBindingsContext<I, DeviceId<BindingsCtx>> for BindingsCtx
 where
     I: socket::datagram::SocketCollectionIpExt<socket::datagram::Udp> + IpExt,
 {
