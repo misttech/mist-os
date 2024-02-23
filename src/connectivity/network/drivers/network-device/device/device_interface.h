@@ -184,17 +184,9 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
       __TA_REQUIRES(control_lock_);
 
   // Event observer hook for Rx queue packets.
-  void NotifyRxQueuePacket(uint64_t key) {
-    if (evt_rx_queue_packet_) {
-      evt_rx_queue_packet_(key);
-    }
-  }
-
-  void NotifyTxComplete() {
-    if (evt_tx_complete_) {
-      evt_tx_complete_();
-    }
-  }
+  void NotifyRxQueuePacket(uint64_t key);
+  // Event observer hook for Tx complete.
+  void NotifyTxComplete();
 
   DiagnosticsService& diagnostics() { return diagnostics_; }
 
