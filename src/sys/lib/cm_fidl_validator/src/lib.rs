@@ -36,6 +36,19 @@ impl HasAvailability for fdecl::OfferService {
     }
 }
 
+#[cfg(feature = "target_api_level_head")]
+macro_rules! get_source_dictionary {
+    ($decl:ident) => {
+        $decl.source_dictionary.as_ref()
+    };
+}
+#[cfg(not(feature = "target_api_level_head"))]
+macro_rules! get_source_dictionary {
+    ($decl:ident) => {
+        None
+    };
+}
+
 /// Validates Configuration Value Spec.
 ///
 /// For now, this simply verifies that all semantically required fields are present.
@@ -272,6 +285,7 @@ struct ValidationContext<'a> {
     all_runners: HashSet<&'a str>,
     all_resolvers: HashSet<&'a str>,
     all_dictionaries: HashMap<&'a str, Option<&'a fdecl::Ref>>,
+    #[cfg(feature = "target_api_level_head")]
     all_configs: HashSet<&'a str>,
     all_environment_names: HashSet<&'a str>,
     strong_dependencies: DirectedGraph<DependencyNode<'a>>,
@@ -379,14 +393,15 @@ impl<'a> ValidationContext<'a> {
         }
 
         // Validate "uses".
-        let mut uses_runner = None;
+        let mut use_runner_name = None;
+        let mut use_runner_source = None;
         if let Some(uses) = decl.uses.as_ref() {
-            uses_runner = self.validate_use_decls(uses);
+            (use_runner_name, use_runner_source) = self.validate_use_decls(uses);
         }
 
         // Validate "program".
         if let Some(program) = decl.program.as_ref() {
-            self.validate_program(program, uses_runner);
+            self.validate_program(program, use_runner_name, use_runner_source);
         }
 
         // Validate "exposes".
@@ -597,9 +612,11 @@ impl<'a> ValidationContext<'a> {
                     self.errors.push(Error::CapabilityMustBeBuiltin(DeclType::EventStream))
                 }
             }
+            #[cfg(feature = "target_api_level_head")]
             fdecl::Capability::Dictionary(dictionary) => {
                 self.validate_dictionary_decl(&dictionary);
             }
+            #[cfg(feature = "target_api_level_head")]
             fdecl::Capability::Config(config) => {
                 self.validate_configuration_decl(&config);
             }
@@ -607,24 +624,35 @@ impl<'a> ValidationContext<'a> {
         }
     }
 
-    fn validate_use_decls(&mut self, uses: &'a [fdecl::Use]) -> Option<fdecl::UseRunner> {
-        let mut uses_runner = None;
-
+    /// Returns the `source_name` and `source` of the runner in `uses`, if present.
+    fn validate_use_decls(
+        &mut self,
+        uses: &'a [fdecl::Use],
+    ) -> (Option<&'a String>, Option<&'a fdecl::Ref>) {
         // Validate individual fields.
         for use_ in uses.iter() {
             self.validate_use_decl(&use_);
-            if let fdecl::Use::Runner(use_runner) = use_ {
-                if uses_runner.is_some() {
-                    self.errors.push(Error::MultipleRunnersUsed);
-                }
-
-                uses_runner = Some(use_runner.clone());
-            }
         }
-
         self.validate_use_paths(&uses);
 
-        uses_runner
+        #[cfg(feature = "target_api_level_head")]
+        {
+            let mut use_runner_name = None;
+            let mut use_runner_source = None;
+            for use_ in uses.iter() {
+                if let fdecl::Use::Runner(use_runner) = use_ {
+                    if use_runner_name.is_some() {
+                        self.errors.push(Error::MultipleRunnersUsed);
+                    }
+
+                    use_runner_name = use_runner.source_name.as_ref();
+                    use_runner_source = use_runner.source.as_ref();
+                }
+            }
+            return (use_runner_name, use_runner_source);
+        }
+        #[cfg(not(feature = "target_api_level_head"))]
+        return (None, None);
     }
 
     fn validate_use_decl(&mut self, use_: &'a fdecl::Use) {
@@ -635,7 +663,7 @@ impl<'a> ValidationContext<'a> {
                     decl,
                     u.source.as_ref(),
                     u.source_name.as_ref(),
-                    u.source_dictionary.as_ref(),
+                    get_source_dictionary!(u),
                     u.target_path.as_ref(),
                     u.dependency_type.as_ref(),
                     u.availability.as_ref(),
@@ -650,7 +678,7 @@ impl<'a> ValidationContext<'a> {
                     decl,
                     u.source.as_ref(),
                     u.source_name.as_ref(),
-                    u.source_dictionary.as_ref(),
+                    get_source_dictionary!(u),
                     u.target_path.as_ref(),
                     u.dependency_type.as_ref(),
                     u.availability.as_ref(),
@@ -665,7 +693,7 @@ impl<'a> ValidationContext<'a> {
                     decl,
                     u.source.as_ref(),
                     u.source_name.as_ref(),
-                    u.source_dictionary.as_ref(),
+                    get_source_dictionary!(u),
                     u.target_path.as_ref(),
                     u.dependency_type.as_ref(),
                     u.availability.as_ref(),
@@ -742,6 +770,7 @@ impl<'a> ValidationContext<'a> {
                     }
                 }
             }
+            #[cfg(feature = "target_api_level_head")]
             fdecl::Use::Runner(u) => {
                 const DEPENDENCY_TYPE: Option<fdecl::DependencyType> =
                     Some(fdecl::DependencyType::Strong);
@@ -752,12 +781,13 @@ impl<'a> ValidationContext<'a> {
                     decl,
                     u.source.as_ref(),
                     u.source_name.as_ref(),
-                    None,
+                    get_source_dictionary!(u),
                     None,
                     DEPENDENCY_TYPE.as_ref(),
                     AVAILABILITY.as_ref(),
                 );
             }
+            #[cfg(feature = "target_api_level_head")]
             fdecl::Use::Config(u) => {
                 const DEPENDENCY_TYPE: Option<fdecl::DependencyType> =
                     Some(fdecl::DependencyType::Strong);
@@ -783,20 +813,24 @@ impl<'a> ValidationContext<'a> {
     fn validate_program(
         &mut self,
         program: &fdecl::Program,
-        uses_runner: Option<fdecl::UseRunner>,
+        use_runner_name: Option<&String>,
+        use_runner_source: Option<&fdecl::Ref>,
     ) {
         match &program.runner {
-            Some(_) => {
-                if let Some(use_runner) = uses_runner {
-                    if &use_runner.source_name != &program.runner
-                        || use_runner.source != Some(fdecl::Ref::Environment(fdecl::EnvironmentRef))
+            Some(_) =>
+            {
+                #[cfg(feature = "target_api_level_head")]
+                if use_runner_name.is_some() {
+                    if use_runner_name != program.runner.as_ref()
+                        || use_runner_source
+                            != Some(&fdecl::Ref::Environment(fdecl::EnvironmentRef))
                     {
                         self.errors.push(Error::ConflictingRunners);
                     }
                 }
             }
             None => {
-                if uses_runner.is_none() {
+                if use_runner_name.is_none() {
                     self.errors.push(Error::MissingRunner);
                 }
             }
@@ -921,6 +955,7 @@ impl<'a> ValidationContext<'a> {
             Some(fdecl::Ref::Framework(_)) => {}
             Some(fdecl::Ref::Debug(_)) => {}
             Some(fdecl::Ref::Self_(_)) => {}
+            #[cfg(feature = "target_api_level_head")]
             Some(fdecl::Ref::Environment(_)) => {}
             Some(fdecl::Ref::Child(child)) => {
                 if self.validate_child_ref(decl, "source", &child, OfferType::Static)
@@ -1343,6 +1378,7 @@ impl<'a> ValidationContext<'a> {
         }
     }
 
+    #[cfg(feature = "target_api_level_head")]
     fn validate_dictionary_decl(&mut self, dictionary: &'a fdecl::Dictionary) {
         let decl = DeclType::Dictionary;
         if check_name(dictionary.name.as_ref(), decl, "name", &mut self.errors) {
@@ -1381,6 +1417,7 @@ impl<'a> ValidationContext<'a> {
         };
     }
 
+    #[cfg(feature = "target_api_level_head")]
     fn validate_configuration_decl(&mut self, config: &'a fdecl::Configuration) {
         let decl = DeclType::Configuration;
         if check_name(config.name.as_ref(), decl, "name", &mut self.errors) {
@@ -1613,7 +1650,7 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Allow,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    e.source_dictionary.as_ref(),
+                    get_source_dictionary!(e),
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     e.availability.as_ref(),
@@ -1635,7 +1672,7 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Deny,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    e.source_dictionary.as_ref(),
+                    get_source_dictionary!(e),
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     e.availability.as_ref(),
@@ -1657,7 +1694,7 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Deny,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    e.source_dictionary.as_ref(),
+                    get_source_dictionary!(e),
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     e.availability.as_ref(),
@@ -1697,7 +1734,7 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Deny,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    e.source_dictionary.as_ref(),
+                    get_source_dictionary!(e),
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
@@ -1718,7 +1755,7 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Deny,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    e.source_dictionary.as_ref(),
+                    get_source_dictionary!(e),
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
@@ -1731,6 +1768,7 @@ impl<'a> ValidationContext<'a> {
                     }
                 }
             }
+            #[cfg(feature = "target_api_level_head")]
             fdecl::Expose::Dictionary(e) => {
                 let decl = DeclType::ExposeDictionary;
                 self.validate_expose_fields(
@@ -1739,7 +1777,7 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Deny,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    e.source_dictionary.as_ref(),
+                    get_source_dictionary!(e),
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
@@ -1752,6 +1790,7 @@ impl<'a> ValidationContext<'a> {
                     }
                 }
             }
+            #[cfg(feature = "target_api_level_head")]
             fdecl::Expose::Config(e) => {
                 let decl = DeclType::ExposeConfig;
                 self.validate_expose_fields(
@@ -1986,7 +2025,7 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Allow,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    o.source_dictionary.as_ref(),
+                    get_source_dictionary!(o),
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     o.availability.as_ref(),
@@ -2018,7 +2057,7 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Deny,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    o.source_dictionary.as_ref(),
+                    get_source_dictionary!(o),
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     o.availability.as_ref(),
@@ -2050,7 +2089,7 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Deny,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    o.source_dictionary.as_ref(),
+                    get_source_dictionary!(o),
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     o.availability.as_ref(),
@@ -2124,7 +2163,7 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Deny,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    o.source_dictionary.as_ref(),
+                    get_source_dictionary!(o),
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
@@ -2150,7 +2189,7 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Deny,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    o.source_dictionary.as_ref(),
+                    get_source_dictionary!(o),
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
@@ -2173,6 +2212,7 @@ impl<'a> ValidationContext<'a> {
             fdecl::Offer::EventStream(e) => {
                 self.validate_event_stream_offer_fields(e, offer_type);
             }
+            #[cfg(feature = "target_api_level_head")]
             fdecl::Offer::Dictionary(o) => {
                 let decl = DeclType::OfferDictionary;
                 self.validate_offer_fields(
@@ -2181,7 +2221,7 @@ impl<'a> ValidationContext<'a> {
                     CollectionSource::Deny,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    o.source_dictionary.as_ref(),
+                    get_source_dictionary!(o),
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
@@ -2201,6 +2241,7 @@ impl<'a> ValidationContext<'a> {
                     DependencyNode::try_from_ref(o.target.as_ref()),
                 );
             }
+            #[cfg(feature = "target_api_level_head")]
             fdecl::Offer::Config(o) => {
                 let decl = DeclType::OfferConfig;
                 self.validate_offer_fields(
@@ -3211,7 +3252,6 @@ mod tests {
                 Error::missing_field(DeclType::UseEventStream, "target_path"),
                 Error::missing_field(DeclType::UseRunner, "source"),
                 Error::missing_field(DeclType::UseRunner, "source_name"),
-                Error::ConflictingRunners,
             ])),
         },
         test_validate_missing_program_info => {

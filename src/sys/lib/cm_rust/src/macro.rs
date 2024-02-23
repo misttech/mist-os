@@ -161,8 +161,12 @@ fn fidl_decl_derive_impl(input: syn::DeriveInput) -> TokenStream {
             let t = quote! {
                 impl SourcePath for #ident {
                     fn source_path(&self) -> BorrowedSeparatedPath<'_> {
+                        #[cfg(feature = "target_api_level_head")]
+                        let dirname = self.source_dictionary.as_ref();
+                        #[cfg(not(feature = "target_api_level_head"))]
+                        let dirname = None;
                         BorrowedSeparatedPath {
-                            dirname: self.source_dictionary.as_ref(),
+                            dirname,
                             basename: self.source_name.as_str(),
                         }
                     }

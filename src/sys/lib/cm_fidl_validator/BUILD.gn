@@ -25,6 +25,12 @@ rustc_library("cm_fidl_validator") {
     "//third_party/rust_crates:url",
   ]
 
+  # TODO: https://fxbug.dev/325448727 - Make Rust support for API levels more systematic.
+  features = []
+  if (platform_version.clang_fuchsia_api_level == CLANG_FUCHSIA_HEAD_VALUE) {
+    features += [ "target_api_level_head" ]
+  }
+
   sources = [
     "src/error.rs",
     "src/lib.rs",
