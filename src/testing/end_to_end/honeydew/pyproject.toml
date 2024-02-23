@@ -32,7 +32,6 @@ guidelines = [
     "pylint==2.17.4",         # for code linting
     "isort==5.12.0",          # for sorting imports
     "autoflake==2.1.1",       # for removeing unused imports and unused variables
-    "mypy==1.3.0",            # for type checking
 ]
 
 [tool.setuptools.packages.find]
@@ -44,28 +43,13 @@ include = ["honeydew*"]  # package names should match these glob patterns (["*"]
 profile = "black"
 line_length = 80
 
-[tool.mypy]
-# Reference at https://mypy.readthedocs.io/en/stable/config_file.html#example-pyproject-toml
-# Needed because dependency modules such as mobly are not pip installed and also FIDL .py files are not available
-ignore_missing_imports = true
-strict = true
-warn_return_any = false  # TODO(b/322207610)
-
-[[tool.mypy.overrides]]
-module = "tests.functional_tests.*"
-# To handle `error: Class cannot subclass "FuchsiaBaseTest" (has type "Any")  [misc]`
-# More info @ https://github.com/python/mypy/issues/9318
-disallow_subclassing_any = false
-
-[[tool.mypy.overrides]]
-module = "tests.unit_tests.*"
-# TODO(b/322232685) - unit tests are not mypy compatible with `stric=true`.
-# Unable to override `strict` config in per-module config. More info @ https://github.com/python/mypy/issues/11401.
-# As a result, disable specific config options for unit tests that were enabled by `strict=true` until unit test code addresses these warnings.
-allow_untyped_defs = true
-allow_untyped_decorators = true
-allow_incomplete_defs = true
-disable_error_code = ["attr-defined"]
+# Honeydew uses the MyPy config in fuchsia/pyproject.toml for type checking.
+# To enable pytype checking on a Python target:
+# 1. Add `enable_pytype = true` to the python build target configuration
+# 2. Run `fx build` to generate type checking results
+# Alternatively, run the following command for MyPy type checking on Honeydew directory:
+# PYTHONPATH=$FUCHSIA_DIR/third_party/pylibs/mypy/src:$FUCHSIA_DIR/third_party/pylibs/mypy_extensions/src:$FUCHSIA_DIR/third_party/pylibs/typing_extensions/src/src:$PYTHONPATH
+# fuchsia-vendored-python -S -m mypy --config-file pyproject.toml  src/testing/end_to_end/honeydew
 
 # Honeydew uses `fx format-code` to format the code.
 # `fx format-code` uses `black` underneath to format the python code, using the

@@ -42,7 +42,12 @@ fx format-code
 
 
 echo "Running static type check using 'mypy'..."
-mypy --config-file=$HONEYDEW_SRC/pyproject.toml $HONEYDEW_SRC > /dev/null 2>&1
+OLD_PYTHONPATH=$PYTHONPATH
+PYTHONPATH="$FUCHSIA_DIR"/third_party/pylibs/mypy_extensions/src:"$FUCHSIA_DIR"/third_party/pylibs/typing_extensions/src/src:"$FUCHSIA_DIR"/third_party/pylibs/mypy/src:$PYTHONPATH
+
+# Execute the Mypy command with python path
+MYPY_CMD="python3 -S -m mypy --config-file $FUCHSIA_DIR/pyproject.toml $HONEYDEW_SRC"
+$MYPY_CMD >/dev/null 2>&1
 if [ $? -eq 0 ]; then
     echo "Code is 'mypy' compliant"
 else
@@ -51,11 +56,13 @@ else
     echo "ERROR: Please run below command sequence, fix all the issues and then rerun this script"
     echo "*************************************"
     echo "$ source $VENV_PATH/bin/activate"
-    echo "$ mypy --config-file=$HONEYDEW_SRC/pyproject.toml $HONEYDEW_SRC"
+    echo "$ PYTHONPATH=$PYTHONPATH $MYPY_CMD"
     echo "*************************************"
     echo
     exit 1
 fi
+echo "Restoring environment..."
+PYTHONPATH=$OLD_PYTHONPATH
 
 echo "Running static code analysis using 'pylint'..."
 pylint --rcfile=$HONEYDEW_SRC/linter/pylintrc $HONEYDEW_SRC/honeydew/ > /dev/null 2>&1 \
