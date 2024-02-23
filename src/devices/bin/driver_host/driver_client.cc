@@ -7,7 +7,7 @@
 #include "src/devices/bin/driver_host/driver.h"
 #include "src/devices/lib/log/log.h"
 
-namespace dfv2 {
+namespace driver_host {
 
 DriverClient::DriverClient(fbl::RefPtr<Driver> driver, std::string_view url)
     : driver_(std::move(driver)), url_(url) {}
@@ -69,4 +69,4 @@ void DriverClient::handle_unknown_event(
        metadata.event_ordinal);
 }
 
-}  // namespace dfv2
+}  // namespace driver_host

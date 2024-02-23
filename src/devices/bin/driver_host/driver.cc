@@ -25,7 +25,7 @@ namespace fdf {
 using namespace fuchsia_driver_framework;
 }  // namespace fdf
 
-namespace dfv2 {
+namespace driver_host {
 
 namespace {
 
@@ -282,7 +282,7 @@ void LoadDriver(fuchsia_driver_framework::DriverStartArgs start_args,
     return;
   }
 
-  uint32_t default_dispatcher_opts = dfv2::ExtractDefaultDispatcherOpts(wire_program);
+  uint32_t default_dispatcher_opts = driver_host::ExtractDefaultDispatcherOpts(wire_program);
   std::string default_dispatcher_scheduler_role = "";
   {
     auto scheduler_role =
@@ -341,4 +341,4 @@ void LoadDriver(fuchsia_driver_framework::DriverStartArgs start_args,
       .ThenExactlyOnce(std::move(vmo_callback));
 }
 
-}  // namespace dfv2
+}  // namespace driver_host

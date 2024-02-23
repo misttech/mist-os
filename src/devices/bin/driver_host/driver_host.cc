@@ -24,7 +24,7 @@ using namespace fuchsia_driver_framework;
 
 namespace fdh = fuchsia_driver_host;
 
-namespace dfv2 {
+namespace driver_host {
 
 DriverHost::DriverHost(inspect::Inspector& inspector, async::Loop& loop) : loop_(loop) {
   inspector.GetRoot().CreateLazyNode("drivers", [this] { return Inspect(); }, &inspector);
@@ -199,4 +199,4 @@ void DriverHost::ShutdownDriver(Driver* driver, fidl::ServerEnd<fdh::Driver> ser
   ZX_ASSERT(ZX_OK == driver_shutdown_ptr->Begin(driver, std::move(shutdown_callback)));
 }
 
-}  // namespace dfv2
+}  // namespace driver_host

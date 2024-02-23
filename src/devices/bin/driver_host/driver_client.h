@@ -10,7 +10,7 @@
 
 #include <fbl/ref_ptr.h>
 
-namespace dfv2 {
+namespace driver_host {
 
 // Forward declare the Driver class.
 class Driver;
@@ -42,6 +42,6 @@ class DriverClient : public fdf::WireAsyncEventHandler<fuchsia_driver_framework:
   std::optional<zx_status_t> start_status_;
 };
 
-}  // namespace dfv2
+}  // namespace driver_host
 
 #endif  // SRC_DEVICES_BIN_DRIVER_HOST_DRIVER_CLIENT_H_

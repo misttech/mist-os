@@ -18,7 +18,7 @@
 
 #include "src/devices/bin/driver_host/driver_client.h"
 
-namespace dfv2 {
+namespace driver_host {
 
 using DriverHooks = const DriverRegistration*;
 
@@ -98,6 +98,6 @@ void LoadDriver(fuchsia_driver_framework::DriverStartArgs start_args,
                 async_dispatcher_t* dispatcher,
                 fit::callback<void(zx::result<LoadedDriver>)> callback);
 
-}  // namespace dfv2
+}  // namespace driver_host
 
 #endif  // SRC_DEVICES_BIN_DRIVER_HOST_DRIVER_H_

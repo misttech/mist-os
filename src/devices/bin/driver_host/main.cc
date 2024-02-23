@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
   // Setup inspect.
   inspect::ComponentInspector inspector(loop.dispatcher(), {});
 
-  dfv2::DriverHost driver_host(inspector.inspector(), loop);
+  driver_host::DriverHost driver_host(inspector.inspector(), loop);
   auto init = driver_host.PublishDriverHost(outgoing);
   if (init.is_error()) {
     return init.error_value();

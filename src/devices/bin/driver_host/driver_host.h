@@ -19,7 +19,7 @@
 
 #include "src/devices/bin/driver_host/driver.h"
 
-namespace dfv2 {
+namespace driver_host {
 
 class DriverHost : public fidl::Server<fuchsia_driver_host::DriverHost> {
  public:
@@ -50,6 +50,6 @@ class DriverHost : public fidl::Server<fuchsia_driver_host::DriverHost> {
   fbl::DoublyLinkedList<fbl::RefPtr<Driver>> drivers_ __TA_GUARDED(mutex_);
 };
 
-}  // namespace dfv2
+}  // namespace driver_host
 
 #endif  // SRC_DEVICES_BIN_DRIVER_HOST_DRIVER_HOST_H_
