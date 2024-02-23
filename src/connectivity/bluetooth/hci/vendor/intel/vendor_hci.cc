@@ -29,6 +29,142 @@ constexpr auto kInitTimeoutMs = zx::sec(10);
 
 VendorHci::VendorHci(zx::channel* ctrl) : ctrl_(ctrl), acl_(nullptr), manufacturer_(false) {}
 
+// Fetch unsigned integer values from 'p' with 'fetch_len' bytes at maximum (little-endian).
+uint32_t fetch_tlv_value(const uint8_t* p, size_t fetch_len) {
+  size_t len = p[1];
+  uint32_t val = 0;  // store the return value.
+
+  ZX_DEBUG_ASSERT(len <= sizeof(val));
+  ZX_DEBUG_ASSERT(len >= fetch_len);
+
+  // Only load the actual number of bytes .
+  fetch_len = fetch_len > len ? len : fetch_len;
+
+  p += 2;  // Skip 'type' and 'length'. Now points to 'value'.
+  for (size_t i = fetch_len; i > 0; i--) {
+    val = (val << 8) + p[i - 1];
+  }
+
+  return val;
+}
+
+ReadVersionReturnParamsTlv parse_tlv_version_return_params(const uint8_t* p, size_t len) {
+  ReadVersionReturnParamsTlv params = {};
+
+  // Ensure the given byte stream contains the status code, type, and length fields.
+  if (len <= 2)
+    return ReadVersionReturnParamsTlv{
+        .status = pw::bluetooth::emboss::StatusCode::PARAMETER_OUT_OF_MANDATORY_RANGE};
+
+  // The first byte is the status code. Extract and strip it before we traverse the TLVs.
+  params.status = static_cast<pw::bluetooth::emboss::StatusCode>(*(p++));
+  len--;
+
+  for (size_t idx = 0; idx < len;) {
+    // ensure at least the Tag and the Length fields.
+    size_t remain_len = len - idx;
+    if (remain_len < 2)
+      return ReadVersionReturnParamsTlv{
+          .status = pw::bluetooth::emboss::StatusCode::PARAMETER_OUT_OF_MANDATORY_RANGE};
+
+    // After excluding the Type and the Length field, ensure there is still room for the Value
+    // field.
+    size_t len_of_value = p[idx + 1];
+    if ((remain_len - 2) < len_of_value)
+      return ReadVersionReturnParamsTlv{
+          .status = pw::bluetooth::emboss::StatusCode::PARAMETER_OUT_OF_MANDATORY_RANGE};
+
+    switch (p[idx]) {
+      uint32_t v;
+
+      case 0x00:  // End of the TLV records.
+        break;
+
+      case 0x10:  // CNVi hardware version
+        v = fetch_tlv_value(&p[idx], 4);
+        params.CNVi = (((v >> 0) & 0xf) << 12) | (((v >> 4) & 0xf) << 0) | (((v >> 8) & 0xf) << 4) |
+                      (((v >> 24) & 0xf) << 8);
+        break;
+
+      case 0x11:  // CNVR hardware version
+        v = fetch_tlv_value(&p[idx], 4);
+        params.CNVR = (((v >> 0) & 0xf) << 12) | (((v >> 4) & 0xf) << 0) | (((v >> 8) & 0xf) << 4) |
+                      (((v >> 24) & 0xf) << 8);
+        break;
+
+      case 0x12:  // hardware info
+        v = fetch_tlv_value(&p[idx], 4);
+        params.hw_platform = (v >> 8) & 0xff;  // 0x37 for now.
+        params.hw_variant = (v >> 16) & 0x3f;  // 0x17 -- Typhoon Peak
+                                               // 0x1c -- Gale Peak
+        break;
+
+      case 0x16:  // Device revision
+        params.device_revision = fetch_tlv_value(&p[idx], 2);
+        break;
+
+      case 0x1c:  // Current mode of operation
+        params.current_mode_of_operation = fetch_tlv_value(&p[idx], 1);
+        break;
+
+      case 0x1d:  // Timestamp
+        v = fetch_tlv_value(&p[idx], 2);
+        params.timestamp_calendar_week = v >> 0;
+        params.timestamp_year = v >> 8;
+        break;
+
+      case 0x1e:  // Build type
+        params.build_type = fetch_tlv_value(&p[idx], 1);
+        break;
+
+      case 0x1f:  // Build number (it can be either 1 or 4 bytes).
+        params.build_number = fetch_tlv_value(&p[idx], 4);
+        break;
+
+      case 0x28:  // Secure boot
+        params.secure_boot = fetch_tlv_value(&p[idx], 1);
+        break;
+
+      case 0x2a:  // OTP lock
+        params.otp_lock = fetch_tlv_value(&p[idx], 1);
+        break;
+
+      case 0x2b:  // API lock
+        params.api_lock = fetch_tlv_value(&p[idx], 1);
+        break;
+
+      case 0x2c:  // debug lock
+        params.debug_lock = fetch_tlv_value(&p[idx], 1);
+        break;
+
+      case 0x2d:  // Firmware build
+        v = fetch_tlv_value(&p[idx], 3);
+        params.firmware_build_number = v >> 0;
+        params.firmware_build_calendar_week = v >> 8;
+        params.firmware_build_year = v >> 16;
+        break;
+
+      case 0x2f:  // Secure boot engine type
+        params.secure_boot_engine_type = fetch_tlv_value(&p[idx], 1);
+        infof("Secure boot engine type: 0x%02x", params.secure_boot_engine_type);
+        break;
+
+      case 0x30:                             // Bluetooth device address
+        ZX_DEBUG_ASSERT(len_of_value == 6);  // expect the address length is 6.
+        memcpy(params.bluetooth_address, &p[idx + 2], sizeof(params.bluetooth_address));
+        break;
+
+      default:
+        // unknown tag. skip it.
+        warnf("Unknown firmware version TLV tag=0x%02x", p[idx]);
+        break;
+    }
+    idx += 2 + len_of_value;  // Skip the 'length' and 'value'.
+  }
+
+  return params;
+}
+
 ReadVersionReturnParams VendorHci::SendReadVersion() const {
   auto packet = CommandPacket::New(kReadVersion);
   SendCommand(packet->view());
@@ -40,6 +176,23 @@ ReadVersionReturnParams VendorHci::SendReadVersion() const {
   }
   errorf("VendorHci: ReadVersion: Error reading response!");
   return ReadVersionReturnParams{.status = pw::bluetooth::emboss::StatusCode::UNSPECIFIED_ERROR};
+}
+
+ReadVersionReturnParamsTlv VendorHci::SendReadVersionTlv() const {
+  auto packet = CommandPacket::New(kReadVersion, sizeof(VersionCommandParams));
+  auto params = packet->mutable_payload<VersionCommandParams>();
+  params->para0 = kVersionSupportTlv;  // Only meaningful for AX210 and later.
+  SendCommand(packet->view());
+  auto evt_packet = WaitForEventPacket();
+  if (evt_packet) {
+    size_t packet_size =
+        evt_packet->view().payload_size() - sizeof(bt::hci_spec::CommandCompleteEventParams);
+    const uint8_t* p = evt_packet->return_params<uint8_t>();
+    if (p)
+      return parse_tlv_version_return_params(p, packet_size);
+  }
+  errorf("VendorHci: ReadVersionTlv: Error reading response!");
+  return ReadVersionReturnParamsTlv{.status = pw::bluetooth::emboss::StatusCode::UNSPECIFIED_ERROR};
 }
 
 ReadBootParamsReturnParams VendorHci::SendReadBootParams() const {

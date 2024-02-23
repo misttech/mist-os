@@ -19,6 +19,17 @@ namespace btintel {
 
 constexpr bt::hci_spec::OpCode kReadVersion = bt::hci_spec::VendorOpCode(0x0005);
 
+constexpr uint8_t kVersionSupportTlv = 0xff;
+
+// This structure is used after AX210.  If 'para0' is assigned with 'kVersionSupportTlv',
+// the new firmware would return with TLV-based values.  The old firmware would silently
+// ignore this structure.
+struct VersionCommandParams {
+  uint8_t para0;
+} __PACKED;
+
+constexpr uint8_t kLegacyVersionParams = 0x37;  // For AX201 and older.
+
 struct ReadVersionReturnParams {
   pw::bluetooth::emboss::StatusCode status;
   uint8_t hw_platform;
@@ -31,6 +42,37 @@ struct ReadVersionReturnParams {
   uint8_t fw_build_year;
   uint8_t fw_patch_num;
 } __PACKED;
+
+constexpr uint8_t kCurrentModeOfOperationBootloader = 0x01;
+constexpr uint8_t kCurrentModeOfOperationOperationalFirmware = 0x03;
+
+struct ReadVersionReturnParamsTlv {
+  pw::bluetooth::emboss::StatusCode status;
+  uint16_t CNVi;
+  uint16_t CNVR;
+  uint8_t hw_platform;  // 0x37: only supported value at the moment
+  uint8_t hw_variant;   //   * 0x17: Typhoon Peak
+                        //   * 0x1c: Gale Peak
+  uint16_t device_revision;
+  uint8_t current_mode_of_operation;  // see kCurrentModeOfOperation*.
+  uint8_t timestamp_calendar_week;
+  uint8_t timestamp_year;
+  uint8_t build_type;
+  uint32_t build_number;
+  uint8_t secure_boot;
+  uint8_t otp_lock;
+  uint8_t api_lock;
+  uint8_t debug_lock;
+  uint8_t firmware_build_number;
+  uint8_t firmware_build_calendar_week;
+  uint8_t firmware_build_year;
+  uint8_t unknown;
+  uint8_t secure_boot_engine_type;  // - 0x00: RSA
+                                    // - 0x01: ECDSA
+  uint8_t bluetooth_address[6];     // BD_ADDR
+} __PACKED;
+
+constexpr uint8_t kLegacyVersionSize = sizeof(struct ReadVersionReturnParams);
 
 constexpr uint8_t kBootloaderFirmwareVariant = 0x06;
 constexpr uint8_t kFirmwareFirmwareVariant = 0x23;
@@ -99,6 +141,10 @@ struct BootloaderVendorEventParams {
   uint8_t vendor_params[];
 } __PACKED;
 
+// Helper functions.
+uint32_t fetch_tlv_value(const uint8_t* p, size_t fetch_len);
+ReadVersionReturnParamsTlv parse_tlv_version_return_params(const uint8_t* p, size_t len);
+
 class VendorHci {
  public:
   explicit VendorHci(zx::channel* ctrl);
@@ -107,7 +153,12 @@ class VendorHci {
   // ACL channels.
   void enable_events_on_bulk(zx::channel* acl) { acl_ = acl; }
 
+  // Read the version info from the hardware.
+  //
+  // The legacy method.
   ReadVersionReturnParams SendReadVersion() const;
+  // The new method that supports TLV.
+  ReadVersionReturnParamsTlv SendReadVersionTlv() const;
 
   ReadBootParamsReturnParams SendReadBootParams() const;
 

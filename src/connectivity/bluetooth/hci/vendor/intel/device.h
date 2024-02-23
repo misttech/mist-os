@@ -25,7 +25,7 @@ using DeviceType = ddk::Device<Device, ddk::Initializable, ddk::GetProtocolable,
 
 class Device : public DeviceType, public ddk::BtHciProtocol<Device, ddk::base_protocol> {
  public:
-  Device(zx_device_t* device, bt_hci_protocol_t* hci, bool secure);
+  Device(zx_device_t* device, bt_hci_protocol_t* hci, bool secure, bool legacy_firmware_loading);
 
   ~Device() = default;
 
@@ -92,6 +92,7 @@ class Device : public DeviceType, public ddk::BtHciProtocol<Device, ddk::base_pr
   ddk::BtHciProtocolClient hci_;
   bool secure_;
   bool firmware_loaded_;
+  bool legacy_firmware_loading_;  // true to use legacy way to load firmware
   std::thread init_thread_;
 };
 

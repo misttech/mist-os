@@ -13,6 +13,7 @@
   } while (false)
 
 #define errorf(args...) logf(ERROR, args)
+#define warnf(args...) logf(WARNING, args)
 #define infof(args...) logf(INFO, args)
 #define tracef(args...) logf(TRACE, args)
 

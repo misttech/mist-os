@@ -13,6 +13,12 @@
 
 namespace btintel {
 
+// Secure boot engine type. The algorithm used to sign the firmware binary.
+enum class SecureBootEngineType {
+  kRSA,    // Rivest–Shamir–Adleman
+  kECDSA,  // Elliptic Curve Digital Signature Algorithm
+};
+
 class FirmwareLoader {
  public:
   // |cmd_channel| is expected to outlive this object.
@@ -42,10 +48,12 @@ class FirmwareLoader {
   // Loads "sfi" firmware into the controller using the channels.
   // |firmware| should be a pointer to firmware, which is at
   // least |len| bytes long.
+  // | engine_type| shall indicate the secure boot engine type specified in the firmware binary.
   // if |boot_addr| is not null, the boot params boot address written to the device will be placed
   // within it.
   // Returns kComplete if the file was loaded, kError otherwise.
-  LoadStatus LoadSfi(const void* firmware, const size_t& len, uint32_t* boot_addr);
+  LoadStatus LoadSfi(const void* firmware, const size_t& len, SecureBootEngineType engine_type,
+                     uint32_t* boot_addr);
 
  private:
   bool ParseBseq();

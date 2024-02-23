@@ -25,6 +25,41 @@ namespace btintel {
 using ::bt::BufferView;
 using ::bt::PacketView;
 
+namespace {
+
+struct {
+  size_t css_header_offset;
+  size_t css_header_size;
+  size_t pki_offset;
+  size_t pki_size;
+  size_t sig_offset;
+  size_t sig_size;
+  size_t write_offset;
+} sec_boot_params[] = {
+    // RSA
+    {
+        .css_header_offset = 0,
+        .css_header_size = 128,
+        .pki_offset = 128,
+        .pki_size = 256,
+        .sig_offset = 388,
+        .sig_size = 256,
+        .write_offset = 964,
+    },
+    // ECDSA
+    {
+        .css_header_offset = 644,
+        .css_header_size = 128,
+        .pki_offset = 772,
+        .pki_size = 96,
+        .sig_offset = 868,
+        .sig_size = 96,
+        .write_offset = 964,
+    },
+};
+
+}  // anonymous namespace
+
 FirmwareLoader::LoadStatus FirmwareLoader::LoadBseq(const void* firmware, const size_t& len) {
   BufferView file(firmware, len);
 
@@ -86,38 +121,42 @@ struct WriteBootParamsCommandParams {
 } __PACKED;
 
 FirmwareLoader::LoadStatus FirmwareLoader::LoadSfi(const void* firmware, const size_t& len,
+                                                   enum SecureBootEngineType engine_type,
                                                    uint32_t* boot_addr) {
   BufferView file(firmware, len);
 
-  if (file.size() < 644) {
-    errorf("FirmwareLoader: SFI is too small: %zu < 644\n", file.size());
+  // index to access the 'sec_boot_params[]'.
+  size_t idx = (engine_type == SecureBootEngineType::kECDSA) ? 1 : 0;
+
+  size_t min_fw_size = sec_boot_params[idx].write_offset;
+  if (file.size() < min_fw_size) {
+    errorf("FirmwareLoader: SFI is too small: %zu < %zu\n", file.size(), min_fw_size);
     return LoadStatus::kError;
   }
 
-  size_t offset = 0;
   // SFI File format:
   // [128 bytes CSS Header]
-  if (!hci_acl_.SendSecureSend(0x00, file.view(offset, 128))) {
+  if (!hci_acl_.SendSecureSend(0x00, file.view(sec_boot_params[idx].css_header_offset,
+                                               sec_boot_params[idx].css_header_size))) {
     errorf("FirmwareLoader: Failed sending CSS Header!\n");
     return LoadStatus::kError;
   }
-  offset += 128;
+
   // [256 bytes PKI]
-  if (!hci_acl_.SendSecureSend(0x03, file.view(offset, 256))) {
+  if (!hci_acl_.SendSecureSend(
+          0x03, file.view(sec_boot_params[idx].pki_offset, sec_boot_params[idx].pki_size))) {
     errorf("FirmwareLoader: Failed sending PKI Header!\n");
     return LoadStatus::kError;
   }
-  offset += 256;
-  // There are 4 bytes of unknown data here, that need to be skipped
-  // for the file format to be correct later (command sequences)
-  offset += 4;
+
   // [256 bytes signature info]
-  if (!hci_acl_.SendSecureSend(0x02, file.view(offset, 256))) {
+  if (!hci_acl_.SendSecureSend(
+          0x02, file.view(sec_boot_params[idx].sig_offset, sec_boot_params[idx].sig_size))) {
     errorf("FirmwareLoader: Failed sending signature Header!\n");
     return LoadStatus::kError;
   }
-  offset += 256;
 
+  size_t offset = sec_boot_params[idx].write_offset;
   size_t frag_len = 0;
   // [N bytes of command packets, arranged so that the "Secure send" command
   // param size can be a multiple of 4 bytes]

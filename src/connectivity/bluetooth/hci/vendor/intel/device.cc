@@ -18,8 +18,13 @@
 
 namespace btintel {
 
-Device::Device(zx_device_t* device, bt_hci_protocol_t* hci, bool secure)
-    : DeviceType(device), hci_(hci), secure_(secure), firmware_loaded_(false) {}
+Device::Device(zx_device_t* device, bt_hci_protocol_t* hci, bool secure,
+               bool legacy_firmware_loading)
+    : DeviceType(device),
+      hci_(hci),
+      secure_(secure),
+      firmware_loaded_(false),
+      legacy_firmware_loading_(legacy_firmware_loading) {}
 
 zx_status_t Device::Bind() { return DdkAdd("bt_hci_intel"); }
 
@@ -29,7 +34,8 @@ void Device::DdkInit(ddk::InitTxn init_txn) {
 }
 
 zx_status_t Device::LoadFirmware(ddk::InitTxn init_txn, bool secure) {
-  infof("LoadFirmware(secure: %s)", (secure ? "yes" : "no"));
+  infof("LoadFirmware(secure: %s, firmware_loading: %s)", (secure ? "yes" : "no"),
+        (legacy_firmware_loading_ ? "legacy" : "new"));
 
   // TODO(armansito): Track metrics for initialization failures.
 
@@ -186,32 +192,51 @@ zx_status_t Device::LoadSecureFirmware(zx::channel* cmd, zx::channel* acl) {
   // ReadVersion command.
   hci.enable_events_on_bulk(acl);
 
-  ReadVersionReturnParams version = hci.SendReadVersion();
-  if (version.status != pw::bluetooth::emboss::StatusCode::SUCCESS) {
-    errorf("failed to obtain version information");
-    return ZX_ERR_BAD_STATE;
+  btintel::SecureBootEngineType engine_type = btintel::SecureBootEngineType::kRSA;
+
+  fbl::String fw_filename;
+  if (legacy_firmware_loading_) {
+    ReadVersionReturnParams version = hci.SendReadVersion();
+    if (version.status != pw::bluetooth::emboss::StatusCode::SUCCESS) {
+      errorf("failed to obtain version information");
+      return ZX_ERR_BAD_STATE;
+    }
+
+    // If we're already in firmware mode, we're done.
+    if (version.fw_variant == kFirmwareFirmwareVariant) {
+      infof("firmware loaded (variant %d, revision %d)", version.hw_variant, version.hw_revision);
+      return ZX_OK;
+    }
+
+    // If we reached here then the controller must be in bootloader mode.
+    if (version.fw_variant != kBootloaderFirmwareVariant) {
+      errorf("unsupported firmware variant (0x%x)", version.fw_variant);
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+
+    ReadBootParamsReturnParams boot_params = hci.SendReadBootParams();
+    if (boot_params.status != pw::bluetooth::emboss::StatusCode::SUCCESS) {
+      errorf("failed to read boot parameters");
+      return ZX_ERR_BAD_STATE;
+    }
+
+    // Map the firmware file into memory.
+    fw_filename = fbl::StringPrintf("ibt-%d-%d.sfi", version.hw_variant, boot_params.dev_revid);
+  } else {
+    ReadVersionReturnParamsTlv version = hci.SendReadVersionTlv();
+
+    engine_type = (version.secure_boot_engine_type == 0x01) ? btintel::SecureBootEngineType::kECDSA
+                                                            : btintel::SecureBootEngineType::kRSA;
+
+    // If we're already in firmware mode, we're done.
+    if (version.current_mode_of_operation == kCurrentModeOfOperationOperationalFirmware) {
+      infof("firmware already loaded");
+      return ZX_OK;
+    }
+
+    fw_filename = fbl::StringPrintf("ibt-%04x-%04x.sfi", 0x0041, 0x0041);
   }
 
-  // If we're already in firmware mode, we're done.
-  if (version.fw_variant == kFirmwareFirmwareVariant) {
-    infof("firmware loaded (variant %d, revision %d)", version.hw_variant, version.hw_revision);
-    return ZX_OK;
-  }
-
-  // If we reached here then the controller must be in bootloader mode.
-  if (version.fw_variant != kBootloaderFirmwareVariant) {
-    errorf("unsupported firmware variant (0x%x)", version.fw_variant);
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  ReadBootParamsReturnParams boot_params = hci.SendReadBootParams();
-  if (boot_params.status != pw::bluetooth::emboss::StatusCode::SUCCESS) {
-    errorf("failed to read boot parameters");
-    return ZX_ERR_BAD_STATE;
-  }
-
-  // Map the firmware file into memory.
-  auto fw_filename = fbl::StringPrintf("ibt-%d-%d.sfi", version.hw_variant, boot_params.dev_revid);
   zx::vmo fw_vmo;
   uintptr_t fw_addr;
   size_t fw_size;
@@ -225,7 +250,7 @@ zx_status_t Device::LoadSecureFirmware(zx::channel* cmd, zx::channel* acl) {
 
   // The boot addr differs for different firmware.  Save it for later.
   uint32_t boot_addr = 0x00000000;
-  auto status = loader.LoadSfi(reinterpret_cast<void*>(fw_addr), fw_size, &boot_addr);
+  auto status = loader.LoadSfi(reinterpret_cast<void*>(fw_addr), fw_size, engine_type, &boot_addr);
   zx_vmar_unmap(zx_vmar_root_self(), fw_addr, fw_size);
   if (status == FirmwareLoader::LoadStatus::kError) {
     errorf("failed to load SFI firmware");

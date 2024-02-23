@@ -18,7 +18,21 @@
 #include "logging.h"
 
 // USB Product IDs that use the "secure" firmware method.
-constexpr uint16_t sfi_product_ids[] = {0x0025, 0x0a2b, 0x0aaa};
+static constexpr uint16_t sfi_product_ids[] = {
+    0x0025,  // Thunder Peak (9160/9260)
+    0x0a2b,  // Snowfield Peak (8260)
+    0x0aaa,  // Jefferson Peak (9460/9560)
+    0x0026,  // Harrison Peak (AX201)
+    0x0032,  // Sun Peak (AX210)
+};
+
+// USB Product IDs that use the "legacy" firmware loading method.
+static constexpr uint16_t legacy_firmware_loading_ids[] = {
+    0x0025,  // Thunder Peak (9160/9260)
+    0x0a2b,  // Snowfield Peak (8260)
+    0x0aaa,  // Jefferson Peak (9460/9560)
+    0x0026,  // Harrison Peak (AX201)
+};
 
 zx_status_t btintel_bind(void* ctx, zx_device_t* device) {
   tracef("bind\n");
@@ -42,6 +56,15 @@ zx_status_t btintel_bind(void* ctx, zx_device_t* device) {
     }
   }
 
+  // Whether this device uses the "legacy" firmware loading method.
+  bool legacy_firmware_loading = false;
+  for (uint16_t id : legacy_firmware_loading_ids) {
+    if (dev_desc.id_product == id) {
+      legacy_firmware_loading = true;
+      break;
+    }
+  }
+
   bt_hci_protocol_t hci;
   result = device_get_protocol(device, ZX_PROTOCOL_BT_HCI, &hci);
   if (result != ZX_OK) {
@@ -49,7 +72,7 @@ zx_status_t btintel_bind(void* ctx, zx_device_t* device) {
     return result;
   }
 
-  auto btdev = new btintel::Device(device, &hci, secure);
+  auto btdev = new btintel::Device(device, &hci, secure, legacy_firmware_loading);
   result = btdev->Bind();
   if (result != ZX_OK) {
     errorf("failed binding device: %s\n", zx_status_get_string(result));
