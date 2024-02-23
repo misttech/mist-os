@@ -189,6 +189,11 @@ pub struct Ffx {
     /// "json-pretty"
     pub machine: Option<Format>,
 
+    #[argh(switch)]
+    /// produce the schema for the MachineWriter output. If `--machine` is also provided, produce a
+    /// machine-comparable schema instead of human-readable one.
+    pub schema: bool,
+
     #[argh(option)]
     /// create a stamp file at the given path containing the exit code
     pub stamp: Option<String>,
@@ -301,6 +306,7 @@ impl Ffx {
             env: None,
             env_root: None,
             machine: None,
+            schema: false,
             stamp: None,
             target: None,
             timeout: None,
@@ -334,6 +340,9 @@ impl Ffx {
                             return_val.machine = Some(fmt);
                         }
                     }
+                }
+                "--schema" => {
+                    return_val.schema = true;
                 }
                 "--stamp" => {
                     if let Some(val) = argv_iter.next() {

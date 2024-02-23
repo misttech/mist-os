@@ -19,6 +19,9 @@ pub trait ToolIO: Write + Sized {
     /// implementation)
     type OutputItem;
 
+    /// The schema the output item is expected to follow.
+    const OUTPUT_SCHEMA: Option<ffx_validation::schema::StaticType> = None;
+
     /// Whether this can theoretically support machine output given the right configuration.
     fn is_machine_supported() -> bool;
 

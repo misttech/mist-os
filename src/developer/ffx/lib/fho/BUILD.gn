@@ -45,6 +45,7 @@ rustc_library("lib") {
     "src/from_env/helpers.rs",
     "src/lib.rs",
     "src/subtool.rs",
+    "src/subtool/schema.rs",
     "src/testing.rs",
   ]
 }

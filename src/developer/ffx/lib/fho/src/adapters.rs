@@ -16,7 +16,16 @@ macro_rules! embedded_plugin {
             #[allow(unused_imports)]
             use $crate::macro_deps::{argh, bug, global_env_context, return_bug, FfxCommandLine};
 
+            // The legacy ffx plugin interface does not expose the global ffx command line arguments
+            // to the plugin. The ffx command line is reparsed so the subtool can be invoked.
+            // As a result global command line arguments cannot be defined in tests, preventing this
+            // from being _fully_ testable.
             let ffx = FfxCommandLine::from_env()?;
+
+            if ffx.global.schema {
+                return $crate::macro_deps::print_schema::<<$tool as $crate::FfxMain>::Writer>();
+            }
+
             let context = if let Some(gc) = global_env_context() {
                 gc
             } else {

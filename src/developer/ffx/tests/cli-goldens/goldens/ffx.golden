@@ -60,6 +60,14 @@
       "hidden": false
     },
     {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--schema",
+      "short": null,
+      "description": "produce the schema for the MachineWriter output. If `--machine` is also provided, produce a machine-comparable schema instead of human-readable one.",
+      "hidden": false
+    },
+    {
       "kind": {
         "Option": {
           "arg_name": "stamp"

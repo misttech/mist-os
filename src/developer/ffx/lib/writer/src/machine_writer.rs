@@ -107,7 +107,7 @@ where
 {
     let mut res = Ok(());
 
-    if let Some(f) = <S as MaybeSchema>::SCHEMA_FN {
+    if let Some(f) = <S as MaybeSchema>::SCHEMA.filter(|_| cfg!(debug_assertions)) {
         if ffx_validation::validate::validate(f, &serde_json::to_value(output)?).is_err() {
             // Validation error has already been output to stderr.
             eprintln!("Machine output does not match its declared schema!");
@@ -139,6 +139,8 @@ where
     S: ?Sized + MaybeSchema,
 {
     type OutputItem = T;
+
+    const OUTPUT_SCHEMA: Option<schema::StaticType> = S::SCHEMA;
 
     fn is_machine_supported() -> bool {
         true
@@ -187,22 +189,16 @@ where
 }
 
 pub trait MaybeSchema {
-    const SCHEMA_FN: Option<schema::StaticType>;
+    const SCHEMA: Option<schema::StaticType>;
 }
 
 pub struct NoSchema;
 impl MaybeSchema for NoSchema {
-    const SCHEMA_FN: Option<schema::StaticType> = None;
+    const SCHEMA: Option<schema::StaticType> = None;
 }
 
 impl<T: Schema + ?Sized> MaybeSchema for T {
-    const SCHEMA_FN: Option<schema::StaticType> = {
-        if cfg!(debug_assertions) {
-            Some(<T as Schema>::TYPE)
-        } else {
-            None
-        }
-    };
+    const SCHEMA: Option<schema::StaticType> = Some(<T as Schema>::TYPE);
 }
 
 #[cfg(test)]

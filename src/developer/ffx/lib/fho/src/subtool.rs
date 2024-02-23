@@ -17,6 +17,8 @@ use std::{fs::File, path::PathBuf};
 
 use crate::{FhoEnvironment, FhoToolMetadata, TryFromEnv};
 
+pub(crate) mod schema;
+
 /// The main trait for defining an ffx tool. This is not intended to be implemented directly
 /// by the user, but instead derived via `#[derive(FfxTool)]`.
 #[async_trait(?Send)]
@@ -37,7 +39,7 @@ pub trait FfxTool: FfxMain + Sized {
 
 #[async_trait(?Send)]
 pub trait FfxMain: Sized {
-    type Writer: TryFromEnv;
+    type Writer: TryFromEnv + ffx_writer::ToolIO;
 
     /// The entrypoint of the tool. Once FHO has set up the environment for the tool, this is
     /// invoked. Should not be invoked directly unless for testing.
@@ -177,6 +179,10 @@ impl<M: FfxTool> ToolSuite for FhoSuite<M> {
         &self,
         ffx: &FfxCommandLine,
     ) -> Result<Option<Box<dyn ToolRunner + '_>>> {
+        if ffx.global.schema {
+            return Ok(Some(Box::new(schema::runner::<M::Writer>())));
+        }
+
         let args = Vec::from_iter(ffx.global.subcommand.iter().map(String::as_str));
         let command = ToolCommand::<M>::from_args(&Vec::from_iter(ffx.cmd_iter()), &args)
             .map_err(|err| Error::from_early_exit(&ffx.command, err))?;
@@ -271,6 +277,39 @@ mod tests {
                 requires_fho: 0,
                 fho_details: FhoDetails::FhoVersion0 { version: Only },
             }
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_schema_runner_redirection() {
+        #[derive(Debug, FfxTool)]
+        struct FakeTool {
+            #[command]
+            _fake_command: FakeCommand,
+        }
+        #[async_trait(?Send)]
+        impl FfxMain for FakeTool {
+            type Writer = SimpleWriter;
+            async fn main(self, _writer: Self::Writer) -> Result<()> {
+                panic!("This should never get called")
+            }
+        }
+
+        let test_env = ffx_config::test_init().await.unwrap();
+        let metrics = MetricsSession::start(&test_env.context).await.expect("Session start");
+
+        let cmd = FfxCommandLine::new(None, &["ffx", "--schema"]).unwrap();
+        let suite = FhoSuite::<FakeTool>::from_env(&test_env.context).await.unwrap();
+        let runner = suite
+            .try_from_args(&cmd)
+            .await
+            .unwrap()
+            .expect("FhoSuite did not return a tool runner");
+        let err = runner.run(metrics).await.expect_err("command should fail");
+
+        assert!(
+            format!("{err}").contains("not have a machine output schema"),
+            "Unexpected error output: {err}"
         );
     }
 }
