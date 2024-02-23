@@ -48,9 +48,9 @@ rustc_library("vfs") {
     ]
   }
 
-  # TODO: https://fxbug.dev/325448727 - Make Rust support for API levels more systematic.
+  # TODO(https://fxbug.dev/325448727): Make Rust support for API levels more systematic.
   features = []
-  if (platform_version.clang_fuchsia_api_level == 4294967295) {
+  if (platform_version.clang_fuchsia_api_level == CLANG_FUCHSIA_HEAD_VALUE) {
     features += [ "target_api_level_head" ]
   }
 
