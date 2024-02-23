@@ -858,6 +858,66 @@ zx_status_t VmMapping::DestroyLocked() {
   return ZX_OK;
 }
 
+zx::result<bool> VmMapping::AdjustMapping(vaddr_t va, paddr_t pa, uint mmu_flags) {
+  // see if something is mapped here now
+  // this may happen if we are one of multiple threads racing on a single address
+  uint page_flags;
+  paddr_t mapped_pa;
+  zx_status_t err = aspace_->arch_aspace().Query(va, &mapped_pa, &page_flags);
+
+  if (err >= 0) {
+    LTRACEF("queried va, page at pa %#" PRIxPTR ", flags %#x is already there\n", mapped_pa,
+            page_flags);
+    if (mapped_pa == pa) {
+      // Faulting on a mapping that is the correct page could happen for a few reasons
+      //  1. Permission are incorrect and this fault is a write fault for a read only mapping.
+      //  2. Fault was caused by (1), but we were racing with another fault and the mapping is
+      //     already fixed.
+      //  3. Some other error, such as an access flag missing on arm, caused this fault
+      // Of these three scenarios (1) is overwhelmingly the most common, and requires us to protect
+      // the page with the new permissions. In the scenario of (2) we could fast return and not
+      // perform the potentially expensive protect, but this scenario is quite rare and requires a
+      // multi-thread race on causing and handling the fault. (3) should also be highly uncommon as
+      // access faults would normally be handled by a separate fault handler, nevertheless we should
+      // still resolve such faults here, which requires calling protect.
+      // Given that (2) is rare and hard to distinguish from (3) we simply always call protect to
+      // ensure the fault is resolved.
+
+      // assert that we're not accidentally marking the zero page writable
+      DEBUG_ASSERT((mapped_pa != vm_get_zero_page_paddr()) ||
+                   !(mmu_flags & ARCH_MMU_FLAG_PERM_WRITE));
+
+      // same page, different permission
+      zx_status_t status = aspace_->arch_aspace().Protect(va, 1, mmu_flags);
+      if (unlikely(status != ZX_OK)) {
+        // ZX_ERR_NO_MEMORY is the only legitimate reason for Protect to fail.
+        ASSERT_MSG(status == ZX_ERR_NO_MEMORY, "Unexpected failure from protect: %d\n", status);
+
+        TRACEF("failed to modify permissions on existing mapping\n");
+        return zx::error(status);
+      }
+      return zx::ok(true);
+    } else {
+      // some other page is mapped there already
+      LTRACEF("thread %s faulted on va %#" PRIxPTR ", different page was present\n",
+              Thread::Current::Get()->name(), va);
+
+      // assert that we're not accidentally marking the zero page writable
+      DEBUG_ASSERT((pa != vm_get_zero_page_paddr()) || !(mmu_flags & ARCH_MMU_FLAG_PERM_WRITE));
+
+      // unmap the old one
+      zx_status_t status =
+          aspace_->arch_aspace().Unmap(va, 1, aspace_->EnlargeArchUnmap(), nullptr);
+      if (status != ZX_OK) {
+        ASSERT_MSG(status == ZX_ERR_NO_MEMORY, "Unexpected failure from unmap: %d\n", status);
+        TRACEF("failed to remove old mapping before replacing\n");
+        return zx::error(status);
+      }
+    }
+  }
+  return zx::ok(false);
+}
+
 zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
                                        LazyPageRequest* page_request) {
   VM_KTRACE_DURATION(
@@ -1047,83 +1107,25 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
 
   VM_KTRACE_DURATION(2, "map_page", ("va", ktrace::Pointer{va}), ("pf_flags", pf_flags));
 
-  // see if something is mapped here now
-  // this may happen if we are one of multiple threads racing on a single address
-  uint page_flags;
-  paddr_t pa;
-  zx_status_t err = aspace_->arch_aspace().Query(va, &pa, &page_flags);
-  if (err >= 0) {
-    LTRACEF("queried va, page at pa %#" PRIxPTR ", flags %#x is already there\n", pa, page_flags);
-    if (pa == pages[0]) {
-      // Faulting on a mapping that is the correct page could happen for a few reasons
-      //  1. Permission are incorrect and this fault is a write fault for a read only mapping.
-      //  2. Fault was caused by (1), but we were racing with another fault and the mapping is
-      //     already fixed.
-      //  3. Some other error, such as an access flag missing on arm, caused this fault
-      // Of these three scenarios (1) is overwhelmingly the most common, and requires us to protect
-      // the page with the new permissions. In the scenario of (2) we could fast return and not
-      // perform the potentially expensive protect, but this scenario is quite rare and requires a
-      // multi-thread race on causing and handling the fault. (3) should also be highly uncommon as
-      // access faults would normally be handled by a separate fault handler, nevertheless we should
-      // still resolve such faults here, which requires calling protect.
-      // Given that (2) is rare and hard to distinguish from (3) we simply always call protect to
-      // ensure the fault is resolved.
-
-      // assert that we're not accidentally marking the zero page writable
-      DEBUG_ASSERT((pa != vm_get_zero_page_paddr()) ||
-                   !(range.mmu_flags & ARCH_MMU_FLAG_PERM_WRITE));
-
-      // same page, different permission
-      zx_status_t status = aspace_->arch_aspace().Protect(va, 1, range.mmu_flags);
-      if (unlikely(status != ZX_OK)) {
-        // ZX_ERR_NO_MEMORY is the only legitimate reason for Protect to fail.
-        ASSERT_MSG(status == ZX_ERR_NO_MEMORY, "Unexpected failure from protect: %d\n", status);
-
-        TRACEF("failed to modify permissions on existing mapping\n");
-        return status;
-      }
-    } else {
-      // some other page is mapped there already
-      LTRACEF("thread %s faulted on va %#" PRIxPTR ", different page was present\n",
-              Thread::Current::Get()->name(), va);
-
-      // assert that we're not accidentally mapping the zero page writable
-      DEBUG_ASSERT(!(range.mmu_flags & ARCH_MMU_FLAG_PERM_WRITE) ||
-                   ktl::all_of(pages, &pages[out_pages],
-                               [](paddr_t p) { return p != vm_get_zero_page_paddr(); }));
-
-      // unmap the old one and put the new one in place
-      zx_status_t status =
-          aspace_->arch_aspace().Unmap(va, 1, aspace_->EnlargeArchUnmap(), nullptr);
-      if (status != ZX_OK) {
-        ASSERT_MSG(status == ZX_ERR_NO_MEMORY, "Unexpected failure from unmap: %d\n", status);
-        TRACEF("failed to remove old mapping before replacing\n");
-        return status;
-      }
-
-      size_t mapped;
-      status = aspace_->arch_aspace().Map(va, pages, out_pages, range.mmu_flags,
-                                          ArchVmAspace::ExistingEntryAction::Skip, &mapped);
-      if (status != ZX_OK) {
-        ASSERT_MSG(status == ZX_ERR_NO_MEMORY, "Unexpected failure from map: %d\n", status);
-        TRACEF("failed to map replacement page\n");
-        return status;
-      }
-      DEBUG_ASSERT(mapped >= 1);
-
-      return ZX_OK;
-    }
+  // Query aspace and adjust the mapping if there is already a page mapped here.
+  bool already_mapped = false;
+  zx::result result = AdjustMapping(va, pages[0], range.mmu_flags);
+  if (result.is_error()) {
+    return result.status_value();
   } else {
-    // nothing was mapped there before, map it now
+    already_mapped = result.value();
+  }
 
+  // nothing was mapped there before, map it now
+  if (!already_mapped) {
     // assert that we're not accidentally mapping the zero page writable
     DEBUG_ASSERT(!(range.mmu_flags & ARCH_MMU_FLAG_PERM_WRITE) ||
                  ktl::all_of(pages, &pages[out_pages],
                              [](paddr_t p) { return p != vm_get_zero_page_paddr(); }));
 
     size_t mapped;
-    zx_status_t status = aspace_->arch_aspace().Map(
-        va, pages, out_pages, range.mmu_flags, ArchVmAspace::ExistingEntryAction::Skip, &mapped);
+    auto status = aspace_->arch_aspace().Map(va, pages, out_pages, range.mmu_flags,
+                                             ArchVmAspace::ExistingEntryAction::Skip, &mapped);
     if (status != ZX_OK) {
       ASSERT_MSG(status == ZX_ERR_NO_MEMORY, "Unexpected failure from map: %d\n", status);
       TRACEF("failed to map page %d\n", status);

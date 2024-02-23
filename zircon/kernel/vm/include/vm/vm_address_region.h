@@ -1002,6 +1002,13 @@ class VmMapping final : public VmAddressRegionOrMapping,
 
   void DumpLocked(uint depth, bool verbose) const TA_REQ(lock()) override;
 
+  // Helper function for PageFaultLocked. Queries the aspace at given vaddr then compares the
+  // outcome to the given physical address. If the mapped page is the same, the permissions are
+  // changed to match that of the mmu flags. If the mapped paged is different, the existing page is
+  // unmapped to make space for the newly faulted page. The return value is true if the mapping has
+  // been adjusted.
+  zx::result<bool> AdjustMapping(vaddr_t va, paddr_t pa, uint mmu_flags);
+
   // Page fault in an address within the mapping.
   // If this returns ZX_ERR_SHOULD_WAIT, then the caller should wait on |page_request|
   // and try again.
