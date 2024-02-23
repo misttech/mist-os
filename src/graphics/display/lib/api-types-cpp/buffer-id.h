@@ -18,6 +18,9 @@ namespace display {
 // Equivalent to the FIDL type [`fuchsia.hardware.display/BufferId`].
 //
 // See `::fuchsia_hardware_display::wire::BufferId` for references.
+//
+// See `DriverBufferId` for the type used at the interface between the display
+// coordinator and the display drivers.
 struct BufferId {
   BufferCollectionId buffer_collection_id;
   uint32_t buffer_index;
@@ -31,6 +34,7 @@ constexpr BufferId ToBufferId(const fuchsia_hardware_display::wire::BufferId fid
       .buffer_index = fidl_buffer_id.buffer_index,
   };
 }
+
 constexpr fuchsia_hardware_display::wire::BufferId ToFidlBufferId(BufferId buffer_id) {
   ZX_DEBUG_ASSERT(buffer_id.buffer_index >= 0);
   ZX_DEBUG_ASSERT(buffer_id.buffer_index <= std::numeric_limits<uint32_t>::max());

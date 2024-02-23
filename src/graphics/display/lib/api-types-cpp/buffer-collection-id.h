@@ -15,8 +15,8 @@ namespace display {
 
 // More useful representation of `fuchsia.hardware.display/BufferCollectionId`.
 //
-// Not to be confused with `DriverBufferCollectionId` which represents
-// BufferCollections imported to display drivers.
+// See `DriverBufferCollectionId` for the type used at the interface between the
+// display coordinator and the display drivers.
 DEFINE_STRONG_INT(BufferCollectionId, uint64_t);
 
 constexpr BufferCollectionId ToBufferCollectionId(
