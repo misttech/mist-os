@@ -32,11 +32,15 @@ use {
     fuchsia_sync::Mutex,
     fuchsia_trace as trace, fuchsia_zircon as zx,
     futures::{
-        channel::{mpsc, oneshot},
+        channel::{
+            mpsc::{self, TrySendError},
+            oneshot,
+        },
         select, StreamExt,
     },
-    std::{cmp, sync::Arc, time::Duration},
+    std::{cmp, fmt, sync::Arc, time::Duration},
     tracing::info,
+    wlan_fidl_ext::{ResponderExt, SendResultExt},
     wlan_sme, wlan_trace as wtrace,
 };
 pub use {ddk_converter::*, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, wlan_common as common};
@@ -150,7 +154,50 @@ type MinstrelWrapper = Arc<Mutex<minstrel::MinstrelRateSelector<MinstrelTimer>>>
 // and sent through this sink, where they can then be handled serially. Multiple copies of
 // DriverEventSink may be safely passed between threads, including one that is used by our
 // vendor driver as the context for wlan_softmac_ifc_protocol_ops.
-pub struct DriverEventSink(pub mpsc::UnboundedSender<DriverEvent>);
+#[derive(Clone)]
+pub struct DriverEventSink(mpsc::UnboundedSender<DriverEvent>);
+
+impl DriverEventSink {
+    pub fn new() -> (Self, mpsc::UnboundedReceiver<DriverEvent>) {
+        let (sink, stream) = mpsc::unbounded();
+        (Self(sink), stream)
+    }
+
+    pub fn unbounded_send(
+        &self,
+        driver_event: DriverEvent,
+    ) -> Result<(), TrySendError<DriverEvent>> {
+        self.0.unbounded_send(driver_event)
+    }
+
+    pub fn disconnect(&mut self) {
+        self.0.disconnect()
+    }
+
+    pub fn unbounded_send_or_respond<R>(
+        &self,
+        driver_event: DriverEvent,
+        responder: R,
+        response: R::Response,
+    ) -> Result<R, anyhow::Error>
+    where
+        R: ResponderExt,
+    {
+        match self.unbounded_send(driver_event) {
+            Err(e) => {
+                let error_string = e.to_string();
+                let event = e.into_inner();
+                let e = format_err!("Failed to queue {}: {}", event, error_string);
+
+                match responder.send(response).format_send_err() {
+                    Ok(()) => Err(e),
+                    Err(send_error) => Err(send_error.context(e)),
+                }
+            }
+            Ok(()) => Ok(responder),
+        }
+    }
+}
 
 // TODO(https://fxbug.dev/42103773): Remove copies from MacFrame and EthFrame.
 pub enum DriverEvent {
@@ -165,6 +212,22 @@ pub enum DriverEvent {
     ScanComplete { status: zx::Status, scan_id: u64 },
     // Reports the result of an attempted frame transmission.
     TxResultReport { tx_result: banjo_common::WlanTxResult },
+}
+
+impl fmt::Display for DriverEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                DriverEvent::Stop(_) => "Stop",
+                DriverEvent::MacFrameRx { .. } => "MacFrameRx",
+                DriverEvent::EthFrameTx { .. } => "EthFrameTx",
+                DriverEvent::ScanComplete { .. } => "ScanComplete",
+                DriverEvent::TxResultReport { .. } => "TxResultReport",
+            }
+        )
+    }
 }
 
 fn should_enable_minstrel(mac_sublayer: &fidl_common::MacSublayerSupport) -> bool {
@@ -443,6 +506,76 @@ mod tests {
         std::task::Poll,
         wlan_common::assert_variant,
     };
+
+    // The following type definitions emulate the definition of FIDL requests and responder types.
+    // In addition to testing `unbounded_send_or_respond_with_error`, these tests demonstrate how
+    // `unbounded_send_or_respond_with_error` would be used in the context of a FIDL request.
+    //
+    // As such, the `Request` type is superfluous but provides a meaningful example for the reader.
+    enum Request {
+        Ax { responder: RequestAxResponder },
+        Cx { responder: RequestCxResponder },
+    }
+
+    struct RequestAxResponder {}
+    impl RequestAxResponder {
+        fn send(self) -> Result<(), fidl::Error> {
+            Ok(())
+        }
+    }
+
+    struct RequestCxResponder {}
+    impl RequestCxResponder {
+        fn send(self, _result: Result<u64, u64>) -> Result<(), fidl::Error> {
+            Ok(())
+        }
+    }
+
+    impl ResponderExt for RequestAxResponder {
+        type Response = ();
+        const REQUEST_NAME: &'static str = stringify!(RequestAx);
+
+        fn send(self, _: Self::Response) -> Result<(), fidl::Error> {
+            Self::send(self)
+        }
+    }
+
+    impl ResponderExt for RequestCxResponder {
+        type Response = Result<u64, u64>;
+        const REQUEST_NAME: &'static str = stringify!(RequestCx);
+
+        fn send(self, response: Self::Response) -> Result<(), fidl::Error> {
+            Self::send(self, response)
+        }
+    }
+
+    #[test]
+    fn unbounded_send_or_respond_with_error_simple() {
+        let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
+        if let Request::Ax { responder } = (Request::Ax { responder: RequestAxResponder {} }) {
+            let _responder: RequestAxResponder = driver_event_sink
+                .unbounded_send_or_respond(
+                    DriverEvent::ScanComplete { status: zx::Status::OK, scan_id: 3 },
+                    responder,
+                    (),
+                )
+                .unwrap();
+        }
+    }
+
+    #[test]
+    fn unbounded_send_or_respond_with_error_simple_with_error() {
+        let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
+        if let Request::Cx { responder } = (Request::Cx { responder: RequestCxResponder {} }) {
+            let _responder: RequestCxResponder = driver_event_sink
+                .unbounded_send_or_respond(
+                    DriverEvent::ScanComplete { status: zx::Status::IO_REFUSED, scan_id: 0 },
+                    responder,
+                    Err(10),
+                )
+                .unwrap();
+        }
+    }
 
     #[test]
     fn start_and_stop_main_loop() {

@@ -14,19 +14,23 @@
 #include <lib/trace/event.h>
 #include <lib/zx/result.h>
 
+#include <mutex>
+
 #include "convert.h"
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
 namespace wlan::drivers::wlansoftmac {
 
 zx::result<std::unique_ptr<SoftmacIfcBridge>> SoftmacIfcBridge::New(
-    const fdf::Dispatcher& softmac_ifc_server_dispatcher,
+    const fdf::Dispatcher& softmac_ifc_server_dispatcher, std::shared_ptr<std::mutex> unbind_lock,
+    std::shared_ptr<bool> unbind_called,
     const rust_wlan_softmac_ifc_protocol_copy_t* rust_softmac_ifc,
     fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacIfc>&& server_endpoint,
     fidl::ClientEnd<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>&&
         softmac_ifc_bridge_client_endpoint) {
   WLAN_TRACE_DURATION();
-  auto softmac_ifc_bridge = std::unique_ptr<SoftmacIfcBridge>(new SoftmacIfcBridge());
+  auto softmac_ifc_bridge = std::unique_ptr<SoftmacIfcBridge>(
+      new SoftmacIfcBridge(std::move(unbind_lock), std::move(unbind_called)));
 
   // The protocol functions are stored in this class, which will act as
   // the server end of WlanSoftmacifc FIDL protocol, and this set of function pointers will be
@@ -39,7 +43,12 @@ zx::result<std::unique_ptr<SoftmacIfcBridge>> SoftmacIfcBridge::New(
   softmac_ifc_bridge->wlan_softmac_ifc_protocol_.ops =
       &softmac_ifc_bridge->wlan_softmac_ifc_protocol_ops_;
 
-  softmac_ifc_bridge->wlan_softmac_ifc_protocol_.ctx = rust_softmac_ifc->ctx;
+  // The Banjo binding generates a `void*`. We use `const_cast` here to allow assignment but assert
+  // the const-correctness in the Rust portion of this driver. In particular, this `ctx` is actually
+  // a `*const DriverEventSink` in Rust. And all methods implementing the functions pointers
+  // contained in `ops` immediately cast the `&mut DriveEventSink` passed to them to a
+  // `&DriverEventSink`.
+  softmac_ifc_bridge->wlan_softmac_ifc_protocol_.ctx = const_cast<void*>(rust_softmac_ifc->ctx);
 
   // Bind the WlanSoftmacIfc server and WlanSoftmacIfcBridge client on
   // softmac_ifc_bridge_server_dispatcher.
@@ -75,8 +84,14 @@ zx::result<std::unique_ptr<SoftmacIfcBridge>> SoftmacIfcBridge::New(
 void SoftmacIfcBridge::Recv(RecvRequestView request, fdf::Arena& arena,
                             RecvCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  wlan_rx_packet_t rx_packet;
+  {
+    std::lock_guard<std::mutex> lock(*unbind_lock_);
+    if (*unbind_called_) {
+      return;
+    }
+  }
 
+  wlan_rx_packet_t rx_packet;
   bool use_prealloc_recv_buffer =
       unlikely(request->packet.mac_frame.count() > kPreAllocRecvBufferSize);
   uint8_t* rx_packet_buffer;
@@ -106,6 +121,13 @@ void SoftmacIfcBridge::Recv(RecvRequestView request, fdf::Arena& arena,
 void SoftmacIfcBridge::ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
                                       ReportTxResultCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
+  {
+    std::lock_guard<std::mutex> lock(*unbind_lock_);
+    if (*unbind_called_) {
+      return;
+    }
+  }
+
   wlan_tx_result_t tx_result;
   zx_status_t status = ConvertTxStatus(request->tx_result, &tx_result);
   if (status != ZX_OK) {
@@ -119,6 +141,13 @@ void SoftmacIfcBridge::ReportTxResult(ReportTxResultRequestView request, fdf::Ar
 void SoftmacIfcBridge::NotifyScanComplete(NotifyScanCompleteRequestView request, fdf::Arena& arena,
                                           NotifyScanCompleteCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
+  {
+    std::lock_guard<std::mutex> lock(*unbind_lock_);
+    if (*unbind_called_) {
+      return;
+    }
+  }
+
   wlan_softmac_ifc_protocol_.ops->notify_scan_complete(wlan_softmac_ifc_protocol_.ctx,
                                                        request->status(), request->scan_id());
   completer.buffer(arena).Reply();

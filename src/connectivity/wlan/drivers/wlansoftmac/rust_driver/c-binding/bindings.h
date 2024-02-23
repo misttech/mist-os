@@ -30,14 +30,19 @@ typedef struct {
 } rust_wlan_softmac_ifc_protocol_ops_copy_t;
 
 /**
- * Hand-rolled Rust version of the banjo wlan_softmac_ifc_protocol for communication from the driver
- * up. Note that we copy the individual fns out of this struct into the equivalent generated struct
- * in C++. Thanks to cbindgen, this gives us a compile-time confirmation that our function
- * signatures are correct.
+ * Type containing pointers to the static `PROTOCOL_OPS` and a `DriverEventSink`.
+ *
+ * The wlansoftmac driver copies the pointers from `CWlanSoftmacIfcProtocol` which means the code
+ * constructing this type must ensure those pointers remain valid for their lifetime in
+ * wlansoftmac.
+ *
+ * Additionally, by assigning functions directly from `PROTOCOL_OPS` to the corresponding Banjo
+ * generated types in wlansoftmac, wlansoftmac ensure the function signatures are correct at
+ * compile-time.
  */
 typedef struct {
   const rust_wlan_softmac_ifc_protocol_ops_copy_t *ops;
-  void *ctx;
+  const void *ctx;
 } rust_wlan_softmac_ifc_protocol_copy_t;
 
 /**

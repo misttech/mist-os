@@ -20,9 +20,9 @@ use {
         buffer::BufferProvider,
         device::{
             completers::{InitCompleter, StopCompleter},
-            DeviceOps, WlanSoftmacIfcProtocol,
+            DeviceOps,
         },
-        DriverEvent,
+        DriverEvent, DriverEventSink,
     },
     wlan_sme::{self, serve::create_sme},
     wlan_trace as wtrace,
@@ -30,7 +30,7 @@ use {
 
 const INSPECT_VMO_SIZE_BYTES: usize = 1000 * 1024;
 
-pub struct WlanSoftmacHandle(mpsc::UnboundedSender<DriverEvent>);
+pub struct WlanSoftmacHandle(DriverEventSink);
 
 impl std::fmt::Debug for WlanSoftmacHandle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -93,7 +93,7 @@ pub async fn start_and_serve<D: DeviceOps + Send + 'static>(
     buf_provider: BufferProvider,
 ) -> Result<(), zx::Status> {
     wtrace::duration_begin_scope!(c"rust_driver::start_and_serve");
-    let (driver_event_sink, driver_event_stream) = mpsc::unbounded();
+    let (driver_event_sink, driver_event_stream) = DriverEventSink::new();
     let softmac_handle_sink = driver_event_sink.clone();
     let init_completer = InitCompleter::new(move |result: Result<(), zx::Status>| {
         init_completer(result.map(|()| WlanSoftmacHandle(softmac_handle_sink)))
@@ -129,7 +129,7 @@ struct StartedDriver<F1, F2> {
 /// configure and create the components to run the futures.
 async fn start<D: DeviceOps + Send + 'static>(
     mlme_init_sender: oneshot::Sender<Result<(), zx::Status>>,
-    driver_event_sink: mpsc::UnboundedSender<DriverEvent>,
+    driver_event_sink: DriverEventSink,
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
     mut device: D,
     buf_provider: BufferProvider,
@@ -142,13 +142,9 @@ async fn start<D: DeviceOps + Send + 'static>(
 > {
     wtrace::duration!(c"rust_driver::start");
 
-    // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
-    let mut mlme_sink = wlan_mlme::DriverEventSink(driver_event_sink);
-    let softmac_ifc_ffi = WlanSoftmacIfcProtocol::new(&mut mlme_sink);
-
     // Bootstrap USME
     let BootstrappedGenericSme { generic_sme_request_stream, legacy_privacy_support, inspect_node } =
-        bootstrap_generic_sme(&mut device, &softmac_ifc_ffi).await?;
+        bootstrap_generic_sme(&mut device, driver_event_sink).await?;
 
     // Make a series of queries to gather device information from the vendor driver.
     let softmac_info = device.wlan_softmac_query_response()?;
@@ -369,7 +365,7 @@ struct BootstrappedGenericSme {
 /// GenericSme request stream will result in a driver no other component can communicate with.
 async fn bootstrap_generic_sme<D: DeviceOps>(
     device: &mut D,
-    softmac_ifc_ffi: &WlanSoftmacIfcProtocol<'_>,
+    driver_event_sink: DriverEventSink,
 ) -> Result<BootstrappedGenericSme, zx::Status> {
     wtrace::duration!(c"rust_driver::bootstrap_generic_sme");
 
@@ -378,11 +374,9 @@ async fn bootstrap_generic_sme<D: DeviceOps>(
 
     // Calling WlanSoftmac.Start() indicates to the vendor driver that this driver (wlansoftmac) is ready to
     // receive WlanSoftmacIfc messages. wlansoftmac will buffer all WlanSoftmacIfc messages in an
-    // mpsc::UnboundedReceiver<DriverEvent> sink until the MLME server drains them. The C++ portion of
-    // wlansoftmac will copy the pointers (to static functions) out of the WlanSoftmacIfcProtocol, so
-    // dropping the WlanSoftmacIfcProtocol after calling WlanSoftmac.Start() is safe.
+    // mpsc::UnboundedReceiver<DriverEvent> sink until the MLME server drains them.
     let usme_bootstrap_handle_via_iface_creation = match device.start(
-        softmac_ifc_ffi,
+        driver_event_sink,
         zx::Handle::from(softmac_ifc_bridge_client.into_channel()).into_raw(),
     ) {
         Ok(handle) => handle,
@@ -476,11 +470,9 @@ mod tests {
         );
 
         // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
-        let (driver_event_sink, _driver_event_stream) = mpsc::unbounded();
-        let mut mlme_sink = wlan_mlme::DriverEventSink(driver_event_sink);
-        let softmac_ifc_ffi = WlanSoftmacIfcProtocol::new(&mut mlme_sink);
+        let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
 
-        let fut = bootstrap_generic_sme(&mut fake_device, &softmac_ifc_ffi);
+        let fut = bootstrap_generic_sme(&mut fake_device, driver_event_sink);
         pin_mut!(fut);
         match exec.run_until_stalled(&mut fut) {
             Poll::Ready(Err(zx::Status::INTERRUPTED_RETRY)) => (),
@@ -497,11 +489,9 @@ mod tests {
             FakeDevice::new_with_config(&exec, FakeDeviceConfig::default());
 
         // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
-        let (driver_event_sink, _driver_event_stream) = mpsc::unbounded();
-        let mut mlme_sink = wlan_mlme::DriverEventSink(driver_event_sink);
-        let softmac_ifc_ffi = WlanSoftmacIfcProtocol::new(&mut mlme_sink);
+        let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
 
-        let fut = bootstrap_generic_sme(&mut fake_device, &softmac_ifc_ffi);
+        let fut = bootstrap_generic_sme(&mut fake_device, driver_event_sink);
         pin_mut!(fut);
         assert!(matches!(exec.run_until_stalled(&mut fut), Poll::Pending));
 
@@ -520,11 +510,9 @@ mod tests {
             FakeDevice::new_with_config(&exec, FakeDeviceConfig::default());
 
         // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
-        let (driver_event_sink, _driver_event_stream) = mpsc::unbounded();
-        let mut mlme_sink = wlan_mlme::DriverEventSink(driver_event_sink);
-        let softmac_ifc_ffi = WlanSoftmacIfcProtocol::new(&mut mlme_sink);
+        let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
 
-        let fut = bootstrap_generic_sme(&mut fake_device, &softmac_ifc_ffi);
+        let fut = bootstrap_generic_sme(&mut fake_device, driver_event_sink);
         pin_mut!(fut);
         assert!(matches!(exec.run_until_stalled(&mut fut), Poll::Pending));
 
@@ -541,11 +529,9 @@ mod tests {
             FakeDevice::new_with_config(&exec, FakeDeviceConfig::default());
 
         // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
-        let (driver_event_sink, _driver_event_stream) = mpsc::unbounded();
-        let mut mlme_sink = wlan_mlme::DriverEventSink(driver_event_sink);
-        let softmac_ifc_ffi = WlanSoftmacIfcProtocol::new(&mut mlme_sink);
+        let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
 
-        let bootstrap_generic_sme_fut = bootstrap_generic_sme(&mut fake_device, &softmac_ifc_ffi);
+        let bootstrap_generic_sme_fut = bootstrap_generic_sme(&mut fake_device, driver_event_sink);
         pin_mut!(bootstrap_generic_sme_fut);
         assert!(matches!(exec.run_until_stalled(&mut bootstrap_generic_sme_fut), Poll::Pending));
 
@@ -606,7 +592,7 @@ mod tests {
         #[allow(dead_code)]
         pub mlme_init_receiver: Pin<Box<oneshot::Receiver<Result<(), zx::Status>>>>,
         #[allow(dead_code)]
-        pub driver_event_sink: mpsc::UnboundedSender<DriverEvent>,
+        pub driver_event_sink: DriverEventSink,
     }
 
     impl StartTestHarness {
@@ -625,7 +611,7 @@ mod tests {
             StartTestHarness,
         ) {
             let (mlme_init_sender, mlme_init_receiver) = oneshot::channel();
-            let (driver_event_sink, driver_event_stream) = mpsc::unbounded();
+            let (driver_event_sink, driver_event_stream) = DriverEventSink::new();
             let fake_buf_provider = wlan_mlme::buffer::FakeBufferProvider::new();
 
             (

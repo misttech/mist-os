@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    crate::{buffer::FinalizedBuffer, common::mac::WlanGi, error::Error},
+    crate::{
+        buffer::FinalizedBuffer, common::mac::WlanGi, error::Error, DriverEvent, DriverEventSink,
+    },
     anyhow::format_err,
     banjo_fuchsia_wlan_common as banjo_common,
     banjo_fuchsia_wlan_softmac::{self as banjo_wlan_softmac, WlanRxPacket, WlanTxPacket},
@@ -11,7 +13,7 @@ use {
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
     futures::channel::mpsc,
     ieee80211::MacAddr,
-    std::{ffi::c_void, fmt::Display, sync::Arc},
+    std::{ffi::c_void, fmt::Display, marker::PhantomPinned, pin::Pin, sync::Arc},
     trace::Id as TraceId,
     tracing::error,
     wlan_common::{mac::FrameControl, pointers::SendPtr, tx_vector, TimeUnit},
@@ -176,6 +178,7 @@ impl From<fidl_mlme::ControlledPortState> for LinkStatus {
 
 pub struct Device {
     raw_device: DeviceInterface,
+    ifc: Option<Pin<Box<WlanSoftmacIfcProtocol>>>,
     wlan_softmac_bridge_proxy: fidl_softmac::WlanSoftmacBridgeSynchronousProxy,
     minstrel: Option<crate::MinstrelWrapper>,
     event_receiver: Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>>,
@@ -190,6 +193,7 @@ impl Device {
         let (event_sink, event_receiver) = mpsc::unbounded();
         Device {
             raw_device,
+            ifc: None,
             wlan_softmac_bridge_proxy,
             minstrel: None,
             event_receiver: Some(event_receiver),
@@ -222,7 +226,7 @@ const PEER_ADDR_OFFSET: usize = 4;
 pub trait DeviceOps {
     fn start(
         &mut self,
-        ifc: *const WlanSoftmacIfcProtocol<'_>,
+        driver_event_sink: DriverEventSink,
         wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
     ) -> Result<zx::Handle, zx::Status>;
     fn wlan_softmac_query_response(
@@ -378,20 +382,37 @@ pub fn try_query_spectrum_management_support(
 impl DeviceOps for Device {
     fn start(
         &mut self,
-        ifc: *const WlanSoftmacIfcProtocol<'_>,
+        driver_event_sink: DriverEventSink,
         wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
     ) -> Result<zx::Handle, zx::Status> {
+        self.ifc = Some(WlanSoftmacIfcProtocol::new(driver_event_sink));
+        let ifc = self.ifc.as_mut().unwrap().as_mut();
+        // Safety: This call is safe because `self.ifc` will outlive all uses of the constructed
+        // `CWlanSoftmacIfcProtocol` across the FFI boundary. This includes during unbind
+        // when the C++ portion of wlansoftmac will ensure no additional calls will be made
+        // through `CWlanSoftmacIfcProtocol` after unbind begins.
+        let ifc = unsafe { ifc.to_c_binding() };
+
         let mut out_channel = 0;
-        let status = (self.raw_device.start)(
-            // Safety: This is safe because the original will not be used while the copy is still in
-            // scope.
-            unsafe { self.raw_device.device.clone().as_ptr() },
-            ifc,
-            wlan_softmac_ifc_bridge_client_handle,
-            &mut out_channel as *mut u32,
-        );
-        // Unsafe block required because we cannot pass a Rust handle over FFI. An invalid
-        // handle violates the banjo API, and may be detected by the caller of this fn.
+
+        // Safety: This call to `self.raw_device.start` is safe because `ifc` was constructed in
+        // accordance with the safety documentation of `WlanSoftmacIfcProtocol::to_c_binding`.
+        //
+        // Safety: This call to `SendPtr::clone()` is safe because the original will not be used
+        // while the copy is still in scope.
+        let status = unsafe {
+            (self.raw_device.start)(
+                self.raw_device.device.clone().as_ptr(),
+                &ifc,
+                wlan_softmac_ifc_bridge_client_handle,
+                &mut out_channel as *mut u32,
+            )
+        };
+        // Safety: Constructing a `zx::Handle` from the returned `out_channel` is safe
+        // because returning an invalid handle violates the FFI.
+        //
+        // An unsafe block is necessary because a `zx::Handle` cannot be passed across
+        // the FFI boundary.
         zx::ok(status).map(|_| unsafe { zx::Handle::from_raw(out_channel) })
     }
 
@@ -661,84 +682,112 @@ impl DeviceOps for Device {
     }
 }
 
-/// Hand-rolled Rust version of the banjo wlan_softmac_ifc_protocol for communication from the driver up.
-/// Note that we copy the individual fns out of this struct into the equivalent generated struct
-/// in C++. Thanks to cbindgen, this gives us a compile-time confirmation that our function
-/// signatures are correct.
 #[repr(C)]
-pub struct WlanSoftmacIfcProtocol<'a> {
-    ops: &'static WlanSoftmacIfcProtocolOps,
-    ctx: &'a mut crate::DriverEventSink,
-}
-
-#[repr(C)]
-pub struct WlanSoftmacIfcProtocolOps {
-    recv: extern "C" fn(ctx: &mut crate::DriverEventSink, packet: *const WlanRxPacket),
-    complete_tx: extern "C" fn(
-        ctx: &'static mut crate::DriverEventSink,
-        packet: *const WlanTxPacket,
-        status: i32,
-    ),
-    report_tx_result: extern "C" fn(
-        ctx: &mut crate::DriverEventSink,
-        tx_result: *const banjo_common::WlanTxResult,
-    ),
-    scan_complete: extern "C" fn(ctx: &mut crate::DriverEventSink, status: i32, scan_id: u64),
+pub struct CWlanSoftmacIfcProtocolOps {
+    recv: extern "C" fn(ctx: &mut DriverEventSink, packet: &WlanRxPacket),
+    complete_tx: extern "C" fn(ctx: &mut DriverEventSink, packet: &WlanTxPacket, status: i32),
+    report_tx_result:
+        extern "C" fn(ctx: &mut DriverEventSink, tx_result: &banjo_common::WlanTxResult),
+    scan_complete: extern "C" fn(ctx: &mut DriverEventSink, status: i32, scan_id: u64),
 }
 
 #[no_mangle]
-extern "C" fn handle_recv(ctx: &mut crate::DriverEventSink, packet: *const WlanRxPacket) {
+extern "C" fn handle_recv(ctx: &mut DriverEventSink, packet: &WlanRxPacket) {
+    // Cast to non-mutable reference since the referenced points to a pinned `DriverEventSink`.
+    let ctx = ctx as &DriverEventSink;
     trace::duration!(c"wlan", c"handle_recv");
 
     // TODO(https://fxbug.dev/42103773): C++ uses a buffer allocator for this, determine if we need one.
+    //
+    // Safety: This call is safe because `WlanRxPacket` is defined such that a slice
+    // such as this one can be constructed from the `mac_frame_buffer` and `mac_frame_size` fields.
     let bytes =
-        unsafe { std::slice::from_raw_parts((*packet).mac_frame_buffer, (*packet).mac_frame_size) }
+        unsafe { std::slice::from_raw_parts(packet.mac_frame_buffer, packet.mac_frame_size) }
             .into();
-    let rx_info = unsafe { (*packet).info };
-    let _ = ctx.0.unbounded_send(crate::DriverEvent::MacFrameRx { bytes, rx_info }).map_err(|e| {
+    let rx_info = packet.info;
+    let _ = ctx.unbounded_send(DriverEvent::MacFrameRx { bytes, rx_info }).map_err(|e| {
         error!("Failed to receive frame: {:?}", e);
     });
 }
 #[no_mangle]
-extern "C" fn handle_complete_tx(
-    _ctx: &mut crate::DriverEventSink,
-    _packet: *const WlanTxPacket,
-    _status: i32,
-) {
+extern "C" fn handle_complete_tx(_ctx: &mut DriverEventSink, _packet: &WlanTxPacket, _status: i32) {
+    // Cast to non-mutable reference since the referenced points to a pinned `DriverEventSink`.
+    let _ctx = _ctx as &DriverEventSink;
     // TODO(https://fxbug.dev/42166877): Implement this to support asynchronous packet delivery.
 }
+
 #[no_mangle]
 extern "C" fn handle_report_tx_result(
-    ctx: &mut crate::DriverEventSink,
-    tx_result_in: *const banjo_common::WlanTxResult,
+    ctx: &mut DriverEventSink,
+    tx_result_in: &banjo_common::WlanTxResult,
 ) {
-    if tx_result_in.is_null() {
-        return;
-    }
-    let tx_result = unsafe { *tx_result_in };
-    let _ = ctx.0.unbounded_send(crate::DriverEvent::TxResultReport { tx_result });
+    // Cast to non-mutable reference since the referenced points to a pinned `DriverEventSink`.
+    let ctx = ctx as &DriverEventSink;
+    let _ = ctx.unbounded_send(crate::DriverEvent::TxResultReport { tx_result: *tx_result_in });
 }
 #[no_mangle]
-extern "C" fn handle_scan_complete(ctx: &mut crate::DriverEventSink, status: i32, scan_id: u64) {
-    let _ = ctx.0.unbounded_send(crate::DriverEvent::ScanComplete {
+extern "C" fn handle_scan_complete(ctx: &mut DriverEventSink, status: i32, scan_id: u64) {
+    // Cast to non-mutable reference since the referenced points to a pinned `DriverEventSink`.
+    let ctx = ctx as &DriverEventSink;
+    let _ = ctx.unbounded_send(crate::DriverEvent::ScanComplete {
         status: zx::Status::from_raw(status),
         scan_id,
     });
 }
 
-const PROTOCOL_OPS: WlanSoftmacIfcProtocolOps = WlanSoftmacIfcProtocolOps {
+const PROTOCOL_OPS: CWlanSoftmacIfcProtocolOps = CWlanSoftmacIfcProtocolOps {
     recv: handle_recv,
     complete_tx: handle_complete_tx,
     report_tx_result: handle_report_tx_result,
     scan_complete: handle_scan_complete,
 };
 
-impl<'a> WlanSoftmacIfcProtocol<'a> {
-    pub fn new(sink: &'a mut crate::DriverEventSink) -> Self {
-        // Const reference has 'static lifetime, so it's safe to pass down to the driver.
-        let ops = &PROTOCOL_OPS;
-        Self { ops, ctx: sink }
+struct WlanSoftmacIfcProtocol {
+    sink: DriverEventSink,
+    _pin: PhantomPinned,
+}
+
+impl WlanSoftmacIfcProtocol {
+    /// Return a pinned `WlanSoftmacIfcProtocol`.
+    ///
+    /// Pinning the returned value is imperative to ensure future `to_c_binding()` calls will return
+    /// pointers that are valid for the lifetime of the returned value.
+    fn new(sink: DriverEventSink) -> Pin<Box<Self>> {
+        Box::pin(Self { sink, _pin: PhantomPinned })
     }
+
+    /// Returns a `CWlanSoftmacIfcProtocol` containing pointers to the static `PROTOCOL_OPS`
+    /// and `self.sink`.
+    ///
+    /// Note that those pointers are to a static value and a pinned value, i.e., the former pointer
+    /// is always valid, and the latter pointer is valid as long as the pinned value was not
+    /// dropped.
+    ///
+    /// # Safety
+    ///
+    /// This method unsafe because we cannot guarantee the `DriverEventSink` pointed to by `ctx`
+    /// will have a lifetime that will exceed its use across an FFI boundary.
+    ///
+    /// By using this method, the caller promises the lifetime of `DriverEventSink` will exceed the
+    /// `ctx` pointer used across the FFI boundary.
+    unsafe fn to_c_binding(self: Pin<&mut Self>) -> CWlanSoftmacIfcProtocol {
+        CWlanSoftmacIfcProtocol { ops: &PROTOCOL_OPS, ctx: &self.sink }
+    }
+}
+
+/// Type containing pointers to the static `PROTOCOL_OPS` and a `DriverEventSink`.
+///
+/// The wlansoftmac driver copies the pointers from `CWlanSoftmacIfcProtocol` which means the code
+/// constructing this type must ensure those pointers remain valid for their lifetime in
+/// wlansoftmac.
+///
+/// Additionally, by assigning functions directly from `PROTOCOL_OPS` to the corresponding Banjo
+/// generated types in wlansoftmac, wlansoftmac ensure the function signatures are correct at
+/// compile-time.
+#[repr(C)]
+pub struct CWlanSoftmacIfcProtocol {
+    ops: *const CWlanSoftmacIfcProtocolOps,
+    ctx: *const DriverEventSink,
 }
 
 /// Type that represents the FFI from the bridged wlansoftmac to wlansoftmac itself.
@@ -762,7 +811,7 @@ pub struct CDeviceInterface {
     /// Start operations on the underlying device and return the SME channel.
     start: extern "C" fn(
         device: *const c_void,
-        ifc: *const WlanSoftmacIfcProtocol<'_>,
+        ifc: *const CWlanSoftmacIfcProtocol,
         wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
         out_sme_channel: *mut zx::sys::zx_handle_t,
     ) -> i32,
@@ -792,9 +841,22 @@ pub struct CDeviceInterface {
 pub struct DeviceInterface {
     device: SendPtr<*const c_void>,
     /// Start operations on the underlying device and return the SME channel.
-    start: extern "C" fn(
+    ///
+    /// # Lifetime
+    ///
+    /// The lifetime of `ifc` ends when the corresponding `Device` is destroyed.
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because this function cannot guarantee `ifc` will remain valid
+    /// for the lifetime of the bridged wlansoftmac driver.
+    ///
+    /// By calling this function, the caller promises `ifc` will remain valid for the lifetime
+    /// of the bridged wlansoftmac driver. Otherwise, `ifc` might cause a `DriverEvent` to be
+    /// written to a dropped `DriverEventSink`.
+    start: unsafe extern "C" fn(
         device: *const c_void,
-        ifc: *const WlanSoftmacIfcProtocol<'_>,
+        ifc: *const CWlanSoftmacIfcProtocol,
         wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
         out_sme_channel: *mut zx::sys::zx_handle_t,
     ) -> i32,
@@ -1220,7 +1282,7 @@ pub mod test_utils {
     impl DeviceOps for FakeDevice {
         fn start(
             &mut self,
-            _ifc: *const WlanSoftmacIfcProtocol<'_>,
+            _driver_event_sink: DriverEventSink,
             wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
         ) -> Result<zx::Handle, zx::Status> {
             let mut state = self.state.lock();

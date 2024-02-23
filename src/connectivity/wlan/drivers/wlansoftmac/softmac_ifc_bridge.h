@@ -22,7 +22,8 @@ namespace wlan::drivers::wlansoftmac {
 class SoftmacIfcBridge : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmacIfc> {
  public:
   static zx::result<std::unique_ptr<SoftmacIfcBridge>> New(
-      const fdf::Dispatcher& softmac_ifc_server_dispatcher,
+      const fdf::Dispatcher& softmac_ifc_server_dispatcher, std::shared_ptr<std::mutex> unbind_lock,
+      std::shared_ptr<bool> unbind_called,
       const rust_wlan_softmac_ifc_protocol_copy_t* rust_softmac_ifc,
       fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacIfc>&& server_endpoint,
       fidl::ClientEnd<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>&& bridge_client_endpoint);
@@ -36,7 +37,12 @@ class SoftmacIfcBridge : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftma
                           NotifyScanCompleteCompleter::Sync& completer) override;
 
  private:
-  SoftmacIfcBridge() = default;
+  explicit SoftmacIfcBridge(std::shared_ptr<std::mutex> unbind_lock,
+                            std::shared_ptr<bool> unbind_called)
+      : unbind_lock_(std::move(unbind_lock)), unbind_called_(std::move(unbind_called)) {}
+
+  std::shared_ptr<std::mutex> unbind_lock_;
+  std::shared_ptr<bool> unbind_called_ __TA_GUARDED(unbind_lock_);
 
   wlan_softmac_ifc_protocol_t wlan_softmac_ifc_protocol_;
   wlan_softmac_ifc_protocol_ops_t wlan_softmac_ifc_protocol_ops_;
