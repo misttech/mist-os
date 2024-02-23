@@ -31,6 +31,7 @@ use {
     futures::StreamExt,
     std::cmp,
     std::rc::Rc,
+    tracing::error,
 };
 
 const SECONDS_PER_NANOSECOND: f64 = 1.0 / 10_u64.pow(9) as f64;
@@ -846,19 +847,19 @@ async fn main() -> Result<(), anyhow::Error> {
 
             match request {
                 IncomingRequest::DeviceControl(stream) => {
-                    audio_daemon.serve_device_control(stream).await.unwrap_or_else(|e: Error| {
-                        panic!("Couldn't serve audio daemon requests: {:?}", e)
-                    })
+                    if let Err(err) = audio_daemon.serve_device_control(stream).await {
+                        error!(%err, "Failed to serve DeviceControl protocol");
+                    }
                 }
                 IncomingRequest::Player(stream) => {
-                    audio_daemon.serve_player(stream).await.unwrap_or_else(|e: Error| {
-                        panic!("Couldn't serve audio player requests: {:?}", e)
-                    })
+                    if let Err(err) = audio_daemon.serve_player(stream).await {
+                        error!(%err, "Failed to serve Player protocol");
+                    }
                 }
                 IncomingRequest::Recorder(stream) => {
-                    audio_daemon.serve_recorder(stream).await.unwrap_or_else(|e: Error| {
-                        panic!("Couldn't serve audio recorder requests: {:?}", e)
-                    })
+                    if let Err(err) = audio_daemon.serve_recorder(stream).await {
+                        error!(%err, "Failed to serve Recorder protocol");
+                    }
                 }
             }
         })
