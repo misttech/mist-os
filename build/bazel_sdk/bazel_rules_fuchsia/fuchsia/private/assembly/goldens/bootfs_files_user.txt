@@ -42,6 +42,7 @@ lib/libfdio.so
 lib/libtrace-engine.so
 lib/libunwind.so.1
 lib/libusb-peripheral-utils.so
+?lib/libvfs_internal.so
 ?meta/blobfs.cm
 ?meta/blobfs.cvf
 ?meta/decompressor-sandbox.cm

@@ -60,6 +60,8 @@ sdk_source_set("cpp") {
     "//zircon/system/ulib/zx",
   ]
 
+  deps = [ "//sdk/lib/vfs/internal:vfs_internal" ]
+
   public_configs = [ "//sdk/config" ]
 
   #  ________  _________  ________  ________
