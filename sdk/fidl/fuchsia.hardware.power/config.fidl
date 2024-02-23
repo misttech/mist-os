@@ -1,6 +1,14 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+/// `PowerElementConfiguration` and types contained in that struct define
+/// the configuration that drivers can expect from board drivers. This
+/// configuration information is intended to be reflected into the
+/// power management system by the receivers of that configuration.
+///
+/// `PowerTokenService` is what drivers should implement to provide their
+/// children with access to the driver's power elements.
 library fuchsia.hardware.power;
 
 using zx;
@@ -50,6 +58,11 @@ type LevelTuple = table {
     2: parent_level uint16;
 };
 
+type RequirementType = strict enum {
+    ACTIVE = 1;
+    PASSIVE = 2;
+};
+
 /// Describes the relationship between the `PowerLevel`s of two
 /// `PowerElement`s. `child` is the name of the `PowerElement` which has
 /// `PowerLevel`s that depend on `parent`.
@@ -60,6 +73,7 @@ type PowerDependency = table {
     1: child string:MAX_NAME_LENGTH;
     2: parent string:MAX_NAME_LENGTH;
     3: level_deps vector<LevelTuple>:MAX_LEVELS;
+    4: strength RequirementType;
 };
 
 /// Contains the `PowerElement` description and any dependencies it has on
@@ -75,6 +89,12 @@ open protocol PowerTokenProvider {
     /// create a relationship between this driver's power element(s) and the
     /// power element this token is associated with.
     flexible GetToken() -> (resource struct {
-        handle zx.Handle:EVENTPAIR;
+        handle zx.Handle:EVENT;
+        name string:MAX_NAME_LENGTH;
     }) error zx.Status;
+};
+
+@available(added=HEAD)
+service PowerTokenService {
+    token_provider client_end:PowerTokenProvider;
 };
