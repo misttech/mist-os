@@ -10,15 +10,19 @@ rustc_library("playground") {
   edition = "2021"
   with_unit_tests = true
   sources = [
+    "src/compiler.rs",
     "src/error.rs",
     "src/frame.rs",
+    "src/interpreter.rs",
     "src/lib.rs",
     "src/parser.rs",
+    "src/test.rs",
     "src/value.rs",
     "src/value/in_use_handle.rs",
     "src/value/iterator.rs",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fidl_codec/rust:fidl_codec",
     "//src/lib/fuchsia-async",

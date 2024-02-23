@@ -635,6 +635,13 @@ pub fn playground_semantic_compare(this: &Value, other: &Value) -> Option<Orderi
     }
 
     match (this, other) {
+        (a @ Value::OutOfLine(_), b @ Value::OutOfLine(_)) => {
+            if let (Some(a), Some(b)) = (try_promote(a), try_promote(b)) {
+                PartialOrd::partial_cmp(&a, &b)
+            } else {
+                None
+            }
+        }
         (Value::OutOfLine(a), b) => cmp_to_fidl(a, b),
         (a, Value::OutOfLine(b)) => cmp_to_fidl(b, a).map(Ordering::reverse),
         (Value::Bits(_, a), b) => playground_semantic_compare(a, b),
