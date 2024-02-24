@@ -372,8 +372,8 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/ui/input/bin/hid:bootfs",
 
     # tests
-    "//src/devices/bin/tee-test:bootfs",
     "//src/devices/block/bin/blktest:bootfs",
+    "//src/devices/tee/bin:bootfs",
     "//src/graphics/display/bin/display-test:bootfs",
     "//src/zircon/tests/evil:bootfs",
   ]
