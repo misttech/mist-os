@@ -116,6 +116,8 @@ open protocol CombinedBufferCollectionToken {
     // fuchsia.sysmem2/Node, with de-conflicted names:
     @selector("fuchsia.sysmem2/Node.Sync")
     flexible SyncV2() -> ();
+    @selector("fuchsia.sysmem2/Node.Release")
+    flexible ReleaseV2();
     @selector("fuchsia.sysmem2/Node.Close")
     flexible CloseV2();
     @selector("fuchsia.sysmem2/Node.SetName")

@@ -89,6 +89,7 @@ class BufferCollectionTokenGroup : public Node {
     // FIDL "compose Node" "interface" (identical among BufferCollection, BufferCollectionToken,
     // BufferCollectionTokenGroup)
     void Sync(SyncCompleter::Sync& completer) override;
+    void Release(ReleaseCompleter::Sync& completer) override;
     void Close(CloseCompleter::Sync& completer) override;
     void GetNodeRef(GetNodeRefCompleter::Sync& completer) override;
     void IsAlternateFor(IsAlternateForRequest& request,

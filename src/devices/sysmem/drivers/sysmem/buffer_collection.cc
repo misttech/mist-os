@@ -357,7 +357,7 @@ bool BufferCollection::CommonAttachTokenStage1(uint32_t rights_attenuation_mask,
                                                Completer& completer,
                                                NodeProperties** out_node_properties) {
   if (is_done_) {
-    // This is Close() followed by AttachToken(), which is not permitted and causes the
+    // This is Release() followed by AttachToken(), which is not permitted and causes the
     // BufferCollection to fail.
     FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
              "BufferCollection::AttachToken() attempted when is_done_");
@@ -455,7 +455,7 @@ void BufferCollection::CommonAttachLifetimeTracking(zx::eventpair server_end,
   TRACE_DURATION("gfx", "BufferCollection::AttachLifetimeTracking", "this", this,
                  "logical_buffer_collection", &logical_buffer_collection());
   if (is_done_) {
-    // This is Close() followed by AttachLifetimeTracking() which is not permitted and causes the
+    // This is Release() followed by AttachLifetimeTracking() which is not permitted and causes the
     // BufferCollection to fail.
     FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
              "BufferCollection::AttachLifetimeTracking() attempted when is_done_");
@@ -541,12 +541,20 @@ void BufferCollection::V2::handle_unknown_method(
                    "BufferCollection unknown method - ordinal: %" PRIx64, metadata.method_ordinal);
 }
 
-void BufferCollection::V1::Close(CloseCompleter::Sync& completer) { parent_.CloseImpl(completer); }
+void BufferCollection::V1::Close(CloseCompleter::Sync& completer) {
+  parent_.ReleaseImpl(completer);
+}
 
-void BufferCollection::V2::Close(CloseCompleter::Sync& completer) { parent_.CloseImpl(completer); }
+void BufferCollection::V2::Release(ReleaseCompleter::Sync& completer) {
+  parent_.ReleaseImpl(completer);
+}
+
+void BufferCollection::V2::Close(CloseCompleter::Sync& completer) {
+  parent_.ReleaseImpl(completer);
+}
 
 void BufferCollection::V1::DeprecatedClose(DeprecatedCloseCompleter::Sync& completer) {
-  parent_.CloseImpl(completer);
+  parent_.ReleaseImpl(completer);
 }
 
 void BufferCollection::V1::SetName(SetNameRequest& request, SetNameCompleter::Sync& completer) {

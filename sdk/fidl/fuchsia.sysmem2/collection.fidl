@@ -73,47 +73,48 @@ open protocol Node {
     ///
     /// Normally a participant will convert a `BufferCollectionToken` into a
     /// [`fuchsia.sysmem2/BufferCollection`], but a participant can instead send
-    /// `Close` via the token (and then close the channel immediately or shortly
-    /// later in response to server closing the server end), which avoids
-    /// causing buffer collection failure. Without a prior `Close`, closing the
-    /// `BufferCollectionToken` client end will cause buffer collection failure.
+    /// `Release` via the token (and then close the channel immediately or
+    /// shortly later in response to server closing the server end), which
+    /// avoids causing buffer collection failure. Without a prior `Release`,
+    /// closing the `BufferCollectionToken` client end will cause buffer
+    /// collection failure.
     ///
     /// ###### On a [`fuchsia.sysmem2/BufferCollection`] channel:
     ///
     /// By default the server handles unexpected closure of a
-    /// [`fuchsia.sysmem2/BufferCollection`] client end (without `Close` first)
-    /// by failing the buffer collection. Partly this is to expedite closing VMO
-    /// handles to reclaim memory when any participant fails. If a participant
-    /// would like to cleanly close a `BufferCollection` without causing buffer
-    /// collection failure, the participant can send `Close` before closing the
-    /// `BufferCollection` client end. The `Close` can occur before or after
-    /// `SetConstraints`. If before `SetConstraints`, the buffer collection
-    /// won't require constraints from this node in order to allocate. If after
-    /// `SetConstraints`, the constraints are retained and aggregated, despite
-    /// the lack of `BufferCollection` connection at the time of constraints
-    /// aggregation.
+    /// [`fuchsia.sysmem2/BufferCollection`] client end (without `Release`
+    /// first) by failing the buffer collection. Partly this is to expedite
+    /// closing VMO handles to reclaim memory when any participant fails. If a
+    /// participant would like to cleanly close a `BufferCollection` without
+    /// causing buffer collection failure, the participant can send `Release`
+    /// before closing the `BufferCollection` client end. The `Release` can
+    /// occur before or after `SetConstraints`. If before `SetConstraints`, the
+    /// buffer collection won't require constraints from this node in order to
+    /// allocate. If after `SetConstraints`, the constraints are retained and
+    /// aggregated, despite the lack of `BufferCollection` connection at the
+    /// time of constraints aggregation.
     ///
     /// ###### On a [`fuchsia.sysmem2/BufferCollectionTokenGroup`] channel:
     ///
     /// By default, unexpected closure of a `BufferCollectionTokenGroup` client
-    /// end (without `Close` first) will trigger failure of the buffer
+    /// end (without `Release` first) will trigger failure of the buffer
     /// collection. To close a `BufferCollectionTokenGroup` channel without
     /// failing the buffer collection, ensure that AllChildrenPresent() has been
-    /// sent, and send `Close` before closing the `BufferCollectionTokenGroup`
+    /// sent, and send `Release` before closing the `BufferCollectionTokenGroup`
     /// client end.
     ///
-    /// If `Close` occurs before
+    /// If `Release` occurs before
     /// [`fuchsia.sysmem2/BufferCollectionTokenGroup.AllChildrenPresent], the
-    /// buffer collection will fail (triggered by reception of `Close` without
+    /// buffer collection will fail (triggered by reception of `Release` without
     /// prior `AllChildrenPresent`). This is intentionally not analogous to how
-    /// [`fuchsia.sysmem2/BufferCollection.Close`] without
+    /// [`fuchsia.sysmem2/BufferCollection.Release`] without
     /// [`fuchsia.sysmem2/BufferCollection.SetConstraints`] first doesn't cause
     /// buffer collection failure. For a `BufferCollectionTokenGroup`, clean
-    /// close requires `AllChildrenPresent` (if not already sent), then `Close`,
-    /// then close client end.
+    /// close requires `AllChildrenPresent` (if not already sent), then
+    /// `Release`, then close client end.
     ///
-    /// If `Close` occurs after `AllChildrenPresent`, the children and all their
-    /// constraints remain intact (just as they would if the
+    /// If `Release` occurs after `AllChildrenPresent`, the children and all
+    /// their constraints remain intact (just as they would if the
     /// `BufferCollectionTokenGroup` channel had remained open), and the client
     /// end close doesn't trigger buffer collection failure.
     ///
@@ -123,12 +124,14 @@ open protocol Node {
     /// separate failure domain created by
     /// [`fuchsia.sysmem2/BufferCollectionToken.SetDispensable`] or
     /// [`fuchsia.sysmem2/BufferCollection.AttachToken`]. When a client end
-    /// unexpectedly closes (without `Close` first) and that client end is under
-    /// a failure domain, instead of failing the whole buffer collection, the
-    /// failure domain is failed, but the buffer collection itself is isolated
-    /// from failure of the failure domain. Such failure domains can be nested,
-    /// in which case only the inner-most failure domain in which the `Node`
-    /// resides fails.
+    /// unexpectedly closes (without `Release` first) and that client end is
+    /// under a failure domain, instead of failing the whole buffer collection,
+    /// the failure domain is failed, but the buffer collection itself is
+    /// isolated from failure of the failure domain. Such failure domains can be
+    /// nested, in which case only the inner-most failure domain in which the
+    /// `Node` resides fails.
+    flexible Release();
+    // TODO(b/316646315): Remove Close(); replaced by Release() above.
     flexible Close();
 
     /// Set a name for VMOs in this buffer collection. The name may be truncated
@@ -165,11 +168,11 @@ open protocol Node {
     /// created [`fuchsia.sysmem2/Node`].
     ///
     /// Also used when verbose logging is enabled (see `SetVerboseLogging`) to
-    /// indicate which client is closing their channel first, leading to
-    /// subtree failure (which can be normal if the purpose of the subtree is
-    /// over, but if happening earlier than expected, the
-    /// client-channel-specific name can help diagnose where the failure is
-    /// first coming from, from sysmem's point of view).
+    /// indicate which client is closing their channel first, leading to subtree
+    /// failure (which can be normal if the purpose of the subtree is over, but
+    /// if happening earlier than expected, the client-channel-specific name can
+    /// help diagnose where the failure is first coming from, from sysmem's
+    /// point of view).
     ///
     /// All table fields are currently required.
     ///
@@ -287,18 +290,17 @@ open protocol Node {
     ///     and the `node_ref` `Node` is not a `BufferCollectionTokenGroup`.
     ///     Currently, this means the first parent node in common is a
     ///     `BufferCollectionToken` or `BufferCollection` (regardless of not
-    ///     `Close`ed or `Close`ed).  This means that the calling `Node` and the
-    ///     `node_ref` `Node` may have both their constraints apply during
-    ///     constraints aggregation of the logical allocation, if both `Node`(s)
-    ///     are selected by any parent `BufferCollectionTokenGroup`(s) involved.
-    ///     In this case, there is no `BufferCollectionTokenGroup` that will
+    ///     `Release`ed).  This means that the calling `Node` and the `node_ref`
+    ///     `Node` may have both their constraints apply during constraints
+    ///     aggregation of the logical allocation, if both `Node`(s) are
+    ///     selected by any parent `BufferCollectionTokenGroup`(s) involved. In
+    ///     this case, there is no `BufferCollectionTokenGroup` that will
     ///     directly prevent the two `Node`(s) from both being selected and
     ///     their constraints both aggregated, but even when false, one or both
     ///     `Node`(s) may still be eliminated from consideration if one or both
     ///     `Node`(s) has a direct or indirect parent
     ///     `BufferCollectionTokenGroup` which selects a child subtree other
-    ///     than the subtree containing the calling `Node` or `node_ref`
-    ///     `Node`.
+    ///     than the subtree containing the calling `Node` or `node_ref` `Node`.
     /// * error `ZX_ERR_NOT_FOUND` The node_ref wasn't associated with the same
     ///   buffer collection as the calling `Node`. Another reason for this error
     ///   is if the `node_ref` is an [`zx.Handle.EVENT`] handle with sufficient
@@ -366,9 +368,9 @@ open protocol Node {
     /// Currently, no conversion from strong `Node` to weak `Node` after ready
     /// for allocation is provided, but a client can simulate that by creating
     /// an additional `Node` before allocation and setting that additional
-    /// `Node` to weak, and then potentially at some point later sending `Close`
-    /// and closing the client end of the client's strong `Node`, but keeping
-    /// the client's weak `Node`.
+    /// `Node` to weak, and then potentially at some point later sending
+    /// `Release` and closing the client end of the client's strong `Node`, but
+    /// keeping the client's weak `Node`.
     ///
     /// Zero strong `Node`(s) and zero strong VMO handles will result in buffer
     /// collection failure (all `Node` client end(s) will see
@@ -377,7 +379,7 @@ open protocol Node {
     /// this situation until all `Node`(s) are ready for allocation. For initial
     /// allocation to succeed, at least one strong `Node` is required to exist
     /// at allocation time, but after that client receives VMO handles, that
-    /// client can `BufferCollection.Close` and close the client end without
+    /// client can `BufferCollection.Release` and close the client end without
     /// causing this type of failure.
     ///
     /// This implies [`fuchsia.sysmem2/Node.SetWeakOk`] as well, but does not
@@ -479,9 +481,9 @@ open protocol BufferCollectionToken {
     ///
     /// All tokens must be turned in to sysmem via
     /// [`fuchsia.sysmem2/Allocator.BindSharedCollection`] or
-    /// [`fuchsia.sysmem2/Node.Close`] for a `BufferCollection` to successfully
-    /// allocate buffers (or to logically allocate buffers in the case of
-    /// subtrees involving
+    /// [`fuchsia.sysmem2/Node.Release`] for a `BufferCollection` to
+    /// successfully allocate buffers (or to logically allocate buffers in the
+    /// case of subtrees involving
     /// [`fuchsia.sysmem2/BufferCollectionToken.AttachToken`]).
     ///
     /// All table fields are currently required.
@@ -530,8 +532,8 @@ open protocol BufferCollectionToken {
     ///
     /// All tokens must be turned in via
     /// [`fuchsia.sysmem2/Allocator.BindSharedCollection`] or
-    /// [`fuchsia.sysmem2/Node.Close`] for a `BufferCollection` to successfully
-    /// allocate buffers.
+    /// [`fuchsia.sysmem2/Node.Release`] for a `BufferCollection` to
+    /// successfully allocate buffers.
     ///
     /// All table fields are currently required.
     ///
@@ -564,12 +566,13 @@ open protocol BufferCollectionToken {
     ///
     /// Normally, if a client closes a [`fuchsia.sysmem2/BufferCollection`]
     /// client end without having sent
-    /// [`fuchsia.sysmem2/BufferCollection.Close`] first, the `BufferCollection`
-    /// [`fuchisa.sysmem2/Node`] will fail, which also propagates failure to the
-    /// parent [`fuchsia.sysmem2/Node`] and so on up to the root `Node`, which
-    /// fails the whole buffer collection. In contrast, a dispensable `Node` can
-    /// fail after buffers are allocated without causing failure of its parent
-    /// in the [`fuchsia.sysmem2/Node`] heirarchy.
+    /// [`fuchsia.sysmem2/BufferCollection.Release`] first, the
+    /// `BufferCollection` [`fuchisa.sysmem2/Node`] will fail, which also
+    /// propagates failure to the parent [`fuchsia.sysmem2/Node`] and so on up
+    /// to the root `Node`, which fails the whole buffer collection. In
+    /// contrast, a dispensable `Node` can fail after buffers are allocated
+    /// without causing failure of its parent in the [`fuchsia.sysmem2/Node`]
+    /// heirarchy.
     ///
     /// The dispensable `Node` participates in constraints aggregation along
     /// with its parent before buffer allocation. If the dispensable `Node`
@@ -730,12 +733,12 @@ open protocol BufferCollection {
     ///     collection must be turned in via `BindSharedCollection` to get a
     ///     [`fuchsia.sysmem2/BufferCollection`] (for brevity, this is assuming
     ///     [`fuchsia.sysmem2/BufferCollection.AttachToken`] isn't being used),
-    ///     or have had [`fuchsia.sysmem2/BufferCollectionToken.Close`] sent to
-    ///     them.
+    ///     or have had [`fuchsia.sysmem2/BufferCollectionToken.Release`] sent
+    ///     to them.
     ///   * All [`fuchsia.sysmem2/BufferCollection`](s) of the buffer collection
     ///     must have had [`fuchsia.sysmem2/BufferCollection.SetConstraints`]
-    ///     sent to them, or had [`fuchsia.sysmem2/BufferCollection.Close`] sent
-    ///     to them.
+    ///     sent to them, or had [`fuchsia.sysmem2/BufferCollection.Release`]
+    ///     sent to them.
     ///
     /// - result `buffer_collection_info` The VMO handles and other related
     ///   info.
@@ -803,10 +806,10 @@ open protocol BufferCollection {
     /// `BufferCollection` `Node` as normal by sending
     /// [`fuchsia.sysmem2/Allocator.BindSharedCollection`], or can be closed
     /// without causing subtree failure by sending
-    /// [`fuchsia.sysmem2/BufferCollectionToken.Close`]. Assuming the former,
+    /// [`fuchsia.sysmem2/BufferCollectionToken.Release`]. Assuming the former,
     /// the [`fuchsia.sysmem2/BufferCollection.SetConstraints`] message or
-    /// [`fuchsia.sysmem2/BufferCollection.Close`] message should be sent to the
-    /// `BufferCollection`.
+    /// [`fuchsia.sysmem2/BufferCollection.Release`] message should be sent to
+    /// the `BufferCollection`.
     ///
     /// Within the subtree, a success result from
     /// [`fuchsia.sysmem2/BufferCollection.WaitForAllBuffersAllocated`] means
@@ -1021,7 +1024,7 @@ open protocol BufferCollection {
 /// Similar to [`fuchsia.sysmem2/BufferCollectionToken`] and
 /// [`fuchsia.sysmem2/BufferCollection`], closure of the
 /// `BufferCollectionTokenGroup` channel without sending
-/// [`fuchsia.sysmem2/Node.Close`] first will cause buffer collection failure
+/// [`fuchsia.sysmem2/Node.Release`] first will cause buffer collection failure
 /// (or subtree failure if using
 /// [`fuchsia.sysmem2/BufferCollectionToken.SetDispensable`] or
 /// [`fuchsia.sysmem2/BufferCollection.AttachToken`] and the
@@ -1097,9 +1100,12 @@ open protocol BufferCollectionTokenGroup {
     /// inform sysmem that no more children will be created, so that sysmem can
     /// know when it's ok to start aggregating constraints.
     ///
-    /// If [`fuchsia.sysmem2/Node.Close`] is to be sent, it should be sent after
-    /// `AllChildrenPresent`, else failure of the group's subtree will be
-    /// triggered. This is intentionally not analogous to how `Close` without
+    /// Sending CreateChild after AllChildrenPresent is not permitted; this will
+    /// fail the group's subtree and close the connection.
+    ///
+    /// If [`fuchsia.sysmem2/Node.Release`] is to be sent, it should be sent
+    /// after `AllChildrenPresent`, else failure of the group's subtree will be
+    /// triggered. This is intentionally not analogous to how `Release` without
     /// prior [`fuchsia.sysmem2/BufferCollection.SetConstraints`] doesn't cause
     /// subtree failure.
     flexible AllChildrenPresent();

@@ -1661,9 +1661,9 @@ TEST(Sysmem, NoSyncV2) {
   set_debug_request.id() = 3u;
   ASSERT_TRUE(token_2->SetDebugClientInfo(std::move(set_debug_request)).is_ok());
 
-  // Close to prevent Sync on token_client_1 from failing later due to LogicalBufferCollection
+  // Release to prevent Sync on token_client_1 from failing later due to LogicalBufferCollection
   // failure caused by the token handle closing.
-  ASSERT_TRUE(token_2->Close().is_ok());
+  ASSERT_TRUE(token_2->Release().is_ok());
 
   v2::AllocatorBindSharedCollectionRequest bind_shared_request;
   bind_shared_request.token() = token_2.TakeClientEnd();
@@ -2539,7 +2539,7 @@ TEST(Sysmem, CloseWithOutstandingWaitV2) {
   ASSERT_OK(verify_connectivity_v2(*allocator_1));
 }
 
-TEST(Sysmem, ConstraintsRetainedBeyondCleanCloseV2) {
+TEST(Sysmem, ConstraintsRetainedBeyondReleaseV2) {
   auto allocator = connect_to_sysmem_driver_v2();
 
   auto token_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
@@ -2624,9 +2624,9 @@ TEST(Sysmem, ConstraintsRetainedBeyondCleanCloseV2) {
   // which would cause sysmem to not recognize the token.
   ASSERT_TRUE(collection_1->Sync().is_ok());
 
-  // client 1 will now do a clean Close(), but client 1's constraints will be
+  // client 1 will now do a Release(), but client 1's constraints will be
   // retained by the LogicalBufferCollection.
-  ASSERT_TRUE(collection_1->Close().is_ok());
+  ASSERT_TRUE(collection_1->Release().is_ok());
   // close client 1's channel.
   collection_1 = {};
 
@@ -2660,8 +2660,7 @@ TEST(Sysmem, ConstraintsRetainedBeyondCleanCloseV2) {
 
   //
   // Now that client 2 has SetConstraints(), the allocation will proceed, with
-  // client 1's constraints included despite client 1 having done a clean
-  // Close().
+  // client 1's constraints included despite client 1 having done a Release().
   //
   auto allocate_result_2 = collection_2->WaitForAllBuffersAllocated();
   ASSERT_TRUE(allocate_result_2.is_ok());
@@ -3394,8 +3393,8 @@ TEST(Sysmem, PixelFormatBgr24V2) {
   }
 }
 
-// Test that closing a token handle that's had Close() called on it doesn't crash sysmem.
-TEST(Sysmem, CloseTokenV2) {
+// Test that closing a token handle that's had Release() called on it doesn't crash sysmem.
+TEST(Sysmem, ReleaseTokenV2) {
   auto allocator = connect_to_sysmem_driver_v2();
 
   auto token_endpoints_1 = fidl::CreateEndpoints<v2::BufferCollectionToken>();
@@ -3418,7 +3417,7 @@ TEST(Sysmem, CloseTokenV2) {
   ASSERT_TRUE(token_1->Duplicate(std::move(duplicate_request)).is_ok());
 
   ASSERT_TRUE(token_1->Sync().is_ok());
-  ASSERT_TRUE(token_1->Close().is_ok());
+  ASSERT_TRUE(token_1->Release().is_ok());
   token_1 = {};
 
   // Try to ensure sysmem processes the token closure before the sync.
@@ -5970,7 +5969,7 @@ TEST(Sysmem, Weak_SetWeak_SparseBufferSet) {
   ASSERT_EQ(ZX_ERR_TIMED_OUT, wait_status);
   // close the parent_collection strong Node to let the first and last buffer get cleaned up in
   // sysmem
-  auto close_result = parent_collection->Close();
+  auto close_result = parent_collection->Release();
   ASSERT_TRUE(close_result.is_ok());
   parent_collection.TakeClientEnd();
   pending_signals = 0;
@@ -6010,7 +6009,7 @@ TEST(Sysmem, Weak_ZeroStrongNodesBeforeReadyForAllocation_Fails) {
   ASSERT_TRUE(child_token->SetWeak().is_ok());
   auto child_collection = convert_token_to_collection_v2(std::move(child_token));
   ASSERT_TRUE(child_collection->Sync().is_ok());
-  ASSERT_TRUE(parent_token->Close().is_ok());
+  ASSERT_TRUE(parent_token->Release().is_ok());
   // Closing the last strong Node before initial allocation is expected to cause
   // LogicalBufferCollection failure. This can be thought of as essentially equivalent to how
   // closing the last stromg VMO causes LogicalBufferCollection failure, since at this point there
@@ -6067,7 +6066,7 @@ TEST(Sysmem, Weak_CloseWeakAsap_Signaled) {
   }
 
   // drop the strong parent Node, which leaves only the parent_info holding the only strong VMOs
-  ASSERT_TRUE(parent_collection->Close().is_ok());
+  ASSERT_TRUE(parent_collection->Release().is_ok());
   parent_collection.TakeClientEnd();
   // give a moment for LogicalBufferCollection to fail, in case it incorrectly fails at this point
   zx::nanosleep(zx::deadline_after(zx::msec(100)));
@@ -6984,7 +6983,7 @@ TEST(Sysmem, BufferCollectionTokenGroupCreateChildZeroAttenuationMaskFails) {
     // give up after kWaitDuration
     ASSERT_TRUE(zx::clock::get_monotonic() < start_wait + kWaitDuration);
     if (parent->Sync().is_ok()) {
-      // failure due to Close before AllChildrenPresent takes effect async; try again
+      // wait longer for async failure
       zx::nanosleep(zx::deadline_after(zx::msec(10)));
       continue;
     } else {
@@ -7004,26 +7003,26 @@ TEST(Sysmem, BufferCollectionTokenGroupCreateChildrenZeroAttenuationMaskFails) {
   ASSERT_FALSE(create_sync_result.is_ok());
 }
 
-TEST(Sysmem, BufferCollectionTokenGroupCloseBeforeAllChildrenPresentFails) {
+TEST(Sysmem, BufferCollectionTokenGroupReleaseBeforeAllChildrenPresentFails) {
   auto parent = create_initial_token_v2();
   auto group = create_group_under_token_v2(parent);
   auto child1 = create_token_under_group_v2(group);
 
-  // sending Close before AllChildrenPresent expected to cause buffer collection failure
-  auto close_result = group->Close();
+  // sending Release before AllChildrenPresent expected to cause buffer collection failure
+  auto close_result = group->Release();
   // one-way message; no visible error yet
   ASSERT_TRUE(close_result.is_ok());
 
   // We shouldn't have to wait anywhere near this long, but to avoid flakes we
   // won't fail the test until it's very clear that sysmem hasn't failed the
-  // buffer collection despite Close before AllChildrenPresent.
+  // buffer collection despite Release before AllChildrenPresent.
   constexpr zx::duration kWaitDuration = zx::sec(10);
   const zx::time start_wait = zx::clock::get_monotonic();
   while (true) {
     // give up after kWaitDuration
     ASSERT_TRUE(zx::clock::get_monotonic() < start_wait + kWaitDuration);
     if (parent->Sync().is_ok()) {
-      // failure due to Close before AllChildrenPresent takes effect async; try again
+      // failure due to Release before AllChildrenPresent takes effect async; try again
       zx::nanosleep(zx::deadline_after(zx::msec(10)));
       continue;
     } else {

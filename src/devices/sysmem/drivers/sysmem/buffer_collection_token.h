@@ -29,16 +29,16 @@ class BufferCollectionToken : public Node, public LoggingMixin {
       NodeProperties* new_node_properties, const TokenServerEnd& server_end);
 
   template <class CompleterSync>
-  void TokenCloseImpl(CompleterSync& completer) {
+  void TokenReleaseImpl(CompleterSync& completer) {
     // BufferCollectionToken has one additional error case we want to check, so check before calling
     // Node::CloseImpl().
     if (buffer_collection_request_) {
       FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
-               "BufferCollectionToken::Close() when buffer_collection_request_");
+               "BufferCollectionToken::Close()/Release() when buffer_collection_request_");
       // We're failing async - no need to try to fail sync.
       return;
     }
-    CloseImpl(completer);
+    ReleaseImpl(completer);
   }
 
   void OnServerKoid();
@@ -134,6 +134,7 @@ class BufferCollectionToken : public Node, public LoggingMixin {
     // FIDL "compose Node" "interface" (identical among BufferCollection, BufferCollectionToken,
     // BufferCollectionTokenGroup)
     void SyncV2(SyncV2Completer::Sync& completer) override;
+    void ReleaseV2(ReleaseV2Completer::Sync& completer) override;
     void CloseV2(CloseV2Completer::Sync& completer) override;
     void GetNodeRefV2(GetNodeRefV2Completer::Sync& completer) override;
     void IsAlternateForV2(IsAlternateForV2Request& request,

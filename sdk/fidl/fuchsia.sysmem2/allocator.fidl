@@ -45,8 +45,8 @@ open protocol Allocator {
     /// [`fuchsia.sysmem2/BufferCollection.WaitForAllBuffersAllocated`].
     ///
     /// Closing the client end of a `BufferCollectionToken` or
-    /// `BufferCollection` (without `Close` first) will fail all client ends in
-    /// the same failure domain, which by default is all client ends of the
+    /// `BufferCollection` (without `Release` first) will fail all client ends
+    /// in the same failure domain, which by default is all client ends of the
     /// buffer collection. See
     /// [`fuchsia.sysmem2/BufferCollection.SetDispensable`] and
     /// [`fuchsia.sysmem2/BufferCollection.AttachToken`] for ways to create
@@ -65,10 +65,10 @@ open protocol Allocator {
     ///
     /// All `BufferCollectionToken`(s) duplicated from a root
     /// `BufferCollectionToken` (created via `AllocateSharedCollection`) must be
-    /// "turned in" via `BindSharedCollection` (or `Close`ed), and all existing
-    /// `BufferCollection` client ends must have sent `SetConstraints` before
-    /// the logical BufferCollection will be populated with buffers (or will
-    /// fail if the overall set of constraints can't be satisfied).
+    /// "turned in" via `BindSharedCollection` (or `Release`ed), and all
+    /// existing `BufferCollection` client ends must have sent `SetConstraints`
+    /// before the logical BufferCollection will be populated with buffers (or
+    /// will fail if the overall set of constraints can't be satisfied).
     ///
     /// + request `token` The client endpoint of a channel whose server end was
     ///   sent to sysmem using

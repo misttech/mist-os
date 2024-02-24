@@ -254,18 +254,23 @@ void BufferCollectionToken::CombinedTokenServer::DeprecatedSyncV1(
 // Clean token close without causing LogicalBufferCollection failure.
 void BufferCollectionToken::CombinedTokenServer::CloseV1(CloseV1Completer::Sync& completer) {
   parent_.last_seen_version_ = ConnectionVersion::kVersion1;
-  parent_.TokenCloseImpl(completer);
+  parent_.TokenReleaseImpl(completer);
+}
+
+void BufferCollectionToken::CombinedTokenServer::ReleaseV2(ReleaseV2Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion2;
+  parent_.TokenReleaseImpl(completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::CloseV2(CloseV2Completer::Sync& completer) {
   parent_.last_seen_version_ = ConnectionVersion::kVersion2;
-  parent_.TokenCloseImpl(completer);
+  parent_.TokenReleaseImpl(completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::DeprecatedCloseV1(
     DeprecatedCloseV1Completer::Sync& completer) {
   parent_.last_seen_version_ = ConnectionVersion::kVersion1;
-  parent_.TokenCloseImpl(completer);
+  parent_.TokenReleaseImpl(completer);
 }
 
 void BufferCollectionToken::OnServerKoid() {

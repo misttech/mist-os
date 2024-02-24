@@ -70,7 +70,7 @@ class Node : public fbl::RefCounted<Node> {
 
   // Consider whether to use the sub-class accessors below, or whether to use
   // NodeProperties::is_token(), is_token_group(), is_collection() instead, depending on the
-  // situation.  A client Close() + channel close will replace the sub-class of Node with an
+  // situation.  A client Release() + channel close will replace the sub-class of Node with an
   // OrphanedNode, yet the NodeProperties still needs to be treated as a token, collection, or
   // group when it comes to the logical node tree and allocation.  These accessors are for getting a
   // pointer to the current Node sub-class, not for checking the logical node type.  These can also
@@ -158,23 +158,23 @@ class Node : public fbl::RefCounted<Node> {
     TRACE_DURATION("gfx", "Node::SyncImpl", "this", this, "logical_buffer_collection",
                    &logical_buffer_collection());
     if (is_done_) {
-      // Probably a Close() followed by Sync(), which is illegal and
+      // Probably a Release() followed by Sync(), which is illegal and
       // causes the whole LogicalBufferCollection to fail.
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "Sync() after Close()");
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "Sync() after Close()/Release()");
       return;
     }
 
     completer.Reply();
   }
 
-  template <class CloseCompleterSync>
-  void CloseImpl(CloseCompleterSync& completer) {
+  template <class ReleaseCompleterSync>
+  void ReleaseImpl(ReleaseCompleterSync& completer) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "Close() after Close()");
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "Close()/Release() after Close()/Release()");
       return;
     }
     // We still want to enforce that the client doesn't send any other messages
-    // between Close() and closing the channel, so we just set is_done_ here and
+    // between Release() and closing the channel, so we just set is_done_ here and
     // do a FailSync() if is_done_ is seen to be set while handling any other
     // message.
     is_done_ = true;
@@ -193,7 +193,7 @@ class Node : public fbl::RefCounted<Node> {
   template <class SetNameRequest, class SetNameCompleterSync>
   void SetNameImplV2(SetNameRequest& request, SetNameCompleterSync& completer) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetName() after Close()");
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetName() after Release()");
       return;
     }
     if (!request.priority().has_value()) {
@@ -228,7 +228,7 @@ class Node : public fbl::RefCounted<Node> {
   void SetDebugClientInfoImplV2(SetDebugClientInfoRequest& request,
                                 SetDebugClientInfoCompleterSync& completer) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetDebugClientInfo() after Close()");
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetDebugClientInfo() after Release()");
       return;
     }
     if (!request.name().has_value()) {
@@ -265,7 +265,7 @@ class Node : public fbl::RefCounted<Node> {
                                         SetDebugTimeoutLogDeadlineCompleterSync& completer) {
     if (is_done_) {
       FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
-               "SetDebugTimeoutLogDeadline() after Close()");
+               "SetDebugTimeoutLogDeadline() after Release()");
       return;
     }
     if (!request.deadline().has_value()) {
@@ -279,7 +279,8 @@ class Node : public fbl::RefCounted<Node> {
   template <class SetVerboseLoggingCompleterSync>
   void SetVerboseLoggingImpl(SetVerboseLoggingCompleterSync& completer) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetVerboseLogging() after Close()");
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+               "SetVerboseLogging() after Close()/Release()");
       return;
     }
     logical_buffer_collection_->SetVerboseLogging();
@@ -288,7 +289,7 @@ class Node : public fbl::RefCounted<Node> {
   template <typename GetNodeRefCompleterSync>
   bool CommonGetNodeRefImplStage1(GetNodeRefCompleterSync& completer, zx::event* out_to_vend) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "GetNodeRef() after Close()");
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "GetNodeRef() after Close()/Release()");
       return false;
     }
     // No process actually needs to wait on or signal this event.  It's just a generic handle that
@@ -325,7 +326,7 @@ class Node : public fbl::RefCounted<Node> {
   template <typename Completer>
   bool CommonIsAlternateFor(zx::event node_ref, Completer& completer, bool* out_result) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "IsAlternateFor() after Close()");
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "IsAlternateFor() after Release()");
       return false;
     }
     zx_koid_t node_ref_koid;
@@ -364,7 +365,7 @@ class Node : public fbl::RefCounted<Node> {
     ZX_DEBUG_ASSERT(common_parent);
     // The common_parent can presently be associated with an OrphanedNode, but
     // common_parent->is_token_group() will still return true if the original Node sub-class was
-    // BufferCollectionTokenGroup (even after the client has done a Close() + channel close on
+    // BufferCollectionTokenGroup (even after the client has done a Release() + channel close on
     // common_parent).
     bool is_alternate_for = common_parent->is_token_group();
     *out_result = is_alternate_for;
@@ -405,7 +406,7 @@ class Node : public fbl::RefCounted<Node> {
             class Response = fuchsia_sysmem2::NodeGetBufferCollectionIdResponse>
   void GetBufferCollectionIdImplV2(GetBufferCollectionIdCompleterSync& completer) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "GetBufferCollectionId after Close");
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "GetBufferCollectionId after Release");
       return;
     }
     Response response;
@@ -416,7 +417,7 @@ class Node : public fbl::RefCounted<Node> {
   template <class SetWeakCompleterSync>
   void SetWeakImplV2(SetWeakCompleterSync& completer) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetWeak after Close");
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetWeak after Release");
       return;
     }
     if (ReadyForAllocation()) {
@@ -446,9 +447,9 @@ class Node : public fbl::RefCounted<Node> {
 
   virtual void CloseServerBinding(zx_status_t epitaph) = 0;
 
-  // Becomes true on the first Close() (or BindSharedCollection(), in the case of
+  // Becomes true on the first Release() (or BindSharedCollection(), in the case of
   // BufferCollectionToken).  This being true means a channel close is not fatal to the node's
-  // sub-tree.  However, if the client sends a redundant Close(), that is fatal to the node's
+  // sub-tree.  However, if the client sends a redundant Release(), that is fatal to the node's
   // sub-tree.
   bool is_done_ = false;
 
@@ -483,8 +484,8 @@ class Node : public fbl::RefCounted<Node> {
   // The main way we avoid accessing NodeProperties beyond when it goes away is the setting of
   // error_handler_ = {} in the two CloseChannel() methods.  We rely on sub-class's error_handler_
   // not running after CloseChannel(), and we rely on LLCPP not calling protocol message handlers
-  // after server binding Close() (other than completion of any currently-in-progress message
-  // handler), since we're running Close() on the same dispatcher.
+  // after server binding Release() (other than completion of any currently-in-progress message
+  // handler), since we're running Release() on the same dispatcher.
   NodeProperties* node_properties_ = nullptr;
 
   // We keep server_end_ around
