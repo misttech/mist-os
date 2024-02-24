@@ -4,8 +4,10 @@
 
 use anyhow::{Context as _, Error};
 use component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirType};
+use fidl_fuchsia_net_stackmigrationdeprecated as fnet_stack_migration;
 use once_cell::sync::OnceCell;
 use serde::Serialize;
+use serde_json::Value;
 
 fn serialize_ipv4<S: serde::Serializer>(
     addresses: &Vec<std::net::Ipv4Addr>,
@@ -122,11 +124,83 @@ impl From<(fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net:
     }
 }
 
+#[derive(Debug, PartialEq, Serialize)]
+/// A serializable alternative to [`fnet_stack_migration::NetstackVersion`].
+pub enum NetstackVersion {
+    Netstack2,
+    Netstack3,
+}
+
+impl From<fnet_stack_migration::NetstackVersion> for NetstackVersion {
+    fn from(version: fnet_stack_migration::NetstackVersion) -> NetstackVersion {
+        match version {
+            fnet_stack_migration::NetstackVersion::Netstack2 => NetstackVersion::Netstack2,
+            fnet_stack_migration::NetstackVersion::Netstack3 => NetstackVersion::Netstack3,
+        }
+    }
+}
+impl From<NetstackVersion> for fnet_stack_migration::NetstackVersion {
+    fn from(version: NetstackVersion) -> fnet_stack_migration::NetstackVersion {
+        match version {
+            NetstackVersion::Netstack2 => fnet_stack_migration::NetstackVersion::Netstack2,
+            NetstackVersion::Netstack3 => fnet_stack_migration::NetstackVersion::Netstack3,
+        }
+    }
+}
+
+impl From<fnet_stack_migration::VersionSetting> for NetstackVersion {
+    fn from(version: fnet_stack_migration::VersionSetting) -> NetstackVersion {
+        let fnet_stack_migration::VersionSetting { version } = version;
+        version.into()
+    }
+}
+
+impl From<NetstackVersion> for fnet_stack_migration::VersionSetting {
+    fn from(version: NetstackVersion) -> fnet_stack_migration::VersionSetting {
+        fnet_stack_migration::VersionSetting { version: version.into() }
+    }
+}
+
+impl TryFrom<Value> for NetstackVersion {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<NetstackVersion, Error> {
+        match value {
+            Value::String(value) => match value.to_lowercase().as_str() {
+                "ns2" | "netstack2" => Ok(NetstackVersion::Netstack2),
+                "ns3" | "netstack3" => Ok(NetstackVersion::Netstack3),
+                _ => Err(anyhow!("unrecognized netstack version: {}", value)),
+            },
+            _ => Err(anyhow!("unrecognized netstack version: {:?}", value)),
+        }
+    }
+}
+
+#[derive(Serialize)]
+/// A serializable alternative to [`fnet_stack_migration::InEffectVersion`].
+pub struct InEffectNetstackVersion {
+    current_boot: NetstackVersion,
+    automated_selection: Option<NetstackVersion>,
+    user_selection: Option<NetstackVersion>,
+}
+
+impl From<fnet_stack_migration::InEffectVersion> for InEffectNetstackVersion {
+    fn from(in_effect: fnet_stack_migration::InEffectVersion) -> InEffectNetstackVersion {
+        let fnet_stack_migration::InEffectVersion { current_boot, automated, user } = in_effect;
+        InEffectNetstackVersion {
+            current_boot: current_boot.into(),
+            automated_selection: automated.map(|selection| (*selection).into()),
+            user_selection: user.map(|selection| (*selection).into()),
+        }
+    }
+}
+
 /// Network stack operations.
 #[derive(Debug, Default)]
 pub struct NetstackFacade {
     interfaces_state: OnceCell<fidl_fuchsia_net_interfaces::StateProxy>,
     root_interfaces: OnceCell<fidl_fuchsia_net_root::InterfacesProxy>,
+    netstack_migration_state: OnceCell<fnet_stack_migration::StateProxy>,
+    netstack_migration_control: OnceCell<fnet_stack_migration::ControlProxy>,
 }
 
 async fn get_netstack_proxy<P: fidl::endpoints::DiscoverableProtocolMarker>(
@@ -140,11 +214,27 @@ async fn get_netstack_proxy<P: fidl::endpoints::DiscoverableProtocolMarker>(
     Ok(proxy)
 }
 
+async fn get_netstack_migration_proxy<P: fidl::endpoints::DiscoverableProtocolMarker>(
+) -> Result<P::Proxy, Error> {
+    let query =
+        fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_sys2::RealmQueryMarker>()?;
+    let moniker = "./core/network/netstack-migration".try_into()?;
+    let proxy =
+        connect_to_instance_protocol_at_dir_root::<P>(&moniker, OpenDirType::Exposed, &query)
+            .await?;
+    Ok(proxy)
+}
+
 impl NetstackFacade {
     async fn get_interfaces_state(
         &self,
     ) -> Result<&fidl_fuchsia_net_interfaces::StateProxy, Error> {
-        let Self { interfaces_state, root_interfaces: _ } = self;
+        let Self {
+            interfaces_state,
+            root_interfaces: _,
+            netstack_migration_state: _,
+            netstack_migration_control: _,
+        } = self;
         if let Some(state_proxy) = interfaces_state.get() {
             Ok(state_proxy)
         } else {
@@ -157,7 +247,12 @@ impl NetstackFacade {
     }
 
     async fn get_root_interfaces(&self) -> Result<&fidl_fuchsia_net_root::InterfacesProxy, Error> {
-        let Self { interfaces_state: _, root_interfaces } = self;
+        let Self {
+            interfaces_state: _,
+            root_interfaces,
+            netstack_migration_state: _,
+            netstack_migration_control: _,
+        } = self;
         if let Some(interfaces_proxy) = root_interfaces.get() {
             Ok(interfaces_proxy)
         } else {
@@ -166,6 +261,46 @@ impl NetstackFacade {
             root_interfaces.set(interfaces_proxy).unwrap();
             let interfaces_proxy = root_interfaces.get().unwrap();
             Ok(interfaces_proxy)
+        }
+    }
+
+    async fn get_netstack_migration_state(
+        &self,
+    ) -> Result<&fnet_stack_migration::StateProxy, Error> {
+        let Self {
+            interfaces_state: _,
+            root_interfaces: _,
+            netstack_migration_state,
+            netstack_migration_control: _,
+        } = self;
+        if let Some(state_proxy) = netstack_migration_state.get() {
+            Ok(state_proxy)
+        } else {
+            let state_proxy =
+                get_netstack_migration_proxy::<fnet_stack_migration::StateMarker>().await?;
+            netstack_migration_state.set(state_proxy).unwrap();
+            let state_proxy = netstack_migration_state.get().unwrap();
+            Ok(state_proxy)
+        }
+    }
+
+    async fn get_netstack_migration_control(
+        &self,
+    ) -> Result<&fnet_stack_migration::ControlProxy, Error> {
+        let Self {
+            interfaces_state: _,
+            root_interfaces: _,
+            netstack_migration_state: _,
+            netstack_migration_control,
+        } = self;
+        if let Some(control_proxy) = netstack_migration_control.get() {
+            Ok(control_proxy)
+        } else {
+            let control_proxy =
+                get_netstack_migration_proxy::<fnet_stack_migration::ControlMarker>().await?;
+            netstack_migration_control.set(control_proxy).unwrap();
+            let control_proxy = netstack_migration_control.get().unwrap();
+            Ok(control_proxy)
         }
     }
 
@@ -310,15 +445,35 @@ impl NetstackFacade {
             addresses.into_iter().filter(|address| address.octets()[..2] == [0xfe, 0x80]).collect()
         })
     }
+
+    /// Gets the current netstack version settings.
+    ///
+    /// See [`fnet_stack_migration::StateProxy::get_netstack_version`] for more
+    /// details.
+    pub async fn get_netstack_version(&self) -> Result<InEffectNetstackVersion, Error> {
+        let netstack_migration_state = self.get_netstack_migration_state().await?;
+        Ok(netstack_migration_state.get_netstack_version().await?.into())
+    }
+
+    /// Sets the user specified netstack version. takes effect on the next boot.
+    ///
+    /// See [`fnet_stack_migration::ControlProxy::set_user_netstack_version`]
+    /// for more details.
+    pub async fn set_user_netstack_version(&self, version: NetstackVersion) -> Result<(), Error> {
+        let netstack_migration_control = self.get_netstack_migration_control().await?;
+        Ok(netstack_migration_control.set_user_netstack_version(Some(&version.into())).await?)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use fidl_fuchsia_net as fnet;
     use fidl_fuchsia_net_interfaces as finterfaces;
     use fuchsia_async as fasync;
     use futures::StreamExt as _;
+    use test_case::test_case;
 
     struct MockStateTester {
         expected_state: Vec<Box<dyn FnOnce(finterfaces::WatcherRequest) + Send + 'static>>,
@@ -442,5 +597,39 @@ mod tests {
             assert_eq!(result_address, [std::net::Ipv6Addr::from(link_local_ipv6_octets)]);
         };
         futures::future::join(facade_fut, stream_fut).await;
+    }
+
+    #[test_case(Value::String("ns2".to_string()), Some(NetstackVersion::Netstack2); "ns2")]
+    #[test_case(Value::String("ns3".to_string()), Some(NetstackVersion::Netstack3); "ns3")]
+    #[test_case(Value::String("netstack2".to_string()), Some(NetstackVersion::Netstack2);
+        "netstack2")]
+    #[test_case(Value::String("netstack3".to_string()), Some(NetstackVersion::Netstack3);
+        "netstack3")]
+    #[test_case(Value::String("invalid".to_string()), None; "invalid_string")]
+    #[test_case(Value::Bool(false), None; "invalid_value")]
+    fn test_convert_netstack_version_from_json_value(
+        json_value: Value,
+        expected_version: Option<NetstackVersion>,
+    ) {
+        let version: Result<NetstackVersion, Error> = json_value.try_into();
+        match expected_version {
+            Some(expected_version) => assert_eq!(version.expect("parse version"), expected_version),
+            None => assert_matches!(version, Err(_)),
+        }
+    }
+
+    #[test_case(fnet_stack_migration::NetstackVersion::Netstack2, NetstackVersion::Netstack2;
+        "netstack2")]
+    #[test_case(fnet_stack_migration::NetstackVersion::Netstack3, NetstackVersion::Netstack3;
+        "netstack3")]
+    fn test_convert_netstack_version_from_fidl(
+        fidl_version: fnet_stack_migration::NetstackVersion,
+        expected_version: NetstackVersion,
+    ) {
+        assert_eq!(NetstackVersion::from(fidl_version), expected_version);
+        assert_eq!(
+            NetstackVersion::from(fnet_stack_migration::VersionSetting { version: fidl_version }),
+            expected_version
+        );
     }
 }
