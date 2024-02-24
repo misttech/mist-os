@@ -45,6 +45,7 @@ use assert_matches::assert_matches;
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker as _, RequestStream};
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fuchsia_async as fasync;
+use fuchsia_inspect::health::Reporter as _;
 use fuchsia_zircon as zx;
 use futures::{channel::mpsc, pin_mut, select, FutureExt as _, StreamExt as _};
 use packet::{Buf, BufferMut};
@@ -1194,6 +1195,12 @@ impl NetstackSeed {
         .fuse();
 
         let inspect_nodes = {
+            // The presence of the health check node is useful even though the
+            // status will always be OK because the same node exists
+            // in NS2 and this helps for test assertions to guard against
+            // issues such as https://fxbug.dev/326510415.
+            let mut health = fuchsia_inspect::health::Node::new(inspector.root());
+            health.set_ok();
             let socket_ctx = netstack.ctx.clone();
             let sockets = inspector.root().create_lazy_child("Sockets", move || {
                 futures::future::ok(inspect::sockets(&mut socket_ctx.clone())).boxed()
@@ -1214,7 +1221,7 @@ impl NetstackSeed {
             let counters = inspector.root().create_lazy_child("Counters", move || {
                 futures::future::ok(inspect::counters(&mut counters_ctx.clone())).boxed()
             });
-            (sockets, routes, devices, neighbors, counters)
+            (health, sockets, routes, devices, neighbors, counters)
         };
 
         let diagnostics_handler = debug_fidl_worker::DiagnosticsHandler::default();

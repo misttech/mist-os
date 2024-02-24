@@ -533,6 +533,20 @@ func Main() {
 		// Trace manager can not be running, or not available in the namespace. We can continue.
 	}
 
+	// The node at /root/fuchsia.inspect.Health is important for testing purposes
+	// as it's the only node that is common to both NS2 and NS3.
+	componentCtx.OutgoingService.AddDiagnostics("root", &component.DirectoryWrapper{
+		Directory: &inspectDirectory{
+			asService: (&inspectImpl{
+				inner: &rootInspectImpl{
+					name: "root",
+					health: healthInspectImpl{
+						name: "fuchsia.inspect.Health",
+					},
+				},
+			}).asService,
+		},
+	})
 	componentCtx.OutgoingService.AddDiagnostics("configuration", &component.DirectoryWrapper{
 		Directory: &inspectDirectory{
 			asService: (&inspectImpl{

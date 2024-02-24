@@ -121,6 +121,56 @@ func (dir *inspectDirectory) ForEach(fn func(string, component.Node) error) erro
 	return fn(inspect.InspectName, dir.asService())
 }
 
+var _ inspectInner = (*rootInspectImpl)(nil)
+
+type rootInspectImpl struct {
+	name   string
+	health healthInspectImpl
+}
+
+// This node is important for testing purposes even though we always return
+// OK as the health check status as it's the only node that is common to both
+// NS2 and NS3. See https://fxbug.dev/326510415 for the issue that such testing
+// guards against.
+func (impl *rootInspectImpl) ReadData() inspect.Object {
+	return inspect.Object{
+		Name:       impl.name,
+		Properties: nil,
+	}
+}
+
+func (impl *rootInspectImpl) ListChildren() []string {
+	return []string{impl.health.name}
+}
+
+func (impl *rootInspectImpl) GetChild(childName string) inspectInner {
+	if childName != impl.health.name {
+		return nil
+	}
+	return &impl.health
+}
+
+type healthInspectImpl struct {
+	name string
+}
+
+func (impl *healthInspectImpl) ReadData() inspect.Object {
+	return inspect.Object{
+		Name: impl.name,
+		Properties: []inspect.Property{
+			{Key: "status", Value: inspect.PropertyValueWithStr("OK")},
+		},
+	}
+}
+
+func (impl *healthInspectImpl) ListChildren() []string {
+	return nil
+}
+
+func (impl *healthInspectImpl) GetChild(childName string) inspectInner {
+	return nil
+}
+
 var _ inspectInner = (*configInspectImpl)(nil)
 
 type configInspectImpl struct {
