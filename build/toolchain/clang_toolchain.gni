@@ -547,10 +547,14 @@ template("clang_toolchain") {
             "--preserve_unchanged_output_mtime",
           ]
           if (rust_rbe_enable) {
+            _exec_strategy_flags = []
+            if (rust_rbe_check == "") {
+              _exec_strategy_flags = _rust_rbe_exec_strategy_flags
+            }
             rust_link_remote_strip_prefix =
                 string_join(" ",
-                            _remote_strip_prefix_common +
-                                _rust_rbe_exec_strategy_flags + [ "-- " ])
+                            _remote_strip_prefix_common + _exec_strategy_flags +
+                                [ "-- " ])
           }
           if (_link_rbe_enable) {
             cxx_link_remote_strip_prefix =
