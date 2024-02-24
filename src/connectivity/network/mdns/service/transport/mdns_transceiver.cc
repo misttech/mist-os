@@ -87,13 +87,18 @@ void MdnsTransceiver::LogTraffic() {
 std::vector<HostAddress> MdnsTransceiver::LocalHostAddresses() {
   std::vector<HostAddress> result;
 
-  result.emplace_back(inet::IpAddress::kV6Loopback, 1, zx::sec(mdns::DnsResource::kShortTimeToLive));
-  result.emplace_back(inet::IpAddress::kV4Loopback, 1, zx::sec(mdns::DnsResource::kShortTimeToLive));
+  result.emplace_back(inet::IpAddress::kV6Loopback, 1,
+                      zx::sec(mdns::DnsResource::kShortTimeToLive));
+  result.emplace_back(inet::IpAddress::kV4Loopback, 1,
+                      zx::sec(mdns::DnsResource::kShortTimeToLive));
   return result;
 }
 
 bool MdnsTransceiver::StartInterfaceTransceivers(const net::interfaces::Properties& properties) {
-  if (properties.is_loopback() || !properties.online()) {
+  // TODO: Fix this when we have a specific interface type for lowpan, until then filter
+  // based on interface name to avoid starting the mdns transceiver on lowpan.
+  if (properties.is_loopback() || (properties.name().find("lowpan") != std::string::npos) ||
+      !properties.online()) {
     return false;
   }
 
