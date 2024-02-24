@@ -771,6 +771,7 @@ open protocol BufferCollection {
     /// * error `ZX_ERR_UNAVAILABLE` The buffer collection hasn't attempted
     ///   allocation yet. This means that WaitForAllBuffersAllocated would not
     ///   respond quickly.
+    @available(added=HEAD)
     flexible CheckAllBuffersAllocated() -> () error zx.Status;
 
     /// Create a new token to add a new participant to an existing logical
