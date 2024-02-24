@@ -134,11 +134,18 @@ open protocol Node {
     // TODO(b/316646315): Remove Close(); replaced by Release() above.
     flexible Close();
 
-    /// Set a name for VMOs in this buffer collection. The name may be truncated
-    /// shorter. The name only affects VMOs allocated after the name is set;
-    /// this call does not rename existing VMOs. If multiple clients set
-    /// different names then the larger priority value will win. Setting a new
-    /// name with the same priority as a prior name doesn't change the name.
+    /// Set a name for VMOs in this buffer collection.
+    ///
+    /// If the name doesn't fit in ZX_MAX_NAME_LEN, the name of the vmo itself
+    /// will be truncated to fit. The name of the vmo will be suffixed with the
+    /// buffer index within the collection (if the suffix fits within
+    /// ZX_MAX_NAME_LEN). The name specified here (without truncation) will be
+    /// listed in the inspect data.
+    ///
+    /// The name only affects VMOs allocated after the name is set; this call
+    /// does not rename existing VMOs. If multiple clients set different names
+    /// then the larger priority value will win. Setting a new name with the
+    /// same priority as a prior name doesn't change the name.
     ///
     /// All table fields are currently required.
     ///
