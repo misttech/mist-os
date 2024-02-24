@@ -19,6 +19,12 @@ pub trait Trel {
 
     /// Returns true if TREL is enabled.
     fn trel_is_enabled(&self) -> bool;
+
+    /// Return all the TREL counters
+    fn trel_get_counters(&self) -> &TrelCounters;
+
+    /// Reset TREL counters
+    fn trel_reset_counters(&self);
 }
 
 impl<T: Trel + Boxable> Trel for ot::Box<T> {
@@ -29,6 +35,14 @@ impl<T: Trel + Boxable> Trel for ot::Box<T> {
     fn trel_is_enabled(&self) -> bool {
         self.as_ref().trel_is_enabled()
     }
+
+    fn trel_get_counters(&self) -> &TrelCounters {
+        self.as_ref().trel_get_counters()
+    }
+
+    fn trel_reset_counters(&self) {
+        self.as_ref().trel_reset_counters()
+    }
 }
 
 impl Trel for Instance {
@@ -38,6 +52,14 @@ impl Trel for Instance {
 
     fn trel_is_enabled(&self) -> bool {
         unsafe { otTrelIsEnabled(self.as_ot_ptr()) }
+    }
+
+    fn trel_get_counters(&self) -> &TrelCounters {
+        unsafe { TrelCounters::ref_from_ot_ptr(otTrelGetCounters(self.as_ot_ptr())).unwrap() }
+    }
+
+    fn trel_reset_counters(&self) {
+        unsafe { otTrelResetCounters(self.as_ot_ptr()) }
     }
 }
 

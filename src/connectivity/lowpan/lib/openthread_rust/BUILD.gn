@@ -94,6 +94,7 @@ rustc_library("openthread") {
     "src/ot/types/srp_server_response_counters.rs",
     "src/ot/types/timestamp.rs",
     "src/ot/types/tlv.rs",
+    "src/ot/types/trel.rs",
     "src/ot/udp.rs",
     "src/ot/uptime.rs",
     "src/otfuchsia.rs",

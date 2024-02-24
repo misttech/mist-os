@@ -204,6 +204,19 @@ impl FromExt<&ot::DnssdCounters> for fidl_fuchsia_lowpan_experimental::DnssdCoun
     }
 }
 
+impl FromExt<&ot::TrelCounters> for fidl_fuchsia_lowpan_experimental::TrelCounters {
+    fn from_ext(x: &ot::TrelCounters) -> Self {
+        fidl_fuchsia_lowpan_experimental::TrelCounters {
+            rx_bytes: Some(x.get_rx_bytes()),
+            rx_packets: Some(x.get_rx_packets()),
+            tx_bytes: Some(x.get_tx_bytes()),
+            tx_failure: Some(x.get_tx_failure()),
+            tx_packets: Some(x.get_tx_packets()),
+            ..Default::default()
+        }
+    }
+}
+
 impl FromExt<&ot::LeaderData> for fidl_fuchsia_lowpan_experimental::LeaderData {
     fn from_ext(x: &ot::LeaderData) -> Self {
         fidl_fuchsia_lowpan_experimental::LeaderData {

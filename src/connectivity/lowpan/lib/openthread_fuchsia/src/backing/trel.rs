@@ -10,7 +10,7 @@ use fidl_fuchsia_net_mdns::*;
 use fuchsia_async::Task;
 use futures::stream::FusedStream;
 use openthread_sys::*;
-use ot::PlatTrel as _;
+use ot::{PlatTrel as _, TrelCounters};
 use std::collections::HashMap;
 use std::net::{Ipv6Addr, SocketAddr, SocketAddrV6};
 use std::task::{Context, Poll};
@@ -25,6 +25,8 @@ pub(crate) struct TrelInstance {
     subscriber: ServiceSubscriber2Proxy,
 
     subscriber_request_stream: ServiceSubscriptionListenerRequestStream,
+
+    counters: RefCell<TrelCounters>,
 }
 
 // Converts an optional vector of strings to a single DNS-compatible string.
@@ -125,6 +127,7 @@ impl TrelInstance {
             peer_instance_sockaddr_map: HashMap::default(),
             subscriber,
             subscriber_request_stream: server.into_stream()?,
+            counters: RefCell::new(TrelCounters::default()),
         })
     }
 
@@ -318,6 +321,14 @@ impl TrelInstance {
         Ok(())
     }
 
+    pub fn get_trel_counters(&self) -> TrelCounters {
+        self.counters.borrow().clone()
+    }
+
+    pub fn reset_trel_counters(&self) {
+        self.counters.borrow_mut().reset_counters()
+    }
+
     /// Async entrypoint for I/O.
     ///
     /// This is explicitly not `mut` so that `on_trel_send` can be called reentrantly from here.
@@ -328,6 +339,9 @@ impl TrelInstance {
                 Poll::Ready(Ok((len, sockaddr))) => {
                     let sockaddr: ot::SockAddr = sockaddr.as_socket_ipv6().unwrap().into();
                     debug!(tag = "trel", "Incoming {} byte TREL packet from {:?}", len, sockaddr);
+                    let mut counters = self.counters.borrow_mut();
+                    counters.update_rx_bytes(len.try_into().unwrap());
+                    counters.update_rx_packets(1);
                     instance.plat_trel_handle_received(&buffer[..len])
                 }
                 Poll::Ready(Err(err)) => {
@@ -410,10 +424,15 @@ impl PlatformBacking {
     fn on_trel_send(&self, _instance: &ot::Instance, payload: &[u8], sockaddr: &ot::SockAddr) {
         let trel = self.trel.borrow();
         if let Some(trel) = trel.as_ref() {
+            let mut counters = trel.counters.borrow_mut();
             debug!(tag = "trel", "otPlatTrelSend: {:?} -> {}", sockaddr, hex::encode(payload));
             match trel.socket.send_to(payload, (*sockaddr).into()).now_or_never() {
-                Some(Ok(_)) => {}
+                Some(Ok(_)) => {
+                    counters.update_tx_bytes(payload.len().try_into().unwrap());
+                    counters.update_tx_packets(1);
+                }
                 Some(Err(err)) => {
+                    counters.update_tx_failure(1);
                     warn!(tag = "trel", "otPlatTrelSend: send_to failed: {:?}", err);
                 }
                 None => {
@@ -498,11 +517,19 @@ unsafe extern "C" fn otPlatTrelSend(
 
 #[no_mangle]
 unsafe extern "C" fn otPlatTrelGetCounters(_instance: *mut otInstance) -> otPlatTrelCounters {
-    otPlatTrelCounters { mTxPackets: 0, mTxBytes: 0, mTxFailure: 0, mRxPackets: 0, mRxBytes: 0 }
+    if let Some(trel) = PlatformBacking::as_ref().trel.borrow().as_ref() {
+        trel.get_trel_counters().into()
+    } else {
+        TrelCounters::default().into()
+    }
 }
 
 #[no_mangle]
-unsafe extern "C" fn otPlatTrelResetCounters(_instance: *mut otInstance) {}
+unsafe extern "C" fn otPlatTrelResetCounters(_instance: *mut otInstance) {
+    if let Some(trel) = PlatformBacking::as_ref().trel.borrow().as_ref() {
+        trel.reset_trel_counters()
+    }
+}
 
 #[cfg(test)]
 mod test {

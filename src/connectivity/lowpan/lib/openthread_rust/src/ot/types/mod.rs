@@ -35,6 +35,7 @@ mod srp_server_lease_info;
 mod srp_server_response_counters;
 mod timestamp;
 mod tlv;
+mod trel;
 
 use crate::prelude_internal::*;
 
@@ -71,6 +72,7 @@ pub use srp_server_lease_info::*;
 pub use srp_server_response_counters::*;
 pub use timestamp::*;
 pub use tlv::*;
+pub use trel::*;
 
 /// 802.15.4 PAN Identifier. Same type as [`otsys::otPanId`](crate::otsys::otPanId).
 pub type PanId = otPanId;
