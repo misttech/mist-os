@@ -3310,6 +3310,16 @@ mod tests {
             cb(&mut self.outer)
         }
 
+        fn with_all_sockets<
+            O,
+            F: FnOnce(&IcmpSocketSet<I, Self::WeakDeviceId, FakeIcmpBindingsCtx<I>>) -> O,
+        >(
+            &mut self,
+            cb: F,
+        ) -> O {
+            cb(&self.outer)
+        }
+
         fn with_socket_state<
             O,
             F: FnOnce(

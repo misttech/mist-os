@@ -259,6 +259,13 @@ impl<I: Ip, BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpAllSocke
         cb(&mut self.write_lock::<crate::lock_ordering::UdpAllSocketsSet<I>>())
     }
 
+    fn with_all_sockets<O, F: FnOnce(&UdpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        cb(&self.read_lock::<crate::lock_ordering::UdpAllSocketsSet<I>>())
+    }
+
     fn with_socket_state<
         O,
         F: FnOnce(&mut Self::SocketStateCtx<'_>, &UdpSocketState<I, Self::WeakDeviceId, BC>) -> O,

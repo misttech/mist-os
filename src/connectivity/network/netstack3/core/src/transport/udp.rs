@@ -572,6 +572,8 @@ impl<BT: UdpBindingsTypes> DatagramSocketSpec for Udp<BT> {
     type Serializer<I: IpExt, B: BufferMut> = Nested<B, UdpPacketBuilder<I::Addr>>;
     type SerializeError = UdpSerializeError;
 
+    type ExternalData<I: Ip> = BT::ExternalData<I>;
+
     fn ip_proto<I: IpProtoExt>() -> I::Proto {
         IpProto::Udp.into()
     }
@@ -1111,6 +1113,12 @@ impl<I: IpExt, D: device::WeakId, BT: UdpBindingsTypes> UdpSocketId<I, D, BT> {
         let Self(rc) = self;
         WeakUdpSocketId(StrongRc::downgrade(rc))
     }
+
+    /// Returns external data associated with this socket.
+    pub fn external_data(&self) -> &BT::ExternalData<I> {
+        let Self(rc) = self;
+        &rc.external_data
+    }
 }
 
 /// A weak reference to a UDP socket.
@@ -1174,7 +1182,7 @@ pub trait UdpReceiveBindingsContext<I: IpExt, D: device::StrongId>: UdpBindingsT
 /// external data in our references so we take the rough edge.
 pub trait UdpBindingsTypes: Sized {
     /// Opaque bindings data held by core for a given IP version.
-    type ExternalData<I: Ip>: Send + Sync;
+    type ExternalData<I: Ip>: Debug + Send + Sync;
 }
 
 /// The bindings context for UDP.
@@ -1265,6 +1273,13 @@ pub trait StateContext<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>>:
     /// Calls the function with mutable access to the set with all UDP
     /// sockets.
     fn with_all_sockets_mut<O, F: FnOnce(&mut UdpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O;
+
+    /// Calls the function with immutable access to the set with all UDP
+    /// sockets.
+    fn with_all_sockets<O, F: FnOnce(&UdpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
         &mut self,
         cb: F,
     ) -> O;
@@ -1435,12 +1450,9 @@ fn receive_ip_packet<
         DatagramBoundStateContext::with_bound_sockets(core_ctx, |_core_ctx, bound_sockets| {
             lookup(bound_sockets, (src_ip, src_port), (dst_ip, dst_port), device_weak)
                 .map(|result| match result {
-                    // TODO(https://fxbug.dev/42076297): Make these socket IDs
-                    // strongly owned instead of just cloning them to prevent
-                    // deletion before delivery is done.
                     LookupResult::Conn(id, _) | LookupResult::Listener(id, _) => id.clone(),
                 })
-                // Collect into an array on the stack that
+                // Collect into an array on the stack.
                 .collect::<Recipients<_>>()
         })
     });
@@ -1695,11 +1707,20 @@ where
         pair.contexts()
     }
 
-    /// Creates an unbound UDP socket.
-    ///
-    /// `create` creates a new UDP socket and returns an identifier for it.
-    pub fn create(&mut self) -> UdpApiSocketId<I, C> {
-        datagram::create(self.core_ctx())
+    /// Creates a new unbound UDP socket with default external data.
+    pub fn create(&mut self) -> UdpApiSocketId<I, C>
+    where
+        <C::BindingsContext as UdpBindingsTypes>::ExternalData<I>: Default,
+    {
+        self.create_with(Default::default())
+    }
+
+    /// Creates a new unbound UDP socket with provided external data.
+    pub fn create_with(
+        &mut self,
+        external_data: <C::BindingsContext as UdpBindingsTypes>::ExternalData<I>,
+    ) -> UdpApiSocketId<I, C> {
+        datagram::create(self.core_ctx(), external_data)
     }
 
     /// Connect a UDP socket
@@ -2279,6 +2300,12 @@ where
             }
         })
     }
+
+    /// Collects all currently opened sockets, returning a cloned reference for
+    /// each one.
+    pub fn collect_all_sockets(&mut self) -> Vec<UdpApiSocketId<I, C>> {
+        datagram::collect_all_sockets(self.core_ctx())
+    }
 }
 
 /// Error when sending a packet on a socket.
@@ -2304,6 +2331,13 @@ impl<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>, CC: StateContext<I, BC
         cb: F,
     ) -> O {
         StateContext::with_all_sockets_mut(self, cb)
+    }
+
+    fn with_all_sockets<O, F: FnOnce(&UdpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        StateContext::with_all_sockets(self, cb)
     }
 
     fn with_socket_state<
@@ -2798,6 +2832,16 @@ mod tests {
             cb: F,
         ) -> O {
             cb(self.outer.borrow_mut())
+        }
+
+        fn with_all_sockets<
+            O,
+            F: FnOnce(&UdpSocketSet<I, Self::WeakDeviceId, FakeUdpBindingsCtx<D>>) -> O,
+        >(
+            &mut self,
+            cb: F,
+        ) -> O {
+            cb(self.outer.borrow())
         }
 
         fn with_socket_state<
@@ -6611,7 +6655,7 @@ mod tests {
         let mut primary_ids = Vec::new();
 
         let mut create_socket = || {
-            let primary = datagram::create_primary_id();
+            let primary = datagram::create_primary_id(());
             let id = UdpSocketId(crate::sync::PrimaryRc::clone_strong(&primary));
             primary_ids.push(primary);
             id
@@ -6673,7 +6717,7 @@ mod tests {
         let mut primary_ids = Vec::new();
 
         let mut create_socket = || {
-            let primary = datagram::create_primary_id();
+            let primary = datagram::create_primary_id(());
             let id = UdpSocketId(crate::sync::PrimaryRc::clone_strong(&primary));
             primary_ids.push(primary);
             id
@@ -6789,6 +6833,7 @@ mod tests {
             C::CoreContext: StateContext<I, C::BindingsContext> + CounterContext<UdpCounters<I>>,
             C::BindingsContext:
                 UdpBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+            <C::BindingsContext as UdpBindingsTypes>::ExternalData<I>: Default,
         {
             let socket = api.create();
             match self {

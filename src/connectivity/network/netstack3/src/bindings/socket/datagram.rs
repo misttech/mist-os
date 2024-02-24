@@ -5,14 +5,11 @@
 //! Datagram socket bindings.
 
 use std::{
-    collections::HashMap,
     convert::{Infallible as Never, TryInto as _},
     fmt::Debug,
     hash::Hash,
-    marker::PhantomData,
     num::{NonZeroU16, NonZeroU64, NonZeroU8, TryFromIntError},
     ops::ControlFlow,
-    sync::Arc,
 };
 
 use either::Either;
@@ -20,7 +17,6 @@ use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
 
-use assert_matches::assert_matches;
 use derivative::Derivative;
 use explicit::ResultExt as _;
 use fidl::endpoints::RequestStream as _;
@@ -39,7 +35,7 @@ use netstack3_core::{
         MulticastInterfaceSelector, MulticastMembershipInterfaceSelector, NotDualStackCapableError,
         SetDualStackEnabledError, SetMulticastMembershipError, ShutdownType,
     },
-    sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
+    sync::Mutex as CoreMutex,
     udp, IpExt,
 };
 use packet::{Buf, BufferMut};
@@ -92,127 +88,17 @@ pub(crate) trait Transport<I: Ip>: Debug + Sized + Send + Sync + 'static {
             (_, _, _) => addr,
         }
     }
+
+    fn external_data(id: &Self::SocketId) -> &DatagramSocketExternalData<I>;
+
+    #[cfg(test)]
+    fn collect_all_sockets(ctx: &mut Ctx) -> Vec<Self::SocketId>;
 }
 
-/// Mapping from socket IDs to their receive queues.
-///
-/// Receive queues are shared between the collections here and the tasks
-/// handling socket requests. Since `SocketCollection` implements
-/// [`UdpReceiveBindingsContext`] whose trait methods may be called from within Core
-/// in a locked context, once one of the [`MessageQueue`]s is locked, no calls
-/// may be made into [`netstack3_core`]. This prevents a potential deadlock
-/// where Core is waiting for a `MessageQueue` to be available and some bindings
-/// code here holds the `MessageQueue` and attempts to lock Core state via a
-/// `netstack3_core` call.
-// TODO(https://fxbug.dev/42076297): Remove this struct when we move bindings
-// data to core.
-#[derive(Derivative)]
-#[derivative(Default(bound = "I: Ip"))]
-pub(crate) struct SocketCollection<I: Ip, T: Transport<I>> {
-    received: HashMap<T::SocketId, Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>>,
-}
-
-pub(crate) struct SocketCollectionPair<T>
-where
-    T: Transport<Ipv4>,
-    T: Transport<Ipv6>,
-{
-    v4: CoreRwLock<SocketCollection<Ipv4, T>>,
-    v6: CoreRwLock<SocketCollection<Ipv6, T>>,
-}
-
-impl<T> Default for SocketCollectionPair<T>
-where
-    T: Transport<Ipv4>,
-    T: Transport<Ipv6>,
-{
-    fn default() -> Self {
-        Self { v4: Default::default(), v6: Default::default() }
-    }
-}
-
-/// An extension trait that allows generic access to IP-specific state.
-pub(crate) trait SocketCollectionIpExt<T>: Ip
-where
-    T: Transport<Ipv4>,
-    T: Transport<Ipv6>,
-    T: Transport<Self>,
-{
-    fn with_collection<
-        D: AsRef<SocketCollectionPair<T>>,
-        O,
-        F: FnOnce(&SocketCollection<Self, T>) -> O,
-    >(
-        dispatcher: &D,
-        cb: F,
-    ) -> O;
-
-    fn with_collection_mut<
-        D: AsRef<SocketCollectionPair<T>>,
-        O,
-        F: FnOnce(&mut SocketCollection<Self, T>) -> O,
-    >(
-        dispatcher: &D,
-        cb: F,
-    ) -> O;
-}
-
-impl<T> SocketCollectionIpExt<T> for Ipv4
-where
-    T: 'static,
-    T: Transport<Ipv4>,
-    T: Transport<Ipv6>,
-{
-    fn with_collection<
-        D: AsRef<SocketCollectionPair<T>>,
-        O,
-        F: FnOnce(&SocketCollection<Ipv4, T>) -> O,
-    >(
-        dispatcher: &D,
-        cb: F,
-    ) -> O {
-        cb(&dispatcher.as_ref().v4.read())
-    }
-
-    fn with_collection_mut<
-        D: AsRef<SocketCollectionPair<T>>,
-        O,
-        F: FnOnce(&mut SocketCollection<Ipv4, T>) -> O,
-    >(
-        dispatcher: &D,
-        cb: F,
-    ) -> O {
-        cb(&mut dispatcher.as_ref().v4.write())
-    }
-}
-
-impl<T> SocketCollectionIpExt<T> for Ipv6
-where
-    T: 'static,
-    T: Transport<Ipv4>,
-    T: Transport<Ipv6>,
-{
-    fn with_collection<
-        D: AsRef<SocketCollectionPair<T>>,
-        O,
-        F: FnOnce(&SocketCollection<Ipv6, T>) -> O,
-    >(
-        dispatcher: &D,
-        cb: F,
-    ) -> O {
-        cb(&dispatcher.as_ref().v6.read())
-    }
-
-    fn with_collection_mut<
-        D: AsRef<SocketCollectionPair<T>>,
-        O,
-        F: FnOnce(&mut SocketCollection<Ipv6, T>) -> O,
-    >(
-        dispatcher: &D,
-        cb: F,
-    ) -> O {
-        cb(&mut dispatcher.as_ref().v6.write())
-    }
+/// Bindings data held by datagram sockets.
+#[derive(Debug)]
+pub(crate) struct DatagramSocketExternalData<I: Ip> {
+    message_queue: CoreMutex<MessageQueue<AvailableMessage<I>>>,
 }
 
 /// A special case of TryFrom that avoids the associated error type in generic contexts.
@@ -249,7 +135,10 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     type SendError: IntoErrno;
     type SendToError: IntoErrno;
 
-    fn create_unbound(ctx: &mut Ctx) -> Self::SocketId;
+    fn create_unbound(
+        ctx: &mut Ctx,
+        external_data: DatagramSocketExternalData<I>,
+    ) -> Self::SocketId;
 
     fn connect(
         ctx: &mut Ctx,
@@ -374,6 +263,18 @@ impl<I: IpExt> Transport<I> for Udp {
     const PROTOCOL: DatagramProtocol = DatagramProtocol::Udp;
     const SUPPORTS_DUALSTACK: bool = true;
     type SocketId = UdpSocketId<I>;
+
+    fn external_data(id: &Self::SocketId) -> &DatagramSocketExternalData<I> {
+        id.external_data()
+    }
+
+    #[cfg(test)]
+    fn collect_all_sockets(ctx: &mut Ctx) -> Vec<Self::SocketId> {
+        net_types::map_ip_twice!(I, IpInvariant(ctx), |IpInvariant(ctx)| ctx
+            .api()
+            .udp::<I>()
+            .collect_all_sockets())
+    }
 }
 
 impl OptionFromU16 for NonZeroU16 {
@@ -385,7 +286,7 @@ impl OptionFromU16 for NonZeroU16 {
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 impl<I> TransportState<I> for Udp
 where
-    I: IpExt + SocketCollectionIpExt<Self>,
+    I: IpExt,
 {
     type ConnectError = ConnectError;
     type ListenError = Either<ExpectedUnboundError, LocalAddressError>;
@@ -401,8 +302,11 @@ where
     type SendError = Either<udp::SendError, fposix::Errno>;
     type SendToError = Either<LocalAddressError, udp::SendToError>;
 
-    fn create_unbound(ctx: &mut Ctx) -> Self::SocketId {
-        ctx.api().udp().create()
+    fn create_unbound(
+        ctx: &mut Ctx,
+        external_data: DatagramSocketExternalData<I>,
+    ) -> Self::SocketId {
+        ctx.api().udp().create_with(external_data)
     }
 
     fn connect(
@@ -582,24 +486,21 @@ where
     }
 }
 
-impl<I: IpExt> SocketCollection<I, Udp> {
+impl<I: IpExt> DatagramSocketExternalData<I> {
     pub(crate) fn receive_udp<B: BufferMut>(
-        &mut self,
-        id: &UdpSocketId<I>,
+        &self,
         device_id: &DeviceId<BindingsCtx>,
         (dst_ip, dst_port): (<I>::Addr, NonZeroU16),
         (src_ip, src_port): (<I>::Addr, Option<NonZeroU16>),
         body: &B,
     ) {
-        let queue = self.received.get(id).unwrap();
-        queue.lock().receive(AvailableMessage {
+        self.message_queue.lock().receive(AvailableMessage {
             interface_id: device_id.bindings_id().id,
             source_addr: src_ip,
             source_port: src_port.map_or(0, NonZeroU16::get),
             destination_addr: dst_ip,
             destination_port: dst_port.get(),
             data: body.as_ref().to_vec(),
-            _marker: PhantomData,
         })
     }
 }
@@ -613,6 +514,18 @@ impl<I: IpExt> Transport<I> for IcmpEcho {
     const PROTOCOL: DatagramProtocol = DatagramProtocol::IcmpEcho;
     const SUPPORTS_DUALSTACK: bool = false;
     type SocketId = IcmpSocketId<I>;
+
+    fn external_data(id: &Self::SocketId) -> &DatagramSocketExternalData<I> {
+        id.external_data()
+    }
+
+    #[cfg(test)]
+    fn collect_all_sockets(ctx: &mut Ctx) -> Vec<Self::SocketId> {
+        net_types::map_ip_twice!(I, IpInvariant(ctx), |IpInvariant(ctx)| ctx
+            .api()
+            .icmp_echo::<I>()
+            .collect_all_sockets())
+    }
 }
 
 impl OptionFromU16 for u16 {
@@ -624,7 +537,7 @@ impl OptionFromU16 for u16 {
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 impl<I> TransportState<I> for IcmpEcho
 where
-    I: IpExt + SocketCollectionIpExt<Self>,
+    I: IpExt,
 {
     type ConnectError = ConnectError;
     type ListenError = Either<ExpectedUnboundError, LocalAddressError>;
@@ -643,8 +556,11 @@ where
         core_socket::SendToError<packet_formats::error::ParseError>,
     >;
 
-    fn create_unbound(ctx: &mut Ctx) -> Self::SocketId {
-        ctx.api().icmp_echo().create()
+    fn create_unbound(
+        ctx: &mut Ctx,
+        external_data: DatagramSocketExternalData<I>,
+    ) -> Self::SocketId {
+        ctx.api().icmp_echo().create_with(external_data)
     }
 
     fn connect(
@@ -891,10 +807,9 @@ impl<E> IntoErrno for core_socket::SendToError<E> {
     }
 }
 
-impl<I: IpExt> SocketCollection<I, IcmpEcho> {
+impl<I: IpExt> DatagramSocketExternalData<I> {
     pub(crate) fn receive_icmp_echo_reply<B: BufferMut>(
-        &mut self,
-        conn: &IcmpSocketId<I>,
+        &self,
         device: &DeviceId<BindingsCtx>,
         src_ip: I::Addr,
         dst_ip: I::Addr,
@@ -902,32 +817,29 @@ impl<I: IpExt> SocketCollection<I, IcmpEcho> {
         data: B,
     ) {
         tracing::debug!("Received ICMP echo reply in binding: {:?}, id: {id}", I::VERSION);
-        let queue = self.received.get(conn).unwrap();
-        queue.lock().receive(AvailableMessage {
+        self.message_queue.lock().receive(AvailableMessage {
             source_addr: src_ip,
             source_port: 0,
             interface_id: device.bindings_id().id,
             destination_addr: dst_ip,
             destination_port: id,
             data: data.as_ref().to_vec(),
-            _marker: PhantomData,
         })
     }
 }
 
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""))]
-struct AvailableMessage<I: Ip, T> {
+struct AvailableMessage<I: Ip> {
     interface_id: BindingId,
     source_addr: I::Addr,
     source_port: u16,
     destination_addr: I::Addr,
     destination_port: u16,
     data: Vec<u8>,
-    _marker: PhantomData<T>,
 }
 
-impl<I: Ip, T> BodyLen for AvailableMessage<I, T> {
+impl<I: Ip> BodyLen for AvailableMessage<I> {
     fn body_len(&self) -> usize {
         self.data.len()
     }
@@ -976,11 +888,6 @@ impl<I: Ip + BindingsDataIpExt> GenericOverIp<I> for Ipv6BindingsData {
 struct BindingData<I: BindingsDataIpExt, T: Transport<I>> {
     peer_event: zx::EventPair,
     info: SocketControlInfo<I, T>,
-    /// The queue for messages received on this socket.
-    ///
-    /// The message queue is held here and also in the [`SocketCollection`]
-    /// to which the socket belongs.
-    messages: Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>,
     /// The bindings data specific to `I`.
     version_specific_data: I::VersionSpecificData,
     /// If true, return the original received destination address in the control data.  This is
@@ -991,11 +898,10 @@ struct BindingData<I: BindingsDataIpExt, T: Transport<I>> {
 
 impl<I, T> BindingData<I, T>
 where
-    I: SocketCollectionIpExt<T> + IpExt + IpSockAddrExt + BindingsDataIpExt,
+    I: IpExt + IpSockAddrExt + BindingsDataIpExt,
     T: Transport<Ipv4>,
     T: Transport<Ipv6>,
     T: TransportState<I>,
-    BindingsCtx: RequestHandlerDispatcher<I, T>,
 {
     /// Creates a new `BindingData`.
     fn new(ctx: &mut Ctx, properties: SocketWorkerProperties) -> Self {
@@ -1008,20 +914,14 @@ where
         if let Err(e) = local_event.signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_OUTGOING) {
             error!("socket failed to signal peer: {:?}", e);
         }
-        let id = T::create_unbound(ctx);
-        let messages = Arc::new(CoreMutex::new(MessageQueue::new(local_event)));
-
-        assert_matches!(
-            I::with_collection_mut(ctx.bindings_ctx(), |c| c
-                .received
-                .insert(id.clone(), messages.clone())),
-            None
-        );
+        let external_data = DatagramSocketExternalData {
+            message_queue: CoreMutex::new(MessageQueue::new(local_event)),
+        };
+        let id = T::create_unbound(ctx, external_data);
 
         Self {
             peer_event,
             info: SocketControlInfo { _properties: properties, id },
-            messages,
             version_specific_data: I::VersionSpecificData::default(),
             ip_receive_original_destination_address: false,
         }
@@ -1033,24 +933,6 @@ where
 pub(crate) struct SocketControlInfo<I: Ip, T: Transport<I>> {
     _properties: SocketWorkerProperties,
     id: T::SocketId,
-}
-
-#[allow(dead_code)]
-pub(crate) trait SocketWorkerDispatcher:
-    RequestHandlerDispatcher<Ipv4, Udp>
-    + RequestHandlerDispatcher<Ipv6, Udp>
-    + RequestHandlerDispatcher<Ipv4, IcmpEcho>
-    + RequestHandlerDispatcher<Ipv6, IcmpEcho>
-{
-}
-
-impl<T> SocketWorkerDispatcher for T
-where
-    T: RequestHandlerDispatcher<Ipv4, Udp>,
-    T: RequestHandlerDispatcher<Ipv6, Udp>,
-    T: RequestHandlerDispatcher<Ipv4, IcmpEcho>,
-    T: RequestHandlerDispatcher<Ipv6, IcmpEcho>,
-{
 }
 
 pub(super) fn spawn_worker(
@@ -1117,14 +999,13 @@ impl worker::CloseResponder for fposix_socket::SynchronousDatagramSocketCloseRes
 
 impl<I, T> worker::SocketWorkerHandler for BindingData<I, T>
 where
-    I: SocketCollectionIpExt<T> + IpExt + IpSockAddrExt + BindingsDataIpExt,
+    I: IpExt + IpSockAddrExt + BindingsDataIpExt,
     T: Transport<Ipv4>,
     T: Transport<Ipv6>,
     T: TransportState<I>,
     T: Send + Sync + 'static,
     DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     WeakDeviceId<BindingsCtx>: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
-    BindingsCtx: RequestHandlerDispatcher<I, T>,
 {
     type Request = fposix_socket::SynchronousDatagramSocketRequest;
     type RequestStream = fposix_socket::SynchronousDatagramSocketRequestStream;
@@ -1143,29 +1024,10 @@ where
 
     async fn close(self, ctx: &mut Ctx) {
         let id = self.info.id;
-        let _: Option<_> = I::with_collection_mut(ctx.bindings_ctx(), |c| c.received.remove(&id));
         T::close(ctx, id).await;
     }
 }
 
-pub(crate) trait RequestHandlerDispatcher<I, T>: AsRef<SocketCollectionPair<T>>
-where
-    I: IpExt,
-    T: Transport<Ipv4>,
-    T: Transport<Ipv6>,
-    T: Transport<I>,
-{
-}
-
-impl<I, T, D> RequestHandlerDispatcher<I, T> for D
-where
-    I: IpExt,
-    T: Transport<Ipv4>,
-    T: Transport<Ipv6>,
-    T: Transport<I>,
-    D: AsRef<SocketCollectionPair<T>>,
-{
-}
 /// A borrow into a [`SocketWorker`]'s state.
 struct RequestHandler<'a, I: BindingsDataIpExt, T: Transport<I>> {
     ctx: &'a mut crate::bindings::Ctx,
@@ -1174,14 +1036,13 @@ struct RequestHandler<'a, I: BindingsDataIpExt, T: Transport<I>> {
 
 impl<'a, I, T> RequestHandler<'a, I, T>
 where
-    I: SocketCollectionIpExt<T> + IpExt + IpSockAddrExt + BindingsDataIpExt,
+    I: IpExt + IpSockAddrExt + BindingsDataIpExt,
     T: Transport<Ipv4>,
     T: Transport<Ipv6>,
     T: TransportState<I>,
     T: Send + Sync + 'static,
     DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     WeakDeviceId<BindingsCtx>: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
-    BindingsCtx: RequestHandlerDispatcher<I, T>,
 {
     fn handle_request(
         mut self,
@@ -1679,13 +1540,22 @@ where
         }
     }
 
+    fn external_data(&self) -> &DatagramSocketExternalData<I> {
+        T::external_data(&self.data.info.id)
+    }
+
     fn get_max_receive_buffer_size(&self) -> u64 {
-        self.data.messages.lock().max_available_messages_size().try_into().unwrap_or(u64::MAX)
+        self.external_data()
+            .message_queue
+            .lock()
+            .max_available_messages_size()
+            .try_into()
+            .unwrap_or(u64::MAX)
     }
 
     fn set_max_receive_buffer_size(&mut self, max_bytes: u64) {
         let max_bytes = max_bytes.try_into().ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
-        self.data.messages.lock().set_max_available_messages_size(max_bytes)
+        self.external_data().message_queue.lock().set_max_available_messages_size(max_bytes)
     }
 
     /// Handles a [POSIX socket connect request].
@@ -1697,7 +1567,6 @@ where
             data:
                 BindingData {
                     peer_event: _,
-                    messages: _,
                     info: SocketControlInfo { _properties: _, id },
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
@@ -1731,7 +1600,6 @@ where
             data:
                 BindingData {
                     peer_event: _,
-                    messages: _,
                     info: SocketControlInfo { _properties: _, id },
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
@@ -1757,7 +1625,6 @@ where
             data:
                 BindingData {
                     peer_event: _,
-                    messages: _,
                     info: SocketControlInfo { _properties: _, id },
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
@@ -1776,7 +1643,6 @@ where
             data:
                 BindingData {
                     peer_event: _,
-                    messages: _,
                     info: SocketControlInfo { _properties: _, id },
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
@@ -1813,7 +1679,6 @@ where
             data:
                 BindingData {
                     peer_event: _,
-                    messages: _,
                     info: SocketControlInfo { _properties: _, id },
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
@@ -1841,20 +1706,18 @@ where
                 BindingData {
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
-                    messages: _,
                     version_specific_data,
                     ip_receive_original_destination_address,
                 },
         } = self;
-        let front = I::with_collection(ctx.bindings_ctx(), |c| {
-            let messages = c.received.get(id).expect("has queue");
-            let mut messages = messages.lock();
+        let front = {
+            let mut messages = <T as Transport<I>>::external_data(id).message_queue.lock();
             if recv_flags.contains(fposix_socket::RecvMsgFlags::PEEK) {
                 messages.peek().cloned()
             } else {
                 messages.pop()
             }
-        });
+        };
 
         let AvailableMessage {
             interface_id,
@@ -1863,7 +1726,6 @@ where
             destination_addr,
             destination_port,
             mut data,
-            _marker: _,
         } = match front {
             None => {
                 // This is safe from races only because the setting of the
@@ -1966,7 +1828,6 @@ where
                 BindingData {
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
-                    messages: _,
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
@@ -1995,7 +1856,6 @@ where
                 BindingData {
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
-                    messages: _,
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
@@ -2016,7 +1876,6 @@ where
                 BindingData {
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
-                    messages: _,
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
@@ -2041,7 +1900,6 @@ where
                 BindingData {
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
-                    messages: _,
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
@@ -2056,7 +1914,6 @@ where
                 BindingData {
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
-                    messages: _,
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
@@ -2092,7 +1949,6 @@ where
                 BindingData {
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
-                    messages: _,
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
@@ -2107,7 +1963,6 @@ where
                 BindingData {
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
-                    messages: _,
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
@@ -2121,7 +1976,6 @@ where
                 BindingData {
                     peer_event: _,
                     info: SocketControlInfo { id, _properties },
-                    messages,
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
@@ -2137,7 +1991,8 @@ where
             ShutdownType::Receive | ShutdownType::SendAndReceive => {
                 // Make sure to signal the peer so any ongoing call to
                 // receive that is waiting for a signal will poll again.
-                if let Err(e) = messages
+                if let Err(e) = <T as Transport<I>>::external_data(id)
+                    .message_queue
                     .lock()
                     .local_event()
                     .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING)
@@ -2175,7 +2030,6 @@ where
                 BindingData {
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
-                    messages: _,
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
@@ -2203,7 +2057,6 @@ where
                 BindingData {
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
-                    messages: _,
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
@@ -2228,7 +2081,6 @@ where
                 BindingData {
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
-                    messages: _,
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
@@ -2243,7 +2095,6 @@ where
                 BindingData {
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
-                    messages: _,
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
@@ -2260,7 +2111,6 @@ where
                 BindingData {
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
-                    messages: _,
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
@@ -2277,7 +2127,6 @@ where
                 BindingData {
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
-                    messages: _,
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
@@ -2292,7 +2141,6 @@ where
                 BindingData {
                     peer_event: _,
                     info: SocketControlInfo { _properties, id },
-                    messages: _,
                     version_specific_data: _,
                     ip_receive_original_destination_address: _,
                 },
@@ -3068,15 +2916,15 @@ mod tests {
         client
     }
 
+    type IpFromSockAddr<A> = <<A as SockAddr>::AddrType as IpAddress>::Version;
+
     #[fixture::teardown(TestSetup::shutdown)]
     async fn clone<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol)
     where
-        <A::AddrType as IpAddress>::Version: SocketCollectionIpExt<T>,
         <A::AddrType as IpAddress>::Version: IcmpIpExt,
         T: Transport<Ipv4>,
         T: Transport<Ipv6>,
         T: Transport<<A::AddrType as IpAddress>::Version>,
-        crate::bindings::BindingsCtx: AsRef<SocketCollectionPair<T>>,
     {
         let mut t = TestSetupBuilder::new()
             .add_endpoint()
@@ -3225,12 +3073,10 @@ mod tests {
                 // Make sure the sockets are still in the stack.
                 for i in 0..2 {
                     t.get(i).with_ctx(|ctx| {
-                        <A::AddrType as IpAddress>::Version::with_collection(
-                            ctx.bindings_ctx(),
-                            |SocketCollection { received }| {
-                                assert_matches!(received.keys().collect::<Vec<_>>()[..], [_]);
-                            },
-                        )
+                        assert_matches!(
+                            &<T as Transport<IpFromSockAddr<A>>>::collect_all_sockets(ctx)[..],
+                            [_]
+                        );
                     });
                 }
 
@@ -3250,12 +3096,10 @@ mod tests {
                 // But the sockets should have gone here.
                 for i in 0..2 {
                     t.get(i).with_ctx(|ctx| {
-                        <A::AddrType as IpAddress>::Version::with_collection(
-                            ctx.bindings_ctx(),
-                            |SocketCollection { received }| {
-                                assert_matches!(received.keys().collect::<Vec<_>>()[..], []);
-                            },
-                        )
+                        assert_matches!(
+                            &<T as Transport<IpFromSockAddr<A>>>::collect_all_sockets(ctx)[..],
+                            []
+                        );
                     });
                 }
             }
@@ -3277,11 +3121,9 @@ mod tests {
     #[fixture::teardown(TestSetup::shutdown)]
     async fn close_twice<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol)
     where
-        <A::AddrType as IpAddress>::Version: SocketCollectionIpExt<T>,
         T: Transport<Ipv4>,
         T: Transport<Ipv6>,
         T: Transport<<A::AddrType as IpAddress>::Version>,
-        crate::bindings::BindingsCtx: AsRef<SocketCollectionPair<T>>,
     {
         // Make sure we cannot close twice from the same channel so that we
         // maintain the correct refcount.
@@ -3303,12 +3145,10 @@ mod tests {
         // Since we still hold the cloned socket, the binding_data shouldn't be
         // empty
         test_stack.with_ctx(|ctx| {
-            <A::AddrType as IpAddress>::Version::with_collection(
-                ctx.bindings_ctx(),
-                |SocketCollection { received }| {
-                    assert_matches!(received.keys().collect::<Vec<_>>()[..], [_]);
-                },
-            )
+            assert_matches!(
+                &<T as Transport<IpFromSockAddr<A>>>::collect_all_sockets(ctx)[..],
+                [_]
+            );
         });
         let () = cloned
             .close()
@@ -3318,12 +3158,7 @@ mod tests {
             .expect("close failed");
         // Now it should become empty
         test_stack.with_ctx(|ctx| {
-            <A::AddrType as IpAddress>::Version::with_collection(
-                ctx.bindings_ctx(),
-                |SocketCollection { received }| {
-                    assert_matches!(received.keys().collect::<Vec<_>>()[..], []);
-                },
-            )
+            assert_matches!(&<T as Transport<IpFromSockAddr<A>>>::collect_all_sockets(ctx)[..], []);
         });
 
         t
@@ -3334,11 +3169,9 @@ mod tests {
     #[fixture::teardown(TestSetup::shutdown)]
     async fn implicit_close<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol)
     where
-        <A::AddrType as IpAddress>::Version: SocketCollectionIpExt<T>,
         T: Transport<Ipv4>,
         T: Transport<Ipv6>,
         T: Transport<<A::AddrType as IpAddress>::Version>,
-        crate::bindings::BindingsCtx: AsRef<SocketCollectionPair<T>>,
     {
         let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
         let test_stack = t.get(0);
@@ -3356,12 +3189,7 @@ mod tests {
             .expect("close failed");
         // No socket should be there now.
         test_stack.with_ctx(|ctx| {
-            <A::AddrType as IpAddress>::Version::with_collection(
-                ctx.bindings_ctx(),
-                |SocketCollection { received }| {
-                    assert_matches!(received.keys().collect::<Vec<_>>()[..], []);
-                },
-            )
+            assert_matches!(&<T as Transport<IpFromSockAddr<A>>>::collect_all_sockets(ctx)[..], []);
         });
 
         t
@@ -3372,11 +3200,9 @@ mod tests {
     #[fixture::teardown(TestSetup::shutdown)]
     async fn invalid_clone_args<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol)
     where
-        <A::AddrType as IpAddress>::Version: SocketCollectionIpExt<T>,
         T: Transport<Ipv4>,
         T: Transport<Ipv6>,
         T: Transport<<A::AddrType as IpAddress>::Version>,
-        crate::bindings::BindingsCtx: AsRef<SocketCollectionPair<T>>,
     {
         let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
         let test_stack = t.get(0);
@@ -3390,12 +3216,7 @@ mod tests {
 
         // make sure we don't leak anything.
         test_stack.with_ctx(|ctx| {
-            <A::AddrType as IpAddress>::Version::with_collection(
-                ctx.bindings_ctx(),
-                |SocketCollection { received }| {
-                    assert_matches!(received.keys().collect::<Vec<_>>()[..], []);
-                },
-            )
+            assert_matches!(&<T as Transport<IpFromSockAddr<A>>>::collect_all_sockets(ctx)[..], []);
         });
 
         t
@@ -3533,9 +3354,7 @@ mod tests {
     >(
         proto: fposix_socket::DatagramSocketProtocol,
     ) where
-        <A::AddrType as IpAddress>::Version: SocketCollectionIpExt<T>,
         <A::AddrType as IpAddress>::Version: IcmpIpExt,
-        BindingsCtx: AsRef<SocketCollectionPair<T>>,
     {
         let mut t = TestSetupBuilder::new().add_stack(StackSetupBuilder::new()).build().await;
 
@@ -3572,16 +3391,13 @@ mod tests {
         };
         loop {
             let all_delivered = stack.with_ctx(|ctx| {
-                let bindings_ctx = ctx.bindings_ctx();
-                <<A::AddrType as IpAddress>::Version as SocketCollectionIpExt<T>>::with_collection(
-                    bindings_ctx,
-                    |SocketCollection { received }| {
-                        // Check the lone socket to see if the packets were
-                        // received.
-                        let messages = received.values().next().unwrap();
-                        has_all_delivered(&messages.lock())
-                    },
-                )
+                let socket = <T as Transport<IpFromSockAddr<A>>>::collect_all_sockets(ctx)
+                    .into_iter()
+                    .next()
+                    .unwrap();
+                let external_data = <T as Transport<IpFromSockAddr<A>>>::external_data(&socket);
+                let message_queue = external_data.message_queue.lock();
+                has_all_delivered(&message_queue)
             });
             if all_delivered {
                 break;

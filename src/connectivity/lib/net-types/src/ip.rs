@@ -3308,6 +3308,8 @@ macro_rules! ip_generic {
 ip_generic!(Option<T>);
 ip_generic!(Result<R, E>);
 ip_generic!(bool);
+#[cfg(feature = "std")]
+ip_generic!(Vec<T>);
 
 impl<'s, NewIp: Ip, T: GenericOverIp<NewIp>> GenericOverIp<NewIp> for &'s T
 where

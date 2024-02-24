@@ -2998,6 +2998,13 @@ impl<
         cb(&mut self.write_lock::<crate::lock_ordering::IcmpAllSocketsSet<I>>())
     }
 
+    fn with_all_sockets<O, F: FnOnce(&IcmpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        cb(&self.read_lock::<crate::lock_ordering::IcmpAllSocketsSet<I>>())
+    }
+
     fn with_socket_state<
         O,
         F: FnOnce(&mut Self::SocketStateCtx<'_>, &IcmpSocketState<I, Self::WeakDeviceId, BC>) -> O,

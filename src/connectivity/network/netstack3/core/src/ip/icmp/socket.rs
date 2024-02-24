@@ -4,6 +4,7 @@
 
 //! ICMP Echo Sockets.
 
+use alloc::vec::Vec;
 use core::{
     borrow::Borrow,
     convert::Infallible as Never,
@@ -134,6 +135,12 @@ impl<I: IpExt, D: device::WeakId, BT: IcmpEchoBindingsTypes> IcmpSocketId<I, D, 
         let Self(rc) = self;
         WeakIcmpSocketId(StrongRc::downgrade(rc))
     }
+
+    /// Returns external data associated with this socket.
+    pub fn external_data(&self) -> &BT::ExternalData<I> {
+        let Self(rc) = self;
+        &rc.external_data
+    }
 }
 
 /// A weak reference to an ICMP socket.
@@ -218,7 +225,7 @@ pub trait IcmpEchoBindingsContext<I: IpExt, D: device::StrongId>: IcmpEchoBindin
 /// external data in our references so we take the rough edge.
 pub trait IcmpEchoBindingsTypes: Sized {
     /// Opaque bindings data held by core for a given IP version.
-    type ExternalData<I: Ip>: Send + Sync;
+    type ExternalData<I: Ip>: Debug + Send + Sync;
 }
 
 /// A Context that provides access to the sockets' states.
@@ -232,6 +239,13 @@ pub trait StateContext<I: IcmpIpExt + IpExt, BC: IcmpBindingsContext<I, Self::De
     /// Calls the function with mutable access to the set with all ICMP
     /// sockets.
     fn with_all_sockets_mut<O, F: FnOnce(&mut IcmpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O;
+
+    /// Calls the function with immutable access to the set with all ICMP
+    /// sockets.
+    fn with_all_sockets<O, F: FnOnce(&IcmpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
         &mut self,
         cb: F,
     ) -> O;
@@ -296,6 +310,8 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
     type Serializer<I: datagram::IpExt, B: BufferMut> =
         packet::Nested<B, IcmpPacketBuilder<I, IcmpEchoRequest>>;
     type SerializeError = packet_formats::error::ParseError;
+
+    type ExternalData<I: Ip> = BT::ExternalData<I>;
 
     fn make_packet<I: datagram::IpExt, B: BufferMut>(
         mut body: B,
@@ -510,6 +526,13 @@ where
         StateContext::with_all_sockets_mut(self, cb)
     }
 
+    fn with_all_sockets<O, F: FnOnce(&IcmpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        StateContext::with_all_sockets(self, cb)
+    }
+
     fn with_socket_state<
         O,
         F: FnOnce(&mut Self::SocketsStateCtx<'_>, &IcmpSocketState<I, Self::WeakDeviceId, BC>) -> O,
@@ -670,9 +693,20 @@ where
         pair.contexts()
     }
 
-    /// Creates a new unbound ICMP socket.
-    pub fn create(&mut self) -> IcmpApiSocketId<I, C> {
-        datagram::create(self.core_ctx())
+    /// Creates a new unbound ICMP socket with default external data.
+    pub fn create(&mut self) -> IcmpApiSocketId<I, C>
+    where
+        <C::BindingsContext as IcmpEchoBindingsTypes>::ExternalData<I>: Default,
+    {
+        self.create_with(Default::default())
+    }
+
+    /// Creates a new unbound ICMP socket with provided external data.
+    pub fn create_with(
+        &mut self,
+        external_data: <C::BindingsContext as IcmpEchoBindingsTypes>::ExternalData<I>,
+    ) -> IcmpApiSocketId<I, C> {
+        datagram::create(self.core_ctx(), external_data)
     }
 
     /// Connects an ICMP socket to remote IP.
@@ -898,6 +932,12 @@ where
             (),
             body,
         )
+    }
+
+    /// Collects all currently opened sockets, returning a cloned reference for
+    /// each one.
+    pub fn collect_all_sockets(&mut self) -> Vec<IcmpApiSocketId<I, C>> {
+        datagram::collect_all_sockets(self.core_ctx())
     }
 }
 

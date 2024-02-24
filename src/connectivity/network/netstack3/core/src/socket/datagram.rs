@@ -4,7 +4,10 @@
 
 //! Shared code for implementing datagram sockets.
 
-use alloc::collections::{HashMap, HashSet};
+use alloc::{
+    collections::{HashMap, HashSet},
+    vec::Vec,
+};
 use core::{
     borrow::Borrow,
     convert::Infallible as Never,
@@ -62,6 +65,7 @@ pub(crate) type BoundSockets<I, D, A, S> = BoundSocketMap<I, D, A, S>;
 #[derivative(Debug(bound = ""))]
 pub struct ReferenceState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
     pub(crate) state: RwLock<SocketState<I, D, S>>,
+    pub(crate) external_data: S::ExternalData<I>,
 }
 
 // Local aliases for brevity.
@@ -575,6 +579,13 @@ pub(crate) trait DatagramStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
     /// Calls the function with mutable access to the set with all datagram
     /// sockets.
     fn with_all_sockets_mut<O, F: FnOnce(&mut DatagramSocketSet<I, Self::WeakDeviceId, S>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O;
+
+    /// Calls the function with immutable access to the set with all datagram
+    /// sockets.
+    fn with_all_sockets<O, F: FnOnce(&DatagramSocketSet<I, Self::WeakDeviceId, S>) -> O>(
         &mut self,
         cb: F,
     ) -> O;
@@ -1201,6 +1212,12 @@ pub trait DatagramSocketSpec: Sized {
         ConnSharingState = Self::SharingState,
     >;
 
+    /// External data kept by datagram sockets.
+    ///
+    /// This is used to store opaque bindings data alongside the core data
+    /// inside the socket references.
+    type ExternalData<I: Ip>: Debug + Send + Sync;
+
     /// Returns the IP protocol of this datagram specification.
     fn ip_proto<I: IpProtoExt>() -> I::Proto;
 
@@ -1249,9 +1266,11 @@ pub struct InUseError;
 
 /// Creates a primary ID without inserting it into the all socket map.
 pub(crate) fn create_primary_id<I: IpExt, D: device::WeakId, S: DatagramSocketSpec>(
+    external_data: S::ExternalData<I>,
 ) -> PrimaryRc<I, D, S> {
     PrimaryRc::new(ReferenceState {
         state: RwLock::new(SocketState::Unbound(UnboundSocketState::default())),
+        external_data,
     })
 }
 
@@ -1262,14 +1281,27 @@ pub(crate) fn create_primary_id<I: IpExt, D: device::WeakId, S: DatagramSocketSp
 /// resource.
 pub(crate) fn create<I: IpExt, S: DatagramSocketSpec, BC, CC: DatagramStateContext<I, BC, S>>(
     core_ctx: &mut CC,
+    external_data: S::ExternalData<I>,
 ) -> S::SocketId<I, CC::WeakDeviceId> {
-    let primary = create_primary_id();
+    let primary = create_primary_id(external_data);
     let strong = PrimaryRc::clone_strong(&primary);
     core_ctx.with_all_sockets_mut(move |socket_set| {
         let strong = PrimaryRc::clone_strong(&primary);
         assert_matches::assert_matches!(socket_set.insert(strong, primary), None);
     });
     strong.into()
+}
+
+/// Collects all currently opened sockets.
+pub(crate) fn collect_all_sockets<
+    I: IpExt,
+    S: DatagramSocketSpec,
+    BC,
+    CC: DatagramStateContext<I, BC, S>,
+>(
+    core_ctx: &mut CC,
+) -> Vec<S::SocketId<I, CC::WeakDeviceId>> {
+    core_ctx.with_all_sockets(|socket_set| socket_set.keys().map(|s| s.clone().into()).collect())
 }
 
 #[derive(Debug)]
@@ -5083,6 +5115,7 @@ mod test {
         type ConnStateExtra = ();
         type ConnState<I: IpExt, D: Debug + Eq + Hash + Send + Sync> =
             I::DualStackConnState<D, Self>;
+        type ExternalData<I: Ip> = ();
 
         fn ip_proto<I: IpProtoExt>() -> I::Proto {
             I::map_ip((), |()| FAKE_DATAGRAM_IPV4_PROTOCOL, |()| FAKE_DATAGRAM_IPV6_PROTOCOL)
@@ -5330,6 +5363,16 @@ mod test {
             cb: F,
         ) -> O {
             cb(&mut self.outer)
+        }
+
+        fn with_all_sockets<
+            O,
+            F: FnOnce(&DatagramSocketSet<I, Self::WeakDeviceId, FakeStateSpec>) -> O,
+        >(
+            &mut self,
+            cb: F,
+        ) -> O {
+            cb(&self.outer)
         }
 
         fn with_socket_state<
@@ -5631,7 +5674,7 @@ mod test {
         );
         let mut bindings_ctx = FakeBindingsCtx::default();
 
-        let unbound = create(&mut core_ctx);
+        let unbound = create(&mut core_ctx, ());
         const EXPECTED_HOP_LIMITS: HopLimits = HopLimits {
             unicast: const_unwrap_option(NonZeroU8::new(45)),
             multicast: const_unwrap_option(NonZeroU8::new(23)),
@@ -5663,7 +5706,7 @@ mod test {
         };
         let mut bindings_ctx = FakeBindingsCtx::default();
 
-        let unbound = create(&mut core_ctx);
+        let unbound = create(&mut core_ctx, ());
         set_device(&mut core_ctx, &mut bindings_ctx, &unbound, Some(&FakeDeviceId)).unwrap();
 
         let HopLimits { mut unicast, multicast } = DEFAULT_HOP_LIMITS;
@@ -5696,7 +5739,7 @@ mod test {
         );
         let mut bindings_ctx = FakeBindingsCtx::default();
 
-        let unbound = create(&mut core_ctx);
+        let unbound = create(&mut core_ctx, ());
         assert_eq!(get_ip_hop_limits(&mut core_ctx, &bindings_ctx, &unbound), DEFAULT_HOP_LIMITS);
 
         update_ip_hop_limit(&mut core_ctx, &mut bindings_ctx, &unbound, |limits| {
@@ -5725,7 +5768,7 @@ mod test {
             FakeCoreCtx::<I, _>::new_with_sockets(Default::default(), Default::default());
         let mut bindings_ctx = FakeBindingsCtx::default();
 
-        let unbound = create(&mut core_ctx);
+        let unbound = create(&mut core_ctx, ());
 
         set_device(&mut core_ctx, &mut bindings_ctx, &unbound, Some(&FakeDeviceId)).unwrap();
         assert_eq!(
@@ -5752,7 +5795,7 @@ mod test {
         };
         let mut bindings_ctx = FakeBindingsCtx::default();
 
-        let socket = create(&mut core_ctx);
+        let socket = create(&mut core_ctx, ());
         let body = Buf::new(Vec::new(), ..);
 
         send_to(
@@ -5785,7 +5828,7 @@ mod test {
         };
         let mut bindings_ctx = FakeBindingsCtx::default();
 
-        let socket = create(&mut core_ctx);
+        let socket = create(&mut core_ctx, ());
         let body = Buf::new(Vec::new(), ..);
 
         assert_matches!(
@@ -5898,7 +5941,7 @@ mod test {
             ),
         };
 
-        let unbound = create(&mut core_ctx);
+        let unbound = create(&mut core_ctx, ());
 
         assert!(!get_ip_transparent(&mut core_ctx, &unbound));
 
@@ -6009,7 +6052,7 @@ mod test {
                 },
             );
 
-        let socket = create(&mut core_ctx);
+        let socket = create(&mut core_ctx, ());
         const LOCAL_PORT: u8 = 10;
         const ORIGINAL_REMOTE_PORT: char = 'a';
         const NEW_REMOTE_PORT: char = 'b';
@@ -6135,7 +6178,7 @@ mod test {
             );
 
         const REMOTE_PORT: char = 'a';
-        let socket = create(&mut core_ctx);
+        let socket = create(&mut core_ctx, ());
         connect(
             &mut core_ctx,
             &mut bindings_ctx,
@@ -6206,8 +6249,8 @@ mod test {
         const LOCAL_PORT: u8 = 10;
         const REMOTE_PORT: char = 'a';
 
-        let socket1 = create(&mut core_ctx);
-        let socket2 = create(&mut core_ctx);
+        let socket1 = create(&mut core_ctx, ());
+        let socket2 = create(&mut core_ctx, ());
 
         // Initialize each socket to the `original` state, and verify that their
         // device can be set.

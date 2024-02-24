@@ -258,26 +258,15 @@ const DEFAULT_LOW_PRIORITY_METRIC: u32 = 99999;
 /// The value is currently kept in sync with the Netstack2 implementation.
 const DEFAULT_INTERFACE_METRIC: u32 = 100;
 
-type UdpSockets = socket::datagram::SocketCollectionPair<socket::datagram::Udp>;
-type IcmpEchoSockets = socket::datagram::SocketCollectionPair<socket::datagram::IcmpEcho>;
-
 pub(crate) struct BindingsCtxInner {
     timers: timers::TimerDispatcher<TimerId<BindingsCtx>>,
     devices: Devices<DeviceId<BindingsCtx>>,
-    udp_sockets: UdpSockets,
-    icmp_echo_sockets: IcmpEchoSockets,
     routes: routes::ChangeSink,
 }
 
 impl BindingsCtxInner {
     fn new(routes_change_sink: routes::ChangeSink) -> Self {
-        Self {
-            timers: Default::default(),
-            devices: Default::default(),
-            udp_sockets: Default::default(),
-            icmp_echo_sockets: Default::default(),
-            routes: routes_change_sink,
-        }
+        Self { timers: Default::default(), devices: Default::default(), routes: routes_change_sink }
     }
 }
 
@@ -290,18 +279,6 @@ impl AsRef<timers::TimerDispatcher<TimerId<BindingsCtx>>> for BindingsCtx {
 impl AsRef<Devices<DeviceId<BindingsCtx>>> for BindingsCtx {
     fn as_ref(&self) -> &Devices<DeviceId<BindingsCtx>> {
         &self.devices
-    }
-}
-
-impl AsRef<UdpSockets> for BindingsCtx {
-    fn as_ref(&self) -> &UdpSockets {
-        &self.udp_sockets
-    }
-}
-
-impl AsRef<IcmpEchoSockets> for BindingsCtx {
-    fn as_ref(&self) -> &IcmpEchoSockets {
-        &self.icmp_echo_sockets
     }
 }
 
@@ -539,9 +516,7 @@ impl DeviceLayerEventDispatcher for BindingsCtx {
     }
 }
 
-impl<I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho> + IpExt>
-    IcmpEchoBindingsContext<I, DeviceId<BindingsCtx>> for BindingsCtx
-{
+impl<I: IpExt> IcmpEchoBindingsContext<I, DeviceId<BindingsCtx>> for BindingsCtx {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
         conn: &IcmpSocketId<I, WeakDeviceId<BindingsCtx>, BindingsCtx>,
@@ -551,20 +526,15 @@ impl<I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho> + Ip
         id: u16,
         data: B,
     ) {
-        I::with_collection_mut(self, |c| {
-            c.receive_icmp_echo_reply(conn, device, src_ip, dst_ip, id, data)
-        })
+        conn.external_data().receive_icmp_echo_reply(device, src_ip, dst_ip, id, data)
     }
 }
 
 impl IcmpEchoBindingsTypes for BindingsCtx {
-    type ExternalData<I: Ip> = ();
+    type ExternalData<I: Ip> = socket::datagram::DatagramSocketExternalData<I>;
 }
 
-impl<I> UdpReceiveBindingsContext<I, DeviceId<BindingsCtx>> for BindingsCtx
-where
-    I: socket::datagram::SocketCollectionIpExt<socket::datagram::Udp> + IpExt,
-{
+impl<I: IpExt> UdpReceiveBindingsContext<I, DeviceId<BindingsCtx>> for BindingsCtx {
     fn receive_udp<B: BufferMut>(
         &mut self,
         id: &UdpSocketId<I, WeakDeviceId<BindingsCtx>, BindingsCtx>,
@@ -573,12 +543,12 @@ where
         src_addr: (<I>::Addr, Option<NonZeroU16>),
         body: &B,
     ) {
-        I::with_collection_mut(self, |c| c.receive_udp(id, device, dst_addr, src_addr, body))
+        id.external_data().receive_udp(device, dst_addr, src_addr, body)
     }
 }
 
 impl UdpBindingsTypes for BindingsCtx {
-    type ExternalData<I: Ip> = ();
+    type ExternalData<I: Ip> = socket::datagram::DatagramSocketExternalData<I>;
 }
 
 impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>> for BindingsCtx {
