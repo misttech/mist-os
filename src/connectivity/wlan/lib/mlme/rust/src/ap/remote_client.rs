@@ -910,20 +910,17 @@ impl RemoteClient {
         ctx: &mut Context<D>,
         capabilities: mac::CapabilityInfo,
         ssid: Option<Ssid>,
-        mgmt_hdr: mac::MgmtHdr,
-        body: B,
+        mgmt_frame: mac::MgmtFrame<B>,
     ) -> Result<(), ClientRejection> {
-        let mgmt_subtype = *&{ mgmt_hdr.frame_ctrl }.mgmt_subtype();
-
-        self.reject_frame_class_if_not_permitted(ctx, mac::frame_class(&{ mgmt_hdr.frame_ctrl }))?;
+        self.reject_frame_class_if_not_permitted(ctx, mac::frame_class(&mgmt_frame.frame_ctrl()))?;
 
         self.reset_bss_max_idle_timeout(ctx);
 
-        match mac::MgmtBody::parse(mgmt_subtype, body).ok_or(ClientRejection::ParseFailed)? {
-            mac::MgmtBody::Authentication { auth_hdr, .. } => {
+        match mgmt_frame.try_into_mgmt_body().1.ok_or(ClientRejection::ParseFailed)? {
+            mac::MgmtBody::Authentication(mac::AuthFrame { auth_hdr, .. }) => {
                 self.handle_auth_frame(ctx, auth_hdr.auth_alg_num)
             }
-            mac::MgmtBody::AssociationReq { assoc_req_hdr, elements } => {
+            mac::MgmtBody::AssociationReq(mac::AssocReqFrame { assoc_req_hdr, elements }) => {
                 let mut rates = vec![];
                 let mut rsne = None;
 
@@ -983,7 +980,7 @@ impl RemoteClient {
             mac::MgmtBody::Disassociation { disassoc_hdr, .. } => {
                 self.handle_disassoc_frame(ctx, disassoc_hdr.reason_code)
             }
-            mac::MgmtBody::Action { action_hdr: _, .. } => self.handle_action_frame(ctx),
+            mac::MgmtBody::Action(_) => self.handle_action_frame(ctx),
             _ => Err(ClientRejection::Unsupported),
         }
     }
@@ -1118,7 +1115,7 @@ mod tests {
         test_case::test_case,
         wlan_common::{
             assert_variant,
-            mac::CapabilityInfo,
+            mac::{AsBytesExt as _, CapabilityInfo},
             test_utils::fake_frames::*,
             timer::{self, create_timer},
         },
@@ -2317,19 +2314,23 @@ mod tests {
                 &mut ctx,
                 mac::CapabilityInfo(0),
                 None,
-                mac::MgmtHdr {
-                    frame_ctrl: mac::FrameControl(0b00000000_10110000), // Auth frame
-                    duration: 0,
-                    addr1: [1; 6].into(),
-                    addr2: [2; 6].into(),
-                    addr3: [3; 6].into(),
-                    seq_ctrl: mac::SequenceControl(10),
+                mac::MgmtFrame {
+                    mgmt_hdr: mac::MgmtHdr {
+                        frame_ctrl: mac::FrameControl(0b00000000_10110000), // Auth frame
+                        duration: 0,
+                        addr1: [1; 6].into(),
+                        addr2: [2; 6].into(),
+                        addr3: [3; 6].into(),
+                        seq_ctrl: mac::SequenceControl(10),
+                    }
+                    .as_bytes_ref(),
+                    ht_ctrl: None,
+                    body: &[
+                        0, 0, // Auth algorithm number
+                        1, 0, // Auth txn seq number
+                        0, 0, // Status code
+                    ][..],
                 },
-                &[
-                    0, 0, // Auth algorithm number
-                    1, 0, // Auth txn seq number
-                    0, 0, // Status code
-                ][..],
             )
             .expect("expected OK");
     }
@@ -2360,15 +2361,19 @@ mod tests {
                 &mut ctx,
                 mac::CapabilityInfo(0),
                 Some(ssid.clone()),
-                mac::MgmtHdr {
-                    frame_ctrl: mac::FrameControl(0b00000000_00000000), // Assoc req frame
-                    duration: 0,
-                    addr1: [1; 6].into(),
-                    addr2: [2; 6].into(),
-                    addr3: [3; 6].into(),
-                    seq_ctrl: mac::SequenceControl(10),
+                mac::MgmtFrame {
+                    mgmt_hdr: mac::MgmtHdr {
+                        frame_ctrl: mac::FrameControl(0b00000000_00000000), // Assoc req frame
+                        duration: 0,
+                        addr1: [1; 6].into(),
+                        addr2: [2; 6].into(),
+                        addr3: [3; 6].into(),
+                        seq_ctrl: mac::SequenceControl(10),
+                    }
+                    .as_bytes_ref(),
+                    ht_ctrl: None,
+                    body: &assoc_frame_body[..],
                 },
-                &assoc_frame_body[..],
             )
             .expect("expected OK");
 
@@ -2428,15 +2433,19 @@ mod tests {
                 &mut ctx,
                 mac::CapabilityInfo(0),
                 Some(Ssid::try_from("coolnet").unwrap()),
-                mac::MgmtHdr {
-                    frame_ctrl: mac::FrameControl(0b00000000_00000000), // Assoc req frame
-                    duration: 0,
-                    addr1: [1; 6].into(),
-                    addr2: [2; 6].into(),
-                    addr3: [3; 6].into(),
-                    seq_ctrl: mac::SequenceControl(10),
+                mac::MgmtFrame {
+                    mgmt_hdr: mac::MgmtHdr {
+                        frame_ctrl: mac::FrameControl(0b00000000_00000000), // Assoc req frame
+                        duration: 0,
+                        addr1: [1; 6].into(),
+                        addr2: [2; 6].into(),
+                        addr3: [3; 6].into(),
+                        seq_ctrl: mac::SequenceControl(10),
+                    }
+                    .as_bytes_ref(),
+                    ht_ctrl: None,
+                    body: &ies[..],
                 },
-                &ies[..],
             )
             .expect("parsing should not fail");
 
@@ -2471,18 +2480,22 @@ mod tests {
                     &mut ctx,
                     mac::CapabilityInfo(0),
                     None,
-                    mac::MgmtHdr {
-                        frame_ctrl: mac::FrameControl(0b00000000_00000000), // Assoc req frame
-                        duration: 0,
-                        addr1: [1; 6].into(),
-                        addr2: [2; 6].into(),
-                        addr3: [3; 6].into(),
-                        seq_ctrl: mac::SequenceControl(10),
+                    mac::MgmtFrame {
+                        mgmt_hdr: mac::MgmtHdr {
+                            frame_ctrl: mac::FrameControl(0b00000000_00000000), // Assoc req frame
+                            duration: 0,
+                            addr1: [1; 6].into(),
+                            addr2: [2; 6].into(),
+                            addr3: [3; 6].into(),
+                            seq_ctrl: mac::SequenceControl(10),
+                        }
+                        .as_bytes_ref(),
+                        ht_ctrl: None,
+                        body: &[
+                            0, 0, // Capability info
+                            10, 0, // Listen interval
+                        ][..],
                     },
-                    &[
-                        0, 0, // Capability info
-                        10, 0, // Listen interval
-                    ][..],
                 )
                 .expect_err("expected error"),
             ClientRejection::NotPermitted
@@ -2537,19 +2550,23 @@ mod tests {
                     &mut ctx,
                     mac::CapabilityInfo(0),
                     None,
-                    mac::MgmtHdr {
-                        frame_ctrl: mac::FrameControl(0b00000000_00010000), // Assoc resp frame
-                        duration: 0,
-                        addr1: [1; 6].into(),
-                        addr2: [2; 6].into(),
-                        addr3: [3; 6].into(),
-                        seq_ctrl: mac::SequenceControl(10),
+                    mac::MgmtFrame {
+                        mgmt_hdr: mac::MgmtHdr {
+                            frame_ctrl: mac::FrameControl(0b00000000_00010000), // Assoc resp frame
+                            duration: 0,
+                            addr1: [1; 6].into(),
+                            addr2: [2; 6].into(),
+                            addr3: [3; 6].into(),
+                            seq_ctrl: mac::SequenceControl(10),
+                        }
+                        .as_bytes_ref(),
+                        ht_ctrl: None,
+                        body: &[
+                            0, 0, // Capability info
+                            0, 0, // Status code
+                            1, 0, // AID
+                        ][..],
                     },
-                    &[
-                        0, 0, // Capability info
-                        0, 0, // Status code
-                        1, 0, // AID
-                    ][..],
                 )
                 .expect_err("expected error"),
             ClientRejection::Unsupported
@@ -2574,18 +2591,22 @@ mod tests {
                 &mut ctx,
                 mac::CapabilityInfo(0),
                 None,
-                mac::MgmtHdr {
-                    frame_ctrl: mac::FrameControl(0b00000000_00000000), // Assoc req frame
-                    duration: 0,
-                    addr1: [1; 6].into(),
-                    addr2: [2; 6].into(),
-                    addr3: [3; 6].into(),
-                    seq_ctrl: mac::SequenceControl(10),
+                mac::MgmtFrame {
+                    mgmt_hdr: mac::MgmtHdr {
+                        frame_ctrl: mac::FrameControl(0b00000000_00000000), // Assoc req frame
+                        duration: 0,
+                        addr1: [1; 6].into(),
+                        addr2: [2; 6].into(),
+                        addr3: [3; 6].into(),
+                        seq_ctrl: mac::SequenceControl(10),
+                    }
+                    .as_bytes_ref(),
+                    ht_ctrl: None,
+                    body: &[
+                        0, 0, // Capability info
+                        10, 0, // Listen interval
+                    ][..],
                 },
-                &[
-                    0, 0, // Capability info
-                    10, 0, // Listen interval
-                ][..],
             )
             .expect("expected OK");
         assert_ne!(

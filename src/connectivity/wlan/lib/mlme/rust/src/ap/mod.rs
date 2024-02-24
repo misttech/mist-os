@@ -438,9 +438,7 @@ impl<D: DeviceOps> Ap<D> {
         };
 
         if let Err(e) = match mac_frame {
-            mac::MacFrame::Mgmt { mgmt_hdr, body, .. } => {
-                bss.handle_mgmt_frame(&mut self.ctx, *mgmt_hdr, body)
-            }
+            mac::MacFrame::Mgmt(mgmt) => bss.handle_mgmt_frame(&mut self.ctx, mgmt),
             mac::MacFrame::Data { fixed_fields, addr4, qos_ctrl, body, .. } => bss
                 .handle_data_frame(
                     &mut self.ctx,

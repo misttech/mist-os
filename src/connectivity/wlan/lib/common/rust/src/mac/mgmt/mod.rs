@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    super::MgmtSubtype,
+    super::{MgmtFrame, MgmtSubtype},
     zerocopy::{ByteSlice, Ref},
 };
 
@@ -13,9 +13,127 @@ mod status;
 
 pub use {fields::*, reason::*, status::*};
 
-// TODO(https://fxbug.dev/42079361): Use this in the `MgmtBody::AssocReq` variant.
+/// Frame or frame body distinguished by acknowledgement or lack thereof, namely action frames.
+#[derive(Clone, Copy, Debug)]
+pub struct NoAck<const NO_ACK: bool, T>(pub T);
+
+impl<const NO_ACK: bool, B> NoAck<NO_ACK, ActionBody<B>>
+where
+    B: ByteSlice,
+{
+    // NOTE: The management frame subtype is not part of the body. This function assumes whether or
+    //       not acknowledgement is required.
+    pub fn parse(bytes: B) -> Option<Self> {
+        ActionBody::parse(bytes).map(NoAck)
+    }
+}
+
+impl<const NO_ACK: bool, T> NoAck<NO_ACK, T> {
+    pub fn into_body(self) -> T {
+        self.0
+    }
+}
+
+impl<const NO_ACK: bool, T> AsRef<T> for NoAck<NO_ACK, T> {
+    fn as_ref(&self) -> &T {
+        &self.0
+    }
+}
+
+/// Action frame that requires acknowledgement per the `ACTION` management frame subtype.
+pub type ActionAckFrame<B> = NoAck<false, ActionBody<B>>;
+
+/// Action frame that does **not** require acknowledgement per the `ACTION_NO_ACK` management frame
+/// subtype.
+pub type ActionNoAckFrame<B> = NoAck<true, ActionBody<B>>;
+
+/// Action frame that may or may not require acknowledgement.
 #[derive(Debug)]
-pub struct ActionFrame<const NO_ACK: bool, B>
+pub enum ActionFrame<B>
+where
+    B: ByteSlice,
+{
+    Ack(ActionAckFrame<B>),
+    NoAck(ActionNoAckFrame<B>),
+}
+
+impl<B> ActionFrame<B>
+where
+    B: ByteSlice,
+{
+    pub fn parse(subtype: MgmtSubtype, bytes: B) -> Option<Self> {
+        match subtype {
+            MgmtSubtype::ACTION => ActionAckFrame::parse(bytes).map(From::from),
+            MgmtSubtype::ACTION_NO_ACK => ActionNoAckFrame::parse(bytes).map(From::from),
+            _ => None,
+        }
+    }
+
+    pub fn into_body(self) -> ActionBody<B> {
+        match self {
+            ActionFrame::Ack(frame) => frame.into_body(),
+            ActionFrame::NoAck(frame) => frame.into_body(),
+        }
+    }
+
+    pub fn ack(self) -> Option<ActionAckFrame<B>> {
+        match self {
+            ActionFrame::Ack(frame) => Some(frame),
+            _ => None,
+        }
+    }
+
+    pub fn no_ack(self) -> Option<ActionNoAckFrame<B>> {
+        match self {
+            ActionFrame::NoAck(frame) => Some(frame),
+            _ => None,
+        }
+    }
+
+    pub fn is_ack(&self) -> bool {
+        matches!(self, ActionFrame::Ack(_))
+    }
+
+    pub fn is_no_ack(&self) -> bool {
+        matches!(self, ActionFrame::NoAck(_))
+    }
+}
+
+impl<B> AsRef<ActionBody<B>> for ActionFrame<B>
+where
+    B: ByteSlice,
+{
+    fn as_ref(&self) -> &ActionBody<B> {
+        match self {
+            ActionFrame::Ack(frame) => frame.as_ref(),
+            ActionFrame::NoAck(frame) => frame.as_ref(),
+        }
+    }
+}
+
+impl<B> From<ActionAckFrame<B>> for ActionFrame<B>
+where
+    B: ByteSlice,
+{
+    fn from(frame: ActionAckFrame<B>) -> Self {
+        ActionFrame::Ack(frame)
+    }
+}
+
+impl<B> From<ActionNoAckFrame<B>> for ActionFrame<B>
+where
+    B: ByteSlice,
+{
+    fn from(frame: ActionNoAckFrame<B>) -> Self {
+        ActionFrame::NoAck(frame)
+    }
+}
+
+/// Action frame body.
+///
+/// Contains the contents of an action frame: an action header and action elements.
+#[derive(Debug)]
+pub struct ActionBody<B>
 where
     B: ByteSlice,
 {
@@ -23,17 +141,16 @@ where
     pub elements: B,
 }
 
-impl<const NO_ACK: bool, B> ActionFrame<NO_ACK, B>
+impl<B> ActionBody<B>
 where
     B: ByteSlice,
 {
     pub fn parse(bytes: B) -> Option<Self> {
         Ref::new_unaligned_from_prefix(bytes)
-            .map(|(action_hdr, elements)| ActionFrame { action_hdr, elements })
+            .map(|(action_hdr, elements)| ActionBody { action_hdr, elements })
     }
 }
 
-// TODO(https://fxbug.dev/42079361): Use this in the `MgmtBody::AssocReq` variant.
 #[derive(Debug)]
 pub struct AssocReqFrame<B>
 where
@@ -53,7 +170,6 @@ where
     }
 }
 
-// TODO(https://fxbug.dev/42079361): Use this in the `MgmtBody::AssocResp` variant.
 #[derive(Debug)]
 pub struct AssocRespFrame<B>
 where
@@ -73,7 +189,6 @@ where
     }
 }
 
-// TODO(https://fxbug.dev/42079361): Use this in the `MgmtBody::Auth` variant.
 #[derive(Debug)]
 pub struct AuthFrame<B>
 where
@@ -93,7 +208,6 @@ where
     }
 }
 
-// TODO(https://fxbug.dev/42079361): Use this in the `MgmtBody::AssocResp` variant.
 #[derive(Debug)]
 pub struct ProbeReqFrame<B>
 where
@@ -111,17 +225,20 @@ where
     }
 }
 
+// TODO(https://fxbug.dev/42079361): Implement dedicated management body types for remaining
+//                                   variants with fields and change those variants to tuple
+//                                   variants instead.
 #[derive(Debug)]
 pub enum MgmtBody<B: ByteSlice> {
     Beacon { bcn_hdr: Ref<B, BeaconHdr>, elements: B },
-    ProbeReq { elements: B },
+    ProbeReq(ProbeReqFrame<B>),
     ProbeResp { probe_resp_hdr: Ref<B, ProbeRespHdr>, elements: B },
-    Authentication { auth_hdr: Ref<B, AuthHdr>, elements: B },
-    AssociationReq { assoc_req_hdr: Ref<B, AssocReqHdr>, elements: B },
-    AssociationResp { assoc_resp_hdr: Ref<B, AssocRespHdr>, elements: B },
+    Authentication(AuthFrame<B>),
+    AssociationReq(AssocReqFrame<B>),
+    AssociationResp(AssocRespFrame<B>),
     Deauthentication { deauth_hdr: Ref<B, DeauthHdr>, elements: B },
     Disassociation { disassoc_hdr: Ref<B, DisassocHdr>, elements: B },
-    Action { no_ack: bool, action_hdr: Ref<B, ActionHdr>, elements: B },
+    Action(ActionFrame<B>),
     Unsupported { subtype: MgmtSubtype },
 }
 
@@ -132,23 +249,14 @@ impl<B: ByteSlice> MgmtBody<B> {
                 let (bcn_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
                 Some(MgmtBody::Beacon { bcn_hdr, elements })
             }
-            MgmtSubtype::PROBE_REQ => Some(MgmtBody::ProbeReq { elements: bytes }),
+            MgmtSubtype::PROBE_REQ => ProbeReqFrame::parse(bytes).map(From::from),
             MgmtSubtype::PROBE_RESP => {
                 let (probe_resp_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
                 Some(MgmtBody::ProbeResp { probe_resp_hdr, elements })
             }
-            MgmtSubtype::AUTH => {
-                let (auth_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
-                Some(MgmtBody::Authentication { auth_hdr, elements })
-            }
-            MgmtSubtype::ASSOC_REQ => {
-                let (assoc_req_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
-                Some(MgmtBody::AssociationReq { assoc_req_hdr, elements })
-            }
-            MgmtSubtype::ASSOC_RESP => {
-                let (assoc_resp_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
-                Some(MgmtBody::AssociationResp { assoc_resp_hdr, elements })
-            }
+            MgmtSubtype::AUTH => AuthFrame::parse(bytes).map(From::from),
+            MgmtSubtype::ASSOC_REQ => AssocReqFrame::parse(bytes).map(From::from),
+            MgmtSubtype::ASSOC_RESP => AssocRespFrame::parse(bytes).map(From::from),
             MgmtSubtype::DEAUTH => {
                 let (deauth_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
                 Some(MgmtBody::Deauthentication { deauth_hdr, elements })
@@ -158,15 +266,69 @@ impl<B: ByteSlice> MgmtBody<B> {
                 Some(MgmtBody::Disassociation { disassoc_hdr, elements })
             }
             MgmtSubtype::ACTION => {
-                let (action_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
-                Some(MgmtBody::Action { no_ack: false, action_hdr, elements })
+                ActionAckFrame::parse(bytes).map(ActionFrame::from).map(From::from)
             }
             MgmtSubtype::ACTION_NO_ACK => {
-                let (action_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
-                Some(MgmtBody::Action { no_ack: true, action_hdr, elements })
+                ActionNoAckFrame::parse(bytes).map(ActionFrame::from).map(From::from)
             }
             subtype => Some(MgmtBody::Unsupported { subtype }),
         }
+    }
+}
+
+impl<B> From<ProbeReqFrame<B>> for MgmtBody<B>
+where
+    B: ByteSlice,
+{
+    fn from(frame: ProbeReqFrame<B>) -> Self {
+        MgmtBody::ProbeReq(frame)
+    }
+}
+
+impl<B> From<AuthFrame<B>> for MgmtBody<B>
+where
+    B: ByteSlice,
+{
+    fn from(frame: AuthFrame<B>) -> Self {
+        MgmtBody::Authentication(frame)
+    }
+}
+
+impl<B> From<AssocReqFrame<B>> for MgmtBody<B>
+where
+    B: ByteSlice,
+{
+    fn from(frame: AssocReqFrame<B>) -> Self {
+        MgmtBody::AssociationReq(frame)
+    }
+}
+
+impl<B> From<AssocRespFrame<B>> for MgmtBody<B>
+where
+    B: ByteSlice,
+{
+    fn from(frame: AssocRespFrame<B>) -> Self {
+        MgmtBody::AssociationResp(frame)
+    }
+}
+
+impl<B> From<ActionFrame<B>> for MgmtBody<B>
+where
+    B: ByteSlice,
+{
+    fn from(frame: ActionFrame<B>) -> Self {
+        MgmtBody::Action(frame)
+    }
+}
+
+impl<B> TryFrom<MgmtFrame<B>> for MgmtBody<B>
+where
+    B: ByteSlice,
+{
+    type Error = ();
+
+    fn try_from(mgmt_frame: MgmtFrame<B>) -> Result<Self, Self::Error> {
+        mgmt_frame.try_into_mgmt_body().1.ok_or(())
     }
 }
 

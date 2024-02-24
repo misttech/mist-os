@@ -1023,9 +1023,7 @@ impl States {
         }
 
         match mac_frame {
-            mac::MacFrame::Mgmt { mgmt_hdr, body, .. } => {
-                self.on_mgmt_frame(sta, &mgmt_hdr, body, rx_info)
-            }
+            mac::MacFrame::Mgmt(mgmt_frame) => self.on_mgmt_frame(sta, mgmt_frame, rx_info),
             mac::MacFrame::Data { fixed_fields, addr4, qos_ctrl, body, .. } => {
                 if let States::Associated(state) = &mut self {
                     state.on_data_frame(
@@ -1055,29 +1053,26 @@ impl States {
     fn on_mgmt_frame<B: ByteSlice, D: DeviceOps>(
         self,
         sta: &mut BoundClient<'_, D>,
-        mgmt_hdr: &mac::MgmtHdr,
-        body: B,
+        mgmt_frame: mac::MgmtFrame<B>,
         rx_info: banjo_wlan_softmac::WlanRxInfo,
     ) -> States {
         trace::duration!(c"wlan", c"States::on_mgmt_frame");
 
         // Parse management frame. Drop corrupted ones.
-        let mgmt_body = match mac::MgmtBody::parse({ mgmt_hdr.frame_ctrl }.mgmt_subtype(), body) {
-            Some(x) => x,
-            None => return self,
+        let (mgmt_hdr, mgmt_body) = match mgmt_frame.try_into_mgmt_body() {
+            (mgmt_hdr, Some(mgmt_body)) => (mgmt_hdr, mgmt_body),
+            (_, None) => return self,
         };
 
         match self {
             States::Authenticating(mut state) => match mgmt_body {
-                mac::MgmtBody::Authentication { auth_hdr, elements } => {
-                    match state.on_auth_frame(sta, &auth_hdr, &elements[..]) {
-                        AuthProgress::Complete => {
-                            state.transition_to(Associating::default()).into()
-                        }
-                        AuthProgress::InProgress => state.into(),
-                        AuthProgress::Failed => state.transition_to(Joined).into(),
-                    }
-                }
+                mac::MgmtBody::Authentication(mac::AuthFrame { auth_hdr, elements }) => match state
+                    .on_auth_frame(sta, &auth_hdr, &elements[..])
+                {
+                    AuthProgress::Complete => state.transition_to(Associating::default()).into(),
+                    AuthProgress::InProgress => state.into(),
+                    AuthProgress::Failed => state.transition_to(Joined).into(),
+                },
                 mac::MgmtBody::Deauthentication { deauth_hdr, .. } => {
                     state.on_deauth_frame(sta, &deauth_hdr);
                     state.transition_to(Joined).into()
@@ -1085,12 +1080,13 @@ impl States {
                 _ => state.into(),
             },
             States::Associating(mut state) => match mgmt_body {
-                mac::MgmtBody::AssociationResp { assoc_resp_hdr, elements } => {
-                    match state.on_assoc_resp_frame(sta, &assoc_resp_hdr, elements) {
-                        Ok(association) => state.transition_to(Associated(association)).into(),
-                        Err(()) => state.transition_to(Joined).into(),
-                    }
-                }
+                mac::MgmtBody::AssociationResp(mac::AssocRespFrame {
+                    assoc_resp_hdr,
+                    elements,
+                }) => match state.on_assoc_resp_frame(sta, &assoc_resp_hdr, elements) {
+                    Ok(association) => state.transition_to(Associated(association)).into(),
+                    Err(()) => state.transition_to(Joined).into(),
+                },
                 mac::MgmtBody::Deauthentication { deauth_hdr, .. } => {
                     state.on_deauth_frame(sta, &deauth_hdr);
                     state.transition_to(Joined).into()
@@ -1105,7 +1101,7 @@ impl States {
             },
             States::Associated(mut state) => {
                 state.extract_and_record_signal_dbm(rx_info);
-                state.on_any_mgmt_frame(sta, mgmt_hdr);
+                state.on_any_mgmt_frame(sta, &mgmt_hdr);
                 match mgmt_body {
                     mac::MgmtBody::Beacon { bcn_hdr, elements } => {
                         state.on_beacon_frame(sta, &bcn_hdr, elements);
@@ -1119,32 +1115,37 @@ impl States {
                         state.on_disassoc_frame(sta, &disassoc_hdr);
                         state.transition_to(Authenticated).into()
                     }
-                    mac::MgmtBody::Action { action_hdr, elements, .. } => match action_hdr.action {
-                        mac::ActionCategory::BLOCK_ACK => {
-                            let reader = BufferReader::new(elements);
-                            if let Some(action) = reader.peek_unaligned::<mac::BlockAckAction>() {
-                                state.on_block_ack_frame(
-                                    sta,
-                                    action.get(),
-                                    reader.into_remaining(),
-                                );
+                    mac::MgmtBody::Action(action_frame) => {
+                        let mac::ActionBody { action_hdr, elements, .. } = action_frame.into_body();
+                        match action_hdr.action {
+                            mac::ActionCategory::BLOCK_ACK => {
+                                let reader = BufferReader::new(elements);
+                                if let Some(action) = reader.peek_unaligned::<mac::BlockAckAction>()
+                                {
+                                    state.on_block_ack_frame(
+                                        sta,
+                                        action.get(),
+                                        reader.into_remaining(),
+                                    );
+                                }
+                                state.into()
                             }
-                            state.into()
-                        }
-                        mac::ActionCategory::SPECTRUM_MGMT => {
-                            let reader = BufferReader::new(elements);
-                            if let Some(action) = reader.peek_unaligned::<mac::SpectrumMgmtAction>()
-                            {
-                                state.on_spectrum_mgmt_frame(
-                                    sta,
-                                    action.get(),
-                                    reader.into_remaining(),
-                                );
+                            mac::ActionCategory::SPECTRUM_MGMT => {
+                                let reader = BufferReader::new(elements);
+                                if let Some(action) =
+                                    reader.peek_unaligned::<mac::SpectrumMgmtAction>()
+                                {
+                                    state.on_spectrum_mgmt_frame(
+                                        sta,
+                                        action.get(),
+                                        reader.into_remaining(),
+                                    );
+                                }
+                                state.into()
                             }
-                            state.into()
+                            _ => state.into(),
                         }
-                        _ => state.into(),
-                    },
+                    }
                     _ => state.into(),
                 }
             }

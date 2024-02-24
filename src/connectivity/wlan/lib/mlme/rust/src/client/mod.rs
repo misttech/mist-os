@@ -238,35 +238,31 @@ impl<D: DeviceOps> ClientMlme<D> {
     pub fn on_mac_frame_rx(&mut self, frame: &[u8], rx_info: banjo_wlan_softmac::WlanRxInfo) {
         trace::duration!(c"wlan", c"ClientMlme::on_mac_frame_rx");
         // TODO(https://fxbug.dev/42120906): Send the entire frame to scanner.
-        match mac::MacFrame::parse(frame, false) {
-            Some(mac::MacFrame::Mgmt { mgmt_hdr, body, .. }) => {
-                let bssid = Bssid::from(mgmt_hdr.addr3);
-                let frame_ctrl = mgmt_hdr.frame_ctrl;
-                match mac::MgmtBody::parse(frame_ctrl.mgmt_subtype(), body) {
-                    Some(mac::MgmtBody::Beacon { bcn_hdr, elements }) => {
-                        trace::duration!(c"wlan", c"MgmtBody::Beacon");
-                        self.scanner.bind(&mut self.ctx).handle_ap_advertisement(
-                            bssid,
-                            bcn_hdr.beacon_interval,
-                            bcn_hdr.capabilities,
-                            elements,
-                            rx_info,
-                        );
-                    }
-                    Some(mac::MgmtBody::ProbeResp { probe_resp_hdr, elements }) => {
-                        trace::duration!(c"wlan", c"MgmtBody::ProbeResp");
-                        self.scanner.bind(&mut self.ctx).handle_ap_advertisement(
-                            bssid,
-                            probe_resp_hdr.beacon_interval,
-                            probe_resp_hdr.capabilities,
-                            elements,
-                            rx_info,
-                        )
-                    }
-                    _ => (),
+        if let Some(mgmt_frame) = mac::MgmtFrame::parse(frame, false) {
+            let bssid = Bssid::from(mgmt_frame.mgmt_hdr.addr3);
+            match mgmt_frame.try_into_mgmt_body().1 {
+                Some(mac::MgmtBody::Beacon { bcn_hdr, elements }) => {
+                    trace::duration!(c"wlan", c"MgmtBody::Beacon");
+                    self.scanner.bind(&mut self.ctx).handle_ap_advertisement(
+                        bssid,
+                        bcn_hdr.beacon_interval,
+                        bcn_hdr.capabilities,
+                        elements,
+                        rx_info,
+                    );
                 }
+                Some(mac::MgmtBody::ProbeResp { probe_resp_hdr, elements }) => {
+                    trace::duration!(c"wlan", c"MgmtBody::ProbeResp");
+                    self.scanner.bind(&mut self.ctx).handle_ap_advertisement(
+                        bssid,
+                        probe_resp_hdr.beacon_interval,
+                        probe_resp_hdr.capabilities,
+                        elements,
+                        rx_info,
+                    )
+                }
+                _ => (),
             }
-            _ => (),
         }
 
         if let Some(sta) = self.sta.as_mut() {
@@ -633,7 +629,9 @@ impl Client {
         // Technically, |transmitter_addr| and |receiver_addr| would be more accurate but using src
         // src and dst to be consistent with |data_dst_addr()|.
         let (src_addr, dst_addr) = match mac_frame {
-            mac::MacFrame::Mgmt { mgmt_hdr, .. } => (Some(mgmt_hdr.addr3), mgmt_hdr.addr1),
+            mac::MacFrame::Mgmt(mac::MgmtFrame { mgmt_hdr, .. }) => {
+                (Some(mgmt_hdr.addr3), mgmt_hdr.addr1)
+            }
             mac::MacFrame::Data { fixed_fields, .. } => {
                 (mac::data_bssid(&fixed_fields), mac::data_dst_addr(&fixed_fields))
             }

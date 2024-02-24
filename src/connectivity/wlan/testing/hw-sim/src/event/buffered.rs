@@ -17,15 +17,17 @@ use {
     fidl_fuchsia_wlan_tap as fidl_tap,
     std::{borrow::Borrow, fmt::Debug, marker::PhantomData},
     wlan_common::mac::{
-        self, ActionFrame as ParsedActionFrame, AssocReqFrame as ParsedAssocReqFrame,
+        self, ActionBody, AssocReqFrame as ParsedAssocReqFrame,
         AssocRespFrame as ParsedAssocRespFrame, AuthFrame as ParsedAuthFrame,
         DataFrame as ParsedDataFrame, MacFrame as ParsedMacFrame, MgmtFrame as ParsedMgmtFrame,
-        MsduIterator, ProbeReqFrame as ParsedProbeReqFrame,
+        MsduIterator, NoAck, ProbeReqFrame as ParsedProbeReqFrame,
     },
     zerocopy::ByteSlice,
 };
 
 use crate::event::extract::FromEvent;
+
+pub type ParsedActionFrame<const NO_ACK: bool, B> = NoAck<NO_ACK, ActionBody<B>>;
 
 mod sealed {
     use super::*;
@@ -201,7 +203,7 @@ impl<const NO_ACK: bool> Parse for ActionFrame<NO_ACK> {
     where
         B: ByteSlice,
     {
-        ParsedActionFrame::parse(bytes)
+        NoAck::<NO_ACK, ActionBody<B>>::parse(bytes)
     }
 }
 

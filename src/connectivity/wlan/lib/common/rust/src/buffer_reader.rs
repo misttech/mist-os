@@ -8,6 +8,20 @@ use {
     zerocopy::{ByteSlice, ByteSliceMut, FromBytes, NoCell, Ref, Unaligned},
 };
 
+/// Types that can be converted into a `BufferReader` over a `ByteSlice`.
+///
+/// Both `BufferReader` and `ByteSlice` types implement this trait and it can be used to accept
+/// both byte slices and readers.
+pub trait IntoBufferReader<B> {
+    fn into_buffer_reader(self) -> BufferReader<B>;
+}
+
+impl<B: ByteSlice> IntoBufferReader<B> for B {
+    fn into_buffer_reader(self) -> BufferReader<B> {
+        BufferReader::new(self)
+    }
+}
+
 pub struct BufferReader<B> {
     buffer: Option<B>,
     bytes_read: usize,
@@ -164,6 +178,12 @@ impl<B: ByteSliceMut> BufferReader<B> {
 
     pub fn peek_remaining_mut(&mut self) -> &mut [u8] {
         &mut self.buffer.as_mut().unwrap()[..]
+    }
+}
+
+impl<B: ByteSlice> IntoBufferReader<B> for BufferReader<B> {
+    fn into_buffer_reader(self) -> BufferReader<B> {
+        self
     }
 }
 

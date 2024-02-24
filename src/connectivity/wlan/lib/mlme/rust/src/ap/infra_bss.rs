@@ -326,21 +326,20 @@ impl InfraBss {
     pub fn handle_mgmt_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
-        mgmt_hdr: mac::MgmtHdr,
-        body: B,
+        mgmt_frame: mac::MgmtFrame<B>,
     ) -> Result<(), Rejection> {
-        if *&{ mgmt_hdr.frame_ctrl }.to_ds() || *&{ mgmt_hdr.frame_ctrl }.from_ds() {
+        let frame_ctrl = mgmt_frame.frame_ctrl();
+        if frame_ctrl.to_ds() || frame_ctrl.from_ds() {
             // IEEE Std 802.11-2016, 9.2.4.1.4 and Table 9-4: The To DS bit is only set for QMF
             // (QoS Management frame) management frames, and the From DS bit is reserved.
             return Err(Rejection::BadDsBits);
         }
 
-        let to_bss = mgmt_hdr.addr1.as_array() == ctx.bssid.as_array()
-            && mgmt_hdr.addr3.as_array() == ctx.bssid.as_array();
-        let client_addr = mgmt_hdr.addr2;
+        let to_bss = mgmt_frame.mgmt_hdr.addr1.as_array() == ctx.bssid.as_array()
+            && mgmt_frame.mgmt_hdr.addr3.as_array() == ctx.bssid.as_array();
+        let client_addr = mgmt_frame.mgmt_hdr.addr2;
 
-        let mgmt_subtype = *&{ mgmt_hdr.frame_ctrl }.mgmt_subtype();
-        if mgmt_subtype == mac::MgmtSubtype::PROBE_REQ {
+        if mgmt_frame.mgmt_subtype() == mac::MgmtSubtype::PROBE_REQ {
             if device::try_query_discovery_support(&mut ctx.device)
                 .map_err(anyhow::Error::from)?
                 .probe_response_offload
@@ -353,14 +352,14 @@ impl InfraBss {
             }
 
             if to_bss
-                || (mgmt_hdr.addr1 == ieee80211::BROADCAST_ADDR
-                    && mgmt_hdr.addr3 == ieee80211::BROADCAST_ADDR)
+                || (mgmt_frame.mgmt_hdr.addr1 == ieee80211::BROADCAST_ADDR
+                    && mgmt_frame.mgmt_hdr.addr3 == ieee80211::BROADCAST_ADDR)
             {
                 // Allow either probe request sent directly to the AP, or ones that are broadcast.
-                for (id, ie_body) in ie::Reader::new(&body[..]) {
+                for (id, ie_body) in mgmt_frame.into_ies().1 {
                     match id {
                         ie::Id::SSID => {
-                            if !ie_body.is_empty() && ie_body != &self.ssid[..] {
+                            if !ie_body.is_empty() && *ie_body != self.ssid[..] {
                                 // Frame is not for this BSS.
                                 return Err(Rejection::OtherBss);
                             }
@@ -390,19 +389,15 @@ impl InfraBss {
             None => new_client.get_or_insert(RemoteClient::new(client_addr)),
         };
 
-        if let Err(e) = client.handle_mgmt_frame(
-            ctx,
-            self.capabilities,
-            Some(self.ssid.clone()),
-            mgmt_hdr,
-            body,
-        ) {
+        if let Err(e) =
+            client.handle_mgmt_frame(ctx, self.capabilities, Some(self.ssid.clone()), mgmt_frame)
+        {
             return Err(Rejection::Client(client_addr, e));
         }
 
         // IEEE Std 802.11-2016, 9.2.4.1.7: The value [of the Power Management subfield] indicates
         // the mode of the STA after the successful completion of the frame exchange sequence.
-        match client.set_power_state(ctx, { mgmt_hdr.frame_ctrl }.power_mgmt()) {
+        match client.set_power_state(ctx, frame_ctrl.power_mgmt()) {
             Err(ClientRejection::NotAssociated) => {
                 error!("client {:02X?} tried to doze but is not associated", client_addr);
             }
@@ -637,7 +632,7 @@ mod tests {
         wlan_common::{
             assert_variant,
             big_endian::BigEndianU16,
-            mac::CapabilityInfo,
+            mac::{AsBytesExt as _, CapabilityInfo},
             test_utils::fake_frames::fake_wpa2_rsne,
             timer::{self, create_timer},
         },
@@ -1053,22 +1048,26 @@ mod tests {
 
         bss.handle_mgmt_frame(
             &mut ctx,
-            mac::MgmtHdr {
-                frame_ctrl: mac::FrameControl(0)
-                    .with_frame_type(mac::FrameType::MGMT)
-                    .with_mgmt_subtype(mac::MgmtSubtype::AUTH),
-                duration: 0,
-                addr1: (*BSSID).into(),
-                addr2: *CLIENT_ADDR,
-                addr3: (*BSSID).into(),
-                seq_ctrl: mac::SequenceControl(10),
+            mac::MgmtFrame {
+                mgmt_hdr: mac::MgmtHdr {
+                    frame_ctrl: mac::FrameControl(0)
+                        .with_frame_type(mac::FrameType::MGMT)
+                        .with_mgmt_subtype(mac::MgmtSubtype::AUTH),
+                    duration: 0,
+                    addr1: (*BSSID).into(),
+                    addr2: *CLIENT_ADDR,
+                    addr3: (*BSSID).into(),
+                    seq_ctrl: mac::SequenceControl(10),
+                }
+                .as_bytes_ref(),
+                ht_ctrl: None,
+                body: &[
+                    // Auth body
+                    0, 0, // Auth Algorithm Number
+                    1, 0, // Auth Txn Seq Number
+                    0, 0, // Status code
+                ][..],
             },
-            &[
-                // Auth body
-                0, 0, // Auth Algorithm Number
-                1, 0, // Auth Txn Seq Number
-                0, 0, // Status code
-            ][..],
         )
         .expect("expected OK");
 
@@ -1102,25 +1101,29 @@ mod tests {
 
         bss.handle_mgmt_frame(
             &mut ctx,
-            mac::MgmtHdr {
-                frame_ctrl: mac::FrameControl(0)
-                    .with_frame_type(mac::FrameType::MGMT)
-                    .with_mgmt_subtype(mac::MgmtSubtype::ASSOC_REQ),
-                duration: 0,
-                addr1: (*BSSID).into(),
-                addr2: *CLIENT_ADDR,
-                addr3: (*BSSID).into(),
-                seq_ctrl: mac::SequenceControl(10),
+            mac::MgmtFrame {
+                mgmt_hdr: mac::MgmtHdr {
+                    frame_ctrl: mac::FrameControl(0)
+                        .with_frame_type(mac::FrameType::MGMT)
+                        .with_mgmt_subtype(mac::MgmtSubtype::ASSOC_REQ),
+                    duration: 0,
+                    addr1: (*BSSID).into(),
+                    addr2: *CLIENT_ADDR,
+                    addr3: (*BSSID).into(),
+                    seq_ctrl: mac::SequenceControl(10),
+                }
+                .as_bytes_ref(),
+                ht_ctrl: None,
+                body: &[
+                    // Assoc req body
+                    0, 0, // Capability info
+                    10, 0, // Listen interval
+                    // IEs
+                    1, 8, 1, 2, 3, 4, 5, 6, 7, 8, // Rates
+                    50, 2, 9, 10, // Extended rates
+                    48, 2, 77, 88, // RSNE
+                ][..],
             },
-            &[
-                // Assoc req body
-                0, 0, // Capability info
-                10, 0, // Listen interval
-                // IEs
-                1, 8, 1, 2, 3, 4, 5, 6, 7, 8, // Rates
-                50, 2, 9, 10, // Extended rates
-                48, 2, 77, 88, // RSNE
-            ][..],
         )
         .expect("expected OK");
 
@@ -1153,23 +1156,27 @@ mod tests {
         assert_variant!(
             bss.handle_mgmt_frame(
                 &mut ctx,
-                mac::MgmtHdr {
-                    frame_ctrl: mac::FrameControl(0)
-                        .with_frame_type(mac::FrameType::MGMT)
-                        .with_mgmt_subtype(mac::MgmtSubtype::AUTH)
-                        .with_to_ds(true),
-                    duration: 0,
-                    addr1: (*BSSID).into(),
-                    addr2: *CLIENT_ADDR,
-                    addr3: (*BSSID).into(),
-                    seq_ctrl: mac::SequenceControl(10),
+                mac::MgmtFrame {
+                    mgmt_hdr: mac::MgmtHdr {
+                        frame_ctrl: mac::FrameControl(0)
+                            .with_frame_type(mac::FrameType::MGMT)
+                            .with_mgmt_subtype(mac::MgmtSubtype::AUTH)
+                            .with_to_ds(true),
+                        duration: 0,
+                        addr1: (*BSSID).into(),
+                        addr2: *CLIENT_ADDR,
+                        addr3: (*BSSID).into(),
+                        seq_ctrl: mac::SequenceControl(10),
+                    }
+                    .as_bytes_ref(),
+                    ht_ctrl: None,
+                    body: &[
+                        // Auth body
+                        0, 0, // Auth Algorithm Number
+                        1, 0, // Auth Txn Seq Number
+                        0, 0, // Status code
+                    ][..],
                 },
-                &[
-                    // Auth body
-                    0, 0, // Auth Algorithm Number
-                    1, 0, // Auth Txn Seq Number
-                    0, 0, // Status code
-                ][..],
             )
             .expect_err("expected error"),
             Rejection::BadDsBits
@@ -1188,23 +1195,27 @@ mod tests {
         assert_variant!(
             bss.handle_mgmt_frame(
                 &mut ctx,
-                mac::MgmtHdr {
-                    frame_ctrl: mac::FrameControl(0)
-                        .with_frame_type(mac::FrameType::MGMT)
-                        .with_mgmt_subtype(mac::MgmtSubtype::AUTH)
-                        .with_from_ds(true),
-                    duration: 0,
-                    addr1: (*BSSID).into(),
-                    addr2: *CLIENT_ADDR,
-                    addr3: (*BSSID).into(),
-                    seq_ctrl: mac::SequenceControl(10),
+                mac::MgmtFrame {
+                    mgmt_hdr: mac::MgmtHdr {
+                        frame_ctrl: mac::FrameControl(0)
+                            .with_frame_type(mac::FrameType::MGMT)
+                            .with_mgmt_subtype(mac::MgmtSubtype::AUTH)
+                            .with_from_ds(true),
+                        duration: 0,
+                        addr1: (*BSSID).into(),
+                        addr2: *CLIENT_ADDR,
+                        addr3: (*BSSID).into(),
+                        seq_ctrl: mac::SequenceControl(10),
+                    }
+                    .as_bytes_ref(),
+                    ht_ctrl: None,
+                    body: &[
+                        // Auth body
+                        0, 0, // Auth Algorithm Number
+                        1, 0, // Auth Txn Seq Number
+                        0, 0, // Status code
+                    ][..],
                 },
-                &[
-                    // Auth body
-                    0, 0, // Auth Algorithm Number
-                    1, 0, // Auth Txn Seq Number
-                    0, 0, // Status code
-                ][..],
             )
             .expect_err("expected error"),
             Rejection::BadDsBits
@@ -1223,20 +1234,24 @@ mod tests {
         assert_variant!(
             bss.handle_mgmt_frame(
                 &mut ctx,
-                mac::MgmtHdr {
-                    frame_ctrl: mac::FrameControl(0)
-                        .with_frame_type(mac::FrameType::MGMT)
-                        .with_mgmt_subtype(mac::MgmtSubtype::DISASSOC),
-                    duration: 0,
-                    addr1: (*BSSID).into(),
-                    addr2: *CLIENT_ADDR,
-                    addr3: (*BSSID).into(),
-                    seq_ctrl: mac::SequenceControl(10),
+                mac::MgmtFrame {
+                    mgmt_hdr: mac::MgmtHdr {
+                        frame_ctrl: mac::FrameControl(0)
+                            .with_frame_type(mac::FrameType::MGMT)
+                            .with_mgmt_subtype(mac::MgmtSubtype::DISASSOC),
+                        duration: 0,
+                        addr1: (*BSSID).into(),
+                        addr2: *CLIENT_ADDR,
+                        addr3: (*BSSID).into(),
+                        seq_ctrl: mac::SequenceControl(10),
+                    }
+                    .as_bytes_ref(),
+                    ht_ctrl: None,
+                    body: &[
+                        // Disassoc header:
+                        8, 0, // reason code
+                    ][..],
                 },
-                &[
-                    // Disassoc header:
-                    8, 0, // reason code
-                ][..],
             )
             .expect_err("expected error"),
             Rejection::Client(_, ClientRejection::NotPermitted)
@@ -1255,19 +1270,22 @@ mod tests {
         assert_variant!(
             bss.handle_mgmt_frame(
                 &mut ctx,
-                mac::MgmtHdr {
-                    frame_ctrl: mac::FrameControl(0)
-                        .with_frame_type(mac::FrameType::MGMT)
-                        .with_mgmt_subtype(mac::MgmtSubtype::AUTH),
-                    duration: 0,
-                    addr1: (*BSSID).into(),
-                    addr2: *CLIENT_ADDR,
-                    addr3: (*BSSID).into(),
-                    seq_ctrl: mac::SequenceControl(10),
+                mac::MgmtFrame {
+                    mgmt_hdr: mac::MgmtHdr {
+                        frame_ctrl: mac::FrameControl(0)
+                            .with_frame_type(mac::FrameType::MGMT)
+                            .with_mgmt_subtype(mac::MgmtSubtype::AUTH),
+                        duration: 0,
+                        addr1: (*BSSID).into(),
+                        addr2: *CLIENT_ADDR,
+                        addr3: (*BSSID).into(),
+                        seq_ctrl: mac::SequenceControl(10),
+                    }
+                    .as_bytes_ref(),
+                    ht_ctrl: None,
+                    // Auth frame should have a header; doesn't.
+                    body: &[][..],
                 },
-                &[
-                // Auth frame should have a header; doesn't.
-            ][..],
             )
             .expect_err("expected error"),
             Rejection::Client(_, ClientRejection::ParseFailed)
@@ -1814,22 +1832,26 @@ mod tests {
     ) {
         bss.handle_mgmt_frame(
             ctx,
-            mac::MgmtHdr {
-                frame_ctrl: mac::FrameControl(0)
-                    .with_frame_type(mac::FrameType::MGMT)
-                    .with_mgmt_subtype(mac::MgmtSubtype::AUTH),
-                duration: 0,
-                addr1: (*BSSID).into(),
-                addr2: client_addr,
-                addr3: (*BSSID).into(),
-                seq_ctrl: mac::SequenceControl(10),
+            mac::MgmtFrame {
+                mgmt_hdr: mac::MgmtHdr {
+                    frame_ctrl: mac::FrameControl(0)
+                        .with_frame_type(mac::FrameType::MGMT)
+                        .with_mgmt_subtype(mac::MgmtSubtype::AUTH),
+                    duration: 0,
+                    addr1: (*BSSID).into(),
+                    addr2: client_addr,
+                    addr3: (*BSSID).into(),
+                    seq_ctrl: mac::SequenceControl(10),
+                }
+                .as_bytes_ref(),
+                ht_ctrl: None,
+                body: &[
+                    // Auth body
+                    0, 0, // Auth Algorithm Number
+                    1, 0, // Auth Txn Seq Number
+                    0, 0, // Status code
+                ][..],
             },
-            &[
-                // Auth body
-                0, 0, // Auth Algorithm Number
-                1, 0, // Auth Txn Seq Number
-                0, 0, // Status code
-            ][..],
         )
         .expect("failed to handle auth req frame");
 
@@ -1858,25 +1880,29 @@ mod tests {
     ) {
         bss.handle_mgmt_frame(
             ctx,
-            mac::MgmtHdr {
-                frame_ctrl: mac::FrameControl(0)
-                    .with_frame_type(mac::FrameType::MGMT)
-                    .with_mgmt_subtype(mac::MgmtSubtype::ASSOC_REQ),
-                duration: 0,
-                addr1: (*BSSID).into(),
-                addr2: client_addr,
-                addr3: (*BSSID).into(),
-                seq_ctrl: mac::SequenceControl(10),
+            mac::MgmtFrame {
+                mgmt_hdr: mac::MgmtHdr {
+                    frame_ctrl: mac::FrameControl(0)
+                        .with_frame_type(mac::FrameType::MGMT)
+                        .with_mgmt_subtype(mac::MgmtSubtype::ASSOC_REQ),
+                    duration: 0,
+                    addr1: (*BSSID).into(),
+                    addr2: client_addr,
+                    addr3: (*BSSID).into(),
+                    seq_ctrl: mac::SequenceControl(10),
+                }
+                .as_bytes_ref(),
+                ht_ctrl: None,
+                body: &[
+                    // Assoc req body
+                    0, 0, // Capability info
+                    10, 0, // Listen interval
+                    // IEs
+                    1, 8, 1, 2, 3, 4, 5, 6, 7, 8, // Rates
+                    50, 2, 9, 10, // Extended rates
+                    48, 2, 77, 88, // RSNE
+                ][..],
             },
-            &[
-                // Assoc req body
-                0, 0, // Capability info
-                10, 0, // Listen interval
-                // IEs
-                1, 8, 1, 2, 3, 4, 5, 6, 7, 8, // Rates
-                50, 2, 9, 10, // Extended rates
-                48, 2, 77, 88, // RSNE
-            ][..],
         )
         .expect("expected OK");
         let msg = fake_device_state
@@ -2138,17 +2164,21 @@ mod tests {
 
         bss.handle_mgmt_frame(
             &mut ctx,
-            mac::MgmtHdr {
-                frame_ctrl: mac::FrameControl(0)
-                    .with_frame_type(mac::FrameType::MGMT)
-                    .with_mgmt_subtype(mac::MgmtSubtype::PROBE_REQ),
-                duration: 0,
-                addr1: (*BSSID).into(),
-                addr2: *CLIENT_ADDR,
-                addr3: (*BSSID).into(),
-                seq_ctrl: mac::SequenceControl(10),
+            mac::MgmtFrame {
+                mgmt_hdr: mac::MgmtHdr {
+                    frame_ctrl: mac::FrameControl(0)
+                        .with_frame_type(mac::FrameType::MGMT)
+                        .with_mgmt_subtype(mac::MgmtSubtype::PROBE_REQ),
+                    duration: 0,
+                    addr1: (*BSSID).into(),
+                    addr2: *CLIENT_ADDR,
+                    addr3: (*BSSID).into(),
+                    seq_ctrl: mac::SequenceControl(10),
+                }
+                .as_bytes_ref(),
+                ht_ctrl: None,
+                body: &[][..],
             },
-            &[][..],
         )
         .expect_err("expected InfraBss::handle_mgmt_frame error");
     }
@@ -2172,19 +2202,23 @@ mod tests {
 
         bss.handle_mgmt_frame(
             &mut ctx,
-            mac::MgmtHdr {
-                frame_ctrl: mac::FrameControl(0)
-                    .with_frame_type(mac::FrameType::MGMT)
-                    .with_mgmt_subtype(mac::MgmtSubtype::PROBE_REQ),
-                duration: 0,
-                addr1: (*BSSID).into(),
-                addr2: *CLIENT_ADDR,
-                addr3: (*BSSID).into(),
-                seq_ctrl: mac::SequenceControl(10),
+            mac::MgmtFrame {
+                mgmt_hdr: mac::MgmtHdr {
+                    frame_ctrl: mac::FrameControl(0)
+                        .with_frame_type(mac::FrameType::MGMT)
+                        .with_mgmt_subtype(mac::MgmtSubtype::PROBE_REQ),
+                    duration: 0,
+                    addr1: (*BSSID).into(),
+                    addr2: *CLIENT_ADDR,
+                    addr3: (*BSSID).into(),
+                    seq_ctrl: mac::SequenceControl(10),
+                }
+                .as_bytes_ref(),
+                ht_ctrl: None,
+                body: &[
+                    0, 0, // Wildcard SSID
+                ][..],
             },
-            &[
-                0, 0, // Wildcard SSID
-            ][..],
         )
         .expect("expected InfraBss::handle_mgmt_frame ok");
 
@@ -2231,17 +2265,21 @@ mod tests {
 
         bss.handle_mgmt_frame(
             &mut ctx,
-            mac::MgmtHdr {
-                frame_ctrl: mac::FrameControl(0)
-                    .with_frame_type(mac::FrameType::MGMT)
-                    .with_mgmt_subtype(mac::MgmtSubtype::PROBE_REQ),
-                duration: 0,
-                addr1: (*BSSID).into(),
-                addr2: *CLIENT_ADDR,
-                addr3: (*BSSID).into(),
-                seq_ctrl: mac::SequenceControl(10),
+            mac::MgmtFrame {
+                mgmt_hdr: mac::MgmtHdr {
+                    frame_ctrl: mac::FrameControl(0)
+                        .with_frame_type(mac::FrameType::MGMT)
+                        .with_mgmt_subtype(mac::MgmtSubtype::PROBE_REQ),
+                    duration: 0,
+                    addr1: (*BSSID).into(),
+                    addr2: *CLIENT_ADDR,
+                    addr3: (*BSSID).into(),
+                    seq_ctrl: mac::SequenceControl(10),
+                }
+                .as_bytes_ref(),
+                ht_ctrl: None,
+                body: &[0, 5, 1, 2, 3, 4, 5][..],
             },
-            &[0, 5, 1, 2, 3, 4, 5][..],
         )
         .expect("expected InfraBss::handle_mgmt_frame ok");
 
@@ -2289,17 +2327,21 @@ mod tests {
         assert_variant!(
             bss.handle_mgmt_frame(
                 &mut ctx,
-                mac::MgmtHdr {
-                    frame_ctrl: mac::FrameControl(0)
-                        .with_frame_type(mac::FrameType::MGMT)
-                        .with_mgmt_subtype(mac::MgmtSubtype::PROBE_REQ),
-                    duration: 0,
-                    addr1: (*BSSID).into(),
-                    addr2: *CLIENT_ADDR,
-                    addr3: (*BSSID).into(),
-                    seq_ctrl: mac::SequenceControl(10),
+                mac::MgmtFrame {
+                    mgmt_hdr: mac::MgmtHdr {
+                        frame_ctrl: mac::FrameControl(0)
+                            .with_frame_type(mac::FrameType::MGMT)
+                            .with_mgmt_subtype(mac::MgmtSubtype::PROBE_REQ),
+                        duration: 0,
+                        addr1: (*BSSID).into(),
+                        addr2: *CLIENT_ADDR,
+                        addr3: (*BSSID).into(),
+                        seq_ctrl: mac::SequenceControl(10),
+                    }
+                    .as_bytes_ref(),
+                    ht_ctrl: None,
+                    body: &[0, 5, 1, 2, 3, 4, 6][..],
                 },
-                &[0, 5, 1, 2, 3, 4, 6][..],
             )
             .expect_err("expected InfraBss::handle_mgmt_frame error"),
             Rejection::OtherBss

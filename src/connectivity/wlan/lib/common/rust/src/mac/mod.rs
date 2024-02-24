@@ -3,10 +3,13 @@
 // found in the LICENSE file.
 
 use {
-    crate::{buffer_reader::BufferReader, UnalignedView},
+    crate::{
+        buffer_reader::{BufferReader, IntoBufferReader},
+        ie, UnalignedView,
+    },
     ieee80211::MacAddr,
     num::Unsigned,
-    zerocopy::{ByteSlice, Ref},
+    zerocopy::{AsBytes, ByteSlice, NoCell, Ref},
 };
 
 mod ctrl;
@@ -36,6 +39,19 @@ pub type Aid = u16;
 // IEEE Std 802.11-2016, 9.4.1.8: A non-DMG STA assigns the value of the AID in the range of 1 to
 // 2007.
 pub const MAX_AID: u16 = 2007;
+
+pub trait AsBytesExt: AsBytes + NoCell + Sized {
+    /// Gets a byte slice reference from a reference to `Self`.
+    ///
+    /// This is essentially the reverse of `Ref` constructors and can be used to construct `Ref`
+    /// fields in `zerocopy` types from a reference to `Self` instead of bytes.
+    fn as_bytes_ref(&self) -> Ref<&'_ [u8], Self> {
+        Ref::new(self.as_bytes())
+            .expect("Unaligned or missized byte slice from `AsBytes` implementation.")
+    }
+}
+
+impl<T> AsBytesExt for T where T: AsBytes + NoCell + Sized {}
 
 // TODO(https://fxbug.dev/42079361): Use this in the `MacFrame::Data` variant.
 pub struct DataFrame<B> {
@@ -100,7 +116,6 @@ where
     }
 }
 
-// TODO(https://fxbug.dev/42079361): Use this in the `MacFrame::Mgmt` variant.
 pub struct MgmtFrame<B> {
     // Management Header: fixed fields
     pub mgmt_hdr: Ref<B, MgmtHdr>,
@@ -114,37 +129,56 @@ impl<B> MgmtFrame<B>
 where
     B: ByteSlice,
 {
-    pub fn parse(bytes: B, is_body_aligned: bool) -> Option<Self> {
-        let mut reader = BufferReader::new(bytes);
+    pub fn parse(reader: impl IntoBufferReader<B>, is_body_aligned: bool) -> Option<Self> {
+        let reader = reader.into_buffer_reader();
         let fc = FrameControl(reader.peek_value()?);
         matches!(fc.frame_type(), FrameType::MGMT)
-            .then(|| {
-                // Parse fixed header fields
-                let mgmt_hdr = reader.read()?;
-
-                // Parse optional header fields
-                let ht_ctrl = if fc.htc_order() { Some(reader.read_unaligned()?) } else { None };
-                // Skip optional padding if body alignment is used.
-                if is_body_aligned {
-                    let full_hdr_len =
-                        MgmtHdr::len(Presence::<HtControl>::from_bool(ht_ctrl.is_some()));
-                    skip_body_alignment_padding(full_hdr_len, &mut reader)?
-                }
-                Some(MgmtFrame { mgmt_hdr, ht_ctrl, body: reader.into_remaining() })
-            })
+            .then(|| MgmtFrame::parse_frame_type_unchecked(reader, is_body_aligned))
             .flatten()
+    }
+
+    fn parse_frame_type_unchecked(
+        reader: impl IntoBufferReader<B>,
+        is_body_aligned: bool,
+    ) -> Option<Self> {
+        let mut reader = reader.into_buffer_reader();
+        let fc = FrameControl(reader.peek_value()?);
+        // Parse fixed header fields
+        let mgmt_hdr = reader.read()?;
+
+        // Parse optional header fields
+        let ht_ctrl = if fc.htc_order() { Some(reader.read_unaligned()?) } else { None };
+        // Skip optional padding if body alignment is used.
+        if is_body_aligned {
+            let full_hdr_len = MgmtHdr::len(Presence::<HtControl>::from_bool(ht_ctrl.is_some()));
+            skip_body_alignment_padding(full_hdr_len, &mut reader)?
+        }
+        Some(MgmtFrame { mgmt_hdr, ht_ctrl, body: reader.into_remaining() })
+    }
+
+    pub fn try_into_mgmt_body(self) -> (Ref<B, MgmtHdr>, Option<MgmtBody<B>>) {
+        let MgmtFrame { mgmt_hdr, body, .. } = self;
+        let mgmt_subtype = { mgmt_hdr.frame_ctrl }.mgmt_subtype();
+        (mgmt_hdr, MgmtBody::parse(mgmt_subtype, body))
+    }
+
+    pub fn into_ies(self) -> (Ref<B, MgmtHdr>, impl Iterator<Item = (ie::Id, B)>) {
+        let MgmtFrame { mgmt_hdr, body, .. } = self;
+        (mgmt_hdr, ie::Reader::new(body))
+    }
+
+    pub fn frame_ctrl(&self) -> FrameControl {
+        self.mgmt_hdr.frame_ctrl
+    }
+
+    pub fn mgmt_subtype(&self) -> MgmtSubtype {
+        self.frame_ctrl().mgmt_subtype()
     }
 }
 
 pub enum MacFrame<B> {
-    Mgmt {
-        // Management Header: fixed fields
-        mgmt_hdr: Ref<B, MgmtHdr>,
-        // Management Header: optional fields
-        ht_ctrl: Option<UnalignedView<B, HtControl>>,
-        // Body
-        body: B,
-    },
+    Mgmt(MgmtFrame<B>),
+    // TODO(https://fxbug.dev/42079361): Implement a dedicated type for control frames.
     Data {
         // Data Header: fixed fields
         fixed_fields: Ref<B, FixedDataHdrFields>,
@@ -155,12 +189,14 @@ pub enum MacFrame<B> {
         // Body
         body: B,
     },
+    // TODO(https://fxbug.dev/42079361): Implement a dedicated type for control frames.
     Ctrl {
         // Control Header: frame control
         frame_ctrl: FrameControl,
         // Body
         body: B,
     },
+    // TODO(https://fxbug.dev/42079361): Implement a dedicated type for control frames.
     Unsupported {
         frame_ctrl: FrameControl,
     },
@@ -173,18 +209,7 @@ impl<B: ByteSlice> MacFrame<B> {
         let fc = FrameControl(reader.peek_value()?);
         match fc.frame_type() {
             FrameType::MGMT => {
-                // Parse fixed header fields
-                let mgmt_hdr = reader.read()?;
-
-                // Parse optional header fields
-                let ht_ctrl = if fc.htc_order() { Some(reader.read_unaligned()?) } else { None };
-                // Skip optional padding if body alignment is used.
-                if body_aligned {
-                    let full_hdr_len =
-                        MgmtHdr::len(Presence::<HtControl>::from_bool(ht_ctrl.is_some()));
-                    skip_body_alignment_padding(full_hdr_len, &mut reader)?
-                }
-                Some(MacFrame::Mgmt { mgmt_hdr, ht_ctrl, body: reader.into_remaining() })
+                MgmtFrame::parse_frame_type_unchecked(reader, body_aligned).map(From::from)
             }
             FrameType::DATA => {
                 // Parse fixed header fields
@@ -225,6 +250,12 @@ impl<B: ByteSlice> MacFrame<B> {
     }
 }
 
+impl<B> From<MgmtFrame<B>> for MacFrame<B> {
+    fn from(mgmt: MgmtFrame<B>) -> Self {
+        MacFrame::Mgmt(mgmt)
+    }
+}
+
 /// Skips optional padding required for body alignment.
 fn skip_body_alignment_padding<B: ByteSlice>(
     hdr_len: usize,
@@ -254,7 +285,7 @@ mod tests {
         let bytes = make_mgmt_frame(false);
         assert_variant!(
             MacFrame::parse(&bytes[..], false),
-            Some(MacFrame::Mgmt { mgmt_hdr, ht_ctrl, body }) => {
+            Some(MacFrame::Mgmt(MgmtFrame { mgmt_hdr, ht_ctrl, body })) => {
                 assert_eq!(0x0101, { mgmt_hdr.frame_ctrl.0 });
                 assert_eq!(0x0202, { mgmt_hdr.duration });
                 assert_eq!(MacAddr::from([3, 3, 3, 3, 3, 3]), mgmt_hdr.addr1);

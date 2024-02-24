@@ -4,7 +4,6 @@
 
 use {crate::mac, zerocopy::ByteSlice};
 
-/// IEEE Std 802.11-2016, 11.3.3
 #[derive(Copy, Clone, PartialOrd, PartialEq, Debug, Ord, Eq)]
 pub enum FrameClass {
     Class1 = 1,
@@ -17,7 +16,9 @@ impl<B: ByteSlice> From<&mac::MacFrame<B>> for FrameClass {
     fn from(mac_frame: &mac::MacFrame<B>) -> FrameClass {
         match mac_frame {
             mac::MacFrame::Data { fixed_fields, .. } => frame_class(&{ fixed_fields.frame_ctrl }),
-            mac::MacFrame::Mgmt { mgmt_hdr, .. } => frame_class(&{ mgmt_hdr.frame_ctrl }),
+            mac::MacFrame::Mgmt(mac::MgmtFrame { mgmt_hdr, .. }) => {
+                frame_class(&{ mgmt_hdr.frame_ctrl })
+            }
             mac::MacFrame::Ctrl { frame_ctrl, .. } => frame_class(&frame_ctrl),
             mac::MacFrame::Unsupported { frame_ctrl } => frame_class(&frame_ctrl),
         }
