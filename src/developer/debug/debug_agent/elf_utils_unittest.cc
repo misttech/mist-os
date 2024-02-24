@@ -68,24 +68,23 @@ TEST(ElfUtils, MergeMmapedModules) {
 
   std::vector<debug_ipc::AddressRegion> maps;
   // A duplicate region for the existing map of a.out.
+  maps.push_back(
+      debug_ipc::AddressRegion{.name = kBinaryName, .base = kBase1, .size = 0x1000, .read = true});
   maps.push_back(debug_ipc::AddressRegion{
-      .name = kBinaryName, .base = kBase1, .size = 0x1000, .mmu_flags = ZX_VM_PERM_READ});
-  maps.push_back(debug_ipc::AddressRegion{
-      .name = kBinaryName, .base = kBase1 + 0x1000, .size = 0x1000, .mmu_flags = ZX_VM_PERM_READ});
+      .name = kBinaryName, .base = kBase1 + 0x1000, .size = 0x1000, .read = true});
 
   std::vector<elflib::Elf64_Phdr> a_segs{
       {.p_type = elflib::PT_LOAD, .p_vaddr = 0, .p_memsz = 0x1000},
       {.p_type = elflib::PT_LOAD, .p_vaddr = 0x1000, .p_memsz = 0x1000}};
 
   // A non-readable section shouldn't count.
-  maps.push_back(debug_ipc::AddressRegion{
-      .name = "/unreadable", .base = kBase2, .size = 0x1000, .mmu_flags = 0});
+  maps.push_back(debug_ipc::AddressRegion{.name = "/unreadable", .base = kBase2, .size = 0x1000});
 
   // This region should be merged in.
+  maps.push_back(
+      debug_ipc::AddressRegion{.name = kLibFooName, .base = kBase3, .size = 0x1000, .read = true});
   maps.push_back(debug_ipc::AddressRegion{
-      .name = kLibFooName, .base = kBase3, .size = 0x1000, .mmu_flags = ZX_VM_PERM_READ});
-  maps.push_back(debug_ipc::AddressRegion{
-      .name = kLibFooName, .base = kBase3 + 0x1000, .size = 0x1000, .mmu_flags = ZX_VM_PERM_READ});
+      .name = kLibFooName, .base = kBase3 + 0x1000, .size = 0x1000, .read = true});
 
   std::vector<elflib::Elf64_Phdr> foo_segs{
       {.p_type = elflib::PT_LOAD, .p_vaddr = 0, .p_memsz = 0x1000},

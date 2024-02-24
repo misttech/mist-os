@@ -185,14 +185,11 @@ void MergeMmapedModules(std::vector<debug_ipc::Module>& modules,
     if (region.base < end_of_last_module) {
       continue;
     }
-#ifdef __Fuchsia__
+
     // With `-fuse-ld=ld -z noseparate-code`, ELF headers live together with the text section.
-    if ((region.mmu_flags & ~ZX_VM_PERM_EXECUTE) != ZX_VM_PERM_READ) {
+    if (region.write) {
       continue;
     }
-#else
-    // TODO(brettw) figure out how this is annotated on Linux.
-#endif
 
     std::optional<ElfSegInfo> opt_info = get_elf_info_for_base(region.base);
     if (!opt_info) {

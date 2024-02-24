@@ -117,6 +117,11 @@ std::vector<debug_ipc::AddressRegion> LinuxProcessHandle::GetAddressSpace(uint64
     region.base = entry.range.begin();
     region.size = entry.range.size();
     region.depth = 0;  // Linux mappings aren't nested.
+    region.vmo_offset = entry.offset;
+    region.read = entry.read;
+    region.write = entry.write;
+    region.execute = entry.execute;
+    region.shared = entry.shared;
   }
   return result;
 }

@@ -45,10 +45,15 @@ debug_ipc::AddressRegion MapToAddressRegion(const zx_info_maps& map) {
   region.base = map.base;
   region.size = map.size;
   region.depth = map.depth;
-  region.mmu_flags = map.u.mapping.mmu_flags;
   region.vmo_koid = map.u.mapping.vmo_koid;
   region.vmo_offset = map.u.mapping.vmo_offset;
   region.committed_pages = map.u.mapping.committed_pages;
+
+  region.read = map.u.mapping.mmu_flags & ZX_VM_PERM_READ;
+  region.write = map.u.mapping.mmu_flags & ZX_VM_PERM_WRITE;
+  region.execute = map.u.mapping.mmu_flags & ZX_VM_PERM_EXECUTE;
+  region.shared = false;  // Unused on Fuchsia.
+
   return region;
 }
 

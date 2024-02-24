@@ -79,16 +79,20 @@ std::string PrintRegionName(uint64_t depth, const std::string& name) {
   return std::string(depth * 2, ' ') + name;
 }
 
-std::string PrintRegionMmuFlags(uint32_t flags) {
+// Set has_shared if the platform supports this flag.
+std::string PrintRegionMmuFlags(const debug_ipc::AddressRegion& region, bool has_shared) {
   std::string str;
-  str += flags & (1u << 0) ? 'r' : '-';
-  str += flags & (1u << 1) ? 'w' : '-';
-  str += flags & (1u << 2) ? 'x' : '-';
+  str += region.read ? 'r' : '-';
+  str += region.write ? 'w' : '-';
+  str += region.execute ? 'x' : '-';
+  if (has_shared) {
+    str += region.shared ? 's' : 'p';
+  }
   return str;
 }
 
-void OnAspaceComplete(const Err& err, std::vector<debug_ipc::AddressRegion> map,
-                      bool print_totals) {
+void OnAspaceComplete(fxl::RefPtr<CommandContext> cmd_context, const Err& err,
+                      std::vector<debug_ipc::AddressRegion> map, bool print_totals) {
   Console* console = Console::get();
   if (err.has_error()) {
     console->Output(err);
@@ -103,31 +107,59 @@ void OnAspaceComplete(const Err& err, std::vector<debug_ipc::AddressRegion> map,
   uint64_t total_mapped = 0;
   uint64_t total_committed = 0;
 
+  debug::Platform platform = cmd_context->GetConsoleContext()->session()->platform();
+
+  // Only Linux has the shared bit.
+  bool has_shared = platform == debug::Platform::kLinux;
+
   std::vector<std::vector<std::string>> rows;
   for (const auto& region : map) {
-    // Only show VMO information for regions which have a VMO koid. Regions with no VMO will be
-    // VMARs and showing offset and committed pages is misleading.
-    bool has_koid = region.vmo_koid != 0;
-    rows.push_back(std::vector<std::string>{
-        to_hex_string(region.base), to_hex_string(region.base + region.size),
-        PrintRegionMmuFlags(region.mmu_flags), PrintRegionSize(region.size),
-        has_koid ? std::to_string(region.vmo_koid) : std::string(),
-        has_koid ? to_hex_string(region.vmo_offset) : std::string(),
-        has_koid ? std::to_string(region.committed_pages) : std::string(),
-        PrintRegionName(region.depth, region.name)});
+    std::vector<std::string> row;
 
-    if (has_koid) {
-      total_mapped += region.size;
-      total_committed += region.committed_pages;
+    row.push_back(to_hex_string(region.base));
+    row.push_back(to_hex_string(region.base + region.size));
+    row.push_back(PrintRegionMmuFlags(region, has_shared));
+    row.push_back(PrintRegionSize(region.size));
+
+    if (platform == debug::Platform::kFuchsia) {
+      // Fuchsia-specific parts.
+
+      // Only show VMO information for regions which have a VMO koid. Regions with no VMO will be
+      // VMARs and showing offset and committed pages is misleading.
+      bool has_koid = region.vmo_koid != 0;
+      row.push_back(has_koid ? std::to_string(region.vmo_koid) : std::string());
+      row.push_back(has_koid ? to_hex_string(region.vmo_offset) : std::string());
+      row.push_back(has_koid ? std::to_string(region.committed_pages) : std::string());
+
+      if (has_koid) {
+        total_mapped += region.size;
+        total_committed += region.committed_pages;
+      }
+    } else {
+      // Non-Fuchsia has only the offset which is unconditionally shown.
+      row.push_back(to_hex_string(region.vmo_offset));
     }
+    row.push_back(PrintRegionName(region.depth, region.name));
+
+    rows.push_back(std::move(row));
   }
 
+  std::vector<ColSpec> colspec;
+  colspec.push_back(ColSpec(Align::kRight, 0, "Start", 2));
+  colspec.push_back(ColSpec(Align::kRight, 0, "End", 2));
+  colspec.push_back(ColSpec(Align::kLeft, 0, "Prot", 1));
+  colspec.push_back(ColSpec(Align::kRight, 0, "Size", 1));
+  if (platform == debug::Platform::kFuchsia) {
+    colspec.push_back(ColSpec(Align::kRight, 0, "Koid", 1));
+    colspec.push_back(ColSpec(Align::kRight, 0, "Offset", 1));
+    colspec.push_back(ColSpec(Align::kRight, 0, "Cmt.Pgs", 1));
+  } else {
+    colspec.push_back(ColSpec(Align::kRight, 0, "Offset", 1));
+  }
+  colspec.push_back(ColSpec(Align::kLeft, 0, "Name", 1));
+
   OutputBuffer out;
-  FormatTable({ColSpec(Align::kRight, 0, "Start", 2), ColSpec(Align::kRight, 0, "End", 2),
-               ColSpec(Align::kLeft, 0, "Prot", 1), ColSpec(Align::kRight, 0, "Size", 1),
-               ColSpec(Align::kRight, 0, "Koid", 1), ColSpec(Align::kRight, 0, "Offset", 1),
-               ColSpec(Align::kRight, 0, "Cmt.Pgs", 1), ColSpec(Align::kLeft, 0, "Name", 1)},
-              rows, &out);
+  FormatTable(colspec, rows, &out);
 
   // Format the section at the bottom showing statistics. These are formatted so the "=" align
   // horizontally (hence extra left-spacing on the strings).
@@ -137,7 +169,7 @@ void OnAspaceComplete(const Err& err, std::vector<debug_ipc::AddressRegion> map,
   out.Append(std::to_string(page_size));
   out.Append("\n");
 
-  if (print_totals) {
+  if (platform == debug::Platform::kFuchsia && print_totals) {
     out.Append(Syntax::kHeading, "     Total mapped bytes: ");
     out.Append(std::to_string(total_mapped));
     out.Append("\n");
@@ -172,8 +204,9 @@ void RunVerbAspace(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
     return cmd_context->ReportError(err);
 
   cmd.target()->GetProcess()->GetAspace(
-      address, [print_totals](const Err& err, std::vector<debug_ipc::AddressRegion> map) {
-        OnAspaceComplete(err, map, print_totals);
+      address,
+      [cmd_context, print_totals](const Err& err, std::vector<debug_ipc::AddressRegion> map) {
+        OnAspaceComplete(cmd_context, err, map, print_totals);
       });
 }
 

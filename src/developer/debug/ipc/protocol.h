@@ -36,7 +36,7 @@ namespace debug_ipc {
 // CURRENT_SUPPORTED_API_LEVEL is equal to FUCHSIA_API_LEVEL specified in version_history.json.
 // If not, continue reading the comments below.
 
-constexpr uint32_t kCurrentProtocolVersion = 59;
+constexpr uint32_t kCurrentProtocolVersion = 60;
 
 // How to decide kMinimumProtocolVersion
 // -------------------------------------

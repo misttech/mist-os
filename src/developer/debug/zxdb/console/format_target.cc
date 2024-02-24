@@ -67,6 +67,7 @@ OutputBuffer FormatTargetList(ConsoleContext* context, int indent) {
   auto targets = context->session()->system().GetTargets();
 
   int active_target_id = context->GetActiveTargetId();
+  bool show_components = context->session()->platform() == debug::Platform::kFuchsia;
 
   // Sort by ID.
   std::vector<std::pair<int, Target*>> id_targets;
@@ -95,7 +96,7 @@ OutputBuffer FormatTargetList(ConsoleContext* context, int indent) {
     if (auto process = target->GetProcess()) {
       row.push_back(std::to_string(process->GetKoid()));
       row.push_back(process->GetName());
-      if (process->GetComponentInfo().size() == 1) {
+      if (show_components && process->GetComponentInfo().size() == 1) {
         row.push_back(GetComponentName(process->GetComponentInfo()[0]));
       }
     } else {
@@ -105,11 +106,16 @@ OutputBuffer FormatTargetList(ConsoleContext* context, int indent) {
 
   const char* id_name = debug::PlatformProcessIdName(context->session()->platform(), true);
 
+  std::vector<ColSpec> cols{ColSpec(Align::kLeft),
+                            ColSpec(Align::kRight, 0, "#", 0, Syntax::kSpecial),
+                            ColSpec(Align::kLeft, 0, "State"), ColSpec(Align::kRight, 0, id_name),
+                            ColSpec(Align::kLeft, 0, "Name")};
+  if (show_components) {
+    cols.push_back(ColSpec(Align::kLeft, 0, "Component"));
+  }
+
   OutputBuffer out;
-  FormatTable({ColSpec(Align::kLeft), ColSpec(Align::kRight, 0, "#", 0, Syntax::kSpecial),
-               ColSpec(Align::kLeft, 0, "State"), ColSpec(Align::kRight, 0, id_name),
-               ColSpec(Align::kLeft, 0, "Name"), ColSpec(Align::kLeft, 0, "Component")},
-              rows, &out);
+  FormatTable(cols, rows, &out);
   return out;
 }
 

@@ -458,13 +458,37 @@ struct AddressRegion {
   uint64_t base = 0;
   uint64_t size = 0;
   uint64_t depth = 0;
-  uint32_t mmu_flags = 0;
-  uint64_t vmo_koid = 0;
+  uint64_t vmo_koid = 0;  // Fuchsia only.
   uint64_t vmo_offset = 0;
   uint64_t committed_pages = 0;
 
+  // MMU flags.
+  bool read = false;
+  bool write = false;
+  bool execute = false;
+  bool shared = false;  // Linux only.
+
   void Serialize(Serializer& ser, uint32_t ver) {
-    ser | name | base | size | depth | mmu_flags | vmo_koid | vmo_offset | committed_pages;
+    if (ver < 60) {
+      // Previous to v60 the MMU flags were sent as a uint32_t bitfield.
+      uint32_t mmu_flags = 0;
+      if (read) {
+        mmu_flags = mmu_flags | (1u << 0);
+      } else if (write) {
+        mmu_flags = mmu_flags | (1u << 1);
+      } else if (execute) {
+        mmu_flags = mmu_flags | (1u << 2);
+      }
+
+      ser | name | base | size | depth | mmu_flags | vmo_koid | vmo_offset | committed_pages;
+
+      read = !!(mmu_flags & (1u << 0));
+      write = !!(mmu_flags & (1u << 1));
+      execute = !!(mmu_flags & (1u << 2));
+    } else {
+      ser | name | base | size | depth | vmo_koid | vmo_offset | committed_pages | read | write |
+          execute | shared;
+    }
   }
 };
 
