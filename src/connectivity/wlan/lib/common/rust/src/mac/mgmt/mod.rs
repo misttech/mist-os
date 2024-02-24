@@ -4,6 +4,7 @@
 
 use {
     super::{MgmtFrame, MgmtSubtype},
+    crate::ie,
     zerocopy::{ByteSlice, Ref},
 };
 
@@ -168,6 +169,10 @@ where
         Ref::new_unaligned_from_prefix(bytes)
             .map(|(assoc_req_hdr, elements)| AssocReqFrame { assoc_req_hdr, elements })
     }
+
+    pub fn ies(&self) -> impl '_ + Iterator<Item = (ie::Id, &'_ B::Target)> {
+        ie::Reader::new(self.elements.deref())
+    }
 }
 
 #[derive(Debug)]
@@ -187,6 +192,15 @@ where
         Ref::new_unaligned_from_prefix(bytes)
             .map(|(assoc_resp_hdr, elements)| AssocRespFrame { assoc_resp_hdr, elements })
     }
+
+    pub fn into_assoc_resp_body(self) -> (Ref<B, AssocRespHdr>, B) {
+        let AssocRespFrame { assoc_resp_hdr, elements } = self;
+        (assoc_resp_hdr, elements)
+    }
+
+    pub fn ies(&self) -> impl '_ + Iterator<Item = (ie::Id, &'_ B::Target)> {
+        ie::Reader::new(self.elements.deref())
+    }
 }
 
 #[derive(Debug)]
@@ -205,6 +219,11 @@ where
     pub fn parse(bytes: B) -> Option<Self> {
         Ref::new_unaligned_from_prefix(bytes)
             .map(|(auth_hdr, elements)| AuthFrame { auth_hdr, elements })
+    }
+
+    pub fn into_auth_body(self) -> (Ref<B, AuthHdr>, B) {
+        let AuthFrame { auth_hdr, elements } = self;
+        (auth_hdr, elements)
     }
 }
 

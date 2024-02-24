@@ -8,6 +8,7 @@ use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     tracing::error,
     wlan_common::mac,
+    zerocopy::ByteSlice,
 };
 
 /// AkmState indicates the current status of authentication after each event is handled by an
@@ -84,15 +85,15 @@ impl AkmAlgorithm {
         }
     }
 
-    pub fn handle_auth_frame<A: AkmAction>(
+    pub fn handle_auth_frame<A: AkmAction, B: ByteSlice>(
         &mut self,
         actions: &mut A,
-        hdr: &mac::AuthHdr,
-        body: Option<&[u8]>,
+        auth_frame: mac::AuthFrame<B>,
     ) -> Result<AkmState, Error> {
+        let (auth_hdr, auth_body) = auth_frame.into_auth_body();
         match self {
             AkmAlgorithm::_OpenAp => bail!("OpenAp akm not yet implemented"),
-            AkmAlgorithm::OpenSupplicant { .. } => match auth::validate_ap_resp(hdr) {
+            AkmAlgorithm::OpenSupplicant { .. } => match auth::validate_ap_resp(&auth_hdr) {
                 Ok(auth::ValidFrame::Open) => Ok(AkmState::AuthComplete),
                 Ok(frame_type) => {
                     error!("Received unhandled auth frame type {:?}", frame_type);
@@ -104,11 +105,11 @@ impl AkmAlgorithm {
                 }
             },
             AkmAlgorithm::Sae { .. } => {
-                let sae_fields = body.map(|body| body.to_vec()).unwrap_or(vec![]);
+                let sae_fields = auth_body.to_vec();
                 actions.forward_sme_sae_rx(
-                    hdr.auth_txn_seq_num,
+                    auth_hdr.auth_txn_seq_num,
                     // TODO(https://fxbug.dev/42172907): All reserved values mapped to REFUSED_REASON_UNSPECIFIED.
-                    Option::<fidl_ieee80211::StatusCode>::from(hdr.status_code)
+                    Option::<fidl_ieee80211::StatusCode>::from(auth_hdr.status_code)
                         .unwrap_or(fidl_ieee80211::StatusCode::RefusedReasonUnspecified),
                     sae_fields,
                 );
@@ -162,7 +163,11 @@ impl AkmAlgorithm {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fidl_fuchsia_wlan_mlme as fidl_mlme, wlan_common::assert_variant};
+    use {
+        super::*,
+        fidl_fuchsia_wlan_mlme as fidl_mlme,
+        wlan_common::{assert_variant, mac::AsBytesExt},
+    };
 
     struct MockAkmAction {
         sent_frames: Vec<(mac::AuthAlgorithmNumber, u16, mac::StatusCode, Vec<u8>)>,
@@ -227,14 +232,20 @@ mod tests {
             (mac::AuthAlgorithmNumber::OPEN, 1, fidl_ieee80211::StatusCode::Success.into(), vec![])
         );
 
-        // A valid response completes auth.
-        let hdr = mac::AuthHdr {
-            auth_alg_num: mac::AuthAlgorithmNumber::OPEN,
-            auth_txn_seq_num: 2,
-            status_code: fidl_ieee80211::StatusCode::Success.into(),
-        };
         assert_variant!(
-            supplicant.handle_auth_frame(&mut actions, &hdr, None),
+            supplicant.handle_auth_frame(
+                &mut actions,
+                // A valid response completes auth.
+                mac::AuthFrame {
+                    auth_hdr: mac::AuthHdr {
+                        auth_alg_num: mac::AuthAlgorithmNumber::OPEN,
+                        auth_txn_seq_num: 2,
+                        status_code: fidl_ieee80211::StatusCode::Success.into(),
+                    }
+                    .as_bytes_ref(),
+                    elements: &[][..],
+                },
+            ),
             Ok(AkmState::AuthComplete)
         );
 
@@ -253,14 +264,20 @@ mod tests {
         assert_eq!(actions.sent_frames.len(), 1);
         actions.sent_frames.clear();
 
-        // A rejected response ends auth.
-        let hdr = mac::AuthHdr {
-            auth_alg_num: mac::AuthAlgorithmNumber::OPEN,
-            auth_txn_seq_num: 2,
-            status_code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified.into(),
-        };
         assert_variant!(
-            supplicant.handle_auth_frame(&mut actions, &hdr, None),
+            supplicant.handle_auth_frame(
+                &mut actions,
+                // A rejected response ends auth.
+                mac::AuthFrame {
+                    auth_hdr: mac::AuthHdr {
+                        auth_alg_num: mac::AuthAlgorithmNumber::OPEN,
+                        auth_txn_seq_num: 2,
+                        status_code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified.into(),
+                    }
+                    .as_bytes_ref(),
+                    elements: &[][..],
+                },
+            ),
             Ok(AkmState::Failed)
         );
 
@@ -302,13 +319,19 @@ mod tests {
         );
         actions.sent_frames.clear();
 
-        let hdr = mac::AuthHdr {
-            auth_alg_num: mac::AuthAlgorithmNumber::SAE,
-            auth_txn_seq_num: 1,
-            status_code: fidl_ieee80211::StatusCode::Success.into(),
-        };
         assert_variant!(
-            supplicant.handle_auth_frame(&mut actions, &hdr, Some(&[0x56, 0x78][..])),
+            supplicant.handle_auth_frame(
+                &mut actions,
+                mac::AuthFrame {
+                    auth_hdr: mac::AuthHdr {
+                        auth_alg_num: mac::AuthAlgorithmNumber::SAE,
+                        auth_txn_seq_num: 1,
+                        status_code: fidl_ieee80211::StatusCode::Success.into(),
+                    }
+                    .as_bytes_ref(),
+                    elements: &[0x56, 0x78][..],
+                },
+            ),
             Ok(AkmState::InProgress)
         );
         assert_eq!(actions.sent_sae_rx.len(), 1);

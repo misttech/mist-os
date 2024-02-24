@@ -38,7 +38,7 @@ use {
         capabilities::{derive_join_capabilities, ClientCapabilities},
         channel::Channel,
         data_writer,
-        ie::{self, rsn::rsne, Id, Reader},
+        ie::{self, rsn::rsne, Id},
         mac::{self, Aid, CapabilityInfo, PowerState},
         mgmt_writer,
         sequence::SequenceManager,
@@ -1073,7 +1073,11 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             .unwrap_or_else(|e| error!("error sending MLME-CONNECT.confirm: {}", e));
     }
 
-    fn send_connect_conf_success(&mut self, association_id: u16, association_ies: &[u8]) {
+    fn send_connect_conf_success<B: ByteSlice>(
+        &mut self,
+        association_id: mac::Aid,
+        association_ies: B,
+    ) {
         self.sta.connect_timeout.take();
         let connect_conf = fidl_mlme::ConnectConfirm {
             peer_sta_address: self.sta.connect_req.selected_bss.bssid.to_array(),
@@ -1187,48 +1191,47 @@ pub struct ParsedAssociateResp {
 }
 
 impl ParsedAssociateResp {
-    pub fn from<B: ByteSlice>(assoc_resp_hdr: &mac::AssocRespHdr, elements: B) -> Self {
-        let mut parsed_assoc_resp = ParsedAssociateResp {
-            association_id: assoc_resp_hdr.aid,
-            capabilities: assoc_resp_hdr.capabilities,
+    pub fn parse<B: ByteSlice>(assoc_resp_frame: &mac::AssocRespFrame<B>) -> Self {
+        let mut parsed = ParsedAssociateResp {
+            association_id: assoc_resp_frame.assoc_resp_hdr.aid,
+            capabilities: assoc_resp_frame.assoc_resp_hdr.capabilities,
             rates: vec![],
             ht_cap: None,
             vht_cap: None,
         };
-
-        for (id, body) in Reader::new(elements) {
+        for (id, body) in assoc_resp_frame.ies() {
             match id {
                 Id::SUPPORTED_RATES => match ie::parse_supported_rates(body) {
                     Err(e) => warn!("invalid Supported Rates: {}", e),
                     Ok(supported_rates) => {
                         // safe to unwrap because supported rate is 1-byte long thus always aligned
-                        parsed_assoc_resp.rates.extend(supported_rates.iter());
+                        parsed.rates.extend(supported_rates.iter());
                     }
                 },
                 Id::EXTENDED_SUPPORTED_RATES => match ie::parse_extended_supported_rates(body) {
                     Err(e) => warn!("invalid Extended Supported Rates: {}", e),
                     Ok(supported_rates) => {
                         // safe to unwrap because supported rate is 1-byte long thus always aligned
-                        parsed_assoc_resp.rates.extend(supported_rates.iter());
+                        parsed.rates.extend(supported_rates.iter());
                     }
                 },
                 Id::HT_CAPABILITIES => match ie::parse_ht_capabilities(body) {
                     Err(e) => warn!("invalid HT Capabilities: {}", e),
                     Ok(ht_cap) => {
-                        parsed_assoc_resp.ht_cap = Some(*ht_cap);
+                        parsed.ht_cap = Some(*ht_cap);
                     }
                 },
                 Id::VHT_CAPABILITIES => match ie::parse_vht_capabilities(body) {
                     Err(e) => warn!("invalid VHT Capabilities: {}", e),
                     Ok(vht_cap) => {
-                        parsed_assoc_resp.vht_cap = Some(*vht_cap);
+                        parsed.vht_cap = Some(*vht_cap);
                     }
                 },
                 // TODO(https://fxbug.dev/42120297): parse vendor ID and include WMM param if exists
                 _ => {}
             }
         }
-        parsed_assoc_resp
+        parsed
     }
 }
 
@@ -2450,7 +2453,7 @@ mod tests {
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
 
-        client.send_connect_conf_success(42, &[0, 5, 3, 4, 5, 6, 7]);
+        client.send_connect_conf_success(42, &[0, 5, 3, 4, 5, 6, 7][..]);
         let connect_conf = m
             .fake_device_state
             .lock()

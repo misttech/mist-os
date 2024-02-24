@@ -920,12 +920,12 @@ impl RemoteClient {
             mac::MgmtBody::Authentication(mac::AuthFrame { auth_hdr, .. }) => {
                 self.handle_auth_frame(ctx, auth_hdr.auth_alg_num)
             }
-            mac::MgmtBody::AssociationReq(mac::AssocReqFrame { assoc_req_hdr, elements }) => {
+            mac::MgmtBody::AssociationReq(assoc_req_frame) => {
                 let mut rates = vec![];
                 let mut rsne = None;
 
                 // TODO(https://fxbug.dev/42164332): This should probably use IeSummaryIter instead.
-                for (id, ie_body) in ie::Reader::new(&elements[..]) {
+                for (id, ie_body) in assoc_req_frame.ies() {
                     match id {
                         // We don't try too hard to verify the supported rates and extended
                         // supported rates provided. A warning is logged if parsing of either
@@ -968,7 +968,7 @@ impl RemoteClient {
                 self.handle_assoc_req_frame(
                     ctx,
                     capabilities,
-                    assoc_req_hdr.listen_interval,
+                    assoc_req_frame.assoc_req_hdr.listen_interval,
                     ssid,
                     rates,
                     rsne,

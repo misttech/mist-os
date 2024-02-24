@@ -36,7 +36,7 @@ use {
         timer::{EventId, Timer},
     },
     wlan_statemachine::*,
-    zerocopy::{ByteSlice, Ref},
+    zerocopy::ByteSlice,
 };
 
 /// Reconnect timeout in Beacon periods.
@@ -165,15 +165,14 @@ impl Authenticating {
     //  association has started.
     /// Returns AuthProgress::InProgress if authentication is still ongoing.
     /// Returns AuthProgress::Failed if failed to authenticate or start association request.
-    fn on_auth_frame<D: DeviceOps>(
+    fn on_auth_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
-        auth_hdr: &mac::AuthHdr,
-        body: &[u8],
+        auth_frame: mac::AuthFrame<B>,
     ) -> AuthProgress {
         trace::duration!(c"wlan", c"Authenticating::on_auth_frame");
 
-        let state = self.algorithm.handle_auth_frame(sta, auth_hdr, Some(body));
+        let state = self.algorithm.handle_auth_frame(sta, auth_frame);
         self.akm_state_update_notify_sme(sta, state)
     }
 
@@ -283,14 +282,15 @@ impl Associating {
     fn on_assoc_resp_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
         sta: &mut BoundClient<'_, D>,
-        assoc_resp_hdr: &mac::AssocRespHdr,
-        elements: B,
+        assoc_resp_frame: mac::AssocRespFrame<B>,
     ) -> Result<Association, ()> {
         trace::duration!(c"wlan", c"Associating::on_assoc_resp_frame");
 
         // TODO(https://fxbug.dev/42172907): All reserved values mapped to REFUSED_REASON_UNSPECIFIED.
-        match Option::<fidl_ieee80211::StatusCode>::from(assoc_resp_hdr.status_code)
-            .unwrap_or(fidl_ieee80211::StatusCode::RefusedReasonUnspecified)
+        match Option::<fidl_ieee80211::StatusCode>::from(
+            assoc_resp_frame.assoc_resp_hdr.status_code,
+        )
+        .unwrap_or(fidl_ieee80211::StatusCode::RefusedReasonUnspecified)
         {
             fidl_ieee80211::StatusCode::Success => (),
             status_code => {
@@ -300,7 +300,8 @@ impl Associating {
             }
         }
 
-        let parsed_assoc_resp = ParsedAssociateResp::from(assoc_resp_hdr, &elements[..]);
+        let aid = assoc_resp_frame.assoc_resp_hdr.aid;
+        let parsed_assoc_resp = ParsedAssociateResp::parse(&assoc_resp_frame);
         let ap_capabilities = ApCapabilities(StaCapabilities {
             capability_info: parsed_assoc_resp.capabilities,
             rates: parsed_assoc_resp.rates.clone(),
@@ -326,7 +327,7 @@ impl Associating {
                 }
             };
 
-        let (ap_ht_op, ap_vht_op) = extract_ht_vht_op(&elements[..]);
+        let (ap_ht_op, ap_vht_op) = extract_ht_vht_op(&assoc_resp_frame);
 
         let main_channel = match sta.channel_state.get_main_channel() {
             Some(main_channel) => main_channel,
@@ -347,7 +348,7 @@ impl Associating {
 
         let assoc_cfg = fidl_softmac::WlanAssociationConfig {
             bssid: Some(sta.sta.bssid().to_array()),
-            aid: Some(assoc_resp_hdr.aid),
+            aid: Some(aid),
             // In the association request we sent out earlier, listen_interval is always set to 0,
             // indicating the client never enters power save mode.
             listen_interval: Some(0),
@@ -358,8 +359,8 @@ impl Associating {
             capability_info: Some(negotiated_cap.capability_info.raw()),
             ht_cap: negotiated_cap.ht_cap.map(Into::into),
             vht_cap: negotiated_cap.vht_cap.map(Into::into),
-            ht_op: ap_ht_op.as_ref().map(|x| x.read().into()),
-            vht_op: ap_vht_op.as_ref().map(|x| x.read().into()),
+            ht_op: ap_ht_op.clone().map(From::from),
+            vht_op: ap_vht_op.clone().map(From::from),
             ..Default::default()
         };
 
@@ -370,7 +371,8 @@ impl Associating {
             return Err(());
         }
 
-        sta.send_connect_conf_success(assoc_resp_hdr.aid, &elements[..]);
+        let (_, assoc_resp_body) = assoc_resp_frame.into_assoc_resp_body();
+        sta.send_connect_conf_success(aid, assoc_resp_body.deref());
         let controlled_port_open = !sta.sta.eapol_required();
         if controlled_port_open {
             if let Err(e) = sta.ctx.device.set_ethernet_up() {
@@ -387,11 +389,11 @@ impl Associating {
             schedule_association_status_timeout(sta.sta.beacon_period(), &mut sta.ctx.timer);
 
         Ok(Association {
-            aid: assoc_resp_hdr.aid,
-            assoc_resp_ies: elements.to_vec(),
+            aid,
+            assoc_resp_ies: assoc_resp_body.to_vec(),
             controlled_port_open,
-            ap_ht_op: ap_ht_op.as_ref().map(|x| x.read()),
-            ap_vht_op: ap_vht_op.as_ref().map(|x| x.read()),
+            ap_ht_op,
+            ap_vht_op,
             qos: Qos::from(qos),
             lost_bss_counter,
             status_check_timeout,
@@ -442,21 +444,21 @@ impl Associating {
 /// Extract HT Operation and VHT Operation IEs from the association response frame.
 /// If either IE is of an incorrect length, it will be ignored.
 fn extract_ht_vht_op<B: ByteSlice>(
-    elements: B,
-) -> (Option<Ref<B, ie::HtOperation>>, Option<Ref<B, ie::VhtOperation>>) {
+    assoc_resp_frame: &mac::AssocRespFrame<B>,
+) -> (Option<ie::HtOperation>, Option<ie::VhtOperation>) {
     let mut ht_op = None;
     let mut vht_op = None;
-    for (id, body) in ie::Reader::new(elements) {
+    for (id, body) in assoc_resp_frame.ies() {
         match id {
             ie::Id::HT_OPERATION => match ie::parse_ht_operation(body) {
-                Ok(parsed_ht_op) => ht_op = Some(parsed_ht_op),
+                Ok(parsed_ht_op) => ht_op = Some(parsed_ht_op.read()),
                 Err(e) => {
                     error!("Invalid HT Operation: {}", e);
                     continue;
                 }
             },
             ie::Id::VHT_OPERATION => match ie::parse_vht_operation(body) {
-                Ok(parsed_vht_op) => vht_op = Some(parsed_vht_op),
+                Ok(parsed_vht_op) => vht_op = Some(parsed_vht_op.read()),
                 Err(e) => {
                     error!("Invalid VHT Operation: {}", e);
                     continue;
@@ -1066,8 +1068,8 @@ impl States {
 
         match self {
             States::Authenticating(mut state) => match mgmt_body {
-                mac::MgmtBody::Authentication(mac::AuthFrame { auth_hdr, elements }) => match state
-                    .on_auth_frame(sta, &auth_hdr, &elements[..])
+                mac::MgmtBody::Authentication(auth_frame) => match state
+                    .on_auth_frame(sta, auth_frame)
                 {
                     AuthProgress::Complete => state.transition_to(Associating::default()).into(),
                     AuthProgress::InProgress => state.into(),
@@ -1080,13 +1082,12 @@ impl States {
                 _ => state.into(),
             },
             States::Associating(mut state) => match mgmt_body {
-                mac::MgmtBody::AssociationResp(mac::AssocRespFrame {
-                    assoc_resp_hdr,
-                    elements,
-                }) => match state.on_assoc_resp_frame(sta, &assoc_resp_hdr, elements) {
-                    Ok(association) => state.transition_to(Associated(association)).into(),
-                    Err(()) => state.transition_to(Joined).into(),
-                },
+                mac::MgmtBody::AssociationResp(assoc_resp_frame) => {
+                    match state.on_assoc_resp_frame(sta, assoc_resp_frame) {
+                        Ok(association) => state.transition_to(Associated(association)).into(),
+                        Err(()) => state.transition_to(Joined).into(),
+                    }
+                }
                 mac::MgmtBody::Deauthentication { deauth_hdr, .. } => {
                     state.on_deauth_frame(sta, &deauth_hdr);
                     state.transition_to(Joined).into()
@@ -1367,15 +1368,29 @@ impl States {
 #[cfg(test)]
 mod free_function_tests {
     use super::*;
+    use wlan_common::mac::AsBytesExt as _;
+
+    fn assoc_resp_frame_from_ies(elements: &[u8]) -> mac::AssocRespFrame<&[u8]> {
+        mac::AssocRespFrame {
+            assoc_resp_hdr: mac::AssocRespHdr {
+                capabilities: mac::CapabilityInfo(0u16),
+                status_code: mac::StatusCode(0u16),
+                aid: 0u16,
+            }
+            .as_bytes_ref(),
+            elements,
+        }
+    }
 
     #[test]
     fn test_extract_ht_vht_op_success() {
         let mut buffer = Vec::<u8>::new();
         ie::write_ht_operation(&mut buffer, &ie::fake_ht_operation()).expect("valid HT Op");
         ie::write_vht_operation(&mut buffer, &ie::fake_vht_operation()).expect("valid VHT Op");
-        let (ht_operation, vht_operation) = extract_ht_vht_op(&buffer[..]);
-        assert_eq!(ht_operation.unwrap().read(), ie::fake_ht_operation());
-        assert_eq!(vht_operation.unwrap().read(), ie::fake_vht_operation());
+        let (ht_operation, vht_operation) =
+            extract_ht_vht_op(&assoc_resp_frame_from_ies(&buffer[..]));
+        assert_eq!(ht_operation.unwrap(), ie::fake_ht_operation());
+        assert_eq!(vht_operation.unwrap(), ie::fake_vht_operation());
     }
 
     #[test]
@@ -1385,9 +1400,10 @@ mod free_function_tests {
         buffer[1] -= 1; // Make length shorter
         buffer.truncate(buffer.len() - 1);
         ie::write_vht_operation(&mut buffer, &ie::fake_vht_operation()).expect("valid VHT Op");
-        let (ht_operation, vht_operation) = extract_ht_vht_op(&buffer[..]);
+        let (ht_operation, vht_operation) =
+            extract_ht_vht_op(&assoc_resp_frame_from_ies(&buffer[..]));
         assert_eq!(ht_operation, None);
-        assert_eq!(vht_operation.unwrap().read(), ie::fake_vht_operation());
+        assert_eq!(vht_operation.unwrap(), ie::fake_vht_operation());
     }
 
     #[test]
@@ -1398,8 +1414,9 @@ mod free_function_tests {
         ie::write_vht_operation(&mut buffer, &ie::fake_vht_operation()).expect("valid VHT Op");
         buffer[ht_end + 1] -= 1; // Make VHT operation shorter.
         buffer.truncate(buffer.len() - 1);
-        let (ht_operation, vht_operation) = extract_ht_vht_op(&buffer[..]);
-        assert_eq!(ht_operation.unwrap().read(), ie::fake_ht_operation());
+        let (ht_operation, vht_operation) =
+            extract_ht_vht_op(&assoc_resp_frame_from_ies(&buffer[..]));
+        assert_eq!(ht_operation.unwrap(), ie::fake_ht_operation());
         assert_eq!(vht_operation, None);
     }
 }
@@ -1432,6 +1449,7 @@ mod tests {
             buffer_writer::BufferWriter,
             fake_bss_description,
             ie::IeType,
+            mac::AsBytesExt as _,
             mgmt_writer,
             sequence::SequenceManager,
             test_utils::{
@@ -1682,12 +1700,15 @@ mod tests {
         assert_variant!(
             state.on_auth_frame(
                 &mut sta,
-                &mac::AuthHdr {
-                    auth_alg_num: mac::AuthAlgorithmNumber::OPEN,
-                    auth_txn_seq_num: 2,
-                    status_code: fidl_ieee80211::StatusCode::NotInSameBss.into(),
+                mac::AuthFrame {
+                    auth_hdr: mac::AuthHdr {
+                        auth_alg_num: mac::AuthAlgorithmNumber::OPEN,
+                        auth_txn_seq_num: 2,
+                        status_code: fidl_ieee80211::StatusCode::NotInSameBss.into(),
+                    }
+                    .as_bytes_ref(),
+                    elements: &[],
                 },
-                &[]
             ),
             AuthProgress::Failed
         );
@@ -1762,12 +1783,15 @@ mod tests {
         let Association { aid, controlled_port_open, .. } = state
             .on_assoc_resp_frame(
                 &mut sta,
-                &mac::AssocRespHdr {
-                    aid: 42,
-                    capabilities: mac::CapabilityInfo(52),
-                    status_code: fidl_ieee80211::StatusCode::Success.into(),
+                mac::AssocRespFrame {
+                    assoc_resp_hdr: mac::AssocRespHdr {
+                        aid: 42,
+                        capabilities: mac::CapabilityInfo(52),
+                        status_code: fidl_ieee80211::StatusCode::Success.into(),
+                    }
+                    .as_bytes_ref(),
+                    elements: &assoc_resp_ies[..],
                 },
-                &assoc_resp_ies[..],
             )
             .expect("failed processing association response frame");
         assert_eq!(aid, 42);
@@ -1813,12 +1837,15 @@ mod tests {
         let Association { aid, controlled_port_open, .. } = state
             .on_assoc_resp_frame(
                 &mut sta,
-                &mac::AssocRespHdr {
-                    aid: 42,
-                    capabilities: mac::CapabilityInfo(0).with_ibss(true).with_cf_pollable(true),
-                    status_code: fidl_ieee80211::StatusCode::Success.into(),
+                mac::AssocRespFrame {
+                    assoc_resp_hdr: mac::AssocRespHdr {
+                        aid: 42,
+                        capabilities: mac::CapabilityInfo(0).with_ibss(true).with_cf_pollable(true),
+                        status_code: fidl_ieee80211::StatusCode::Success.into(),
+                    }
+                    .as_bytes_ref(),
+                    elements: &assoc_resp_ies[..],
                 },
-                &assoc_resp_ies[..],
             )
             .expect("failed processing association response frame");
         assert_eq!(aid, 42);
@@ -1879,12 +1906,15 @@ mod tests {
         state
             .on_assoc_resp_frame(
                 &mut sta,
-                &mac::AssocRespHdr {
-                    aid: 42,
-                    capabilities: mac::CapabilityInfo(52),
-                    status_code: fidl_ieee80211::StatusCode::NotInSameBss.into(),
+                mac::AssocRespFrame {
+                    assoc_resp_hdr: mac::AssocRespHdr {
+                        aid: 42,
+                        capabilities: mac::CapabilityInfo(52),
+                        status_code: fidl_ieee80211::StatusCode::NotInSameBss.into(),
+                    }
+                    .as_bytes_ref(),
+                    elements: &[][..],
                 },
-                &[][..],
             )
             .expect_err("expected failure processing association response frame");
 
@@ -1912,12 +1942,15 @@ mod tests {
         state
             .on_assoc_resp_frame(
                 &mut sta,
-                &mac::AssocRespHdr {
-                    aid: 42,
-                    capabilities: mac::CapabilityInfo(52),
-                    status_code: fidl_ieee80211::StatusCode::Success.into(),
+                mac::AssocRespFrame {
+                    assoc_resp_hdr: mac::AssocRespHdr {
+                        aid: 42,
+                        capabilities: mac::CapabilityInfo(52),
+                        status_code: fidl_ieee80211::StatusCode::Success.into(),
+                    }
+                    .as_bytes_ref(),
+                    elements: fake_bss_description!(Wpa2, rates: vec![0x81]).ies(),
                 },
-                fake_bss_description!(Wpa2, rates: vec![0x81]).ies(),
             )
             .expect_err("expected failure processing association response frame");
 

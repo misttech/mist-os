@@ -167,6 +167,10 @@ where
         (mgmt_hdr, ie::Reader::new(body))
     }
 
+    pub fn ies(&self) -> impl '_ + Iterator<Item = (ie::Id, &'_ B::Target)> {
+        ie::Reader::new(self.body.deref())
+    }
+
     pub fn frame_ctrl(&self) -> FrameControl {
         self.mgmt_hdr.frame_ctrl
     }
