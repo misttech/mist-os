@@ -162,8 +162,9 @@ zx::result<> GpioImplVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint
           },
       .properties =
           {
+              fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
               fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+                                bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
               fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, "fuchsia.gpio.FUNCTION." + gpio_name),
           },
   }};
