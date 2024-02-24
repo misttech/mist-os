@@ -166,7 +166,7 @@ open protocol CombinedBufferCollectionToken {
     });
     @selector("fuchsia.sysmem2/BufferCollectionToken.Duplicate")
     flexible DuplicateV2(resource table {
-        1: rights_attenuation_mask uint32;
+        1: rights_attenuation_mask zx.Rights;
         2: token_request server_end:fuchsia.sysmem2.BufferCollectionToken;
     });
     @selector("fuchsia.sysmem2/BufferCollectionToken.SetDispensable")

@@ -561,7 +561,7 @@ open protocol BufferCollectionToken {
     ///   channel. The client end of this channel acts as another participant in
     ///   the shared buffer collection.
     flexible Duplicate(resource table {
-        1: rights_attenuation_mask uint32;
+        1: rights_attenuation_mask zx.Rights;
         2: token_request server_end:BufferCollectionToken;
     });
 
@@ -873,7 +873,7 @@ open protocol BufferCollection {
     /// + requesst `token_request` The server end of the `BufferCollectionToken`
     ///   channel. The client retains the client end.
     flexible AttachToken(resource table {
-        1: rights_attenuation_mask uint32;
+        1: rights_attenuation_mask zx.Rights;
         2: token_request server_end:BufferCollectionToken;
     });
 
@@ -1066,7 +1066,7 @@ open protocol BufferCollectionTokenGroup {
         1: token_request server_end:BufferCollectionToken;
 
         /// If not set, the default is `ZX_RIGHT_SAME_RIGHTS`.
-        2: rights_attenuation_mask uint32;
+        2: rights_attenuation_mask zx.Rights;
     });
 
     /// Create 1 or more child tokens at once, synchronously.  In contrast to
