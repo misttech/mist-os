@@ -26,6 +26,7 @@ impl Future for Yield {
 }
 
 #[fasync::run_until_stalled(test)]
+#[ignore] // TODO(https://fxbug.dev/325329165): Fix the ordering issue
 async fn test_legacy_joining_mutual_exclusion() {
     let device = DummyDevice::default();
 
