@@ -37,7 +37,7 @@ def owners(ctx):
             for line in finding["lines"]:
                 #TODO(danikay) Change to error once broken includes are fixed.
                 ctx.emit.finding(
-                    level = "error",
+                    level = "warning",
                     filepath = f,
                     message = BROKEN_INCLUDE_MSG,
                     line = line,
