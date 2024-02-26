@@ -107,6 +107,7 @@ void FileTester::Unmount(std::unique_ptr<F2fs> fs, std::unique_ptr<BcacheMapper>
 
 void FileTester::SuddenPowerOff(std::unique_ptr<F2fs> fs, std::unique_ptr<BcacheMapper> *bc) {
   fs->GetVCache().ForDirtyVnodesIf([&](fbl::RefPtr<VnodeF2fs> &vnode) {
+    vnode->ResetFileCache();
     vnode->ClearDirty();
     return ZX_OK;
   });

@@ -347,7 +347,6 @@ class VnodeF2fs : public fs::PagedVnode,
                                           bool zero = true) {
     return file_cache_->InvalidatePages(start, end, zero);
   }
-  void ResetFileCache(pgoff_t start = 0, pgoff_t end = kPgOffMax) { file_cache_->Reset(); }
   void SetOrphan() __TA_EXCLUDES(mutex_);
 
   VmoManager &GetVmoManager() { return vmo_manager(); }
@@ -356,6 +355,7 @@ class VnodeF2fs : public fs::PagedVnode,
   void InitFileCacheUnsafe(uint64_t nbytes = 0) __TA_REQUIRES(mutex_);
 
   // for testing
+  void ResetFileCache() { file_cache_->Reset(); }
   ExtentTree &GetExtentTree() { return *extent_tree_; }
   uint8_t GetDirLevel() TA_NO_THREAD_SAFETY_ANALYSIS { return dir_level_; }
   timespec GetMTime() TA_NO_THREAD_SAFETY_ANALYSIS { return mtime_; }
