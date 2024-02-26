@@ -16,6 +16,7 @@ use netlink::{
 };
 use netlink_packet_core::{NetlinkMessage, NetlinkSerializable};
 use netlink_packet_route::rtnl::RtnlMessage;
+use netlink_packet_sock_diag::message::SockDiagMessage;
 use netlink_packet_utils::Emitable as _;
 use starnix_sync::{Locked, Mutex, ReadOps, WriteOps};
 use std::{marker::PhantomData, num::NonZeroU32, sync::Arc};
@@ -39,7 +40,7 @@ use crate::{
         },
     },
 };
-use starnix_logging::{log_error, log_info, log_warn, track_stub};
+use starnix_logging::{log_debug, log_error, log_info, log_warn, track_stub};
 use starnix_uapi::{
     auth::CAP_NET_ADMIN, errno, error, errors::Errno, nlmsghdr, sockaddr_nl, socklen_t, ucred,
     user_buffer::UserBuffer, vfs::FdEvents, AF_NETLINK, NETLINK_ADD_MEMBERSHIP, NETLINK_AUDIT,
@@ -1050,12 +1051,29 @@ impl SocketOps for DiagnosticNetlinkSocket {
         _locked: &mut Locked<'_, WriteOps>,
         _socket: &Socket,
         _current_task: &CurrentTask,
-        _data: &mut dyn InputBuffer,
+        data: &mut dyn InputBuffer,
         _dest_address: &mut Option<SocketAddress>,
         _ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
-        track_stub!(TODO("https://fxbug.dev/323590076"), "NETLINK_SOCK_DIAG handle request");
-        error!(ENOTSUP)
+        // TODO(https://fxbug.dev/323590076): Replace this with `read_all`
+        // For now, we'd like to parse the SOCK_DIAG message and know the message
+        // type without handling the functionality yet. This allows us to return an
+        // error since bytes_read is 0.
+        let peeked_bytes = data.peek_all()?;
+        match NetlinkMessage::<SockDiagMessage>::deserialize(&peeked_bytes) {
+            Ok(msg) => {
+                log_debug!(?msg, "got write to NETLINK_SOCK_DIAG");
+                track_stub!(
+                    TODO("https://fxbug.dev/323590076"),
+                    "NETLINK_SOCK_DIAG handle request"
+                );
+                error!(ENOTSUP)
+            }
+            Err(err) => {
+                log_warn!(tag = NETLINK_LOG_TAG, ?err, "Failed to process write");
+                error!(EINVAL)
+            }
+        }
     }
 
     fn wait_async(
