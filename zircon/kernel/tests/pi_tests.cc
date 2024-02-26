@@ -284,6 +284,8 @@ class DeadlineProfile : public Profile {
                     sched_params_.capacity_ns.raw_value(), sched_params_.deadline_ns.raw_value());
   }
 
+  const SchedDeadlineParams& sched_params() const { return sched_params_; }
+
  private:
   DeadlineProfile(SchedDuration capacity, SchedDuration deadline)
       : sched_params_(capacity, deadline) {
@@ -1504,6 +1506,139 @@ bool pi_test_cycle() {
   END_TEST;
 }
 
+bool bug_42182770_regression() {
+  BEGIN_TEST;
+
+  // Set up and test a situation which mimics the one encountered in during bug 42182770.
+  // Basically, we want to:
+  //
+  // 1) Block a thread A which has a fair profile in an owned wait queue W.  Be
+  //    sure to test both inheritable and non-inheritable profiles.
+  // 2) Observe that the start time, finish time, and time slice of W (the
+  //    "dynamic" IPVs) remain zero (the initial defaults)  A has blocked in W,
+  //    and it was the first thread to block, but its profile is
+  //    non-inheritable, therefore the dynamic parameters remain undefined.
+  // 3) Block a thread B, which has an inheritable deadline profile in W.
+  // 4) Observe that W's IPVs have taken on B's dynamic scheduler profile values.
+  // 5) Unblock B from W.  Observe that W still has IPV storage allocated to it,
+  //    but that the static parameters (total weight, uncapped utilization, min
+  //    deadline) have returned to their default values.  If extra scheduler
+  //    invariant validation is turned on, the static parameters should have
+  //    returned to their defaults as well, otherwise they should remain
+  //    unchanged.
+  // 6) Unblock A from W.  After this operation, W should no longer have any
+  //    inherited profile value storage allocated to it as it no longer has any
+  //    waiting threads.
+
+  constexpr ktl::array kInheritableOptions = {InheritableProfile::No, InheritableProfile::Yes};
+  for (const InheritableProfile allow_inherit : kInheritableOptions) {
+    // Create the queue, profiles, and threads we will need to run the test.
+    fbl::AllocChecker ac;
+    ktl::unique_ptr<LockedOwnedWaitQueue> owq = ktl::make_unique<LockedOwnedWaitQueue>(&ac);
+    ASSERT_TRUE(ac.check());
+
+    fbl::RefPtr<Profile> fair_profile = FairProfile::Create(TEST_DEFAULT_WEIGHT, allow_inherit);
+    fbl::RefPtr<Profile> deadline_profile = DeadlineProfile::Create(ZX_MSEC(2), ZX_MSEC(5));
+    ASSERT_NONNULL(fair_profile);
+    ASSERT_NONNULL(deadline_profile);
+
+    const SchedWeight inheritable_weight =
+        (allow_inherit == InheritableProfile::Yes) ? TEST_DEFAULT_WEIGHT : SchedWeight{0};
+
+    TestThread fair_thread, deadline_thread;
+    ASSERT_TRUE(fair_thread.Create(fair_profile));
+    ASSERT_TRUE(deadline_thread.Create(deadline_profile));
+
+    // Make sure that our default barriers have been reset to their proper initial
+    // states, and that we will properly release threads from their blocked state
+    // if anything goes wrong during the test and we bail out.
+    TestThread::ResetShutdownBarrier();
+    auto cleanup = fit::defer([&]() {
+      TestThread::ClearShutdownBarrier();
+      owq->ReleaseAllThreads();
+      fair_thread.Reset();
+      deadline_thread.Reset();
+    });
+
+    // Verify that the OWQ has no inherited profile storage allocated to it.  This
+    // should always be the case when there are no waiters.
+    EXPECT_NULL(owq->inherited_scheduler_state_storage());
+
+    // Now, block the fair thread on the queue, and verify the IPV state.  There
+    // should be storage allocated at this point in time, but because the
+    // blocked thread's profile is not inheritable, there should be no inherited
+    // utilization in the queue's values.
+    ASSERT_TRUE(fair_thread.BlockOnOwnedQueue(owq.get(), nullptr));
+    ASSERT_NONNULL(owq->inherited_scheduler_state_storage());
+    {
+      const SchedulerState::WaitQueueInheritedSchedulerState& iss =
+          *owq->inherited_scheduler_state_storage();
+      EXPECT_EQ(iss.ipvs.total_weight.raw_value(), inheritable_weight.raw_value());
+      EXPECT_EQ(iss.ipvs.uncapped_utilization.raw_value(), SchedUtilization{0}.raw_value());
+      EXPECT_EQ(iss.ipvs.min_deadline.raw_value(), SchedDuration::Max().raw_value());
+      EXPECT_EQ(iss.start_time.raw_value(), SchedTime{0}.raw_value());
+      EXPECT_EQ(iss.finish_time.raw_value(), SchedTime{0}.raw_value());
+      EXPECT_EQ(iss.time_slice_ns.raw_value(), SchedDuration{0}.raw_value());
+    }
+
+    // Next, block the deadline thread.  After this, the queue should have
+    // inherited the blocked thread's utilization, as well as its dynamic
+    // parameters since it is the only "consequential" thread blocked in the
+    // queue.
+    ASSERT_TRUE(deadline_thread.BlockOnOwnedQueue(owq.get(), nullptr));
+    ASSERT_NONNULL(owq->inherited_scheduler_state_storage());
+    {
+      const SchedDeadlineParams& params =
+          static_cast<DeadlineProfile*>(deadline_profile.get())->sched_params();
+      const SchedulerState::WaitQueueInheritedSchedulerState& iss =
+          *owq->inherited_scheduler_state_storage();
+      EXPECT_EQ(iss.ipvs.total_weight.raw_value(), inheritable_weight.raw_value());
+      EXPECT_EQ(iss.ipvs.uncapped_utilization.raw_value(), params.utilization.raw_value());
+      EXPECT_EQ(iss.ipvs.min_deadline.raw_value(), params.deadline_ns.raw_value());
+      EXPECT_NE(iss.start_time.raw_value(), SchedTime{0}.raw_value());
+      EXPECT_NE(iss.finish_time.raw_value(), SchedTime{0}.raw_value());
+      EXPECT_NE(iss.time_slice_ns.raw_value(), SchedDuration{0}.raw_value());
+    }
+
+    // Wake the deadline thread from the owned wait queue.  We cannot 100% control
+    // which thread the will be woken if we simply use WakeOne as the choice of
+    // which thread to wake is part of the scheduler's logic, and not something we
+    // can guarantee over time.
+    //
+    // Instead, we can force the thread we want to wake by sending it either a
+    // suspend, or kill signal (in this case, we are going to send it the kill
+    // signal).
+    //
+    // Once the thread has woken and exited, observe that the OWQ's IPVs have gone
+    // back to no inherited weight or utilization.  If we have extra scheduler
+    // invariant validation turned on, we should see the dynamic parameters get
+    // reset as well (even though they are not normally reset as they are now
+    // considered to be undefined.
+    ASSERT_TRUE(deadline_thread.Reset(true));
+    {
+      const SchedulerState::WaitQueueInheritedSchedulerState& iss =
+          *owq->inherited_scheduler_state_storage();
+      EXPECT_EQ(iss.ipvs.total_weight.raw_value(), inheritable_weight.raw_value());
+      EXPECT_EQ(iss.ipvs.uncapped_utilization.raw_value(), SchedUtilization{0}.raw_value());
+      EXPECT_EQ(iss.ipvs.min_deadline.raw_value(), SchedDuration::Max().raw_value());
+      if constexpr (kSchedulerExtraInvariantValidation) {
+        EXPECT_EQ(iss.start_time.raw_value(), SchedTime{0}.raw_value());
+        EXPECT_EQ(iss.finish_time.raw_value(), SchedTime{0}.raw_value());
+        EXPECT_EQ(iss.time_slice_ns.raw_value(), SchedDuration{0}.raw_value());
+      }
+    }
+
+    // Finally, release the fair thread, confirm that the IPV storage no longer
+    // exists in the OWQ, and shutdown the test.
+    TestThread::ClearShutdownBarrier();
+    owq->ReleaseAllThreads();
+    ASSERT_TRUE(fair_thread.Reset());
+    ASSERT_NULL(owq->inherited_scheduler_state_storage());
+  }
+
+  END_TEST;
+}
+
 }  // namespace
 
 UNITTEST_START_TESTCASE(pi_tests)
@@ -1514,4 +1649,5 @@ UNITTEST("multiple waiters", pi_test_multi_waiter)
 UNITTEST("multiple owned queues", pi_test_multi_owned_queues)
 UNITTEST("cycles (inheritable)", pi_test_cycle<InheritableProfile::Yes>)
 UNITTEST("cycles (non-inheritable)", pi_test_cycle<InheritableProfile::No>)
+UNITTEST("b/42182770 regression test", bug_42182770_regression)
 UNITTEST_END_TESTCASE(pi_tests, "pi", "Priority inheritance tests for OwnedWaitQueues")

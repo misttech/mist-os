@@ -569,36 +569,72 @@ void OwnedWaitQueue::FinishPropagate(UpstreamNodeType& upstream_node,
 
   while (true) {
     {
-      // Propagate from the current thread_iter to the current owq_iter.
-      // First, apply the change in pressure to the next OWQ in the chain.
-      ApplyIpvDeltaToOwq(lost_ipv, added_ipv, *owq_iter);
-
-      // We should not be here if this OWQ has no waiters.  That special case
-      // was handled above.
+      // We should not be here if this OWQ has no waiters, or if we have not
+      // found a place to store our ISS.  That special case was handled above.
       DEBUG_ASSERT(owq_iter->Count() > 0);
+      DEBUG_ASSERT(owq_iter->inherited_scheduler_state_storage_ != nullptr);
 
-      // If our OWQ target has exactly one waiter, then propagation of the
-      // dynamic parameters is simple, we just need to copy that thread's current
-      // dynamic parameters.  Otherwise, we call into the scheduler in order to
-      // allow it to apply the lag equation, as appropriate.
-      if (owq_iter->Count() == 1) {
-        DEBUG_ASSERT(owq_iter->inherited_scheduler_state_storage_ != nullptr);
-        SchedulerState::WaitQueueInheritedSchedulerState& owq_iss =
-            *owq_iter->inherited_scheduler_state_storage_;
+      // Record what our deadline pressure was before we accumulate the upstream
+      // pressure into this node.  We will need it to reason about what to do
+      // with our dynamic scheduling parameters after IPV accumulation.
+      //
+      // OWQs which are receiving deadline pressure have defined dynamic
+      // scheduler parameters (start_time, end_time, time_slice_ns) finish
+      // times, which they inherited from their upstream deadline threads.  Fair
+      // threads do not have things like a defined start time while they are
+      // blocked, they will get a new set of dynamic parameters the next time
+      // they unblock and are scheduled to run.
+      //
+      // After we have finished accumulating the IPV deltas, we a few different
+      // potential situations:
+      //
+      // 1) The utilization (deadline pressure) has not changed.  Therefore,
+      //    nothing about the dynamic parameters needs to change either.
+      // 2) The utilization has changed, and it was 0 before.  This is the first
+      //    deadline thread to join the queue, so we can just copy its dynamic
+      //    parameters.
+      // 3) The utilization has changed, and it is now 0.  The final deadline
+      //    thread has left this queue, and our dynamic params are now
+      //    undefined.  Strictly speaking, we don't have to do anything, but in
+      //    builds with extra checks enabled, we reset the dynamic parameters
+      //    so that they have a deterministic value.
+      // 4) The utilization has changed, but it was not zero before, and isn't
+      //    zero now either.  We call into the scheduler code to compute what
+      //    the new dynamic parameters should be.
+      //
+      SchedulerState::WaitQueueInheritedSchedulerState& owq_iss =
+          *owq_iter->inherited_scheduler_state_storage_;
+      const SchedUtilization utilization_before = owq_iss.ipvs.uncapped_utilization;
+      ApplyIpvDeltaToOwq(lost_ipv, added_ipv, *owq_iter);
+      const SchedUtilization utilization_after = owq_iss.ipvs.uncapped_utilization;
 
-        Thread& only_waiter = owq_iter->collection_.PeekOnlyThread();
-        SchedulerState& only_waiter_ss = only_waiter.scheduler_state();
-
-        owq_iss.start_time = only_waiter_ss.start_time_;
-        owq_iss.finish_time = only_waiter_ss.finish_time_;
-        owq_iss.time_slice_ns = only_waiter_ss.time_slice_ns_;
-      } else {
-        Propagate(upstream_node, *owq_iter, op);
+      if (utilization_before != utilization_after) {
+        if (utilization_before == SchedUtilization{0}) {
+          // First deadline thread just arrived, copy its parameters.
+          const SchedulerState& ss = thread_iter->scheduler_state();
+          owq_iss.start_time = ss.start_time_;
+          owq_iss.finish_time = ss.finish_time_;
+          owq_iss.time_slice_ns = ss.time_slice_ns_;
+        } else if (utilization_after == SchedUtilization{0}) {
+          // Last deadline thread just left, reset our dynamic params.
+          owq_iss.ResetDynamicParameters();
+        } else {
+          // The overall utilization has changed, but there was deadline
+          // pressure both before and after.  We need to recompute the dynamic
+          // scheduler parameters.
+          Propagate(upstream_node, *owq_iter, op);
+        }
       }
-      len_tracker.NodeVisited();
+
+      // If we no longer have any deadline pressure, our parameters should now
+      // be reset to initialization defaults.
+      if (utilization_after == SchedUtilization{0}) {
+        owq_iss.AssertDynamicParametersAreReset();
+      }
 
       // Advance to the next thread, if any.  If there isn't another thread,
       // then we are finished, simply break out of the propagation loop.
+      len_tracker.NodeVisited();
       thread_iter = owq_iter->owner_;
       if (thread_iter == nullptr) {
         break;

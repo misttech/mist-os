@@ -316,14 +316,45 @@ class SchedulerState {
 
     void Reset() { new (this) WaitQueueInheritedSchedulerState{}; }
 
-    void AssertIsReset() const {
+    // If we have extra validation enabled, and this queue is no longer
+    // inheriting any deadline pressure (even if there are still waiters),
+    // then reset the dynamic parameters as well.
+    //
+    // The dynamic parameters (start time, finish time, time slice) are
+    // technically undefined when we are not inheriting any utilization.  Fair
+    // thread do not have defined dynamic parameters when they are blocked.
+    //
+    // In a production build with no extra validation checks, it should not be
+    // necessary to ever touch them once they become undefined. Their values
+    // will be overwritten later on if/when they do finally become defined
+    // again.  In a build with extra checks enabled, however, it can be
+    // beneficial to reset them to known default values when they are in the
+    // "undefined" state, in order to make it easier to catch an accidental use
+    // of the parameters when they have no defined meaning.
+    void ResetDynamicParameters() {
       if constexpr (kSchedulerExtraInvariantValidation) {
-        ASSERT(ipvs.total_weight == SchedWeight{0});
+        ASSERT(ipvs.uncapped_utilization == SchedUtilization{0});
+        ASSERT(ipvs.min_deadline == SchedDuration::Max());
+        start_time = SchedTime{0};
+        finish_time = SchedTime{0};
+        time_slice_ns = SchedDuration{0};
+      }
+    }
+
+    void AssertDynamicParametersAreReset() const {
+      if constexpr (kSchedulerExtraInvariantValidation) {
         ASSERT(ipvs.uncapped_utilization == SchedUtilization{0});
         ASSERT(ipvs.min_deadline == SchedDuration::Max());
         ASSERT(start_time == SchedTime{0});
         ASSERT(finish_time == SchedTime{0});
-        ASSERT(time_slice_ns == SchedTime{0});
+        ASSERT(time_slice_ns == SchedDuration{0});
+      }
+    }
+
+    void AssertIsReset() const {
+      if constexpr (kSchedulerExtraInvariantValidation) {
+        ASSERT(ipvs.total_weight == SchedWeight{0});
+        AssertDynamicParametersAreReset();
       }
     }
 

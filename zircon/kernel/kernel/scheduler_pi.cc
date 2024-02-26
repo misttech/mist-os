@@ -230,6 +230,10 @@ inline void Scheduler::HandlePiInteractionCommon(SchedTime now, PiNodeAdapter<Ta
     target.RecomputeEffectiveProfile();
     UpdateDynamicParams(old_ep, SchedTime{0});
   }
+
+  DEBUG_ASSERT_MSG(target.start_time() >= 0, "start_time %ld\n", target.start_time().raw_value());
+  DEBUG_ASSERT_MSG(target.finish_time() >= 0, "finish_time %ld\n",
+                   target.finish_time().raw_value());
 }
 
 void Scheduler::ThreadBaseProfileChanged(Thread& thread) {
