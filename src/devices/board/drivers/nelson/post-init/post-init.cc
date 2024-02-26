@@ -300,10 +300,23 @@ zx::result<> PostInit::AddSelinaCompositeNode() {
                         bind_fuchsia_amlogic_platform_s905d3::GPIOH_PIN_ID_PIN_2),
   };
 
+  const std::vector<fuchsia_driver_framework::BindRule> cs_gpio_rules{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_s905d3::GPIOH_PIN_ID_PIN_6),
+  };
+
+  const std::vector<fuchsia_driver_framework::NodeProperty> cs_gpio_properties{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia::GPIO_PIN,
+                        bind_fuchsia_amlogic_platform_s905d3::GPIOH_PIN_ID_PIN_6),
+  };
+
   const std::vector<fuchsia_driver_framework::ParentSpec> selina_parents{
       {{spi_rules, spi_properties}},
       {{irq_gpio_rules, irq_gpio_properties}},
       {{reset_gpio_rules, reset_gpio_properties}},
+      {{cs_gpio_rules, cs_gpio_properties}},
   };
 
   const fuchsia_driver_framework::CompositeNodeSpec selina_node_spec{{

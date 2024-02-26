@@ -272,8 +272,8 @@ zx_status_t Nelson::Spi1Init() {
   static const amlogic_spi::amlspi_config_t spi_1_config = {
       .bus_id = NELSON_SPICC1,
       .cs_count = 1,
-      .cs = {0},                                      // index into fragments list
-      .clock_divider_register_value = (22 >> 1) - 1,  // SCLK = core clock / 22 = 30.3 MHz
+      .cs = {amlogic_spi::amlspi_config_t::kCsClientManaged},  // CS GPIO managed by client driver
+      .clock_divider_register_value = (22 >> 1) - 1,           // SCLK = core clock / 22 = 30.3 MHz
       .use_enhanced_clock_mode = true,
       .client_reverses_dma_transfers = true,
       .delay_control = kMoNoDelay | kMiDelay3Cycles | kMiCapAhead2Cycles,
