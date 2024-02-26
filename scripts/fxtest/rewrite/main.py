@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import atexit
 from dataclasses import dataclass
@@ -40,8 +41,16 @@ def main() -> None:
     # Main entrypoint.
     # Set up the event loop to catch termination signals (i.e. Ctrl+C), and
     # cancel the main task when they are received.
-    config_file = config.load_config()
-    real_flags = args.parse_args(defaults=config_file.default_flags)
+    try:
+        config_file = config.load_config()
+    except argparse.ArgumentError as e:
+        print(f"Failed to parse config: {e.message}")
+        sys.exit(1)
+    try:
+        real_flags = args.parse_args(defaults=config_file.default_flags)
+    except argparse.ArgumentError as e:
+        print(f"Failed to parse command line: {e.message}")
+        sys.exit(1)
     fut = asyncio.ensure_future(
         async_main_wrapper(real_flags, config_file=config_file)
     )
