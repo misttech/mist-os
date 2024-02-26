@@ -11,8 +11,8 @@ use fidl_fuchsia_component::{CreateChildArgs, RealmMarker};
 use fidl_fuchsia_component_decl::{Child, CollectionRef, StartupMode};
 use fidl_fuchsia_process as fprocess;
 use fidl_fuchsia_scheduler::{
-    ProfileProviderMarker, ProfileProviderRequest, ProfileProviderRequestStream,
-    ProfileProviderSetProfileByRoleResponder,
+    RoleManagerMarker, RoleManagerRequest, RoleManagerRequestStream, RoleManagerSetRoleResponder,
+    RoleManagerSetRoleResponse, RoleTarget,
 };
 use fuchsia_async::Task;
 use fuchsia_component_test::{
@@ -35,7 +35,7 @@ async fn main() {
     info!("reading package profile config");
     let profiles_config = std::fs::read_to_string("/pkg/config/profiles/starnix.profiles").unwrap();
     let profiles_config: ProfilesConfig = serde_json5::from_str(&profiles_config).unwrap();
-    let (fake_provider, mut requests) = FakeProfileProvider::new(profiles_config);
+    let (fake_manager, mut requests) = FakeRoleManager::new(profiles_config);
 
     let builder = RealmBuilder::with_params(
         RealmBuilderParams::new().from_relative_url("#meta/test_realm.cm"),
@@ -43,10 +43,10 @@ async fn main() {
     .await
     .unwrap();
 
-    let profile_provider_ref = builder
+    let role_manager_ref = builder
         .add_local_child(
-            "fake_profile_provider",
-            move |handles| Box::pin(fake_provider.clone().serve(handles)),
+            "fake_role_manager",
+            move |handles| Box::pin(fake_manager.clone().serve(handles)),
             ChildOptions::new(),
         )
         .await
@@ -55,8 +55,8 @@ async fn main() {
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol_by_name(ProfileProviderMarker::PROTOCOL_NAME))
-                .from(&profile_provider_ref)
+                .capability(Capability::protocol_by_name(RoleManagerMarker::PROTOCOL_NAME))
+                .from(&role_manager_ref)
                 .to(Ref::child("kernel")),
         )
         .await
@@ -210,12 +210,12 @@ struct ProfileConfig {
 }
 
 #[derive(Clone)]
-struct FakeProfileProvider {
+struct FakeRoleManager {
     config: ProfilesConfig,
-    sender: UnboundedSender<SetProfileByRole>,
+    sender: UnboundedSender<SetRole>,
 }
 
-impl FakeProfileProvider {
+impl FakeRoleManager {
     fn new(config: ProfilesConfig) -> (Self, FakeProfileRequests) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         (Self { config, sender }, FakeProfileRequests { receiver })
@@ -223,25 +223,34 @@ impl FakeProfileProvider {
 
     async fn serve(self, handles: LocalComponentHandles) -> Result<(), anyhow::Error> {
         let mut fs = fuchsia_component::server::ServiceFs::new();
-        fs.dir("svc").add_fidl_service(|client: ProfileProviderRequestStream| client);
+        fs.dir("svc").add_fidl_service(|client: RoleManagerRequestStream| client);
         fs.serve_connection(handles.outgoing_dir).unwrap();
 
         while let Some(mut client) = fs.next().await {
             while let Some(request) = client.next().await {
                 match request.unwrap() {
-                    ProfileProviderRequest::SetProfileByRole { handle, role, responder } => {
+                    RoleManagerRequest::SetRole { payload, responder } => {
+                        let role_name = payload.role.unwrap().role;
+                        let thread = match payload.target.unwrap() {
+                            RoleTarget::Thread(t) => t,
+                            other => panic!("unexpected request {other:?} for role {role_name}"),
+                        };
                         assert!(
-                            self.config.profiles.contains_key(&role),
-                            "requested={role} allowed={:#?}",
+                            self.config.profiles.contains_key(&role_name),
+                            "requested={role_name} allowed={:#?}",
                             self.config.profiles,
                         );
 
                         self.sender
-                            .unbounded_send(SetProfileByRole { handle, role, responder })
+                            .unbounded_send(SetRole {
+                                thread: thread,
+                                role: role_name,
+                                responder: responder,
+                            })
                             .unwrap();
                     }
                     other => {
-                        panic!("unexpected ProfileProvider request from starnix kernel {other:?}")
+                        panic!("unexpected RoleManager request from starnix kernel {other:?}")
                     }
                 }
             }
@@ -252,21 +261,22 @@ impl FakeProfileProvider {
 }
 
 struct FakeProfileRequests {
-    receiver: UnboundedReceiver<SetProfileByRole>,
+    receiver: UnboundedReceiver<SetRole>,
 }
 
 impl FakeProfileRequests {
     async fn with_next<R>(&mut self, op: impl FnOnce(zx::Koid, &str) -> R) -> R {
         let next = self.receiver.next().await.unwrap();
-        let ret = op(next.handle.get_koid().unwrap(), &next.role);
-        next.responder.send(zx::sys::ZX_OK).unwrap();
+        let ret = op(next.thread.get_koid().unwrap(), &next.role);
+        let response = RoleManagerSetRoleResponse { ..Default::default() };
+        next.responder.send(Ok(response)).unwrap();
         ret
     }
 }
 
 #[derive(Debug)]
-struct SetProfileByRole {
-    handle: zx::Handle,
+struct SetRole {
+    thread: zx::Thread,
     role: String,
-    responder: ProfileProviderSetProfileByRoleResponder,
+    responder: RoleManagerSetRoleResponder,
 }

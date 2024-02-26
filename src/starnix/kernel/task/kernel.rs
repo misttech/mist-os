@@ -33,7 +33,7 @@ use fidl::{
     AsHandleRef,
 };
 use fidl_fuchsia_io as fio;
-use fidl_fuchsia_scheduler::ProfileProviderSynchronousProxy;
+use fidl_fuchsia_scheduler::RoleManagerSynchronousProxy;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::FutureExt;
@@ -222,8 +222,8 @@ pub struct Kernel {
     // as well as `CurrentTask`).
     pub delayed_releaser: DelayedReleaser,
 
-    /// Proxy to the scheduler profile provider for adjusting task priorities.
-    pub profile_provider: Option<ProfileProviderSynchronousProxy>,
+    /// Proxy to the scheduler role manager for adjusting task priorities.
+    pub role_manager: Option<RoleManagerSynchronousProxy>,
 
     /// The syslog manager.
     pub syslog: Syslog,
@@ -282,7 +282,7 @@ impl Kernel {
         features: KernelFeatures,
         container_svc: Option<fio::DirectoryProxy>,
         container_data_dir: Option<fio::DirectorySynchronousProxy>,
-        profile_provider: Option<ProfileProviderSynchronousProxy>,
+        role_manager: Option<RoleManagerSynchronousProxy>,
         inspect_node: fuchsia_inspect::Node,
         framebuffer_aspect_ratio: Option<&AspectRatio>,
         security_server: Option<Arc<SecurityServer>>,
@@ -345,7 +345,7 @@ impl Kernel {
             build_version: OnceCell::new(),
             stats: Arc::new(KernelStats::default()),
             delayed_releaser: Default::default(),
-            profile_provider,
+            role_manager,
             syslog: Default::default(),
         });
 

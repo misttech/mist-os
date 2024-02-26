@@ -4,5 +4,5 @@
 
 group("tests") {
   testonly = true
-  deps = [ "profile_provider:tests" ]
+  deps = [ "role_manager:tests" ]
 }

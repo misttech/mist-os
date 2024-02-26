@@ -14,11 +14,11 @@ group("tests") {
 
   # TODO(https://fxbug.dev/42086687): Re-enable on asan builders.
   if (!is_asan) {
-    deps += [ ":starnix_profile_provider_integration_test" ]
+    deps += [ ":starnix_role_manager_integration_test" ]
   }
 }
 
-rustc_binary("profile_provider_integration_test_bin") {
+rustc_binary("role_manager_integration_test_bin") {
   testonly = true
   edition = "2021"
   sources = [ "src/main.rs" ]
@@ -43,11 +43,11 @@ rustc_binary("profile_provider_integration_test_bin") {
   ]
 }
 
-fuchsia_test_component("profile_provider_test") {
+fuchsia_test_component("role_manager_test") {
   manifest = "meta/integration_test.cml"
   deps = [
     ":linux_scheduler_puppet",
-    ":profile_provider_integration_test_bin",
+    ":role_manager_integration_test_bin",
     "//src/starnix/config:starnix.profiles",
   ]
   test_type = "starnix"
@@ -73,8 +73,8 @@ fuchsia_component("test_realm") {
   manifest = "meta/test_realm.cml"
 }
 
-fuchsia_test_package("starnix_profile_provider_integration_test") {
-  test_components = [ ":profile_provider_test" ]
+fuchsia_test_package("starnix_role_manager_integration_test") {
+  test_components = [ ":role_manager_test" ]
   deps = [
     ":container",
     ":puppet",

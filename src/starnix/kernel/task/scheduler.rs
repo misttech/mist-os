@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use fidl::HandleBased;
-use fidl_fuchsia_scheduler::ProfileProviderSynchronousProxy;
+use fidl_fuchsia_scheduler::{
+    RoleManagerSetRoleRequest, RoleManagerSynchronousProxy, RoleName, RoleTarget,
+};
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, log_debug, log_warn, track_stub};
 use starnix_uapi::{
@@ -286,23 +288,26 @@ pub fn max_priority_for_sched_policy(policy: u32) -> Result<u8, Errno> {
 }
 
 pub fn set_thread_role(
-    profile_provider: &ProfileProviderSynchronousProxy,
+    role_manager: &RoleManagerSynchronousProxy,
     thread: &zx::Thread,
     policy: SchedulerPolicy,
 ) -> Result<(), Errno> {
     let role_name = policy.kind.role_name();
     log_debug!(?policy, role_name, "setting thread role");
     let thread = thread.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)?;
-    profile_provider
-        .set_profile_by_role(thread.into_handle(), role_name, zx::Time::INFINITE)
-        .map_err(|err| {
-            log_warn!(?err, "Unable to set thread profile.");
-            errno!(EINVAL)
-        })?;
+    let request = RoleManagerSetRoleRequest {
+        target: Some(RoleTarget::Thread(thread)),
+        role: Some(RoleName { role: role_name.to_string() }),
+        ..Default::default()
+    };
+    let _ = role_manager.set_role(request, zx::Time::INFINITE).map_err(|err| {
+        log_warn!(?err, "Unable to set thread role.");
+        errno!(EINVAL)
+    })?;
     Ok(())
 }
 
-/// Names of ProfileProvider roles for each static Zircon priority in the fair scheduler.
+/// Names of RoleManager roles for each static Zircon priority in the fair scheduler.
 /// The index in the array is equal to the static priority.
 // LINT.IfChange
 const FAIR_PRIORITY_ROLE_NAMES: [&str; 32] = [

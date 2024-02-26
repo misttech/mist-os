@@ -940,7 +940,7 @@ impl Task {
             state.scheduler_policy
         };
 
-        let Some(profile_provider) = &self.thread_group.kernel.profile_provider else {
+        let Some(role_manager) = &self.thread_group.kernel.role_manager else {
             log_debug!("thread role update requested in kernel without ProfileProvider, skipping");
             return Ok(());
         };
@@ -949,7 +949,7 @@ impl Task {
             log_debug!("thread role update requested for task without thread, skipping");
             return Ok(());
         };
-        set_thread_role(profile_provider, thread, new_scheduler_policy)?;
+        set_thread_role(role_manager, thread, new_scheduler_policy)?;
         Ok(())
     }
 

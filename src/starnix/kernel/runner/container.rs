@@ -16,7 +16,7 @@ use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_element as felement;
 use fidl_fuchsia_io as fio;
-use fidl_fuchsia_scheduler::ProfileProviderMarker;
+use fidl_fuchsia_scheduler::RoleManagerMarker;
 use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async as fasync;
 use fuchsia_async::DurationExt;
@@ -337,17 +337,17 @@ async fn create_container(
         }
     }
 
-    // Check whether we actually have access to a profile provider by trying to set our own
+    // Check whether we actually have access to a role manager by trying to set our own
     // thread's role.
-    let profile_provider = connect_to_protocol_sync::<ProfileProviderMarker>().unwrap();
-    let profile_provider = if let Err(e) =
-        set_thread_role(&profile_provider, &*fuchsia_runtime::thread_self(), Default::default())
+    let role_manager = connect_to_protocol_sync::<RoleManagerMarker>().unwrap();
+    let role_manager = if let Err(e) =
+        set_thread_role(&role_manager, &*fuchsia_runtime::thread_self(), Default::default())
     {
         log_warn!("Setting thread role failed ({e:?}), will not set thread priority.");
         None
     } else {
         log_info!("Thread role set successfully.");
-        Some(profile_provider)
+        Some(role_manager)
     };
 
     let node = inspect::component::inspector().root().create_child("container");
@@ -360,7 +360,7 @@ async fn create_container(
         features.kernel,
         svc_dir,
         data_dir,
-        profile_provider,
+        role_manager,
         node.create_child("kernel"),
         features.aspect_ratio.as_ref(),
         security_server,
