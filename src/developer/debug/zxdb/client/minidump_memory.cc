@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "src/lib/elflib/elflib.h"
+#include "src/lib/fxl/strings/string_printf.h"
 #include "src/lib/unwinder/module.h"
 
 namespace zxdb {
@@ -184,14 +185,11 @@ std::string MinidumpGetBuildId(const crashpad::ModuleSnapshot& mod) {
     return "";
   }
 
-  // 2 hex characters per 1 byte, so the string size is twice the data size. Hopefully we'll be
-  // overwriting the zeros we're filling with.
-  std::string ret(build_id.size() * 2, '\0');
-  char* pos = ret.data();
-
+  // 2 hex characters per 1 byte, so the string size is twice the data size.
+  std::string ret;
+  ret.reserve(2 * build_id.size());
   for (const auto& byte : build_id) {
-    sprintf(pos, "%02hhx", byte);
-    pos += 2;
+    ret.append(fxl::StringPrintf("%02hhx", byte));
   }
 
   return ret;

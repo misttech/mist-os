@@ -322,6 +322,7 @@ source_set("tests") {
     # Duplicate the crashpad dependency below to avoid making it into public_deps of :client.
     "//third_party/crashpad/src/compat",
     "//third_party/crashpad/src/snapshot",
+    "//third_party/crashpad/src/snapshot:test_support",
     "//third_party/crashpad/src/util",
     "//third_party/mini_chromium/src/base",
   ]

@@ -15,6 +15,7 @@
 
 #include "lib/syslog/cpp/macros.h"
 #include "src/lib/unwinder/error.h"
+#include "third_party/crashpad/src/snapshot/test/test_module_snapshot.h"
 
 namespace zxdb {
 
@@ -120,6 +121,16 @@ TEST(MinidumpMemory, ReadMemoryBlocks) {
   ASSERT_EQ(0x2000u, res[2].address);
   ASSERT_EQ(0x100u, res[2].size);
   ASSERT_EQ(true, res[2].valid);
+}
+
+TEST(MinidumpMemory, ReadBuildId) {
+  crashpad::test::TestModuleSnapshot mock_snapshot;
+  const std::vector<uint8_t> kBuildId = {0x1, 0x2, 0x3, 0x4, 0x5, 0x6};
+
+  mock_snapshot.SetBuildID(kBuildId);
+
+  std::string build_id_string = MinidumpGetBuildId(mock_snapshot);
+  EXPECT_EQ(build_id_string, "010203040506");
 }
 
 }  // namespace
