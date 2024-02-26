@@ -24,9 +24,6 @@ struct CompositeInfo {
   bool has_acpi;
 };
 
-zx_status_t AddLegacyComposite(zx_device_t* pci_dev_parent, const char* composite_name,
-                               const CompositeInfo& info);
-
 ddk::CompositeNodeSpec CreateCompositeNodeSpec(const CompositeInfo& info);
 
 }  // namespace pci

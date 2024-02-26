@@ -267,13 +267,6 @@ zx_status_t KernelPci::CreateComposite(zx_device_t* parent, kpci_device device, 
       .has_acpi = uses_acpi,
   };
 
-  char composite_name[ZX_DEVICE_NAME_MAX];
-  snprintf(composite_name, sizeof(composite_name), "pci-%s-fidl", device.name);
-  status = AddLegacyComposite(kpci_unowned->parent(), composite_name, pci_info);
-  if (status != ZX_OK) {
-    return status;
-  }
-
   char spec_name[8];
   snprintf(spec_name, sizeof(spec_name), "%02x_%02x_%01x", device.info.bus_id, device.info.dev_id,
            device.info.func_id);

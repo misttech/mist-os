@@ -108,12 +108,6 @@ zx::result<> FidlDevice::Create(zx_device_t* parent, pci::Device* device) {
       .has_acpi = device->has_acpi(),
   };
 
-  status = AddLegacyComposite(fidl_dev_unowned->parent(), device->config()->addr(), pci_info);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "[%s] Failed to create pci composite: %s", device->config()->addr(),
-           zx_status_get_string(status));
-  }
-
   char spec_name[8];
   snprintf(spec_name, sizeof(spec_name), "%02x_%02x_%01x", device->bus_id(), device->dev_id(),
            device->func_id());
