@@ -790,6 +790,7 @@ void Session::SendLocalHello(fit::callback<void(const Err&)> cb) {
                          const Err& err, debug_ipc::HelloReply reply) mutable {
                        if (weak_this && !err.has_error()) {
                          if (weak_this->HandleHelloReply(reply).ok()) {
+                           weak_this->analytics_reporter_.ReportSessionStarted();
                            weak_this->SyncAgentStatus();
                            weak_this->system_.DidConnect(System::Where::kLocal);
                          }
