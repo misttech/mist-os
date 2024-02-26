@@ -47,14 +47,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target: OfferTarget::static_child("b".to_string()),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .capability(
                         StorageBuilder::new()
                             .name("cache")
                             .backing_dir("tmp")
                             .source(StorageDirectorySource::Parent)
-                            .subdir("cache")
-                            .build(),
+                            .subdir("cache"),
                     )
                     .build(),
             ),
@@ -104,11 +103,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -117,13 +112,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .capability(
                         StorageBuilder::new()
                             .name("cache")
                             .backing_dir("data")
-                            .source(StorageDirectorySource::Self_)
-                            .build(),
+                            .source(StorageDirectorySource::Self_),
                     )
                     .build(),
             ),
@@ -168,11 +162,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -181,14 +171,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .capability(
                         StorageBuilder::new()
                             .name("cache")
                             .backing_dir("data")
                             .source(StorageDirectorySource::Self_)
-                            .subdir("cache")
-                            .build(),
+                            .subdir("cache"),
                     )
                     .build(),
             ),
@@ -233,11 +222,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::R_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::R_STAR_DIR),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -246,13 +231,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .capability(
                         StorageBuilder::new()
                             .name("cache")
                             .backing_dir("data")
-                            .source(StorageDirectorySource::Self_)
-                            .build(),
+                            .source(StorageDirectorySource::Self_),
                     )
                     .build(),
             ),
@@ -298,11 +282,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
@@ -315,7 +295,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -328,13 +308,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("c")
+                    .child_default("c")
                     .capability(
                         StorageBuilder::new()
                             .name("data")
                             .backing_dir("minfs")
-                            .source(StorageDirectorySource::Parent)
-                            .build(),
+                            .source(StorageDirectorySource::Parent),
                     )
                     .build(),
             ),
@@ -381,11 +360,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
@@ -398,7 +373,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -411,14 +386,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("c")
+                    .child_default("c")
                     .capability(
                         StorageBuilder::new()
                             .name("data")
                             .backing_dir("minfs")
                             .source(StorageDirectorySource::Parent)
-                            .subdir("subdir_2")
-                            .build(),
+                            .subdir("subdir_2"),
                     )
                     .build(),
             ),
@@ -488,7 +462,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -501,14 +475,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("c")
+                    .child_default("c")
                     .capability(
                         StorageBuilder::new()
                             .name("data")
                             .backing_dir("minfs")
                             .source(StorageDirectorySource::Parent)
-                            .subdir("bar")
-                            .build(),
+                            .subdir("bar"),
                     )
                     .build(),
             ),
@@ -558,8 +531,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         DirectoryBuilder::new()
                             .name("data-root")
                             .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -568,13 +540,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .capability(
                         StorageBuilder::new()
                             .name("data")
                             .backing_dir("data-root")
-                            .source(StorageDirectorySource::Self_)
-                            .build(),
+                            .source(StorageDirectorySource::Self_),
                     )
                     .build(),
             ),
@@ -588,7 +559,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("c")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -634,8 +605,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         StorageBuilder::new()
                             .name("cache")
                             .backing_dir("minfs")
-                            .source(StorageDirectorySource::Child("b".into()))
-                            .build(),
+                            .source(StorageDirectorySource::Child("b".into())),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -644,19 +614,15 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
@@ -715,8 +681,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .name("cache")
                             .backing_dir("minfs")
                             .source(StorageDirectorySource::Child("b".into()))
-                            .subdir("subdir_2")
-                            .build(),
+                            .subdir("subdir_2"),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -725,19 +690,15 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
@@ -805,16 +766,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .name("data")
                             .backing_dir("minfs")
                             .source(StorageDirectorySource::Child("b".into()))
-                            .subdir("data")
-                            .build(),
+                            .subdir("data"),
                     )
                     .capability(
                         StorageBuilder::new()
                             .name("cache")
                             .backing_dir("minfs")
                             .source(StorageDirectorySource::Child("b".into()))
-                            .subdir("cache")
-                            .build(),
+                            .subdir("cache"),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -830,19 +789,15 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
@@ -883,7 +838,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target_path: "/cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("d")
+                    .child_default("d")
                     .build(),
             ),
             (
@@ -967,11 +922,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -980,13 +931,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .capability(
                         StorageBuilder::new()
                             .name("cache")
                             .backing_dir("minfs")
-                            .source(StorageDirectorySource::Self_)
-                            .build(),
+                            .source(StorageDirectorySource::Self_),
                     )
                     .build(),
             ),
@@ -1028,11 +978,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
@@ -1045,7 +991,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -1086,20 +1032,18 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .capability(
                         DirectoryBuilder::new()
                             .name("minfs")
                             .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .capability(
                         StorageBuilder::new()
                             .name("data")
                             .backing_dir("minfs")
-                            .source(StorageDirectorySource::Self_)
-                            .build(),
+                            .source(StorageDirectorySource::Self_),
                     )
                     .build(),
             ),
@@ -1145,11 +1089,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new_empty_component()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
@@ -1162,7 +1102,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -1175,13 +1115,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("c")
+                    .child_default("c")
                     .capability(
                         StorageBuilder::new()
                             .name("data")
                             .backing_dir("minfs")
-                            .source(StorageDirectorySource::Parent)
-                            .build(),
+                            .source(StorageDirectorySource::Parent),
                     )
                     .build(),
             ),
@@ -1233,14 +1172,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target: OfferTarget::static_child("b".to_string()),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .capability(
                         StorageBuilder::new()
                             .name("cache")
                             .backing_dir("tmp")
                             .source(StorageDirectorySource::Parent)
-                            .subdir("cache")
-                            .build(),
+                            .subdir("cache"),
                     )
                     .build(),
             ),
@@ -1307,11 +1245,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -1320,13 +1254,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .capability(
                         StorageBuilder::new()
                             .name("cache")
                             .backing_dir("data")
-                            .source(StorageDirectorySource::Self_)
-                            .build(),
+                            .source(StorageDirectorySource::Self_),
                     )
                     .build(),
             ),
@@ -1345,7 +1278,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("c")
+                    .child_default("c")
                     .build(),
             ),
             (

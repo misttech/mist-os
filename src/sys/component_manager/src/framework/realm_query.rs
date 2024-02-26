@@ -925,7 +925,7 @@ mod tests {
             checksum: checksum.clone(),
         };
 
-        let components = vec![("root", ComponentDeclBuilder::new().add_config(config).build())];
+        let components = vec![("root", ComponentDeclBuilder::new().config(config).build())];
 
         let TestModelResult { model, builtin_environment, .. } = TestEnvironmentBuilder::new()
             .set_components(components)
@@ -1187,14 +1187,13 @@ mod tests {
             (
                 "root",
                 ComponentDeclBuilder::new()
-                    .add_lazy_child("a")
+                    .child_default("a")
                     .capability(
                         StorageBuilder::new()
                             .name("data")
                             .backing_dir("fs")
                             .source(StorageDirectorySource::Child("a".into()))
-                            .subdir("persistent")
-                            .build(),
+                            .subdir("persistent"),
                     )
                     .build(),
             ),
@@ -1205,8 +1204,7 @@ mod tests {
                         DirectoryBuilder::new()
                             .name("fs")
                             .path("/fs/data")
-                            .rights(fio::Operations::all())
-                            .build(),
+                            .rights(fio::Operations::all()),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "fs".parse().unwrap(),

@@ -6,7 +6,9 @@ use {
     anyhow::{Context, Error},
     cm_rust::{ComponentDecl, FidlIntoNative},
     cm_types::{Name, Path, RelativePath},
-    cml, fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
+    cml,
+    derivative::Derivative,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     std::path::PathBuf,
 };
 
@@ -43,40 +45,25 @@ impl ComponentDeclBuilder {
     }
 
     /// Add a child element.
-    pub fn add_child(mut self, decl: impl Into<cm_rust::ChildDecl>) -> Self {
+    pub fn child(mut self, decl: impl Into<cm_rust::ChildDecl>) -> Self {
         self.result.children.push(decl.into());
         self
     }
 
+    /// Add a child with default properties.
+    pub fn child_default(self, name: &str) -> Self {
+        self.child(ChildBuilder::new().name(name))
+    }
+
     // Add a collection element.
-    pub fn add_collection(mut self, decl: impl Into<cm_rust::CollectionDecl>) -> Self {
+    pub fn collection(mut self, decl: impl Into<cm_rust::CollectionDecl>) -> Self {
         self.result.collections.push(decl.into());
         self
     }
 
-    /// Add a lazily instantiated child with a default test URL derived from the name.
-    pub fn add_lazy_child(self, name: &str) -> Self {
-        self.add_child(ChildDeclBuilder::new_lazy_child(name))
-    }
-
-    /// Add an eagerly instantiated child with a default test URL derived from the name.
-    pub fn add_eager_child(self, name: &str) -> Self {
-        self.add_child(
-            ChildDeclBuilder::new()
-                .name(name)
-                .url(&format!("test:///{}", name))
-                .startup(fdecl::StartupMode::Eager),
-        )
-    }
-
-    /// Add a transient collection.
-    pub fn add_transient_collection(self, name: &str) -> Self {
-        self.add_collection(CollectionDeclBuilder::new_transient_collection(name))
-    }
-
-    /// Add a single run collection.
-    pub fn add_single_run_collection(self, name: &str) -> Self {
-        self.add_collection(CollectionDeclBuilder::new_single_run_collection(name))
+    /// Add a collection with default properties.
+    pub fn collection_default(self, name: &str) -> Self {
+        self.collection(CollectionBuilder::new().name(name))
     }
 
     /// Add a "program" clause, using the given runner.
@@ -122,8 +109,8 @@ impl ComponentDeclBuilder {
     }
 
     /// Add a capability declaration.
-    pub fn capability(mut self, capability: cm_rust::CapabilityDecl) -> Self {
-        self.result.capabilities.push(capability);
+    pub fn capability(mut self, capability: impl Into<cm_rust::CapabilityDecl>) -> Self {
+        self.result.capabilities.push(capability.into());
         self
     }
 
@@ -153,13 +140,13 @@ impl ComponentDeclBuilder {
     }
 
     /// Add an environment declaration.
-    pub fn add_environment(mut self, environment: impl Into<cm_rust::EnvironmentDecl>) -> Self {
+    pub fn environment(mut self, environment: impl Into<cm_rust::EnvironmentDecl>) -> Self {
         self.result.environments.push(environment.into());
         self
     }
 
     /// Add a config declaration.
-    pub fn add_config(mut self, config: cm_rust::ConfigDecl) -> Self {
+    pub fn config(mut self, config: cm_rust::ConfigDecl) -> Self {
         self.result.config = Some(config);
         self
     }
@@ -171,209 +158,202 @@ impl ComponentDeclBuilder {
 }
 
 /// A convenience builder for constructing ChildDecls.
-#[derive(Debug)]
-pub struct ChildDeclBuilder(cm_rust::ChildDecl);
+#[derive(Debug, Derivative)]
+#[derivative(Default)]
+pub struct ChildBuilder {
+    name: Option<String>,
+    url: Option<String>,
+    #[derivative(Default(value = "fdecl::StartupMode::Lazy"))]
+    startup: fdecl::StartupMode,
+    on_terminate: Option<fdecl::OnTerminate>,
+    environment: Option<String>,
+}
 
-impl ChildDeclBuilder {
-    /// Creates a new builder.
+impl ChildBuilder {
     pub fn new() -> Self {
-        ChildDeclBuilder(cm_rust::ChildDecl {
-            name: String::new(),
-            url: String::new(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        })
+        Self::default()
     }
 
-    /// Creates a new builder initialized with a lazy child.
-    pub fn new_lazy_child(name: &str) -> Self {
-        Self::new().name(name).url(&format!("test:///{}", name)).startup(fdecl::StartupMode::Lazy)
-    }
-
-    /// Sets the ChildDecl's name.
+    /// Defaults url to `"test:///{name}"`.
     pub fn name(mut self, name: &str) -> Self {
-        self.0.name = name.to_string();
-        self
-    }
-
-    /// Sets the ChildDecl's url.
-    pub fn url(mut self, url: &str) -> Self {
-        self.0.url = url.to_string();
-        self
-    }
-
-    /// Sets the ChildDecl's startup mode.
-    pub fn startup(mut self, startup: fdecl::StartupMode) -> Self {
-        self.0.startup = startup;
-        self
-    }
-
-    /// Sets the ChildDecl's on_terminate action.
-    pub fn on_terminate(mut self, on_terminate: fdecl::OnTerminate) -> Self {
-        self.0.on_terminate = Some(on_terminate);
-        self
-    }
-
-    /// Sets the ChildDecl's environment name.
-    pub fn environment(mut self, environment: &str) -> Self {
-        self.0.environment = Some(environment.to_string());
-        self
-    }
-
-    /// Consumes the builder and returns a ChildDecl.
-    pub fn build(mut self) -> cm_rust::ChildDecl {
-        if self.0.url == String::new() {
-            self.0.url = format!("test://{}", self.0.name);
+        self.name = Some(name.into());
+        if self.url.is_none() {
+            self.url = Some(format!("test:///{name}"));
         }
-        self.0
+        self
+    }
+
+    pub fn url(mut self, url: &str) -> Self {
+        self.url = Some(url.into());
+        self
+    }
+
+    pub fn startup(mut self, startup: fdecl::StartupMode) -> Self {
+        self.startup = startup;
+        self
+    }
+
+    pub fn eager(self) -> Self {
+        self.startup(fdecl::StartupMode::Eager)
+    }
+
+    pub fn on_terminate(mut self, on_terminate: fdecl::OnTerminate) -> Self {
+        self.on_terminate = Some(on_terminate);
+        self
+    }
+
+    pub fn environment(mut self, environment: &str) -> Self {
+        self.environment = Some(environment.into());
+        self
+    }
+
+    pub fn build(self) -> cm_rust::ChildDecl {
+        cm_rust::ChildDecl {
+            name: self.name.expect("name not set"),
+            url: self.url.expect("url not set"),
+            startup: self.startup,
+            on_terminate: self.on_terminate,
+            environment: self.environment,
+            config_overrides: None,
+        }
     }
 }
 
-impl From<ChildDeclBuilder> for cm_rust::ChildDecl {
-    fn from(builder: ChildDeclBuilder) -> Self {
+impl From<ChildBuilder> for cm_rust::ChildDecl {
+    fn from(builder: ChildBuilder) -> Self {
         builder.build()
     }
 }
 
 /// A convenience builder for constructing CollectionDecls.
-#[derive(Debug)]
-pub struct CollectionDeclBuilder(cm_rust::CollectionDecl);
+#[derive(Debug, Derivative)]
+#[derivative(Default)]
+pub struct CollectionBuilder {
+    name: Option<Name>,
+    #[derivative(Default(value = "fdecl::Durability::Transient"))]
+    durability: fdecl::Durability,
+    environment: Option<String>,
+    #[derivative(Default(value = "cm_types::AllowedOffers::StaticOnly"))]
+    allowed_offers: cm_types::AllowedOffers,
+    allow_long_names: bool,
+    persistent_storage: Option<bool>,
+}
 
-impl CollectionDeclBuilder {
-    /// Creates a new builder.
+impl CollectionBuilder {
     pub fn new() -> Self {
-        CollectionDeclBuilder(cm_rust::CollectionDecl {
-            name: "coll".parse().unwrap(),
-            durability: fdecl::Durability::Transient,
-            environment: None,
-            allowed_offers: cm_types::AllowedOffers::StaticOnly,
-            allow_long_names: false,
-            persistent_storage: None,
-        })
+        Self::default()
     }
 
-    /// Creates a new builder initialized with a transient collection.
-    pub fn new_transient_collection(name: &str) -> Self {
-        Self::new().name(name).durability(fdecl::Durability::Transient)
-    }
-
-    /// Creates a new builder initialized with a single run collection.
-    pub fn new_single_run_collection(name: &str) -> Self {
-        Self::new().name(name).durability(fdecl::Durability::SingleRun)
-    }
-
-    /// Sets the CollectionDecl's name.
     pub fn name(mut self, name: &str) -> Self {
-        self.0.name = name.parse().expect("invalid name");
+        self.name = Some(name.parse().unwrap());
         self
     }
 
-    /// Sets the CollectionDecl's durability
     pub fn durability(mut self, durability: fdecl::Durability) -> Self {
-        self.0.durability = durability;
+        self.durability = durability;
         self
     }
 
-    /// Sets the CollectionDecl's environment name.
     pub fn environment(mut self, environment: &str) -> Self {
-        self.0.environment = Some(environment.to_string());
+        self.environment = Some(environment.into());
         self
     }
 
-    /// Sets the kinds of offers that may target the instances in the
-    /// collection.
     pub fn allowed_offers(mut self, allowed_offers: cm_types::AllowedOffers) -> Self {
-        self.0.allowed_offers = allowed_offers;
+        self.allowed_offers = allowed_offers;
         self
     }
 
-    // Sets the flag to allow the collection to have child names that exceed the default length
-    // limit.
-    pub fn allow_long_names(mut self, allow_long_names: bool) -> Self {
-        self.0.allow_long_names = allow_long_names;
+    pub fn allow_long_names(mut self) -> Self {
+        self.allow_long_names = true;
         self
     }
 
-    // Sets the flag to persist isolated storage data of the collection and its descendents.
     pub fn persistent_storage(mut self, persistent_storage: bool) -> Self {
-        self.0.persistent_storage = Some(persistent_storage);
+        self.persistent_storage = Some(persistent_storage);
         self
     }
 
-    /// Consumes the builder and returns a CollectionDecl.
     pub fn build(self) -> cm_rust::CollectionDecl {
-        self.0
+        cm_rust::CollectionDecl {
+            name: self.name.expect("name not set"),
+            durability: self.durability,
+            environment: self.environment,
+            allowed_offers: self.allowed_offers,
+            allow_long_names: self.allow_long_names,
+            persistent_storage: self.persistent_storage,
+        }
     }
 }
 
-impl From<CollectionDeclBuilder> for cm_rust::CollectionDecl {
-    fn from(builder: CollectionDeclBuilder) -> Self {
+impl From<CollectionBuilder> for cm_rust::CollectionDecl {
+    fn from(builder: CollectionBuilder) -> Self {
         builder.build()
     }
 }
 
 /// A convenience builder for constructing EnvironmentDecls.
-#[derive(Debug)]
-pub struct EnvironmentDeclBuilder(cm_rust::EnvironmentDecl);
+#[derive(Debug, Derivative)]
+#[derivative(Default)]
+pub struct EnvironmentBuilder {
+    name: Option<String>,
+    #[derivative(Default(value = "fdecl::EnvironmentExtends::Realm"))]
+    extends: fdecl::EnvironmentExtends,
+    runners: Vec<cm_rust::RunnerRegistration>,
+    resolvers: Vec<cm_rust::ResolverRegistration>,
+    debug_capabilities: Vec<cm_rust::DebugRegistration>,
+    stop_timeout_ms: Option<u32>,
+}
 
-impl EnvironmentDeclBuilder {
-    /// Creates a new builder.
+impl EnvironmentBuilder {
     pub fn new() -> Self {
-        EnvironmentDeclBuilder(cm_rust::EnvironmentDecl {
-            name: String::new(),
-            extends: fdecl::EnvironmentExtends::None,
-            runners: vec![],
-            resolvers: vec![],
-            debug_capabilities: vec![],
-            stop_timeout_ms: None,
-        })
+        Self::default()
     }
 
-    /// Sets the EnvironmentDecl's name.
     pub fn name(mut self, name: &str) -> Self {
-        self.0.name = name.to_string();
+        self.name = Some(name.into());
         self
     }
 
-    /// Sets whether the environment extends from its realm.
     pub fn extends(mut self, extends: fdecl::EnvironmentExtends) -> Self {
-        self.0.extends = extends;
+        self.extends = extends;
         self
     }
 
-    /// Registers a runner with the environment.
-    pub fn add_runner(mut self, runner: cm_rust::RunnerRegistration) -> Self {
-        self.0.runners.push(runner);
+    pub fn runner(mut self, runner: cm_rust::RunnerRegistration) -> Self {
+        self.runners.push(runner);
         self
     }
 
-    /// Registers a resolver with the environment.
-    pub fn add_resolver(mut self, resolver: cm_rust::ResolverRegistration) -> Self {
-        self.0.resolvers.push(resolver);
+    pub fn resolver(mut self, resolver: cm_rust::ResolverRegistration) -> Self {
+        self.resolvers.push(resolver);
         self
     }
 
-    /// Registers a debug capability with the environment.
-    pub fn add_debug_registration(mut self, debug: cm_rust::DebugRegistration) -> Self {
-        self.0.debug_capabilities.push(debug);
+    pub fn debug(mut self, debug: cm_rust::DebugRegistration) -> Self {
+        self.debug_capabilities.push(debug);
         self
     }
 
     pub fn stop_timeout(mut self, timeout_ms: u32) -> Self {
-        self.0.stop_timeout_ms = Some(timeout_ms);
+        self.stop_timeout_ms = Some(timeout_ms);
         self
     }
 
-    /// Consumes the builder and returns an EnvironmentDecl.
     pub fn build(self) -> cm_rust::EnvironmentDecl {
-        self.0
+        cm_rust::EnvironmentDecl {
+            name: self.name.expect("name not set"),
+            extends: self.extends,
+            runners: self.runners,
+            resolvers: self.resolvers,
+            debug_capabilities: self.debug_capabilities,
+            stop_timeout_ms: self.stop_timeout_ms,
+        }
     }
 }
 
-impl From<EnvironmentDeclBuilder> for cm_rust::EnvironmentDecl {
-    fn from(builder: EnvironmentDeclBuilder) -> Self {
+impl From<EnvironmentBuilder> for cm_rust::EnvironmentDecl {
+    fn from(builder: EnvironmentBuilder) -> Self {
         builder.build()
     }
 }
@@ -502,11 +482,13 @@ impl From<ServiceBuilder> for cm_rust::CapabilityDecl {
 }
 
 // A convenience builder for constructing DirectoryDecls.
-#[derive(Debug, Default)]
+#[derive(Debug, Derivative)]
+#[derivative(Default)]
 pub struct DirectoryBuilder {
     name: Option<Name>,
     path: Option<Path>,
-    rights: Option<fio::Operations>,
+    #[derivative(Default(value = "fio::R_STAR_DIR"))]
+    rights: fio::Operations,
 }
 
 impl DirectoryBuilder {
@@ -525,7 +507,7 @@ impl DirectoryBuilder {
     }
 
     pub fn rights(mut self, rights: fio::Operations) -> Self {
-        self.rights = Some(rights);
+        self.rights = rights;
         self
     }
 
@@ -533,7 +515,7 @@ impl DirectoryBuilder {
         cm_rust::CapabilityDecl::Directory(cm_rust::DirectoryDecl {
             name: self.name.expect("name not set"),
             source_path: Some(self.path.expect("path not set")),
-            rights: self.rights.unwrap_or(fio::R_STAR_DIR),
+            rights: self.rights,
         })
     }
 }
@@ -545,13 +527,15 @@ impl From<DirectoryBuilder> for cm_rust::CapabilityDecl {
 }
 
 // A convenience builder for constructing StorageDecls.
-#[derive(Debug, Default)]
+#[derive(Debug, Derivative)]
+#[derivative(Default)]
 pub struct StorageBuilder {
     name: Option<Name>,
     backing_dir: Option<Name>,
     subdir: Option<PathBuf>,
     source: Option<cm_rust::StorageDirectorySource>,
-    storage_id: Option<fdecl::StorageId>,
+    #[derivative(Default(value = "fdecl::StorageId::StaticInstanceIdOrMoniker"))]
+    storage_id: fdecl::StorageId,
 }
 
 impl StorageBuilder {
@@ -580,7 +564,7 @@ impl StorageBuilder {
     }
 
     pub fn storage_id(mut self, storage_id: fdecl::StorageId) -> Self {
-        self.storage_id = Some(storage_id);
+        self.storage_id = storage_id;
         self
     }
 
@@ -590,7 +574,7 @@ impl StorageBuilder {
             backing_dir: self.backing_dir.expect("backing_dir not set"),
             source: self.source.expect("source not set"),
             subdir: self.subdir,
-            storage_id: self.storage_id.unwrap_or(fdecl::StorageId::StaticInstanceIdOrMoniker),
+            storage_id: self.storage_id,
         })
     }
 }

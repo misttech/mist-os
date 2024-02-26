@@ -146,8 +146,7 @@ pub mod tests {
             testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
         },
         async_trait::async_trait,
-        cm_rust_testing::ComponentDeclBuilder,
-        fidl_fuchsia_component_decl as fdecl,
+        cm_rust_testing::*,
         moniker::Moniker,
         std::sync::{Arc, Weak},
     };
@@ -157,14 +156,7 @@ pub mod tests {
         let components = vec![(
             "root",
             ComponentDeclBuilder::new()
-                .add_child(cm_rust::ChildDecl {
-                    name: "bad-scheme".to_string(),
-                    url: "bad-scheme://sdf".to_string(),
-                    startup: fdecl::StartupMode::Eager,
-                    environment: None,
-                    on_terminate: None,
-                    config_overrides: None,
-                })
+                .child(ChildBuilder::new().name("bad-scheme").url("bad-scheme://sdf").eager())
                 .build(),
         )];
 
@@ -184,14 +176,7 @@ pub mod tests {
         let components = vec![(
             "root",
             ComponentDeclBuilder::new()
-                .add_child(cm_rust::ChildDecl {
-                    name: "bad-scheme".to_string(),
-                    url: "bad-scheme://sdf".to_string(),
-                    startup: fdecl::StartupMode::Eager,
-                    environment: None,
-                    on_terminate: None,
-                    config_overrides: None,
-                })
+                .child(ChildBuilder::new().name("bad-scheme").url("bad-scheme://sdf").eager())
                 .build(),
         )];
 
@@ -241,14 +226,7 @@ pub mod tests {
         let components = vec![(
             "root",
             ComponentDeclBuilder::new()
-                .add_child(cm_rust::ChildDecl {
-                    name: "bad-scheme".to_string(),
-                    url: "bad-scheme://sdf".to_string(),
-                    startup: fdecl::StartupMode::Eager,
-                    environment: None,
-                    on_terminate: None,
-                    config_overrides: None,
-                })
+                .child(ChildBuilder::new().name("bad-scheme").url("bad-scheme://sdf").eager())
                 .build(),
         )];
 

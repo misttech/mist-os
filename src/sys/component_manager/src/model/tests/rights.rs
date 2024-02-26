@@ -118,7 +118,7 @@ async fn framework_directory_rights() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("b")
+                .child_default("b")
                 .build(),
         ),
         (
@@ -163,7 +163,7 @@ async fn framework_directory_incompatible_rights() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("b")
+                .child_default("b")
                 .build(),
         ),
         (

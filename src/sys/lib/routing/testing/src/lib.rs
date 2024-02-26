@@ -31,9 +31,8 @@ use {
     cm_rust_testing::*,
     cm_types::Name,
     fidl::endpoints::ProtocolMarker,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-    fuchsia_zircon_status as zx,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
+    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx,
     moniker::{ExtendedMoniker, Moniker, MonikerBase},
     routing::{
         capability_source::{
@@ -403,7 +402,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .protocol_default("file")
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
@@ -435,7 +434,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -520,13 +519,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -625,7 +624,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -649,13 +648,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
-                    .add_lazy_child("c")
+                    .child_default("c")
                     .build(),
             ),
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -708,7 +707,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
@@ -730,7 +729,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -756,7 +755,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("c")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -824,7 +823,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -839,7 +838,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("c")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -886,7 +885,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// c: uses /data/foobar as /data/hippo
     pub async fn test_use_from_sibling_no_root(&self) {
         let components = vec![
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").build()),
             (
                 "b",
                 ComponentDeclBuilder::new()
@@ -910,8 +909,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("c")
-                    .add_lazy_child("d")
+                    .child_default("c")
+                    .child_default("d")
                     .build(),
             ),
             (
@@ -940,7 +939,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -1013,14 +1012,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -1119,8 +1118,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -1144,7 +1143,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
-                    .add_lazy_child("d")
+                    .child_default("d")
                     .build(),
             ),
             (
@@ -1173,7 +1172,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -1252,8 +1251,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -1289,8 +1288,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         subdir: None,
                         availability: cm_rust::Availability::Required,
                     }))
-                    .add_lazy_child("d")
-                    .add_lazy_child("e")
+                    .child_default("d")
+                    .child_default("e")
                     .build(),
             ),
             (
@@ -1316,14 +1315,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("f")
-                    .add_lazy_child("g")
+                    .child_default("f")
+                    .child_default("g")
                     .build(),
             ),
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -1393,7 +1392,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
-                    .add_lazy_child("h")
+                    .child_default("h")
                     .build(),
             ),
             (
@@ -1533,7 +1532,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -1597,7 +1596,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// b: uses service /svc/hippo as /svc/hippo, but it's not in its realm
     pub async fn test_use_not_offered(&self) {
         let components = vec![
-            ("a", ComponentDeclBuilder::new_empty_component().add_lazy_child("b").build()),
+            ("a", ComponentDeclBuilder::new_empty_component().child_default("b").build()),
             (
                 "b",
                 ComponentDeclBuilder::new()
@@ -1673,8 +1672,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             ("b", component_decl_with_test_runner()),
@@ -1732,7 +1731,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// c: uses service /svc/hippo as /svc/hippo
     pub async fn test_use_offer_source_not_offered(&self) {
         let components = vec![
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").build()),
             (
                 "b",
                 ComponentDeclBuilder::new_empty_component()
@@ -1756,7 +1755,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("c")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -1811,7 +1810,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// c: exposes /svc/hippo
     pub async fn test_use_from_expose(&self) {
         let components = vec![
-            ("a", ComponentDeclBuilder::new_empty_component().add_lazy_child("b").build()),
+            ("a", ComponentDeclBuilder::new_empty_component().child_default("b").build()),
             (
                 "b",
                 ComponentDeclBuilder::new()
@@ -1833,15 +1832,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("c")
+                    .child_default("c")
                     .build(),
             ),
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .capability(
-                        DirectoryBuilder::new().name("hippo_data").path("/data/foo").build(),
-                    )
+                    .capability(DirectoryBuilder::new().name("hippo_data").path("/data/foo"))
                     .protocol_default("hippo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "hippo_data".parse().unwrap(),
@@ -1907,7 +1904,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .expose(ExposeDecl::Protocol(expose_decl.clone()))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -1975,14 +1972,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -2059,7 +2056,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new_empty_component()
-                    .capability(DirectoryBuilder::new().name("hippo_data").path("/data").build())
+                    .capability(DirectoryBuilder::new().name("hippo_data").path("/data"))
                     .protocol_default("hippo")
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source_name: "hippo_data".parse().unwrap(),
@@ -2081,7 +2078,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -2167,9 +2164,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         renamed_instances: None,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
-                    .add_lazy_child("d")
+                    .child_default("b")
+                    .child_default("c")
+                    .child_default("d")
                     .build(),
             ),
             (
@@ -2278,7 +2275,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         availability: Availability::Required,
                     }))
                     .capability(expected_service_decl.clone())
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -2315,8 +2312,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         availability: Availability::Required,
                     }))
                     .capability(expected_service_decl.clone())
-                    .add_lazy_child("c")
-                    .add_lazy_child("d")
+                    .child_default("c")
+                    .child_default("d")
                     .build(),
             ),
             (
@@ -2428,9 +2425,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         renamed_instances: None,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
-                    .add_lazy_child("d")
+                    .child_default("b")
+                    .child_default("c")
+                    .child_default("d")
                     .build(),
             ),
             (
@@ -2511,7 +2508,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
@@ -2524,7 +2521,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -2541,7 +2538,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("c")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -2601,14 +2598,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -2679,7 +2676,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         subdir: Some(PathBuf::from("s3")),
                         availability: cm_rust::Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -2695,13 +2692,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         subdir: Some(PathBuf::from("s1/s2")),
                         availability: cm_rust::Availability::Required,
                     }))
-                    .add_lazy_child("c")
+                    .child_default("c")
                     .build(),
             ),
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -2734,7 +2731,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
     pub async fn test_expose_from_self_and_child(&self) {
         let components = vec![
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").build()),
             (
                 "b",
                 ComponentDeclBuilder::new()
@@ -2756,13 +2753,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
-                    .add_lazy_child("c")
+                    .child_default("c")
                     .build(),
             ),
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -2828,12 +2825,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
     pub async fn test_use_not_exposed(&self) {
         let components = vec![
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
-            ("b", ComponentDeclBuilder::new().add_lazy_child("c").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").build()),
+            ("b", ComponentDeclBuilder::new().child_default("c").build()),
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -2956,7 +2953,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -3003,7 +3000,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         /// to b, which then offers that to f.
         pub async fn test_expose_event_stream_with_scope(&self) {
             let components = vec![
-                ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
+                ("a", ComponentDeclBuilder::new().child_default("b").build()),
                 (
                     "b",
                     ComponentDeclBuilder::new()
@@ -3022,8 +3019,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             target_name: "started".parse().unwrap(),
                             availability: Availability::Required,
                         }))
-                        .add_lazy_child("c")
-                        .add_lazy_child("f")
+                        .child_default("c")
+                        .child_default("f")
                         .build(),
                 ),
                 (
@@ -3040,8 +3037,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                             target: ExposeTarget::Parent,
                             target_name: "started".parse().unwrap(),
                         }))
-                        .add_lazy_child("d")
-                        .add_lazy_child("e")
+                        .child_default("d")
+                        .child_default("e")
                         .build(),
                 ),
                 ("d", ComponentDeclBuilder::new().build()),
@@ -3096,7 +3093,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// A offers started to d with scope c.
     pub async fn test_event_stream_aliasing(&self) {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
             (
                 "a",
                 ComponentDeclBuilder::new()
@@ -3133,9 +3130,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target_name: "started".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
-                    .add_lazy_child("d")
+                    .child_default("b")
+                    .child_default("c")
+                    .child_default("d")
                     .build(),
             ),
             (
@@ -3304,8 +3301,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target_name: "started".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -3343,8 +3340,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target_name: "started".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("d")
-                    .add_lazy_child("e")
+                    .child_default("d")
+                    .child_default("e")
                     .build(),
             ),
             (
@@ -3437,7 +3434,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         scope: None,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -3495,7 +3492,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -3546,7 +3543,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -3558,7 +3555,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -3620,7 +3617,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -3643,7 +3640,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target_path: "/svc/hippo".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("c")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -3721,7 +3718,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -3745,8 +3742,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("c")
-                    .add_lazy_child("d")
+                    .child_default("c")
+                    .child_default("d")
                     .build(),
             ),
             (
@@ -3890,7 +3887,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         availability: Availability::Required,
                     }))
                     .service_default("foo")
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
@@ -3948,7 +3945,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .use_(use_decl.clone().into())
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -4029,8 +4026,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: OfferTarget::static_child("b".to_string()),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
@@ -4117,8 +4114,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: OfferTarget::static_child("b".to_string()),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
@@ -4228,8 +4225,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target: OfferTarget::static_child("b".to_string()),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
@@ -4315,18 +4312,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new_lazy_child("b").environment("env").build())
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_runner(RunnerRegistration {
-                                source_name: "elf".parse().unwrap(),
-                                source: RegistrationSource::Self_,
-                                target_name: "hobbit".parse().unwrap(),
-                            })
-                            .build(),
-                    )
+                    .child(ChildBuilder::new().name("b").environment("env"))
+                    .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                        source_name: "elf".parse().unwrap(),
+                        source: RegistrationSource::Self_,
+                        target_name: "hobbit".parse().unwrap(),
+                    }))
                     .runner_default("elf")
                     .build(),
             ),
@@ -4387,7 +4378,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .offer(OfferDecl::Runner(OfferRunnerDecl {
                         source: OfferSource::Self_,
                         source_name: "elf".parse().unwrap(),
@@ -4401,18 +4392,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new_lazy_child("c").environment("env").build())
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_runner(RunnerRegistration {
-                                source_name: "dwarf".parse().unwrap(),
-                                source: RegistrationSource::Parent,
-                                target_name: "hobbit".parse().unwrap(),
-                            })
-                            .build(),
-                    )
+                    .child(ChildBuilder::new().name("c").environment("env"))
+                    .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                        source_name: "dwarf".parse().unwrap(),
+                        source: RegistrationSource::Parent,
+                        target_name: "hobbit".parse().unwrap(),
+                    }))
                     .build(),
             ),
             ("c", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
@@ -4469,19 +4454,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_lazy_child("b")
-                    .add_child(ChildDeclBuilder::new_lazy_child("c").environment("env").build())
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_runner(RunnerRegistration {
-                                source_name: "dwarf".parse().unwrap(),
-                                source: RegistrationSource::Child("b".parse().unwrap()),
-                                target_name: "hobbit".parse().unwrap(),
-                            })
-                            .build(),
-                    )
+                    .child_default("b")
+                    .child(ChildBuilder::new().name("c").environment("env"))
+                    .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                        source_name: "dwarf".parse().unwrap(),
+                        source: RegistrationSource::Child("b".parse().unwrap()),
+                        target_name: "hobbit".parse().unwrap(),
+                    }))
                     .build(),
             ),
             (
@@ -4555,31 +4534,20 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new_lazy_child("b").environment("env").build())
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_runner(RunnerRegistration {
-                                source_name: "elf".parse().unwrap(),
-                                source: RegistrationSource::Self_,
-                                target_name: "hobbit".parse().unwrap(),
-                            })
-                            .build(),
-                    )
+                    .child(ChildBuilder::new().name("b").environment("env"))
+                    .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                        source_name: "elf".parse().unwrap(),
+                        source: RegistrationSource::Self_,
+                        target_name: "hobbit".parse().unwrap(),
+                    }))
                     .runner_default("elf")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new_lazy_child("c").environment("env").build())
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .build(),
-                    )
+                    .child(ChildBuilder::new().name("c").environment("env"))
+                    .environment(EnvironmentBuilder::new().name("env"))
                     .build(),
             ),
             ("c", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
@@ -4636,18 +4604,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new_lazy_child("b").environment("env").build())
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_runner(RunnerRegistration {
-                                source_name: "elf".parse().unwrap(),
-                                source: RegistrationSource::Self_,
-                                target_name: "dwarf".parse().unwrap(),
-                            })
-                            .build(),
-                    )
+                    .child(ChildBuilder::new().name("b").environment("env"))
+                    .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                        source_name: "elf".parse().unwrap(),
+                        source: RegistrationSource::Self_,
+                        target_name: "dwarf".parse().unwrap(),
+                    }))
                     .runner_default("elf")
                     .build(),
             ),
@@ -4693,18 +4655,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new_lazy_child("b").environment("env").build())
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_runner(RunnerRegistration {
-                                source_name: "elf".parse().unwrap(),
-                                source: RegistrationSource::Parent,
-                                target_name: "hobbit".parse().unwrap(),
-                            })
-                            .build(),
-                    )
+                    .child(ChildBuilder::new().name("b").environment("env"))
+                    .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                        source_name: "elf".parse().unwrap(),
+                        source: RegistrationSource::Parent,
+                        target_name: "hobbit".parse().unwrap(),
+                    }))
                     .build(),
             ),
             ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
@@ -4807,18 +4763,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new_lazy_child("b").environment("env").build())
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_runner(RunnerRegistration {
-                                source_name: "elf".parse().unwrap(),
-                                source: RegistrationSource::Parent,
-                                target_name: "hobbit".parse().unwrap(),
-                            })
-                            .build(),
-                    )
+                    .child(ChildBuilder::new().name("b").environment("env"))
+                    .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                        source_name: "elf".parse().unwrap(),
+                        source: RegistrationSource::Parent,
+                        target_name: "hobbit".parse().unwrap(),
+                    }))
                     .build(),
             ),
             ("b", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
@@ -4908,7 +4858,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "dwarf".parse().unwrap(),
                         source_dictionary: None,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -4984,7 +4934,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         target_name: "dwarf".parse().unwrap(),
                     }))
                     .runner_default("elf")
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -5050,18 +5000,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new_lazy_child("b").environment("env").build())
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_runner(RunnerRegistration {
-                                source_name: "elf".parse().unwrap(),
-                                source: RegistrationSource::Self_,
-                                target_name: "hobbit".parse().unwrap(),
-                            })
-                            .build(),
-                    )
+                    .child(ChildBuilder::new().name("b").environment("env"))
+                    .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                        source_name: "elf".parse().unwrap(),
+                        source: RegistrationSource::Self_,
+                        target_name: "hobbit".parse().unwrap(),
+                    }))
                     .runner_default("elf")
                     .build(),
             ),

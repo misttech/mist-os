@@ -117,7 +117,7 @@ mod tests {
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest, ComponentInfo},
         },
         async_trait::async_trait,
-        cm_rust_testing::ComponentDeclBuilder,
+        cm_rust_testing::*,
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
         moniker::{Moniker, MonikerBase},
@@ -135,9 +135,20 @@ mod tests {
     async fn test_system_controller() {
         // Configure and start component
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
-            ("b", ComponentDeclBuilder::new().add_eager_child("c").add_eager_child("d").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("d").eager().build())
+                    .build(),
+            ),
             ("c", component_decl_with_test_runner()),
             ("d", component_decl_with_test_runner()),
         ];
@@ -212,7 +223,12 @@ mod tests {
         let mut test_logic = Box::pin(async {
             // Configure and start component
             let components = vec![
-                ("root", ComponentDeclBuilder::new().add_eager_child("a").build()),
+                (
+                    "root",
+                    ComponentDeclBuilder::new()
+                        .child(ChildBuilder::new().name("a").eager().build())
+                        .build(),
+                ),
                 ("a", ComponentDeclBuilder::new().build()),
             ];
 

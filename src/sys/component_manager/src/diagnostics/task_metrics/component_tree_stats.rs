@@ -554,7 +554,7 @@ mod tests {
             diagnostics::task_metrics::testing::{FakeDiagnosticsContainer, FakeRuntime, FakeTask},
             model::testing::routing_test_helpers::RoutingTest,
         },
-        cm_rust_testing::ComponentDeclBuilder,
+        cm_rust_testing::*,
         diagnostics_assertions::{assert_data_tree, AnyProperty},
         diagnostics_hierarchy::DiagnosticsHierarchy,
         fuchsia_inspect::DiagnosticsHierarchyGetter,
@@ -1182,7 +1182,12 @@ mod tests {
         // Set up the test
         let test = RoutingTest::new(
             "root",
-            vec![("root", ComponentDeclBuilder::new().add_eager_child("a").build())],
+            vec![(
+                "root",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("a").eager().build())
+                    .build(),
+            )],
         )
         .await;
 

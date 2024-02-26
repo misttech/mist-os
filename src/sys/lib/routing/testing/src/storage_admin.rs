@@ -44,15 +44,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         DirectoryBuilder::new()
                             .name("tmpfs")
                             .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .capability(
                         StorageBuilder::new()
                             .name("data")
                             .backing_dir("tmpfs")
-                            .source(StorageDirectorySource::Self_)
-                            .build(),
+                            .source(StorageDirectorySource::Self_),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -70,8 +68,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -130,11 +128,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
@@ -147,7 +141,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -158,8 +152,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                             .name("storage")
                             .backing_dir("data")
                             .source(StorageDirectorySource::Parent)
-                            .subdir("bar")
-                            .build(),
+                            .subdir("bar"),
                     )
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Capability("storage".parse().unwrap()),
@@ -170,7 +163,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("c")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -228,8 +221,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -253,15 +246,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         DirectoryBuilder::new()
                             .name("tmpfs")
                             .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .capability(
                         StorageBuilder::new()
                             .name("data")
                             .backing_dir("tmpfs")
-                            .source(StorageDirectorySource::Self_)
-                            .build(),
+                            .source(StorageDirectorySource::Self_),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -278,7 +269,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
-                    .add_lazy_child("d")
+                    .child_default("d")
                     .build(),
             ),
             (
@@ -322,15 +313,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         DirectoryBuilder::new()
                             .name("tmpfs")
                             .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .capability(
                         StorageBuilder::new()
                             .name("data")
                             .backing_dir("tmpfs")
-                            .source(StorageDirectorySource::Self_)
-                            .build(),
+                            .source(StorageDirectorySource::Self_),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -348,7 +337,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -394,18 +383,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         DirectoryBuilder::new()
                             .name("tmpfs")
                             .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                            .rights(fio::RW_STAR_DIR),
                     )
-                    .capability(
-                        ProtocolBuilder::new().name("unrelated.protocol").path("/svc/foo").build(),
-                    )
+                    .capability(ProtocolBuilder::new().name("unrelated.protocol").path("/svc/foo"))
                     .capability(
                         StorageBuilder::new()
                             .name("data")
                             .backing_dir("tmpfs")
-                            .source(StorageDirectorySource::Self_)
-                            .build(),
+                            .source(StorageDirectorySource::Self_),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -423,7 +408,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -468,18 +453,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         DirectoryBuilder::new()
                             .name("tmpfs")
                             .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                            .rights(fio::RW_STAR_DIR),
                     )
-                    .capability(
-                        ProtocolBuilder::new().name("unrelated.protocol").path("/svc/foo").build(),
-                    )
+                    .capability(ProtocolBuilder::new().name("unrelated.protocol").path("/svc/foo"))
                     .capability(
                         StorageBuilder::new()
                             .name("data")
                             .backing_dir("tmpfs")
-                            .source(StorageDirectorySource::Self_)
-                            .build(),
+                            .source(StorageDirectorySource::Self_),
                     )
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Capability("unrelated.protocol".parse().unwrap()),
@@ -490,7 +471,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -549,8 +530,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -574,19 +555,15 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         DirectoryBuilder::new()
                             .name("tmpfs")
                             .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .capability(
                         StorageBuilder::new()
                             .name("data")
                             .backing_dir("tmpfs")
-                            .source(StorageDirectorySource::Self_)
-                            .build(),
+                            .source(StorageDirectorySource::Self_),
                     )
-                    .capability(
-                        ProtocolBuilder::new().name("unrelated.protocol").path("/svc/foo").build(),
-                    )
+                    .capability(ProtocolBuilder::new().name("unrelated.protocol").path("/svc/foo"))
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("d".to_string()),
@@ -602,7 +579,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
-                    .add_lazy_child("d")
+                    .child_default("d")
                     .build(),
             ),
             (
@@ -647,18 +624,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         DirectoryBuilder::new()
                             .name("tmpfs")
                             .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                            .rights(fio::RW_STAR_DIR),
                     )
-                    .capability(
-                        ProtocolBuilder::new().name("unrelated.protocol").path("/svc/foo").build(),
-                    )
+                    .capability(ProtocolBuilder::new().name("unrelated.protocol").path("/svc/foo"))
                     .capability(
                         StorageBuilder::new()
                             .name("data")
                             .backing_dir("tmpfs")
-                            .source(StorageDirectorySource::Self_)
-                            .build(),
+                            .source(StorageDirectorySource::Self_),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -676,7 +649,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -720,15 +693,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         DirectoryBuilder::new()
                             .name("tmpfs")
                             .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .capability(
                         StorageBuilder::new()
                             .name("data")
                             .backing_dir("tmpfs")
-                            .source(StorageDirectorySource::Self_)
-                            .build(),
+                            .source(StorageDirectorySource::Self_),
                     )
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Capability("data".parse().unwrap()),
@@ -739,7 +710,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -797,8 +768,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -822,15 +793,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         DirectoryBuilder::new()
                             .name("tmpfs")
                             .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .capability(
                         StorageBuilder::new()
                             .name("data")
                             .backing_dir("tmpfs")
-                            .source(StorageDirectorySource::Self_)
-                            .build(),
+                            .source(StorageDirectorySource::Self_),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -847,7 +816,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
-                    .add_lazy_child("d")
+                    .child_default("d")
                     .build(),
             ),
             (

@@ -35,7 +35,7 @@ async fn use_protocol_from_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("mid".into()))
+                .child_default("mid")
                 .build(),
         ),
         (
@@ -76,7 +76,7 @@ async fn use_protocol_from_dictionary() {
                     target_path: "/svc/C".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("leaf")
                 .build(),
         ),
         (
@@ -122,7 +122,7 @@ async fn use_directory_from_dictionary_not_supported() {
         (
             "root",
             ComponentDeclBuilder::new()
-                .capability(DirectoryBuilder::new().name("bar_data").path("/data/bar").build())
+                .capability(DirectoryBuilder::new().name("bar_data").path("/data/bar"))
                 .dictionary_default("parent_dict")
                 .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
                     source: OfferSource::Self_,
@@ -144,13 +144,13 @@ async fn use_directory_from_dictionary_not_supported() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("leaf")
                 .build(),
         ),
         (
             "leaf",
             ComponentDeclBuilder::new()
-                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                 .dictionary_default("self_dict")
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source: OfferSource::Self_,
@@ -235,13 +235,13 @@ async fn expose_directory_from_dictionary_not_supported() {
                     subdir: None,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("mid".into()))
+                .child_default("mid")
                 .build(),
         ),
         (
             "mid",
             ComponentDeclBuilder::new()
-                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                 .dictionary_default("self_dict")
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source: OfferSource::Self_,
@@ -274,13 +274,13 @@ async fn expose_directory_from_dictionary_not_supported() {
                     target: ExposeTarget::Parent,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("leaf")
                 .build(),
         ),
         (
             "leaf",
             ComponentDeclBuilder::new()
-                .capability(DirectoryBuilder::new().name("bar_data").path("/data/bar").build())
+                .capability(DirectoryBuilder::new().name("bar_data").path("/data/bar"))
                 .dictionary_default("child_dict")
                 .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
                     source: ExposeSource::Self_,
@@ -364,7 +364,7 @@ async fn use_protocol_from_nested_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("mid".into()))
+                .child_default("mid")
                 .build(),
         ),
         (
@@ -415,7 +415,7 @@ async fn use_protocol_from_nested_dictionary() {
                     target_path: "/svc/C".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("leaf")
                 .build(),
         ),
         (
@@ -491,7 +491,7 @@ async fn offer_protocol_from_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("mid".into()))
+                .child_default("mid")
                 .build(),
         ),
         (
@@ -535,8 +535,8 @@ async fn offer_protocol_from_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("provider".into()))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("provider")
+                .child_default("leaf")
                 .build(),
         ),
         (
@@ -642,7 +642,7 @@ async fn offer_protocol_from_nested_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("mid".into()))
+                .child_default("mid")
                 .build(),
         ),
         (
@@ -696,8 +696,8 @@ async fn offer_protocol_from_nested_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("provider".into()))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("provider")
+                .child_default("leaf")
                 .build(),
         ),
         (
@@ -798,7 +798,7 @@ async fn expose_protocol_from_dictionary() {
                     target_path: "/svc/B".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("mid".into()))
+                .child_default("mid")
                 .build(),
         ),
         (
@@ -831,7 +831,7 @@ async fn expose_protocol_from_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("leaf")
                 .build(),
         ),
         (
@@ -894,7 +894,7 @@ async fn expose_protocol_from_nested_dictionary() {
                     target_path: "/svc/B".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("mid".into()))
+                .child_default("mid")
                 .build(),
         ),
         (
@@ -937,7 +937,7 @@ async fn expose_protocol_from_nested_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("leaf")
                 .build(),
         ),
         (
@@ -1020,7 +1020,7 @@ async fn dictionary_in_exposed_dir() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("leaf")
                 .build(),
         ),
         (
@@ -1097,7 +1097,7 @@ async fn offer_dictionary_to_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("mid".into()))
+                .child_default("mid")
                 .build(),
         ),
         (
@@ -1166,7 +1166,7 @@ async fn offer_dictionary_to_dictionary() {
                     target_path: "/svc/C".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("leaf")
                 .build(),
         ),
         (
@@ -1222,7 +1222,7 @@ async fn extend_from_self() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("leaf")
                 .build(),
         ),
         (
@@ -1317,7 +1317,7 @@ async fn extend_from_parent() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("leaf")
                 .build(),
         ),
         (
@@ -1420,7 +1420,7 @@ async fn extend_from_child() {
                     target_path: "/svc/B".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("leaf")
                 .build(),
         ),
         (
@@ -1514,7 +1514,7 @@ async fn use_from_dictionary_availability_attenuated() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("leaf")
                 .build(),
         ),
         (
@@ -1633,7 +1633,7 @@ async fn use_from_dictionary_availability_invalid() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("leaf")
                 .build(),
         ),
         (
@@ -1755,7 +1755,7 @@ async fn offer_from_dictionary_availability_attenuated() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("leaf")
                 .build(),
         ),
         (
@@ -1874,7 +1874,7 @@ async fn offer_from_dictionary_availability_invalid() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("mid".into()))
+                .child_default("mid")
                 .build(),
         ),
         (
@@ -1907,7 +1907,7 @@ async fn offer_from_dictionary_availability_invalid() {
                     target: OfferTarget::static_child("leaf".into()),
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("leaf")
                 .build(),
         ),
         (
@@ -1996,7 +1996,7 @@ async fn expose_from_dictionary_availability_attenuated() {
                     target_path: "/svc/B".parse().unwrap(),
                     availability: Availability::Optional,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("leaf")
                 .build(),
         ),
         (
@@ -2100,7 +2100,7 @@ async fn expose_from_dictionary_availability_invalid() {
                     target_path: "/svc/C".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("mid".into()))
+                .child_default("mid")
                 .build(),
         ),
         (
@@ -2130,7 +2130,7 @@ async fn expose_from_dictionary_availability_invalid() {
                     target: ExposeTarget::Parent,
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .child_default("leaf")
                 .build(),
         ),
         (

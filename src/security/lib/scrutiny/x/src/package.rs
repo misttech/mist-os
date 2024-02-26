@@ -415,7 +415,7 @@ pub(crate) mod test {
     /// Returns the component declaration for the placeholder component.
     pub(crate) fn placeholder_component() -> cm::ComponentDecl {
         cmt::ComponentDeclBuilder::new()
-            .add_child(cmt::ChildDeclBuilder::new().url(PLACEHOLDER_CHILD_URL).build())
+            .child(cmt::ChildBuilder::new().name("test_child").url(PLACEHOLDER_CHILD_URL).build())
             .use_(cm::UseDecl::Protocol(cm::UseProtocolDecl {
                 dependency_type: cm::DependencyType::Strong,
                 source: cm::UseSource::Parent,

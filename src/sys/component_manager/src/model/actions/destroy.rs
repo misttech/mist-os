@@ -156,7 +156,7 @@ pub mod tests {
         },
         assert_matches::assert_matches,
         cm_rust::{Availability, UseEventStreamDecl, UseSource},
-        cm_rust_testing::ComponentDeclBuilder,
+        cm_rust_testing::*,
         fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::{channel::mpsc, StreamExt},
         moniker::{ChildName, Moniker, MonikerBase},
@@ -166,7 +166,7 @@ pub mod tests {
     #[fuchsia::test]
     async fn destroy_one_component() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
             ("a", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
@@ -219,8 +219,8 @@ pub mod tests {
     #[fuchsia::test]
     async fn destroy_collection() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("container").build()),
-            ("container", ComponentDeclBuilder::new().add_transient_collection("coll").build()),
+            ("root", ComponentDeclBuilder::new().child_default("container").build()),
+            ("container", ComponentDeclBuilder::new().collection_default("coll").build()),
             ("a", component_decl_with_test_runner()),
             ("b", component_decl_with_test_runner()),
         ];
@@ -267,8 +267,8 @@ pub mod tests {
     #[fuchsia::test]
     async fn destroy_already_shut_down() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").build()),
             ("b", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
@@ -370,7 +370,7 @@ pub mod tests {
         mock_action_result: Result<(), ActionError>,
     ) {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
             ("a", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
@@ -465,7 +465,7 @@ pub mod tests {
     #[fuchsia::test]
     async fn destroy_marks_destroyed_after_blocking_tasks() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
             ("a", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
@@ -606,9 +606,9 @@ pub mod tests {
     #[fuchsia::test]
     async fn destroy_not_resolved() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
-            ("b", ComponentDeclBuilder::new().add_lazy_child("c").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").build()),
+            ("b", ComponentDeclBuilder::new().child_default("c").build()),
             ("c", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
@@ -668,9 +668,20 @@ pub mod tests {
     #[fuchsia::test]
     async fn destroy_hierarchy() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").add_lazy_child("x").build()),
-            ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
-            ("b", ComponentDeclBuilder::new().add_eager_child("c").add_eager_child("d").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").child_default("x").build()),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("d").eager().build())
+                    .build(),
+            ),
             ("c", component_decl_with_test_runner()),
             ("d", component_decl_with_test_runner()),
             ("x", component_decl_with_test_runner()),
@@ -788,9 +799,9 @@ pub mod tests {
     #[fuchsia::test]
     async fn destroy_self_referential() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
-            ("b", ComponentDeclBuilder::new().add_lazy_child("b").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").build()),
+            ("b", ComponentDeclBuilder::new().child_default("b").build()),
         ];
         let test = ActionsTest::new("root", components, None).await;
         let component_root = test.model.root();
@@ -875,9 +886,20 @@ pub mod tests {
     #[fuchsia::test]
     async fn destroy_error() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
-            ("b", ComponentDeclBuilder::new().add_eager_child("c").add_eager_child("d").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("d").eager().build())
+                    .build(),
+            ),
             ("c", component_decl_with_test_runner()),
             ("d", component_decl_with_test_runner()),
         ];
@@ -997,7 +1019,7 @@ pub mod tests {
         // be idempotent, works correctly if a new instance of the child under the same name is
         // created between them.
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_transient_collection("coll").build()),
+            ("root", ComponentDeclBuilder::new().collection_default("coll").build()),
             ("a", component_decl_with_test_runner()),
             ("b", component_decl_with_test_runner()),
         ];

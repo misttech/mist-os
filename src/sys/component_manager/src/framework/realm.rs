@@ -433,13 +433,11 @@ mod tests {
         // Set up model and realm service.
         let test = RealmCapabilityTest::new(
             vec![
-                ("root", ComponentDeclBuilder::new().add_lazy_child("system").build()),
+                ("root", ComponentDeclBuilder::new().child_default("system").build()),
                 (
                     "system",
                     ComponentDeclBuilder::new()
-                        .add_collection(
-                            CollectionDeclBuilder::new().name("coll").allow_long_names(true),
-                        )
+                        .collection(CollectionBuilder::new().name("coll").allow_long_names())
                         .build(),
                 ),
                 // Eagerly launched so it needs a definition
@@ -533,23 +531,21 @@ mod tests {
     async fn create_dynamic_child_errors() {
         let mut test = RealmCapabilityTest::new(
             vec![
-                ("root", ComponentDeclBuilder::new().add_lazy_child("system").build()),
+                ("root", ComponentDeclBuilder::new().child_default("system").build()),
                 (
                     "system",
                     ComponentDeclBuilder::new()
-                        .add_transient_collection("coll")
-                        .add_collection(
-                            CollectionDeclBuilder::new()
+                        .collection_default("coll")
+                        .collection(
+                            CollectionBuilder::new()
                                 .name("pcoll")
                                 .durability(fdecl::Durability::Transient)
-                                .allow_long_names(true)
-                                .build(),
+                                .allow_long_names(),
                         )
-                        .add_collection(
-                            CollectionDeclBuilder::new()
+                        .collection(
+                            CollectionBuilder::new()
                                 .name("dynoff")
-                                .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic)
-                                .build(),
+                                .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                         )
                         .build(),
                 ),
@@ -899,8 +895,8 @@ mod tests {
         // Set up model and realm service.
         let test = RealmCapabilityTest::new(
             vec![
-                ("root", ComponentDeclBuilder::new().add_lazy_child("system").build()),
-                ("system", ComponentDeclBuilder::new().add_transient_collection("coll").build()),
+                ("root", ComponentDeclBuilder::new().child_default("system").build()),
+                ("system", ComponentDeclBuilder::new().collection_default("coll").build()),
                 ("a", component_decl_with_exposed_binder()),
                 ("b", component_decl_with_exposed_binder()),
             ],
@@ -1005,8 +1001,8 @@ mod tests {
     async fn destroy_dynamic_child_errors() {
         let mut test = RealmCapabilityTest::new(
             vec![
-                ("root", ComponentDeclBuilder::new().add_lazy_child("system").build()),
-                ("system", ComponentDeclBuilder::new().add_transient_collection("coll").build()),
+                ("root", ComponentDeclBuilder::new().child_default("system").build()),
+                ("system", ComponentDeclBuilder::new().collection_default("coll").build()),
             ],
             vec!["system"].try_into().unwrap(),
         )
@@ -1065,8 +1061,17 @@ mod tests {
         // Set up model and realm service.
         let test = RealmCapabilityTest::new(
             vec![
-                ("root", ComponentDeclBuilder::new().add_lazy_child("system").build()),
-                ("system", ComponentDeclBuilder::new().add_single_run_collection("coll").build()),
+                ("root", ComponentDeclBuilder::new().child_default("system").build()),
+                (
+                    "system",
+                    ComponentDeclBuilder::new()
+                        .collection(
+                            CollectionBuilder::new()
+                                .name("coll")
+                                .durability(fdecl::Durability::SingleRun),
+                        )
+                        .build(),
+                ),
                 ("a", component_decl_with_test_runner()),
             ],
             vec!["system"].try_into().unwrap(),
@@ -1116,7 +1121,7 @@ mod tests {
     async fn list_children_errors() {
         // Create a root component with a collection.
         let mut test = RealmCapabilityTest::new(
-            vec![("root", ComponentDeclBuilder::new().add_transient_collection("coll").build())],
+            vec![("root", ComponentDeclBuilder::new().collection_default("coll").build())],
             Moniker::root(),
         )
         .await;
@@ -1153,7 +1158,7 @@ mod tests {
     async fn open_exposed_dir() {
         let test = RealmCapabilityTest::new(
             vec![
-                ("root", ComponentDeclBuilder::new().add_lazy_child("system").build()),
+                ("root", ComponentDeclBuilder::new().child_default("system").build()),
                 (
                     "system",
                     ComponentDeclBuilder::new()
@@ -1219,7 +1224,7 @@ mod tests {
     async fn open_exposed_dir_dynamic_child() {
         let test = RealmCapabilityTest::new(
             vec![
-                ("root", ComponentDeclBuilder::new().add_transient_collection("coll").build()),
+                ("root", ComponentDeclBuilder::new().collection_default("coll").build()),
                 (
                     "system",
                     ComponentDeclBuilder::new()
@@ -1304,9 +1309,9 @@ mod tests {
                 (
                     "root",
                     ComponentDeclBuilder::new()
-                        .add_lazy_child("system")
-                        .add_lazy_child("unresolvable")
-                        .add_lazy_child("unrunnable")
+                        .child_default("system")
+                        .child_default("unresolvable")
+                        .child_default("unrunnable")
                         .build(),
                 ),
                 ("system", component_decl_with_test_runner()),

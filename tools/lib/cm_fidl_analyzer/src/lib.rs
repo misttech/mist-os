@@ -372,9 +372,9 @@ mod tests {
     #[fuchsia::test]
     fn breadth_first_walker() -> Result<(), anyhow::Error> {
         let components = vec![
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").add_lazy_child("c").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").child_default("c").build()),
             ("b", ComponentDeclBuilder::new().build()),
-            ("c", ComponentDeclBuilder::new().add_lazy_child("d").build()),
+            ("c", ComponentDeclBuilder::new().child_default("d").build()),
             ("d", ComponentDeclBuilder::new().build()),
         ];
         let a_url = make_test_url("a");

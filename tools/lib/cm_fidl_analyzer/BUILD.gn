@@ -34,7 +34,6 @@ rustc_library("cm_fidl_analyzer") {
     "//src/lib/zircon/rust:fuchsia-zircon-status",
   ]
   test_deps = [
-    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//src/lib/fuchsia",
     "//src/sys/lib/cm_rust/testing",
     "//src/sys/lib/cm_types",

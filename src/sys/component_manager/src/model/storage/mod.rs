@@ -557,16 +557,12 @@ mod tests {
     #[fuchsia::test]
     async fn open_isolated_storage_test() {
         let components = vec![
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").add_lazy_child("c").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").child_default("c").build()),
             (
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
@@ -651,16 +647,12 @@ mod tests {
     #[fuchsia::test]
     async fn open_isolated_storage_instance_id() {
         let components = vec![
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").add_lazy_child("c").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").child_default("c").build()),
             (
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
@@ -776,16 +768,12 @@ mod tests {
     #[fuchsia::test]
     async fn delete_isolated_storage_test() {
         let components = vec![
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").add_lazy_child("c").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").child_default("c").build()),
             (
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
@@ -915,16 +903,12 @@ mod tests {
     #[fuchsia::test]
     async fn delete_isolated_storage_instance_id_test() {
         let components = vec![
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").add_lazy_child("c").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").child_default("c").build()),
             (
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),

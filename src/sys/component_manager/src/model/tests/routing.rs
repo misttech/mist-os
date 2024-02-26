@@ -93,7 +93,7 @@ async fn capability_requested_event_at_parent() {
                     }),
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("b")
+                .child_default("b")
                 .build(),
         ),
         (
@@ -173,7 +173,7 @@ async fn use_in_collection() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                 .protocol_default("foo")
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source_name: "foo_data".parse().unwrap(),
@@ -195,7 +195,7 @@ async fn use_in_collection() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("b")
+                .child_default("b")
                 .build(),
         ),
         (
@@ -229,7 +229,7 @@ async fn use_in_collection() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_transient_collection("coll")
+                .collection_default("coll")
                 .build(),
         ),
         (
@@ -314,7 +314,7 @@ async fn use_in_collection_not_offered() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                 .protocol_default("foo")
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source_name: "foo_data".parse().unwrap(),
@@ -336,7 +336,7 @@ async fn use_in_collection_not_offered() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("b")
+                .child_default("b")
                 .build(),
         ),
         (
@@ -350,7 +350,7 @@ async fn use_in_collection_not_offered() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_transient_collection("coll")
+                .collection_default("coll")
                 .build(),
         ),
         (
@@ -431,7 +431,7 @@ async fn dynamic_offer_from_parent() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("b")
+                .child_default("b")
                 .build(),
         ),
         (
@@ -445,10 +445,10 @@ async fn dynamic_offer_from_parent() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("coll")
-                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic)
-                        .build(),
+                .collection(
+                    CollectionBuilder::new()
+                        .name("coll")
+                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                 )
                 .build(),
         ),
@@ -551,10 +551,10 @@ async fn dynamic_offer_siblings_same_collection() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("coll")
-                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic)
-                        .build(),
+                .collection(
+                    CollectionBuilder::new()
+                        .name("coll")
+                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                 )
                 .build(),
         ),
@@ -654,13 +654,11 @@ async fn dynamic_offer_siblings_cross_collection() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("source_coll").build(),
-                )
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("target_coll")
-                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic)
-                        .build(),
+                .collection_default("source_coll")
+                .collection(
+                    CollectionBuilder::new()
+                        .name("target_coll")
+                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                 )
                 .build(),
         ),
@@ -760,10 +758,10 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("coll")
-                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic)
-                        .build(),
+                .collection(
+                    CollectionBuilder::new()
+                        .name("coll")
+                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                 )
                 .build(),
         ),
@@ -887,17 +885,17 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("coll")
-                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic)
-                        .build(),
+                .collection(
+                    CollectionBuilder::new()
+                        .name("coll")
+                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                 )
                 .build(),
         ),
         (
             "b",
             ComponentDeclBuilder::new()
-                .capability(DirectoryBuilder::new().name("hippo_data").path("/data/foo").build())
+                .capability(DirectoryBuilder::new().name("hippo_data").path("/data/foo"))
                 .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                     source_name: "hippo_data".parse().unwrap(),
                     source: ExposeSource::Self_,
@@ -1018,12 +1016,12 @@ async fn dynamic_offer_to_static_offer() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("coll")
-                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic)
-                        .build(),
+                .collection(
+                    CollectionBuilder::new()
+                        .name("coll")
+                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                 )
-                .add_lazy_child("b")
+                .child_default("b")
                 .build(),
         ),
         (
@@ -1052,7 +1050,7 @@ async fn dynamic_offer_to_static_offer() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("d")
+                .child_default("d")
                 .build(),
         ),
         (
@@ -1066,7 +1064,7 @@ async fn dynamic_offer_to_static_offer() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("d")
+                .child_default("d")
                 .build(),
         ),
     ];
@@ -1127,7 +1125,7 @@ async fn create_child_with_dict() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll").build())
+                .collection_default("coll")
                 .build(),
         ),
         (
@@ -1201,7 +1199,7 @@ async fn create_child_with_dict() {
 #[fuchsia::test]
 async fn destroying_instance_kills_framework_service_task() {
     let components = vec![
-        ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
+        ("a", ComponentDeclBuilder::new().child_default("b").build()),
         (
             "b",
             ComponentDeclBuilder::new()
@@ -1259,8 +1257,8 @@ async fn destroying_instance_blocks_on_routing() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("b")
-                .add_lazy_child("c")
+                .child_default("b")
+                .child_default("c")
                 .build(),
         ),
         (
@@ -1290,7 +1288,7 @@ async fn destroying_instance_blocks_on_routing() {
             "c",
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
-                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source: ExposeSource::Self_,
                     source_name: "foo".parse().unwrap(),
@@ -1386,18 +1384,12 @@ async fn use_runner_from_parent_environment() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .add_child(ChildDeclBuilder::new_lazy_child("b").environment("env").build())
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
-                        .name("env")
-                        .extends(fdecl::EnvironmentExtends::Realm)
-                        .add_runner(RunnerRegistration {
-                            source_name: "elf".parse().unwrap(),
-                            source: RegistrationSource::Self_,
-                            target_name: "hobbit".parse().unwrap(),
-                        })
-                        .build(),
-                )
+                .child(ChildBuilder::new().name("b").environment("env"))
+                .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                    source_name: "elf".parse().unwrap(),
+                    source: RegistrationSource::Self_,
+                    target_name: "hobbit".parse().unwrap(),
+                }))
                 .runner_default("elf")
                 .build(),
         ),
@@ -1445,22 +1437,12 @@ async fn use_runner_from_environment_in_collection() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("coll")
-                        .environment("env")
-                        .build(),
-                )
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
-                        .name("env")
-                        .extends(fdecl::EnvironmentExtends::Realm)
-                        .add_runner(RunnerRegistration {
-                            source_name: "elf".parse().unwrap(),
-                            source: RegistrationSource::Self_,
-                            target_name: "hobbit".parse().unwrap(),
-                        })
-                        .build(),
-                )
+                .collection(CollectionBuilder::new().name("coll").environment("env"))
+                .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                    source_name: "elf".parse().unwrap(),
+                    source: RegistrationSource::Self_,
+                    target_name: "hobbit".parse().unwrap(),
+                }))
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
@@ -1533,7 +1515,7 @@ async fn use_runner_from_grandparent_environment() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .add_lazy_child("b")
+                .child_default("b")
                 .offer(OfferDecl::Runner(OfferRunnerDecl {
                     source: OfferSource::Self_,
                     source_name: "elf".parse().unwrap(),
@@ -1547,18 +1529,12 @@ async fn use_runner_from_grandparent_environment() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .add_child(ChildDeclBuilder::new_lazy_child("c").environment("env").build())
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
-                        .name("env")
-                        .extends(fdecl::EnvironmentExtends::Realm)
-                        .add_runner(RunnerRegistration {
-                            source_name: "dwarf".parse().unwrap(),
-                            source: RegistrationSource::Parent,
-                            target_name: "hobbit".parse().unwrap(),
-                        })
-                        .build(),
-                )
+                .child(ChildBuilder::new().name("c").environment("env"))
+                .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                    source_name: "dwarf".parse().unwrap(),
+                    source: RegistrationSource::Parent,
+                    target_name: "hobbit".parse().unwrap(),
+                }))
                 .build(),
         ),
         ("c", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
@@ -1605,19 +1581,13 @@ async fn use_runner_from_sibling_environment() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .add_lazy_child("b")
-                .add_child(ChildDeclBuilder::new_lazy_child("c").environment("env").build())
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
-                        .name("env")
-                        .extends(fdecl::EnvironmentExtends::Realm)
-                        .add_runner(RunnerRegistration {
-                            source_name: "dwarf".parse().unwrap(),
-                            source: RegistrationSource::Child("b".to_string()),
-                            target_name: "hobbit".parse().unwrap(),
-                        })
-                        .build(),
-                )
+                .child_default("b")
+                .child(ChildBuilder::new().name("c").environment("env"))
+                .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                    source_name: "dwarf".parse().unwrap(),
+                    source: RegistrationSource::Child("b".to_string()),
+                    target_name: "hobbit".parse().unwrap(),
+                }))
                 .build(),
         ),
         (
@@ -1680,31 +1650,20 @@ async fn use_runner_from_inherited_environment() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .add_child(ChildDeclBuilder::new_lazy_child("b").environment("env").build())
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
-                        .name("env")
-                        .extends(fdecl::EnvironmentExtends::Realm)
-                        .add_runner(RunnerRegistration {
-                            source_name: "elf".parse().unwrap(),
-                            source: RegistrationSource::Self_,
-                            target_name: "hobbit".parse().unwrap(),
-                        })
-                        .build(),
-                )
+                .child(ChildBuilder::new().name("b").environment("env"))
+                .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                    source_name: "elf".parse().unwrap(),
+                    source: RegistrationSource::Self_,
+                    target_name: "hobbit".parse().unwrap(),
+                }))
                 .runner_default("elf")
                 .build(),
         ),
         (
             "b",
             ComponentDeclBuilder::new()
-                .add_child(ChildDeclBuilder::new_lazy_child("c").environment("env").build())
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
-                        .name("env")
-                        .extends(fdecl::EnvironmentExtends::Realm)
-                        .build(),
-                )
+                .child(ChildBuilder::new().name("c").environment("env"))
+                .environment(EnvironmentBuilder::new().name("env"))
                 .build(),
         ),
         ("c", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
@@ -1752,18 +1711,12 @@ async fn use_runner_from_environment_failed() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .add_child(ChildDeclBuilder::new_lazy_child("b").environment("env").build())
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
-                        .name("env")
-                        .extends(fdecl::EnvironmentExtends::Realm)
-                        .add_runner(RunnerRegistration {
-                            source_name: "runner".parse().unwrap(),
-                            source: RegistrationSource::Self_,
-                            target_name: "runner".parse().unwrap(),
-                        })
-                        .build(),
-                )
+                .child(ChildBuilder::new().name("b").environment("env"))
+                .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                    source_name: "runner".parse().unwrap(),
+                    source: RegistrationSource::Self_,
+                    target_name: "runner".parse().unwrap(),
+                }))
                 .runner_default("runner")
                 // For Stopped event
                 .use_(UseDecl::EventStream(UseEventStreamDecl {
@@ -1843,18 +1796,12 @@ async fn use_runner_from_environment_not_found() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .add_child(ChildDeclBuilder::new_lazy_child("b").environment("env").build())
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
-                        .name("env")
-                        .extends(fdecl::EnvironmentExtends::Realm)
-                        .add_runner(RunnerRegistration {
-                            source_name: "elf".parse().unwrap(),
-                            source: RegistrationSource::Self_,
-                            target_name: "dwarf".parse().unwrap(),
-                        })
-                        .build(),
-                )
+                .child(ChildBuilder::new().name("b").environment("env"))
+                .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                    source_name: "elf".parse().unwrap(),
+                    source: RegistrationSource::Self_,
+                    target_name: "dwarf".parse().unwrap(),
+                }))
                 .runner_default("elf")
                 .build(),
         ),
@@ -1947,7 +1894,7 @@ async fn use_with_destroyed_parent() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_transient_collection("coll")
+                .collection_default("coll")
                 .build(),
         ),
         (
@@ -1962,7 +1909,7 @@ async fn use_with_destroyed_parent() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("c")
+                .child_default("c")
                 .build(),
         ),
         ("c", ComponentDeclBuilder::new().use_(use_decl.clone()).build()),
@@ -2036,14 +1983,14 @@ async fn use_from_destroyed_but_not_removed() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("b")
-                .add_lazy_child("c")
+                .child_default("b")
+                .child_default("c")
                 .build(),
         ),
         (
             "b",
             ComponentDeclBuilder::new()
-                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo").build())
+                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
                 .protocol_default("foo")
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source: ExposeSource::Self_,
@@ -2107,18 +2054,13 @@ async fn use_resolver_from_parent_environment() {
         (
             "a",
             ComponentDeclBuilder::new_empty_component()
-                .add_child(ChildDeclBuilder::new().name("b").url("base://b").environment("env"))
-                .add_child(ChildDeclBuilder::new_lazy_child("c"))
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
-                        .name("env")
-                        .extends(fdecl::EnvironmentExtends::Realm)
-                        .add_resolver(ResolverRegistration {
-                            resolver: "base".parse().unwrap(),
-                            source: RegistrationSource::Child("c".to_string()),
-                            scheme: "base".parse().unwrap(),
-                        }),
-                )
+                .child(ChildBuilder::new().name("b").url("base://b").environment("env"))
+                .child(ChildBuilder::new().name("c"))
+                .environment(EnvironmentBuilder::new().name("env").resolver(ResolverRegistration {
+                    resolver: "base".parse().unwrap(),
+                    source: RegistrationSource::Child("c".to_string()),
+                    scheme: "base".parse().unwrap(),
+                }))
                 .build(),
         ),
         (
@@ -2217,24 +2159,19 @@ async fn use_resolver_from_grandparent_environment() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .add_child(ChildDeclBuilder::new_lazy_child("b").environment("env"))
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
-                        .name("env")
-                        .extends(fdecl::EnvironmentExtends::Realm)
-                        .add_resolver(ResolverRegistration {
-                            resolver: "base".parse().unwrap(),
-                            source: RegistrationSource::Self_,
-                            scheme: "base".parse().unwrap(),
-                        }),
-                )
+                .child(ChildBuilder::new().name("b").environment("env"))
+                .environment(EnvironmentBuilder::new().name("env").resolver(ResolverRegistration {
+                    resolver: "base".parse().unwrap(),
+                    source: RegistrationSource::Self_,
+                    scheme: "base".parse().unwrap(),
+                }))
                 .resolver_default("base")
                 .build(),
         ),
         (
             "b",
             ComponentDeclBuilder::new_empty_component()
-                .add_child(ChildDeclBuilder::new().name("c").url("base://c"))
+                .child(ChildBuilder::new().name("c").url("base://c"))
                 .build(),
         ),
     ];
@@ -2317,18 +2254,13 @@ async fn resolver_is_not_available() {
     let components = vec![(
         "a",
         ComponentDeclBuilder::new()
-            .add_child(ChildDeclBuilder::new().name("b").url("base://b").environment("env"))
-            .add_child(ChildDeclBuilder::new().name("c").url("base://c"))
-            .add_environment(
-                EnvironmentDeclBuilder::new()
-                    .name("env")
-                    .extends(fdecl::EnvironmentExtends::Realm)
-                    .add_resolver(ResolverRegistration {
-                        resolver: "base".parse().unwrap(),
-                        source: RegistrationSource::Self_,
-                        scheme: "base".parse().unwrap(),
-                    }),
-            )
+            .child(ChildBuilder::new().name("b").url("base://b").environment("env"))
+            .child(ChildBuilder::new().name("c").url("base://c"))
+            .environment(EnvironmentBuilder::new().name("env").resolver(ResolverRegistration {
+                resolver: "base".parse().unwrap(),
+                source: RegistrationSource::Self_,
+                scheme: "base".parse().unwrap(),
+            }))
             .resolver_default("base")
             .build(),
     )];
@@ -2423,17 +2355,12 @@ async fn resolver_component_decl_is_validated() {
     let components = vec![(
         "a",
         ComponentDeclBuilder::new()
-            .add_child(ChildDeclBuilder::new().name("b").url("base://b").environment("env"))
-            .add_environment(
-                EnvironmentDeclBuilder::new()
-                    .name("env")
-                    .extends(fdecl::EnvironmentExtends::Realm)
-                    .add_resolver(ResolverRegistration {
-                        resolver: "base".parse().unwrap(),
-                        source: RegistrationSource::Self_,
-                        scheme: "base".parse().unwrap(),
-                    }),
-            )
+            .child(ChildBuilder::new().name("b").url("base://b").environment("env"))
+            .environment(EnvironmentBuilder::new().name("env").resolver(ResolverRegistration {
+                resolver: "base".parse().unwrap(),
+                source: RegistrationSource::Self_,
+                scheme: "base".parse().unwrap(),
+            }))
             .resolver_default("base")
             .build(),
     )];
@@ -2576,12 +2503,8 @@ async fn verify_service_route(
     for child_moniker in &child_monikers {
         let coll = child_moniker.collection().unwrap();
         let name = child_moniker.name();
-        test.create_dynamic_child(
-            &agg_moniker,
-            coll.as_str(),
-            ChildDeclBuilder::new_lazy_child(name),
-        )
-        .await;
+        test.create_dynamic_child(&agg_moniker, coll.as_str(), ChildBuilder::new().name(name))
+            .await;
         test.start_instance_and_wait_start(&agg_moniker.child(child_moniker.clone()))
             .await
             .unwrap();
@@ -2646,8 +2569,8 @@ async fn offer_service_from_collection() {
                     target: OfferTarget::static_child("b".into()),
                     availability: Availability::Required,
                 }))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll"))
-                .add_lazy_child("b")
+                .collection_default("coll")
+                .child_default("b")
                 .build(),
         ),
         ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
@@ -2664,7 +2587,7 @@ async fn offer_service_from_collection() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service").build())
+                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service"))
                 .build(),
         )
     }));
@@ -2720,10 +2643,10 @@ async fn offer_service_from_collections() {
                 .offer(offers.remove(0))
                 .offer(offers.remove(0))
                 .offer(offers.remove(0))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll1"))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll2"))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll3"))
-                .add_lazy_child("b")
+                .collection_default("coll1")
+                .collection_default("coll2")
+                .collection_default("coll3")
+                .child_default("b")
                 .build(),
         ),
         ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
@@ -2740,7 +2663,7 @@ async fn offer_service_from_collections() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service").build())
+                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service"))
                 .build(),
         )
     }));
@@ -2798,10 +2721,10 @@ async fn offer_service_from_collections_multilevel() {
                 .offer(offers.remove(0))
                 .offer(offers.remove(0))
                 .offer(offers.remove(0))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll1"))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll2"))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll3"))
-                .add_lazy_child("m")
+                .collection_default("coll1")
+                .collection_default("coll2")
+                .collection_default("coll3")
+                .child_default("m")
                 .build(),
         ),
         (
@@ -2817,7 +2740,7 @@ async fn offer_service_from_collections_multilevel() {
                     target: OfferTarget::static_child("b".into()),
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("b")
+                .child_default("b")
                 .build(),
         ),
         ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
@@ -2834,7 +2757,7 @@ async fn offer_service_from_collections_multilevel() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service").build())
+                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service"))
                 .build(),
         )
     }));
@@ -2870,10 +2793,7 @@ async fn expose_service_from_collection() {
         availability: Availability::Required,
     };
     let mut components = vec![
-        (
-            "a",
-            ComponentDeclBuilder::new().use_(use_decl.clone().into()).add_lazy_child("b").build(),
-        ),
+        ("a", ComponentDeclBuilder::new().use_(use_decl.clone().into()).child_default("b").build()),
         (
             "b",
             ComponentDeclBuilder::new()
@@ -2886,7 +2806,7 @@ async fn expose_service_from_collection() {
                     target_name: "foo".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll"))
+                .collection_default("coll")
                 .build(),
         ),
     ];
@@ -2902,7 +2822,7 @@ async fn expose_service_from_collection() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service").build())
+                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service"))
                 .build(),
         )
     }));
@@ -2951,10 +2871,7 @@ async fn expose_service_from_collections() {
         })
         .collect();
     let mut components = vec![
-        (
-            "a",
-            ComponentDeclBuilder::new().use_(use_decl.clone().into()).add_lazy_child("b").build(),
-        ),
+        ("a", ComponentDeclBuilder::new().use_(use_decl.clone().into()).child_default("b").build()),
         (
             "b",
             ComponentDeclBuilder::new()
@@ -2962,9 +2879,9 @@ async fn expose_service_from_collections() {
                 .expose(exposes.remove(0))
                 .expose(exposes.remove(0))
                 .expose(exposes.remove(0))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll1"))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll2"))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll3"))
+                .collection_default("coll1")
+                .collection_default("coll2")
+                .collection_default("coll3")
                 .build(),
         ),
     ];
@@ -2980,7 +2897,7 @@ async fn expose_service_from_collections() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service").build())
+                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service"))
                 .build(),
         )
     }));
@@ -3031,10 +2948,7 @@ async fn expose_service_from_collections_multilevel() {
         })
         .collect();
     let mut components = vec![
-        (
-            "a",
-            ComponentDeclBuilder::new().use_(use_decl.clone().into()).add_lazy_child("m").build(),
-        ),
+        ("a", ComponentDeclBuilder::new().use_(use_decl.clone().into()).child_default("m").build()),
         (
             "m",
             ComponentDeclBuilder::new()
@@ -3046,7 +2960,7 @@ async fn expose_service_from_collections_multilevel() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .add_lazy_child("b")
+                .child_default("b")
                 .build(),
         ),
         (
@@ -3056,9 +2970,9 @@ async fn expose_service_from_collections_multilevel() {
                 .expose(exposes.remove(0))
                 .expose(exposes.remove(0))
                 .expose(exposes.remove(0))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll1"))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll2"))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll3"))
+                .collection_default("coll1")
+                .collection_default("coll2")
+                .collection_default("coll3")
                 .build(),
         ),
     ];
@@ -3074,7 +2988,7 @@ async fn expose_service_from_collections_multilevel() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service").build())
+                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service"))
                 .build(),
         )
     }));
@@ -3129,9 +3043,9 @@ async fn list_service_instances_from_collections() {
                 .use_realm()
                 .offer(offers.remove(0))
                 .offer(offers.remove(0))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll1"))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll2"))
-                .add_lazy_child("client")
+                .collection_default("coll1")
+                .collection_default("coll2")
+                .child_default("client")
                 .build(),
         ),
         ("client", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
@@ -3146,7 +3060,7 @@ async fn list_service_instances_from_collections() {
                     target_name: "foo".parse().unwrap(),
                     availability: cm_rust::Availability::Required,
                 }))
-                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service").build())
+                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service"))
                 .build(),
         ),
         (
@@ -3160,7 +3074,7 @@ async fn list_service_instances_from_collections() {
                     target_name: "foo".parse().unwrap(),
                     availability: cm_rust::Availability::Required,
                 }))
-                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service").build())
+                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service"))
                 .build(),
         ),
         ("non_service_child", ComponentDeclBuilder::new().build()),
@@ -3171,19 +3085,19 @@ async fn list_service_instances_from_collections() {
     test.create_dynamic_child(
         &Moniker::root(),
         "coll1",
-        ChildDeclBuilder::new_lazy_child("service_child_a"),
+        ChildBuilder::new().name("service_child_a"),
     )
     .await;
     test.create_dynamic_child(
         &Moniker::root(),
         "coll1",
-        ChildDeclBuilder::new_lazy_child("non_service_child"),
+        ChildBuilder::new().name("non_service_child"),
     )
     .await;
     test.create_dynamic_child(
         &Moniker::root(),
         "coll2",
-        ChildDeclBuilder::new_lazy_child("service_child_b"),
+        ChildBuilder::new().name("service_child_b"),
     )
     .await;
 
@@ -3268,8 +3182,8 @@ async fn use_service_from_sibling_collection() {
                     target_name: "my.service.Service".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("b"))
-                .add_child(ChildDeclBuilder::new_lazy_child("c"))
+                .child(ChildBuilder::new().name("b"))
+                .child(ChildBuilder::new().name("c"))
                 .build(),
         ),
         (
@@ -3304,7 +3218,7 @@ async fn use_service_from_sibling_collection() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .add_collection(CollectionDeclBuilder::new_transient_collection("coll"))
+                .collection_default("coll")
                 .build(),
         ),
         (
@@ -3356,7 +3270,7 @@ async fn use_service_from_sibling_collection() {
     test.create_dynamic_child(
         &vec!["c"].try_into().unwrap(),
         "coll",
-        ChildDeclBuilder::new_lazy_child("foo"),
+        ChildBuilder::new().name("foo"),
     )
     .await;
     test.start_instance_and_wait_start(&vec!["c", "coll:foo"].try_into().unwrap())
@@ -3365,7 +3279,7 @@ async fn use_service_from_sibling_collection() {
     test.create_dynamic_child(
         &vec!["c"].try_into().unwrap(),
         "coll",
-        ChildDeclBuilder::new_lazy_child("bar"),
+        ChildBuilder::new().name("bar"),
     )
     .await;
     test.start_instance_and_wait_start(&vec!["c", "coll:bar"].try_into().unwrap())
@@ -3374,7 +3288,7 @@ async fn use_service_from_sibling_collection() {
     test.create_dynamic_child(
         &vec!["c"].try_into().unwrap(),
         "coll",
-        ChildDeclBuilder::new_lazy_child("baz"),
+        ChildBuilder::new().name("baz"),
     )
     .await;
 
@@ -3438,9 +3352,9 @@ async fn use_filtered_service_from_sibling() {
                     target_name: "my.service.Service".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("b"))
-                .add_child(ChildDeclBuilder::new_lazy_child("c"))
-                .add_child(ChildDeclBuilder::new_lazy_child("d"))
+                .child(ChildBuilder::new().name("b"))
+                .child(ChildBuilder::new().name("c"))
+                .child(ChildBuilder::new().name("d"))
                 .build(),
         ),
         (
@@ -3599,8 +3513,8 @@ async fn use_filtered_aggregate_service_from_sibling() {
                     target_name: "my.service.Service".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("b"))
-                .add_child(ChildDeclBuilder::new_lazy_child("c"))
+                .child(ChildBuilder::new().name("b"))
+                .child(ChildBuilder::new().name("c"))
                 .build(),
         ),
         (
@@ -3726,7 +3640,7 @@ async fn use_anonymized_aggregate_service() {
                     renamed_instances: None,
                 }))
                 .service_default("my.service.Service")
-                .add_child(ChildDeclBuilder::new_lazy_child("b"))
+                .child(ChildBuilder::new().name("b"))
                 .build(),
         ),
         (
@@ -3773,9 +3687,9 @@ async fn use_anonymized_aggregate_service() {
                     renamed_instances: None,
                 }))
                 .service_default("my.service.Service")
-                .add_child(ChildDeclBuilder::new_lazy_child("c"))
-                .add_child(ChildDeclBuilder::new_lazy_child("d"))
-                .add_child(ChildDeclBuilder::new_lazy_child("e"))
+                .child(ChildBuilder::new().name("c"))
+                .child(ChildBuilder::new().name("d"))
+                .child(ChildBuilder::new().name("e"))
                 .build(),
         ),
         ("c", expose_service_decl.clone()),

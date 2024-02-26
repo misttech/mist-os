@@ -1216,10 +1216,9 @@ mod tests {
             Availability, ComponentDecl, DependencyType, RegistrationSource, ResolverRegistration,
             RunnerRegistration, UseProtocolDecl, UseSource, UseStorageDecl,
         },
-        cm_rust_testing::{ChildDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder},
+        cm_rust_testing::{ChildBuilder, ComponentDeclBuilder, EnvironmentBuilder},
         cm_types::Name,
         config_encoder::ConfigFields,
-        fidl_fuchsia_component_decl as fdecl,
         fidl_fuchsia_component_internal as component_internal,
         maplit::hashmap,
         moniker::{ChildName, Moniker, MonikerBase},
@@ -1255,7 +1254,7 @@ mod tests {
     #[fuchsia::test]
     fn build_model() -> Result<()> {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("child").build()),
+            ("root", ComponentDeclBuilder::new().child_default("child").build()),
             ("child", ComponentDeclBuilder::new().build()),
         ];
 
@@ -1348,7 +1347,7 @@ mod tests {
     #[fuchsia::test]
     fn build_model_with_relative_url() {
         let root_decl = ComponentDeclBuilder::new()
-            .add_child(ChildDeclBuilder::new().name("child").url("#child").build())
+            .child(ChildBuilder::new().name("child").url("#child").build())
             .build();
         let child_decl = ComponentDeclBuilder::new().build();
         let root_url = make_test_url("root");
@@ -1472,16 +1471,12 @@ mod tests {
             (
                 "root",
                 ComponentDeclBuilder::new()
-                    .add_child(
-                        ChildDeclBuilder::new_lazy_child("child").environment(child_env_name),
-                    )
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("child").environment(child_env_name))
+                    .environment(
+                        EnvironmentBuilder::new()
                             .name(child_env_name)
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_resolver(child_resolver_registration.clone())
-                            .add_runner(child_runner_registration.clone())
-                            .build(),
+                            .resolver(child_resolver_registration.clone())
+                            .runner(child_runner_registration.clone()),
                     )
                     .build(),
             ),
@@ -1574,7 +1569,7 @@ mod tests {
 
     fn decl(id: &str) -> ComponentDecl {
         // Identify decls by a single child named `id`.
-        ComponentDeclBuilder::new().add_child(ChildDeclBuilder::new_lazy_child(id)).build()
+        ComponentDeclBuilder::new().child_default(id).build()
     }
 
     #[fuchsia::test]

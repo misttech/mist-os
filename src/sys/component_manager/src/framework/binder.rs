@@ -185,10 +185,7 @@ mod tests {
         let fixture = BinderCapabilityTestFixture::new(vec![
             (
                 "root",
-                ComponentDeclBuilder::new()
-                    .add_lazy_child("source")
-                    .add_lazy_child("target")
-                    .build(),
+                ComponentDeclBuilder::new().child_default("source").child_default("target").build(),
             ),
             ("source", component_decl_with_test_runner()),
             ("target", component_decl_with_test_runner()),
@@ -220,8 +217,8 @@ mod tests {
         let fixture = BinderCapabilityTestFixture::new(vec![(
             "root",
             ComponentDeclBuilder::new()
-                .add_lazy_child("target")
-                .add_lazy_child("unresolvable")
+                .child_default("target")
+                .child_default("unresolvable")
                 .build(),
         )])
         .await;

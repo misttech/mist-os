@@ -884,7 +884,7 @@ mod tests {
             StorageDirectorySource, UseDecl, UseSource,
         },
         cm_rust_testing::{
-            ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder,
+            ChildBuilder, CollectionBuilder, ComponentDeclBuilder, EnvironmentBuilder,
         },
         cm_types::AllowedOffers,
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
@@ -1108,17 +1108,17 @@ mod tests {
     #[fuchsia::test]
     fn test_environment_with_runner_from_parent() {
         let decl = ComponentDecl {
-            environments: vec![EnvironmentDeclBuilder::new()
+            environments: vec![EnvironmentBuilder::new()
                 .name("env")
-                .add_runner(cm_rust::RunnerRegistration {
+                .runner(cm_rust::RunnerRegistration {
                     source: RegistrationSource::Parent,
                     source_name: "foo".parse().unwrap(),
                     target_name: "foo".parse().unwrap(),
                 })
                 .build()],
             children: vec![
-                ChildDeclBuilder::new_lazy_child("childA").build(),
-                ChildDeclBuilder::new_lazy_child("childB").environment("env").build(),
+                ChildBuilder::new().name("childA").build(),
+                ChildBuilder::new().name("childB").environment("env").build(),
             ],
             ..default_component_decl()
         };
@@ -1136,17 +1136,17 @@ mod tests {
     #[fuchsia::test]
     fn test_environment_with_runner_from_self() {
         let decl = ComponentDecl {
-            environments: vec![EnvironmentDeclBuilder::new()
+            environments: vec![EnvironmentBuilder::new()
                 .name("env")
-                .add_runner(cm_rust::RunnerRegistration {
+                .runner(cm_rust::RunnerRegistration {
                     source: RegistrationSource::Self_,
                     source_name: "foo".parse().unwrap(),
                     target_name: "foo".parse().unwrap(),
                 })
                 .build()],
             children: vec![
-                ChildDeclBuilder::new_lazy_child("childA").build(),
-                ChildDeclBuilder::new_lazy_child("childB").environment("env").build(),
+                ChildBuilder::new().name("childA").build(),
+                ChildBuilder::new().name("childB").environment("env").build(),
             ],
             ..default_component_decl()
         };
@@ -1164,17 +1164,17 @@ mod tests {
     #[fuchsia::test]
     fn test_environment_with_runner_from_child() {
         let decl = ComponentDecl {
-            environments: vec![EnvironmentDeclBuilder::new()
+            environments: vec![EnvironmentBuilder::new()
                 .name("env")
-                .add_runner(cm_rust::RunnerRegistration {
+                .runner(cm_rust::RunnerRegistration {
                     source: RegistrationSource::Child("childA".to_string()),
                     source_name: "foo".parse().unwrap(),
                     target_name: "foo".parse().unwrap(),
                 })
                 .build()],
             children: vec![
-                ChildDeclBuilder::new_lazy_child("childA").build(),
-                ChildDeclBuilder::new_lazy_child("childB").environment("env").build(),
+                ChildBuilder::new().name("childA").build(),
+                ChildBuilder::new().name("childB").environment("env").build(),
             ],
             ..default_component_decl()
         };
@@ -1192,16 +1192,16 @@ mod tests {
     #[fuchsia::test]
     fn test_environment_with_runner_from_child_to_collection() {
         let decl = ComponentDecl {
-            environments: vec![EnvironmentDeclBuilder::new()
+            environments: vec![EnvironmentBuilder::new()
                 .name("env")
-                .add_runner(cm_rust::RunnerRegistration {
+                .runner(cm_rust::RunnerRegistration {
                     source: RegistrationSource::Child("childA".to_string()),
                     source_name: "foo".parse().unwrap(),
                     target_name: "foo".parse().unwrap(),
                 })
                 .build()],
-            collections: vec![CollectionDeclBuilder::new().name("coll").environment("env").build()],
-            children: vec![ChildDeclBuilder::new_lazy_child("childA").build()],
+            collections: vec![CollectionBuilder::new().name("coll").environment("env").build()],
+            children: vec![ChildBuilder::new().name("childA").build()],
             ..default_component_decl()
         };
 
@@ -1245,17 +1245,17 @@ mod tests {
     fn test_chained_environments() {
         let decl = ComponentDecl {
             environments: vec![
-                EnvironmentDeclBuilder::new()
+                EnvironmentBuilder::new()
                     .name("env")
-                    .add_runner(cm_rust::RunnerRegistration {
+                    .runner(cm_rust::RunnerRegistration {
                         source: RegistrationSource::Child("childA".to_string()),
                         source_name: "foo".parse().unwrap(),
                         target_name: "foo".parse().unwrap(),
                     })
                     .build(),
-                EnvironmentDeclBuilder::new()
+                EnvironmentBuilder::new()
                     .name("env2")
-                    .add_runner(cm_rust::RunnerRegistration {
+                    .runner(cm_rust::RunnerRegistration {
                         source: RegistrationSource::Child("childB".to_string()),
                         source_name: "bar".parse().unwrap(),
                         target_name: "bar".parse().unwrap(),
@@ -1263,9 +1263,9 @@ mod tests {
                     .build(),
             ],
             children: vec![
-                ChildDeclBuilder::new_lazy_child("childA").build(),
-                ChildDeclBuilder::new_lazy_child("childB").environment("env").build(),
-                ChildDeclBuilder::new_lazy_child("childC").environment("env2").build(),
+                ChildBuilder::new().name("childA").build(),
+                ChildBuilder::new().name("childB").environment("env").build(),
+                ChildBuilder::new().name("childC").environment("env2").build(),
             ],
             ..default_component_decl()
         };
@@ -1297,18 +1297,18 @@ mod tests {
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
             })],
-            environments: vec![EnvironmentDeclBuilder::new()
+            environments: vec![EnvironmentBuilder::new()
                 .name("env")
-                .add_runner(cm_rust::RunnerRegistration {
+                .runner(cm_rust::RunnerRegistration {
                     source: RegistrationSource::Child("childA".into()),
                     source_name: "foo".parse().unwrap(),
                     target_name: "foo".parse().unwrap(),
                 })
                 .build()],
             children: vec![
-                ChildDeclBuilder::new_lazy_child("childA").build(),
-                ChildDeclBuilder::new_lazy_child("childB").environment("env").build(),
-                ChildDeclBuilder::new_lazy_child("childC").build(),
+                ChildBuilder::new().name("childA").build(),
+                ChildBuilder::new().name("childB").environment("env").build(),
+                ChildBuilder::new().name("childC").build(),
             ],
             ..default_component_decl()
         };
@@ -1331,17 +1331,17 @@ mod tests {
     #[fuchsia::test]
     fn test_environment_with_resolver_from_parent() {
         let decl = ComponentDecl {
-            environments: vec![EnvironmentDeclBuilder::new()
+            environments: vec![EnvironmentBuilder::new()
                 .name("resolver_env")
-                .add_resolver(cm_rust::ResolverRegistration {
+                .resolver(cm_rust::ResolverRegistration {
                     source: RegistrationSource::Parent,
                     resolver: "foo".parse().unwrap(),
                     scheme: "httweeeeees".into(),
                 })
                 .build()],
             children: vec![
-                ChildDeclBuilder::new_lazy_child("childA").build(),
-                ChildDeclBuilder::new_lazy_child("childB").environment("resolver_env").build(),
+                ChildBuilder::new().name("childA").build(),
+                ChildBuilder::new().name("childB").environment("resolver_env").build(),
             ],
             ..default_component_decl()
         };
@@ -1359,17 +1359,17 @@ mod tests {
     #[fuchsia::test]
     fn test_environment_with_resolver_from_child() {
         let decl = ComponentDecl {
-            environments: vec![EnvironmentDeclBuilder::new()
+            environments: vec![EnvironmentBuilder::new()
                 .name("resolver_env")
-                .add_resolver(cm_rust::ResolverRegistration {
+                .resolver(cm_rust::ResolverRegistration {
                     source: RegistrationSource::Child("childA".to_string()),
                     resolver: "foo".parse().unwrap(),
                     scheme: "httweeeeees".into(),
                 })
                 .build()],
             children: vec![
-                ChildDeclBuilder::new_lazy_child("childA").build(),
-                ChildDeclBuilder::new_lazy_child("childB").environment("resolver_env").build(),
+                ChildBuilder::new().name("childA").build(),
+                ChildBuilder::new().name("childB").environment("resolver_env").build(),
             ],
             ..default_component_decl()
         };
@@ -1390,17 +1390,17 @@ mod tests {
     fn test_environment_with_chain_of_resolvers() {
         let decl = ComponentDecl {
             environments: vec![
-                EnvironmentDeclBuilder::new()
+                EnvironmentBuilder::new()
                     .name("env1")
-                    .add_resolver(cm_rust::ResolverRegistration {
+                    .resolver(cm_rust::ResolverRegistration {
                         source: RegistrationSource::Child("childA".to_string()),
                         resolver: "foo".parse().unwrap(),
                         scheme: "httweeeeees".into(),
                     })
                     .build(),
-                EnvironmentDeclBuilder::new()
+                EnvironmentBuilder::new()
                     .name("env2")
-                    .add_resolver(cm_rust::ResolverRegistration {
+                    .resolver(cm_rust::ResolverRegistration {
                         source: RegistrationSource::Child("childB".to_string()),
                         resolver: "bar".parse().unwrap(),
                         scheme: "httweeeeee".into(),
@@ -1408,9 +1408,9 @@ mod tests {
                     .build(),
             ],
             children: vec![
-                ChildDeclBuilder::new_lazy_child("childA").build(),
-                ChildDeclBuilder::new_lazy_child("childB").environment("env1").build(),
-                ChildDeclBuilder::new_lazy_child("childC").environment("env2").build(),
+                ChildBuilder::new().name("childA").build(),
+                ChildBuilder::new().name("childB").environment("env1").build(),
+                ChildBuilder::new().name("childC").environment("env2").build(),
             ],
             ..default_component_decl()
         };
@@ -1433,23 +1433,23 @@ mod tests {
     #[fuchsia::test]
     fn test_environment_with_resolver_and_runner_from_child() {
         let decl = ComponentDecl {
-            environments: vec![EnvironmentDeclBuilder::new()
+            environments: vec![EnvironmentBuilder::new()
                 .name("multi_env")
-                .add_resolver(cm_rust::ResolverRegistration {
+                .resolver(cm_rust::ResolverRegistration {
                     source: RegistrationSource::Child("childA".to_string()),
                     resolver: "foo".parse().unwrap(),
                     scheme: "httweeeeees".into(),
                 })
-                .add_runner(cm_rust::RunnerRegistration {
+                .runner(cm_rust::RunnerRegistration {
                     source: RegistrationSource::Child("childB".to_string()),
                     source_name: "bar".parse().unwrap(),
                     target_name: "bar".parse().unwrap(),
                 })
                 .build()],
             children: vec![
-                ChildDeclBuilder::new_lazy_child("childA").build(),
-                ChildDeclBuilder::new_lazy_child("childB").build(),
-                ChildDeclBuilder::new_lazy_child("childC").environment("multi_env").build(),
+                ChildBuilder::new().name("childA").build(),
+                ChildBuilder::new().name("childB").build(),
+                ChildBuilder::new().name("childC").environment("multi_env").build(),
             ],
             ..default_component_decl()
         };
@@ -1472,16 +1472,16 @@ mod tests {
     #[fuchsia::test]
     fn test_environment_with_collection_resolver_from_child() {
         let decl = ComponentDecl {
-            environments: vec![EnvironmentDeclBuilder::new()
+            environments: vec![EnvironmentBuilder::new()
                 .name("resolver_env")
-                .add_resolver(cm_rust::ResolverRegistration {
+                .resolver(cm_rust::ResolverRegistration {
                     source: RegistrationSource::Child("childA".to_string()),
                     resolver: "foo".parse().unwrap(),
                     scheme: "httweeeeees".into(),
                 })
                 .build()],
-            children: vec![ChildDeclBuilder::new_lazy_child("childA").build()],
-            collections: vec![CollectionDeclBuilder::new()
+            children: vec![ChildBuilder::new().name("childA").build()],
+            collections: vec![CollectionBuilder::new()
                 .name("coll")
                 .environment("resolver_env")
                 .build()],
@@ -1523,8 +1523,8 @@ mod tests {
     #[fuchsia::test]
     fn test_dynamic_offers_within_collection() {
         let decl = ComponentDeclBuilder::new()
-            .add_lazy_child("childA")
-            .add_transient_collection("coll")
+            .child_default("childA")
+            .collection_default("coll")
             .offer(OfferDecl::Directory(OfferDirectoryDecl {
                 source: OfferSource::Child(ChildRef { name: "childA".into(), collection: None }),
                 target: OfferTarget::Collection("coll".parse().unwrap()),
@@ -1607,8 +1607,8 @@ mod tests {
     #[fuchsia::test]
     fn test_dynamic_offers_between_collections() {
         let decl = ComponentDeclBuilder::new()
-            .add_transient_collection("coll1")
-            .add_transient_collection("coll2")
+            .collection_default("coll1")
+            .collection_default("coll2")
             .build();
 
         let instance = FakeComponent {
@@ -1672,7 +1672,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_dynamic_offer_from_parent() {
-        let decl = ComponentDeclBuilder::new().add_transient_collection("coll").build();
+        let decl = ComponentDeclBuilder::new().collection_default("coll").build();
         let instance = FakeComponent {
             decl,
             dynamic_children: vec![
@@ -1708,7 +1708,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_dynamic_offer_from_self() {
-        let decl = ComponentDeclBuilder::new().add_transient_collection("coll").build();
+        let decl = ComponentDeclBuilder::new().collection_default("coll").build();
         let instance = FakeComponent {
             decl,
             dynamic_children: vec![
@@ -1745,9 +1745,9 @@ mod tests {
     #[fuchsia::test]
     fn test_dynamic_offer_from_static_child() {
         let decl = ComponentDeclBuilder::new()
-            .add_lazy_child("childA")
-            .add_lazy_child("childB")
-            .add_transient_collection("coll")
+            .child_default("childA")
+            .child_default("childB")
+            .collection_default("coll")
             .build();
 
         let instance = FakeComponent {
@@ -2887,7 +2887,7 @@ mod tests {
     #[fuchsia::test]
     async fn shutdown_one_component() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
             ("a", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
@@ -2923,13 +2923,10 @@ mod tests {
     #[fuchsia::test]
     async fn shutdown_collection() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("container").build()),
+            ("root", ComponentDeclBuilder::new().child_default("container").build()),
             (
                 "container",
-                ComponentDeclBuilder::new()
-                    .add_transient_collection("coll")
-                    .add_lazy_child("c")
-                    .build(),
+                ComponentDeclBuilder::new().collection_default("coll").child_default("c").build(),
             ),
             ("a", component_decl_with_test_runner()),
             ("b", component_decl_with_test_runner()),
@@ -3022,16 +3019,16 @@ mod tests {
     #[fuchsia::test]
     async fn shutdown_dynamic_offers() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("container").build()),
+            ("root", ComponentDeclBuilder::new().child_default("container").build()),
             (
                 "container",
                 ComponentDeclBuilder::new()
-                    .add_collection(
-                        CollectionDeclBuilder::new_transient_collection("coll")
-                            .allowed_offers(AllowedOffers::StaticAndDynamic)
-                            .build(),
+                    .collection(
+                        CollectionBuilder::new()
+                            .name("coll")
+                            .allowed_offers(AllowedOffers::StaticAndDynamic),
                     )
-                    .add_lazy_child("c")
+                    .child_default("c")
                     .offer(cm_rust::OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Child(ChildRef { name: "c".into(), collection: None }),
                         source_name: "static_offer_source".parse().unwrap(),
@@ -3156,8 +3153,8 @@ mod tests {
     #[fuchsia::test]
     async fn shutdown_not_started() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").build()),
             ("b", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
@@ -3197,9 +3194,9 @@ mod tests {
     #[fuchsia::test]
     async fn shutdown_not_resolved() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
-            ("b", ComponentDeclBuilder::new().add_lazy_child("c").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").build()),
+            ("b", ComponentDeclBuilder::new().child_default("c").build()),
             ("c", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
@@ -3253,9 +3250,20 @@ mod tests {
     #[fuchsia::test]
     async fn shutdown_hierarchy() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
-            ("b", ComponentDeclBuilder::new().add_eager_child("c").add_eager_child("d").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("d").eager().build())
+                    .build(),
+            ),
             ("c", component_decl_with_test_runner()),
             ("d", component_decl_with_test_runner()),
         ];
@@ -3329,14 +3337,19 @@ mod tests {
     #[fuchsia::test]
     async fn shutdown_with_multiple_deps() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .build(),
+            ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .add_eager_child("c")
-                    .add_eager_child("d")
-                    .add_eager_child("e")
+                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("d").eager().build())
+                    .child(ChildBuilder::new().name("e").eager().build())
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
                         source_name: "serviceD".parse().unwrap(),
@@ -3482,15 +3495,20 @@ mod tests {
     #[fuchsia::test]
     async fn shutdown_with_multiple_out_and_longer_chain() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .build(),
+            ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .add_eager_child("c")
-                    .add_eager_child("d")
-                    .add_eager_child("e")
-                    .add_eager_child("f")
+                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("d").eager().build())
+                    .child(ChildBuilder::new().name("e").eager().build())
+                    .child(ChildBuilder::new().name("f").eager().build())
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
                         source_name: "serviceD".parse().unwrap(),
@@ -3696,15 +3714,20 @@ mod tests {
     #[fuchsia::test]
     async fn shutdown_with_multiple_out_multiple_in() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .build(),
+            ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .add_eager_child("c")
-                    .add_eager_child("d")
-                    .add_eager_child("e")
-                    .add_eager_child("f")
+                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("d").eager().build())
+                    .child(ChildBuilder::new().name("e").eager().build())
+                    .child(ChildBuilder::new().name("f").eager().build())
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
                         source_name: "serviceD".parse().unwrap(),
@@ -3919,13 +3942,18 @@ mod tests {
     #[fuchsia::test]
     async fn shutdown_with_dependency() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .build(),
+            ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .add_eager_child("c")
-                    .add_eager_child("d")
+                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("d").eager().build())
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("c".to_string()),
                         source_name: "serviceC".parse().unwrap(),
@@ -4023,12 +4051,12 @@ mod tests {
     #[fuchsia::test]
     async fn shutdown_use_from_child() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_eager_child("b")
-                    .add_eager_child("c")
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .child(ChildBuilder::new().name("c").eager().build())
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Child("b".to_string()),
                         source_name: "serviceC".parse().unwrap(),
@@ -4109,12 +4137,12 @@ mod tests {
     #[fuchsia::test]
     async fn test_shutdown_use_runner_from_child() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_eager_child("b")
-                    .add_eager_child("c")
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .child(ChildBuilder::new().name("c").eager().build())
                     .use_(UseDecl::Runner(UseRunnerDecl {
                         source: UseSource::Child("b".to_string()),
                         source_name: "test.runner".parse().unwrap(),
@@ -4190,12 +4218,12 @@ mod tests {
     #[fuchsia::test]
     async fn shutdown_use_from_child_that_uses_from_sibling() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_eager_child("b")
-                    .add_eager_child("c")
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .child(ChildBuilder::new().name("c").eager().build())
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Child("b".to_string()),
                         source_name: "serviceB".parse().unwrap(),
@@ -4306,12 +4334,12 @@ mod tests {
     #[fuchsia::test]
     async fn shutdown_use_from_child_weak() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_eager_child("b")
-                    .add_eager_child("c")
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .child(ChildBuilder::new().name("c").eager().build())
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Child("b".to_string()),
                         source_name: "serviceC".parse().unwrap(),
@@ -4402,9 +4430,9 @@ mod tests {
     #[fuchsia::test]
     async fn shutdown_self_referential() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
-            ("b", ComponentDeclBuilder::new().add_lazy_child("b").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").build()),
+            ("b", ComponentDeclBuilder::new().child_default("b").build()),
         ];
         let test = ActionsTest::new("root", components, None).await;
         let root = test.model.root();
@@ -4473,9 +4501,20 @@ mod tests {
     #[fuchsia::test]
     async fn shutdown_error() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
-            ("b", ComponentDeclBuilder::new().add_eager_child("c").add_eager_child("d").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("d").eager().build())
+                    .build(),
+            ),
             ("c", component_decl_with_test_runner()),
             ("d", component_decl_with_test_runner()),
         ];

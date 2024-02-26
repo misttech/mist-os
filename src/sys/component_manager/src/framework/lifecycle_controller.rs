@@ -296,7 +296,7 @@ mod tests {
             actions::test_utils::{is_discovered, is_resolved},
             testing::test_helpers::TestEnvironmentBuilder,
         },
-        cm_rust_testing::{CollectionDeclBuilder, ComponentDeclBuilder},
+        cm_rust_testing::ComponentDeclBuilder,
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
         fidl_fuchsia_component_decl::{ChildRef, CollectionRef},
@@ -309,7 +309,7 @@ mod tests {
             (
                 "root",
                 ComponentDeclBuilder::new()
-                    .add_child(cm_rust::ChildDecl {
+                    .child(cm_rust::ChildDecl {
                         name: "a".to_string(),
                         url: "test:///a".to_string(),
                         startup: fdecl::StartupMode::Eager,
@@ -317,7 +317,7 @@ mod tests {
                         on_terminate: None,
                         config_overrides: None,
                     })
-                    .add_child(cm_rust::ChildDecl {
+                    .child(cm_rust::ChildDecl {
                         name: "cant-resolve".to_string(),
                         url: "cant-resolve://cant-resolve".to_string(),
                         startup: fdecl::StartupMode::Eager,
@@ -330,7 +330,7 @@ mod tests {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_child(cm_rust::ChildDecl {
+                    .child(cm_rust::ChildDecl {
                         name: "b".to_string(),
                         url: "test:///b".to_string(),
                         startup: fdecl::StartupMode::Eager,
@@ -385,7 +385,7 @@ mod tests {
             (
                 "root",
                 ComponentDeclBuilder::new()
-                    .add_child(cm_rust::ChildDecl {
+                    .child(cm_rust::ChildDecl {
                         name: "a".to_string(),
                         url: "test:///a".to_string(),
                         startup: fdecl::StartupMode::Eager,
@@ -398,7 +398,7 @@ mod tests {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_child(cm_rust::ChildDecl {
+                    .child(cm_rust::ChildDecl {
                         name: "b".to_string(),
                         url: "test:///b".to_string(),
                         startup: fdecl::StartupMode::Eager,
@@ -453,13 +453,12 @@ mod tests {
 
     #[fuchsia::test]
     async fn lifecycle_create_and_destroy_test() {
-        let collection = CollectionDeclBuilder::new_transient_collection("coll").build();
         let components = vec![
             (
                 "root",
                 ComponentDeclBuilder::new()
-                    .add_collection(collection)
-                    .add_lazy_child("child")
+                    .collection_default("coll")
+                    .child_default("child")
                     .build(),
             ),
             ("child", ComponentDeclBuilder::new().build()),
@@ -522,13 +521,12 @@ mod tests {
 
     #[fuchsia::test]
     async fn lifecycle_create_fail_test() {
-        let collection = CollectionDeclBuilder::new_transient_collection("coll").build();
         let components = vec![
             (
                 "root",
                 ComponentDeclBuilder::new()
-                    .add_collection(collection)
-                    .add_lazy_child("child")
+                    .collection_default("coll")
+                    .child_default("child")
                     .build(),
             ),
             ("child", ComponentDeclBuilder::new().build()),

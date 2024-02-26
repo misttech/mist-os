@@ -360,7 +360,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .capability(diagnostics_decl())
                     .expose(expose_diagnostics_decl())
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -368,8 +368,8 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .capability(diagnostics_decl())
                     .expose(expose_diagnostics_decl())
-                    .add_lazy_child("c")
-                    .add_lazy_child("d")
+                    .child_default("c")
+                    .child_default("d")
                     .build(),
             ),
             (

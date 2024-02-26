@@ -91,8 +91,8 @@ mod tests {
     #[fuchsia::test]
     async fn tracks_started_components() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").build()),
             ("b", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;

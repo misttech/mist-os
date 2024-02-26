@@ -571,7 +571,7 @@ mod tests {
                         availability: Availability::Required,
                     }))
                     .service_default("foo")
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
@@ -621,7 +621,7 @@ mod tests {
                         availability: Availability::Required,
                     }))
                     .service_default("foo")
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
@@ -661,7 +661,7 @@ mod tests {
                 "a",
                 ComponentDeclBuilder::new()
                     .use_(use_decl.clone().into())
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (
@@ -724,8 +724,8 @@ mod tests {
                         target: OfferTarget::static_child("b".to_string()),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
@@ -774,31 +774,20 @@ mod tests {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new_lazy_child("b").environment("env").build())
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_runner(RunnerRegistration {
-                                source_name: "elf".parse().unwrap(),
-                                source: RegistrationSource::Self_,
-                                target_name: "hobbit".parse().unwrap(),
-                            })
-                            .build(),
-                    )
+                    .child(ChildBuilder::new().name("b").environment("env"))
+                    .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                        source_name: "elf".parse().unwrap(),
+                        source: RegistrationSource::Self_,
+                        target_name: "hobbit".parse().unwrap(),
+                    }))
                     .runner_default("elf")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new_lazy_child("c").environment("env").build())
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .build(),
-                    )
+                    .child(ChildBuilder::new().name("c").environment("env"))
+                    .environment(EnvironmentBuilder::new().name("env"))
                     .build(),
             ),
             ("c", ComponentDeclBuilder::new_empty_component().add_program("hobbit").build()),
@@ -895,8 +884,8 @@ mod tests {
                         target_name: "started".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -934,8 +923,8 @@ mod tests {
                         target_name: "started".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("d")
-                    .add_lazy_child("e")
+                    .child_default("d")
+                    .child_default("e")
                     .build(),
             ),
             (
@@ -1023,18 +1012,12 @@ mod tests {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new_lazy_child("b").environment("env").build())
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_runner(RunnerRegistration {
-                                source_name: "elf".parse().unwrap(),
-                                source: RegistrationSource::Self_,
-                                target_name: "dwarf".parse().unwrap(),
-                            })
-                            .build(),
-                    )
+                    .child(ChildBuilder::new().name("b").environment("env"))
+                    .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                        source_name: "elf".parse().unwrap(),
+                        source: RegistrationSource::Self_,
+                        target_name: "dwarf".parse().unwrap(),
+                    }))
                     .runner_default("elf")
                     .build(),
             ),
@@ -1081,17 +1064,14 @@ mod tests {
             (
                 a_url.clone(),
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new().name("b").url(&b_url).environment("env"))
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_resolver(ResolverRegistration {
-                                resolver: "base".parse().unwrap(),
-                                source: RegistrationSource::Self_,
-                                scheme: "base".into(),
-                            }),
-                    )
+                    .child(ChildBuilder::new().name("b").url(&b_url).environment("env"))
+                    .environment(EnvironmentBuilder::new().name("env").resolver(
+                        ResolverRegistration {
+                            resolver: "base".parse().unwrap(),
+                            source: RegistrationSource::Self_,
+                            scheme: "base".into(),
+                        },
+                    ))
                     .resolver_default("base")
                     .build(),
             ),
@@ -1128,26 +1108,23 @@ mod tests {
             (
                 a_url.clone(),
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new_lazy_child("b").environment("b_env"))
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("b_env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_resolver(ResolverRegistration {
-                                resolver: "base".parse().unwrap(),
-                                source: RegistrationSource::Self_,
-                                scheme: "base".into(),
-                            }),
-                    )
+                    .child(ChildBuilder::new().name("b").environment("b_env"))
+                    .environment(EnvironmentBuilder::new().name("b_env").resolver(
+                        ResolverRegistration {
+                            resolver: "base".parse().unwrap(),
+                            source: RegistrationSource::Self_,
+                            scheme: "base".into(),
+                        },
+                    ))
                     .resolver_default("base")
                     .build(),
             ),
             (
                 b_url,
                 ComponentDeclBuilder::new_empty_component()
-                    .add_child(ChildDeclBuilder::new().name("c").url(&c_url).environment("c_env"))
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("c").url(&c_url).environment("c_env"))
+                    .environment(
+                        EnvironmentBuilder::new()
                             .name("c_env")
                             .extends(fdecl::EnvironmentExtends::None),
                     )
@@ -1188,9 +1165,7 @@ mod tests {
             (
                 a_url.clone(),
                 ComponentDeclBuilder::new()
-                    .add_child(
-                        ChildDeclBuilder::new().name("b").url(&format!("{}:///b", BOOT_SCHEME)),
-                    )
+                    .child(ChildBuilder::new().name("b").url(&format!("{}:///b", BOOT_SCHEME)))
                     .build(),
             ),
             (b_url, ComponentDeclBuilder::new().build()),
@@ -1246,7 +1221,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .capability(protocol_decl.clone())
                     .offer(offer_decl.clone())
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             ("b", ComponentDeclBuilder::new().use_(use_decl.clone()).build()),
@@ -1298,7 +1273,7 @@ mod tests {
         });
         let protocol_decl = ProtocolBuilder::new().name("foo").build();
         let components = vec![
-            ("a", ComponentDeclBuilder::new().use_(use_decl.clone()).add_lazy_child("b").build()),
+            ("a", ComponentDeclBuilder::new().use_(use_decl.clone()).child_default("b").build()),
             (
                 "b",
                 ComponentDeclBuilder::new()
@@ -1426,15 +1401,15 @@ mod tests {
                 "a",
                 ComponentDeclBuilder::new()
                     .offer(a_offer_decl.clone())
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
                     .expose(b_expose_decl.clone())
-                    .add_lazy_child("d")
+                    .child_default("d")
                     .build(),
             ),
             ("c", ComponentDeclBuilder::new().use_(use_decl.clone()).build()),
@@ -1498,14 +1473,8 @@ mod tests {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new_lazy_child("b").environment("env").build())
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_runner(runner_reg.clone())
-                            .build(),
-                    )
+                    .child(ChildBuilder::new().name("b").environment("env"))
+                    .environment(EnvironmentBuilder::new().name("env").runner(runner_reg.clone()))
                     .capability(runner_decl.clone())
                     .build(),
             ),
@@ -1585,7 +1554,7 @@ mod tests {
                     .capability(storage_decl.clone())
                     .capability(directory_decl.clone())
                     .offer(offer_storage_decl.clone())
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             ("b", ComponentDeclBuilder::new().use_(use_storage_decl.clone()).build()),
@@ -1663,7 +1632,7 @@ mod tests {
                 "a",
                 ComponentDeclBuilder::new()
                     .offer(offer_realm_decl.clone())
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             ("b", ComponentDeclBuilder::new().use_(use_realm_decl.clone()).build()),
@@ -1725,10 +1694,7 @@ mod tests {
         let capability_decl =
             ProtocolBuilder::new().name("foo").path("/offer_from_cm_namespace/svc/foo").build();
         let components = vec![
-            (
-                "a",
-                ComponentDeclBuilder::new().offer(offer_decl.clone()).add_lazy_child("b").build(),
-            ),
+            ("a", ComponentDeclBuilder::new().offer(offer_decl.clone()).child_default("b").build()),
             ("b", ComponentDeclBuilder::new().use_(use_decl.clone()).build()),
         ];
 
@@ -1788,13 +1754,10 @@ mod tests {
             (
                 a_url.clone(),
                 ComponentDeclBuilder::new_empty_component()
-                    .add_child(ChildDeclBuilder::new().name("b").url(&b_url).environment("env"))
-                    .add_child(ChildDeclBuilder::new_lazy_child("c"))
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_resolver(registration_decl.clone()),
+                    .child(ChildBuilder::new().name("b").url(&b_url).environment("env"))
+                    .child(ChildBuilder::new().name("c"))
+                    .environment(
+                        EnvironmentBuilder::new().name("env").resolver(registration_decl.clone()),
                     )
                     .build(),
             ),
@@ -1862,12 +1825,9 @@ mod tests {
             (
                 a_url.clone(),
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new_lazy_child("b").environment("env"))
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_resolver(registration_decl.clone()),
+                    .child(ChildBuilder::new().name("b").environment("env"))
+                    .environment(
+                        EnvironmentBuilder::new().name("env").resolver(registration_decl.clone()),
                     )
                     .capability(resolver_decl.clone())
                     .build(),
@@ -1875,7 +1835,7 @@ mod tests {
             (
                 b_url,
                 ComponentDeclBuilder::new_empty_component()
-                    .add_child(ChildDeclBuilder::new().name("c").url(&c_url))
+                    .child(ChildBuilder::new().name("c").url(&c_url))
                     .build(),
             ),
             (c_url, ComponentDeclBuilder::new_empty_component().build()),
@@ -1923,7 +1883,7 @@ mod tests {
             (
                 a_url.clone(),
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new().name("b").url(&b_url))
+                    .child(ChildBuilder::new().name("b").url(&b_url))
                     .build(),
             ),
             (b_url, ComponentDeclBuilder::new().build()),
@@ -1969,12 +1929,11 @@ mod tests {
             (
                 a_url.clone(),
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new().name("b").url(b_relative).environment("env"))
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").url(b_relative).environment("env"))
+                    .environment(
+                        EnvironmentBuilder::new()
                             .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_resolver(resolver_registration.clone()),
+                            .resolver(resolver_registration.clone()),
                     )
                     .capability(resolver_decl.clone())
                     .build(),
@@ -2115,13 +2074,12 @@ mod tests {
             (
                 a_url.clone(),
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new().name("b").url(&b_url).environment("env"))
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").url(&b_url).environment("env"))
+                    .environment(
+                        EnvironmentBuilder::new()
                             .name("env")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_resolver(resolver_registration_decl.clone())
-                            .add_runner(runner_registration_decl.clone()),
+                            .resolver(resolver_registration_decl.clone())
+                            .runner(runner_registration_decl.clone()),
                     )
                     .offer(offer_directory_decl.clone())
                     .capability(directory_decl.clone())
@@ -2274,7 +2232,7 @@ mod tests {
             (
                 a_url.clone(),
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new().name("b").url(&b_url))
+                    .child(ChildBuilder::new().name("b").url(&b_url))
                     .offer(offer_protocol_decl.clone())
                     .build(),
             ),
@@ -2326,7 +2284,7 @@ mod tests {
             (
                 a_url.clone(),
                 ComponentDeclBuilder::new()
-                    .add_child(ChildDeclBuilder::new().name("b").url(&b_url))
+                    .child(ChildBuilder::new().name("b").url(&b_url))
                     .offer(offer_protocol_decl.clone())
                     .build(),
             ),

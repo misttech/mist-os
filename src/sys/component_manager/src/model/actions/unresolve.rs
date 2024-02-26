@@ -110,7 +110,7 @@ pub mod tests {
         },
         assert_matches::assert_matches,
         cm_rust::{Availability, UseEventStreamDecl, UseSource},
-        cm_rust_testing::{CollectionDeclBuilder, ComponentDeclBuilder},
+        cm_rust_testing::*,
         cm_types::Name,
         fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync,
         moniker::{Moniker, MonikerBase},
@@ -129,9 +129,9 @@ pub mod tests {
     #[fuchsia::test]
     async fn unresolve_action_recursive_test() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
-            ("b", ComponentDeclBuilder::new().add_lazy_child("c").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").build()),
+            ("b", ComponentDeclBuilder::new().child_default("c").build()),
             ("c", component_decl_with_test_runner()),
         ];
         // Resolve components without starting them.
@@ -174,9 +174,20 @@ pub mod tests {
     #[fuchsia::test]
     async fn unresolve_action_recursive_test2() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
-            ("b", ComponentDeclBuilder::new().add_eager_child("c").add_eager_child("d").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("d").eager().build())
+                    .build(),
+            ),
             ("c", component_decl_with_test_runner()),
             ("d", component_decl_with_test_runner()),
         ];
@@ -235,8 +246,8 @@ pub mod tests {
     #[fuchsia::test]
     async fn unresolve_action_registers_unresolve_event_test() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            ("a", ComponentDeclBuilder::new().child_default("b").build()),
             ("b", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
@@ -285,15 +296,12 @@ pub mod tests {
     async fn start_collection(
         durability: fdecl::Durability,
     ) -> (ActionsTest, Arc<ComponentInstance>, Arc<ComponentInstance>, Arc<ComponentInstance>) {
-        let collection = CollectionDeclBuilder::new()
-            .name("coll")
-            .durability(durability)
-            .allow_long_names(true)
-            .build();
+        let collection =
+            CollectionBuilder::new().name("coll").durability(durability).allow_long_names().build();
 
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("container").build()),
-            ("container", ComponentDeclBuilder::new().add_collection(collection).build()),
+            ("root", ComponentDeclBuilder::new().child_default("container").build()),
+            ("container", ComponentDeclBuilder::new().collection(collection).build()),
             ("a", component_decl_with_test_runner()),
             ("b", component_decl_with_test_runner()),
         ];

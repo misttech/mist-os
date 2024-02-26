@@ -631,7 +631,7 @@ mod tests {
             error::RoutingError,
         },
         cm_rust::*,
-        cm_rust_testing::{ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder},
+        cm_rust_testing::{ChildBuilder, CollectionBuilder, ComponentDeclBuilder},
         fuchsia_async as fasync,
         maplit::hashmap,
         moniker::{Moniker, MonikerBase},
@@ -801,12 +801,12 @@ mod tests {
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
-                    .add_collection(CollectionDeclBuilder::new_transient_collection("coll1"))
-                    .add_collection(CollectionDeclBuilder::new_transient_collection("coll2"))
-                    .add_lazy_child("static_a")
-                    .add_lazy_child("static_b")
+                    .collection(CollectionBuilder::new().name("coll1"))
+                    .collection(CollectionBuilder::new().name("coll2"))
+                    .child_default("static_a")
+                    .child_default("static_b")
                     // This child is not included in the aggregate.
-                    .add_lazy_child("static_c")
+                    .child_default("static_c")
                     .build(),
             ),
             ("foo", leaf_component_decl.clone()),
@@ -888,24 +888,9 @@ mod tests {
             .build()
             .await;
 
-        test.create_dynamic_child(
-            &Moniker::root(),
-            "coll1",
-            ChildDeclBuilder::new_lazy_child("foo"),
-        )
-        .await;
-        test.create_dynamic_child(
-            &Moniker::root(),
-            "coll1",
-            ChildDeclBuilder::new_lazy_child("bar"),
-        )
-        .await;
-        test.create_dynamic_child(
-            &Moniker::root(),
-            "coll2",
-            ChildDeclBuilder::new_lazy_child("baz"),
-        )
-        .await;
+        test.create_dynamic_child(&Moniker::root(), "coll1", ChildBuilder::new().name("foo")).await;
+        test.create_dynamic_child(&Moniker::root(), "coll1", ChildBuilder::new().name("bar")).await;
+        test.create_dynamic_child(&Moniker::root(), "coll2", ChildBuilder::new().name("baz")).await;
         let root = test.model.root();
         let foo_component =
             root.find_and_maybe_resolve(&"coll1:foo".parse().unwrap()).await.unwrap();
@@ -1066,7 +1051,7 @@ mod tests {
                         source_instance_filter: None,
                         renamed_instances: None,
                     }))
-                    .add_lazy_child("container")
+                    .child_default("container")
                     .build(),
             ),
             (
@@ -1110,8 +1095,8 @@ mod tests {
                         source_instance_filter: None,
                         renamed_instances: None,
                     }))
-                    .add_collection(CollectionDeclBuilder::new_transient_collection("coll"))
-                    .add_lazy_child("target")
+                    .collection_default("coll")
+                    .child_default("target")
                     .build(),
             ),
             (
@@ -1164,13 +1149,13 @@ mod tests {
         test.create_dynamic_child(
             &"container".parse().unwrap(),
             "coll",
-            ChildDeclBuilder::new_lazy_child("foo"),
+            ChildBuilder::new().name("foo"),
         )
         .await;
         test.create_dynamic_child(
             &"container".parse().unwrap(),
             "coll",
-            ChildDeclBuilder::new_lazy_child("bar"),
+            ChildBuilder::new().name("bar"),
         )
         .await;
 
@@ -1385,18 +1370,8 @@ mod tests {
             .await;
 
         let root = test.model.root();
-        test.create_dynamic_child(
-            &Moniker::root(),
-            "coll1",
-            ChildDeclBuilder::new_lazy_child("foo"),
-        )
-        .await;
-        test.create_dynamic_child(
-            &Moniker::root(),
-            "coll1",
-            ChildDeclBuilder::new_lazy_child("bar"),
-        )
-        .await;
+        test.create_dynamic_child(&Moniker::root(), "coll1", ChildBuilder::new().name("foo")).await;
+        test.create_dynamic_child(&Moniker::root(), "coll1", ChildBuilder::new().name("bar")).await;
         let foo_component =
             root.find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
 
@@ -1458,18 +1433,8 @@ mod tests {
             .await;
 
         let root = test.model.root();
-        test.create_dynamic_child(
-            &Moniker::root(),
-            "coll1",
-            ChildDeclBuilder::new_lazy_child("foo"),
-        )
-        .await;
-        test.create_dynamic_child(
-            &Moniker::root(),
-            "coll2",
-            ChildDeclBuilder::new_lazy_child("bar"),
-        )
-        .await;
+        test.create_dynamic_child(&Moniker::root(), "coll1", ChildBuilder::new().name("foo")).await;
+        test.create_dynamic_child(&Moniker::root(), "coll2", ChildBuilder::new().name("bar")).await;
         let foo_component =
             root.find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
         let bar_component =
@@ -1548,12 +1513,7 @@ mod tests {
             .await;
 
         let root = test.model.root();
-        test.create_dynamic_child(
-            &Moniker::root(),
-            "coll1",
-            ChildDeclBuilder::new_lazy_child("foo"),
-        )
-        .await;
+        test.create_dynamic_child(&Moniker::root(), "coll1", ChildBuilder::new().name("foo")).await;
         let foo_component = root
             .find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap())
             .await

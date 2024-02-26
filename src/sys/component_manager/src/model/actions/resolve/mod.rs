@@ -179,7 +179,7 @@ pub mod tests {
     #[fuchsia::test]
     async fn resolve_action_test() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
             ("a", component_decl_with_test_runner()),
         ];
         // Resolve and start the components.

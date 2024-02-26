@@ -106,11 +106,7 @@ async fn use_in_collection_from_parent() {
             "a",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new()
-                        .name("data")
-                        .path("/data")
-                        .rights(fio::RW_STAR_DIR)
-                        .build(),
+                    DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                 )
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source: OfferSource::Self_,
@@ -123,7 +119,7 @@ async fn use_in_collection_from_parent() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("b")
+                .child_default("b")
                 .build(),
         ),
         (
@@ -156,18 +152,16 @@ async fn use_in_collection_from_parent() {
                         .name("data")
                         .backing_dir("minfs")
                         .source(StorageDirectorySource::Parent)
-                        .subdir("data")
-                        .build(),
+                        .subdir("data"),
                 )
                 .capability(
                     StorageBuilder::new()
                         .name("cache")
                         .backing_dir("minfs")
                         .source(StorageDirectorySource::Parent)
-                        .subdir("cache")
-                        .build(),
+                        .subdir("cache"),
                 )
-                .add_transient_collection("coll")
+                .collection_default("coll")
                 .build(),
         ),
         (
@@ -266,11 +260,7 @@ async fn use_in_collection_from_grandparent() {
             "a",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new()
-                        .name("minfs")
-                        .path("/data")
-                        .rights(fio::RW_STAR_DIR)
-                        .build(),
+                    DirectoryBuilder::new().name("minfs").path("/data").rights(fio::RW_STAR_DIR),
                 )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
@@ -286,22 +276,20 @@ async fn use_in_collection_from_grandparent() {
                     target_name: "cache".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("b")
+                .child_default("b")
                 .capability(
                     StorageBuilder::new()
                         .name("data")
                         .backing_dir("minfs")
                         .source(StorageDirectorySource::Self_)
-                        .subdir("data")
-                        .build(),
+                        .subdir("data"),
                 )
                 .capability(
                     StorageBuilder::new()
                         .name("cache")
                         .backing_dir("minfs")
                         .source(StorageDirectorySource::Self_)
-                        .subdir("cache")
-                        .build(),
+                        .subdir("cache"),
                 )
                 .build(),
         ),
@@ -330,7 +318,7 @@ async fn use_in_collection_from_grandparent() {
                     target_name: "cache".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_transient_collection("coll")
+                .collection_default("coll")
                 .build(),
         ),
         (
@@ -498,19 +486,14 @@ async fn use_restricted_storage_start_failure() {
             "provider",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new()
-                        .name("data")
-                        .path("/data")
-                        .rights(fio::RW_STAR_DIR)
-                        .build(),
+                    DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                 )
                 .capability(
                     StorageBuilder::new()
                         .name("cache")
                         .backing_dir("data")
                         .source(StorageDirectorySource::Self_)
-                        .storage_id(fdecl::StorageId::StaticInstanceId)
-                        .build(),
+                        .storage_id(fdecl::StorageId::StaticInstanceId),
                 )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
@@ -519,7 +502,7 @@ async fn use_restricted_storage_start_failure() {
                     target_name: "cache".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("parent_consumer")
+                .child_default("parent_consumer")
                 .build(),
         ),
         (
@@ -537,7 +520,7 @@ async fn use_restricted_storage_start_failure() {
                     target_name: "cache".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("child_consumer")
+                .child_default("child_consumer")
                 .build(),
         ),
         (
@@ -604,18 +587,13 @@ async fn use_restricted_storage_open_failure() {
             "provider",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new()
-                        .name("data")
-                        .path("/data")
-                        .rights(fio::RW_STAR_DIR)
-                        .build(),
+                    DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                 )
                 .capability(
                     StorageBuilder::new()
                         .name("cache")
                         .backing_dir("data")
-                        .source(StorageDirectorySource::Self_)
-                        .build(),
+                        .source(StorageDirectorySource::Self_),
                 )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
@@ -624,7 +602,7 @@ async fn use_restricted_storage_open_failure() {
                     target_name: "cache".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("parent_consumer")
+                .child_default("parent_consumer")
                 .build(),
         ),
         (
@@ -736,18 +714,13 @@ async fn open_storage_subdirectory() {
             "provider",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new()
-                        .name("data")
-                        .path("/data")
-                        .rights(fio::RW_STAR_DIR)
-                        .build(),
+                    DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                 )
                 .capability(
                     StorageBuilder::new()
                         .name("cache")
                         .backing_dir("data")
-                        .source(StorageDirectorySource::Self_)
-                        .build(),
+                        .source(StorageDirectorySource::Self_),
                 )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
@@ -756,7 +729,7 @@ async fn open_storage_subdirectory() {
                     target_name: "cache".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("consumer")
+                .child_default("consumer")
                 .build(),
         ),
         (
@@ -858,18 +831,13 @@ async fn storage_persistence_moniker_path() {
             "a",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new()
-                        .name("minfs")
-                        .path("/data")
-                        .rights(fio::RW_STAR_DIR)
-                        .build(),
+                    DirectoryBuilder::new().name("minfs").path("/data").rights(fio::RW_STAR_DIR),
                 )
                 .capability(
                     StorageBuilder::new()
                         .name("data")
                         .backing_dir("minfs")
-                        .source(StorageDirectorySource::Self_)
-                        .build(),
+                        .source(StorageDirectorySource::Self_),
                 )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
@@ -887,7 +855,7 @@ async fn storage_persistence_moniker_path() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("b")
+                .child_default("b")
                 .build(),
         ),
         (
@@ -921,9 +889,8 @@ async fn storage_persistence_moniker_path() {
                     target_name: "data".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("persistent_coll")
-                        .persistent_storage(true),
+                .collection(
+                    CollectionBuilder::new().name("persistent_coll").persistent_storage(true),
                 )
                 .build(),
         ),
@@ -1047,18 +1014,13 @@ async fn storage_persistence_instance_id_path() {
             "a",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new()
-                        .name("minfs")
-                        .path("/data")
-                        .rights(fio::RW_STAR_DIR)
-                        .build(),
+                    DirectoryBuilder::new().name("minfs").path("/data").rights(fio::RW_STAR_DIR),
                 )
                 .capability(
                     StorageBuilder::new()
                         .name("data")
                         .backing_dir("minfs")
-                        .source(StorageDirectorySource::Self_)
-                        .build(),
+                        .source(StorageDirectorySource::Self_),
                 )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
@@ -1076,7 +1038,7 @@ async fn storage_persistence_instance_id_path() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("b")
+                .child_default("b")
                 .build(),
         ),
         (
@@ -1110,9 +1072,8 @@ async fn storage_persistence_instance_id_path() {
                     target_name: "data".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("persistent_coll")
-                        .persistent_storage(true),
+                .collection(
+                    CollectionBuilder::new().name("persistent_coll").persistent_storage(true),
                 )
                 .build(),
         ),
@@ -1240,18 +1201,13 @@ async fn storage_persistence_inheritance() {
             "a",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new()
-                        .name("minfs")
-                        .path("/data")
-                        .rights(fio::RW_STAR_DIR)
-                        .build(),
+                    DirectoryBuilder::new().name("minfs").path("/data").rights(fio::RW_STAR_DIR),
                 )
                 .capability(
                     StorageBuilder::new()
                         .name("data")
                         .backing_dir("minfs")
-                        .source(StorageDirectorySource::Self_)
-                        .build(),
+                        .source(StorageDirectorySource::Self_),
                 )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
@@ -1260,7 +1216,7 @@ async fn storage_persistence_inheritance() {
                     target_name: "data".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("b")
+                .child_default("b")
                 .build(),
         ),
         (
@@ -1286,9 +1242,8 @@ async fn storage_persistence_inheritance() {
                     target_name: "data".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("persistent_coll")
-                        .persistent_storage(true),
+                .collection(
+                    CollectionBuilder::new().name("persistent_coll").persistent_storage(true),
                 )
                 .build(),
         ),
@@ -1322,8 +1277,8 @@ async fn storage_persistence_inheritance() {
                     target_name: "data".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("d")
-                .add_transient_collection("lower_coll")
+                .child_default("d")
+                .collection_default("lower_coll")
                 .build(),
         ),
         (
@@ -1496,18 +1451,13 @@ async fn storage_persistence_disablement() {
             "a",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new()
-                        .name("minfs")
-                        .path("/data")
-                        .rights(fio::RW_STAR_DIR)
-                        .build(),
+                    DirectoryBuilder::new().name("minfs").path("/data").rights(fio::RW_STAR_DIR),
                 )
                 .capability(
                     StorageBuilder::new()
                         .name("data")
                         .backing_dir("minfs")
-                        .source(StorageDirectorySource::Self_)
-                        .build(),
+                        .source(StorageDirectorySource::Self_),
                 )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
@@ -1516,7 +1466,7 @@ async fn storage_persistence_disablement() {
                     target_name: "data".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("b")
+                .child_default("b")
                 .build(),
         ),
         (
@@ -1542,9 +1492,8 @@ async fn storage_persistence_disablement() {
                     target_name: "data".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("persistent_coll")
-                        .persistent_storage(true),
+                .collection(
+                    CollectionBuilder::new().name("persistent_coll").persistent_storage(true),
                 )
                 .build(),
         ),
@@ -1578,10 +1527,9 @@ async fn storage_persistence_disablement() {
                     target_name: "data".parse().unwrap(),
                     availability: Availability::Required,
                 }))
-                .add_lazy_child("d")
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("non_persistent_coll")
-                        .persistent_storage(false),
+                .child_default("d")
+                .collection(
+                    CollectionBuilder::new().name("non_persistent_coll").persistent_storage(false),
                 )
                 .build(),
         ),

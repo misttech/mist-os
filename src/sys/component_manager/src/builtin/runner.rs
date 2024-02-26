@@ -207,7 +207,7 @@ mod tests {
             (
                 "a",
                 ComponentDeclBuilder::new_empty_component()
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .add_program("elf")
                     .build(),
             ),

@@ -191,7 +191,7 @@ mod tests {
         },
         cm_rust::{RegistrationSource, RunnerRegistration},
         cm_rust_testing::{
-            ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder,
+            ChildBuilder, CollectionBuilder, ComponentDeclBuilder, EnvironmentBuilder,
         },
         cm_types::Name,
         fidl_fuchsia_component as fcomponent,
@@ -213,7 +213,7 @@ mod tests {
         );
         let environment = Environment::from_decl(
             &component,
-            &EnvironmentDeclBuilder::new()
+            &EnvironmentBuilder::new()
                 .name("env")
                 .extends(fdecl::EnvironmentExtends::None)
                 .stop_timeout(1234)
@@ -223,7 +223,7 @@ mod tests {
 
         let environment = Environment::from_decl(
             &component,
-            &EnvironmentDeclBuilder::new()
+            &EnvironmentBuilder::new()
                 .name("env")
                 .extends(fdecl::EnvironmentExtends::Realm)
                 .build(),
@@ -232,17 +232,15 @@ mod tests {
 
         let environment = Environment::from_decl(
             &component,
-            &EnvironmentDeclBuilder::new()
+            &EnvironmentBuilder::new()
                 .name("env")
                 .extends(fdecl::EnvironmentExtends::None)
                 .stop_timeout(1234)
-                .add_debug_registration(cm_rust::DebugRegistration::Protocol(
-                    cm_rust::DebugProtocolRegistration {
-                        source_name: "source_name".parse().unwrap(),
-                        target_name: "target_name".parse().unwrap(),
-                        source: RegistrationSource::Parent,
-                    },
-                ))
+                .debug(cm_rust::DebugRegistration::Protocol(cm_rust::DebugProtocolRegistration {
+                    source_name: "source_name".parse().unwrap(),
+                    target_name: "target_name".parse().unwrap(),
+                    source: RegistrationSource::Parent,
+                }))
                 .build(),
         );
         let expected_debug_capability: HashMap<Name, DebugRegistration> = hashmap! {
@@ -266,31 +264,20 @@ mod tests {
             resolver.add_component(
                 "root",
                 ComponentDeclBuilder::new_empty_component()
-                    .add_child(
-                        ChildDeclBuilder::new().name("a").url("test:///a").environment("env_a"),
-                    )
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env_a")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .add_debug_registration(cm_rust::DebugRegistration::Protocol(
-                                cm_rust::DebugProtocolRegistration {
-                                    source_name: "source_name".parse().unwrap(),
-                                    target_name: "target_name".parse().unwrap(),
-                                    source: RegistrationSource::Parent,
-                                },
-                            )),
-                    )
+                    .child(ChildBuilder::new().name("a").environment("env_a"))
+                    .environment(EnvironmentBuilder::new().name("env_a").debug(
+                        cm_rust::DebugRegistration::Protocol(cm_rust::DebugProtocolRegistration {
+                            source_name: "source_name".parse().unwrap(),
+                            target_name: "target_name".parse().unwrap(),
+                            source: RegistrationSource::Parent,
+                        }),
+                    ))
                     .build(),
             );
             resolver.add_component(
                 "a",
                 ComponentDeclBuilder::new_empty_component()
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env_b")
-                            .extends(fdecl::EnvironmentExtends::Realm),
-                    )
+                    .environment(EnvironmentBuilder::new().name("env_b"))
                     .build(),
             );
             let resolvers = {
@@ -355,9 +342,9 @@ mod tests {
         resolver.add_component(
             "root",
             ComponentDeclBuilder::new_empty_component()
-                .add_child(ChildDeclBuilder::new().name("a").url("test:///a").environment("env_a"))
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
+                .child(ChildBuilder::new().name("a").environment("env_a"))
+                .environment(
+                    EnvironmentBuilder::new()
                         .name("env_a")
                         .extends(fdecl::EnvironmentExtends::Realm),
                 )
@@ -366,9 +353,9 @@ mod tests {
         resolver.add_component(
             "a",
             ComponentDeclBuilder::new_empty_component()
-                .add_child(ChildDeclBuilder::new().name("b").url("test:///b").environment("env_b"))
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
+                .child(ChildBuilder::new().name("b").environment("env_b"))
+                .environment(
+                    EnvironmentBuilder::new()
                         .name("env_b")
                         .extends(fdecl::EnvironmentExtends::Realm),
                 )
@@ -446,17 +433,17 @@ mod tests {
         resolver.add_component(
             "root",
             ComponentDeclBuilder::new_empty_component()
-                .add_child(ChildDeclBuilder::new().name("a").url("test:///a").environment("env_a"))
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
+                .child(ChildBuilder::new().name("a").environment("env_a"))
+                .environment(
+                    EnvironmentBuilder::new()
                         .name("env_a")
                         .extends(fdecl::EnvironmentExtends::Realm)
-                        .add_runner(RunnerRegistration {
+                        .runner(RunnerRegistration {
                             source: RegistrationSource::Parent,
                             source_name: "test-src".parse().unwrap(),
                             target_name: "test".parse().unwrap(),
                         })
-                        .add_debug_registration(cm_rust::DebugRegistration::Protocol(
+                        .debug(cm_rust::DebugRegistration::Protocol(
                             cm_rust::DebugProtocolRegistration {
                                 source_name: "source_name".parse().unwrap(),
                                 target_name: "target_name".parse().unwrap(),
@@ -469,9 +456,9 @@ mod tests {
         resolver.add_component(
             "a",
             ComponentDeclBuilder::new_empty_component()
-                .add_child(ChildDeclBuilder::new().name("b").url("test:///b").environment("env_b"))
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
+                .child(ChildBuilder::new().name("b").environment("env_b"))
+                .environment(
+                    EnvironmentBuilder::new()
                         .name("env_b")
                         .extends(fdecl::EnvironmentExtends::Realm),
                 )
@@ -576,17 +563,17 @@ mod tests {
         resolver.add_component(
             "root",
             ComponentDeclBuilder::new_empty_component()
-                .add_child(ChildDeclBuilder::new().name("a").url("test:///a").environment("env_a"))
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
+                .child(ChildBuilder::new().name("a").environment("env_a"))
+                .environment(
+                    EnvironmentBuilder::new()
                         .name("env_a")
                         .extends(fdecl::EnvironmentExtends::Realm)
-                        .add_runner(RunnerRegistration {
+                        .runner(RunnerRegistration {
                             source: RegistrationSource::Parent,
                             source_name: "test-src".parse().unwrap(),
                             target_name: "test".parse().unwrap(),
                         })
-                        .add_debug_registration(cm_rust::DebugRegistration::Protocol(
+                        .debug(cm_rust::DebugRegistration::Protocol(
                             cm_rust::DebugProtocolRegistration {
                                 source_name: "source_name".parse().unwrap(),
                                 target_name: "target_name".parse().unwrap(),
@@ -599,11 +586,9 @@ mod tests {
         resolver.add_component(
             "a",
             ComponentDeclBuilder::new_empty_component()
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("coll").environment("env_b"),
-                )
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
+                .collection(CollectionBuilder::new().name("coll").environment("env_b"))
+                .environment(
+                    EnvironmentBuilder::new()
                         .name("env_b")
                         .extends(fdecl::EnvironmentExtends::Realm),
                 )
@@ -642,7 +627,7 @@ mod tests {
                 .root()
                 .start_instance(&vec!["a"].try_into().unwrap(), &StartReason::Eager)
                 .await?;
-            let child_decl = ChildDeclBuilder::new_lazy_child("b").build();
+            let child_decl = ChildBuilder::new().name("b").build();
             parent
                 .add_dynamic_child(
                     "coll".into(),
@@ -707,9 +692,9 @@ mod tests {
         resolver.add_component(
             "root",
             ComponentDeclBuilder::new_empty_component()
-                .add_child(ChildDeclBuilder::new().name("a").url("test:///a").environment("env_a"))
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
+                .child(ChildBuilder::new().name("a").environment("env_a"))
+                .environment(
+                    EnvironmentBuilder::new()
                         .name("env_a")
                         .extends(fdecl::EnvironmentExtends::Realm),
                 )
@@ -718,7 +703,7 @@ mod tests {
         resolver.add_component(
             "a",
             ComponentDeclBuilder::new_empty_component()
-                .add_child(ChildDeclBuilder::new().name("b").url("test:///b"))
+                .child(ChildBuilder::new().name("b"))
                 .build(),
         );
         resolver.add_component("b", ComponentDeclBuilder::new_empty_component().build());
@@ -780,9 +765,9 @@ mod tests {
         resolver.add_component(
             "root",
             ComponentDeclBuilder::new_empty_component()
-                .add_child(ChildDeclBuilder::new().name("a").url("test:///a").environment("env_a"))
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
+                .child(ChildBuilder::new().name("a").environment("env_a"))
+                .environment(
+                    EnvironmentBuilder::new()
                         .name("env_a")
                         .extends(fdecl::EnvironmentExtends::Realm),
                 )
@@ -791,9 +776,9 @@ mod tests {
         resolver.add_component(
             "a",
             ComponentDeclBuilder::new_empty_component()
-                .add_child(ChildDeclBuilder::new().name("b").url("test:///b").environment("env_b"))
-                .add_environment(
-                    EnvironmentDeclBuilder::new()
+                .child(ChildBuilder::new().name("b").environment("env_b"))
+                .environment(
+                    EnvironmentBuilder::new()
                         .name("env_b")
                         .extends(fdecl::EnvironmentExtends::None)
                         .stop_timeout(1234),

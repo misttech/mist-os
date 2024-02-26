@@ -486,7 +486,7 @@ mod tests {
                     .use_(use_from_framework_decl)
                     .use_(use_from_child_decl)
                     .expose(expose_from_child_decl)
-                    .add_lazy_child("my_child")
+                    .child_default("my_child")
                     .build(),
             ),
             (
@@ -627,7 +627,7 @@ mod tests {
                     .use_(invalid_source_use_from_child_decl)
                     .expose(invalid_source_name_expose_from_child_decl)
                     .expose(invalid_source_expose_from_child_decl)
-                    .add_lazy_child("my_child")
+                    .child_default("my_child")
                     .build(),
             ),
             ("my_child", ComponentDeclBuilder::new().build()),
@@ -757,7 +757,7 @@ mod tests {
                     .use_(use_from_framework_decl)
                     .use_(use_from_child_decl)
                     .expose(expose_from_child_decl)
-                    .add_lazy_child("my_child")
+                    .child_default("my_child")
                     .build(),
             ),
             (
@@ -889,7 +889,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .use_(use_from_framework_decl)
                     .expose(expose_from_child_decl)
-                    .add_lazy_child("my_child")
+                    .child_default("my_child")
                     .build(),
             ),
             (
@@ -1013,7 +1013,7 @@ mod tests {
                     .expose(expose_from_child_decl)
                     .expose(expose_from_child_decl2)
                     .expose(expose_from_child_decl3)
-                    .add_lazy_child("my_child")
+                    .child_default("my_child")
                     .build(),
             ),
             (
@@ -1127,8 +1127,8 @@ mod tests {
                 "root",
                 ComponentDeclBuilder::new()
                     .offer(offer_from_collection_decl)
-                    .add_transient_collection("coll")
-                    .add_lazy_child("target")
+                    .collection_default("coll")
+                    .child_default("target")
                     .build(),
             ),
             ("target", ComponentDeclBuilder::new().use_(use_decl).build()),
@@ -1306,7 +1306,7 @@ mod tests {
                     .use_(invalid_source_use_from_child_decl)
                     .expose(invalid_source_name_expose_from_child_decl)
                     .expose(invalid_source_expose_from_child_decl)
-                    .add_lazy_child("my_child")
+                    .child_default("my_child")
                     .build(),
             ),
             ("my_child", ComponentDeclBuilder::new().build()),

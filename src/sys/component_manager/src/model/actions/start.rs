@@ -569,7 +569,7 @@ mod tests {
         assert_matches::assert_matches,
         async_trait::async_trait,
         cm_rust::ComponentDecl,
-        cm_rust_testing::{ChildDeclBuilder, ComponentDeclBuilder},
+        cm_rust_testing::{ChildBuilder, ComponentDeclBuilder},
         fuchsia, fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::{channel::mpsc, stream::FuturesUnordered, FutureExt, StreamExt},
         moniker::Moniker,
@@ -751,7 +751,7 @@ mod tests {
     async fn start_aborted_by_stop() {
         let root_name = "root";
         let components = vec![
-            (root_name, ComponentDeclBuilder::new().add_lazy_child(TEST_CHILD_NAME).build()),
+            (root_name, ComponentDeclBuilder::new().child_default(TEST_CHILD_NAME).build()),
             (TEST_CHILD_NAME, test_helpers::component_decl_with_test_runner()),
         ];
         let builder = RoutingTestBuilder::new(components[0].0, components);
@@ -854,7 +854,7 @@ mod tests {
         let original_decl =
             resolver.get_component_decl(TEST_CHILD_NAME).expect("child decl not stored");
         let mut modified_decl = original_decl.clone();
-        modified_decl.children.push(ChildDeclBuilder::new().name("foo").build());
+        modified_decl.children.push(ChildBuilder::new().name("foo").build());
         resolver.add_component(TEST_CHILD_NAME, modified_decl.clone());
 
         ActionSet::register(
@@ -874,7 +874,7 @@ mod tests {
     ) -> (ActionsTest, Arc<ComponentInstance>) {
         let root_name = "root";
         let components = vec![
-            (root_name, ComponentDeclBuilder::new().add_lazy_child(child_name).build()),
+            (root_name, ComponentDeclBuilder::new().child_default(child_name).build()),
             (child_name, test_helpers::component_decl_with_test_runner()),
         ];
         let test_topology = ActionsTest::new(components[0].0, components, None).await;
@@ -912,7 +912,7 @@ mod tests {
             Some(Err(StartActionError::InstanceDestroyed { moniker: _ }))
         );
         let (_, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
-        let decl = ComponentDeclBuilder::new().add_lazy_child(TEST_CHILD_NAME).build();
+        let decl = ComponentDeclBuilder::new().child_default(TEST_CHILD_NAME).build();
         let resolved_component = Component {
             resolved_url: "".to_string(),
             context_to_resolve_children: None,

@@ -2632,7 +2632,7 @@ pub mod tests {
             OfferSource, OfferTarget, UseEventStreamDecl, UseProtocolDecl, UseSource,
         },
         cm_rust_testing::{
-            ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder,
+            ChildBuilder, CollectionBuilder, ComponentDeclBuilder, EnvironmentBuilder,
             ProtocolBuilder,
         },
         component_id_index::InstanceId,
@@ -2708,8 +2708,18 @@ pub mod tests {
     /// the component is stopped.
     async fn test_early_component_exit() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_eager_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
+            (
+                "root",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("a").eager().build())
+                    .build(),
+            ),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .build(),
+            ),
             ("b", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
@@ -2782,9 +2792,20 @@ pub mod tests {
     #[fuchsia::test]
     async fn unresolve_test() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
-            ("b", ComponentDeclBuilder::new().add_eager_child("c").add_eager_child("d").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("d").eager().build())
+                    .build(),
+            ),
             ("c", component_decl_with_test_runner()),
             ("d", component_decl_with_test_runner()),
         ];
@@ -2812,8 +2833,18 @@ pub mod tests {
     #[fuchsia::test]
     async fn realm_instance_id() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_eager_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
+            (
+                "root",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("a").eager().build())
+                    .build(),
+            ),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .build(),
+            ),
             ("b", component_decl_with_test_runner()),
         ];
 
@@ -2880,22 +2911,16 @@ pub mod tests {
             availability: Availability::Required,
         });
 
-        let env_a = EnvironmentDeclBuilder::new()
-            .name("env_a")
-            .extends(fdecl::EnvironmentExtends::Realm)
-            .build();
-        let env_b = EnvironmentDeclBuilder::new()
-            .name("env_b")
-            .extends(fdecl::EnvironmentExtends::Realm)
-            .build();
+        let env_a = EnvironmentBuilder::new().name("env_a").build();
+        let env_b = EnvironmentBuilder::new().name("env_b").build();
 
         let root_decl = ComponentDeclBuilder::new()
-            .add_environment(env_a.clone())
-            .add_environment(env_b.clone())
-            .add_child(ChildDeclBuilder::new().name("a").environment("env_a").build())
-            .add_child(ChildDeclBuilder::new().name("b").environment("env_b").build())
-            .add_lazy_child("c")
-            .add_transient_collection("coll")
+            .environment(env_a.clone())
+            .environment(env_b.clone())
+            .child(ChildBuilder::new().name("a").environment("env_a").build())
+            .child(ChildBuilder::new().name("b").environment("env_b").build())
+            .child_default("c")
+            .collection_default("coll")
             .offer(example_offer.clone())
             .expose(example_expose.clone())
             .capability(example_capability.clone())
@@ -2961,30 +2986,20 @@ pub mod tests {
             (
                 "root",
                 ComponentDeclBuilder::new()
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env_a")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .build(),
+                    .environment(EnvironmentBuilder::new().name("env_a"))
+                    .environment(EnvironmentBuilder::new().name("env_b"))
+                    .child(ChildBuilder::new().name("a").environment("env_a").build())
+                    .child_default("b")
+                    .collection(
+                        CollectionBuilder::new()
+                            .name("coll_1")
+                            .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                     )
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .name("env_b")
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .build(),
-                    )
-                    .add_child(ChildDeclBuilder::new().name("a").environment("env_a").build())
-                    .add_lazy_child("b")
-                    .add_collection(
-                        CollectionDeclBuilder::new_transient_collection("coll_1")
-                            .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic)
-                            .build(),
-                    )
-                    .add_collection(
-                        CollectionDeclBuilder::new_transient_collection("coll_2")
+                    .collection(
+                        CollectionBuilder::new()
+                            .name("coll_2")
                             .environment("env_b")
-                            .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic)
-                            .build(),
+                            .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                     )
                     .offer(example_offer.clone())
                     .build(),
@@ -3196,11 +3211,11 @@ pub mod tests {
             (
                 "root",
                 ComponentDeclBuilder::new()
-                    .add_lazy_child("static_child")
-                    .add_collection(
-                        CollectionDeclBuilder::new_transient_collection("coll")
-                            .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic)
-                            .build(),
+                    .child_default("static_child")
+                    .collection(
+                        CollectionBuilder::new()
+                            .name("coll")
+                            .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                     )
                     .offer(example_offer.clone())
                     .build(),
@@ -3250,15 +3265,15 @@ pub mod tests {
         let components = vec![(
             "root",
             ComponentDeclBuilder::new()
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("coll1")
-                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic)
-                        .build(),
+                .collection(
+                    CollectionBuilder::new()
+                        .name("coll1")
+                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                 )
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("coll2")
-                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic)
-                        .build(),
+                .collection(
+                    CollectionBuilder::new()
+                        .name("coll2")
+                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                 )
                 .offer(static_collection_offer.clone())
                 .build(),
@@ -3293,10 +3308,10 @@ pub mod tests {
         let components = vec![(
             "root",
             ComponentDeclBuilder::new()
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("coll")
-                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic)
-                        .build(),
+                .collection(
+                    CollectionBuilder::new()
+                        .name("coll")
+                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                 )
                 .build(),
         )];
@@ -3328,10 +3343,10 @@ pub mod tests {
         let components = vec![(
             "root",
             ComponentDeclBuilder::new()
-                .add_collection(
-                    CollectionDeclBuilder::new_transient_collection("coll")
-                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic)
-                        .build(),
+                .collection(
+                    CollectionBuilder::new()
+                        .name("coll")
+                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                 )
                 .build(),
         )];
@@ -3486,14 +3501,11 @@ pub mod tests {
         let components = vec![(
             "root",
             ComponentDeclBuilder::new()
-                .add_collection(CollectionDecl {
-                    name: "col".parse().unwrap(),
-                    durability: fdecl::Durability::Transient,
-                    environment: None,
-                    allowed_offers: cm_types::AllowedOffers::StaticAndDynamic,
-                    allow_long_names: false,
-                    persistent_storage: Some(false),
-                })
+                .collection(
+                    CollectionBuilder::new()
+                        .name("col")
+                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
+                )
                 .build(),
         )];
         let test = ActionsTest::new("root", components, None).await;
@@ -3642,14 +3654,11 @@ pub mod tests {
         let components = vec![(
             "root",
             ComponentDeclBuilder::new()
-                .add_collection(CollectionDecl {
-                    name: "col".parse().unwrap(),
-                    durability: fdecl::Durability::Transient,
-                    environment: None,
-                    allowed_offers: cm_types::AllowedOffers::StaticAndDynamic,
-                    allow_long_names: false,
-                    persistent_storage: Some(false),
-                })
+                .collection(
+                    CollectionBuilder::new()
+                        .name("col")
+                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
+                )
                 .build(),
         )];
         let test = ActionsTest::new("root", components, None).await;
@@ -3739,7 +3748,7 @@ pub mod tests {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child(TEST_CHILD_NAME)
+                    .child_default(TEST_CHILD_NAME)
                     .build(),
             ),
             (
@@ -3806,9 +3815,20 @@ pub mod tests {
     #[fuchsia::test]
     async fn find_resolved_test() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_eager_child("b").build()),
-            ("b", ComponentDeclBuilder::new().add_eager_child("c").add_eager_child("d").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("d").eager().build())
+                    .build(),
+            ),
             ("c", component_decl_with_test_runner()),
             ("d", component_decl_with_test_runner()),
         ];

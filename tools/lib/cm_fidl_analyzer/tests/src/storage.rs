@@ -171,19 +171,14 @@ mod tests {
                 "provider",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
                     )
                     .capability(
                         StorageBuilder::new()
                             .name("cache")
                             .backing_dir("data")
                             .source(StorageDirectorySource::Self_)
-                            .storage_id(fdecl::StorageId::StaticInstanceId)
-                            .build(),
+                            .storage_id(fdecl::StorageId::StaticInstanceId),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -192,7 +187,7 @@ mod tests {
                         target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("consumer")
+                    .child_default("consumer")
                     .build(),
             ),
             (

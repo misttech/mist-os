@@ -105,7 +105,7 @@ mod tests {
                             subdir: None,
                             availability: test_case.expose_availability,
                         }))
-                        .add_lazy_child("b")
+                        .child_default("b")
                         .build(),
                 ),
                 (

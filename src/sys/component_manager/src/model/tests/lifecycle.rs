@@ -115,7 +115,7 @@ async fn bind_concurrent() {
     let (blocker, mut unblocker) = StartBlocker::new();
     let (model, _builtin_environment, mock_runner) = new_model_with(
         vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("system").build()),
+            ("root", ComponentDeclBuilder::new().child_default("system").build()),
             ("system", component_decl_with_test_runner()),
         ],
         vec![HooksRegistration::new(
@@ -167,7 +167,7 @@ async fn bind_parent_then_child() {
         vec![
             (
                 "root",
-                ComponentDeclBuilder::new().add_lazy_child("system").add_lazy_child("echo").build(),
+                ComponentDeclBuilder::new().child_default("system").child_default("echo").build(),
             ),
             ("system", component_decl_with_test_runner()),
             ("echo", component_decl_with_test_runner()),
@@ -216,12 +216,12 @@ async fn bind_child_doesnt_bind_parent() {
     let hook = Arc::new(TestHook::new());
     let (model, _builtin_environment, mock_runner) = new_model_with(
         vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("system").build()),
+            ("root", ComponentDeclBuilder::new().child_default("system").build()),
             (
                 "system",
                 ComponentDeclBuilder::new()
-                    .add_lazy_child("logger")
-                    .add_lazy_child("netstack")
+                    .child_default("logger")
+                    .child_default("netstack")
                     .build(),
             ),
             ("logger", component_decl_with_test_runner()),
@@ -260,7 +260,7 @@ async fn bind_child_doesnt_bind_parent() {
 #[fuchsia::test]
 async fn bind_child_non_existent() {
     let (model, _builtin_environment, mock_runner) = new_model(vec![
-        ("root", ComponentDeclBuilder::new().add_lazy_child("system").build()),
+        ("root", ComponentDeclBuilder::new().child_default("system").build()),
         ("system", component_decl_with_test_runner()),
     ])
     .await;
@@ -295,11 +295,17 @@ async fn bind_eager_children() {
     let hook = Arc::new(TestHook::new());
     let (model, _builtin_environment, mock_runner) = new_model_with(
         vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_eager_child("b").add_eager_child("c").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").eager())
+                    .child(ChildBuilder::new().name("c").eager())
+                    .build(),
+            ),
             ("b", component_decl_with_test_runner()),
-            ("c", ComponentDeclBuilder::new().add_eager_child("d").build()),
-            ("d", ComponentDeclBuilder::new().add_lazy_child("e").build()),
+            ("c", ComponentDeclBuilder::new().child(ChildBuilder::new().name("d").eager()).build()),
+            ("d", ComponentDeclBuilder::new().child_default("e").build()),
             ("e", component_decl_with_test_runner()),
         ],
         hook.hooks(),
@@ -332,30 +338,23 @@ async fn bind_eager_children_reentrant() {
     let hook = Arc::new(TestHook::new());
     let (model, _builtin_environment, mock_runner) = new_model_with(
         vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .add_child(
-                        ChildDeclBuilder::new()
+                    .child(
+                        ChildBuilder::new()
                             .name("b")
                             .url("test:///b")
                             .startup(fdecl::StartupMode::Eager)
-                            .environment("env")
-                            .build(),
+                            .environment("env"),
                     )
                     .runner_default("foo")
-                    .add_environment(
-                        EnvironmentDeclBuilder::new()
-                            .extends(fdecl::EnvironmentExtends::Realm)
-                            .name("env")
-                            .add_runner(RunnerRegistration {
-                                source_name: "foo".parse().unwrap(),
-                                source: RegistrationSource::Self_,
-                                target_name: "foo".parse().unwrap(),
-                            })
-                            .build(),
-                    )
+                    .environment(EnvironmentBuilder::new().name("env").runner(RunnerRegistration {
+                        source_name: "foo".parse().unwrap(),
+                        source: RegistrationSource::Self_,
+                        target_name: "foo".parse().unwrap(),
+                    }))
                     .build(),
             ),
             ("b", ComponentDeclBuilder::new_empty_component().add_program("foo").build()),
@@ -399,8 +398,13 @@ async fn bind_eager_children_reentrant() {
 async fn bind_no_execute() {
     // Create a non-executable component with an eagerly-started child.
     let (model, _builtin_environment, mock_runner) = new_model(vec![
-        ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-        ("a", ComponentDeclBuilder::new_empty_component().add_eager_child("b").build()),
+        ("root", ComponentDeclBuilder::new().child_default("a").build()),
+        (
+            "a",
+            ComponentDeclBuilder::new_empty_component()
+                .child(ChildBuilder::new().name("b").eager())
+                .build(),
+        ),
         ("b", component_decl_with_test_runner()),
     ])
     .await;
@@ -419,7 +423,7 @@ async fn bind_action_sequence() {
 
     // Set up the tree.
     let (model, builtin_environment, _mock_runner) = new_model(vec![
-        ("root", ComponentDeclBuilder::new().add_lazy_child("system").build()),
+        ("root", ComponentDeclBuilder::new().child_default("system").build()),
         ("system", component_decl_with_test_runner()),
     ])
     .await;
@@ -467,11 +471,7 @@ async fn reboot_on_terminate_disallowed() {
         (
             "root",
             ComponentDeclBuilder::new()
-                .add_child(
-                    ChildDeclBuilder::new_lazy_child("system")
-                        .on_terminate(fdecl::OnTerminate::Reboot)
-                        .build(),
-                )
+                .child(ChildBuilder::new().name("system").on_terminate(fdecl::OnTerminate::Reboot))
                 .build(),
         ),
         ("system", ComponentDeclBuilder::new().build()),
@@ -510,16 +510,9 @@ async fn on_terminate_stop_triggers_reboot() {
         (
             "root",
             ComponentDeclBuilder::new()
-                .add_child(
-                    ChildDeclBuilder::new_lazy_child("system")
-                        .on_terminate(fdecl::OnTerminate::Reboot)
-                        .build(),
-                )
+                .child(ChildBuilder::new().name("system").on_terminate(fdecl::OnTerminate::Reboot))
                 .capability(
-                    ProtocolBuilder::new()
-                        .name(REBOOT_PROTOCOL)
-                        .path(&reboot_protocol_path)
-                        .build(),
+                    ProtocolBuilder::new().name(REBOOT_PROTOCOL).path(&reboot_protocol_path),
                 )
                 .expose(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Self_,
@@ -568,16 +561,9 @@ async fn on_terminate_exit_triggers_reboot() {
         (
             "root",
             ComponentDeclBuilder::new()
-                .add_child(
-                    ChildDeclBuilder::new_lazy_child("system")
-                        .on_terminate(fdecl::OnTerminate::Reboot)
-                        .build(),
-                )
+                .child(ChildBuilder::new().name("system").on_terminate(fdecl::OnTerminate::Reboot))
                 .capability(
-                    ProtocolBuilder::new()
-                        .name(REBOOT_PROTOCOL)
-                        .path(&reboot_protocol_path)
-                        .build(),
+                    ProtocolBuilder::new().name(REBOOT_PROTOCOL).path(&reboot_protocol_path),
                 )
                 .expose(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Self_,
@@ -622,16 +608,9 @@ async fn reboot_shutdown_does_not_trigger_reboot() {
         (
             "root",
             ComponentDeclBuilder::new()
-                .add_child(
-                    ChildDeclBuilder::new_lazy_child("system")
-                        .on_terminate(fdecl::OnTerminate::Reboot)
-                        .build(),
-                )
+                .child(ChildBuilder::new().name("system").on_terminate(fdecl::OnTerminate::Reboot))
                 .capability(
-                    ProtocolBuilder::new()
-                        .name(REBOOT_PROTOCOL)
-                        .path(&reboot_protocol_path)
-                        .build(),
+                    ProtocolBuilder::new().name(REBOOT_PROTOCOL).path(&reboot_protocol_path),
                 )
                 .expose(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Self_,
@@ -676,11 +655,7 @@ async fn on_terminate_with_missing_reboot_protocol_panics() {
         (
             "root",
             ComponentDeclBuilder::new()
-                .add_child(
-                    ChildDeclBuilder::new_lazy_child("system")
-                        .on_terminate(fdecl::OnTerminate::Reboot)
-                        .build(),
-                )
+                .child(ChildBuilder::new().name("system").on_terminate(fdecl::OnTerminate::Reboot))
                 .build(),
         ),
         ("system", ComponentDeclBuilder::new().build()),
@@ -714,8 +689,9 @@ async fn on_terminate_with_failed_reboot_panics() {
         (
             "root",
             ComponentDeclBuilder::new()
-                .add_child(
-                    ChildDeclBuilder::new_lazy_child("system")
+                .child(
+                    ChildBuilder::new()
+                        .name("system")
                         .on_terminate(fdecl::OnTerminate::Reboot)
                         .build(),
                 )

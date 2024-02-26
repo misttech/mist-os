@@ -35,8 +35,8 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -46,8 +46,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         DirectoryBuilder::new()
                             .name("foo_data")
                             .path("/data/foo")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -102,8 +101,8 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -113,8 +112,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         DirectoryBuilder::new()
                             .name("foo_data")
                             .path("/data/foo")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -169,8 +167,8 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -180,8 +178,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         DirectoryBuilder::new()
                             .name("foo_data")
                             .path("/data/foo")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -236,8 +233,8 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -247,8 +244,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         DirectoryBuilder::new()
                             .name("foo_data")
                             .path("/data/foo")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -303,8 +299,8 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -314,8 +310,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         DirectoryBuilder::new()
                             .name("foo_data")
                             .path("/data/foo")
-                            .rights(fio::RW_STAR_DIR)
-                            .build(),
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -370,8 +365,8 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
+                    .child_default("b")
+                    .child_default("c")
                     .build(),
             ),
             (
@@ -381,8 +376,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         DirectoryBuilder::new()
                             .name("foo_data")
                             .path("/data/foo")
-                            .rights(fio::W_STAR_DIR)
-                            .build(),
+                            .rights(fio::W_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -445,7 +439,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
+                    .child_default("b")
                     .build(),
             ),
             (

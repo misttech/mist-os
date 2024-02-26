@@ -56,7 +56,7 @@ pub mod tests {
     #[fuchsia::test]
     async fn stopped() {
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
             ("a", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
@@ -162,7 +162,7 @@ pub mod tests {
         let stop_hook =
             Arc::new(StopHook::new(vec!["a"].try_into().unwrap(), stopped_tx, continue_rx));
         let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
             ("a", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new_with_hooks("root", components, None, stop_hook.hooks()).await;
