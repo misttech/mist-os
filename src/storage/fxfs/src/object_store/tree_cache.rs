@@ -22,6 +22,7 @@ fn filter(key: &ObjectKey) -> bool {
         // Attribute and keys could also be added here to some immediate benefit, but would be
         // somewhat redundant with a node cache planned to be added after.
         ObjectKeyData::Object => true,
+        ObjectKeyData::ExtendedAttribute { .. } => true,
         _ => false,
     }
 }
@@ -68,15 +69,12 @@ impl Drop for Placeholder<'_> {
 
 impl<'a> ObjectCachePlaceholder<ObjectValue> for Placeholder<'a> {
     fn complete(mut self: Box<Self>, value: Option<&ObjectValue>) {
-        let entry_value = match &value {
-            Some(ObjectValue::Object { kind, attributes }) => {
-                Some(CacheValue::Value(ObjectValue::Object {
-                    kind: kind.clone(),
-                    attributes: attributes.clone(),
-                }))
-            }
+        let entry_value = match value {
+            value @ Some(ObjectValue::Object { .. }) => value.cloned(),
+            value @ Some(ObjectValue::ExtendedAttribute(_)) => value.cloned(),
             _ => None,
-        };
+        }
+        .map(|v| CacheValue::Value(v));
         self.replace_entry(entry_value);
     }
 }
