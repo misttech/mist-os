@@ -21,12 +21,6 @@ test("devfs-bin") {
 }
 
 fuchsia_unittest_package("devfs-test") {
-  # TODO(https://fxbug.dev/319345143): For now, allow the error logs
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
   deps = [ ":devfs-bin" ]
 }
 
