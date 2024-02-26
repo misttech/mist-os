@@ -43,8 +43,18 @@ class FuchsiaTaskRegisterDriver(FuchsiaTask):
         args = self.parse_args(parser)
         ffx = [args.ffx] + (["--target", args.target] if args.target else [])
 
+        subprocess.check_call(
+            [
+                *ffx,
+                "driver",
+                "register",
+                args.url,
+            ]
+        )
+
         # If disable url is provided, we will disable the pre-existing driver
-        # before register a new one.
+        # after informing the driver manager about the new driver package.
+        # Note: The order cannot be swapped.
         if args.disable_url:
             subprocess.check_call(
                 [
@@ -54,15 +64,6 @@ class FuchsiaTaskRegisterDriver(FuchsiaTask):
                     args.disable_url,
                 ]
             )
-
-        subprocess.check_call(
-            [
-                *ffx,
-                "driver",
-                "register",
-                args.url,
-            ]
-        )
 
 
 if __name__ == "__main__":
