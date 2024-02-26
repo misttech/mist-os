@@ -42,7 +42,7 @@ bootstrap_user_platform_aib_names = [
   # Storage
   "fshost_common",
   "fshost_fxfs",
-  "fshost_fvm_blobfs",
+  "fshost_fvm",
   "fshost_fvm_f2fs",
   "fshost_fvm_fxfs",
   "fshost_fvm_minfs",

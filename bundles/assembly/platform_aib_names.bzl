@@ -17,7 +17,7 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "emulator_support",
     "fshost_common",
     "fshost_fxfs",
-    "fshost_fvm_blobfs",
+    "fshost_fvm",
     "fshost_fvm_f2fs",
     "fshost_fvm_fxfs",
     "fshost_fvm_minfs",

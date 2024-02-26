@@ -2119,11 +2119,8 @@ assembly_input_bundle("fshost_storage") {
       ]
     },
   ]
-  bootfs_files_labels = [
-    "//src/storage/fshost:assembly_bundle_fshost_storage_common",
-    "//src/storage/blobfs/bin:bootfs",
-    "//src/storage/blobfs:bootfs",
-  ]
+  bootfs_files_labels =
+      [ "//src/storage/fshost:assembly_bundle_fshost_storage_common" ]
 }
 
 # AIB containing the fshost with fxfs.
@@ -2146,16 +2143,16 @@ assembly_input_bundle("fshost_fxfs") {
       ]
     },
   ]
-  bootfs_files_labels = [ "//src/storage/fshost:assembly_bundle_fshost_fxfs" ]
+  bootfs_files_labels = [ "//src/storage/fshost:assembly_bundle_fshost" ]
 }
 
-# AIB containing fshost with an fvm and fxfs to hold the data.
+# AIB containing fshost with an fvm and blobfs only.
 #
 # optional: product must specify its inclusion
 # valid feature_set_levels: all
 # valid build-types: all
 #
-assembly_input_bundle("fshost_fvm_blobfs") {
+assembly_input_bundle("fshost_fvm") {
   compiled_packages = [
     {
       name = "fshost"
@@ -2169,6 +2166,7 @@ assembly_input_bundle("fshost_fvm_blobfs") {
       ]
     },
   ]
+  bootfs_files_labels = [ "//src/storage/fshost:assembly_bundle_fshost_fvm" ]
 }
 
 # AIB containing fshost with an fvm and fxfs to hold the data.
@@ -2190,7 +2188,8 @@ assembly_input_bundle("fshost_fvm_fxfs") {
       ]
     },
   ]
-  bootfs_files_labels = [ "//src/storage/fshost:assembly_bundle_fshost_fxfs" ]
+  bootfs_files_labels =
+      [ "//src/storage/fshost:assembly_bundle_fshost_fvm_fxfs" ]
 }
 
 # AIB containing fshost support for minfs. Not compatible with fxfs.
@@ -2216,6 +2215,7 @@ assembly_input_bundle("fshost_fvm_minfs") {
       ]
     },
   ]
+  bootfs_files_labels = [ "//src/storage/fshost:assembly_bundle_fshost_minfs" ]
 }
 
 # AIB containing fshost support for minfs-to-fxfs migration.
@@ -2243,7 +2243,10 @@ assembly_input_bundle("fshost_fvm_minfs_migration") {
       ]
     },
   ]
-  bootfs_files_labels = [ "//src/storage/fshost:assembly_bundle_fshost_fxfs" ]
+  bootfs_files_labels = [
+    "//src/storage/fshost:assembly_bundle_fshost",
+    "//src/storage/fshost:assembly_bundle_fshost_minfs",
+  ]
 }
 
 # AIB containing fshost support for f2fs

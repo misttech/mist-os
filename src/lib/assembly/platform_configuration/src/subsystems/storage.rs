@@ -109,7 +109,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 }
                 VolumeConfig::Fvm(FvmVolumeConfig { blob, data, .. }) => {
                     if let Some(blob) = blob {
-                        builder.platform_bundle("fshost_fvm_blobfs");
+                        builder.platform_bundle("fshost_fvm");
                         blob_deprecated_padded = blob.blob_layout == BlobfsLayout::DeprecatedPadded;
                     }
                     if let Some(DataFvmVolumeConfig {

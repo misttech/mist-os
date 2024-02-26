@@ -62,6 +62,7 @@ group("blobfs-component") {
   visibility += [
     "//src/recovery/system:*",
     "//src/security/tests/pkg_test/fshost:*",
+    "//src/storage/fshost:*",
     "//src/storage/lib/fs_management/rust:*",
     "//src/sys/pkg/testing/blobfs-ramdisk:*",
     "//tools/blackout/blobfs-checkerboard:*",
@@ -104,6 +105,7 @@ fuchsia_component("blobfs-component-test-component") {
   testonly = true
   manifest = "meta/blobfs_component_test.cml"
   deps = [
+    ":blobfs-component",
     ":blobfs_component_test",
     "//src/storage/testing:storage_driver_test_realm",
   ]

@@ -272,6 +272,7 @@ fuchsia_component("decompressor-sandbox") {
   visibility = [
     ":*",
     "//src/storage/blobfs/bin",
+    "//src/storage/fshost:*",
   ]
   manifest = "meta/decompressor_sandbox.cml"
   deps = [ ":decompressor" ]

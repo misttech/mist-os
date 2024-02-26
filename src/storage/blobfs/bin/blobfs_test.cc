@@ -39,7 +39,7 @@ class BlobfsComponentTest : public testing::Test {
     fuchsia_component_decl::wire::CollectionRef collection_ref{.name = "fs-collection"};
     auto child_decl = fuchsia_component_decl::wire::Child::Builder(allocator)
                           .name("test-blobfs")
-                          .url("fuchsia-boot:///#meta/blobfs.cm")
+                          .url("#meta/blobfs.cm")
                           .startup(fuchsia_component_decl::wire::StartupMode::kLazy)
                           .Build();
     fuchsia_component::wire::CreateChildArgs child_args;
