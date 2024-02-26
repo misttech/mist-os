@@ -47,6 +47,14 @@
 
 using ffl::Round;
 
+// Counts the number of times we set the preemption timer to fire at a point
+// that's prior to the time at which the CPU last entered the scheduler.  See
+// also the comment where this counter is used.
+KCOUNTER(counter_preempt_past, "scheduler.preempt_past")
+// Counts the number of times we dequeue a deadline thread whose finish_time is
+// earlier than its eligible_time.
+KCOUNTER(counter_deadline_past, "scheduler.deadline_past")
+
 namespace {
 
 // The minimum possible weight and its reciprocal.
@@ -126,6 +134,49 @@ template <typename T, typename Alpha, typename Beta>
 constexpr T PeakDecayDelta(T value, T sample, Alpha alpha, Beta beta) {
   const T delta = sample - value;
   return ktl::max<T>(delta >= 0 ? T{beta * delta} : T{alpha * delta}, -value);
+}
+
+// Reset this CPU's preemption timer to fire at |deadline|.
+//
+// |current_cpu| is the current CPU.
+//
+// |now| is the time that was latched when the CPU entered the scheduler.
+//
+// Must be called with interrupts disabled.
+void PreemptReset(cpu_num_t current_cpu, zx_time_t now, zx_time_t deadline) {
+  // Setting a preemption time that's prior to the point at which the CPU
+  // entered the scheduler indicates at worst a bug, or at best a wasted
+  // reschedule.
+  //
+  // What do we mean by wasted reschedule?  When leaving the scheduler, if the
+  // preemption timer was set to a point prior to entering the scheduler, it
+  // will immediately fire once we've re-enabled interrupts.  When it fires,
+  // we'll then re-enter the scheduler (provided that preemption is not
+  // disabled) without running the the current ask for any appreciable amount of
+  // time.  Instead, we should have set the preemption timer to a point that's
+  // after the latched entry time and avoided an unnecessary interrupt and trip
+  // through the scheduler.
+  //
+  // TODO(https://fxbug.dev/42182770): For now, simply count the number of times
+  // this happens.  Once we have eliminated all causes of "preemption time in
+  // the past" (whether they are bugs or simply missed optimization
+  // opportunities) replace this counter with a DEBUG_ASSERT.
+  //
+  // Aside from simple bugs, how can we end up with a preemption time that's
+  // earlier than the time at which we last entered the scheduler?  Consider the
+  // case where the current thread, A, is blocking and the run queue contains
+  // just one thread, B, that's deadline scheduled and whose finish time has
+  // already elapsed.  In other words, B's finish time is earlier than the time
+  // at which we last entered the scheduler.  In this case, we'll end up
+  // scheduling B and setting the preemption timer to B's finish time.  Longer
+  // term, we should consider resetting or reactivating all eligible tasks whose
+  // finish times would be earlier than the point at which we entered the
+  // scheduler.  See also |counter_deadline_past|.
+  if (deadline < now) {
+    kcounter_add(counter_preempt_past, 1);
+  }
+
+  percpu::Get(current_cpu).timer_queue.PreemptReset(deadline);
 }
 
 }  // anonymous namespace
@@ -602,6 +653,9 @@ Thread* Scheduler::DequeueDeadlineThread(SchedTime eligible_time) {
   TraceThreadQueueEvent("tqe_deque_deadline"_intern, eligible_thread);
 
   const SchedulerState& state = eligible_thread->scheduler_state();
+  if (state.finish_time_ <= eligible_time) {
+    kcounter_add(counter_deadline_past, 1);
+  }
   trace = KTRACE_END_SCOPE(("start time", Round<uint64_t>(state.start_time_)),
                            ("finish time", Round<uint64_t>(state.finish_time_)));
   return eligible_thread;
@@ -1000,7 +1054,7 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
       target_preemption_time_ns_ = start_of_current_time_slice_ns_ + remaining_time_slice_ns;
       const SchedTime preemption_time_ns = ClampToDeadline(target_preemption_time_ns_);
       DEBUG_ASSERT(preemption_time_ns <= target_preemption_time_ns_);
-      percpu::Get(current_cpu).timer_queue.PreemptReset(preemption_time_ns.raw_value());
+      PreemptReset(current_cpu, now.raw_value(), preemption_time_ns.raw_value());
     }
 
     ep.fair.initial_time_slice_ns = time_slice_ns;
@@ -1144,7 +1198,7 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
     target_preemption_time_ns_ = percpu::Get(this_cpu_).idle_power_thread.pending_power_work()
                                      ? SchedTime(ZX_TIME_INFINITE)
                                      : GetNextEligibleTime();
-    percpu::Get(current_cpu).timer_queue.PreemptReset(target_preemption_time_ns_.raw_value());
+    PreemptReset(current_cpu, now.raw_value(), target_preemption_time_ns_.raw_value());
   } else if (timeslice_expired || next_thread != current_thread) {
     ktrace::Scope trace_start_preemption = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "next_slice");
 
@@ -1175,7 +1229,7 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
             : ClampToEarlierDeadline(target_preemption_time_ns_, next_state->finish_time_);
     DEBUG_ASSERT(preemption_time_ns <= target_preemption_time_ns_);
 
-    percpu::Get(current_cpu).timer_queue.PreemptReset(preemption_time_ns.raw_value());
+    PreemptReset(current_cpu, now.raw_value(), preemption_time_ns.raw_value());
     trace_start_preemption =
         KTRACE_END_SCOPE(("preemption_time", Round<uint64_t>(preemption_time_ns)),
                          ("target preemption time", Round<uint64_t>(target_preemption_time_ns_)));
@@ -1217,7 +1271,7 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
             : ClampToEarlierDeadline(target_preemption_time_ns_, next_state->finish_time_);
     DEBUG_ASSERT(preemption_time_ns <= target_preemption_time_ns_);
 
-    percpu::Get(current_cpu).timer_queue.PreemptReset(preemption_time_ns.raw_value());
+    PreemptReset(current_cpu, now.raw_value(), preemption_time_ns.raw_value());
     trace_continue =
         KTRACE_END_SCOPE(("preemption_time", Round<uint64_t>(preemption_time_ns)),
                          ("target preemption time", Round<uint64_t>(target_preemption_time_ns_)));
