@@ -288,6 +288,24 @@ class TestExecution:
         )
 
         if maybe_temp_dir is not None:
+            files: typing.List[str] = []
+            for prefix, _, names in os.walk(maybe_temp_dir.name):
+                files.extend(
+                    [
+                        os.path.relpath(
+                            os.path.join(prefix, n), maybe_temp_dir.name
+                        )
+                        for n in names
+                    ]
+                )
+            if files:
+                name_list = statusinfo.ellipsize(", ".join(files), 100)
+                recorder.emit_instruction_message(
+                    f"Deleting {len(files)} files at {maybe_temp_dir.name}: {name_list}"
+                )
+                recorder.emit_instruction_message(
+                    "To keep these files, set --ffx-output-directory."
+                )
             maybe_temp_dir.cleanup()
 
         if not output:
@@ -458,7 +476,7 @@ async def run_command(
             timeout=timeout,
         )
 
-        def handle_event(current_event: command.CommandEvent):
+        def handle_event(current_event: command.CommandEvent) -> None:
             if recorder is not None:
                 if isinstance(current_event, command.StdoutEvent):
                     recorder.emit_program_output(
