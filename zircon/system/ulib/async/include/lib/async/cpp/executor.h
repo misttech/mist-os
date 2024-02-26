@@ -62,8 +62,6 @@ class Executor final : public fpromise::executor {
   fpromise::promise<> MakeDelayedPromise(zx::duration duration);
 
   // Returns a promise that will complete on or after |deadline|.
-  //
-  // The countdown starts when this method is called.
   fpromise::promise<> MakePromiseForTime(zx::time deadline);
 
   // Makes a promise that waits for one or more signals on a handle.
