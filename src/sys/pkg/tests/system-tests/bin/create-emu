@@ -5,6 +5,7 @@
 
 import argparse
 import asyncio
+import json
 import os
 import pathlib
 import shlex
@@ -88,11 +89,12 @@ are documented in that script, and can be discovered by passing -h or
     help='mount the disk with this type in qemu')
   parser.add_argument(
     '--product-bundle-name',
+    required=True,
     help='The name of the product bundle to use to create the image')
   parser.add_argument(
-    '--use-fxfs',
-    action='store_true',
-    default=False,
+    '--filesystem',
+    choices=['fxfs', 'blobfs'],
+    default='fxfs',
     help='Use fxfs to create the image')
   parser.add_argument(
     'image',
@@ -119,6 +121,24 @@ are documented in that script, and can be discovered by passing -h or
       file=sys.stderr)
 
     return 1
+
+  # Check that the product bundle exists.
+  with open(args.fuchsia_build_dir / 'product_bundles.json') as f:
+    product_bundles = json.load(f)
+
+    for product_bundle in product_bundles:
+      if product_bundle['name'] == args.product_bundle_name:
+        break
+    else:
+
+      print(f'Unknown product bundle "{args.product_bundle_name}", must be one of:',
+            file=sys.stderr)
+
+      for product_bundle in product_bundles:
+        print(f'  - {product_bundle["name"]}',
+              file=sys.stderr)
+
+      return 1
 
   print(f'Creating {args.image}')
 
@@ -153,7 +173,7 @@ are documented in that script, and can be discovered by passing -h or
     if args.abr_size is not None:
       make_fuchsia_vol_args.extend(['--abr-size', str(args.abr_size)])
 
-    if args.use_fxfs:
+    if args.filesystem == 'fxfs':
       make_fuchsia_vol_args.append('--use-fxfs')
 
     print(f'Running: {shlex.join(str(s) for s in make_fuchsia_vol_args)}')
