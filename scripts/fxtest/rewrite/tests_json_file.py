@@ -85,6 +85,9 @@ class TestEntry:
     # The "environments" field for a specific entry in the file.
     environments: typing.List[EnvironmentEntry] | None = None
 
+    # Optional field that is set for boot tests only.
+    product_bundle: str | None = None
+
     @classmethod
     def from_file(
         cls: typing.Type[typing.Self], file: str

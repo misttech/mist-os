@@ -385,6 +385,54 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(e, expected_exception)
         recorder.emit_end()
 
+    @mock.patch("execution.run_command", return_value=None)
+    async def test_test_execution_skip_boot_tests(self, command_mock):
+        """Test that boot tests are skipped"""
+
+        exec_env = environment.ExecutionEnvironment(
+            "/fuchsia", "/some_temp", None, "", ""
+        )
+
+        flags = args.parse_args([])
+
+        test = execution.TestExecution(
+            test_list_file.Test(
+                tests_json_file.TestEntry(
+                    tests_json_file.TestSection(
+                        "foo", "//foo", "linux", path="ls"
+                    ),
+                    environments=[
+                        tests_json_file.EnvironmentEntry(
+                            dimensions=tests_json_file.DimensionsEntry(
+                                device_type="AEMU"
+                            )
+                        )
+                    ],
+                    product_bundle="some_product",
+                ),
+                test_list_file.TestListEntry("foo", [], execution=None),
+            ),
+            exec_env,
+            flags,
+        )
+
+        self.assertTrue(test._test.is_e2e_test())
+        self.assertFalse(test.is_hermetic())
+        env = test.environment()
+        assert env is not None
+        self.assertDictEqual(env, {"CWD": "/some_temp"})
+        self.assertFalse(test.should_symbolize())
+
+        recorder = event.EventRecorder()
+        recorder.emit_init()
+
+        try:
+            await test.run(recorder, flags, event.GLOBAL_RUN_ID)
+            self.assertTrue(False, "No exception was raised")
+        except Exception as e:
+            self.assertIsInstance(e, execution.TestSkipped)
+        recorder.emit_end()
+
     async def test_test_execution_with_package_hash(self):
         """Ensure that test execution respects --use-package-hash"""
         with tempfile.TemporaryDirectory() as tmp:

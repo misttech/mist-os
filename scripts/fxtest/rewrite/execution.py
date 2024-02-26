@@ -257,6 +257,10 @@ class TestExecution:
         Returns:
             command.CommandOutput: The output of executing this command.
         """
+        if self._test.is_boot_test():
+            raise TestSkipped(
+                "Boot tests are not supported by `fx test`. Use `fx run-boot-test`."
+            )
         if self._test.is_e2e_test() and not flags.e2e:
             raise TestSkipped(
                 "Skipping optional end to end test. Pass --e2e to execute this test."

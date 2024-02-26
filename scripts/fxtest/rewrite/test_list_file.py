@@ -139,7 +139,7 @@ class Test:
     def __hash__(self) -> int:
         return self.info.name.__hash__()
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         return self.build.__eq__(other)
 
     def is_device_test(self) -> bool:
@@ -171,6 +171,16 @@ class Test:
                 for env in self.build.environments or []
             ]
         )
+
+    def is_boot_test(self) -> bool:
+        """Determine if this test is a boot test.
+
+        Boot tests specify a product_bundle entry and reboot the device.
+
+        Returns:
+            bool: True only if this test is a boot test.
+        """
+        return self.build.product_bundle is not None
 
     def package_name(self) -> str | None:
         """Get the package name for this test if applicable.
