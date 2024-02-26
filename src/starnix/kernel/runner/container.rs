@@ -570,7 +570,9 @@ mod test {
     use fuchsia_async as fasync;
     use futures::{SinkExt, StreamExt};
     use starnix_core::{testing::create_kernel_task_and_unlocked, vfs::FdNumber};
-    use starnix_uapi::{file_mode::FileMode, open_flags::OpenFlags, signals::SIGCHLD, CLONE_FS};
+    use starnix_uapi::{
+        file_mode::FileMode, open_flags::OpenFlags, signals::SIGCHLD, vfs::ResolveFlags, CLONE_FS,
+    };
 
     #[fuchsia::test]
     async fn test_init_file_already_exists() {
@@ -585,6 +587,7 @@ mod test {
                 path.into(),
                 OpenFlags::CREAT,
                 FileMode::default(),
+                ResolveFlags::empty(),
             )
             .expect("Failed to create file");
 
@@ -625,6 +628,7 @@ mod test {
                 path.into(),
                 OpenFlags::CREAT,
                 FileMode::default(),
+                ResolveFlags::empty(),
             )
             .expect("Failed to create file");
 

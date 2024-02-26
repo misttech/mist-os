@@ -22,7 +22,7 @@ use starnix_logging::track_stub;
 use starnix_sync::{LockBefore, Locked, ReadOps, Unlocked};
 use starnix_uapi::{
     device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode, ino_t, off_t,
-    open_flags::OpenFlags,
+    open_flags::OpenFlags, vfs::ResolveFlags,
 };
 use std::{
     ops::Deref,
@@ -271,6 +271,7 @@ impl StarnixNodeConnection {
                 name,
                 flags.into(),
                 FileMode::ALLOW_ALL,
+                ResolveFlags::empty(),
             ) {
                 Err(e) if e == errno!(EISDIR) && must_create_directory => {
                     let mode =

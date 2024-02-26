@@ -48,6 +48,7 @@ use starnix_uapi::{
     time::timeval_from_duration,
     uid_t,
     user_address::{UserAddress, UserCString, UserRef},
+    vfs::ResolveFlags,
     AT_EMPTY_PATH, AT_SYMLINK_NOFOLLOW, CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1,
     CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_NEWNS, CLONE_NEWUTS, CLONE_SETTLS, CLONE_VFORK,
     NGROUPS_MAX, PATH_MAX, PRIO_PROCESS, PR_CAPBSET_DROP, PR_CAPBSET_READ, PR_CAP_AMBIENT,
@@ -250,7 +251,14 @@ pub fn sys_execveat(
         // See https://man7.org/linux/man-pages/man3/fexecve.3.html#DESCRIPTION
         file.name.open(locked, current_task, OpenFlags::RDONLY, false)?
     } else {
-        current_task.open_file_at(locked, dir_fd, path.as_ref(), open_flags, FileMode::default())?
+        current_task.open_file_at(
+            locked,
+            dir_fd,
+            path.as_ref(),
+            open_flags,
+            FileMode::default(),
+            ResolveFlags::empty(),
+        )?
     };
 
     // This path can affect script resolution (the path is appended to the script args)

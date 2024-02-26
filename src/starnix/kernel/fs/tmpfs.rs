@@ -357,7 +357,7 @@ mod test {
             FdNumber, UnlinkKind,
         },
     };
-    use starnix_uapi::{errno, mount_flags::MountFlags};
+    use starnix_uapi::{errno, mount_flags::MountFlags, vfs::ResolveFlags};
     use zerocopy::AsBytes;
 
     #[::fuchsia::test]
@@ -435,6 +435,7 @@ mod test {
                 path.into(),
                 OpenFlags::CREAT | OpenFlags::RDONLY,
                 FileMode::from_bits(0o777),
+                ResolveFlags::empty(),
             )
             .expect("failed to create file");
         assert_eq!(
@@ -452,6 +453,7 @@ mod test {
                 path.into(),
                 OpenFlags::WRONLY,
                 FileMode::EMPTY,
+                ResolveFlags::empty(),
             )
             .expect("failed to open file WRONLY");
 
@@ -470,6 +472,7 @@ mod test {
                 path.into(),
                 OpenFlags::RDWR,
                 FileMode::EMPTY,
+                ResolveFlags::empty(),
             )
             .expect("failed to open file RDWR");
 
@@ -515,6 +518,7 @@ mod test {
                 "/usr/bin/test.txt".into(),
                 OpenFlags::RDWR | OpenFlags::CREAT,
                 FileMode::from_bits(0o777),
+                ResolveFlags::empty(),
             )
             .expect("failed to create test.txt");
         let txt = current_task

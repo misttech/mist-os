@@ -18,8 +18,8 @@ use crate::{
         SeccompStateValue, StopState, Task, TaskFlags, ThreadGroup, Waiter,
     },
     vfs::{
-        FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext, NamespaceNode, SymlinkMode,
-        SymlinkTarget,
+        FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext, NamespaceNode, ResolveBase,
+        SymlinkMode, SymlinkTarget, MAX_SYMLINK_FOLLOWS,
     },
 };
 use extended_pstate::ExtendedPstateState;
@@ -48,6 +48,7 @@ use starnix_uapi::{
     signals::{SigSet, Signal, SIGBUS, SIGCHLD, SIGILL, SIGSEGV, SIGTRAP},
     sock_filter, sock_fprog,
     user_address::{UserAddress, UserRef},
+    vfs::ResolveFlags,
     BPF_MAXINSNS, CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS,
     CLONE_INTO_CGROUP, CLONE_NEWUTS, CLONE_PARENT_SETTID, CLONE_PTRACE, CLONE_SETTLS,
     CLONE_SIGHAND, CLONE_SYSVSEM, CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_OWNER_DIED,
@@ -365,9 +366,17 @@ impl CurrentTask {
         &self,
         dir_fd: FdNumber,
         mut path: &'a FsStr,
+        flags: ResolveFlags,
     ) -> Result<(NamespaceNode, &'a FsStr), Errno> {
-        let dir = if path.starts_with(b"/") {
+        let path_is_absolute = path.starts_with(b"/");
+        if path_is_absolute {
+            if flags.contains(ResolveFlags::BENEATH) {
+                return error!(EXDEV);
+            }
             path = &path[1..];
+        }
+
+        let dir = if path_is_absolute && !flags.contains(ResolveFlags::IN_ROOT) {
             self.fs().root()
         } else if dir_fd == FdNumber::AT_FDCWD {
             self.fs().cwd()
@@ -375,6 +384,7 @@ impl CurrentTask {
             let file = self.files.get(dir_fd)?;
             file.name.clone()
         };
+
         if !path.is_empty() {
             if !dir.entry.node.is_dir() {
                 return error!(ENOTDIR);
@@ -402,7 +412,14 @@ impl CurrentTask {
             // FileMode argument.
             return error!(EINVAL);
         }
-        self.open_file_at(locked, FdNumber::AT_FDCWD, path, flags, FileMode::default())
+        self.open_file_at(
+            locked,
+            FdNumber::AT_FDCWD,
+            path,
+            flags,
+            FileMode::default(),
+            ResolveFlags::empty(),
+        )
     }
 
     /// Resolves a path for open.
@@ -438,6 +455,7 @@ impl CurrentTask {
             Ok(name) => {
                 if name.entry.node.is_lnk() {
                     if context.symlink_mode == SymlinkMode::NoFollow
+                        || context.resolve_flags.contains(ResolveFlags::NO_SYMLINKS)
                         || context.remaining_follows == 0
                     {
                         if must_create {
@@ -456,7 +474,13 @@ impl CurrentTask {
                             let dir = if path[0] == b'/' { self.fs().root() } else { parent };
                             self.resolve_open_path(context, &dir, path.as_ref(), mode, flags)
                         }
-                        SymlinkTarget::Node(node) => Ok((node, false)),
+                        SymlinkTarget::Node(node) => {
+                            if context.resolve_flags.contains(ResolveFlags::NO_MAGICLINKS) {
+                                error!(ELOOP)
+                            } else {
+                                Ok((node, false))
+                            }
+                        }
                     }
                 } else {
                     if must_create {
@@ -500,6 +524,7 @@ impl CurrentTask {
         path: &FsStr,
         flags: OpenFlags,
         mode: FileMode,
+        resolve_flags: ResolveFlags,
     ) -> Result<FileHandle, Errno>
     where
         L: LockBefore<ReadOps>,
@@ -508,8 +533,8 @@ impl CurrentTask {
             return error!(ENOENT);
         }
 
-        let (dir, path) = self.resolve_dir_fd(dir_fd, path)?;
-        self.open_namespace_node_at(locked, dir, path, flags, mode)
+        let (dir, path) = self.resolve_dir_fd(dir_fd, path, resolve_flags)?;
+        self.open_namespace_node_at(locked, dir, path, flags, mode, resolve_flags)
     }
 
     pub fn open_namespace_node_at<L>(
@@ -519,6 +544,7 @@ impl CurrentTask {
         path: &FsStr,
         flags: OpenFlags,
         mode: FileMode,
+        mut resolve_flags: ResolveFlags,
     ) -> Result<FileHandle, Errno>
     where
         L: LockBefore<ReadOps>,
@@ -547,8 +573,30 @@ impl CurrentTask {
         let symlink_mode =
             if nofollow || must_create { SymlinkMode::NoFollow } else { SymlinkMode::Follow };
 
-        let mut context = LookupContext::new(symlink_mode);
-        context.must_be_directory = flags.contains(OpenFlags::DIRECTORY);
+        let resolve_base = match (
+            resolve_flags.contains(ResolveFlags::BENEATH),
+            resolve_flags.contains(ResolveFlags::IN_ROOT),
+        ) {
+            (false, false) => ResolveBase::None,
+            (true, false) => ResolveBase::Beneath(dir.clone()),
+            (false, true) => ResolveBase::InRoot(dir.clone()),
+            (true, true) => return error!(EINVAL),
+        };
+
+        // `RESOLVE_BENEATH` and `RESOLVE_IN_ROOT` imply `RESOLVE_NO_MAGICLINKS`. This matches
+        // Linux behavior. Strictly speaking it's is not really required, but it's hard to
+        // implement `BENEATH` and `IN_ROOT` flags correctly otherwise.
+        if resolve_base != ResolveBase::None {
+            resolve_flags.insert(ResolveFlags::NO_MAGICLINKS);
+        }
+
+        let mut context = LookupContext {
+            symlink_mode,
+            remaining_follows: MAX_SYMLINK_FOLLOWS,
+            must_be_directory: flags.contains(OpenFlags::DIRECTORY),
+            resolve_flags,
+            resolve_base,
+        };
         let (name, created) = match self.resolve_open_path(&mut context, &dir, path, mode, flags) {
             Ok((n, c)) => (n, c),
             Err(e) => {
@@ -628,7 +676,7 @@ impl CurrentTask {
         dir_fd: FdNumber,
         path: &'a FsStr,
     ) -> Result<(NamespaceNode, &'a FsStr), Errno> {
-        let (dir, path) = self.resolve_dir_fd(dir_fd, path)?;
+        let (dir, path) = self.resolve_dir_fd(dir_fd, path, ResolveFlags::empty())?;
         self.lookup_parent(context, &dir, path)
     }
 

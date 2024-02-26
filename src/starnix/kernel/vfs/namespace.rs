@@ -39,7 +39,7 @@ use starnix_uapi::{
     mount_flags::MountFlags,
     open_flags::OpenFlags,
     ownership::WeakRef,
-    vfs::FdEvents,
+    vfs::{FdEvents, ResolveFlags},
     NAME_MAX,
 };
 use std::{
@@ -910,7 +910,7 @@ pub enum SymlinkMode {
 }
 
 /// The maximum number of symlink traversals that can be made during path resolution.
-const MAX_SYMLINK_FOLLOWS: u8 = 40;
+pub const MAX_SYMLINK_FOLLOWS: u8 = 40;
 
 /// The context passed during namespace lookups.
 ///
@@ -934,6 +934,26 @@ pub struct LookupContext {
     /// O_DIRECTORY. This flag can be set to true if the lookup encounters a
     /// symlink that ends with a `/`.
     pub must_be_directory: bool,
+
+    /// Resolve flags passed to `openat2`. Empty if the lookup originated in any other syscall.
+    pub resolve_flags: ResolveFlags,
+
+    /// Base directory for the lookup. Set only when either `RESOLVE_BENEATH` or `RESOLVE_IN_ROOT`
+    /// is passed to `openat2`.
+    pub resolve_base: ResolveBase,
+}
+
+/// Used to specify base directory in `LookupContext` for lookups originating in the `openat2`
+/// syscall with either `RESOLVE_BENEATH` or `RESOLVE_IN_ROOT` flag.
+#[derive(Clone, Eq, PartialEq)]
+pub enum ResolveBase {
+    None,
+
+    /// The lookup is not allowed to traverse any node that's not beneath the specified node.
+    Beneath(NamespaceNode),
+
+    /// The lookup should be handled as if the root specified node is the file-system root.
+    InRoot(NamespaceNode),
 }
 
 impl LookupContext {
@@ -942,15 +962,13 @@ impl LookupContext {
             symlink_mode,
             remaining_follows: MAX_SYMLINK_FOLLOWS,
             must_be_directory: false,
+            resolve_flags: ResolveFlags::empty(),
+            resolve_base: ResolveBase::None,
         }
     }
 
     pub fn with(&self, symlink_mode: SymlinkMode) -> LookupContext {
-        LookupContext {
-            symlink_mode,
-            remaining_follows: self.remaining_follows,
-            must_be_directory: self.must_be_directory,
-        }
+        LookupContext { symlink_mode, resolve_base: self.resolve_base.clone(), ..*self }
     }
 
     pub fn update_for_path(&mut self, path: &FsStr) {
@@ -1213,9 +1231,21 @@ impl NamespaceNode {
         let child = if basename.is_empty() || basename == "." {
             self.clone()
         } else if basename == ".." {
-            // Make sure this can't escape a chroot
-            if *self == current_task.fs().root() {
-                self.clone()
+            let root = match &context.resolve_base {
+                ResolveBase::None => current_task.fs().root(),
+                ResolveBase::Beneath(node) => {
+                    // Do not allow traversal out of the 'node'.
+                    if *self == *node {
+                        return error!(EXDEV);
+                    }
+                    current_task.fs().root()
+                }
+                ResolveBase::InRoot(root) => root.clone(),
+            };
+
+            // Make sure this can't escape a chroot.
+            if *self == root {
+                root
             } else {
                 self.parent().unwrap_or_else(|| self.clone())
             }
@@ -1231,14 +1261,20 @@ impl NamespaceNode {
                         break;
                     }
                     SymlinkMode::Follow => {
-                        if context.remaining_follows == 0 {
+                        if context.remaining_follows == 0
+                            || context.resolve_flags.contains(ResolveFlags::NO_SYMLINKS)
+                        {
                             return error!(ELOOP);
                         }
                         context.remaining_follows -= 1;
                         child = match child.readlink(current_task)? {
                             SymlinkTarget::Path(link_target) => {
                                 let link_directory = if link_target[0] == b'/' {
-                                    current_task.fs().root()
+                                    match &context.resolve_base {
+                                        ResolveBase::None => current_task.fs().root(),
+                                        ResolveBase::Beneath(_) => return error!(EXDEV),
+                                        ResolveBase::InRoot(root) => root.clone(),
+                                    }
                                 } else {
                                     self.clone()
                                 };
@@ -1248,7 +1284,12 @@ impl NamespaceNode {
                                     link_target.as_ref(),
                                 )?
                             }
-                            SymlinkTarget::Node(node) => node,
+                            SymlinkTarget::Node(node) => {
+                                if context.resolve_flags.contains(ResolveFlags::NO_MAGICLINKS) {
+                                    return error!(ELOOP);
+                                }
+                                node
+                            }
                         }
                     }
                 };
@@ -1256,6 +1297,10 @@ impl NamespaceNode {
 
             child.enter_mount()
         };
+
+        if context.resolve_flags.contains(ResolveFlags::NO_XDEV) && child.mount != self.mount {
+            return error!(EXDEV);
+        }
 
         if context.must_be_directory && !child.entry.node.is_dir() {
             return error!(ENOTDIR);

@@ -4,7 +4,7 @@
 
 use crate::{
     fs::fuchsia::{TimerFile, TimerFileClock},
-    mm::{MemoryAccessor, MemoryAccessorExt},
+    mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE},
     task::{CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter},
     vfs::{
         buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer},
@@ -52,8 +52,8 @@ use starnix_uapi::{
     },
     timespec, uapi, uid_t,
     user_address::{UserAddress, UserCString, UserRef},
-    vfs::EpollEvent,
-    vfs::FdEvents,
+    user_buffer::UserBuffer,
+    vfs::{EpollEvent, FdEvents, ResolveFlags},
     AT_EACCESS, AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW,
     AT_SYMLINK_NOFOLLOW, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_REALTIME,
     CLOCK_REALTIME_ALARM, CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, EFD_CLOEXEC, EFD_NONBLOCK,
@@ -61,12 +61,12 @@ use starnix_uapi::{
     F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLK, F_GETOWN, F_GETOWN_EX, F_GET_SEALS,
     F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID, F_OWNER_TID, F_SETFD,
     F_SETFL, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX, IN_CLOEXEC, IN_NONBLOCK, MFD_ALLOW_SEALING,
-    MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK, MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, PATH_MAX,
-    PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND,
-    POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL, POSIX_FADV_RANDOM,
-    POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK,
-    TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, UMOUNT_NOFOLLOW, XATTR_CREATE, XATTR_NAME_MAX,
-    XATTR_REPLACE,
+    MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK, MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, O_CREAT,
+    O_TMPFILE, PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND,
+    POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL,
+    POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC,
+    TFD_NONBLOCK, TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, UMOUNT_NOFOLLOW, XATTR_CREATE,
+    XATTR_NAME_MAX, XATTR_REPLACE,
 };
 use std::{
     cmp::Ordering, collections::VecDeque, convert::TryInto, marker::PhantomData, mem::MaybeUninit,
@@ -523,6 +523,7 @@ fn open_file_at(
     user_path: UserCString,
     flags: u32,
     mode: FileMode,
+    resolve_flags: ResolveFlags,
 ) -> Result<FileHandle, Errno> {
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
     log_trace!(%dir_fd, %path, "open_file_at");
@@ -532,6 +533,7 @@ fn open_file_at(
         path.as_ref(),
         OpenFlags::from_bits_truncate(flags),
         mode,
+        resolve_flags,
     )
 }
 
@@ -615,7 +617,8 @@ fn lookup_at(
     log_trace!(%dir_fd, %path, "lookup_at");
     if path.is_empty() {
         if options.allow_empty_path {
-            let (node, _) = current_task.resolve_dir_fd(dir_fd, path.as_ref())?;
+            let (node, _) =
+                current_task.resolve_dir_fd(dir_fd, path.as_ref(), ResolveFlags::empty())?;
             return Ok(node);
         }
         return error!(ENOENT);
@@ -637,6 +640,20 @@ fn lookup_at(
     parent.lookup_child(current_task, &mut child_context, basename)
 }
 
+fn do_openat(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    dir_fd: FdNumber,
+    user_path: UserCString,
+    flags: u32,
+    mode: FileMode,
+    resolve_flags: ResolveFlags,
+) -> Result<FdNumber, Errno> {
+    let file = open_file_at(locked, current_task, dir_fd, user_path, flags, mode, resolve_flags)?;
+    let fd_flags = get_fd_flags(flags);
+    current_task.add_file(file, fd_flags)
+}
+
 pub fn sys_openat(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
@@ -645,9 +662,60 @@ pub fn sys_openat(
     flags: u32,
     mode: FileMode,
 ) -> Result<FdNumber, Errno> {
-    let file = open_file_at(locked, current_task, dir_fd, user_path, flags, mode)?;
-    let fd_flags = get_fd_flags(flags);
-    current_task.add_file(file, fd_flags)
+    do_openat(locked, current_task, dir_fd, user_path, flags, mode, ResolveFlags::empty())
+}
+
+pub fn sys_openat2(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    dir_fd: FdNumber,
+    user_path: UserCString,
+    how_ref: UserRef<uapi::open_how>,
+    size: usize,
+) -> Result<FdNumber, Errno> {
+    const EXPECTED_SIZE: usize = std::mem::size_of::<uapi::open_how>();
+    if size < EXPECTED_SIZE {
+        return error!(EINVAL);
+    }
+
+    let how = current_task.read_object(how_ref)?;
+
+    // If the `size` is greater than expected, then we need to check that any extra bytes after
+    // `open_how` are set to 0. This is needed to properly handle the case when `open_how` is
+    // extended with new fields in the future. There is no upper limit on the buffer size, so we
+    // limit size of each read to one page.
+    let mut pos = EXPECTED_SIZE;
+    while pos < size {
+        let length = std::cmp::min(size - pos, *PAGE_SIZE as usize);
+        let extra_bytes =
+            current_task.read_buffer(&UserBuffer { address: how_ref.addr() + pos, length })?;
+        for b in extra_bytes {
+            if b != 0 {
+                return error!(E2BIG);
+            }
+        }
+        pos += length;
+    }
+
+    let flags: u32 = how.flags.try_into().map_err(|_| errno!(EINVAL))?;
+
+    // `mode` can be specified only with `O_CREAT` or `O_TMPFILE`.
+    let allowed_mode_flags = if (flags & (O_CREAT | O_TMPFILE)) > 0 { 0o7777 } else { 0 };
+    if (how.mode & !allowed_mode_flags) != 0 {
+        return error!(EINVAL);
+    }
+
+    let mode = FileMode::from_bits(how.mode.try_into().map_err(|_| errno!(EINVAL))?);
+    let resolve_flags =
+        ResolveFlags::from_bits(how.resolve.try_into().map_err(|_| errno!(EINVAL))?)
+            .ok_or_else(|| errno!(EINVAL))?;
+
+    if resolve_flags.contains(ResolveFlags::CACHED) {
+        track_stub!(TODO("https://fxbug.dev/326474574"), "openat2: RESOLVE_CACHED");
+        return error!(EAGAIN);
+    }
+
+    do_openat(locked, current_task, dir_fd, user_path, flags, mode, resolve_flags)
 }
 
 pub fn sys_faccessat(
@@ -2566,7 +2634,8 @@ pub fn sys_utimensat(
         if dir_fd == FdNumber::AT_FDCWD {
             return error!(EFAULT);
         }
-        let (node, _) = current_task.resolve_dir_fd(dir_fd, Default::default())?;
+        let (node, _) =
+            current_task.resolve_dir_fd(dir_fd, Default::default(), ResolveFlags::empty())?;
         node
     } else {
         let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW)?;

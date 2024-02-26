@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use super::PAGE_SIZE;
+use bitflags::bitflags;
 use linux_uapi as uapi;
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
@@ -69,5 +70,17 @@ impl EpollEvent {
 
     pub fn data(&self) -> u64 {
         self.0.data
+    }
+}
+
+bitflags! {
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct ResolveFlags: u32 {
+        const NO_XDEV = uapi::RESOLVE_NO_XDEV;
+        const NO_MAGICLINKS = uapi::RESOLVE_NO_MAGICLINKS;
+        const NO_SYMLINKS = uapi::RESOLVE_NO_SYMLINKS;
+        const BENEATH = uapi::RESOLVE_BENEATH;
+        const IN_ROOT = uapi::RESOLVE_IN_ROOT;
+        const CACHED = uapi::RESOLVE_CACHED;
     }
 }
