@@ -29,6 +29,7 @@ if (is_host) {
 
     test_deps = [
       "//src/developer/ffx/config:lib",
+      "//src/lib/fuchsia",
       "//third_party/rust_crates:pretty_assertions",
       "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:tempfile",

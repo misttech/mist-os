@@ -30,6 +30,7 @@ rustc_library("lib") {
   ]
 
   test_deps = [
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:tempfile",
   ]

@@ -26,7 +26,9 @@ pub use instances::{
     read_from_disk_untyped, write_to_disk, EMU_INSTANCE_ROOT_DIR,
 };
 
-pub use targets::{start_emulator_watching, EmulatorTargetAction, EmulatorWatcher};
+pub use targets::{
+    get_all_targets, start_emulator_watching, EmulatorTargetAction, EmulatorWatcher,
+};
 
 /// Holds a single mapping from a host port to the guest.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]

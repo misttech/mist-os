@@ -320,6 +320,10 @@ impl EmulatorWatcher {
         })
     }
 }
+pub async fn get_all_targets() -> Result<Vec<ffx::TargetInfo>> {
+    let instances = get_all_instances().await?;
+    Ok(instances.iter().flat_map(|i| EmulatorWatcher::make_target(i)).collect())
+}
 #[cfg(test)]
 mod tests {
     pub(crate) use super::*;
@@ -358,7 +362,7 @@ mod tests {
         }
         Ok(())
     }
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_handle_event() -> Result<()> {
         let temp = tempdir().expect("cannot get tempdir");
         let instance_dir = temp.path().to_path_buf();
@@ -522,7 +526,7 @@ mod tests {
         }
         Ok(())
     }
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_emulator_target_detected() -> Result<()> {
         let temp = tempdir().expect("cannot get tempdir");
         let instance_dir = temp.path().to_path_buf();
@@ -593,6 +597,47 @@ mod tests {
             let actual = watcher.emulator_target_detected().await;
             assert_eq!(expected, actual, "for event {event:?}");
         }
+        Ok(())
+    }
+    #[fuchsia::test]
+    async fn test_get_all_targets() -> Result<()> {
+        use serde_json::json;
+        use std::fs::File;
+        use std::io::Write;
+        let env = ffx_config::test_init().await.unwrap();
+        let temp_dir = tempdir()
+            .expect("Couldn't get a temporary directory for testing.")
+            .path()
+            .to_str()
+            .expect("Couldn't convert Path to str")
+            .to_string();
+        env.context
+            .query(EMU_INSTANCE_ROOT_DIR)
+            .level(Some(ffx_config::ConfigLevel::User))
+            .set(json!(temp_dir))
+            .await?;
+
+        let path1 = PathBuf::from(&temp_dir).join("path1");
+        create_dir_all(path1.as_path())?;
+        let file1_path = path1.join(crate::instances::SERIALIZE_FILE_NAME);
+        let mut file1 = File::create(&file1_path)?;
+        let mut instance_data = crate::EmulatorInstanceData::new_with_state(
+            "emu-data-instance",
+            crate::EngineState::Running,
+        );
+        instance_data.set_pid(std::process::id());
+        let config = instance_data.get_emulator_configuration_mut();
+        config.host.networking = crate::NetworkingMode::User;
+        config
+            .host
+            .port_map
+            .insert(String::from("ssh"), crate::PortMapping { guest: 22, host: Some(3322) });
+        let emu_config = serde_json::to_string(&instance_data)?;
+        file1.write_all(emu_config.as_bytes())?;
+
+        let targets = get_all_targets().await?;
+        assert_eq!(targets.first().unwrap().nodename, Some(String::from("emu-data-instance")));
+
         Ok(())
     }
 }
