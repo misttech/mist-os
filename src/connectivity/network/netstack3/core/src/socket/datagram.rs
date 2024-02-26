@@ -1320,7 +1320,7 @@ pub(crate) fn close<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     id: S::SocketId<I, CC::WeakDeviceId>,
-) -> RemoveResourceResultWithContext<(), BC> {
+) -> RemoveResourceResultWithContext<S::ExternalData<I>, BC> {
     // Remove the socket from the list first to prevent double close.
     let primary = core_ctx.with_all_sockets_mut(|all_sockets| {
         all_sockets.remove(id.borrow()).expect("socket already closed")
@@ -1358,18 +1358,17 @@ pub(crate) fn close<
     core::mem::drop(id);
     let debug_references = PrimaryRc::debug_references(&primary);
     match PrimaryRc::unwrap_or_notify_with(primary, || {
-        let (notifier, receiver) = BC::new_reference_notifier::<(), _>(debug_references);
-        let notifier = MapRcNotifier::new(notifier, |state: ReferenceState<_, _, _>| {
-            // TODO(https://fxbug.dev/42076297): Expose bindings state when
-            // we start keeping it in core.
-            let _ = state;
-            ()
-        });
+        let (notifier, receiver) =
+            BC::new_reference_notifier::<S::ExternalData<I>, _>(debug_references);
+        let notifier =
+            MapRcNotifier::new(notifier, |ReferenceState { state: _, external_data }| {
+                external_data
+            });
         (notifier, receiver)
     }) {
-        // TODO(https://fxbug.dev/42076297): Expose bindings state when
-        // we start keeping it in core.
-        Ok(ReferenceState { .. }) => RemoveResourceResult::Removed(()),
+        Ok(ReferenceState { state: _, external_data }) => {
+            RemoveResourceResult::Removed(external_data)
+        }
         Err(receiver) => RemoveResourceResult::Deferred(receiver),
     }
 }

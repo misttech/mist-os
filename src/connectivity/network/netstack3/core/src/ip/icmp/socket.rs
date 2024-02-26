@@ -842,7 +842,10 @@ where
     pub fn close(
         &mut self,
         id: IcmpApiSocketId<I, C>,
-    ) -> RemoveResourceResultWithContext<(), C::BindingsContext> {
+    ) -> RemoveResourceResultWithContext<
+        <C::BindingsContext as IcmpEchoBindingsTypes>::ExternalData<I>,
+        C::BindingsContext,
+    > {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::close(core_ctx, bindings_ctx, id)
     }

@@ -2154,7 +2154,10 @@ where
     pub fn close(
         &mut self,
         id: UdpApiSocketId<I, C>,
-    ) -> RemoveResourceResultWithContext<(), C::BindingsContext> {
+    ) -> RemoveResourceResultWithContext<
+        <C::BindingsContext as UdpBindingsTypes>::ExternalData<I>,
+        C::BindingsContext,
+    > {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::close(core_ctx, bindings_ctx, id)
     }

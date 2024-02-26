@@ -350,7 +350,7 @@ where
     async fn close(ctx: &mut Ctx, id: Self::SocketId) {
         let debug_references = id.debug_references();
         let weak = id.downgrade();
-        util::wait_for_resource_removal(
+        let DatagramSocketExternalData { message_queue: _ } = util::wait_for_resource_removal(
             "udp socket",
             &weak,
             ctx.api().udp().close(id),
@@ -604,7 +604,7 @@ where
     async fn close(ctx: &mut Ctx, id: Self::SocketId) {
         let debug_references = id.debug_references();
         let weak = id.downgrade();
-        util::wait_for_resource_removal(
+        let DatagramSocketExternalData { message_queue: _ } = util::wait_for_resource_removal(
             "icmp socket",
             &weak,
             ctx.api().icmp_echo().close(id),
