@@ -259,7 +259,7 @@ closed protocol LifecycleController {
 };
 
 /// Describes the result of the Start command.
-@available(added=7, deprecated=11, removed=12, note="Use StartInstance instead", legacy=true)
+@available(added=7, deprecated=11, removed=12, note="Use StartInstance instead")
 type StartResult = strict enum {
     /// The instance was started.
     STARTED = 0;
