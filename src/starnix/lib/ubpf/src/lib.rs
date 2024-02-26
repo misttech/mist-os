@@ -11,6 +11,7 @@ pub mod maps;
 pub mod program;
 pub mod ubpf;
 pub mod verifier;
+mod visitor;
 
 pub use converter::*;
 pub use error::*;

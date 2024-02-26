@@ -21,6 +21,7 @@ rustc_library("ubpf") {
     "src/program.rs",
     "src/ubpf.rs",
     "src/verifier.rs",
+    "src/visitor.rs",
   ]
   with_unit_tests = true
 
