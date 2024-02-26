@@ -9,7 +9,6 @@ group("tests") {
     "aml-canvas:tests",
     "amlogic-display:tests",
     "coordinator:tests",
-    "dsi-dw:tests",
     "fake:tests",
     "goldfish-display:tests",
     "intel-i915:tests",
