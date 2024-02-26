@@ -22,14 +22,37 @@ use {
     },
 };
 
+struct Inner {
+    /// Used to round-robin across NUM_FILES in order.
+    file_counter: usize,
+    /// Maps from file_counter to file index. This allows us to shuffle the tail
+    /// as we round-robin without touching the files that are in the dirent cache.
+    file_map: [u64; NUM_FILES],
+}
+
+impl Inner {
+    /// Returns the next file to use, avoiding the most recent DIRENT_CACHE_LIMIT
+    /// files returned but shuffling the remainder.
+    pub fn next_file_num(&mut self) -> u64 {
+        let mut rng = rand::thread_rng();
+        self.file_map.swap(
+            self.file_counter,
+            (self.file_counter + rng.gen_range(0..(NUM_FILES - DIRENT_CACHE_LIMIT))) % NUM_FILES,
+        );
+        let ret = self.file_map[self.file_counter];
+        self.file_counter = (self.file_counter + 1) % NUM_FILES;
+        ret
+    }
+}
+
 /// Designed to 'exercise' the filesystem and thrash the dirent cache.
 /// This cyclically works its way through 10000 files (the dirent cache holds 8000).
 /// On each iteration it will either read, write or rewrite a file.
 /// Unaligned random reads and append-only writes up to 128kB each in length.
 /// Write errors causes the file to be truncated to zero bytes.
 pub struct Stressor {
-    /// Used to round-robin across NUM_FILES in order.
-    file_counter: AtomicU64,
+    /// Inner state tracking which files can be accessed next.
+    inner: Mutex<Inner>,
     /// Tracks the number of bytes we have allocated.
     bytes_stored: AtomicU64,
     /// The target number of bytes we want the filesystem to consume in steady-state.
@@ -50,8 +73,10 @@ const NUM_OPS: usize = 2;
 
 /// The number of files to cycle through.
 /// This must be larger than DIRENT_CACHE_LIMIT to induce cache thrashing.
+const NUM_FILES: usize = 10000;
+
 /// See src/storage/fxfs/platform/src/fuchsia/volume.rs.
-const NUM_FILES: u64 = 10000;
+const DIRENT_CACHE_LIMIT: usize = 8000;
 
 // We favour writes because half of those writes will end up being truncates.
 // The expected long-term mix will therefore be around 1:1 reads/writes.
@@ -76,7 +101,10 @@ impl Stressor {
         );
 
         Arc::new(Stressor {
-            file_counter: AtomicU64::new(0),
+            inner: Mutex::new(Inner {
+                file_counter: 0,
+                file_map: std::array::from_fn(|i| i as u64),
+            }),
             bytes_stored: AtomicU64::new(info.used_bytes),
             target_bytes: info.total_bytes - target_free_bytes,
             op_stats: Default::default(),
@@ -111,8 +139,8 @@ impl Stressor {
         let mut buf = Vec::new();
         loop {
             let op = WeightedIndex::new(WEIGHTS).unwrap().sample(&mut rng);
-            let path =
-                format!("/data/{}", self.file_counter.fetch_add(1, Ordering::Relaxed) % NUM_FILES);
+            let file_num = self.inner.lock().unwrap().next_file_num();
+            let path = format!("/data/{}", file_num);
             match op {
                 READ => match File::options().read(true).write(false).open(&path) {
                     Ok(f) => {
