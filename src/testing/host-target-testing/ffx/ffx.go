@@ -17,24 +17,29 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
+type IsolateDir struct {
+	path string
+}
+
+func NewIsolateDir(path string) IsolateDir {
+	return IsolateDir{path: path}
+}
+
 type FFXTool struct {
 	ffxToolPath string
-	isolateDir  string
+	isolateDir  IsolateDir
 	stdout      io.Writer
 }
 
-func NewFFXTool(ffxToolPath string) (*FFXTool, error) {
-	return NewFFXToolWithStdout(ffxToolPath, nil)
+func NewFFXTool(ffxToolPath string, isolateDir IsolateDir) (*FFXTool, error) {
+	return NewFFXToolWithStdout(ffxToolPath, isolateDir, nil)
 }
 
-func NewFFXToolWithStdout(ffxToolPath string, stdout io.Writer) (*FFXTool, error) {
-	isolateDir, err := os.MkdirTemp("", "systemTestIsoDir*")
-	if err != nil {
-		return nil, err
-	}
+func NewFFXToolWithStdout(ffxToolPath string, isolateDir IsolateDir, stdout io.Writer) (*FFXTool, error) {
 	if _, err := os.Stat(ffxToolPath); err != nil {
 		return nil, fmt.Errorf("error accessing %v: %w", ffxToolPath, err)
 	}
+
 	return &FFXTool{
 		ffxToolPath: ffxToolPath,
 		isolateDir:  isolateDir,
@@ -44,10 +49,6 @@ func NewFFXToolWithStdout(ffxToolPath string, stdout io.Writer) (*FFXTool, error
 
 func (f *FFXTool) SetStdout(stdout io.Writer) {
 	f.stdout = stdout
-}
-
-func (f *FFXTool) Close() error {
-	return os.RemoveAll(f.isolateDir)
 }
 
 type targetEntry struct {
@@ -147,11 +148,17 @@ func (f *FFXTool) runFFXCmd(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-	logger.Infof(ctx, "running: %s %q", path, args)
 
 	// prepend a config flag for finding subtools that are compiled separately
 	// in the same directory as ffx itself.
-	args = append([]string{"--isolate-dir", f.isolateDir, "--config", fmt.Sprintf("ffx.subtool-search-paths=%s", filepath.Dir(path))}, args...)
+	args = append(
+		[]string{
+			"--isolate-dir", f.isolateDir.path,
+			"--config", fmt.Sprintf("ffx.subtool-search-paths=%s", filepath.Dir(path)),
+		},
+		args...,
+	)
+
 	logger.Infof(ctx, "running: %s %q", path, args)
 	cmd := exec.CommandContext(ctx, path, args...)
 	if f.stdout != nil {

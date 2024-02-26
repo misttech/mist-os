@@ -115,7 +115,11 @@ func (c *BuildConfig) getBuildID(ctx context.Context) (string, error) {
 	return c.buildID, nil
 }
 
-func (c *BuildConfig) GetBuild(ctx context.Context, deviceClient *device.Client, dir string) (artifacts.Build, error) {
+func (c *BuildConfig) GetBuild(
+	ctx context.Context,
+	deviceClient *device.Client,
+	outputDir string,
+) (artifacts.Build, error) {
 	sshPrivateKey, err := c.deviceConfig.SSHPrivateKey()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ssh key: %w", err)
@@ -132,11 +136,23 @@ func (c *BuildConfig) GetBuild(ctx context.Context, deviceClient *device.Client,
 		if c.useLatestFfx {
 			ffxPath = c.deviceConfig.ffxPath
 		}
-		build, err = c.archiveConfig.BuildArchive().GetBuildByID(ctx, buildID, dir, sshPrivateKey.PublicKey(), ffxPath)
+		build, err = c.archiveConfig.BuildArchive().GetBuildByID(
+			ctx,
+			buildID,
+			outputDir,
+			sshPrivateKey.PublicKey(),
+			ffxPath,
+		)
 	} else if c.fuchsiaBuildDir != "" {
-		build, err = artifacts.NewFuchsiaDirBuild(c.fuchsiaBuildDir, sshPrivateKey.PublicKey()), nil
+		build, err = artifacts.NewFuchsiaDirBuild(
+			c.fuchsiaBuildDir,
+			sshPrivateKey.PublicKey(),
+		), nil
 	} else if c.productBundleDir != "" {
-		build, err = artifacts.NewProductBundleDirBuild(c.productBundleDir, sshPrivateKey.PublicKey()), nil
+		build, err = artifacts.NewProductBundleDirBuild(
+			c.productBundleDir,
+			sshPrivateKey.PublicKey(),
+		), nil
 	}
 
 	if err != nil {
@@ -236,9 +252,17 @@ func (c *RepeatableBuildConfig) GetBuilds(
 
 			builds = append(builds, build)
 		case fuchsiaBuildDirKind:
-			builds = append(builds, artifacts.NewFuchsiaDirBuild(b.value, sshPrivateKey.PublicKey()))
+			build := artifacts.NewFuchsiaDirBuild(
+				b.value,
+				sshPrivateKey.PublicKey(),
+			)
+			builds = append(builds, build)
 		case productBundleDirKind:
-			builds = append(builds, artifacts.NewProductBundleDirBuild(b.value, sshPrivateKey.PublicKey()))
+			build := artifacts.NewProductBundleDirBuild(
+				b.value,
+				sshPrivateKey.PublicKey(),
+			)
+			builds = append(builds, build)
 		}
 	}
 

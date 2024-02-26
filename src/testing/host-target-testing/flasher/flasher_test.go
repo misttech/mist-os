@@ -47,7 +47,9 @@ func createAndRunFfxFlasher(t *testing.T, options ...FfxFlasherOption) string {
 	var output bytes.Buffer
 	options = append(options, Stdout(&output))
 	flash_manifest := "dir/flash.json"
-	ffx, err := ffx.NewFFXTool(ffxPath)
+
+	isolateDir := ffx.NewIsolateDir(filepath.Join(t.TempDir(), "ffx-isolate-dir"))
+	ffx, err := ffx.NewFFXTool(ffxPath, isolateDir)
 	if err != nil {
 		t.Fatal(err)
 	}

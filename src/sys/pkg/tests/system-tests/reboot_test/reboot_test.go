@@ -20,6 +20,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/artifacts"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/errutil"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/sl4f"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/tools/lib/color"
@@ -72,7 +73,13 @@ func doTest(ctx context.Context) error {
 	}
 	defer cleanup()
 
-	deviceClient, err := c.deviceConfig.NewDeviceClient(ctx)
+	ffxIsolateDirPath, err := os.MkdirTemp("", "ffx-isolate-dir")
+	if err != nil {
+		return fmt.Errorf("failed to create ffx isolate dir: %w", err)
+	}
+	ffxIsolateDir := ffx.NewIsolateDir(ffxIsolateDirPath)
+
+	deviceClient, err := c.deviceConfig.NewDeviceClient(ctx, ffxIsolateDir)
 	if err != nil {
 		return fmt.Errorf("failed to create ota test client: %w", err)
 	}
@@ -137,7 +144,7 @@ func doTestReboot(
 	build artifacts.Build,
 ) error {
 	// We don't install an OTA, so we don't need to prefetch the blobs.
-	repo, err := build.GetPackageRepository(ctx, artifacts.LazilyFetchBlobs, nil)
+	repo, err := build.GetPackageRepository(ctx, artifacts.LazilyFetchBlobs, device.FfxIsolateDir())
 	if err != nil {
 		return fmt.Errorf("unable to get repository: %w", err)
 	}
@@ -221,7 +228,7 @@ func initializeDevice(
 ) error {
 	logger.Infof(ctx, "Initializing device")
 
-	repo, err := build.GetPackageRepository(ctx, artifacts.LazilyFetchBlobs, nil)
+	repo, err := build.GetPackageRepository(ctx, artifacts.LazilyFetchBlobs, device.FfxIsolateDir())
 	if err != nil {
 		return err
 	}

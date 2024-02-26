@@ -81,9 +81,9 @@ func (c *DeviceConfig) Validate() error {
 	return nil
 }
 
-func (c *DeviceConfig) FFXTool() (*ffx.FFXTool, error) {
+func (c *DeviceConfig) FFXTool(ffxIsolateDir ffx.IsolateDir) (*ffx.FFXTool, error) {
 	if c.ffx == nil {
-		ffx, err := ffx.NewFFXTool(c.ffxPath)
+		ffx, err := ffx.NewFFXTool(c.ffxPath, ffxIsolateDir)
 		if err != nil {
 			return nil, err
 		}
@@ -93,14 +93,17 @@ func (c *DeviceConfig) FFXTool() (*ffx.FFXTool, error) {
 	return c.ffx, nil
 }
 
-func (c *DeviceConfig) DeviceResolver(ctx context.Context) (device.DeviceResolver, error) {
+func (c *DeviceConfig) deviceResolver(
+	ctx context.Context,
+	ffxIsolateDir ffx.IsolateDir,
+) (device.DeviceResolver, error) {
 	if c.deviceHostname != "" {
 		return device.NewConstantHostResolver(ctx, c.deviceName, c.deviceHostname), nil
 	}
 
 	switch c.deviceResolverMode {
 	case FfxResolver:
-		ffx, err := c.FFXTool()
+		ffx, err := c.FFXTool(ffxIsolateDir)
 		if err != nil {
 			return nil, err
 		}
@@ -133,8 +136,11 @@ func (c *DeviceConfig) SSHPrivateKey() (ssh.Signer, error) {
 	return c.sshPrivateKey, nil
 }
 
-func (c *DeviceConfig) NewDeviceClient(ctx context.Context) (*device.Client, error) {
-	deviceResolver, err := c.DeviceResolver(ctx)
+func (c *DeviceConfig) NewDeviceClient(
+	ctx context.Context,
+	ffxIsolateDir ffx.IsolateDir,
+) (*device.Client, error) {
+	deviceResolver, err := c.deviceResolver(ctx, ffxIsolateDir)
 	if err != nil {
 		return nil, err
 	}
@@ -154,5 +160,20 @@ func (c *DeviceConfig) NewDeviceClient(ctx context.Context) (*device.Client, err
 		}
 	}
 
-	return device.NewClient(ctx, c.deviceSshPort, c.repoPort, deviceResolver, sshPrivateKey, connectBackoff, c.WorkaroundBrokenTimeSkip, serialConn)
+	client, err := device.NewClient(
+		ctx,
+		c.deviceSshPort,
+		c.repoPort,
+		deviceResolver,
+		sshPrivateKey,
+		connectBackoff,
+		c.WorkaroundBrokenTimeSkip,
+		serialConn,
+		ffxIsolateDir,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
 }

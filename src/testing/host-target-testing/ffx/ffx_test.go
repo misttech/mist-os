@@ -30,8 +30,11 @@ func TestTargetListEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to marshal: %s", err)
 	}
+
 	ffxtoolScript := createScript(t, string(data))
-	ffx, err := NewFFXTool(ffxtoolScript)
+
+	isolateDir := NewIsolateDir(filepath.Join(t.TempDir(), "ffx-isolate-dir"))
+	ffx, err := NewFFXTool(ffxtoolScript, isolateDir)
 	if err != nil {
 		t.Fatalf("Failed to create ffx tool: %s", err)
 	}
@@ -53,8 +56,11 @@ func TestTargetList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to marshal: %s", err)
 	}
+
 	ffxtoolScript := createScript(t, string(data))
-	ffx, err := NewFFXTool(ffxtoolScript)
+
+	isolateDir := NewIsolateDir(filepath.Join(t.TempDir(), "ffx-isolate-dir"))
+	ffx, err := NewFFXTool(ffxtoolScript, isolateDir)
 	if err != nil {
 		t.Fatalf("Failed to create ffx tool: %s", err)
 	}

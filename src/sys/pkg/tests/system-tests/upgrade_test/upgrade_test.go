@@ -25,6 +25,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/artifacts"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/errutil"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/packages"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/sl4f"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
@@ -66,7 +67,13 @@ func TestOTA(t *testing.T) {
 
 	defer c.installerConfig.Shutdown(ctx)
 
-	deviceClient, err := c.deviceConfig.NewDeviceClient(ctx)
+	ffxIsolateDirPath, err := os.MkdirTemp("", "ffx-isolate-dir")
+	if err != nil {
+		t.Fatalf("failed to create ffx isolate dir: %v", err)
+	}
+	ffxIsolateDir := ffx.NewIsolateDir(ffxIsolateDirPath)
+
+	deviceClient, err := c.deviceConfig.NewDeviceClient(ctx, ffxIsolateDir)
 	if err != nil {
 		t.Fatalf("failed to create ota test client: %v", err)
 	}
@@ -79,7 +86,10 @@ func TestOTA(t *testing.T) {
 	}
 }
 
-func doTest(ctx context.Context, deviceClient *device.Client) error {
+func doTest(
+	ctx context.Context,
+	deviceClient *device.Client,
+) error {
 	outputDir, cleanup, err := c.archiveConfig.OutputDir()
 	if err != nil {
 		return fmt.Errorf("failed to get output directory: %w", err)
@@ -174,11 +184,7 @@ func doTestOTAs(
 
 	startTime := time.Now()
 
-	ffx, err := c.deviceConfig.FFXTool()
-	if err != nil {
-		return fmt.Errorf("error getting FFXTool: %w", err)
-	}
-	repo, err := build.GetPackageRepository(ctx, artifacts.PrefetchBlobs, ffx)
+	repo, err := build.GetPackageRepository(ctx, artifacts.PrefetchBlobs, device.FfxIsolateDir())
 	if err != nil {
 		return fmt.Errorf("error getting repository: %w", err)
 	}
@@ -223,8 +229,9 @@ func doTestOTAs(
 		}
 
 		// Reset our client state since the device has _potentially_ rebooted
+		ffxIsolateDir := device.FfxIsolateDir()
 		device.Close()
-		newClient, err := c.deviceConfig.NewDeviceClient(ctx)
+		newClient, err := c.deviceConfig.NewDeviceClient(ctx, ffxIsolateDir)
 		if err != nil {
 			return fmt.Errorf("failed to create ota test client: %w", err)
 		}
@@ -268,9 +275,11 @@ func doTestOTAs(
 					lastError)
 			}
 
-			// Reset our client state since the device has _potentially_ rebooted
+			// Reset our client state since the device has _potentially_
+			// rebooted
+			ffxIsolateDir := device.FfxIsolateDir()
 			device.Close()
-			newClient, err := c.deviceConfig.NewDeviceClient(ctx)
+			newClient, err := c.deviceConfig.NewDeviceClient(ctx, ffxIsolateDir)
 			if err != nil {
 				return fmt.Errorf("failed to create ota test client: %w", err)
 			}
@@ -303,16 +312,13 @@ func initializeDevice(
 	startTime := time.Now()
 
 	var repo *packages.Repository
+	var err error
 	var expectedSystemImage *packages.SystemImagePackage
 
 	if build != nil {
-		ffx, err := c.deviceConfig.FFXTool()
-		if err != nil {
-			return nil, fmt.Errorf("error getting FFXTool: %w", err)
-		}
 		// We don't need to prefetch all the blobs, since we only use a subset of
 		// packages from the repository, like run, sl4f.
-		repo, err = build.GetPackageRepository(ctx, artifacts.LazilyFetchBlobs, ffx)
+		repo, err = build.GetPackageRepository(ctx, artifacts.LazilyFetchBlobs, device.FfxIsolateDir())
 		if err != nil {
 			return nil, fmt.Errorf("error getting downgrade repository: %w", err)
 		}

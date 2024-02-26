@@ -24,7 +24,6 @@ type FfxFlasher struct {
 type Flasher interface {
 	Flash(ctx context.Context) error
 	SetTarget(ctx context.Context, target string) error
-	Close() error
 }
 
 // NewFfxFlasher constructs a new flasher that uses `ffx` as the FFXTool used
@@ -64,11 +63,6 @@ func Stdout(writer io.Writer) FfxFlasherOption {
 		p.ffx.SetStdout(writer)
 		return nil
 	}
-}
-
-// Close cleans up the resources associated with the flasher.
-func (p *FfxFlasher) Close() error {
-	return p.ffx.Close()
 }
 
 // SetTarget sets the target to flash.
