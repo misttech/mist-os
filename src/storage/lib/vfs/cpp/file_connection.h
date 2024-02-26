@@ -29,7 +29,7 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
 
   ~FileConnection() override;
 
-  zx::result<VnodeRepresentation> NodeGetRepresentation() const override;
+  zx::result<fuchsia_io::Representation> NodeGetRepresentation() const override;
 
  private:
   std::unique_ptr<Binding> Bind(async_dispatcher*, zx::channel, OnUnbound) override;

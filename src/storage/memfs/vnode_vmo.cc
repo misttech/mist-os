@@ -45,7 +45,9 @@ VnodeVmo::~VnodeVmo() {
   }
 }
 
-fs::VnodeProtocolSet VnodeVmo::GetProtocols() const { return fs::VnodeProtocol::kFile; }
+fuchsia_io::NodeProtocolKinds VnodeVmo::GetProtocols() const {
+  return fuchsia_io::NodeProtocolKinds::kFile;
+}
 
 bool VnodeVmo::ValidateRights(fs::Rights rights) const {
   return !rights.write && (!rights.execute || executable_);

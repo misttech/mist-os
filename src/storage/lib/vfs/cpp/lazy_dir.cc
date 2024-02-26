@@ -39,7 +39,9 @@ bool DoDot(VdirCookie* cookie) {
 LazyDir::LazyDir() = default;
 LazyDir::~LazyDir() = default;
 
-VnodeProtocolSet LazyDir::GetProtocols() const { return VnodeProtocol::kDirectory; }
+fuchsia_io::NodeProtocolKinds LazyDir::GetProtocols() const {
+  return fuchsia_io::NodeProtocolKinds::kDirectory;
+}
 
 zx_status_t LazyDir::GetAttributes(VnodeAttributes* attr) {
   *attr = VnodeAttributes();

@@ -97,7 +97,7 @@ class VnodeF2fs : public fs::PagedVnode,
   zx_status_t GetAttributes(fs::VnodeAttributes *a) final __TA_EXCLUDES(mutex_);
   zx_status_t SetAttributes(fs::VnodeAttributesUpdate attr) final __TA_EXCLUDES(mutex_);
 
-  fs::VnodeProtocolSet GetProtocols() const override;
+  fuchsia_io::NodeProtocolKinds GetProtocols() const override;
 
   // For fs::PagedVnode
   zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) override

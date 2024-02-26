@@ -27,6 +27,7 @@ static_library("cpp") {
   ]
 
   public_deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/fdio:constants",
     "//sdk/lib/fit",
     "//zircon/system/ulib/fbl",
@@ -96,7 +97,6 @@ static_library("cpp") {
     ]
     public_deps += [
       "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
-      "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
       "//sdk/lib/file-lock:cpp",
       "//zircon/system/ulib/async",
 
@@ -148,7 +148,6 @@ test("fs-vnode-test") {
     "vfs_tests.cc",
     "vfs_types_tests.cc",
     "vmo_file_tests.cc",
-    "vnode_contract_tests.cc",
     "watcher_test.cc",
   ]
   deps = [

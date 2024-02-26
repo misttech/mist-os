@@ -5,12 +5,13 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_VFS_TYPES_H_
 #define SRC_STORAGE_LIB_VFS_CPP_VFS_TYPES_H_
 
+#include <fidl/fuchsia.io/cpp/natural_types.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
 #include <lib/fdio/vfs.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
 #ifdef __Fuchsia__
-#include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/event.h>
 #include <lib/zx/eventpair.h>
@@ -23,21 +24,15 @@
 #include <cstdint>
 #include <cstring>
 #include <optional>
-#include <type_traits>
 #include <utility>
 #include <variant>
 
 #include <fbl/bits.h>
 
-// The filesystem server exposes various FIDL protocols on top of the Vnode abstractions.
-// In order to achieve the following objectives:
-// - the FIDL protocol and the Vnode APIs can evolve independently from each other
-// - the Vnode APIs can be tested in isolation without relying on FIDL
-// - the Vnode APIs structures have recursive ownership semantics, simplifying passing around
-//
-// We explicitly define a set of filesystem types to be used by the Vnode interface, as opposed to
-// blindly reusing the FIDL generated types. The names of these types all begin with "Vnode" to
-// reduce confusion with their FIDL counterparts.
+// The filesystem server exposes various FIDL protocols on top of the Vnode abstractions. This
+// header defines some helper types composed with the fuchsia.io protocol types to better express
+// API requirements. These type names should start with "Vnode" to reduce confusion with their FIDL
+// counterparts.
 namespace fs {
 
 union Rights {
@@ -111,95 +106,16 @@ union Rights {
 
 constexpr Rights operator&(Rights lhs, Rights rhs) { return Rights(lhs.raw_value & rhs.raw_value); }
 
-// Identifies the different operational contracts used to interact with a vnode. For example, the
-// |kFile| protocol allows reading and writing byte contents through a buffer.
-//
-// The members in this class have one-to-one correspondence with the variants in
-// |VnodeRepresentation|.
-//
-// Note: Due to the implementation strategy in |VnodeProtocolSet|, the number of protocols must be
-// less than 64. When the need arises as to support more than 64 protocols, we should change the
-// implementation in |VnodeProtocolSet| accordingly.
-enum class VnodeProtocol : uint32_t {
-  kConnector,
-  kFile,
+// Identifies a single type of node protocol where required for protocol negotiation/resolution.
+enum class VnodeProtocol : uint8_t {
   kDirectory,
-  // Note: when appending more members, adjust |kVnodeProtocolCount| accordingly.
+  kFile,
+  kNode,
+  kService,
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  kSymlink,
+#endif
 };
-
-constexpr size_t kVnodeProtocolCount = static_cast<uint32_t>(VnodeProtocol::kDirectory) + 1;
-
-// A collection of |VnodeProtocol|s, stored internally as a bit-field.
-// The N-th bit corresponds to the N-th element in the |VnodeProtocol| enum, under zero-based index.
-class VnodeProtocolSet {
- public:
-  // Constructs a set containing a single protocol.
-  //
-  // The implicit conversion is intentional, to improve ergonomics when performing
-  // union/intersection operations between |VnodeProtocol| and |VnodeProtocolSet|.
-  // NOLINTNEXTLINE(google-explicit-constructor)
-  constexpr VnodeProtocolSet(VnodeProtocol protocol)
-      : protocol_bits_(1 << static_cast<uint32_t>(protocol)) {}
-
-  // Union operator.
-  constexpr VnodeProtocolSet operator|(VnodeProtocolSet other) const {
-    return VnodeProtocolSet(protocol_bits_ | other.protocol_bits_);
-  }
-
-  // Intersection operator.
-  constexpr VnodeProtocolSet operator&(VnodeProtocolSet other) const {
-    return VnodeProtocolSet(protocol_bits_ & other.protocol_bits_);
-  }
-
-  // Difference operator.
-  constexpr VnodeProtocolSet Except(VnodeProtocolSet other) const {
-    return VnodeProtocolSet(protocol_bits_ & ~other.protocol_bits_);
-  }
-
-  // True iff at least one element is present in the set.
-  constexpr bool any() const { return protocol_bits_ != 0; }
-
-  // Returns the first element in the set, if any. The ordering of elements is defined by their
-  // declaration order within |VnodeProtocol|.
-  constexpr std::optional<VnodeProtocol> first() const {
-    if (protocol_bits_ == 0) {
-      return std::nullopt;
-    }
-    return static_cast<VnodeProtocol>(static_cast<uint32_t>(__builtin_ctzl(protocol_bits_)));
-  }
-
-  // If the set contains a single element, returns that element. Otherwise, return std::nullopt.
-  constexpr std::optional<VnodeProtocol> which() const {
-    uint64_t is_power_of_two = protocol_bits_ && !(protocol_bits_ & (protocol_bits_ - 1));
-    if (!is_power_of_two) {
-      return std::nullopt;
-    }
-    return first();
-  }
-
-  constexpr bool operator==(const VnodeProtocolSet& rhs) const {
-    return protocol_bits_ == rhs.protocol_bits_;
-  }
-
-  constexpr bool operator!=(const VnodeProtocolSet& rhs) const { return !operator==(rhs); }
-
-  // The set of all defined protocols.
-  constexpr static VnodeProtocolSet All() {
-    return VnodeProtocolSet((1ul << kVnodeProtocolCount) - 1ul);
-  }
-
-  // The empty set of protocols.
-  constexpr static VnodeProtocolSet Empty() { return VnodeProtocolSet(0); }
-
- private:
-  constexpr explicit VnodeProtocolSet(uint64_t raw_bits) : protocol_bits_(raw_bits) {}
-
-  uint64_t protocol_bits_;
-};
-
-inline constexpr VnodeProtocolSet operator|(VnodeProtocol lhs, VnodeProtocol rhs) {
-  return VnodeProtocolSet(lhs) | VnodeProtocolSet(rhs);
-}
 
 // Options specified during opening and cloning.
 struct VnodeConnectionOptions {
@@ -281,26 +197,30 @@ struct VnodeConnectionOptions {
     return options;
   }
 
-  // Translate the flags passed by the client into an equivalent set of acceptable protocols.
-  constexpr VnodeProtocolSet protocols() const {
-    if (flags.directory && flags.not_directory) {
-      return VnodeProtocolSet::Empty();
-    }
+  // Translates the io1 flags passed by the client into an equivalent set of io2 protocols.
+  constexpr fuchsia_io::NodeProtocolKinds protocols() const {
+    constexpr fuchsia_io::NodeProtocolKinds kSupportedIo1Protocols =
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+        // Symlinks are not supported via io1.
+        fuchsia_io::NodeProtocolKinds::kMask ^ fuchsia_io::NodeProtocolKinds::kSymlink;
+#else
+        fuchsia_io::NodeProtocolKinds::kMask;
+#endif
     if (flags.directory) {
-      return VnodeProtocol::kDirectory;
+      return fuchsia_io::NodeProtocolKinds::kDirectory;
     }
     if (flags.not_directory) {
-      return VnodeProtocolSet::All().Except(VnodeProtocol::kDirectory);
+      return kSupportedIo1Protocols ^ fuchsia_io::NodeProtocolKinds::kDirectory;
     }
-    return VnodeProtocolSet::All();
+    return kSupportedIo1Protocols;
   }
 
 #ifdef __Fuchsia__
   // Converts from fuchsia.io v1 flags to |VnodeConnectionOptions|.
-  static VnodeConnectionOptions FromIoV1Flags(fuchsia_io::wire::OpenFlags fidl_flags);
+  static VnodeConnectionOptions FromIoV1Flags(fuchsia_io::OpenFlags fidl_flags);
 
   // Converts from |VnodeConnectionOptions| to fuchsia.io flags.
-  fuchsia_io::wire::OpenFlags ToIoV1Flags() const;
+  fuchsia_io::OpenFlags ToIoV1Flags() const;
 
   // Some flags (e.g. POSIX) only affect the interpretation of rights at the time of Open/Clone, and
   // should have no effects thereafter. Hence we filter them here.
@@ -376,61 +296,9 @@ class VnodeAttributesUpdate {
 
 #ifdef __Fuchsia__
 
-// Describe how the vnode connection should be handled, and provides auxiliary handles and
-// information for the connection where applicable.
-// TODO(https://fxbug.dev/324112857): Replace with fuchsia.io/Representation.
-class VnodeRepresentation {
- public:
-  struct Connector {};
-
-  struct File {
-    zx::event observer = {};
-    zx::stream stream = {};
-  };
-
-  struct Directory {};
-
-  VnodeRepresentation() = default;
-
-  // Forwards the constructor arguments into the underlying |std::variant|. This allows
-  // |VnodeRepresentation| to be constructed directly from one of the variants, e.g.
-  //
-  //     VnodeRepresentation repr = VnodeRepresentation::File{.observer = zx::event(...)};
-  //
-  template <typename T>
-  VnodeRepresentation(T&& v) : variants_(std::forward<T>(v)) {}
-
-  // Applies the |visitor| function to the variant payload. It simply forwards the visitor into the
-  // underlying |std::variant|. Returns the return value of |visitor|. Refer to C++ documentation
-  // for |std::visit|.
-  template <class Visitor>
-  constexpr auto visit(Visitor&& visitor) -> decltype(visitor(std::declval<Connector>())) {
-    return std::visit(std::forward<Visitor>(visitor), variants_);
-  }
-
-  Connector& connector() { return std::get<Connector>(variants_); }
-
-  bool is_connector() const { return std::holds_alternative<Connector>(variants_); }
-
-  File& file() { return std::get<File>(variants_); }
-
-  bool is_file() const { return std::holds_alternative<File>(variants_); }
-
-  Directory& directory() { return std::get<Directory>(variants_); }
-
-  bool is_directory() const { return std::holds_alternative<Directory>(variants_); }
-
- private:
-  using Variants = std::variant<std::monostate, Connector, File, Directory>;
-
-  Variants variants_ = {};
-};
-
-// Converts the vnode representation to a fuchsia.io v1 NodeInfoDeprecated union, then synchronously
-// invoke the callback. This operation consumes the |representation|. Using a callback works around
-// LLCPP ownership limitations where an extensible union cannot recursively own its variant payload.
-void ConvertToIoV1NodeInfo(VnodeRepresentation representation,
-                           fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated&&)> callback);
+// Converts an io2 Representation to an io1 NodeInfoDeprecated.
+fuchsia_io::wire::NodeInfoDeprecated ConvertToIoV1NodeInfo(
+    fidl::AnyArena& arena, fuchsia_io::Representation representation);
 
 #endif  // __Fuchsia__
 

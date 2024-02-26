@@ -5,14 +5,7 @@
 #ifndef SRC_STORAGE_LIB_WATCHDOG_INCLUDE_LIB_WATCHDOG_WATCHDOG_H_
 #define SRC_STORAGE_LIB_WATCHDOG_INCLUDE_LIB_WATCHDOG_WATCHDOG_H_
 
-#ifdef __Fuchsia__
 #include <lib/syslog/cpp/macros.h>
-using LogSeverity = fuchsia_logging::LogSeverity;
-constexpr LogSeverity LOG_INFO = fuchsia_logging::LOG_INFO;
-#else
-using LogSeverity = int;
-constexpr LogSeverity LOG_INFO = 4;
-#endif
 #include <lib/zx/result.h>
 #include <zircon/types.h>
 
@@ -68,7 +61,7 @@ constexpr std::chrono::nanoseconds kDefaultSleepDuration =
 constexpr bool kDefaultEnableState = true;
 
 // Default severity level with which messages are logged.
-constexpr LogSeverity kDefaultLogSeverity = LOG_INFO;
+constexpr fuchsia_logging::LogSeverity kDefaultLogSeverity = fuchsia_logging::LOG_INFO;
 
 // Log messages are buffered before they are sent to logging subsystem.
 // This is default size of that buffer.
@@ -89,7 +82,7 @@ struct Options {
   // This is largely unused because syslog expects a macro and not variable
   // to specify logging level. Once that is changed, we need to use
   // severity_.
-  LogSeverity severity = kDefaultLogSeverity;
+  fuchsia_logging::LogSeverity severity = kDefaultLogSeverity;
 
   // Size of the log buffer.
   size_t log_buffer_size = kDefaultLogBufferSize;

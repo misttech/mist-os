@@ -26,7 +26,7 @@ class Directory final : public fs::Vnode {
   ~Directory() final;
 
   // fs::Vnode interface.
-  fs::VnodeProtocolSet GetProtocols() const final;
+  fuchsia_io::NodeProtocolKinds GetProtocols() const final;
   zx_status_t Readdir(fs::VdirCookie* cookie, void* dirents, size_t len, size_t* out_actual) final;
   zx_status_t Read(void* data, size_t len, size_t off, size_t* out_actual) final;
   zx_status_t Write(const void* data, size_t len, size_t offset, size_t* out_actual) final;

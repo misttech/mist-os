@@ -136,35 +136,26 @@ fio::wire::NodeAttributes VnodeAttributes::ToIoV1NodeAttributes() const {
                                    .modification_time = modification_time};
 }
 
-namespace {
-
-// See https://en.cppreference.com/w/cpp/utility/variant/visit.
-//
-// helper constant for the visitor #3
-template <class>
-[[maybe_unused]] inline constexpr bool always_false_v = false;
-
-}  // namespace
-
-void ConvertToIoV1NodeInfo(VnodeRepresentation representation,
-                           fit::callback<void(fio::wire::NodeInfoDeprecated&&)> callback) {
-  representation.visit([&](auto&& repr) {
-    using T = std::decay_t<decltype(repr)>;
-    if constexpr (std::is_same_v<T, std::monostate>) {
-      ZX_PANIC("Representation variant is not initialized");
-    } else if constexpr (std::is_same_v<T, fs::VnodeRepresentation::Connector>) {
-      callback(fio::wire::NodeInfoDeprecated::WithService({}));
-    } else if constexpr (std::is_same_v<T, fs::VnodeRepresentation::File>) {
-      fio::wire::FileObject file = {.event = std::move(repr.observer),
-                                    .stream = std::move(repr.stream)};
-      callback(fio::wire::NodeInfoDeprecated::WithFile(
-          fidl::ObjectView<fio::wire::FileObject>::FromExternal(&file)));
-    } else if constexpr (std::is_same_v<T, fs::VnodeRepresentation::Directory>) {
-      callback(fio::wire::NodeInfoDeprecated::WithDirectory({}));
-    } else {
-      static_assert(always_false_v<T>, "non-exhaustive visitor");
+fuchsia_io::wire::NodeInfoDeprecated ConvertToIoV1NodeInfo(
+    fidl::AnyArena& arena, fuchsia_io::Representation representation) {
+  switch (representation.Which()) {
+    case fuchsia_io::Representation::Tag::kConnector:
+      return fuchsia_io::wire::NodeInfoDeprecated::WithService({});
+    case fuchsia_io::Representation::Tag::kDirectory:
+      return fuchsia_io::wire::NodeInfoDeprecated::WithDirectory({});
+    case fuchsia_io::Representation::Tag::kFile: {
+      auto info = fuchsia_io::wire::NodeInfoDeprecated::WithFile(arena);
+      if (representation.file()->observer()) {
+        info.file().event = std::move(*representation.file()->observer());
+      }
+      if (representation.file()->stream()) {
+        info.file().stream = std::move(*representation.file()->stream());
+      }
+      return info;
     }
-  });
+    default:
+      ZX_PANIC("Protocol not supported by fuchsia.io1.");
+  }
 }
 
 }  // namespace fs

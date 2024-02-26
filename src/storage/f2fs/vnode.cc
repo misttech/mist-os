@@ -22,7 +22,9 @@ VnodeF2fs::VnodeF2fs(F2fs *fs, ino_t ino, umode_t mode)
   Activate();
 }
 
-fs::VnodeProtocolSet VnodeF2fs::GetProtocols() const { return fs::VnodeProtocol::kFile; }
+fuchsia_io::NodeProtocolKinds VnodeF2fs::GetProtocols() const {
+  return fuchsia_io::NodeProtocolKinds::kFile;
+}
 
 void VnodeF2fs::SetMode(const umode_t &mode) { mode_ = mode; }
 

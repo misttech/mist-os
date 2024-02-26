@@ -21,7 +21,9 @@ RemoteFile::RemoteFile(fidl::ClientEnd<fio::Directory> remote_client)
 
 RemoteFile::~RemoteFile() = default;
 
-VnodeProtocolSet RemoteFile::GetProtocols() const { return VnodeProtocol::kFile; }
+fuchsia_io::NodeProtocolKinds RemoteFile::GetProtocols() const {
+  return fuchsia_io::NodeProtocolKinds::kFile;
+}
 
 zx_status_t RemoteFile::GetAttributes(VnodeAttributes* attr) {
   *attr = VnodeAttributes();

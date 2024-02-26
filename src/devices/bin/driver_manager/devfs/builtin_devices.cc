@@ -37,6 +37,8 @@ zx_status_t BuiltinDevVnode::GetAttributes(fs::VnodeAttributes* a) {
   return ZX_OK;
 }
 
-fs::VnodeProtocolSet BuiltinDevVnode::GetProtocols() const { return fs::VnodeProtocol::kFile; }
+fuchsia_io::NodeProtocolKinds BuiltinDevVnode::GetProtocols() const {
+  return fuchsia_io::NodeProtocolKinds::kFile;
+}
 
 }  // namespace driver_manager

@@ -29,7 +29,7 @@ class BuiltinDevVnode : public fs::Vnode {
 
   zx_status_t GetAttributes(fs::VnodeAttributes* a) override;
 
-  fs::VnodeProtocolSet GetProtocols() const override;
+  fuchsia_io::NodeProtocolKinds GetProtocols() const override;
 
  private:
   const bool null_;

@@ -27,7 +27,9 @@ VmoFile::VmoFile(zx::vmo vmo, size_t length, bool writable, DefaultSharingMode v
 
 VmoFile::~VmoFile() = default;
 
-VnodeProtocolSet VmoFile::GetProtocols() const { return VnodeProtocol::kFile; }
+fuchsia_io::NodeProtocolKinds VmoFile::GetProtocols() const {
+  return fuchsia_io::NodeProtocolKinds::kFile;
+}
 
 bool VmoFile::ValidateRights(Rights rights) const {
   // Executable rights/VMOs are currently not supported, but may be added in the future.

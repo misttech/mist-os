@@ -28,7 +28,9 @@ Directory::Directory(Blobfs* bs) : blobfs_(bs) {}
 
 Directory::~Directory() = default;
 
-fs::VnodeProtocolSet Directory::GetProtocols() const { return fs::VnodeProtocol::kDirectory; }
+fuchsia_io::NodeProtocolKinds Directory::GetProtocols() const {
+  return fuchsia_io::NodeProtocolKinds::kDirectory;
+}
 
 zx_status_t Directory::Readdir(fs::VdirCookie* cookie, void* dirents, size_t len,
                                size_t* out_actual) {

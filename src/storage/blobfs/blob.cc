@@ -353,7 +353,9 @@ void Blob::ActivateLowMemory() {
 
 Blob::~Blob() { ActivateLowMemory(); }
 
-fs::VnodeProtocolSet Blob::GetProtocols() const { return fs::VnodeProtocol::kFile; }
+fuchsia_io::NodeProtocolKinds Blob::GetProtocols() const {
+  return fuchsia_io::NodeProtocolKinds::kFile;
+}
 
 bool Blob::ValidateRights(fs::Rights rights) const {
   // To acquire write access to a blob, it must be empty.

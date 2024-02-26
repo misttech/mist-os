@@ -15,7 +15,7 @@ class VnodeVmo final : public Vnode {
   VnodeVmo(Memfs& memfs, zx_handle_t vmo, zx_off_t offset, zx_off_t length);
   ~VnodeVmo() override;
 
-  fs::VnodeProtocolSet GetProtocols() const final;
+  fuchsia_io::NodeProtocolKinds GetProtocols() const final;
   bool ValidateRights(fs::Rights rights) const final;
 
  private:

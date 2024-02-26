@@ -93,7 +93,7 @@ class Devnode {
   // This is exposed for use in tests.
   class VnodeImpl : public fs::Vnode {
    public:
-    fs::VnodeProtocolSet GetProtocols() const final;
+    fuchsia_io::NodeProtocolKinds GetProtocols() const final;
     zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
     zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) final;
     zx_status_t WatchDir(fs::FuchsiaVfs* vfs, fuchsia_io::wire::WatchMask mask, uint32_t options,

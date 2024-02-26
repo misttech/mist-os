@@ -87,7 +87,9 @@ zx_status_t PseudoDir::Readdir(VdirCookie* cookie, void* data, size_t len, size_
   return ZX_OK;
 }
 
-VnodeProtocolSet PseudoDir::GetProtocols() const { return VnodeProtocol::kDirectory; }
+fuchsia_io::NodeProtocolKinds PseudoDir::GetProtocols() const {
+  return fuchsia_io::NodeProtocolKinds::kDirectory;
+}
 
 zx_status_t PseudoDir::AddEntry(fbl::String name, fbl::RefPtr<fs::Vnode> vn) {
   ZX_DEBUG_ASSERT(vn);

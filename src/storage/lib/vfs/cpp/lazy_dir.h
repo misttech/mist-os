@@ -37,7 +37,7 @@ class LazyDir : public Vnode {
   using LazyEntryVector = fbl::Vector<LazyEntry>;
 
   // |Vnode| implementation.
-  VnodeProtocolSet GetProtocols() const final;
+  fuchsia_io::NodeProtocolKinds GetProtocols() const final;
   zx_status_t GetAttributes(fs::VnodeAttributes* out_attr) final;
   // Read the directory contents. Note that cookie->p is used to denote if the "." entry has been
   // returned. All IDs other than 0 are valid.

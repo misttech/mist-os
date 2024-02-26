@@ -52,6 +52,7 @@ zx_library("watchdog") {
     "lib/watchdog/watchdog.h",
     "lib/watchdog/operations.h",
   ]
+  public_deps = [ "//sdk/lib/syslog/cpp" ]
   deps = [
     "//sdk/lib/fit",
     "//src/storage/lib/vfs/cpp",
@@ -61,8 +62,7 @@ zx_library("watchdog") {
 
   if (is_fuchsia) {
     sources = [ "watchdog.cc" ]
-    public_deps = [
-      "//sdk/lib/syslog/cpp",
+    public_deps += [
       "//zircon/system/ulib/fzl",
       "//zircon/system/ulib/zx",
     ]

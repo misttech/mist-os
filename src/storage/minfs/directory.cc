@@ -487,7 +487,9 @@ zx::result<bool> Directory::ForEachDirent(DirArgs* args, const DirentCallback fu
   return zx::ok(false);
 }
 
-fs::VnodeProtocolSet Directory::GetProtocols() const { return fs::VnodeProtocol::kDirectory; }
+fuchsia_io::NodeProtocolKinds Directory::GetProtocols() const {
+  return fuchsia_io::NodeProtocolKinds::kDirectory;
+}
 
 zx_status_t Directory::Read(void* data, size_t len, size_t off, size_t* out_actual) {
   return ZX_ERR_NOT_FILE;

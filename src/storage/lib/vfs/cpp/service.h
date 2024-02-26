@@ -55,7 +55,7 @@ class Service : public Vnode {
   using ProtocolConnector = fit::function<zx_status_t(fidl::ServerEnd<Protocol>)>;
 
   // |Vnode| implementation:
-  VnodeProtocolSet GetProtocols() const final;
+  fuchsia_io::NodeProtocolKinds GetProtocols() const final;
   zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
   zx_status_t ConnectService(zx::channel channel) final;
   bool IsService() const override { return true; }

@@ -113,10 +113,10 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // time.
 
   // Returns the set of all protocols supported by the vnode.
-  virtual VnodeProtocolSet GetProtocols() const = 0;
+  virtual fuchsia_io::NodeProtocolKinds GetProtocols() const = 0;
 
   // Returns true iff the vnode supports _any_ protocol requested by |protocols|.
-  bool Supports(VnodeProtocolSet protocols) const;
+  bool Supports(fuchsia_io::NodeProtocolKinds protocols) const;
 
   // To be overridden by implementations to check that it is valid to access the vnode with the
   // given |rights|. The default implementation always returns true. The vnode will only be opened
@@ -134,14 +134,11 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // when validation fails.
   zx::result<ValidatedOptions> ValidateOptions(VnodeConnectionOptions options) const;
 
-  // Picks one protocol from |protocols|, when the intersection of the protocols requested by the
-  // client and the ones supported by the vnode has more than one elements i.e. tie-breaking is
-  // required to determine the resultant protocol.
-  //
-  // This method is only called when tie-breaking is required. |protocols| is guaranteed to be a
-  // subset of the supported protocols. The default implementation performs tie-breaking in the
-  // order of element declaration within |VnodeProtocol|.
-  virtual VnodeProtocol Negotiate(VnodeProtocolSet protocols) const;
+  // Picks one protocol from |protocols| that the node supports. |protocols| is guaranteed to be a
+  // subset of the supported protocols. If multiple protocols are specified, the default
+  // implementation performs tie-breaking in the following order:
+  // kService, kDirectory, kFile, kSymlink.
+  virtual VnodeProtocol Negotiate(fuchsia_io::NodeProtocolKinds protocols) const;
 
   // Opens the vnode. This is a callback to signal that a new connection is about to be created and
   // I/O operations will follow. In addition, it provides an opportunity to redirect subsequent I/O.

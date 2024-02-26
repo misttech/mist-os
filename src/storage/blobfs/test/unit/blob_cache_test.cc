@@ -48,7 +48,9 @@ class TestNode : public CacheNode, fbl::Recyclable<TestNode> {
 
   void SetHighMemory() { using_memory_ = true; }
 
-  fs::VnodeProtocolSet GetProtocols() const final { return fs::VnodeProtocol::kFile; }
+  fuchsia_io::NodeProtocolKinds GetProtocols() const final {
+    return fuchsia_io::NodeProtocolKinds::kFile;
+  }
 
  private:
   BlobCache* cache_;

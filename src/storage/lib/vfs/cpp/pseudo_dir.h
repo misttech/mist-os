@@ -67,7 +67,7 @@ class PseudoDir : public Vnode {
   bool HasWatchers() const { return watcher_.HasWatchers(); }
 
   // |Vnode| implementation:
-  VnodeProtocolSet GetProtocols() const final;
+  fuchsia_io::NodeProtocolKinds GetProtocols() const final;
   zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
   zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) override;
   void Notify(std::string_view name, fuchsia_io::wire::WatchEvent event) final;

@@ -46,7 +46,7 @@ class Directory final : public VnodeMinfs, public fbl::Recyclable<Directory> {
   void fbl_recycle() { RecycleNode(); }
 
   // fs::Vnode interface.
-  fs::VnodeProtocolSet GetProtocols() const final;
+  fuchsia_io::NodeProtocolKinds GetProtocols() const final;
   zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) final;
   zx_status_t Read(void* data, size_t len, size_t off, size_t* out_actual) final;
   zx_status_t Write(const void* data, size_t len, size_t offset, size_t* out_actual) final;

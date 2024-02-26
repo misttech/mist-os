@@ -19,7 +19,9 @@ VnodeDir::VnodeDir(Memfs& memfs) : Vnode(memfs), memfs_(memfs) {
 
 VnodeDir::~VnodeDir() = default;
 
-fs::VnodeProtocolSet VnodeDir::GetProtocols() const { return fs::VnodeProtocol::kDirectory; }
+fuchsia_io::NodeProtocolKinds VnodeDir::GetProtocols() const {
+  return fuchsia_io::NodeProtocolKinds::kDirectory;
+}
 
 void VnodeDir::Notify(std::string_view name, fuchsia_io::wire::WatchEvent event) {
   watcher_.Notify(name, event);

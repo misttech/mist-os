@@ -21,7 +21,9 @@ RemoteDir::RemoteDir(fidl::ClientEnd<fio::Directory> remote_dir_client)
 
 RemoteDir::~RemoteDir() = default;
 
-VnodeProtocolSet RemoteDir::GetProtocols() const { return VnodeProtocol::kDirectory; }
+fuchsia_io::NodeProtocolKinds RemoteDir::GetProtocols() const {
+  return fuchsia_io::NodeProtocolKinds::kDirectory;
+}
 
 zx_status_t RemoteDir::GetAttributes(VnodeAttributes* attr) {
   *attr = VnodeAttributes();

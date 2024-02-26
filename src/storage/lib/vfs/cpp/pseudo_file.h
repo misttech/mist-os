@@ -54,7 +54,7 @@ class PseudoFile : public Vnode {
   ~PseudoFile() override;
 
   // |Vnode| implementation:
-  VnodeProtocolSet GetProtocols() const final;
+  fuchsia_io::NodeProtocolKinds GetProtocols() const final;
   bool ValidateRights(Rights rights) const override;
   zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
 
@@ -96,7 +96,7 @@ class BufferedPseudoFile : public PseudoFile {
   class Content final : public Vnode {
    public:
     // |Vnode| implementation:
-    VnodeProtocolSet GetProtocols() const final;
+    fuchsia_io::NodeProtocolKinds GetProtocols() const final;
     zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
     zx_status_t Read(void* data, size_t length, size_t offset, size_t* out_actual) final;
     zx_status_t Write(const void* data, size_t length, size_t offset, size_t* out_actual) final;
@@ -191,7 +191,7 @@ class UnbufferedPseudoFile : public PseudoFile {
   class Content final : public Vnode {
    public:
     // |Vnode| implementation:
-    VnodeProtocolSet GetProtocols() const final;
+    fuchsia_io::NodeProtocolKinds GetProtocols() const final;
     zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
     zx_status_t Read(void* data, size_t length, size_t offset, size_t* out_actual) final;
     zx_status_t Write(const void* data, size_t length, size_t offset, size_t* out_actual) final;

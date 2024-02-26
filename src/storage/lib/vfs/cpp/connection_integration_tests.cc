@@ -37,8 +37,8 @@ class FileOrDirectory : public fs::Vnode {
  public:
   FileOrDirectory() = default;
 
-  fs::VnodeProtocolSet GetProtocols() const final {
-    return fs::VnodeProtocol::kFile | fs::VnodeProtocol::kDirectory;
+  fuchsia_io::NodeProtocolKinds GetProtocols() const final {
+    return fuchsia_io::NodeProtocolKinds::kFile | fuchsia_io::NodeProtocolKinds::kDirectory;
   }
 };
 
@@ -341,7 +341,9 @@ class CountOutstandingOpenVnode : public fs::Vnode {
  public:
   CountOutstandingOpenVnode() = default;
 
-  fs::VnodeProtocolSet GetProtocols() const final { return fs::VnodeProtocol::kFile; }
+  fuchsia_io::NodeProtocolKinds GetProtocols() const final {
+    return fuchsia_io::NodeProtocolKinds::kFile;
+  }
 
   uint64_t GetOpenCount() const {
     std::lock_guard lock(mutex_);

@@ -18,7 +18,7 @@ class VnodeFile final : public Vnode {
   explicit VnodeFile(Memfs& memfs);
   ~VnodeFile() final;
 
-  fs::VnodeProtocolSet GetProtocols() const final;
+  fuchsia_io::NodeProtocolKinds GetProtocols() const final;
 
   zx::result<zx::stream> CreateStream(uint32_t stream_options) final;
   void DidModifyStream() final;

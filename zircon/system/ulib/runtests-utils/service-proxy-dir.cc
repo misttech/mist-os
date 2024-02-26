@@ -35,7 +35,9 @@ zx_status_t ServiceProxyDir::GetAttributes(fs::VnodeAttributes* attr) {
   return ZX_OK;
 }
 
-fs::VnodeProtocolSet ServiceProxyDir::GetProtocols() const { return fs::VnodeProtocol::kDirectory; }
+fuchsia_io::NodeProtocolKinds ServiceProxyDir::GetProtocols() const {
+  return fuchsia_io::NodeProtocolKinds::kDirectory;
+}
 
 zx_status_t ServiceProxyDir::Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) {
   auto entry_name = std::string(name.data(), name.length());

@@ -22,7 +22,9 @@ VnodeFile::~VnodeFile() {
   ZX_DEBUG_ASSERT(file == nullptr);
 }
 
-fs::VnodeProtocolSet VnodeFile::GetProtocols() const { return fs::VnodeProtocol::kFile; }
+fuchsia_io::NodeProtocolKinds VnodeFile::GetProtocols() const {
+  return fuchsia_io::NodeProtocolKinds::kFile;
+}
 
 zx::result<zx::stream> VnodeFile::CreateStream(uint32_t stream_options) {
   std::lock_guard lock(mutex_);

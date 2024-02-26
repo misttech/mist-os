@@ -67,7 +67,7 @@ class VmoFile : public Vnode {
   bool is_writable() const { return writable_; }
 
   // |Vnode| implementation:
-  VnodeProtocolSet GetProtocols() const final;
+  fuchsia_io::NodeProtocolKinds GetProtocols() const final;
   bool ValidateRights(Rights rights) const final;
   zx_status_t GetAttributes(VnodeAttributes* a) final;
   zx_status_t Read(void* data, size_t length, size_t offset, size_t* out_actual) final;

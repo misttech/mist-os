@@ -59,15 +59,15 @@ void FileConnection::Query(QueryCompleter::Sync& completer) {
   completer.Reply(Connection::NodeQuery());
 }
 
-zx::result<VnodeRepresentation> FileConnection::NodeGetRepresentation() const {
-  VnodeRepresentation representation = VnodeRepresentation::File();
+zx::result<fuchsia_io::Representation> FileConnection::NodeGetRepresentation() const {
+  fuchsia_io::FileInfo info;
   zx::result<zx::event> observer = vnode()->GetObserver();
   if (observer.is_ok()) {
-    representation.file().observer = std::move(*observer);
+    info.observer() = std::move(*observer);
   } else if (observer.error_value() != ZX_ERR_NOT_SUPPORTED) {
     return observer.take_error();
   }
-  return zx::ok(std::move(representation));
+  return zx::ok(fuchsia_io::Representation::WithFile(std::move(info)));
 }
 
 void FileConnection::Describe(DescribeCompleter::Sync& completer) {
@@ -78,11 +78,11 @@ void FileConnection::Describe(DescribeCompleter::Sync& completer) {
   }
   fidl::Arena arena;
   auto builder = fio::wire::FileInfo::Builder(arena);
-  if (representation->file().observer.is_valid()) {
-    builder.observer(std::move(representation->file().observer));
+  if (representation->file()->observer().has_value()) {
+    builder.observer(std::move(*representation->file()->observer()));
   }
-  if (representation->file().stream.is_valid()) {
-    builder.stream(std::move(representation->file().stream));
+  if (representation->file()->stream().has_value()) {
+    builder.stream(std::move(*representation->file()->stream()));
   }
   completer.Reply(builder.Build());
 }

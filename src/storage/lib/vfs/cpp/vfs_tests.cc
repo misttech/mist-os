@@ -19,7 +19,9 @@ namespace {
 class TestNode : public fs::Vnode {
  public:
   // Vnode implementation:
-  fs::VnodeProtocolSet GetProtocols() const override { return fs::VnodeProtocol::kFile; }
+  fuchsia_io::NodeProtocolKinds GetProtocols() const override {
+    return fuchsia_io::NodeProtocolKinds::kFile;
+  }
 
  private:
   friend fbl::internal::MakeRefCountedHelper<TestNode>;

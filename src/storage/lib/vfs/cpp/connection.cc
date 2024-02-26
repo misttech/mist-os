@@ -177,15 +177,21 @@ fidl::VectorView<uint8_t> Connection::NodeQuery() {
       return fio::wire::kNodeProtocolName;
     }
     switch (protocol()) {
-      case VnodeProtocol::kConnector: {
-        return fio::wire::kNodeProtocolName;
+      case VnodeProtocol::kDirectory: {
+        return fio::wire::kDirectoryProtocolName;
       }
       case VnodeProtocol::kFile: {
         return fio::wire::kFileProtocolName;
       }
-      case VnodeProtocol::kDirectory: {
-        return fio::wire::kDirectoryProtocolName;
+      case VnodeProtocol::kNode:
+      case VnodeProtocol::kService: {
+        return fio::wire::kNodeProtocolName;
       }
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+      case VnodeProtocol::kSymlink: {
+        return fio::wire::kSymlinkProtocolName;
+      }
+#endif
     }
   }();
   // TODO(https://fxbug.dev/42052765): avoid the const cast.
@@ -197,7 +203,8 @@ void Connection::NodeSync(fit::callback<void(zx_status_t)> callback) {
   FS_PRETTY_TRACE_DEBUG("[NodeSync] options: ", options());
 
   if (options().flags.node_reference) {
-    return callback(ZX_ERR_BAD_HANDLE);
+    callback(ZX_ERR_BAD_HANDLE);
+    return;
   }
   vnode_->Sync(Vnode::SyncCallback(std::move(callback)));
 }

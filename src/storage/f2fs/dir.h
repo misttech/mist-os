@@ -5,6 +5,9 @@
 #ifndef SRC_STORAGE_F2FS_DIR_H_
 #define SRC_STORAGE_F2FS_DIR_H_
 
+#include "src/storage/f2fs/common.h"
+#include "src/storage/f2fs/vnode.h"
+
 namespace f2fs {
 
 struct DirHash {
@@ -23,7 +26,7 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   // Required for memory management, see the class comment above Vnode for more.
   void fbl_recycle() { RecycleNode(); }
 
-  fs::VnodeProtocolSet GetProtocols() const final;
+  fuchsia_io::NodeProtocolKinds GetProtocols() const final;
 
   zx::result<LockedPage> FindDataPage(pgoff_t index, bool do_read = true);
 

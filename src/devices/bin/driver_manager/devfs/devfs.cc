@@ -102,10 +102,10 @@ Devnode::VnodeImpl::VnodeImpl(Devnode& holder, Target target)
 
 bool Devnode::VnodeImpl::IsDirectory() const { return !target_.has_value(); }
 
-fs::VnodeProtocolSet Devnode::VnodeImpl::GetProtocols() const {
-  fs::VnodeProtocolSet protocols = fs::VnodeProtocol::kDirectory;
+fuchsia_io::NodeProtocolKinds Devnode::VnodeImpl::GetProtocols() const {
+  fuchsia_io::NodeProtocolKinds protocols = fuchsia_io::NodeProtocolKinds::kDirectory;
   if (!IsDirectory()) {
-    protocols = protocols | fs::VnodeProtocol::kConnector;
+    protocols = protocols | fuchsia_io::NodeProtocolKinds::kConnector;
   }
   return protocols;
 }

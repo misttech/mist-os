@@ -281,7 +281,7 @@ TEST_P(DirectoryPermissionTest, TestOpathDirectoryAccess) {
   // it should not be possible to open sub_file from there as O_RDWR,
   // because Fuchsia's O_PATH disallows this explicitly
   fbl::unique_fd sub_dir_fd(openat(foo_fd.get(), "sub_dir", O_PATH, 0644));
-  ASSERT_TRUE(sub_dir_fd.is_valid());
+  ASSERT_TRUE(sub_dir_fd.is_valid()) << strerror(errno);
 
   fbl::unique_fd sub_file_fd(openat(sub_dir_fd.get(), "sub_file", O_RDWR, 0644));
   ASSERT_FALSE(sub_file_fd.is_valid());

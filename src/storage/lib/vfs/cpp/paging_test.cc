@@ -139,7 +139,9 @@ class PagingTestFile : public PagedVnode {
   }
 
   // Vnode implementation:
-  VnodeProtocolSet GetProtocols() const override { return fs::VnodeProtocol::kFile; }
+  fuchsia_io::NodeProtocolKinds GetProtocols() const override {
+    return fuchsia_io::NodeProtocolKinds::kFile;
+  }
 
   zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) override {
     std::lock_guard lock(mutex_);

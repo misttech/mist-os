@@ -27,7 +27,7 @@ class ServiceProxyDir : public fs::Vnode {
 
   // Overridden from |fs::Vnode|:
 
-  fs::VnodeProtocolSet GetProtocols() const final;
+  fuchsia_io::NodeProtocolKinds GetProtocols() const final;
   zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) final;
   zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
 

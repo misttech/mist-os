@@ -20,7 +20,9 @@ PseudoFile::PseudoFile(ReadHandler read_handler, WriteHandler write_handler)
 
 PseudoFile::~PseudoFile() = default;
 
-VnodeProtocolSet PseudoFile::GetProtocols() const { return VnodeProtocol::kFile; }
+fuchsia_io::NodeProtocolKinds PseudoFile::GetProtocols() const {
+  return fuchsia_io::NodeProtocolKinds::kFile;
+}
 
 bool PseudoFile::ValidateRights(Rights rights) const {
   if (rights.read && !read_handler_) {
@@ -77,7 +79,9 @@ BufferedPseudoFile::Content::Content(fbl::RefPtr<BufferedPseudoFile> file,
 
 BufferedPseudoFile::Content::~Content() { delete[] input_data_; }
 
-VnodeProtocolSet BufferedPseudoFile::Content::GetProtocols() const { return VnodeProtocol::kFile; }
+fuchsia_io::NodeProtocolKinds BufferedPseudoFile::Content::GetProtocols() const {
+  return fuchsia_io::NodeProtocolKinds::kFile;
+}
 
 zx_status_t BufferedPseudoFile::Content::CloseNode() {
   if (options_.rights.write) {
@@ -173,8 +177,8 @@ UnbufferedPseudoFile::UnbufferedPseudoFile(ReadHandler read_handler, WriteHandle
 
 UnbufferedPseudoFile::~UnbufferedPseudoFile() = default;
 
-VnodeProtocolSet UnbufferedPseudoFile::Content::GetProtocols() const {
-  return VnodeProtocol::kFile;
+fuchsia_io::NodeProtocolKinds UnbufferedPseudoFile::Content::GetProtocols() const {
+  return fuchsia_io::NodeProtocolKinds::kFile;
 }
 
 zx_status_t UnbufferedPseudoFile::OpenNode(ValidatedOptions options,

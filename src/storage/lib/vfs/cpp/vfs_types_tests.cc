@@ -78,7 +78,9 @@ class DummyVnode : public fs::Vnode {
 TEST(VnodeConnectionOptions, ValidateOptionsForDirectory) {
   class TestDirectory : public DummyVnode {
    public:
-    fs::VnodeProtocolSet GetProtocols() const final { return fs::VnodeProtocol::kDirectory; }
+    fuchsia_io::NodeProtocolKinds GetProtocols() const final {
+      return fuchsia_io::NodeProtocolKinds::kDirectory;
+    }
   };
 
   TestDirectory vnode;
@@ -92,7 +94,9 @@ TEST(VnodeConnectionOptions, ValidateOptionsForDirectory) {
 TEST(VnodeConnectionOptions, ValidateOptionsForService) {
   class TestConnector : public DummyVnode {
    public:
-    fs::VnodeProtocolSet GetProtocols() const final { return fs::VnodeProtocol::kConnector; }
+    fuchsia_io::NodeProtocolKinds GetProtocols() const final {
+      return fuchsia_io::NodeProtocolKinds::kConnector;
+    }
   };
 
   TestConnector vnode;
@@ -106,7 +110,9 @@ TEST(VnodeConnectionOptions, ValidateOptionsForService) {
 TEST(VnodeConnectionOptions, ValidateOptionsForFile) {
   class TestFile : public DummyVnode {
    public:
-    fs::VnodeProtocolSet GetProtocols() const final { return fs::VnodeProtocol::kFile; }
+    fuchsia_io::NodeProtocolKinds GetProtocols() const final {
+      return fuchsia_io::NodeProtocolKinds::kFile;
+    }
   };
 
   TestFile vnode;
@@ -115,77 +121,6 @@ TEST(VnodeConnectionOptions, ValidateOptionsForFile) {
                           fio::wire::OpenFlags::kDirectory)));
   EXPECT_RESULT_OK(vnode.ValidateOptions(
       fs::VnodeConnectionOptions::FromIoV1Flags(fio::wire::OpenFlags::kNotDirectory)));
-}
-
-TEST(VnodeProtocolSet, Union) {
-  auto file = fs::VnodeProtocol::kFile;
-  auto directory = fs::VnodeProtocol::kDirectory;
-
-  auto combined = file | directory;
-  static_assert(std::is_same_v<decltype(combined), fs::VnodeProtocolSet>);
-
-  // Note: using |EXPECT_FALSE| and explicit |operator==()| here and elsewhere as directly using
-  // |EXPECT_EQ| does not seem to pick up our |operator==()| definition and fails to compile.
-  EXPECT_FALSE(combined == fs::VnodeProtocol::kFile);
-  EXPECT_FALSE(combined == fs::VnodeProtocol::kDirectory);
-
-  EXPECT_TRUE((combined & file).any());
-  EXPECT_TRUE((combined & directory).any());
-  EXPECT_FALSE((combined & fs::VnodeProtocol::kConnector).any());
-}
-
-TEST(VnodeProtocolSet, Intersection) {
-  auto file_plus_directory = fs::VnodeProtocol::kFile | fs::VnodeProtocol::kDirectory;
-  auto directory_plus_connector = fs::VnodeProtocol::kDirectory | fs::VnodeProtocol::kConnector;
-
-  auto intersection = file_plus_directory & directory_plus_connector;
-  static_assert(std::is_same_v<decltype(intersection), fs::VnodeProtocolSet>);
-
-  EXPECT_TRUE(intersection == fs::VnodeProtocol::kDirectory);
-
-  EXPECT_TRUE((intersection & fs::VnodeProtocol::kDirectory).any());
-  EXPECT_FALSE((intersection & fs::VnodeProtocol::kConnector).any());
-  EXPECT_FALSE((intersection & fs::VnodeProtocol::kFile).any());
-}
-
-TEST(VnodeProtocolSet, Difference) {
-  auto difference =
-      (fs::VnodeProtocol::kFile | fs::VnodeProtocol::kDirectory | fs::VnodeProtocol::kConnector)
-          .Except(fs::VnodeProtocol::kConnector);
-  EXPECT_TRUE(difference.any());
-  EXPECT_TRUE(difference == (fs::VnodeProtocol::kFile | fs::VnodeProtocol::kDirectory));
-}
-
-TEST(VnodeProtocolSet, ConvertToSingleProtocol) {
-  fs::VnodeProtocolSet file(fs::VnodeProtocol::kFile);
-  ASSERT_TRUE(file.which());
-  ASSERT_EQ(file.which().value(), fs::VnodeProtocol::kFile);
-
-  // The |kConnector| case is significant, because it's the first (zero-th) member in the bit-field.
-  // Refer to the internal implementation of |fs::VnodeProtocol| and |fs::VnodeProtocolSet|.
-  fs::VnodeProtocolSet connector(fs::VnodeProtocol::kConnector);
-  ASSERT_TRUE(connector.which());
-  ASSERT_EQ(connector.which().value(), fs::VnodeProtocol::kConnector);
-
-  auto file_plus_directory = fs::VnodeProtocol::kFile | fs::VnodeProtocol::kDirectory;
-  ASSERT_FALSE(file_plus_directory.which());
-}
-
-TEST(VnodeProtocolSet, All) {
-  auto all = fs::VnodeProtocolSet::All();
-  ASSERT_TRUE(all.any());
-
-  EXPECT_TRUE((all & fs::VnodeProtocol::kConnector) == fs::VnodeProtocol::kConnector);
-  EXPECT_TRUE((all & fs::VnodeProtocol::kDirectory) == fs::VnodeProtocol::kDirectory);
-  EXPECT_TRUE((all & fs::VnodeProtocol::kFile) == fs::VnodeProtocol::kFile);
-}
-
-TEST(VnodeProtocolSet, Empty) {
-  auto empty = fs::VnodeProtocolSet::Empty();
-  ASSERT_FALSE(empty.any());
-
-  auto empty_then_intersection = empty & fs::VnodeProtocol::kDirectory;
-  ASSERT_FALSE(empty_then_intersection.any());
 }
 
 }  // namespace
