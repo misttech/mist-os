@@ -1002,6 +1002,8 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
   uint64_t out_pages = 0;
   __UNINITIALIZED paddr_t pages[kMaxPages];
 
+  bool already_mapped = false;
+
   if (likely(object_->is_paged())) {
     VmObjectPaged* object = static_cast<VmObjectPaged*>(object_.get());
     AssertHeld(object->lock_ref());
@@ -1042,13 +1044,6 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
     pages[0] = result->page->paddr();
     out_pages = 1;
 
-    // Acquire any additional pages, but only if they already exist as the user has not actually
-    // attempted to use these pages yet.
-    if (max_out_pages > 1) {
-      out_pages +=
-          cursor->IfExistPages(result->writable, static_cast<uint>(max_out_pages - 1), &pages[1]);
-    }
-
     // We looked up in order to write. Mark as modified.
     if (write) {
       DEBUG_ASSERT(result->writable);
@@ -1062,6 +1057,21 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
     if (!write && !result->writable) {
       // we read faulted, so only map with read permissions
       range.mmu_flags &= ~ARCH_MMU_FLAG_PERM_WRITE;
+    }
+
+    // Query aspace and adjust the mapping if there is already a page mapped here.
+    zx::result map_result = AdjustMapping(va, pages[0], range.mmu_flags);
+    if (result.is_error()) {
+      return map_result.status_value();
+    } else {
+      already_mapped = map_result.value();
+    }
+
+    // Acquire any additional pages, but only if they already exist as the user has not actually
+    // attempted to use these pages yet.
+    if (max_out_pages > 1 && !already_mapped) {
+      out_pages +=
+          cursor->IfExistPages(result->writable, static_cast<uint>(max_out_pages - 1), &pages[1]);
     }
   } else {
     VmObjectPhysical* object = static_cast<VmObjectPhysical*>(object_.get());
@@ -1078,6 +1088,15 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
     // Already validated the size, and since physical VMOs are always allocated this should never
     // fail.
     ASSERT(status == ZX_OK);
+
+    // Query aspace and adjust the mapping if there is already a page mapped here.
+    zx::result result = AdjustMapping(va, pages[0], range.mmu_flags);
+    if (result.is_error()) {
+      return result.status_value();
+    } else {
+      already_mapped = result.value();
+    }
+
     // Extrapolate the remaining pages from the base address.
     for (uint64_t i = 1; i < out_pages; i++) {
       pages[i] = pages[0] + i * PAGE_SIZE;
@@ -1107,25 +1126,16 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
 
   VM_KTRACE_DURATION(2, "map_page", ("va", ktrace::Pointer{va}), ("pf_flags", pf_flags));
 
-  // Query aspace and adjust the mapping if there is already a page mapped here.
-  bool already_mapped = false;
-  zx::result result = AdjustMapping(va, pages[0], range.mmu_flags);
-  if (result.is_error()) {
-    return result.status_value();
-  } else {
-    already_mapped = result.value();
-  }
-
-  // nothing was mapped there before, map it now
+  // Nothing was mapped there before, map it now.
   if (!already_mapped) {
-    // assert that we're not accidentally mapping the zero page writable
+    // Assert that we're not accidentally mapping the zero page writable.
     DEBUG_ASSERT(!(range.mmu_flags & ARCH_MMU_FLAG_PERM_WRITE) ||
                  ktl::all_of(pages, &pages[out_pages],
                              [](paddr_t p) { return p != vm_get_zero_page_paddr(); }));
 
     size_t mapped;
-    auto status = aspace_->arch_aspace().Map(va, pages, out_pages, range.mmu_flags,
-                                             ArchVmAspace::ExistingEntryAction::Skip, &mapped);
+    zx_status_t status = aspace_->arch_aspace().Map(
+        va, pages, out_pages, range.mmu_flags, ArchVmAspace::ExistingEntryAction::Skip, &mapped);
     if (status != ZX_OK) {
       ASSERT_MSG(status == ZX_ERR_NO_MEMORY, "Unexpected failure from map: %d\n", status);
       TRACEF("failed to map page %d\n", status);
