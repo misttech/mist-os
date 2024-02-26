@@ -46,6 +46,11 @@ def main():
         "--cxx", help="The C++ compiler to use", required=False, default="c++"
     )
     parser.add_argument(
+        "--clang-fuchsia-api-level",
+        help='The target Fuchsia API level. Required iff "--current-os" is "fuchsia"',
+        type=int,
+    )
+    parser.add_argument(
         "--ar", help="The archive linker to use", required=False, default="ar"
     )
     parser.add_argument(
@@ -253,6 +258,20 @@ def main():
         cflags.extend(["--sysroot", os.path.abspath(args.sysroot)])
     if args.target:
         cflags.extend(["-target", args.target])
+
+    if (args.clang_fuchsia_api_level is None) != (args.current_os != "fuchsia"):
+        parser.error(
+            '--clang-fuchsia-api-level must be specified if and only if the target OS is "fuchsia".'
+        )
+    if args.current_os == "fuchsia":
+        if args.clang_fuchsia_api_level <= 0:
+            parser.error(
+                "--clang-fuchsia-api-level must specify a positive integer. Value specified: "
+                + str(args.clang_fuchsia_api_level)
+            )
+        cflags.extend(
+            ["-ffuchsia-api-level=" + str(args.clang_fuchsia_api_level)]
+        )
 
     ldflags = cflags[:]
     if args.current_os == "linux":
