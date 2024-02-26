@@ -1778,17 +1778,6 @@ struct_decl_macro! {
     }
 }
 
-struct_decl_macro! {
-    #[repr(C)]
-    #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-    pub struct <zx_info_thread_stats_t> {
-        pub total_runtime: zx_duration_t,
-        pub last_scheduled_cpu: u32,
-    }
-}
-
-zx_info_thread_stats_t!(zx_info_thread_stats_t);
-
 zx_info_resource_t!(zx_info_resource_t);
 
 struct_decl_macro! {

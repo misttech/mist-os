@@ -84,6 +84,7 @@
                 "fsetxattr02",
                 "fstatat01",
                 "futimesat01",
+                "getcpu01",
                 "getitimer01",
                 "getpriority01",
                 "getpriority02",
@@ -241,10 +242,6 @@
                 // These tests hang
                 "creat07",
                 "fork14",
-
-                // This test asserts that the current CPU is within a requested affinity mask, but
-                // we don't support CPU affinity masks yet.
-                "getcpu01",
 
                 // Makes all following tests to fail.
                 "kill10",

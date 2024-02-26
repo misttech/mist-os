@@ -82,15 +82,6 @@ impl Thread {
         .map(|_| info)
     }
 
-    /// Wraps the
-    /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
-    /// syscall for the ZX_INFO_THREAD_STATS topic.
-    pub fn get_stats(&self) -> Result<sys::zx_info_thread_stats_t, Status> {
-        let mut info = sys::zx_info_thread_stats_t::default();
-        object_get_info::<ThreadStatsQuery>(self.as_handle_ref(), std::slice::from_mut(&mut info))
-            .map(|_| info)
-    }
-
     pub fn read_state_general_regs(&self) -> Result<sys::zx_thread_state_general_regs_t, Status> {
         let mut state = sys::zx_thread_state_general_regs_t::default();
         let thread_raw = self.raw_handle();
@@ -123,12 +114,6 @@ impl Thread {
 }
 
 impl Task for Thread {}
-
-struct ThreadStatsQuery;
-unsafe impl ObjectQuery for ThreadStatsQuery {
-    const TOPIC: Topic = Topic::THREAD_STATS;
-    type InfoTy = sys::zx_info_thread_stats_t;
-}
 
 #[cfg(target_arch = "x86_64")]
 unsafe_handle_properties!(object: Thread,
