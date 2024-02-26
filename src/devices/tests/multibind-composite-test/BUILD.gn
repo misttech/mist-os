@@ -31,7 +31,6 @@ fuchsia_unittest_package("pkg") {
   package_name = "multibind-composite-test"
   deps = [
     ":multibind-composite-test",
-    "drivers:legacy-composite",
     "drivers:root",
     "drivers:spec-composite-1",
     "drivers:spec-composite-2",

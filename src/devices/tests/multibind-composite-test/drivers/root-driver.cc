@@ -17,14 +17,6 @@ namespace root_driver {
 namespace {
 
 // Node a bind rules and properties.
-const zx_bind_inst_t kNodeAMatch[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD),
-    BI_MATCH_IF(EQ, BIND_PLATFORM_DEV_INSTANCE_ID, 1),
-};
-const device_fragment_part_t kNodeAFragment[] = {
-    {std::size(kNodeAMatch), kNodeAMatch},
-};
-
 const ddk::BindRule kNodeARules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD),
     ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, static_cast<uint32_t>(1)),
@@ -35,14 +27,6 @@ const device_bind_prop_t kNodeAProperties[] = {
 };
 
 // Node b bind rules and properties.
-const zx_bind_inst_t kNodeBMatch[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD),
-    BI_MATCH_IF(EQ, BIND_PLATFORM_DEV_INSTANCE_ID, 2),
-};
-const device_fragment_part_t kNodeBFragment[] = {
-    {std::size(kNodeBMatch), kNodeBMatch},
-};
-
 const ddk::BindRule kNodeBRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD),
     ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, static_cast<uint32_t>(2)),
@@ -53,14 +37,6 @@ const device_bind_prop_t kNodeBProperties[] = {
 };
 
 // Node c bind rules and properties.
-const zx_bind_inst_t kNodeCMatch[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD),
-    BI_MATCH_IF(EQ, BIND_PLATFORM_DEV_INSTANCE_ID, 3),
-};
-const device_fragment_part_t kNodeCFragment[] = {
-    {std::size(kNodeCMatch), kNodeCMatch},
-};
-
 const ddk::BindRule kNodeCRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD),
     ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, static_cast<uint32_t>(3)),
@@ -78,11 +54,6 @@ const ddk::BindRule kNodeDRules[] = {
 
 const device_bind_prop_t kNodeDProperties[] = {
     ddk::MakeProperty(bind_multibind_test::NODE_ID, bind_multibind_test::NODE_ID_D),
-};
-
-// Legacy composite properties.
-const zx_device_prop_t kLegacyCompositeProperties[] = {
-    {BIND_PROTOCOL, 0, bind_fuchsia_test::BIND_PROTOCOL_DEVICE},
 };
 
 }  // namespace
@@ -113,54 +84,12 @@ zx_status_t RootDriver::Bind(void* ctx, zx_device_t* dev) {
     [[maybe_unused]] auto node_dev_ptr = node_dev.release();
   }
 
-  // Add the first legacy composite.
-  const device_fragment_t kLegacyCompositeFragments1[] = {
-      {"node-a", std::size(kNodeAFragment), kNodeAFragment},
-      {"node-c", std::size(kNodeCFragment), kNodeCFragment},
-  };
-
-  const composite_device_desc_t kLegacyCompositeDesc1 = {
-      .props = kLegacyCompositeProperties,
-      .props_count = std::size(kLegacyCompositeProperties),
-      .fragments = kLegacyCompositeFragments1,
-      .fragments_count = std::size(kLegacyCompositeFragments1),
-      .primary_fragment = "node-a",
-      .spawn_colocated = true,
-  };
-
-  status = root_dev->DdkAddCompositeDeprecated("legacy_composite_1", &kLegacyCompositeDesc1);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "DdkAddComposite failed: %d ", status);
-    return status;
-  }
-
   // Add composite node spec 1.
   status = root_dev->DdkAddCompositeNodeSpec("spec_1",
                                              ddk::CompositeNodeSpec(kNodeARules, kNodeAProperties)
                                                  .AddParentSpec(kNodeCRules, kNodeCProperties)
                                                  .AddParentSpec(kNodeDRules, kNodeDProperties));
   if (status != ZX_OK) {
-    return status;
-  }
-
-  // Add second legacy composite.
-  const device_fragment_t kLegacyCompositeFragments2[] = {
-      {"node-b", std::size(kNodeBFragment), kNodeBFragment},
-      {"node-c", std::size(kNodeCFragment), kNodeCFragment},
-  };
-
-  const composite_device_desc_t kLegacyCompositeDesc2 = {
-      .props = kLegacyCompositeProperties,
-      .props_count = std::size(kLegacyCompositeProperties),
-      .fragments = kLegacyCompositeFragments2,
-      .fragments_count = std::size(kLegacyCompositeFragments2),
-      .primary_fragment = "node-b",
-      .spawn_colocated = true,
-  };
-
-  status = root_dev->DdkAddCompositeDeprecated("legacy_composite_2", &kLegacyCompositeDesc2);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "DdkAddComposite failed: %d ", status);
     return status;
   }
 

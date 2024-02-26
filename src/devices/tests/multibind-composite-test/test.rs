@@ -37,9 +37,6 @@ async fn test_composites() -> Result<()> {
     device_watcher::recursive_wait(&dev, "sys/test/node_c").await?;
     device_watcher::recursive_wait(&dev, "sys/test/node_d").await?;
 
-    device_watcher::recursive_wait(&dev, "sys/test/node_a/legacy_composite_1/composite").await?;
-    device_watcher::recursive_wait(&dev, "sys/test/node_b/legacy_composite_2/composite").await?;
-
     device_watcher::recursive_wait(&dev, "sys/test/node_a/spec_1/composite").await?;
     device_watcher::recursive_wait(&dev, "sys/test/node_d/spec_2/composite").await?;
 

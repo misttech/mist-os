@@ -10,7 +10,6 @@ import("//build/test.gni")
 group("drivers") {
   testonly = true
   deps = [
-    ":legacy-composite",
     ":root",
     ":spec-composite-1",
     ":spec-composite-2",
@@ -45,30 +44,6 @@ fuchsia_driver_component("root") {
   deps = [ ":root-driver" ]
   info = "root-driver-info.json"
   manifest = "meta/root.cml"
-}
-
-driver_bind_rules("legacy-composite-bind") {
-  rules = "legacy-composite.bind"
-  bind_output = "legacy-composite.bindbc"
-  deps = [ "//src/devices/bind/fuchsia.test" ]
-}
-
-fuchsia_driver("legacy-composite-driver") {
-  output_name = "legacy-composite"
-  sources = [ "composite.cc" ]
-  deps = [
-    ":legacy-composite-bind",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/devices/lib/driver",
-    "//src/lib/ddktl",
-  ]
-}
-
-fuchsia_driver_component("legacy-composite") {
-  component_name = "legacy-composite"
-  deps = [ ":legacy-composite-driver" ]
-  info = "composite-info.json"
-  manifest = "meta/legacy-composite.cml"
 }
 
 driver_bind_rules("spec-composite-1-bind") {
