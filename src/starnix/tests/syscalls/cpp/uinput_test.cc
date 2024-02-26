@@ -160,7 +160,6 @@ TEST_F(UinputTest, UiDevCreateTouchscreen) {
 }
 
 TEST_F(UinputTest, UiDevCreateDestroyTouchscreenEvIoGid) {
-  GTEST_SKIP() << "b/302172833 does not support touchscreen creation yet";
   auto ls_before = lsDir("/dev/input");
 
   int res = ioctl(uinput_fd_.get(), UI_SET_EVBIT, EV_ABS);

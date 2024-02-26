@@ -16,9 +16,10 @@ use crate::{
 use bit_vec::BitVec;
 use fidl_fuchsia_ui_test_input::{
     self as futinput, KeyboardSimulateKeyEventRequest, RegistryRegisterKeyboardRequest,
+    RegistryRegisterTouchScreenRequest,
 };
 use fuchsia_zircon as zx;
-use starnix_logging::{log_warn, track_stub};
+use starnix_logging::log_warn;
 use starnix_sync::{FileOpsIoctl, Locked, Mutex, ReadOps, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -53,7 +54,7 @@ pub fn create_uinput_device(
 enum CreatedDevice {
     None,
     Keyboard(futinput::KeyboardSynchronousProxy, LinuxKeyboardEventParser),
-    Touchscreen,
+    Touchscreen(futinput::TouchScreenSynchronousProxy),
 }
 
 struct UinputDeviceMutableState {
@@ -168,30 +169,17 @@ impl UinputDevice {
                     None => return error!(EINVAL),
                 };
 
-                let server = match device_type {
+                match device_type {
                     DeviceType::Keyboard => {
                         let (key_client, key_server) =
                             fidl::endpoints::create_sync_proxy::<futinput::KeyboardMarker>();
                         inner.created_device =
                             CreatedDevice::Keyboard(key_client, LinuxKeyboardEventParser::create());
-                        key_server
-                    }
-                    DeviceType::Touchscreen => {
-                        track_stub!(
-                            TODO("https://fxbug.dev/302172833"),
-                            "run uinput touchscreen server"
-                        );
-                        return Ok(SUCCESS);
-                    }
-                };
 
-                let device_type_clone = device_type.clone();
-                match device_type_clone {
-                    DeviceType::Keyboard => {
                         // Register a keyboard
                         let register_res = proxy.register_keyboard(
                             RegistryRegisterKeyboardRequest {
-                                device: Some(server),
+                                device: Some(key_server),
                                 ..Default::default()
                             },
                             zx::Time::INFINITE,
@@ -201,9 +189,23 @@ impl UinputDevice {
                         }
                     }
                     DeviceType::Touchscreen => {
-                        // TODO(b/302172833): also support touchscreen here.
+                        let (touch_client, touch_server) =
+                            fidl::endpoints::create_sync_proxy::<futinput::TouchScreenMarker>();
+                        inner.created_device = CreatedDevice::Touchscreen(touch_client);
+
+                        // Register a touchscreen
+                        let register_res = proxy.register_touch_screen(
+                            RegistryRegisterTouchScreenRequest {
+                                device: Some(touch_server),
+                                ..Default::default()
+                            },
+                            zx::Time::INFINITE,
+                        );
+                        if register_res.is_err() {
+                            log_warn!("Uinput could not register Keyboard device to Registry");
+                        }
                     }
-                }
+                };
 
                 let device = add_and_register_input_device(
                     current_task,
@@ -326,7 +328,7 @@ impl FileOps for Arc<UinputDevice> {
                     Err(e) => return Err(e),
                 }
             }
-            CreatedDevice::Touchscreen | CreatedDevice::None => return error!(EINVAL),
+            CreatedDevice::Touchscreen(_) | CreatedDevice::None => return error!(EINVAL),
         }
 
         Ok(content.len())
@@ -645,6 +647,13 @@ mod test {
             std::mem::size_of::<uapi::uinput_setup>() as u64,
         );
         let mut locked = locked.cast_locked::<FileOpsIoctl>();
+        let _ = dev.ioctl(
+            &mut locked,
+            &file_object,
+            &current_task,
+            uapi::UI_SET_EVBIT,
+            SyscallArg::from(uapi::EV_KEY as u64),
+        );
         let _ =
             dev.ioctl(&mut locked, &file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
 
@@ -687,6 +696,13 @@ mod test {
             std::mem::size_of::<uapi::uinput_setup>() as u64,
         );
         let mut locked = locked.cast_locked::<FileOpsIoctl>();
+        let _ = dev.ioctl(
+            &mut locked,
+            &file_object,
+            &current_task,
+            uapi::UI_SET_EVBIT,
+            SyscallArg::from(uapi::EV_KEY as u64),
+        );
         let _ =
             dev.ioctl(&mut locked, &file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
         let res = dev.ui_dev_create_inner(&current_task, None);
@@ -705,6 +721,13 @@ mod test {
             &current_task,
             UserAddress::default(),
             std::mem::size_of::<uapi::uinput_setup>() as u64,
+        );
+        let _ = dev.ioctl(
+            &mut locked_ioctl,
+            &file_object,
+            &current_task,
+            uapi::UI_SET_EVBIT,
+            SyscallArg::from(uapi::EV_KEY as u64),
         );
         let _ = dev.ioctl(
             &mut locked_ioctl,
@@ -836,5 +859,79 @@ mod test {
         assert_eq!(res, Ok(24));
 
         handle.join().expect("stream panic");
+    }
+
+    #[fasync::run(2, test)]
+    async fn ui_dev_create_touchscreen() {
+        let dev = UinputDevice::new();
+        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
+        let address = map_memory(
+            &current_task,
+            UserAddress::default(),
+            std::mem::size_of::<uapi::uinput_setup>() as u64,
+        );
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
+        let _ = dev.ioctl(
+            &mut locked,
+            &file_object,
+            &current_task,
+            uapi::UI_SET_EVBIT,
+            SyscallArg::from(uapi::EV_ABS as u64),
+        );
+        let _ =
+            dev.ioctl(&mut locked, &file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
+
+        let (registry_proxy, mut stream) =
+            create_sync_proxy_and_stream::<futinput::RegistryMarker>()
+                .expect("create Registry proxy and stream");
+
+        let handle = thread::spawn(move || {
+            fasync::LocalExecutor::new().run_singlethreaded(async {
+                if let Some(request) = stream.next().await {
+                    match request {
+                        Ok(futinput::RegistryRequest::RegisterTouchScreen {
+                            responder, ..
+                        }) => {
+                            let _ = responder.send();
+                        }
+                        _ => panic!("Registry handler received an unexpected request"),
+                    }
+                } else {
+                    panic!("Registry handler did not receive RegistryRequest")
+                }
+            })
+        });
+
+        let res = dev.ui_dev_create_inner(&current_task, Some(registry_proxy));
+        assert_eq!(res, Ok(SUCCESS));
+
+        handle.join().expect("stream panic");
+
+        // This test will timeout if the `fuchsia.ui.test.input` stub does not
+        // receive the device register request.
+        // Or panic if the stub receives an invalid request.
+    }
+
+    #[::fuchsia::test]
+    async fn ui_dev_create_touchscreen_fails_no_registry() {
+        let dev = UinputDevice::new();
+        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
+        let address = map_memory(
+            &current_task,
+            UserAddress::default(),
+            std::mem::size_of::<uapi::uinput_setup>() as u64,
+        );
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
+        let _ = dev.ioctl(
+            &mut locked,
+            &file_object,
+            &current_task,
+            uapi::UI_SET_EVBIT,
+            SyscallArg::from(uapi::EV_ABS as u64),
+        );
+        let _ =
+            dev.ioctl(&mut locked, &file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
+        let res = dev.ui_dev_create_inner(&current_task, None);
+        assert_eq!(res, error!(EPERM))
     }
 }
