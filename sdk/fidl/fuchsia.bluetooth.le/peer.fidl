@@ -99,4 +99,35 @@ closed protocol Connection {
     strict RequestGattClient(resource struct {
         client server_end:gatt2.Client;
     });
+
+    /// Accept a future CIS request from the peer with the specified CIG/CIS values. All
+    /// CIS requests that have not explicitly been allowed will be rejected.
+    ///
+    /// The provided IsochronousStream will be used for future notification of established
+    /// connections.
+    ///
+    /// The host may wait for multiple incoming connections simultaneously, although each
+    /// must have a combination of CIG/CIS values that is unique to this connection.
+    ///
+    /// If we are not operating in the peripheral role in this connection, connection_stream
+    /// will be closed with a ZX_ERR_NOT_SUPPORTED epitaph.
+    ///
+    /// If we are already waiting for another connection with the same combination of CIG/CIS
+    /// values, connection_stream will be closed with a ZX_ERR_INVALID_ARGS epitaph.
+    @available(added=HEAD)
+    strict AcceptCis(resource table {
+        /// Identifier of the CIG that contains the requested CIS. Required.
+        1: cig_id uint8;
+
+        /// Identifier of the requested CIS. Required.
+        2: cis_id uint8;
+
+        /// When the stream is established, the server will invoke
+        /// IsochronousStream::OnCisEstablished() on this channel. Required.
+        ///
+        /// If the client end of this channel is closed, requests of the corresponding CIG/CIS
+        /// combination will be rejected until/unless another call is made to AcceptCis() with
+        /// the same CIG/CIS parameters.
+        3: connection_stream server_end:IsochronousStream;
+    });
 };

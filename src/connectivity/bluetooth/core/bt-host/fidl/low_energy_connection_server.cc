@@ -44,4 +44,7 @@ void LowEnergyConnectionServer::RequestGattClient(fidl::InterfaceRequest<fbg::Cl
   gatt_client_server_.emplace(peer_id_, gatt_, std::move(client), std::move(server_error_cb));
 }
 
+void LowEnergyConnectionServer::AcceptCis(
+    fuchsia::bluetooth::le::ConnectionAcceptCisRequest parameters) {}
+
 }  // namespace bthost

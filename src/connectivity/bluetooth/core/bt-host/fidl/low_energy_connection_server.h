@@ -34,6 +34,7 @@ class LowEnergyConnectionServer : public ServerBase<fuchsia::bluetooth::le::Conn
   // fuchsia::bluetooth::le::Connection overrides:
   void RequestGattClient(
       ::fidl::InterfaceRequest<::fuchsia::bluetooth::gatt2::Client> client) override;
+  void AcceptCis(fuchsia::bluetooth::le::ConnectionAcceptCisRequest parameters) override;
 
   std::unique_ptr<bt::gap::LowEnergyConnectionHandle> conn_;
   fit::callback<void()> closed_handler_;

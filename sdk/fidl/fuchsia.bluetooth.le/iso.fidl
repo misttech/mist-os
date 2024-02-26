@@ -1,0 +1,78 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.bluetooth.le;
+
+using zx;
+
+/// Parameters related to a single direction of transmission in an established CIS.
+@available(added=HEAD)
+type CisUnidirectionalParams = table {
+    /// Transport latency, in the range [234, 8388607] microseconds
+    ///
+    /// This field is always present.
+    1: transport_latency zx.Duration;
+
+    /// Burst number for transmissions in this direction.
+    ///
+    /// This field is always present.
+    2: burst_number uint8;
+
+    /// Flush timeout for each payload, in multiples of the ISO interval.
+    ///
+    /// This field is always present.
+    3: flush_timeout uint8;
+};
+
+/// Established configuration for a single CIS.
+@available(added=HEAD)
+type CisEstablishedParameters = table {
+    /// Maximum time, in microseconds, for transmission of PDUs of all CISes in a CIG event.
+    /// In the range [234, 8388607] microseconds.
+    ///
+    /// This field is always present.
+    1: cig_sync_delay zx.Duration;
+
+    /// The maximum time, in microseconds, for transmission of PDUs of the specified CIS in a CIG
+    /// event. In the range [234, 8388607] microseconds.
+    ///
+    /// This field is always present.
+    2: cis_sync_delay zx.Duration;
+
+    /// Maximum number of subevents in each CIS event.
+    ///
+    /// This field is always present.
+    3: max_subevents uint8;
+
+    /// Time between two consecutive CIS anchor points, in the range [5ms, 4s]
+    ///
+    /// This field is always present.
+    4: iso_interval zx.Duration;
+
+    /// Parameters for Central => Peripheral transmissions, if applicable.
+    ///
+    /// This field is present if the stream includes isochronous data transmission from the
+    /// Central to the Peripheral.
+    5: central_to_peripheral_params CisUnidirectionalParams;
+
+    /// Parameters for Peripheral => Central transmissions, if applicable.
+    ///
+    /// This field is present if the stream includes isochronous data transmission from the
+    /// Peripheral to the Central.
+    6: peripheral_to_central_params CisUnidirectionalParams;
+};
+
+@available(added=HEAD)
+open protocol IsochronousStream {
+    /// Provide notification when a CIS is established, as initiated by a Central
+    /// (from CigServer::CreateCis()), or a Peripheral (from CisRequestManager::Accept()).
+    flexible -> OnEstablished(table {
+
+        /// A result of ZX_ERR_INTERNAL indicates that the controller received a request
+        /// but was unable to establish the stream.
+        1: result zx.Status;
+
+        /// This field is always present if a stream was successfully established.
+        2: established_params CisEstablishedParameters;
+    });
+};
