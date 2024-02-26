@@ -1103,27 +1103,6 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
     }
   }
 
-#if ARCH_ARM64
-  // If we are faulting a page into a guest, clean the caches.
-  //
-  // Cleaning pages is required to ensure that guests --- who can disable
-  // their own caches at will --- don't get access to stale (potentially
-  // sensitive) data in memory that hasn't been written back yet.
-  if ((pf_flags & VMM_PF_FLAG_GUEST) != 0) {
-    ArchVmICacheConsistencyManager sync_cm;
-    for (size_t i = 0; i < out_pages; i++) {
-      // Ignore non-physmap pages, such as passed through device ranges.
-      if (unlikely(!is_physmap_phys_addr(pages[i]))) {
-        continue;
-      }
-
-      vaddr_t vaddr = reinterpret_cast<vaddr_t>(paddr_to_physmap(pages[i]));
-      arch_clean_cache_range(vaddr, PAGE_SIZE);  // Clean d-cache
-      sync_cm.SyncAddr(vaddr, PAGE_SIZE);        // Sync i-cache with d-cache.
-    }
-  }
-#endif
-
   VM_KTRACE_DURATION(2, "map_page", ("va", ktrace::Pointer{va}), ("pf_flags", pf_flags));
 
   // Nothing was mapped there before, map it now.

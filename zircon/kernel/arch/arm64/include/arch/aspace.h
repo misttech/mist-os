@@ -283,7 +283,16 @@ class ArmVmICacheConsistencyManager final : public ArchVmICacheConsistencyManage
   void SyncAddr(vaddr_t start, size_t len) override;
   void Finish() override;
 
+  // If a cache operation is going to be performed anyone on the addresses provided, then can avoid
+  // doing duplicate operations by insisting SyncAddr cleans to the PoC. If SyncAddr did not need
+  // to do any cache operation, due to CTR.IDC[28]=1, then this still forces it to do a clean to
+  // PoC. Note that the default clean, when CTR.IDC[28] = 0, is only to PoU.
+  void ForceCleanToPoC() { clean_poc_ = true; }
+
  private:
+  // When set SyncAddr will always clean to PoC, even if cleaning is not required by the
+  // implementation.
+  bool clean_poc_ = false;
   bool need_invalidate_ = false;
 };
 

@@ -1375,8 +1375,16 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
   {
     Guard<CriticalMutex> a{&lock_};
     ASSERT(updates_enabled_);
-    if (mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE) {
+    if ((mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE) || type_ == ArmAspaceType::kHypervisor) {
+      // The icache gets synced both for executable mappings, which is the expected case, as well as
+      // for any hypervisor mapping. For hypervisor mappings we additionally need to clean the cache
+      // fully to PoC (not just PoU as required for icache consistency) as guests, who can disable
+      // their caches at will, could otherwise see stale data that hasn't been written back to
+      // memory yet.
       ArmVmICacheConsistencyManager cache_cm;
+      if (type_ == ArmAspaceType::kHypervisor) {
+        cache_cm.ForceCleanToPoC();
+      }
       cache_cm.SyncAddr(reinterpret_cast<vaddr_t>(paddr_to_physmap(paddr)), count * PAGE_SIZE);
     }
     pte_t attrs = MmuParamsFromFlags(mmu_flags);
@@ -1436,9 +1444,13 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
   {
     Guard<CriticalMutex> a{&lock_};
     ASSERT(updates_enabled_);
-    if (mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE) {
+    if ((mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE) || type_ == ArmAspaceType::kHypervisor) {
       ArmVmICacheConsistencyManager cache_cm;
       for (size_t idx = 0; idx < count; ++idx) {
+        // See comment in MapContiguous for why we do this for the hypervisor.
+        if (type_ == ArmAspaceType::kHypervisor) {
+          cache_cm.ForceCleanToPoC();
+        }
         cache_cm.SyncAddr(reinterpret_cast<vaddr_t>(paddr_to_physmap(phys[idx])), PAGE_SIZE);
       }
     }
@@ -2265,10 +2277,14 @@ vaddr_t ArmArchVmAspace::PickSpot(vaddr_t base, vaddr_t end, vaddr_t align, size
 void ArmVmICacheConsistencyManager::SyncAddr(vaddr_t start, size_t len) {
   // Validate we are operating on a kernel address range.
   DEBUG_ASSERT(is_kernel_address(start));
-  // use the physmap to clean the range to PoU, which is the point of where the instruction cache
-  // pulls from. Cleaning to PoU is potentially cheaper than cleaning to PoC, which is the default
-  // of arch_clean_cache_range.
-  arm64_clean_cache_range_pou(start, len);
+  // use the physmap to clean the range. If we have been requested to clean to PoC then we must do
+  // that, otherwise we can just clean to the PoU, which is the point where the instruction cache
+  // pulls from. Cleaning to PoU is potentially cheaper than cleaning to PoC.
+  if (clean_poc_) {
+    arch_clean_cache_range(start, len);
+  } else {
+    arm64_clean_cache_range_pou(start, len);
+  }
   // We can batch the icache invalidate and just perform it once at the end.
   need_invalidate_ = true;
 }
