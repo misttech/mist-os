@@ -205,9 +205,9 @@ class TestGroupPayload(EventGroupPayload):
         )
 
     @classmethod
-    def from_dict(_cls, dict: typing.Dict[str, typing.Any]):
+    def from_dict(cls, dict: typing.Dict[str, typing.Any]) -> typing.Self:
         s: EventGroupPayload = super().from_dict(dict)  # type:ignore
-        ret: TestGroupPayload = _cls(0)
+        ret: typing.Self = cls(0)
         ret.name = s.name
         ret.queued_events = s.queued_events
         return ret
@@ -296,7 +296,7 @@ class EventPayloadUnion:
     with a different form of tagging in the future.
     """
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         fields_present: typing.Set[str] = set(
             [f.name for f in fields(self) if getattr(self, f.name) is not None]
         )
@@ -433,7 +433,7 @@ class EventRecorder:
     everywhere events are emitted or read.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize a new EventRecorder."""
 
         # Keep track of the system time corresponding to the below monotonic
@@ -489,7 +489,7 @@ class EventRecorder:
         diff = monotonic - self._monotonic_time_start
         return datetime.datetime.fromtimestamp(self._system_time_start + diff)
 
-    def _emit(self, event: Event):
+    def _emit(self, event: Event) -> None:
         """Helper to emit an event to all listeners.
 
         Args:
@@ -499,7 +499,7 @@ class EventRecorder:
         for queue in self._queues:
             queue.put_nowait(event)
 
-    def end(self):
+    def end(self) -> None:
         """End this queue. No further events may be emitted, and all listeners
         will eventually terminate.
         """
@@ -533,7 +533,7 @@ class EventRecorder:
         parent = self
 
         class Iter:
-            def __aiter__(self):
+            def __aiter__(self) -> typing.Self:
                 self._init_items: typing.List[Event] = parent._events.copy()
                 self._queue: asyncio.Queue[Event | None] = asyncio.Queue()
                 if not parent._done.is_set():
@@ -639,7 +639,7 @@ class EventRecorder:
         else:
             return "BUG: UNKNOWN EVENT PAYLOAD " + str(payload.__dict__)
 
-    def emit_init(self):
+    def emit_init(self) -> None:
         """Emit the initial event.
 
         This method must be called first following the creation of
@@ -656,7 +656,7 @@ class EventRecorder:
             )
         )
 
-    def emit_end(self, error: str | None = None, id: Id | None = None):
+    def emit_end(self, error: str | None = None, id: Id | None = None) -> None:
         """Emit an end event for an event duration.
 
         By default, the global run duration is terminated with an error
@@ -687,7 +687,7 @@ class EventRecorder:
         path: str,
         flags: typing.Dict[str, typing.Any],
         command_line: typing.List[str],
-    ):
+    ) -> None:
         """Emit a load_config event with details on the config.
 
         Args:
@@ -705,7 +705,7 @@ class EventRecorder:
             )
         )
 
-    def emit_parse_flags(self, flags: typing.Dict[str, typing.Any]):
+    def emit_parse_flags(self, flags: typing.Dict[str, typing.Any]) -> None:
         """Emit a parse_flags event with details on the flags.
 
         Args:
@@ -719,7 +719,7 @@ class EventRecorder:
             )
         )
 
-    def emit_process_env(self, env: typing.Dict[str, typing.Any]):
+    def emit_process_env(self, env: typing.Dict[str, typing.Any]) -> None:
         """Emit a process_env event with details of the environment.
 
         Args:
@@ -735,7 +735,7 @@ class EventRecorder:
 
     def _emit_user_message(
         self, message: str, level: MessageLevel = MessageLevel.INFO
-    ):
+    ) -> None:
         """Emit a message to display to a user.
 
         Args:
@@ -752,7 +752,7 @@ class EventRecorder:
             )
         )
 
-    def emit_instruction_message(self, message: str):
+    def emit_instruction_message(self, message: str) -> None:
         """Emit a message to the user with level INSTRUCTION.
 
         Args:
@@ -760,7 +760,7 @@ class EventRecorder:
         """
         self._emit_user_message(message, level=MessageLevel.INSTRUCTION)
 
-    def emit_info_message(self, message: str):
+    def emit_info_message(self, message: str) -> None:
         """Emit a message to the user with level INFO.
 
         Args:
@@ -768,7 +768,7 @@ class EventRecorder:
         """
         self._emit_user_message(message, level=MessageLevel.INFO)
 
-    def emit_warning_message(self, message: str):
+    def emit_warning_message(self, message: str) -> None:
         """Emit a message to the user with level WARNING.
 
         Args:
@@ -776,7 +776,7 @@ class EventRecorder:
         """
         self._emit_user_message(message, level=MessageLevel.WARNING)
 
-    def emit_verbatim_message(self, message: str):
+    def emit_verbatim_message(self, message: str) -> None:
         """Emit a message to the user with level VERBATIM.
 
         Args:
@@ -859,7 +859,7 @@ class EventRecorder:
         content: str,
         stream: ProgramOutputStream,
         print_verbatim: bool = False,
-    ):
+    ) -> None:
         """A program produced output on a stream.
 
         Args:
@@ -884,7 +884,7 @@ class EventRecorder:
 
     def emit_program_termination(
         self, id: Id, return_code: int, error: str | None = None
-    ):
+    ) -> None:
         """A program terminated.
 
         Args:
@@ -908,7 +908,7 @@ class EventRecorder:
 
     def emit_test_file_loaded(
         self, entries: typing.List[tests_json_file.TestEntry], file_path: str
-    ):
+    ) -> None:
         """Event with details of loading the tests.json file.
 
         Args:
@@ -928,7 +928,7 @@ class EventRecorder:
     def emit_test_selections(
         self,
         selections: selection_types.TestSelections,
-    ):
+    ) -> None:
         """Event with details of test selection.
 
         Args:
@@ -1078,7 +1078,7 @@ class EventRecorder:
 
     def emit_test_suite_ended(
         self, id: Id, status: TestSuiteStatus, message: str | None
-    ):
+    ) -> None:
         """A test suite has finished executing.
 
         Args:
@@ -1100,7 +1100,7 @@ class EventRecorder:
 
     def emit_enumerate_test_cases(
         self, test_name: str, test_case_names: typing.List[str]
-    ):
+    ) -> None:
         id = self._new_id()
         self._emit(
             Event(

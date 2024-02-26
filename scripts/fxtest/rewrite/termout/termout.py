@@ -53,7 +53,7 @@ def is_valid() -> bool:
     return os.isatty(sys.stdout.fileno())
 
 
-def cursor_show(show: bool):
+def cursor_show(show: bool) -> None:
     """Show or hide the cursor.
 
     Args:
@@ -63,7 +63,7 @@ def cursor_show(show: bool):
     sys.stdout.write(s)
 
 
-def _suspend_echo():
+def _suspend_echo() -> None:
     """Stop echoing to the terminal and hide the cursor.
 
     Automatically installs a routine to run at process exit to
@@ -76,7 +76,7 @@ def _suspend_echo():
     termios.tcsetattr(fd, termios.TCSANOW, new_flags)
     cursor_show(False)
 
-    def cleanup():
+    def cleanup() -> None:
         print("\r")
         termios.tcsetattr(fd, termios.TCSANOW, orig_flags)
         cursor_show(True)
@@ -87,7 +87,7 @@ def _suspend_echo():
 _init: bool = False
 
 
-def init():
+def init() -> None:
     """Initialize terminal writing, installing handlers to restore settings at exit.
 
     Raises:
@@ -136,7 +136,7 @@ _last_line_count: int | None = None
 _write_lock: threading.Lock = threading.Lock()
 
 
-def reset():
+def reset() -> None:
     """Resets the global state of the library.
 
     termout is stateful, and for testing purposes it is useful to
@@ -154,7 +154,7 @@ def write_lines(
     lines: typing.List[str],
     prepend: typing.List[str] | None = None,
     size: Size | None = None,
-):
+) -> None:
     """Write a list of lines to the terminal.
 
     Lines will be truncated if they fail to fit within the current

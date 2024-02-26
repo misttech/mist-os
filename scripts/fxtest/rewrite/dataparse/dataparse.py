@@ -35,7 +35,10 @@ class DataParseError(Exception):
     """Raised when there was an issue matching data against a schema defined by a dataclass."""
 
 
-def dataparse(cls):
+T = typing.TypeVar("T")
+
+
+def dataparse(cls: T) -> T:
     """Decorator for dataclass to support converting to and from dictionaries.
 
     dataclasses.dataclass allows for typed fields to be set by an
@@ -81,12 +84,12 @@ def dataparse(cls):
     class_fields = dataclasses.fields(cls)
 
     if not hasattr(cls, "dataparse_renames"):
-        cls.dataparse_renames = classmethod(lambda self: dict())
-    renames: typing.Dict[str, str] = cls.dataparse_renames()
+        setattr(cls, "dataparse_renames", classmethod(lambda self: dict()))
+    renames: typing.Dict[str, str] = getattr(cls, "dataparse_renames")()
 
-    def to_dict(self):
+    def to_dict(self: T) -> typing.Dict[str, typing.Any]:
         out_dict = {}
-        f: dataclasses.Field
+        f: dataclasses.Field  # type: ignore
         for f in class_fields:
             name = renames.get(f.name, f.name)
 
@@ -123,13 +126,15 @@ def dataparse(cls):
     if not hasattr(cls, "to_dict"):
         setattr(cls, "to_dict", to_dict)
 
-    def from_dict(_, input):
+    def from_dict(_: typing.Any, input: typing.Dict[str, typing.Any]) -> T:
         build_args: typing.Dict[str, typing.Any] = dict()
 
-        f: dataclasses.Field
+        f: dataclasses.Field  # type: ignore
         for f in class_fields:
 
-            def load_real_type(incoming_type):
+            def load_real_type(
+                incoming_type: typing.Any,
+            ) -> typing.Tuple[typing.Any, typing.Any]:
                 """Recursively determine the real type of an incoming type.
 
                 Some field types refer to typing-module aliases
@@ -163,7 +168,7 @@ def dataparse(cls):
                     Tuple of (base type, optional argument type).
                 """
 
-                def load_union_type():
+                def load_union_type() -> typing.Any:
                     # Load the union type from incoming_type.
                     # Only support Optional unions.
                     args = incoming_type.__args__
@@ -200,10 +205,12 @@ def dataparse(cls):
                 elif real_type == list:
                     # Handle parsing lists.
                     build_args[f.name] = [
-                        real_args.from_dict(val)
-                        if real_args is not None
-                        and hasattr(real_args, "from_dict")
-                        else val
+                        (
+                            real_args.from_dict(val)
+                            if real_args is not None
+                            and hasattr(real_args, "from_dict")
+                            else val
+                        )
                         for val in input[name]
                     ]
                 elif real_type == set:
@@ -211,10 +218,12 @@ def dataparse(cls):
                     # We store sets as a list of the elements. Convert back to set on read.
                     build_args[f.name] = set(
                         [
-                            real_args.from_dict(val)
-                            if real_args is not None
-                            and hasattr(real_args, "from_dict")
-                            else val
+                            (
+                                real_args.from_dict(val)
+                                if real_args is not None
+                                and hasattr(real_args, "from_dict")
+                                else val
+                            )
                             for val in input[name]
                         ]
                     )
@@ -238,9 +247,9 @@ def dataparse(cls):
                     # Handle all other types by assigning directly.
                     build_args[f.name] = input[name]
 
-        return cls(**build_args)
+        return cls(**build_args)  # type: ignore
 
     if not hasattr(cls, "from_dict"):
         setattr(cls, "from_dict", classmethod(from_dict))
 
-    return cls
+    return cls  # type: ignore

@@ -4,3 +4,8 @@
 
 from .dataparse import dataparse
 from .dataparse import DataParseError
+
+__all__ = [
+    "dataparse",
+    "DataParseError",
+]

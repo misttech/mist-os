@@ -13,7 +13,6 @@ import gzip
 import json
 import os
 import re
-import signal
 import subprocess
 import sys
 import typing
@@ -37,7 +36,7 @@ import util.command as command
 import util.signals
 
 
-def main():
+def main() -> None:
     # Main entrypoint.
     # Set up the event loop to catch termination signals (i.e. Ctrl+C), and
     # cancel the main task when they are received.
@@ -382,7 +381,7 @@ async def validate_test_selections(
     selections: selection_types.TestSelections,
     recorder: event.EventRecorder,
     flags: args.Flags,
-):
+) -> None:
     """Validate the selections matched from tests.json.
 
     Args:
@@ -441,9 +440,11 @@ async def validate_test_selections(
                 arg_threshold_pairs.append(
                     (
                         ",".join(list(all_args)),
-                        max(0.4, 0.9 - len(all_args) * 0.05)
-                        if len(all_args) > 1
-                        else None,
+                        (
+                            max(0.4, 0.9 - len(all_args) * 0.05)
+                            if len(all_args) > 1
+                            else None
+                        ),
                     ),
                 )
 
@@ -458,7 +459,7 @@ async def validate_test_selections(
             )
 
             if any([val is None for val in outputs]):
-                return False
+                return
 
             for group, output in zip(missing_groups, outputs):
                 assert output is not None  # Checked above
@@ -782,9 +783,9 @@ async def run_all_tests(
                 exec_env,
                 flags,
                 run_suffix=None if flags.count == 1 else i + 1,
-                device_env=None
-                if not test.is_e2e_test()
-                else device_environment,
+                device_env=(
+                    None if not test.is_e2e_test() else device_environment
+                ),
             )
             for i in range(flags.count)
         ]
@@ -949,7 +950,7 @@ async def enumerate_test_cases(
     recorder: event.EventRecorder,
     flags: args.Flags,
     exec_env: environment.ExecutionEnvironment,
-):
+) -> None:
     # Get the set of test executions that support enumeration.
     executions = [
         e
@@ -1020,7 +1021,7 @@ async def run_commands_in_parallel(
     while index < len(commands) or in_progress:
         while can_add():
 
-            async def set_index(i: int):
+            async def set_index(i: int) -> None:
                 output[i] = await execution.run_command(
                     *commands[i], recorder=recorder, parent=parent
                 )

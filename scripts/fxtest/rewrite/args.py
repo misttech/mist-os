@@ -64,7 +64,7 @@ class Flags:
     status_delay: float
     ffx_output_directory: str | None
 
-    def validate(self):
+    def validate(self) -> None:
         """Validate incoming flags, raising an exception on failure.
 
         Raises:

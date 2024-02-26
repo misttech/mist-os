@@ -83,11 +83,13 @@ class ExecutionEnvironment:
         log_file = (
             None
             if not flags.log
-            else flags.logpath
-            if flags.logpath
-            else os.path.join(
-                out_dir,
-                f"fxtest-{datetime.datetime.now().isoformat()}.log.json.gz",
+            else (
+                flags.logpath
+                if flags.logpath
+                else os.path.join(
+                    out_dir,
+                    f"fxtest-{datetime.datetime.now().isoformat()}.log.json.gz",
+                )
             )
         )
 
@@ -110,9 +112,11 @@ class ExecutionEnvironment:
             log_file,
             tests_json_file,
             test_list_file,
-            package_repositories_file=package_repositories_file
-            if os.path.isfile(package_repositories_file)
-            else None,
+            package_repositories_file=(
+                package_repositories_file
+                if os.path.isfile(package_repositories_file)
+                else None
+            ),
         )
 
     def relative_to_root(self, path: str) -> str:

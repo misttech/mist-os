@@ -11,7 +11,7 @@ import event
 async def writer(
     recorder: event.EventRecorder,
     out_stream: typing.TextIO,
-):
+) -> None:
     """Asynchronously serialize events to the given stream.
 
     Args:
