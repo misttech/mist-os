@@ -39,20 +39,6 @@ impl RetainedIndex {
     }
 
     #[cfg(test)]
-    fn packages_with_unknown_blobs(&self) -> Vec<Hash> {
-        let mut res = self
-            .packages
-            .iter()
-            .filter_map(|(k, v)| match v {
-                None => Some(*k),
-                Some(_) => None,
-            })
-            .collect::<Vec<_>>();
-        res.sort_unstable();
-        res
-    }
-
-    #[cfg(test)]
     pub fn from_packages(packages: HashMap<Hash, Option<HashSet<Hash>>>) -> Self {
         Self { packages }
     }
@@ -155,18 +141,6 @@ mod tests {
 
     fn hash(n: u8) -> Hash {
         Hash::from([n; 32])
-    }
-
-    #[test]
-    fn iter_packages_with_unknown_content_blobs_does_what_it_says_it_does() {
-        let index = RetainedIndex::from_packages(hashmap! {
-            hash(0) => None,
-            hash(1) => Some(HashSet::new()),
-            hash(2) => Some(HashSet::from_iter([hash(7), hash(8), hash(9)])),
-            hash(3) => None,
-        });
-
-        assert_eq!(index.packages_with_unknown_blobs(), vec![hash(0), hash(3)]);
     }
 
     #[test]
