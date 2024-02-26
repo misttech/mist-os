@@ -10,13 +10,11 @@ library fuchsia.modular;
 /// does not change.
 closed protocol StoryController {
     /// Gets information associated with the story.
-    @transitional("Use GetInfo2 instead")
     strict GetInfo() -> (struct {
         info StoryInfo;
         state StoryState;
     });
     /// For transition purposes only.
-    @transitional("Only use while GetInfo2 is transitional")
     strict GetInfo2() -> (resource struct {
         info StoryInfo2;
         state StoryState;

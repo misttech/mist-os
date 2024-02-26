@@ -15,7 +15,6 @@ closed protocol ComponentContext {
     ///
     /// Used to start an agent in the user scope if it isn't already running, and
     /// connect to it.
-    @transitional
     strict DeprecatedConnectToAgent(resource struct {
         url string:MAX;
         incoming_services server_end:fuchsia.sys.ServiceProvider;
@@ -35,7 +34,6 @@ closed protocol ComponentContext {
     ///     specified, and an agent for the `request.service_name` is not found
     ///   * `ZX_ERR_PEER_CLOSED` -- if `request.service_name` is not available from
     ///     the agent (either specified or discovered)
-    @transitional
     strict DeprecatedConnectToAgentService(resource struct {
         request AgentServiceRequest;
     });

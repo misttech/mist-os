@@ -14,17 +14,14 @@ closed protocol SessionShell {
     /// Displays the given story view. The story this view belongs to is
     /// identified by `view_id.story_id`.
     /// DEPRECATED.  For transitional purposes only.
-    @transitional
     strict AttachView(resource struct {
         view_id ViewIdentifier;
         view_holder_token fuchsia.ui.views.ViewHolderToken;
     });
-    @transitional
     strict AttachView2(resource struct {
         view_id ViewIdentifier;
         view_holder_token fuchsia.ui.views.ViewHolderToken;
     });
-    @transitional
     @available(added=9)
     strict AttachView3(resource struct {
         view_id ViewIdentifier;
@@ -84,6 +81,5 @@ closed protocol SessionShellContext {
     strict Restart();
 
     /// Deprecated: Equivalent to Restart().
-    @transitional
     strict Logout();
 };
