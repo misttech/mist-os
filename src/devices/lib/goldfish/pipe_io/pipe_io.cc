@@ -232,7 +232,7 @@ zx::result<uint32_t> PipeIo::ExecTransferCommandLocked(bool has_write, bool has_
   auto result = pipe_->Exec(id_);
   if (!result.ok()) {
     zxlogf(ERROR, "[%s] Exec failed: %s", __func__, result.status_string());
-    return zx::error_result(ZX_ERR_INTERNAL);
+    return zx::error_result(result.status());
   }
 
   // Positive consumed size always indicate a successful transfer.
@@ -242,8 +242,7 @@ zx::result<uint32_t> PipeIo::ExecTransferCommandLocked(bool has_write, bool has_
 
   // Early out if error is not because of back-pressure.
   if (buffer->status != static_cast<int32_t>(fuchsia_hardware_goldfish_pipe::PipeError::kAgain)) {
-    zxlogf(ERROR, "[%s] Pipe::Transfer() transfer failed: %s", __func__,
-           zx_status_get_string(buffer->status));
+    zxlogf(ERROR, "[%s] Pipe::Transfer() transfer failed: %" PRId32, __func__, buffer->status);
     return zx::error_result(ZX_ERR_INTERNAL);
   }
 
@@ -264,11 +263,11 @@ zx::result<uint32_t> PipeIo::ExecTransferCommandLocked(bool has_write, bool has_
   auto result2 = pipe_->Exec(id_);
   if (!result2.ok()) {
     zxlogf(ERROR, "[%s] Pipe::Exec() failed: %s", __func__, result2.status_string());
-    return zx::error_result(ZX_ERR_INTERNAL);
+    return zx::error_result(result2.status());
   }
 
   if (buffer->status) {
-    zxlogf(ERROR, "Pipe::Transfer() failed to request interrupt: %d", buffer->status);
+    zxlogf(ERROR, "Pipe::Transfer() failed to request interrupt: %" PRId32, buffer->status);
     return zx::error_result(ZX_ERR_INTERNAL);
   }
 

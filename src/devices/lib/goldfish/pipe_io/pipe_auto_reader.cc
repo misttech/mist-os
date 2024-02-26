@@ -26,35 +26,36 @@ zx_status_t PipeAutoReader::AsyncReadWithHeader() {
     return ZX_OK;
   }
 
-  if (read_result.is_error()) {
-    // All the other errors indicates that the pipe read / write process
-    // is broken and we should not continue.
-    ZX_DEBUG_ASSERT(read_result.error_value() == ZX_ERR_SHOULD_WAIT);
-    if (read_result.error_value() != ZX_ERR_SHOULD_WAIT) {
-      zxlogf(ERROR, "%s: read error: %d", __func__, read_result.error_value());
+  switch (read_result.error_value()) {
+    case ZX_ERR_PEER_CLOSED: {
+      zxlogf(INFO, "The pipe server is closed. Read is cancelled.");
+      return read_result.error_value();
     }
-
-    pipe_event().signal(/* clear_mask= */
-                        fuchsia_hardware_goldfish::wire::kSignalHangup |
-                            fuchsia_hardware_goldfish::wire::kSignalReadable,
-                        0u);
-    wait_event_.set_object(pipe_event().get());
-    wait_event_.set_trigger(fuchsia_hardware_goldfish::wire::kSignalHangup |
-                            fuchsia_hardware_goldfish::wire::kSignalReadable);
-    wait_event_.Begin(dispatcher_, [this](async_dispatcher_t* dispatcher, async::WaitOnce* wait,
-                                          zx_status_t status, const zx_packet_signal_t* signal) {
-      if (status == ZX_OK) {
-        AsyncReadWithHeader();
-      } else if (status == ZX_ERR_CANCELED) {
-        zxlogf(INFO, "AsyncReadWithHeader callback: wait event is canceled");
-      } else {
-        zxlogf(ERROR, "AsyncReadWithHeader callback: wait event error: %d", status);
-      }
-    });
-    return read_result.error_value();
+    case ZX_ERR_SHOULD_WAIT: {
+      pipe_event().signal(/* clear_mask= */
+                          fuchsia_hardware_goldfish::wire::kSignalHangup |
+                              fuchsia_hardware_goldfish::wire::kSignalReadable,
+                          0u);
+      wait_event_.set_object(pipe_event().get());
+      wait_event_.set_trigger(fuchsia_hardware_goldfish::wire::kSignalHangup |
+                              fuchsia_hardware_goldfish::wire::kSignalReadable);
+      wait_event_.Begin(dispatcher_, [this](async_dispatcher_t* dispatcher, async::WaitOnce* wait,
+                                            zx_status_t status, const zx_packet_signal_t* signal) {
+        if (status == ZX_OK) {
+          AsyncReadWithHeader();
+        } else if (status == ZX_ERR_CANCELED) {
+          zxlogf(INFO, "AsyncReadWithHeader callback: wait event is canceled");
+        } else {
+          zxlogf(ERROR, "AsyncReadWithHeader callback: wait event error: %d", status);
+        }
+      });
+      return read_result.error_value();
+    }
+    default: {
+      ZX_ASSERT_MSG(false, "Unexpected Pipe IO error: %s",
+                    zx_status_get_string(read_result.error_value()));
+    }
   }
-
-  return ZX_ERR_WRONG_TYPE;
 }
 
 zx_status_t PipeAutoReader::BeginRead() {
