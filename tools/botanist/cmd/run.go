@@ -267,6 +267,13 @@ func (r *RunCommand) setupSerialLog(ctx context.Context, eg *errgroup.Group, fuc
 				serialLogName = "serial_log.txt"
 			}
 			serialLogPath := filepath.Join(r.serialLogDir, serialLogName)
+			absPath, err := filepath.Abs(serialLogPath)
+			if err != nil {
+				return fmt.Errorf("failed to get abspath of serial log: %w", err)
+			}
+			if err := os.Setenv(constants.SerialLogEnvKey, absPath); err != nil {
+				logger.Debugf(ctx, "failed to set %s to %s", constants.SerialLogEnvKey, absPath)
+			}
 
 			// Start capturing the serial log for this target.
 			if err := t.CaptureSerialLog(serialLogPath); err != nil && ctx.Err() == nil {

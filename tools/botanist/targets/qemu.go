@@ -477,6 +477,9 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 			cleanupTempLogfile()
 			return fmt.Errorf("failed to create %s", logfile)
 		}
+		if err := os.Setenv(constants.SerialLogEnvKey, logfile); err != nil {
+			logger.Debugf(ctx, "failed to set %s to %s", constants.SerialLogEnvKey, logfile)
+		}
 		serialWriter := botanist.NewLineWriter(botanist.NewTimestampWriter(g))
 		go func() {
 			for {
@@ -580,16 +583,6 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		cmd.Stdin = t.ptm
 		cmd.Stdout = io.MultiWriter(t.ptm, stdout)
 		cmd.Stderr = io.MultiWriter(t.ptm, stderr)
-		if isBootTest {
-			// TODO(https://fxbug.dev/42085023): Don't write to stdout for
-			// boot tests to rule out whether the issue in the bug
-			// is due to a race between writing to stdout from the
-			// emulator and the boot test. Instead the boot test
-			// will print out the serial output it reads from the
-			// emulator.
-			cmd.Stdout = t.ptm
-			cmd.Stderr = t.ptm
-		}
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			Setctty: true,
 			Setsid:  true,

@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -41,53 +40,25 @@ func init() {
 	flag.StringVar(&successString, "success-str", "", "string that - if read - indicates success")
 }
 
-// TODO(https://fxbug.dev/42067738): Revisit as this is a workaround for a possibly lower-level bug.
-type socketReader struct {
-	ctx     context.Context
-	r       net.Conn
-	timeout time.Duration
-}
-
-func (s *socketReader) Read(p []byte) (int, error) {
-	for {
-		if err := s.r.SetReadDeadline(time.Now().Add(s.timeout)); err != nil {
-			return 0, err
-		}
-		n, err := s.r.Read(p)
-		var netErr net.Error
-		if errors.As(err, &netErr) {
-			// If the error was due to an IO timeout, try reading again.
-			if netErr.Timeout() {
-				logger.Debugf(s.ctx, "%s", netErr)
-				continue
-			}
-		}
-		return n, err
-	}
-}
-
-func execute(ctx context.Context, socketPath string, stdout io.Writer) error {
+func execute(ctx context.Context, serialLogPath string, stdout io.Writer) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-
-	if socketPath == "" {
-		flag.Usage()
-		return fmt.Errorf("could not find socket in environment")
-	}
-	logger.Debugf(ctx, "socket: %s", socketPath)
 
 	if successString == "" {
 		flag.Usage()
 		return fmt.Errorf("-success is a required argument")
 	}
-
-	socket, err := net.Dial("unix", socketPath)
-	if err != nil {
-		return err
+	if serialLogPath == "" {
+		return fmt.Errorf("could not find serial log path in environment")
 	}
-	defer socket.Close()
 
-	socketTee := io.TeeReader(&socketReader{ctx, socket, 10 * time.Second}, stdout)
+	serialReader, err := os.Open(serialLogPath)
+	if err != nil {
+		return fmt.Errorf("failed to open serial log: %w", err)
+	}
+	logger.Debugf(ctx, "serial log: %s", serialLogPath)
+	defer serialReader.Close()
+	serialTee := io.TeeReader(serialReader, stdout)
 
 	// Print out a log periodically to give an estimate of the timestamp at which
 	// logs are getting read from the socket.
@@ -100,11 +71,23 @@ func execute(ctx context.Context, socketPath string, stdout io.Writer) error {
 		}
 	}()
 
-	if _, err := iomisc.ReadUntilMatchString(ctx, socketTee, successString); err != nil {
-		if ctx.Err() != nil {
-			return fmt.Errorf("timed out before success string %q was read from serial", successString)
+	for {
+		if match, err := iomisc.ReadUntilMatchString(ctx, serialTee, successString); err != nil {
+			if ctx.Err() != nil {
+				return fmt.Errorf("timed out before success string %q was read from serial", successString)
+			}
+			if !errors.Is(err, io.EOF) {
+				return fmt.Errorf("error trying to read from serial log: %w", err)
+			}
+			// The serial log is continuously being written to, so ReadUntilMatchString() may
+			// return an EOF if it's read everything that's been written so far. Keep trying
+			// to read until the success string is found or the timeout is hit.
+			time.Sleep(100 * time.Millisecond)
+			continue
+		} else if match != successString {
+			return fmt.Errorf("match found %q doesn't match successString %q", match, successString)
 		}
-		return fmt.Errorf("error trying to read from socket: %w", err)
+		break
 	}
 	logger.Debugf(ctx, "success string found: %q", successString)
 	return nil
@@ -127,10 +110,7 @@ func main() {
 		if serialOutput, err := osmisc.CreateFile(filepath.Join(outDir, "serial_output")); err != nil {
 			logger.Errorf(ctx, "%s", err)
 		} else {
-			// TODO(https://fxbug.dev/42085023): Temporarily write to stdout while
-			// emulator serial output has been temporarily disabled from
-			// being written to stdout.
-			stdout = io.MultiWriter(os.Stdout, serialOutput)
+			stdout = serialOutput
 			// Have the logger write to the file as well to get a
 			// better sense of how much is read from the socket before
 			// the socket io or ticker timeouts are reached.
@@ -145,8 +125,8 @@ func main() {
 		stdout = os.Stdout
 	}
 
-	socketPath := os.Getenv(constants.SerialSocketEnvKey)
-	if err := execute(ctx, socketPath, stdout); err != nil {
+	serialLogPath := os.Getenv(constants.SerialLogEnvKey)
+	if err := execute(ctx, serialLogPath, stdout); err != nil {
 		logger.Fatalf(ctx, "%s", err)
 	}
 }

@@ -20,12 +20,14 @@ const (
 	NodenameEnvKey     = "FUCHSIA_NODENAME"
 	SSHKeyEnvKey       = "FUCHSIA_SSH_KEY"
 	SerialSocketEnvKey = "FUCHSIA_SERIAL_SOCKET"
-	ECCableEnvKey      = "EC_CABLE_PATH"
-	DeviceAddrEnvKey   = "FUCHSIA_DEVICE_ADDR"
-	DeviceTypeEnvKey   = "FUCHSIA_DEVICE_TYPE" // Not set by botanist directly, but part of the host-target interaction API
-	IPv4AddrEnvKey     = "FUCHSIA_IPV4_ADDR"
-	IPv6AddrEnvKey     = "FUCHSIA_IPV6_ADDR"
-	PkgSrvPortKey      = "FUCHSIA_PACKAGE_SERVER_PORT"
+	// needed by boot tests
+	SerialLogEnvKey  = "FUCHSIA_SERIAL_LOG"
+	ECCableEnvKey    = "EC_CABLE_PATH"
+	DeviceAddrEnvKey = "FUCHSIA_DEVICE_ADDR"
+	DeviceTypeEnvKey = "FUCHSIA_DEVICE_TYPE" // Not set by botanist directly, but part of the host-target interaction API
+	IPv4AddrEnvKey   = "FUCHSIA_IPV4_ADDR"
+	IPv6AddrEnvKey   = "FUCHSIA_IPV6_ADDR"
+	PkgSrvPortKey    = "FUCHSIA_PACKAGE_SERVER_PORT"
 	// LINT.IfChange
 	TestbedConfigEnvKey = "FUCHSIA_TESTBED_CONFIG"
 	// LINT.ThenChange(//src/testing/end_to_end/mobly_driver/api_infra.py)
