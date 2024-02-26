@@ -10,11 +10,14 @@ if (is_host) {
     testonly = true
     deps = [
       "../util",
+      "//third_party/golibs:golang.org/x/crypto",
       "//tools/lib/logger",
     ]
     sources = [
       "ffx.go",
       "ffx_test.go",
+      "flasher.go",
+      "flasher_test.go",
     ]
   }
 

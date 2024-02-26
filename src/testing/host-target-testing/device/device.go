@@ -253,6 +253,32 @@ func (c *Client) Reboot(ctx context.Context) error {
 	})
 }
 
+// RebootToBootloader asks the device to reboot into the bootloader. It
+// waits until the device disconnects before returning.
+func (c *Client) RebootToBootloader(ctx context.Context) error {
+	logger.Infof(ctx, "Rebooting to bootloader")
+
+	return c.ExpectDisconnect(ctx, func() error {
+		// Run the reboot in the background, which gives us a chance to
+		// observe us successfully executing the reboot command.
+		cmd := []string{"dm", "reboot-bootloader", "&", "exit", "0"}
+		if err := c.Run(ctx, cmd, os.Stdout, os.Stderr); err != nil {
+			// If the device rebooted before ssh was able to tell
+			// us the command ran, it will tell us the session
+			// exited without passing along an exit code. So,
+			// ignore that specific error.
+			var exitErr *ssh.ExitMissingError
+			if errors.As(err, &exitErr) {
+				logger.Infof(ctx, "ssh disconnected before returning a status")
+			} else {
+				return fmt.Errorf("failed to reboot into bootloader: %w", err)
+			}
+		}
+
+		return nil
+	})
+}
+
 // RebootToRecovery asks the device to reboot into the recovery partition. It
 // waits until the device disconnects before returning.
 func (c *Client) RebootToRecovery(ctx context.Context) error {
@@ -671,20 +697,40 @@ func (c *Client) Pave(ctx context.Context, build artifacts.Build) error {
 }
 
 // Flash the device to the specified build. Does not reconnect to the device.
-func (c *Client) Flash(ctx context.Context, build artifacts.Build) error {
-	f, err := build.GetFlasher(ctx, c.ffxIsolateDir)
+func (c *Client) Flash(
+	ctx context.Context,
+	build artifacts.Build,
+	publicKey ssh.PublicKey,
+) error {
+	ffx, err := build.GetFfx(ctx, c.ffxIsolateDir)
 	if err != nil {
-		return fmt.Errorf("failed to get flasher to flash device: %w", err)
+		return err
 	}
 
-	deviceHostname, err := c.deviceResolver.ResolveName(ctx)
+	manifest, err := build.GetFlashManifest(ctx)
 	if err != nil {
-		return fmt.Errorf("error resolving device host: %w", err)
+		return fmt.Errorf("failed to get flash manifest from build: %w", err)
 	}
-	if err := f.SetTarget(ctx, deviceHostname); err != nil {
-		return fmt.Errorf("failed to add target to ffx: %w", err)
+
+	if err := c.RebootToBootloader(ctx); err != nil {
+		return err
 	}
-	if err = f.Flash(ctx); err != nil {
+
+	_, err = c.deviceResolver.WaitToFindDeviceInFastboot(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to wait for device to reboot into bootloader: %w", err)
+	}
+
+	// FIXME(https://fxbug.dev/326658880): We can remove this sleep after the next stepping stone.
+	logger.Infof(ctx, "Sleeping 15s in case https://fxbug.dev/326658880 can't flash the device right after rebooting to the bootloader")
+	time.Sleep(15 * time.Second)
+
+	flasher := ffx.Flasher()
+	flasher.SetSSHPublicKey(publicKey)
+	flasher.SetManifest(manifest)
+	flasher.SetTarget(c.Name())
+
+	if _, err = flasher.Flash(ctx); err != nil {
 		return fmt.Errorf("device failed to flash: %w", err)
 	}
 

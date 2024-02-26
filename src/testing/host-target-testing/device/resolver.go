@@ -20,6 +20,9 @@ type DeviceResolver interface {
 	// Resolve the device's nodename into a hostname.
 	ResolveName(ctx context.Context) (string, error)
 
+	// Block until the device appears to be in fastboot.
+	WaitToFindDeviceInFastboot(ctx context.Context) (string, error)
+
 	// Block until the device appears to be in netboot.
 	WaitToFindDeviceInNetboot(ctx context.Context) (string, error)
 }
@@ -44,6 +47,12 @@ func (r ConstantHostResolver) NodeName() string {
 
 func (r ConstantHostResolver) ResolveName(ctx context.Context) (string, error) {
 	return r.host, nil
+}
+
+func (r ConstantHostResolver) WaitToFindDeviceInFastboot(ctx context.Context) (string, error) {
+	// We have no way to tell if the device is in fastboot, so just exit.
+	logger.Warningf(ctx, "ConstantHostResolver cannot tell if device is in fastboot, assuming nodename is %s", r.nodeName)
+	return r.nodeName, nil
 }
 
 func (r ConstantHostResolver) WaitToFindDeviceInNetboot(ctx context.Context) (string, error) {
@@ -107,7 +116,41 @@ func (r *FfxResolver) ResolveName(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("multiple addresses found for nodename %v: %v", nodeName, targets)
 	}
 
-	return targets[0].Addresses[0], nil
+	target := targets[0]
+
+	if len(target.Addresses) == 0 {
+		return "", fmt.Errorf("no address found for nodename %v: %v", nodeName, target)
+	}
+
+	return target.Addresses[0], nil
+}
+
+func (r *FfxResolver) WaitToFindDeviceInFastboot(ctx context.Context) (string, error) {
+	nodeName := r.NodeName()
+
+	// Wait for the device to be listening in netboot.
+	logger.Infof(ctx, "waiting for the device to be listening on the nodename: %v", nodeName)
+
+	attempt := 0
+	for {
+		attempt += 1
+
+		if entries, err := r.ffx.TargetListForNode(ctx, nodeName); err == nil {
+			for _, entry := range entries {
+				logger.Infof(ctx, "device is in %v", entry.TargetState)
+				if entry.TargetState == "Fastboot" {
+					logger.Infof(ctx, "device %v is listening on %q", entry.NodeName, entry)
+					return entry.NodeName, nil
+				}
+			}
+
+			logger.Infof(ctx, "attempt %d waiting for device to boot into fastboot", attempt)
+			time.Sleep(5 * time.Second)
+		} else {
+			logger.Infof(ctx, "attempt %d failed to resolve nodename %v: %v", attempt, nodeName, err)
+		}
+
+	}
 }
 
 func (r *FfxResolver) WaitToFindDeviceInNetboot(ctx context.Context) (string, error) {

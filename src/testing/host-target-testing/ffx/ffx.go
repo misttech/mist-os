@@ -5,15 +5,14 @@
 package ffx
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 
-	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
@@ -28,14 +27,9 @@ func NewIsolateDir(path string) IsolateDir {
 type FFXTool struct {
 	ffxToolPath string
 	isolateDir  IsolateDir
-	stdout      io.Writer
 }
 
 func NewFFXTool(ffxToolPath string, isolateDir IsolateDir) (*FFXTool, error) {
-	return NewFFXToolWithStdout(ffxToolPath, isolateDir, nil)
-}
-
-func NewFFXToolWithStdout(ffxToolPath string, isolateDir IsolateDir, stdout io.Writer) (*FFXTool, error) {
 	if _, err := os.Stat(ffxToolPath); err != nil {
 		return nil, fmt.Errorf("error accessing %v: %w", ffxToolPath, err)
 	}
@@ -43,12 +37,7 @@ func NewFFXToolWithStdout(ffxToolPath string, isolateDir IsolateDir, stdout io.W
 	return &FFXTool{
 		ffxToolPath: ffxToolPath,
 		isolateDir:  isolateDir,
-		stdout:      stdout,
 	}, nil
-}
-
-func (f *FFXTool) SetStdout(stdout io.Writer) {
-	f.stdout = stdout
 }
 
 type targetEntry struct {
@@ -65,9 +54,9 @@ func (f *FFXTool) TargetList(ctx context.Context) ([]targetEntry, error) {
 		"list",
 	}
 
-	stdout, stderr, err := util.RunCommand(ctx, f.ffxToolPath, args...)
+	stdout, err := f.runFFXCmd(ctx, args...)
 	if err != nil {
-		return []targetEntry{}, fmt.Errorf("ffx target list failed: %w: %s", err, string(stderr))
+		return []targetEntry{}, fmt.Errorf("ffx target list failed: %w", err)
 	}
 
 	if len(stdout) == 0 {
@@ -107,7 +96,7 @@ func (f *FFXTool) SupportsZedbootDiscovery(ctx context.Context) (bool, error) {
 		"discovery.zedboot.enabled",
 	}
 
-	stdout, stderr, err := util.RunCommand(ctx, f.ffxToolPath, args...)
+	stdout, err := f.runFFXCmd(ctx, args...)
 	if err != nil {
 		// `ffx config get` exits with 2 if variable is undefined.
 		if exiterr, ok := err.(*exec.ExitError); ok {
@@ -116,7 +105,7 @@ func (f *FFXTool) SupportsZedbootDiscovery(ctx context.Context) (bool, error) {
 			}
 		}
 
-		return false, fmt.Errorf("ffx config get failed: %w: %s", err, string(stderr))
+		return false, fmt.Errorf("ffx config get failed: %w", err)
 	}
 
 	// FIXME(https://fxbug.dev/42060660): Unfortunately we need to parse the raw string to see if it's true.
@@ -129,24 +118,18 @@ func (f *FFXTool) SupportsZedbootDiscovery(ctx context.Context) (bool, error) {
 
 func (f *FFXTool) TargetAdd(ctx context.Context, target string) error {
 	args := []string{"target", "add", "--nowait", target}
-	return f.runFFXCmd(ctx, args...)
+	_, err := f.runFFXCmd(ctx, args...)
+	return err
 }
 
-func (f *FFXTool) Flash(ctx context.Context, target, FlashManifest string, args ...string) error {
-	var finalArgs []string
-	if target != "" {
-		finalArgs = []string{"--target", target}
-	}
-	finalArgs = append(finalArgs, []string{"target", "flash"}...)
-	finalArgs = append(finalArgs, args...)
-	finalArgs = append(finalArgs, []string{"--manifest", FlashManifest}...)
-	return f.runFFXCmd(ctx, finalArgs...)
+func (f *FFXTool) Flasher() *Flasher {
+	return newFlasher(f)
 }
 
-func (f *FFXTool) runFFXCmd(ctx context.Context, args ...string) error {
+func (f *FFXTool) runFFXCmd(ctx context.Context, args ...string) ([]byte, error) {
 	path, err := exec.LookPath(f.ffxToolPath)
 	if err != nil {
-		return err
+		return []byte{}, err
 	}
 
 	// prepend a config flag for finding subtools that are compiled separately
@@ -161,16 +144,23 @@ func (f *FFXTool) runFFXCmd(ctx context.Context, args ...string) error {
 
 	logger.Infof(ctx, "running: %s %q", path, args)
 	cmd := exec.CommandContext(ctx, path, args...)
-	if f.stdout != nil {
-		cmd.Stdout = f.stdout
-	} else {
-		cmd.Stdout = os.Stdout
-	}
+	var stdoutBuf bytes.Buffer
+	cmd.Stdout = &stdoutBuf
 	cmd.Stderr = os.Stderr
 
 	cmdRet := cmd.Run()
-	logger.Infof(ctx, "finished running %s %q: %q", path, args, cmdRet)
-	return cmdRet
+
+	stdout := stdoutBuf.Bytes()
+	if len(stdout) != 0 {
+		logger.Infof(ctx, "%s", string(stdout))
+	}
+
+	if cmdRet == nil {
+		logger.Infof(ctx, "finished running %s %q", path, args)
+	} else {
+		logger.Infof(ctx, "running %s %q failed with: %v", path, args, cmdRet)
+	}
+	return stdout, cmdRet
 }
 
 func (f *FFXTool) RepositoryCreate(ctx context.Context, repoDir, keysDir string) error {
@@ -182,7 +172,8 @@ func (f *FFXTool) RepositoryCreate(ctx context.Context, repoDir, keysDir string)
 		repoDir,
 	}
 
-	return f.runFFXCmd(ctx, args...)
+	_, err := f.runFFXCmd(ctx, args...)
+	return err
 }
 
 func (f *FFXTool) RepositoryPublish(ctx context.Context, repoDir string, packageManifests []string, additionalArgs ...string) error {
@@ -198,5 +189,6 @@ func (f *FFXTool) RepositoryPublish(ctx context.Context, repoDir string, package
 	args = append(args, additionalArgs...)
 	args = append(args, repoDir)
 
-	return f.runFFXCmd(ctx, args...)
+	_, err := f.runFFXCmd(ctx, args...)
+	return err
 }

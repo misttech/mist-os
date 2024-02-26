@@ -1,11 +1,10 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-package flasher
+package ffx
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -14,7 +13,6 @@ import (
 	"strings"
 	"testing"
 
-	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -31,41 +29,35 @@ func generatePublicKey(t *testing.T) ssh.PublicKey {
 	return pub
 }
 
-// createScript returns the path to a bash script that outputs its name and
-// all its arguments.
-func createScript(t *testing.T, scriptName string) string {
+func createAndRunFlasher(t *testing.T, setupFlasher func(t *testing.T, flasher *Flasher)) string {
+	// createScript returns the path to a bash script that outputs its name and
+	// all its arguments.
+	ffxPath := filepath.Join(t.TempDir(), "ffx.sh")
 	contents := "#!/bin/sh\necho \"$0 $@\"\n"
-	name := filepath.Join(t.TempDir(), scriptName)
-	if err := os.WriteFile(name, []byte(contents), 0o700); err != nil {
+	if err := os.WriteFile(ffxPath, []byte(contents), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	return name
-}
 
-func createAndRunFfxFlasher(t *testing.T, options ...FfxFlasherOption) string {
-	ffxPath := createScript(t, "ffx.sh")
-	var output bytes.Buffer
-	options = append(options, Stdout(&output))
-	flash_manifest := "dir/flash.json"
-
-	isolateDir := ffx.NewIsolateDir(filepath.Join(t.TempDir(), "ffx-isolate-dir"))
-	ffx, err := ffx.NewFFXTool(ffxPath, isolateDir)
+	ffxIsolateDir := NewIsolateDir(filepath.Join(t.TempDir(), "ffx-isolate-dir"))
+	ffx, err := NewFFXTool(ffxPath, ffxIsolateDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	flasher, err := NewFfxFlasher(ffx, flash_manifest, false, options...)
+
+	flasher := ffx.Flasher()
+	flasher.SetManifest("dir/flash.json")
+	setupFlasher(t, flasher)
+
+	stdout, err := flasher.Flash(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := flasher.Flash(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	result := strings.ReplaceAll(output.String(), ffxPath, "ffx")
-	return result
+
+	return strings.Trim(strings.ReplaceAll(stdout, ffxPath, "ffx"), "\n")
 }
 
 func TestDefault(t *testing.T) {
-	result := strings.Trim(createAndRunFfxFlasher(t), "\n")
+	result := createAndRunFlasher(t, func(t *testing.T, flasher *Flasher) {})
 	expected_result := "target flash --manifest dir/flash.json"
 	if !strings.HasPrefix(result, "ffx") || !strings.HasSuffix(result, expected_result) {
 		t.Fatalf("target flash result mismatched: " + result)
@@ -74,7 +66,9 @@ func TestDefault(t *testing.T) {
 
 func TestSSHKeys(t *testing.T) {
 	sshKey := generatePublicKey(t)
-	result := strings.Trim(createAndRunFfxFlasher(t, SSHPublicKey(sshKey)), "\n")
+	result := createAndRunFlasher(t, func(t *testing.T, flasher *Flasher) {
+		flasher.SetSSHPublicKey(sshKey)
+	})
 	segs := strings.Fields(result)
 	result = strings.Join(segs[:len(segs)-3], " ")
 	expected_result := "target flash --authorized-keys"

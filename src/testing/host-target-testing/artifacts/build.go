@@ -19,7 +19,6 @@ import (
 	pmBuild "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/avb"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
-	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/flasher"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/omaha_tool"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/packages"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/paver"
@@ -67,12 +66,6 @@ type Build interface {
 
 	// GetPaver downloads and returns a paver for the build.
 	GetPaver(ctx context.Context) (paver.Paver, error)
-
-	// GetFlasher downloads and returns a paver for the build.
-	GetFlasher(
-		ctx context.Context,
-		ffxIsolateDir ffx.IsolateDir,
-	) (flasher.Flasher, error)
 
 	// GetSshPublicKey returns the SSH public key used by this build's paver.
 	GetSshPublicKey() ssh.PublicKey
@@ -381,24 +374,6 @@ func (b *ArtifactsBuild) getPaver(ctx context.Context) (*paver.BuildPaver, error
 	return paver.NewBuildPaver(bootserverPath, buildImageDir, paver.SSHPublicKey(b.sshPublicKey))
 }
 
-// GetFlasher downloads and returns a flasher for the build.
-func (b *ArtifactsBuild) GetFlasher(
-	ctx context.Context,
-	ffxIsolateDir ffx.IsolateDir,
-) (flasher.Flasher, error) {
-	ffx, err := b.GetFfx(ctx, ffxIsolateDir)
-	if err != nil {
-		return nil, err
-	}
-
-	flashManifest, err := b.GetFlashManifest(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return flasher.NewFfxFlasher(ffx, flashManifest, false, flasher.SSHPublicKey(b.sshPublicKey))
-}
-
 func (b *ArtifactsBuild) GetSshPublicKey() ssh.PublicKey {
 	return b.sshPublicKey
 }
@@ -511,22 +486,6 @@ func (b *FuchsiaDirBuild) GetPaver(ctx context.Context) (paver.Paver, error) {
 	)
 }
 
-func (b *FuchsiaDirBuild) GetFlasher(
-	ctx context.Context,
-	ffxIsolateDir ffx.IsolateDir,
-) (flasher.Flasher, error) {
-	ffx, err := b.GetFfx(ctx, ffxIsolateDir)
-	if err != nil {
-		return nil, err
-	}
-	return flasher.NewFfxFlasher(
-		ffx,
-		filepath.Join(b.dir, "flash.json"),
-		false,
-		flasher.SSHPublicKey(b.sshPublicKey),
-	)
-}
-
 func (b *FuchsiaDirBuild) GetSshPublicKey() ssh.PublicKey {
 	return b.sshPublicKey
 }
@@ -631,22 +590,6 @@ func (b *ProductBundleDirBuild) GetPaver(ctx context.Context) (paver.Paver, erro
 	return nil, nil
 }
 
-func (b *ProductBundleDirBuild) GetFlasher(
-	ctx context.Context,
-	ffxIsolateDir ffx.IsolateDir,
-) (flasher.Flasher, error) {
-	ffx, err := b.GetFfx(ctx, ffxIsolateDir)
-	if err != nil {
-		return nil, err
-	}
-	return flasher.NewFfxFlasher(
-		ffx,
-		b.dir,
-		true,
-		flasher.SSHPublicKey(b.sshPublicKey),
-	)
-}
-
 func (b *ProductBundleDirBuild) GetSshPublicKey() ssh.PublicKey {
 	return b.sshPublicKey
 }
@@ -709,8 +652,134 @@ func (b *OmahaBuild) GetFfx(
 	return b.build.GetFfx(ctx, ffxIsolateDir)
 }
 
+type versionedFlashManifest struct {
+	Version  int           `json:"version"`
+	Manifest flashManifest `json:"manifest"`
+}
+
+type flashManifest struct {
+	Credentials []string       `json:"credentials,omitempty"`
+	HwRevision  string         `json:"hw_revision"`
+	Products    []flashProduct `json:"products,omitempty"`
+}
+
+type flashProduct struct {
+	BootloaderPartitions []flashPartition `json:"bootloader_partitions,omitempty"`
+	Name                 string           `json:"name"`
+	Partitions           []flashPartition `json:"partitions,omitempty"`
+	RequiresUnlock       bool             `json:"requires_unlock"`
+}
+
+type flashPartition struct {
+	Name      string          `json:"name"`
+	Path      string          `json:"path"`
+	Condition *flashCondition `json:"condition,omitempty"`
+}
+
+type flashCondition struct {
+	Value    string `json:"value"`
+	Variable string `json:"variable"`
+}
+
 func (b *OmahaBuild) GetFlashManifest(ctx context.Context) (string, error) {
-	return b.build.GetFlashManifest(ctx)
+	flashManifestPath, err := b.build.GetFlashManifest(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	fileInfo, err := os.Stat(flashManifestPath)
+	if err != nil {
+		return "", err
+	}
+
+	// Error out if we're dealing with a product bundle build.
+	if fileInfo.IsDir() {
+		return "", fmt.Errorf(
+			"flashing product bundles with omaha builds currently not supported",
+		)
+	}
+
+	f, err := os.Open(flashManifestPath)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	var manifest versionedFlashManifest
+	decoder := json.NewDecoder(f)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&manifest); err != nil {
+		return "", err
+	}
+
+	if manifest.Version != 3 {
+		return "", fmt.Errorf("Unknown flash manifest version %d", manifest.Version)
+	}
+
+	srcVbmetaPath, err := b.GetVbmetaPath(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to find zircon-a vbmeta: %w", err)
+	}
+
+	tempDir, err := os.MkdirTemp("", "")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create a ZBI with the omaha_url argument.
+	destZbiPath := path.Join(tempDir, "omaha_argument.zbi")
+	imageArguments := map[string]string{
+		"omaha_url":    b.omahatool.URL(),
+		"omaha_app_id": b.omahatool.Args.AppId,
+	}
+
+	if err := b.zbitool.MakeImageArgsZbi(ctx, destZbiPath, imageArguments); err != nil {
+		return "", fmt.Errorf("Failed to create ZBI: %w", err)
+	}
+
+	// Create a vbmeta that includes the ZBI we just created.
+	propFiles := map[string]string{
+		"zbi": destZbiPath,
+	}
+
+	paverDir, err := b.GetPaverDir(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	destVbmetaPath := filepath.Join(paverDir, "zircon-a-omaha-test.vbmeta")
+	err = b.avbtool.MakeVBMetaImage(ctx, destVbmetaPath, srcVbmetaPath, propFiles)
+	if err != nil {
+		return "", fmt.Errorf("failed to create vbmeta: %w", err)
+	}
+
+	// Update the manifest to point at the new vbmeta.
+	for i, product := range manifest.Manifest.Products {
+		if product.Name == "fuchsia" || product.Name == "fuchsia_only" {
+			for j, partition := range product.Partitions {
+				if partition.Name == "vbmeta_a" || partition.Name == "vbmeta_b" {
+					manifest.Manifest.Products[i].Partitions[j].Path = destVbmetaPath
+				}
+			}
+		}
+	}
+
+	// Write out the manifest to a new file and return it..
+	updatedFlashManifest := filepath.Join(paverDir, "flash-omaha-test.json")
+	f, err = os.Create(updatedFlashManifest)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	encoder := json.NewEncoder(f)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(&manifest); err != nil {
+		return "", err
+	}
+
+	return updatedFlashManifest, nil
 }
 
 // GetPackageRepository returns a Repository for this build.
@@ -778,91 +847,6 @@ func (b *OmahaBuild) GetPaver(ctx context.Context) (paver.Paver, error) {
 		paver.SSHPublicKey(b.GetSshPublicKey()),
 		paver.OverrideVBMetaA(destVbmetaPath),
 	)
-}
-
-// GetFlasher downloads and returns a paver for the build.
-func (b *OmahaBuild) GetFlasher(
-	ctx context.Context,
-	ffxIsolateDir ffx.IsolateDir,
-) (flasher.Flasher, error) {
-	paverDir, err := b.GetPaverDir(ctx)
-	if err != nil {
-		return nil, err
-	}
-	// Create a ZBI with the omaha_url argument.
-	tempDir, err := os.MkdirTemp("", "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temp directory: %w", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Create a ZBI with the omaha_url argument.
-	destZbiPath := path.Join(tempDir, "omaha_argument.zbi")
-	imageArguments := map[string]string{
-		"omaha_url":    b.omahatool.URL(),
-		"omaha_app_id": b.omahatool.Args.AppId,
-	}
-
-	if err := b.zbitool.MakeImageArgsZbi(ctx, destZbiPath, imageArguments); err != nil {
-		return nil, fmt.Errorf("Failed to create ZBI: %w", err)
-	}
-
-	// Create a vbmeta that includes the ZBI we just created.
-	propFiles := map[string]string{
-		"zbi": destZbiPath,
-	}
-
-	destVbmetaPath := filepath.Join(paverDir, "zircon-a-omaha-test.vbmeta")
-
-	srcVbmetaPath, err := b.GetVbmetaPath(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find zircon-a vbmeta: %w", err)
-	}
-
-	err = b.avbtool.MakeVBMetaImage(ctx, destVbmetaPath, srcVbmetaPath, propFiles)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create vbmeta: %w", err)
-	}
-
-	ffx, err := b.GetFfx(ctx, ffxIsolateDir)
-	if err != nil {
-		return nil, err
-	}
-	flashManifest, err := b.GetFlashManifest(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	fileInfo, err := os.Stat(flashManifest)
-	if err != nil {
-		return nil, err
-	}
-
-	if fileInfo.IsDir() {
-		// We are using Product Bundle instead of flash.json
-		os.Rename(destVbmetaPath, srcVbmetaPath)
-		return flasher.NewFfxFlasher(ffx, flashManifest, true, flasher.SSHPublicKey(b.GetSshPublicKey()))
-	}
-
-	content, err := os.ReadFile(flashManifest)
-	if err != nil {
-		return nil, err
-	}
-	updatedContent := strings.Replace(string(content), "fuchsia.vbmeta", "zircon-a-omaha-test.vbmeta", -1)
-
-	updatedFlashManifest := filepath.Join(paverDir, "flash_new.json")
-	f, err := os.Create(updatedFlashManifest)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	_, err = f.WriteString(updatedContent)
-	if err != nil {
-		return nil, err
-	}
-
-	return flasher.NewFfxFlasher(ffx, updatedFlashManifest, false, flasher.SSHPublicKey(b.GetSshPublicKey()))
 }
 
 func (b *OmahaBuild) GetSshPublicKey() ssh.PublicKey {

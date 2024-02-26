@@ -352,7 +352,12 @@ func initializeDevice(
 			logger.Infof(ctx, "device already up to date")
 		} else {
 			if c.useFlash {
-				if err := flash.FlashDevice(ctx, device, build); err != nil {
+				sshPrivateKey, err := c.deviceConfig.SSHPrivateKey()
+				if err != nil {
+					return nil, fmt.Errorf("failed to get ssh key: %w", err)
+				}
+
+				if err := flash.FlashDevice(ctx, device, build, sshPrivateKey.PublicKey()); err != nil {
 					return nil, fmt.Errorf("failed to flash device during initialization: %w", err)
 				}
 			} else {
