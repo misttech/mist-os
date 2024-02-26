@@ -30,6 +30,7 @@ python_mobly_test("target_identity_tests") {
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_host_test_data",
     "//sdk/fidl/fuchsia.io:fuchsia.io_host_test_data",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_host_test_data",
+    "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
     "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
   ]
 }
@@ -45,6 +46,7 @@ python_mobly_test("reboot_test") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_host_test_data",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_host_test_data",
+    "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
     "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
   ]
 }
@@ -67,6 +69,7 @@ python_mobly_test("tracing_test") {
     ":tracing_runtime_deps",
     "//sdk/fidl/fuchsia.tracing:fuchsia.tracing_host_test_data",
     "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_host_test_data",
+    "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
     "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
   ]
 }

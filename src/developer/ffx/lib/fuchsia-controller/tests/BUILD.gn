@@ -7,8 +7,6 @@ import("//build/python/python_host_test.gni")
 import("//build/testing/host_test_data.gni")
 
 host_test_data("fuchsia_controller_host_test_data") {
-  _sdk_out_dir =
-      get_label_info("//sdk:core($default_toolchain)", "root_out_dir")
   sources = [
     get_label_info("//build/fidl:all_fidl_json($default_toolchain)",
                    "root_out_dir") + "/all_fidl_json.txt",
@@ -16,14 +14,19 @@ host_test_data("fuchsia_controller_host_test_data") {
                    "root_out_dir") + "/fuchsia_controller_internal.so",
     get_label_info("//src/developer/ffx/lib/fuchsia-controller",
                    "root_out_dir") + "/fidl_codec.so",
-    _sdk_out_dir + "/sdk/exported/core",
   ]
   deps = [
-    "//sdk:core($default_toolchain)",
     "//src/developer/ffx/lib/fuchsia-controller:fidl_codec",
     "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
     "//src/developer/ffx/lib/fuchsia-controller:lib",
   ]
+}
+
+host_test_data("core_sdk_host_test_data") {
+  _sdk_out_dir =
+      get_label_info("//sdk:core($default_toolchain)", "root_out_dir")
+  sources = [ _sdk_out_dir + "/sdk/exported/core" ]
+  deps = [ "//sdk:core($default_toolchain)" ]
 }
 
 group("fuchsia_controller_test_data") {
@@ -94,7 +97,10 @@ python_host_test("fuchsia_controller_e2e_test") {
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
     "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
   ]
-  deps = [ ":fuchsia_controller_test_data" ]
+  deps = [
+    ":core_sdk_host_test_data",
+    ":fuchsia_controller_test_data",
+  ]
 }
 
 python_host_test("fuchsia_controller_fidl_client_test") {
