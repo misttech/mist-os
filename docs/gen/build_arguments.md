@@ -3466,7 +3466,7 @@ From //src/firmware/gigaboot/cpp/backends.gni:15
 
 **Current value (from the default):** `false`
 
-From //build/go/go_build.gni:22
+From //build/go/go_build.gni:23
 
 ### gocache_dir
 
@@ -3477,7 +3477,7 @@ From //build/go/go_build.gni:22
 
 **Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
-From //build/go/go_build.gni:18
+From //build/go/go_build.gni:19
 
 ### goma_dir
 
@@ -5410,7 +5410,7 @@ From //build/images/tools/fastboot.gni:6
 
 **Current value (from the default):** `"//prebuilt/third_party/go/linux-x64"`
 
-From //build/go/go_build.gni:27
+From //build/go/go_build.gni:28
 
 ### prebuilt_libvulkan_img_path
 
