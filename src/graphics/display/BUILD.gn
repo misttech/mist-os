@@ -10,6 +10,7 @@ group("drivers") {
     "drivers/aml-canvas",
     "drivers/amlogic-display",
     "drivers/coordinator",
+    "drivers/dsi-dw",
     "drivers/goldfish-display",
     "drivers/intel-i915",
     "drivers/simple:simple.amd-kaveri",
