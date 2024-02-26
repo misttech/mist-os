@@ -7,8 +7,6 @@ use std::sync::Arc;
 
 use fidl_fuchsia_settings::{AccessibilityMarker, DisplayMarker, PrivacyMarker};
 
-use fidl_fuchsia_settings_policy::VolumePolicyControllerMarker;
-
 use crate::config::default_settings::DefaultSetting;
 use crate::ingress::fidl::InterfaceSpec;
 use crate::storage::testing::InMemoryStorageFactory;
@@ -44,12 +42,6 @@ async fn test_no_configuration_provided() {
     // No ServiceConfiguration provided, we should be able to connect to the service and make a watch call without issue.
     let service = env.connect_to_protocol::<AccessibilityMarker>().expect("Connected to service");
     let _ = service.watch().await.expect("watch completed");
-
-    // No ServiceConfiguration provided, audio policy should not be able to connect.
-    let policy = env
-        .connect_to_protocol::<VolumePolicyControllerMarker>()
-        .expect("Connected to policy service");
-    let _ = policy.get_properties().await.expect_err("Policy get should fail");
 }
 
 #[fuchsia::test(allow_stalls = false)]
