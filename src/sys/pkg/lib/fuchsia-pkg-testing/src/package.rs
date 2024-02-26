@@ -5,7 +5,7 @@
 //! Test tools for building Fuchsia packages.
 
 use {
-    anyhow::{anyhow, format_err, Context as _, Error},
+    anyhow::{format_err, Context as _, Error},
     blobfs_ramdisk::BlobfsRamdisk,
     camino::{Utf8Path, Utf8PathBuf},
     fidl::endpoints::ServerEnd,
@@ -23,7 +23,7 @@ use {
         path::{Path, PathBuf},
     },
     tempfile::TempDir,
-    version_history::{AbiRevision, ApiLevel},
+    version_history::AbiRevision,
     walkdir::WalkDir,
 };
 
@@ -537,22 +537,6 @@ impl PackageBuilder {
         }
     }
 
-    /// Set the API Level that should be included in the package. This will return an error if there
-    /// is no ABI revision that corresponds with this API Level.
-    ///
-    /// # Panics
-    ///
-    /// Panics if API level or ABI Revision has already been set.
-    pub fn api_level(self, api_level: ApiLevel) -> Result<Self, Error> {
-        for v in version_history::VERSION_HISTORY {
-            if v.api_level == api_level {
-                return Ok(self.abi_revision(v.abi_revision));
-            }
-        }
-
-        Err(anyhow!("unknown API level {}", api_level))
-    }
-
     /// Set the ABI Revision that should be included in the package.
     ///
     /// # Panics
@@ -688,13 +672,7 @@ impl PackageBuilder {
         // If an ABI revision wasn't specified, default to a pinned one so that merkles won't
         // change when we create a new ABI revision.
         if self.abi_revision == None {
-            let abi_revision = version_history::VERSION_HISTORY
-                .iter()
-                .find(|v| v.api_level.as_u64() == 7)
-                .expect("API Level 7 to exist")
-                .abi_revision;
-
-            self.builder.abi_revision(abi_revision);
+            self.builder.abi_revision(0xECCEA2F70ACD6FC0.into());
         }
 
         // self.artifacts contains outputs from package creation (manifest.json/meta.far) as well
@@ -909,7 +887,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_from_dir() {
-        let abi_revision = version_history::LATEST_VERSION.abi_revision;
+        let abi_revision = version_history::HISTORY.get_default_abi_revision_for_swd();
 
         let root = {
             let dir = tempfile::tempdir().unwrap();

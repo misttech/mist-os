@@ -385,11 +385,9 @@ impl PackageBuilder {
     /// Set the API Level that should be included in the package. This will return an error if there
     /// is no ABI revision that corresponds with this API Level.
     pub fn api_level(&mut self, api_level: ApiLevel) -> Result<()> {
-        for v in version_history::VERSION_HISTORY {
-            if v.api_level == api_level {
-                self.abi_revision(v.abi_revision);
-                return Ok(());
-            }
+        if let Some(v) = version_history::HISTORY.version_from_api_level(api_level) {
+            self.abi_revision(v.abi_revision);
+            return Ok(());
         }
 
         Err(anyhow!("unknown API level {}", api_level))
@@ -462,7 +460,8 @@ impl PackageBuilder {
                 .with_context(|| format!("Writing the {} file", MetaPackage::PATH))?,
         );
 
-        let abi_revision = abi_revision.unwrap_or(version_history::LATEST_VERSION.abi_revision);
+        let abi_revision =
+            abi_revision.unwrap_or(version_history::HISTORY.get_default_abi_revision_for_swd());
 
         let abi_revision_file =
             Self::write_contents_to_file(gendir, ABI_REVISION_FILE_PATH, abi_revision.as_bytes())
@@ -634,6 +633,7 @@ mod tests {
         camino::Utf8Path,
         fuchsia_merkle::MerkleTreeBuilder,
         tempfile::{NamedTempFile, TempDir},
+        version_history::HISTORY,
     };
 
     #[test]
@@ -722,7 +722,7 @@ mod tests {
         let abi_revision_data = far_reader.read_file("meta/fuchsia.abi/abi-revision").unwrap();
         let abi_revision_data: [u8; 8] = abi_revision_data.try_into().unwrap();
         let abi_revision = AbiRevision::from_bytes(abi_revision_data);
-        assert_eq!(abi_revision, version_history::LATEST_VERSION.abi_revision);
+        assert_eq!(abi_revision, HISTORY.get_default_abi_revision_for_swd());
     }
 
     #[test]
@@ -737,7 +737,7 @@ mod tests {
         first_builder.published_name(published_name);
         // Set a non-default ABI revision
         let fake_abi_revision =
-            AbiRevision::from_u64(version_history::LATEST_VERSION.abi_revision.as_u64() + 1);
+            AbiRevision::from_u64(HISTORY.get_default_abi_revision_for_swd().as_u64() + 1);
         first_builder.abi_revision(fake_abi_revision);
 
         // Create a file to write to the package metafar

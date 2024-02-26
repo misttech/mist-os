@@ -19,7 +19,7 @@ use {
     },
     tempfile::NamedTempFile,
     tempfile_ext::NamedTempFileExt as _,
-    version_history::AbiRevision,
+    version_history::{AbiRevision, HISTORY},
 };
 
 const META_FAR_NAME: &str = "meta.far";
@@ -162,21 +162,13 @@ fn get_abi_revision(cmd: &PackageBuildCommand) -> Result<Option<AbiRevision>> {
             bail!("--api-level and --abi-revision cannot be specified at the same time")
         }
         (Some(api_level), None) => {
-            for version in version_history::VERSION_HISTORY {
-                if api_level == version.api_level {
-                    return Ok(Some(version.abi_revision));
-                }
-            }
-
-            bail!("Unknown API level {}", api_level)
+            let abi_revision = HISTORY.check_api_level_for_build(api_level)?;
+            Ok(Some(abi_revision))
         }
         (None, Some(abi_revision)) => {
-            for version in version_history::VERSION_HISTORY {
-                if version.abi_revision == abi_revision {
-                    return Ok(Some(abi_revision));
-                }
+            if HISTORY.abi_revision_matches_some_api_level(abi_revision) {
+                return Ok(Some(abi_revision));
             }
-
             bail!("Unknown ABI revision {}", abi_revision)
         }
         (None, None) => Ok(None),
@@ -198,6 +190,7 @@ mod test {
             fs::{read_dir, read_to_string},
             io::Write,
         },
+        version_history::HISTORY,
     };
 
     fn file_merkle(path: &Utf8Path) -> fuchsia_merkle::Hash {
@@ -341,12 +334,8 @@ mod test {
                 ("meta/package".into(), r#"{"name":"my-package","version":"0"}"#.into()),
                 (
                     "meta/fuchsia.abi/abi-revision".into(),
-                    version_history::VERSION_HISTORY
-                        .iter()
-                        .find(|v| v.api_level.as_u64() == 8)
-                        .unwrap()
-                        .abi_revision
-                        .to_string(),
+                    // ABI revision for API level 8.
+                    "a56735a6690e09d8".into()
                 ),
             ]),
         );
@@ -429,7 +418,7 @@ mod test {
                 ("meta/package".into(), r#"{"name":"my-package","version":"0"}"#.into()),
                 (
                     "meta/fuchsia.abi/abi-revision".into(),
-                    version_history::LATEST_VERSION.abi_revision.to_string(),
+                    version_history::HISTORY.get_default_abi_revision_for_swd().to_string(),
                 ),
             ]),
         );
@@ -558,12 +547,8 @@ mod test {
                 ("meta/package".into(), r#"{"name":"my-package","version":"0"}"#.into()),
                 (
                     "meta/fuchsia.abi/abi-revision".into(),
-                    version_history::VERSION_HISTORY
-                        .iter()
-                        .find(|v| v.api_level.as_u64() == 8)
-                        .unwrap()
-                        .abi_revision
-                        .to_string(),
+                    // ABI revision for API level 8.
+                    "a56735a6690e09d8".into()
                 ),
             ]),
         );
@@ -581,6 +566,8 @@ mod test {
         let meta_package_file = File::create(&meta_package_path).unwrap();
         let meta_package = MetaPackage::from_name("my-package".parse().unwrap());
         meta_package.serialize(meta_package_file).unwrap();
+
+        let supported_version = HISTORY.get_example_supported_version_for_tests();
 
         // Write the subpackages build manifest file, matching the schema from
         // //src/sys/pkg/lib/fuchsia-pkg/src/subpackages_build_manifest.rs
@@ -652,7 +639,7 @@ mod test {
         cmd_package_build(PackageBuildCommand {
             package_build_manifest_path,
             out: out.clone(),
-            api_level: Some(8.into()),
+            api_level: Some(supported_version.api_level),
             abi_revision: None,
             repository: None,
             published_name: Some("published-name".into()),
@@ -677,12 +664,7 @@ mod test {
                 ("meta/package".into(), r#"{"name":"my-package","version":"0"}"#.into()),
                 (
                     "meta/fuchsia.abi/abi-revision".into(),
-                    version_history::VERSION_HISTORY
-                        .iter()
-                        .find(|v| v.api_level.as_u64() == 8)
-                        .unwrap()
-                        .abi_revision
-                        .to_string(),
+                    supported_version.abi_revision.to_string(),
                 ),
                 ("meta/fuchsia.pkg/subpackages".into(), meta_subpackages_str),
             ]),
