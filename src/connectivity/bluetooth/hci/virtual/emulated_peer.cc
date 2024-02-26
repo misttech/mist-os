@@ -68,7 +68,7 @@ EmulatedPeer::Result EmulatedPeer::NewLowEnergy(
                                                       connectable, scannable);
   peer->set_advertising_data(adv);
   if (scannable) {
-    peer->set_scan_response(/*should_batch_reports=*/false, scan_response);
+    peer->set_scan_response(scan_response);
   }
 
   if (!fake_controller->AddPeer(std::move(peer))) {

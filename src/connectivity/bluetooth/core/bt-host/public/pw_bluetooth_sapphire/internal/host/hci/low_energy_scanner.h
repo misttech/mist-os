@@ -5,11 +5,6 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_HCI_LOW_ENERGY_SCANNER_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_HCI_LOW_ENERGY_SCANNER_H_
 
-#include <set>
-
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/device_address.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/defaults.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/local_address_delegate.h"
@@ -17,6 +12,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/transport.h"
 
 namespace bt::hci {
+
+class SequentialCommandRunner;
 
 // Represents a discovered Bluetooth Low Energy peer.
 struct LowEnergyScanResult {
@@ -107,16 +104,65 @@ class LowEnergyScanner : public LocalAddressClient {
     // is kPeriodInfinite, then the scan will remain enabled until StopScan()
     // gets called. For all other values, the scan will be disabled after the
     // duration expires.
-    pw::chrono::SystemClock::duration period;
+    pw::chrono::SystemClock::duration period = kPeriodInfinite;
 
     // Maximum time duration during an active scan for which a scannable
     // advertisement will be stored and not reported to clients until a
     // corresponding scan response is received.
-    pw::chrono::SystemClock::duration scan_response_timeout;
+    pw::chrono::SystemClock::duration scan_response_timeout =
+        std::chrono::seconds(2);
 
     // Scan parameters.
     uint16_t interval = hci_spec::defaults::kLEScanInterval;
     uint16_t window = hci_spec::defaults::kLEScanWindow;
+  };
+
+  // This represents the data obtained for a scannable advertisement for which a
+  // scan response has not yet been received. Clients are notified for scannable
+  // advertisement either when the corresponding scan response is received or,
+  // otherwise, a timeout expires.
+  class PendingScanResult {
+   public:
+    PendingScanResult(LowEnergyScanResult result,
+                      const ByteBuffer& data,
+                      pw::async::Dispatcher& dispatcher,
+                      pw::chrono::SystemClock::duration timeout,
+                      fit::closure timeout_handler);
+    ~PendingScanResult() { timeout_task_.Cancel(); }
+
+    // Return the contents of the data.
+    BufferView data() const { return buffer_.view(0, data_size_); }
+
+    const LowEnergyScanResult& result() const { return result_; }
+
+    void set_rssi(int8_t rssi) { result_.rssi = rssi; }
+    void set_resolved(bool resolved) { result_.resolved = resolved; }
+
+    // Appends |data| to the end of the current contents.
+    void AppendData(const ByteBuffer& data);
+
+    bool CancelTimeout() { return timeout_task_.Cancel(); }
+
+   private:
+    LowEnergyScanResult result_;
+
+    // The size of the data so far accumulated in |buffer_|.
+    size_t data_size_ = 0u;
+
+    // Buffer large enough to store both advertising and scan response payloads.
+    // LowEnergyScanner is subclassed by both LegacyLowEnergyScanner and
+    // ExtendedLowEnergyScanner. We use the maximum extended advertising data
+    // length here to support either version.
+    StaticByteBuffer<hci_spec::kMaxLEExtendedAdvertisingDataLength * 2> buffer_;
+
+    // The duration which we will wait for a pending scan result to receive more
+    // data before reporting the pending result to the delegate.
+    pw::chrono::SystemClock::duration timeout_;
+
+    // Since not all scannable advertisements are always followed by a scan
+    // response, we report a pending result if a scan response is not received
+    // within a timeout.
+    SmartTask timeout_task_;
   };
 
   // Interface for receiving events related to Low Energy scan.
@@ -128,14 +174,15 @@ class LowEnergyScanner : public LocalAddressClient {
     // advertising data. During an active scan |data| contains the combined
     // advertising and scan response data (if the peer is scannable).
     virtual void OnPeerFound(const LowEnergyScanResult& result,
-                             const ByteBuffer& data);
+                             const ByteBuffer& data) {}
 
     // Called when a directed advertising report is received from the peer with
     // the given address.
-    virtual void OnDirectedAdvertisement(const LowEnergyScanResult& result);
+    virtual void OnDirectedAdvertisement(const LowEnergyScanResult& result) {}
   };
 
-  LowEnergyScanner(Transport::WeakPtr hci,
+  LowEnergyScanner(LocalAddressDelegate* local_addr_delegate,
+                   Transport::WeakPtr hci,
                    pw::async::Dispatcher& pw_dispatcher);
   ~LowEnergyScanner() override = default;
 
@@ -149,7 +196,7 @@ class LowEnergyScanner : public LocalAddressClient {
 
   // LocalAddressClient override:
   bool AllowsRandomAddressChange() const override {
-    return !IsScanning() && hci_cmd_runner()->IsReady();
+    return !IsScanning() && hci_cmd_runner_->IsReady();
   }
 
   // True if no scan procedure is currently enabled.
@@ -197,12 +244,12 @@ class LowEnergyScanner : public LocalAddressClient {
   // v5.2, Vol 6, Part B, 4.4.3.1 and 4.4.3.2).
   using ScanStatusCallback = fit::function<void(ScanStatus)>;
   virtual bool StartScan(const ScanOptions& options,
-                         ScanStatusCallback callback) = 0;
+                         ScanStatusCallback callback);
 
   // Stops a previously started scan. Returns false if a scan is not in
   // progress. Otherwise, cancels any in progress scan procedure and returns
   // true.
-  virtual bool StopScan() = 0;
+  virtual bool StopScan();
 
   // Assigns the delegate for scan events.
   void set_delegate(Delegate* delegate) { delegate_ = delegate; }
@@ -219,33 +266,52 @@ class LowEnergyScanner : public LocalAddressClient {
       const ScanOptions& options,
       pw::bluetooth::emboss::GenericEnableParam enable) = 0;
 
-  pw::async::Dispatcher& pw_dispatcher() { return pw_dispatcher_; }
-  Transport::WeakPtr transport() const { return transport_; }
-  SequentialCommandRunner* hci_cmd_runner() const {
-    return hci_cmd_runner_.get();
-  }
-  Delegate* delegate() const {
-    BT_ASSERT(delegate_);
-    return delegate_;
-  }
+  void AddPendingResult(const DeviceAddress& address,
+                        const LowEnergyScanResult& scan_result,
+                        const ByteBuffer& data,
+                        fit::closure timeout_handler);
 
-  void set_state(State state) { state_ = state; }
+  std::unique_ptr<PendingScanResult> RemovePendingResult(
+      const DeviceAddress& address);
 
-  // Returns true if an active scan was most recently requested. This applies to
-  // the on-going scan only if IsScanning() returns true.
-  bool active_scan_requested() const { return active_scan_requested_; }
-  void set_active_scan_requested(bool value) { active_scan_requested_ = value; }
+  Transport::WeakPtr hci() const { return hci_; }
+  Delegate* delegate() const { return delegate_; }
 
  private:
-  State state_;
-  bool active_scan_requested_;
+  // Called by StartScan() after the local peer address has been obtained.
+  void StartScanInternal(const DeviceAddress& local_address,
+                         const ScanOptions& options,
+                         ScanStatusCallback callback);
 
-  Delegate* delegate_;  // weak
+  // Called by StopScan() and by the scan timeout handler set up by StartScan().
+  void StopScanInternal(bool stopped);
 
+  State state_ = State::kIdle;
   pw::async::Dispatcher& pw_dispatcher_;
+  Delegate* delegate_ = nullptr;  // weak
+
+  // Callback passed in to the most recently accepted call to StartScan();
+  ScanStatusCallback scan_cb_;
+
+  // The scan period timeout handler for the currently active scan session.
+  SmartTask scan_timeout_task_;
+
+  // Maximum time duration for which a scannable advertisement will be stored
+  // and not reported to clients until a corresponding scan response is
+  // received.
+  pw::chrono::SystemClock::duration scan_response_timeout_;
+
+  // Scannable advertising events for which a Scan Response PDU has not been
+  // received. This is accumulated during a discovery procedure and always
+  // cleared at the end of the scan period.
+  std::unordered_map<DeviceAddress, std::unique_ptr<PendingScanResult>>
+      pending_results_;
+
+  // Used to obtain the local peer address type to use during scanning.
+  LocalAddressDelegate* local_addr_delegate_;  // weak
 
   // The HCI transport.
-  Transport::WeakPtr transport_;
+  Transport::WeakPtr hci_;
 
   // Command runner for all HCI commands sent out by implementations.
   std::unique_ptr<SequentialCommandRunner> hci_cmd_runner_;
