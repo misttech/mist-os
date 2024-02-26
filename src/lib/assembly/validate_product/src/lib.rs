@@ -33,7 +33,7 @@ pub fn validate_product(
                             let print_warning = warn_only && match e {
                                 PackageValidationError::MissingAbiRevisionFile(_) => true,
                                 PackageValidationError::InvalidAbiRevisionFile(_) => true,
-                                PackageValidationError::UnsupportedAbiRevision { found: _, supported: _ } => true,
+                                PackageValidationError::UnsupportedAbiRevision (_) => true,
                                 _ => false};
                              if print_warning {
                                 println!("WARNING: The package named '{}', with manifest at {} failed validation:\n{}", manifest.name(), package_manifest_path, e);
@@ -120,11 +120,9 @@ pub fn validate_package(manifest: &PackageManifest) -> Result<(), PackageValidat
         .map_err(|e| PackageValidationError::MissingAbiRevisionFile(e))?;
     let abi_revision = AbiRevision::try_from(raw_abi_revision.as_slice())
         .map_err(|e| PackageValidationError::InvalidAbiRevisionFile(e))?;
-    if !version_history::is_supported_abi_revision(abi_revision) {
-        return Err(PackageValidationError::UnsupportedAbiRevision {
-            found: abi_revision,
-            supported: version_history::get_supported_abi_revisions(),
-        });
+
+    if let Err(err) = version_history::HISTORY.check_abi_revision_for_runtime(abi_revision) {
+        return Err(PackageValidationError::UnsupportedAbiRevision(err));
     }
 
     Ok(())
@@ -208,7 +206,7 @@ pub enum PackageValidationError {
     InvalidComponents(BTreeMap<String, anyhow::Error>),
     MissingAbiRevisionFile(fuchsia_archive::Error),
     InvalidAbiRevisionFile(std::array::TryFromSliceError),
-    UnsupportedAbiRevision { found: AbiRevision, supported: Vec<AbiRevision> },
+    UnsupportedAbiRevision(version_history::AbiRevisionError),
 }
 
 impl fmt::Display for PackageValidationError {
@@ -246,11 +244,8 @@ impl fmt::Display for PackageValidationError {
                 write!(f, "\n└── {cause}")?;
                 Ok(())
             }
-            UnsupportedAbiRevision { found, supported } => {
-                write!(f, "The package abi revision ({found}) is not supported")?;
-                for revision in supported {
-                    write!(f, "\n└── {revision}")?;
-                }
+            UnsupportedAbiRevision(cause) => {
+                write!(f, "Error validating abi revision: {cause}")?;
                 Ok(())
             }
         }
