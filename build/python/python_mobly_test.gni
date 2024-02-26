@@ -233,7 +233,7 @@ template("python_mobly_test") {
     "-test_data_path",
     rebase_path(_test_dir, root_build_dir),
     "-ffx_path",
-    rebase_path("${root_out_dir}/ffx", root_build_dir),
+    rebase_path("${host_tools_dir}/ffx", root_build_dir),
     "-transport",
     invoker.transport,
     "-ffx_subtools_search_path",
