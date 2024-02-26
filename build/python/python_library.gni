@@ -113,7 +113,7 @@ template("python_library") {
 
   if (_enable_pytype) {
     action(target_name + "_mypy_checker") {
-      inputs = [ "//pyproject.toml" ]
+      inputs = [ "//pyproject.toml" ] + _full_source_paths
       script = "//build/python/mypy_checker.py"
       outputs = [ "${target_out_dir}/${target_name}.mypy_checked" ]
       args =
