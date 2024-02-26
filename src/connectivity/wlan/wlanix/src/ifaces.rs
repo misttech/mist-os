@@ -4,7 +4,7 @@
 
 use {
     crate::security::{get_authenticator, Credential},
-    anyhow::{format_err, Context, Error},
+    anyhow::{bail, format_err, Context, Error},
     async_trait::async_trait,
     fidl::endpoints::create_proxy,
     fidl_fuchsia_wlan_common as fidl_common,
@@ -14,7 +14,7 @@ use {
     fuchsia_async::TimeoutExt,
     fuchsia_sync::Mutex,
     fuchsia_zircon as zx,
-    futures::{channel::oneshot, select, TryStreamExt},
+    futures::{channel::oneshot, select, FutureExt, TryStreamExt},
     ieee80211::Bssid,
     std::{collections::HashMap, convert::TryFrom, sync::Arc},
     tracing::info,
@@ -145,15 +145,29 @@ impl IfaceManager for DeviceMonitorIfaceManager {
     }
 }
 
-pub(crate) struct ConnectedResult {
+pub(crate) struct ConnectSuccess {
     pub ssid: Vec<u8>,
     pub bssid: Bssid,
     pub transaction_stream: fidl_sme::ConnectTransactionEventStream,
 }
 
-impl std::fmt::Debug for ConnectedResult {
+#[derive(Debug)]
+pub(crate) struct ConnectFail {
+    pub ssid: Vec<u8>,
+    pub bssid: Bssid,
+    pub status_code: fidl_ieee80211::StatusCode,
+    pub timed_out: bool,
+}
+
+#[derive(Debug)]
+pub(crate) enum ConnectResult {
+    Success(ConnectSuccess),
+    Fail(ConnectFail),
+}
+
+impl std::fmt::Debug for ConnectSuccess {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "ConnectedResult {{ ssid: {:?}, bssid: {:?} }}", self.ssid, self.bssid)
+        write!(f, "ConnectSuccess {{ ssid: {:?}, bssid: {:?} }}", self.ssid, self.bssid)
     }
 }
 
@@ -173,7 +187,7 @@ pub(crate) trait ClientIface: Sync + Send {
         ssid: &[u8],
         passphrase: Option<Vec<u8>>,
         requested_bssid: Option<Bssid>,
-    ) -> Result<ConnectedResult, Error>;
+    ) -> Result<ConnectResult, Error>;
     async fn disconnect(&self) -> Result<(), Error>;
     fn get_connected_network_rssi(&self) -> Option<i8>;
 
@@ -245,7 +259,7 @@ impl ClientIface for SmeClientIface {
         ssid: &[u8],
         passphrase: Option<Vec<u8>>,
         bssid: Option<Bssid>,
-    ) -> Result<ConnectedResult, Error> {
+    ) -> Result<ConnectResult, Error> {
         let last_scan_results = self.last_scan_results.lock().clone();
         let mut scan_results = last_scan_results
             .iter()
@@ -276,20 +290,14 @@ impl ClientIface for SmeClientIface {
 
         let (bss_description, compatibility) = match scan_results.pop() {
             Some(scan_result) => scan_result,
-            None => {
-                return Err(format_err!("Requested network not found"));
-            }
+            None => bail!("Requested network not found"),
         };
 
         let credential = passphrase.map(|p| Credential::Password(p)).unwrap_or(Credential::None);
         let authenticator =
             match get_authenticator(bss_description.bssid, compatibility, &credential) {
                 Some(authenticator) => authenticator,
-                None => {
-                    return Err(format_err!(
-                        "Failed to create authenticator for requested network"
-                    ));
-                }
+                None => bail!("Failed to create authenticator for requested network"),
             };
 
         info!("Selected BSS to connect to");
@@ -306,17 +314,35 @@ impl ClientIface for SmeClientIface {
 
         info!("Waiting for connect result from SME");
         let mut stream = connect_txn.take_event_stream();
-        let sme_result = wait_for_connect_result(&mut stream)
+        let (sme_result, timed_out) = wait_for_connect_result(&mut stream)
+            .map(|res| (res, false))
             .on_timeout(zx::Duration::from_seconds(30), || {
-                Err(format_err!("Timed out waiting for connect result from SME."))
+                (
+                    Ok(fidl_sme::ConnectResult {
+                        code: fidl_ieee80211::StatusCode::RejectedSequenceTimeout,
+                        is_credential_rejected: false,
+                        is_reconnect: false,
+                    }),
+                    true,
+                )
             })
-            .await?;
+            .await;
+        let sme_result = sme_result?;
 
         info!("Received connect result from SME: {:?}", sme_result);
         if sme_result.code == fidl_ieee80211::StatusCode::Success {
-            Ok(ConnectedResult { ssid: ssid.to_vec(), bssid, transaction_stream: stream })
+            Ok(ConnectResult::Success(ConnectSuccess {
+                ssid: ssid.to_vec(),
+                bssid,
+                transaction_stream: stream,
+            }))
         } else {
-            Err(format_err!("Connect failed with status code: {:?}", sme_result.code))
+            Ok(ConnectResult::Fail(ConnectFail {
+                ssid: ssid.to_vec(),
+                bssid,
+                status_code: sme_result.code,
+                timed_out,
+            }))
         }
     }
 
@@ -429,6 +455,7 @@ pub mod test_utils {
         pub transaction_handle: Mutex<Option<fidl_sme::ConnectTransactionControlHandle>>,
         scan_end_receiver: Mutex<Option<oneshot::Receiver<Result<ScanEnd, Error>>>>,
         pub calls: Arc<Mutex<Vec<ClientIfaceCall>>>,
+        pub connect_success: Mutex<bool>,
     }
 
     impl TestClientIface {
@@ -437,6 +464,7 @@ pub mod test_utils {
                 transaction_handle: Mutex::new(None),
                 scan_end_receiver: Mutex::new(None),
                 calls: Arc::new(Mutex::new(vec![])),
+                connect_success: Mutex::new(true),
             }
         }
     }
@@ -464,24 +492,33 @@ pub mod test_utils {
             ssid: &[u8],
             passphrase: Option<Vec<u8>>,
             bssid: Option<Bssid>,
-        ) -> Result<ConnectedResult, Error> {
+        ) -> Result<ConnectResult, Error> {
             self.calls.lock().push(ClientIfaceCall::ConnectToNetwork {
                 ssid: ssid.to_vec(),
                 passphrase: passphrase.clone(),
                 bssid,
             });
-            let (proxy, server) =
-                fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>()
-                    .expect("Failed to create fidl endpoints");
-            let (_, handle) = server
-                .into_stream_and_control_handle()
-                .expect("Failed to get connect transaction control handle");
-            *self.transaction_handle.lock() = Some(handle);
-            Ok(ConnectedResult {
-                ssid: ssid.to_vec(),
-                bssid: bssid.unwrap_or([42, 42, 42, 42, 42, 42].into()),
-                transaction_stream: proxy.take_event_stream(),
-            })
+            if *self.connect_success.lock() {
+                let (proxy, server) =
+                    fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>()
+                        .expect("Failed to create fidl endpoints");
+                let (_, handle) = server
+                    .into_stream_and_control_handle()
+                    .expect("Failed to get connect transaction control handle");
+                *self.transaction_handle.lock() = Some(handle);
+                Ok(ConnectResult::Success(ConnectSuccess {
+                    ssid: ssid.to_vec(),
+                    bssid: bssid.unwrap_or([42, 42, 42, 42, 42, 42].into()),
+                    transaction_stream: proxy.take_event_stream(),
+                }))
+            } else {
+                Ok(ConnectResult::Fail(ConnectFail {
+                    ssid: ssid.to_vec(),
+                    bssid: bssid.unwrap_or([42, 42, 42, 42, 42, 42].into()),
+                    status_code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                    timed_out: false,
+                }))
+            }
         }
         async fn disconnect(&self) -> Result<(), Error> {
             self.calls.lock().push(ClientIfaceCall::Disconnect);
@@ -959,7 +996,7 @@ mod tests {
 
         let connect_result =
             assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(r) => r);
-        let connected_result = assert_variant!(connect_result, Ok(r) => r);
+        let connected_result = assert_variant!(connect_result, Ok(ConnectResult::Success(r)) => r);
         assert_eq!(connected_result.ssid, vec![b'f', b'o', b'o']);
         assert_eq!(connected_result.bssid, Bssid::from([1, 2, 3, 4, 5, 6]));
     }
@@ -1073,8 +1110,44 @@ mod tests {
         assert_variant!(result, Ok(()));
 
         let connect_result =
-            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(r) => r);
-        assert_variant!(connect_result, Err(_e));
+            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(r)) => r);
+        let failure = assert_variant!(connect_result, ConnectResult::Fail(failure) => failure);
+        assert_eq!(failure.status_code, fidl_ieee80211::StatusCode::RefusedExternalReason);
+        assert!(!failure.timed_out);
+    }
+
+    #[test]
+    fn test_connect_fails_with_timeout() {
+        let (mut exec, _monitor_stream, manager) = setup_test();
+        let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
+            .expect("Failed to create device monitor service");
+        manager.ifaces.lock().insert(1, Arc::new(SmeClientIface::new(sme_proxy)));
+        let mut client_fut = manager.get_client_iface(1);
+        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+
+        let bss_description = fake_fidl_bss_description!(Open,
+            ssid: Ssid::try_from("foo").unwrap(),
+            bssid: [1, 2, 3, 4, 5, 6],
+        );
+        *iface.last_scan_results.lock() = vec![fidl_sme::ScanResult {
+            bss_description: bss_description.clone(),
+            compatibility: Some(Box::new(fidl_sme::Compatibility {
+                mutual_security_protocols: vec![fidl_security::Protocol::Open],
+            })),
+            timestamp_nanos: 1,
+        }];
+
+        let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], None, None);
+        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+        let (_req, _connect_txn) = assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Connect { req, txn: Some(txn), .. }))) => (req, txn));
+        exec.set_fake_time(fasync::Time::from_nanos(40_000_000_000));
+
+        let connect_result =
+            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(r)) => r);
+        let failure = assert_variant!(connect_result, ConnectResult::Fail(failure) => failure);
+        assert!(failure.timed_out);
     }
 
     #[test_case(
