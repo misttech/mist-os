@@ -16,6 +16,8 @@
 
 namespace vkp {
 
+std::optional<uint32_t> GetGpuVendorId();
+
 class PhysicalDeviceProperties {
  public:
   PhysicalDeviceProperties() {}

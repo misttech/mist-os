@@ -3,11 +3,19 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/sys/test_runners/gtest/default.shard.cml",
+        "//src/graphics/tests/common/meta/vulkan.offer.shard.cml",
         "syslog/client.shard.cml",
-        "vulkan/client.shard.cml",
     ],
-    program: {
-        binary: "bin/vkproto-driver-tests",
-    },
+    children: [
+        {
+            name: "test",
+            url: "vkproto-driver-tests#meta/vkproto-driver-tests-child.cm",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#test",
+        },
+    ],
 }

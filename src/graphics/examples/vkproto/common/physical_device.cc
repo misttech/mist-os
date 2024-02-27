@@ -50,6 +50,9 @@ bool ChoosePhysicalDevice(const vk::PhysicalDevice &physical_device_in, const Vk
 }  // namespace
 
 namespace vkp {
+// This is a default implementation that returns no value. It's weak and can be overridden by
+// config_query.cc or other implementations.
+__attribute__((weak)) std::optional<uint32_t> GetGpuVendorId() { return {}; }
 
 PhysicalDevice::PhysicalDevice(std::shared_ptr<vk::Instance> instance, const VkSurfaceKHR &surface,
                                std::optional<PhysicalDeviceProperties> properties,
@@ -71,10 +74,10 @@ bool PhysicalDevice::Init() {
   }
 
   for (const auto &phys_device : phys_devices) {
+    vk::PhysicalDeviceProperties p = phys_device.getProperties();
     // Conditionalize physical device selection based on any set properties.
     if (properties_.has_value()) {
       const char *fmt = "\tSkipping phys device: %s mismatch. Value: %d  Reqd: %d\n";
-      vk::PhysicalDeviceProperties p = phys_device.getProperties();
       if (properties_->api_version_.has_value() &&
           properties_->api_version_.value() != p.apiVersion) {
         printf(fmt, "api version", static_cast<int>(p.apiVersion),
@@ -90,6 +93,11 @@ bool PhysicalDevice::Init() {
           properties_->device_type_.value() != p.deviceType) {
         printf(fmt, "device type", static_cast<int>(p.deviceType),
                static_cast<int>(properties_->device_type_.value()));
+        continue;
+      }
+    }
+    if (auto vendor_id = GetGpuVendorId(); vendor_id) {
+      if (p.vendorID != *vendor_id) {
         continue;
       }
     }
