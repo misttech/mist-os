@@ -442,7 +442,7 @@ zx_status_t SdmmcBlockDevice::Flush() {
 }
 
 zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition partition) {
-  // TODO(b/312236221): Add discard support for SD.
+  // TODO(b/312236221): Add trim support for SD.
   if (is_sd_) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -459,51 +459,51 @@ zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition 
   constexpr uint32_t kEraseErrorFlags =
       MMC_STATUS_ADDR_OUT_OF_RANGE | MMC_STATUS_ERASE_SEQ_ERR | MMC_STATUS_ERASE_PARAM;
 
-  const sdmmc_req_t discard_start = {
+  const sdmmc_req_t trim_start = {
       .cmd_idx = MMC_ERASE_GROUP_START,
       .cmd_flags = MMC_ERASE_GROUP_START_FLAGS,
       .arg = static_cast<uint32_t>(txn.offset_dev),
   };
   uint32_t response[4] = {};
-  if ((status = sdmmc_->Request(&discard_start, response)) != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "failed to set discard group start: %d", status);
+  if ((status = sdmmc_->Request(&trim_start, response)) != ZX_OK) {
+    FDF_LOGL(ERROR, logger(), "failed to set trim group start: %d", status);
     properties_.io_errors_.Add(1);
     return status;
   }
   if (response[0] & kEraseErrorFlags) {
-    FDF_LOGL(ERROR, logger(), "card reported discard group start error: 0x%08x", response[0]);
+    FDF_LOGL(ERROR, logger(), "card reported trim group start error: 0x%08x", response[0]);
     properties_.io_errors_.Add(1);
     return ZX_ERR_IO;
   }
 
-  const sdmmc_req_t discard_end = {
+  const sdmmc_req_t trim_end = {
       .cmd_idx = MMC_ERASE_GROUP_END,
       .cmd_flags = MMC_ERASE_GROUP_END_FLAGS,
       .arg = static_cast<uint32_t>(txn.offset_dev + txn.length - 1),
   };
-  if ((status = sdmmc_->Request(&discard_end, response)) != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "failed to set discard group end: %d", status);
+  if ((status = sdmmc_->Request(&trim_end, response)) != ZX_OK) {
+    FDF_LOGL(ERROR, logger(), "failed to set trim group end: %d", status);
     properties_.io_errors_.Add(1);
     return status;
   }
   if (response[0] & kEraseErrorFlags) {
-    FDF_LOGL(ERROR, logger(), "card reported discard group end error: 0x%08x", response[0]);
+    FDF_LOGL(ERROR, logger(), "card reported trim group end error: 0x%08x", response[0]);
     properties_.io_errors_.Add(1);
     return ZX_ERR_IO;
   }
 
-  const sdmmc_req_t discard = {
+  const sdmmc_req_t trim = {
       .cmd_idx = SDMMC_ERASE,
       .cmd_flags = SDMMC_ERASE_FLAGS,
-      .arg = MMC_ERASE_DISCARD_ARG,
+      .arg = MMC_ERASE_TRIM_ARG,
   };
-  if ((status = sdmmc_->Request(&discard, response)) != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "discard failed: %d", status);
+  if ((status = sdmmc_->Request(&trim, response)) != ZX_OK) {
+    FDF_LOGL(ERROR, logger(), "trim failed: %d", status);
     properties_.io_errors_.Add(1);
     return status;
   }
   if (response[0] & kEraseErrorFlags) {
-    FDF_LOGL(ERROR, logger(), "card reported discard error: 0x%08x", response[0]);
+    FDF_LOGL(ERROR, logger(), "card reported trim error: 0x%08x", response[0]);
     properties_.io_errors_.Add(1);
     return ZX_ERR_IO;
   }

@@ -92,7 +92,7 @@ zx_status_t FakeSdmmcDevice::SdmmcRequestInternal(const sdmmc_req_t& req, uint32
     case SDMMC_ERASE:
       if (!erase_group_start_ || !erase_group_end_) {
         out_response[0] = MMC_STATUS_ERASE_SEQ_ERR;
-      } else if (req.arg != MMC_ERASE_DISCARD_ARG || *erase_group_start_ > *erase_group_end_) {
+      } else if (req.arg != MMC_ERASE_TRIM_ARG || *erase_group_start_ > *erase_group_end_) {
         out_response[0] = MMC_STATUS_ERASE_PARAM;
       } else {
         Erase(*erase_group_start_ * kBlockSize,

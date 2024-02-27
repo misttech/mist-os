@@ -114,7 +114,8 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
       out_data[MMC_EXT_CSD_CACHE_SIZE_251] = 0x34;
       out_data[MMC_EXT_CSD_CACHE_SIZE_MSB] = 0x12;
       out_data[MMC_EXT_CSD_PARTITION_CONFIG] = 0xa8;
-      out_data[MMC_EXT_CSD_EXT_CSD_REV] = 6;
+      out_data[MMC_EXT_CSD_SEC_FEATURE_SUPPORT] = 0x1
+                                                  << MMC_EXT_CSD_SEC_FEATURE_SUPPORT_SEC_GB_CL_EN;
       out_data[MMC_EXT_CSD_PARTITION_SWITCH_TIME] = 0;
       out_data[MMC_EXT_CSD_BOOT_SIZE_MULT] = 0x10;
       out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;

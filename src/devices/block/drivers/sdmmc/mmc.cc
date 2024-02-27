@@ -442,8 +442,8 @@ zx_status_t SdmmcBlockDevice::ProbeMmc(
   FDF_LOGL(INFO, logger(), "initialized mmc @ %u MHz, bus width %d, timing %d",
            clock_rate_ / 1000000, bus_width_, timing_);
 
-  // The discard command was added in eMMC 4.5.
-  if (raw_ext_csd_[MMC_EXT_CSD_EXT_CSD_REV] >= MMC_EXT_CSD_EXT_CSD_REV_1_6 &&
+  if ((raw_ext_csd_[MMC_EXT_CSD_SEC_FEATURE_SUPPORT] &
+       (0x1 << MMC_EXT_CSD_SEC_FEATURE_SUPPORT_SEC_GB_CL_EN)) &&
       metadata.enable_trim()) {
     block_info_.flags |= FLAG_TRIM_SUPPORT;
   }

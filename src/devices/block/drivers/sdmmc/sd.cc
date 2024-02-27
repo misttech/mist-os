@@ -156,7 +156,7 @@ zx_status_t SdmmcBlockDevice::ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcM
     return st;
   }
 
-  // TODO(bradenkell): Read SD_STATUS to see if the card supports discard (trim).
+  // TODO(bradenkell): Read SD_STATUS to see if the card supports trim.
 
   // If this card supports 4 bit mode, then put it into 4 bit mode.
   const uint32_t supported_bus_widths = scr[1] & 0xf;
