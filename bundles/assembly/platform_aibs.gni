@@ -146,10 +146,10 @@ user_platform_aib_names =
       "netstack_migration_packages_gub",
 
       # WLAN
-      "wlan_base",
       "wlan_legacy_privacy_support",
       "wlan_contemporary_privacy_only_support",
       "wlan_fullmac_support",
+      "wlan_policy",
       "wlan_softmac_support",
       "wlan_wlanix",
 

@@ -2628,13 +2628,13 @@ assembly_input_bundle("thread_lowpan") {
   ]
 }
 
-# WLAN base support
+# WLAN policy component
 #
 # feature_set_levels: utility, minimal
 # build-types: all
 #
 # Not included in utility + user by default, but otherwise is included.
-assembly_input_bundle("wlan_base") {
+assembly_input_bundle("wlan_policy") {
   base_packages = [
     "//src/connectivity/location/regulatory_region",
     "//src/connectivity/wlan/wlancfg",

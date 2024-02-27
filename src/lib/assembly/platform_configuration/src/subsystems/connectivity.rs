@@ -154,7 +154,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             let has_fullmac = context.board_info.provides_feature("fuchsia::wlan_fullmac");
             let has_softmac = context.board_info.provides_feature("fuchsia::wlan_softmac");
             if has_fullmac || has_softmac {
-                builder.platform_bundle("wlan_base");
+                builder.platform_bundle("wlan_policy");
 
                 // Add development support on eng and userdebug systems if we have wlan.
                 match context.build_type {
