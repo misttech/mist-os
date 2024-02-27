@@ -243,7 +243,10 @@ pub fn sys_reboot(
                 || reboot_args.contains(&&b"System update during setup"[..])
             {
                 fpower::RebootReason::SystemUpdate
-            } else if reboot_args.is_empty() || reboot_args.contains(&&b"shell"[..]) {
+            } else if reboot_args.is_empty()
+                || reboot_args.contains(&&b"shell"[..])
+                || reboot_args.contains(&&b"userrequested"[..])
+            {
                 fpower::RebootReason::UserRequest
             } else {
                 log_warn!("Unknown reboot args: {arg_bytes}");
