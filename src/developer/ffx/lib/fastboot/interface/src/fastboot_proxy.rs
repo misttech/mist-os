@@ -20,7 +20,7 @@ use fastboot::{
 use ffx_config::get;
 use futures::io::{AsyncRead, AsyncWrite};
 use std::fmt::Debug;
-use std::fs::read;
+use std::fs::File;
 use tokio::sync::mpsc::Sender;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -187,11 +187,17 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         path: &str,
         listener: Sender<UploadProgress>,
     ) -> Result<()> {
-        let bytes = read(path)?;
+        let mut file_to_flash = File::open(path)?;
+        let size = file_to_flash.metadata()?.len();
         let progress_listener = ProgressListener::new(listener)?;
-        let upload_reply = upload(&bytes[..], self.interface().await?, &progress_listener)
-            .await
-            .context(format!("uploading {}", path))?;
+        let upload_reply = upload(
+            size.try_into()?,
+            &mut file_to_flash,
+            self.interface().await?,
+            &progress_listener,
+        )
+        .await
+        .context(format!("uploading {}", path))?;
         match upload_reply {
             Reply::Okay(s) => tracing::debug!("Received response from download command: {}", s),
             Reply::Fail(s) => bail!("Failed to upload {}: {}", path, s),
@@ -200,7 +206,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         //timeout rate is in mb per seconds
         let min_timeout: i64 = get(MIN_FLASH_TIMEOUT).await?;
         let timeout_rate: i64 = get(FLASH_TIMEOUT_RATE).await?;
-        let megabytes = (bytes.len() / 1000000) as i64;
+        let megabytes = (size / 1000000) as i64;
         let mut timeout = megabytes / timeout_rate;
         timeout = std::cmp::max(timeout, min_timeout);
         tracing::debug!("Estimated timeout: {}s for {}MB", timeout, megabytes);
@@ -361,11 +367,17 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
     #[tracing::instrument]
     async fn stage(&mut self, path: &str, listener: Sender<UploadProgress>) -> Result<()> {
         let progress_listener = ProgressListener::new(listener)?;
-        let bytes = read(path)?;
-        tracing::debug!("uploading file size: {}", bytes.len());
-        match upload(&bytes[..], self.interface().await?, &progress_listener)
-            .await
-            .context(format!("uploading {}", path))?
+        let mut file_to_stage = File::open(path)?;
+        let size = file_to_stage.metadata()?.len();
+        tracing::debug!("uploading file size: {}", size);
+        match upload(
+            size.try_into()?,
+            &mut file_to_stage,
+            self.interface().await?,
+            &progress_listener,
+        )
+        .await
+        .context(format!("uploading {}", path))?
         {
             Reply::Okay(s) => {
                 tracing::debug!("Received response from download command: {}", s);

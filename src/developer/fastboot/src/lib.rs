@@ -16,6 +16,7 @@ use {
     },
     lazy_static::lazy_static,
     std::convert::TryFrom,
+    std::io::Read,
     std::marker::Sync,
     thiserror::Error,
 };
@@ -181,41 +182,61 @@ pub async fn send_with_timeout<T: AsyncRead + AsyncWrite + Unpin>(
     read_with_timeout(interface, &LogInfoListener {}, timeout).await
 }
 
-#[tracing::instrument(skip(interface, listener, data))]
-pub async fn upload<T: AsyncRead + AsyncWrite + Unpin>(
-    data: &[u8],
+#[tracing::instrument(skip(interface, listener, buf))]
+pub async fn upload<T: AsyncRead + AsyncWrite + Unpin, R: Read>(
+    size: usize,
+    buf: &mut R,
     interface: &mut T,
     listener: &impl UploadProgressListener,
 ) -> Result<Reply> {
     let _lock = TRANSFER_LOCK.lock().await;
-    let size = u32::try_from(data.len())?;
     // We are sending "Download" in our "upload" function because we are the
     // host -- from the device's point of view, it is a download
+    let size = u32::try_from(size)?;
     let reply = send(Command::Download(size), interface).await?;
     match reply {
         Reply::Data(s) => {
-            if s != u32::try_from(data.len())? {
+            if s != size {
                 let err = format!(
                     "Target responded with wrong data size - received:{} expected:{}",
-                    s,
-                    data.len()
+                    s, size
                 );
                 tracing::error!(%err);
                 listener.on_error(&err).await?;
                 bail!(err);
             }
-            listener.on_started(data.len()).await?;
-            tracing::debug!("fastboot: writing {} bytes", data.len());
-            match interface.write(&data).await {
-                Err(e) => {
-                    let err = format!("Could not write to usb interface: {:?}", e);
-                    tracing::error!(%err);
-                    listener.on_error(&err).await?;
-                    bail!(err);
+            listener.on_started(size.try_into().unwrap()).await?;
+            tracing::debug!("fastboot: writing {} bytes", size);
+
+            let mut bytes = [0; 4096];
+            loop {
+                match buf.read(&mut bytes) {
+                    Ok(n) => {
+                        if n == 0 {
+                            break;
+                        }
+                        match interface.write(&bytes[..n]).await {
+                            Err(e) => {
+                                let err = format!("Could not write to interface: {:?}", e);
+                                tracing::error!(%err);
+                                listener.on_error(&err).await?;
+                                bail!(err);
+                            }
+                            _ => {
+                                listener.on_progress(n.try_into().unwrap()).await?;
+                                tracing::trace!("fastboot: wrote {} bytes", n);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        let err = format!("Could not read bytes to upload: {:?}", e);
+                        tracing::error!(%err);
+                        listener.on_error(&err).await?;
+                        bail!(err);
+                    }
                 }
-                _ => (),
             }
-            tracing::debug!("fastboot: completed writing {} bytes", data.len());
+            tracing::debug!("fastboot: completed writing {} bytes", size);
             match read_and_log_info(interface).await {
                 Ok(reply) => {
                     listener.on_finished().await?;
@@ -255,7 +276,7 @@ pub async fn download<T: AsyncRead + AsyncWrite + Unpin>(
                 .await?;
             while bytes_read != size {
                 match interface.read(&mut buffer[..]).await {
-                    Err(e) => bail!("Could not read to usb interface: {:?}", e),
+                    Err(e) => bail!("Could not read to interface: {:?}", e),
                     Ok(len) => {
                         tracing::debug!("fastboot: upload got {bytes_read}/{size} bytes");
                         bytes_read += len;
@@ -280,25 +301,41 @@ mod test {
     use super::*;
     use crate::command::ClientVariable;
     use crate::test_transport::TestTransport;
+    use std::io::Cursor;
+    use std::sync::Arc;
 
-    struct LogUploadProgressListener {}
+    #[derive(Debug, PartialEq)]
+    enum UploadEvent {
+        OnStarted(usize),
+        OnProgress(u64),
+        OnError(String),
+        OnFinished,
+    }
+
+    struct PushEventsUploadProgressListener {
+        event_queue: Arc<Mutex<Vec<UploadEvent>>>,
+    }
 
     #[async_trait]
-    impl UploadProgressListener for LogUploadProgressListener {
+    impl UploadProgressListener for PushEventsUploadProgressListener {
         async fn on_started(&self, size: usize) -> Result<()> {
-            tracing::info!("Upload Started size: {size}");
+            let mut queue = self.event_queue.lock().await;
+            queue.push(UploadEvent::OnStarted(size));
             Ok(())
         }
         async fn on_progress(&self, bytes_written: u64) -> Result<()> {
-            tracing::info!("Upload Progress. Bytes Written: {bytes_written}");
+            let mut queue = self.event_queue.lock().await;
+            queue.push(UploadEvent::OnProgress(bytes_written));
             Ok(())
         }
         async fn on_error(&self, error: &str) -> Result<()> {
-            tracing::info!("Upload Error: {error}");
+            let mut queue = self.event_queue.lock().await;
+            queue.push(UploadEvent::OnError(error.to_string()));
             Ok(())
         }
         async fn on_finished(&self) -> Result<()> {
-            tracing::info!("Upload Finished");
+            let mut queue = self.event_queue.lock().await;
+            queue.push(UploadEvent::OnFinished);
             Ok(())
         }
     }
@@ -330,17 +367,32 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_uploading_data_to_partition() {
-        let data: [u8; 1024] = [0; 1024];
+        let data: [u8; 14336] = [0; 14336];
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Okay("Done Writing".to_string()));
         test_transport.push(Reply::Info("Writing".to_string()));
-        test_transport.push(Reply::Data(1024));
+        test_transport.push(Reply::Data(14336));
 
-        let listener = LogUploadProgressListener {};
+        let events = Arc::new(Mutex::new(Vec::<UploadEvent>::new()));
+        let listener = PushEventsUploadProgressListener { event_queue: events.clone() };
 
-        let response = upload(&data, &mut test_transport, &listener).await;
+        let response =
+            upload(data.len(), &mut Cursor::new(data), &mut test_transport, &listener).await;
         assert!(!response.is_err());
         assert_eq!(response.unwrap(), Reply::Okay("Done Writing".to_string()));
+
+        let queue = events.lock().await;
+        assert_eq!(
+            *queue,
+            vec![
+                UploadEvent::OnStarted(14336),
+                UploadEvent::OnProgress(4096),
+                UploadEvent::OnProgress(4096),
+                UploadEvent::OnProgress(4096),
+                UploadEvent::OnProgress(2048),
+                UploadEvent::OnFinished,
+            ]
+        );
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -349,9 +401,13 @@ mod test {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Info("Writing".to_string()));
 
-        let listener = LogUploadProgressListener {};
-        let response = upload(&data, &mut test_transport, &listener).await;
+        let events = Arc::new(Mutex::new(Vec::<UploadEvent>::new()));
+        let listener = PushEventsUploadProgressListener { event_queue: events.clone() };
+        let response =
+            upload(data.len(), &mut Cursor::new(data), &mut test_transport, &listener).await;
         assert!(response.is_err());
+        let queue = events.lock().await;
+        assert_eq!(*queue, vec![]);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -360,8 +416,17 @@ mod test {
         let mut test_transport = TestTransport::new();
         test_transport.push(Reply::Data(1000));
 
-        let listener = LogUploadProgressListener {};
-        let response = upload(&data, &mut test_transport, &listener).await;
+        let events = Arc::new(Mutex::new(Vec::<UploadEvent>::new()));
+        let listener = PushEventsUploadProgressListener { event_queue: events.clone() };
+        let response =
+            upload(data.len(), &mut Cursor::new(data), &mut test_transport, &listener).await;
         assert!(response.is_err());
+        let queue = events.lock().await;
+        assert_eq!(
+            *queue,
+            vec![UploadEvent::OnError(
+                "Target responded with wrong data size - received:1000 expected:1024".to_string()
+            ),]
+        );
     }
 }

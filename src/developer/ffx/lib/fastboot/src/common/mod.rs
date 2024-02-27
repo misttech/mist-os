@@ -159,7 +159,7 @@ async fn handle_upload_progress_for_upload<W: Write>(
                 ffx_bail!("{}", error)
             }
             Some(UploadProgress::OnProgress { bytes_written, .. }) => {
-                tracing::debug!("Upload progress: {}", bytes_written);
+                tracing::trace!("Upload progress: {}", bytes_written);
             }
             None => return Ok(finish_time),
         }
