@@ -4,13 +4,13 @@
 
 use {
     crate::{
-        checksum::fletcher64,
+        checksum::{fletcher64, Checksums},
         errors::FxfsError,
         log::*,
         lsm_tree::types::{Item, ItemRef, LayerIterator},
         object_handle::ObjectHandle,
         object_store::{
-            extent_record::{Checksums, ExtentKey, ExtentValue},
+            extent_record::{ExtentKey, ExtentValue},
             object_manager::ObjectManager,
             object_record::{
                 AttributeKey, EncryptionKeys, ExtendedAttributeValue, ObjectAttributes, ObjectItem,
@@ -310,7 +310,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             Ok(())
         })?;
         Ok(if !self.options.skip_checksums {
-            Checksums::Fletcher(checksums)
+            Checksums::fletcher(checksums)
         } else {
             Checksums::None
         })
@@ -949,10 +949,12 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                         }
                         let chunk_len = std::cmp::min(len, current_range.end - current_range.start);
                         let tail = checksums.split_off((chunk_len / block_size) as usize);
-                        match &checksums {
-                            Checksums::None => (),
-                            Checksums::Fletcher(c) => out_checksums
-                                .push((device_offset..device_offset + chunk_len, c.clone())),
+                        // OK to unwrap here; we just generated checksums so they will be valid.
+                        if let Some(checksums) = checksums.maybe_as_ref().unwrap() {
+                            out_checksums.push((
+                                device_offset..device_offset + chunk_len,
+                                checksums.to_owned(),
+                            ));
                         }
                         mutations.push(Mutation::merge_object(
                             ObjectKey::extent(

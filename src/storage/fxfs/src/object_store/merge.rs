@@ -271,12 +271,13 @@ mod tests {
     use {
         super::merge,
         crate::{
+            checksum::Checksums,
             lsm_tree::{
                 cache::NullCache,
                 types::{Item, LayerIterator, MergeableKey, Value},
                 LSMTree,
             },
-            object_store::extent_record::{Checksums, ExtentValue},
+            object_store::extent_record::ExtentValue,
             object_store::object_record::{AttributeKey, ObjectKey, ObjectValue, Timestamp},
         },
         anyhow::Error,

@@ -24,7 +24,7 @@ mod writer;
 
 use {
     crate::{
-        checksum::Checksum,
+        checksum::{Checksum, Checksums},
         debug_assert_not_too_long,
         errors::FxfsError,
         filesystem::{ApplyContext, ApplyMode, FxFilesystem, SyncOptions},
@@ -33,7 +33,7 @@ use {
         object_handle::{ObjectHandle as _, ReadObjectHandle},
         object_store::{
             allocator::Allocator,
-            extent_record::{Checksums, ExtentKey, ExtentValue, DEFAULT_DATA_ATTRIBUTE_ID},
+            extent_record::{ExtentKey, ExtentValue, DEFAULT_DATA_ATTRIBUTE_ID},
             graveyard::Graveyard,
             journal::{
                 bootstrap_handle::BootstrapObjectHandle,
@@ -46,8 +46,8 @@ use {
             object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue},
             transaction::{
                 lock_keys, AllocatorMutation, Mutation, MutationV20, MutationV25, MutationV29,
-                MutationV30, MutationV31, MutationV32, ObjectStoreMutation, Options, Transaction,
-                TxnMutation, TRANSACTION_MAX_JOURNAL_USAGE,
+                MutationV30, MutationV31, MutationV32, MutationV36, ObjectStoreMutation, Options,
+                Transaction, TxnMutation, TRANSACTION_MAX_JOURNAL_USAGE,
             },
             DataObjectHandle, HandleOptions, HandleOwner, Item, ItemRef, LastObjectId, LockState,
             NewChildStoreOptions, ObjectStore, INVALID_OBJECT_ID,
@@ -140,10 +140,55 @@ pub enum JournalRecord {
     // Checksums for a data range written by this transaction, for a particular store identified by
     // the u64 object id. A transaction is only valid if these checksums are right. The range is
     // the device offset the checksums are for.
+    DataChecksums(Range<u64>, Checksums),
+}
+
+#[derive(Debug, Deserialize, Serialize, Versioned, TypeFingerprint)]
+pub enum JournalRecordV36 {
+    // Indicates no more records in this block.
+    EndBlock,
+    // Mutation for a particular object.  object_id here is for the collection i.e. the store or
+    // allocator.
+    Mutation { object_id: u64, mutation: MutationV36 },
+    // Commits records in the transaction.
+    Commit,
+    // Discard all mutations with offsets greater than or equal to the given offset.
+    Discard(u64),
+    // Indicates the device was flushed at the given journal offset.
+    // Note that this really means that at this point in the journal offset, we can be certain that
+    // there's no remaining buffered data in the block device; the buffers and the disk contents are
+    // consistent.
+    // We insert one of these records *after* a flush along with the *next* transaction to go
+    // through.  If that never comes (either due to graceful or hard shutdown), the journal reset
+    // on the next mount will serve the same purpose and count as a flush, although it is necessary
+    // to defensively flush the device before replaying the journal (if possible, i.e. not
+    // read-only) in case the block device connection was reused.
+    DidFlushDevice(u64),
+    // Checksums for a data range written by this transaction, for a particular store identified by
+    // the u64 object id. A transaction is only valid if these checksums are right. The range is
+    // the device offset the checksums are for.
     DataChecksums(Range<u64>, Vec<Checksum>),
 }
 
+impl From<JournalRecordV36> for JournalRecord {
+    fn from(record: JournalRecordV36) -> Self {
+        match record {
+            JournalRecordV36::EndBlock => Self::EndBlock,
+            JournalRecordV36::Mutation { object_id, mutation } => {
+                Self::Mutation { object_id, mutation: mutation.into() }
+            }
+            JournalRecordV36::Commit => Self::Commit,
+            JournalRecordV36::Discard(offset) => Self::Discard(offset),
+            JournalRecordV36::DidFlushDevice(offset) => Self::DidFlushDevice(offset),
+            JournalRecordV36::DataChecksums(range, sums) => {
+                Self::DataChecksums(range, Checksums::fletcher(sums))
+            }
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(JournalRecordV36)]
 pub enum JournalRecordV34 {
     EndBlock,
     Mutation { object_id: u64, mutation: MutationV32 },
@@ -345,7 +390,7 @@ pub struct JournaledTransaction {
 #[derive(Debug)]
 pub struct JournaledChecksums {
     pub device_range: Range<u64>,
-    pub checksums: Vec<Checksum>,
+    pub checksums: Checksums,
 }
 
 /// Handles for journal-like objects have some additional functionality to manage their extents,
@@ -433,11 +478,7 @@ impl Journal {
                                 ..
                             },
                         value:
-                            ObjectValue::Extent(ExtentValue::Some {
-                                device_offset,
-                                checksums: Checksums::Fletcher(checksums),
-                                ..
-                            }),
+                            ObjectValue::Extent(ExtentValue::Some { device_offset, checksums, .. }),
                         ..
                     },
                 ..
@@ -445,15 +486,14 @@ impl Journal {
                 if range.is_empty() || !range.is_aligned(block_size) {
                     return false;
                 }
-                if checksums.len() == 0 {
-                    return false;
-                }
                 let len = range.length().unwrap();
-                if len % checksums.len() as u64 != 0 {
-                    return false;
-                }
-                if (len / checksums.len() as u64) % block_size != 0 {
-                    return false;
+                if checksums.len() > 0 {
+                    if len % checksums.len() as u64 != 0 {
+                        return false;
+                    }
+                    if (len / checksums.len() as u64) % block_size != 0 {
+                        return false;
+                    }
                 }
                 if *device_offset % block_size != 0
                     || *device_offset >= device_size
@@ -519,20 +559,18 @@ impl Journal {
                                 ..
                             },
                         value:
-                            ObjectValue::Extent(ExtentValue::Some {
-                                device_offset,
-                                checksums: Checksums::Fletcher(checksums),
-                                ..
-                            }),
+                            ObjectValue::Extent(ExtentValue::Some { device_offset, checksums, .. }),
                         ..
                     },
                 ..
             }) => {
-                checksum_list.push(
-                    journal_offset,
-                    *device_offset..*device_offset + range.length().unwrap(),
-                    checksums,
-                )?;
+                if let Some(checksums) = checksums.maybe_as_ref().context("Malformed checksums")? {
+                    checksum_list.push(
+                        journal_offset,
+                        *device_offset..*device_offset + range.length().unwrap(),
+                        checksums,
+                    )?;
+                }
             }
             Mutation::ObjectStore(_) => {}
             Mutation::Allocator(AllocatorMutation::Deallocate { device_range, .. }) => {
@@ -661,7 +699,9 @@ impl Journal {
             &transactions
         {
             for JournaledChecksums { device_range, checksums } in checksums {
-                checksum_list.push(checkpoint.file_offset, device_range.clone(), &checksums)?;
+                if let Some(checksums) = checksums.maybe_as_ref().context("Malformed checksums")? {
+                    checksum_list.push(checkpoint.file_offset, device_range.clone(), checksums)?;
+                }
             }
             for (_, mutation) in mutations {
                 if !self.validate_mutation(&mutation, block_size, device_size) {
@@ -1452,7 +1492,10 @@ impl Journal {
                 for (device_range, checksums) in transaction.take_checksums().into_iter() {
                     inner
                         .writer
-                        .write_record(&JournalRecord::DataChecksums(device_range, checksums))
+                        .write_record(&JournalRecord::DataChecksums(
+                            device_range,
+                            Checksums::fletcher(checksums),
+                        ))
                         .unwrap();
                 }
                 inner.writer.write_record(&JournalRecord::Commit).unwrap();

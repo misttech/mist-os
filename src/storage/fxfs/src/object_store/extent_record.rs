@@ -5,7 +5,11 @@
 // TODO(https://fxbug.dev/42178223): need validation after deserialization.
 
 use {
-    crate::lsm_tree::types::{OrdLowerBound, OrdUpperBound},
+    crate::{
+        checksum::{Checksums, ChecksumsV36},
+        lsm_tree::types::{OrdLowerBound, OrdUpperBound},
+        serialized_types::Migrate,
+    },
     fprint::TypeFingerprint,
     serde::{Deserialize, Serialize},
     std::{
@@ -117,23 +121,6 @@ impl PartialOrd for ExtentKey {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TypeFingerprint)]
-#[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum Checksums {
-    None,
-    /// A vector of checksums, one per block.
-    Fletcher(Vec<u64>),
-}
-
-impl Checksums {
-    pub fn split_off(&mut self, at: usize) -> Checksums {
-        match self {
-            Checksums::None => Checksums::None,
-            Checksums::Fletcher(sums) => Checksums::Fletcher(sums.split_off(at)),
-        }
-    }
-}
-
 /// ExtentValue is the payload for an extent in the object store, which describes where the extent
 /// is physically located.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TypeFingerprint)]
@@ -220,6 +207,12 @@ impl ExtentValue {
             }
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Migrate, TypeFingerprint)]
+pub enum ExtentValueV36 {
+    None,
+    Some { device_offset: u64, checksums: ChecksumsV36, key_id: u64 },
 }
 
 #[cfg(test)]

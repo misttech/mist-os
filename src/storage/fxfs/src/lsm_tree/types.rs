@@ -9,7 +9,7 @@ use {
         object_handle::ReadObjectHandle,
         object_store::object_record::{
             ObjectKey, ObjectKeyV25, ObjectKeyV5, ObjectValue, ObjectValueV25, ObjectValueV29,
-            ObjectValueV30, ObjectValueV31, ObjectValueV5,
+            ObjectValueV30, ObjectValueV31, ObjectValueV36, ObjectValueV5,
         },
         serialized_types::{Version, Versioned, VersionedLatest},
     },
@@ -146,8 +146,14 @@ impl From<Item<ObjectKey, ObjectValueV30>> for Item<ObjectKey, ObjectValueV31> {
     }
 }
 
-impl From<Item<ObjectKey, ObjectValueV31>> for Item<ObjectKey, ObjectValue> {
+impl From<Item<ObjectKey, ObjectValueV31>> for Item<ObjectKey, ObjectValueV36> {
     fn from(item: Item<ObjectKey, ObjectValueV31>) -> Self {
+        Self { key: item.key, value: item.value.into(), sequence: item.sequence }
+    }
+}
+
+impl From<Item<ObjectKey, ObjectValueV36>> for Item<ObjectKey, ObjectValue> {
+    fn from(item: Item<ObjectKey, ObjectValueV36>) -> Self {
         Self { key: item.key, value: item.value.into(), sequence: item.sequence }
     }
 }

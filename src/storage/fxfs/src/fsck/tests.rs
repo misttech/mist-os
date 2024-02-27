@@ -395,66 +395,6 @@ async fn test_malformed_allocation() {
 }
 
 #[fuchsia::test]
-async fn test_misaligned_extent_in_root_store() {
-    let mut test = FsckTest::new().await;
-
-    {
-        let fs = test.filesystem();
-        let root_store = fs.root_store();
-
-        let mut transaction = fs
-            .clone()
-            .new_transaction(lock_keys![], Options::default())
-            .await
-            .expect("new_transaction failed");
-        transaction.add(
-            root_store.store_object_id(),
-            Mutation::insert_object(
-                ObjectKey::extent(555, 0, 1..fs.block_size()),
-                ObjectValue::Extent(ExtentValue::new(1)),
-            ),
-        );
-        transaction.commit().await.expect("commit failed");
-    }
-
-    test.remount().await.expect("Remount failed");
-    test.run(TestOptions { halt_on_error: true, ..Default::default() })
-        .await
-        .expect_err("Fsck should fail");
-    assert_matches!(test.errors()[..], [FsckIssue::Error(FsckError::MisalignedExtent(..))]);
-}
-
-#[fuchsia::test]
-async fn test_malformed_extent_in_root_store() {
-    let mut test = FsckTest::new().await;
-
-    {
-        let fs = test.filesystem();
-        let root_store = fs.root_store();
-
-        let mut transaction = fs
-            .clone()
-            .new_transaction(lock_keys![], Options::default())
-            .await
-            .expect("new_transaction failed");
-        transaction.add(
-            root_store.store_object_id(),
-            Mutation::insert_object(
-                ObjectKey::extent(555, 0, fs.block_size()..0),
-                ObjectValue::Extent(ExtentValue::new(1)),
-            ),
-        );
-        transaction.commit().await.expect("commit failed");
-    }
-
-    test.remount().await.expect("Remount failed");
-    test.run(TestOptions { halt_on_error: true, ..Default::default() })
-        .await
-        .expect_err("Fsck should fail");
-    assert_matches!(test.errors()[..], [FsckIssue::Error(FsckError::MalformedExtent(..))]);
-}
-
-#[fuchsia::test]
 async fn test_misaligned_extent_in_child_store() {
     let mut test = FsckTest::new().await;
 

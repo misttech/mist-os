@@ -44,7 +44,7 @@ use {
             },
             object_record::{
                 ObjectItem, ObjectItemV25, ObjectItemV29, ObjectItemV30, ObjectItemV31,
-                ObjectItemV5,
+                ObjectItemV36, ObjectItemV5,
             },
             transaction::{AssocObj, Options},
             tree::MajorCompactable,
@@ -221,6 +221,14 @@ pub enum SuperBlockRecord {
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+pub enum SuperBlockRecordV36 {
+    Extent(Range<u64>),
+    ObjectItem(ObjectItemV36),
+    End,
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(SuperBlockRecordV36)]
 pub enum SuperBlockRecordV31 {
     Extent(Range<u64>),
     ObjectItem(ObjectItemV31),

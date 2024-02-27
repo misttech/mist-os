@@ -5,10 +5,11 @@
 // TODO(https://fxbug.dev/42178223): need validation after deserialization.
 use {
     crate::{
+        checksum::Checksums,
         lsm_tree::types::{
             Item, ItemRef, LayerKey, MergeType, OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
         },
-        object_store::extent_record::{Checksums, ExtentKey, ExtentValue},
+        object_store::extent_record::{ExtentKey, ExtentValue, ExtentValueV36},
         serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned},
     },
     fprint::TypeFingerprint,
@@ -591,14 +592,30 @@ pub enum ObjectValue {
     VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadata },
 }
 
+#[derive(Debug, Serialize, Deserialize, Migrate, TypeFingerprint, Versioned)]
+pub enum ObjectValueV36 {
+    None,
+    Some,
+    Object { kind: ObjectKind, attributes: ObjectAttributes },
+    Keys(EncryptionKeys),
+    Attribute { size: u64 },
+    Extent(ExtentValueV36),
+    Child(ChildValue),
+    Trim,
+    BytesAndNodes { bytes: i64, nodes: i64 },
+    ExtendedAttribute(ExtendedAttributeValue),
+    VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadata },
+}
+
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(ObjectValueV36)]
 pub enum ObjectValueV31 {
     None,
     Some,
     Object { kind: ObjectKind, attributes: ObjectAttributesV31 },
     Keys(EncryptionKeys),
     Attribute { size: u64 },
-    Extent(ExtentValue),
+    Extent(ExtentValueV36),
     Child(ChildValue),
     Trim,
     BytesAndNodes { bytes: i64, nodes: i64 },
@@ -612,7 +629,7 @@ pub enum ObjectValueV30 {
     Object { kind: ObjectKindV30, attributes: ObjectAttributesV30 },
     Keys(EncryptionKeys),
     Attribute { size: u64 },
-    Extent(ExtentValue),
+    Extent(ExtentValueV36),
     Child(ChildValue),
     Trim,
     BytesAndNodes { bytes: i64, nodes: i64 },
@@ -687,7 +704,7 @@ pub enum ObjectValueV29 {
     Object { kind: ObjectKindV30, attributes: ObjectAttributesV30 },
     Keys(EncryptionKeys),
     Attribute { size: u64 },
-    Extent(ExtentValue),
+    Extent(ExtentValueV36),
     Child(ChildValue),
     Trim,
     BytesAndNodes { bytes: i64, nodes: i64 },
@@ -701,7 +718,7 @@ pub enum ObjectValueV25 {
     Object { kind: ObjectKindV30, attributes: ObjectAttributesV25 },
     Keys(EncryptionKeys),
     Attribute { size: u64 },
-    Extent(ExtentValue),
+    Extent(ExtentValueV36),
     Child(ChildValue),
     Trim,
     BytesAndNodes { bytes: i64, nodes: i64 },
@@ -715,7 +732,7 @@ pub enum ObjectValueV5 {
     Object { kind: ObjectKindV30, attributes: ObjectAttributesV5 },
     Keys(EncryptionKeys),
     Attribute { size: u64 },
-    Extent(ExtentValue),
+    Extent(ExtentValueV36),
     Child(ChildValue),
     Trim,
     BytesAndNodes { bytes: i64, nodes: i64 },
@@ -799,6 +816,7 @@ impl ObjectValue {
 }
 
 pub type ObjectItem = Item<ObjectKey, ObjectValue>;
+pub type ObjectItemV36 = Item<ObjectKey, ObjectValueV36>;
 pub type ObjectItemV31 = Item<ObjectKey, ObjectValueV31>;
 pub type ObjectItemV30 = Item<ObjectKey, ObjectValueV30>;
 pub type ObjectItemV29 = Item<ObjectKeyV25, ObjectValueV29>;

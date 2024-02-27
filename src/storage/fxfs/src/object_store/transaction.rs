@@ -15,7 +15,8 @@ use {
             object_manager::{reserved_space_from_journal_usage, ObjectManager},
             object_record::{
                 ObjectItem, ObjectItemV25, ObjectItemV29, ObjectItemV30, ObjectItemV31,
-                ObjectItemV5, ObjectKey, ObjectKeyData, ObjectValue, ProjectProperty,
+                ObjectItemV36, ObjectItemV5, ObjectKey, ObjectKeyData, ObjectValue,
+                ProjectProperty,
             },
         },
         serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned},
@@ -106,8 +107,26 @@ pub enum Mutation {
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+pub enum MutationV36 {
+    ObjectStore(ObjectStoreMutationV36),
+    EncryptedObjectStore(Box<[u8]>),
+    Allocator(AllocatorMutation),
+    // Indicates the beginning of a flush.  This would typically involve sealing a tree.
+    BeginFlush,
+    // Indicates the end of a flush.  This would typically involve replacing the immutable layers
+    // with compacted ones.
+    EndFlush,
+    // Volume has been deleted.  Requires we remove it from the set of managed ObjectStore.
+    DeleteVolume,
+    UpdateBorrowed(u64),
+    UpdateMutationsKey(UpdateMutationsKey),
+    CreateInternalDir(u64),
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(MutationV36)]
 pub enum MutationV32 {
-    ObjectStore(ObjectStoreMutation),
+    ObjectStore(ObjectStoreMutationV36),
     EncryptedObjectStore(Box<[u8]>),
     Allocator(AllocatorMutation),
     BeginFlush,
@@ -226,6 +245,14 @@ pub struct ObjectStoreMutation {
 
 #[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
 #[migrate_nodefault]
+pub struct ObjectStoreMutationV36 {
+    item: ObjectItemV36,
+    op: Operation,
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
+#[migrate_nodefault]
+#[migrate_to_version(ObjectStoreMutationV36)]
 pub struct ObjectStoreMutationV31 {
     item: ObjectItemV31,
     op: Operation,

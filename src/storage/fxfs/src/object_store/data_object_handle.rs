@@ -4,6 +4,7 @@
 
 use {
     crate::{
+        checksum::Checksums,
         errors::FxfsError,
         log::*,
         lsm_tree::types::{ItemRef, LayerIterator},
@@ -11,7 +12,7 @@ use {
             ObjectHandle, ObjectProperties, ReadObjectHandle, WriteBytes, WriteObjectHandle,
         },
         object_store::{
-            extent_record::{Checksums, ExtentKey, ExtentValue},
+            extent_record::{ExtentKey, ExtentValue},
             object_manager::ObjectManager,
             object_record::{
                 AttributeKey, FsverityMetadata, ObjectAttributes, ObjectItem, ObjectKey,
