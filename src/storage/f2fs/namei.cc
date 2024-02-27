@@ -114,6 +114,7 @@ zx_status_t Dir::Link(std::string_view name, fbl::RefPtr<fs::Vnode> new_child) {
     return ZX_ERR_INVALID_ARGS;
   }
 
+  fs()->GetSegmentManager().BalanceFs(kMaxNeededBlocksForUpdate);
   {
     fs::SharedLock lock(f2fs::GetGlobalLock());
     fbl::RefPtr<VnodeF2fs> target = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(new_child));
@@ -136,8 +137,6 @@ zx_status_t Dir::Link(std::string_view name, fbl::RefPtr<fs::Vnode> new_child) {
       return err;
     }
   }
-
-  fs()->GetSegmentManager().BalanceFs();
 
   return ZX_OK;
 }
@@ -309,6 +308,7 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
     return ZX_ERR_BAD_STATE;
   }
 
+  fs()->GetSegmentManager().BalanceFs(2 * kMaxNeededBlocksForUpdate + 1);
   {
     fs::SharedLock lock(f2fs::GetGlobalLock());
     fbl::RefPtr<Dir> new_dir = fbl::RefPtr<Dir>::Downcast(std::move(_newdir));
@@ -466,7 +466,6 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
     }
   }
 
-  fs()->GetSegmentManager().BalanceFs();
   return ZX_OK;
 }
 
@@ -478,6 +477,8 @@ zx_status_t Dir::Create(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vn
   if (!fs::IsValidName(name)) {
     return ZX_ERR_INVALID_ARGS;
   }
+
+  fs()->GetSegmentManager().BalanceFs(kMaxNeededBlocksForUpdate + 1);
   {
     fs::SharedLock lock(f2fs::GetGlobalLock());
     std::lock_guard dir_lock(mutex_);
@@ -499,7 +500,6 @@ zx_status_t Dir::Create(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vn
     }
   }
 
-  fs()->GetSegmentManager().BalanceFs();
   return (*out)->OpenValidating(fs::VnodeConnectionOptions(), nullptr);
 }
 
@@ -528,7 +528,6 @@ zx_status_t Dir::Unlink(std::string_view name, bool must_be_dir) {
       return ret;
     }
   }
-  fs()->GetSegmentManager().BalanceFs();
   return ZX_OK;
 }
 

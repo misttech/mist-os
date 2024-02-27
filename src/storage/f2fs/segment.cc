@@ -376,23 +376,29 @@ bool SegmentManager::SecUsageCheck(unsigned int secno) const {
   return IsCurSec(secno) || cur_victim_sec_ == secno;
 }
 
-bool SegmentManager::HasNotEnoughFreeSecs(uint32_t freed) {
+bool SegmentManager::HasNotEnoughFreeSecs(uint32_t freed, uint32_t needed) {
   if (fs_->IsOnRecovery())
     return false;
 
-  return (FreeSections() + freed) <= (fs_->GetFreeSectionsForDirtyPages() + ReservedSections());
+  uint32_t blocks_per_sec = safemath::CheckMul<uint32_t>(superblock_info_.GetBlocksPerSeg(),
+                                                         superblock_info_.GetSegsPerSec())
+                                .ValueOrDie();
+  uint32_t freed_sec = CheckedDivRoundUp(freed, blocks_per_sec);
+  uint32_t needed_sec = CheckedDivRoundUp(needed, blocks_per_sec);
+  return FreeSections() + freed_sec <=
+         fs_->GetFreeSectionsForDirtyPages() + ReservedSections() + needed_sec;
 }
 
 // This function balances dirty node and dentry pages.
 // In addition, it controls garbage collection.
-void SegmentManager::BalanceFs() {
+void SegmentManager::BalanceFs(uint32_t num_blocks) {
   if (fs_->IsOnRecovery()) {
     return;
   }
 
   // If there is not enough memory, wait for writeback.
   fs_->WaitForAvailableMemory();
-  if (HasNotEnoughFreeSecs()) {
+  if (HasNotEnoughFreeSecs(0, num_blocks)) {
     if (auto ret = fs_->GetGcManager().Run(); ret.is_error()) {
       // Run() returns ZX_ERR_UNAVAILABLE when there is no available victim section, otherwise BUG
       ZX_DEBUG_ASSERT(ret.error_value() == ZX_ERR_UNAVAILABLE);

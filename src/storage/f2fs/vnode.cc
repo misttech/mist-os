@@ -550,7 +550,6 @@ zx_status_t VnodeF2fs::DoTruncate(size_t len) {
   SetCTime(cur_time);
   SetMTime(cur_time);
   SetDirty();
-  fs()->GetSegmentManager().BalanceFs();
   return ZX_OK;
 }
 

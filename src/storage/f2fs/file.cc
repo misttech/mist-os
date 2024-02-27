@@ -362,7 +362,9 @@ void File::VmoDirty(uint64_t offset, uint64_t length) {
     return VnodeF2fs::VmoDirty(offset, length);
   }
 
-  fs()->GetSegmentManager().BalanceFs();
+  uint32_t num_blocks =
+      CheckedDivRoundUp<uint32_t>(safemath::checked_cast<uint32_t>(length), kBlockSize);
+  fs()->GetSegmentManager().BalanceFs(num_blocks);
   fs::SharedLock lock(f2fs::GetGlobalLock());
   auto pages_or = WriteBegin(offset, length);
   if (unlikely(pages_or.is_error())) {

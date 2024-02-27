@@ -190,7 +190,7 @@ class SegmentManager {
   bool CompareValidBlocks(uint32_t blocks, uint32_t segno, bool section)
       __TA_EXCLUDES(sentry_lock_);
   uint32_t GetValidBlocks(uint32_t segno, bool section) const __TA_REQUIRES_SHARED(sentry_lock_);
-  bool HasNotEnoughFreeSecs(uint32_t freed = 0);
+  bool HasNotEnoughFreeSecs(uint32_t freed = 0, uint32_t needed = 0);
   uint32_t Utilization();
   uint32_t CursegSegno(int type);
   uint8_t CursegAllocType(int type);
@@ -217,7 +217,7 @@ class SegmentManager {
   bool NeedSSR();
   bool NeedInplaceUpdate(bool is_dir);
 
-  void BalanceFs() __TA_EXCLUDES(f2fs::GetGlobalLock());
+  void BalanceFs(uint32_t num_blocks = 0) __TA_EXCLUDES(f2fs::GetGlobalLock());
   void LocateDirtySegment(uint32_t segno, enum DirtyType dirty_type) __TA_REQUIRES(seglist_lock_)
       __TA_REQUIRES_SHARED(sentry_lock_);
   void RemoveDirtySegment(uint32_t segno, enum DirtyType dirty_type) __TA_REQUIRES(seglist_lock_)
@@ -425,12 +425,12 @@ class SegmentManager {
   std::unique_ptr<SitInfo> sit_info_;  // whole segment information
 
   fs::SharedMutex segmap_lock_;  // free segmap lock
-  std::unique_ptr<FreeSegmapInfo> free_info_ __TA_GUARDED(
-      segmap_lock_);  // free segment information
+  std::unique_ptr<FreeSegmapInfo> free_info_
+      __TA_GUARDED(segmap_lock_);  // free segment information
 
   fs::SharedMutex seglist_lock_;  // lock for segment bitmaps
-  std::unique_ptr<DirtySeglistInfo> dirty_info_ __TA_GUARDED(
-      seglist_lock_);                       // dirty segment information
+  std::unique_ptr<DirtySeglistInfo> dirty_info_
+      __TA_GUARDED(seglist_lock_);          // dirty segment information
   CursegInfo curseg_array_[kNrCursegType];  // active segment information
 
   block_t start_segno_ = 0;  // start segment number logically

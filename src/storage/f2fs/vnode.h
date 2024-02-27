@@ -50,6 +50,8 @@ enum class InodeInfoFlag {
   kFlagSize,
 };
 
+constexpr uint32_t kMaxNeededBlocksForUpdate = 5;
+
 inline bool IsValidNameLength(std::string_view name) { return name.length() <= kMaxNameLen; }
 
 class VnodeF2fs : public fs::PagedVnode,
