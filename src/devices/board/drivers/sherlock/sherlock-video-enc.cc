@@ -71,8 +71,9 @@ const std::vector<fdf::NodeProperty> kSysmemProperties = std::vector{
                       bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
 };
 
-const std::vector<fdf::BindRule> kCanvasRules = std::vector{fdf::MakeAcceptBindRule(
-    bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_amlogic_platform::BIND_FIDL_PROTOCOL_CANVAS_SERVICE)};
+const std::vector<fdf::BindRule> kCanvasRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
+                            bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT)};
 
 const std::vector<fdf::NodeProperty> kCanvasProperties = std::vector{
     fdf::MakeProperty(bind_fuchsia_hardware_amlogiccanvas::SERVICE,

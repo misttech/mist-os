@@ -35,7 +35,7 @@ DDK_FIDL_PROTOCOL_DEF(POWER_SENSOR,    16, "fuchsia.hardware.power.sensor.Servic
 DDK_FIDL_PROTOCOL_DEF(VREG,            17, "fuchsia.hardware.vreg.Service")
 DDK_FIDL_PROTOCOL_DEF(REGISTERS,       18, "fuchsia.hardware.registers.Service")
 DDK_FIDL_PROTOCOL_DEF(TEE,             19, "fuchsia.hardware.tee.Service")
-DDK_FIDL_PROTOCOL_DEF(AMLOGIC_CANVAS,  20, "fuchsia.hardware.amlogiccanvas.Service")
+// 20 was "fuchsia.hardware.amlogiccanvas.Service"
 DDK_FIDL_PROTOCOL_DEF(POWER,           21, "fuchsia.hardware.power.Service")
 DDK_FIDL_PROTOCOL_DEF(CLOCK,           22, "fuchsia.hardware.clock.Service")
 DDK_FIDL_PROTOCOL_DEF(CODEC,           23, "fuchsia.hardware.audio.CodecService")

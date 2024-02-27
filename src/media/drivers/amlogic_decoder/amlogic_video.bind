@@ -6,6 +6,7 @@ composite aml_video;
 
 using fuchsia.amlogic.platform;
 using fuchsia.clock;
+using fuchsia.hardware.amlogiccanvas;
 using fuchsia.platform;
 using fuchsia.sysmem;
 using fuchsia.tee;
@@ -27,7 +28,7 @@ node "sysmem" {
 }
 
 node "canvas" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.amlogic.platform.BIND_FIDL_PROTOCOL.CANVAS_SERVICE;
+  fuchsia.hardware.amlogiccanvas.Service == fuchsia.hardware.amlogiccanvas.Service.ZirconTransport;
 }
 
 node "clock-dos-vdec" {

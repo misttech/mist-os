@@ -83,11 +83,6 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   TEMP_SENSOR_DDR = 0x40,
 };
 
-
-extend uint fuchsia.BIND_FIDL_PROTOCOL {
-  CANVAS_SERVICE = 0x14, // fuchsia.hardware.amlogiccanvas.Service
-};
-
 enum PWM_ID {
   A,
   AO_D,

@@ -15,6 +15,7 @@
 #include <bind/fuchsia/amlogic/platform/meson/cpp/bind.h>
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <soc/aml-a311d/a311d-hw.h>
 #include <soc/aml-meson/g12b-clk.h>
@@ -99,14 +100,13 @@ zx_status_t Vim3::VideoInit() {
   auto video_canvas = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(
-                  bind_fuchsia::FIDL_PROTOCOL,
-                  bind_fuchsia_amlogic_platform::BIND_FIDL_PROTOCOL_CANVAS_SERVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
+                                      bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_amlogic_platform::BIND_FIDL_PROTOCOL_CANVAS_SERVICE),
+              fdf::MakeProperty(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
+                                bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
           },
   }};
 

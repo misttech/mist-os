@@ -99,6 +99,7 @@ fuchsia_driver("nelson-module-driver") {
     "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
     "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_bindlib_cpp",
+    "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
