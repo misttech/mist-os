@@ -115,7 +115,6 @@ Add coverage to:
 * The [dynamic compatibility suite].
 * The dynamic [client suite] and [server suite].
 * The [dangerous identifiers suite].
-* The [source compatibility suite].
 
 <!-- xrefs -->
 [api-rubric]: /docs/development/api/fidl.md
@@ -148,7 +147,6 @@ Add coverage to:
 [sanitizer-abi]: /zircon/system/ulib/ldmsg/BUILD.gn
 [summarize]: /tools/fidl/fidl_api_summarize/
 [server suite]: /src/tests/fidl/dynsuite/server_suite/
-[source compatibility suite]: /src/tests/fidl/source_compatibility/
 [span-tests]: /tools/fidl/fidlc/tests/span_tests.cc
 [table-tests]: /tools/fidl/fidlc/tests/table_tests.cc
 [userboot]: https://cs.opensource.google/fuchsia/fuchsia/+/28e6aba6f37d7c5430f41d93e31674d2d401a47a:zircon/kernel/lib/userabi/userboot/start.cc;l=308

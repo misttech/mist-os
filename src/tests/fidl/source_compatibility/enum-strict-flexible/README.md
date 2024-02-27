@@ -1,1 +1,0 @@
-See //docs/development/languages/fidl/guides/compatibility/enum_strict_flexible.md

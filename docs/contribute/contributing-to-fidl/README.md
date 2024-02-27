@@ -64,12 +64,6 @@ The actual test targets for the conformance tests in each backend are generally
 defined alongside the [corresponding tests for that backend](#compiler-backends).
 Refer to the [Bindings tests](#bindings-tests) section for details.
 
-##### Source compatibility
-
-Source compatibility tests are used to test FIDL's
-[source compatibility guarantees][abi-api-compat]. They are found in
-[/src/tests/fidl/source_compatibility].
-
 ##### Compatibility
 
 Compatibility tests are integration tests that run FIDL clients
@@ -755,8 +749,6 @@ fidl fmt --library my_library.fidl -i
 [/third_party/go/src/syscall/zx/fidl/fidl_test]: /third_party/go/src/syscall/zx/fidl/fidl_test
 [/src/tests/benchmarks/fidl/benchmark_suite]: /src/tests/benchmarks/fidl/benchmark_suite
 [/src/tests/benchmarks/fidl]: /src/tests/benchmarks/fidl
-
-[/src/tests/fidl/source_compatibility]: /src/tests/fidl/source_compatibility
 
 [/src/tests/fidl/compatibility/]: /src/tests/fidl/compatibility/
 [/src/tests/fidl/dangerous_identifiers]: /src/tests/fidl/dangerous_identifiers

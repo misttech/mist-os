@@ -1,1 +1,0 @@
-See //docs/development/languages/fidl/guides/compatibility/protocol_method_remove.md

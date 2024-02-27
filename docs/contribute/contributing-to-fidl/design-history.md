@@ -203,7 +203,7 @@ _Legend:_
 | [RFC-0039] | Types come second | Rejected; Superseded by [RFC-0050]
 | [RFC-0028] | Handle rights | Implemented
 | [RFC-0042] | Non nullable types | Rejected (April Fools)
-| [RFC-0024] | Mandatory source compatibility | Implemented; see also [source_compatibility]
+| [RFC-0024] | Mandatory source compatibility | Implemented
 | [RFC-0040] | Identifier uniqueness | Implemented (rejected at first, later accepted)
 | [RFC-0041] | Support for unifying services and devices | [Partially implemented](https://fxbug.dev/42160684#c36): only in C++, Rust
 | [RFC-0044] | Extensible method arguments | Rejected; Superseded by [RFC-0087]
@@ -252,7 +252,6 @@ _Legend:_
 [ftps]: /docs/contribute/governance/deprecated-ftp-process.md
 [protobuf-self-describe]: https://developers.google.com/protocol-buffers/docs/techniques#self-description
 [measure-tape]: /tools/fidl/measure-tape/README.md
-[source_compatibility]: /src/tests/fidl/source_compatibility/README.md
 [large-message-cl]: https://fuchsia-review.googlesource.com/c/fuchsia/+/470640
 [rfc-0017]: /docs/contribute/governance/rfcs/0017_folding_ftp_into_rfc.md
 [rfc-0018]: /docs/contribute/governance/rfcs/0018_ftp_process.md

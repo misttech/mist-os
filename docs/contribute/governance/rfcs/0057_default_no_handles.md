@@ -250,7 +250,7 @@ This feature will be tested in the following ways:
     not) fails to conform to the definition of a resource type (or value type).
 *   Add some resource type declarations to the goldens, in addition to fixing
     existing declarations that need `resource`.
-*   Update the [fidl-changes test suite](/src/tests/fidl/source_compatibility/) to
+*   Update the fidl-changes test suite to
     demonstrate the steps for a transition from value type to resource type and
     vice versa.
 

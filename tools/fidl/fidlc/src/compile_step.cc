@@ -1185,10 +1185,6 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
 
   // Ensure that only methods from a small allow-list use the @transitional attribute.
   static const auto transitional_allowlist = std::set<std::string_view>{
-      "fidl.test.protocoleventadd.Example.OnNewEvent",
-      "fidl.test.protocoleventremove.Example.OnOldEvent",
-      "fidl.test.protocolmethodadd.Example.NewMethod",
-      "fidl.test.protocolmethodremove.Example.OldMethod",
       "fuchsia.camera.Manager.CreateStreamV2",
       "fuchsia.camera3.Device.GetConfigurations",
       "fuchsia.camera3.Device.GetConfigurations2",

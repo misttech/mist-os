@@ -306,8 +306,8 @@ Unfortunately, these restrictions are difficult or impossible to test
 because they would require enumerating every possible usage of the API
 before the change.
 
-However, we can (and should) add items to [the FIDL change test
-suite][test-suite] to show that there does exist *some* usage of the
+However, we can (and should) add items to the FIDL change test
+suite to show that there does exist *some* usage of the
 API before the change that remains valid after the change.
 This is a necessary but not sufficient condition for meeting the source
 compatibility requirements.
@@ -341,5 +341,4 @@ This design and the intended modifications to it have been discussed in
 earlier parts of this proposal.
 
 <!-- xrefs -->
-[test-suite]: /src/tests/fidl/source_compatibility/
 
