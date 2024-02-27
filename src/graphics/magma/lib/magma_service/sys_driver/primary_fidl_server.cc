@@ -9,6 +9,7 @@
 #include <lib/magma/platform/platform_trace.h>
 #include <lib/magma/platform/zircon/zircon_platform_status.h>
 #include <lib/magma/util/utils.h>
+#include <zircon/assert.h>
 
 #include <optional>
 
@@ -18,6 +19,7 @@ namespace {
 std::optional<fuchsia_gpu_magma::ObjectType> ValidateObjectType(
     fuchsia_gpu_magma::ObjectType fidl_type) {
   switch (fidl_type) {
+    case fuchsia_gpu_magma::ObjectType::kEvent:
     case fuchsia_gpu_magma::ObjectType::kBuffer:
     case fuchsia_gpu_magma::ObjectType::kSemaphore:
       return {fidl_type};
@@ -161,6 +163,11 @@ void PrimaryFidlServer::FlowControl(uint64_t size) {
                      result.FormatDescription().c_str());
     }
   }
+}
+
+void PrimaryFidlServer::ImportObject2(ImportObject2RequestView request,
+                                      ImportObject2Completer::Sync& completer) {
+  SetError(&completer, MAGMA_STATUS_UNIMPLEMENTED);
 }
 
 void PrimaryFidlServer::ImportObject(ImportObjectRequestView request,

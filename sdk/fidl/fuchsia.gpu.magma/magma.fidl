@@ -132,7 +132,7 @@ type Object = flexible resource union {
 };
 
 type ObjectType = flexible enum : uint32 {
-    @available(deprecated=17, removed=18)
+    @available(deprecated=17, removed=18, legacy=true)
     EVENT = 10;
     /// A memory object backeed by a Zircon VMO.
     BUFFER = 11;
@@ -227,7 +227,7 @@ alias PerformanceCounterSet = vector<uint64>:64;
 /// If a system driver error occurs, or if the client sends a message that the client should have
 /// known is invalid, the connection will be closed and a zx.Status sent via epitaph.
 closed protocol Primary {
-    @available(deprecated=17, removed=18)
+    @available(deprecated=17, removed=18, legacy=true)
     strict ImportObject2(resource struct {
         object zx.Handle;
         object_type ObjectType;

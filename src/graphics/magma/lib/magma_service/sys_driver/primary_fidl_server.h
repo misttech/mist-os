@@ -127,6 +127,8 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
   async_dispatcher_t* GetAsyncDispatcher() override { return async_loop()->dispatcher(); }
 
  private:
+  void ImportObject2(ImportObject2RequestView request,
+                     ImportObject2Completer::Sync& _completer) override;
   void ImportObject(ImportObjectRequestView request,
                     ImportObjectCompleter::Sync& _completer) override;
   void ReleaseObject(ReleaseObjectRequestView request,
