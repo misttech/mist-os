@@ -62,12 +62,11 @@ config("compiler") {
   }
 
   if (support_rust) {
-    if (!is_debug || rust_rbe_enable) {
+    if (!is_debug) {
       # https://fxbug.dev/42166874#c15: forcing one codegen unit produces
       # smaller binaries but makes builds slower.
       # Enforce one codegen unit only when we really care about
-      # size (release builds), or when RBE is enabled (and then
-      # the benefits of parallelized codegen are diminished).
+      # size (release builds).
       configs += [ "//build/config/rust:one_codegen_unit" ]
     }
 

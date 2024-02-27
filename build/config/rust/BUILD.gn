@@ -15,6 +15,7 @@
 # approval because they create risk and may have stable alternatives that better
 # fit our needs. See the "Unstable features" section for more information.
 
+import("//build/board.gni")
 import("//build/images/filesystem_limits.gni")
 import("//build/rust/config.gni")
 import("//build/toolchain/rbe.gni")
@@ -140,6 +141,11 @@ config("bootfs") {
     # See: https://fxbug.dev/42160867
     # See: https://fxbug.dev/42172876
     configs = [ "//build/config/lto:thinlto" ]
+
+    # Multiple codegen units on vim3 with debug push bootfs over the limit.
+    if (board_name == "vim3") {
+      configs += [ ":one_codegen_unit" ]
+    }
   }
 
   # Can't dynamically link libstd and libtest for ZBI binaries.
