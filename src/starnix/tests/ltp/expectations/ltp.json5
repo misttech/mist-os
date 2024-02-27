@@ -237,8 +237,7 @@
                 "creat07",
                 "fork14",
 
-                // This test asserts that the current CPU is within a requested affinity mask, but
-                // we don't support CPU affinity masks yet.
+                // TODO(https://fxbug.dev/322874889) requires a working sched_setaffinity
                 "getcpu01",
 
                 // Makes all following tests to fail.
