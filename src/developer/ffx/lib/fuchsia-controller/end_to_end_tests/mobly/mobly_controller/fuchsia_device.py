@@ -9,7 +9,7 @@ import os
 import os.path
 import time
 import ipaddress
-from typing import Any, Callable, Coroutine, Dict, List
+from typing import Any, Callable, Coroutine
 
 import fidl.fuchsia_developer_ffx as ffx
 from fuchsia_controller_py import Context
@@ -18,7 +18,7 @@ from fuchsia_controller_py import ZxStatus
 from mobly import base_test
 
 MOBLY_CONTROLLER_CONFIG_NAME = "FuchsiaDevice"
-TIMEOUTS: Dict[str, float] = {
+TIMEOUTS: dict[str, float] = {
     "OFFLINE": 120,
     "ONLINE": 180,
     "SLEEP": 0.5,
@@ -26,7 +26,7 @@ TIMEOUTS: Dict[str, float] = {
 
 
 class FuchsiaDevice(object):
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         target = config.get("ipv6") or config.get("ipv4") or config.get("name")
         if not target:
             raise ValueError(
@@ -36,7 +36,7 @@ class FuchsiaDevice(object):
         self.config = config
         self.ctx: Context | None = None
 
-    def set_ctx(self, test: base_test.BaseTestClass):
+    def set_ctx(self, test: base_test.BaseTestClass) -> None:
         log_dir = test.log_path
         isolation_path = None
         ctx_config = {
@@ -77,7 +77,7 @@ class FuchsiaDevice(object):
         if ctx_config["discovery.mdns.enabled"] == "false":
             self.ctx.target_add(self.target, True)
 
-    async def wait_offline(self, timeout=TIMEOUTS["OFFLINE"]) -> None:
+    async def wait_offline(self, timeout: float = TIMEOUTS["OFFLINE"]) -> None:
         """Waits for the Fuchsia device to be offline.
 
         Args:
@@ -117,7 +117,7 @@ class FuchsiaDevice(object):
             f"Target '{self.target}' is now offline after {time.time() - start_time} seconds"
         )
 
-    async def wait_online(self, timeout=TIMEOUTS["ONLINE"]) -> None:
+    async def wait_online(self, timeout: float = TIMEOUTS["ONLINE"]) -> None:
         """Waits for the Fuchsia device to come online.
 
         A device is considered online when it is connected to the remote control proxy in the ffx
@@ -143,7 +143,7 @@ class FuchsiaDevice(object):
         )
 
 
-def create(configs: List[Dict[str, Any]]) -> List[FuchsiaDevice]:
+def create(configs: list[dict[str, Any]]) -> list[FuchsiaDevice]:
     """Creates the all Fuchsia devices for tests.
 
     Args:
@@ -162,7 +162,7 @@ def create(configs: List[Dict[str, Any]]) -> List[FuchsiaDevice]:
     return res
 
 
-def destroy(_: List[FuchsiaDevice]) -> None:
+def destroy(_: list[FuchsiaDevice]) -> None:
     """Destroys all listed Fuchsia devices.
 
     Args:
@@ -170,7 +170,7 @@ def destroy(_: List[FuchsiaDevice]) -> None:
     """
 
 
-def get_info(fuchsia_devices: List[FuchsiaDevice]) -> List[Dict[str, Any]]:
+def get_info(fuchsia_devices: list[FuchsiaDevice]) -> list[dict[str, Any]]:
     """Returns all info of each Fuchsia device.
 
     Args:
@@ -187,7 +187,7 @@ def get_info(fuchsia_devices: List[FuchsiaDevice]) -> List[Dict[str, Any]]:
 
 def asynctest(
     func: Callable[[base_test.BaseTestClass], Coroutine[Any, Any, None]]
-):
+) -> Callable[[base_test.BaseTestClass], None]:
     """Simple wrapper around async tests.
 
     Args:
@@ -197,7 +197,7 @@ def asynctest(
         The wrapped function. Runs the body of the `func` in asyncio.run()
     """
 
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: str, **kwargs: dict[str, int]) -> None:
         coro = func(*args, **kwargs)
         asyncio.run(coro)
 

@@ -4,7 +4,6 @@
 
 import asyncio
 import json
-import typing
 import subprocess
 
 import fidl.fuchsia_tracing_controller as tracing_controller
@@ -21,9 +20,9 @@ from mobly_controller.fuchsia_device import asynctest
 TRACE2JSON = "tracing_runtime_deps/trace2json"
 
 
-class FuchsiaControllerTests(base_test.BaseTestClass):
+class FuchsiaControllerTests(base_test.BaseTestClass):  # type: ignore
     def setup_class(self) -> None:
-        self.fuchsia_devices: typing.List[
+        self.fuchsia_devices: list[
             fuchsia_device.FuchsiaDevice
         ] = self.register_controller(fuchsia_device)
         self.device = self.fuchsia_devices[0]
@@ -32,6 +31,8 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
     @asynctest
     async def test_fuchsia_device_get_known_categories(self) -> None:
         """Verifies that kernel:vm is an existing category for tracing on the device."""
+        if self.device.ctx is None:
+            raise ValueError(f"Device: {self.device.target} has no context")
         ch = self.device.ctx.connect_device_proxy(
             "core/trace_manager", tracing_controller.Controller.MARKER
         )
@@ -50,6 +51,8 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
     @asynctest
     async def test_fuchsia_device_tracing_start_stop(self) -> None:
         """Does a simple start and stop of tracing on a device."""
+        if self.device.ctx is None:
+            raise ValueError(f"Device: {self.device.target} has no context")
         ch = self.device.ctx.connect_device_proxy(
             "core/trace_manager", tracing_controller.Controller.MARKER
         )

@@ -13,7 +13,7 @@ from mobly_controller import fuchsia_device
 from mobly_controller.fuchsia_device import asynctest
 
 
-class FuchsiaControllerTests(base_test.BaseTestClass):
+class FuchsiaControllerTests(base_test.BaseTestClass):  # type: ignore
     def setup_class(self) -> None:
         self.fuchsia_devices: typing.List[
             fuchsia_device.FuchsiaDevice
@@ -24,6 +24,8 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
     @asynctest
     async def test_fuchsia_device_reboot(self) -> None:
         """Attempts to reboot a device."""
+        if self.device.ctx is None:
+            raise ValueError(f"Device: {self.device.target} has no context")
         # [START reboot_example]
         ch = self.device.ctx.connect_device_proxy(
             "bootstrap/shutdown_shim", power_statecontrol.Admin.MARKER
