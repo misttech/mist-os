@@ -9,7 +9,7 @@ use chrono::Duration;
 use errors::ffx_bail;
 use ffx_fastboot::common::{
     cmd::OemFile,
-    fastboot::{tcp_proxy, udp_proxy, usb_proxy},
+    fastboot::{tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig},
     from_manifest,
 };
 use ffx_flash_args::FlashCommand;
@@ -216,7 +216,8 @@ Using address {} as node name",
                     .user_message("Error writing user message")?;
                     socket_addr.to_string()
                 };
-                let mut proxy = udp_proxy(target_name, &socket_addr).await?;
+                let config = FastbootNetworkConnectionConfig::new_udp().await;
+                let mut proxy = udp_proxy(target_name, &socket_addr, config).await?;
                 from_manifest(&mut writer, cmd, &mut proxy).await.map_err(fho::Error::from)
             } else {
                 ffx_bail!("Could not get a valid address for target");
@@ -243,7 +244,8 @@ Using address {} as node name",
                     .user_message("Error writing user message")?;
                     socket_addr.to_string()
                 };
-                let mut proxy = tcp_proxy(target_name, &socket_addr).await?;
+                let config = FastbootNetworkConnectionConfig::new_tcp().await;
+                let mut proxy = tcp_proxy(target_name, &socket_addr, config).await?;
                 from_manifest(&mut writer, cmd, &mut proxy).await.map_err(fho::Error::from)
             } else {
                 ffx_bail!("Could not get a valid address for target");

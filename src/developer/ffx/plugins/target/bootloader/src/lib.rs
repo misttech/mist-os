@@ -17,6 +17,7 @@ use ffx_fastboot::{
     common::fastboot::tcp_proxy,
     common::fastboot::udp_proxy,
     common::fastboot::usb_proxy,
+    common::fastboot::FastbootNetworkConnectionConfig,
     common::{from_manifest, prepare},
     file_resolver::resolvers::EmptyResolver,
     info::info,
@@ -156,7 +157,8 @@ Using address {} as node name",
                         );
                         socket_addr.to_string()
                     };
-                    let proxy = udp_proxy(target_name, &socket_addr).await?;
+                    let config = FastbootNetworkConnectionConfig::new_udp().await;
+                    let proxy = udp_proxy(target_name, &socket_addr, config).await?;
                     bootloader_impl(proxy, self.cmd, &mut writer).await
                 } else {
                     ffx_bail!("Could not get a valid address for target");
@@ -181,7 +183,8 @@ Using address {} as node name
                         );
                         socket_addr.to_string()
                     };
-                    let proxy = tcp_proxy(target_name, &socket_addr).await?;
+                    let config = FastbootNetworkConnectionConfig::new_tcp().await;
+                    let proxy = tcp_proxy(target_name, &socket_addr, config).await?;
                     bootloader_impl(proxy, self.cmd, &mut writer).await
                 } else {
                     ffx_bail!("Could not get a valid address for target");

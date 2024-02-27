@@ -32,6 +32,57 @@ pub enum FastbootConnectionKind {
     Udp(String, SocketAddr),
 }
 
+const UDP_RETRY_COUNT: &str = "fastboot.network.udp.retry_count";
+const UDP_RETRY_COUNT_DEFAULT: u64 = 3;
+const UDP_WAIT_SECONDS: &str = "fastboot.network.udp.retry_wait_seconds";
+const UDP_WAIT_SECONDS_DEFAULT: u64 = 2;
+const TCP_RETRY_COUNT: &str = "fastboot.network.tcp.retry_count";
+const TCP_RETRY_COUNT_DEFAULT: u64 = 3;
+const TCP_WAIT_SECONDS: &str = "fastboot.network.udp.retry_wait_seconds";
+const TCP_WAIT_SECONDS_DEFAULT: u64 = 2;
+
+pub struct FastbootNetworkConnectionConfig {
+    retry_wait_seconds: u64,
+    retry_count: u64,
+}
+
+impl FastbootNetworkConnectionConfig {
+    pub fn new(retry_wait_seconds: u64, retry_count: u64) -> Self {
+        Self { retry_wait_seconds, retry_count }
+    }
+
+    async fn new_from_config(
+        retry_key: &str,
+        retry_default: u64,
+        wait_key: &str,
+        wait_default: u64,
+    ) -> Self {
+        let retry_count = ffx_config::get(retry_key).await.unwrap_or(retry_default);
+        let retry_wait_seconds = ffx_config::get(wait_key).await.unwrap_or(wait_default);
+        Self::new(retry_wait_seconds, retry_count)
+    }
+
+    pub async fn new_tcp() -> Self {
+        Self::new_from_config(
+            TCP_RETRY_COUNT,
+            TCP_RETRY_COUNT_DEFAULT,
+            TCP_WAIT_SECONDS,
+            TCP_WAIT_SECONDS_DEFAULT,
+        )
+        .await
+    }
+
+    pub async fn new_udp() -> Self {
+        Self::new_from_config(
+            UDP_RETRY_COUNT,
+            UDP_RETRY_COUNT_DEFAULT,
+            UDP_WAIT_SECONDS,
+            UDP_WAIT_SECONDS_DEFAULT,
+        )
+        .await
+    }
+}
+
 #[async_trait(?Send)]
 pub trait FastbootConnectionFactory {
     async fn build_interface(
@@ -53,10 +104,12 @@ impl FastbootConnectionFactory for ConnectionFactory {
                 Ok(Box::new(usb_proxy(serial_number).await?))
             }
             FastbootConnectionKind::Tcp(target_name, addr) => {
-                Ok(Box::new(tcp_proxy(target_name, &addr).await?))
+                let config = FastbootNetworkConnectionConfig::new_tcp().await;
+                Ok(Box::new(tcp_proxy(target_name, &addr, config).await?))
             }
             FastbootConnectionKind::Udp(target_name, addr) => {
-                Ok(Box::new(udp_proxy(target_name, &addr).await?))
+                let config = FastbootNetworkConnectionConfig::new_udp().await;
+                Ok(Box::new(udp_proxy(target_name, &addr, config).await?))
             }
         }
     }
@@ -80,20 +133,18 @@ pub async fn usb_proxy(serial_number: String) -> Result<FastbootProxy<AsyncInter
 // TcpInterface
 //
 
-const TCP_N_OPEN_RETRIES: u64 = 5;
-const TCP_RETRY_WAIT_SECONDS: u64 = 1;
-
 /// Creates a FastbootProxy over TCP for a device at the given SocketAddr
 pub async fn tcp_proxy(
     target_name: String,
     addr: &SocketAddr,
+    config: FastbootNetworkConnectionConfig,
 ) -> Result<FastbootProxy<TcpNetworkInterface>> {
     if target_name.is_empty() {
         bail!(FastbootConnectionFactoryError::EmptyTargetName);
     }
 
     let mut factory =
-        TcpFactory::new(target_name, *addr, TCP_N_OPEN_RETRIES, TCP_RETRY_WAIT_SECONDS);
+        TcpFactory::new(target_name, *addr, config.retry_count, config.retry_wait_seconds);
     let interface = factory
         .open()
         .await
@@ -105,20 +156,18 @@ pub async fn tcp_proxy(
 // UdpInterface
 //
 
-const UDP_N_OPEN_RETRIES: u64 = 5;
-const UDP_RETRY_WAIT_SECONDS: u64 = 1;
-
 /// Creates a FastbootProxy over TCP for a device at the given SocketAddr
 pub async fn udp_proxy(
     target_name: String,
     addr: &SocketAddr,
+    config: FastbootNetworkConnectionConfig,
 ) -> Result<FastbootProxy<UdpNetworkInterface>> {
     if target_name.is_empty() {
         bail!(FastbootConnectionFactoryError::EmptyTargetName);
     }
 
     let mut factory =
-        UdpFactory::new(target_name, *addr, UDP_N_OPEN_RETRIES, UDP_RETRY_WAIT_SECONDS);
+        UdpFactory::new(target_name, *addr, config.retry_count, config.retry_wait_seconds);
     let interface = factory
         .open()
         .await
