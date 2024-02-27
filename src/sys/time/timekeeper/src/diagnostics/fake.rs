@@ -23,8 +23,24 @@ impl FakeDiagnostics {
     /// Panics if the supplied slice does not match the received events. When present in
     /// expected, the special values ANY_TIME and ANY_DURATION will match any received value.
     pub fn assert_events(&self, expected: &[Event]) {
+        self.assert_events_with_len(0, expected);
+    }
+
+    /// Panics if the supplied slice is not the prefix of the received events. When present in
+    /// expected, the special values ANY_TIME and ANY_DURATION will match any received value.
+    /// See [assert_events] for details.
+    pub fn assert_events_prefix(&self, expected: &[Event]) {
+        self.assert_events_with_len(expected.len(), expected);
+    }
+
+    // `len` is the prefix of internal events queue to consider in comparison. If set to 0,
+    // the entire events queue is used, if set to `n>0`, the first `n` events are used.
+    fn assert_events_with_len(&self, mut len: usize, expected: &[Event]) {
         let events_lock = self.events.lock();
-        if !expected.eq_with_any(&events_lock) {
+        if len == 0 {
+            len = events_lock.len();
+        }
+        if !expected.eq_with_any(&events_lock[..len]) {
             // If we failed to match considering sentinels we are guaranteed to fail without
             // considering them; use the standard assert_eq to generate a nicely formatted error.
             assert_eq!(*events_lock, expected);

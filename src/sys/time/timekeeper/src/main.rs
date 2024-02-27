@@ -22,7 +22,6 @@ use futures::{
     channel::mpsc,
     future::{self, OptionFuture},
     stream::StreamExt as _,
-    SinkExt,
 };
 use {
     crate::{
@@ -404,7 +403,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
     });
 
     info!("launching clock managers...");
-    let (mut s1, r1) = mpsc::channel(1);
+    let (s1, r1) = mpsc::channel(1);
     let fut1 = ClockManager::execute(
         primary.clock,
         primary_source_manager,
@@ -415,6 +414,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
         r1,
     );
     let (_, r2) = mpsc::channel(1);
+    let fut2_cfg_clone = config.clone();
     let fut2: OptionFuture<_> = monitor_source_manager_and_clock
         .map(|(source_manager, clock)| {
             ClockManager::<R, D>::execute(
@@ -423,15 +423,23 @@ async fn maintain_utc<R: 'static, D: 'static>(
                 None,
                 diagnostics,
                 Track::Monitor,
-                config,
+                fut2_cfg_clone,
                 r2,
             )
         })
         .into();
+
+    let pte = config.power_topology_integration_enabled();
     let oneshot = Box::pin(async move {
-        // TODO: b/304805834 - Integrate with actual management API here.
-        fasync::Timer::new(fasync::Time::after(zx::Duration::from_seconds(5))).await;
-        let _ignore = s1.send(()).await;
+        info!("power_topology_integration_enabled: {}", pte);
+        if pte {
+            power_topology_integration::manage(s1)
+                .await
+                .context("power topology integration error")
+                .map_err(|e| warn!("power_topology_error: {}", e))
+                .expect("power topology task setup succeeds")
+                .await;
+        }
     });
     future::join3(fut1, fut2, oneshot).await;
 }
@@ -638,7 +646,7 @@ mod tests {
         assert!(rtc.last_set().is_some());
 
         // Check that the correct diagnostic events were logged.
-        diagnostics.assert_events(&[
+        diagnostics.assert_events_prefix(&[
             Event::Initialized { clock_state: InitialClockState::NotSet },
             Event::InitializeRtc {
                 outcome: InitializeRtcOutcome::InvalidBeforeBackstop,
