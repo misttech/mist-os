@@ -19,7 +19,7 @@ const CLEANUP_COMMAND: &'static str = include_str!("cleanup_command");
 pub enum TunnelError {
     #[error("Target {target} did not have any valid Ip Addresses associated with it.")]
     NoAdressesError { target: String },
-    #[error("There may be a tunnel already running to {remote_host}. Try running `funnel cleanup-tunnel {remote_host}` to clean it up before retrying")]
+    #[error("There may be a tunnel already running to {remote_host}. Try running `funnel cleanup-remote-host {remote_host}` to clean it up before retrying")]
     TunnelAlreadyRunning { remote_host: String },
     #[error("Ssh was terminated by a signal")]
     SshTerminatedFromSignal,
