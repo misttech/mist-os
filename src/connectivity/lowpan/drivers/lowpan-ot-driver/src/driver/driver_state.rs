@@ -20,8 +20,6 @@ pub struct DriverState<OT> {
 
     pub srp_advertising_proxy: Option<AdvertisingProxy>,
 
-    pub trel_enabled: bool,
-
     pub ot_ctl: ot_ctl::OtCtl,
 
     pub detailed_logging: detailed_logging::DetailedLogging,
@@ -48,8 +46,21 @@ impl<OT> AsRef<Option<AdvertisingProxy>> for DriverState<OT> {
 }
 
 impl<OT: openthread::ot::Trel> DriverState<OT> {
+    // SAFETY: In general this is safe to call because `bool`s are
+    //         safe to write to or read from multiple threads.
+    //         This code happens to always be called from a single
+    //         thread anyway, so it is going to be safe regardless.
+    unsafe fn trel_enabled_ref() -> &'static mut bool {
+        static mut TREL_ENABLED: bool = false;
+        #[allow(unknown_lints)]
+        #[allow(static_mut_ref)]
+        &mut TREL_ENABLED
+    }
+
     pub fn is_trel_enabled(&self) -> bool {
-        self.trel_enabled
+        // SAFETY: This is safe for the reasons explained
+        //         in the comment above `trel_enable_ref()`.
+        unsafe { *Self::trel_enabled_ref() }
     }
 
     pub fn set_trel_enabled(&mut self, enabled: bool) {
@@ -57,11 +68,15 @@ impl<OT: openthread::ot::Trel> DriverState<OT> {
             self.ot_instance.trel_set_enabled(enabled);
         }
 
-        self.trel_enabled = enabled;
+        // SAFETY: This is safe for the reasons explained
+        //         in the comment above `trel_enable_ref()`.
+        unsafe {
+            *Self::trel_enabled_ref() = enabled;
+        }
     }
 
     pub fn check_trel(&self) {
-        if !self.trel_enabled && self.ot_instance.trel_is_enabled() {
+        if !self.is_trel_enabled() && self.ot_instance.trel_is_enabled() {
             self.ot_instance.trel_set_enabled(false);
         }
     }
@@ -107,7 +122,6 @@ impl<OT> DriverState<OT> {
             address_table: Default::default(),
             srp_discovery_proxy: None,
             srp_advertising_proxy: None,
-            trel_enabled: false,
             ot_ctl: ot_ctl::OtCtl::new(),
             detailed_logging: detailed_logging::DetailedLogging::new(),
             nat64: nat64::Nat64::new(),
