@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Private rule used by fuchsia_product_assembly_bundle."""
+"""Rule for defining an Assembly Input Bundle (AIB)."""
 
 load(":providers.bzl", "FuchsiaProductAssemblyBundleInfo")
 
@@ -13,19 +13,16 @@ def _assembly_bundle_impl(ctx):
     )]
 
 assembly_bundle = rule(
+    doc = """Declares a target to wrap a prebuilt Assembly Input Bundle (AIB).""",
     implementation = _assembly_bundle_impl,
     provides = [FuchsiaProductAssemblyBundleInfo],
     attrs = {
-        "dir": attr.label(
-            doc = "(deprecated) path to the assembly bundle directory",
-            allow_single_file = True,
-        ),
         "config": attr.label(
-            doc = "assembly_config.json file located at the root of this AIB",
+            doc = "The assembly_config.json file located at the root of this prebuilt AIB directory.",
             allow_single_file = True,
         ),
         "files": attr.label(
-            doc = "a list of all files to include in the assembly bundle",
+            doc = "A filegroup including all files of this prebuilt AIB.",
             mandatory = True,
             allow_files = True,
         ),

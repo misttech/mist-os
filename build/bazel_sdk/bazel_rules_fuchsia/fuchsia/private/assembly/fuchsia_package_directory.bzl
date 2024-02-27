@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Provides access to a Fuchsia package directory."""
+"""Rule to make a Fuchsia package directory available during build."""
 
 load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 
@@ -20,7 +20,7 @@ _fuchsia_package = rule(
     provides = [FuchsiaPackageInfo],
     attrs = {
         "package_manifest": attr.label(
-            doc = "Manifest of this package",
+            doc = "Manifest of this package.",
             allow_single_file = True,
             mandatory = True,
         ),

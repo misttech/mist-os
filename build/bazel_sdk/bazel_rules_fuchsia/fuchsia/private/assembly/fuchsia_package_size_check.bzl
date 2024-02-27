@@ -88,20 +88,20 @@ fuchsia_package_size_check = rule(
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "size_report_name": attr.string(
-            doc = "The name to add to the size report for viewing in gerrit",
+            doc = "The name to add to the size report for viewing in Gerrit.",
             mandatory = True,
         ),
         "packages": attr.label_list(
-            doc = "fuchsia_package targets to cover in the report",
+            doc = "fuchsia_package targets to cover in the report.",
             providers = [FuchsiaPackageInfo],
             allow_empty = False,
         ),
         "budget": attr.int(
-            doc = "Maximum number of bytes the packages can consume",
+            doc = "Maximum number of bytes the packages can consume.",
             mandatory = True,
         ),
         "creep_budget": attr.int(
-            doc = "Maximum number of bytes the packages can grow without a warning",
+            doc = "Maximum number of bytes the packages can grow without a warning.",
             mandatory = True,
         ),
         "_construct_budgets_file": attr.label(

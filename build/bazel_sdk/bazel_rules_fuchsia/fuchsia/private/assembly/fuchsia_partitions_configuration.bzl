@@ -47,36 +47,30 @@ fuchsia_partitions_configuration = rule(
     doc = """Creates a partitions configuration.""",
     implementation = _fuchsia_partitions_configuration,
     attrs = {
-        #TODO(lijiaming) After the partition configuration generation is moved OOT
-        #, we can remove this workaround.
+        # TODO(lijiaming) After the partition configuration generation is moved
+        # OOT, we can remove this workaround.
         "partition_config": attr.label(
             doc = "Relative path of built partition config file. If this file is" +
                   "provided we will skip building it.",
             allow_single_file = [".json"],
         ),
         "bootstrap_partitions": attr.label_list(
-            doc = "Partitions that only flashed in \"fuchsia\" configuration",
-            providers = [
-                [FuchsiaPartitionInfo],
-            ],
+            doc = "Partitions that are only flashed in the \"fuchsia\" configuration.",
+            providers = [FuchsiaPartitionInfo],
         ),
         "bootloader_partitions": attr.label_list(
-            doc = "List of bootloader partitions",
-            providers = [
-                [FuchsiaPartitionInfo],
-            ],
+            doc = "List of bootloader partitions.",
+            providers = [FuchsiaPartitionInfo],
         ),
         "partitions": attr.label_list(
-            doc = "List of non-bootloader partitions",
-            providers = [
-                [FuchsiaPartitionInfo],
-            ],
+            doc = "List of non-bootloader partitions.",
+            providers = [FuchsiaPartitionInfo],
         ),
         "hardware_revision": attr.string(
-            doc = "name of the hardware that needs to assert before flashing images",
+            doc = "Name of the hardware that needs to assert before flashing images.",
         ),
         "unlock_credentials": attr.label_list(
-            doc = "Zip files containing the fastboot unlock credentials",
+            doc = "List of zip files containing the fastboot unlock credentials.",
             allow_files = [".zip"],
         ),
     },

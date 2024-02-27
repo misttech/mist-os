@@ -73,13 +73,13 @@ def _fuchsia_size_report_aggregator_impl(ctx):
     ]
 
 fuchsia_size_report_aggregator = rule(
-    doc = """Create an aggregated size report.""",
+    doc = """Declares a target for creating an aggregated size report.""",
     implementation = _fuchsia_size_report_aggregator_impl,
     provides = [FuchsiaSizeCheckerInfo],
     attrs = {
         "size_reports": attr.label_list(
-            doc = "size reports that needs to be aggregated",
-            providers = [[FuchsiaSizeCheckerInfo]],
+            doc = "size reports that needs to be aggregated.",
+            providers = [FuchsiaSizeCheckerInfo],
             mandatory = True,
         ),
         "_size_report_merger": attr.label(

@@ -2,7 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# buildifier: disable=module-docstring
+"""Rule for creating a partition mapping."""
+
 load(
     ":providers.bzl",
     "FuchsiaPartitionInfo",

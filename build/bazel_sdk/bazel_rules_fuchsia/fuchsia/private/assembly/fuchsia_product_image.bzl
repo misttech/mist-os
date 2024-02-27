@@ -1,7 +1,8 @@
 # Copyright 2022 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Rule for defining a pavable Fuchsia image."""
+
+"""Rule for assembling a Fuchsia product."""
 
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load(
@@ -12,6 +13,12 @@ load(
     "FuchsiaProductAssemblyInfo",
     "FuchsiaProductConfigInfo",
     "FuchsiaProductImageInfo",
+)
+
+PACKAGE_MODE = struct(
+    DISK = "disk",
+    EMBED_IN_ZBI = "embed-in-zbi",
+    BOOTFS = "bootfs",
 )
 
 # Base source for running ffx assembly product
@@ -171,23 +178,25 @@ def _fuchsia_product_assembly_impl(ctx):
     ]
 
 fuchsia_product_assembly = rule(
-    doc = """Declares a Fuchsia product assembly.""",
+    # TODO(http://b/326152150): Make this rule private.
+    doc = """Declares a target to product a fully-configured list of artifacts that make up a product.""",
     implementation = _fuchsia_product_assembly_impl,
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     provides = [FuchsiaProductAssemblyInfo],
     attrs = {
         "product_config": attr.label(
-            doc = "A product configuration target.",
+            doc = "Product configuration used to assemble this product.",
             providers = [FuchsiaProductConfigInfo],
             mandatory = True,
         ),
         "board_config": attr.label(
-            doc = "A board configuration target.",
+            doc = "Board configuration used to assemble this product.",
             providers = [[FuchsiaBoardConfigInfo], [FuchsiaBoardConfigDirectoryInfo]],
             mandatory = True,
         ),
         "mode": attr.string(
-            doc = "Mode indicating where to place packages",
+            doc = "Mode indicating where to place packages.",
+            values = [PACKAGE_MODE.DISK, PACKAGE_MODE.EMBED_IN_ZBI, PACKAGE_MODE.BOOTFS],
         ),
         "legacy_aib": attr.label(
             doc = "Legacy AIB for this product.",
@@ -267,8 +276,8 @@ def _fuchsia_product_create_system_impl(ctx):
         ),
     ]
 
-fuchsia_product_create_system = rule(
-    doc = """Declares a Fuchsia product create system.""",
+_fuchsia_product_create_system = rule(
+    doc = """Declares a target to generate the images for a Fuchsia product.""",
     implementation = _fuchsia_product_create_system_impl,
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     provides = [FuchsiaProductImageInfo],
@@ -279,7 +288,7 @@ fuchsia_product_create_system = rule(
             mandatory = True,
         ),
         "mode": attr.string(
-            doc = "Mode indicating where to place packages",
+            doc = "Mode indicating where to place packages.",
         ),
         "_sdk_manifest": attr.label(
             allow_single_file = True,
@@ -288,6 +297,7 @@ fuchsia_product_create_system = rule(
     },
 )
 
+# TODO(http://b/327134851): Rename this to fuchsia_product.
 def fuchsia_product_image(
         name,
         product_config,
@@ -305,7 +315,7 @@ def fuchsia_product_image(
         platform_aibs = platform_aibs,
     )
 
-    fuchsia_product_create_system(
+    _fuchsia_product_create_system(
         name = name,
         product_assembly = ":" + name + "_product_assembly",
         mode = create_system_mode,

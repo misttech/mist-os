@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Fuchsia product configuration."""
+"""Rule for declaring a Fuchsia product configuration."""
 
 load("//fuchsia/private:fuchsia_package.bzl", "get_driver_component_manifests")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
@@ -128,11 +128,11 @@ _fuchsia_product_configuration = rule(
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "product_config": attr.string(
-            doc = "Raw json config. Used as a base template for the config",
+            doc = "Raw json config. Used as a base template for the config.",
             default = "{}",
         ),
         "product_config_labels": attr.label_keyed_string_dict(
-            doc = """Map of labels to LABEL(label) strings in the product config.""",
+            doc = "Map of labels in the raw json config to LABEL(label) strings. Labels in the raw json config are replaced by file paths identified by their corresponding values in this dict.",
             allow_files = True,
             default = {},
         ),
@@ -158,11 +158,11 @@ _fuchsia_product_configuration = rule(
             default = [],
         ),
         "ota_configuration": attr.label(
-            doc = "OTA configuration to include in product. only for use with products that use Omaha.",
+            doc = "OTA configuration to include in the product. Only for use with products that use Omaha.",
             providers = [FuchsiaOmahaOtaConfigInfo],
         ),
         "deps": attr.label_list(
-            doc = "Additional dependencies that must be built.",
+            doc = "Additional dependencies that must be built before this target is built.",
             default = [],
         ),
     },

@@ -2,7 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# buildifier: disable=module-docstring
+"""Rule for creating a scrutiny config."""
+
 load(":providers.bzl", "FuchsiaScrutinyConfigInfo")
 
 def _fuchsia_scrutiny_config_impl(ctx):
@@ -32,47 +33,47 @@ fuchsia_scrutiny_config = rule(
     provides = [FuchsiaScrutinyConfigInfo],
     attrs = {
         "bootfs_files": attr.label_list(
-            doc = "Set of files expected in bootfs",
+            doc = "Set of files expected in bootfs.",
             allow_files = True,
         ),
         "bootfs_packages": attr.label_list(
-            doc = "Set of packages expected in bootfs",
+            doc = "Set of packages expected in bootfs.",
             allow_files = True,
         ),
         "kernel_cmdline": attr.label_list(
-            doc = "Set of cmdline args expected to be passed to the kernel",
+            doc = "Set of cmdline args expected to be passed to the kernel.",
             allow_files = True,
         ),
         "routes_config_golden": attr.label(
-            doc = "Config file for route resources validation",
+            doc = "Config file for route resources validation.",
             allow_single_file = True,
         ),
         "component_resolver_allowlist": attr.label(
-            doc = "Allowlist of components that can be resolved using privileged component resolvers",
+            doc = "Allowlist of components that can be resolved using privileged component resolvers.",
             allow_single_file = True,
         ),
         "component_route_exceptions": attr.label_list(
-            doc = "Allowlist of all capability routes that are exempt from route checking",
+            doc = "Allowlist of all capability routes that are exempt from route checking.",
             allow_files = True,
         ),
         "component_tree_config": attr.label(
-            doc = "Tree of expected component routes",
+            doc = "Tree of expected component routes.",
             allow_single_file = True,
         ),
         "base_packages": attr.label(
-            doc = "Set of base packages expected in the fvm",
+            doc = "Set of base packages expected in the fvm.",
             allow_single_file = True,
         ),
         "static_packages": attr.label_list(
-            doc = "Set of base and cache packages expected in the fvm",
+            doc = "Set of base and cache packages expected in the fvm.",
             allow_files = True,
         ),
         "structured_config_policy": attr.label(
-            doc = "File describing the policy of structured config",
+            doc = "File describing the policy of structured config.",
             allow_single_file = True,
         ),
         "pre_signing_policy": attr.label(
-            doc = "File describing the policy of checks required before signing",
+            doc = "File describing the policy of checks required before signing.",
             allow_single_file = True,
         ),
     },

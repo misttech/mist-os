@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Rule for creating OTA configurations for products that use the Omaha Client"""
+"""Rule for creating OTA configurations for products that use the Omaha Client."""
 
 load(
     ":providers.bzl",
@@ -108,7 +108,7 @@ _fuchsia_product_ota_config = rule(
             doc = "Raw json of the channel configuration.",
         ),
         "tuf_repositories": attr.string_dict(
-            doc = "Dict of raw json of the tuf repo configurations, by hostname",
+            doc = "Dict of raw json of the tuf repo configurations, by hostname.",
         ),
     },
 )
@@ -123,7 +123,7 @@ def fuchsia_product_ota_config(
     from the product name and set of realms.
 
     Args:
-     realms: list of realms created by realm()
+     realms: list of realms created by realm().
      default_channel: A default channel, or None.
      **kwarg: The usual.
     """

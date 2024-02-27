@@ -65,7 +65,7 @@ fuchsia_elf_sizes = rule(
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "product_image": attr.label(
-            doc = "fuchsia_product_image target to check size",
+            doc = "The fuchsia_product_image target to check the size of.",
             providers = [FuchsiaProductImageInfo],
             mandatory = True,
         ),

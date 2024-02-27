@@ -1,6 +1,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
 """Rule for collecting Fuchsia TUF repository keys."""
 
 load(":providers.bzl", "FuchsiaRepositoryKeysInfo")
@@ -31,7 +32,7 @@ def _fuchsia_repository_keys(ctx):
     ]
 
 fuchsia_repository_keys = rule(
-    doc = """Collects all Fuchsia TUF repository keys. All keys must come from the same directory.""",
+    doc = """Rule for collecting Fuchsia TUF repository keys from the same directory.""",
     implementation = _fuchsia_repository_keys,
     provides = [FuchsiaRepositoryKeysInfo],
     attrs = {

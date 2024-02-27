@@ -81,12 +81,12 @@ fuchsia_product_size_check = rule(
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "product_image": attr.label(
-            doc = "fuchsia_product_image target to check size",
+            doc = "fuchsia_product_image target to check the size of.",
             providers = [FuchsiaProductImageInfo],
             mandatory = True,
         ),
         "blobfs_creep_limit": attr.int(
-            doc = "Creep limit for Blobfs, this is how much BlobFS contents can increase in one CL",
+            doc = "Creep limit for Blobfs, which defines how much blobfs can increase without warning.",
         ),
         "platform_resources_budget": attr.int(
             doc = """Space allocated for shared platform resources.
@@ -94,7 +94,7 @@ fuchsia_product_size_check = rule(
             that can be included in many different components. It can be helpful
             to isolate these resources into a separate budget to enforce a
             specific number of unique copies, and to have a distinct creep
-            budget""",
+            budget.""",
         ),
     },
 )

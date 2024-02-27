@@ -2,7 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# buildifier: disable=module-docstring
+"""Rule for tying a package to its configs for assembly."""
+
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load(":providers.bzl", "FuchsiaAssembledPackageInfo", "FuchsiaConfigDataInfo")
 
@@ -29,16 +30,17 @@ def _fuchsia_assemble_package_impl(ctx):
     ]
 
 fuchsia_assemble_package = rule(
-    doc = """Generates assembled config based on package and their config.""",
+    doc = """Declares a target to attach configs to package for assembly.""",
     implementation = _fuchsia_assemble_package_impl,
     provides = [FuchsiaAssembledPackageInfo],
     attrs = {
         "package": attr.label(
+            doc = "The package to attach configs to.",
             providers = [FuchsiaPackageInfo],
             mandatory = True,
         ),
         "configs": attr.label_keyed_string_dict(
-            doc = "Config-datas that are attached to the package. It's a dictionary of source files to destination string",
+            doc = "Config-datas that are attached to the package. It's a dictionary of source files to destination string.",
             allow_files = True,
         ),
     },

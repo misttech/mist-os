@@ -1,6 +1,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
 """Rule for creating an update package."""
 
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
@@ -83,29 +84,29 @@ fuchsia_update_package = rule(
     provides = [FuchsiaUpdatePackageInfo],
     attrs = {
         "product_image": attr.label(
-            doc = "fuchsia_product_image target to put in slot A",
+            doc = "fuchsia_product_image target to put in slot A.",
             providers = [FuchsiaProductImageInfo],
             mandatory = True,
         ),
         "recovery_image": attr.label(
-            doc = "fuchsia_product_image target to put in slot R",
+            doc = "fuchsia_product_image target to put in slot R.",
             providers = [FuchsiaProductImageInfo],
         ),
         "board_name": attr.string(
-            doc = "Name of the board this update package runs on. E.g. qemu-x64",
+            doc = "Name of the board this update package runs on. E.g. qemu-x64.",
             mandatory = True,
         ),
         "partitions_config": attr.label(
-            doc = "Partitions config to use",
+            doc = "Partitions config to use.",
             mandatory = True,
         ),
         "update_version_file": attr.label(
-            doc = "version file needed to create update package",
+            doc = "Version file needed to create update package.",
             allow_single_file = True,
             mandatory = True,
         ),
         "update_epoch": attr.string(
-            doc = "epoch needed to create update package",
+            doc = "Epoch needed to create update package.",
             mandatory = True,
         ),
     },

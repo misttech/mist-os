@@ -2,11 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# buildifier: disable=module-docstring
-load(
-    ":providers.bzl",
-    "FuchsiaPartitionInfo",
-)
+"""Rule for creating a bootstrap partition mapping."""
+
+load(":providers.bzl", "FuchsiaPartitionInfo")
 
 def _fuchsia_bootstrap_partition_impl(ctx):
     bootstrap_partition = {
@@ -32,19 +30,19 @@ fuchsia_bootstrap_partition = rule(
     provides = [FuchsiaPartitionInfo],
     attrs = {
         "partition_name": attr.string(
-            doc = "Name of the partition",
+            doc = "Name of the partition.",
             mandatory = True,
         ),
         "image": attr.label(
-            doc = "The bootstrap image file",
+            doc = "The bootstrap image file.",
             allow_single_file = True,
             mandatory = True,
         ),
         "condition_variable": attr.string(
-            doc = "Condition that needs to be met before flash.",
+            doc = "Variable part of the condition that needs to be met before flash.",
         ),
         "condition_value": attr.string(
-            doc = "Condition that needs to be met before flash.",
+            doc = "Value part of the condition that needs to be met before flash.",
         ),
     },
 )

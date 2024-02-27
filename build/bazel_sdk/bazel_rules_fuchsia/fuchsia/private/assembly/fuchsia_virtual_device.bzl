@@ -66,40 +66,40 @@ fuchsia_virtual_device = rule(
     implementation = _fuchsia_virtual_device_impl,
     attrs = {
         "device_name": attr.string(
-            doc = "Name of the virtual device",
+            doc = "Name of the virtual device.",
             mandatory = True,
         ),
         "description": attr.string(
-            doc = "Description of the virtual device",
+            doc = "Description of the virtual device.",
             default = "",
         ),
         "arch": attr.string(
-            doc = "The architecture of the cpu",
+            doc = "The architecture of the cpu.",
             values = [ARCH.X64, ARCH.ARM64],
             mandatory = True,
         ),
         "window_width_px": attr.int(
-            doc = "Width of the virtual device's screen, in pixels",
+            doc = "Width of the virtual device's screen, in pixels.",
             default = 1200,
         ),
         "window_height_px": attr.int(
-            doc = "Height of the virtual device's screen, in pixels",
+            doc = "Height of the virtual device's screen, in pixels.",
             default = 800,
         ),
         "memory_quantity": attr.int(
-            doc = "Memory of the virtual device",
+            doc = "Memory of the virtual device.",
             default = 8192,
         ),
         "memory_unit": attr.string(
-            doc = "Unit for memory of the virtual device (e.g. megabytes, gigabytes, etc.)",
+            doc = "Unit for memory of the virtual device (e.g. megabytes, gigabytes, etc.).",
             default = "megabytes",
         ),
         "storage_quantity": attr.int(
-            doc = "Storage of the virtual device",
+            doc = "Storage of the virtual device.",
             default = 2,
         ),
         "storage_unit": attr.string(
-            doc = "Unit for storage of the virtual device (e.g. megabytes, gigabytes, etc.)",
+            doc = "Unit for storage of the virtual device (e.g. megabytes, gigabytes, etc.).",
             default = "gigabytes",
         ),
     },

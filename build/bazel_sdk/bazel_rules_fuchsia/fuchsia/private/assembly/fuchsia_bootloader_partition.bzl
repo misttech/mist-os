@@ -2,11 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# buildifier: disable=module-docstring
-load(
-    ":providers.bzl",
-    "FuchsiaPartitionInfo",
-)
+"""Rule for creating a bootloader partition mapping."""
+
+load(":providers.bzl", "FuchsiaPartitionInfo")
 
 def _fuchsia_bootloader_partition_impl(ctx):
     bootloader_partition = {
@@ -28,16 +26,16 @@ fuchsia_bootloader_partition = rule(
     provides = [FuchsiaPartitionInfo],
     attrs = {
         "partition_name": attr.string(
-            doc = "Name of the partition",
+            doc = "Name of the partition.",
             mandatory = True,
         ),
         "image": attr.label(
-            doc = "The bootloader image file",
+            doc = "The bootloader image file.",
             allow_single_file = True,
             mandatory = True,
         ),
         "type": attr.string(
-            doc = "The firmware type provided to the update system",
+            doc = "The firmware type provided to the update system.",
             mandatory = True,
         ),
     },

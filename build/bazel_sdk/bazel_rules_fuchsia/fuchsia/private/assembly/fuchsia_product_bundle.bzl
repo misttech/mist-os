@@ -1,7 +1,8 @@
 # Copyright 2022 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Rule for creating product bundle for flashing Fuchsia images to target devices."""
+
+"""Rule that creates a product bundle for flashing, emulating, or updating a Fuchsia product to a target device."""
 
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_product_bundle_inputs")
 load("//fuchsia/private/workflows:fuchsia_product_bundle_tasks.bzl", "fuchsia_product_bundle_tasks")
@@ -23,7 +24,7 @@ def fuchsia_product_bundle(
         product_image = None,
         product_name = None,
         **kwargs):
-    """ Build a fuchsia product bundle.
+    """Build a fuchsia product bundle.
 
     This rule produces a fuchsia product bundle which can be used to flash or OTA a device.
 
@@ -653,66 +654,66 @@ def _build_fuchsia_product_bundle_impl(ctx):
     )]
 
 _build_fuchsia_product_bundle = rule(
-    doc = """Creates pb for flashing Fuchsia images to target devices.""",
+    doc = """Create a product bundle (PB) for flashing, emulating, or updating a Fuchsia product to a target device.""",
     implementation = _build_fuchsia_product_bundle_impl,
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "board_name": attr.string(
-            doc = "Name of the board this PB runs on. E.g. qemu-x64",
+            doc = "Name of the board this PB runs on. E.g. qemu-x64.",
             mandatory = True,
         ),
         "delivery_blob_type": attr.string(
             doc = "Delivery blob type of the product bundle.",
         ),
         "partitions_config": attr.label(
-            doc = "Partitions config to use",
+            doc = "Partitions config to use.",
             mandatory = True,
         ),
         "product_image": attr.label(
-            doc = "fuchsia_product_image target to put in slot A",
+            doc = "fuchsia_product_image target to put in slot A.",
             providers = [FuchsiaProductImageInfo],
             mandatory = True,
         ),
         "product_name": attr.string(
-            doc = "Name of the Fuchsia product. E.g. workstation_eng",
+            doc = "Name of the Fuchsia product. E.g. workstation_eng.",
             mandatory = True,
         ),
         "product_version": attr.string(
-            doc = "Version of the Fuchsia product. E.g. 35.20221231.0.1",
+            doc = "Version of the Fuchsia product. E.g. 35.20221231.0.1.",
         ),
         "recovery": attr.label(
-            doc = "fuchsia_product_image target to put in slot R",
+            doc = "fuchsia_product_image target to put in slot R.",
             providers = [FuchsiaProductImageInfo],
         ),
         "repository_keys": attr.label(
-            doc = "A fuchsia_repository_keys target, must be specified when update_version_file is specified",
+            doc = "A fuchsia_repository_keys target, which must be specified when update_version_file is specified.",
             providers = [FuchsiaRepositoryKeysInfo],
             default = None,
         ),
         "update_version_file": attr.label(
-            doc = "version file needed to create update package",
+            doc = "Version file needed to create update package.",
             allow_single_file = True,
             default = None,
         ),
         "update_epoch": attr.string(
-            doc = "epoch needed to create update package",
+            doc = "Epoch needed to create update package.",
             default = "1",
         ),
         "product_image_scrutiny_config": attr.label(
-            doc = "Scrutiny config for slot A",
+            doc = "Scrutiny config for slot A.",
             providers = [FuchsiaScrutinyConfigInfo],
         ),
         "recovery_scrutiny_config": attr.label(
-            doc = "Scrutiny config for recovery",
+            doc = "Scrutiny config for recovery.",
             providers = [FuchsiaScrutinyConfigInfo],
         ),
         "virtual_devices": attr.label_list(
-            doc = "Virtual devices to make available",
+            doc = "Virtual devices to make available.",
             providers = [FuchsiaVirtualDeviceInfo],
             default = [],
         ),
         "default_virtual_device": attr.label(
-            doc = "Default virtual device to run when none is specified",
+            doc = "Default virtual device to run when none is specified.",
             providers = [FuchsiaVirtualDeviceInfo],
             default = None,
         ),
