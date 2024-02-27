@@ -6,8 +6,8 @@ use {
     crate::common::mac::WlanGi,
     crate::probe_sequence::{ProbeEntry, ProbeSequence},
     banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
-    fidl_fuchsia_wlan_minstrel as fidl_minstrel, fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_minstrel as fidl_minstrel,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx,
     ieee80211::{MacAddr, MacAddrBytes},
     std::{
         collections::{hash_map, HashMap, HashSet},
@@ -181,7 +181,7 @@ impl Peer {
         Ok(peer)
     }
 
-    fn handle_tx_result_report(&mut self, tx_result: &banjo_common::WlanTxResult) {
+    fn handle_tx_result_report(&mut self, tx_result: &fidl_common::WlanTxResult) {
         let mut last_attempted_idx = None;
         for status_entry in &tx_result.tx_result_entry[..] {
             let idx = match TxVecIdx::new(status_entry.tx_vector_idx) {
@@ -205,7 +205,7 @@ impl Peer {
             }
         }
         if let Some(idx) = last_attempted_idx {
-            if tx_result.result_code == banjo_common::WlanTxResultCode::SUCCESS {
+            if tx_result.result_code == fidl_common::WlanTxResultCode::Success {
                 // last_attempted_idx will always have a corresponding tx_stats_map entry.
                 self.tx_stats_map.get_mut(&idx).unwrap().success_cur += 1;
             }
@@ -539,7 +539,7 @@ impl<T: TimerManager> MinstrelRateSelector<T> {
         }
     }
 
-    pub fn handle_tx_result_report(&mut self, tx_result: &banjo_common::WlanTxResult) {
+    pub fn handle_tx_result_report(&mut self, tx_result: &fidl_common::WlanTxResult) {
         let peer_addr: MacAddr = tx_result.peer_addr.into();
         match self.peer_map.get_mut(&peer_addr) {
             Some(peer) => {
@@ -879,25 +879,25 @@ mod tests {
     }
 
     /// Helper fn to easily create tx result reports.
-    fn make_tx_result(entries: Vec<(u16, u8)>, success: bool) -> banjo_common::WlanTxResult {
+    fn make_tx_result(entries: Vec<(u16, u8)>, success: bool) -> fidl_common::WlanTxResult {
         assert!(entries.len() <= 8);
         let mut tx_result_entry =
-            [banjo_common::WlanTxResultEntry { tx_vector_idx: 0, attempts: 0 }; 8];
+            [fidl_common::WlanTxResultEntry { tx_vector_idx: 0, attempts: 0 }; 8];
         tx_result_entry[0..entries.len()].copy_from_slice(
             &entries
                 .into_iter()
-                .map(|(tx_vector_idx, attempts)| banjo_common::WlanTxResultEntry {
+                .map(|(tx_vector_idx, attempts)| fidl_common::WlanTxResultEntry {
                     tx_vector_idx,
                     attempts,
                 })
-                .collect::<Vec<banjo_common::WlanTxResultEntry>>()[..],
+                .collect::<Vec<fidl_common::WlanTxResultEntry>>()[..],
         );
         let result_code = if success {
-            banjo_common::WlanTxResultCode::SUCCESS
+            fidl_common::WlanTxResultCode::Success
         } else {
-            banjo_common::WlanTxResultCode::FAILED
+            fidl_common::WlanTxResultCode::Failed
         };
-        banjo_common::WlanTxResult {
+        fidl_common::WlanTxResult {
             tx_result_entry,
             peer_addr: TEST_MAC_ADDR.to_array(),
             result_code,

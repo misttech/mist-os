@@ -16,12 +16,10 @@ namespace wlan::drivers {
 namespace {
 namespace wlan_softmac = fuchsia_wlan_softmac::wire;
 namespace wlan_common = fuchsia_wlan_common::wire;
-namespace wlan_ieee80211 = fuchsia_wlan_ieee80211::wire;
 
 /* Metadata which is used as input and expected output for the under-test conversion functions*/
 
 // Fake metadata -- general
-static constexpr uint8_t kFakeMacAddr[wlan_ieee80211::kMacAddrLen] = {6, 5, 4, 3, 2, 2};
 static constexpr uint8_t kFakeChannel = 15;
 static constexpr size_t kFakePacketSize = 50;
 
@@ -35,8 +33,6 @@ static constexpr int16_t kRandomPopulaterInt16 = -24679;
 static constexpr wlan_common::WlanPhyType kFakeFidlPhyType = wlan_common::WlanPhyType::kErp;
 static constexpr wlan_common::ChannelBandwidth kFakeFidlChannelBandwidth =
     wlan_common::ChannelBandwidth::kCbw160;
-static constexpr wlan_common::WlanTxResultCode kFakeFidlTxResultCode =
-    wlan_common::WlanTxResultCode::kSuccess;
 static constexpr wlan_softmac::WlanRxInfoFlags kFakeRxFlags =
     wlan_softmac::WlanRxInfoFlags::TruncatingUnknown(kRandomPopulaterUint32);
 static constexpr wlan_softmac::WlanRxInfoValid kFakeRxValid =
@@ -45,7 +41,6 @@ static constexpr wlan_softmac::WlanRxInfoValid kFakeRxValid =
 // Fake metadata -- banjo
 static constexpr uint32_t kFakeBanjoPhyType = WLAN_PHY_TYPE_ERP;
 static constexpr uint32_t kFakeBanjoChannelBandwidth = CHANNEL_BANDWIDTH_CBW160;
-static constexpr uint8_t kFakeBanjoTxResultCode = WLAN_TX_RESULT_CODE_SUCCESS;
 
 /* Test cases*/
 
@@ -105,36 +100,6 @@ TEST_F(ConvertTest, ToBanjoRxPacket) {
 
   free(rx_packet);
 }  // namespace
-
-TEST_F(ConvertTest, ToBanjoTxStatus) {
-  log::Instance::Init(0);
-  // Populate wlan_common::WlanTxResult
-  wlan_common::WlanTxResult in = {
-      .result_code = kFakeFidlTxResultCode,
-  };
-  for (size_t i = 0; i < wlan_common::kWlanTxResultMaxEntry; i++) {
-    in.tx_result_entry[i].tx_vector_idx = kRandomPopulaterUint16;
-    in.tx_result_entry[i].attempts = kRandomPopulaterUint8;
-  }
-  for (size_t i = 0; i < wlan_ieee80211::kMacAddrLen; i++) {
-    in.peer_addr[i] = kFakeMacAddr[i];
-  }
-
-  // Conduct conversion
-  wlan_tx_result_t out;
-  EXPECT_EQ(ZX_OK, ConvertTxStatus(in, &out));
-
-  // Verify outputs
-  for (size_t i = 0; i < wlan_common::kWlanTxResultMaxEntry; i++) {
-    EXPECT_EQ(kRandomPopulaterUint16, out.tx_result_entry[i].tx_vector_idx);
-    EXPECT_EQ(kRandomPopulaterUint8, out.tx_result_entry[i].attempts);
-  }
-
-  for (size_t i = 0; i < wlan_ieee80211::kMacAddrLen; i++) {
-    EXPECT_EQ(kFakeMacAddr[i], out.peer_addr[i]);
-  }
-  EXPECT_EQ(kFakeBanjoTxResultCode, out.result_code);
-}
 
 // banjo to FIDL types tests.
 TEST_F(ConvertTest, ToFidlTxPacket) {

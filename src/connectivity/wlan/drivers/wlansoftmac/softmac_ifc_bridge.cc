@@ -39,7 +39,6 @@ zx::result<std::unique_ptr<SoftmacIfcBridge>> SoftmacIfcBridge::New(
   // called in the handler functions of FIDL server end.
   softmac_ifc_bridge->wlan_softmac_ifc_protocol_ops_ = {
       .recv = rust_softmac_ifc->ops->recv,
-      .report_tx_result = rust_softmac_ifc->ops->report_tx_result,
   };
   softmac_ifc_bridge->wlan_softmac_ifc_protocol_.ops =
       &softmac_ifc_bridge->wlan_softmac_ifc_protocol_ops_;
@@ -119,26 +118,16 @@ void SoftmacIfcBridge::Recv(RecvRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void SoftmacIfcBridge::ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
+void SoftmacIfcBridge::ReportTxResult(ReportTxResultRequestView request, fdf::Arena& fdf_arena,
                                       ReportTxResultCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  {
-    std::lock_guard<std::mutex> lock(*unbind_lock_);
-    if (*unbind_called_) {
-      return;
-    }
+  auto result = softmac_ifc_bridge_client_->sync()->ReportTxResult(request->tx_result);
+  if (!result.ok()) {
+    lerror("ReportTxResult failed (FIDL error %s)", result.status_string());
   }
-
-  wlan_tx_result_t tx_result;
-  zx_status_t status = ConvertTxStatus(request->tx_result, &tx_result);
-  if (status != ZX_OK) {
-    lerror("TxStatus conversion failed: %s", zx_status_get_string(status));
-  }
-
-  wlan_softmac_ifc_protocol_.ops->report_tx_result(wlan_softmac_ifc_protocol_.ctx, &tx_result);
-
-  completer.buffer(arena).Reply();
+  completer.buffer(fdf_arena).Reply();
 }
+
 void SoftmacIfcBridge::NotifyScanComplete(NotifyScanCompleteRequestView request,
                                           fdf::Arena& fdf_arena,
                                           NotifyScanCompleteCompleter::Sync& completer) {

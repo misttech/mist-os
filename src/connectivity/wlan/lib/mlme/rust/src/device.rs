@@ -686,8 +686,6 @@ impl DeviceOps for Device {
 pub struct CWlanSoftmacIfcProtocolOps {
     recv: extern "C" fn(ctx: &mut DriverEventSink, packet: &WlanRxPacket),
     complete_tx: extern "C" fn(ctx: &mut DriverEventSink, packet: &WlanTxPacket, status: i32),
-    report_tx_result:
-        extern "C" fn(ctx: &mut DriverEventSink, tx_result: &banjo_common::WlanTxResult),
 }
 
 #[no_mangle]
@@ -715,21 +713,8 @@ extern "C" fn handle_complete_tx(_ctx: &mut DriverEventSink, _packet: &WlanTxPac
     // TODO(https://fxbug.dev/42166877): Implement this to support asynchronous packet delivery.
 }
 
-#[no_mangle]
-extern "C" fn handle_report_tx_result(
-    ctx: &mut DriverEventSink,
-    tx_result_in: &banjo_common::WlanTxResult,
-) {
-    // Cast to non-mutable reference since the referenced points to a pinned `DriverEventSink`.
-    let ctx = ctx as &DriverEventSink;
-    let _ = ctx.unbounded_send(DriverEvent::TxResultReport { tx_result: *tx_result_in });
-}
-
-const PROTOCOL_OPS: CWlanSoftmacIfcProtocolOps = CWlanSoftmacIfcProtocolOps {
-    recv: handle_recv,
-    complete_tx: handle_complete_tx,
-    report_tx_result: handle_report_tx_result,
-};
+const PROTOCOL_OPS: CWlanSoftmacIfcProtocolOps =
+    CWlanSoftmacIfcProtocolOps { recv: handle_recv, complete_tx: handle_complete_tx };
 
 struct WlanSoftmacIfcProtocol {
     sink: DriverEventSink,

@@ -26,7 +26,7 @@ mod probe_sequence;
 
 use {
     anyhow::{bail, format_err, Error},
-    banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
+    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     device::{completers::StopCompleter, DeviceOps},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_softmac as fidl_softmac,
     fuchsia_sync::Mutex,
@@ -211,7 +211,7 @@ pub enum DriverEvent {
     // Reports a scan is complete.
     ScanComplete { status: zx::Status, scan_id: u64 },
     // Reports the result of an attempted frame transmission.
-    TxResultReport { tx_result: banjo_common::WlanTxResult },
+    TxResultReport { tx_result: fidl_common::WlanTxResult },
 }
 
 impl fmt::Display for DriverEvent {

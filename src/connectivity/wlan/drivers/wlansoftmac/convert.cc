@@ -126,30 +126,6 @@ zx_status_t ConvertRxPacket(const fuchsia_wlan_softmac::wire::WlanRxPacket& in,
   return ConvertRxInfo(in.info, &out->info);
 }
 
-zx_status_t ConvertTxStatus(const fuchsia_wlan_common::wire::WlanTxResult& in,
-                            wlan_tx_result_t* out) {
-  for (size_t i = 0; i < fuchsia_wlan_common::wire::kWlanTxResultMaxEntry; i++) {
-    out->tx_result_entry[i].tx_vector_idx = in.tx_result_entry.begin()[i].tx_vector_idx;
-    out->tx_result_entry[i].attempts = in.tx_result_entry.begin()[i].attempts;
-  }
-
-  memcpy(&out->peer_addr[0], in.peer_addr.begin(), fuchsia_wlan_ieee80211::wire::kMacAddrLen);
-
-  switch (in.result_code) {
-    case fuchsia_wlan_common::wire::WlanTxResultCode::kFailed:
-      out->result_code = WLAN_TX_RESULT_CODE_FAILED;
-      break;
-    case fuchsia_wlan_common::wire::WlanTxResultCode::kSuccess:
-      out->result_code = WLAN_TX_RESULT_CODE_SUCCESS;
-      break;
-    default:
-      lerror("WlanTxResult is not supported: %hhu", static_cast<uint8_t>(in.result_code));
-      return ZX_ERR_INVALID_ARGS;
-  }
-  return ZX_OK;
-}
-
-// banjo to FIDL conversions.
 zx_status_t ConvertMacRole(const wlan_mac_role_t& in, fuchsia_wlan_common::wire::WlanMacRole* out) {
   switch (in) {
     case WLAN_MAC_ROLE_AP:

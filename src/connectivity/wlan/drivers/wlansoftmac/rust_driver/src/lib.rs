@@ -563,6 +563,14 @@ async fn serve_wlan_softmac_ifc_bridge(
             }
         };
         match request {
+            fidl_softmac::WlanSoftmacIfcBridgeRequest::ReportTxResult { tx_result, responder } => {
+                let responder = driver_event_sink.unbounded_send_or_respond(
+                    DriverEvent::TxResultReport { tx_result },
+                    responder,
+                    (),
+                )?;
+                responder.send().format_send_err_with_context("ReportTxResult")?;
+            }
             fidl_softmac::WlanSoftmacIfcBridgeRequest::NotifyScanComplete {
                 payload,
                 responder,
@@ -1055,6 +1063,50 @@ mod tests {
                     complete_sme_sender,
                 },
             )
+        }
+    }
+
+    #[test]
+    fn serve_wlansoftmac_ifc_bridge_enqueues_report_tx_result() {
+        let mut exec = TestExecutor::new();
+        let (driver_event_sink, mut driver_event_stream) = DriverEventSink::new();
+        let (softmac_ifc_bridge_proxy, softmac_ifc_bridge_server) =
+            fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>().unwrap();
+        let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream().unwrap();
+
+        let server_fut =
+            serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);
+        pin_mut!(server_fut);
+
+        let resp_fut = softmac_ifc_bridge_proxy.report_tx_result(&fidl_common::WlanTxResult {
+            tx_result_entry: [fidl_common::WlanTxResultEntry {
+                tx_vector_idx: fidl_common::WLAN_TX_VECTOR_IDX_INVALID,
+                attempts: 0,
+            }; fidl_common::WLAN_TX_RESULT_MAX_ENTRY as usize],
+            peer_addr: [3; 6],
+            result_code: fidl_common::WlanTxResultCode::Failed,
+        });
+        pin_mut!(resp_fut);
+        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut server_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Ready(Ok(())));
+
+        match driver_event_stream.try_next().unwrap().unwrap() {
+            DriverEvent::TxResultReport { tx_result } => {
+                assert_eq!(
+                    tx_result,
+                    fidl_common::WlanTxResult {
+                        tx_result_entry: [fidl_common::WlanTxResultEntry {
+                            tx_vector_idx: fidl_common::WLAN_TX_VECTOR_IDX_INVALID,
+                            attempts: 0
+                        };
+                            fidl_common::WLAN_TX_RESULT_MAX_ENTRY as usize],
+                        peer_addr: [3; 6],
+                        result_code: fidl_common::WlanTxResultCode::Failed,
+                    }
+                );
+            }
+            _ => panic!("Unexpected DriverEvent!"),
         }
     }
 

@@ -308,6 +308,16 @@ type WlanTxPacket = struct {
 /// and `WlanSoftmacIfcBridge`.
 @available(added=HEAD)
 closed protocol WlanSoftmacIfcBase {
+    /// Reports the result of an attempted transmission.
+    ///
+    /// A device driver indicates support for `ReportTxResult()` using
+    /// `fuchsia.wlan.common/DeviceExtension.report_tx_result_supported`.
+    @available(added=HEAD)
+    @selector("fuchsia.wlan.softmac/WlanSoftmacIfc.ReportTxResult")
+    strict ReportTxResult(struct {
+        tx_result fuchsia.wlan.common.WlanTxResult;
+    }) -> ();
+
     /// Reports completion of a scan associated with the unique `scan_id`. `status`
     /// indicates whether the scan completed successfully, failed due to an error,
     /// or was cancelled.
@@ -348,18 +358,19 @@ closed protocol WlanSoftmacIfc {
         packet WlanRxPacket;
     }) -> ();
 
-    /// Reports the result of an attempted transmission.
-    ///
-    /// A device driver indicates support for `ReportTxResult()` using
-    /// `fuchsia.wlan.common/DeviceExtension.report_tx_result_supported`.
-    strict ReportTxResult(struct {
-        tx_result fuchsia.wlan.common.WlanTxResult;
-    }) -> ();
-
     @available(added=HEAD)
     compose WlanSoftmacIfcBase;
 
     // At API level HEAD, WlanSoftmacIfc composes all the methods below this line from WlanSoftmacBase.
+
+    /// Reports the result of an attempted transmission.
+    ///
+    /// A device driver indicates support for `ReportTxResult()` using
+    /// `fuchsia.wlan.common/DeviceExtension.report_tx_result_supported`.
+    @available(added=15, removed=HEAD)
+    strict ReportTxResult(struct {
+        tx_result fuchsia.wlan.common.WlanTxResult;
+    }) -> ();
 
     /// Reports completion of a scan associated with the unique `scan_id`. `status`
     /// indicates whether the scan completed successfully, failed due to an error,

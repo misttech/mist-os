@@ -80,3 +80,13 @@ impl ResponderExt for fidl_softmac::WlanSoftmacIfcBridgeNotifyScanCompleteRespon
         Self::send(self)
     }
 }
+
+impl ResponderExt for fidl_softmac::WlanSoftmacIfcBridgeReportTxResultResponder {
+    type Response = ();
+    const REQUEST_NAME: &'static str =
+        stringify!(fidl_softmac::WlanSoftmacIfcBaseReportTxResultRequest);
+
+    fn send(self, _: Self::Response) -> Result<(), fidl::Error> {
+        Self::send(self)
+    }
+}
