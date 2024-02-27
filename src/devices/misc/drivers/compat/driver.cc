@@ -900,9 +900,9 @@ zx_status_t Driver::AddDevice(Device* parent, device_add_args_t* args, zx_device
 }
 
 zx::result<> Driver::SetProfileByRole(zx::unowned_thread thread, std::string_view role) {
-  auto profile_client = incoming()->Connect<fuchsia_scheduler::ProfileProvider>();
-  if (profile_client.is_error()) {
-    return profile_client.take_error();
+  auto role_manager = incoming()->Connect<fuchsia_scheduler::RoleManager>();
+  if (role_manager.is_error()) {
+    return role_manager.take_error();
   }
 
   zx::thread duplicate_thread;
@@ -912,14 +912,18 @@ zx::result<> Driver::SetProfileByRole(zx::unowned_thread thread, std::string_vie
     return zx::error(status);
   }
 
-  fidl::WireResult result =
-      fidl::WireCall(*profile_client)
-          ->SetProfileByRole(std::move(duplicate_thread), fidl::StringView::FromExternal(role));
-  if (!result.ok()) {
+  fidl::Arena arena;
+  auto request =
+      fuchsia_scheduler::wire::RoleManagerSetRoleRequest::Builder(arena)
+          .target(fuchsia_scheduler::wire::RoleTarget::WithThread(std::move(duplicate_thread)))
+          .role(fuchsia_scheduler::wire::RoleName{fidl::StringView::FromExternal(role)})
+          .Build();
+  auto result = fidl::WireCall(*role_manager)->SetRole(request);
+  if (result.status() != ZX_OK) {
     return zx::error(result.status());
   }
-  if (result->status != ZX_OK) {
-    return zx::error(result->status);
+  if (!result.value().is_ok()) {
+    return result.value().take_error();
   }
   return zx::ok();
 }

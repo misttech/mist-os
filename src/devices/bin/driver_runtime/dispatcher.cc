@@ -252,10 +252,11 @@ std::unique_ptr<driver_runtime::CallbackRequest> Dispatcher::AsyncIrq::CreateCal
     Dispatcher& dispatcher) {
   auto async_dispatcher = dispatcher.GetAsyncDispatcher();
 
-  // TODO(https://fxbug.dev/42052990): We should consider something more efficient than creating a callback
-  // request each time the irq is triggered. This is complex due to an AsyncIrq not having a 1:1
-  // mapping to interrupt callbacks, and we cannot easily return ownership of a |CallbackRequest|
-  // after dispatching it. See https://fxbug.dev/42052990 for a longer explanation.
+  // TODO(https://fxbug.dev/42052990): We should consider something more efficient than creating a
+  // callback request each time the irq is triggered. This is complex due to an AsyncIrq not having
+  // a 1:1 mapping to interrupt callbacks, and we cannot easily return ownership of a
+  // |CallbackRequest| after dispatching it. See https://fxbug.dev/42052990 for a longer
+  // explanation.
   auto callback_request =
       std::make_unique<driver_runtime::CallbackRequest>(CallbackRequest::RequestType::kIrq);
   driver_runtime::Callback callback =
@@ -1790,12 +1791,11 @@ void Dispatcher::ThreadPool::ThreadWakeupPrologue() {
 }
 
 zx_status_t Dispatcher::ThreadPool::SetRoleProfile() {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-  zx::result client_end = component::Connect<fuchsia_scheduler::ProfileProvider>();
+  zx::result client_end = component::Connect<fuchsia_scheduler::RoleManager>();
   if (client_end.is_error()) {
     return client_end.status_value();
   }
-  auto provider = *std::move(client_end);
+  auto role_manager = *std::move(client_end);
 
   const zx_rights_t kRights = ZX_RIGHT_TRANSFER | ZX_RIGHT_MANAGE_THREAD;
   zx::thread duplicate;
@@ -1805,17 +1805,20 @@ zx_status_t Dispatcher::ThreadPool::SetRoleProfile() {
     return status;
   }
 
-  auto result = fidl::WireCall(provider)->SetProfileByRole(
-      std::move(duplicate), fidl::StringView::FromExternal(scheduler_role()));
+  fidl::Arena arena;
+  auto request =
+      fuchsia_scheduler::wire::RoleManagerSetRoleRequest::Builder(arena)
+          .target(fuchsia_scheduler::wire::RoleTarget::WithThread(std::move(duplicate)))
+          .role(fuchsia_scheduler::wire::RoleName{fidl::StringView::FromExternal(scheduler_role())})
+          .Build();
+  auto result = fidl::WireCall(role_manager)->SetRole(request);
   if (result.status() != ZX_OK) {
     return result.status();
   }
-  if (result.value().status != ZX_OK) {
-    return result.value().status;
+  if (!result.value().is_ok()) {
+    return result.value().error_value();
   }
   return ZX_OK;
-#endif  // #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-  return ZX_ERR_NOT_SUPPORTED;
 }
 
 zx_status_t Dispatcher::ThreadPool::AddThread() {

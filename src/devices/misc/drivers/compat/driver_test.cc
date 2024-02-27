@@ -418,46 +418,41 @@ class TestDevice : public fidl::WireServer<fuchsia_driver_compat::Device> {
   std::unordered_map<uint32_t, MockProtocol> banjo_protocols_;
 };
 
-class TestProfileProvider : public fidl::testing::WireTestBase<fuchsia_scheduler::ProfileProvider> {
+class TestRoleManager : public fidl::testing::WireTestBase<fuchsia_scheduler::RoleManager> {
  public:
-  TestProfileProvider() = default;
+  TestRoleManager() = default;
 
-  explicit TestProfileProvider(std::string expected_role)
-      : expected_role_(std::move(expected_role)) {}
+  explicit TestRoleManager(std::string expected_role) : expected_role_(std::move(expected_role)) {}
 
-  fidl::ProtocolHandler<fuchsia_scheduler::ProfileProvider> GetHandler() {
+  fidl::ProtocolHandler<fuchsia_scheduler::RoleManager> GetHandler() {
     return bindings_.CreateHandler(this, async_get_default_dispatcher(),
                                    fidl::kIgnoreBindingClosure);
   }
 
  private:
-  void GetProfile(GetProfileRequestView request, GetProfileCompleter::Sync& completer) override {
-    completer.Reply(ZX_ERR_NOT_SUPPORTED, zx::profile());
-  }
-
-  void GetDeadlineProfile(GetDeadlineProfileRequestView request,
-                          GetDeadlineProfileCompleter::Sync& completer) override {
-    completer.Reply(ZX_ERR_NOT_SUPPORTED, zx::profile());
-  }
-
-  void SetProfileByRole(SetProfileByRoleRequestView request,
-                        SetProfileByRoleCompleter::Sync& completer) override {
-    if (!request->handle.is_valid()) {
-      completer.Reply(ZX_ERR_INVALID_ARGS);
+  void SetRole(SetRoleRequestView request, SetRoleCompleter::Sync& completer) override {
+    if (!request->target().is_thread()) {
+      completer.ReplyError(ZX_ERR_INVALID_ARGS);
       return;
     }
-    if (request->role.get() != expected_role_) {
-      completer.Reply(ZX_ERR_BAD_PATH);
+    if (!request->target().thread().is_valid()) {
+      completer.ReplyError(ZX_ERR_INVALID_ARGS);
       return;
     }
-    completer.Reply(ZX_OK);
+    if (request->role().role.get() != expected_role_) {
+      completer.ReplyError(ZX_ERR_BAD_PATH);
+      return;
+    }
+    fidl::Arena arena;
+    completer.ReplySuccess(
+        fuchsia_scheduler::wire::RoleManagerSetRoleResponse::Builder(arena).Build());
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    printf("Not implemented: ProfileProvider::%s", name.data());
+    printf("Not implemented: RoleManager::%s", name.data());
   }
 
-  fidl::ServerBindingGroup<fuchsia_scheduler::ProfileProvider> bindings_;
+  fidl::ServerBindingGroup<fuchsia_scheduler::RoleManager> bindings_;
   std::string expected_role_;
 };
 
@@ -522,7 +517,7 @@ class IncomingNamespace {
                      std::string expected_profile_role, fidl::ServerEnd<fio::Directory> pkg_server,
                      fidl::ServerEnd<fio::Directory> svc_server) {
     async_dispatcher_t* dispatcher = async_get_default_dispatcher();
-    profile_provider_.emplace(std::move(expected_profile_role));
+    role_manager_.emplace(std::move(expected_profile_role));
 
     std::map<std::string, std::string> arguments;
     arguments["kernel.shell"] = "true";
@@ -618,8 +613,8 @@ class IncomingNamespace {
         return result.take_error();
       }
 
-      result = outgoing.AddUnmanagedProtocol<fuchsia_scheduler::ProfileProvider>(
-          profile_provider_->GetHandler());
+      result = outgoing.AddUnmanagedProtocol<fuchsia_scheduler::RoleManager>(
+          role_manager_->GetHandler());
       if (result.is_error()) {
         return result.take_error();
       }
@@ -677,7 +672,7 @@ class IncomingNamespace {
   TestSmcResource smc_resource_;
   TestInfoResource info_resource_;
   TestMsiResource msi_resource_;
-  std::optional<TestProfileProvider> profile_provider_;
+  std::optional<TestRoleManager> role_manager_;
   mock_boot_arguments::Server boot_args_;
   TestItems items_;
   TestFile compat_file_;

@@ -77,7 +77,7 @@ TEST_F(ThreadPoolTest, NoSchedulerRole) {
 }
 
 TEST_F(ThreadPoolTest, WithSchedulerRole) {
-  constexpr std::string_view kSchedulerRole = "fuchsia.test-role:ok";
+  constexpr std::string_view kSchedulerRole = "fuchsia.default";
   ASSERT_NO_FATAL_FAILURE(InitTestDispatcher(kSchedulerRole));
 
   libsync::Completion task_completion;
@@ -107,7 +107,7 @@ TEST_F(ThreadPoolTest, BadSchedulerRole) {
 }
 
 TEST_F(ThreadPoolTest, AllowSyncCalls) {
-  constexpr std::string_view kSchedulerRole = "fuchsia.test-role:ok";
+  constexpr std::string_view kSchedulerRole = "fuchsia.default";
   ASSERT_NO_FATAL_FAILURE(
       InitTestDispatcher(kSchedulerRole, fdf::SynchronizedDispatcher::Options::kAllowSyncCalls));
 
@@ -130,7 +130,7 @@ TEST_F(ThreadPoolTest, AllowSyncCalls) {
 }
 
 TEST_F(ThreadPoolTest, Shutdown) {
-  constexpr std::string_view kSchedulerRole = "fuchsia.test-role:ok";
+  constexpr std::string_view kSchedulerRole = "fuchsia.default";
 
   auto fake_driver = CreateFakeDriver();
   libsync::Completion shutdown_completion;
@@ -207,7 +207,7 @@ MultipleDispatchersThreadPoolTest::CreateTestDispatcher(
 }
 
 TEST_F(MultipleDispatchersThreadPoolTest, ManyDispatchers) {
-  constexpr std::string_view kSchedulerRole = "fuchsia.test-role:ok";
+  constexpr std::string_view kSchedulerRole = "fuchsia.default";
   constexpr std::string_view kBadSchedulerRole = "fuchsia.test-role:not-found";
   constexpr uint32_t kNumDispatchers = 5;
 
@@ -245,7 +245,7 @@ TEST_F(MultipleDispatchersThreadPoolTest, ManyDispatchers) {
 }
 
 TEST_F(MultipleDispatchersThreadPoolTest, NumThreads) {
-  constexpr std::string_view kSchedulerRole = "fuchsia.test-role:ok";
+  constexpr std::string_view kSchedulerRole = "fuchsia.default";
 
   {
     auto dispatcher = CreateTestDispatcher(kSchedulerRole, {});
@@ -266,7 +266,7 @@ TEST_F(MultipleDispatchersThreadPoolTest, NumThreads) {
 }
 
 TEST_F(MultipleDispatchersThreadPoolTest, NumThreadsAllowSyncCalls) {
-  constexpr std::string_view kSchedulerRole = "fuchsia.test-role:ok";
+  constexpr std::string_view kSchedulerRole = "fuchsia.default";
 
   {
     auto dispatcher =
