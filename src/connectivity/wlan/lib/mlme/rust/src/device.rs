@@ -8,7 +8,7 @@ use {
     },
     anyhow::format_err,
     banjo_fuchsia_wlan_common as banjo_common,
-    banjo_fuchsia_wlan_softmac::{self as banjo_wlan_softmac, WlanRxPacket, WlanTxPacket},
+    banjo_fuchsia_wlan_softmac::{self as banjo_wlan_softmac, WlanRxPacket},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
     futures::channel::mpsc,
@@ -685,7 +685,6 @@ impl DeviceOps for Device {
 #[repr(C)]
 pub struct CWlanSoftmacIfcProtocolOps {
     recv: extern "C" fn(ctx: &mut DriverEventSink, packet: &WlanRxPacket),
-    complete_tx: extern "C" fn(ctx: &mut DriverEventSink, packet: &WlanTxPacket, status: i32),
 }
 
 #[no_mangle]
@@ -706,15 +705,7 @@ extern "C" fn handle_recv(ctx: &mut DriverEventSink, packet: &WlanRxPacket) {
         error!("Failed to receive frame: {:?}", e);
     });
 }
-#[no_mangle]
-extern "C" fn handle_complete_tx(_ctx: &mut DriverEventSink, _packet: &WlanTxPacket, _status: i32) {
-    // Cast to non-mutable reference since the referenced points to a pinned `DriverEventSink`.
-    let _ctx = _ctx as &DriverEventSink;
-    // TODO(https://fxbug.dev/42166877): Implement this to support asynchronous packet delivery.
-}
-
-const PROTOCOL_OPS: CWlanSoftmacIfcProtocolOps =
-    CWlanSoftmacIfcProtocolOps { recv: handle_recv, complete_tx: handle_complete_tx };
+const PROTOCOL_OPS: CWlanSoftmacIfcProtocolOps = CWlanSoftmacIfcProtocolOps { recv: handle_recv };
 
 struct WlanSoftmacIfcProtocol {
     sink: DriverEventSink,
