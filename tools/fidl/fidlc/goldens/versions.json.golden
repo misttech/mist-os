@@ -38,7 +38,7 @@
     "transitional_allow_list"
   ],
   "available": {
-    "fuchsia": "LEGACY",
+    "fuchsia": "HEAD",
     "test": "HEAD"
   },
   "library_dependencies": [],

@@ -80,7 +80,10 @@ foreach(filename, standalone_libraries) {
     }
 
     if (filename == "versions.test.fidl") {
-      available = [ "test:HEAD" ]
+      available = [
+        "fuchsia:HEAD",
+        "test:HEAD",
+      ]
     }
 
     # To output index jsons

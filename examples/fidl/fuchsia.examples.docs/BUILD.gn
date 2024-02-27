@@ -8,6 +8,7 @@ import("//build/fidl/fidl.gni")
 # Define a target for our FIDL library by passing it the FIDL source files
 # that make up the library.
 fidl("fuchsia.examples.docs") {
+  testonly = true
   sources = [
     "api_rubric.test.fidl",
     "attributes.test.fidl",
@@ -31,12 +32,18 @@ fidl("fuchsia.examples.docs") {
 }
 
 fidl("versioning") {
+  testonly = true
   name = "fuchsia.examples.docs"
   sources = [ "versioning.test.fidl" ]
   excluded_checks = [ "string-bounds-not-specified" ]
+
+  # Override --available because the "fuchsia" platform versions in this library
+  # are just for demonstration, they aren't real API levels.
+  available = [ "fuchsia:HEAD" ]
 }
 
 fidl("builtin") {
+  testonly = true
   sources = [ "language_reference_builtin.test.fidl" ]
   excluded_checks = [
     "invalid-case-for-decl-name",
@@ -45,6 +52,7 @@ fidl("builtin") {
 }
 
 group("all") {
+  testonly = true
   deps = [
     ":builtin($fidl_toolchain)",
     ":fuchsia.examples.docs($fidl_toolchain)",

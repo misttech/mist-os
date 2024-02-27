@@ -52,6 +52,10 @@ template("fidl_ir") {
   assert(defined(invoker.json_representation),
          "json_representation is required")
   assert(defined(invoker.sources), "sources is required")
+  if (defined(invoker.available)) {
+    assert(defined(invoker.testonly) && invoker.testonly,
+           "the `available` parameter is only allowed on testonly libraries")
+  }
 
   main_target_deps = []
 
@@ -67,9 +71,8 @@ template("fidl_ir") {
                            ])
     visibility = [ ":*" ]
     if (!defined(available)) {
-      available = []
+      available = [ "fuchsia:" + invoker.target_api_level ]
     }
-    available += [ "fuchsia:" + invoker.target_api_level ]
   }
 
   main_target_deps += [ ":$fidlc_target_name" ]

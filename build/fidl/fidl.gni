@@ -80,6 +80,9 @@ import("//build/testing/host_test_data.gni")
 #     A list of strings of the form PLATFORM:VERSION. This is needed when using
 #     @available annotations for platforms other than "fuchsia". For more
 #     information, look for --available in `fidlc --help`.
+#     Warning: All dependencies must specify the same value for `available`,
+#     otherwise bindings will be inconsistent. Since this is easy to misuse,
+#     this parameter is only allowed on testonly libraries.
 #
 #   experimental_flags (optional)
 #     A list of experimental fidlc features to enable.

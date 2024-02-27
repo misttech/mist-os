@@ -226,6 +226,11 @@ template("fidl_library") {
   # Enforce compatibility checks for all FIDL libraries included in the IDK with
   # platform `fuchsia`.
   if (requires_compatibility_tests) {
+    assert(
+        !defined(invoker.available),
+        "Cannot override `available` for FIDL library " + invoker.library_name +
+            " since it is compiled at each API level for compatibility tests")
+
     # The current level might be a supported level. Don't double count it.
     #
     # TODO: https://fxbug.dev/305961460 - Replace with more definite logic.
@@ -257,7 +262,6 @@ template("fidl_library") {
         forward_variables_from(invoker,
                                [
                                  "applicable_licenses",
-                                 "available",
                                  "experimental_flags",
                                  "non_fidl_deps",
                                  "public_deps",
