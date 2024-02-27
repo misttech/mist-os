@@ -21,7 +21,6 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/fuchsia-contiguous/sysmem",
       "sys/platform/register-controller-1000/registers-device",
       "sys/platform/nna-ff100000/nna-ff100000_group/aml-nna",
-      "sys/platform/dsi-7000/dw-dsi",
       "sys/platform/canvas-ff638000/aml-canvas",
       "sys/platform/adc-9000",
       "sys/platform/gpio-controller-ff634400/aml-gpio/gpio",

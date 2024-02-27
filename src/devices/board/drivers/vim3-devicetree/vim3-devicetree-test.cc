@@ -46,7 +46,6 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/fuchsia-contiguous",
       "sys/platform/register-controller-1000",
       "sys/platform/nna-ff100000",
-      "sys/platform/dsi-7000",
       "sys/platform/canvas-ff638000",
       "sys/platform/adc-9000",
       "sys/platform/gpio-controller-ff634400",
