@@ -239,7 +239,9 @@ pub fn sys_reboot(
                 }
             }
 
-            let reboot_reason = if reboot_args.contains(&&b"ota_update"[..]) {
+            let reboot_reason = if reboot_args.contains(&&b"ota_update"[..])
+                || reboot_args.contains(&&b"System update during setup"[..])
+            {
                 fpower::RebootReason::SystemUpdate
             } else if reboot_args.is_empty() || reboot_args.contains(&&b"shell"[..]) {
                 fpower::RebootReason::UserRequest
