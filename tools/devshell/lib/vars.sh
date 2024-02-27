@@ -534,7 +534,11 @@ function _looks_like_ipv6 {
     # try again but wrap the arg in "[]"
     local wrapped
     wrapped="[${1}]"
-    [[ "$1" =~ ${expression} ]] || return 1
+    [[ "${wrapped}" =~ ${expression} ]] || return 1
+    # Okay check that the address is not just a bare port
+    ! [[ "$1" =~ ^:[0-9a-fA-F]+$ ]] || return 1
+    # Okay check that the address is not just a host name
+    ! [[ "$1" =~ ^[0-9a-fA-F\.]+$ ]] || return 1
   fi
   local colons="${BASH_REMATCH[1]//[^:]}"
   # validate that there are no more than 7 colons

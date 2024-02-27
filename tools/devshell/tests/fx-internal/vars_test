@@ -213,14 +213,15 @@ TEST_fx-getdeviceraw-and-isvaliddevice() {
       "strut-wind-ahead-turf" "strut-wind-ahead-turf:8111"
       "[::1]:22" "[fe80::7:8%eth0]:222" "[fe80::7:8%eth0]"
       "[fe80::4607:bff:fe68:41c9%zircon1-4]"
-    )
+      # no brackets but also no port:
+      "::1" "::1:22" "fe80::7:8%eth0")
   for valid in "${valids[@]}"; do
     BT_EXPECT is-valid-device "${valid}"
     BT_EXPECT "(" FUCHSIA_DEVICE_NAME="$valid" get-device-raw ")" > /dev/null
   done
   local invalids=(
-      # no brackets:
-      "::1" "::1:22" "fe80::7:8%eth0" "fe80::7:8%eth0:222"
+      # no brackets but has a port
+      "fe80::7:8%eth0:222"
       # invalid host names:
       "AAbbb" "aa_bbb" "xyz@bla.com"
       # more than 7 colons:

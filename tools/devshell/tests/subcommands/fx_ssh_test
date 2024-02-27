@@ -55,9 +55,6 @@ TEST_ssh_invalid_hostname_port() {
 # ensure that "fx -d ipv6:port shell" fails because of invalid formats
 TEST_ssh_invalid_ipv6_port() {
   # no brackets
-  BT_EXPECT_FAIL ${fx} -d "::1" shell 2> /dev/null
-  BT_EXPECT_FAIL ${fx} -d "::1:22" shell 2> /dev/null
-  BT_EXPECT_FAIL ${fx} -d "fe80::7:8%eth0" shell 2> /dev/null
   BT_EXPECT_FAIL ${fx} -d "fe80::7:8%eth0:222" shell 2> /dev/null
   # more than 7 colons
   BT_EXPECT_FAIL ${fx} -d "[2001:db8:aaaa:bbbb:cccc:dddd:0:1:0]" shell 2> /dev/null
