@@ -5,6 +5,7 @@
 import("//build/go/go_binary.gni")
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
+import("//build/sdk/sdk_host_tool.gni")
 
 go_library("lib") {
   sources = [
@@ -48,6 +49,15 @@ go_test("orchestrate_tests") {
 
 go_binary("orchestrate") {
   library = ":main"
+}
+
+# Used for distributing the Orchestrate tool to private IDKs. Not to be included in
+# the Fuchsia IDK.
+# See http://goto.google.com/orchestrate-distribution-testing.
+sdk_host_tool("orchestrate_sdk") {
+  category = "partner"
+  output_name = "orchestrate"
+  deps = [ "//tools/orchestrate" ]
 }
 
 group("tests") {
