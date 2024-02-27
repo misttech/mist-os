@@ -515,8 +515,11 @@ template("gvisor_with_expectations_test_package") {
         max_severity = "ERROR"
       }
 
-      # These tests can take a while on debug builders.
+      # It takes a while to download the blobs. Debug builders are slower than
+      # their release counterparts.
       if (is_debug) {
+        timeout_secs = 900
+      } else {
         timeout_secs = 600
       }
     }
