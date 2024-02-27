@@ -65,7 +65,7 @@ zx_status_t CheckDsiDeviceRegister(
       .pld_data_count = payload.size(),
       .rsp_data_list = response.data(),
       .rsp_data_count = response.size(),
-      .flags = MIPI_DSI_CMD_FLAGS_ACK | MIPI_DSI_CMD_FLAGS_SET_MAX,
+      .flags = MIPI_DSI_CMD_FLAGS_SET_MAX,
   };
 
   zx_status_t status = designware_dsi_host_controller.SendCmd(&cmd, 1);
@@ -107,7 +107,7 @@ zx::result<uint32_t> GetMipiDsiDisplayId(
       .pld_data_count = payload.size(),
       .rsp_data_list = response.data(),
       .rsp_data_count = response.size(),
-      .flags = MIPI_DSI_CMD_FLAGS_ACK | MIPI_DSI_CMD_FLAGS_SET_MAX,
+      .flags = MIPI_DSI_CMD_FLAGS_SET_MAX,
   };
 
   zx_status_t status = designware_dsi_host_controller.SendCmd(&cmd, 1);

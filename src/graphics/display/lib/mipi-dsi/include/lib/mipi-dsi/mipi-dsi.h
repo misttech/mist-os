@@ -73,8 +73,7 @@ constexpr uint8_t kMipiDsiRspDcsShort2 = 0x22;
 
 // MipiDsiCmd flag bit def
 enum {
-  MIPI_DSI_CMD_FLAGS_ACK = (1 << 0),
-  MIPI_DSI_CMD_FLAGS_SET_MAX = (1 << 1),
+  MIPI_DSI_CMD_FLAGS_SET_MAX = (1 << 0),
 };
 
 #endif  // SRC_GRAPHICS_DISPLAY_LIB_MIPI_DSI_INCLUDE_LIB_MIPI_DSI_MIPI_DSI_H_
