@@ -21,7 +21,7 @@
 namespace standalone {
 namespace {
 
-zx::resource root_resource, ioport_resource, mmio_resource, system_resource;
+zx::resource root_resource, ioport_resource, irq_resource, mmio_resource, system_resource;
 
 constexpr std::string_view kMissingRootResource =
     "*** standalone-test must run directly from userboot ***\n";
@@ -61,6 +61,11 @@ zx::unowned_resource GetIoportResource() {
   return ioport_resource.borrow();
 }
 
+zx::unowned_resource GetIrqResource() {
+  ZX_ASSERT_MSG(irq_resource, "standalone test didn't receive IRQ resource");
+  return irq_resource.borrow();
+}
+
 zx::unowned_resource GetMmioResource() {
   ZX_ASSERT_MSG(mmio_resource, "standalone test didn't receive MMIO resource");
   return mmio_resource.borrow();
@@ -96,6 +101,10 @@ extern "C" [[gnu::retain]] __EXPORT void __libc_extensions_init(uint32_t count,
 
       case PA_IOPORT_RESOURCE:
         ioport_resource.reset(take_handle(n));
+        break;
+
+      case PA_IRQ_RESOURCE:
+        irq_resource.reset(take_handle(n));
         break;
 
       case PA_MMIO_RESOURCE:
