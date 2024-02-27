@@ -106,7 +106,6 @@ impl JoinCommand {
         Ok(Identity {
             raw_name: self.get_name_vec_from_str()?,
             xpanid: self.get_xpanid()?,
-            xpanid_deprecated: self.get_xpanid()?.map(|array| array.to_vec()),
             net_type: self.net_type.clone(),
             channel: self.channel.clone(),
             panid: self.panid.clone(),

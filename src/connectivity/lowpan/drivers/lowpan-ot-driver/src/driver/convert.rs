@@ -123,7 +123,6 @@ impl FromExt<ot::ActiveScanResult> for BeaconInfo {
                 channel: Some(x.channel().into()),
                 panid: Some(x.pan_id()),
                 xpanid: Some(x.extended_pan_id().into_array()),
-                xpanid_deprecated: Some(x.extended_pan_id().to_vec()),
                 ..Default::default()
             }),
             rssi: Some(x.rssi()),
@@ -142,9 +141,6 @@ impl FromExt<&ot::OperationalDataset> for Identity {
                 .get_extended_pan_id()
                 .copied()
                 .map(ot::ExtendedPanId::into_array),
-            xpanid_deprecated: operational_dataset
-                .get_extended_pan_id()
-                .map(ot::ExtendedPanId::to_vec),
             net_type: Some(NET_TYPE_THREAD_1_X.to_string()),
             channel: operational_dataset.get_channel().map(|x| x as u16),
             panid: operational_dataset.get_pan_id(),

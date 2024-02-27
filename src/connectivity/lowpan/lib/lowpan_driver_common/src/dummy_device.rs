@@ -84,7 +84,6 @@ impl Driver for DummyDevice {
                 ready(Ok(Ok(ProvisioningProgress::Identity(Identity {
                     raw_name: Some("MyNet".as_bytes().to_vec()),
                     xpanid: Some([0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]),
-                    xpanid_deprecated: Some(vec![0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]),
                     net_type: Some(NET_TYPE_THREAD_1_X.to_string()),
                     channel: Some(11),
                     panid: Some(0x1234),
@@ -184,9 +183,6 @@ impl Driver for DummyDevice {
                     identity: Some(Identity {
                         raw_name: Some("MyNet".as_bytes().to_vec()),
                         xpanid: Some([0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]),
-                        xpanid_deprecated: Some(vec![
-                            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
-                        ]),
                         net_type: Some(NET_TYPE_THREAD_1_X.to_string()),
                         channel: Some(11),
                         panid: Some(0x1234),
@@ -207,9 +203,6 @@ impl Driver for DummyDevice {
                         identity: Some(Identity {
                             raw_name: Some("MyNet".as_bytes().to_vec()),
                             xpanid: Some([0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]),
-                            xpanid_deprecated: Some(vec![
-                                0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
-                            ]),
                             net_type: Some(NET_TYPE_THREAD_1_X.to_string()),
                             channel: Some(11),
                             panid: Some(0x1234),
@@ -225,9 +218,6 @@ impl Driver for DummyDevice {
                         identity: Some(Identity {
                             raw_name: Some("MyNet2".as_bytes().to_vec()),
                             xpanid: Some([0xFF, 0xAA, 0xBB, 0xCC, 0x11, 0x22, 0x33, 0xFF]),
-                            xpanid_deprecated: Some(vec![
-                                0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
-                            ]),
                             net_type: Some(NET_TYPE_THREAD_1_X.to_string()),
                             channel: Some(12),
                             panid: Some(0x5678),
