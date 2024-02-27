@@ -73,7 +73,7 @@ unsafe impl fidl::encoding::Encode<{{ .Name }}> for &{{ if .IsResourceType }}mut
         let max_ordinal: u64 = self.max_ordinal_present();
         encoder.write_num(max_ordinal, offset);
         encoder.write_num(fidl::encoding::ALLOC_PRESENT_U64, offset + 8);
-        // write_out_of_line must not be called with a zero-sized out-of-line block.
+        // Calling encoder.out_of_line_offset(0) is not allowed.
         if max_ordinal == 0 {
             return Ok(());
         }
@@ -127,6 +127,10 @@ impl fidl::encoding::Decode<Self> for {{ .Name }} {
         let len = match fidl::encoding::decode_vector_header(decoder, offset)? {
             None => return Err(fidl::Error::NotNullable),
             Some(len) => len,
+        };
+        // Calling decoder.out_of_line_offset(0) is not allowed.
+        if len == 0 {
+            return Ok(());
         };
         depth.increment()?;
         let envelope_size = 8;

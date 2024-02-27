@@ -252,12 +252,6 @@ impl Depth {
         }
         Ok(())
     }
-
-    /// Decrements the depth.
-    #[inline(always)]
-    pub fn decrement(&mut self) {
-        self.0 -= 1;
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -418,28 +412,25 @@ impl<'a> Encoder<'a> {
         (ptr as *mut T).write_unaligned(num);
     }
 
-    /// Returns an offset for writing `len` out-of-line bytes (must be nonzero).
-    /// Takes care of zeroing the padding bytes if `len` is not a multiple of 8.
-    /// The caller must also call `depth.increment()?`.
+    /// Returns an offset for writing `len` out-of-line bytes. Zeroes padding
+    /// bytes at the end if `len` is not a multiple of 8.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `len` is nonzero.
     #[inline]
-    pub fn out_of_line_offset(&mut self, len: usize) -> usize {
+    pub unsafe fn out_of_line_offset(&mut self, len: usize) -> usize {
         debug_assert!(len > 0);
         let new_offset = self.buf.len();
         let padded_len = round_up_to_align(len, 8);
-        // Safety: The uninitialized elements are written by `f`, except the
-        // trailing padding which is zeroed below.
-        unsafe {
-            // In order to zero bytes for padding, we assume that at least 8 bytes are in the
-            // out-of-line block.
-            debug_assert!(padded_len >= 8);
-
-            let new_len = self.buf.len() + padded_len;
-            resize_vec_no_zeroing(self.buf, new_len);
-
-            // Zero the last 8 bytes in the block to ensure padding bytes are zero.
-            let padding_ptr = self.buf.get_unchecked_mut(new_len - 8) as *mut u8;
-            (padding_ptr as *mut u64).write_unaligned(0);
-        }
+        debug_assert!(padded_len >= 8);
+        let new_len = self.buf.len() + padded_len;
+        resize_vec_no_zeroing(self.buf, new_len);
+        // Zero the last 8 bytes in the block to ensure padding bytes are zero.
+        // It's more efficient to always write 8 bytes regardless of how much
+        // padding is needed because we will overwrite non-padding afterwards.
+        let padding_ptr = self.buf.get_unchecked_mut(new_len - 8) as *mut u8;
+        (padding_ptr as *mut u64).write_unaligned(0);
         new_offset
     }
 
@@ -595,32 +586,29 @@ impl<'a> Decoder<'a> {
         }
     }
 
-    /// Returns an offset for reading `len` out-of-line bytes. Validates padding
-    /// bytes, which must be present if `len` is not a multiple of 8. The caller
-    /// must call `self.depth.increment()?` before encoding the out-of-line
-    /// object and `self.depth.decrement()` after.
+    /// Returns an offset for reading `len` out-of-line bytes. Validates that
+    /// padding bytes at the end are zero if `len` is not a multiple of 8.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `len` is nonzero.
     #[inline(always)]
-    pub fn out_of_line_offset(&mut self, len: usize) -> Result<usize> {
-        // Compute offsets for out of line block.
+    pub unsafe fn out_of_line_offset(&mut self, len: usize) -> Result<usize> {
+        debug_assert!(len > 0);
         let offset = self.next_out_of_line;
         let aligned_len = round_up_to_align(len, 8);
         self.next_out_of_line += aligned_len;
+        debug_assert!(self.next_out_of_line >= 8);
         if self.next_out_of_line > self.buf.len() {
             return Err(Error::OutOfRange);
         }
-
         // Validate padding bytes at the end of the block.
         // Safety:
-        // - self.next_out_of_line <= self.buf.len() based on the if-statement above.
-        // - If `len` is 0, `next_out_of_line` is unchanged and this will read
-        //   the prior 8 bytes. This is valid because at least 8 inline bytes
-        //   are always read before calling `out_of_line_offset`. The `mask` will
-        //   be zero so the check will not fail.
-        debug_assert!(self.next_out_of_line >= 8);
-        let last_u64 = unsafe {
-            let last_u64_ptr = self.buf.get_unchecked(self.next_out_of_line - 8) as *const u8;
-            (last_u64_ptr as *const u64).read_unaligned()
-        };
+        // - The caller ensures `len > 0`, therefore `aligned_len >= 8`.
+        // - After `self.next_out_of_line += aligned_len`, we know `self.next_out_of_line >= aligned_len >= 8`.
+        // - Therefore `self.next_out_of_line - 8 >= 0` is a valid *const u64.
+        let last_u64_ptr = self.buf.get_unchecked(self.next_out_of_line - 8) as *const u8;
+        let last_u64 = (last_u64_ptr as *const u64).read_unaligned();
         let padding = aligned_len - len;
         // padding == 0 => mask == 0x0000000000000000
         // padding == 1 => mask == 0xff00000000000000
@@ -1236,6 +1224,8 @@ unsafe fn encode_array_value<T: ValueTypeMarker>(
 ) -> Result<()> {
     let stride = T::inline_size(encoder.context);
     let len = slice.len();
+    // Not a safety requirement, but len should be nonzero since FIDL does not allow empty arrays.
+    debug_assert_ne!(len, 0);
     if T::encode_is_copy() {
         debug_assert_eq!(stride, mem::size_of::<T::Owned>());
         // Safety:
@@ -1246,7 +1236,7 @@ unsafe fn encode_array_value<T: ValueTypeMarker>(
         // - Rust guarantees `slice` and `encoder.buf` do not alias.
         unsafe {
             let src = slice.as_ptr() as *const u8;
-            let dst: *mut u8 = encoder.buf.get_unchecked_mut(offset);
+            let dst: *mut u8 = encoder.buf.as_mut_ptr().add(offset);
             ptr::copy_nonoverlapping(src, dst, len * stride);
         }
     } else {
@@ -1268,6 +1258,8 @@ unsafe fn encode_array_resource<T: ResourceTypeMarker>(
 ) -> Result<()> {
     let stride = T::inline_size(encoder.context);
     let len = slice.len();
+    // Not a safety requirement, but len should be nonzero since FIDL does not allow empty arrays.
+    debug_assert_ne!(len, 0);
     if T::encode_is_copy() {
         debug_assert_eq!(stride, mem::size_of::<T::Owned>());
         // Safety:
@@ -1278,7 +1270,7 @@ unsafe fn encode_array_resource<T: ResourceTypeMarker>(
         // - Rust guarantees `slice` and `encoder.buf` do not alias.
         unsafe {
             let src = slice.as_ptr() as *const u8;
-            let dst: *mut u8 = encoder.buf.get_unchecked_mut(offset);
+            let dst: *mut u8 = encoder.buf.as_mut_ptr().add(offset);
             ptr::copy_nonoverlapping(src, dst, len * stride);
         }
     } else {
@@ -1300,6 +1292,8 @@ unsafe fn decode_array<T: TypeMarker>(
 ) -> Result<()> {
     let stride = T::inline_size(decoder.context);
     let len = slice.len();
+    // Not a safety requirement, but len should be nonzero since FIDL does not allow empty arrays.
+    debug_assert_ne!(len, 0);
     if T::decode_is_copy() {
         debug_assert_eq!(stride, mem::size_of::<T::Owned>());
         // Safety:
@@ -1309,7 +1303,7 @@ unsafe fn decode_array<T: TypeMarker>(
         //   types, `slice` also has exactly `len * stride` bytes.
         // - Rust guarantees `slice` and `decoder.buf` do not alias.
         unsafe {
-            let src: *const u8 = decoder.buf.get_unchecked(offset);
+            let src: *const u8 = decoder.buf.as_ptr().add(offset);
             let dst = slice.as_mut_ptr() as *mut u8;
             ptr::copy_nonoverlapping(src, dst, len * stride);
         }
@@ -1413,7 +1407,7 @@ unsafe fn encode_vector_value<T: ValueTypeMarker>(
 ) -> Result<()> {
     encoder.write_num(slice.len() as u64, offset);
     encoder.write_num(ALLOC_PRESENT_U64, offset + 8);
-    // write_out_of_line must not be called with a zero-sized out-of-line block.
+    // Calling encoder.out_of_line_offset(0) is not allowed.
     if slice.is_empty() {
         return Ok(());
     }
@@ -1434,7 +1428,7 @@ unsafe fn encode_vector_resource<T: ResourceTypeMarker>(
 ) -> Result<()> {
     encoder.write_num(slice.len() as u64, offset);
     encoder.write_num(ALLOC_PRESENT_U64, offset + 8);
-    // write_out_of_line must not be called with a zero-sized out-of-line block.
+    // Calling encoder.out_of_line_offset(0) is not allowed.
     if slice.is_empty() {
         return Ok(());
     }
@@ -1456,6 +1450,10 @@ unsafe fn decode_vector<T: TypeMarker>(
     let Some(len) = decode_vector_header(decoder, offset)? else {
         return Err(Error::NotNullable);
     };
+    // Calling decoder.out_of_line_offset(0) is not allowed.
+    if len == 0 {
+        return Ok(());
+    }
     check_vector_length(len, max_length)?;
     depth.increment()?;
     let bytes_len = len * T::inline_size(decoder.context);
@@ -1579,9 +1577,14 @@ fn decode_string(
     let Some(len) = decode_vector_header(decoder, offset)? else {
         return Err(Error::NotNullable);
     };
+    // Calling decoder.out_of_line_offset(0) is not allowed.
+    if len == 0 {
+        return Ok(());
+    }
     check_string_length(len, max_length)?;
     depth.increment()?;
-    let offset = decoder.out_of_line_offset(len)?;
+    // Safety: we return early above if `len == 0`.
+    let offset = unsafe { decoder.out_of_line_offset(len)? };
     // Safety: `out_of_line_offset` does this bounds check.
     let bytes = unsafe { &decoder.buf.get_unchecked(offset..offset + len) };
     let utf8 = str::from_utf8(bytes).map_err(|_| Error::Utf8Error)?;
@@ -2004,7 +2007,7 @@ pub unsafe fn encode_in_envelope<T: TypeMarker>(
         val.encode(encoder, out_of_line_offset, depth)?;
         let bytes_written = (encoder.buf.len() - bytes_before) as u32;
         let handles_written = (encoder.handles.len() - handles_before) as u32;
-        debug_assert!(bytes_written % 8 == 0);
+        debug_assert_eq!(bytes_written % 8, 0);
         encoder.write_num(bytes_written, offset);
         encoder.write_num(handles_written, offset + 4);
     }
@@ -2057,7 +2060,10 @@ pub unsafe fn decode_unknown_envelope(
     if let Some((inlined, num_bytes, num_handles)) = decode_envelope_header(decoder, offset)? {
         if !inlined {
             depth.increment()?;
-            let _ = decoder.out_of_line_offset(num_bytes as usize)?;
+            // Calling decoder.out_of_line_offset(0) is not allowed.
+            if num_bytes != 0 {
+                let _ = decoder.out_of_line_offset(num_bytes as usize)?;
+            }
         }
         if num_handles != 0 {
             for _ in 0..num_handles {
