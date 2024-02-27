@@ -78,6 +78,10 @@ pub fn impl_derive_reference_doc(ast: syn::DeriveInput) -> Result<TokenStream2, 
 
     impl ToTokens for ReferenceDocFieldAttributes {
         fn to_tokens(&self, tokens: &mut TokenStream2) {
+            if self.skip {
+                tokens.append_all(quote!({ "" }));
+                return;
+            }
             let name = self.rename.clone().unwrap_or_else(|| get_ident_name(&self.ident));
             let indent_headers = self.indent_headers.unwrap_or(0);
             let mut rust_ty_path = expect_typepath(&self.ty);
@@ -264,6 +268,10 @@ struct ReferenceDocFieldAttributes {
     /// Forwarded from `ReferenceDocAttributes.fields_as`.
     #[darling(skip)]
     fields_as: FieldOutputType,
+
+    /// Instructs the doc generator to skip this field's doc comments.
+    #[darling(default)]
+    skip: bool,
 }
 
 /// Returns true if the outer type in `p` is equal to `str`. For example, for

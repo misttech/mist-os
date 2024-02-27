@@ -421,21 +421,22 @@ The `capabilities` section defines capabilities that are provided by this compon
 Capabilities that are [offered](#offer) or [exposed](#expose) from `self` must be declared
 here.
 
-One and only one of the capability type keys (`protocol`, `directory`, `service`, ...) is required.
+#### Capability fields
+This supports the following capability keys. Exactly one of these must be set:
+- `protocol`: (_optional `string or array of strings`_)
+- `service`: (_optional `string or array of strings`_)
+- `directory`: (_optional `string`_)
+- `storage`: (_optional `string`_)
+- `runner`: (_optional `string`_)
+- `resolver`: (_optional `string`_)
+- `event_stream`: (_optional `string or array of strings`_)
+- `dictionary`: (_optional `string`_)
+- `config`: (_optional `string`_)
 
+#### Additional fields
+This supports the following additional fields:
 [glossary.outgoing directory]: /docs/glossary/README.md#outgoing-directory
 
-- `service`: (_optional `string or array of strings`_) The [name](#name) for this service capability. Specifying `path` is valid
-    only when this value is a string.
-- `protocol`: (_optional `string or array of strings`_) The [name](#name) for this protocol capability. Specifying `path` is valid
-    only when this value is a string.
-- `directory`: (_optional `string`_) The [name](#name) for this directory capability.
-- `storage`: (_optional `string`_) The [name](#name) for this storage capability.
-- `runner`: (_optional `string`_) The [name](#name) for this runner capability.
-- `resolver`: (_optional `string`_) The [name](#name) for this resolver capability.
-- `event_stream`: (_optional `string or array of strings`_) The [name](#name) for this event_stream capability.
-- `dictionary`: (_optional `string`_) The [name](#name) for this dictionary capability.
-- `config`: (_optional `string`_) The [name](#name) for this configuration capability.
 - `path`: (_optional `string`_) The path within the [outgoing directory][glossary.outgoing directory] of the component's
     program to source the capability.
 
@@ -523,16 +524,22 @@ Capabilities are routed from the `parent` unless otherwise specified,
 and each capability must have a valid route through all components between
 this component and the capability's source.
 
+#### Capability fields
+This supports the following capability keys. Exactly one of these must be set:
+- `service`: (_optional `string or array of strings`_)
+- `directory`: (_optional `string`_)
+- `protocol`: (_optional `string or array of strings`_)
+- `dictionary`: (_optional `string`_)
+- `storage`: (_optional `string`_)
+- `event_stream`: (_optional `string or array of strings`_)
+- `runner`: (_optional `string`_)
+- `config`: (_optional `string`_)
+
+#### Additional fields
+This supports the following additional fields:
 [fidl-environment-decl]: /reference/fidl/fuchsia.component.decl#Environment
 [glossary.namespace]: /docs/glossary/README.md#namespace
 
-- `service`: (_optional `string or array of strings`_) When using a service capability, the [name](#name) of a [service capability][doc-service].
-- `protocol`: (_optional `string or array of strings`_) When using a protocol capability, the [name](#name) of a [protocol capability][doc-protocol].
-- `directory`: (_optional `string`_) When using a directory capability, the [name](#name) of a [directory capability][doc-directory].
-- `storage`: (_optional `string`_) When using a storage capability, the [name](#name) of a [storage capability][doc-storage].
-- `event_stream`: (_optional `string or array of strings`_) When using an event stream capability, the [name](#name) of an [event stream capability][doc-event].
-- `runner`: (_optional `string`_) When using a runner capability, the [name](#name) of a [runner capability][doc-runners].
-- `config`: (_optional `string`_) When using a configuration capability, the [name](#name) of a [configuration capability][doc-configuration].
 - `from`: (_optional `string`_) The source of the capability. Defaults to `parent`.  One of:
     - `parent`: The component's parent.
     - `debug`: One of [`debug_capabilities`][fidl-environment-decl] in the
@@ -622,15 +629,19 @@ _array of `object` (optional)_
 Declares the capabilities that are made available to the parent component or to the
 framework. It is valid to `expose` from `self` or from a child component.
 
-One and only one of the capability type keys (`protocol`, `directory`, `service`, ...) is required.
+#### Capability fields
+This supports the following capability keys. Exactly one of these must be set:
+- `service`: (_optional `string or array of strings`_)
+- `protocol`: (_optional `string or array of strings`_)
+- `directory`: (_optional `string`_)
+- `runner`: (_optional `string`_)
+- `resolver`: (_optional `string`_)
+- `dictionary`: (_optional `string`_)
+- `config`: (_optional `string`_)
 
-- `service`: (_optional `string or array of strings`_) When routing a service, the [name](#name) of a [service capability][doc-service].
-- `protocol`: (_optional `string or array of strings`_) When routing a protocol, the [name](#name) of a [protocol capability][doc-protocol].
-- `directory`: (_optional `string or array of strings`_) When routing a directory, the [name](#name) of a [directory capability][doc-directory].
-- `runner`: (_optional `string or array of strings`_) When routing a runner, the [name](#name) of a [runner capability][doc-runners].
-- `resolver`: (_optional `string or array of strings`_) When routing a resolver, the [name](#name) of a [resolver capability][doc-resolvers].
-- `dictionary`: (_optional `string or array of strings`_) When routing a dictionary, the [name](#name) of a [dictionary capability][doc-dictionaries].
-- `config`: (_optional `string or array of strings`_) When routing a config, the [name](#name) of a configuration capability.
+#### Additional fields
+This supports the following additional fields:
+
 - `from`: (_`string or array of strings`_) `from`: The source of the capability, one of:
     - `self`: This component. Requires a corresponding
         [`capability`](#capabilities) declaration.
@@ -710,6 +721,21 @@ _array of `object` (optional)_
 
 Declares the capabilities that are made available to a [child component][doc-children]
 instance or a [child collection][doc-collections].
+
+#### Capability fields
+This supports the following capability keys. Exactly one of these must be set:
+- `protocol`: (_optional `string or array of strings`_)
+- `service`: (_optional `string or array of strings`_)
+- `directory`: (_optional `string`_)
+- `storage`: (_optional `string`_)
+- `runner`: (_optional `string`_)
+- `resolver`: (_optional `string`_)
+- `event_stream`: (_optional `string or array of strings`_)
+- `dictionary`: (_optional `string`_)
+- `config`: (_optional `string`_)
+
+#### Additional fields
+This supports the following additional fields:
 
 - `service`: (_optional `string or array of strings`_) When routing a service, the [name](#name) of a [service capability][doc-service].
 - `protocol`: (_optional `string or array of strings`_) When routing a protocol, the [name](#name) of a [protocol capability][doc-protocol].

@@ -39,6 +39,10 @@ mod tests {
         /// More objects.
         #[reference_doc(recurse)]
         objects2: ReferenceDocTestObject2,
+
+        /// A hidden bool. This field shall be skipped refdoc comments.
+        #[reference_doc(skip = true)]
+        please_skip: bool,
     }
 
     /// This will appear after describing the fields.

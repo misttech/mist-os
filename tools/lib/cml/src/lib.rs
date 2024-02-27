@@ -1245,8 +1245,20 @@ pub struct Document {
     /// Capabilities that are [offered](#offer) or [exposed](#expose) from `self` must be declared
     /// here.
     ///
-    /// One and only one of the capability type keys (`protocol`, `directory`, `service`, ...) is required.
+    /// # Capability fields
+    /// This supports the following capability keys. Exactly one of these must be set:
+    /// - `protocol`: (_optional `string or array of strings`_)
+    /// - `service`: (_optional `string or array of strings`_)
+    /// - `directory`: (_optional `string`_)
+    /// - `storage`: (_optional `string`_)
+    /// - `runner`: (_optional `string`_)
+    /// - `resolver`: (_optional `string`_)
+    /// - `event_stream`: (_optional `string or array of strings`_)
+    /// - `dictionary`: (_optional `string`_)
+    /// - `config`: (_optional `string`_)
     ///
+    /// # Additional fields
+    /// This supports the following additional fields:
     /// [glossary.outgoing directory]: /docs/glossary/README.md#outgoing-directory
     #[reference_doc(recurse)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1258,6 +1270,19 @@ pub struct Document {
     /// and each capability must have a valid route through all components between
     /// this component and the capability's source.
     ///
+    /// # Capability fields
+    /// This supports the following capability keys. Exactly one of these must be set:
+    /// - `service`: (_optional `string or array of strings`_)
+    /// - `directory`: (_optional `string`_)
+    /// - `protocol`: (_optional `string or array of strings`_)
+    /// - `dictionary`: (_optional `string`_)
+    /// - `storage`: (_optional `string`_)
+    /// - `event_stream`: (_optional `string or array of strings`_)
+    /// - `runner`: (_optional `string`_)
+    /// - `config`: (_optional `string`_)
+    ///
+    /// # Additional fields
+    /// This supports the following additional fields:
     /// [fidl-environment-decl]: /reference/fidl/fuchsia.component.decl#Environment
     /// [glossary.namespace]: /docs/glossary/README.md#namespace
     #[reference_doc(recurse)]
@@ -1267,13 +1292,39 @@ pub struct Document {
     /// Declares the capabilities that are made available to the parent component or to the
     /// framework. It is valid to `expose` from `self` or from a child component.
     ///
-    /// One and only one of the capability type keys (`protocol`, `directory`, `service`, ...) is required.
+    /// # Capability fields
+    /// This supports the following capability keys. Exactly one of these must be set:
+    /// - `service`: (_optional `string or array of strings`_)
+    /// - `protocol`: (_optional `string or array of strings`_)
+    /// - `directory`: (_optional `string`_)
+    /// - `runner`: (_optional `string`_)
+    /// - `resolver`: (_optional `string`_)
+    /// - `dictionary`: (_optional `string`_)
+    /// - `config`: (_optional `string`_)
+    ///
+    /// # Additional fields
+    /// This supports the following additional fields:
     #[reference_doc(recurse)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expose: Option<Vec<Expose>>,
 
     /// Declares the capabilities that are made available to a [child component][doc-children]
     /// instance or a [child collection][doc-collections].
+    ///
+    /// # Capability fields
+    /// This supports the following capability keys. Exactly one of these must be set:
+    /// - `protocol`: (_optional `string or array of strings`_)
+    /// - `service`: (_optional `string or array of strings`_)
+    /// - `directory`: (_optional `string`_)
+    /// - `storage`: (_optional `string`_)
+    /// - `runner`: (_optional `string`_)
+    /// - `resolver`: (_optional `string`_)
+    /// - `event_stream`: (_optional `string or array of strings`_)
+    /// - `dictionary`: (_optional `string`_)
+    /// - `config`: (_optional `string`_)
+    ///
+    /// # Additional fields
+    /// This supports the following additional fields:
     #[reference_doc(recurse)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub offer: Option<Vec<Offer>>,
@@ -2415,39 +2466,48 @@ pub struct Capability {
     /// The [name](#name) for this service capability. Specifying `path` is valid
     /// only when this value is a string.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub service: Option<OneOrMany<Name>>,
 
     /// The [name](#name) for this protocol capability. Specifying `path` is valid
     /// only when this value is a string.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub protocol: Option<OneOrMany<Name>>,
 
     /// The [name](#name) for this directory capability.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub directory: Option<Name>,
 
     /// The [name](#name) for this storage capability.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub storage: Option<Name>,
 
     /// The [name](#name) for this runner capability.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub runner: Option<Name>,
 
     /// The [name](#name) for this resolver capability.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub resolver: Option<Name>,
 
     /// The [name](#name) for this event_stream capability.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub event_stream: Option<OneOrMany<Name>>,
 
     /// The [name](#name) for this dictionary capability.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub dictionary: Option<Name>,
 
     /// The [name](#name) for this configuration capability.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub config: Option<Name>,
 
     /// The path within the [outgoing directory][glossary.outgoing directory] of the component's
@@ -2698,30 +2758,37 @@ impl<'de> de::Deserialize<'de> for Program {
 pub struct Use {
     /// When using a service capability, the [name](#name) of a [service capability][doc-service].
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub service: Option<OneOrMany<Name>>,
 
     /// When using a protocol capability, the [name](#name) of a [protocol capability][doc-protocol].
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub protocol: Option<OneOrMany<Name>>,
 
     /// When using a directory capability, the [name](#name) of a [directory capability][doc-directory].
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub directory: Option<Name>,
 
     /// When using a storage capability, the [name](#name) of a [storage capability][doc-storage].
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub storage: Option<Name>,
 
     /// When using an event stream capability, the [name](#name) of an [event stream capability][doc-event].
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub event_stream: Option<OneOrMany<Name>>,
 
     /// When using a runner capability, the [name](#name) of a [runner capability][doc-runners].
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub runner: Option<Name>,
 
     /// When using a configuration capability, the [name](#name) of a [configuration capability][doc-configuration].
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub config: Option<Name>,
 
     /// The source of the capability. Defaults to `parent`.  One of:
@@ -2836,30 +2903,37 @@ pub struct Use {
 pub struct Expose {
     /// When routing a service, the [name](#name) of a [service capability][doc-service].
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub service: Option<OneOrMany<Name>>,
 
     /// When routing a protocol, the [name](#name) of a [protocol capability][doc-protocol].
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub protocol: Option<OneOrMany<Name>>,
 
     /// When routing a directory, the [name](#name) of a [directory capability][doc-directory].
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub directory: Option<OneOrMany<Name>>,
 
     /// When routing a runner, the [name](#name) of a [runner capability][doc-runners].
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub runner: Option<OneOrMany<Name>>,
 
     /// When routing a resolver, the [name](#name) of a [resolver capability][doc-resolvers].
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub resolver: Option<OneOrMany<Name>>,
 
     /// When routing a dictionary, the [name](#name) of a [dictionary capability][doc-dictionaries].
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub dictionary: Option<OneOrMany<Name>>,
 
     /// When routing a config, the [name](#name) of a configuration capability.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[reference_doc(skip = true)]
     pub config: Option<OneOrMany<Name>>,
 
     /// `from`: The source of the capability, one of:
