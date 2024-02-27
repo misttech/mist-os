@@ -38,14 +38,19 @@ class SoftmacIfcBridge : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftma
 
  private:
   explicit SoftmacIfcBridge(std::shared_ptr<std::mutex> unbind_lock,
-                            std::shared_ptr<bool> unbind_called)
-      : unbind_lock_(std::move(unbind_lock)), unbind_called_(std::move(unbind_called)) {}
+                            std::shared_ptr<bool> unbind_called,
+                            const rust_wlan_softmac_ifc_protocol_copy_t* rust_softmac_ifc)
+      : unbind_lock_(std::move(unbind_lock)),
+        unbind_called_(std::move(unbind_called)),
+        rust_softmac_ifc_(*rust_softmac_ifc) {}
 
   std::shared_ptr<std::mutex> unbind_lock_;
   std::shared_ptr<bool> unbind_called_ __TA_GUARDED(unbind_lock_);
 
-  wlan_softmac_ifc_protocol_t wlan_softmac_ifc_protocol_;
-  wlan_softmac_ifc_protocol_ops_t wlan_softmac_ifc_protocol_ops_;
+  // The protocol functions in rust_softmac_ifc_ act as the client end
+  // of WlanSoftmacIfc protocol to the Rust portion of the wlansoftmac.
+  const rust_wlan_softmac_ifc_protocol_copy_t rust_softmac_ifc_;
+
   std::unique_ptr<fdf::ServerBinding<fuchsia_wlan_softmac::WlanSoftmacIfc>>
       softmac_ifc_server_binding_;
 

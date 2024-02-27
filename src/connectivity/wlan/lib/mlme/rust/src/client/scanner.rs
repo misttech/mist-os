@@ -24,6 +24,7 @@ use {
         time::TimeUnit,
     },
     wlan_frame_writer::write_frame_with_dynamic_buffer,
+    wlan_trace as wtrace,
 };
 
 // TODO(https://fxbug.dev/42171393): Currently hardcoded until parameters supported.
@@ -298,7 +299,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
         ies: &[u8],
         rx_info: banjo_wlan_softmac::WlanRxInfo,
     ) {
-        trace::duration!(c"wlan", c"BoundScanner::handle_ap_advertisement");
+        wtrace::duration!(c"BoundScanner::handle_ap_advertisement");
 
         let mlme_txn_id = match self.scanner.ongoing_scan {
             Some(OngoingScan::PassiveOffloadScan { mlme_txn_id, .. }) => mlme_txn_id,
@@ -517,7 +518,7 @@ fn send_scan_result<D: DeviceOps>(txn_id: u64, bss: fidl_internal::BssDescriptio
         let trace_bss = wlan_common::bss::BssDescription::try_from(bss.clone())
             .map(|bss| format!("{}", bss))
             .unwrap_or_else(|e| format!("{}", e));
-        trace::duration!(c"wlan", c"send_scan_result", "bss" => &*trace_bss);
+        wtrace::duration!(c"send_scan_result", "bss" => &*trace_bss);
     }
     device
         .send_mlme_event(fidl_mlme::MlmeEvent::OnScanResult {

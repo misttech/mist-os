@@ -478,7 +478,7 @@ impl DeviceOps for Device {
             wtrace::async_begin_wlansoftmac_tx(async_id, "mlme");
             async_id
         });
-        trace::duration!(c"wlan", c"Device::send_data_frame");
+        wtrace::duration!(c"Device::send_data_frame");
 
         if buffer.len() < REQUIRED_WLAN_HEADER_LEN {
             let status = zx::Status::BUFFER_TOO_SMALL;
@@ -684,15 +684,12 @@ impl DeviceOps for Device {
 
 #[repr(C)]
 pub struct CWlanSoftmacIfcProtocolOps {
-    recv: extern "C" fn(ctx: &mut DriverEventSink, packet: &WlanRxPacket),
+    recv: extern "C" fn(ctx: &DriverEventSink, packet: &WlanRxPacket, async_id: TraceId),
 }
 
 #[no_mangle]
-extern "C" fn handle_recv(ctx: &mut DriverEventSink, packet: &WlanRxPacket) {
-    // Cast to non-mutable reference since the referenced points to a pinned `DriverEventSink`.
-    let ctx = ctx as &DriverEventSink;
-    trace::duration!(c"wlan", c"handle_recv");
-
+extern "C" fn handle_recv(ctx: &DriverEventSink, packet: &WlanRxPacket, async_id: TraceId) {
+    wtrace::duration!(c"handle_recv");
     // TODO(https://fxbug.dev/42103773): C++ uses a buffer allocator for this, determine if we need one.
     //
     // Safety: This call is safe because `WlanRxPacket` is defined such that a slice
@@ -701,8 +698,9 @@ extern "C" fn handle_recv(ctx: &mut DriverEventSink, packet: &WlanRxPacket) {
         unsafe { std::slice::from_raw_parts(packet.mac_frame_buffer, packet.mac_frame_size) }
             .into();
     let rx_info = packet.info;
-    let _ = ctx.unbounded_send(DriverEvent::MacFrameRx { bytes, rx_info }).map_err(|e| {
+    let _ = ctx.unbounded_send(DriverEvent::MacFrameRx { bytes, rx_info, async_id }).map_err(|e| {
         error!("Failed to receive frame: {:?}", e);
+        wtrace::async_end_wlansoftmac_rx(async_id, "failed to queue received frame");
     });
 }
 const PROTOCOL_OPS: CWlanSoftmacIfcProtocolOps = CWlanSoftmacIfcProtocolOps { recv: handle_recv };

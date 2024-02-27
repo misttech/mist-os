@@ -22,7 +22,8 @@ use {
     banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_trace as trace, fuchsia_zircon as zx,
+    fuchsia_trace::Id as TraceId,
+    fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr, MacAddrBytes},
     tracing::{debug, error, info, trace, warn},
     wlan_common::{
@@ -36,6 +37,7 @@ use {
         timer::{EventId, Timer},
     },
     wlan_statemachine::*,
+    wlan_trace as wtrace,
     zerocopy::ByteSlice,
 };
 
@@ -170,7 +172,7 @@ impl Authenticating {
         sta: &mut BoundClient<'_, D>,
         auth_frame: mac::AuthFrame<B>,
     ) -> AuthProgress {
-        trace::duration!(c"wlan", c"Authenticating::on_auth_frame");
+        wtrace::duration!(c"Authenticating::on_auth_frame");
 
         let state = self.algorithm.handle_auth_frame(sta, auth_frame);
         self.akm_state_update_notify_sme(sta, state)
@@ -207,7 +209,7 @@ impl Authenticating {
         sta: &mut BoundClient<'_, D>,
         deauth_hdr: &mac::DeauthHdr,
     ) {
-        trace::duration!(c"wlan", c"Authenticating::on_deauth_frame");
+        wtrace::duration!(c"Authenticating::on_deauth_frame");
 
         info!(
             "received spurious deauthentication frame while authenticating with BSS (unusual); \
@@ -284,7 +286,7 @@ impl Associating {
         sta: &mut BoundClient<'_, D>,
         assoc_resp_frame: mac::AssocRespFrame<B>,
     ) -> Result<Association, ()> {
-        trace::duration!(c"wlan", c"Associating::on_assoc_resp_frame");
+        wtrace::duration!(c"Associating::on_assoc_resp_frame");
 
         // TODO(https://fxbug.dev/42172907): All reserved values mapped to REFUSED_REASON_UNSPECIFIED.
         match Option::<fidl_ieee80211::StatusCode>::from(
@@ -412,7 +414,7 @@ impl Associating {
         sta: &mut BoundClient<'_, D>,
         _disassoc_hdr: &mac::DisassocHdr,
     ) {
-        trace::duration!(c"wlan", c"Associating::on_disassoc_frame");
+        wtrace::duration!(c"Associating::on_disassoc_frame");
         warn!("received unexpected disassociation frame while associating");
         sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::SpuriousDeauthOrDisassoc);
     }
@@ -425,7 +427,7 @@ impl Associating {
         sta: &mut BoundClient<'_, D>,
         deauth_hdr: &mac::DeauthHdr,
     ) {
-        trace::duration!(c"wlan", c"Associating::on_deauth_frame");
+        wtrace::duration!(c"Associating::on_deauth_frame");
         info!(
             "received spurious deauthentication frame while associating with BSS (unusual); \
              association failed: {:?}",
@@ -552,7 +554,7 @@ impl Associated {
         sta: &mut BoundClient<'_, D>,
         disassoc_hdr: &mac::DisassocHdr,
     ) {
-        trace::duration!(c"wlan", c"Associated::on_disassoc_frame");
+        wtrace::duration!(c"Associated::on_disassoc_frame");
         self.pre_leaving_associated_state(sta);
         let reason_code = fidl_ieee80211::ReasonCode::from_primitive(disassoc_hdr.reason_code.0)
             .unwrap_or(fidl_ieee80211::ReasonCode::UnspecifiedReason);
@@ -565,7 +567,7 @@ impl Associated {
         sta: &mut BoundClient<'_, D>,
         deauth_hdr: &mac::DeauthHdr,
     ) {
-        trace::duration!(c"wlan", c"Associated::on_deauth_frame");
+        wtrace::duration!(c"Associated::on_deauth_frame");
         self.pre_leaving_associated_state(sta);
         let reason_code = fidl_ieee80211::ReasonCode::from_primitive(deauth_hdr.reason_code.0)
             .unwrap_or(fidl_ieee80211::ReasonCode::UnspecifiedReason);
@@ -613,7 +615,7 @@ impl Associated {
         header: &BeaconHdr,
         elements: B,
     ) {
-        trace::duration!(c"wlan", c"Associated::on_beacon_frame");
+        wtrace::duration!(c"Associated::on_beacon_frame");
         self.0.lost_bss_counter.reset();
         // TODO(b/253637931): Add metrics to track channel switch counts and success rates.
         if let Err(e) =
@@ -652,8 +654,9 @@ impl Associated {
         addr4: Option<mac::Addr4>,
         qos_ctrl: Option<mac::QosControl>,
         body: B,
+        async_id: TraceId,
     ) {
-        trace::duration!(c"wlan", c"States::on_data_frame");
+        wtrace::duration!(c"States::on_data_frame");
 
         self.request_bu_if_available(
             sta,
@@ -670,9 +673,12 @@ impl Associated {
                 error!("error sending keep alive frame: {}", e);
             }
         }
+
+        const MSDU_TRACE_NAME: &'static std::ffi::CStr = c"States::on_data_frame => MSDU";
+
         // Handle aggregated and non-aggregated MSDUs.
         for msdu in msdus {
-            trace::duration!(c"wlan", c"States::on_data_frame MSDU");
+            wtrace::duration_begin!(MSDU_TRACE_NAME);
 
             let mac::Msdu { dst_addr, src_addr, llc_frame } = &msdu;
             match llc_frame.hdr.protocol_id.to_native() {
@@ -682,28 +688,52 @@ impl Associated {
                     if let Err(e) =
                         sta.send_eapol_indication(*src_addr, *dst_addr, &llc_frame.body[..])
                     {
+                        wtrace::duration_end!(
+                            MSDU_TRACE_NAME,
+                            "status" => "failure sending EAPOL indication",
+                        );
                         error!("error sending MLME-EAPOL.indication: {}", e);
+                    } else {
+                        wtrace::duration_end!(
+                            MSDU_TRACE_NAME,
+                            "status" => "sent EAPOL indication",
+                        );
                     }
                 }
                 // Deliver non-EAPoL MSDUs only if the controlled port is open.
                 _ if self.0.controlled_port_open => {
                     if let Err(e) = sta.deliver_msdu(msdu) {
+                        wtrace::duration_end!(
+                            MSDU_TRACE_NAME,
+                            "status" => "failure delivering MSDU",
+                        );
                         error!("error while handling data frame: {}", e);
+                    } else {
+                        wtrace::duration_end!(
+                            MSDU_TRACE_NAME,
+                            "status" => "delivered MSDU",
+                        );
                     }
                 }
                 // Drop all non-EAPoL MSDUs if the controlled port is closed.
-                _ => {}
+                _ => {
+                    wtrace::duration_end!(
+                        MSDU_TRACE_NAME,
+                        "status" => "dropping MSDU. controlled port closed.",
+                    );
+                }
             }
         }
+        wtrace::async_end_wlansoftmac_rx(async_id, "completed data frame processing");
     }
 
     fn on_eth_frame<B: ByteSlice, D: DeviceOps>(
         &self,
         sta: &mut BoundClient<'_, D>,
         frame: B,
-        async_id: trace::Id,
+        async_id: TraceId,
     ) -> Result<(), Error> {
-        trace::duration!(c"wlan", c"Associated::on_eth_frame");
+        wtrace::duration!(c"Associated::on_eth_frame");
         let mac::EthernetFrame { hdr, body } = match mac::EthernetFrame::parse(frame) {
             Some(eth_frame) => eth_frame,
             None => {
@@ -995,8 +1025,9 @@ impl States {
         sta: &mut BoundClient<'_, D>,
         bytes: B,
         rx_info: banjo_wlan_softmac::WlanRxInfo,
+        async_id: TraceId,
     ) -> States {
-        trace::duration!(c"wlan", c"States::on_mac_frame");
+        wtrace::duration!(c"States::on_mac_frame");
 
         let body_aligned = (rx_info.rx_flags
             & banjo_wlan_softmac::WlanRxInfoFlags::FRAME_BODY_PADDING_4)
@@ -1008,12 +1039,14 @@ impl States {
             Some(mac_frame) => mac_frame,
             None => {
                 debug!("Dropping corrupt MAC frame.");
+                wtrace::async_end_wlansoftmac_rx(async_id, "corrupt frame");
                 return self;
             }
         };
 
         if !sta.sta.should_handle_frame(&mac_frame) {
             warn!("Mac frame is either from a foreign BSS or not destined for us. Dropped.");
+            wtrace::async_end_wlansoftmac_rx(async_id, "foreign BSS frame");
             return self;
         }
 
@@ -1021,11 +1054,19 @@ impl States {
         let frame_class = mac::FrameClass::from(&mac_frame);
         if !self.is_frame_class_permitted(frame_class) {
             debug!("Dropping MAC frame with prohibited frame class.");
+            wtrace::async_end_wlansoftmac_rx(async_id, "frame with prohibited frame class");
             return self;
         }
 
         match mac_frame {
-            mac::MacFrame::Mgmt(mgmt_frame) => self.on_mgmt_frame(sta, mgmt_frame, rx_info),
+            mac::MacFrame::Mgmt(mgmt_frame) => {
+                let states = self.on_mgmt_frame(sta, mgmt_frame, rx_info);
+                wtrace::async_end_wlansoftmac_rx(
+                    async_id,
+                    "management frame successfully received",
+                );
+                states
+            }
             mac::MacFrame::Data { fixed_fields, addr4, qos_ctrl, body, .. } => {
                 if let States::Associated(state) = &mut self {
                     state.on_data_frame(
@@ -1034,17 +1075,20 @@ impl States {
                         addr4.map(|x| *x),
                         qos_ctrl.map(|x| x.get()),
                         body,
+                        async_id,
                     );
                     state.extract_and_record_signal_dbm(rx_info);
                 } else {
                     // Drop data frames in all other states
                     debug!("Dropping MAC data frame while not associated.");
+                    wtrace::async_end_wlansoftmac_rx(async_id, "data frame while not associated");
                 }
                 self
             }
             // Control frames are not yet supported. Drop them.
             _ => {
                 debug!("Dropping unsupported MAC control frame.");
+                wtrace::async_end_wlansoftmac_rx(async_id, "unsupported control frame");
                 self
             }
         }
@@ -1058,7 +1102,7 @@ impl States {
         mgmt_frame: mac::MgmtFrame<B>,
         rx_info: banjo_wlan_softmac::WlanRxInfo,
     ) -> States {
-        trace::duration!(c"wlan", c"States::on_mgmt_frame");
+        wtrace::duration!(c"States::on_mgmt_frame");
 
         // Parse management frame. Drop corrupted ones.
         let (mgmt_hdr, mgmt_body) = match mgmt_frame.try_into_mgmt_body() {
@@ -1158,9 +1202,9 @@ impl States {
         &self,
         sta: &mut BoundClient<'_, D>,
         frame: B,
-        async_id: trace::Id,
+        async_id: TraceId,
     ) -> Result<(), Error> {
-        trace::duration!(c"wlan", c"States::on_eth_frame");
+        wtrace::duration!(c"States::on_eth_frame");
         match self {
             States::Associated(state) => state.on_eth_frame(sta, frame, async_id),
             _ => Err(Error::Status(
@@ -1338,7 +1382,7 @@ impl States {
 
     /// Returns |true| iff a given FrameClass is permitted to be processed in the current state.
     fn is_frame_class_permitted(&self, class: mac::FrameClass) -> bool {
-        trace::duration!(c"wlan", c"State::is_frame_class_permitted");
+        wtrace::duration!(c"State::is_frame_class_permitted");
         match self {
             States::Joined(_) | States::Authenticating(_) => class == mac::FrameClass::Class1,
             States::Authenticated(_) | States::Associating(_) => class <= mac::FrameClass::Class2,
@@ -2060,7 +2104,7 @@ mod tests {
             &mut client,
         ))));
         let rx_info = mock_rx_info(&client);
-        match state.on_mac_frame(&mut client, &frame[..], rx_info) {
+        match state.on_mac_frame(&mut client, &frame[..], rx_info, 0.into()) {
             States::Associated(state) => {
                 let (_, associated) = state.release_data();
                 // TODO(https://fxbug.dev/42104687): Handle BlockAck frames. The following code has been
@@ -2180,7 +2224,7 @@ mod tests {
 
         let data_frame = make_data_frame_single_llc(None, None);
         let (fixed, addr4, qos, body) = parse_data_frame(&data_frame[..]);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
+        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
 
         // Verify data frame was dropped.
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 0);
@@ -2198,7 +2242,7 @@ mod tests {
 
         let data_frame = make_data_frame_single_llc(None, None);
         let (fixed, addr4, qos, body) = parse_data_frame(&data_frame[..]);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
+        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
 
         // Verify data frame was processed.
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 1);
@@ -2223,7 +2267,7 @@ mod tests {
 
         let data_frame = make_data_frame_single_llc_payload(None, None, &[]);
         let (fixed, addr4, qos, body) = parse_data_frame(&data_frame[..]);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
+        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
 
         // Verify data frame was discarded.
         assert!(m.fake_device_state.lock().eth_queue.is_empty());
@@ -2247,7 +2291,7 @@ mod tests {
 
         let data_frame = make_null_data_frame();
         let (fixed, addr4, qos, body) = parse_data_frame(&data_frame[..]);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
+        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
 
         // Verify data frame was not forwarded up.
         assert!(m.fake_device_state.lock().eth_queue.is_empty());
@@ -2271,7 +2315,7 @@ mod tests {
 
         let (src_addr, dst_addr, eapol_frame) = make_eapol_frame(*IFACE_MAC);
         let (fixed, addr4, qos, body) = parse_data_frame(&eapol_frame[..]);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
+        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
 
         // Verify EAPOL frame was not sent to netstack.
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 0);
@@ -2303,7 +2347,7 @@ mod tests {
 
         let (src_addr, dst_addr, eapol_frame) = make_eapol_frame(*IFACE_MAC);
         let (fixed, addr4, qos, body) = parse_data_frame(&eapol_frame[..]);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
+        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
 
         // Verify EAPOL frame was not sent to netstack.
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 0);
@@ -2336,7 +2380,7 @@ mod tests {
 
         let data_frame = make_data_frame_amsdu();
         let (fixed, addr4, qos, body) = parse_data_frame(&data_frame[..]);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
+        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
 
         let queue = &m.fake_device_state.lock().eth_queue;
         assert_eq!(queue.len(), 2);
@@ -2374,7 +2418,7 @@ mod tests {
         let data_frame = make_data_frame_single_llc(None, None);
         let (mut fixed, addr4, qos, body) = parse_data_frame(&data_frame[..]);
         fixed.frame_ctrl = fixed.frame_ctrl.with_more_data(true);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
+        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
 
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
@@ -2441,7 +2485,7 @@ mod tests {
         let data_frame = make_data_frame_single_llc(None, None);
         let (mut fixed, addr4, qos, body) = parse_data_frame(&data_frame[..]);
         fixed.frame_ctrl = fixed.frame_ctrl.with_more_data(true);
-        state.on_data_frame(&mut sta, &fixed, addr4, qos, body);
+        state.on_data_frame(&mut sta, &fixed, addr4, qos, body, 0.into());
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 0);
 
         // Foreign management frame
@@ -2461,7 +2505,7 @@ mod tests {
             // Omit IEs
         ];
         let rx_info = mock_rx_info(&sta);
-        state.on_mac_frame(&mut sta, &beacon[..], rx_info);
+        state.on_mac_frame(&mut sta, &beacon[..], rx_info, 0.into());
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 0);
     }
 
@@ -2501,7 +2545,7 @@ mod tests {
             11, 11, 11,
         ];
         let rx_info = mock_rx_info(&sta);
-        state.on_mac_frame(&mut sta, &bytes[..], rx_info);
+        state.on_mac_frame(&mut sta, &bytes[..], rx_info, 0.into());
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 0);
     }
 
@@ -2565,7 +2609,7 @@ mod tests {
             0, 0, // Status Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &auth_resp_success[..], rx_info);
+        state = state.on_mac_frame(&mut sta, &auth_resp_success[..], rx_info, 0.into());
         assert_variant!(state, States::Associating(_), "not in associating state");
     }
 
@@ -2596,7 +2640,7 @@ mod tests {
             42, 0, // Status Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &auth_resp_failure[..], rx_info);
+        state = state.on_mac_frame(&mut sta, &auth_resp_failure[..], rx_info, 0.into());
         assert_variant!(state, States::Joined(_), "not in joined state");
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
@@ -2626,7 +2670,7 @@ mod tests {
             5, 0, // Algorithm Number (Open)
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &deauth[..], rx_info);
+        state = state.on_mac_frame(&mut sta, &deauth[..], rx_info, 0.into());
         assert_variant!(state, States::Joined(_), "not in joined state");
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
@@ -2657,7 +2701,7 @@ mod tests {
             0, 0, // Status Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &auth_resp_success[..], rx_info);
+        state = state.on_mac_frame(&mut sta, &auth_resp_success[..], rx_info, 0.into());
         assert_variant!(state, States::Authenticating(_), "not in authenticating state");
 
         // Verify that an authentication response from the joined BSS still moves the Client
@@ -2677,7 +2721,7 @@ mod tests {
             0, 0, // Status Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &auth_resp_success[..], rx_info);
+        state = state.on_mac_frame(&mut sta, &auth_resp_success[..], rx_info, 0.into());
         assert_variant!(state, States::Associating(_), "not in associating state");
     }
 
@@ -2741,7 +2785,7 @@ mod tests {
             0, 0, // Status Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &auth_resp_wrong[..], rx_info);
+        state = state.on_mac_frame(&mut sta, &auth_resp_wrong[..], rx_info, 0.into());
         assert_variant!(state, States::Joined(_), "not in joined state");
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
@@ -2781,7 +2825,7 @@ mod tests {
             0xea, 0xff, 0x00, 0x00, 0xea, 0xff, 0x00, 0x00, // VHT supported MCS set
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &assoc_resp_success[..], rx_info);
+        state = state.on_mac_frame(&mut sta, &assoc_resp_success[..], rx_info, 0.into());
         assert_variant!(state, States::Associated(_), "not in associated state");
     }
 
@@ -2811,7 +2855,7 @@ mod tests {
             0, 0, // AID
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &assoc_resp_failure[..], rx_info);
+        state = state.on_mac_frame(&mut sta, &assoc_resp_failure[..], rx_info, 0.into());
         assert_variant!(state, States::Joined(_), "not in joined state");
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
     }
@@ -2840,7 +2884,7 @@ mod tests {
             4, 0, // Reason Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &deauth[..], rx_info);
+        state = state.on_mac_frame(&mut sta, &deauth[..], rx_info, 0.into());
         assert_variant!(state, States::Joined(_), "not in joined state");
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
@@ -2931,7 +2975,7 @@ mod tests {
             4, 0, // Reason Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &disassoc[..], rx_info);
+        state = state.on_mac_frame(&mut sta, &disassoc[..], rx_info, 0.into());
         assert_variant!(state, States::Authenticated(_), "not in auth'd state");
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
 
@@ -2997,7 +3041,7 @@ mod tests {
             0xea, 0xff, 0x00, 0x00, 0xea, 0xff, 0x00, 0x00, // VHT supported MCS set
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &assoc_resp_success[..], rx_info);
+        state = state.on_mac_frame(&mut sta, &assoc_resp_success[..], rx_info, 0.into());
         assert_variant!(state, States::Associated(_), "not in associated state");
 
         // Verify a successful connect conf is sent
@@ -3036,7 +3080,7 @@ mod tests {
             4, 0, // Reason Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &disassoc[..], rx_info);
+        state = state.on_mac_frame(&mut sta, &disassoc[..], rx_info, 0.into());
         assert_variant!(state, States::Authenticated(_), "not in auth'd state");
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
 
@@ -3107,7 +3151,7 @@ mod tests {
             4, 0, // Reason Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &disassoc[..], rx_info);
+        state = state.on_mac_frame(&mut sta, &disassoc[..], rx_info, 0.into());
         assert_variant!(state, States::Authenticated(_), "not in auth'd state");
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
 
@@ -3206,7 +3250,7 @@ mod tests {
             4, 0, // Reason Code
         ];
         let rx_info = mock_rx_info(&sta);
-        state = state.on_mac_frame(&mut sta, &deauth[..], rx_info);
+        state = state.on_mac_frame(&mut sta, &deauth[..], rx_info, 0.into());
         assert_variant!(state, States::Joined(_), "not in joined state");
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
@@ -3793,7 +3837,7 @@ mod tests {
         ];
 
         let rx_info = mock_rx_info(&sta);
-        state.on_mac_frame(&mut sta, &data_frame[..], rx_info);
+        state.on_mac_frame(&mut sta, &data_frame[..], rx_info, 0.into());
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 1);
     }
 
@@ -3835,7 +3879,7 @@ mod tests {
         // We deliberately ignore the cbw, since it isn't important and not all
         // drivers report it consistently.
         rx_info.channel.cbw = banjo_common::ChannelBandwidth::CBW80;
-        state.on_mac_frame(&mut sta, &data_frame[..], rx_info);
+        state.on_mac_frame(&mut sta, &data_frame[..], rx_info, 0.into());
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 1);
     }
 
@@ -3867,7 +3911,7 @@ mod tests {
         ];
 
         let rx_info = mock_rx_info(&sta);
-        state.on_mac_frame(&mut sta, &beacon[..], rx_info);
+        state.on_mac_frame(&mut sta, &beacon[..], rx_info, 0.into());
 
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
@@ -3908,7 +3952,7 @@ mod tests {
             5, 4, 0, 0, 0, 0, // Tim IE: No buffered frame for any client.
         ];
         let rx_info = mock_rx_info(&sta);
-        state.on_mac_frame(&mut sta, &beacon[..], rx_info);
+        state.on_mac_frame(&mut sta, &beacon[..], rx_info, 0.into());
 
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 0);
     }
@@ -3963,7 +4007,7 @@ mod tests {
 
         const EXPECTED_DBM: i8 = -32;
         let rx_info = rx_info_with_dbm(&sta, EXPECTED_DBM);
-        let state = state.on_mac_frame(&mut sta, &beacon[..], rx_info);
+        let state = state.on_mac_frame(&mut sta, &beacon[..], rx_info, 0.into());
 
         let (_, timed_event) =
             m.time_stream.try_next().unwrap().expect("Should have scheduled signal report timeout");

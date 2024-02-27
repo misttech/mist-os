@@ -90,6 +90,15 @@
 #define WLAN_TRACE_ASYNC_END_TX(async_id, status) \
   TRACE_ASYNC_END("wlan", "wlansoftmac:tx", async_id, "status", TA_INT64(status));
 
+// The name_literal used here should be the same as defined in
+// wlan_trace::names::NAME_WLANSOFTMAC_RX.
+#define WLAN_TRACE_ASYNC_BEGIN_RX(async_id) TRACE_ASYNC_BEGIN("wlan", "wlansoftmac:rx", async_id);
+
+// The name_literal used here should be the same as defined in
+// wlan_trace::names::NAME_WLANSOFTMAC_RX.
+#define WLAN_TRACE_ASYNC_END_RX(async_id, status) \
+  TRACE_ASYNC_END("wlan", "wlansoftmac:rx", async_id, "status", TA_INT64(status));
+
 #define FMT_MAC "%02x:%02x:%02x:%02x:%02x:%02x"
 #define FMT_MAC_ARGS(arr) (arr)[0], (arr)[1], (arr)[2], (arr)[3], (arr)[4], (arr)[5]
 

@@ -26,6 +26,7 @@ use {
         TimeUnit,
     },
     wlan_sme::{self},
+    wlan_trace as wtrace,
     zerocopy::ByteSlice,
 };
 
@@ -150,8 +151,9 @@ impl<D: DeviceOps> crate::MlmeImpl for Ap<D> {
         &mut self,
         frame: &[u8],
         rx_info: banjo_fuchsia_wlan_softmac::WlanRxInfo,
+        async_id: trace::Id,
     ) {
-        Self::handle_mac_frame_rx(self, frame, rx_info)
+        Self::handle_mac_frame_rx(self, frame, rx_info, async_id)
     }
     fn handle_eth_frame_tx(
         &mut self,
@@ -411,17 +413,20 @@ impl<D: DeviceOps> Ap<D> {
         &mut self,
         bytes: B,
         rx_info: banjo_wlan_softmac::WlanRxInfo,
+        async_id: trace::Id,
     ) {
         let bss = match self.bss.as_mut() {
             Some(bss) => bss,
             None => {
                 error!("received WLAN frame but BSS was not started yet");
+                wtrace::async_end_wlansoftmac_rx(async_id, "BSS not started");
                 return;
             }
         };
 
         // Rogue frames received from the wrong channel
         if rx_info.channel.primary != bss.channel {
+            wtrace::async_end_wlansoftmac_rx(async_id, "frame from wrong channel");
             return;
         }
 
@@ -433,6 +438,7 @@ impl<D: DeviceOps> Ap<D> {
             Some(mac_frame) => mac_frame,
             None => {
                 error!("failed to parse MAC frame");
+                wtrace::async_end_wlansoftmac_rx(async_id, "failed to parse frame");
                 return;
             }
         };
@@ -452,10 +458,14 @@ impl<D: DeviceOps> Ap<D> {
             }
             mac::MacFrame::Unsupported { frame_ctrl } => {
                 error!("received unsupported MAC frame: frame_ctrl = {:?}", frame_ctrl);
+                wtrace::async_end_wlansoftmac_rx(async_id, "received unsupported frame");
                 return;
             }
         } {
+            wtrace::async_end_wlansoftmac_rx(async_id, "failed to handle frame");
             e.log("failed to handle MAC frame")
+        } else {
+            wtrace::async_end_wlansoftmac_rx(async_id, "successfully handled frame");
         }
     }
 }
@@ -654,6 +664,7 @@ mod tests {
                 0, 0, // Status code
             ][..],
             mock_rx_info(&ap),
+            0.into(),
         );
 
         assert_eq!(ap.bss.as_mut().unwrap().clients.contains_key(&CLIENT_ADDR), true);
@@ -718,6 +729,7 @@ mod tests {
                 0x10, 0, // Sequence control.
             ][..],
             mock_rx_info(&ap),
+            0.into(),
         );
 
         ap.handle_eth_frame_tx(
@@ -736,6 +748,7 @@ mod tests {
                 4, 4, 4, 4, 4, 4, // addr2
             ][..],
             mock_rx_info(&ap),
+            0.into(),
         );
 
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
@@ -788,6 +801,7 @@ mod tests {
                 8, 0, // reason code
             ][..],
             mock_rx_info(&ap),
+            0.into(),
         );
 
         assert_eq!(ap.bss.as_mut().unwrap().clients.contains_key(&CLIENT_ADDR), false);
@@ -826,6 +840,7 @@ mod tests {
                 rssi_dbm: 0,
                 snr_dbh: 0,
             },
+            0.into(),
         );
     }
 
@@ -871,7 +886,7 @@ mod tests {
             rssi_dbm: 0,
             snr_dbh: 0,
         };
-        ap.handle_mac_frame_rx(&probe_req[..], rx_info_wrong_channel.clone());
+        ap.handle_mac_frame_rx(&probe_req[..], rx_info_wrong_channel.clone(), 0.into());
 
         // Probe Request from the wrong channel should be dropped and no probe response sent.
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 0);
@@ -886,7 +901,7 @@ mod tests {
             ..rx_info_wrong_channel
         };
         fake_device_state.lock().wlan_queue.clear();
-        ap.handle_mac_frame_rx(&probe_req[..], rx_info_same_channel);
+        ap.handle_mac_frame_rx(&probe_req[..], rx_info_same_channel, 0.into());
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
     }
 

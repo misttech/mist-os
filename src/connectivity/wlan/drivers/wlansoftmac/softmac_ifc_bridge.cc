@@ -13,6 +13,7 @@
 #include <lib/sync/cpp/completion.h>
 #include <lib/trace/event.h>
 #include <lib/zx/result.h>
+#include <zircon/errors.h>
 
 #include <mutex>
 
@@ -32,23 +33,7 @@ zx::result<std::unique_ptr<SoftmacIfcBridge>> SoftmacIfcBridge::New(
         softmac_ifc_bridge_client_endpoint) {
   WLAN_TRACE_DURATION();
   auto softmac_ifc_bridge = std::unique_ptr<SoftmacIfcBridge>(
-      new SoftmacIfcBridge(std::move(unbind_lock), std::move(unbind_called)));
-
-  // The protocol functions are stored in this class, which will act as
-  // the server end of WlanSoftmacifc FIDL protocol, and this set of function pointers will be
-  // called in the handler functions of FIDL server end.
-  softmac_ifc_bridge->wlan_softmac_ifc_protocol_ops_ = {
-      .recv = rust_softmac_ifc->ops->recv,
-  };
-  softmac_ifc_bridge->wlan_softmac_ifc_protocol_.ops =
-      &softmac_ifc_bridge->wlan_softmac_ifc_protocol_ops_;
-
-  // The Banjo binding generates a `void*`. We use `const_cast` here to allow assignment but
-  // assert the const-correctness in the Rust portion of this driver. In particular, this `ctx` is
-  // actually a `*const DriverEventSink` in Rust. And all methods implementing the functions
-  // pointers contained in `ops` immediately cast the `&mut DriveEventSink` passed to them to a
-  // `&DriverEventSink`.
-  softmac_ifc_bridge->wlan_softmac_ifc_protocol_.ctx = const_cast<void*>(rust_softmac_ifc->ctx);
+      new SoftmacIfcBridge(std::move(unbind_lock), std::move(unbind_called), rust_softmac_ifc));
 
   // Bind the WlanSoftmacIfc server and WlanSoftmacIfcBridge client on
   // softmac_ifc_bridge_server_dispatcher.
@@ -83,10 +68,13 @@ zx::result<std::unique_ptr<SoftmacIfcBridge>> SoftmacIfcBridge::New(
 
 void SoftmacIfcBridge::Recv(RecvRequestView request, fdf::Arena& arena,
                             RecvCompleter::Sync& completer) {
+  trace_async_id_t async_id = TRACE_NONCE();
+  WLAN_TRACE_ASYNC_BEGIN_RX(async_id);
   WLAN_TRACE_DURATION();
   {
     std::lock_guard<std::mutex> lock(*unbind_lock_);
     if (*unbind_called_) {
+      WLAN_TRACE_ASYNC_END_RX(async_id, ZX_ERR_CANCELED);
       return;
     }
   }
@@ -106,7 +94,7 @@ void SoftmacIfcBridge::Recv(RecvRequestView request, fdf::Arena& arena,
     lerror("RxPacket conversion failed: %s", zx_status_get_string(status));
   }
 
-  wlan_softmac_ifc_protocol_.ops->recv(wlan_softmac_ifc_protocol_.ctx, &rx_packet);
+  rust_softmac_ifc_.ops->recv(rust_softmac_ifc_.ctx, &rx_packet, async_id);
   if (use_prealloc_recv_buffer) {
     // Freeing the frame buffer allocated in ConvertRxPacket() above.
     memset(const_cast<uint8_t*>(rx_packet.mac_frame_buffer), 0, rx_packet.mac_frame_size);

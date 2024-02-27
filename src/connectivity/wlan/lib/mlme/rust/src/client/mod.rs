@@ -131,16 +131,17 @@ impl<D: DeviceOps> crate::MlmeImpl for ClientMlme<D> {
         &mut self,
         bytes: &[u8],
         rx_info: banjo_fuchsia_wlan_softmac::WlanRxInfo,
+        async_id: trace::Id,
     ) {
-        trace::duration!(c"wlan", c"ClientMlme::handle_mac_frame_rx");
-        Self::on_mac_frame_rx(self, bytes, rx_info)
+        wtrace::duration!(c"ClientMlme::handle_mac_frame_rx");
+        Self::on_mac_frame_rx(self, bytes, rx_info, async_id)
     }
     fn handle_eth_frame_tx(
         &mut self,
         bytes: &[u8],
         async_id: trace::Id,
     ) -> Result<(), anyhow::Error> {
-        trace::duration!(c"wlan", c"ClientMlme::handle_eth_frame_tx");
+        wtrace::duration!(c"ClientMlme::handle_eth_frame_tx");
         Self::on_eth_frame_tx(self, bytes, async_id).map_err(From::from)
     }
     fn handle_scan_complete(&mut self, status: zx::Status, scan_id: u64) {
@@ -235,14 +236,19 @@ impl<D: DeviceOps> ClientMlme<D> {
         self.channel_state.bind(&mut self.ctx, &mut self.scanner).set_main_channel(channel)
     }
 
-    pub fn on_mac_frame_rx(&mut self, frame: &[u8], rx_info: banjo_wlan_softmac::WlanRxInfo) {
-        trace::duration!(c"wlan", c"ClientMlme::on_mac_frame_rx");
+    pub fn on_mac_frame_rx(
+        &mut self,
+        frame: &[u8],
+        rx_info: banjo_wlan_softmac::WlanRxInfo,
+        async_id: trace::Id,
+    ) {
+        wtrace::duration!(c"ClientMlme::OnMacFrameRx");
         // TODO(https://fxbug.dev/42120906): Send the entire frame to scanner.
         if let Some(mgmt_frame) = mac::MgmtFrame::parse(frame, false) {
             let bssid = Bssid::from(mgmt_frame.mgmt_hdr.addr3);
             match mgmt_frame.try_into_mgmt_body().1 {
                 Some(mac::MgmtBody::Beacon { bcn_hdr, elements }) => {
-                    trace::duration!(c"wlan", c"MgmtBody::Beacon");
+                    wtrace::duration!(c"MgmtBody::Beacon");
                     self.scanner.bind(&mut self.ctx).handle_ap_advertisement(
                         bssid,
                         bcn_hdr.beacon_interval,
@@ -252,7 +258,7 @@ impl<D: DeviceOps> ClientMlme<D> {
                     );
                 }
                 Some(mac::MgmtBody::ProbeResp { probe_resp_hdr, elements }) => {
-                    trace::duration!(c"wlan", c"MgmtBody::ProbeResp");
+                    wtrace::duration!(c"MgmtBody::ProbeResp");
                     self.scanner.bind(&mut self.ctx).handle_ap_advertisement(
                         bssid,
                         probe_resp_hdr.beacon_interval,
@@ -272,8 +278,10 @@ impl<D: DeviceOps> ClientMlme<D> {
             match self.channel_state.get_main_channel() {
                 Some(main_channel) if main_channel.primary == rx_info.channel.primary => sta
                     .bind(&mut self.ctx, &mut self.scanner, &mut self.channel_state)
-                    .on_mac_frame(frame, rx_info),
-                Some(_) => (),
+                    .on_mac_frame(frame, rx_info, async_id),
+                Some(_) => {
+                    wtrace::async_end_wlansoftmac_rx(async_id, "off main channel");
+                }
                 // TODO(https://fxbug.dev/42075118): This is only reachable because the Client state machine
                 // returns to the Joined state and clears the main channel upon deauthentication.
                 None => {
@@ -281,8 +289,11 @@ impl<D: DeviceOps> ClientMlme<D> {
                         "Received MAC frame on channel {:?} while main channel is not set.",
                         rx_info.channel
                     );
+                    wtrace::async_end_wlansoftmac_rx(async_id, "main channel not set");
                 }
             }
+        } else {
+            wtrace::async_end_wlansoftmac_rx(async_id, "no bound client");
         }
     }
 
@@ -495,7 +506,7 @@ impl<D: DeviceOps> ClientMlme<D> {
         bytes: B,
         async_id: trace::Id,
     ) -> Result<(), Error> {
-        trace::duration!(c"wlan", c"ClientMlme::on_eth_frame_tx");
+        wtrace::duration!(c"ClientMlme::on_eth_frame_tx");
         match self.sta.as_mut() {
             None => Err(Error::Status(
                 format!("Ethernet frame dropped (Client does not exist)."),
@@ -624,7 +635,7 @@ impl Client {
     /// be the BSSID the client associated to and the receiver address should either be non-unicast
     /// or the client's MAC address.
     fn should_handle_frame<B: ByteSlice>(&self, mac_frame: &mac::MacFrame<B>) -> bool {
-        trace::duration!(c"wlan", c"Client::should_handle_frame");
+        wtrace::duration!(c"Client::should_handle_frame");
 
         // Technically, |transmitter_addr| and |receiver_addr| would be more accurate but using src
         // src and dst to be consistent with |data_dst_addr()|.
@@ -854,7 +865,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             wtrace::async_begin_wlansoftmac_tx(async_id, "mlme");
             async_id
         });
-        trace::duration!(c"wlan", c"BoundClient::send_data_frame");
+        wtrace::duration!(c"BoundClient::send_data_frame");
 
         let qos_ctrl = if qos_ctrl {
             Some(
@@ -1017,10 +1028,12 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         &mut self,
         bytes: B,
         rx_info: banjo_wlan_softmac::WlanRxInfo,
+        async_id: trace::Id,
     ) {
-        trace::duration!(c"wlan", c"BoundClient::on_mac_frame");
+        wtrace::duration!(c"BoundClient::on_mac_frame");
         // Safe: |state| is never None and always replaced with Some(..).
-        self.sta.state = Some(self.sta.state.take().unwrap().on_mac_frame(self, bytes, rx_info));
+        self.sta.state =
+            Some(self.sta.state.take().unwrap().on_mac_frame(self, bytes, rx_info, async_id));
     }
 
     pub fn on_eth_frame_tx<B: ByteSlice>(
@@ -1028,7 +1041,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         frame: B,
         async_id: trace::Id,
     ) -> Result<(), Error> {
-        trace::duration!(c"wlan", c"BoundClient::on_eth_frame_tx");
+        wtrace::duration!(c"BoundClient::on_eth_frame_tx");
         // Safe: |state| is never None and always replaced with Some(..).
         let state = self.sta.state.take().unwrap();
         let result = state.on_eth_frame(self, frame, async_id);
@@ -1691,6 +1704,7 @@ mod tests {
                 rssi_dbm: 0,
                 snr_dbh: 0,
             },
+            0.into(),
         );
 
         // Verify auto deauth is not triggered for the entire duration.
@@ -2041,7 +2055,7 @@ mod tests {
         let mut client = me.get_bound_client().expect("client should be present");
         client.move_to_associated_state();
 
-        client.on_mac_frame(&data_frame[..], mock_rx_info(&client));
+        client.on_mac_frame(&data_frame[..], mock_rx_info(&client), 0.into());
 
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
@@ -2070,7 +2084,7 @@ mod tests {
         let mut client = me.get_bound_client().expect("client should be present");
         client.move_to_associated_state();
 
-        client.on_mac_frame(&data_frame[..], mock_rx_info(&client));
+        client.on_mac_frame(&data_frame[..], mock_rx_info(&client), 0.into());
 
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 1);
         #[rustfmt::skip]
@@ -2096,7 +2110,7 @@ mod tests {
         let mut client = me.get_bound_client().expect("client should be present");
         client.move_to_associated_state();
 
-        client.on_mac_frame(&data_frame[..], mock_rx_info(&client));
+        client.on_mac_frame(&data_frame[..], mock_rx_info(&client), 0.into());
 
         let queue = &m.fake_device_state.lock().eth_queue;
         assert_eq!(queue.len(), 2);
@@ -2132,7 +2146,7 @@ mod tests {
         let mut client = me.get_bound_client().expect("client should be present");
         client.move_to_associated_state();
 
-        client.on_mac_frame(&data_frame[..], mock_rx_info(&client));
+        client.on_mac_frame(&data_frame[..], mock_rx_info(&client), 0.into());
 
         let queue = &m.fake_device_state.lock().eth_queue;
         assert_eq!(queue.len(), 1);
@@ -2161,7 +2175,7 @@ mod tests {
         client.move_to_associated_state();
         client.close_controlled_port();
 
-        client.on_mac_frame(&data_frame[..], mock_rx_info(&client));
+        client.on_mac_frame(&data_frame[..], mock_rx_info(&client), 0.into());
 
         // Verify frame was not sent to netstack.
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 0);
@@ -2182,7 +2196,7 @@ mod tests {
         client.move_to_associated_state();
         client.close_controlled_port();
 
-        client.on_mac_frame(&eapol_frame[..], mock_rx_info(&client));
+        client.on_mac_frame(&eapol_frame[..], mock_rx_info(&client), 0.into());
 
         // Verify EAPoL frame was not sent to netstack.
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 0);
@@ -2217,7 +2231,7 @@ mod tests {
         let mut client = me.get_bound_client().expect("client should be present");
         client.move_to_associated_state();
 
-        client.on_mac_frame(&eapol_frame[..], mock_rx_info(&client));
+        client.on_mac_frame(&eapol_frame[..], mock_rx_info(&client), 0.into());
 
         // Verify EAPoL frame was not sent to netstack.
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 0);
@@ -2769,6 +2783,7 @@ mod tests {
         me.on_mac_frame_rx(
             &auth_resp_success[..],
             MockWlanRxInfo::with_channel(channel.into()).into(),
+            0.into(),
         );
 
         // Verify association request frame was went to AP
@@ -2828,6 +2843,7 @@ mod tests {
         me.on_mac_frame_rx(
             &assoc_resp_success[..],
             MockWlanRxInfo::with_channel(channel.into()).into(),
+            0.into(),
         );
 
         // Verify a successful connect conf is sent
@@ -2930,6 +2946,7 @@ mod tests {
         me.on_mac_frame_rx(
             &auth_resp_success[..],
             MockWlanRxInfo::with_channel(channel.into()).into(),
+            0.into(),
         );
 
         // Verify association request frame was went to AP
@@ -2999,6 +3016,7 @@ mod tests {
         me.on_mac_frame_rx(
             &assoc_resp_success[..],
             MockWlanRxInfo::with_channel(channel.into()).into(),
+            0.into(),
         );
 
         // Verify a successful connect conf is sent
@@ -3097,6 +3115,7 @@ mod tests {
         me.on_mac_frame_rx(
             &auth_resp_success[..],
             MockWlanRxInfo::with_channel(channel.into()).into(),
+            0.into(),
         );
 
         // Verify association request frame was went to AP

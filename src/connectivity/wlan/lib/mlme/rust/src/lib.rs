@@ -126,7 +126,12 @@ pub trait MlmeImpl {
     where
         Self: Sized;
     fn handle_mlme_request(&mut self, msg: wlan_sme::MlmeRequest) -> Result<(), Error>;
-    fn handle_mac_frame_rx(&mut self, bytes: &[u8], rx_info: banjo_wlan_softmac::WlanRxInfo);
+    fn handle_mac_frame_rx(
+        &mut self,
+        bytes: &[u8],
+        rx_info: banjo_wlan_softmac::WlanRxInfo,
+        async_id: trace::Id,
+    );
     fn handle_eth_frame_tx(&mut self, bytes: &[u8], async_id: trace::Id) -> Result<(), Error>;
     fn handle_scan_complete(&mut self, status: zx::Status, scan_id: u64);
     fn handle_timeout(&mut self, event_id: common::timer::EventId, event: Self::TimerEvent);
@@ -205,7 +210,7 @@ pub enum DriverEvent {
     Stop(StopCompleter),
     // TODO(https://fxbug.dev/42119762): We need to keep stats for these events and respond to StatsQueryRequest.
     // Indicates receipt of a MAC frame from a peer.
-    MacFrameRx { bytes: Vec<u8>, rx_info: banjo_wlan_softmac::WlanRxInfo },
+    MacFrameRx { bytes: Vec<u8>, rx_info: banjo_wlan_softmac::WlanRxInfo, async_id: trace::Id },
     // Requests transmission of an ethernet frame over the air.
     EthFrameTx { bytes: Vec<u8>, async_id: trace::Id },
     // Reports a scan is complete.
@@ -324,12 +329,12 @@ async fn main_loop_impl<T: MlmeImpl>(
                         stop_completer.complete();
                         return Ok(())
                     },
-                    DriverEvent::MacFrameRx { bytes, rx_info } => {
-                        trace::duration!(c"wlan", c"DriverEvent::MacFrameRx");
-                        mlme_impl.handle_mac_frame_rx(&bytes[..], rx_info);
+                    DriverEvent::MacFrameRx { bytes, rx_info, async_id } => {
+                        wtrace::duration!(c"DriverEvent::MacFrameRx");
+                        mlme_impl.handle_mac_frame_rx(&bytes[..], rx_info, async_id);
                     }
                     DriverEvent::EthFrameTx { bytes, async_id } => {
-                        trace::duration!(c"wlan", c"DriverEvent::EthFrameTx");
+                        wtrace::duration!(c"DriverEvent::EthFrameTx");
                         let _: Result<(), ()> = mlme_impl.handle_eth_frame_tx(&bytes[..], async_id)
                             .map_err(|e| {
                                 // TODO(https://fxbug.dev/42121991): Keep a counter of these failures.
@@ -396,7 +401,12 @@ pub mod test_utils {
             unimplemented!()
         }
 
-        fn handle_mac_frame_rx(&mut self, _bytes: &[u8], _rx_info: banjo_wlan_softmac::WlanRxInfo) {
+        fn handle_mac_frame_rx(
+            &mut self,
+            _bytes: &[u8],
+            _rx_info: banjo_wlan_softmac::WlanRxInfo,
+            _async_id: trace::Id,
+        ) {
             unimplemented!()
         }
 

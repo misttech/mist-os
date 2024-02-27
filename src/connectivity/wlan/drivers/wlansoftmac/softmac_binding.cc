@@ -427,6 +427,7 @@ zx_status_t SoftmacBinding::DeliverEthernet(cpp20::span<const uint8_t> eth_frame
   if (ethernet_proxy_.is_valid()) {
     ethernet_proxy_.Recv(eth_frame.data(), eth_frame.size(), 0u);
   }
+
   return ZX_OK;
 }
 

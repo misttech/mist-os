@@ -20,7 +20,7 @@
 typedef struct wlansoftmac_handle_t wlansoftmac_handle_t;
 
 typedef struct {
-  void (*recv)(void *ctx, const wlan_rx_packet_t *packet);
+  void (*recv)(const void *ctx, const wlan_rx_packet_t *packet, trace_async_id_t async_id);
 } rust_wlan_softmac_ifc_protocol_ops_copy_t;
 
 /**

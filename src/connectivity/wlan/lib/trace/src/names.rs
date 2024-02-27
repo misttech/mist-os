@@ -10,3 +10,7 @@ pub const NAME_WLANCFG_START: &'static CStr = c"wlancfg:start";
 // This name should be the same as defined in
 // //src/connectivity/wlan/drivers/lib/log/cpp/include/common/wlan/drivers/log.h
 pub const NAME_WLANSOFTMAC_TX: &'static CStr = c"wlansoftmac:tx";
+
+// This name should be the same as defined in
+// //src/connectivity/wlan/drivers/lib/log/cpp/include/common/wlan/drivers/log.h
+pub const NAME_WLANSOFTMAC_RX: &'static CStr = c"wlansoftmac:rx";
