@@ -1701,6 +1701,7 @@ async fn tcp_socket<N: Netstack>(name: &str) {
         .await
         .expect("client failed to join network");
     client_ep.add_address_and_subnet_route(CLIENT_SUBNET).await.expect("configure address");
+    client_ep.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     let server = sandbox
         .create_netstack_realm::<N, _>(format!("{}_server", name))
@@ -1715,6 +1716,7 @@ async fn tcp_socket<N: Netstack>(name: &str) {
         .await
         .expect("server failed to join network");
     server_ep.add_address_and_subnet_route(SERVER_SUBNET).await.expect("configure address");
+    server_ep.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     run_tcp_socket_test(&server, SERVER_SUBNET.addr, &client, CLIENT_SUBNET.addr).await
 }
@@ -2298,6 +2300,7 @@ async fn ping<N: Netstack>(name: &str) {
                 .await
                 .expect("failed to join network in realm");
             interface.add_address_and_subnet_route(addr).await.expect("configure address");
+            interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
             (realm, interface)
         }
     };
