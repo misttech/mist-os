@@ -925,3 +925,8 @@ group("marker-public") {
 group("marker-allowed-for-ffx-subtool") {
   visibility += [ "*" ]
 }
+
+# Marker for the allow list for use in Lacewing.
+group("marker-allowed-for-host-test") {
+  visibility += [ "*" ]
+}

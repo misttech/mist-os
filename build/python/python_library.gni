@@ -43,6 +43,9 @@ import("//build/group_with_inputs.gni")
 #     Type: boolean
 #     Default: False
 #
+#   assert_no_deps (optional)
+#     GN usual
+#
 # Metadata
 #
 #   library_info
@@ -76,6 +79,7 @@ template("python_library") {
                            [
                              "testonly",
                              "visibility",
+                             "assert_no_deps",
                            ])
 
     library_name = target_name
