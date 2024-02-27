@@ -20,17 +20,28 @@ import (
 type MockFFXInstance struct {
 	CmdsCalled  []string
 	TestOutcome string
+	Output      string
+	stdout      io.Writer
+	stderr      io.Writer
 }
 
 func (f *MockFFXInstance) Stdout() io.Writer {
-	return os.Stdout
+	if f.stdout == nil {
+		return os.Stdout
+	}
+	return f.stdout
 }
 
 func (f *MockFFXInstance) Stderr() io.Writer {
-	return os.Stderr
+	if f.stderr == nil {
+		return os.Stderr
+	}
+	return f.stderr
 }
 
-func (f *MockFFXInstance) SetStdoutStderr(_, _ io.Writer) {
+func (f *MockFFXInstance) SetStdoutStderr(stdout, stderr io.Writer) {
+	f.stdout = stdout
+	f.stderr = stderr
 }
 
 func (f *MockFFXInstance) run(cmd string, args ...string) error {
@@ -51,6 +62,9 @@ func (f *MockFFXInstance) Test(_ context.Context, testList build.TestList, outDi
 		return nil, fmt.Errorf(`schema_id must be %q, found %q`, build.TestListSchemaIDExperimental, testList.SchemaID)
 	}
 	f.run("test", args...)
+	if _, err := f.Stdout().Write([]byte(f.Output)); err != nil {
+		return nil, err
+	}
 	return f.WriteRunResult(testList, outDir)
 }
 

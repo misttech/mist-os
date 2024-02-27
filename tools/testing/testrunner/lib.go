@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -33,6 +34,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/environment"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
+	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 	"go.fuchsia.dev/fuchsia/tools/testing/resultdb"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 	"go.fuchsia.dev/fuchsia/tools/testing/tap"
@@ -462,29 +464,36 @@ func runAndOutputTests(
 			return err
 		}
 
-		runIndex := test.previousRuns
+		var result *TestResult
+		if err := retryOnConnectionFailure(ctx, t, func() error {
+			runIndex := test.previousRuns
 
-		outDir := filepath.Join(globalOutDir, url.PathEscape(strings.ReplaceAll(test.Name, ":", "")), strconv.Itoa(runIndex))
-		result, err := runTestOnce(ctx, test.Test, t, outDir)
-		if err != nil {
+			outDir := filepath.Join(globalOutDir, url.PathEscape(strings.ReplaceAll(test.Name, ":", "")), strconv.Itoa(runIndex))
+			var testErr error
+			result, testErr = runTestOnce(ctx, test.Test, t, outDir)
+			if result == nil {
+				return testErr
+			}
+			result.RunIndex = runIndex
+			if err := outputs.Record(ctx, *result); err != nil {
+				return err
+			}
+
+			test.previousRuns++
+			test.totalDuration += result.Duration()
+
+			// TODO(danikay): Temporarily using the existence of the resultdb client to
+			// enable the soft transition from uploading to resultdb from the fuchsia.py
+			// recipe to uploading the test results here, as they complete
+			if resultdbClient != nil {
+				testTags := testTagsToStringPairs(result.Tags)
+				testDetails := testDetailsFromTestResult(result.Name, result.StartTime, result)
+				testResults, _ := resultdb.TestCaseToResultSink(result.Cases, testTags, &testDetails, outDir)
+				resultdbResults = append(resultdbResults, testResults...)
+			}
+			return testErr
+		}); err != nil {
 			return err
-		}
-		result.RunIndex = runIndex
-		if err := outputs.Record(ctx, *result); err != nil {
-			return err
-		}
-
-		test.previousRuns++
-		test.totalDuration += result.Duration()
-
-		// TODO(danikay): Temporarily using the existence of the resultdb client to
-		// enable the soft transition from uploading to resultdb from the fuchsia.py
-		// recipe to uploading the test results here, as they complete
-		if resultdbClient != nil {
-			testTags := testTagsToStringPairs(result.Tags)
-			testDetails := testDetailsFromTestResult(result.Name, result.StartTime, result)
-			testResults, _ := resultdb.TestCaseToResultSink(result.Cases, testTags, &testDetails, outDir)
-			resultdbResults = append(resultdbResults, testResults...)
 		}
 
 		if shouldKeepGoing(test.Test, result, test.totalDuration) {
@@ -503,6 +512,36 @@ func runAndOutputTests(
 		}
 	}
 	return nil
+}
+
+type connectionError struct {
+	error
+}
+
+func isConnectionError(err error) bool {
+	var connErr connectionError
+	return errors.As(err, &connErr)
+}
+
+var connectionErrorRetryBackoff retry.Backoff = retry.NewConstantBackoff(time.Second)
+
+func retryOnConnectionFailure(ctx context.Context, t Tester, execFunc func() error) error {
+	return retry.Retry(ctx, retry.WithMaxAttempts(connectionErrorRetryBackoff, maxReconnectAttempts), func() error {
+		err := execFunc()
+		if isConnectionError(err) {
+			logger.Errorf(ctx, "attempting to reconnect after error: %s", err)
+			if reconnectErr := t.Reconnect(ctx); reconnectErr != nil {
+				logger.Errorf(ctx, "%s", reconnectErr)
+				// If we fail to reconnect, continuing is likely hopeless.
+				// Return the *original* error (which will generally be more
+				// closely related to the root cause of the failure) rather than
+				// the reconnection error.
+				return retry.Fatal(err)
+			}
+			return err
+		}
+		return retry.Fatal(err)
+	}, nil)
 }
 
 // shouldKeepGoing returns whether we should schedule another run of the test.
@@ -620,7 +659,7 @@ func runTestOnce(
 		cancelTest()
 	}
 
-	if err != nil {
+	if err != nil && !isConnectionError(err) {
 		// The tester encountered a fatal condition and cannot run any more
 		// tests.
 		return nil, err
@@ -694,7 +733,7 @@ func runTestOnce(
 	result.StartTime = startTime
 	result.EndTime = endTime
 	result.Affected = test.Affected
-	return result, nil
+	return result, err
 }
 
 // Helper function to convert []build.TestTag to []resultpb.StringPair

@@ -24,10 +24,12 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
+	ffxutilconstants "go.fuchsia.dev/fuchsia/tools/lib/ffxutil/constants"
 	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 	"go.fuchsia.dev/fuchsia/tools/lib/subprocess"
 	"go.fuchsia.dev/fuchsia/tools/net/sshutil"
+	sshutilconstants "go.fuchsia.dev/fuchsia/tools/net/sshutil/constants"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
 
@@ -378,7 +380,9 @@ func TestFFXTester(t *testing.T) {
 		name            string
 		sshRunErrs      []error
 		expectedResult  runtests.TestResult
+		connErr         bool
 		experimentLevel int
+		output          string
 	}{
 		{
 			name:            "run tests with ssh if low experiment level",
@@ -406,6 +410,13 @@ func TestFFXTester(t *testing.T) {
 			expectedResult:  runtests.TestSkipped,
 			experimentLevel: 2,
 		},
+		{
+			name:            "ffx test returns ssh connection failure",
+			expectedResult:  runtests.TestFailure,
+			connErr:         true,
+			experimentLevel: 2,
+			output:          sshutilconstants.ProcessTerminatedMsg + "\n" + ffxutilconstants.ClientChannelClosedMsg,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -414,10 +425,9 @@ func TestFFXTester(t *testing.T) {
 			}
 			copier := &fakeDataSinkCopier{remoteDirs: make(map[string]struct{})}
 			sshTester := &FuchsiaSSHTester{
-				client:                      client,
-				copier:                      copier,
-				connectionErrorRetryBackoff: &retry.ZeroBackoff{},
-				testRuns:                    make(map[string]sshTestRun),
+				client:   client,
+				copier:   copier,
+				testRuns: make(map[string]sshTestRun),
 			}
 			var outcome string
 			switch c.expectedResult {
@@ -430,7 +440,7 @@ func TestFFXTester(t *testing.T) {
 			case runtests.TestSkipped:
 				outcome = ffxutil.TestNotStarted
 			}
-			ffx := &ffxutil.MockFFXInstance{TestOutcome: outcome}
+			ffx := &ffxutil.MockFFXInstance{TestOutcome: outcome, Output: c.output}
 			localOutputDir := t.TempDir()
 			tester, err := NewFFXTester(context.Background(), ffx, sshTester, localOutputDir, c.experimentLevel)
 			if err != nil {
@@ -452,7 +462,9 @@ func TestFFXTester(t *testing.T) {
 			outDir := t.TempDir()
 			testResult, err := tester.Test(ctx, test, io.Discard, io.Discard, outDir)
 			testResult, err = tester.ProcessResult(ctx, test, outDir, testResult, err)
-			if err != nil {
+			if c.connErr && !isConnectionError(err) {
+				t.Errorf("tester.Test got err: %s, want conn err", err)
+			} else if !c.connErr && err != nil {
 				t.Errorf("tester.Test got unexpected error: %s", err)
 			}
 			if testResult.Result != c.expectedResult {
@@ -466,6 +478,10 @@ func TestFFXTester(t *testing.T) {
 				}
 				if !ffx.ContainsCmd("test", testArgs...) {
 					t.Errorf("failed to call `ffx test`, called: %s", ffx.CmdsCalled)
+				}
+				numRuns := strings.Count(strings.Join(ffx.CmdsCalled, " "), "test:")
+				if numRuns != 1 {
+					t.Errorf("called `ffx test` %d times, expected 1", numRuns)
 				}
 				expectedCaseStatus := runtests.TestSuccess
 				if c.expectedResult != runtests.TestSuccess {
@@ -556,27 +572,10 @@ func TestSSHTester(t *testing.T) {
 			expectedResult: runtests.TestFailure,
 		},
 		{
-			name:           "connection error retry and test failure",
-			runErrs:        []error{sshutil.ConnectionError{}, fmt.Errorf("test failed")},
-			reconErrs:      []error{nil},
+			name:           "connection failure",
+			runErrs:        []error{sshutil.ConnectionError{}},
 			expectedResult: runtests.TestFailure,
-		},
-		{
-			name:      "reconnect succeeds then fails",
-			runErrs:   []error{sshutil.ConnectionError{}, sshutil.ConnectionError{}},
-			reconErrs: []error{nil, fmt.Errorf("reconnect failed")},
-			// Make sure we return the original ConnectionError and not the error from the failed
-			// reconnect attempt. This is important because the code that calls Test() in a loop
-			// aborts the loop when it sees an ConnectionError.
-			wantConnErr: true,
-		},
-		{
-			name:           "reconnect succeeds thrice",
-			runErrs:        []error{sshutil.ConnectionError{}, sshutil.ConnectionError{}, sshutil.ConnectionError{}},
-			reconErrs:      []error{nil, nil, nil},
-			expectedResult: runtests.TestFailure,
-			// Reconnection succeeds so we don't want the caller to see a ConnectionError.
-			wantConnErr: false,
+			wantConnErr:    true,
 		},
 		{
 			name:        "reconnect before snapshot",
@@ -604,11 +603,10 @@ func TestSSHTester(t *testing.T) {
 			serialSocket := &fakeSerialClient{}
 			var tester Tester
 			tester = &FuchsiaSSHTester{
-				client:                      client,
-				copier:                      copier,
-				connectionErrorRetryBackoff: &retry.ZeroBackoff{},
-				serialSocket:                serialSocket,
-				testRuns:                    make(map[string]sshTestRun),
+				client:       client,
+				copier:       copier,
+				serialSocket: serialSocket,
+				testRuns:     make(map[string]sshTestRun),
 			}
 
 			defer func() {
@@ -636,7 +634,7 @@ func TestSSHTester(t *testing.T) {
 			} else if err != nil {
 				if !c.wantConnErr {
 					t.Errorf("tester.Test got error: %s, want nil", err)
-				} else if !sshutil.IsConnectionError(err) {
+				} else if !isConnectionError(err) {
 					t.Errorf("tester.Test got error: %s. want conn err", err)
 				}
 			}
@@ -691,7 +689,7 @@ func TestSSHTester(t *testing.T) {
 				t.Errorf("Run() called wrong number of times. Got: %d, Want: %d", client.runCalls, wantRunCalls)
 			}
 
-			if c.wantConnErr {
+			if reconnFailures > 0 && c.reconErrs[len(c.reconErrs)-1] != nil {
 				if serialSocket.runCalls != 1 {
 					t.Errorf("called RunSerialDiagnostics() %d times", serialSocket.runCalls)
 				}

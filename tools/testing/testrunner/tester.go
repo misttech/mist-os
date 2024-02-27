@@ -38,6 +38,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/serial"
 	"go.fuchsia.dev/fuchsia/tools/lib/subprocess"
 	"go.fuchsia.dev/fuchsia/tools/net/sshutil"
+	sshutilconstants "go.fuchsia.dev/fuchsia/tools/net/sshutil/constants"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 	"go.fuchsia.dev/fuchsia/tools/testing/testrunner/constants"
 )
@@ -88,6 +89,7 @@ type Tester interface {
 	Close() error
 	EnsureSinks(context.Context, []runtests.DataSinkReference, *TestOutputs) error
 	RunSnapshot(context.Context, string) error
+	Reconnect(context.Context) error
 }
 
 // For testability
@@ -511,6 +513,10 @@ func (t *SubprocessTester) RunSnapshot(_ context.Context, _ string) error {
 	return nil
 }
 
+func (t *SubprocessTester) Reconnect(_ context.Context) error {
+	return nil
+}
+
 func (t *SubprocessTester) Close() error {
 	return nil
 }
@@ -562,6 +568,7 @@ type FFXTester struct {
 
 type ffxTestRun struct {
 	result        *ffxutil.TestRunResult
+	output        string
 	totalDuration time.Duration
 }
 
@@ -592,6 +599,12 @@ func (t *FFXTester) Test(ctx context.Context, test testsharder.Test, stdout, std
 	return t.sshTester.Test(ctx, test, stdout, stderr, outDir)
 }
 
+func (t *FFXTester) Reconnect(ctx context.Context) error {
+	return retry.Retry(ctx, retry.WithMaxDuration(retry.NewConstantBackoff(time.Second), 30*time.Second), func() error {
+		return t.ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
+	}, nil)
+}
+
 // testWithFile runs `ffx test` with -test-file and returns the test result.
 func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, stdout, stderr io.Writer, outDir string) error {
 	testDef := []build.TestListEntry{{
@@ -610,6 +623,9 @@ func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, std
 	}}
 	origStdout := t.ffx.Stdout()
 	origStderr := t.ffx.Stderr()
+	var buf bytes.Buffer
+	stdout = io.MultiWriter(stdout, &buf)
+	stderr = io.MultiWriter(stderr, &buf)
 	t.ffx.SetStdoutStderr(stdout, stderr)
 	defer t.ffx.SetStdoutStderr(origStdout, origStderr)
 
@@ -619,23 +635,11 @@ func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, std
 	}
 	startTime := clock.Now(ctx)
 	runResult, err := t.ffx.Test(ctx, build.TestList{Data: testDef, SchemaID: build.TestListSchemaIDExperimental}, outDir, extraArgs...)
-	if err != nil {
-		return err
+	if runResult == nil && err == nil {
+		err = fmt.Errorf("no test result was found")
 	}
-	if runResult == nil {
-		return fmt.Errorf("no test result was found")
-	}
-	t.setTestRun(test, runResult, clock.Now(ctx).Sub(startTime))
-	return nil
-}
-
-func (t *FFXTester) setTestRun(test testsharder.Test, runResult *ffxutil.TestRunResult, duration time.Duration) {
-	t.testRuns[test.PackageURL] = ffxTestRun{runResult, duration}
-}
-
-func (t *FFXTester) getTestRun(test testsharder.Test) (*ffxutil.TestRunResult, time.Duration) {
-	run := t.testRuns[test.PackageURL]
-	return run.result, run.totalDuration
+	t.testRuns[test.PackageURL] = ffxTestRun{runResult, buf.String(), clock.Now(ctx).Sub(startTime)}
+	return err
 }
 
 func (t *FFXTester) ProcessResult(ctx context.Context, test testsharder.Test, outDir string, testResult *TestResult, err error) (*TestResult, error) {
@@ -643,11 +647,11 @@ func (t *FFXTester) ProcessResult(ctx context.Context, test testsharder.Test, ou
 		return t.sshTester.ProcessResult(ctx, test, outDir, testResult, err)
 	}
 	finalTestResult := testResult
-	if err == nil {
-		runResult, totalDuration := t.getTestRun(test)
-		testOutDir := runResult.GetTestOutputDir()
+	testRun := t.testRuns[test.PackageURL]
+	if testRun.result != nil {
+		testOutDir := testRun.result.GetTestOutputDir()
 		t.testOutDirs = append(t.testOutDirs, testOutDir)
-		testResult, err = processTestResult(runResult, test, totalDuration, false)
+		testResult, err = processTestResult(testRun.result, test, testRun.totalDuration, false)
 	}
 	if err != nil {
 		finalTestResult.FailReason = err.Error()
@@ -656,13 +660,11 @@ func (t *FFXTester) ProcessResult(ctx context.Context, test testsharder.Test, ou
 	} else {
 		finalTestResult = testResult
 	}
-	if finalTestResult.Result != runtests.TestSuccess {
-		err = retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), maxReconnectAttempts), func() error {
-			return t.ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
-		}, nil)
-		if err != nil {
-			return finalTestResult, err
+	if finalTestResult.Result != runtests.TestSuccess && strings.Contains(testRun.output, sshutilconstants.ProcessTerminatedMsg) {
+		if err == nil {
+			err = errors.New(sshutilconstants.ProcessTerminatedMsg)
 		}
+		return finalTestResult, connectionError{err}
 	}
 	return finalTestResult, nil
 }
@@ -1038,13 +1040,12 @@ func sshToTarget(ctx context.Context, addr net.IPAddr, sshKeyFile string) (*sshu
 
 // FuchsiaSSHTester executes fuchsia tests over an SSH connection.
 type FuchsiaSSHTester struct {
-	client                      sshClient
-	copier                      dataSinkCopier
-	localOutputDir              string
-	connectionErrorRetryBackoff retry.Backoff
-	serialSocket                serialClient
-	ignoreEarlyBoot             bool
-	testRuns                    map[string]sshTestRun
+	client          sshClient
+	copier          dataSinkCopier
+	localOutputDir  string
+	serialSocket    serialClient
+	ignoreEarlyBoot bool
+	testRuns        map[string]sshTestRun
 }
 
 // NewFuchsiaSSHTester returns a FuchsiaSSHTester associated to a fuchsia
@@ -1060,17 +1061,19 @@ func NewFuchsiaSSHTester(ctx context.Context, addr net.IPAddr, sshKeyFile, local
 		return nil, err
 	}
 	return &FuchsiaSSHTester{
-		client:                      client,
-		copier:                      copier,
-		localOutputDir:              localOutputDir,
-		connectionErrorRetryBackoff: retry.NewConstantBackoff(time.Second),
-		serialSocket:                &serialSocket{serialSocketPath},
-		testRuns:                    make(map[string]sshTestRun),
+		client:         client,
+		copier:         copier,
+		localOutputDir: localOutputDir,
+		serialSocket:   &serialSocket{serialSocketPath},
+		testRuns:       make(map[string]sshTestRun),
 	}, nil
 }
 
 func (t *FuchsiaSSHTester) reconnect(ctx context.Context) error {
 	if err := t.client.ReconnectWithBackoff(ctx, retry.WithMaxDuration(retry.NewConstantBackoff(time.Second), 10*time.Second)); err != nil {
+		if err := t.serialSocket.runDiagnostics(ctx); err != nil {
+			logger.Warningf(ctx, "failed to run serial diagnostics: %s", err)
+		}
 		return fmt.Errorf("failed to reestablish SSH connection: %w", err)
 	}
 	if err := t.copier.Reconnect(); err != nil {
@@ -1102,32 +1105,19 @@ func (t *FuchsiaSSHTester) isTimeoutError(test testsharder.Test, err error) bool
 	return false
 }
 
-func (t *FuchsiaSSHTester) runSSHCommandWithRetry(ctx context.Context, command []string, stdout, stderr io.Writer) error {
-	return retry.Retry(ctx, retry.WithMaxAttempts(t.connectionErrorRetryBackoff, maxReconnectAttempts), func() error {
-		if cmdErr := t.client.Run(ctx, command, stdout, stderr); cmdErr != nil {
-			if !sshutil.IsConnectionError(cmdErr) {
-				// Not a connection error -> break retry loop.
-				return retry.Fatal(cmdErr)
-			}
-			logger.Errorf(ctx, "attempting to reconnect over SSH after error: %s", cmdErr)
-			if err := t.reconnect(ctx); err != nil {
-				logger.Errorf(ctx, "%s: %s", constants.FailedToReconnectMsg, err)
-				// If we fail to reconnect, continuing is likely hopeless.
-				// Return the *original* error (which will generally be more
-				// closely related to the root cause of the failure) rather than
-				// the reconnection error.
-				return retry.Fatal(cmdErr)
-			}
-			// Return non-ConnectionError because code in main.go will exit
-			// early if it sees that. Since reconnection succeeded, we don't
-			// want that.
-			// TODO(olivernewman): Clean this up; have main.go do its own
-			// connection recovery between tests.
-			cmdErr = fmt.Errorf("%s", cmdErr)
-			return cmdErr
-		}
-		return nil
-	}, nil)
+func (t *FuchsiaSSHTester) runSSHCommand(ctx context.Context, command []string, stdout, stderr io.Writer) error {
+	cmdErr := t.client.Run(ctx, command, stdout, stderr)
+	if sshutil.IsConnectionError(cmdErr) {
+		return connectionError{cmdErr}
+	}
+	return cmdErr
+}
+
+func (t *FuchsiaSSHTester) Reconnect(ctx context.Context) error {
+	if err := t.reconnect(ctx); err != nil {
+		return fmt.Errorf("%s: %s", constants.FailedToReconnectMsg, err)
+	}
+	return nil
 }
 
 type sshTestRun struct {
@@ -1165,7 +1155,7 @@ func (t *FuchsiaSSHTester) Test(ctx context.Context, test testsharder.Test, stdo
 		command = append(command, "--deprecated-output-directory", targetOutDir)
 	}
 	startTime := clock.Now(ctx)
-	testErr := t.runSSHCommandWithRetry(ctx, command, stdout, stderr)
+	testErr := t.runSSHCommand(ctx, command, stdout, stderr)
 	if setOutputDir {
 		t.setTestRun(test, targetOutDir, clock.Now(ctx).Sub(startTime))
 	}
@@ -1217,20 +1207,14 @@ func (t *FuchsiaSSHTester) ProcessResult(ctx context.Context, test testsharder.T
 				} else {
 					// If there was no processing error, return the test result
 					// constructed from the run_summary.json in the outputs.
-					return result, nil
+					testResult = result
 				}
 			}
 		}
 	}
 
-	if sshutil.IsConnectionError(testErr) {
-		if err := t.serialSocket.runDiagnostics(ctx); err != nil {
-			logger.Warningf(ctx, "failed to run serial diagnostics: %s", err)
-		}
-		// If we continue to experience a connection error after several retries
-		// then the device has likely become unresponsive and there's no use in
-		// continuing to try to run tests, so mark the error as fatal.
-		return nil, testErr
+	if isConnectionError(testErr) {
+		return testResult, testErr
 	}
 
 	return testResult, nil
@@ -1303,28 +1287,14 @@ func (t *FuchsiaSSHTester) EnsureSinks(ctx context.Context, sinkRefs []runtests.
 }
 
 func (t *FuchsiaSSHTester) runCopierWithRetry(ctx context.Context, copierFunc func() error) error {
-	strategy := retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), 4)
-	disconnected := false
-	return retry.Retry(ctx, strategy, func() error {
-		if disconnected {
-			logger.Debugf(ctx, "reconnecting to retry getting data sinks...")
-			if err := t.reconnect(ctx); err != nil {
-				return retry.Fatal(err)
-			}
-			disconnected = false
-			logger.Debugf(ctx, "successfully reconnected, will retry getting data sinks")
+	return retryOnConnectionFailure(ctx, t, func() error {
+		err := copierFunc()
+		if errors.Is(err, sftp.ErrSSHFxConnectionLost) {
+			logger.Warningf(ctx, "connection lost while getting data sinks: %s", err)
+			return connectionError{err}
 		}
-
-		if err := copierFunc(); err != nil {
-			if errors.Is(err, sftp.ErrSSHFxConnectionLost) {
-				logger.Warningf(ctx, "connection lost while getting data sinks: %s", err)
-				disconnected = true
-				return err
-			}
-			return retry.Fatal(err)
-		}
-		return nil
-	}, nil)
+		return err
+	})
 }
 
 func (t *FuchsiaSSHTester) copySinks(ctx context.Context, sinkRefs []runtests.DataSinkReference, localOutputDir string) error {
@@ -1361,16 +1331,14 @@ func (t *FuchsiaSSHTester) RunSnapshot(ctx context.Context, snapshotFile string)
 		return fmt.Errorf("failed to create snapshot output file: %w", err)
 	}
 	defer snapshotOutFile.Close()
-	if err := t.runSSHCommandWithRetry(ctx, []string{"/bin/snapshot"}, snapshotOutFile, os.Stderr); err != nil {
+	if err := retryOnConnectionFailure(ctx, t, func() error {
+		return t.runSSHCommand(ctx, []string{"/bin/snapshot"}, snapshotOutFile, os.Stderr)
+	}); err != nil {
 		logger.Errorf(ctx, "%s: %s", constants.FailedToRunSnapshotMsg, err)
-		if sshutil.IsConnectionError(err) {
-			if err := t.serialSocket.runDiagnostics(ctx); err != nil {
-				logger.Warningf(ctx, "failed to run serial diagnostics: %s", err)
-			}
-		}
+		return err
 	}
 	logger.Debugf(ctx, "ran snapshot in %s", clock.Now(ctx).Sub(startTime))
-	return err
+	return nil
 }
 
 // Close terminates the underlying SSH connection. The object is no longer
@@ -1633,6 +1601,10 @@ func (t *FuchsiaSerialTester) EnsureSinks(_ context.Context, _ []runtests.DataSi
 }
 
 func (t *FuchsiaSerialTester) RunSnapshot(_ context.Context, _ string) error {
+	return nil
+}
+
+func (t *FuchsiaSerialTester) Reconnect(_ context.Context) error {
 	return nil
 }
 

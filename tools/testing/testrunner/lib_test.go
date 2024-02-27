@@ -24,6 +24,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
 	"go.fuchsia.dev/fuchsia/tools/lib/clock"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
+	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 	"go.fuchsia.dev/fuchsia/tools/testing/tap"
 )
@@ -36,9 +37,11 @@ const (
 )
 
 type fakeTester struct {
-	runTest   func(context.Context, testsharder.Test, io.Writer, io.Writer, string) (*TestResult, error)
-	funcCalls []string
-	outDirs   map[string]bool
+	runTest     func(context.Context, testsharder.Test, io.Writer, io.Writer, string) (*TestResult, error)
+	reconnect   func(context.Context, testsharder.Test) error
+	funcCalls   []string
+	outDirs     map[string]bool
+	lastTestRun testsharder.Test
 }
 
 func testResult(test testsharder.Test, result runtests.TestResult) *TestResult {
@@ -56,6 +59,7 @@ func (t *fakeTester) Test(ctx context.Context, test testsharder.Test, stdout, st
 	}
 	t.outDirs[outDir] = true
 	result := runtests.TestSuccess
+	t.lastTestRun = test
 	if t.runTest != nil {
 		return t.runTest(ctx, test, stdout, stderr, outDir)
 	}
@@ -79,6 +83,13 @@ func (t *fakeTester) EnsureSinks(_ context.Context, _ []runtests.DataSinkReferen
 
 func (t *fakeTester) RunSnapshot(_ context.Context, _ string) error {
 	t.funcCalls = append(t.funcCalls, runSnapshotFunc)
+	return nil
+}
+
+func (t *fakeTester) Reconnect(ctx context.Context) error {
+	if t.reconnect != nil {
+		return t.reconnect(ctx, t.lastTestRun)
+	}
 	return nil
 }
 
@@ -247,6 +258,10 @@ func TestRunAndOutputTests(t *testing.T) {
 		hang bool
 		// Whether the test should emit a fatal error.
 		fatal bool
+		// Whether the test should return a connection error.
+		connErr bool
+		// Whether the tester should fail to reconnect.
+		failReconnect bool
 		// The duration that the test will take to run.
 		duration time.Duration
 		// Data that the test should emit to stdout and stderr.
@@ -646,6 +661,61 @@ func TestRunAndOutputTests(t *testing.T) {
 			},
 		},
 		{
+			name: "retries on connection error",
+			tests: []testsharder.Test{
+				{
+					Test:         build.Test{Name: "foo"},
+					RunAlgorithm: testsharder.StopOnFailure,
+					Runs:         1,
+				},
+			},
+			behavior: map[string]testBehavior{
+				"foo/0": {connErr: true},
+				"foo/1": {connErr: true},
+			},
+			expectedResults: []runtests.TestDetails{
+				failedTest("foo", 0, defaultDuration),
+				failedTest("foo", 1, defaultDuration),
+				succeededTest("foo", 2, defaultDuration),
+			},
+		},
+		{
+			name: "reconnect fails",
+			tests: []testsharder.Test{
+				{
+					Test:         build.Test{Name: "foo"},
+					RunAlgorithm: testsharder.StopOnFailure,
+					Runs:         1,
+				},
+			},
+			behavior: map[string]testBehavior{
+				"foo/0": {connErr: true, failReconnect: true},
+			},
+			expectedResults: []runtests.TestDetails{
+				failedTest("foo", 0, defaultDuration),
+			},
+			wantErr: true,
+		},
+		{
+			name: "reconnect succeeds, then fails",
+			tests: []testsharder.Test{
+				{
+					Test:         build.Test{Name: "foo"},
+					RunAlgorithm: testsharder.StopOnFailure,
+					Runs:         1,
+				},
+			},
+			behavior: map[string]testBehavior{
+				"foo/0": {connErr: true},
+				"foo/1": {connErr: true, failReconnect: true},
+			},
+			expectedResults: []runtests.TestDetails{
+				failedTest("foo", 0, defaultDuration),
+				failedTest("foo", 1, defaultDuration),
+			},
+			wantErr: true,
+		},
+		{
 			name: "fatal error running test",
 			tests: []testsharder.Test{
 				{
@@ -830,6 +900,9 @@ func TestRunAndOutputTests(t *testing.T) {
 					} else if behavior.fail {
 						result.Result = runtests.TestFailure
 						return result, nil
+					} else if behavior.connErr {
+						result.Result = runtests.TestFailure
+						return result, connectionError{fmt.Errorf("conn err")}
 					}
 
 					if timeout > 0 && behavior.duration >= timeout {
@@ -842,6 +915,13 @@ func TestRunAndOutputTests(t *testing.T) {
 						<-ctx.Done()
 					}
 					return result, nil
+				}, reconnect: func(ctx context.Context, test testsharder.Test) error {
+					runIndex := runCounts[test.Name] - 1
+					behavior := tc.behavior[fmt.Sprintf("%s/%d", test.Name, runIndex)]
+					if behavior.failReconnect {
+						return fmt.Errorf("reconnect failed")
+					}
+					return nil
 				}}, &[]runtests.DataSinkReference{}, nil
 			}
 
@@ -850,6 +930,12 @@ func TestRunAndOutputTests(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			origRetryBackoff := connectionErrorRetryBackoff
+			defer func() {
+				connectionErrorRetryBackoff = origRetryBackoff
+			}()
+			connectionErrorRetryBackoff = &retry.ZeroBackoff{}
 
 			err = runAndOutputTests(ctx, tc.tests, testerForTest, outputs, resultsDir, nil)
 			if tc.wantErr != (err != nil) {

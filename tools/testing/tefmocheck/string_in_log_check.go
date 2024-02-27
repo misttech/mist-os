@@ -550,7 +550,7 @@ func infraToolLogChecks() []FailureModeCheck {
 		},
 		// For https://fxbug.dev/317290699.
 		&stringInLogCheck{
-			String:             "process terminated with abnormal return code url=fuchsia-pkg://fuchsia.com/sshd-host#meta/sshd.cm",
+			String:             sshutilconstants.ProcessTerminatedMsg,
 			Type:               swarmingOutputType,
 			SkipAllPassedTests: true,
 		},
@@ -563,7 +563,7 @@ func infraToolLogChecks() []FailureModeCheck {
 		},
 		// For https://fxbug.dev/42176228.
 		&stringInLogCheck{
-			String: "There was an internal error running tests: Fidl(ClientChannelClosed { status: Status(PEER_CLOSED)",
+			String: ffxutilconstants.ClientChannelClosedMsg,
 			Type:   swarmingOutputType,
 		},
 		// General ffx error check.
