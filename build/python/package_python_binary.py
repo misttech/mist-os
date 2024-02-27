@@ -90,7 +90,6 @@ def main() -> int:
 
     # For writing a depfile.
     files_to_copy: list[str] = []
-    type_check_files: list[str] = args.sources
     # Make sub directories for all libraries and copy over their sources.
     for info in infos:
         dest_lib_root = os.path.join(app_dir, info["library_name"])
@@ -104,9 +103,6 @@ def main() -> int:
             # Make sub directories if necessary.
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             files_to_copy.append(src)
-            # Add the target sources only if pytype support is enabled.
-            if info["pytype_support"]:
-                type_check_files.append(src)
             shutil.copy2(src, dest)
 
     args.depfile.write("{}: {}\n".format(args.output, " ".join(files_to_copy)))
@@ -148,9 +144,9 @@ sys.exit({args.main_callable}())
             os.rmdir(os.path.join(root, dir))
     os.rmdir(app_dir)
 
+    # Type check for Python binary sources and their pytype_enabled library sources
     if args.enable_pytype:
-        # Type check for Python binary sources and their pytype_enabled library sources
-        return mypy_checker.run_mypy_checks(type_check_files)
+        return mypy_checker.run_mypy_checks(args.sources, infos)
     return 0
 
 

@@ -8,6 +8,7 @@ import argparse
 import subprocess
 import sys
 import os
+import json
 from pathlib import Path
 
 
@@ -22,27 +23,39 @@ def main() -> int:
         "--output",
         help="Path to output file",
     )
+    parser.add_argument(
+        "--library_infos",
+        help="Path to the library infos JSON file",
+        type=argparse.FileType("r"),
+        required=True,
+    )
     args = parser.parse_args()
 
     # To satisfy GN action requirements, creating a necessary empty output file
     Path(args.output).touch()
 
-    return run_mypy_checks(args.sources)
+    lib_infos = json.load(args.library_infos)
+    return run_mypy_checks(args.sources, lib_infos)
 
 
-def run_mypy_checks(files: list[str]) -> int:
+def run_mypy_checks(
+    src_files: list[str], lib_infos: list[dict[str, str]]
+) -> int:
     """
-    Runs `mypy` type checking on the provided file paths, excluding duplicates
+    Runs `mypy` type checking on the provided file paths and pytype enabled
+    library sources, excluding duplicates.
 
     Args:
-        files: List of file paths to run type checking on.
+        src_files: List of source file paths to run type checking on
+        lib_infos: List of library infos
 
     Returns:
         int: returncode if type checking was successful, else error returncode
     """
 
+    lib_files = get_pytype_enabled_library_sources(lib_infos)
     # Remove the duplicate and non-MyPy supported files
-    files = exclude_files(files)
+    files = exclude_files(src_files + lib_files)
     if not files:
         return ""
 
@@ -86,6 +99,28 @@ def run_mypy_checks(files: list[str]) -> int:
                     file=sys.stderr,
                 )
         return e.returncode
+
+
+def get_pytype_enabled_library_sources(
+    lib_infos: list[dict[str, str]]
+) -> list[str]:
+    """Returns a list of library sources with Pytype enabled targets.
+
+    Args:
+        lib_infos: List of library infos
+
+    Returns:
+        list of pytype enabled library sources
+    """
+    type_check_files = []
+    for info in lib_infos:
+        # Add the target sources only if pytype support is enabled.
+        type_check_files += [
+            os.path.join(info["source_root"], source)
+            for source in info["sources"]
+            if info["pytype_support"]
+        ]
+    return type_check_files
 
 
 def exclude_files(file_list: list[str]) -> set[str]:

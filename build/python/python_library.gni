@@ -116,16 +116,40 @@ template("python_library") {
   }
 
   if (_enable_pytype) {
+    # Generate library_info.json file with all the library dependencies info
+    _library_infos_target = "${target_name}_library_infos"
+    _library_infos_json = "${target_gen_dir}/${target_name}_library_infos.json"
+    generated_file(_library_infos_target) {
+      forward_variables_from(invoker, [ "testonly" ])
+      visibility = [ ":*" ]
+
+      if (defined(invoker.library_deps)) {
+        public_deps = invoker.library_deps
+      }
+
+      outputs = [ _library_infos_json ]
+      output_conversion = "json"
+      data_keys = [ "library_info" ]
+      walk_keys = [ "library_info_barrier" ]
+    }
+
     action(target_name + "_mypy_checker") {
-      inputs = [ "//pyproject.toml" ] + _full_source_paths
+      forward_variables_from(invoker, [ "testonly" ])
+      inputs = [
+                 "//pyproject.toml",
+                 _library_infos_json,
+               ] + _full_source_paths
       script = "//build/python/mypy_checker.py"
       outputs = [ "${target_out_dir}/${target_name}.mypy_checked" ]
+      deps = [ ":${_library_infos_target}" ]
       args =
           # This source list includes only direct library sources, excluding
           # any dependencies.
           [ "--sources" ] + rebase_path(_full_source_paths, root_build_dir) + [
             "--output",
             rebase_path(outputs[0], root_build_dir),
+            "--library_infos",
+            rebase_path(_library_infos_json, root_build_dir),
           ]
     }
   }
