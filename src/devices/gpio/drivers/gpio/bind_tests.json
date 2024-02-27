@@ -1,14 +1,14 @@
 [
     {
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.bluetooth.BIND_PROTOCOL.DEVICE"
+            "fuchsia.BIND_PROTOCOL": "fuchsia.gpio.BIND_PROTOCOL.IMPL"
         },
         "expected": "abort",
         "name": "Incorrect_Protocol"
     },
     {
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.gpio.BIND_PROTOCOL.IMPL"
+            "fuchsia.hardware.gpioimpl.Service": "fuchsia.hardware.gpioimpl.Service.DriverTransport"
         },
         "expected": "match",
         "name": "Correct_Protocol"

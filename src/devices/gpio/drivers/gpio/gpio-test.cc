@@ -24,7 +24,7 @@ namespace gpio {
 
 namespace {
 
-class MockGpioImplFidl : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl> {
+class MockGpioImpl : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl> {
  public:
   static constexpr uint32_t kMaxInitStepPinIndex = 10;
 
@@ -38,7 +38,7 @@ class MockGpioImplFidl : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioI
     uint64_t drive_strength = UINT64_MAX;
   };
 
-  explicit MockGpioImplFidl(fdf::UnownedSynchronizedDispatcher dispatcher, uint32_t controller = 0)
+  explicit MockGpioImpl(fdf::UnownedSynchronizedDispatcher dispatcher, uint32_t controller = 0)
       : dispatcher_(std::move(dispatcher)),
         controller_(controller),
         outgoing_(dispatcher_->get()) {}
@@ -161,7 +161,7 @@ class GpioTest : public zxtest::Test {
                   gpioimpl_dispatcher_->borrow()) {}
 
   void SetUp() override {
-    auto client = gpioimpl_.SyncCall(&MockGpioImplFidl::CreateOutgoingAndServe);
+    auto client = gpioimpl_.SyncCall(&MockGpioImpl::CreateOutgoingAndServe);
     ASSERT_TRUE(client.is_ok());
     parent_->AddFidlService(fuchsia_hardware_gpioimpl::Service::Name, *std::move(client));
   }
@@ -170,7 +170,7 @@ class GpioTest : public zxtest::Test {
   std::shared_ptr<fdf_testing::DriverRuntime> runtime_;
   fdf::UnownedSynchronizedDispatcher gpioimpl_dispatcher_;
   std::shared_ptr<MockDevice> parent_;
-  async_patterns::TestDispatcherBound<MockGpioImplFidl> gpioimpl_;
+  async_patterns::TestDispatcherBound<MockGpioImpl> gpioimpl_;
 };
 
 TEST_F(GpioTest, TestFidlAll) {
@@ -195,7 +195,7 @@ TEST_F(GpioTest, TestFidlAll) {
   fidl::WireClient<fuchsia_hardware_gpio::Gpio> gpio_client(
       *std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
-  gpioimpl_.SyncCall(&MockGpioImplFidl::set_pin_state, 1, MockGpioImplFidl::PinState{.value = 20});
+  gpioimpl_.SyncCall(&MockGpioImpl::set_pin_state, 1, MockGpioImpl::PinState{.value = 20});
   gpio_client->Read().ThenExactlyOnce(
       [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::Read>& result) {
         ASSERT_OK(result.status());
@@ -213,7 +213,7 @@ TEST_F(GpioTest, TestFidlAll) {
   runtime_->Run();
   runtime_->ResetQuit();
 
-  EXPECT_EQ(gpioimpl_.SyncCall(&MockGpioImplFidl::pin_state, 1).value, 11);
+  EXPECT_EQ(gpioimpl_.SyncCall(&MockGpioImpl::pin_state, 1).value, 11);
 
   gpio_client->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullDown)
       .ThenExactlyOnce([&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigIn>& result) {
@@ -223,7 +223,7 @@ TEST_F(GpioTest, TestFidlAll) {
   runtime_->Run();
   runtime_->ResetQuit();
 
-  EXPECT_EQ(gpioimpl_.SyncCall(&MockGpioImplFidl::pin_state, 1).flags,
+  EXPECT_EQ(gpioimpl_.SyncCall(&MockGpioImpl::pin_state, 1).flags,
             fuchsia_hardware_gpio::GpioFlags::kPullDown);
 
   gpio_client->ConfigOut(5).ThenExactlyOnce(
@@ -234,7 +234,7 @@ TEST_F(GpioTest, TestFidlAll) {
   runtime_->Run();
   runtime_->ResetQuit();
 
-  EXPECT_EQ(gpioimpl_.SyncCall(&MockGpioImplFidl::pin_state, 1).value, 5);
+  EXPECT_EQ(gpioimpl_.SyncCall(&MockGpioImpl::pin_state, 1).value, 5);
 
   gpio_client->SetDriveStrength(2000).ThenExactlyOnce(
       [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::SetDriveStrength>& result) {
@@ -245,7 +245,7 @@ TEST_F(GpioTest, TestFidlAll) {
   runtime_->Run();
   runtime_->ResetQuit();
 
-  EXPECT_EQ(gpioimpl_.SyncCall(&MockGpioImplFidl::pin_state, 1).drive_strength, 2000);
+  EXPECT_EQ(gpioimpl_.SyncCall(&MockGpioImpl::pin_state, 1).drive_strength, 2000);
 
   gpio_client->GetDriveStrength().ThenExactlyOnce(
       [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::GetDriveStrength>& result) {
@@ -420,20 +420,20 @@ TEST_F(GpioTest, Init) {
   EXPECT_OK(GpioRootDevice::Create(nullptr, parent_.get()));
 
   // Validate the final state of the pins with the init steps applied.
-  gpioimpl_.SyncCall([&](MockGpioImplFidl* gpioimpl) {
-    EXPECT_EQ(gpioimpl->pin_state(1).mode, MockGpioImplFidl::PinState::Mode::kOut);
+  gpioimpl_.SyncCall([&](MockGpioImpl* gpioimpl) {
+    EXPECT_EQ(gpioimpl->pin_state(1).mode, MockGpioImpl::PinState::Mode::kOut);
     EXPECT_EQ(gpioimpl->pin_state(1).flags, fuchsia_hardware_gpio::GpioFlags::kPullUp);
     EXPECT_EQ(gpioimpl->pin_state(1).value, 1);
     EXPECT_EQ(gpioimpl->pin_state(1).alt_function, 0);
     EXPECT_EQ(gpioimpl->pin_state(1).drive_strength, 4000);
 
-    EXPECT_EQ(gpioimpl->pin_state(2).mode, MockGpioImplFidl::PinState::Mode::kOut);
+    EXPECT_EQ(gpioimpl->pin_state(2).mode, MockGpioImpl::PinState::Mode::kOut);
     EXPECT_EQ(gpioimpl->pin_state(2).flags, fuchsia_hardware_gpio::GpioFlags::kNoPull);
     EXPECT_EQ(gpioimpl->pin_state(2).value, 1);
     EXPECT_EQ(gpioimpl->pin_state(2).alt_function, 0);
     EXPECT_EQ(gpioimpl->pin_state(2).drive_strength, 1000);
 
-    EXPECT_EQ(gpioimpl->pin_state(3).mode, MockGpioImplFidl::PinState::Mode::kIn);
+    EXPECT_EQ(gpioimpl->pin_state(3).mode, MockGpioImpl::PinState::Mode::kIn);
     EXPECT_EQ(gpioimpl->pin_state(3).flags, fuchsia_hardware_gpio::GpioFlags::kPullUp);
     EXPECT_EQ(gpioimpl->pin_state(3).value, 1);
     EXPECT_EQ(gpioimpl->pin_state(3).alt_function, 3);
@@ -475,7 +475,7 @@ TEST_F(GpioTest, InitWithoutPins) {
 
   EXPECT_OK(GpioRootDevice::Create(nullptr, parent_.get()));
 
-  gpioimpl_.SyncCall([&](MockGpioImplFidl* gpioimpl) {
+  gpioimpl_.SyncCall([&](MockGpioImpl* gpioimpl) {
     EXPECT_EQ(gpioimpl->pin_state(1).flags, fuchsia_hardware_gpio::GpioFlags::kPullDown);
   });
 
@@ -528,7 +528,7 @@ TEST_F(GpioTest, InitErrorHandling) {
   metadata.steps[5].call = fhgpioimpl::InitCall::WithDriveStrengthUa(arena, 2000);
 
   // Using an index of 11 should cause the fake gpioimpl device to return an error.
-  metadata.steps[6].index = MockGpioImplFidl::kMaxInitStepPinIndex + 1;
+  metadata.steps[6].index = MockGpioImpl::kMaxInitStepPinIndex + 1;
   metadata.steps[6].call = fhgpioimpl::InitCall::WithOutputValue(0);
 
   // Processing should not continue after the above error.
@@ -548,13 +548,13 @@ TEST_F(GpioTest, InitErrorHandling) {
 
   EXPECT_OK(GpioRootDevice::Create(nullptr, parent_.get()));
 
-  gpioimpl_.SyncCall([&](MockGpioImplFidl* gpioimpl) {
-    EXPECT_EQ(gpioimpl->pin_state(2).mode, MockGpioImplFidl::PinState::Mode::kIn);
+  gpioimpl_.SyncCall([&](MockGpioImpl* gpioimpl) {
+    EXPECT_EQ(gpioimpl->pin_state(2).mode, MockGpioImpl::PinState::Mode::kIn);
     EXPECT_EQ(gpioimpl->pin_state(2).flags, fuchsia_hardware_gpio::GpioFlags::kNoPull);
     EXPECT_EQ(gpioimpl->pin_state(2).alt_function, 5);
     EXPECT_EQ(gpioimpl->pin_state(2).drive_strength, 2000);
 
-    EXPECT_EQ(gpioimpl->pin_state(4).mode, MockGpioImplFidl::PinState::Mode::kOut);
+    EXPECT_EQ(gpioimpl->pin_state(4).mode, MockGpioImpl::PinState::Mode::kOut);
     EXPECT_EQ(gpioimpl->pin_state(4).flags, fuchsia_hardware_gpio::GpioFlags::kPullDown);
     EXPECT_EQ(gpioimpl->pin_state(4).value, 1);
     EXPECT_EQ(gpioimpl->pin_state(4).drive_strength, 4000);
@@ -584,12 +584,12 @@ TEST(GpioTest, ControllerId) {
   auto parent = MockDevice::FakeRootParent();
   parent->SetMetadata(DEVICE_METADATA_GPIO_PINS, pins, std::size(pins) * sizeof(gpio_pin_t));
 
-  async_patterns::TestDispatcherBound<MockGpioImplFidl> gpioimpl_fidl(
+  async_patterns::TestDispatcherBound<MockGpioImpl> gpioimpl_fidl(
       background_dispatcher->async_dispatcher(), std::in_place, background_dispatcher->borrow(),
       kController);
 
   {
-    auto outgoing_client = gpioimpl_fidl.SyncCall(&MockGpioImplFidl::CreateOutgoingAndServe);
+    auto outgoing_client = gpioimpl_fidl.SyncCall(&MockGpioImpl::CreateOutgoingAndServe);
     ASSERT_TRUE(outgoing_client.is_ok());
 
     parent->AddFidlService(fuchsia_hardware_gpioimpl::Service::Name, std::move(*outgoing_client));
@@ -666,11 +666,11 @@ TEST(GpioTest, SchedulerRole) {
     parent->SetMetadata(DEVICE_METADATA_SCHEDULER_ROLE_NAME, result->data(), result->size());
   }
 
-  async_patterns::TestDispatcherBound<MockGpioImplFidl> gpioimpl_fidl(
+  async_patterns::TestDispatcherBound<MockGpioImpl> gpioimpl_fidl(
       background_dispatcher->async_dispatcher(), std::in_place, background_dispatcher->borrow(), 0);
 
   {
-    auto outgoing_client = gpioimpl_fidl.SyncCall(&MockGpioImplFidl::CreateOutgoingAndServe);
+    auto outgoing_client = gpioimpl_fidl.SyncCall(&MockGpioImpl::CreateOutgoingAndServe);
     ASSERT_TRUE(outgoing_client.is_ok());
 
     parent->AddFidlService(fuchsia_hardware_gpioimpl::Service::Name, std::move(*outgoing_client));

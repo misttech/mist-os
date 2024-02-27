@@ -13,7 +13,6 @@ driver_bind_rules("gpio_bind") {
   tests = "bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_bindlib",
-    "//src/devices/bind/fuchsia.gpio",
   ]
 }
 
@@ -26,7 +25,6 @@ fuchsia_driver("gpio-driver") {
   sources = [ "gpio.cc" ]
   deps = [
     ":gpio_bind",
-    "//sdk/banjo/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
@@ -38,7 +36,6 @@ fuchsia_driver("gpio-driver") {
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -64,7 +61,6 @@ test("gpio-test-bin") {
   ]
   deps = [
     ":gpio_bind",
-    "//sdk/banjo/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
@@ -79,7 +75,6 @@ test("gpio-test-bin") {
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
