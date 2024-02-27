@@ -768,11 +768,7 @@ config("Wno-undef") {
 }
 
 config("Wno-bitfield-conversion") {
-  cflags = [
-    # TODO(https://fxbug.dev/42084851): Remove -Wno-unknown-warning-option after the next Clang roll.
-    "-Wno-unknown-warning-option",
-    "-Wno-bitfield-conversion",
-  ]
+  cflags = [ "-Wno-bitfield-conversion" ]
   visibility = [
     "//src/connectivity/wlan/drivers/third_party/nxp/nxpfmac:*",
     "//src/lib/vulkan:*",
