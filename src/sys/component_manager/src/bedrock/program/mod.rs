@@ -11,7 +11,6 @@ use fidl_fuchsia_diagnostics_types as fdiagnostics;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_mem as fmem;
 use fidl_fuchsia_process as fprocess;
-use fuchsia_async::Task;
 use fuchsia_zircon as zx;
 use futures::{
     channel::oneshot,
@@ -42,9 +41,6 @@ pub struct Program {
     /// runner must either serve the server endpoint, or drop it to avoid
     /// blocking any consumers indefinitely.
     runtime_dir: fio::DirectoryProxy,
-
-    /// Only here to keep the diagnostics task alive. Never read.
-    _send_diagnostics: Task<()>,
 
     /// The scope in which the namespace is run. component_manager will use this to gracefully shutdown
     /// the namespace when the component is stopped.
@@ -82,21 +78,8 @@ impl Program {
         let start_info = start_info.into_fidl(outgoing_server, runtime_server)?;
 
         runner.start(start_info, server_end);
-        let mut controller = ComponentController::new(controller);
-        let diagnostics_receiver = controller.take_diagnostics_receiver().unwrap();
-        let send_diagnostics = Task::spawn(async move {
-            let diagnostics = diagnostics_receiver.await;
-            if let Ok(diagnostics) = diagnostics {
-                _ = diagnostics_sender.send(diagnostics);
-            }
-        });
-        Ok(Program {
-            controller,
-            outgoing_dir,
-            runtime_dir,
-            _send_diagnostics: send_diagnostics,
-            namespace_scope,
-        })
+        let controller = ComponentController::new(controller, Some(diagnostics_sender));
+        Ok(Program { controller, outgoing_dir, runtime_dir, namespace_scope })
     }
 
     /// Gets the outgoing directory of the program.
@@ -213,19 +196,12 @@ impl Program {
     pub fn mock_from_controller(
         controller: endpoints::ClientEnd<fcrunner::ComponentControllerMarker>,
     ) -> Program {
-        let controller = ComponentController::new(controller.into_proxy().unwrap());
+        let controller = ComponentController::new(controller.into_proxy().unwrap(), None);
         let (outgoing_dir, _outgoing_server) =
             fidl::endpoints::create_proxy::<fio::OpenableMarker>().unwrap();
         let (runtime_dir, _runtime_server) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let send_diagnostics = Task::spawn(async {});
-        Program {
-            controller,
-            outgoing_dir,
-            runtime_dir,
-            _send_diagnostics: send_diagnostics,
-            namespace_scope: ExecutionScope::new(),
-        }
+        Program { controller, outgoing_dir, runtime_dir, namespace_scope: ExecutionScope::new() }
     }
 }
 
