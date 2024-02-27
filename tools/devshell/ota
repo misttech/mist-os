@@ -108,6 +108,7 @@ function main {
 
   if needs-update; then
     fx-error "After update, system appears still out of date. OTA may have failed. Run 'fx log' for details."
+    fx-error "Also ensure your firewall rules are up to date (e.g. fx setup-ufw)"
     return 1
   fi
 }
