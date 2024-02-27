@@ -763,7 +763,9 @@ mod tests {
             (
                 "my_child",
                 ComponentDeclBuilder::new()
-                    .capability(ProtocolBuilder::new().name("biz.buz").path("/svc/foo.bar").build())
+                    .capability(
+                        CapabilityBuilder::protocol().name("biz.buz").path("/svc/foo.bar").build(),
+                    )
                     .expose(expose_from_self_decl)
                     .build(),
             ),
@@ -881,7 +883,8 @@ mod tests {
             target_name: "qax.qux".parse().unwrap(),
         });
 
-        let capability_decl = ResolverBuilder::new().name("qax.qux").path("/svc/qax.qux").build();
+        let capability_decl =
+            CapabilityBuilder::resolver().name("qax.qux").path("/svc/qax.qux").build();
 
         let components = vec![
             (
@@ -1120,7 +1123,8 @@ mod tests {
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
-        let capability_decl = ServiceBuilder::new().name("my_service").path("/svc/foo.bar").build();
+        let capability_decl =
+            CapabilityBuilder::service().name("my_service").path("/svc/foo.bar").build();
 
         let components = vec![
             (

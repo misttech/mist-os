@@ -5,7 +5,7 @@
 use {
     crate::{CheckUse, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder},
     cm_rust::*,
-    cm_rust_testing::{ComponentDeclBuilder, DirectoryBuilder},
+    cm_rust_testing::{CapabilityBuilder, ComponentDeclBuilder},
     fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status,
     std::{marker::PhantomData, str::FromStr},
 };
@@ -43,7 +43,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("foo_data")
                             .path("/data/foo")
                             .rights(fio::RW_STAR_DIR),
@@ -109,7 +109,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("foo_data")
                             .path("/data/foo")
                             .rights(fio::RW_STAR_DIR),
@@ -175,7 +175,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("foo_data")
                             .path("/data/foo")
                             .rights(fio::RW_STAR_DIR),
@@ -241,7 +241,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("foo_data")
                             .path("/data/foo")
                             .rights(fio::RW_STAR_DIR),
@@ -307,7 +307,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("foo_data")
                             .path("/data/foo")
                             .rights(fio::RW_STAR_DIR),
@@ -373,7 +373,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("foo_data")
                             .path("/data/foo")
                             .rights(fio::W_STAR_DIR),
@@ -458,7 +458,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .build(),
             ),
         ];
-        let namespace_capabilities = vec![DirectoryBuilder::new()
+        let namespace_capabilities = vec![CapabilityBuilder::directory()
             .name("foo_data")
             .path("/offer_from_cm_namespace/data/foo")
             .rights(fio::W_STAR_DIR)

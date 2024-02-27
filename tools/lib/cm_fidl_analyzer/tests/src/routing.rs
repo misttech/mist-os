@@ -1214,7 +1214,7 @@ mod tests {
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
-        let protocol_decl = ProtocolBuilder::new().name("foo").build();
+        let protocol_decl = CapabilityBuilder::protocol().name("foo").build();
         let components = vec![
             (
                 "a",
@@ -1271,7 +1271,7 @@ mod tests {
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
         });
-        let protocol_decl = ProtocolBuilder::new().name("foo").build();
+        let protocol_decl = CapabilityBuilder::protocol().name("foo").build();
         let components = vec![
             ("a", ComponentDeclBuilder::new().use_(use_decl.clone()).child_default("b").build()),
             (
@@ -1316,7 +1316,7 @@ mod tests {
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
-        let protocol_decl = ProtocolBuilder::new().name("foo").build();
+        let protocol_decl = CapabilityBuilder::protocol().name("foo").build();
         let components = vec![(
             "a",
             ComponentDeclBuilder::new()
@@ -1394,7 +1394,8 @@ mod tests {
             subdir: None,
             availability: cm_rust::Availability::Required,
         });
-        let directory_decl = DirectoryBuilder::new().name("foo_data").path("/foo/data").build();
+        let directory_decl =
+            CapabilityBuilder::directory().name("foo_data").path("/foo/data").build();
 
         let components = vec![
             (
@@ -1468,7 +1469,7 @@ mod tests {
             source: RegistrationSource::Self_,
             target_name: "hobbit".parse().unwrap(),
         };
-        let runner_decl = RunnerBuilder::new().name("elf").build();
+        let runner_decl = CapabilityBuilder::runner().name("elf").build();
         let components = vec![
             (
                 "a",
@@ -1528,9 +1529,12 @@ mod tests {
     /// directory.
     #[fuchsia::test]
     async fn map_route_storage_and_dir_from_parent() {
-        let directory_decl =
-            DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR).build();
-        let storage_decl = StorageBuilder::new()
+        let directory_decl = CapabilityBuilder::directory()
+            .name("data")
+            .path("/data")
+            .rights(fio::RW_STAR_DIR)
+            .build();
+        let storage_decl = CapabilityBuilder::storage()
             .name("cache")
             .backing_dir("data")
             .source(StorageDirectorySource::Self_)
@@ -1691,8 +1695,10 @@ mod tests {
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
-        let capability_decl =
-            ProtocolBuilder::new().name("foo").path("/offer_from_cm_namespace/svc/foo").build();
+        let capability_decl = CapabilityBuilder::protocol()
+            .name("foo")
+            .path("/offer_from_cm_namespace/svc/foo")
+            .build();
         let components = vec![
             ("a", ComponentDeclBuilder::new().offer(offer_decl.clone()).child_default("b").build()),
             ("b", ComponentDeclBuilder::new().use_(use_decl.clone()).build()),
@@ -1748,7 +1754,7 @@ mod tests {
             target: ExposeTarget::Parent,
             target_name: "base".parse().unwrap(),
         });
-        let resolver_decl = ResolverBuilder::new().name("base").build();
+        let resolver_decl = CapabilityBuilder::resolver().name("base").build();
 
         let components = vec![
             (
@@ -1820,7 +1826,7 @@ mod tests {
             source: RegistrationSource::Self_,
             scheme: "base".into(),
         };
-        let resolver_decl = ResolverBuilder::new().name("base").build();
+        let resolver_decl = CapabilityBuilder::resolver().name("base").build();
         let components = vec![
             (
                 a_url.clone(),
@@ -1924,7 +1930,7 @@ mod tests {
             source: RegistrationSource::Self_,
             scheme: "test".into(),
         };
-        let resolver_decl = ResolverBuilder::new().name("test").build();
+        let resolver_decl = CapabilityBuilder::resolver().name("test").build();
         let components = vec![
             (
                 a_url.clone(),
@@ -2029,8 +2035,8 @@ mod tests {
             source: RegistrationSource::Self_,
             target_name: "dwarf".parse().unwrap(),
         };
-        let resolver_decl = ResolverBuilder::new().name("base_resolver").build();
-        let runner_decl = RunnerBuilder::new().name("hobbit").build();
+        let resolver_decl = CapabilityBuilder::resolver().name("base_resolver").build();
+        let runner_decl = CapabilityBuilder::runner().name("hobbit").build();
         let use_directory_decl = UseDecl::Directory(UseDirectoryDecl {
             source: UseSource::Parent,
             source_name: "bar_data".parse().unwrap(),
@@ -2052,7 +2058,8 @@ mod tests {
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
-        let directory_decl = DirectoryBuilder::new().name("foo_data").path("/foo/data").build();
+        let directory_decl =
+            CapabilityBuilder::directory().name("foo_data").path("/foo/data").build();
         let expose_protocol_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("c".to_string()),
             source_name: "bad_protocol".parse().unwrap(),

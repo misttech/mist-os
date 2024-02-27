@@ -402,7 +402,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                    .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .protocol_default("file")
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
@@ -525,7 +525,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                    .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -654,7 +654,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                    .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -707,7 +707,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                    .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
@@ -939,7 +939,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                    .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -1019,7 +1019,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                    .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -1172,7 +1172,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                    .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -1322,7 +1322,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                    .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -1474,11 +1474,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 .build(),
         )];
         let namespace_capabilities = vec![
-            DirectoryBuilder::new()
+            CapabilityBuilder::directory()
                 .name("foo_data")
                 .path("/use_from_cm_namespace/data/foo")
                 .build(),
-            ProtocolBuilder::new().name("foo").path("/use_from_cm_namespace/svc/foo").build(),
+            CapabilityBuilder::protocol()
+                .name("foo")
+                .path("/use_from_cm_namespace/svc/foo")
+                .build(),
         ];
         let mut builder = T::new("a", components);
         builder.set_namespace_capabilities(namespace_capabilities);
@@ -1560,11 +1563,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             ),
         ];
         let namespace_capabilities = vec![
-            DirectoryBuilder::new()
+            CapabilityBuilder::directory()
                 .name("foo_data")
                 .path("/offer_from_cm_namespace/data/foo")
                 .build(),
-            ProtocolBuilder::new().name("foo").path("/offer_from_cm_namespace/svc/foo").build(),
+            CapabilityBuilder::protocol()
+                .name("foo")
+                .path("/offer_from_cm_namespace/svc/foo")
+                .build(),
         ];
         let mut builder = T::new("a", components);
         builder.set_namespace_capabilities(namespace_capabilities);
@@ -1838,7 +1844,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("hippo_data").path("/data/foo"))
+                    .capability(CapabilityBuilder::directory().name("hippo_data").path("/data/foo"))
                     .protocol_default("hippo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "hippo_data".parse().unwrap(),
@@ -1979,7 +1985,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                    .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -2056,7 +2062,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new_empty_component()
-                    .capability(DirectoryBuilder::new().name("hippo_data").path("/data"))
+                    .capability(CapabilityBuilder::directory().name("hippo_data").path("/data"))
                     .protocol_default("hippo")
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source_name: "hippo_data".parse().unwrap(),
@@ -2133,7 +2139,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// d: uses "foo" from parent
     /// routing an aggregate service with non-conflicting filters should succeed.
     pub async fn test_route_filtered_aggregate_service(&self) {
-        let expected_service_decl = ServiceBuilder::new().name("foo").build();
+        let expected_service_decl = CapabilityBuilder::service().name("foo").build();
         let components = vec![
             (
                 "a",
@@ -2259,7 +2265,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// d: uses "foo" from parent
     /// routing an aggregate service without specifying a source_instance_filter should fail.
     pub async fn test_route_anonymized_aggregate_service(&self) {
-        let expected_service_decl = ServiceBuilder::new().name("foo").build();
+        let expected_service_decl = CapabilityBuilder::service().name("foo").build();
         let components = vec![
             (
                 "a",
@@ -2394,7 +2400,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// d: uses "foo" from parent
     /// routing an aggregate service with conflicting source_instance_filters should fail.
     pub async fn test_route_filtered_aggregate_service_with_conflicting_filter_fails(&self) {
-        let expected_service_decl = ServiceBuilder::new().name("foo").build();
+        let expected_service_decl = CapabilityBuilder::service().name("foo").build();
         let components = vec![
             (
                 "a",
@@ -2508,7 +2514,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                    .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
@@ -2605,7 +2611,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                    .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -2698,7 +2704,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                    .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -2759,7 +2765,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                    .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -2830,7 +2836,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                    .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
@@ -3543,7 +3549,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                    .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
@@ -3830,8 +3836,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 }))
                 .build(),
         )];
-        let namespace_capabilities =
-            vec![ProtocolBuilder::new().name("foo").path("/use_from_cm_namespace/svc/foo").build()];
+        let namespace_capabilities = vec![CapabilityBuilder::protocol()
+            .name("foo")
+            .path("/use_from_cm_namespace/svc/foo")
+            .build()];
         let mut builder = T::new("a", components);
         builder.set_namespace_capabilities(namespace_capabilities);
         builder.add_capability_policy(

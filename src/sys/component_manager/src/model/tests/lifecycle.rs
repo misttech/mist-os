@@ -511,9 +511,7 @@ async fn on_terminate_stop_triggers_reboot() {
             "root",
             ComponentDeclBuilder::new()
                 .child(ChildBuilder::new().name("system").on_terminate(fdecl::OnTerminate::Reboot))
-                .capability(
-                    ProtocolBuilder::new().name(REBOOT_PROTOCOL).path(&reboot_protocol_path),
-                )
+                .protocol_default(REBOOT_PROTOCOL)
                 .expose(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Self_,
                     source_name: REBOOT_PROTOCOL.parse().unwrap(),
@@ -562,9 +560,7 @@ async fn on_terminate_exit_triggers_reboot() {
             "root",
             ComponentDeclBuilder::new()
                 .child(ChildBuilder::new().name("system").on_terminate(fdecl::OnTerminate::Reboot))
-                .capability(
-                    ProtocolBuilder::new().name(REBOOT_PROTOCOL).path(&reboot_protocol_path),
-                )
+                .protocol_default(REBOOT_PROTOCOL)
                 .expose(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Self_,
                     source_name: REBOOT_PROTOCOL.parse().unwrap(),
@@ -609,9 +605,7 @@ async fn reboot_shutdown_does_not_trigger_reboot() {
             "root",
             ComponentDeclBuilder::new()
                 .child(ChildBuilder::new().name("system").on_terminate(fdecl::OnTerminate::Reboot))
-                .capability(
-                    ProtocolBuilder::new().name(REBOOT_PROTOCOL).path(&reboot_protocol_path),
-                )
+                .protocol_default(REBOOT_PROTOCOL)
                 .expose(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Self_,
                     source_name: REBOOT_PROTOCOL.parse().unwrap(),
@@ -695,12 +689,7 @@ async fn on_terminate_with_failed_reboot_panics() {
                         .on_terminate(fdecl::OnTerminate::Reboot)
                         .build(),
                 )
-                .capability(
-                    ProtocolBuilder::new()
-                        .name(REBOOT_PROTOCOL)
-                        .path(&reboot_protocol_path)
-                        .build(),
-                )
+                .protocol_default(REBOOT_PROTOCOL)
                 .expose(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Self_,
                     source_name: REBOOT_PROTOCOL.parse().unwrap(),

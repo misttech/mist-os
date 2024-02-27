@@ -173,7 +173,7 @@ async fn use_in_collection() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                 .protocol_default("foo")
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source_name: "foo_data".parse().unwrap(),
@@ -314,7 +314,7 @@ async fn use_in_collection_not_offered() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                 .protocol_default("foo")
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source_name: "foo_data".parse().unwrap(),
@@ -895,7 +895,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .capability(DirectoryBuilder::new().name("hippo_data").path("/data/foo"))
+                .capability(CapabilityBuilder::directory().name("hippo_data").path("/data/foo"))
                 .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                     source_name: "hippo_data".parse().unwrap(),
                     source: ExposeSource::Self_,
@@ -1288,7 +1288,7 @@ async fn destroying_instance_blocks_on_routing() {
             "c",
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
-                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source: ExposeSource::Self_,
                     source_name: "foo".parse().unwrap(),
@@ -1990,7 +1990,7 @@ async fn use_from_destroyed_but_not_removed() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                 .protocol_default("foo")
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source: ExposeSource::Self_,
@@ -2587,7 +2587,7 @@ async fn offer_service_from_collection() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service"))
+                .capability(CapabilityBuilder::service().name("foo").path("/svc/foo.service"))
                 .build(),
         )
     }));
@@ -2663,7 +2663,7 @@ async fn offer_service_from_collections() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service"))
+                .capability(CapabilityBuilder::service().name("foo").path("/svc/foo.service"))
                 .build(),
         )
     }));
@@ -2757,7 +2757,7 @@ async fn offer_service_from_collections_multilevel() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service"))
+                .capability(CapabilityBuilder::service().name("foo").path("/svc/foo.service"))
                 .build(),
         )
     }));
@@ -2822,7 +2822,7 @@ async fn expose_service_from_collection() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service"))
+                .capability(CapabilityBuilder::service().name("foo").path("/svc/foo.service"))
                 .build(),
         )
     }));
@@ -2897,7 +2897,7 @@ async fn expose_service_from_collections() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service"))
+                .capability(CapabilityBuilder::service().name("foo").path("/svc/foo.service"))
                 .build(),
         )
     }));
@@ -2988,7 +2988,7 @@ async fn expose_service_from_collections_multilevel() {
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
                 }))
-                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service"))
+                .capability(CapabilityBuilder::service().name("foo").path("/svc/foo.service"))
                 .build(),
         )
     }));
@@ -3060,7 +3060,7 @@ async fn list_service_instances_from_collections() {
                     target_name: "foo".parse().unwrap(),
                     availability: cm_rust::Availability::Required,
                 }))
-                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service"))
+                .capability(CapabilityBuilder::service().name("foo").path("/svc/foo.service"))
                 .build(),
         ),
         (
@@ -3074,7 +3074,7 @@ async fn list_service_instances_from_collections() {
                     target_name: "foo".parse().unwrap(),
                     availability: cm_rust::Availability::Required,
                 }))
-                .capability(ServiceBuilder::new().name("foo").path("/svc/foo.service"))
+                .capability(CapabilityBuilder::service().name("foo").path("/svc/foo.service"))
                 .build(),
         ),
         ("non_service_child", ComponentDeclBuilder::new().build()),

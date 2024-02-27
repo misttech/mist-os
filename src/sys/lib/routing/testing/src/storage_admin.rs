@@ -41,13 +41,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("tmpfs")
                             .source(StorageDirectorySource::Self_),
@@ -128,7 +128,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
@@ -148,7 +151,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("storage")
                             .backing_dir("data")
                             .source(StorageDirectorySource::Parent)
@@ -243,13 +246,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "c",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("tmpfs")
                             .source(StorageDirectorySource::Self_),
@@ -310,13 +313,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("tmpfs")
                             .source(StorageDirectorySource::Self_),
@@ -380,14 +383,16 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .capability(ProtocolBuilder::new().name("unrelated.protocol").path("/svc/foo"))
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::protocol().name("unrelated.protocol").path("/svc/foo"),
+                    )
+                    .capability(
+                        CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("tmpfs")
                             .source(StorageDirectorySource::Self_),
@@ -450,14 +455,16 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .capability(ProtocolBuilder::new().name("unrelated.protocol").path("/svc/foo"))
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::protocol().name("unrelated.protocol").path("/svc/foo"),
+                    )
+                    .capability(
+                        CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("tmpfs")
                             .source(StorageDirectorySource::Self_),
@@ -552,18 +559,20 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "c",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("tmpfs")
                             .source(StorageDirectorySource::Self_),
                     )
-                    .capability(ProtocolBuilder::new().name("unrelated.protocol").path("/svc/foo"))
+                    .capability(
+                        CapabilityBuilder::protocol().name("unrelated.protocol").path("/svc/foo"),
+                    )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("d".to_string()),
@@ -621,14 +630,16 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .capability(ProtocolBuilder::new().name("unrelated.protocol").path("/svc/foo"))
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::protocol().name("unrelated.protocol").path("/svc/foo"),
+                    )
+                    .capability(
+                        CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("tmpfs")
                             .source(StorageDirectorySource::Self_),
@@ -690,13 +701,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("tmpfs")
                             .source(StorageDirectorySource::Self_),
@@ -790,13 +801,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 "c",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("tmpfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("tmpfs")
                             .source(StorageDirectorySource::Self_),

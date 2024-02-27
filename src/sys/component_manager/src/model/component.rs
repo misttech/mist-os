@@ -2632,8 +2632,8 @@ pub mod tests {
             OfferSource, OfferTarget, UseEventStreamDecl, UseProtocolDecl, UseSource,
         },
         cm_rust_testing::{
-            ChildBuilder, CollectionBuilder, ComponentDeclBuilder, EnvironmentBuilder,
-            ProtocolBuilder,
+            CapabilityBuilder, ChildBuilder, CollectionBuilder, ComponentDeclBuilder,
+            EnvironmentBuilder,
         },
         component_id_index::InstanceId,
         fidl::endpoints::DiscoverableProtocolMarker,
@@ -2893,7 +2893,7 @@ pub mod tests {
             subdir: None,
             availability: Availability::Required,
         });
-        let example_capability = ProtocolBuilder::new().name("bar").build();
+        let example_capability = CapabilityBuilder::protocol().name("bar").build();
         let example_expose = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
             target: ExposeTarget::Parent,

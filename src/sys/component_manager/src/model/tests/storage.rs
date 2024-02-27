@@ -106,7 +106,10 @@ async fn use_in_collection_from_parent() {
             "a",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                    CapabilityBuilder::directory()
+                        .name("data")
+                        .path("/data")
+                        .rights(fio::RW_STAR_DIR),
                 )
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source: OfferSource::Self_,
@@ -148,14 +151,14 @@ async fn use_in_collection_from_parent() {
                     availability: Availability::Required,
                 }))
                 .capability(
-                    StorageBuilder::new()
+                    CapabilityBuilder::storage()
                         .name("data")
                         .backing_dir("minfs")
                         .source(StorageDirectorySource::Parent)
                         .subdir("data"),
                 )
                 .capability(
-                    StorageBuilder::new()
+                    CapabilityBuilder::storage()
                         .name("cache")
                         .backing_dir("minfs")
                         .source(StorageDirectorySource::Parent)
@@ -260,7 +263,10 @@ async fn use_in_collection_from_grandparent() {
             "a",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new().name("minfs").path("/data").rights(fio::RW_STAR_DIR),
+                    CapabilityBuilder::directory()
+                        .name("minfs")
+                        .path("/data")
+                        .rights(fio::RW_STAR_DIR),
                 )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
@@ -278,14 +284,14 @@ async fn use_in_collection_from_grandparent() {
                 }))
                 .child_default("b")
                 .capability(
-                    StorageBuilder::new()
+                    CapabilityBuilder::storage()
                         .name("data")
                         .backing_dir("minfs")
                         .source(StorageDirectorySource::Self_)
                         .subdir("data"),
                 )
                 .capability(
-                    StorageBuilder::new()
+                    CapabilityBuilder::storage()
                         .name("cache")
                         .backing_dir("minfs")
                         .source(StorageDirectorySource::Self_)
@@ -486,10 +492,13 @@ async fn use_restricted_storage_start_failure() {
             "provider",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                    CapabilityBuilder::directory()
+                        .name("data")
+                        .path("/data")
+                        .rights(fio::RW_STAR_DIR),
                 )
                 .capability(
-                    StorageBuilder::new()
+                    CapabilityBuilder::storage()
                         .name("cache")
                         .backing_dir("data")
                         .source(StorageDirectorySource::Self_)
@@ -587,10 +596,13 @@ async fn use_restricted_storage_open_failure() {
             "provider",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                    CapabilityBuilder::directory()
+                        .name("data")
+                        .path("/data")
+                        .rights(fio::RW_STAR_DIR),
                 )
                 .capability(
-                    StorageBuilder::new()
+                    CapabilityBuilder::storage()
                         .name("cache")
                         .backing_dir("data")
                         .source(StorageDirectorySource::Self_),
@@ -714,10 +726,13 @@ async fn open_storage_subdirectory() {
             "provider",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                    CapabilityBuilder::directory()
+                        .name("data")
+                        .path("/data")
+                        .rights(fio::RW_STAR_DIR),
                 )
                 .capability(
-                    StorageBuilder::new()
+                    CapabilityBuilder::storage()
                         .name("cache")
                         .backing_dir("data")
                         .source(StorageDirectorySource::Self_),
@@ -831,10 +846,13 @@ async fn storage_persistence_moniker_path() {
             "a",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new().name("minfs").path("/data").rights(fio::RW_STAR_DIR),
+                    CapabilityBuilder::directory()
+                        .name("minfs")
+                        .path("/data")
+                        .rights(fio::RW_STAR_DIR),
                 )
                 .capability(
-                    StorageBuilder::new()
+                    CapabilityBuilder::storage()
                         .name("data")
                         .backing_dir("minfs")
                         .source(StorageDirectorySource::Self_),
@@ -1014,10 +1032,13 @@ async fn storage_persistence_instance_id_path() {
             "a",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new().name("minfs").path("/data").rights(fio::RW_STAR_DIR),
+                    CapabilityBuilder::directory()
+                        .name("minfs")
+                        .path("/data")
+                        .rights(fio::RW_STAR_DIR),
                 )
                 .capability(
-                    StorageBuilder::new()
+                    CapabilityBuilder::storage()
                         .name("data")
                         .backing_dir("minfs")
                         .source(StorageDirectorySource::Self_),
@@ -1201,10 +1222,13 @@ async fn storage_persistence_inheritance() {
             "a",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new().name("minfs").path("/data").rights(fio::RW_STAR_DIR),
+                    CapabilityBuilder::directory()
+                        .name("minfs")
+                        .path("/data")
+                        .rights(fio::RW_STAR_DIR),
                 )
                 .capability(
-                    StorageBuilder::new()
+                    CapabilityBuilder::storage()
                         .name("data")
                         .backing_dir("minfs")
                         .source(StorageDirectorySource::Self_),
@@ -1451,10 +1475,13 @@ async fn storage_persistence_disablement() {
             "a",
             ComponentDeclBuilder::new()
                 .capability(
-                    DirectoryBuilder::new().name("minfs").path("/data").rights(fio::RW_STAR_DIR),
+                    CapabilityBuilder::directory()
+                        .name("minfs")
+                        .path("/data")
+                        .rights(fio::RW_STAR_DIR),
                 )
                 .capability(
-                    StorageBuilder::new()
+                    CapabilityBuilder::storage()
                         .name("data")
                         .backing_dir("minfs")
                         .source(StorageDirectorySource::Self_),

@@ -112,13 +112,13 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             availability: test_case.provider_availability,
                         }))
                         .capability(
-                            DirectoryBuilder::new()
+                            CapabilityBuilder::directory()
                                 .name("data")
                                 .path("/data")
                                 .rights(fio::RW_STAR_DIR),
                         )
                         .capability(
-                            StorageBuilder::new()
+                            CapabilityBuilder::storage()
                                 .name("cache")
                                 .backing_dir("data")
                                 .source(StorageDirectorySource::Self_)
@@ -150,7 +150,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     "b",
                     ComponentDeclBuilder::new()
                         .capability(
-                            ServiceBuilder::new()
+                            CapabilityBuilder::service()
                                 .name("fuchsia.examples.EchoService")
                                 .path("/svc/foo.service"),
                         )
@@ -163,7 +163,9 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             availability: cm_rust::Availability::Required,
                         }))
                         .capability(
-                            ProtocolBuilder::new().name("fuchsia.examples.Echo").path("/svc/foo"),
+                            CapabilityBuilder::protocol()
+                                .name("fuchsia.examples.Echo")
+                                .path("/svc/foo"),
                         )
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Self_,
@@ -174,7 +176,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             availability: cm_rust::Availability::Required,
                         }))
                         .capability(
-                            DirectoryBuilder::new()
+                            CapabilityBuilder::directory()
                                 .name("dir")
                                 .path("/data/dir")
                                 .rights(fio::R_STAR_DIR),
@@ -365,7 +367,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             availability: test_case.offer_availability,
                         }))
                         .capability(
-                            StorageBuilder::new()
+                            CapabilityBuilder::storage()
                                 .name("data")
                                 .backing_dir("dir")
                                 .source(StorageDirectorySource::Child("b".into())),
@@ -378,7 +380,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     "b",
                     ComponentDeclBuilder::new()
                         .capability(
-                            ServiceBuilder::new()
+                            CapabilityBuilder::service()
                                 .name("fuchsia.examples.EchoService")
                                 .path("/svc/foo.service"),
                         )
@@ -391,7 +393,9 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             availability: cm_rust::Availability::Required,
                         }))
                         .capability(
-                            ProtocolBuilder::new().name("fuchsia.examples.Echo").path("/svc/foo"),
+                            CapabilityBuilder::protocol()
+                                .name("fuchsia.examples.Echo")
+                                .path("/svc/foo"),
                         )
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Self_,
@@ -402,7 +406,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             availability: cm_rust::Availability::Required,
                         }))
                         .capability(
-                            DirectoryBuilder::new()
+                            CapabilityBuilder::directory()
                                 .name("dir")
                                 .path("/dir")
                                 .rights(fio::Operations::CONNECT),
@@ -539,7 +543,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     "b",
                     ComponentDeclBuilder::new()
                         .capability(
-                            ServiceBuilder::new()
+                            CapabilityBuilder::service()
                                 .name("fuchsia.examples.EchoService")
                                 .path("/svc/foo.service"),
                         )
@@ -552,7 +556,9 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             availability: test_case.provider_availability,
                         }))
                         .capability(
-                            ProtocolBuilder::new().name("fuchsia.examples.Echo").path("/svc/foo"),
+                            CapabilityBuilder::protocol()
+                                .name("fuchsia.examples.Echo")
+                                .path("/svc/foo"),
                         )
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Self_,
@@ -563,7 +569,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             availability: test_case.provider_availability,
                         }))
                         .capability(
-                            DirectoryBuilder::new()
+                            CapabilityBuilder::directory()
                                 .name("dir")
                                 .path("/data/dir")
                                 .rights(fio::R_STAR_DIR),
@@ -714,7 +720,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     "b",
                     ComponentDeclBuilder::new()
                         .capability(
-                            ServiceBuilder::new()
+                            CapabilityBuilder::service()
                                 .name("fuchsia.examples.EchoService")
                                 .path("/svc/foo.service"),
                         )
@@ -727,7 +733,9 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             availability: test_case.expose_availability,
                         }))
                         .capability(
-                            ProtocolBuilder::new().name("fuchsia.examples.Echo").path("/svc/foo"),
+                            CapabilityBuilder::protocol()
+                                .name("fuchsia.examples.Echo")
+                                .path("/svc/foo"),
                         )
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: test_case.source.clone(),
@@ -738,7 +746,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             availability: test_case.expose_availability,
                         }))
                         .capability(
-                            DirectoryBuilder::new()
+                            CapabilityBuilder::directory()
                                 .name("dir")
                                 .path("/data/dir")
                                 .rights(fio::R_STAR_DIR),

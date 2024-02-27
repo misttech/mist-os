@@ -122,7 +122,7 @@ async fn use_directory_from_dictionary_not_supported() {
         (
             "root",
             ComponentDeclBuilder::new()
-                .capability(DirectoryBuilder::new().name("bar_data").path("/data/bar"))
+                .capability(CapabilityBuilder::directory().name("bar_data").path("/data/bar"))
                 .dictionary_default("parent_dict")
                 .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
                     source: OfferSource::Self_,
@@ -150,7 +150,7 @@ async fn use_directory_from_dictionary_not_supported() {
         (
             "leaf",
             ComponentDeclBuilder::new()
-                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                 .dictionary_default("self_dict")
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source: OfferSource::Self_,
@@ -241,7 +241,7 @@ async fn expose_directory_from_dictionary_not_supported() {
         (
             "mid",
             ComponentDeclBuilder::new()
-                .capability(DirectoryBuilder::new().name("foo_data").path("/data/foo"))
+                .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                 .dictionary_default("self_dict")
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source: OfferSource::Self_,
@@ -280,7 +280,7 @@ async fn expose_directory_from_dictionary_not_supported() {
         (
             "leaf",
             ComponentDeclBuilder::new()
-                .capability(DirectoryBuilder::new().name("bar_data").path("/data/bar"))
+                .capability(CapabilityBuilder::directory().name("bar_data").path("/data/bar"))
                 .dictionary_default("child_dict")
                 .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
                     source: ExposeSource::Self_,
@@ -1231,7 +1231,7 @@ async fn extend_from_self() {
                 .protocol_default("foo")
                 .dictionary_default("origin_dict")
                 .capability(
-                    DictionaryBuilder::new()
+                    CapabilityBuilder::dictionary()
                         .name("self_dict")
                         .source_dictionary(DictionarySource::Self_, "origin_dict")
                         .build(),
@@ -1325,7 +1325,7 @@ async fn extend_from_parent() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .capability(
-                    DictionaryBuilder::new()
+                    CapabilityBuilder::dictionary()
                         .name("self_dict")
                         .source_dictionary(DictionarySource::Parent, "origin_dict")
                         .build(),
@@ -1384,7 +1384,7 @@ async fn extend_from_child() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .capability(
-                    DictionaryBuilder::new()
+                    CapabilityBuilder::dictionary()
                         .name("self_dict")
                         .source_dictionary(
                             DictionarySource::Child(ChildRef {

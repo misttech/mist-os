@@ -171,10 +171,13 @@ mod tests {
                 "provider",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("cache")
                             .backing_dir("data")
                             .source(StorageDirectorySource::Self_)

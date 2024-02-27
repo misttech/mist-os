@@ -562,7 +562,10 @@ mod tests {
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
@@ -652,7 +655,10 @@ mod tests {
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
@@ -773,7 +779,10 @@ mod tests {
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
@@ -908,7 +917,10 @@ mod tests {
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),

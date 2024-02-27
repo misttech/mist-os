@@ -1189,7 +1189,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .child_default("a")
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("fs")
                             .source(StorageDirectorySource::Child("a".into()))
@@ -1201,7 +1201,7 @@ mod tests {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("fs")
                             .path("/fs/data")
                             .rights(fio::Operations::all()),

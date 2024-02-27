@@ -49,7 +49,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     }))
                     .child_default("b")
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("cache")
                             .backing_dir("tmp")
                             .source(StorageDirectorySource::Parent)
@@ -68,8 +68,11 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .build(),
             ),
         ];
-        let namespace_capabilities =
-            vec![DirectoryBuilder::new().name("tmp").path("/tmp").rights(fio::RW_STAR_DIR).build()];
+        let namespace_capabilities = vec![CapabilityBuilder::directory()
+            .name("tmp")
+            .path("/tmp")
+            .rights(fio::RW_STAR_DIR)
+            .build()];
         let mut builder = T::new("a", components);
         builder.set_namespace_capabilities(namespace_capabilities);
         let model = builder.build().await;
@@ -103,7 +106,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -114,7 +120,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     }))
                     .child_default("b")
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("cache")
                             .backing_dir("data")
                             .source(StorageDirectorySource::Self_),
@@ -162,7 +168,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -173,7 +182,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     }))
                     .child_default("b")
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("cache")
                             .backing_dir("data")
                             .source(StorageDirectorySource::Self_)
@@ -222,7 +231,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::R_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::R_STAR_DIR),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -233,7 +245,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     }))
                     .child_default("b")
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("cache")
                             .backing_dir("data")
                             .source(StorageDirectorySource::Self_),
@@ -282,7 +294,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
@@ -310,7 +325,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     }))
                     .child_default("c")
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("minfs")
                             .source(StorageDirectorySource::Parent),
@@ -360,7 +375,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
@@ -388,7 +406,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     }))
                     .child_default("c")
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("minfs")
                             .source(StorageDirectorySource::Parent)
@@ -445,7 +463,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("data")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR)
@@ -477,7 +495,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     }))
                     .child_default("c")
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("minfs")
                             .source(StorageDirectorySource::Parent)
@@ -528,7 +546,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("data-root")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
@@ -542,7 +560,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     }))
                     .child_default("b")
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("data-root")
                             .source(StorageDirectorySource::Self_),
@@ -602,7 +620,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("cache")
                             .backing_dir("minfs")
                             .source(StorageDirectorySource::Child("b".into())),
@@ -622,7 +640,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
@@ -677,7 +698,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("cache")
                             .backing_dir("minfs")
                             .source(StorageDirectorySource::Child("b".into()))
@@ -698,7 +719,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
@@ -762,14 +786,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("minfs")
                             .source(StorageDirectorySource::Child("b".into()))
                             .subdir("data"),
                     )
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("cache")
                             .backing_dir("minfs")
                             .source(StorageDirectorySource::Child("b".into()))
@@ -797,7 +821,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
@@ -922,7 +949,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -933,7 +963,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     }))
                     .child_default("b")
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("cache")
                             .backing_dir("minfs")
                             .source(StorageDirectorySource::Self_),
@@ -978,7 +1008,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
@@ -1034,13 +1067,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 ComponentDeclBuilder::new()
                     .child_default("b")
                     .capability(
-                        DirectoryBuilder::new()
+                        CapabilityBuilder::directory()
                             .name("minfs")
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("minfs")
                             .source(StorageDirectorySource::Self_),
@@ -1089,7 +1122,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new_empty_component()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
@@ -1117,7 +1153,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     }))
                     .child_default("c")
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("data")
                             .backing_dir("minfs")
                             .source(StorageDirectorySource::Parent),
@@ -1174,7 +1210,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     }))
                     .child_default("b")
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("cache")
                             .backing_dir("tmp")
                             .source(StorageDirectorySource::Parent)
@@ -1193,8 +1229,11 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .build(),
             ),
         ];
-        let namespace_capabilities =
-            vec![DirectoryBuilder::new().name("tmp").path("/tmp").rights(fio::RW_STAR_DIR).build()];
+        let namespace_capabilities = vec![CapabilityBuilder::directory()
+            .name("tmp")
+            .path("/tmp")
+            .rights(fio::RW_STAR_DIR)
+            .build()];
         let mut builder = T::new("a", components);
         builder.set_namespace_capabilities(namespace_capabilities);
         builder.add_capability_policy(
@@ -1245,7 +1284,10 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .capability(
-                        DirectoryBuilder::new().name("data").path("/data").rights(fio::RW_STAR_DIR),
+                        CapabilityBuilder::directory()
+                            .name("data")
+                            .path("/data")
+                            .rights(fio::RW_STAR_DIR),
                     )
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
@@ -1256,7 +1298,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     }))
                     .child_default("b")
                     .capability(
-                        StorageBuilder::new()
+                        CapabilityBuilder::storage()
                             .name("cache")
                             .backing_dir("data")
                             .source(StorageDirectorySource::Self_),

@@ -396,7 +396,7 @@ mod tests {
     }
 
     fn diagnostics_decl() -> CapabilityDecl {
-        DirectoryBuilder::new().name("diagnostics").path("/diagnostics").build()
+        CapabilityBuilder::directory().name("diagnostics").path("/diagnostics").build()
     }
 
     fn expose_diagnostics_decl() -> ExposeDecl {
