@@ -15,20 +15,6 @@ driver_bind_rules("amlogic_display_bind") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.display.dsi",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.sysmem",
-  ]
-}
-
-driver_bind_rules("amlogic_display_without_dsi_bind") {
-  rules = "amlogic-display-without-dsi.bind"
-  bind_output = "amlogic-display.bindbc"
-  tests = "amlogic-display-without-dsi-bind_tests.json"
-  deps = [
-    "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
-    "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sysmem",
@@ -38,13 +24,13 @@ driver_bind_rules("amlogic_display_without_dsi_bind") {
 group("bind_rules") {
   public_deps = []
   if (board_name == "astro") {
-    public_deps += [ ":amlogic_display_without_dsi_bind" ]
+    public_deps += [ ":amlogic_display_bind" ]
   } else if (board_name == "sherlock") {
-    public_deps += [ ":amlogic_display_without_dsi_bind" ]
+    public_deps += [ ":amlogic_display_bind" ]
   } else if (board_name == "nelson") {
-    public_deps += [ ":amlogic_display_without_dsi_bind" ]
+    public_deps += [ ":amlogic_display_bind" ]
   } else if (board_name == "vim3") {
-    public_deps += [ ":amlogic_display_without_dsi_bind" ]
+    public_deps += [ ":amlogic_display_bind" ]
   } else {
     # Unsupported board.
   }
@@ -212,10 +198,7 @@ test("amlogic-display-test") {
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fzl",
   ]
-  assert_no_deps = [
-    ":amlogic_display_bind",
-    ":amlogic_display_without_dsi_bind",
-  ]
+  assert_no_deps = [ ":amlogic_display_bind" ]
 }
 
 group("tests") {
@@ -223,7 +206,6 @@ group("tests") {
   deps = [
     ":amlogic-display-test-package",
     ":amlogic_display_bind_test",
-    ":amlogic_display_without_dsi_bind_test",
   ]
 }
 

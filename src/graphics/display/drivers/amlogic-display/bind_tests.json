@@ -1,17 +1,5 @@
 [
     {
-        "node": "dsi",
-        "tests": [
-            {
-                "name": "Match",
-                "expected": "match",
-                "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.display.dsi.BIND_PROTOCOL.IMPL"
-                }
-            }
-        ]
-    },
-    {
         "node": "pdev",
         "tests": [
             {

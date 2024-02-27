@@ -5,24 +5,12 @@
 composite display;
 
 using fuchsia.hardware.amlogiccanvas;
-using fuchsia.display.dsi;
 using fuchsia.gpio;
 using fuchsia.platform;
 using fuchsia.sysmem;
 using fuchsia.amlogic.platform;
 
-// TODO(https://fxbug.dev/42076007): `dsi` must be the primary node.
-//
-// amlogic-display driver needs to create a DsiImpl banjo client, but there's
-// no fragment proxy support for the DsiImpl protocol.
-//
-// As a result, the driver implementing DsiImpl protocol has to be a "primary"
-// ancestor of amlogic-display and they must be colocated in the same devhost.
-primary node "dsi" {
-  fuchsia.BIND_PROTOCOL == fuchsia.display.dsi.BIND_PROTOCOL.IMPL;
-}
-
-node "pdev" {
+primary node "pdev" {
   fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
   fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.DISPLAY;
