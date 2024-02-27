@@ -535,14 +535,14 @@ void IgcDriver::NetworkDeviceImplStop(network_device_impl_stop_callback callback
 
     while (rxh != rxt) {
       // Populate empty buffers.
-      buffers[buf_idx].data_count = 1;
-      buffers[buf_idx].meta.port = kPortId;
-      buffers[buf_idx].data_list = &buffer_parts[buf_idx];
-      buffers[buf_idx].meta.frame_type =
-          static_cast<uint8_t>(::fuchsia_hardware_network::wire::FrameType::kEthernet);
-      buffer_parts[buf_idx].id = rx_buffers_[rxh].buffer_id;
-      buffer_parts[buf_idx].length = 0;
-      buffer_parts[buf_idx].offset = 0;
+      buffers[buf_idx] = {
+          .meta{.port = kPortId,
+                .frame_type =
+                    static_cast<uint8_t>(::fuchsia_hardware_network::wire::FrameType::kEthernet)},
+          .data_list = &buffer_parts[buf_idx],
+          .data_count = 1,
+      };
+      buffer_parts[buf_idx] = {.id = rx_buffers_[rxh].buffer_id, .offset = 0, .length = 0};
 
       rx_buffers_[rxh].available = false;
       // Clean up the status flag in rx descriptor.
