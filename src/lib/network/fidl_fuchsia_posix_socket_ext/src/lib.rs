@@ -245,19 +245,53 @@ mod test {
             .expect("send_to should succeed");
         assert_eq!(n, payload.len());
 
-        let (n, address) = socket_b.recv_from(&mut buf[..]).expect("recv_from should succeed");
-        let buf = buf[..n].iter().map(|byte| unsafe { byte.assume_init() }).collect::<Vec<_>>();
+        // We make multiple attempts because there's no guarantee that we're the
+        // exclusive traffic over this interface. In particular, this is being
+        // introduced because we're seeing IGMP reports over the interface
+        // (https://g-issues.fuchsia.dev/issues/324591565#comment13), but even
+        // without that this is a source of flakiness.
+        const NUM_ATTEMPTS: i32 = 5;
 
-        assert_eq!(&buf[..], payload.as_ref());
-        assert_eq!(address.try_to_sockaddr_ll().expect("should be sockaddr_ll"), {
-            let mut addr = libc::sockaddr_ll::from(sockaddr::EthernetSockaddr {
-                interface_id: Some(iface_b.id().try_into().expect("nonzero")),
-                addr: MAC_A,
-                protocol: packet_formats::ethernet::EtherType::Ipv4,
-            });
-            const ARPHRD_ETHER: libc::c_ushort = 1;
-            addr.sll_hatype = ARPHRD_ETHER;
-            addr
-        });
+        for attempt in 1..=NUM_ATTEMPTS {
+            let (n, address) = socket_b.recv_from(&mut buf[..]).expect("recv_from should succeed");
+            let buf = buf[..n].iter().map(|byte| unsafe { byte.assume_init() }).collect::<Vec<_>>();
+
+            if &buf[..] != payload.as_ref() {
+                println!("got buf={buf:?} didn't match wanted={payload:?} in attempt {attempt}");
+                continue;
+            }
+
+            let got_address = match address.try_to_sockaddr_ll() {
+                Some(addr) => addr,
+                None => {
+                    println!("could not convert {address:?} to sockaddr_ll in attempt {attempt}");
+                    continue;
+                }
+            };
+
+            let want_address = {
+                let mut addr = libc::sockaddr_ll::from(sockaddr::EthernetSockaddr {
+                    interface_id: Some(iface_b.id().try_into().expect("nonzero")),
+                    addr: MAC_A,
+                    protocol: packet_formats::ethernet::EtherType::Ipv4,
+                });
+                const ARPHRD_ETHER: libc::c_ushort = 1;
+                addr.sll_hatype = ARPHRD_ETHER;
+                addr
+            };
+
+            if got_address != want_address {
+                println!(
+                    "got_address {got_address:?} didn't match \
+                want_address {want_address:?} in attempt {attempt}"
+                );
+                continue;
+            }
+
+            println!("succeeded on attempt {attempt}");
+            return;
+        }
+
+        panic!("failed to receive expected frame in all {NUM_ATTEMPTS} attempts");
     }
 }
