@@ -612,6 +612,29 @@ mod tests {
         zx::Vmo,
     };
 
+    struct BootstrapGenericSmeTestHarness {
+        _softmac_ifc_bridge_request_stream: fidl_softmac::WlanSoftmacIfcBridgeRequestStream,
+    }
+
+    // We could implement BootstrapGenericSmeTestHarness::new() instead of a macro, but doing so requires
+    // pinning the FakeDevice and WlanSoftmacIfcProtocol (and its associated DriverEventSink). While the
+    // pinning itself is feasible, it leads to a complex harness implementation that outweighs the benefit
+    // of using a harness to begin with.
+    macro_rules! make_bootstrap_generic_sme_test_harness {
+        (&mut $fake_device:ident, $driver_event_sink:ident) => {{
+            let (softmac_ifc_bridge_proxy, _softmac_ifc_bridge_request_stream) =
+                fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>().unwrap();
+            (
+                Box::pin(bootstrap_generic_sme(
+                    &mut $fake_device,
+                    $driver_event_sink,
+                    softmac_ifc_bridge_proxy,
+                )),
+                BootstrapGenericSmeTestHarness { _softmac_ifc_bridge_request_stream },
+            )
+        }};
+    }
+
     #[test]
     fn bootstrap_generic_sme_fails_to_retrieve_usme_bootstrap_handle() {
         let mut exec = TestExecutor::new();
@@ -619,17 +642,11 @@ mod tests {
             &exec,
             FakeDeviceConfig::default().with_mock_start_result(Err(zx::Status::INTERRUPTED_RETRY)),
         );
-
-        // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
         let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
-        let (softmac_ifc_bridge_proxy, _softmac_ifc_bridge_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>()
-                .unwrap();
 
-        let fut =
-            bootstrap_generic_sme(&mut fake_device, driver_event_sink, softmac_ifc_bridge_proxy);
-        pin_mut!(fut);
-        match exec.run_until_stalled(&mut fut) {
+        let (mut bootstrap_generic_sme_fut, _harness) =
+            make_bootstrap_generic_sme_test_harness!(&mut fake_device, driver_event_sink);
+        match exec.run_until_stalled(&mut bootstrap_generic_sme_fut) {
             Poll::Ready(Err(zx::Status::INTERRUPTED_RETRY)) => (),
             Poll::Ready(Err(status)) => panic!("Failed with wrong status: {}", status),
             Poll::Ready(Ok(_)) => panic!("Succeeded unexpectedly"),
@@ -642,24 +659,21 @@ mod tests {
         let mut exec = TestExecutor::new();
         let (mut fake_device, fake_device_state) =
             FakeDevice::new_with_config(&exec, FakeDeviceConfig::default());
-
-        // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
         let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
-        let (softmac_ifc_bridge_proxy, _softmac_ifc_bridge_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>()
-                .unwrap();
 
-        let fut =
-            bootstrap_generic_sme(&mut fake_device, driver_event_sink, softmac_ifc_bridge_proxy);
-        pin_mut!(fut);
-        assert!(matches!(exec.run_until_stalled(&mut fut), Poll::Pending));
+        let (mut bootstrap_generic_sme_fut, _harness) =
+            make_bootstrap_generic_sme_test_harness!(&mut fake_device, driver_event_sink);
+        assert!(matches!(exec.run_until_stalled(&mut bootstrap_generic_sme_fut), Poll::Pending));
 
         // Write an invalid FIDL message to the USME bootstrap channel.
         let usme_bootstrap_channel =
             fake_device_state.lock().usme_bootstrap_client_end.take().unwrap().into_channel();
         usme_bootstrap_channel.write(&[], &mut []).unwrap();
 
-        assert!(matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(zx::Status::INTERNAL))));
+        assert!(matches!(
+            exec.run_until_stalled(&mut bootstrap_generic_sme_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        ));
     }
 
     #[test]
@@ -667,22 +681,19 @@ mod tests {
         let mut exec = TestExecutor::new();
         let (mut fake_device, fake_device_state) =
             FakeDevice::new_with_config(&exec, FakeDeviceConfig::default());
-
-        // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
         let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
-        let (softmac_ifc_bridge_proxy, _softmac_ifc_bridge_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>()
-                .unwrap();
 
-        let fut =
-            bootstrap_generic_sme(&mut fake_device, driver_event_sink, softmac_ifc_bridge_proxy);
-        pin_mut!(fut);
-        assert!(matches!(exec.run_until_stalled(&mut fut), Poll::Pending));
+        let (mut bootstrap_generic_sme_fut, _harness) =
+            make_bootstrap_generic_sme_test_harness!(&mut fake_device, driver_event_sink);
+        assert!(matches!(exec.run_until_stalled(&mut bootstrap_generic_sme_fut), Poll::Pending));
 
         // Drop the client end of USME bootstrap channel.
         let _ = fake_device_state.lock().usme_bootstrap_client_end.take().unwrap();
 
-        assert!(matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(zx::Status::INTERNAL))));
+        assert!(matches!(
+            exec.run_until_stalled(&mut bootstrap_generic_sme_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        ));
     }
 
     #[test]
@@ -690,16 +701,10 @@ mod tests {
         let mut exec = TestExecutor::new();
         let (mut fake_device, fake_device_state) =
             FakeDevice::new_with_config(&exec, FakeDeviceConfig::default());
-
-        // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
         let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
-        let (softmac_ifc_bridge_proxy, _softmac_ifc_bridge_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>()
-                .unwrap();
 
-        let bootstrap_generic_sme_fut =
-            bootstrap_generic_sme(&mut fake_device, driver_event_sink, softmac_ifc_bridge_proxy);
-        pin_mut!(bootstrap_generic_sme_fut);
+        let (mut bootstrap_generic_sme_fut, _harness) =
+            make_bootstrap_generic_sme_test_harness!(&mut fake_device, driver_event_sink);
         assert!(matches!(exec.run_until_stalled(&mut bootstrap_generic_sme_fut), Poll::Pending));
 
         let usme_bootstrap_proxy = fake_device_state
