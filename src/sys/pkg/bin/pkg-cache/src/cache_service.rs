@@ -211,6 +211,55 @@ async fn get(
     gc_protection: fpkg::GcProtection,
     needed_blobs: ServerEnd<NeededBlobsMarker>,
     dir_and_scope: Option<(ServerEnd<fio::DirectoryMarker>, package_directory::ExecutionScope)>,
+    cobalt_sender: ProtocolSender<MetricEvent>,
+    node: &finspect::Node,
+) -> Result<(), Status> {
+    let guard =
+        package_index.write().await.start_writing(meta_far_blob.blob_id.into(), gc_protection);
+    let get_ret = get_impl(
+        package_index,
+        base_packages,
+        executability_restrictions,
+        blobfs,
+        open_packages,
+        meta_far_blob,
+        gc_protection,
+        needed_blobs,
+        dir_and_scope,
+        cobalt_sender,
+        node,
+    )
+    .await;
+    let stop_ret = package_index.write().await.stop_writing(guard);
+    match (get_ret, stop_ret) {
+        (get_ret, Ok(())) => get_ret,
+        (Ok(()), Err(e)) => {
+            error!("stopping the write of {meta_far_blob:?}: {:#}", anyhow!(e));
+            Err(Status::INTERNAL)
+        }
+        (Err(get_err), Err(stop_err)) => {
+            error!(
+                "erroring stopping the write of {meta_far_blob:?}: {:#}, \
+                the get failed first so that error will be returned",
+                anyhow!(stop_err)
+            );
+            Err(get_err)
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+/// Fetch a package and optionally open it.
+async fn get_impl(
+    package_index: &async_lock::RwLock<PackageIndex>,
+    base_packages: &BasePackages,
+    executability_restrictions: system_image::ExecutabilityRestrictions,
+    blobfs: &blobfs::Client,
+    open_packages: &package_directory::RootDirCache<blobfs::Client>,
+    meta_far_blob: BlobInfo,
+    gc_protection: fpkg::GcProtection,
+    needed_blobs: ServerEnd<NeededBlobsMarker>,
+    dir_and_scope: Option<(ServerEnd<fio::DirectoryMarker>, package_directory::ExecutionScope)>,
     mut cobalt_sender: ProtocolSender<MetricEvent>,
     node: &finspect::Node,
 ) -> Result<(), Status> {
@@ -864,7 +913,11 @@ mod serve_needed_blobs_tests {
 
         (
             Task::spawn(async move {
-                serve_needed_blobs(
+                let guard = package_index
+                    .write()
+                    .await
+                    .start_writing(meta_blob_info.blob_id.into(), gc_protection);
+                let res = serve_needed_blobs(
                     stream,
                     meta_blob_info,
                     gc_protection,
@@ -873,7 +926,9 @@ mod serve_needed_blobs_tests {
                     &inspector.root().create_child("test-node-name"),
                 )
                 .await
-                .map(|_| ())
+                .map(|_| ());
+                let () = package_index.write().await.stop_writing(guard).unwrap();
+                res
             }),
             proxy,
             blobfs_mock,

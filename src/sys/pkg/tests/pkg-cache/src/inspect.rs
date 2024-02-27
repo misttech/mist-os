@@ -868,7 +868,8 @@ async fn index_updated_mid_package_write() {
                             "blobs-count": 2u64,
                         },
                     },
-                }
+                },
+                "writing" : {},
             }
         }
     );

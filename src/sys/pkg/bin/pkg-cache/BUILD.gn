@@ -94,6 +94,7 @@ rustc_binary("bin") {
     "src/index/dynamic.rs",
     "src/index/package.rs",
     "src/index/retained.rs",
+    "src/index/writing.rs",
     "src/main.rs",
     "src/reboot.rs",
     "src/required_blobs.rs",

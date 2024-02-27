@@ -668,3 +668,100 @@ async fn blobs_protected_from_gc_by_open_package_tracking() {
     assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
     assert!(env.blobfs.list_blobs().unwrap().is_disjoint(&pkg0_protected));
 }
+
+// The dynamic index and the writing index both protect packages while they are being written.
+// This test uses inspect to make sure the writing index is activating.
+// When the dynamic index is removed this test can also be removed and the writing index will be
+// tested by the other tests that actually try to delete blobs.
+#[fuchsia_async::run_singlethreaded(test)]
+async fn writing_index_protects_packages() {
+    let env = TestEnv::builder().build().await;
+    let pkg = PackageBuilder::new("ephemeral").build().await.unwrap();
+    let (needed_blobs, needed_blobs_server_end) =
+        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
+    let get_fut = env
+        .proxies
+        .package_cache
+        .get(
+            &fpkg::BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 },
+            fpkg::GcProtection::OpenPackageTracking,
+            needed_blobs_server_end,
+            None,
+        )
+        .map_ok(|res| res.map_err(Status::from_raw));
+    let (meta_far, _) = pkg.contents();
+    let meta_blob =
+        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
+    let hash_str = &pkg.hash().to_string();
+
+    // NeededBlobs.OpenMetaBlob has responded, so the package should be in the index.
+    assert_eq!(
+        env.inspect_hierarchy()
+            .await
+            .get_property_by_path(&vec!["index", "writing", hash_str, "count"])
+            .unwrap()
+            .number_as_int()
+            .unwrap(),
+        1
+    );
+
+    let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
+    let () = blob_written(&needed_blobs, meta_far.merkle).await;
+    assert_eq!(get_missing_blobs(&needed_blobs).await, vec![]);
+    let () = get_fut.await.unwrap().unwrap();
+
+    // PackageCache.Get has responded, so the Get is complete and the index should be empty.
+    assert_eq!(
+        env.inspect_hierarchy().await.get_property_by_path(&vec!["index", "writing", hash_str]),
+        None
+    );
+}
+
+// The dynamic index and the writing index both protect packages while they are being written.
+// This test uses inspect to make sure the writing index is activating.
+// When the dynamic index is removed this test can also be removed and the writing index will be
+// tested by the other tests that actually try to delete blobs.
+#[fuchsia_async::run_singlethreaded(test)]
+async fn writing_index_clears_on_get_error() {
+    let env = TestEnv::builder().build().await;
+    let pkg = PackageBuilder::new("ephemeral").build().await.unwrap();
+    let (needed_blobs, needed_blobs_server_end) =
+        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
+    let get_fut = env
+        .proxies
+        .package_cache
+        .get(
+            &fpkg::BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 },
+            fpkg::GcProtection::OpenPackageTracking,
+            needed_blobs_server_end,
+            None,
+        )
+        .map_ok(|res| res.map_err(Status::from_raw));
+    let _ = needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
+    let hash_str = &pkg.hash().to_string();
+
+    // NeededBlobs.OpenMetaBlob has responded, so the package should be in the index.
+    assert_eq!(
+        env.inspect_hierarchy()
+            .await
+            .get_property_by_path(&vec!["index", "writing", hash_str, "count"])
+            .unwrap()
+            .number_as_int()
+            .unwrap(),
+        1
+    );
+
+    // It is a protocol violation to call GetMissingBlobs before the meta.far is written, doing so
+    // will fail the Get with an error, but the package should still be removed from the writing
+    // index.
+    let (_, blob_iterator_server_end) =
+        fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>().unwrap();
+    let () = needed_blobs.get_missing_blobs(blob_iterator_server_end).unwrap();
+    assert_matches!(get_fut.await.unwrap(), Err(Status::UNAVAILABLE));
+
+    // PackageCache.Get has responded, so the index should be empty.
+    assert_eq!(
+        env.inspect_hierarchy().await.get_property_by_path(&vec!["index", "writing", hash_str]),
+        None
+    );
+}

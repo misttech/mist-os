@@ -7,6 +7,7 @@
 mod dynamic;
 mod package;
 mod retained;
+mod writing;
 
 pub use package::{
     fulfill_meta_far_blob, load_cache_packages, set_retained_index, CompleteInstallError,
