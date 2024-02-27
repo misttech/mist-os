@@ -199,6 +199,12 @@ int Vim3::Thread() {
     return status;
   }
 
+  if ((status = SuspendInit()) != ZX_OK) {
+    zxlogf(ERROR, "SuspendInit() failed: %d", status);
+    init_txn_->Reply(ZX_ERR_INTERNAL);
+    return status;
+  }
+
   ZX_ASSERT_MSG(clock_init_steps_.empty(), "Clock init steps added but not applied");
 
   init_txn_->Reply(status);

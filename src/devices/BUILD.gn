@@ -40,6 +40,7 @@ group("tests") {
     "securemem:tests",
     "serial:tests",
     "spi:tests",
+    "suspend:tests",
     "sysmem:tests",
     "tee:tests",
     "temperature:tests",

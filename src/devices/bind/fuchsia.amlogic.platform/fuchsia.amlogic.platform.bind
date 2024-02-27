@@ -81,6 +81,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   ADC = 0x38,
   TEMP_SENSOR_PLL = 0x39,
   TEMP_SENSOR_DDR = 0x40,
+  SUSPEND_HAL = 0x41,
 };
 
 enum PWM_ID {

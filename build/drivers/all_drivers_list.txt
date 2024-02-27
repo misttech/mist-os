@@ -186,6 +186,7 @@
 //src/devices/spi/drivers/aml-spi:aml-spi-driver
 //src/devices/spi/drivers/intel-gspi:fuchsia_driver
 //src/devices/spi/drivers/spi:spi-driver
+//src/devices/suspend/drivers/aml-suspend:aml-suspend-driver
 //src/devices/sysmem/drivers/sysmem:sysmem-driver
 //src/devices/tee/drivers/optee:optee-driver
 //src/devices/temperature/drivers/aml-trip:aml-trip-driver

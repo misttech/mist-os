@@ -188,6 +188,11 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/aml-trip.cm" ]
     },
     {
+      package_target = "//src/devices/suspend/drivers/aml-suspend:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-suspend.cm" ]
+    },
+    {
       package_target = "//src/devices/usb/drivers/dwc2:package"
       package_set = "bootfs"
       driver_components = [ "meta/dwc2.cm" ]

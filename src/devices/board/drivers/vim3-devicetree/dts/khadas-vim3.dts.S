@@ -18,6 +18,10 @@
 		#iommu-cells = <0x1>;
 	};
 
+	suspend {
+		compatible="amlogic,suspend";
+	};
+
 	reserved-memory {
 		#address-cells = <0x02>;
 		#size-cells = <0x02>;

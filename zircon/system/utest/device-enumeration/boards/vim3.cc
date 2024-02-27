@@ -107,6 +107,9 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
 
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-24/vim3-mcu",
 
+      // Suspend HAL
+      "sys/platform/05:06:41/aml-suspend-device",
+
       // ADC
       "sys/platform/05:00:38/aml-saradc",
 

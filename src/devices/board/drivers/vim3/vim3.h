@@ -104,6 +104,7 @@ class Vim3 : public Vim3Type {
   zx_status_t UsbInit();
   zx_status_t MaliInit();
   zx_status_t VideoInit();
+  zx_status_t SuspendInit();
 
   int Thread();
 
