@@ -59,7 +59,10 @@ if (is_host) {
 
   group("stable_vim3_tests") {
     testonly = true
-    public_deps = [ "honeydew/tests/functional_tests:stable_vim3_tests" ]
+    public_deps = [
+      "honeydew/tests/functional_tests:stable_vim3_tests",
+      "//src/tests/end_to_end/rtc:rtc_conformance_test($host_toolchain)",
+    ]
   }
 
   group("stable_nuc_sl4f_tests") {
@@ -103,10 +106,6 @@ if (is_host) {
       "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
       "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
       "honeydew/tests/functional_tests:unstable_vim3_tests",
-
-      # TODO(b/324470093): Promote this test to stable_vim3_tests once it's had
-      # a chance to soak for a while (>= 200 successful runs).
-      "//src/tests/end_to_end/rtc:rtc_conformance_test($host_toolchain)",
     ]
   }
 
