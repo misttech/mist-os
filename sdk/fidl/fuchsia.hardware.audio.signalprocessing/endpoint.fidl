@@ -37,7 +37,7 @@ type PlugDetectCapabilities = flexible enum {
 type EndpointType = flexible enum : uint8 {
     /// The endpoint represents a ring buffer.
     /// A ring buffer processing element's id allows for multi-ring buffer topologies to
-    /// be supported by a driver proding the fuchsia.hardware.audio/Device API.
+    /// be supported by a driver providing the fuchsia.hardware.audio/Composite API.
     RING_BUFFER = 1;
 
     /// The endpoint represents a Digital Audio Interface Interconnect,

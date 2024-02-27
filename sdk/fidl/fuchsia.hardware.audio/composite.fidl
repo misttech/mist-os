@@ -76,6 +76,9 @@ closed protocol Composite {
     compose Health;
 
     /// Allows providing signal processing capabilities.
+    /// Supporting the `signalprocessing` protocols -- and exposing one or more elements and one or
+    /// more topologies -- is required for `Composite` implementations (unlike `Codec`, `Dai` and
+    /// `StreamConfig` implementations where this is optional).
     compose fuchsia.hardware.audio.signalprocessing.Connector;
 
     /// Resets the hardware including all DAI interconnects and signal processing.
