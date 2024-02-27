@@ -1246,7 +1246,12 @@
         {
             protocol: [ "fuchsia.power.broker.Topology" ],
             from: "#power-broker",
-            to: "#system-activity-governor",
+            to: [
+                "#boot-drivers",
+                "#full-pkg-drivers",
+                "#pkg-drivers",
+                "#system-activity-governor",
+            ],
         },
 
         // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
