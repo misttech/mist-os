@@ -325,6 +325,9 @@ TEST_F(AmlTripTest, TestTripPointSuccess) {
   EXPECT_TRUE(set_result.ok());
   EXPECT_TRUE(set_result->is_ok());
 
+  auto get_result = client_->GetTripPointDescriptors();
+  ASSERT_TRUE(get_result.ok());
+
   // Trigger an interrupt and set the registers to make it look like an
   // interrupt is pending.
   sensor_mmio_.SetIrqStat(rise_desc->index, true);

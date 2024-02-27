@@ -96,12 +96,16 @@ void AmlTripDevice::GetTripPointDescriptors(GetTripPointDescriptorsCompleter::Sy
 
     switch (configured_trip_points_[i]->direction) {
       case TripPointDirection::Rise:
-        result[i].configuration.oneshot_temp_above_trip_point().critical_temperature_celsius =
-            configured_trip_points_[i]->temperature;
+        result[i].configuration =
+            fuchsia_hardware_trippoint::wire::TripPointValue::WithOneshotTempAboveTripPoint(
+                fuchsia_hardware_trippoint::wire::OneshotTempAboveTripPoint{
+                    .critical_temperature_celsius = configured_trip_points_[i]->temperature});
         break;
       case TripPointDirection::Fall:
-        result[i].configuration.oneshot_temp_below_trip_point().critical_temperature_celsius =
-            configured_trip_points_[i]->temperature;
+        result[i].configuration =
+            fuchsia_hardware_trippoint::wire::TripPointValue::WithOneshotTempBelowTripPoint(
+                fuchsia_hardware_trippoint::wire::OneshotTempBelowTripPoint{
+                    .critical_temperature_celsius = configured_trip_points_[i]->temperature});
         break;
       default:
         ZX_PANIC("Invalid configured trip point type");
