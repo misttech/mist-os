@@ -24,7 +24,7 @@ namespace network {
 class NetworkDevice;
 using DeviceType =
     ddk::Device<NetworkDevice, ddk::Messageable<fuchsia_hardware_network::DeviceInstance>::Mixin,
-                ddk::Unbindable>;
+                ddk::Unbindable, ddk::Suspendable>;
 
 // Creates `fuchsia_hardware_network_driver::NetworkDeviceImpl` endpoints for a
 // parent device that is backed by the FIDL based driver runtime.
@@ -48,6 +48,8 @@ class NetworkDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_N
   void DdkUnbind(ddk::UnbindTxn unbindTxn);
 
   void DdkRelease();
+
+  void DdkSuspend(ddk::SuspendTxn suspendTxn);
 
   void GetDevice(GetDeviceRequestView request, GetDeviceCompleter::Sync& _completer) override;
 

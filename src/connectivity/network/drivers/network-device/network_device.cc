@@ -130,6 +130,16 @@ void NetworkDevice::DdkRelease() {
   delete this;
 }
 
+void NetworkDevice::DdkSuspend(ddk::SuspendTxn suspendTxn) {
+  // In DFv1 DdkSuspend is only called during shutdown and reboot, resuming is not supported. It's
+  // therefore safe to tear down the device here as it will never come back from this.
+  zxlogf(INFO, "%p DdkSuspend", zxdev());
+  device_->Teardown([txn = std::move(suspendTxn), this]() mutable {
+    zxlogf(INFO, "%p DdkSuspend Done", zxdev());
+    txn.Reply(ZX_OK, txn.requested_state());
+  });
+}
+
 void NetworkDevice::GetDevice(GetDeviceRequestView request, GetDeviceCompleter::Sync& _completer) {
   ZX_ASSERT_MSG(device_, "can't serve device if not bound to parent implementation");
   device_->Bind(std::move(request->device));
