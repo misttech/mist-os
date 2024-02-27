@@ -213,6 +213,62 @@ impl FromExt<&ot::TrelCounters> for fidl_fuchsia_lowpan_experimental::TrelCounte
     }
 }
 
+impl FromExt<&ot::Nat64Counters> for fidl_fuchsia_lowpan_experimental::Nat64TrafficCounters {
+    fn from_ext(x: &ot::Nat64Counters) -> Self {
+        fidl_fuchsia_lowpan_experimental::Nat64TrafficCounters {
+            ipv4_to_ipv6_packets: Some(x.get_4_to_6_packets() as i64),
+            ipv4_to_ipv6_bytes: Some(x.get_4_to_6_bytes() as i64),
+            ipv6_to_ipv4_packets: Some(x.get_6_to_4_packets() as i64),
+            ipv6_to_ipv4_bytes: Some(x.get_6_to_4_bytes() as i64),
+            ..Default::default()
+        }
+    }
+}
+
+impl FromExt<&ot::Nat64ProtocolCounters>
+    for fidl_fuchsia_lowpan_experimental::Nat64ProtocolCounters
+{
+    fn from_ext(x: &ot::Nat64ProtocolCounters) -> Self {
+        fidl_fuchsia_lowpan_experimental::Nat64ProtocolCounters {
+            total: Some((&x.get_total_counters()).into_ext()),
+            tcp: Some((&x.get_tcp_counters()).into_ext()),
+            udp: Some((&x.get_udp_counters()).into_ext()),
+            icmp: Some((&x.get_icmp_counters()).into_ext()),
+            ..Default::default()
+        }
+    }
+}
+
+impl FromExt<&ot::Nat64AddressMapping> for fidl_fuchsia_lowpan_experimental::Nat64Mapping {
+    fn from_ext(x: &ot::Nat64AddressMapping) -> Self {
+        fidl_fuchsia_lowpan_experimental::Nat64Mapping {
+            mapping_id: Some(x.get_mapping_id()),
+            ip4_addr: Some(x.get_ipv4_addr().octets().into()),
+            ip6_addr: Some(x.get_ipv6_addr().octets().into()),
+            remaining_time_ms: Some(x.get_remaining_time_ms()),
+            counters: Some((&x.get_protocol_counters()).into_ext()),
+            ..Default::default()
+        }
+    }
+}
+
+impl FromExt<&ot::Nat64State> for fidl_fuchsia_lowpan_experimental::Nat64State {
+    fn from_ext(x: &ot::Nat64State) -> Self {
+        match x {
+            ot::Nat64State::Disabled => {
+                fidl_fuchsia_lowpan_experimental::Nat64State::Nat64StateDisabled
+            }
+            ot::Nat64State::NotRunning => {
+                fidl_fuchsia_lowpan_experimental::Nat64State::Nat64StateNotRunning
+            }
+            ot::Nat64State::Idle => fidl_fuchsia_lowpan_experimental::Nat64State::Nat64StateIdle,
+            ot::Nat64State::Active => {
+                fidl_fuchsia_lowpan_experimental::Nat64State::Nat64StateActive
+            }
+        }
+    }
+}
+
 impl FromExt<&ot::LeaderData> for fidl_fuchsia_lowpan_experimental::LeaderData {
     fn from_ext(x: &ot::LeaderData) -> Self {
         fidl_fuchsia_lowpan_experimental::LeaderData {

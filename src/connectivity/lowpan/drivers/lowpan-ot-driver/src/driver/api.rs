@@ -947,6 +947,76 @@ where
             }
         }
 
+        // Get NAT64 telemetry
+        let nat64_mappings = ot
+            .nat64_get_address_mapping_iterator()
+            .map(|mapping| fidl_fuchsia_lowpan_experimental::Nat64Mapping {
+                mapping_id: Some(mapping.get_mapping_id()),
+                ip4_addr: Some(mapping.get_ipv4_addr().octets().into()),
+                ip6_addr: Some(mapping.get_ipv6_addr().octets().into()),
+                remaining_time_ms: Some(mapping.get_remaining_time_ms()),
+                counters: Some((&mapping.get_protocol_counters()).into_ext()),
+                ..Default::default()
+            })
+            .collect::<Vec<_>>();
+
+        let nat64_error_counter = ot.nat64_get_error_counters();
+        let nat64_error_counter_4_to_6 = nat64_error_counter.get_counter_4_to_6();
+        let nat64_error_counter_6_to_4 = nat64_error_counter.get_counter_6_to_4();
+
+        let nat64_info = fidl_fuchsia_lowpan_experimental::Nat64Info {
+            nat64_state: Some(fidl_fuchsia_lowpan_experimental::BorderRoutingNat64State {
+                prefix_manager_state: Some((&ot.nat64_get_prefix_manager_state()).into_ext()),
+                translator_state: Some((&ot.nat64_get_translator_state()).into_ext()),
+                ..Default::default()
+            }),
+            nat64_mappings: Some(nat64_mappings),
+            nat64_error_counters: Some(fidl_fuchsia_lowpan_experimental::Nat64ErrorCounters {
+                unkonwn: Some(fidl_fuchsia_lowpan_experimental::Nat64PacketCounters {
+                    ipv4_to_ipv6_packets: Some(
+                        nat64_error_counter_4_to_6[otsys::OT_NAT64_DROP_REASON_UNKNOWN as usize],
+                    ),
+                    ipv6_to_ipv4_packets: Some(
+                        nat64_error_counter_6_to_4[otsys::OT_NAT64_DROP_REASON_UNKNOWN as usize],
+                    ),
+                    ..Default::default()
+                }),
+                illegal_packet: Some(fidl_fuchsia_lowpan_experimental::Nat64PacketCounters {
+                    ipv4_to_ipv6_packets: Some(
+                        nat64_error_counter_4_to_6
+                            [otsys::OT_NAT64_DROP_REASON_ILLEGAL_PACKET as usize],
+                    ),
+                    ipv6_to_ipv4_packets: Some(
+                        nat64_error_counter_6_to_4
+                            [otsys::OT_NAT64_DROP_REASON_ILLEGAL_PACKET as usize],
+                    ),
+                    ..Default::default()
+                }),
+                unsupported_protocol: Some(fidl_fuchsia_lowpan_experimental::Nat64PacketCounters {
+                    ipv4_to_ipv6_packets: Some(
+                        nat64_error_counter_4_to_6
+                            [otsys::OT_NAT64_DROP_REASON_UNSUPPORTED_PROTO as usize],
+                    ),
+                    ipv6_to_ipv4_packets: Some(
+                        nat64_error_counter_6_to_4
+                            [otsys::OT_NAT64_DROP_REASON_UNSUPPORTED_PROTO as usize],
+                    ),
+                    ..Default::default()
+                }),
+                no_mapping: Some(fidl_fuchsia_lowpan_experimental::Nat64PacketCounters {
+                    ipv4_to_ipv6_packets: Some(
+                        nat64_error_counter_4_to_6[otsys::OT_NAT64_DROP_REASON_NO_MAPPING as usize],
+                    ),
+                    ipv6_to_ipv4_packets: Some(
+                        nat64_error_counter_6_to_4[otsys::OT_NAT64_DROP_REASON_NO_MAPPING as usize],
+                    ),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
         Ok(Telemetry {
             rssi: Some(ot.get_rssi()),
             partition_id: Some(ot.get_partition_id()),
@@ -978,6 +1048,7 @@ where
             leader_data: Some((&ot.get_leader_data().ok().unwrap_or_default()).into_ext()),
             uptime: Some(ot.get_uptime().into_nanos()),
             trel_counters: Some(ot.trel_get_counters().into_ext()),
+            nat64_info: Some(nat64_info),
             ..Default::default()
         })
     }

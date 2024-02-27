@@ -88,3 +88,127 @@ impl Ip4Cidr {
         self.0.mLength
     }
 }
+
+#[derive(Default, Clone, Copy)]
+#[repr(transparent)]
+/// NAT64 Address Mapping, which is part of NAT64 telemetry
+pub struct Nat64AddressMapping(pub otNat64AddressMapping);
+
+impl_ot_castable!(Nat64AddressMapping, otNat64AddressMapping);
+
+impl Nat64AddressMapping {
+    /// Get NAT64 mapping ID
+    pub fn get_mapping_id(&self) -> u64 {
+        self.0.mId
+    }
+
+    /// Get IPv4 address
+    pub fn get_ipv4_addr(&self) -> std::net::Ipv4Addr {
+        unsafe { self.0.mIp4.mFields.m8.into() }
+    }
+
+    /// Get IPv6 address
+    pub fn get_ipv6_addr(&self) -> std::net::Ipv6Addr {
+        unsafe { self.0.mIp6.mFields.m8.into() }
+    }
+
+    /// Get the remaining time in ms
+    pub fn get_remaining_time_ms(&self) -> u32 {
+        self.0.mRemainingTimeMs
+    }
+
+    /// Get the protocol counters for this mapping
+    pub fn get_protocol_counters(&self) -> Nat64ProtocolCounters {
+        self.0.mCounters.into()
+    }
+}
+
+impl Debug for Nat64AddressMapping {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "mapping_id:{:?},ip4_addr:{:?},ip6_addr:{:?},remaining_time:{:?}",
+            self.get_mapping_id(),
+            self.get_ipv4_addr(),
+            self.get_ipv6_addr(),
+            self.get_remaining_time_ms()
+        )
+    }
+}
+
+#[derive(Default, Clone, Copy, Debug)]
+#[repr(transparent)]
+/// Counters for sum of all protocols for NAT64
+pub struct Nat64ProtocolCounters(pub otNat64ProtocolCounters);
+
+impl_ot_castable!(Nat64ProtocolCounters, otNat64ProtocolCounters);
+
+impl Nat64ProtocolCounters {
+    /// Get total counters
+    pub fn get_total_counters(&self) -> Nat64Counters {
+        self.0.mTotal.into()
+    }
+
+    /// Get ICMP counters
+    pub fn get_icmp_counters(&self) -> Nat64Counters {
+        self.0.mIcmp.into()
+    }
+
+    /// Get UDP counters
+    pub fn get_udp_counters(&self) -> Nat64Counters {
+        self.0.mUdp.into()
+    }
+
+    /// Get TCP counters
+    pub fn get_tcp_counters(&self) -> Nat64Counters {
+        self.0.mTcp.into()
+    }
+}
+
+#[derive(Default, Clone, Copy, Debug)]
+#[repr(transparent)]
+/// Represents the counters for NAT64
+pub struct Nat64Counters(pub otNat64Counters);
+
+impl_ot_castable!(Nat64Counters, otNat64Counters);
+
+impl Nat64Counters {
+    /// Get IPv4 to IPv6 packets
+    pub fn get_4_to_6_packets(&self) -> u64 {
+        self.0.m4To6Packets
+    }
+
+    /// Get IPv4 to IPv6 bytes
+    pub fn get_4_to_6_bytes(&self) -> u64 {
+        self.0.m4To6Bytes
+    }
+
+    /// Get IPv6 to IPv4 packets
+    pub fn get_6_to_4_packets(&self) -> u64 {
+        self.0.m6To4Packets
+    }
+
+    /// Get IPv6 to IPv4 bytes
+    pub fn get_6_to_4_bytes(&self) -> u64 {
+        self.0.m6To4Bytes
+    }
+}
+
+#[derive(Default, Clone, Copy, Debug)]
+#[repr(transparent)]
+/// Represents the error counters for NAT64
+pub struct Nat64ErrorCounters(pub otNat64ErrorCounters);
+
+impl_ot_castable!(Nat64ErrorCounters, otNat64ErrorCounters);
+
+impl Nat64ErrorCounters {
+    /// Get IPv4 to IPv6 counters
+    pub fn get_counter_4_to_6(&self) -> [u64; 4usize] {
+        self.0.mCount4To6
+    }
+
+    /// Get IPv6 to IPv4 counters
+    pub fn get_counter_6_to_4(&self) -> [u64; 4usize] {
+        self.0.mCount6To4
+    }
+}

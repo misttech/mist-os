@@ -4,6 +4,27 @@
 
 use crate::prelude_internal::*;
 
+#[allow(missing_debug_implementations)]
+/// NAT64 Address Mapping iterator
+pub struct Nat64AddressMappingIterator<'a, T: ?Sized> {
+    /// NAT64 mapping iter
+    pub ot_nat64_address_mapping_iter: otNat64AddressMappingIterator,
+
+    /// OpenThread instance
+    pub ot_instance: &'a T,
+}
+
+impl<'a, T: ?Sized + Nat64> Iterator for Nat64AddressMappingIterator<'a, T> {
+    type Item = Nat64AddressMapping;
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut mapping = Nat64AddressMapping::default();
+        self.ot_instance
+            .nat64_get_next_address_mapping(&mut self.ot_nat64_address_mapping_iter, &mut mapping)
+            .ok()
+            .map(|()| mapping)
+    }
+}
+
 /// Methods from the [OpenThread "NAT64" Module](https://openthread.io/reference/group/api-nat64).
 pub trait Nat64 {
     /// Enable or disable NAT64 functions.
@@ -33,8 +54,31 @@ pub trait Nat64 {
         ip6_prefix: openthread_sys::otIp6Prefix,
     );
 
-    /// Check the NAT64 translator staste in OpenThread
+    /// Get the NAT64 address mapping iterator instance
+    fn nat64_get_address_mapping_iterator(&self) -> Nat64AddressMappingIterator<'_, Self> {
+        let mut iter = otNat64AddressMappingIterator::default();
+        self.nat64_init_address_mapping_iterator(&mut iter);
+        Nat64AddressMappingIterator { ot_nat64_address_mapping_iter: iter, ot_instance: self }
+    }
+
+    ///  Init the NAT64 address mapping iterator
+    fn nat64_init_address_mapping_iterator(&self, iter: &mut otNat64AddressMappingIterator);
+
+    /// Get next NAT64 address mapping
+    fn nat64_get_next_address_mapping(
+        &self,
+        iter: &mut otNat64AddressMappingIterator,
+        mapping: &mut Nat64AddressMapping,
+    ) -> Result;
+
+    /// Get NAT64 translator state
     fn nat64_get_translator_state(&self) -> Nat64State;
+
+    /// Get NAT64 prefix manager state
+    fn nat64_get_prefix_manager_state(&self) -> Nat64State;
+
+    /// Get NAT64 error counters
+    fn nat64_get_error_counters(&self) -> Nat64ErrorCounters;
 }
 
 impl<T: Nat64 + ot::Boxable> Nat64 for ot::Box<T> {
@@ -66,8 +110,24 @@ impl<T: Nat64 + ot::Boxable> Nat64 for ot::Box<T> {
     ) {
         self.as_ref().nat64_infra_if_prefix_discover_done(infra_if_idx, ip6_prefix);
     }
+    fn nat64_init_address_mapping_iterator(&self, iter: &mut otNat64AddressMappingIterator) {
+        self.as_ref().nat64_init_address_mapping_iterator(iter)
+    }
+    fn nat64_get_next_address_mapping(
+        &self,
+        iter: &mut otNat64AddressMappingIterator,
+        mapping: &mut Nat64AddressMapping,
+    ) -> Result {
+        self.as_ref().nat64_get_next_address_mapping(iter, mapping)
+    }
     fn nat64_get_translator_state(&self) -> Nat64State {
         self.as_ref().nat64_get_translator_state()
+    }
+    fn nat64_get_prefix_manager_state(&self) -> Nat64State {
+        self.as_ref().nat64_get_prefix_manager_state()
+    }
+    fn nat64_get_error_counters(&self) -> Nat64ErrorCounters {
+        self.as_ref().nat64_get_error_counters()
     }
 }
 
@@ -164,7 +224,39 @@ impl Nat64 for Instance {
         }
     }
 
+    fn nat64_init_address_mapping_iterator(&self, iter: &mut otNat64AddressMappingIterator) {
+        unsafe {
+            otNat64InitAddressMappingIterator(self.as_ot_ptr(), iter);
+        }
+    }
+
+    fn nat64_get_next_address_mapping(
+        &self,
+        iter: &mut otNat64AddressMappingIterator,
+        mapping: &mut Nat64AddressMapping,
+    ) -> Result {
+        Error::from(unsafe {
+            otNat64GetNextAddressMapping(self.as_ot_ptr(), iter, mapping.as_ot_mut_ptr())
+        })
+        .into()
+    }
+
     fn nat64_get_translator_state(&self) -> Nat64State {
         unsafe { otNat64GetTranslatorState(self.as_ot_ptr()).into() }
+    }
+
+    fn nat64_get_prefix_manager_state(&self) -> Nat64State {
+        unsafe { otNat64GetPrefixManagerState(self.as_ot_ptr()).into() }
+    }
+
+    fn nat64_get_error_counters(&self) -> Nat64ErrorCounters {
+        unsafe {
+            let mut error_counters: otNat64ErrorCounters = Default::default();
+            otNat64GetErrorCounters(
+                self.as_ot_ptr(),
+                (&mut error_counters) as *mut otNat64ErrorCounters,
+            );
+            error_counters.into()
+        }
     }
 }
