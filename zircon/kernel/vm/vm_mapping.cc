@@ -549,7 +549,7 @@ void VmMapping::AspaceDebugUnpinLockedObject(uint64_t offset, uint64_t len) cons
 }
 
 namespace {
-
+template <size_t NumPages>
 class VmMappingCoalescer {
  public:
   VmMappingCoalescer(VmMapping* mapping, vaddr_t base, uint mmu_flags,
@@ -588,15 +588,17 @@ class VmMappingCoalescer {
 
   VmMapping* mapping_;
   vaddr_t base_;
-  paddr_t phys_[16];
+  paddr_t phys_[NumPages];
   size_t count_;
   bool aborted_;
   const uint mmu_flags_;
   const ArchVmAspace::ExistingEntryAction existing_entry_action_;
 };
 
-VmMappingCoalescer::VmMappingCoalescer(VmMapping* mapping, vaddr_t base, uint mmu_flags,
-                                       ArchVmAspace::ExistingEntryAction existing_entry_action)
+template <size_t NumPages>
+VmMappingCoalescer<NumPages>::VmMappingCoalescer(
+    VmMapping* mapping, vaddr_t base, uint mmu_flags,
+    ArchVmAspace::ExistingEntryAction existing_entry_action)
     : mapping_(mapping),
       base_(base),
       count_(0),
@@ -604,12 +606,14 @@ VmMappingCoalescer::VmMappingCoalescer(VmMapping* mapping, vaddr_t base, uint mm
       mmu_flags_(mmu_flags),
       existing_entry_action_(existing_entry_action) {}
 
-VmMappingCoalescer::~VmMappingCoalescer() {
+template <size_t NumPages>
+VmMappingCoalescer<NumPages>::~VmMappingCoalescer() {
   // Make sure we've flushed or aborted
   DEBUG_ASSERT(count_ == 0 || aborted_);
 }
 
-zx_status_t VmMappingCoalescer::Flush() {
+template <size_t NumPages>
+zx_status_t VmMappingCoalescer<NumPages>::Flush() {
   AssertHeld(mapping_->lock_ref());
 
   if (count_ == 0) {
@@ -702,9 +706,10 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
         // pass in.
         __UNINITIALIZED LazyPageRequest page_request;
 
-        VmMappingCoalescer coalescer(this, base, mmu_flags,
-                                     ignore_existing ? ArchVmAspace::ExistingEntryAction::Skip
-                                                     : ArchVmAspace::ExistingEntryAction::Error);
+        VmMappingCoalescer<16> coalescer(this, base, mmu_flags,
+                                         ignore_existing
+                                             ? ArchVmAspace::ExistingEntryAction::Skip
+                                             : ArchVmAspace::ExistingEntryAction::Error);
         const uint64_t vmo_offset = object_offset_locked() + (base - base_);
         if (likely(object_->is_paged())) {
           VmObjectPaged* object = static_cast<VmObjectPaged*>(object_.get());
