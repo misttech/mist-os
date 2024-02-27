@@ -550,6 +550,15 @@
             ],
         },
         {
+            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
+            from: "#system-activity-governor",
+            to: [
+                "#boot-drivers",
+                "#full-pkg-drivers",
+                "#pkg-drivers",
+            ],
+        },
+        {
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.kernel.DebugResource",
