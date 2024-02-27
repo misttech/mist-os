@@ -300,10 +300,24 @@ pub fn sys_getcpu(
     cpu_out: UserRef<u32>,
     node_out: UserRef<u32>,
 ) -> Result<(), Errno> {
-    track_stub!(TODO("https://fxbug.dev/297305396"), "real getcpu implementation");
-    let fake_cpu_and_node = 0;
-    current_task.write_object(cpu_out, &fake_cpu_and_node)?;
-    current_task.write_object(node_out, &fake_cpu_and_node)?;
+    // "When either cpu or node is NULL nothing is written to the respective pointer."
+    // from https://man7.org/linux/man-pages/man2/getcpu.2.html
+    if !cpu_out.is_null() {
+        let thread_stats = current_task
+            .thread
+            .read()
+            .as_ref()
+            .expect("current thread is never None when executing")
+            .get_stats()
+            .map_err(|e| errno!(EINVAL, format!("getting thread stats failed {e:?}")))?;
+        current_task.write_object(cpu_out, &thread_stats.last_scheduled_cpu)?;
+    }
+    if !node_out.is_null() {
+        // Zircon does not yet have a concept of NUMA task scheduling, always tell userspace that
+        // it's on the "first" node which should be true for non-NUMA systems.
+        track_stub!(TODO("https://fxbug.dev/325643815"), "getcpu() numa node");
+        current_task.write_object(node_out, &0)?;
+    }
     Ok(())
 }
 

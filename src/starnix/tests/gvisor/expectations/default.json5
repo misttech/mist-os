@@ -213,7 +213,6 @@
 
                 // getcpu_host_test and getcpu_test
                 "GetcpuTest.IsValidCpu",
-                "GetcpuTest.IsValidCpuStress",
 
                 // getdents_test
                 // Assumes structure of root directory.
