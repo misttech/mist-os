@@ -5,6 +5,7 @@
 use {
     crate::{SendResultExt, TryUnpack},
     anyhow::format_err,
+    fidl_fuchsia_wlan_softmac as fidl_softmac,
     itertools::Itertools,
 };
 
@@ -67,5 +68,15 @@ pub trait ResponderExt {
         Self: ResponderExt<Response = ()> + Sized,
     {
         self.unpack_fields_or_else_send(fields, || ())
+    }
+}
+
+impl ResponderExt for fidl_softmac::WlanSoftmacIfcBridgeNotifyScanCompleteResponder {
+    type Response = ();
+    const REQUEST_NAME: &'static str =
+        stringify!(fidl_softmac::WlanSoftmacIfcBaseNotifyScanCompleteRequest);
+
+    fn send(self, _: Self::Response) -> Result<(), fidl::Error> {
+        Self::send(self)
     }
 }

@@ -16,6 +16,8 @@
 
 #include <mutex>
 
+#include <wlan/drivers/log.h>
+
 #include "convert.h"
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
@@ -38,15 +40,14 @@ zx::result<std::unique_ptr<SoftmacIfcBridge>> SoftmacIfcBridge::New(
   softmac_ifc_bridge->wlan_softmac_ifc_protocol_ops_ = {
       .recv = rust_softmac_ifc->ops->recv,
       .report_tx_result = rust_softmac_ifc->ops->report_tx_result,
-      .notify_scan_complete = rust_softmac_ifc->ops->scan_complete,
   };
   softmac_ifc_bridge->wlan_softmac_ifc_protocol_.ops =
       &softmac_ifc_bridge->wlan_softmac_ifc_protocol_ops_;
 
-  // The Banjo binding generates a `void*`. We use `const_cast` here to allow assignment but assert
-  // the const-correctness in the Rust portion of this driver. In particular, this `ctx` is actually
-  // a `*const DriverEventSink` in Rust. And all methods implementing the functions pointers
-  // contained in `ops` immediately cast the `&mut DriveEventSink` passed to them to a
+  // The Banjo binding generates a `void*`. We use `const_cast` here to allow assignment but
+  // assert the const-correctness in the Rust portion of this driver. In particular, this `ctx` is
+  // actually a `*const DriverEventSink` in Rust. And all methods implementing the functions
+  // pointers contained in `ops` immediately cast the `&mut DriveEventSink` passed to them to a
   // `&DriverEventSink`.
   softmac_ifc_bridge->wlan_softmac_ifc_protocol_.ctx = const_cast<void*>(rust_softmac_ifc->ctx);
 
@@ -138,19 +139,15 @@ void SoftmacIfcBridge::ReportTxResult(ReportTxResultRequestView request, fdf::Ar
 
   completer.buffer(arena).Reply();
 }
-void SoftmacIfcBridge::NotifyScanComplete(NotifyScanCompleteRequestView request, fdf::Arena& arena,
+void SoftmacIfcBridge::NotifyScanComplete(NotifyScanCompleteRequestView request,
+                                          fdf::Arena& fdf_arena,
                                           NotifyScanCompleteCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  {
-    std::lock_guard<std::mutex> lock(*unbind_lock_);
-    if (*unbind_called_) {
-      return;
-    }
+  auto result = softmac_ifc_bridge_client_->sync()->NotifyScanComplete(*request);
+  if (!result.ok()) {
+    lerror("NotifyScanComplete failed (FIDL error %s)", result.status_string());
   }
-
-  wlan_softmac_ifc_protocol_.ops->notify_scan_complete(wlan_softmac_ifc_protocol_.ctx,
-                                                       request->status(), request->scan_id());
-  completer.buffer(arena).Reply();
+  completer.buffer(fdf_arena).Reply();
 }
 
 }  // namespace wlan::drivers::wlansoftmac

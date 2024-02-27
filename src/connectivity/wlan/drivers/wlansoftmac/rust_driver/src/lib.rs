@@ -21,6 +21,7 @@ use {
     },
     std::pin::Pin,
     tracing::{error, info, warn},
+    wlan_fidl_ext::{ResponderExt, SendResultExt, WithName},
     wlan_mlme::{
         buffer::CBufferProvider,
         device::{
@@ -547,11 +548,11 @@ async fn bootstrap_generic_sme<D: DeviceOps>(
 }
 
 async fn serve_wlan_softmac_ifc_bridge(
-    _driver_event_sink: DriverEventSink,
+    driver_event_sink: DriverEventSink,
     mut softmac_ifc_bridge_request_stream: fidl_softmac::WlanSoftmacIfcBridgeRequestStream,
 ) -> Result<(), anyhow::Error> {
     loop {
-        let _request = match softmac_ifc_bridge_request_stream.next().await {
+        let request = match softmac_ifc_bridge_request_stream.next().await {
             Some(Ok(request)) => request,
             Some(Err(e)) => {
                 return Err(format_err!("WlanSoftmacIfcBridge server stream failed: {}", e));
@@ -561,6 +562,24 @@ async fn serve_wlan_softmac_ifc_bridge(
                 return Ok(());
             }
         };
+        match request {
+            fidl_softmac::WlanSoftmacIfcBridgeRequest::NotifyScanComplete {
+                payload,
+                responder,
+            } => {
+                let ((status, scan_id), responder) = responder.unpack_fields_or_respond((
+                    payload.status.with_name("status"),
+                    payload.scan_id.with_name("scan_id"),
+                ))?;
+                let status = zx::Status::from_raw(status);
+                let responder = driver_event_sink.unbounded_send_or_respond(
+                    DriverEvent::ScanComplete { status, scan_id },
+                    responder,
+                    (),
+                )?;
+                responder.send().format_send_err_with_context("NotifyScanComplete")?;
+            }
+        }
     }
 }
 
@@ -926,6 +945,67 @@ mod tests {
 
         drop(softmac_ifc_bridge_client);
         assert_variant!(exec.run_until_stalled(&mut server_fut), Poll::Ready(Ok(())));
+    }
+
+    #[test_case(fidl_softmac::WlanSoftmacIfcBaseNotifyScanCompleteRequest {
+                status: None,
+                scan_id: Some(754),
+                ..Default::default()
+    })]
+    #[test_case(fidl_softmac::WlanSoftmacIfcBaseNotifyScanCompleteRequest {
+                status: Some(zx::Status::OK.into_raw()),
+                scan_id: None,
+                ..Default::default()
+            })]
+    fn serve_wlansoftmac_ifc_bridge_exits_on_invalid_notify_scan_complete_request(
+        request: fidl_softmac::WlanSoftmacIfcBaseNotifyScanCompleteRequest,
+    ) {
+        let mut exec = TestExecutor::new();
+        let (driver_event_sink, mut driver_event_stream) = DriverEventSink::new();
+        let (softmac_ifc_bridge_proxy, softmac_ifc_bridge_server) =
+            fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>().unwrap();
+        let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream().unwrap();
+
+        let server_fut =
+            serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);
+        pin_mut!(server_fut);
+
+        let resp_fut = softmac_ifc_bridge_proxy.notify_scan_complete(&request);
+        pin_mut!(resp_fut);
+        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut server_fut), Poll::Ready(Err(_)));
+        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Ready(Ok(())));
+        assert!(matches!(driver_event_stream.try_next(), Ok(None)));
+    }
+
+    #[test]
+    fn serve_wlansoftmac_ifc_bridge_enqueues_notify_scan_complete() {
+        let mut exec = TestExecutor::new();
+        let (driver_event_sink, mut driver_event_stream) = DriverEventSink::new();
+        let (softmac_ifc_bridge_proxy, softmac_ifc_bridge_server) =
+            fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>().unwrap();
+        let softmac_ifc_bridge_request_stream = softmac_ifc_bridge_server.into_stream().unwrap();
+
+        let server_fut =
+            serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);
+        pin_mut!(server_fut);
+
+        let resp_fut = softmac_ifc_bridge_proxy.notify_scan_complete(
+            &fidl_softmac::WlanSoftmacIfcBaseNotifyScanCompleteRequest {
+                status: Some(zx::Status::OK.into_raw()),
+                scan_id: Some(754),
+                ..Default::default()
+            },
+        );
+        pin_mut!(resp_fut);
+        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut server_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Ready(Ok(())));
+
+        assert!(matches!(
+            driver_event_stream.try_next(),
+            Ok(Some(DriverEvent::ScanComplete { status: zx::Status::OK, scan_id: 754 }))
+        ));
     }
 
     struct ServeTestHarness {
@@ -1337,6 +1417,69 @@ mod tests {
         // All SME proxies should shutdown.
         assert!(generic_sme_proxy.is_closed());
         assert!(sme_telemetry_proxy.is_closed());
+        assert!(client_sme_proxy.is_closed());
+    }
+
+    // Mocking a passive scan verifies the path through SME, MLME, and the FFI is functional. Other paths
+    // are much more complex to mock and sufficiently covered by other testing. For example, queueing an
+    // Ethernet frame requires mocking an association first, and the outcome of a reported Tx result cannot
+    // be confirmed because the Minstrel is internal to MLME.
+    #[test]
+    fn start_and_serve_responds_to_passive_scan_request() {
+        let mut exec = TestExecutor::new();
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let StartAndServeTestHarness {
+            mut start_and_serve_fut,
+            mut softmac_handle_receiver,
+            generic_sme_proxy,
+        } = start_and_serve_with_device(&mut exec, fake_device)
+            .expect("Failed to initiate wlansoftmac setup.");
+        let handle = assert_variant!(exec.run_until_stalled(&mut softmac_handle_receiver), Poll::Ready(Ok(Ok(handle))) => handle);
+
+        let (client_sme_proxy, client_sme_server) =
+            fidl::endpoints::create_proxy().expect("Failed to create_proxy");
+
+        let resp_fut = generic_sme_proxy.get_client_sme(client_sme_server);
+        pin_mut!(resp_fut);
+        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
+        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
+        assert!(matches!(exec.run_until_stalled(&mut resp_fut), Poll::Ready(Ok(Ok(())))));
+
+        let scan_response_fut =
+            client_sme_proxy.scan(&fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {}));
+        pin_mut!(scan_response_fut);
+        assert!(matches!(exec.run_until_stalled(&mut scan_response_fut), Poll::Pending));
+
+        assert!(fake_device_state.lock().captured_passive_scan_request.is_none());
+        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
+        assert!(fake_device_state.lock().captured_passive_scan_request.is_some());
+
+        let wlan_softmac_ifc_bridge_proxy =
+            fake_device_state.lock().wlan_softmac_ifc_bridge_proxy.take().unwrap();
+        let notify_scan_complete_fut = wlan_softmac_ifc_bridge_proxy.notify_scan_complete(
+            &fidl_softmac::WlanSoftmacIfcBaseNotifyScanCompleteRequest {
+                status: Some(zx::Status::OK.into_raw()),
+                scan_id: Some(0),
+                ..Default::default()
+            },
+        );
+        assert!(matches!(exec.run_singlethreaded(notify_scan_complete_fut), Ok(())));
+        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
+        assert!(matches!(exec.run_until_stalled(&mut scan_response_fut), Poll::Ready(Ok(_))));
+
+        let (shutdown_sender, shutdown_receiver) = oneshot::channel::<()>();
+        handle.stop(StopCompleter::new(Box::new(move || {
+            shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
+        })));
+        assert_variant!(
+            exec.run_singlethreaded(async {
+                futures::join!(start_and_serve_fut, shutdown_receiver)
+            }),
+            (Ok(()), Ok(()))
+        );
+
+        // All SME proxies should shutdown.
+        assert!(generic_sme_proxy.is_closed());
         assert!(client_sme_proxy.is_closed());
     }
 }

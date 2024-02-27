@@ -169,7 +169,7 @@ void WlantapPhy::ScanComplete(ScanCompleteRequestView request,
   auto arena = fdf::Arena::Create(0, 0);
   fidl::Arena fidl_arena;
 
-  using Request = fuchsia_wlan_softmac::wire::WlanSoftmacIfcNotifyScanCompleteRequest;
+  using Request = fuchsia_wlan_softmac::wire::WlanSoftmacIfcBaseNotifyScanCompleteRequest;
   auto scan_complete_req =
       Request::Builder(fidl_arena).scan_id(request->scan_id).status(request->status).Build();
 

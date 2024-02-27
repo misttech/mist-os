@@ -688,7 +688,6 @@ pub struct CWlanSoftmacIfcProtocolOps {
     complete_tx: extern "C" fn(ctx: &mut DriverEventSink, packet: &WlanTxPacket, status: i32),
     report_tx_result:
         extern "C" fn(ctx: &mut DriverEventSink, tx_result: &banjo_common::WlanTxResult),
-    scan_complete: extern "C" fn(ctx: &mut DriverEventSink, status: i32, scan_id: u64),
 }
 
 #[no_mangle]
@@ -723,23 +722,13 @@ extern "C" fn handle_report_tx_result(
 ) {
     // Cast to non-mutable reference since the referenced points to a pinned `DriverEventSink`.
     let ctx = ctx as &DriverEventSink;
-    let _ = ctx.unbounded_send(crate::DriverEvent::TxResultReport { tx_result: *tx_result_in });
-}
-#[no_mangle]
-extern "C" fn handle_scan_complete(ctx: &mut DriverEventSink, status: i32, scan_id: u64) {
-    // Cast to non-mutable reference since the referenced points to a pinned `DriverEventSink`.
-    let ctx = ctx as &DriverEventSink;
-    let _ = ctx.unbounded_send(crate::DriverEvent::ScanComplete {
-        status: zx::Status::from_raw(status),
-        scan_id,
-    });
+    let _ = ctx.unbounded_send(DriverEvent::TxResultReport { tx_result: *tx_result_in });
 }
 
 const PROTOCOL_OPS: CWlanSoftmacIfcProtocolOps = CWlanSoftmacIfcProtocolOps {
     recv: handle_recv,
     complete_tx: handle_complete_tx,
     report_tx_result: handle_report_tx_result,
-    scan_complete: handle_scan_complete,
 };
 
 struct WlanSoftmacIfcProtocol {
@@ -1183,8 +1172,7 @@ pub mod test_utils {
         pub minstrel: Option<crate::MinstrelWrapper>,
         pub eth_queue: Vec<Vec<u8>>,
         pub wlan_queue: Vec<(Vec<u8>, u32)>,
-        pub wlan_softmac_ifc_bridge_proxy:
-            Option<fidl_softmac::WlanSoftmacIfcBridgeSynchronousProxy>,
+        pub wlan_softmac_ifc_bridge_proxy: Option<fidl_softmac::WlanSoftmacIfcBridgeProxy>,
         pub mlme_event_stream: Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>>,
         pub mlme_request_sink: mpsc::UnboundedSender<wlan_sme::MlmeRequest>,
         pub mlme_request_stream: Option<mpsc::UnboundedReceiver<wlan_sme::MlmeRequest>>,
@@ -1292,9 +1280,11 @@ pub mod test_utils {
             }
 
             state.wlan_softmac_ifc_bridge_proxy =
-                Some(fidl_softmac::WlanSoftmacIfcBridgeSynchronousProxy::new(fidl::Channel::from(
-                    unsafe { fidl::Handle::from_raw(wlan_softmac_ifc_bridge_client_handle) },
-                )));
+                Some(fidl_softmac::WlanSoftmacIfcBridgeProxy::new(
+                    fidl::AsyncChannel::from_channel(fidl::Channel::from(unsafe {
+                        fidl::Handle::from_raw(wlan_softmac_ifc_bridge_client_handle)
+                    })),
+                ));
             let usme_bootstrap_server_end_handle =
                 state.usme_bootstrap_server_end.take().unwrap().into_channel().into_handle();
             // TODO(https://fxbug.dev/42121991): Capture _ifc and provide a testing surface.

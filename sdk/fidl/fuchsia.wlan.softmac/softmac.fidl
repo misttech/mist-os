@@ -294,9 +294,45 @@ type WlanTxPacket = struct {
     info WlanTxInfo;
 };
 
+/// Protocol containing methods common to both `WlanSoftmacIfc` and `WlanSoftmacIfcBridge`.
+///
+/// The `WlanSoftmacIfc` and `WlanSoftmacIfcBridge` protocols have common methods, as the latter
+/// generally transforms `WlanSoftmacIfc` requests received in the C++ portion of the wlansoftmac driver
+/// to `WlanSoftmacIfcBridge` requests in the Rust portion of the wlansoftmac driver. Composing this
+/// protocol into `WlanSoftmacIfc` and `WlanSoftmacIfcBridge` minimizes the duplication of method
+/// definitions (and associated request conversions that would be caused by such duplication).
+/// This level of indirection enables flexibility to use different methods definitions in the transport
+/// between the Rust and C++ portions.
+///
+/// **This protocol is not implemented directly by any component.** It is composed into `WlanSoftmacIfc`
+/// and `WlanSoftmacIfcBridge`.
 @available(added=HEAD)
-closed protocol WlanSoftmacIfcBase {};
+closed protocol WlanSoftmacIfcBase {
+    /// Reports completion of a scan associated with the unique `scan_id`. `status`
+    /// indicates whether the scan completed successfully, failed due to an error,
+    /// or was cancelled.
+    ///
+    /// Return status indicates the reason for scan completion:
+    ///   ZX_OK: All channels were scanned successfully.
+    ///   ZX_ERR_CANCELLED: The scan was terminated by a user request, either an
+    ///       explicit WlanSoftmac.CancelScan() or the initiation of an
+    ///       incompatible request (e.g. connect).
+    ///   ZX_ERR_OUT_OF_RANGE: The scan request included a prohibited channel.
+    ///       This may be due to the current country setting.
+    @available(added=HEAD)
+    @selector("fuchsia.wlan.softmac/WlanSoftmacIfc.NotifyScanComplete")
+    strict NotifyScanComplete(table {
+        1: status zx.Status;
+        2: scan_id uint64;
+    }) -> ();
+};
 
+/// Protocol that transports `WlanSoftmacIfc` requests from the C++ portion of the wlansoftmac driver to
+/// the Rust portion of the wlansoftmac driver.
+///
+/// This protocol should always be available at HEAD since it's intended to be an in-tree only protocol.
+/// This protocol only exists because wlansoftmac cannot be implemented in Rust and must interact with
+/// the wlansoftmac-c, wlansoftmac-rust, and wlan-mlme crates.
 @available(added=HEAD)
 closed protocol WlanSoftmacIfcBridge {
     compose WlanSoftmacIfcBase;
@@ -307,9 +343,6 @@ closed protocol WlanSoftmacIfcBridge {
 @banjo_layout("ddk-interface")
 @available(added=15)
 closed protocol WlanSoftmacIfc {
-    @available(added=HEAD)
-    compose WlanSoftmacIfcBase;
-
     /// Forward up a packet received over the wireless medium.
     strict Recv(struct {
         packet WlanRxPacket;
@@ -323,6 +356,11 @@ closed protocol WlanSoftmacIfc {
         tx_result fuchsia.wlan.common.WlanTxResult;
     }) -> ();
 
+    @available(added=HEAD)
+    compose WlanSoftmacIfcBase;
+
+    // At API level HEAD, WlanSoftmacIfc composes all the methods below this line from WlanSoftmacBase.
+
     /// Reports completion of a scan associated with the unique `scan_id`. `status`
     /// indicates whether the scan completed successfully, failed due to an error,
     /// or was cancelled.
@@ -334,6 +372,7 @@ closed protocol WlanSoftmacIfc {
     ///       incompatible request (e.g. connect).
     ///   ZX_ERR_OUT_OF_RANGE: The scan request included a prohibited channel.
     ///       This may be due to the current country setting.
+    @available(added=15, removed=HEAD)
     strict NotifyScanComplete(table {
         1: status zx.Status;
         2: scan_id uint64;
