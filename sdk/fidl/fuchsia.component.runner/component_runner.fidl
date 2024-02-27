@@ -5,6 +5,7 @@
 library fuchsia.component.runner;
 
 using fuchsia.component;
+using fuchsia.component.sandbox;
 using fuchsia.data;
 using fuchsia.diagnostics.types;
 using fuchsia.io;
@@ -135,6 +136,11 @@ type ComponentStartInfo = resource table {
     /// The token is invalidated when the component instance is destroyed.
     @available(added=HEAD)
     9: component_instance zx.Handle:EVENT;
+
+    /// A dictionary containing data and handles that the component has escrowed
+    /// during its previous execution via [`ComponentController.OnEscrow`].
+    @available(added=HEAD)
+   10: escrowed_dictionary client_end:fuchsia.component.sandbox.Dictionary;
 };
 
 /// A protocol for binding and controlling the lifetime of a component instance
@@ -166,6 +172,10 @@ type ComponentStartInfo = resource table {
 /// Component manager first waits for the ComponentController to close, and
 /// then tears down the namespace it hosts for the stopped component. Component
 /// manager may call `Kill()` without first having called `Stop()`.
+///
+/// Before stopping, a component can optionally use `OnEscrow` to store some
+/// state in the framework, to receive those state again the next time it is
+/// started.
 ///
 /// EPITAPH
 ///
@@ -220,5 +230,40 @@ closed protocol ComponentController {
     /// to clients.
     strict -> OnPublishDiagnostics(resource struct {
         payload fuchsia.diagnostics.types.ComponentDiagnostics;
+    });
+
+    /// Store some of the component's state in the framework, to be redelivered
+    /// to the component the next time it's started (a practice called
+    /// "escrowing").
+    ///
+    /// When the framework receives this event, it will wait until the current
+    /// execution of the component has finished, then start the component again
+    /// when the `ZX_CHANNEL_READABLE` signal is observed on `outgoing_dir`.
+    ///
+    /// It is an error to send this event multiple times. Subsequent calls will
+    /// be discarded and an error will be logged in the component's log sink.
+    ///
+    /// Handles escrowed via `OnEscrow` are always delivered to the next
+    /// execution of the component.
+    @available(added=HEAD)
+    strict -> OnEscrow(resource table {
+        /// Escrow the outgoing directory server endpoint. Whenever the
+        /// component is started, the framework will return this channel via
+        /// [`ComponentStartInfo.outgoing_dir`].
+        1: outgoing_dir server_end:fuchsia.io.Directory;
+
+        /// Escrow some user defined state. Whenever the component is started,
+        /// the framework will return these handles via
+        /// [`ComponentStartInfo.escrowed_dictionary`].
+        ///
+        /// The framework will not wait for any signals on these objects.
+        ///
+        /// ## Example
+        ///
+        /// Let's say a component needs to escrow an event pair that represents
+        /// the result of some expensive calculation. It can create a
+        /// dictionary, put the event pair inside with an appropriate key
+        /// (e.g. `"my_event_pair"`), then check for that entry on startup.
+        2: escrowed_dictionary client_end:fuchsia.component.sandbox.Dictionary;
     });
 };

@@ -9,5 +9,9 @@ fidl("fuchsia.process.lifecycle") {
   sdk_area = "Unknown"
   api = "fuchsia.process.lifecycle.api"
   sources = [ "lifecycle.fidl" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.component.sandbox",
+    "//sdk/fidl/fuchsia.io",
+  ]
   enable_hlcpp = true
 }

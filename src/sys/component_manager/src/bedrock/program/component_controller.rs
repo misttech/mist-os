@@ -100,6 +100,10 @@ impl<'a> ComponentController {
                     } => {
                         diagnostics_sender.take().and_then(|sender| sender.send(payload).ok());
                     }
+                    fcrunner::ComponentControllerEvent::OnEscrow { .. } => {
+                        // TODO(https://fxbug.dev/319754472): Implement.
+                        tracing::warn!("Unimplemented OnStopped (https://fxbug.dev/319754472)");
+                    }
                 },
             }
         }

@@ -59,8 +59,8 @@ struct zx_proc_args {
 // Handle Info entries associate a type and optional
 // argument with each handle included in the process
 // arguments message.
-#define PA_HND(type, arg) (((type)&0xFF) | (((arg)&0xFFFF) << 16))
-#define PA_HND_TYPE(n) ((n)&0xFF)
+#define PA_HND(type, arg) (((type) & 0xFF) | (((arg) & 0xFFFF) << 16))
+#define PA_HND_TYPE(n) ((n) & 0xFF)
 #define PA_HND_ARG(n) (((n) >> 16) & 0xFFFF)
 
 // --- Core Runtime Handles ---
@@ -143,7 +143,7 @@ struct zx_proc_args {
 // A handle which will be used as a file descriptor.
 #define PA_FD 0x30u
 
-// -- Lifecyle handle --
+// -- Lifecycle handle --
 //
 // A Handle to a channel on which the process may receive lifecycle events from
 // the ELF runner by serving the |fuchsia.process.Lifecycle| protocol.
@@ -152,6 +152,18 @@ struct zx_proc_args {
 // Server endpoint for a processes' outgoing directory.
 // https://fuchsia.dev/fuchsia-src/glossary?hl=en#outgoing-directory
 #define PA_DIRECTORY_REQUEST 0x3Bu
+
+#if __Fuchsia_API_level__ >= HEAD
+// A |fuchsia.component.sandbox/Dictionary| client endpoint where the process
+// may find a dictionary that it has stowed away earlier via
+// |fuchsia.process.Lifecycle/OnEscrow|.
+//
+// TODO(https://fxbug.dev/319754472): This processarg is an experimental element
+// added as we iterate on stopping a component. It may be changed or removed.
+// Do not depend on it unless you're one of the initial customers trying to stop
+// your component.
+#define PA_ESCROWED_DICTIONARY 0x3Cu
+#endif
 
 // Used by devmgr and devhosts
 #define PA_RESOURCE 0x3Fu
