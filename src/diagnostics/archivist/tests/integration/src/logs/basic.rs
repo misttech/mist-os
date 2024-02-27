@@ -5,7 +5,7 @@
 use crate::{logs::utils::Listener, test_topology};
 use diagnostics_reader::{ArchiveReader, Logs};
 use fidl_fuchsia_archivist_test as ftest;
-use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
+use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, Severity};
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogMessage, LogProxy};
 use fuchsia_async as fasync;
 use fuchsia_component::client;
@@ -112,6 +112,9 @@ async fn listen_for_syslog_routed_stdio() {
 
     let puppet = test_topology::connect_to_puppet(&realm_proxy, "stdio-puppet").await.unwrap();
     info!("Connected to puppet");
+
+    // Ensure the component already started by waiting for its initial interest change.
+    assert_eq!(Some(Severity::Info), puppet.wait_for_interest_change().await.unwrap().severity);
 
     let msg = format!("logger_integration_rust test_klog stdout {}", rand::random::<u64>());
     puppet.println(&msg).unwrap();
