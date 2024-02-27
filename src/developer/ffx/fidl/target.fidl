@@ -365,11 +365,6 @@ closed protocol Target {
         remote_control server_end:rc.RemoteControl;
     }) -> () error TargetConnectionError;
 
-    /// Opens a Fastboot controller for a given target.
-    strict OpenFastboot(resource struct {
-        fastboot server_end:Fastboot;
-    });
-
     /// Reboots the target to the desired state.
     ///
     /// Returns:

@@ -120,9 +120,6 @@ impl TargetHandleInner {
                     }
                 }
             }
-            ffx::TargetRequest::OpenFastboot { .. } => {
-                unimplemented!();
-            }
             ffx::TargetRequest::Reboot { state, responder } => {
                 self.reboot_controller.reboot(state, responder).await
             }
