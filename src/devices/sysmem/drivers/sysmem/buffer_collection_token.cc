@@ -262,11 +262,6 @@ void BufferCollectionToken::CombinedTokenServer::ReleaseV2(ReleaseV2Completer::S
   parent_.TokenReleaseImpl(completer);
 }
 
-void BufferCollectionToken::CombinedTokenServer::CloseV2(CloseV2Completer::Sync& completer) {
-  parent_.last_seen_version_ = ConnectionVersion::kVersion2;
-  parent_.TokenReleaseImpl(completer);
-}
-
 void BufferCollectionToken::CombinedTokenServer::DeprecatedCloseV1(
     DeprecatedCloseV1Completer::Sync& completer) {
   parent_.last_seen_version_ = ConnectionVersion::kVersion1;

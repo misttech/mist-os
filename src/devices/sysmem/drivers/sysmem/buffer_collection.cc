@@ -549,10 +549,6 @@ void BufferCollection::V2::Release(ReleaseCompleter::Sync& completer) {
   parent_.ReleaseImpl(completer);
 }
 
-void BufferCollection::V2::Close(CloseCompleter::Sync& completer) {
-  parent_.ReleaseImpl(completer);
-}
-
 void BufferCollection::V1::DeprecatedClose(DeprecatedCloseCompleter::Sync& completer) {
   parent_.ReleaseImpl(completer);
 }

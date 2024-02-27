@@ -118,8 +118,6 @@ open protocol CombinedBufferCollectionToken {
     flexible SyncV2() -> ();
     @selector("fuchsia.sysmem2/Node.Release")
     flexible ReleaseV2();
-    @selector("fuchsia.sysmem2/Node.Close")
-    flexible CloseV2();
     @selector("fuchsia.sysmem2/Node.SetName")
     flexible SetNameV2(table {
         1: priority uint32;

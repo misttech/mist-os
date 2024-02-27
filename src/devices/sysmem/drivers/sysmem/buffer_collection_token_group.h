@@ -90,7 +90,6 @@ class BufferCollectionTokenGroup : public Node {
     // BufferCollectionTokenGroup)
     void Sync(SyncCompleter::Sync& completer) override;
     void Release(ReleaseCompleter::Sync& completer) override;
-    void Close(CloseCompleter::Sync& completer) override;
     void GetNodeRef(GetNodeRefCompleter::Sync& completer) override;
     void IsAlternateFor(IsAlternateForRequest& request,
                         IsAlternateForCompleter::Sync& completer) override;

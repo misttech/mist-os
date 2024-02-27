@@ -40,14 +40,6 @@ void BufferCollectionTokenGroup::V2::Release(ReleaseCompleter::Sync& completer) 
   parent_.ReleaseImpl(completer);
 }
 
-void BufferCollectionTokenGroup::V2::Close(CloseCompleter::Sync& completer) {
-  if (!parent_.ReadyForAllocation()) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "Close() before AllChildrenPresent()");
-    return;
-  }
-  parent_.ReleaseImpl(completer);
-}
-
 void BufferCollectionTokenGroup::V1::GetNodeRef(GetNodeRefCompleter::Sync& completer) {
   parent_.GetNodeRefImplV1(completer);
 }

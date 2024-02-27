@@ -131,8 +131,6 @@ open protocol Node {
     /// nested, in which case only the inner-most failure domain in which the
     /// `Node` resides fails.
     flexible Release();
-    // TODO(b/316646315): Remove Close(); replaced by Release() above.
-    flexible Close();
 
     /// Set a name for VMOs in this buffer collection.
     ///
