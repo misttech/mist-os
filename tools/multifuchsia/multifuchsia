@@ -207,6 +207,11 @@ function cmd_rebase() {
   if ! cmp --quiet "$checkout/out/default/args.gn" "$checkout.new/out/default/args.gn"; then
     cp "$checkout/out/default/args.gn" "$checkout.new/out/default/args.gn"
   fi
+
+  # Update the checkout's remotes/origin/main.
+  echo "updating remotes/origin/main"
+  git -C "$checkout.new" fetch "$WORKDIR/snapshots/update.success" "remotes/origin/main:remotes/origin/main"
+
   swap "$checkout" "$checkout.new"
   btrfs subvolume delete -c "$checkout.new"
 
