@@ -332,8 +332,34 @@ efi_status EfiGptBlockDevice::Read(void *buffer, size_t offset, size_t length) {
 efi_status EfiGptBlockDevice::Write(const void *data, size_t offset, size_t length) {
   // According to UEFI specification chapter 13.7, disk-io protocol allows unaligned access.
   // Thus we don't check block alignment.
-  return disk_io_protocol_->WriteDisk(disk_io_protocol_.get(), block_io_protocol_->Media->MediaId,
-                                      offset, length, data);
+  efi_status status = EFI_SUCCESS;
+
+  // TODO(b/327226483): remove the write breakup after DiskIO Protocol write bug is fixed.
+  constexpr size_t kGiB = 1 << 30;
+  for (size_t count = length / kGiB; count != 0; count--) {
+    status = disk_io_protocol_->WriteDisk(disk_io_protocol_.get(),
+                                          block_io_protocol_->Media->MediaId, offset, kGiB, data);
+    if (status != EFI_SUCCESS) {
+      printf("%s @ %d: %s\n", __func__, __LINE__, EfiStatusToString(status));
+      return status;
+    }
+
+    data = static_cast<const uint8_t *>(data) + kGiB;
+    offset += kGiB;
+  }
+
+  length = length % kGiB;
+  if (length) {
+    // TODO(b/327226483): this is the only necessary statement after UEFI bug is fixed.
+    status = disk_io_protocol_->WriteDisk(disk_io_protocol_.get(),
+                                          block_io_protocol_->Media->MediaId, offset, length, data);
+  }
+
+  if (status != EFI_SUCCESS) {
+    printf("%s @ %d: %s\n", __func__, __LINE__, EfiStatusToString(status));
+  }
+
+  return status;
 }
 
 bool EfiGptBlockDevice::RawRead(void *ctx, size_t block_offset, size_t blocks_count, void *dest) {
