@@ -90,7 +90,9 @@ impl EnvContext {
         let target = ffx_target::resolve_default_target(&context).await?;
         let injector = Box::new(Injection::new(
             context.clone(),
-            DaemonVersionCheck::CheckApiLevel(version_history::LATEST_VERSION.api_level),
+            DaemonVersionCheck::CheckApiLevel(
+                version_history::HISTORY.get_misleading_version_for_ffx().api_level,
+            ),
             node,
             None,
             target,

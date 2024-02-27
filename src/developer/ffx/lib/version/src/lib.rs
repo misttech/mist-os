@@ -58,7 +58,7 @@ fn build_info_impl(raw_version_info: String, raw_build_version: String) -> Versi
     let hash_opt = if raw_hash.is_empty() { None } else { Some(raw_hash) };
     let timestamp_str = split.get(1).unwrap();
     let timestamp = timestamp_str.parse::<u64>().ok();
-    let vh = version_history::LATEST_VERSION;
+    let vh = version_history::HISTORY.get_misleading_version_for_ffx();
 
     return VersionInfo {
         commit_hash: hash_opt,
@@ -78,22 +78,21 @@ mod test {
     const HASH: &str = "hashyhashhash";
     const TIMESTAMP: u64 = 12345689;
     const FAKE_BUILD_VERSION: &str = "20201118";
-    const ABI_REVISION: version_history::AbiRevision = version_history::LATEST_VERSION.abi_revision;
-    const API_LEVEL: version_history::ApiLevel = version_history::LATEST_VERSION.api_level;
 
     #[test]
     fn test_valid_string_dirty() {
         let s = format!("{}-{}", HASH, TIMESTAMP);
         let result = build_info_impl(s, FAKE_BUILD_VERSION.to_string());
 
+        let version = version_history::HISTORY.get_misleading_version_for_ffx();
         assert_eq!(
             result,
             VersionInfo {
                 commit_hash: Some(HASH.to_string()),
                 commit_timestamp: Some(TIMESTAMP),
                 build_version: Some(FAKE_BUILD_VERSION.to_string()),
-                abi_revision: Some(ABI_REVISION.as_u64()),
-                api_level: Some(API_LEVEL.as_u64()),
+                abi_revision: Some(version.abi_revision.as_u64()),
+                api_level: Some(version.api_level.as_u64()),
                 exec_path: std::env::current_exe().map(|x| x.to_string_lossy().to_string()).ok(),
                 ..Default::default()
             }
@@ -105,14 +104,15 @@ mod test {
         let s = format!("{}-{}", HASH, TIMESTAMP);
         let result = build_info_impl(s, FAKE_BUILD_VERSION.to_string());
 
+        let version = version_history::HISTORY.get_misleading_version_for_ffx();
         assert_eq!(
             result,
             VersionInfo {
                 commit_hash: Some(HASH.to_string()),
                 commit_timestamp: Some(TIMESTAMP),
                 build_version: Some(FAKE_BUILD_VERSION.to_string()),
-                abi_revision: Some(ABI_REVISION.as_u64()),
-                api_level: Some(API_LEVEL.as_u64()),
+                abi_revision: Some(version.abi_revision.as_u64()),
+                api_level: Some(version.api_level.as_u64()),
                 exec_path: std::env::current_exe().map(|x| x.to_string_lossy().to_string()).ok(),
                 ..Default::default()
             }
@@ -157,14 +157,15 @@ mod test {
     fn test_invalid_string_clean_missing_hash() {
         let result = build_info_impl(format!("-{}", TIMESTAMP), FAKE_BUILD_VERSION.to_string());
 
+        let version = version_history::HISTORY.get_misleading_version_for_ffx();
         assert_eq!(
             result,
             VersionInfo {
                 commit_hash: None,
                 commit_timestamp: Some(TIMESTAMP),
                 build_version: Some(FAKE_BUILD_VERSION.to_string()),
-                abi_revision: Some(ABI_REVISION.as_u64()),
-                api_level: Some(API_LEVEL.as_u64()),
+                abi_revision: Some(version.abi_revision.as_u64()),
+                api_level: Some(version.api_level.as_u64()),
                 exec_path: std::env::current_exe().map(|x| x.to_string_lossy().to_string()).ok(),
                 ..Default::default()
             }

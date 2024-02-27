@@ -12,7 +12,7 @@ use {
     futures::io::BufReader,
     futures::prelude::*,
     std::os::unix::io::{AsRawFd, FromRawFd},
-    version_history::{check_abi_revision, AbiRevision},
+    version_history::{AbiRevision, HISTORY},
 };
 
 const BUFFER_SIZE: usize = 65536;
@@ -78,9 +78,9 @@ async fn main() -> Result<()> {
     // Perform the compatibility checking between the caller (the daemon) and the platform (this program).
     if let Some(abi) = args.abi_revision {
         let daemon_revision = AbiRevision::from_u64(abi);
-        let platform_abi = version_history::get_latest_abi_revision();
+        let platform_abi = HISTORY.get_misleading_version_for_ffx().abi_revision;
         let status: CompatibilityState;
-        let message = match check_abi_revision(Some(daemon_revision)) {
+        let message = match HISTORY.check_abi_revision_for_runtime(daemon_revision) {
             Ok(_) => {
                 tracing::info!("Daemon is running supported revision: {daemon_revision}");
                 status = CompatibilityState::Supported;
