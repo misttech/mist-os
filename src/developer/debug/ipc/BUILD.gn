@@ -6,6 +6,18 @@
 
 import("//build/cpp/sdk_source_set.gni")
 
+if (current_os != "fuchsia") {
+  # TODO(https://fxbug.dev/308808613) Remove this along with FUCHSIA_API_LEVEL.
+  import("//build/config/fuchsia/platform_version.gni")
+  config("fuchsia_api_level_for_developer_tools") {
+    visibility = [ ":*" ]
+    defines = [
+      # Deprecated mechanism used for host tools compatibility versioning.
+      "FUCHSIA_API_LEVEL=${platform_version.in_development_api_level}",
+    ]
+  }
+}
+
 sdk_source_set("ipc") {
   category = "internal"
   build_as_static = true
@@ -38,6 +50,10 @@ sdk_source_set("ipc") {
     "//src/lib/fxl",
     "//src/lib/unwinder",
   ]
+
+  if (current_os != "fuchsia") {
+    public_configs = [ ":fuchsia_api_level_for_developer_tools" ]
+  }
 }
 
 # Unit tests for this directory. These are intended to be referenced by unit

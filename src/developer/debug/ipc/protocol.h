@@ -64,6 +64,10 @@ constexpr uint32_t kCurrentProtocolVersion = 60;
 #define INITIAL_VERSION_FOR_API_LEVEL_CURRENT 58
 #define CURRENT_SUPPORTED_API_LEVEL 16
 
+#if defined(__Fuchsia__) == defined(FUCHSIA_API_LEVEL)
+#error FUCHSIA_API_LEVEL should be defind only and always for non-Fuchsia platforms.
+#endif
+
 #if !defined(FUCHSIA_API_LEVEL)
 // This is a workaround when using this library in the @internal_sdk, as the SDK
 // metadata surface has no way to indicate that a library requires a specific
