@@ -76,27 +76,6 @@ def _fuchsia_driver_bind_bytecode_impl(context):
         ),
     ]
 
-_bind_rules_header = rule(
-    implementation = _bind_rules_header_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
-    output_to_genfiles = True,
-    attrs = {
-        "rules": attr.label(
-            doc = "Path to the bind rules source file",
-            mandatory = True,
-            allow_single_file = True,
-        ),
-        "output": attr.output(
-            mandatory = True,
-        ),
-        "deps": attr.label_list(
-            doc = "The list of libraries this library depends on",
-            mandatory = False,
-            providers = [FuchsiaBindLibraryInfo],
-        ),
-    },
-)
-
 fuchsia_driver_bind_bytecode = rule(
     implementation = _fuchsia_driver_bind_bytecode_impl,
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
