@@ -8,6 +8,7 @@ import("//build/bazel/legacy_ninja_build_outputs.gni")
 import("//build/bazel/logging.gni")
 import("//build/bazel/remote_services.gni")
 import("//build/config/compiler.gni")
+import("//build/config/fuchsia_cxx_version.gni")
 
 declare_args() {
   # Suppress Bazel non-error output
@@ -599,6 +600,17 @@ template("bazel_action") {
         # multiple flags.
         args += [ "--output_groups=${output_group}" ]
       }
+    }
+
+    # If the c++ version is 20, we overwrite the copts to use
+    # c++20 in Bazel too.
+    if (fuchsia_cxx_version == 20) {
+      args += [
+        "--cxxopt=-std=c++20",
+        "--cxxopt=-Wno-deprecated-this-capture",
+        "--cxxopt=-Wc++20-compat",
+        "--cxxopt=-Wno-error=c++20-compat",
+      ]
     }
 
     if (!defined(deps)) {

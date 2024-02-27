@@ -15,7 +15,6 @@
 //examples/drivers/transport/zircon/v2:child_driver
 //examples/drivers/transport/zircon/v2:parent_driver
 //examples/drivers/demo-number:driver
-//sdk/lib/driver/devicetree/examples/example-board:example-board-driver
 //sdk/lib/driver_test_realm/fake_driver:driver
 //src/camera/drivers/bus/aml_mipicsi:aml_mipicsi_driver-driver
 //src/camera/drivers/controller/sherlock:sherlock-camera-controller_driver

@@ -2,7 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-cc_library(
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_devicetree_visitor",
+)
+
+fuchsia_devicetree_visitor(
     name = "example-visitor",
     srcs = [
         "example-visitor.cc",

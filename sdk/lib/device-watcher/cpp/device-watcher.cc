@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "device-watcher.h"
+#include "lib/device-watcher/cpp/device-watcher.h"
 
 #include <dirent.h>
 #include <fidl/fuchsia.io/cpp/wire_types.h>
