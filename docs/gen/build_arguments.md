@@ -374,7 +374,7 @@ to stdout/stderr during the Ninja build.
 
 **Current value (from the default):** `false`
 
-From //build/bazel/bazel_action.gni:17
+From //build/bazel/bazel_action.gni:18
 
 ### bazel_upload_build_events
 
@@ -3145,7 +3145,7 @@ vendor/acme/proprietary:build_installer with Ninja:
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:121
+From //build/bazel/legacy_ninja_build_outputs.gni:123
 
 ### extra_package_labels
 
