@@ -9,7 +9,10 @@ if (is_host) {
     sources = [
       "config.json",
       "root/test.py",
-      "want.json",
+
+      # The path to the generated test directory includes the host architecture
+      # so the generated hash depends on that directory name.
+      "want_${current_cpu}.json",
     ]
     outputs = [ "$root_gen_dir/{{source}}" ]
   }

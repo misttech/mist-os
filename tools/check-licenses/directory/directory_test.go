@@ -7,8 +7,10 @@ package directory
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -40,7 +42,11 @@ func runDirectoryTest(name string, t *testing.T) {
 	root := filepath.Join(testDir, "root")
 
 	// Create a Directory object from the want.json file.
-	wantPath := filepath.Join(testDir, "want.json")
+	gnArchName, ok := map[string]string{"amd64": "x64", "arm64": "arm64"}[runtime.GOARCH]
+	if !ok {
+		t.Fatal("unknown arch ", runtime.GOARCH)
+	}
+	wantPath := filepath.Join(testDir, fmt.Sprintf("want_%v.json", gnArchName))
 	want := &Directory{}
 	decodeJSON(wantPath, want, t)
 

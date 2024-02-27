@@ -1,0 +1,11 @@
+{
+    "name": "root",
+    "path": "{root}",
+    "files": [
+        {
+            "name": "test.py",
+            "spdxID": "LicenseRef-file-ca2480f27b0c1e375912d3ccede4fc06",
+            "project": "unknown"
+        }
+    ]
+}
