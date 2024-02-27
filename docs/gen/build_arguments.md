@@ -6969,7 +6969,7 @@ Enable debug assertions, e.g. for overflow checking.
 
 **Current value (from the default):** `false`
 
-From //build/config/rust/BUILD.gn:32
+From //build/config/rust/BUILD.gn:33
 
 ### rust_emit_rmeta
 
@@ -6988,7 +6988,7 @@ as the cache.
 
 **Current value (from the default):** `""`
 
-From //build/config/rust/BUILD.gn:29
+From //build/config/rust/BUILD.gn:30
 
 ### rust_lto
 
@@ -7121,7 +7121,7 @@ Controls whether the rust compiler uses v0 symbol mangling scheme
 
 **Current value (from the default):** `true`
 
-From //build/config/rust/BUILD.gn:25
+From //build/config/rust/BUILD.gn:26
 
 ### rust_virtio_net
 
@@ -8602,7 +8602,7 @@ From //build/images/args.gni:106
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/BUILD.gn:181
+From //build/config/fuchsia/BUILD.gn:180
 
 ### zircon_b_partition
 
