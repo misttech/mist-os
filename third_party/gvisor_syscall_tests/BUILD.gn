@@ -457,6 +457,10 @@ syscall_test_suite(tcp_blocking_test_label) {
 }
 syscall_test_suite(tcp_test_label) {
   run_with_fast_udp = false
+
+  # The TCP suite is particularly large and needs to be sharded further
+  # in order to complete within a reasonable period of time on RISC-V.
+  num_shards = 10
 }
 
 suite_labels = [
