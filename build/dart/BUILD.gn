@@ -52,8 +52,8 @@ group("dart_allowlist") {
   # Third_party dart programs/libraries must continue to be built as dart libraries.
   visibility += [ "//third_party/dart-pkg/pub/*" ]
 
-  # Catch-all for //vendor/google.
-  visibility += [ "//vendor/google/*" ]
+  # Catch-all for //vendor repos.
+  visibility += [ "//vendor/*" ]
 }
 
 python_binary("gen_dart_package_config") {
