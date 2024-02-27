@@ -30,25 +30,6 @@ def _process_bindc_args(context):
         "include_filepaths": include_filepaths,
     }
 
-def _bind_rules_header_impl(context):
-    args = _process_bindc_args(context)
-    sdk = context.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
-    context.actions.run(
-        executable = sdk.bindc,
-        arguments = [
-                        "compile",
-                    ] + args["include_filepaths"] +
-                    [
-                        "--output",
-                        context.outputs.output.path,
-                    ] + args["files_argument"],
-        inputs = args["inputs"],
-        outputs = [
-            context.outputs.output,
-        ],
-        mnemonic = "Bindcheader",
-    )
-
 def _fuchsia_driver_bind_bytecode_impl(context):
     args = _process_bindc_args(context)
     sdk = context.toolchains["@fuchsia_sdk//fuchsia:toolchain"]

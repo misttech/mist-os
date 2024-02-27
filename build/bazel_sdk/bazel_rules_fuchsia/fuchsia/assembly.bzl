@@ -38,6 +38,10 @@ load(
     _fuchsia_package_directory = "fuchsia_package_directory",
 )
 load(
+    "//fuchsia/private/assembly:fuchsia_package_size_check.bzl",
+    _fuchsia_package_size_check = "fuchsia_package_size_check",
+)
+load(
     "//fuchsia/private/assembly:fuchsia_partition.bzl",
     _PARTITION_TYPE = "PARTITION_TYPE",
     _SLOT = "SLOT",
@@ -70,20 +74,16 @@ load(
     _tuf_repo_root = "tuf_repo_root",
 )
 load(
+    "//fuchsia/private/assembly:fuchsia_product_size_check.bzl",
+    _fuchsia_product_size_check = "fuchsia_product_size_check",
+)
+load(
     "//fuchsia/private/assembly:fuchsia_repository_keys.bzl",
     _fuchsia_repository_keys = "fuchsia_repository_keys",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_scrutiny_config.bzl",
     _fuchsia_scrutiny_config = "fuchsia_scrutiny_config",
-)
-load(
-    "//fuchsia/private/assembly:fuchsia_product_size_check.bzl",
-    _fuchsia_product_size_check = "fuchsia_product_size_check",
-)
-load(
-    "//fuchsia/private/assembly:fuchsia_package_size_check.bzl",
-    _fuchsia_package_size_check = "fuchsia_package_size_check",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_size_report_aggregator.bzl",

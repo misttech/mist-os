@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+"""Creates a fuchsia_package_resource for devicetree visitor."""
+
 load(
     "//fuchsia/private:fuchsia_package_resource.bzl",
     "fuchsia_package_resource",

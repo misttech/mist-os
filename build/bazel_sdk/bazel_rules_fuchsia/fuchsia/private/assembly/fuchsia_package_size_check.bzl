@@ -6,7 +6,7 @@
 
 load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
-load(":providers.bzl", "FuchsiaProductImageInfo", "FuchsiaSizeCheckerInfo")
+load(":providers.bzl", "FuchsiaSizeCheckerInfo")
 
 def _fuchsia_package_size_check_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
