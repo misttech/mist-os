@@ -6,7 +6,6 @@ use {
     anyhow::{bail, format_err, Result},
     argh::FromArgs,
     serde::{de::DeserializeOwned, Deserialize},
-    serde_yaml,
     std::{
         fs::{File, OpenOptions},
         io::{stdin, stdout, BufRead, BufReader, Read, Write},

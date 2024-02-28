@@ -12,7 +12,6 @@ pub(crate) use crate::{
 use anyhow::{bail, Context, Result};
 use argh::FromArgs;
 use glob::glob;
-use serde_json;
 use serde_yaml::Value;
 use std::{
     fs::{self, File},

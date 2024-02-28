@@ -243,7 +243,7 @@ mod test {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::{md_element::Element, DocLine};
+    use crate::DocLine;
     use pulldown_cmark::{CowStr::Borrowed, LinkType};
     #[test]
     fn test_basic_elements() {
