@@ -8,7 +8,6 @@ use {
     futures_util::{StreamExt, TryStreamExt},
     sensors_fidl::ManagerRequest,
     std::collections::HashMap,
-    tracing,
 };
 
 #[derive(Clone, Debug)]
