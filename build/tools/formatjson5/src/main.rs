@@ -29,7 +29,6 @@
 
 #![warn(missing_docs)]
 
-use anyhow;
 use anyhow::Result;
 use json5format::*;
 use std::fs;

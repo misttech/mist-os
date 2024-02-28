@@ -127,7 +127,7 @@ impl VirtualDeviceManifest {
 mod tests {
     use super::*;
     use crate::virtual_device::VirtualDeviceV1;
-    use std::fs::{create_dir_all, File};
+    use std::fs::create_dir_all;
     use std::io::Write;
     use tempfile::TempDir;
 

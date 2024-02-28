@@ -79,7 +79,6 @@ impl VirtualDevice {
 mod tests {
     use super::*;
     use serde_json::json;
-    use std::fs::File;
     use tempfile::TempDir;
 
     #[test]

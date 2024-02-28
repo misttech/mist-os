@@ -400,9 +400,7 @@ impl ProductBundleV2 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_manifest::Image;
     use assembly_partitions_config::{BootloaderPartition, BootstrapPartition, Partition, Slot};
-    use camino::Utf8Path;
     use fuchsia_repo::test_utils;
     use std::fs::File;
     use std::io::Write;
