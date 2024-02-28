@@ -343,23 +343,6 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn create_describe_destroy() {
-        let ramdisk = RamdiskClient::create(512, 2048).await.unwrap();
-        let client_end = ramdisk.open().await.unwrap();
-
-        // Ask it to describe itself using the Node interface.
-        //
-        // TODO(https://fxbug.dev/42063787): this relies on multiplexing.
-        let client_end =
-            fidl::endpoints::ClientEnd::<fio::NodeMarker>::new(client_end.into_channel());
-        let proxy = client_end.into_proxy().unwrap();
-        let protocol = proxy.query().await.expect("failed to get node info");
-        assert_eq!(protocol, fio::NODE_PROTOCOL_NAME.as_bytes());
-
-        ramdisk.destroy().await.expect("failed to destroy the ramdisk");
-    }
-
-    #[fuchsia::test]
     async fn destroy_and_wait_for_removal() {
         let mut ramdisk = RamdiskClient::create(512, 2048).await.unwrap();
         let dir = ramdisk.take_dir().unwrap();
