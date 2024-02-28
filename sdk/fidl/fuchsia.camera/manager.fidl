@@ -74,7 +74,6 @@ closed protocol Manager {
     /// Create a Stream with the specified access rights.  This may not succeed.
     /// If it does succeed, the Stream will have the rights indicated.
     /// `buffer_info` contains a set of buffers to be used with the Stream.
-    @transitional("This is meant to replace CreateStream")
     strict CreateStreamV2(resource struct {
         request VideoStreamV2;
         buffer_info fuchsia.sysmem.BufferCollectionInfo;

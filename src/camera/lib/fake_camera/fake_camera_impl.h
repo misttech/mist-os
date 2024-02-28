@@ -13,7 +13,7 @@
 
 namespace camera {
 
-class FakeCameraImpl : public FakeCamera, public fuchsia::camera3::Device {
+class FakeCameraImpl final : public FakeCamera, public fuchsia::camera3::Device {
  public:
   FakeCameraImpl();
   ~FakeCameraImpl() override;
@@ -31,6 +31,9 @@ class FakeCameraImpl : public FakeCamera, public fuchsia::camera3::Device {
   // |fuchsia::hardware::camera3::Device|
   void GetIdentifier(GetIdentifierCallback callback) override;
   void GetConfigurations(GetConfigurationsCallback callback) override;
+  void GetConfigurations2(GetConfigurations2Callback callback) override {
+    ZX_PANIC("Not Implemented");
+  }
   void WatchCurrentConfiguration(WatchCurrentConfigurationCallback callback) override;
   void SetCurrentConfiguration(uint32_t index) override;
   void WatchMuteState(WatchMuteStateCallback callback) override;

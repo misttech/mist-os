@@ -23,7 +23,6 @@ closed protocol Device {
     /// Returns a list of configurations supported by the camera. All cameras will have at least
     /// one configuration. The values returned are immutable - they will not change for the
     /// lifetime of the client's connection to the Camera.
-    @transitional
     @deprecated("Use GetConfigurations2")
     strict GetConfigurations() -> (struct {
         configurations vector<Configuration>:MAX_CONFIGURATIONS_PER_CAMERA;
@@ -32,7 +31,6 @@ closed protocol Device {
     /// Returns a list of configurations supported by the camera. All cameras will have at least
     /// one configuration. The values returned are immutable - they will not change for the
     /// lifetime of the client's connection to the Camera.
-    @transitional
     strict GetConfigurations2() -> (struct {
         configurations vector<Configuration2>:MAX_CONFIGURATIONS_PER_CAMERA;
     });

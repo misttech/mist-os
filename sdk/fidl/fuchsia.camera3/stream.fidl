@@ -14,7 +14,6 @@ const MAX_RESOLUTIONS_PER_STREAM uint32 = 256;
 closed protocol Stream {
     /// Gets the properties associated with this stream. The value returned is identical to the one
     /// corresponding to this stream as returned by |Device.GetConfigurations|.
-    @transitional
     @deprecated("Use GetProperties2")
     strict GetProperties() -> (struct {
         properties StreamProperties;
@@ -22,7 +21,6 @@ closed protocol Stream {
 
     /// Gets the properties associated with this stream. The value returned is identical to the one
     /// corresponding to this stream as returned by |Device.GetConfigurations|.
-    @transitional
     strict GetProperties2() -> (struct {
         properties StreamProperties2;
     });
@@ -89,7 +87,6 @@ closed protocol Stream {
     });
 
     /// See GetNextFrame2.
-    @transitional
     @deprecated("Use GetNextFrame2")
     strict GetNextFrame() -> (resource struct {
         info FrameInfo;
@@ -101,7 +98,6 @@ closed protocol Stream {
     /// the number of unreleased buffers is less than the count provided via the most recently
     /// negotiated buffer collection token. If a buffer renegotiation is in progress, this call will
     /// return only after the negotiation is complete and a new collection is available.
-    @transitional
     strict GetNextFrame2() -> (resource struct {
         info FrameInfo2;
     });

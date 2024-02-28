@@ -18,7 +18,7 @@ class FakeCameraImpl;
 
 // Implements the FakeStream interface. Unless otherwise noted, all public methods are thread-safe,
 // and all private methods must be called on the loop's thread.
-class FakeStreamImpl : public FakeStream, public fuchsia::camera3::Stream {
+class FakeStreamImpl final : public FakeStream, public fuchsia::camera3::Stream {
  public:
   FakeStreamImpl();
   ~FakeStreamImpl() override;
@@ -44,6 +44,9 @@ class FakeStreamImpl : public FakeStream, public fuchsia::camera3::Stream {
   void WatchOrientation(WatchOrientationCallback callback) override;
   void GetNextFrame(GetNextFrameCallback callback) override;
   void Rebind(fidl::InterfaceRequest<Stream> request) override;
+  void GetProperties(GetPropertiesCallback callback) override { ZX_PANIC("Not Implemented"); }
+  void GetProperties2(GetProperties2Callback callback) override { ZX_PANIC("Not Implemented"); }
+  void GetNextFrame2(GetNextFrame2Callback callback) override { ZX_PANIC("Not Implemented"); }
 
   async::Loop loop_;
   fidl::BindingSet<fuchsia::camera3::Stream> bindings_;
