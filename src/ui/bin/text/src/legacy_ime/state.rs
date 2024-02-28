@@ -6,7 +6,6 @@
 
 use {
     anyhow::{Context as _, Error},
-    core::convert::TryInto,
     fidl_fuchsia_input as input, fidl_fuchsia_ui_input as uii,
     std::{
         char,

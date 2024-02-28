@@ -13,7 +13,7 @@ use {
     },
     fuchsia_trace as ftrace,
     std::time::{Duration, Instant},
-    std::{any::Any, cell::RefCell, convert::TryFrom, rc::Rc},
+    std::{any::Any, cell::RefCell, rc::Rc},
     term_model::{ansi::TermInfo, config::Config, Term},
     terminal::{renderable_layers, FontSet, Offset, Renderer},
 };

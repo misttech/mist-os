@@ -20,7 +20,6 @@ use futures::lock::Mutex;
 use futures::prelude::*;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use splines::{Interpolation, Key, Spline};
 use watch_handler::{Sender, WatchHandler};
 
@@ -724,13 +723,12 @@ async fn set_brightness_slowly(
 mod tests {
     use std::path::Path;
 
-    use anyhow::{format_err, Error};
+    use anyhow::format_err;
     use async_trait::async_trait;
     use fuchsia_async::TestExecutor;
     use futures::executor::block_on;
     use futures::pin_mut;
 
-    use crate::sender_channel::SenderChannel;
     use lib::sensor::AmbientLightInputRpt;
 
     use super::*;

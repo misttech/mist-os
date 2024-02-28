@@ -14,11 +14,11 @@ use {
     fidl_fuchsia_ui_pointerinjector as pointerinjector,
     fidl_fuchsia_ui_pointerinjector_configuration as pointerinjector_config,
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_inspect::{self, health::Reporter},
+    fuchsia_inspect::health::Reporter,
     fuchsia_zircon as zx,
     futures::stream::StreamExt,
     metrics_registry::*,
-    std::{cell::RefCell, collections::HashMap, option::Option, rc::Rc},
+    std::{cell::RefCell, collections::HashMap, rc::Rc},
 };
 
 /// An input handler that parses touch events and forwards them to Scenic through the
@@ -472,8 +472,7 @@ mod tests {
         },
         assert_matches::assert_matches,
         fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
-        fuchsia_async as fasync, fuchsia_inspect, fuchsia_zircon as zx,
-        futures::StreamExt,
+        fuchsia_async as fasync, fuchsia_zircon as zx,
         maplit::hashmap,
         pretty_assertions::assert_eq,
         std::collections::HashSet,

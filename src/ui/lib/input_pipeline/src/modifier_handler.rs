@@ -6,7 +6,7 @@ use crate::input_device::{Handled, InputDeviceEvent, InputEvent, UnhandledInputE
 use crate::input_handler::{InputHandlerStatus, UnhandledInputHandler};
 use async_trait::async_trait;
 use fidl_fuchsia_ui_input3::{KeyMeaning, Modifiers, NonPrintableKey};
-use fuchsia_inspect::{self, health::Reporter};
+use fuchsia_inspect::health::Reporter;
 use keymaps::{LockStateKeys, ModifierState};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -165,14 +165,13 @@ impl UnhandledInputHandler for ModifierMeaningHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::input_device::{Handled, InputDeviceDescriptor, InputDeviceEvent, InputEvent};
+    use crate::input_device::InputDeviceDescriptor;
     use crate::input_handler::InputHandler;
     use crate::keyboard_binding::{self, KeyboardEvent};
     use crate::testing_utilities;
     use fidl_fuchsia_input::Key;
-    use fidl_fuchsia_ui_input3::{KeyEventType, LockState, Modifiers};
+    use fidl_fuchsia_ui_input3::{KeyEventType, LockState};
     use fuchsia_async as fasync;
-    use fuchsia_inspect;
     use fuchsia_zircon as zx;
     use pretty_assertions::assert_eq;
 

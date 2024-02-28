@@ -6,7 +6,7 @@ use async_utils::hanging_get::client::HangingGetStream;
 use fidl_fuchsia_settings::{LightGroup as LightGroupFidl, LightProxy, LightValue};
 use fidl_fuchsia_ui_brightness::ControlProxy;
 use fuchsia_async as fasync;
-use fuchsia_inspect::{self, Property};
+use fuchsia_inspect::Property;
 #[cfg(test)]
 use futures::channel::mpsc;
 use futures::channel::oneshot;

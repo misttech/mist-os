@@ -21,7 +21,7 @@ use crate::keyboard_binding::{KeyboardDeviceDescriptor, KeyboardEvent};
 use async_trait::async_trait;
 use fidl_fuchsia_input::Key;
 use fidl_fuchsia_ui_input3::KeyEventType;
-use fuchsia_inspect::{self, health::Reporter};
+use fuchsia_inspect::health::Reporter;
 use fuchsia_trace as ftrace;
 use fuchsia_zircon as zx;
 use keymaps::KeyState;
@@ -416,9 +416,6 @@ fn into_unhandled_input_event(
 mod tests {
     use super::*;
     use crate::testing_utilities::create_input_event;
-    use fidl_fuchsia_ui_input3::KeyEventType;
-    use fuchsia_inspect;
-    use std::convert::TryInto;
     use test_case::test_case;
 
     lazy_static! {

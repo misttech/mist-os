@@ -41,7 +41,7 @@ use {
     fuchsia_inspect as inspect, fuchsia_zircon as zx,
     futures::lock::Mutex,
     futures::{StreamExt, TryStreamExt},
-    scene_management::{self, SceneManager, SceneManagerTrait, ViewingDistance},
+    scene_management::{SceneManager, SceneManagerTrait, ViewingDistance},
     scene_manager_structured_config::Config,
     std::fs::File,
     std::io::Read,

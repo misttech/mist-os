@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    fuchsia_async as fasync, input_synthesis,
+    fuchsia_async as fasync,
     std::{env, time::Duration},
     structopt::StructOpt,
 };

@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 use {
     anyhow::{format_err, Error, Result},
-    core::convert::TryFrom,
     fidl_fuchsia_input as input, fidl_fuchsia_ui_input as ui_input,
     fidl_fuchsia_ui_input3::{self as ui_input3, LockState, Modifiers},
-    keymaps::{self, usages::input3_key_to_hid_usage, LockStateKeys, ModifierState},
+    keymaps::{usages::input3_key_to_hid_usage, LockStateKeys, ModifierState},
     std::collections::HashSet,
 };
 
@@ -217,10 +216,7 @@ impl TryFrom<KeyEvent> for ui_input3::KeyEvent {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*, core::convert::TryInto, fuchsia_zircon as zx, keymaps::usages::Usages,
-        maplit::hashset, std::iter::FromIterator,
-    };
+    use {super::*, fuchsia_zircon as zx, keymaps::usages::Usages, maplit::hashset};
 
     static TEST_TIMESTAMP: i64 = 123;
 

@@ -25,7 +25,6 @@ use {
     fuchsia_trace as trace, fuchsia_zircon as zx,
     futures::{
         channel::mpsc::{unbounded, UnboundedSender},
-        future,
         prelude::*,
     },
     internal_message::*,

@@ -10,7 +10,7 @@ use async_utils::hanging_get::client::HangingGetStream;
 use fidl_fuchsia_input as finput;
 use fidl_fuchsia_settings as fsettings;
 use fuchsia_async as fasync;
-use fuchsia_inspect::{self, health::Reporter};
+use fuchsia_inspect::health::Reporter;
 use futures::{TryFutureExt, TryStreamExt};
 use metrics_registry::*;
 use std::cell::RefCell;
@@ -190,14 +190,10 @@ impl TextSettingsHandler {
 mod tests {
     use super::*;
 
-    use crate::input_device;
     use crate::input_handler::InputHandler;
     use crate::keyboard_binding;
     use crate::testing_utilities;
-    use fidl_fuchsia_input;
-    use fidl_fuchsia_ui_input3;
     use fuchsia_async as fasync;
-    use fuchsia_inspect;
     use fuchsia_zircon as zx;
     use pretty_assertions::assert_eq;
     use std::convert::TryFrom as _;

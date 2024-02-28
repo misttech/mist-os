@@ -10,7 +10,6 @@ use crate::light_sensor::test_utils::{
 use fidl_fuchsia_settings::{LightGroup as LightGroupFidl, LightRequest, LightState, LightValue};
 use fidl_fuchsia_ui_brightness::ControlRequest;
 use fuchsia_async as fasync;
-use fuchsia_inspect;
 use futures::channel::{mpsc, oneshot};
 use futures::StreamExt;
 use std::cell::RefCell;

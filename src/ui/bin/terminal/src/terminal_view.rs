@@ -26,8 +26,8 @@ use {
     futures::{channel::mpsc, io::AsyncReadExt, select, FutureExt, StreamExt},
     pty::ServerPty,
     std::{
-        any::Any, cell::RefCell, convert::TryFrom, ffi::CStr, ffi::CString, fs::File,
-        io::prelude::*, path::PathBuf, rc::Rc,
+        any::Any, cell::RefCell, ffi::CStr, ffi::CString, fs::File, io::prelude::*, path::PathBuf,
+        rc::Rc,
     },
     term_model::{
         ansi::Processor,
@@ -722,7 +722,6 @@ mod tests {
         fuchsia_async::{DurationExt, Timer},
         fuchsia_zircon::DurationNum,
         futures::future::Either,
-        term_model::grid::Scroll,
     };
 
     fn unit_metrics() -> Size {

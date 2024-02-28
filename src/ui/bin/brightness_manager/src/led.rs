@@ -73,7 +73,6 @@ impl LedControl for Led {
 #[cfg(test)]
 mod test {
 
-    use super::LedControl;
     use super::*;
     use fidl_fuchsia_hardware_light::{Capability, LightRequest};
     use futures::{future, StreamExt};

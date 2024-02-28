@@ -19,7 +19,6 @@ use {
     metrics_registry::*,
     std::collections::HashMap,
     std::collections::HashSet,
-    std::iter::FromIterator,
 };
 
 /// A [`TouchScreenEvent`] represents a set of contacts and the phase those contacts are in.

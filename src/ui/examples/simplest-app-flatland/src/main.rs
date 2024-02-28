@@ -20,7 +20,6 @@ use {
     fuchsia_trace as trace,
     futures::{
         channel::mpsc::{unbounded, UnboundedSender},
-        future,
         prelude::*,
     },
     internal_message::InternalMessage,

@@ -16,7 +16,6 @@ use {
         TouchInputDescriptor, TouchType, Unit, UnitType, TOUCH_MAX_CONTACTS,
     },
     fidl_fuchsia_ui_test_input::MouseButton,
-    std::convert::TryFrom,
 };
 
 /// Implements the client side of the `fuchsia.input.injection.InputDeviceRegistry` protocol.
@@ -202,7 +201,6 @@ impl InputDeviceRegistry {
 mod tests {
     use {
         super::*,
-        crate::input_device::InputDevice,
         anyhow::format_err,
         fidl_fuchsia_input_injection::{InputDeviceRegistryMarker, InputDeviceRegistryRequest},
         fidl_fuchsia_input_report::InputReportsReaderMarker,

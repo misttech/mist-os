@@ -349,7 +349,7 @@ fn record_lazy_recent_events(
 mod tests {
     use super::*;
     use crate::{
-        input_device::{self, InputDeviceDescriptor, InputDeviceEvent, InputEvent},
+        input_device::{self, InputDeviceDescriptor},
         keyboard_binding::KeyboardDeviceDescriptor,
         light_sensor::types::Rgbc,
         light_sensor_binding::{LightSensorDeviceDescriptor, LightSensorEvent},
@@ -371,7 +371,6 @@ mod tests {
     use fidl_fuchsia_input_report::InputDeviceMarker;
     use fuchsia_async as fasync;
     use maplit::{hashmap, hashset};
-    use std::collections::HashSet;
     use test_case::test_case;
 
     fn fixed_now() -> zx::Time {

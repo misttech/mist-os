@@ -9,7 +9,7 @@ use anyhow::{Context, Result};
 use fidl_fuchsia_ui_composition_internal as fcomp;
 use fidl_fuchsia_ui_input3::KeyEventType;
 use fuchsia_async::{OnSignals, Task};
-use fuchsia_inspect::{self, health::Reporter};
+use fuchsia_inspect::health::Reporter;
 use fuchsia_zircon::{AsHandleRef, Duration, Signals, Status, Time};
 use futures::{
     channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
@@ -291,13 +291,10 @@ fn into_input_event(keyboard_event: KeyboardEvent, event_time: Time) -> input_de
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::input_device::InputEvent;
     use crate::testing_utilities::{create_fake_input_event, create_input_event};
     use fidl_fuchsia_input::Key;
-    use fidl_fuchsia_ui_input3::KeyEventType;
     use fuchsia_async as fasync;
-    use fuchsia_zircon::{EventPair, Peered, Time};
-    use futures::channel::mpsc;
+    use fuchsia_zircon::{EventPair, Peered};
     use pretty_assertions::assert_eq;
 
     // Manages losing and regaining display, since manual management is error-prone:

@@ -249,7 +249,7 @@ fn position_from_event(event: &TouchpadEvent) -> Position {
 mod tests {
     use {
         super::*,
-        crate::gestures::gesture_arena::{Contender, MatchedContender as _, TouchpadEvent},
+        crate::gestures::gesture_arena::{Contender, MatchedContender as _},
         crate::testing_utilities::create_touch_contact,
         assert_matches::assert_matches,
         std::any::TypeId,

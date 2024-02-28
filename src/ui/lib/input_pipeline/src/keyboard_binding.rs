@@ -8,7 +8,6 @@ use {
     crate::metrics,
     anyhow::{format_err, Error, Result},
     async_trait::async_trait,
-    fidl_fuchsia_input,
     fidl_fuchsia_input_report::{InputDeviceProxy, InputReport},
     fidl_fuchsia_ui_input3 as fidl_ui_input3,
     fidl_fuchsia_ui_input3::KeyEventType,

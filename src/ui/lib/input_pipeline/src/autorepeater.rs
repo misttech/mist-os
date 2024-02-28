@@ -26,14 +26,13 @@ use anyhow::{anyhow, Context, Result};
 use fidl_fuchsia_settings as fsettings;
 use fidl_fuchsia_ui_input3::{self as finput3, KeyEventType, KeyMeaning};
 use fuchsia_async::{Task, Time, Timer};
-use fuchsia_inspect::{self, health::Reporter};
+use fuchsia_inspect::health::Reporter;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::Duration;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::StreamExt;
 use metrics_registry::*;
 use std::cell::RefCell;
-use std::convert::TryInto;
 use std::rc::Rc;
 
 /// The value range reserved for the modifier key meanings.  See the documentation for
@@ -476,7 +475,6 @@ mod tests {
     use crate::testing_utilities;
     use fidl_fuchsia_input::Key;
     use fuchsia_async::TestExecutor;
-    use fuchsia_inspect;
     use fuchsia_zircon as zx;
     use futures::Future;
     use pin_utils::pin_mut;

@@ -16,7 +16,6 @@ use {
     futures::channel::mpsc::{UnboundedReceiver, UnboundedSender},
     metrics_registry::*,
     std::collections::HashSet,
-    std::iter::FromIterator,
 };
 
 pub type MouseButton = u8;
@@ -645,8 +644,8 @@ fn buttons_from_optional_report(
 #[cfg(test)]
 mod tests {
     use {
-        super::*, crate::testing_utilities, fidl_fuchsia_input_report, fuchsia_async as fasync,
-        futures::StreamExt, pretty_assertions::assert_eq,
+        super::*, crate::testing_utilities, fuchsia_async as fasync, futures::StreamExt,
+        pretty_assertions::assert_eq,
     };
 
     const DEVICE_ID: u32 = 1;

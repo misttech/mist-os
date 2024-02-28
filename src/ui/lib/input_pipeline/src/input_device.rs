@@ -10,7 +10,6 @@ use {
     anyhow::{format_err, Error},
     async_trait::async_trait,
     async_utils::hanging_get::client::HangingGetStream,
-    fdio,
     fidl::endpoints::Proxy,
     fidl_fuchsia_input_report as fidl_input_report,
     fidl_fuchsia_input_report::{InputDeviceMarker, InputReport},

@@ -16,7 +16,7 @@ use {
     async_trait::async_trait,
     core::cell::RefCell,
     fidl_fuchsia_input_report as fidl_input_report,
-    fuchsia_inspect::{self, health::Reporter, ArrayProperty, Node as InspectNode},
+    fuchsia_inspect::{health::Reporter, ArrayProperty, Node as InspectNode},
     fuchsia_inspect_contrib::nodes::BoundedListNode,
     fuchsia_zircon as zx,
     std::any::Any,

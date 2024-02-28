@@ -12,9 +12,9 @@ use {
     anyhow::{format_err, Error},
     async_trait::async_trait,
     derivative::Derivative,
-    fuchsia_inspect::{self, health::Reporter},
+    fuchsia_inspect::health::Reporter,
     metrics_registry::*,
-    std::{convert::From, rc::Rc},
+    std::rc::Rc,
 };
 
 // TODO(https://fxbug.dev/42172817) Add trackpad support
@@ -209,7 +209,7 @@ mod tests {
         crate::input_handler::InputHandler,
         crate::testing_utilities,
         assert_matches::assert_matches,
-        fuchsia_async as fasync, fuchsia_inspect, fuchsia_zircon as zx,
+        fuchsia_async as fasync, fuchsia_zircon as zx,
         maplit::hashset,
         std::{cell::Cell, collections::HashSet, ops::Add},
         test_case::test_case,

@@ -10,7 +10,7 @@ use {
     fidl::endpoints::Proxy,
     fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
     fidl_fuchsia_ui_policy as fidl_ui_policy, fuchsia_async as fasync,
-    fuchsia_inspect::{self, health::Reporter},
+    fuchsia_inspect::health::Reporter,
     fuchsia_zircon::AsHandleRef,
     futures::{channel::mpsc, StreamExt, TryStreamExt},
     metrics_registry::*,
@@ -279,16 +279,10 @@ mod tests {
     use crate::input_handler::InputHandler;
 
     use {
-        super::*,
-        crate::testing_utilities,
-        anyhow::Error,
-        assert_matches::assert_matches,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_input_report as fidl_input_report, fuchsia_async as fasync, fuchsia_inspect,
-        fuchsia_zircon as zx,
-        futures::{channel::oneshot, StreamExt},
-        pretty_assertions::assert_eq,
-        std::{cell::RefCell, rc::Rc, task::Poll},
+        super::*, crate::testing_utilities, assert_matches::assert_matches,
+        fidl::endpoints::create_proxy_and_stream, fidl_fuchsia_input_report as fidl_input_report,
+        fuchsia_async as fasync, fuchsia_zircon as zx, futures::channel::oneshot,
+        pretty_assertions::assert_eq, std::task::Poll,
     };
 
     fn spawn_device_listener_registry_server(

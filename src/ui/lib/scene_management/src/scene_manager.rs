@@ -11,7 +11,6 @@ use {
     anyhow::{Context, Error, Result},
     async_trait::async_trait,
     async_utils::hanging_get::server as hanging_get,
-    fidl,
     fidl::endpoints::{create_proxy, Proxy},
     fidl_fuchsia_accessibility_scene as a11y_scene, fidl_fuchsia_math as math,
     fidl_fuchsia_ui_app as ui_app,

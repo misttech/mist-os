@@ -11,10 +11,10 @@ use {
         utils::Position,
     },
     async_trait::async_trait,
-    fuchsia_inspect::{self, health::Reporter},
+    fuchsia_inspect::health::Reporter,
     fuchsia_zircon as zx,
     metrics_registry::*,
-    std::{cell::RefCell, convert::From, num::FpCategory, option::Option, rc::Rc},
+    std::{cell::RefCell, num::FpCategory, rc::Rc},
 };
 
 pub struct PointerSensorScaleHandler {

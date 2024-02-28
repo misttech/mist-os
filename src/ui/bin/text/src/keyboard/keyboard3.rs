@@ -11,7 +11,6 @@ use {
     futures::{future, lock::Mutex, TryStreamExt},
     std::{
         collections::{HashMap, HashSet},
-        convert::TryFrom,
         fmt,
         hash::{Hash, Hasher},
         sync::Arc,
@@ -419,9 +418,8 @@ mod tests {
     use {
         super::*,
         fidl_fuchsia_input as input, fuchsia_async as fasync,
-        futures::{future, StreamExt, TryFutureExt},
+        futures::{StreamExt, TryFutureExt},
         maplit::hashset,
-        std::iter::FromIterator,
         std::task::Poll,
     };
 

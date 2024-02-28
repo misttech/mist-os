@@ -11,7 +11,6 @@ use {
     futures::{lock::Mutex, prelude::*},
     std::{
         collections::{HashMap, HashSet},
-        convert::TryInto,
         sync::{Arc, Weak},
     },
 };

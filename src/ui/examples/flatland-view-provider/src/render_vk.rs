@@ -10,7 +10,6 @@ use {
     fidl::endpoints::{create_endpoints, ClientEnd, Proxy},
     fidl_fuchsia_sysmem as fsysmem, fidl_fuchsia_ui_composition as fland,
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_runtime,
     fuchsia_scenic::{
         duplicate_buffer_collection_import_token, duplicate_buffer_collection_token,
         BufferCollectionTokenPair,

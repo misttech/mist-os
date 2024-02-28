@@ -376,7 +376,7 @@ impl Default for ScrollContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use carnelian::{geometry::IntVector, Point};
+    use carnelian::geometry::IntVector;
     use euclid::point2;
     use std::collections::HashSet;
 

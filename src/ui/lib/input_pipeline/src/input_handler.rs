@@ -5,7 +5,7 @@
 use {
     crate::input_device,
     async_trait::async_trait,
-    fuchsia_inspect::{self, health::Reporter, NumericProperty, Property},
+    fuchsia_inspect::{health::Reporter, NumericProperty, Property},
     std::any::Any,
     std::cell::RefCell,
     std::fmt::{Debug, Formatter},
@@ -206,7 +206,7 @@ mod tests {
             },
             input_handler::InputHandlerStatus,
         },
-        fuchsia_inspect, fuchsia_zircon as zx,
+        fuchsia_zircon as zx,
         futures::{channel::mpsc, StreamExt as _},
         pretty_assertions::assert_eq,
         test_case::test_case,

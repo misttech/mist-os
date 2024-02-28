@@ -19,10 +19,9 @@ use {
     fuchsia_scenic::{self as scenic, flatland},
     futures::{
         channel::mpsc::{unbounded, UnboundedSender},
-        future,
         prelude::*,
     },
-    std::{collections::BTreeMap, convert::TryInto},
+    std::collections::BTreeMap,
     tracing::{error, info, warn},
 };
 

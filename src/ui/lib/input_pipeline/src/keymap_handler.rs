@@ -10,9 +10,8 @@ use crate::input_device;
 use crate::input_handler::{InputHandlerStatus, UnhandledInputHandler};
 use crate::keyboard_binding;
 use async_trait::async_trait;
-use fuchsia_inspect::{self, health::Reporter};
+use fuchsia_inspect::health::Reporter;
 use fuchsia_zircon as zx;
-use keymaps;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -130,7 +129,6 @@ mod tests {
     use fidl_fuchsia_input as finput;
     use fidl_fuchsia_ui_input3 as finput3;
     use fuchsia_async as fasync;
-    use fuchsia_inspect;
     use fuchsia_zircon as zx;
     use pretty_assertions::assert_eq;
     use std::convert::TryFrom as _;

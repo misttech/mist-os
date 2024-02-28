@@ -254,7 +254,6 @@ mod tests {
                 *,
             },
             assert_matches::assert_matches,
-            fidl_fuchsia_input_report::InputReportsReaderMarker,
             futures::task::Poll,
         };
 
@@ -623,8 +622,7 @@ mod tests {
         use {
             super::*,
             fidl_fuchsia_input_report::{
-                Axis, ContactInputDescriptor, DeviceDescriptor, InputDeviceMarker,
-                InputDeviceProxy, InputReportsReaderMarker, InputReportsReaderProxy, Range,
+                Axis, ContactInputDescriptor, InputDeviceProxy, InputReportsReaderProxy, Range,
                 TouchDescriptor, TouchInputDescriptor, TouchType, Unit, UnitType,
             },
             //fuchsia_zircon as zx,
