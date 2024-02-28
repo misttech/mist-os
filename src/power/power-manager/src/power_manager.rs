@@ -11,7 +11,6 @@ use futures::{
     future::{join_all, LocalBoxFuture},
     stream::{FuturesUnordered, StreamExt},
 };
-use power_manager_config_lib;
 use serde_json as json;
 use std::collections::HashMap;
 use std::rc::Rc;

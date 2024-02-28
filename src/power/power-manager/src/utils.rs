@@ -22,7 +22,6 @@ macro_rules! log_if_false_and_debug_assert {
 
 #[cfg(test)]
 mod log_err_with_debug_assert_tests {
-    use crate::log_if_false_and_debug_assert;
 
     /// Tests that `log_if_false_and_debug_assert` panics for a false expression when debug
     /// assertions are enabled.

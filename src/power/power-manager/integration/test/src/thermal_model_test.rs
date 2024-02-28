@@ -12,7 +12,7 @@ use {
     fuchsia_zircon as zx,
     named_timer::DeadlineId,
     power_manager_integration_test_lib::{TestEnv, TestEnvBuilder},
-    rkf45, serde_json as json,
+    serde_json as json,
     test_util::assert_near,
     tracing::info,
     types::{Celsius, Farads, Hertz, Nanoseconds, PState, Seconds, Volts, Watts},

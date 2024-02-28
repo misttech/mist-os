@@ -4,7 +4,6 @@
 
 use crate::node::Node;
 use anyhow::{format_err, Context, Error};
-use cpu_manager_config_lib;
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;

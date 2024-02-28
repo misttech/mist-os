@@ -856,14 +856,12 @@ mod inspect_throttle_history_tests {
 mod tests {
     use super::*;
     use crate::test::mock_node::{create_dummy_node, MessageMatcher, MockNodeMaker};
-    use crate::types::Seconds;
     use crate::utils::run_all_tasks_until_stalled::run_all_tasks_until_stalled;
     use crate::{msg_eq, msg_ok_return};
     use assert_matches::assert_matches;
     use async_utils::PollExt as _;
     use diagnostics_assertions::{assert_data_tree, HistogramAssertion};
-    use fidl_contrib::protocol_connector::ProtocolSender;
-    use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
+    use fidl_fuchsia_metrics::MetricEventPayload;
 
     /// Tests that well-formed configuration JSON does not panic the `new_from_json` function.
     #[fasync::run_singlethreaded(test)]

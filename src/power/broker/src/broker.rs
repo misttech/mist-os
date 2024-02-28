@@ -833,7 +833,7 @@ impl SatisfyPowerLevel for PowerLevel {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl_fuchsia_power_broker::{DependencyToken, PowerLevel};
+    use fidl_fuchsia_power_broker::DependencyToken;
     use fuchsia_zircon::{self as zx, HandleBased};
     use power_broker_client::BINARY_POWER_LEVELS;
 

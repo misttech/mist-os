@@ -389,7 +389,6 @@ mod tests {
     use fidl_fuchsia_hardware_input as finput;
     use fuchsia_async as fasync;
     use fuchsia_zircon::{AsHandleRef, HandleBased};
-    use futures::channel::mpsc;
     use std::cell::Cell;
 
     const LID_OPEN: u8 = 0x1;

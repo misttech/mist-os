@@ -181,7 +181,6 @@ mod tests {
     use {
         super::*,
         crate::test::mock_node::{create_dummy_node, MessageMatcher, MockNodeMaker},
-        crate::types::ThermalLoad,
         crate::{msg_eq, msg_ok_return},
         assert_matches::assert_matches,
         diagnostics_assertions::assert_data_tree,

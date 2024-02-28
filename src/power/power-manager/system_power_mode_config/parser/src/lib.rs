@@ -7,7 +7,6 @@ pub use fidl_fuchsia_power_clientlevel::ClientType;
 pub use fidl_fuchsia_power_systemmode::{ClientConfig, ModeMatch, SystemMode};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
-use std::convert::TryInto;
 use std::fs::File;
 use std::io::Read as _;
 use std::path::Path;

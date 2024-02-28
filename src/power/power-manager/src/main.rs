@@ -38,7 +38,6 @@ mod test;
 
 use crate::power_manager::PowerManager;
 use anyhow::Error;
-use fuchsia_trace_provider;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

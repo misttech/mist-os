@@ -8,8 +8,6 @@ use fuchsia_async as fasync;
 use fuchsia_fs::OpenFlags;
 use fuchsia_zircon::{self as zx, Signals};
 use futures::prelude::*;
-use std::convert::From;
-use std::marker::Send;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};

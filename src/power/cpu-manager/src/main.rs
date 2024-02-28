@@ -27,7 +27,6 @@ mod test;
 
 use crate::cpu_manager::CpuManager;
 use anyhow::Error;
-use fuchsia_trace_provider;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

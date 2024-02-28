@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{self, Context, Result};
+use anyhow::{Context, Result};
 use async_utils::hanging_get::server::HangingGet;
 use fidl_fuchsia_power_broker as fbroker;
 use fidl_fuchsia_power_suspend as fsuspend;
