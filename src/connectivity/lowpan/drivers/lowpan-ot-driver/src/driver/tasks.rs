@@ -268,6 +268,9 @@ where
         // <b/293936909>: Make sure the TREL state matches what is expected.
         driver_state.check_trel();
 
+        // Make sure the DHCPv6 state matches what is expected.
+        driver_state.check_dhcpv6_pd();
+
         // Set default NAT64 CIDR address
         if let Err(e) = driver_state.ot_instance.nat64_set_ip4_cidr(Nat64::get_default_nat64_cidr())
         {

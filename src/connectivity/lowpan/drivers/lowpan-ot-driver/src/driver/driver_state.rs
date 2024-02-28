@@ -82,6 +82,49 @@ impl<OT: openthread::ot::Trel> DriverState<OT> {
     }
 }
 
+impl<OT: openthread::ot::BorderRouter> DriverState<OT> {
+    // SAFETY: In general this is safe to call because `bool`s are
+    //         safe to write to or read from multiple threads.
+    //         This code happens to always be called from a single
+    //         thread anyway, so it is going to be safe regardless.
+    unsafe fn dhcpv6_pd_enabled_ref() -> &'static mut bool {
+        static mut DHCPV6_PD_ENABLED: bool = false;
+        #[allow(unknown_lints)]
+        #[allow(static_mut_ref)]
+        &mut DHCPV6_PD_ENABLED
+    }
+
+    pub fn is_dhcpv6_pd_enabled(&self) -> bool {
+        // SAFETY: This is safe for the reasons explained
+        //         in the comment above `dhcpv6_pd_enable_ref()`.
+        unsafe { *Self::dhcpv6_pd_enabled_ref() }
+    }
+
+    pub fn set_dhcpv6_pd_enabled(&mut self, enabled: bool) {
+        if enabled
+            != (self.ot_instance.border_routing_dhcp6_pd_get_state()
+                != ot::BorderRoutingDhcp6PdState::Disabled)
+        {
+            self.ot_instance.border_routing_dhcp6_pd_set_enabled(enabled);
+        }
+
+        // SAFETY: This is safe for the reasons explained
+        //         in the comment above `dhcpv6_pd_enable_ref()`.
+        unsafe {
+            *Self::dhcpv6_pd_enabled_ref() = enabled;
+        }
+    }
+
+    pub fn check_dhcpv6_pd(&self) {
+        if !self.is_dhcpv6_pd_enabled()
+            && (self.ot_instance.border_routing_dhcp6_pd_get_state()
+                != ot::BorderRoutingDhcp6PdState::Disabled)
+        {
+            self.ot_instance.border_routing_dhcp6_pd_set_enabled(false);
+        }
+    }
+}
+
 impl<OT: AsRef<ot::Instance>> DriverState<OT> {
     pub fn is_discovery_proxy_enabled(&self) -> bool {
         self.srp_discovery_proxy.is_some()

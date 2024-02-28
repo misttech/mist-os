@@ -1063,6 +1063,7 @@ where
             trel_enabled: Some(driver_state.is_trel_enabled()),
             detailed_logging_enabled: Some(detailed_logging_enabled),
             detailed_logging_level: Some(detailed_logging_level.into()),
+            dhcpv6_pd_enabled: Some(driver_state.is_dhcpv6_pd_enabled()),
             ..Default::default()
         })
     }
@@ -1078,6 +1079,10 @@ where
 
         if let Some(nat64_enabled) = config.nat64_enabled {
             driver_state.ot_instance.nat64_set_enabled(nat64_enabled);
+        }
+
+        if let Some(dhcpv6_pd_enabled) = config.dhcpv6_pd_enabled {
+            driver_state.set_dhcpv6_pd_enabled(dhcpv6_pd_enabled);
         }
 
         if let Err(e) = driver_state.detailed_logging.process_detailed_logging_set(
