@@ -9,6 +9,7 @@ import operator
 import os
 import tempfile
 import unittest
+import io
 
 import perf_publish.summarize as summarize
 
@@ -262,7 +263,8 @@ class SummarizeTest(unittest.TestCase):
         write_fuchsiaperf_json() can be read back successfully and give the
         same value.
         """
-        with tempfile.NamedTemporaryFile(delete=False, mode="w") as f:
+        with tempfile.NamedTemporaryFile(delete=False, mode="wb") as temp_file:
+            f = io.TextIOWrapper(temp_file)
             json_data = [
                 {
                     "foo": "bar",
@@ -277,7 +279,7 @@ class SummarizeTest(unittest.TestCase):
             ]
             summarize.write_fuchsiaperf_json(f, json_data)
             f.close()
-            with open(f.name) as f:
+            with open(f.name, "r", encoding="utf-8") as f:
                 self.assertEqual(json.load(f), json_data)
 
     def test_write_fuchsia_perf_json_newlines(self) -> None:
@@ -285,8 +287,9 @@ class SummarizeTest(unittest.TestCase):
         Check that write_fuchsiaperf_json() outputs a newline after each
         top-level entry.
         """
-        with tempfile.NamedTemporaryFile(delete=False, mode="w") as f:
+        with tempfile.NamedTemporaryFile(delete=False, mode="wb") as temp_file:
+            f = io.TextIOWrapper(temp_file)
             summarize.write_fuchsiaperf_json(f, ["foo", "bar", "qux"])
             f.close()
-            with open(f.name) as f:
+            with open(f.name, "r", encoding="utf-8") as f:
                 self.assertEqual(f.read(), '["foo",\n"bar",\n"qux"]\n')

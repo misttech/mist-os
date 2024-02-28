@@ -5,7 +5,7 @@
 """CPU trace metrics."""
 
 import logging
-from typing import Any, Dict, Iterable, Iterator, List
+from typing import Any, Iterable, Iterator
 
 import trace_processing.trace_metrics as trace_metrics
 import trace_processing.trace_model as trace_model
@@ -21,8 +21,8 @@ _AGGREGATE_METRICS_ONLY: str = "aggregateMetricsOnly"
 # DEPRECATED: Use CpuMetricsProcessor instead.
 # TODO(b/320778225): Remove once downstream callers are migrated.
 def metrics_processor(
-    model: trace_model.Model, extra_args: Dict[str, Any]
-) -> List[trace_metrics.TestCaseResult]:
+    model: trace_model.Model, extra_args: dict[str, Any]
+) -> list[trace_metrics.TestCaseResult]:
     """Computes the CPU utilization for the given trace.
 
     Args:
@@ -51,7 +51,7 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
 
     def process_metrics(
         self, model: trace_model.Model
-    ) -> List[trace_metrics.TestCaseResult]:
+    ) -> list[trace_metrics.TestCaseResult]:
         all_events: Iterator[trace_model.Event] = model.all_events()
         cpu_usage_events: Iterable[
             trace_model.Event
@@ -61,7 +61,7 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
             name=_CPU_USAGE_EVENT_NAME,
             type=trace_model.CounterEvent,
         )
-        cpu_percentages: List[float] = list(
+        cpu_percentages: list[float] = list(
             trace_utils.get_arg_values_from_events(
                 cpu_usage_events,
                 arg_key=_CPU_USAGE_EVENT_NAME,
@@ -91,7 +91,7 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
             duration: trace_time.TimeDelta = model.total_duration()
             _LOGGER.info(
                 f"No cpu usage measurements are present. Perhaps the trace duration"
-                f"{duration.toMilliseconds()} milliseconds) is too short to provide"
+                f"{duration.to_milliseconds()} milliseconds) is too short to provide"
                 f"cpu usage information"
             )
             return []

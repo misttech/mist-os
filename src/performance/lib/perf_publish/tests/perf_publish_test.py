@@ -102,7 +102,7 @@ _MISMATCH_METRICS_FUCHSIA_PERF = json.dumps(
 class CatapultConverterTest(unittest.TestCase):
     """Catapult converter metric publishing tests"""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self._temp_dir = tempfile.TemporaryDirectory()
         self._expected_metrics_txt: str = self._init_file(
             _EXPECTED_METRICS_FILE, _EXPECTED_METRICS
@@ -135,7 +135,7 @@ class CatapultConverterTest(unittest.TestCase):
             self._temp_dir.name, "results.catapult_json_disabled"
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self._temp_dir.cleanup()
 
     def test_run_converter_local(self) -> None:
@@ -547,7 +547,7 @@ class CatapultConverterTest(unittest.TestCase):
             ]
         )
 
-    def _init_file(self, filename: str, contents: str):
+    def _init_file(self, filename: str, contents: str) -> str:
         file_path = os.path.join(self._temp_dir.name, filename)
         with open(file_path, "w") as f:
             f.write(contents)

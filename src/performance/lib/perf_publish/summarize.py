@@ -7,14 +7,14 @@ a concise and human-readable format.
 """
 
 import json
-import math
-from numbers import Number
 import os
 import statistics
-from typing import Any, TextIO, Tuple
+from typing import Any, TextIO, Iterable
 
 
-def write_fuchsiaperf_json(destination_file: TextIO, json_list: list[Any]):
+def write_fuchsiaperf_json(
+    destination_file: TextIO, json_list: list[Any]
+) -> None:
     """Writes a human readable json file in a more concise way than pretty json."""
     destination_file.write("[")
     is_first: bool = True
@@ -26,7 +26,7 @@ def write_fuchsiaperf_json(destination_file: TextIO, json_list: list[Any]):
     destination_file.write("]\n")
 
 
-def mean_excluding_warm_up(values: list[Number]) -> Number:
+def mean_excluding_warm_up(values: list[int | float]) -> float:
     """Returns the mean of the given list of values excluding the first one."""
     if len(values) == 0:
         raise ValueError("Cannot calculate mean of empty list")
@@ -35,7 +35,9 @@ def mean_excluding_warm_up(values: list[Number]) -> Number:
     return statistics.mean(values[1:])
 
 
-def summarize_perf_files(json_files: list[os.PathLike]) -> list[dict[str, Any]]:
+def summarize_perf_files(
+    json_files: Iterable[str | os.PathLike[str]],
+) -> list[dict[str, Any]]:
     """
     This function takes a set of "raw data" fuchsiaperf files as input
     and produces the contents of a "summary" fuchsiaperf file as output.
@@ -44,7 +46,7 @@ def summarize_perf_files(json_files: list[os.PathLike]) -> list[dict[str, Any]]:
     See `//docs/development/performance/metric_name_expectations.md` for a
     description of how the summarization is done and what benefits it provides.
     """
-    output_by_name: dict[Tuple[str, str], dict[str, Any]] = {}
+    output_by_name: dict[tuple[str, str], dict[str, Any]] = {}
     result: list[dict[str, Any]] = []
     for json_file in json_files:
         with open(json_file, "r") as f:

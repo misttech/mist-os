@@ -103,7 +103,7 @@ class CatapultConverterTest(unittest.TestCase):
             str(context.exception),
         )
 
-    def test_no_summarize(self):
+    def test_no_summarize(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             metrics_file = os.path.join(tmpdir, "metrics.txt")
             with open(metrics_file, "w") as f:
@@ -121,7 +121,7 @@ class CatapultConverterTest(unittest.TestCase):
         self.assertEqual(allowlist.optional_metrics, set())
         self.assertFalse(allowlist.should_summarize)
 
-    def test_command_can_be_present_after_comments_or_blank_lines(self):
+    def test_command_can_be_present_after_comments_or_blank_lines(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             metrics_file = os.path.join(tmpdir, "metrics.txt")
             with open(metrics_file, "w") as f:
@@ -137,7 +137,7 @@ class CatapultConverterTest(unittest.TestCase):
             set(["fuchsia.suite1: foo", "fuchsia.suite1: bar"]),
         )
 
-    def test_command_rejected_in_between_metrics(self):
+    def test_command_rejected_in_between_metrics(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             metrics_file = os.path.join(tmpdir, "metrics.txt")
             with open(metrics_file, "w") as f:

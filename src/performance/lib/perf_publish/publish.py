@@ -5,10 +5,11 @@
 import json
 import logging
 import os
+import pathlib
 import re
 import subprocess
 import time
-from typing import Any, Iterable, Self, Union
+from typing import Any, Iterable, Self
 
 import perf_publish.metrics_allowlist as metrics_allowlist
 import perf_publish.summarize as summarize
@@ -20,13 +21,13 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 # Fuchsia test results from results from other projects that upload to Catapult (Chromeperf),
 # because the namespace is shared between projects and Catapult does not enforce any separation
 # between projects.
-_TEST_SUITE_REGEX: re.Pattern = re.compile(
+_TEST_SUITE_REGEX: re.Pattern[str] = re.compile(
     r"^fuchsia\.([a-z0-9_-]+\.)*[a-z0-9_-]+$"
 )
 
 # The regexp for the 'label' field is fairly permissive. This reflects what is currently generated
 # by tests.
-_LABEL_REGEX: re.Pattern = re.compile(r"^[A-Za-z0-9_/.:=+<>\\ -]+$")
+_LABEL_REGEX: re.Pattern[str] = re.compile(r"^[A-Za-z0-9_/.:=+<>\\ -]+$")
 
 _FUCHSIA_PERF_EXT: str = ".fuchsiaperf.json"
 _FUCHSIA_PERF_FULL_EXT: str = ".fuchsiaperf_full.json"
@@ -45,10 +46,10 @@ ENV_FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR: str = (
 
 
 def publish_fuchsiaperf(
-    fuchsia_perf_file_paths: Iterable[Union[str, os.PathLike]],
+    fuchsia_perf_file_paths: Iterable[str | os.PathLike[str]],
     expected_metric_names_filename: str,
-    env: Union[dict[str, str], type(os.environ)] = os.environ,
-    runtime_deps_dir: Union[str, os.PathLike] | None = None,
+    env: dict[str, str] = dict(os.environ),
+    runtime_deps_dir: str | os.PathLike[str] | None = None,
 ) -> None:
     """Publishes the given metrics.
 
@@ -73,7 +74,7 @@ def publish_fuchsiaperf(
 class CatapultConverter:
     def __init__(
         self,
-        fuchsia_perf_file_paths: Iterable[Union[str, os.PathLike]],
+        fuchsia_perf_file_paths: Iterable[str | os.PathLike[str]],
         expected_metric_names_filename: str,
         master: str | None = None,
         bot: str | None = None,
@@ -83,7 +84,7 @@ class CatapultConverter:
         fuchsia_expected_metric_names_dest_dir: str | None = None,
         current_time: int | None = None,
         subprocess_check_call: Any = subprocess.check_call,
-        runtime_deps_dir: Union[str, os.PathLike] | None = None,
+        runtime_deps_dir: str | os.PathLike[str] | None = None,
     ):
         """Creates a new catapult converter.
 
@@ -180,15 +181,17 @@ class CatapultConverter:
             + catapult_extension
         )
 
-    def _check_extension_and_relocate(self, fuchsia_perf_file_paths):
-        fuchsia_perf_file_paths = list(map(str, fuchsia_perf_file_paths))
-        if len(fuchsia_perf_file_paths) == 0:
+    def _check_extension_and_relocate(
+        self, fuchsia_perf_file_paths: Iterable[str | os.PathLike[str]]
+    ) -> list[str]:
+        perf_file_paths = list(map(str, fuchsia_perf_file_paths))
+        if len(perf_file_paths) == 0:
             raise ValueError("Expected at least one fuchsiaperf.json file")
         files_with_wrong_ext = []
         files_to_rename = []
         paths = []
 
-        for p in fuchsia_perf_file_paths:
+        for p in perf_file_paths:
             if p.endswith(_FUCHSIA_PERF_EXT):
                 files_to_rename.append(p)
             elif p.endswith(_FUCHSIA_PERF_FULL_EXT):
@@ -214,10 +217,10 @@ class CatapultConverter:
     @classmethod
     def from_env(
         cls,
-        fuchsia_perf_file_paths: Iterable[Union[str, os.PathLike]],
+        fuchsia_perf_file_paths: Iterable[str | os.PathLike[str]],
         expected_metric_names_filename: str,
-        env: Union[dict[str, str], type(os.environ)] = os.environ,
-        runtime_deps_dir: Union[str, os.PathLike] | None = None,
+        env: dict[str, str] = dict(os.environ),
+        runtime_deps_dir: str | os.PathLike[str] | None = None,
         current_time: int | None = None,
         subprocess_check_call: Any = subprocess.check_call,
     ) -> Self:
