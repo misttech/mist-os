@@ -8,7 +8,6 @@ use fidl::encoding::{
 use fidl::AsHandleRef as _;
 
 use std::collections::HashMap;
-use std::convert::TryFrom;
 
 use crate::error::{Error, Result};
 use crate::library;

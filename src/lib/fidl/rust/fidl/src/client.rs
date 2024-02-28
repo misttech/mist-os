@@ -22,7 +22,7 @@ use {
         task::{noop_waker, ArcWake, Context, Poll, Waker},
     },
     slab::Slab,
-    std::{collections::VecDeque, marker::Unpin, mem, pin::Pin, sync::Arc},
+    std::{collections::VecDeque, mem, pin::Pin, sync::Arc},
 };
 
 /// Decodes the body of `buf` as the FIDL type `T`.
@@ -899,7 +899,7 @@ mod tests {
         fuchsia_async::{DurationExt, TimeoutExt},
         fuchsia_zircon as zx,
         fuchsia_zircon::{AsHandleRef, DurationNum},
-        futures::{join, FutureExt, StreamExt, TryFutureExt},
+        futures::{join, StreamExt, TryFutureExt},
         futures_test::task::new_count_waker,
         std::thread,
     };

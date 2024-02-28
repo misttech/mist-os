@@ -26,7 +26,6 @@ use {
     fuchsia_async as fasync,
     fuchsia_zircon::{Handle, ObjectType, Rights, Signals, Time},
     futures::{future, stream::StreamExt},
-    std::convert::TryInto,
     std::io::prelude::*,
 };
 

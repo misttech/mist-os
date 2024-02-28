@@ -411,7 +411,6 @@ mod test {
     use super::*;
     use std::fs::File;
     use std::io::Write;
-    use std::path::PathBuf;
     use tempfile::{tempdir, NamedTempFile};
 
     #[test]

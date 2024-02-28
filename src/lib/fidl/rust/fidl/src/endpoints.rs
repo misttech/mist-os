@@ -10,9 +10,8 @@ use {
         HandleRef, OnSignals, ServeInner,
     },
     fuchsia_async as fasync, fuchsia_zircon_status as zx_status,
-    futures::{self, Future, FutureExt, Stream, TryFutureExt, TryStream, TryStreamExt},
-    std::convert::From,
-    std::marker::{PhantomData, Unpin},
+    futures::{Future, FutureExt, Stream, TryFutureExt, TryStream, TryStreamExt},
+    std::marker::PhantomData,
     std::sync::Arc,
     tracing::error,
 };

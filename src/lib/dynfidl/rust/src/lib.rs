@@ -7,8 +7,6 @@
 //!
 //! [FIDL wire format]: https://fuchsia.dev/fuchsia-src/reference/fidl/language/wire-format
 
-use std::default::Default;
-
 /// A FIDL struct for encoding. Fields are defined in order.
 pub struct Structure {
     fields: Vec<Field>,

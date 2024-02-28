@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    benchmark_suite,
     criterion::Criterion,
     fuchsia_criterion::{criterion::Benchmark, FuchsiaCriterion},
     std::{mem, time::Duration},

@@ -14,7 +14,6 @@ use crate::library;
 use crate::util::*;
 use crate::value::Value;
 
-use std::borrow::ToOwned;
 use std::str;
 
 type DResult<'a, R> = IResult<&'a [u8], R, Error>;
