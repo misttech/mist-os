@@ -7,7 +7,6 @@
 use super::PeerConnRef;
 use crate::labels::NodeId;
 use anyhow::{format_err, Error};
-use std::convert::TryInto;
 
 /// The type of frame that can be received on a QUIC stream
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

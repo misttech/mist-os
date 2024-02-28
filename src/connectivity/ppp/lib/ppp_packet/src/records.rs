@@ -539,7 +539,6 @@ impl<'a> packet::BufferView<&'a [u8]> for LongLivedBuff<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use packet::BufferView;
     use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
     const DUMMY_BYTES: [u8; 16] = [
@@ -956,7 +955,6 @@ mod test {
 /// can be implemented using the same utility with a bit of customization.
 pub mod options {
     use super::*;
-    use packet::BufferView;
 
     /// A parsed set of header options.
     ///

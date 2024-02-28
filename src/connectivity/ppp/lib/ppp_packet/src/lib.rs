@@ -19,7 +19,6 @@ use {
         BufferView, BufferViewMut, FragmentedBytesMut, PacketBuilder, PacketConstraints,
         ParsablePacket, ParseMetadata, SerializeTarget,
     },
-    std::convert::TryInto,
     thiserror::Error,
     zerocopy::{
         byteorder::network_endian::{U16, U32},
@@ -455,10 +454,7 @@ impl PacketBuilder for EchoDiscardPacketBuilder {
 mod tests {
     use {
         super::*,
-        crate::{
-            ipv4, ipv6, link,
-            records::options::{Options, OptionsSerializer},
-        },
+        crate::records::options::{Options, OptionsSerializer},
         packet::{Buf, InnerPacketBuilder, ParseBuffer, Serializer},
     };
 

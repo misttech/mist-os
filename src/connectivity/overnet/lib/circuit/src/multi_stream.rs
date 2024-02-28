@@ -12,7 +12,6 @@ use futures::future::Either;
 use futures::prelude::*;
 use futures::StreamExt;
 use std::collections::HashMap;
-use std::future::Future;
 use std::sync::{Arc, Mutex as SyncMutex};
 
 /// Status of an individual stream.
