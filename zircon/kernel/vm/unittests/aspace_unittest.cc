@@ -1215,6 +1215,70 @@ static bool vmaspace_priority_reference_test() {
   END_TEST;
 }
 
+// Tests that page attribution works as expected in a nested aspace hierarchy.
+static bool vmaspace_nested_attribution_test() {
+  BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
+
+  fbl::RefPtr<VmAspace> aspace = VmAspace::Create(VmAspace::Type::User, "test-aspace");
+  ASSERT_NONNULL(aspace);
+
+  // 8 page vmar.
+  fbl::RefPtr<VmAddressRegion> vmar;
+  ASSERT_OK(aspace->RootVmar()->CreateSubVmar(
+      0, PAGE_SIZE * 8, 0,
+      VMAR_FLAG_CAN_MAP_SPECIFIC | VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE, "test vmar",
+      &vmar));
+
+  // Child vmar that covers the first 4 pages of the previous vmar.
+  fbl::RefPtr<VmAddressRegion> subvmar1;
+  ASSERT_OK(vmar->CreateSubVmar(
+      0, PAGE_SIZE * 4, 0,
+      VMAR_FLAG_CAN_MAP_SPECIFIC | VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE, "test vmar",
+      &subvmar1));
+
+  // Grandchild vmar that covers the first 2 pages of the child.
+  fbl::RefPtr<VmAddressRegion> subvmar2;
+  ASSERT_OK(subvmar1->CreateSubVmar(
+      0, PAGE_SIZE * 2, 0,
+      VMAR_FLAG_CAN_MAP_SPECIFIC | VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE, "test vmar",
+      &subvmar2));
+
+  // Make 2 page vmo.
+  fbl::RefPtr<VmObjectPaged> vmo;
+  zx_status_t status =
+      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, 2 * PAGE_SIZE,
+                            AttributionObject::GetKernelAttribution(), &vmo);
+  ASSERT_EQ(ZX_OK, status);
+
+  // Map VMO to grandchild.
+  EXPECT_EQ(aspace->is_user(), true);
+  auto mapping_result =
+      subvmar2->CreateVmMapping(0, 2 * PAGE_SIZE, 0, 0, vmo, 0, kArchRwUserFlags, "test-mapping");
+  EXPECT_EQ(ZX_OK, mapping_result.status_value());
+  fbl::RefPtr<VmMapping> mapping = ktl::move(mapping_result->mapping);
+
+  // Commit 2 pages into mapping.
+  status = vmo->CommitRange(0, 2 * PAGE_SIZE);
+  ASSERT_EQ(ZX_OK, status);
+
+  // Verify that the two pages are counted for the parent vmar chain.
+  VmObject::AttributionCounts page_counts = mapping->AllocatedPages();
+  ASSERT_EQ(page_counts.uncompressed, (uint64_t)2);
+
+  page_counts = subvmar2->AllocatedPages();
+  ASSERT_EQ(page_counts.uncompressed, (uint64_t)2);
+
+  page_counts = subvmar1->AllocatedPages();
+  ASSERT_EQ(page_counts.uncompressed, (uint64_t)2);
+
+  page_counts = vmar->AllocatedPages();
+  ASSERT_EQ(page_counts.uncompressed, (uint64_t)2);
+
+  END_TEST;
+}
+
 // Tests that page attribution caching at the VmMapping layer behaves as expected under
 // commits and decommits on the vmo range.
 static bool vm_mapping_attribution_commit_decommit_test() {
@@ -2469,6 +2533,7 @@ VM_UNITTEST(vmaspace_priority_bidir_clone_test)
 VM_UNITTEST(vmaspace_priority_slice_test)
 VM_UNITTEST(vmaspace_priority_pager_test)
 VM_UNITTEST(vmaspace_priority_reference_test)
+VM_UNITTEST(vmaspace_nested_attribution_test)
 VM_UNITTEST(vm_mapping_attribution_commit_decommit_test)
 VM_UNITTEST(vm_mapping_attribution_map_unmap_test)
 VM_UNITTEST(vm_mapping_attribution_merge_test)

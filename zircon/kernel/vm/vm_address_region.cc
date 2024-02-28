@@ -382,18 +382,20 @@ fbl::RefPtr<VmAddressRegionOrMapping> VmAddressRegion::FindRegionLocked(vaddr_t 
   return fbl::RefPtr(subregions_.FindRegion(addr));
 }
 
-VmObject::AttributionCounts VmAddressRegion::AllocatedPagesLocked() const {
+VmObject::AttributionCounts VmAddressRegion::AllocatedPagesLocked() {
   canary_.Assert();
 
   AttributionCounts page_counts;
-  if (state_ != LifeCycleState::ALIVE) {
-    return page_counts;
-  }
 
-  for (const auto& child : subregions_) {
-    AssertHeld(child.lock_ref());
-    page_counts += child.AllocatedPagesLocked();
-  }
+  // Enumerate all of the subregions below us & count allocated pages.
+  EnumerateChildrenInternalLocked(
+      0, UINT64_MAX, [](VmAddressRegion* vmar, uint depth) { return true; },
+      [&page_counts](VmMapping* map, const VmAddressRegion* vmar, uint depth) {
+        AssertHeld(map->lock_ref());
+        page_counts += map->AllocatedPagesLocked();
+        return true;
+      });
+
   return page_counts;
 }
 

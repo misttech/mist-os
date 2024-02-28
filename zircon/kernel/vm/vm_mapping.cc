@@ -70,7 +70,7 @@ fbl::RefPtr<VmObject> VmMapping::vmo() const {
   return vmo_locked();
 }
 
-VmMapping::AttributionCounts VmMapping::AllocatedPagesLocked() const {
+VmMapping::AttributionCounts VmMapping::AllocatedPagesLocked() {
   canary_.Assert();
 
   if (state_ != LifeCycleState::ALIVE) {

@@ -121,7 +121,7 @@ class VmAddressRegionOrMapping
 
   // Recursively compute the number of allocated pages within this region
   using AttributionCounts = VmObject::AttributionCounts;
-  virtual AttributionCounts AllocatedPages() const;
+  virtual AttributionCounts AllocatedPages();
 
   // Subtype information and safe down-casting
   bool is_mapping() const { return is_mapping_; }
@@ -228,7 +228,7 @@ class VmAddressRegionOrMapping
 
   virtual zx_status_t DestroyLocked() TA_REQ(lock()) = 0;
 
-  virtual AttributionCounts AllocatedPagesLocked() const TA_REQ(lock()) = 0;
+  virtual AttributionCounts AllocatedPagesLocked() TA_REQ(lock()) = 0;
 
   // Applies the given memory priority to this VMAR, which may or may not result in a change. Up to
   // the derived type to know how to apply and update the |memory_priority_| field.
@@ -723,7 +723,7 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
   // constructor for use in creating the kernel aspace singleton
   explicit VmAddressRegion(VmAspace& kernel_aspace);
   // Count the allocated pages, caller must be holding the aspace lock
-  AttributionCounts AllocatedPagesLocked() const TA_REQ(lock()) override;
+  AttributionCounts AllocatedPagesLocked() TA_REQ(lock()) override;
 
   // Used to implement VmAspace::EnumerateChildren.
   // |aspace_->lock()| must be held.
@@ -1119,7 +1119,7 @@ class VmMapping final : public VmAddressRegionOrMapping,
   static zx_status_t ProtectOrUnmap(const fbl::RefPtr<VmAspace>& aspace, vaddr_t base, size_t size,
                                     uint new_arch_mmu_flags);
 
-  AttributionCounts AllocatedPagesLocked() const TA_REQ(lock()) override;
+  AttributionCounts AllocatedPagesLocked() TA_REQ(lock()) override;
 
   zx_status_t SetMemoryPriorityLocked(VmAddressRegion::MemoryPriority priority) override
       TA_REQ(lock());
