@@ -12,8 +12,11 @@ use discovery::{
 };
 use futures::Stream;
 use futures::StreamExt;
-use std::marker::Unpin;
+use signal_hook::consts::signal::*;
+use signal_hook::iterator::Signals;
+use std::sync::Arc;
 use std::{collections::HashMap, io, io::Write, time::Duration};
+use std::{marker::Unpin, sync::Mutex};
 use target::TargetInfo;
 use timeout::timeout;
 use tracing_subscriber::filter::LevelFilter;
@@ -127,7 +130,7 @@ async fn main() -> Result<()> {
 }
 
 async fn close_existing_tunnel_main(args: SubCommandCloseLocalTunnel) -> Result<()> {
-    ssh::close_existing_tunnel(args.host).await
+    ssh::close_existing_tunnel(args.host)
 }
 
 async fn cleanup_main(args: SubCommandCleanupRemote) -> Result<()> {
@@ -153,10 +156,51 @@ async fn funnel_main(args: SubCommandHost) -> Result<()> {
 
     let mut stdin = io::stdin().lock();
     let target = choose_target(&mut stdin, &mut stdout, targets, args.target_name).await?;
+    // Drop the locks we have on stdin and stdout
+    drop(stdin);
+    drop(stdout);
 
     tracing::debug!("Target to forward: {:?}", target);
     tracing::info!("Additional port forwards: {:?}", args.additional_port_forwards);
-    do_ssh(args.host, target, args.repository_port, args.additional_port_forwards)?;
+    let host = args.host.clone();
+    let do_ssh_fut =
+        do_ssh(host.clone(), target, args.repository_port, args.additional_port_forwards);
+    // Need to both do ssh and listen for signals
+    let mut signals = Signals::new(&[SIGINT]).unwrap();
+    let handle = signals.handle();
+    // Need something to signal that we exited due to a signal
+    let term_requested = Arc::new(Mutex::new(false));
+    let thread_reqested = Arc::clone(&term_requested);
+    let signal_thread = std::thread::spawn(move || {
+        if let Some(signal) = signals.forever().next() {
+            assert_eq!(signal, SIGINT);
+            eprintln!("\nCaught interrupt. Shutting down the tunnel...");
+            let res = ssh::close_existing_tunnel(host.clone());
+            tracing::debug!("Result from closing existing tunnel: {:?}", res);
+            *thread_reqested.lock().unwrap() = true;
+            return;
+        }
+    });
+
+    let do_ssh_res = do_ssh_fut.await;
+    tracing::info!("result from do_ssh: {:?}", do_ssh_res);
+    match do_ssh_res {
+        Ok(_) => {}
+        e @ Err(ssh::TunnelError::TunnelAlreadyRunning { remote_host: _ }) => {
+            // If this returned an error due to our signal just log and return
+            let was_requested = term_requested.lock().unwrap();
+            if !*was_requested {
+                // We did not get a signal. Error out
+                e?;
+            }
+        }
+        e @ _ => {
+            // We got an unexpected error
+            e?;
+        }
+    }
+    handle.close();
+    signal_thread.join().expect("signal thread to shutdown without panic");
     Ok(())
 }
 

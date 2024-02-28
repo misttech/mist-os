@@ -7,8 +7,9 @@ use addr::TargetAddr;
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use home::home_dir;
-use std::path::PathBuf;
 use std::process::Command;
+use std::process::Stdio;
+use std::{os::unix::process::CommandExt, path::PathBuf};
 use thiserror::Error;
 
 const CONTROL_MASTER_PATH: &str = ".ssh/control/funnel_control_master";
@@ -53,7 +54,7 @@ fn get_control_path() -> Result<Utf8PathBuf, TunnelError> {
     Ok(funnel_control_path)
 }
 
-pub(crate) fn do_ssh(
+pub(crate) async fn do_ssh(
     host: String,
     target: TargetInfo,
     repo_port: u32,
@@ -69,7 +70,12 @@ pub(crate) fn do_ssh(
         ssh_cmd = ssh_cmd.arg(arg);
     }
     ssh_cmd = ssh_cmd.arg(host.clone());
-    ssh_cmd = ssh_cmd.arg(format!("echo 'Tunnel established' && sleep infinity"));
+    ssh_cmd = ssh_cmd.arg(format!(r#"echo 'Tunnel established'; sleep infinity"#));
+
+    // Disable stdin
+    ssh_cmd = ssh_cmd.stdin(Stdio::null());
+    // Use the PID as the process group so that SIGINT doesnt get forwarded
+    ssh_cmd = ssh_cmd.process_group(0);
 
     // Spawn
     tracing::debug!("About to ssh with command: {:#?}", ssh_cmd);
@@ -147,7 +153,7 @@ pub(crate) async fn cleanup_remote_sshd(host: String) -> Result<()> {
     Ok(())
 }
 
-pub(crate) async fn close_existing_tunnel(host: String) -> Result<()> {
+pub(crate) fn close_existing_tunnel(host: String) -> Result<()> {
     let funnel_control_path = get_control_path()?;
     let args = vec![
         "-o".to_string(),
@@ -156,6 +162,7 @@ pub(crate) async fn close_existing_tunnel(host: String) -> Result<()> {
         "exit".to_string(),
         host,
     ];
+    tracing::info!("executing ssh command with args: {:?}", args);
     let mut ssh = Command::new("ssh").args(args).spawn()?;
     ssh.wait()?;
     Ok(())

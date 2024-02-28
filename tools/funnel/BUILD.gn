@@ -31,6 +31,7 @@ rustc_binary("funnel_bin") {
     "//third_party/rust_crates:home",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:signal-hook",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:tracing-subscriber",
