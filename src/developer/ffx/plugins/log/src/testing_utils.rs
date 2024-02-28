@@ -203,11 +203,16 @@ async fn handle_archive_accessor(
 async fn handle_log_settings(channel: fidl::Channel, mut scheduler: TaskScheduler) {
     let mut stream =
         LogSettingsRequestStream::from_channel(fuchsia_async::Channel::from_channel(channel));
-    while let Some(Ok(LogSettingsRequest::SetInterest { selectors, responder })) =
-        stream.next().await
-    {
-        scheduler.send_event(TestEvent::SeverityChanged(selectors));
-        responder.send().unwrap();
+    while let Some(Ok(request)) = stream.next().await {
+        match request {
+            LogSettingsRequest::RegisterInterest { .. } => {
+                panic!("fuchsia.diagnostics/LogSettings.RegisterInterest is not supported");
+            }
+            LogSettingsRequest::SetInterest { selectors, responder } => {
+                scheduler.send_event(TestEvent::SeverityChanged(selectors));
+                responder.send().unwrap();
+            }
+        }
     }
     scheduler.send_event(TestEvent::LogSettingsConnectionClosed);
 }

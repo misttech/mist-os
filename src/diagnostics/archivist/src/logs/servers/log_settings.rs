@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::logs::{error::LogsError, repository::LogsRepository};
-use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl::endpoints::{ControlHandle, DiscoverableProtocolMarker};
 use fidl_fuchsia_diagnostics as fdiagnostics;
 use fuchsia_async as fasync;
 use futures::{channel::mpsc, StreamExt};
@@ -57,6 +57,10 @@ impl LogSettingsServer {
                 source,
             })?;
             match request {
+                fdiagnostics::LogSettingsRequest::RegisterInterest { control_handle, .. } => {
+                    warn!("fuchsia.diagnostics/LogSettings.RegisterInterest is not supported; closing the channel");
+                    control_handle.shutdown();
+                }
                 fdiagnostics::LogSettingsRequest::SetInterest { selectors, responder } => {
                     logs_repo.update_logs_interest(connection_id, selectors);
                     responder.send().ok();
