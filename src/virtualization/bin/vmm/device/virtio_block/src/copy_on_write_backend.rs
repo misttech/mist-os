@@ -9,7 +9,6 @@ use {
     fuchsia_trace as ftrace,
     futures::future::try_join_all,
     std::cell::RefCell,
-    std::convert::TryInto,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -203,7 +202,6 @@ mod tests {
         crate::backend_test::{BackendController, BackendTest},
         crate::file_backend::tests::{FileBackendController, FileBackendTest},
         crate::memory_backend::{self, MemoryBackend},
-        anyhow::Error,
     };
 
     struct CopyOnWriteBackendController {

@@ -216,7 +216,7 @@ impl<'a, 'b, N: DriverNotify, M: DriverMem, Q: Stream<Item = DescChain<'a, 'b, N
 mod tests {
     use {
         super::*,
-        anyhow::{self, Context},
+        anyhow::Context,
         async_utils::PollExt,
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_ui_pointer::{MousePointerSample, MouseSourceMarker, Rectangle},

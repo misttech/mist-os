@@ -9,7 +9,7 @@ mod linuxfb;
 #[cfg(target_os = "fuchsia")]
 mod zirconfb;
 
-use {crate::framebuffer::Framebuffer, anyhow::Error, argh::FromArgs, serde_json};
+use {crate::framebuffer::Framebuffer, anyhow::Error, argh::FromArgs};
 
 /// Detect details about the framebuffer.
 #[derive(FromArgs, Debug)]

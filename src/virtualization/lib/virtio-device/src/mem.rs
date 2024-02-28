@@ -19,12 +19,7 @@
 //! through  [`try_ptr`](DeviceRange::try_ptr) and [`try_mut_ptr`](DeviceRange::try_mut_ptr) to
 //! actually read and write.
 
-use std::{
-    convert::{From, TryFrom},
-    marker::PhantomData,
-    mem,
-    ops::Range,
-};
+use std::{marker::PhantomData, mem, ops::Range};
 
 /// Represents a range of memory as seen from the driver.
 ///

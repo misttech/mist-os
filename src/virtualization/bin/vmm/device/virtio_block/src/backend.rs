@@ -255,7 +255,7 @@ pub trait BlockBackend {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::wire, virtio_device::fake_queue::IdentityDriverMem};
+    use {super::*, virtio_device::fake_queue::IdentityDriverMem};
 
     #[fuchsia::test]
     fn test_ranges_bounded_no_change() {

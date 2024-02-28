@@ -101,8 +101,8 @@ impl BlockBackend for QcowBackend {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, crate::backend::Request, crate::backend_test::check_range, crate::wire,
-        fuchsia_async as fasync, virtio_device::fake_queue::IdentityDriverMem,
+        super::*, crate::backend_test::check_range, crate::wire, fuchsia_async as fasync,
+        virtio_device::fake_queue::IdentityDriverMem,
     };
 
     // We don't use the test cases in `crate::backend_test` directly because we don't currently

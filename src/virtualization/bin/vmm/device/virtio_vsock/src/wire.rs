@@ -6,7 +6,6 @@ use {
     anyhow::{anyhow, Error},
     bitflags::bitflags,
     num_derive::FromPrimitive,
-    std::convert::TryFrom,
     zerocopy::{AsBytes, FromBytes, FromZeros, NoCell},
 };
 

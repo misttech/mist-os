@@ -28,7 +28,7 @@
 
 use {
     crate::mem::DeviceRange,
-    std::{convert::TryInto, marker::PhantomData, mem, sync::atomic},
+    std::{marker::PhantomData, mem, sync::atomic},
 };
 
 /// Descriptor has a next field.

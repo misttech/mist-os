@@ -288,8 +288,6 @@ mod tests {
         crate::wire::{LE16, LE64},
         diagnostics_assertions::assert_data_tree,
         fuchsia_inspect::Inspector,
-        std::ops::Range,
-        virtio_device::chain::{ReadableChain, WritableChain},
         virtio_device::fake_queue::{Chain, ChainBuilder, IdentityDriverMem, TestQueue},
         virtio_device::ring::DescAccess,
     };

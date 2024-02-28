@@ -6,8 +6,6 @@ use {
     anyhow::{anyhow, Context, Result},
     fuchsia_async as fasync,
     futures::{AsyncReadExt, AsyncWriteExt},
-    std::convert::TryFrom,
-    std::default::Default,
 };
 
 /// Default vsock port that vshd listens on.
@@ -64,7 +62,6 @@ pub async fn recv_message<P: prost::Message + Default>(socket: &mut fasync::Sock
 mod test {
     use super::*;
 
-    use anyhow::{Context, Result};
     use fuchsia_zircon as zx;
     use rand::{thread_rng, Rng};
     use vsh_rust_proto::vm_tools::vsh;

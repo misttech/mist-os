@@ -240,7 +240,7 @@ mod test {
     use {
         super::*,
         fidl::endpoints::{create_proxy_and_stream, ControlHandle, RequestStream},
-        fidl_fuchsia_virtualization::{BalloonControllerMarker, MemStat},
+        fidl_fuchsia_virtualization::MemStat,
         fuchsia_async as fasync, fuchsia_zircon_status as zx_status,
         futures::StreamExt,
     };

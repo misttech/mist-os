@@ -15,7 +15,6 @@ use {
     futures::channel::mpsc,
     futures::{future, StreamExt, TryFutureExt, TryStreamExt},
     machina_virtio_device::GuestBellTrap,
-    tracing,
     virtio_device::chain::{ReadableChain, WritableChain},
 };
 

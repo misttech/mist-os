@@ -7,7 +7,6 @@ use {
     fuchsia_zircon::{self as zx},
     futures::{channel::mpsc, Stream, StreamExt, TryStreamExt},
     std::{
-        convert::TryInto,
         pin::Pin,
         task::{Context, Poll},
     },

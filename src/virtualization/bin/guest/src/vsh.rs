@@ -17,7 +17,6 @@ use {
     guest_cli::platform::PlatformServices,
     guest_cli::platform::{GuestConsole, UnbufferedStdio},
     guest_cli_args::GuestType,
-    tracing,
     vsh_rust_proto::vm_tools::vsh,
 };
 

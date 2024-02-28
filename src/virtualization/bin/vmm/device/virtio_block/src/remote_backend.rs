@@ -152,7 +152,6 @@ mod tests {
     use {
         super::*,
         crate::backend_test::{BackendController, BackendTest},
-        anyhow::Error,
         fuchsia_zircon as zx,
         fuchsia_zircon::HandleBased as _,
     };

@@ -72,7 +72,6 @@ use {
     },
     std::{
         cell::{Cell, RefCell},
-        convert::TryFrom,
         io::Write,
         task::Context,
     },

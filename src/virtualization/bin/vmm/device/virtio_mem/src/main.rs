@@ -13,7 +13,6 @@ use {
     fuchsia_component::server,
     fuchsia_inspect as inspect,
     futures::{future, StreamExt, TryFutureExt, TryStreamExt},
-    tracing,
     virtio_device::chain::ReadableChain,
 };
 

@@ -12,18 +12,15 @@ use {
     crate::wire_convert,
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
-    fidl_fuchsia_media,
     fuchsia_async::{DurationExt, TimeoutExt},
     fuchsia_zircon::{self as zx, AsHandleRef},
     futures::FutureExt,
     futures::TryStreamExt,
     mapped_vmo::Mapping,
-    scopeguard,
     std::cell::RefCell,
     std::collections::{HashMap, VecDeque},
     std::ffi::CString,
     std::ops::Range,
-    tracing,
 };
 
 /// Parameters needed to construct an AudioStream.

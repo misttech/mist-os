@@ -11,7 +11,6 @@ use {
     fuchsia_zircon as zx,
     futures::{future::ready, select, stream, StreamExt},
     std::io::Write,
-    tracing,
 };
 
 // ANSI Escape sequences for terminal manipulation.
@@ -197,7 +196,6 @@ pub async fn launch(linux_manager: &LinuxManagerProxy, w: &mut impl Write) -> Re
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::default::Default;
     use std::iter::repeat;
     use term_model::{
         ansi::{Color, NamedColor, Processor, TermInfo},

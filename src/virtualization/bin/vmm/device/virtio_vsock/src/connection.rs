@@ -16,7 +16,7 @@ use {
         channel::mpsc::UnboundedSender,
         future::{AbortHandle, Abortable, Aborted},
     },
-    std::{convert::TryFrom, mem, rc::Rc},
+    std::{mem, rc::Rc},
     virtio_device::{
         chain::{ReadableChain, WritableChain},
         mem::DriverMem,
@@ -359,7 +359,7 @@ mod tests {
             HostVsockAcceptorMarker, HostVsockEndpointMarker, DEFAULT_GUEST_CID, HOST_CID,
         },
         futures::{channel::mpsc, TryStreamExt},
-        std::{convert::TryInto, io::Read, task::Poll},
+        std::{io::Read, task::Poll},
         virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
     };
 

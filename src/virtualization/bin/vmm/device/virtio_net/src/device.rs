@@ -291,7 +291,7 @@ mod tests {
         fuchsia_async as fasync,
         futures::channel::mpsc::{self, UnboundedSender},
         rand::{distributions::Standard, Rng},
-        std::{cell::RefCell, collections::VecDeque},
+        std::collections::VecDeque,
         virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
         zerocopy::FromBytes,
     };

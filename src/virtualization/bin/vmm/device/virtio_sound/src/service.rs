@@ -13,8 +13,6 @@ use {
     futures::TryStreamExt,
     std::cell::Cell,
     std::io::{Read, Write},
-    std::vec::Vec,
-    tracing,
     zerocopy::{AsBytes, FromBytes, NoCell},
 };
 

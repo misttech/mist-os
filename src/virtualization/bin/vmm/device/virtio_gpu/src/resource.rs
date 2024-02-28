@@ -7,7 +7,6 @@ use {
     anyhow::{anyhow, Error},
     fidl_fuchsia_ui_composition::BufferCollectionImportToken,
     fuchsia_zircon::{self as zx, HandleBased},
-    mapped_vmo,
     virtio_device::mem::DeviceRange,
 };
 
@@ -317,7 +316,7 @@ impl<'a> Resource2D<'a> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::wire, virtio_device::fake_queue::IdentityDriverMem};
+    use {super::*, virtio_device::fake_queue::IdentityDriverMem};
 
     #[fuchsia::test]
     async fn test_attach_backing() {

@@ -24,7 +24,6 @@ use {
     std::{
         cell::{Cell, RefCell},
         collections::HashMap,
-        convert::TryFrom,
         io::{Read, Write},
         mem,
         rc::Rc,

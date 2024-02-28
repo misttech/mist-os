@@ -293,7 +293,6 @@ mod tests {
         futures::StreamExt,
         std::cell::RefCell,
         std::ops::Range,
-        virtio_device::chain::ReadableChain,
         virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
     };
 

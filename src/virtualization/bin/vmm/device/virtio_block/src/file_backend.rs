@@ -148,7 +148,6 @@ pub mod tests {
     use {
         super::*,
         crate::backend_test::{BackendController, BackendTest},
-        anyhow::Error,
         std::io::{Read, Seek, SeekFrom, Write},
         tempfile::tempfile,
     };

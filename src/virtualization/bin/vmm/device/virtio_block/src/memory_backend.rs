@@ -11,7 +11,6 @@ use {
     async_trait::async_trait,
     fuchsia_trace as ftrace,
     std::cell::RefCell,
-    std::convert::TryInto,
     std::rc::Rc,
 };
 
@@ -138,7 +137,7 @@ impl BlockBackend for MemoryBackend {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::backend_test::BackendTest, anyhow::Error};
+    use {super::*, crate::backend_test::BackendTest};
 
     struct MemoryBackendTest;
 

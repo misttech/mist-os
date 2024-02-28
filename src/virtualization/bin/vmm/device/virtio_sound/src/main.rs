@@ -16,16 +16,12 @@ use {
     crate::wire_convert::*,
     anyhow::{anyhow, Context, Error},
     fidl::endpoints::RequestStream,
-    fidl_fuchsia_media,
     fidl_fuchsia_virtualization_hardware::{VirtioSoundRequest, VirtioSoundRequestStream},
-    fuchsia_scheduler,
     fuchsia_zircon::{self as zx, DurationNum},
     futures::{StreamExt, TryFutureExt, TryStreamExt},
     once_cell::sync::Lazy,
     service::VirtSoundService,
     std::rc::Rc,
-    std::vec::Vec,
-    tracing,
     virtio_device::chain::ReadableChain,
 };
 

@@ -16,7 +16,6 @@ use {
     fidl_fuchsia_virtualization_hardware::VirtioGpuRequestStream,
     fuchsia_component::server,
     futures::{select, FutureExt, StreamExt, TryFutureExt, TryStreamExt},
-    tracing,
 };
 
 async fn run_virtio_gpu(mut virtio_gpu_fidl: VirtioGpuRequestStream) -> Result<(), anyhow::Error> {

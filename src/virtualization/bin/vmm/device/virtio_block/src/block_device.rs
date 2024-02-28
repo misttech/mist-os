@@ -385,9 +385,7 @@ mod tests {
         super::*,
         crate::backend_test::BackendController,
         crate::memory_backend::MemoryBackend,
-        crate::wire,
         fuchsia_async as fasync,
-        virtio_device::chain::ReadableChain,
         virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
     };
 

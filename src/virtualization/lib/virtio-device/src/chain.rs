@@ -539,10 +539,7 @@ impl<'a, 'b, N: DriverNotify, M: DriverMem> std::io::Write for WritableChain<'a,
 mod tests {
     use {
         super::*,
-        crate::{
-            fake_queue::{Chain, IdentityDriverMem, TestQueue},
-            ring::DescAccess,
-        },
+        crate::fake_queue::{Chain, IdentityDriverMem, TestQueue},
         std::io::{Read, Write},
     };
 

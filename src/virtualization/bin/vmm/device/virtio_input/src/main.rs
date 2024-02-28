@@ -16,7 +16,6 @@ use {
     fidl_fuchsia_virtualization_hardware::{InputType, VirtioInputRequestStream},
     fuchsia_component::server,
     futures::{StreamExt, TryFutureExt, TryStreamExt},
-    tracing,
 };
 
 async fn run_virtio_input(

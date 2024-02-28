@@ -146,7 +146,7 @@ mod tests {
     use {
         super::*,
         async_utils::PollExt,
-        futures::{AsyncReadExt, FutureExt},
+        futures::FutureExt,
         rand::{distributions::Standard, Rng},
         virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
     };

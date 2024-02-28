@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    super::*, crate::wire, anyhow::Error, async_trait::async_trait, fidl_fuchsia_io::MAX_BUF,
+    super::*, anyhow::Error, async_trait::async_trait, fidl_fuchsia_io::MAX_BUF,
     futures::future::try_join_all, std::slice, virtio_device::fake_queue::IdentityDriverMem,
     virtio_device::mem::DeviceRange,
 };

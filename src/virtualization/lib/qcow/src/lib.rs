@@ -6,7 +6,6 @@ mod wire;
 
 use {
     anyhow::{anyhow, Error},
-    std::convert::TryInto,
     std::io::{Read, Seek},
     std::mem,
     zerocopy::FromBytes,

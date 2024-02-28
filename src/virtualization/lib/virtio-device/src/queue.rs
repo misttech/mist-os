@@ -19,10 +19,7 @@ use {
         ring,
     },
     fuchsia_sync::Mutex,
-    std::{
-        convert::{TryFrom, TryInto},
-        sync::atomic,
-    },
+    std::sync::atomic,
     thiserror::Error,
 };
 
