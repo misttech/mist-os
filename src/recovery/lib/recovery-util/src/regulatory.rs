@@ -67,7 +67,6 @@ fn validate_region_code(region_code: &str) -> Result<(), Error> {
 mod tests {
     use super::*;
     use fidl_fuchsia_hwinfo as hwinfo;
-    use fidl_fuchsia_intl::RegulatoryDomain;
     use fidl_fuchsia_location_namedplace as regulatory;
     use fuchsia_async as fasync;
     use fuchsia_async::TimeoutExt;

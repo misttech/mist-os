@@ -282,14 +282,11 @@ pub fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl::endpoints::DiscoverableProtocolMarker;
     use fidl_fuchsia_recovery_ui::{
         ProgressRendererMarker, ProgressRendererRender2Request, Status,
     };
     use fuchsia_async as fasync;
-    use futures::channel::mpsc;
-    use ota_lib::OtaStatus;
-    use recovery_util::ota::controller::{EventSender, MockController};
+    use recovery_util::ota::controller::MockController;
 
     #[fuchsia::test]
     async fn test_create_view_assistant_sets_up_state_handlers_and_starts() {

@@ -219,7 +219,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
-    use fidl_fuchsia_component::{Error, RealmMarker, RealmRequest};
+    use fidl_fuchsia_component::{Error, RealmRequest};
     use fuchsia_async as fasync;
     use futures::StreamExt;
     use std::sync::{

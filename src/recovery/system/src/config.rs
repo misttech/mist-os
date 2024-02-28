@@ -7,7 +7,6 @@ use {
     fidl_fuchsia_boot::{ArgumentsMarker, ArgumentsProxy},
     fidl_fuchsia_buildinfo::{ProviderMarker as BuildInfoMarker, ProviderProxy as BuildInfoProxy},
     serde::{Deserialize, Serialize},
-    std::convert::From,
     std::{fs::File, io::BufReader},
 };
 
@@ -181,7 +180,7 @@ mod tests {
         assert_matches::assert_matches,
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_buildinfo::{BuildInfo, ProviderRequest as BuildInfoRequest},
-        fuchsia, fuchsia_async as fasync,
+        fuchsia_async as fasync,
         futures::prelude::*,
         maplit::hashmap,
         mock_boot_arguments::MockBootArgumentsService,

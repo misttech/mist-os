@@ -23,7 +23,6 @@ use carnelian::{
     AppSender, Message, MessageTarget, Point, Size, ViewAssistant, ViewAssistantContext, ViewKey,
 };
 use euclid::size2;
-use std::option::Option::None;
 use std::path::PathBuf;
 
 const TEXT_FIELD_WIDTH: f32 = 895.0;

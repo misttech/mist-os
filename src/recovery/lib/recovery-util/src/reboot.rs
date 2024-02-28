@@ -56,11 +56,9 @@ impl RebootHandler for RebootImpl {
 #[cfg(test)]
 mod test {
     use super::*;
-    use anyhow::Error;
     use fidl_fuchsia_hardware_power_statecontrol as powercontrol;
     use fuchsia_async as fasync;
     use fuchsia_async::TimeoutExt;
-    use fuchsia_zircon::Duration;
     use futures::{channel::mpsc, StreamExt, TryStreamExt};
 
     // Reboot tests - this functionality is only exercised in recovery OTA flows.

@@ -238,9 +238,7 @@ pub async fn execute_reset() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl_fuchsia_paver::{
-        BootManagerMarker, BootManagerProxy, BootManagerRequest, Configuration,
-    };
+    use fidl_fuchsia_paver::BootManagerRequest;
     use fuchsia_async as fasync;
     use fuchsia_zircon as zx;
     use futures::{channel::mpsc, StreamExt, TryStreamExt};

@@ -24,7 +24,6 @@ use carnelian::{
 use euclid::{size2, Size2D, UnknownUnit};
 use recovery_util::ota::state_machine::Event;
 use rive_rs::File;
-use std::option::Option::None;
 
 #[derive(Debug, Clone)]
 pub struct ButtonInfo {

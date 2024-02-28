@@ -29,7 +29,6 @@ use fidl_fuchsia_wlan_policy::SecurityType;
 use recovery_util::ota::state_machine::Event;
 use recovery_util::wlan::NetworkInfo;
 use rive_rs::File;
-use std::option::Option::None;
 use std::path::PathBuf;
 
 const ADD_WIFI_NETWORK: &str = "  Add Wi-Fi network";

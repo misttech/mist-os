@@ -45,10 +45,9 @@ impl FactoryResetAction {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ota::controller::{MockSendEvent, SendEvent};
-    use crate::ota::state_machine::Event;
+    use crate::ota::controller::MockSendEvent;
     use anyhow::Error;
-    use fidl_fuchsia_recovery::{FactoryResetMarker, FactoryResetProxy, FactoryResetRequest};
+    use fidl_fuchsia_recovery::FactoryResetRequest;
     use fuchsia_async::TimeoutExt;
     use fuchsia_async::{self as fasync};
     use fuchsia_zircon::Duration;

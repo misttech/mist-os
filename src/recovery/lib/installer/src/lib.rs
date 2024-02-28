@@ -12,7 +12,6 @@ pub mod partition;
 
 use {
     anyhow::{anyhow, Context, Error},
-    fdio,
     fidl::endpoints::{ClientEnd, Proxy, ServerEnd},
     fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason},
     fidl_fuchsia_paver::{

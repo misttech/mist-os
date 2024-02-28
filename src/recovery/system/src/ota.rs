@@ -349,7 +349,7 @@ mod tests {
         hyper::{header, Body, Request, Response, StatusCode},
         std::{
             collections::{BTreeSet, HashMap},
-            sync::{Arc, Mutex},
+            sync::Mutex,
         },
     };
 
