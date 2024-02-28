@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use argh::{self, FromArgs};
+use argh::FromArgs;
 use std::fs::read_to_string;
 use std::path::PathBuf;
-use strsim;
 
 /// Command to match a list of strings using Damerau–Levenshtein distance.
 #[derive(Debug, FromArgs)]
