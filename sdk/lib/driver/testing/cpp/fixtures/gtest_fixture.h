@@ -18,6 +18,10 @@ namespace fdf_testing {
 template <class Configuration>
 class DriverTestFixture : public BaseDriverTestFixture<Configuration>, public ::testing::Test {};
 
+// The Configuration must be given a non-void DriverType, but not all tests need access to the
+// driver type.
+class EmptyDriverType {};
+
 // A class that can be used in the Configuration's EnvironmentType if no environment customization
 // is needed. Provides a minimal compat server.
 class MinimalEnvironment {

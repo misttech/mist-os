@@ -76,14 +76,14 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
         env_wrapper_.SyncCall(&internal::EnvWrapper<EnvironmentType>::TakeOutgoingClient);
 
     if constexpr (kAutoStartDriver) {
-      auto result = StartDriver();
+      auto result = StartDriverImpl({});
       ZX_ASSERT_MSG(result.is_ok(), "Failed to StartDriver: %s.", result.status_string());
     }
   }
 
   virtual ~BaseDriverTestFixture() {
     if constexpr (kAutoStopDriver) {
-      auto result = StopDriver();
+      auto result = StopDriverImpl();
       ZX_ASSERT_MSG(result.is_ok(), "Failed to StopDriver: %s.", result.status_string());
     }
 
@@ -114,35 +114,32 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
 
   // Start the driver. The start arguments will be moved into the driver, therefore this must be
   // called only once.
-  zx::result<> StartDriver() { return StartDriverCustomized({}); }
+  //
+  // Enabled only when kAutoStartDriver is false.
+  template <bool A = kAutoStartDriver, typename = std::enable_if_t<!A>>
+  zx::result<> StartDriver() {
+    static_assert(A == kAutoStartDriver, "Do not override the A template parameter.");
+    return StartDriverImpl({});
+  }
 
   // Start the driver with modified DriverStartArgs. This is done through the |args_modifier| which
   // is called with a reference to the start args that will be used to start the driver.
   // Modifications can happen in-place with this reference.
+  //
+  // Enabled only when kAutoStartDriver is false.
+  template <bool A = kAutoStartDriver, typename = std::enable_if_t<!A>>
   zx::result<> StartDriverCustomized(fit::callback<void(fdf::DriverStartArgs&)> args_modifier) {
-    if (!start_args_.has_value()) {
-      return zx::error(ZX_ERR_BAD_STATE);
-    }
-
-    if (args_modifier) {
-      args_modifier(start_args_.value());
-    }
-
-    fdf::DriverStartArgs start_args = std::move(start_args_.value());
-    start_args_.reset();
-
-    return dut_.Start(std::move(start_args));
+    static_assert(A == kAutoStartDriver, "Do not override the A template parameter.");
+    return StartDriverImpl(std::move(args_modifier));
   }
 
   // Stops the driver.
+  //
+  // Enabled only when kAutoStopDriver is false.
+  template <bool A = kAutoStopDriver, typename = std::enable_if_t<!A>>
   zx::result<> StopDriver() {
-    if (prepare_stop_result_.has_value()) {
-      return zx::error(ZX_ERR_BAD_STATE);
-    }
-
-    zx::result prepare_stop_result = dut_.PrepareStop();
-    prepare_stop_result_.emplace(prepare_stop_result);
-    return prepare_stop_result;
+    static_assert(A == kAutoStopDriver, "Do not override the A template parameter.");
+    return StopDriverImpl();
   }
 
   // Runs a task on the dispatcher context of the driver under test. This will be a different
@@ -340,6 +337,31 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
     ZX_ASSERT_MSG(ZX_OK == status, "Failed to fdio_open_at '/svc' on the driver's outgoing: %s.",
                   zx_status_get_string(status));
     return std::move(svc_endpoints->client);
+  }
+
+  zx::result<> StartDriverImpl(fit::callback<void(fdf::DriverStartArgs&)> args_modifier) {
+    if (!start_args_.has_value()) {
+      return zx::error(ZX_ERR_BAD_STATE);
+    }
+
+    if (args_modifier) {
+      args_modifier(start_args_.value());
+    }
+
+    fdf::DriverStartArgs start_args = std::move(start_args_.value());
+    start_args_.reset();
+
+    return dut_.Start(std::move(start_args));
+  }
+
+  zx::result<> StopDriverImpl() {
+    if (prepare_stop_result_.has_value()) {
+      return zx::error(ZX_ERR_BAD_STATE);
+    }
+
+    zx::result prepare_stop_result = dut_.PrepareStop();
+    prepare_stop_result_.emplace(prepare_stop_result);
+    return prepare_stop_result;
   }
 
   fdf_testing::DriverRuntime runtime_;
