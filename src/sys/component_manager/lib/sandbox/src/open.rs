@@ -325,7 +325,9 @@ mod tests {
     use std::sync::Mutex;
     use test_util::Counter;
     use vfs::{
-        directory::{entry::DirectoryEntry, helper::DirectlyMutable, immutable::simple as pfs},
+        directory::{
+            entry_container::Directory as _, helper::DirectlyMutable, immutable::simple as pfs,
+        },
         execution_scope::ExecutionScope,
         name::Name,
     };

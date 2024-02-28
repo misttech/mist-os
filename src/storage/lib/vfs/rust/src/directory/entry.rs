@@ -6,14 +6,15 @@
 
 #![warn(missing_docs)]
 
-use crate::{common::IntoAny, execution_scope::ExecutionScope, path::Path, ObjectRequestRef};
+use crate::{common::IntoAny, node::IsDirectory};
 
 use {
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon_status::Status,
     std::{fmt, sync::Arc},
 };
+
+pub use super::simple::OpenRequest;
 
 /// Information about a directory entry, used to populate ReadDirents() output.
 /// The first element is the inode number, or INO_UNKNOWN (from fuchsia.io) if not set, and the second
@@ -53,63 +54,20 @@ impl fmt::Debug for EntryInfo {
 
 /// Pseudo directories contain items that implement this trait.  Pseudo directories refer to the
 /// items they contain as `Arc<dyn DirectoryEntry>`.
-pub trait DirectoryEntry: IntoAny + Sync + Send {
-    /// Opens a connection to this item if the `path` is "." or a connection to an item inside this
-    /// one otherwise.  `path` will not contain any "." or ".." components.
-    ///
-    /// `flags` holds one or more of the `OPEN_RIGHT_*`, `OPEN_FLAG_*` constants.  Processing of the
-    /// `flags` value is specific to the item - in particular, the `OPEN_RIGHT_*` flags need to
-    /// match the item capabilities.
-    ///
-    /// It is the responsibility of the implementation to strip POSIX flags if the path crosses
-    /// a boundary that does not have the required permissions.
-    ///
-    /// It is the responsibility of the implementation to send an `OnOpen` event on the channel
-    /// contained by `server_end` in case `OPEN_FLAG_STATUS` was present in `flags`, and to
-    /// populate the `info` part of the event if `OPEN_FLAG_DESCRIBE` was set.  This also applies
-    /// to the error cases.
-    ///
-    /// This method is called via either `Open` or `Clone` fuchsia.io methods.  This is deliberate
-    /// that this method does not return any errors.  Any errors that occur during this process
-    /// should be sent as an `OnOpen` event over the `server_end` connection and the connection is
-    /// then closed.  No errors should ever affect the connection where `Open` or `Clone` were
-    /// received.
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    );
-
-    /// Opens a connection to this item if the `path` is "." or a connection to an item inside
-    /// this one otherwise.  `path` will not contain any "." or ".." components.
-    ///
-    /// `protocols` holds representations accepted by the caller, for example, it holds `node` that
-    /// is the underlying `Node` protocol to be served on the connection. `node` holds information
-    /// like the open mode (`mode`), node protocols (`protocols`), rights (`rights`) and create
-    /// attributes (`create_attributes`).
-    ///
-    /// If this method was initiated by a FIDL Open2 call, hierarchical rights are enforced at the
-    /// connection layer. The connection layer also checks that when creating a new object,
-    /// no more than one protocol is specified and `create_attributes` is some value.
-    ///
-    /// If the implementation takes `object_request`, it is then responsible for sending an
-    /// `OnRepresentation` event if `protocols` has `NodeFlags.GET_REPRESENTATION` set. Although
-    /// not enforced, the implementation should shutdown with an epitaph if any error occurred
-    /// during this process.
-    ///
-    /// See fuchsia.io's Open2 method for more details.
-    fn open2(
-        self: Arc<Self>,
-        _scope: ExecutionScope,
-        _path: Path,
-        _protocols: fio::ConnectionProtocols,
-        _object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
-    }
-
+///
+/// *NOTE*: This trait only needs to be implemented if you want to add your nodes to a pseudo
+/// directory.  If you don't need to add your nodes to a pseudo directory, consider implementing
+/// node::IsDirectory instead.
+pub trait DirectoryEntry: IntoAny + Sync + Send + 'static {
     /// This method is used to populate ReadDirents() output.
     fn entry_info(&self) -> EntryInfo;
+
+    /// Opens this entry.
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status>;
+}
+
+impl<T: DirectoryEntry> IsDirectory for T {
+    fn is_directory(&self) -> bool {
+        self.entry_info().type_() == fio::DirentType::Directory
+    }
 }

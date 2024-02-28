@@ -10,8 +10,12 @@ use {
     futures::TryStreamExt,
     std::{collections::HashMap, sync::Arc},
     vfs::{
-        self, directory::entry::DirectoryEntry, directory::immutable::simple as pfs,
-        execution_scope::ExecutionScope, file::vmo::read_only, remote::remote_dir, service::host,
+        self,
+        directory::{entry::DirectoryEntry, entry_container::Directory, immutable::simple as pfs},
+        execution_scope::ExecutionScope,
+        file::vmo::read_only,
+        remote::remote_dir,
+        service::host,
         tree_builder::TreeBuilder,
     },
 };

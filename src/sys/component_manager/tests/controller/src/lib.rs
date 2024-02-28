@@ -21,8 +21,8 @@ use {
     },
     std::sync::{Arc, Mutex},
     vfs::{
-        directory::entry::DirectoryEntry as _, execution_scope::ExecutionScope,
-        file::vmo::read_only, pseudo_directory,
+        directory::entry_container::Directory as _, execution_scope::ExecutionScope,
+        file::vmo::read_only, pseudo_directory, ToObjectRequest,
     },
 };
 
@@ -373,12 +373,14 @@ pub async fn start_with_dict() {
             control_handle: _,
         }) = echo_openable_stream.try_next().await.unwrap()
         {
-            echo_service.clone().open(
-                ExecutionScope::new(),
-                flags,
-                vfs::path::Path::dot(),
-                object.into(),
-            );
+            flags.to_object_request(object).handle(|object_request| {
+                vfs::service::serve(
+                    echo_service.clone(),
+                    ExecutionScope::new(),
+                    &flags,
+                    object_request,
+                )
+            });
         }
     });
 

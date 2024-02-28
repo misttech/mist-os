@@ -12,7 +12,6 @@ use {
         util::{dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time},
     },
     async_trait::async_trait,
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, Status},
     libc::{S_IRUSR, S_IWUSR},
@@ -25,11 +24,9 @@ use {
     },
     vfs::{
         attributes,
-        directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
         file::{FidlIoConnection, File as VfsFile, FileIo as VfsFileIo, FileOptions, SyncMode},
-        path::Path,
-        ObjectRequestRef, ToObjectRequest,
+        ObjectRequestRef,
     },
 };
 
@@ -287,6 +284,10 @@ impl vfs::node::Node for FatFile {
     fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
         self.filesystem.query_filesystem()
     }
+
+    fn will_clone(&self) {
+        self.open_ref(&self.filesystem.lock().unwrap()).unwrap();
+    }
 }
 
 impl Debug for FatFile {
@@ -401,40 +402,9 @@ impl VfsFileIo for FatFile {
     }
 }
 
-impl DirectoryEntry for FatFile {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        flags.to_object_request(server_end).handle(|object_request| {
-            if !path.is_empty() {
-                return Err(Status::NOT_DIR);
-            }
-            self.open_ref(&self.filesystem.lock().unwrap())?;
-            self.create_connection(scope, flags, object_request)
-        });
-    }
-
-    fn open2(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        path: Path,
-        protocols: fio::ConnectionProtocols,
-        object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), Status> {
-        if !path.is_empty() {
-            return Err(Status::NOT_DIR);
-        }
-
-        self.open_ref(&self.filesystem.lock().unwrap())?;
-        object_request.spawn_connection(scope, self, protocols, FidlIoConnection::create)
-    }
-
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
+impl vfs::node::IsDirectory for FatFile {
+    fn is_directory(&self) -> bool {
+        false
     }
 }
 
@@ -447,8 +417,6 @@ mod tests {
             node::{Closer, FatNode},
             tests::{TestDiskContents, TestFatDisk},
         },
-        assert_matches::assert_matches,
-        futures::TryStreamExt,
     };
 
     const TEST_DISK_SIZE: u64 = 2048 << 10; // 2048K
@@ -516,58 +484,5 @@ mod tests {
         assert_eq!(attrs.content_size, TEST_FILE_CONTENT.len() as u64);
         assert!(attrs.storage_size > TEST_FILE_CONTENT.len() as u64);
         assert_eq!(attrs.link_count, 1);
-    }
-
-    #[fuchsia::test]
-    async fn test_open2_fails_with_path() {
-        let file = TestFile::new();
-        let scope = ExecutionScope::new();
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-            rights: Some(fio::Operations::READ_BYTES),
-            flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-            ..Default::default()
-        });
-        protocols.to_object_request(server_end).handle(|request| {
-            file.clone().open2(
-                scope.clone(),
-                Path::validate_and_split("foo").expect("validate_and_split failed"),
-                protocols,
-                request,
-            )
-        });
-
-        let event =
-            proxy.take_event_stream().try_next().await.expect_err("open2 passed unexpectedly");
-        assert_matches!(
-            event,
-            fidl::Error::ClientChannelClosed { status: zx::Status::NOT_DIR, .. }
-        );
-    }
-
-    #[fuchsia::test]
-    async fn test_open2() {
-        let file = TestFile::new();
-        let scope = ExecutionScope::new();
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-            rights: Some(fio::Operations::READ_BYTES),
-            flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-            ..Default::default()
-        });
-        protocols
-            .to_object_request(server_end)
-            .handle(|request| file.clone().open2(scope.clone(), Path::dot(), protocols, request));
-
-        assert_matches!(
-            proxy
-                .take_event_stream()
-                .try_next()
-                .await
-                .expect("expected OnRepresentation event")
-                .expect("missing OnRepresentation event")
-                .into_on_representation(),
-            Some(fio::Representation::File(_))
-        );
     }
 }

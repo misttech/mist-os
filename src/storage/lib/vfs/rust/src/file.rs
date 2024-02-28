@@ -5,10 +5,16 @@
 //! Module holding different kinds of files and their building blocks.
 
 use {
-    crate::node::Node,
+    crate::{
+        execution_scope::ExecutionScope, node::Node, object_request::ObjectRequestRef,
+        protocols::ProtocolsExt,
+    },
     fidl_fuchsia_io as fio,
     fuchsia_zircon_status::Status,
-    std::future::{ready, Future},
+    std::{
+        future::{ready, Future},
+        sync::Arc,
+    },
 };
 
 #[cfg(target_os = "fuchsia")]
@@ -31,7 +37,7 @@ pub use connection::{GetVmo, StreamIoConnection};
 
 /// FileOptions include options that are relevant after the file has been opened. Flags like
 /// `TRUNCATE`, which only applies during open time, are not included.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileOptions {
     pub rights: fio::Operations,
     pub is_append: bool,
@@ -278,4 +284,28 @@ pub trait RawFileIoConnection: Send + Sync {
 
     /// Notifies the `IoOpHandler` that the flags of the connection have changed.
     fn update_flags(&self, flags: fio::OpenFlags) -> Status;
+}
+
+pub trait FileLike: Node {
+    fn open(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        options: FileOptions,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status>;
+}
+
+/// Helper to open a file or node as required.
+pub fn serve(
+    file: Arc<impl FileLike + ?Sized>,
+    scope: ExecutionScope,
+    protocols: &impl ProtocolsExt,
+    object_request: ObjectRequestRef<'_>,
+) -> Result<(), Status> {
+    if protocols.is_node() {
+        let options = protocols.to_node_options(file.is_directory())?;
+        file.open_as_node(scope, options, object_request)
+    } else {
+        file.open(scope, protocols.to_file_options()?, object_request)
+    }
 }

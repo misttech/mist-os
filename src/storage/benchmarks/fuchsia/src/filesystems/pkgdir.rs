@@ -12,7 +12,7 @@ use {
     futures::future::FutureExt,
     std::path::Path,
     storage_benchmarks::{BlockDeviceFactory, Filesystem, FilesystemConfig},
-    vfs::directory::entry::DirectoryEntry as _,
+    vfs::directory::entry_container::Directory as _,
 };
 /// Config object for starting a `PkgDirInstance`. The `PkgDirInstance` allows blob benchmarks to
 /// open and read a blob through its package directory as opposed to talking directly to the

@@ -729,7 +729,7 @@ mod tests {
         rand::Rng,
         std::collections::HashSet,
         vfs::{
-            directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path,
+            directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path,
             pseudo_directory, service as pseudo_fs_service,
         },
     };

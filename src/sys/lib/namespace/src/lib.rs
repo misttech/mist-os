@@ -355,7 +355,8 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_clone() {
         use vfs::{
-            directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo::read_only,
+            directory::entry_container::Directory, execution_scope::ExecutionScope,
+            file::vmo::read_only,
         };
 
         // Set up a directory server.

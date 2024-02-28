@@ -14,7 +14,7 @@ use {
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::path::PathBuf,
     std::sync,
-    vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope},
+    vfs::{execution_scope::ExecutionScope, ToObjectRequest},
 };
 
 pub type CapabilitySource = ::routing::capability_source::CapabilitySource<ComponentInstance>;
@@ -67,13 +67,16 @@ impl<T: InternalCapabilityProvider + 'static> CapabilityProvider for T {
                 task_group.spawn(this.open_protocol(server_end.into_zx_channel()));
             },
         );
-        let relative_path = match relative_path.to_string_lossy() {
-            s if s.is_empty() => vfs::path::Path::dot(),
-            s => vfs::path::Path::validate_and_split(s)
-                .map_err(|_| CapabilityProviderError::BadPath)?,
-        };
+        let relative_path = relative_path.to_string_lossy();
+        if !relative_path.is_empty()
+            && !vfs::path::Path::validate_and_split(relative_path).map_or(false, |p| p.is_dot())
+        {
+            return Err(CapabilityProviderError::BadPath);
+        }
         let server_end = channel::take_channel(server_end);
-        service.open(ExecutionScope::new(), flags, relative_path, server_end.into());
+        flags.to_object_request(server_end).handle(|object_request| {
+            vfs::service::serve(service, ExecutionScope::new(), &flags, object_request)
+        });
         Ok(())
     }
 }

@@ -4,18 +4,15 @@
 
 use crate::{
     attributes,
-    directory::entry::{DirectoryEntry, EntryInfo},
+    directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
     execution_scope::ExecutionScope,
-    file::{FidlIoConnection, File, FileIo, FileOptions, SyncMode},
+    file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode},
     node::Node,
-    path::Path,
-    protocols::ProtocolsExt,
-    ObjectRequestRef, ToObjectRequest,
+    ObjectRequestRef,
 };
 
 use {
     async_trait::async_trait,
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon_status::Status,
     std::sync::{Arc, Mutex},
@@ -44,57 +41,12 @@ impl TestFile {
 }
 
 impl DirectoryEntry for TestFile {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        flags.to_object_request(server_end).handle(|object_request| {
-            if !path.is_empty() {
-                return Err(Status::NOT_DIR);
-            }
-
-            if flags.intersects(fio::OpenFlags::APPEND) {
-                return Err(Status::NOT_SUPPORTED);
-            }
-
-            object_request.take().spawn(&scope.clone(), move |object_request| {
-                Box::pin(async move {
-                    object_request.create_connection(scope, self, flags, FidlIoConnection::create)
-                })
-            });
-            Ok(())
-        });
-    }
-
-    fn open2(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        path: Path,
-        protocols: fio::ConnectionProtocols,
-        object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), Status> {
-        if !path.is_empty() {
-            return Err(Status::NOT_DIR);
-        }
-
-        let options = protocols.to_file_options()?;
-        if options.is_append {
-            return Err(Status::NOT_SUPPORTED);
-        }
-
-        object_request.take().spawn(&scope.clone(), move |object_request| {
-            Box::pin(async move {
-                object_request.create_connection(scope, self, protocols, FidlIoConnection::create)
-            })
-        });
-        Ok(())
-    }
-
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+        request.open_file(self)
     }
 }
 
@@ -215,5 +167,19 @@ impl File for TestFile {
 
     async fn sync(&self, _mode: SyncMode) -> Result<(), Status> {
         Ok(())
+    }
+}
+
+impl FileLike for TestFile {
+    fn open(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        options: FileOptions,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        if options.is_append {
+            return Err(Status::NOT_SUPPORTED);
+        }
+        FidlIoConnection::spawn(scope, self, options, object_request)
     }
 }

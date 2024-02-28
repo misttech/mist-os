@@ -96,7 +96,6 @@ rustc_library("vfs") {
     "src/remote.rs",
     "src/remote/tests.rs",
     "src/service.rs",
-    "src/service/common.rs",
     "src/service/tests.rs",
     "src/service/tests/direct_connection.rs",
     "src/service/tests/node_reference.rs",

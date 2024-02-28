@@ -16,10 +16,7 @@ use crate::{
     clone_get_vmo_file_proxy_assert_ok,
 };
 
-use crate::{
-    directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::test_utils::*,
-    path::Path,
-};
+use crate::{execution_scope::ExecutionScope, file::test_utils::*, ToObjectRequest};
 
 use {
     fidl::endpoints::create_proxy,
@@ -133,7 +130,9 @@ fn read_only_read_with_describe() {
             create_proxy::<fio::FileMarker>().expect("Failed to create connection endpoints");
 
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
-        server.open(scope, flags, Path::dot(), server_end.into_channel().into());
+        flags
+            .to_object_request(server_end)
+            .handle(|object_request| vfs::file::serve(server, scope, &flags, object_request));
 
         assert_event!(proxy, fio::FileEvent::OnOpen_ { s, info }, {
             assert_eq!(s, ZX_OK);
@@ -220,12 +219,9 @@ fn read_error() {
             let (proxy, server_end) =
                 create_proxy::<fio::FileMarker>().expect("Failed to create connection endpoints");
 
-            server.clone().open(
-                scope.clone(),
-                flags,
-                Path::dot(),
-                server_end.into_channel().into(),
-            );
+            flags.to_object_request(server_end).handle(|object_request| {
+                vfs::file::serve(server.clone(), scope.clone(), &flags, object_request)
+            });
 
             assert_event!(proxy, fio::FileEvent::OnOpen_ { s, info }, {
                 assert_eq!(Status::from_raw(s), Status::SHOULD_WAIT);
@@ -237,7 +233,9 @@ fn read_error() {
             let (proxy, server_end) =
                 create_proxy::<fio::FileMarker>().expect("Failed to create connection endpoints");
 
-            server.open(scope, flags, Path::dot(), server_end.into_channel().into());
+            flags
+                .to_object_request(server_end)
+                .handle(|object_request| vfs::file::serve(server, scope, &flags, object_request));
 
             assert_event!(proxy, fio::FileEvent::OnOpen_ { s, info }, {
                 assert_eq!(s, ZX_OK);
@@ -844,12 +842,10 @@ fn mock_directory_with_one_file_and_two_connections() {
             move || async move {
                 start_rx.await.unwrap();
 
-                server.open(
-                    scope,
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                    Path::dot(),
-                    server_end.into_channel().into(),
-                );
+                let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                flags.to_object_request(server_end).handle(|object_request| {
+                    vfs::file::serve(server, scope, &flags, object_request)
+                });
 
                 assert_read!(proxy, initial_content);
 

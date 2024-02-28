@@ -26,7 +26,7 @@ use {
     tracing::{error, info, warn},
     vfs::{
         directory::{
-            entry::DirectoryEntry,
+            entry_container::Directory,
             helper::DirectlyMutable,
             mutable::simple::{simple, Simple},
         },

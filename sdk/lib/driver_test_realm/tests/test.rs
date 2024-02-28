@@ -14,7 +14,9 @@ use {
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
     fuchsia_zircon as zx,
     futures::{FutureExt as _, StreamExt as _},
-    vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path, service},
+    vfs::{
+        directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path, service,
+    },
 };
 
 async fn get_driver_info(

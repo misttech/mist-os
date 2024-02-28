@@ -29,15 +29,15 @@ use {
         common::rights_to_posix_mode_bits,
         directory::{
             dirents_sink::{self, AppendResult},
-            entry::DirectoryEntry,
+            entry::{DirectoryEntry, OpenRequest},
             entry_container::Directory,
             helper::DirectlyMutable,
             traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
-        file::{FidlIoConnection, File, FileIo, FileOptions, SyncMode},
+        file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode},
         node::Node,
-        ToObjectRequest,
+        ObjectRequestRef, ToObjectRequest,
     },
 };
 
@@ -74,25 +74,12 @@ impl InternalFile {
 }
 
 impl DirectoryEntry for InternalFile {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        _path: vfs::path::Path,
-        server_end: fidl::endpoints::ServerEnd<fio::NodeMarker>,
-    ) {
-        flags.to_object_request(server_end).handle(|object_request| {
-            object_request.spawn_connection(
-                scope.clone(),
-                self.clone(),
-                flags,
-                FidlIoConnection::create,
-            )
-        });
-    }
-
     fn entry_info(&self) -> vfs::directory::entry::EntryInfo {
         vfs::directory::entry::EntryInfo::new(self.object_id, fio::DirentType::File)
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+        request.open_file(self)
     }
 }
 
@@ -133,8 +120,6 @@ impl vfs::node::Node for InternalFile {
             }
         ))
     }
-
-    fn close(self: Arc<Self>) {}
 
     fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
         // Nb: self.handle() is async so we can't call it here.
@@ -206,6 +191,17 @@ impl FileIo for InternalFile {
 
     async fn append(&self, _content: &[u8]) -> Result<(u64, u64), Status> {
         Err(zx::Status::NOT_SUPPORTED)
+    }
+}
+
+impl FileLike for InternalFile {
+    fn open(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        options: FileOptions,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        FidlIoConnection::spawn(scope, self, options, object_request)
     }
 }
 
@@ -311,37 +307,12 @@ pub struct ObjectDirectory {
 }
 
 impl DirectoryEntry for ObjectDirectory {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        mut path: vfs::path::Path,
-        server_end: fidl::endpoints::ServerEnd<fio::NodeMarker>,
-    ) {
-        match path.next_with_ref() {
-            (path_ref, Some(name)) => {
-                // Lookup an object by id and return it.
-                let path = path_ref.clone();
-                let name = name.to_owned();
-                let object_id = name.parse().unwrap_or(INVALID_OBJECT_ID);
-                InternalFile::new(object_id, self.store.clone())
-                    .open(scope, flags, path, server_end);
-            }
-            (_, None) => {
-                flags.to_object_request(server_end).handle(|object_request| {
-                    object_request.spawn_connection(
-                        scope,
-                        self,
-                        flags,
-                        vfs::directory::immutable::connection::ImmutableConnection::create,
-                    )
-                });
-            }
-        }
-    }
-
     fn entry_info(&self) -> vfs::directory::entry::EntryInfo {
         vfs::directory::entry::EntryInfo::new(self.store_object_id, fio::DirentType::Directory)
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+        request.open_dir(self)
     }
 }
 
@@ -387,6 +358,36 @@ impl Node for ObjectDirectory {
 
 #[async_trait]
 impl Directory for ObjectDirectory {
+    fn open(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        flags: fio::OpenFlags,
+        mut path: vfs::path::Path,
+        server_end: fidl::endpoints::ServerEnd<fio::NodeMarker>,
+    ) {
+        flags.to_object_request(server_end).handle(|object_request| {
+            match path.next_with_ref() {
+                (_, Some(name)) => {
+                    // Lookup an object by id and return it.
+                    let name = name.to_owned();
+                    let object_id = name.parse().unwrap_or(INVALID_OBJECT_ID);
+                    vfs::file::serve(
+                        InternalFile::new(object_id, self.store.clone()),
+                        scope,
+                        &flags,
+                        object_request,
+                    )
+                }
+                (_, None) => object_request.spawn_connection(
+                    scope,
+                    self,
+                    flags,
+                    vfs::directory::immutable::connection::ImmutableConnection::create,
+                ),
+            }
+        });
+    }
+
     /// Reads directory entries starting from `pos` by adding them to `sink`.
     /// Once finished, should return a sealed sink.
     // The lifetimes here are because of https://github.com/rust-lang/rust/issues/63033.

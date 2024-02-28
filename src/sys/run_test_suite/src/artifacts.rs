@@ -282,7 +282,7 @@ mod file_tests {
         maplit::hashmap,
         std::{collections::HashMap, sync::Arc},
         vfs::{
-            directory::{entry::DirectoryEntry, helper::DirectlyMutable, immutable::Simple},
+            directory::{entry_container::Directory, helper::DirectlyMutable, immutable::Simple},
             execution_scope::ExecutionScope,
             file::vmo::read_only,
             pseudo_directory,

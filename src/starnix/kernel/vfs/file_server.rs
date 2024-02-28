@@ -29,8 +29,9 @@ use std::{
     sync::{Arc, Weak},
 };
 use vfs::{
-    attributes, directory, directory::entry::DirectoryEntry, execution_scope, file, path,
-    ToObjectRequest,
+    attributes,
+    directory::{self, entry_container::Directory},
+    execution_scope, file, path, ToObjectRequest,
 };
 
 /// Returns a handle implementing a fuchsia.io.Node delegating to the given `file`.
@@ -430,6 +431,31 @@ impl vfs::node::Node for StarnixNodeConnection {
 
 #[async_trait]
 impl directory::entry_container::Directory for StarnixNodeConnection {
+    fn open(
+        self: Arc<Self>,
+        scope: execution_scope::ExecutionScope,
+        flags: fio::OpenFlags,
+        path: path::Path,
+        mut server_end: ServerEnd<fio::NodeMarker>,
+    ) {
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/324394958): propagate through DirectoryEntry
+        scope.spawn({
+            let scope = scope.clone();
+            async move {
+                if let Err(errno) = self
+                    .directory_entry_open(&mut locked, scope, flags, path, &mut server_end)
+                    .await
+                {
+                    vfs::common::send_on_open_with_error(
+                        flags.contains(fio::OpenFlags::DESCRIBE),
+                        server_end,
+                        errno.into(),
+                    );
+                }
+            }
+        })
+    }
+
     async fn read_dirents<'a>(
         &'a self,
         pos: &'a directory::traversal_position::TraversalPosition,
@@ -652,36 +678,9 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
     }
 }
 
-impl directory::entry::DirectoryEntry for StarnixNodeConnection {
-    fn open(
-        self: Arc<Self>,
-        scope: execution_scope::ExecutionScope,
-        flags: fio::OpenFlags,
-        path: path::Path,
-        mut server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/324394958): propagate through DirectoryEntry
-        scope.spawn({
-            let scope = scope.clone();
-            async move {
-                if let Err(errno) = self
-                    .directory_entry_open(&mut locked, scope, flags, path, &mut server_end)
-                    .await
-                {
-                    vfs::common::send_on_open_with_error(
-                        flags.contains(fio::OpenFlags::DESCRIBE),
-                        server_end,
-                        errno.into(),
-                    );
-                }
-            }
-        })
-    }
-
-    fn entry_info(&self) -> directory::entry::EntryInfo {
-        let dirent_type =
-            if self.is_dir() { fio::DirentType::Directory } else { fio::DirentType::File };
-        directory::entry::EntryInfo::new(0, dirent_type)
+impl vfs::node::IsDirectory for StarnixNodeConnection {
+    fn is_directory(&self) -> bool {
+        self.is_dir()
     }
 }
 

@@ -18,7 +18,7 @@ use {
     futures::{StreamExt, TryStreamExt},
     std::sync::Arc,
     tracing::*,
-    vfs::{directory::entry::DirectoryEntry, file::vmo::read_only, pseudo_directory},
+    vfs::{directory::entry_container::Directory, file::vmo::read_only, pseudo_directory},
 };
 
 #[fuchsia::main]
@@ -133,7 +133,7 @@ async fn serve_config_data(handles: LocalComponentHandles) -> Result<(), Error> 
 }
 
 // Returns a `DirectoryProxy` that serves the directory entry `dir`.
-fn spawn_vfs(dir: Arc<dyn DirectoryEntry>) -> fio::DirectoryProxy {
+fn spawn_vfs(dir: Arc<dyn Directory>) -> fio::DirectoryProxy {
     let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
     let scope = vfs::execution_scope::ExecutionScope::new();
     dir.open(

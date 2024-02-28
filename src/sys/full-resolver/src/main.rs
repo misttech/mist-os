@@ -248,7 +248,7 @@ mod tests {
         futures::{channel::mpsc, lock::Mutex, SinkExt as _},
         std::{boxed::Box, sync::Arc},
         vfs::{
-            directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
+            directory::entry_container::Directory, execution_scope::ExecutionScope,
             file::vmo::read_only, path::Path, pseudo_directory,
         },
     };

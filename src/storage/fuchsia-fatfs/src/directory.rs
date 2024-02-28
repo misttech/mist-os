@@ -30,7 +30,7 @@ use {
         attributes,
         directory::{
             dirents_sink::{self, AppendResult, Sink},
-            entry::{DirectoryEntry, EntryInfo},
+            entry::{DirectoryEntry, EntryInfo, OpenRequest},
             entry_container::{Directory, DirectoryWatcher, MutableDirectory},
             mutable::connection::MutableConnection,
             traversal_position::TraversalPosition,
@@ -853,71 +853,12 @@ impl MutableDirectory for FatDirectory {
 }
 
 impl DirectoryEntry for FatDirectory {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        let mut closer = Closer::new(&self.filesystem);
-
-        flags.to_object_request(server_end).handle(|object_request| {
-            match self.lookup(flags, path, &mut closer)? {
-                FatNode::Dir(entry) => {
-                    let () = entry
-                        .open_ref(&self.filesystem.lock().unwrap())
-                        .expect("entry should already be open");
-                    object_request.spawn_connection(
-                        scope,
-                        entry.clone(),
-                        flags,
-                        MutableConnection::create,
-                    )
-                }
-                FatNode::File(entry) => {
-                    let () = entry
-                        .open_ref(&self.filesystem.lock().unwrap())
-                        .expect("entry should already be open");
-                    entry.clone().create_connection(scope, flags, object_request)
-                }
-            }
-        });
-    }
-
-    fn open2(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        path: Path,
-        protocols: fio::ConnectionProtocols,
-        object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), Status> {
-        let mut closer = Closer::new(&self.filesystem);
-
-        match self.lookup_with_protocols(protocols.clone(), path, &mut closer)? {
-            FatNode::Dir(entry) => {
-                let () = entry.open_ref(&self.filesystem.lock().unwrap())?;
-                object_request.spawn_connection(
-                    scope,
-                    entry.clone(),
-                    protocols,
-                    MutableConnection::create,
-                )
-            }
-            FatNode::File(entry) => {
-                let () = entry.open_ref(&self.filesystem.lock().unwrap())?;
-                object_request.spawn_connection(
-                    scope,
-                    entry.clone(),
-                    protocols,
-                    FidlIoConnection::create,
-                )
-            }
-        }
-    }
-
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+        request.open_dir(self)
     }
 }
 
@@ -983,10 +924,77 @@ impl vfs::node::Node for FatDirectory {
     fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
         self.filesystem.query_filesystem()
     }
+
+    fn will_clone(&self) {
+        self.open_ref(&self.filesystem.lock().unwrap()).unwrap();
+    }
 }
 
 #[async_trait]
 impl Directory for FatDirectory {
+    fn open(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        flags: fio::OpenFlags,
+        path: Path,
+        server_end: ServerEnd<fio::NodeMarker>,
+    ) {
+        let mut closer = Closer::new(&self.filesystem);
+
+        flags.to_object_request(server_end).handle(|object_request| {
+            match self.lookup(flags, path, &mut closer)? {
+                FatNode::Dir(entry) => {
+                    let () = entry
+                        .open_ref(&self.filesystem.lock().unwrap())
+                        .expect("entry should already be open");
+                    object_request.spawn_connection(
+                        scope,
+                        entry.clone(),
+                        flags,
+                        MutableConnection::create,
+                    )
+                }
+                FatNode::File(entry) => {
+                    let () = entry
+                        .open_ref(&self.filesystem.lock().unwrap())
+                        .expect("entry should already be open");
+                    entry.clone().create_connection(scope, flags, object_request)
+                }
+            }
+        });
+    }
+
+    fn open2(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: Path,
+        protocols: fio::ConnectionProtocols,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        let mut closer = Closer::new(&self.filesystem);
+
+        match self.lookup_with_protocols(protocols.clone(), path, &mut closer)? {
+            FatNode::Dir(entry) => {
+                let () = entry.open_ref(&self.filesystem.lock().unwrap())?;
+                object_request.spawn_connection(
+                    scope,
+                    entry.clone(),
+                    protocols,
+                    MutableConnection::create,
+                )
+            }
+            FatNode::File(entry) => {
+                let () = entry.open_ref(&self.filesystem.lock().unwrap())?;
+                object_request.spawn_connection(
+                    scope,
+                    entry.clone(),
+                    protocols,
+                    FidlIoConnection::create,
+                )
+            }
+        }
+    }
+
     async fn read_dirents<'a>(
         &'a self,
         pos: &'a TraversalPosition,

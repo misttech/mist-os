@@ -18,7 +18,7 @@ use {
     inspect_runtime,
     std::{collections::HashSet, sync::Arc},
     vfs::{
-        directory::{entry::DirectoryEntry, helper::DirectlyMutable},
+        directory::{entry_container::Directory, helper::DirectlyMutable},
         execution_scope::ExecutionScope,
         path::Path,
         remote::remote_dir,

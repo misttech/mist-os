@@ -6,7 +6,6 @@ use crate::{
     common::{inherit_rights_for_clone, send_on_open_with_error, IntoAny as _},
     directory::{
         common::check_child_connection_flags,
-        entry::DirectoryEntry,
         entry_container::{Directory, DirectoryWatcher},
         read_dirents,
         traversal_position::TraversalPosition,

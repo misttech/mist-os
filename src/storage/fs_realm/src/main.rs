@@ -25,8 +25,8 @@ use {
     vfs::{
         self,
         directory::{
-            entry::DirectoryEntry, helper::DirectlyMutable, mutable::connection::MutableConnection,
-            simple::Simple,
+            entry_container::Directory, helper::DirectlyMutable,
+            mutable::connection::MutableConnection, simple::Simple,
         },
         service,
     },

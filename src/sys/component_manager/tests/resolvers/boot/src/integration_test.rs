@@ -17,7 +17,7 @@ use {
     fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
     futures::prelude::*,
-    vfs::directory::entry::DirectoryEntry as _,
+    vfs::directory::entry_container::Directory as _,
 };
 
 #[fuchsia::test]

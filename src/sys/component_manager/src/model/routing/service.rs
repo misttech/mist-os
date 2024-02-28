@@ -40,10 +40,12 @@ use {
     tracing::{error, warn},
     vfs::{
         directory::{
-            entry::{DirectoryEntry, EntryInfo},
+            entry::{DirectoryEntry, EntryInfo, OpenRequest as VfsOpenRequest},
+            entry_container::Directory,
             immutable::simple::{simple as simple_immutable_dir, Simple as SimpleImmutableDir},
         },
         execution_scope::ExecutionScope,
+        remote::RemoteLike,
     },
 };
 
@@ -277,8 +279,8 @@ impl AnonymizedAggregateServiceDir {
         )]
     }
 
-    /// Returns a DirectoryEntry that represents this service directory.
-    pub async fn dir_entry(&self) -> Arc<dyn DirectoryEntry> {
+    /// Returns the backing directory that represents this service directory.
+    pub async fn dir_entry(&self) -> Arc<SimpleImmutableDir> {
         self.inner.lock().await.dir.clone()
     }
 
@@ -518,7 +520,7 @@ impl Hook for AnonymizedAggregateServiceDir {
 
 /// A directory entry representing an instance of a service.
 /// Upon opening, performs capability routing and opens the instance at its source.
-pub struct ServiceInstanceDirectoryEntry<T: Send + Sync + 'static + fmt::Display> {
+pub struct ServiceInstanceDirectoryEntry<T> {
     /// The name of the entry in its parent directory.
     pub name: String,
 
@@ -554,7 +556,7 @@ struct ServiceInstanceDirectoryKey<T: Send + Sync + 'static + fmt::Display> {
     pub service_instance: FlyStr,
 }
 
-impl<T: Send + Sync + 'static + fmt::Display> DirectoryEntry for ServiceInstanceDirectoryEntry<T> {
+impl<T: Send + Sync + 'static> RemoteLike for ServiceInstanceDirectoryEntry<T> {
     fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
@@ -568,7 +570,7 @@ impl<T: Send + Sync + 'static + fmt::Display> DirectoryEntry for ServiceInstance
             WeakExtendedInstance::AboveRoot(_) => {
                 unreachable!(
                     "aggregate service directory has a capability source above root, but this is \
-                impossible"
+                     impossible"
                 );
             }
         };
@@ -605,9 +607,15 @@ impl<T: Send + Sync + 'static + fmt::Display> DirectoryEntry for ServiceInstance
             }
         });
     }
+}
 
+impl<T: Send + Sync + 'static> DirectoryEntry for ServiceInstanceDirectoryEntry<T> {
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+    }
+
+    fn open_entry(self: Arc<Self>, request: VfsOpenRequest<'_>) -> Result<(), zx::Status> {
+        request.open_remote(self)
     }
 }
 
@@ -728,10 +736,7 @@ mod tests {
         }
     }
 
-    fn open_dir(
-        execution_scope: ExecutionScope,
-        dir: Arc<dyn DirectoryEntry>,
-    ) -> fio::DirectoryProxy {
+    fn open_dir(execution_scope: ExecutionScope, dir: Arc<dyn Directory>) -> fio::DirectoryProxy {
         let (dir_proxy, server_end) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 

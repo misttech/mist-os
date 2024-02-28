@@ -184,7 +184,11 @@ mod test_util {
         fuchsia_zircon::HandleBased,
         sandbox::{OneShotHandle, Open},
         vfs::{
-            directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path, service,
+            execution_scope::ExecutionScope,
+            path::Path,
+            service,
+            service::{ServiceLike, ServiceOptions},
+            ToObjectRequest,
         },
     };
 
@@ -204,9 +208,11 @@ mod test_util {
 
         let open_fn = move |scope: ExecutionScope,
                             flags: fio::OpenFlags,
-                            path: vfs::path::Path,
+                            _path: vfs::path::Path,
                             server_end: zx::Channel| {
-            service.clone().open(scope, flags, path, server_end.into());
+            flags
+                .to_object_request(server_end)
+                .handle(|object_request| service.connect(scope, ServiceOptions, object_request));
         };
 
         let open = Open::new(open_fn, fio::DirentType::Service);

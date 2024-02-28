@@ -20,7 +20,7 @@ use fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx};
 use futures::FutureExt as _;
-use vfs::directory::{entry::DirectoryEntry, helper::DirectlyMutable};
+use vfs::directory::{entry_container::Directory, helper::DirectlyMutable};
 
 #[fasync::run_singlethreaded]
 pub async fn main() {

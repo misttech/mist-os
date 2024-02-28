@@ -43,7 +43,7 @@ use {
     },
     vfs::{
         self,
-        directory::{entry::DirectoryEntry, helper::DirectlyMutable},
+        directory::{entry_container, helper::DirectlyMutable},
         path::Path,
     },
 };
@@ -369,7 +369,8 @@ impl VolumesDirectory {
         if as_blob {
             flags |= fio::OpenFlags::RIGHT_EXECUTABLE;
         }
-        outgoing_dir.open(
+        entry_container::Directory::open(
+            outgoing_dir,
             scope.clone(),
             flags,
             Path::dot(),
@@ -661,7 +662,7 @@ mod tests {
             time::Duration,
         },
         storage_device::{fake_device::FakeDevice, DeviceHolder},
-        vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
+        vfs::{directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path},
     };
 
     #[fuchsia::test]
@@ -729,7 +730,7 @@ mod tests {
         let new_dirty = {
             let (root, server_end) =
                 create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
-            vol.root().clone().open(
+            vol.root().clone().as_directory().open(
                 vol.volume().scope().clone(),
                 fio::OpenFlags::DIRECTORY
                     | fio::OpenFlags::RIGHT_READABLE

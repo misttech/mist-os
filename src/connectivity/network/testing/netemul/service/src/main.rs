@@ -34,9 +34,12 @@ use {
     },
     thiserror::Error,
     tracing::{debug, error, info, warn},
-    vfs::directory::{
-        entry::DirectoryEntry, helper::DirectlyMutable as _,
-        mutable::simple::Simple as SimpleMutableDir,
+    vfs::{
+        directory::{
+            entry::OpenRequest, entry_container::Directory, helper::DirectlyMutable as _,
+            mutable::simple::Simple as SimpleMutableDir,
+        },
+        remote::RemoteLike,
     },
 };
 
@@ -514,7 +517,8 @@ struct DevfsDevice {
     path: String,
 }
 
-impl vfs::directory::entry::DirectoryEntry for DevfsDevice {
+// TODO(https://fxbug.dev/326325522): This is an abuse of directories.
+impl RemoteLike for DevfsDevice {
     fn open(
         self: Arc<Self>,
         _scope: vfs::execution_scope::ExecutionScope,
@@ -539,9 +543,15 @@ impl vfs::directory::entry::DirectoryEntry for DevfsDevice {
         }
         error!("failed to serve device or controller: Bad path {}", path.as_ref());
     }
+}
 
+impl vfs::directory::entry::DirectoryEntry for DevfsDevice {
     fn entry_info(&self) -> vfs::directory::entry::EntryInfo {
         vfs::directory::entry::EntryInfo::new(1, fio::DirentType::Directory)
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+        request.open_remote(self)
     }
 }
 
@@ -655,7 +665,7 @@ impl ManagedRealm {
                         let response = match dir.remove_entry(device_name, false) {
                             Ok(entry) => {
                                 if let Some(entry) = entry {
-                                    let _: Arc<dyn vfs::directory::entry::DirectoryEntry> = entry;
+                                    let _: Arc<_> = entry;
                                     info!(
                                         "removing virtual device at path '{}/{}'",
                                         DEVFS_PATH, path

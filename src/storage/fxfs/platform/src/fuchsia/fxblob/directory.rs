@@ -46,8 +46,8 @@ use {
     vfs::{
         directory::{
             dirents_sink::{self, Sink},
-            entry::{DirectoryEntry, EntryInfo},
-            entry_container::{DirectoryWatcher, MutableDirectory},
+            entry::{DirectoryEntry, EntryInfo, OpenRequest},
+            entry_container::{Directory as VfsDirectory, DirectoryWatcher, MutableDirectory},
             mutable::connection::MutableConnection,
             traversal_position::TraversalPosition,
         },
@@ -88,7 +88,11 @@ impl Identifier {
 #[async_trait]
 impl RootDir for BlobDirectory {
     fn as_directory_entry(self: Arc<Self>) -> Arc<dyn DirectoryEntry> {
-        self as Arc<dyn DirectoryEntry>
+        self
+    }
+
+    fn as_directory(self: Arc<Self>) -> Arc<dyn VfsDirectory> {
+        self
     }
 
     fn as_node(self: Arc<Self>) -> Arc<dyn FxNode> {
@@ -463,6 +467,36 @@ impl MutableDirectory for BlobDirectory {
 
 /// Implementation of VFS pseudo-directory for blobs. Forks a task per connection.
 impl DirectoryEntry for BlobDirectory {
+    fn entry_info(&self) -> EntryInfo {
+        self.directory.entry_info()
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+        request.open_dir(self)
+    }
+}
+
+#[async_trait]
+impl vfs::node::Node for BlobDirectory {
+    async fn get_attrs(&self) -> Result<NodeAttributes, Status> {
+        self.directory.get_attrs().await
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, Status> {
+        self.directory.get_attributes(requested_attributes).await
+    }
+
+    fn query_filesystem(&self) -> Result<FilesystemInfo, Status> {
+        self.directory.query_filesystem()
+    }
+}
+
+/// Implements VFS entry container trait for directories, allowing manipulation of their contents.
+#[async_trait]
+impl VfsDirectory for BlobDirectory {
     fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
@@ -494,32 +528,6 @@ impl DirectoryEntry for BlobDirectory {
         });
     }
 
-    fn entry_info(&self) -> EntryInfo {
-        self.directory.entry_info()
-    }
-}
-
-#[async_trait]
-impl vfs::node::Node for BlobDirectory {
-    async fn get_attrs(&self) -> Result<NodeAttributes, Status> {
-        self.directory.get_attrs().await
-    }
-
-    async fn get_attributes(
-        &self,
-        requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, Status> {
-        self.directory.get_attributes(requested_attributes).await
-    }
-
-    fn query_filesystem(&self) -> Result<FilesystemInfo, Status> {
-        self.directory.query_filesystem()
-    }
-}
-
-/// Implements VFS entry container trait for directories, allowing manipulation of their contents.
-#[async_trait]
-impl vfs::directory::entry_container::Directory for BlobDirectory {
     async fn read_dirents<'a>(
         &'a self,
         pos: &'a TraversalPosition,

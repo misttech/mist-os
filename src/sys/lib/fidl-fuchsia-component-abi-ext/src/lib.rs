@@ -64,12 +64,12 @@ mod tests {
         std::sync::Arc,
         version_history::AbiRevision,
         vfs::{
-            directory::entry::DirectoryEntry, execution_scope, file::vmo::read_only,
-            pseudo_directory, remote::remote_dir,
+            directory::entry_container::Directory, execution_scope, file::vmo::read_only,
+            pseudo_directory,
         },
     };
 
-    fn serve_dir(root: Arc<impl DirectoryEntry>) -> fio::DirectoryProxy {
+    fn serve_dir(root: Arc<impl Directory>) -> fio::DirectoryProxy {
         let (dir_proxy, dir_server) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         root.open(
@@ -140,14 +140,11 @@ mod tests {
     // Read this test package's ABI revision.
     #[fuchsia::test]
     async fn read_test_pkg_abi_revision() -> Result<(), AbiRevisionFileError> {
-        let root = remote_dir(
-            open_in_namespace(
-                "/pkg",
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            )
-            .unwrap(),
-        );
-        let dir_proxy = serve_dir(root);
+        let dir_proxy = open_in_namespace(
+            "/pkg",
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        )
+        .unwrap();
         let abi_revision = read_abi_revision(&dir_proxy, AbiRevision::PATH)
             .await
             .expect("test package doesn't contain an ABI revision");

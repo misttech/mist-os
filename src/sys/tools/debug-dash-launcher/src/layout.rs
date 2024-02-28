@@ -14,7 +14,7 @@ use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
 use tracing::warn;
 use vfs::{
-    directory::{entry::DirectoryEntry, helper::DirectlyMutable},
+    directory::{entry_container::Directory, helper::DirectlyMutable},
     execution_scope::ExecutionScope,
     path::Path,
     service::endpoint,

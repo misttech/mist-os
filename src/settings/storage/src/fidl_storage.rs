@@ -412,7 +412,7 @@ mod tests {
     use fuchsia_async as fasync;
     use std::task::Poll;
     use test_case::test_case;
-    use vfs::directory::entry::DirectoryEntry;
+    use vfs::directory::entry_container::Directory;
     use vfs::directory::mutable::simple::tree_constructor;
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_write;
@@ -439,7 +439,7 @@ mod tests {
         }
     }
 
-    fn serve_vfs_dir(root: Arc<impl DirectoryEntry>) -> DirectoryProxy {
+    fn serve_vfs_dir(root: Arc<impl Directory>) -> DirectoryProxy {
         let fs_scope = ExecutionScope::build()
             .entry_constructor(tree_constructor(move |_, _| {
                 Ok(read_write(b"", /*capacity*/ Some(100)))
@@ -887,7 +887,7 @@ mod tests {
         assert_file!(executor, storage_dir, "xyz.pfidl", value_to_write3);
     }
 
-    fn serve_full_vfs_dir(root: Arc<impl DirectoryEntry>, recovers_after: usize) -> DirectoryProxy {
+    fn serve_full_vfs_dir(root: Arc<impl Directory>, recovers_after: usize) -> DirectoryProxy {
         let attempts = std::sync::Mutex::new(0);
         let fs_scope = ExecutionScope::build()
             .entry_constructor(tree_constructor(move |_, file_name| {

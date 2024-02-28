@@ -40,8 +40,8 @@ use {
     tracing::warn,
     version_history,
     vfs::{
-        directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo::read_only,
-        pseudo_directory,
+        directory::entry_container::Directory, execution_scope::ExecutionScope,
+        file::vmo::read_only, pseudo_directory,
     },
 };
 

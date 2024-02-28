@@ -98,7 +98,7 @@ pub fn get_backing_memory_validate_flags(
 #[cfg(test)]
 mod tests {
     use super::new_connection_validate_options;
-    use crate::{file::FileOptions, test_utils::build_flag_combinations, ProtocolsExt};
+    use crate::{file::FileOptions, protocols::ToFileOptions, test_utils::build_flag_combinations};
 
     use {assert_matches::assert_matches, fidl_fuchsia_io as fio, fuchsia_zircon_status::Status};
 

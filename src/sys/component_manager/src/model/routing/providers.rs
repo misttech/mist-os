@@ -20,7 +20,7 @@ use {
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     sandbox::Message,
     std::{path::PathBuf, sync::Arc},
-    vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope},
+    vfs::{directory::entry_container::Directory, execution_scope::ExecutionScope},
 };
 
 /// The default provider for a ComponentCapability.
@@ -137,8 +137,8 @@ pub struct DirectoryEntryCapabilityProvider {
     /// Execution scope for requests to `entry`.
     pub execution_scope: ExecutionScope,
 
-    /// The pseudo directory entry that backs this capability.
-    pub entry: Arc<dyn DirectoryEntry>,
+    /// The pseudo directory that backs this capability.
+    pub entry: Arc<vfs::directory::immutable::simple::Simple>,
 }
 
 #[async_trait]

@@ -25,7 +25,8 @@ use {
     vfs::{
         common::send_on_open_with_error,
         directory::{
-            entry::EntryInfo, immutable::connection::ImmutableConnection,
+            entry::{EntryInfo, OpenRequest},
+            immutable::connection::ImmutableConnection,
             traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
@@ -267,6 +268,56 @@ pub enum PathError {
 }
 
 impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir<S> {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+        request.open_dir(self)
+    }
+}
+
+#[async_trait]
+impl<S: crate::NonMetaStorage> vfs::node::Node for RootDir<S> {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_DIRECTORY
+                | vfs::common::rights_to_posix_mode_bits(
+                    true, // read
+                    true, // write
+                    true, // execute
+                ),
+            id: 1,
+            content_size: 0,
+            storage_size: 0,
+            link_count: 1,
+            creation_time: 0,
+            modification_time: 0,
+        })
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        Ok(immutable_attributes!(
+            requested_attributes,
+            Immutable {
+                protocols: fio::NodeProtocolKinds::DIRECTORY,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::ENUMERATE
+                    | fio::Operations::TRAVERSE,
+                content_size: 0,
+                storage_size: 0,
+                link_count: 1,
+                id: 1,
+            }
+        ))
+    }
+}
+
+#[async_trait]
+impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for RootDir<S> {
     fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
@@ -277,12 +328,15 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
         let flags = flags & !fio::OpenFlags::POSIX_WRITABLE;
         let describe = flags.contains(fio::OpenFlags::DESCRIBE);
 
+        if flags.intersects(fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT) {
+            let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_SUPPORTED);
+            return;
+        }
+
         if path.is_empty() {
             flags.to_object_request(server_end).handle(|object_request| {
                 if flags.intersects(
                     fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::CREATE
-                        | fio::OpenFlags::CREATE_IF_ABSENT
                         | fio::OpenFlags::TRUNCATE
                         | fio::OpenFlags::APPEND,
                 ) {
@@ -307,7 +361,9 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
             // This branch is done here instead of in MetaAsDir so that Clone'ing MetaAsDir yields
             // MetaAsDir. See the MetaAsDir::open impl for more.
             if open_meta_as_file(flags) {
-                let () = MetaAsFile::new(self).open(scope, flags, VfsPath::dot(), server_end);
+                flags.to_object_request(server_end).handle(|object_request| {
+                    vfs::file::serve(MetaAsFile::new(self), scope, &flags, object_request)
+                });
             } else {
                 let () = MetaAsDir::new(self).open(scope, flags, VfsPath::dot(), server_end);
             }
@@ -316,8 +372,9 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
 
         if canonical_path.starts_with("meta/") {
             if let Some(meta_file) = self.meta_files.get(canonical_path).copied() {
-                let () =
-                    MetaFile::new(self, meta_file).open(scope, flags, VfsPath::dot(), server_end);
+                flags.to_object_request(server_end).handle(|object_request| {
+                    vfs::file::serve(MetaFile::new(self, meta_file), scope, &flags, object_request)
+                });
                 return;
             }
 
@@ -370,14 +427,14 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
         protocols: fio::ConnectionProtocols,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
-        if path.is_empty() {
-            match protocols.open_mode() {
-                fio::OpenMode::OpenExisting => {}
-                fio::OpenMode::AlwaysCreate | fio::OpenMode::MaybeCreate => {
-                    return Err(zx::Status::NOT_SUPPORTED);
-                }
+        match protocols.open_mode() {
+            fio::OpenMode::OpenExisting => {}
+            fio::OpenMode::AlwaysCreate | fio::OpenMode::MaybeCreate => {
+                return Err(zx::Status::NOT_SUPPORTED);
             }
+        }
 
+        if path.is_empty() {
             if let Some(rights) = protocols.rights() {
                 if rights.intersects(fio::Operations::WRITE_BYTES) {
                     return Err(zx::Status::NOT_SUPPORTED);
@@ -406,7 +463,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
             // This branch is done here instead of in MetaAsDir so that Clone'ing MetaAsDir yields
             // MetaAsDir. See the MetaAsDir::open impl for more.
             return if !protocols.is_dir_allowed() {
-                MetaAsFile::new(self).open2(scope, VfsPath::dot(), protocols, object_request)
+                vfs::file::serve(MetaAsFile::new(self), scope, &protocols, object_request)
             } else {
                 MetaAsDir::new(self).open2(scope, VfsPath::dot(), protocols, object_request)
             };
@@ -414,10 +471,10 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
 
         if canonical_path.starts_with("meta/") {
             if let Some(meta_file) = self.meta_files.get(canonical_path).copied() {
-                return MetaFile::new(self, meta_file).open2(
+                return vfs::file::serve(
+                    MetaFile::new(self, meta_file),
                     scope,
-                    VfsPath::dot(),
-                    protocols,
+                    &protocols,
                     object_request,
                 );
             }
@@ -455,52 +512,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
         Err(zx::Status::NOT_FOUND)
     }
 
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-    }
-}
-
-#[async_trait]
-impl<S: crate::NonMetaStorage> vfs::node::Node for RootDir<S> {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY
-                | vfs::common::rights_to_posix_mode_bits(
-                    true, // read
-                    true, // write
-                    true, // execute
-                ),
-            id: 1,
-            content_size: 0,
-            storage_size: 0,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
-    async fn get_attributes(
-        &self,
-        requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, zx::Status> {
-        Ok(immutable_attributes!(
-            requested_attributes,
-            Immutable {
-                protocols: fio::NodeProtocolKinds::DIRECTORY,
-                abilities: fio::Operations::GET_ATTRIBUTES
-                    | fio::Operations::ENUMERATE
-                    | fio::Operations::TRAVERSE,
-                content_size: 0,
-                storage_size: 0,
-                link_count: 1,
-                id: 1,
-            }
-        ))
-    }
-}
-
-#[async_trait]
-impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for RootDir<S> {
     async fn read_dirents<'a>(
         &'a self,
         pos: &'a TraversalPosition,
@@ -913,8 +924,7 @@ mod tests {
         ] {
             let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
 
-            DirectoryEntry::open(
-                root_dir.clone(),
+            root_dir.clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::DESCRIBE | forbidden_flag,
                 VfsPath::dot(),
@@ -934,8 +944,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
         let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
 
-        DirectoryEntry::open(
-            root_dir,
+        root_dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE,
             VfsPath::dot(),
@@ -959,8 +968,7 @@ mod tests {
         for path in ["resource", "resource/"] {
             let (proxy, server_end) = create_proxy().unwrap();
 
-            DirectoryEntry::open(
-                root_dir.clone(),
+            root_dir.clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -985,8 +993,7 @@ mod tests {
         for path in ["meta", "meta/"] {
             let (proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
 
-            DirectoryEntry::open(
-                root_dir.clone(),
+            root_dir.clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -1017,8 +1024,7 @@ mod tests {
         for path in ["meta", "meta/"] {
             let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
 
-            DirectoryEntry::open(
-                root_dir.clone(),
+            root_dir.clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -1060,8 +1066,7 @@ mod tests {
         for path in ["meta/file", "meta/file/"] {
             let (proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
 
-            DirectoryEntry::open(
-                root_dir.clone(),
+            root_dir.clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -1079,8 +1084,7 @@ mod tests {
         for path in ["meta/dir", "meta/dir/"] {
             let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
 
-            DirectoryEntry::open(
-                root_dir.clone(),
+            root_dir.clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -1101,8 +1105,7 @@ mod tests {
         for path in ["dir", "dir/"] {
             let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
 
-            DirectoryEntry::open(
-                root_dir.clone(),
+            root_dir.clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -1178,7 +1181,7 @@ mod tests {
         });
         protocols
             .to_object_request(server_end)
-            .handle(|req| DirectoryEntry::open2(root_dir, scope, VfsPath::dot(), protocols, req));
+            .handle(|req| root_dir.open2(scope, VfsPath::dot(), protocols, req));
         assert_eq!(
             fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
             vec![
@@ -1204,7 +1207,7 @@ mod tests {
             });
             protocols
                 .to_object_request(server_end)
-                .handle(|req| DirectoryEntry::open2(root_dir.clone(), scope, path, protocols, req));
+                .handle(|req| root_dir.clone().open2(scope, path, protocols, req));
             // TODO(b/293947862): FakeBlobfs is backed by memfs, which currently does not support
             // Open2. Once memfs supports Open2, this test case will need to be updated.
             assert_matches!(
@@ -1233,7 +1236,7 @@ mod tests {
             });
             protocols
                 .to_object_request(server_end)
-                .handle(|req| DirectoryEntry::open2(root_dir.clone(), scope, path, protocols, req));
+                .handle(|req| root_dir.clone().open2(scope, path, protocols, req));
             assert_eq!(
                 fuchsia_fs::file::read(&proxy).await.unwrap(),
                 root_dir.hash.to_string().as_bytes()
@@ -1269,7 +1272,7 @@ mod tests {
             });
             protocols
                 .to_object_request(server_end)
-                .handle(|req| DirectoryEntry::open2(root_dir.clone(), scope, path, protocols, req));
+                .handle(|req| root_dir.clone().open2(scope, path, protocols, req));
             assert_eq!(
                 fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
                 vec![
@@ -1312,7 +1315,7 @@ mod tests {
             });
             protocols
                 .to_object_request(server_end)
-                .handle(|req| DirectoryEntry::open2(root_dir.clone(), scope, path, protocols, req));
+                .handle(|req| root_dir.clone().open2(scope, path, protocols, req));
             assert_eq!(fuchsia_fs::file::read(&proxy).await.unwrap(), b"meta-contents0".to_vec());
         }
     }
@@ -1332,7 +1335,7 @@ mod tests {
             });
             protocols
                 .to_object_request(server_end)
-                .handle(|req| DirectoryEntry::open2(root_dir.clone(), scope, path, protocols, req));
+                .handle(|req| root_dir.clone().open2(scope, path, protocols, req));
             assert_eq!(
                 fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
                 vec![DirEntry { name: "file".to_string(), kind: DirentKind::File }]
@@ -1355,7 +1358,7 @@ mod tests {
             });
             protocols
                 .to_object_request(server_end)
-                .handle(|req| DirectoryEntry::open2(root_dir.clone(), scope, path, protocols, req));
+                .handle(|req| root_dir.clone().open2(scope, path, protocols, req));
             assert_eq!(
                 fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
                 vec![DirEntry { name: "file".to_string(), kind: DirentKind::File }]
@@ -1377,9 +1380,9 @@ mod tests {
                 rights: Some(fio::Operations::READ_BYTES),
                 ..Default::default()
             });
-            protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(sub_dir.clone(), scope, VfsPath::dot(), protocols, req)
-            });
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| sub_dir.clone().open2(scope, VfsPath::dot(), protocols, req));
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
                 Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
@@ -1398,9 +1401,9 @@ mod tests {
             rights: Some(fio::Operations::WRITE_BYTES),
             ..Default::default()
         });
-        protocols.to_object_request(server_end).handle(|req| {
-            DirectoryEntry::open2(root_dir.clone(), scope, VfsPath::dot(), protocols, req)
-        });
+        protocols
+            .to_object_request(server_end)
+            .handle(|req| root_dir.clone().open2(scope, VfsPath::dot(), protocols, req));
         assert_matches!(
             proxy.take_event_stream().try_next().await,
             Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
@@ -1428,9 +1431,9 @@ mod tests {
                 }),
                 ..Default::default()
             });
-            protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(root_dir.clone(), scope, VfsPath::dot(), protocols, req)
-            });
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| root_dir.clone().open2(scope, VfsPath::dot(), protocols, req));
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
                 Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FILE, .. })

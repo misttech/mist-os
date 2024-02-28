@@ -23,10 +23,13 @@ use crate::{
         },
     },
     execution_scope::ExecutionScope,
+    file::{self, FileLike},
     name::Name,
     node::Node,
     path::Path,
     protocols::ProtocolsExt,
+    remote::RemoteLike,
+    service::{self, ServiceLike},
     ObjectRequestRef, ToObjectRequest,
 };
 
@@ -223,6 +226,62 @@ impl<Connection> DirectoryEntry for Simple<Connection>
 where
     Connection: DerivedConnection + 'static,
 {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(self.inode, fio::DirentType::Directory)
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+        request.open_dir(self)
+    }
+}
+
+#[async_trait]
+impl<Connection: DerivedConnection + 'static> Node for Simple<Connection> {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_DIRECTORY
+                | rights_to_posix_mode_bits(
+                    /*r*/ true,
+                    /*w*/ Connection::MUTABLE,
+                    /*x*/ true,
+                ),
+            id: self.inode,
+            content_size: 0,
+            storage_size: 0,
+            link_count: 1,
+            creation_time: 0,
+            modification_time: 0,
+        })
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, Status> {
+        Ok(attributes!(
+            requested_attributes,
+            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
+            Immutable {
+                protocols: fio::NodeProtocolKinds::DIRECTORY,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::UPDATE_ATTRIBUTES
+                    | fio::Operations::ENUMERATE
+                    | fio::Operations::TRAVERSE
+                    | fio::Operations::MODIFY_DIRECTORY,
+                content_size: 0,
+                storage_size: 0,
+                link_count: 1,
+                id: self.inode,
+            }
+        ))
+    }
+}
+
+#[async_trait]
+impl<Connection> Directory for Simple<Connection>
+where
+    Connection: DerivedConnection + 'static,
+{
     fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
@@ -281,7 +340,14 @@ where
                 }
             }
             Ok(entry) => {
-                entry.open(scope, flags, path, server_end);
+                flags.to_object_request(server_end).handle(|object_request| {
+                    entry.open_entry(OpenRequest {
+                        scope,
+                        flags_or_protocols: flags.into(),
+                        path,
+                        object_request,
+                    })
+                });
             }
         }
     }
@@ -329,7 +395,12 @@ where
         };
 
         match entry {
-            Ok(entry) => entry.open2(scope, path, protocols, object_request),
+            Ok(entry) => entry.open_entry(OpenRequest {
+                scope,
+                flags_or_protocols: (&protocols).into(),
+                path,
+                object_request,
+            }),
             Err(e) => {
                 let mut handler = ref_copy.not_found_handler.lock().unwrap();
                 if let Some(handler) = handler.as_mut() {
@@ -340,58 +411,6 @@ where
         }
     }
 
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(self.inode, fio::DirentType::Directory)
-    }
-}
-
-#[async_trait]
-impl<Connection: DerivedConnection + 'static> Node for Simple<Connection> {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY
-                | rights_to_posix_mode_bits(
-                    /*r*/ true,
-                    /*w*/ Connection::MUTABLE,
-                    /*x*/ true,
-                ),
-            id: self.inode,
-            content_size: 0,
-            storage_size: 0,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
-    async fn get_attributes(
-        &self,
-        requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, Status> {
-        Ok(attributes!(
-            requested_attributes,
-            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
-            Immutable {
-                protocols: fio::NodeProtocolKinds::DIRECTORY,
-                abilities: fio::Operations::GET_ATTRIBUTES
-                    | fio::Operations::UPDATE_ATTRIBUTES
-                    | fio::Operations::ENUMERATE
-                    | fio::Operations::TRAVERSE
-                    | fio::Operations::MODIFY_DIRECTORY,
-                content_size: 0,
-                storage_size: 0,
-                link_count: 1,
-                id: self.inode,
-            }
-        ))
-    }
-}
-
-#[async_trait]
-impl<Connection> Directory for Simple<Connection>
-where
-    Connection: DerivedConnection + 'static,
-{
     async fn read_dirents<'a>(
         &'a self,
         pos: &'a TraversalPosition,
@@ -626,6 +645,131 @@ fn create_entry(
         entry_constructor.create_entry(parent, entry_type, name, path)
     } else {
         Err(Status::NOT_SUPPORTED)
+    }
+}
+
+/// An open request.
+pub struct OpenRequest<'a> {
+    scope: ExecutionScope,
+    flags_or_protocols: FlagsOrProtocols<'a>,
+    path: Path,
+    object_request: ObjectRequestRef<'a>,
+}
+
+enum FlagsOrProtocols<'a> {
+    Flags(fio::OpenFlags),
+    Protocols(&'a fio::ConnectionProtocols),
+}
+
+impl From<fio::OpenFlags> for FlagsOrProtocols<'_> {
+    fn from(value: fio::OpenFlags) -> Self {
+        FlagsOrProtocols::Flags(value)
+    }
+}
+
+impl<'a> From<&'a fio::ConnectionProtocols> for FlagsOrProtocols<'a> {
+    fn from(value: &'a fio::ConnectionProtocols) -> Self {
+        FlagsOrProtocols::Protocols(value)
+    }
+}
+
+impl OpenRequest<'_> {
+    /// Opens a directory.
+    pub fn open_dir(self, dir: Arc<impl Directory>) -> Result<(), Status> {
+        match self {
+            OpenRequest {
+                scope,
+                flags_or_protocols: FlagsOrProtocols::Flags(flags),
+                path,
+                object_request,
+            } => {
+                dir.open(scope, flags, path, object_request.take().into_server_end());
+                // This will cause issues for heavily nested directory structures because it thwarts
+                // tail recursion optimization, but that shouldn't occur in practice.
+                Ok(())
+            }
+            OpenRequest {
+                scope,
+                flags_or_protocols: FlagsOrProtocols::Protocols(protocols),
+                path,
+                object_request,
+            } => {
+                // We should fix the copy of protocols here.
+                dir.open2(scope, path, protocols.clone(), object_request)
+            }
+        }
+    }
+
+    /// Opens a file.
+    pub fn open_file(self, file: Arc<impl FileLike>) -> Result<(), Status> {
+        match self {
+            OpenRequest {
+                scope,
+                flags_or_protocols: FlagsOrProtocols::Flags(flags),
+                path,
+                object_request,
+            } => {
+                if !path.is_empty() {
+                    return Err(Status::NOT_DIR);
+                }
+                file::serve(file, scope, &flags, object_request)
+            }
+            OpenRequest {
+                scope,
+                flags_or_protocols: FlagsOrProtocols::Protocols(protocols),
+                path,
+                object_request,
+            } => {
+                if !path.is_empty() {
+                    return Err(Status::NOT_DIR);
+                }
+                file::serve(file, scope, protocols, object_request)
+            }
+        }
+    }
+
+    /// Opens a service.
+    pub fn open_service(self, service: Arc<impl ServiceLike>) -> Result<(), Status> {
+        match self {
+            OpenRequest {
+                scope,
+                flags_or_protocols: FlagsOrProtocols::Flags(flags),
+                path,
+                object_request,
+            } => {
+                if !path.is_empty() {
+                    return Err(Status::NOT_DIR);
+                }
+                service::serve(service, scope, &flags, object_request)
+            }
+            OpenRequest {
+                scope,
+                flags_or_protocols: FlagsOrProtocols::Protocols(protocols),
+                path,
+                object_request,
+            } => {
+                if !path.is_empty() {
+                    return Err(Status::NOT_DIR);
+                }
+                service::serve(service, scope, protocols, object_request)
+            }
+        }
+    }
+
+    /// Forwards the request to a remote.
+    pub fn open_remote(self, remote: Arc<impl RemoteLike>) -> Result<(), Status> {
+        match self {
+            OpenRequest {
+                scope,
+                flags_or_protocols: FlagsOrProtocols::Flags(flags),
+                path,
+                object_request,
+            } => {
+                remote.open(scope, flags, path, object_request.take().into_server_end());
+                Ok(())
+            }
+            _ => Err(Status::NOT_SUPPORTED),
+        }
     }
 }
 

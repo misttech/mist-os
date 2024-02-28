@@ -9,7 +9,7 @@ use {
     mock_metrics::MockMetricEventLoggerFactory,
     std::sync::Arc,
     tracing::info,
-    vfs::directory::{entry::DirectoryEntry as _, helper::DirectlyMutable as _},
+    vfs::directory::{entry_container::Directory as _, helper::DirectlyMutable as _},
 };
 
 static PKGFS_BOOT_ARG_KEY: &'static str = "zircon.system.pkgfs.cmd";

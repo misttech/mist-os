@@ -17,7 +17,8 @@ use crate::{
 
 use crate::{
     directory::{
-        entry::{DirectoryEntry, EntryInfo},
+        entry::EntryInfo,
+        entry_container::Directory,
         helper::DirectlyMutable,
         immutable::{simple_with_inode, Simple},
         test_utils::{run_server_client, DirentsSameInodeBuilder},
@@ -1527,7 +1528,7 @@ fn watch_addition_with_two_scopes() {
     run_client(exec, || {
         async move {
             async fn open_with_scope(
-                server: Arc<dyn DirectoryEntry>,
+                server: Arc<dyn Directory>,
                 scope: ExecutionScope,
             ) -> fio::DirectoryProxy {
                 let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>()

@@ -6,8 +6,8 @@
 
 use {
     crate::{
-        common::io2_conversions, directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-        path::Path,
+        common::io2_conversions, directory::entry_container::Directory,
+        execution_scope::ExecutionScope, path::Path,
     },
     fidl::endpoints::{create_endpoints, ServerEnd},
     fidl_fuchsia_io as fio,
@@ -22,7 +22,7 @@ pub mod common;
 pub mod immutable;
 pub mod mutable;
 
-pub mod connection;
+mod connection;
 pub mod dirents_sink;
 pub mod entry;
 pub mod entry_container;
@@ -56,12 +56,12 @@ impl Default for DirectoryOptions {
 }
 
 /// Serves [dir] and returns a `DirectoryProxy` to it.
-pub fn spawn_directory<D: DirectoryEntry + ?Sized>(dir: Arc<D>) -> fio::DirectoryProxy {
+pub fn spawn_directory<D: Directory + ?Sized>(dir: Arc<D>) -> fio::DirectoryProxy {
     spawn_directory_with_options(dir, DirectoryOptions::default())
 }
 
 /// Serves [dir] with the given [options] and returns a `DirectoryProxy` to it.
-pub fn spawn_directory_with_options<D: DirectoryEntry + ?Sized>(
+pub fn spawn_directory_with_options<D: Directory + ?Sized>(
     dir: Arc<D>,
     options: DirectoryOptions,
 ) -> fio::DirectoryProxy {

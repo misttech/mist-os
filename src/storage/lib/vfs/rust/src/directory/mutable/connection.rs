@@ -343,11 +343,10 @@ mod tests {
         crate::{
             directory::{
                 dirents_sink,
-                entry::{DirectoryEntry, EntryInfo},
                 entry_container::{Directory, DirectoryWatcher},
                 traversal_position::TraversalPosition,
             },
-            node::Node,
+            node::{IsDirectory, Node},
             path::Path,
             ToObjectRequest,
         },
@@ -388,22 +387,6 @@ mod tests {
         }
     }
 
-    impl DirectoryEntry for MockDirectory {
-        fn open(
-            self: Arc<Self>,
-            _scope: ExecutionScope,
-            _flags: fio::OpenFlags,
-            _path: Path,
-            _server_end: ServerEnd<fio::NodeMarker>,
-        ) {
-            panic!("Not implemented!");
-        }
-
-        fn entry_info(&self) -> EntryInfo {
-            EntryInfo::new(0, fio::DirentType::Directory)
-        }
-    }
-
     #[async_trait]
     impl Node for MockDirectory {
         async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
@@ -424,6 +407,16 @@ mod tests {
 
     #[async_trait]
     impl Directory for MockDirectory {
+        fn open(
+            self: Arc<Self>,
+            _scope: ExecutionScope,
+            _flags: fio::OpenFlags,
+            _path: Path,
+            _server_end: ServerEnd<fio::NodeMarker>,
+        ) {
+            panic!("Not implemented!");
+        }
+
         async fn read_dirents<'a>(
             &'a self,
             _pos: &'a TraversalPosition,
@@ -503,6 +496,8 @@ mod tests {
             })
         }
     }
+
+    impl IsDirectory for MockDirectory {}
 
     struct Events(Mutex<Vec<MutableDirectoryAction>>);
 

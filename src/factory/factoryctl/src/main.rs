@@ -198,7 +198,7 @@ mod tests {
         fuchsia_zircon as zx,
         futures::{StreamExt, TryStreamExt},
         vfs::{
-            directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
+            directory::entry_container::Directory, execution_scope::ExecutionScope,
             file::vmo::read_only, tree_builder::TreeBuilder,
         },
     };

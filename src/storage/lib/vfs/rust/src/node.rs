@@ -5,13 +5,14 @@
 //! Implementation of a (limited) node connection.
 
 use crate::{
-    common::inherit_rights_for_clone,
-    directory::{entry::DirectoryEntry, entry_container::MutableDirectory},
+    common::{inherit_rights_for_clone, IntoAny},
+    directory::entry_container::MutableDirectory,
     execution_scope::ExecutionScope,
     name::Name,
+    node,
     object_request::Representation,
-    path::Path,
-    ObjectRequestRef, ProtocolsExt, ToObjectRequest,
+    protocols::ToNodeOptions,
+    ObjectRequestRef, ToObjectRequest,
 };
 
 use {
@@ -31,13 +32,20 @@ pub const POSIX_READ_WRITE_PROTECTION_ATTRIBUTES: u32 = S_IRUSR | S_IWUSR;
 #[cfg(target_os = "macos")]
 pub const POSIX_READ_WRITE_PROTECTION_ATTRIBUTES: u16 = S_IRUSR | S_IWUSR;
 
+#[derive(Clone, Copy)]
 pub struct NodeOptions {
     pub rights: fio::Operations,
 }
 
+pub trait IsDirectory {
+    fn is_directory(&self) -> bool {
+        true
+    }
+}
+
 /// All nodes must implement this trait.
 #[async_trait]
-pub trait Node: DirectoryEntry {
+pub trait Node: IsDirectory + IntoAny + Send + Sync + 'static {
     /// Returns node attributes (io2).
     async fn get_attributes(
         &self,
@@ -46,6 +54,19 @@ pub trait Node: DirectoryEntry {
 
     /// Get this node's attributes.
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status>;
+
+    /// Called when the node is about to be opened as the node protocol.  Implementers can use this
+    /// to perform any initialization or reference counting.  Errors here will result in the open
+    /// failing.  By default, this forwards to the infallible will_clone.
+    fn will_open_as_node(&self) -> Result<(), Status> {
+        self.will_clone();
+        Ok(())
+    }
+
+    /// Called when the node is about to be cloned (and also by the default implementation of
+    /// will_open_as_node).  Implementations that perform their own open count can use this.  Each
+    /// call to `will_clone` will be accompanied by an eventual call to `close`.
+    fn will_clone(&self) {}
 
     /// Called when the node is closed.
     fn close(self: Arc<Self>) {}
@@ -62,10 +83,22 @@ pub trait Node: DirectoryEntry {
     fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
         Err(Status::NOT_SUPPORTED)
     }
+
+    /// Opens the node using the node protocol.
+    fn open_as_node(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        options: NodeOptions,
+        object_request: ObjectRequestRef,
+    ) -> Result<(), Status> {
+        self.will_open_as_node()?;
+        scope.spawn(node::Connection::create(scope.clone(), self, options, object_request)?);
+        Ok(())
+    }
 }
 
 /// Represents a FIDL (limited) node connection.
-pub struct Connection<N: Node> {
+pub struct Connection<N: Node + ?Sized> {
     // Execution scope this connection and any async operations and connections it creates will
     // use.
     scope: ExecutionScope,
@@ -87,15 +120,15 @@ enum ConnectionState {
     Closed,
 }
 
-impl<N: Node> Connection<N> {
+impl<N: Node + ?Sized> Connection<N> {
     pub fn create(
         scope: ExecutionScope,
         node: Arc<N>,
-        protocols: impl ProtocolsExt,
+        options: impl ToNodeOptions,
         object_request: ObjectRequestRef,
     ) -> Result<impl Future<Output = ()>, Status> {
         let node = OpenNode::new(node);
-        let options = protocols.to_node_options(&node.entry_info())?;
+        let options = options.to_node_options(node.is_directory())?;
         let object_request = object_request.take();
         Ok(async move {
             let connection = Connection { scope: scope.clone(), node, options };
@@ -226,19 +259,27 @@ impl<N: Node> Connection<N> {
 
     fn handle_clone(&mut self, flags: fio::OpenFlags, server_end: ServerEnd<fio::NodeMarker>) {
         flags.to_object_request(server_end).handle(|object_request| {
-            let flags = inherit_rights_for_clone(fio::OpenFlags::NODE_REFERENCE, flags)?;
-            self.node.clone().open(
-                self.scope.clone(),
-                flags,
-                Path::dot(),
-                object_request.take().into_server_end(),
-            );
+            let options = inherit_rights_for_clone(fio::OpenFlags::NODE_REFERENCE, flags)?
+                .to_node_options(self.node.is_directory())?;
+
+            self.node.will_clone();
+
+            let connection =
+                Self { scope: self.scope.clone(), node: OpenNode::new(self.node.clone()), options };
+
+            object_request.take().spawn(&self.scope, |object_request| {
+                Box::pin(async {
+                    let requests = object_request.take().into_request_stream(&connection).await?;
+                    Ok(connection.handle_requests(requests))
+                })
+            });
+
             Ok(())
         });
     }
 }
 
-impl<N: Node> Representation for Connection<N> {
+impl<N: Node + ?Sized> Representation for Connection<N> {
     type Protocol = fio::NodeMarker;
 
     async fn get_representation(

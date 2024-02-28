@@ -34,7 +34,7 @@ mod tests {
         std::{fs, path::Path},
         tempfile::TempDir,
         vfs::{
-            directory::entry::DirectoryEntry,
+            directory::entry_container::Directory,
             execution_scope::ExecutionScope,
             file::vmo::{read_only, read_write},
             pseudo_directory,

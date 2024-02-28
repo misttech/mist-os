@@ -347,7 +347,7 @@ mod tests {
         fidl_fuchsia_io as fio,
         ramdevice_client::RamdiskClient,
         vfs::{
-            directory::entry::DirectoryEntry as _, execution_scope::ExecutionScope,
+            directory::entry_container::Directory, execution_scope::ExecutionScope,
             file::vmo::read_only, pseudo_directory,
         },
     };

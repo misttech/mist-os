@@ -15,7 +15,9 @@ use {
         FutureExt as _, SinkExt as _, StreamExt as _,
     },
     std::sync::Arc,
-    vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path, service},
+    vfs::{
+        directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path, service,
+    },
 };
 
 /// Identifier for ramdisk storage. Defined in sdk/lib/zbi-format/include/lib/zbi-format/zbi.h.

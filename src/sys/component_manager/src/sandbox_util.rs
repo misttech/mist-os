@@ -28,7 +28,7 @@ use {
     std::iter,
     std::sync::{self, Arc},
     tracing::warn,
-    vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
+    vfs::{execution_scope::ExecutionScope, ToObjectRequest},
 };
 
 lazy_static! {
@@ -58,7 +58,9 @@ fn unwrap_server_end_or_serve_node(
             *server_end_return = Some(server_end.into_zx_channel());
         },
     );
-    service.open(ExecutionScope::new(), flags, Path::dot(), channel.into());
+    flags.to_object_request(channel).handle(|object_request| {
+        vfs::service::serve(service, ExecutionScope::new(), &flags, object_request)
+    });
 
     let mut server_end_return = server_end_return.lock().unwrap();
     if let Some(server_end) = server_end_return.take() {

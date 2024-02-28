@@ -195,7 +195,7 @@ mod tests {
         diagnostics_assertions::assert_data_tree,
         fidl_fuchsia_io as fio,
         fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
-        vfs::directory::entry::DirectoryEntry as _,
+        vfs::directory::entry_container::Directory as _,
     };
 
     #[fuchsia::test]

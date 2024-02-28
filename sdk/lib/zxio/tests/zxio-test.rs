@@ -17,14 +17,18 @@ use {
         OpenOptions, SeekOrigin, XattrSetMode, Zxio, ZXIO_ROOT_HASH_LENGTH,
     },
     vfs::{
-        directory::entry::{DirectoryEntry, EntryInfo},
+        directory::{
+            entry::{DirectoryEntry, EntryInfo, OpenRequest},
+            entry_container::Directory,
+        },
         execution_scope::ExecutionScope,
-        file::{FidlIoConnection, File, FileIo, FileOptions, SyncMode},
+        file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode},
         node::Node,
         path::Path,
         pseudo_directory,
+        remote::RemoteLike,
         symlink::Symlink,
-        ToObjectRequest,
+        ObjectRequestRef, ToObjectRequest,
     },
 };
 
@@ -239,6 +243,39 @@ async fn test_read_link_error() {
 
         async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
             unreachable!();
+        }
+    }
+
+    impl RemoteLike for ErrorSymlink {
+        fn open(
+            self: Arc<Self>,
+            scope: ExecutionScope,
+            flags: fio::OpenFlags,
+            path: Path,
+            server_end: ServerEnd<fio::NodeMarker>,
+        ) {
+            flags.to_object_request(server_end).handle(|object_request| {
+                if !path.is_empty() {
+                    return Err(Status::NOT_DIR);
+                }
+                scope.spawn(vfs::symlink::Connection::create(
+                    scope.clone(),
+                    self,
+                    flags,
+                    object_request,
+                )?);
+                Ok(())
+            });
+        }
+    }
+
+    impl DirectoryEntry for ErrorSymlink {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Symlink)
+        }
+
+        fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+            request.open_remote(self)
         }
     }
 
@@ -723,25 +760,12 @@ impl AllocateFile {
 }
 
 impl DirectoryEntry for AllocateFile {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        _path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        flags.to_object_request(server_end).handle(|object_request| {
-            object_request.spawn_connection(
-                scope.clone(),
-                self.clone(),
-                flags,
-                FidlIoConnection::create,
-            )
-        });
-    }
-
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+        request.open_file(self)
     }
 }
 
@@ -809,6 +833,17 @@ impl File for AllocateFile {
         _mode: fio::AllocateMode,
     ) -> Result<(), Status> {
         self.res
+    }
+}
+
+impl FileLike for AllocateFile {
+    fn open(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        options: FileOptions,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        FidlIoConnection::spawn(scope, self, options, object_request)
     }
 }
 

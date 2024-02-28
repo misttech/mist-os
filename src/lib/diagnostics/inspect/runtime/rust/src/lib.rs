@@ -170,7 +170,9 @@ pub mod deprecated {
     use std::sync::Arc;
     use tracing::warn;
     use vfs::{
-        directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path,
+        directory::{entry_container::Directory, immutable::Simple},
+        execution_scope::ExecutionScope,
+        path::Path,
         pseudo_directory,
     };
 
@@ -211,7 +213,7 @@ pub mod deprecated {
     pub fn create_diagnostics_dir_with_options(
         inspector: fuchsia_inspect::Inspector,
         options: PublishOptions,
-    ) -> Arc<dyn DirectoryEntry> {
+    ) -> Arc<Simple> {
         pseudo_directory! {
             TreeMarker::PROTOCOL_NAME =>
                 vfs::service::host(move |stream| {
@@ -231,7 +233,7 @@ pub mod deprecated {
     /// Creates the outgoing diagnostics directory. Should be added to the component's outgoing
     /// directory at `DIAGNOSTICS_DIR`. Use `serve` if the component's outgoing directory is served by
     /// `ServiceFs`.
-    pub fn create_diagnostics_dir(inspector: Inspector) -> Arc<dyn DirectoryEntry> {
+    pub fn create_diagnostics_dir(inspector: Inspector) -> Arc<Simple> {
         create_diagnostics_dir_with_options(inspector, PublishOptions::default())
     }
 }

@@ -958,7 +958,7 @@ mod tests {
         lazy_static::lazy_static,
         std::mem,
         vfs::{
-            directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
+            directory::entry_container::Directory, execution_scope::ExecutionScope,
             file::vmo::read_only, pseudo_directory,
         },
         zerocopy::Ref,

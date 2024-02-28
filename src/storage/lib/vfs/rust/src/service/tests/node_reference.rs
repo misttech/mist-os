@@ -13,10 +13,9 @@ use crate::{
 };
 
 use crate::{
-    directory::entry::DirectoryEntry,
     execution_scope::ExecutionScope,
     file::test_utils::{run_client, run_server_client},
-    path::Path,
+    service, ToObjectRequest,
 };
 
 use {
@@ -108,7 +107,9 @@ fn describe() {
             create_proxy::<fio::FileMarker>().expect("Failed to create connection endpoints");
 
         let flags = fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE;
-        server.open(scope, flags, Path::dot(), server_end.into_channel().into());
+        flags
+            .to_object_request(server_end)
+            .handle(|object_request| service::serve(server, scope, &flags, object_request));
 
         assert_event!(proxy, fio::FileEvent::OnOpen_ { s, info }, {
             assert_eq!(s, Status::OK.into_raw());

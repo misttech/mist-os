@@ -4,13 +4,13 @@
 
 //! Tests for the remote node.
 
-use super::remote_dir;
+use super::{remote_dir, RemoteLike};
 
 use crate::{assert_close, assert_read, assert_read_dirents, pseudo_directory};
 
 use crate::{
     directory::{
-        entry::DirectoryEntry,
+        entry_container::Directory,
         test_utils::{run_client, DirentsSameInodeBuilder},
     },
     execution_scope::ExecutionScope,

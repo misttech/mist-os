@@ -15,7 +15,7 @@ use std::{
 use tracing::warn;
 use vfs::{
     directory::{
-        entry::DirectoryEntry,
+        entry_container::Directory,
         helper::{AlreadyExists, DirectlyMutable},
         immutable::simple as pfs,
     },
@@ -323,6 +323,7 @@ mod tests {
     use futures::try_join;
     use lazy_static::lazy_static;
     use test_util::Counter;
+    use vfs::remote::RemoteLike;
 
     const CAP_KEY: &str = "cap";
 

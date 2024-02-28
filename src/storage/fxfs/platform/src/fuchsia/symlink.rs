@@ -186,6 +186,12 @@ impl Node for FxSymlink {
     }
 }
 
+impl vfs::node::IsDirectory for FxSymlink {
+    fn is_directory(&self) -> bool {
+        false
+    }
+}
+
 impl FxNode for FxSymlink {
     fn object_id(&self) -> u64 {
         self.handle.object_id()

@@ -31,7 +31,7 @@ use {
     remote_block_device::BlockClient as _,
     std::{io, sync::Arc},
     vfs::{
-        directory::{self, entry::DirectoryEntry},
+        directory::{self, entry_container::Directory},
         execution_scope::ExecutionScope,
         file::vmo::read_only,
         tree_builder::TreeBuilder,

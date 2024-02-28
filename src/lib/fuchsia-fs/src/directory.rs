@@ -759,7 +759,7 @@ mod tests {
         proptest::prelude::*,
         tempfile::TempDir,
         vfs::{
-            directory::entry::DirectoryEntry,
+            directory::entry_container::Directory,
             execution_scope::ExecutionScope,
             file::vmo::{read_only, read_write},
             pseudo_directory,

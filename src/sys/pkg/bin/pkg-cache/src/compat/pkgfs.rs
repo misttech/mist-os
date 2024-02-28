@@ -7,9 +7,7 @@ use {
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::{collections::BTreeMap, sync::Arc},
     vfs::directory::{
-        dirents_sink,
-        entry::{DirectoryEntry, EntryInfo},
-        helper::DirectlyMutable as _,
+        dirents_sink, entry::DirectoryEntry, entry::EntryInfo, helper::DirectlyMutable as _,
         traversal_position::TraversalPosition,
     },
 };

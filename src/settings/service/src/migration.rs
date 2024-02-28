@@ -439,7 +439,7 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
-    use vfs::directory::entry::DirectoryEntry;
+    use vfs::directory::entry_container::Directory;
     use vfs::directory::mutable::simple::tree_constructor;
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_write;
@@ -495,7 +495,7 @@ mod tests {
     }
 
     fn serve_vfs_dir(
-        root: Arc<impl DirectoryEntry>,
+        root: Arc<impl Directory>,
     ) -> (DirectoryProxy, Arc<Mutex<HashMap<String, Vmo>>>) {
         let vmo_map = Arc::new(Mutex::new(HashMap::new()));
         let fs_scope = ExecutionScope::build()

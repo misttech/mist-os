@@ -20,8 +20,8 @@ use {
     std::{collections::HashMap, fs::File, str::FromStr, sync::Arc},
     structopt::StructOpt,
     vfs::{
-        directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo::read_only,
-        tree_builder::TreeBuilder,
+        directory::entry_container::Directory, execution_scope::ExecutionScope,
+        file::vmo::read_only, tree_builder::TreeBuilder,
     },
 };
 

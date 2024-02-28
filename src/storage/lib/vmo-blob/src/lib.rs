@@ -5,18 +5,15 @@
 use {
     anyhow::{anyhow, Error},
     async_trait::async_trait,
-    fidl::{endpoints::ServerEnd, AsHandleRef},
+    fidl::AsHandleRef,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::sync::{Arc, OnceLock},
     tracing::error,
     vfs::{
         common::rights_to_posix_mode_bits,
-        directory::entry::{DirectoryEntry, EntryInfo},
-        execution_scope::ExecutionScope,
-        file::{File, FileOptions, GetVmo, StreamIoConnection, SyncMode},
+        file::{File, FileOptions, GetVmo, SyncMode},
         immutable_attributes,
-        path::Path,
-        ObjectRequestRef, ToObjectRequest,
+        node::IsDirectory,
     },
 };
 
@@ -48,40 +45,9 @@ impl GetVmo for VmoBlob {
     }
 }
 
-/// Implement VFS pseudo-directory entry for a blob.
-impl DirectoryEntry for VmoBlob {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        flags.to_object_request(server_end).spawn(&scope.clone(), move |object_request| {
-            Box::pin(async move {
-                if !path.is_empty() {
-                    return Err(zx::Status::NOT_DIR);
-                }
-                object_request.create_connection(scope, self, flags, StreamIoConnection::create)
-            })
-        });
-    }
-
-    fn open2(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        path: Path,
-        protocols: fio::ConnectionProtocols,
-        object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), zx::Status> {
-        if !path.is_empty() {
-            return Err(zx::Status::NOT_DIR);
-        }
-        object_request.spawn_connection(scope, self, protocols, StreamIoConnection::create)
-    }
-
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
+impl IsDirectory for VmoBlob {
+    fn is_directory(&self) -> bool {
+        false
     }
 }
 

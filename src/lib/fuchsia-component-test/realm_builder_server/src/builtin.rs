@@ -10,7 +10,7 @@ use {
     std::{collections::HashMap, sync::Arc},
     tracing::*,
     vfs::{
-        directory::entry::DirectoryEntry, directory::helper::DirectlyMutable,
+        directory::entry_container::Directory, directory::helper::DirectlyMutable,
         directory::immutable::simple as simpledir, execution_scope::ExecutionScope,
         file::vmo::VmoFile, path::Path as VfsPath,
     },

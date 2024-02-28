@@ -14,7 +14,7 @@ use {
     futures::{channel::mpsc, SinkExt, StreamExt, TryStream, TryStreamExt},
     std::sync::Arc,
     tracing::info,
-    vfs::directory::{entry::DirectoryEntry, spawn_directory},
+    vfs::directory::{entry_container::Directory, spawn_directory},
 };
 
 // #! Library for common utilities (mocks, definitions) for the manifest integration tests.
@@ -83,7 +83,7 @@ where
 /// Sets up a mock dev/ directory with the provided `dev_directory` topology.
 pub async fn mock_dev(
     handles: LocalComponentHandles,
-    dev_directory: Arc<dyn DirectoryEntry>,
+    dev_directory: Arc<dyn Directory>,
 ) -> Result<(), Error> {
     let mut fs = ServiceFs::new();
     let _ = fs.add_remote("dev", spawn_directory(dev_directory));

@@ -5,7 +5,10 @@
 //! Utilities to run asynchronous tests that use `pseudo-fs` objects.
 
 use crate::{
-    directory::{entry::DirectoryEntry, mutable::entry_constructor::EntryConstructor},
+    directory::{
+        entry::DirectoryEntry, entry_container::Directory, helper::DirectlyMutable, immutable,
+        mutable::entry_constructor::EntryConstructor,
+    },
     execution_scope::ExecutionScope,
     path::Path,
 };
@@ -224,10 +227,14 @@ where
             Some(entry_constructor) => scope_builder.entry_constructor(entry_constructor),
             None => scope_builder,
         };
-        self.server.open(
+
+        let root = immutable::simple();
+        root.add_entry("server", self.server).unwrap();
+
+        root.open(
             scope_builder.new(),
             self.flags,
-            Path::dot(),
+            Path::validate_and_split("server").unwrap(),
             server_end.into_channel().into(),
         );
 

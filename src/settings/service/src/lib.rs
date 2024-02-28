@@ -39,7 +39,7 @@ pub use light::light_hardware_configuration::LightHardwareConfiguration;
 use serde::Deserialize;
 pub use service::{Address, Payload};
 #[cfg(test)]
-use vfs::directory::entry::DirectoryEntry;
+use vfs::directory::entry_container::Directory;
 #[cfg(test)]
 use vfs::directory::mutable::simple::tree_constructor;
 #[cfg(test)]

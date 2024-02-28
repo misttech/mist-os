@@ -17,7 +17,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
-use vfs::directory::{entry::DirectoryEntry, mutable::simple::Simple};
+use vfs::directory::{entry_container::Directory, mutable::simple::Simple};
 
 fn to_render2_error(err: fidl::Error) -> Error {
     anyhow::format_err!("Error encountered while calling render2: {:?}", err)
@@ -146,7 +146,7 @@ mod tests {
     use fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream};
     use fidl_fuchsia_recovery_ui::ProgressRendererRequest;
     use futures::stream::StreamExt;
-    use vfs::{directory::entry::DirectoryEntry, file::vmo::read_only};
+    use vfs::file::vmo::read_only;
 
     async fn fake_wipe_storage() -> Result<fio::DirectoryProxy, Error> {
         let (client, server) = create_endpoints::<fio::DirectoryMarker>();

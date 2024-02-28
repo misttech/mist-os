@@ -38,7 +38,7 @@ use {
         sync::{Arc, Weak},
     },
     tracing::{trace, warn},
-    vfs::directory::entry::DirectoryEntry,
+    vfs::directory::entry_container::Directory,
 };
 
 lazy_static! {

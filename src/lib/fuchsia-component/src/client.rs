@@ -378,10 +378,10 @@ pub fn realm() -> Result<RealmProxy, Error> {
 pub mod test_util {
     use super::*;
     use std::sync::Arc;
-    use vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope};
+    use vfs::{directory::entry_container::Directory, execution_scope::ExecutionScope};
 
     #[cfg(test)]
-    pub fn run_directory_server(dir: Arc<dyn DirectoryEntry>) -> fio::DirectoryProxy {
+    pub fn run_directory_server(dir: Arc<dyn Directory>) -> fio::DirectoryProxy {
         let (dir_proxy, dir_server) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let scope = ExecutionScope::new();

@@ -15,7 +15,7 @@ use {
         stream::TryStreamExt as _,
     },
     std::sync::Arc,
-    vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope},
+    vfs::{directory::entry_container::Directory, execution_scope::ExecutionScope},
 };
 
 static PKGFS_BOOT_ARG_KEY: &'static str = "zircon.system.pkgfs.cmd";

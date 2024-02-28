@@ -14,7 +14,7 @@ use fuchsia_component_test::*;
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 use tracing::*;
 use vfs::{
-    directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo::read_only,
+    directory::entry_container::Directory, execution_scope::ExecutionScope, file::vmo::read_only,
     pseudo_directory,
 };
 

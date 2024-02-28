@@ -35,7 +35,7 @@ use {
         stream::{StreamExt, TryStreamExt},
     },
     tracing::info,
-    vfs::{execution_scope::ExecutionScope, path::Path},
+    vfs::{directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path},
 };
 
 async fn run_ext4_server(mut stream: Server_RequestStream) -> Result<(), Error> {

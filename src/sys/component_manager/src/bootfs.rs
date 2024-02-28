@@ -14,7 +14,7 @@ use {
     thiserror::Error,
     tracing::info,
     vfs::{
-        directory::{entry::DirectoryEntry, immutable::connection::ImmutableConnection},
+        directory::immutable::connection::ImmutableConnection,
         execution_scope::ExecutionScope,
         file::vmo,
         tree_builder::{self, TreeBuilder},
@@ -136,7 +136,7 @@ impl BootfsSvc {
         size: u64,
         executable: bool,
         inode: u64,
-    ) -> Result<Arc<dyn DirectoryEntry>, BootfsError> {
+    ) -> Result<Arc<vmo::VmoFile>, BootfsError> {
         // If this is a VMO with execution rights, passing zx::VmoChildOptions::NO_WRITE will
         // allow the child to also inherit execution rights. Without that flag execution
         // rights are stripped, even if the VMO already lacked write permission.
@@ -150,7 +150,7 @@ impl BootfsSvc {
         Ok(BootfsSvc::create_dir_entry(child, executable, inode))
     }
 
-    fn create_dir_entry(vmo: zx::Vmo, executable: bool, inode: u64) -> Arc<dyn DirectoryEntry> {
+    fn create_dir_entry(vmo: zx::Vmo, executable: bool, inode: u64) -> Arc<vmo::VmoFile> {
         vmo::VmoFile::new_with_inode(
             vmo, /*readable*/ true, /*writable*/ false, executable, inode,
         )

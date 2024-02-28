@@ -6,9 +6,8 @@ use {
     crate::{
         common::{
             decode_extended_attribute_value, encode_extended_attribute_value,
-            extended_attributes_sender, inherit_rights_for_clone, send_on_open_with_error,
+            extended_attributes_sender, inherit_rights_for_clone,
         },
-        directory::entry::DirectoryEntry,
         execution_scope::ExecutionScope,
         file::{
             common::new_connection_validate_options, File, FileIo, FileOptions,
@@ -17,8 +16,8 @@ use {
         name::parse_name,
         node::OpenNode,
         object_request::Representation,
-        path::Path,
-        ObjectRequestRef, ProtocolsExt,
+        protocols::ToFileOptions,
+        ObjectRequestRef, ProtocolsExt, ToObjectRequest,
     },
     anyhow::Error,
     fidl::endpoints::ServerEnd,
@@ -78,7 +77,7 @@ fn create_connection<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMu
 }
 
 /// Trait for dispatching read, write, and seek FIDL requests.
-trait IoOpHandler: Send + Sync {
+trait IoOpHandler: Send + Sync + Sized + 'static {
     /// Reads at most `count` bytes from the file starting at the connection's seek offset and
     /// advances the seek offset.
     fn read(&mut self, count: u64) -> impl Future<Output = Result<Vec<u8>, Status>> + Send;
@@ -116,6 +115,9 @@ trait IoOpHandler: Send + Sync {
     /// Returns `None` if the connection is not backed by a stream.
     #[cfg(target_os = "fuchsia")]
     fn duplicate_stream(&self) -> Result<Option<zx::Stream>, Status>;
+
+    /// Clones the connection
+    fn clone_connection(&self, options: FileOptions) -> Result<Self, Status>;
 }
 
 /// Wrapper around a file that manages the seek offset of the connection and transforms `IoOpHandler`
@@ -155,22 +157,35 @@ impl<T: 'static + File> DerefMut for FidlIoConnection<T> {
     }
 }
 
-impl<T: 'static + DirectoryEntry + File + FileIo> FidlIoConnection<T> {
+impl<T: 'static + File + FileIo> FidlIoConnection<T> {
     /// Creates a connection to a file that uses FIDL for all IO.
     pub fn create(
         scope: ExecutionScope,
         file: Arc<T>,
-        protocols: impl ProtocolsExt,
+        options: impl ToFileOptions,
         object_request: ObjectRequestRef,
     ) -> Result<impl Future<Output = ()>, Status> {
         let file = OpenNode::new(file);
-        let options = protocols.to_file_options()?;
+        let options = options.to_file_options()?;
         create_connection(
             scope,
             FidlIoConnection { file, seek: 0, is_append: options.is_append },
             options,
             object_request,
         )
+    }
+
+    /// Like create, but spawns a task to run the connection.
+    pub fn spawn(
+        scope: ExecutionScope,
+        file: Arc<T>,
+        options: FileOptions,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        object_request.take().spawn(&scope.clone(), move |object_request| {
+            Box::pin(async move { Ok(Self::create(scope, file, options, object_request)?) })
+        });
+        Ok(())
     }
 }
 
@@ -240,13 +255,18 @@ impl<T: 'static + File + FileIo> IoOpHandler for FidlIoConnection<T> {
     fn duplicate_stream(&self) -> Result<Option<zx::Stream>, Status> {
         Ok(None)
     }
+
+    fn clone_connection(&self, options: FileOptions) -> Result<Self, Status> {
+        self.file.will_clone();
+        Ok(Self { file: OpenNode::new(self.file.clone()), seek: 0, is_append: options.is_append })
+    }
 }
 
 pub struct RawIoConnection<T: 'static + File> {
     file: OpenNode<T>,
 }
 
-impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> RawIoConnection<T> {
+impl<T: 'static + File + RawFileIoConnection> RawIoConnection<T> {
     pub fn create(
         scope: ExecutionScope,
         file: Arc<T>,
@@ -277,7 +297,7 @@ impl<T: 'static + File> DerefMut for RawIoConnection<T> {
     }
 }
 
-impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> IoOpHandler for RawIoConnection<T> {
+impl<T: 'static + File + RawFileIoConnection> IoOpHandler for RawIoConnection<T> {
     async fn read(&mut self, count: u64) -> Result<Vec<u8>, Status> {
         self.file.read(count).await
     }
@@ -305,6 +325,11 @@ impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> IoOpHandler for R
     #[cfg(target_os = "fuchsia")]
     fn duplicate_stream(&self) -> Result<Option<zx::Stream>, Status> {
         Ok(None)
+    }
+
+    fn clone_connection(&self, _options: FileOptions) -> Result<Self, Status> {
+        self.file.will_clone();
+        Ok(Self { file: OpenNode::new(self.file.clone()) })
     }
 }
 
@@ -340,7 +365,7 @@ mod stream_io {
         }
     }
 
-    impl<T: 'static + File + DirectoryEntry> StreamIoConnection<T> {
+    impl<T: 'static + File + GetVmo> StreamIoConnection<T> {
         /// Creates a stream-based file connection. A stream based file connection sends a zx::stream to
         /// clients that can be used for issuing read, write, and seek calls. Any read, write, and seek
         /// calls that continue to come in over FIDL will be forwarded to `stream` instead of being sent
@@ -350,10 +375,7 @@ mod stream_io {
             file: Arc<T>,
             protocols: impl ProtocolsExt,
             object_request: ObjectRequestRef,
-        ) -> Result<impl Future<Output = ()>, Status>
-        where
-            T: GetVmo,
-        {
+        ) -> Result<impl Future<Output = ()>, Status> {
             let file = OpenNode::new(file);
             let options = protocols.to_file_options()?;
             let stream = TempClonable::new(zx::Stream::create(
@@ -365,7 +387,7 @@ mod stream_io {
         }
     }
 
-    impl<T: 'static + File> IoOpHandler for StreamIoConnection<T> {
+    impl<T: 'static + File + GetVmo> IoOpHandler for StreamIoConnection<T> {
         async fn read(&mut self, count: u64) -> Result<Vec<u8>, Status> {
             let stream = self.stream.temp_clone();
             unblock(move || {
@@ -431,6 +453,16 @@ mod stream_io {
 
         fn duplicate_stream(&self) -> Result<Option<zx::Stream>, Status> {
             self.stream.duplicate_handle(zx::Rights::SAME_RIGHTS).map(|s| Some(s))
+        }
+
+        fn clone_connection(&self, options: FileOptions) -> Result<Self, Status> {
+            let stream = TempClonable::new(zx::Stream::create(
+                options.to_stream_options(),
+                self.file.get_vmo(),
+                0,
+            )?);
+            self.file.will_clone();
+            Ok(Self { file: OpenNode::new(self.file.clone()), stream })
         }
     }
 }
@@ -778,16 +810,25 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
     }
 
     fn handle_clone(&mut self, flags: fio::OpenFlags, server_end: ServerEnd<fio::NodeMarker>) {
-        let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
-        let flags = match inherit_rights_for_clone(self.options.to_io1(), flags) {
-            Ok(updated) => updated,
-            Err(status) => {
-                send_on_open_with_error(describe, server_end, status);
-                return;
-            }
-        };
+        flags.to_object_request(server_end).handle(|object_request| {
+            let options =
+                inherit_rights_for_clone(self.options.to_io1(), flags)?.to_file_options()?;
 
-        self.file.clone().open(self.scope.clone(), flags, Path::dot(), server_end);
+            let connection = Self {
+                scope: self.scope.clone(),
+                file: self.file.clone_connection(options)?,
+                options,
+            };
+
+            object_request.take().spawn(&self.scope, |object_request| {
+                Box::pin(async move {
+                    let requests = object_request.take().into_request_stream(&connection).await?;
+                    Ok(connection.handle_requests(requests))
+                })
+            });
+
+            Ok(())
+        });
     }
 
     async fn handle_get_attr(&mut self) -> (Status, fio::NodeAttributes) {
@@ -1027,7 +1068,11 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + IoOpHandler> Representa
 mod tests {
     use {
         super::*,
-        crate::{file::FileOptions, node::Node, ToObjectRequest},
+        crate::{
+            file::FileOptions,
+            node::{IsDirectory, Node},
+            ToObjectRequest,
+        },
         assert_matches::assert_matches,
         async_trait::async_trait,
         futures::prelude::*,
@@ -1255,35 +1300,16 @@ mod tests {
         }
     }
 
-    impl DirectoryEntry for MockFile {
-        fn open(
-            self: Arc<Self>,
-            scope: ExecutionScope,
-            flags: fio::OpenFlags,
-            path: Path,
-            server_end: ServerEnd<fio::NodeMarker>,
-        ) {
-            assert!(path.is_empty());
-
-            flags.to_object_request(server_end).handle(|object_request| {
-                object_request.spawn_connection(
-                    scope.clone(),
-                    self.clone(),
-                    flags,
-                    FidlIoConnection::create,
-                )
-            });
-        }
-
-        fn entry_info(&self) -> crate::directory::entry::EntryInfo {
-            todo!()
-        }
-    }
-
     #[cfg(target_os = "fuchsia")]
     impl GetVmo for MockFile {
         fn get_vmo(&self) -> &zx::Vmo {
             &self.vmo
+        }
+    }
+
+    impl IsDirectory for MockFile {
+        fn is_directory(&self) -> bool {
+            false
         }
     }
 
@@ -1375,9 +1401,6 @@ mod tests {
                     options: FileOptions { rights: RIGHTS_RW, is_append: false }
                 },
                 FileOperation::ReadAt { offset: 0, count: 6 },
-                FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_RW, is_append: false }
-                },
                 FileOperation::ReadAt { offset: 100, count: 5 },
                 FileOperation::ReadAt { offset: 6, count: 5 },
             ]

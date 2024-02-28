@@ -13,7 +13,7 @@ use {
     futures::{Future, StreamExt, TryStreamExt},
     std::sync::Mutex,
     tracing::{error, info, warn},
-    vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope},
+    vfs::{execution_scope::ExecutionScope, ToObjectRequest},
 };
 
 // RealmProxy mediates a test suite's access to the services in a test realm.
@@ -251,12 +251,14 @@ where
                 unimplemented!()
             }
             fsandbox::ReceiverRequest::Receive { channel, flags, control_handle: _ } => {
-                service.clone().open(
-                    ExecutionScope::new(),
-                    flags,
-                    vfs::path::Path::dot(),
-                    channel.into(),
-                );
+                flags.to_object_request(channel).handle(|object_request| {
+                    vfs::service::serve(
+                        service.clone(),
+                        ExecutionScope::new(),
+                        &flags,
+                        object_request,
+                    )
+                });
             }
             fsandbox::ReceiverRequest::_UnknownMethod { .. } => {
                 unimplemented!()

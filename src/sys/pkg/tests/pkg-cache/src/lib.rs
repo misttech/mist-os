@@ -30,7 +30,7 @@ use {
     mock_reboot::{MockRebootService, RebootReason},
     mock_verifier::MockVerifierService,
     std::{collections::HashMap, sync::Arc},
-    vfs::directory::{entry::DirectoryEntry as _, helper::DirectlyMutable as _},
+    vfs::directory::{entry_container::Directory as _, helper::DirectlyMutable as _},
 };
 
 mod base_pkg_index;

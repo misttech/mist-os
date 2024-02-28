@@ -33,7 +33,7 @@ use futures::FutureExt;
 use futures::StreamExt;
 use std::collections::HashMap;
 use std::sync::Arc;
-use vfs::directory::entry::DirectoryEntry;
+use vfs::directory::entry_container::Directory;
 use vfs::directory::mutable::simple::tree_constructor;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_write;
@@ -195,9 +195,7 @@ async fn test_job_sourcing() {
     assert_matches!(job_state_rx.next().await, Some(channel::State::Execute));
 }
 
-fn serve_vfs_dir(
-    root: Arc<impl DirectoryEntry>,
-) -> (DirectoryProxy, Arc<Mutex<HashMap<String, Vmo>>>) {
+fn serve_vfs_dir(root: Arc<impl Directory>) -> (DirectoryProxy, Arc<Mutex<HashMap<String, Vmo>>>) {
     let vmo_map = Arc::new(Mutex::new(HashMap::new()));
     let fs_scope = ExecutionScope::build()
         .entry_constructor(tree_constructor(move |_, _| {

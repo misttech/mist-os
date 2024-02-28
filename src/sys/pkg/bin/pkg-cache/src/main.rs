@@ -31,7 +31,7 @@ use {
     std::sync::{atomic::AtomicU32, Arc},
     tracing::{error, info},
     vfs::{
-        directory::{entry::DirectoryEntry as _, helper::DirectlyMutable as _},
+        directory::{entry_container::Directory, helper::DirectlyMutable as _},
         remote::remote_dir,
     },
 };

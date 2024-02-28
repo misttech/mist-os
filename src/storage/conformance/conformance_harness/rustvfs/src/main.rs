@@ -17,7 +17,7 @@ use {
     tracing::error,
     vfs::{
         directory::{
-            entry::DirectoryEntry,
+            entry_container::Directory,
             helper::DirectlyMutable,
             mutable::{connection::MutableConnection, simple},
             simple::Simple,
@@ -37,7 +37,7 @@ const HARNESS_EXEC_PATH: &'static str = "/pkg/bin/io_conformance_harness_rustvfs
 ///
 /// The VMO backing the buffer is duplicated so that tests can ensure the same VMO is returned by
 /// subsequent GetBackingMemory calls.
-fn new_vmo_file(vmo: zx::Vmo) -> Result<Arc<dyn DirectoryEntry>, Error> {
+fn new_vmo_file(vmo: zx::Vmo) -> Result<Arc<vmo::VmoFile>, Error> {
     Ok(vmo::VmoFile::new(
         vmo, /*readable*/ true, /*writable*/ true, /*executable*/ false,
     ))
@@ -45,7 +45,7 @@ fn new_vmo_file(vmo: zx::Vmo) -> Result<Arc<dyn DirectoryEntry>, Error> {
 
 /// Creates and returns a Rust VFS VmoFile-backed executable file using the contents of the
 /// conformance test harness binary itself.
-fn new_executable_file() -> Result<Arc<dyn DirectoryEntry>, Error> {
+fn new_executable_file() -> Result<Arc<vmo::VmoFile>, Error> {
     let file = fdio::open_fd(
         HARNESS_EXEC_PATH,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,

@@ -10,7 +10,7 @@ use {
     futures::stream::TryStreamExt as _,
     std::{collections::HashMap, sync::Arc},
     tracing::error,
-    vfs::directory::entry::DirectoryEntry as _,
+    vfs::directory::entry_container::Directory,
 };
 
 pub(crate) async fn serve_request_stream(

@@ -471,7 +471,7 @@ mod test {
         fidl_fuchsia_io as fio, fuchsia_zircon as zx,
         futures::future::join3,
         vfs::{
-            directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
+            directory::entry_container::Directory, execution_scope::ExecutionScope,
             file::vmo::read_only, pseudo_directory,
         },
     };

@@ -8,14 +8,12 @@ use {
     crate::{
         common::{
             decode_extended_attribute_value, encode_extended_attribute_value,
-            extended_attributes_sender, inherit_rights_for_clone, send_on_open_with_error, IntoAny,
+            extended_attributes_sender, inherit_rights_for_clone, send_on_open_with_error,
         },
-        directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
         name::parse_name,
         node::Node,
         object_request::Representation,
-        path::Path,
         ObjectRequest, ObjectRequestRef, ProtocolsExt, ToObjectRequest,
     },
     fidl::endpoints::{ControlHandle as _, Responder, ServerEnd},
@@ -287,28 +285,6 @@ impl<T: Symlink> Connection<T> {
     }
 }
 
-impl<T: IntoAny + Symlink + Send + Sync> DirectoryEntry for T {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        flags.to_object_request(server_end).handle(|object_request| {
-            if !path.is_empty() {
-                return Err(Status::NOT_DIR);
-            }
-            scope.spawn(Connection::create(scope.clone(), self, flags, object_request)?);
-            Ok(())
-        });
-    }
-
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Symlink)
-    }
-}
-
 impl<T: Symlink> Representation for Connection<T> {
     type Protocol = fio::SymlinkMarker;
 
@@ -335,7 +311,9 @@ mod tests {
     use {
         super::{Connection, Symlink},
         crate::{
-            common::rights_to_posix_mode_bits, execution_scope::ExecutionScope, node::Node,
+            common::rights_to_posix_mode_bits,
+            execution_scope::ExecutionScope,
+            node::{IsDirectory, Node},
             ToObjectRequest,
         },
         assert_matches::assert_matches,
@@ -415,6 +393,12 @@ mod tests {
                 creation_time: 0,
                 modification_time: 0,
             })
+        }
+    }
+
+    impl IsDirectory for TestSymlink {
+        fn is_directory(&self) -> bool {
+            false
         }
     }
 

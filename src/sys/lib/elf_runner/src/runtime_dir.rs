@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_io as fio,
     std::sync::Arc,
     vfs::{
-        directory::entry::DirectoryEntry, directory::helper::DirectlyMutable,
+        directory::entry_container::Directory, directory::helper::DirectlyMutable,
         directory::immutable::simple as pfs, execution_scope::ExecutionScope, file::vmo::read_only,
         path::Path as fvfsPath, tree_builder::TreeBuilder,
     },

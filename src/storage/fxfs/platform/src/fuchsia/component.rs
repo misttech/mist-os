@@ -41,7 +41,7 @@ use {
     std::sync::{Arc, Weak},
     storage_device::{block_device::BlockDevice, DeviceHolder},
     vfs::{
-        directory::{entry::DirectoryEntry, helper::DirectlyMutable},
+        directory::{entry_container::Directory, helper::DirectlyMutable},
         execution_scope::ExecutionScope,
         path::Path,
     },

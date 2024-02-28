@@ -19,12 +19,15 @@ use {
     vfs::{
         attributes,
         common::rights_to_posix_mode_bits,
-        directory::entry::{DirectoryEntry, EntryInfo},
+        directory::{
+            entry::{DirectoryEntry, EntryInfo, OpenRequest},
+            entry_container::Directory,
+        },
         execution_scope::ExecutionScope,
-        file::{FidlIoConnection, File, FileIo, FileOptions, SyncMode},
+        file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode},
         node::Node,
         path::Path,
-        pseudo_directory, ToObjectRequest,
+        pseudo_directory, ObjectRequestRef,
     },
 };
 
@@ -43,23 +46,12 @@ struct BlockFile {
 }
 
 impl DirectoryEntry for BlockFile {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        flags.to_object_request(server_end).handle(|object_request| {
-            if !path.is_empty() {
-                return Err(zx::Status::NOT_FILE);
-            }
-            object_request.spawn_connection(scope, self, flags, FidlIoConnection::create)
-        });
-    }
-
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(0, fio::DirentType::File)
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+        request.open_file(self)
     }
 }
 
@@ -170,6 +162,17 @@ impl FileIo for BlockFile {
 
     async fn append(&self, _content: &[u8]) -> Result<(u64, u64), zx::Status> {
         Err(zx::Status::NOT_SUPPORTED)
+    }
+}
+
+impl FileLike for BlockFile {
+    fn open(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        options: FileOptions,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        FidlIoConnection::spawn(scope, self, options, object_request)
     }
 }
 

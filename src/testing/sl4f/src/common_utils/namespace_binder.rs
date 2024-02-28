@@ -7,7 +7,9 @@ use fdio::Namespace;
 use fidl_fuchsia_io as fio;
 use std::collections::{hash_map::Entry, HashMap};
 use std::sync::Arc;
-use vfs::directory::{entry::DirectoryEntry, helper::DirectlyMutable, mutable::simple as pfs};
+use vfs::directory::{
+    self, entry::DirectoryEntry, helper::DirectlyMutable, mutable::simple as pfs,
+};
 use vfs::execution_scope::ExecutionScope;
 
 type Directory = Arc<pfs::Simple>;
@@ -45,7 +47,8 @@ impl NamespaceBinder {
                 let dir = pfs::simple();
 
                 let (client, server) = fidl::endpoints::create_endpoints();
-                dir.clone().open(
+                directory::entry_container::Directory::open(
+                    dir.clone(),
                     self.scope.clone(),
                     fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE

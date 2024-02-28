@@ -23,7 +23,7 @@ use {
     realmbuilder_mock_helpers::{mock_dev, provide_bt_gap_uses},
     std::sync::Arc,
     tracing::info,
-    vfs::{directory::entry::DirectoryEntry, pseudo_directory},
+    vfs::{directory::entry_container::Directory, pseudo_directory},
 };
 
 const BT_GAP_URL: &str = "fuchsia-pkg://fuchsia.com/bt-gap-smoke-test#meta/bt-gap.cm";
@@ -76,7 +76,7 @@ impl From<SecureStoreMarker> for Event {
 }
 
 /// An empty dev/bt-host pseudo-directory.
-pub fn dev_bt_host() -> Arc<dyn DirectoryEntry> {
+pub fn dev_bt_host() -> Arc<dyn Directory> {
     pseudo_directory! {
         "class" => pseudo_directory! {
             "bt-host" => pseudo_directory! {}

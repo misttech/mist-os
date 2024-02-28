@@ -40,7 +40,7 @@ use {
         sync::Arc,
     },
     tempfile::TempDir,
-    vfs::directory::entry::DirectoryEntry,
+    vfs::directory::entry_container::Directory,
 };
 
 const BINARY_PATH: &str = "/pkg/bin/pkgctl";
@@ -357,7 +357,7 @@ struct MockPackageResolverService {
     get_hash_response: Mutex<Option<Result<fidl_fuchsia_pkg::BlobId, Status>>>,
     resolve_response: Mutex<
         Option<(
-            Arc<dyn DirectoryEntry>,
+            Arc<dyn Directory>,
             Result<fpkg::ResolutionContext, fidl_fuchsia_pkg::ResolveError>,
         )>,
     >,

@@ -17,7 +17,9 @@ use {
     serde_json::{json, Value},
     std::sync::Arc,
     std::{fs::File, str::FromStr},
-    vfs::directory::{entry::DirectoryEntry, helper::DirectlyMutable, mutable::simple::Simple},
+    vfs::directory::{
+        entry_container::Directory, helper::DirectlyMutable, mutable::simple::Simple,
+    },
 };
 
 const PATH_TO_CONFIGS_DIR: &'static str = "/config/data/ota-configs";

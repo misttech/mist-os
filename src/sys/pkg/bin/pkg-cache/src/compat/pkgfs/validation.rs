@@ -13,7 +13,8 @@ use {
     tracing::{error, info},
     vfs::{
         directory::{
-            entry::EntryInfo, immutable::connection::ImmutableConnection,
+            entry::{EntryInfo, OpenRequest},
+            immutable::connection::ImmutableConnection,
             traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
@@ -65,6 +66,51 @@ impl Validation {
 }
 
 impl vfs::directory::entry::DirectoryEntry for Validation {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+        request.open_dir(self)
+    }
+}
+
+#[async_trait]
+impl vfs::node::Node for Validation {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_DIRECTORY,
+            id: 1,
+            content_size: 1,
+            storage_size: 1,
+            link_count: 1,
+            creation_time: 0,
+            modification_time: 0,
+        })
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        Ok(immutable_attributes!(
+            requested_attributes,
+            Immutable {
+                protocols: fio::NodeProtocolKinds::DIRECTORY,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::ENUMERATE
+                    | fio::Operations::TRAVERSE,
+                content_size: 1,
+                storage_size: 1,
+                link_count: 1,
+                id: 1,
+            }
+        ))
+    }
+}
+
+#[async_trait]
+impl vfs::directory::entry_container::Directory for Validation {
     fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
@@ -98,12 +144,14 @@ impl vfs::directory::entry::DirectoryEntry for Validation {
         if path.as_ref() == "missing" {
             let () = scope.clone().spawn(async move {
                 let missing_contents = self.make_missing_contents().await;
-                vfs::file::vmo::read_only(missing_contents).open(
-                    scope,
-                    flags,
-                    VfsPath::dot(),
-                    object_request.into_server_end(),
-                );
+                object_request.handle(|object_request| {
+                    vfs::file::serve(
+                        vfs::file::vmo::read_only(missing_contents),
+                        scope,
+                        &flags,
+                        object_request,
+                    )
+                });
             });
             return;
         }
@@ -150,10 +198,10 @@ impl vfs::directory::entry::DirectoryEntry for Validation {
             scope.clone().spawn(async move {
                 let missing_contents = self.make_missing_contents().await;
                 object_request.handle(|object_request| {
-                    vfs::file::vmo::read_only(missing_contents).open2(
+                    vfs::file::serve(
+                        vfs::file::vmo::read_only(missing_contents),
                         scope,
-                        VfsPath::dot(),
-                        protocols,
+                        &protocols,
                         object_request,
                     )
                 });
@@ -164,47 +212,6 @@ impl vfs::directory::entry::DirectoryEntry for Validation {
         Err(zx::Status::NOT_FOUND)
     }
 
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-    }
-}
-
-#[async_trait]
-impl vfs::node::Node for Validation {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY,
-            id: 1,
-            content_size: 1,
-            storage_size: 1,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
-    async fn get_attributes(
-        &self,
-        requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, zx::Status> {
-        Ok(immutable_attributes!(
-            requested_attributes,
-            Immutable {
-                protocols: fio::NodeProtocolKinds::DIRECTORY,
-                abilities: fio::Operations::GET_ATTRIBUTES
-                    | fio::Operations::ENUMERATE
-                    | fio::Operations::TRAVERSE,
-                content_size: 1,
-                storage_size: 1,
-                link_count: 1,
-                id: 1,
-            }
-        ))
-    }
-}
-
-#[async_trait]
-impl vfs::directory::entry_container::Directory for Validation {
     async fn read_dirents<'a>(
         &'a self,
         pos: &'a TraversalPosition,
@@ -303,8 +310,7 @@ mod tests {
         ] {
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            DirectoryEntry::open(
-                validation.clone(),
+            validation.clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::DESCRIBE | forbidden_flag,
                 VfsPath::dot(),
@@ -565,9 +571,9 @@ mod tests {
                 rights: Some(fio::Operations::READ_BYTES),
                 ..Default::default()
             });
-            protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(validation.clone(), scope, VfsPath::dot(), protocols, req)
-            });
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| validation.clone().open2(scope, VfsPath::dot(), protocols, req));
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
                 Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
@@ -588,9 +594,9 @@ mod tests {
                 rights: Some(forbidden_rights),
                 ..Default::default()
             });
-            protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(validation.clone(), scope, VfsPath::dot(), protocols, req)
-            });
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| validation.clone().open2(scope, VfsPath::dot(), protocols, req));
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
                 Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
@@ -619,9 +625,9 @@ mod tests {
                 }),
                 ..Default::default()
             });
-            protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(validation.clone(), scope, VfsPath::dot(), protocols, req)
-            });
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| validation.clone().open2(scope, VfsPath::dot(), protocols, req));
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
                 Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FILE, .. })

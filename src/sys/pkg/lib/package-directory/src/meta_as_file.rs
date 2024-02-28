@@ -5,17 +5,14 @@
 use {
     crate::{root_dir::RootDir, u64_to_usize_safe, usize_to_u64_safe},
     async_trait::async_trait,
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::sync::Arc,
     vfs::{
-        directory::entry::EntryInfo, execution_scope::ExecutionScope, file::FidlIoConnection,
-        immutable_attributes, path::Path as VfsPath, ToObjectRequest,
+        execution_scope::ExecutionScope,
+        file::{FidlIoConnection, FileLike, FileOptions},
+        immutable_attributes, ObjectRequestRef,
     },
 };
-
-#[cfg(feature = "supports_open2")]
-use vfs::{ObjectRequestRef, ProtocolsExt as _};
 
 pub(crate) struct MetaAsFile<S: crate::NonMetaStorage> {
     root_dir: Arc<RootDir<S>>,
@@ -31,70 +28,23 @@ impl<S: crate::NonMetaStorage> MetaAsFile<S> {
     }
 }
 
-impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaAsFile<S> {
+impl<S: crate::NonMetaStorage> FileLike for MetaAsFile<S> {
     fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: VfsPath,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        flags.to_object_request(server_end).handle(|object_request| {
-            if !path.is_empty() {
-                return Err(zx::Status::NOT_DIR);
-            }
-
-            if flags.intersects(
-                fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::RIGHT_EXECUTABLE
-                    | fio::OpenFlags::CREATE
-                    | fio::OpenFlags::CREATE_IF_ABSENT
-                    | fio::OpenFlags::TRUNCATE
-                    | fio::OpenFlags::APPEND,
-            ) {
-                return Err(zx::Status::NOT_SUPPORTED);
-            }
-
-            object_request.spawn_connection(scope, self, flags, FidlIoConnection::create)
-        });
-    }
-
-    #[cfg(feature = "supports_open2")]
-    fn open2(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        path: VfsPath,
-        protocols: fio::ConnectionProtocols,
+        options: FileOptions,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
-        if !path.is_empty() {
-            return Err(zx::Status::NOT_DIR);
-        }
-
-        match protocols.open_mode() {
-            fio::OpenMode::OpenExisting => {}
-            fio::OpenMode::AlwaysCreate | fio::OpenMode::MaybeCreate => {
-                return Err(zx::Status::NOT_SUPPORTED);
-            }
-        }
-
-        if let Some(rights) = protocols.rights() {
-            if rights.intersects(fio::Operations::WRITE_BYTES)
-                | rights.intersects(fio::Operations::EXECUTE)
-            {
-                return Err(zx::Status::NOT_SUPPORTED);
-            }
-        }
-
-        if protocols.to_file_options()?.is_append || object_request.truncate {
+        if options.is_append {
             return Err(zx::Status::NOT_SUPPORTED);
         }
-
-        object_request.spawn_connection(scope, self, protocols, FidlIoConnection::create)
+        FidlIoConnection::spawn(scope, self, options, object_request)
     }
+}
 
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
+impl<S: crate::NonMetaStorage> vfs::node::IsDirectory for MetaAsFile<S> {
+    fn is_directory(&self) -> bool {
+        false
     }
 }
 
@@ -199,74 +149,57 @@ mod tests {
         futures::prelude::*,
         std::convert::TryInto as _,
         vfs::{
-            directory::entry::DirectoryEntry,
+            directory::entry_container::Directory,
             file::{File, FileIo},
             node::Node,
-            ProtocolsExt,
         },
     };
+
+    #[cfg(feature = "supports_open2")]
+    use vfs::ToObjectRequest;
 
     struct TestEnv {
         _blobfs_fake: FakeBlobfs,
     }
 
     impl TestEnv {
-        async fn new() -> (Self, Arc<MetaAsFile<blobfs::Client>>) {
+        async fn new() -> (Self, Arc<RootDir<blobfs::Client>>) {
             let pkg = PackageBuilder::new("pkg").build().await.unwrap();
             let (metafar_blob, _) = pkg.contents();
             let (blobfs_fake, blobfs_client) = FakeBlobfs::new();
             blobfs_fake.add_blob(metafar_blob.merkle, metafar_blob.contents);
             let root_dir = RootDir::new(blobfs_client, metafar_blob.merkle).await.unwrap();
-            let meta_as_file = MetaAsFile::new(root_dir);
-            (Self { _blobfs_fake: blobfs_fake }, meta_as_file)
+            (Self { _blobfs_fake: blobfs_fake }, root_dir)
         }
+    }
+
+    fn get_meta_as_file(root_dir: Arc<RootDir<blobfs::Client>>) -> Arc<MetaAsFile<blobfs::Client>> {
+        MetaAsFile::new(root_dir)
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_size() {
-        let (_env, meta_as_file) = TestEnv::new().await;
-        assert_eq!(meta_as_file.file_size(), 64);
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open_rejects_non_empty_path() {
-        let (_env, meta_as_file) = TestEnv::new().await;
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-
-        DirectoryEntry::open(
-            meta_as_file,
-            ExecutionScope::new(),
-            fio::OpenFlags::DESCRIBE,
-            VfsPath::validate_and_split("non-empty").unwrap(),
-            server_end.into_channel().into(),
-        );
-
-        assert_matches!(
-            proxy.take_event_stream().next().await,
-            Some(Ok(fio::FileEvent::OnOpen_{ s, info: None}))
-                if s == zx::Status::NOT_DIR.into_raw()
-        );
+        let (_env, root_dir) = TestEnv::new().await;
+        assert_eq!(get_meta_as_file(root_dir).file_size(), 64);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_rejects_disallowed_flags() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
 
         for forbidden_flag in [
-            fio::OpenFlags::RIGHT_WRITABLE,
-            fio::OpenFlags::RIGHT_EXECUTABLE,
-            fio::OpenFlags::CREATE,
-            fio::OpenFlags::CREATE_IF_ABSENT,
-            fio::OpenFlags::TRUNCATE,
-            fio::OpenFlags::APPEND,
+            fio::OpenFlags::RIGHT_WRITABLE,   // ACCESS_DENIED
+            fio::OpenFlags::RIGHT_EXECUTABLE, // ACCESS_DENIED
+            fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT, // NOT_SUPPORTED
+            fio::OpenFlags::TRUNCATE,         // INVALID_ARGS without RIGHT_WRITABLE
+            fio::OpenFlags::APPEND,           // NOT_SUPPORTED
         ] {
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            DirectoryEntry::open(
-                meta_as_file.clone(),
+            root_dir.clone().open(
                 ExecutionScope::new(),
-                fio::OpenFlags::DESCRIBE | forbidden_flag,
-                VfsPath::dot(),
+                fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::DESCRIBE | forbidden_flag,
+                "meta".try_into().unwrap(),
                 server_end.into_channel().into(),
             );
 
@@ -274,21 +207,23 @@ mod tests {
                 proxy.take_event_stream().next().await,
                 Some(Ok(fio::DirectoryEvent::OnOpen_{ s, info: None}))
                     if s == zx::Status::NOT_SUPPORTED.into_raw()
+                        || s == zx::Status::ACCESS_DENIED.into_raw()
+                        || s == zx::Status::INVALID_ARGS.into_raw(),
+                "forbidden_flag: {forbidden_flag:?}",
             );
         }
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_succeeds() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-        let hash = meta_as_file.root_dir.hash.to_string();
+        let hash = root_dir.hash.to_string();
 
-        DirectoryEntry::open(
-            meta_as_file,
+        root_dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
-            VfsPath::dot(),
+            "meta".try_into().unwrap(),
             server_end.into_channel().into(),
         );
 
@@ -296,40 +231,26 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_entry_info() {
-        let (_env, meta_as_file) = TestEnv::new().await;
-
-        assert_eq!(
-            DirectoryEntry::entry_info(meta_as_file.as_ref()),
-            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
-        );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
     async fn file_open() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
 
-        assert_eq!(
-            File::open_file(
-                meta_as_file.as_ref(),
-                &fio::OpenFlags::empty().to_file_options().unwrap()
-            )
-            .await,
-            Ok(())
-        );
+        assert_eq!(get_meta_as_file(root_dir).open_file(&FileOptions::default()).await, Ok(()));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_read_at_caps_offset() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
+        let meta_as_file = get_meta_as_file(root_dir);
         let mut buffer = vec![0u8];
         assert_eq!(
-            FileIo::read_at(
-                meta_as_file.as_ref(),
-                (meta_as_file.root_dir.hash.to_string().as_bytes().len() + 1).try_into().unwrap(),
-                buffer.as_mut()
-            )
-            .await,
+            meta_as_file
+                .read_at(
+                    (meta_as_file.root_dir.hash.to_string().as_bytes().len() + 1)
+                        .try_into()
+                        .unwrap(),
+                    buffer.as_mut()
+                )
+                .await,
             Ok(0)
         );
         assert_eq!(buffer.as_slice(), &[0]);
@@ -337,15 +258,18 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_read_at_caps_count() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
+        let meta_as_file = get_meta_as_file(root_dir);
         let mut buffer = vec![0u8; 2];
         assert_eq!(
-            FileIo::read_at(
-                meta_as_file.as_ref(),
-                (meta_as_file.root_dir.hash.to_string().as_bytes().len() - 1).try_into().unwrap(),
-                buffer.as_mut()
-            )
-            .await,
+            meta_as_file
+                .read_at(
+                    (meta_as_file.root_dir.hash.to_string().as_bytes().len() - 1)
+                        .try_into()
+                        .unwrap(),
+                    buffer.as_mut()
+                )
+                .await,
             Ok(1)
         );
         assert_eq!(
@@ -356,54 +280,50 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_read_at() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
+        let meta_as_file = get_meta_as_file(root_dir);
         let content_len = meta_as_file.root_dir.hash.to_string().as_bytes().len();
         let mut buffer = vec![0u8; content_len];
 
-        assert_eq!(FileIo::read_at(meta_as_file.as_ref(), 0, buffer.as_mut()).await, Ok(64));
+        assert_eq!(meta_as_file.read_at(0, buffer.as_mut()).await, Ok(64));
         assert_eq!(buffer.as_slice(), meta_as_file.root_dir.hash.to_string().as_bytes());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_write_at() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
 
         assert_eq!(
-            FileIo::write_at(meta_as_file.as_ref(), 0, &[]).await,
+            get_meta_as_file(root_dir).write_at(0, &[]).await,
             Err(zx::Status::NOT_SUPPORTED)
         );
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_append() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
 
-        assert_eq!(
-            FileIo::append(meta_as_file.as_ref(), &[]).await,
-            Err(zx::Status::NOT_SUPPORTED)
-        );
+        assert_eq!(get_meta_as_file(root_dir).append(&[]).await, Err(zx::Status::NOT_SUPPORTED));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_truncate() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
 
-        assert_eq!(File::truncate(meta_as_file.as_ref(), 0).await, Err(zx::Status::NOT_SUPPORTED));
+        assert_eq!(get_meta_as_file(root_dir).truncate(0).await, Err(zx::Status::NOT_SUPPORTED));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_get_backing_memory() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
+        let meta_as_file = get_meta_as_file(root_dir);
 
         for sharing_mode in
             [fio::VmoFlags::empty(), fio::VmoFlags::SHARED_BUFFER, fio::VmoFlags::PRIVATE_CLONE]
         {
             for flag in [fio::VmoFlags::empty(), fio::VmoFlags::READ] {
                 assert_eq!(
-                    File::get_backing_memory(meta_as_file.as_ref(), sharing_mode | flag)
-                        .await
-                        .err()
-                        .unwrap(),
+                    meta_as_file.get_backing_memory(sharing_mode | flag).await.err().unwrap(),
                     zx::Status::NOT_SUPPORTED
                 );
             }
@@ -412,17 +332,17 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_get_size() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
 
-        assert_eq!(File::get_size(meta_as_file.as_ref()).await, Ok(64));
+        assert_eq!(get_meta_as_file(root_dir).get_size().await, Ok(64));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_get_attrs() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
 
         assert_eq!(
-            Node::get_attrs(meta_as_file.as_ref()).await,
+            get_meta_as_file(root_dir).get_attrs().await,
             Ok(fio::NodeAttributes {
                 mode: fio::MODE_TYPE_FILE | 0o600,
                 id: 1,
@@ -437,43 +357,44 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_set_attrs() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
 
         assert_eq!(
-            File::set_attrs(
-                meta_as_file.as_ref(),
-                fio::NodeAttributeFlags::empty(),
-                fio::NodeAttributes {
-                    mode: 0,
-                    id: 0,
-                    content_size: 0,
-                    storage_size: 0,
-                    link_count: 0,
-                    creation_time: 0,
-                    modification_time: 0,
-                },
-            )
-            .await,
+            get_meta_as_file(root_dir)
+                .set_attrs(
+                    fio::NodeAttributeFlags::empty(),
+                    fio::NodeAttributes {
+                        mode: 0,
+                        id: 0,
+                        content_size: 0,
+                        storage_size: 0,
+                        link_count: 0,
+                        creation_time: 0,
+                        modification_time: 0,
+                    },
+                )
+                .await,
             Err(zx::Status::NOT_SUPPORTED)
         );
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_sync() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
 
         assert_eq!(
-            File::sync(meta_as_file.as_ref(), Default::default()).await,
+            get_meta_as_file(root_dir).sync(Default::default()).await,
             Err(zx::Status::NOT_SUPPORTED)
         );
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_get_attributes() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
 
         assert_eq!(
-            Node::get_attributes(meta_as_file.as_ref(), fio::NodeAttributesQuery::all())
+            get_meta_as_file(root_dir)
+                .get_attributes(fio::NodeAttributesQuery::all())
                 .await
                 .unwrap(),
             immutable_attributes!(
@@ -492,11 +413,13 @@ mod tests {
 
     #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open2_rejects_non_empty_path() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+    async fn directory_entry_open2_succeeds() {
+        let (_env, root_dir) = TestEnv::new().await;
+        let hash = root_dir.hash.to_string();
 
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
         let scope = ExecutionScope::new();
+
         let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
             rights: Some(fio::Operations::READ_BYTES),
             protocols: Some(fio::NodeProtocols {
@@ -505,44 +428,23 @@ mod tests {
             }),
             ..Default::default()
         });
-        let path = VfsPath::validate_and_split("non-empty").unwrap();
         protocols
             .to_object_request(server_end)
-            .handle(|req| DirectoryEntry::open2(meta_as_file, scope, path, protocols, req));
+            .handle(|req| root_dir.open2(scope, "meta".try_into().unwrap(), protocols, req));
 
-        assert_matches!(
-            proxy.take_event_stream().try_next().await,
-            Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_DIR, .. })
-        );
-    }
-
-    #[cfg(feature = "supports_open2")]
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open2_succeeds() {
-        let (_env, meta_as_file) = TestEnv::new().await;
-        let hash = meta_as_file.root_dir.hash.to_string();
-
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-        let scope = ExecutionScope::new();
-        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-            rights: Some(fio::Operations::READ_BYTES),
-            ..Default::default()
-        });
-        protocols.to_object_request(server_end).handle(|req| {
-            DirectoryEntry::open2(meta_as_file, scope, VfsPath::dot(), protocols, req)
-        });
         assert_eq!(fuchsia_fs::file::read(&proxy).await.unwrap(), hash.as_bytes());
     }
 
     #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_open_modes() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
 
         for forbidden_open_mode in [fio::OpenMode::AlwaysCreate, fio::OpenMode::MaybeCreate] {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
             let scope = ExecutionScope::new();
             let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
                 mode: Some(forbidden_open_mode),
                 rights: Some(fio::Operations::READ_BYTES),
                 protocols: Some(fio::NodeProtocols {
@@ -552,11 +454,13 @@ mod tests {
                 ..Default::default()
             });
             protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(meta_as_file.clone(), scope, VfsPath::dot(), protocols, req)
+                root_dir.clone().open2(scope, "meta".try_into().unwrap(), protocols, req)
             });
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
-                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+                Err(fidl::Error::ClientChannelClosed { status, .. })
+                    if status == zx::Status::NOT_SUPPORTED
+                        || status == zx::Status::ACCESS_DENIED
             );
         }
     }
@@ -564,7 +468,7 @@ mod tests {
     #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_rights() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
 
         for forbidden_rights in [fio::Operations::WRITE_BYTES, fio::Operations::EXECUTE] {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
@@ -578,11 +482,11 @@ mod tests {
                 ..Default::default()
             });
             protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(meta_as_file.clone(), scope, VfsPath::dot(), protocols, req)
+                root_dir.clone().open2(scope, "meta".try_into().unwrap(), protocols, req)
             });
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
-                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::ACCESS_DENIED, .. })
             );
         }
     }
@@ -590,7 +494,7 @@ mod tests {
     #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_file_protocols() {
-        let (_env, meta_as_file) = TestEnv::new().await;
+        let (_env, root_dir) = TestEnv::new().await;
         for forbidden_file_protocols in
             [fio::FileProtocolFlags::APPEND, fio::FileProtocolFlags::TRUNCATE]
         {
@@ -605,36 +509,12 @@ mod tests {
                 ..Default::default()
             });
             protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(meta_as_file.clone(), scope, VfsPath::dot(), protocols, req)
+                root_dir.clone().open2(scope, "meta".try_into().unwrap(), protocols, req)
             });
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
                 Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
             );
         }
-    }
-
-    #[cfg(feature = "supports_open2")]
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open2_rejects_non_file() {
-        let (_env, meta_as_file) = TestEnv::new().await;
-
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-        let scope = ExecutionScope::new();
-        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-            rights: Some(fio::Operations::READ_BYTES),
-            protocols: Some(fio::NodeProtocols {
-                directory: Some(fio::DirectoryProtocolOptions::default()),
-                ..Default::default()
-            }),
-            ..Default::default()
-        });
-        protocols.to_object_request(server_end).handle(|req| {
-            DirectoryEntry::open2(meta_as_file.clone(), scope, VfsPath::dot(), protocols, req)
-        });
-        assert_matches!(
-            proxy.take_event_stream().try_next().await,
-            Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_DIR, .. })
-        );
     }
 }

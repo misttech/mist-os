@@ -36,7 +36,9 @@ use {
     push_source::{PushSource, TestUpdateAlgorithm, Update},
     std::{ops::Deref, sync::Arc},
     time_metrics_registry::PROJECT_ID,
-    vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, pseudo_directory},
+    vfs::{
+        directory::entry_container::Directory, execution_scope::ExecutionScope, pseudo_directory,
+    },
 };
 
 /// URL for timekeeper.

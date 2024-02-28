@@ -90,7 +90,7 @@ mod tests {
     use futures::StreamExt;
     use std::sync::Arc;
     use vfs::{
-        directory::entry::DirectoryEntry,
+        directory::entry_container::Directory,
         execution_scope::ExecutionScope,
         file::vmo::read_only,
         pseudo_directory,
@@ -210,7 +210,7 @@ mod tests {
         );
     }
 
-    fn serve_vfs_dir(root: Arc<impl DirectoryEntry>) -> fio::DirectoryProxy {
+    fn serve_vfs_dir(root: Arc<impl Directory>) -> fio::DirectoryProxy {
         let fs_scope = ExecutionScope::new();
         let (client, server) = create_proxy::<fio::DirectoryMarker>().unwrap();
         root.open(

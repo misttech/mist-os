@@ -28,8 +28,7 @@ use {
     mock_omaha_server::OmahaResponse,
     mock_paver::{hooks as mphooks, PaverEvent},
     std::collections::BTreeSet,
-    vfs::directory::entry::DirectoryEntry,
-    vfs::file::vmo::read_only,
+    vfs::{directory::entry_container::Directory, file::vmo::read_only},
 };
 
 struct TestResult {

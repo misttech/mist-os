@@ -801,7 +801,6 @@ mod tests {
         vfs::{
             directory::{
                 dirents_sink,
-                entry::{DirectoryEntry, EntryInfo},
                 entry_container::{Directory, DirectoryWatcher},
                 helper::DirectlyMutable,
                 immutable::connection::ImmutableConnection,
@@ -1315,24 +1314,6 @@ mod tests {
         }
     }
 
-    impl DirectoryEntry for FakeDir {
-        fn open(
-            self: Arc<Self>,
-            scope: ExecutionScope,
-            flags: fio::OpenFlags,
-            _path: Path,
-            server_end: ServerEnd<fio::NodeMarker>,
-        ) {
-            flags.to_object_request(server_end).handle(|object_request| {
-                object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
-            });
-        }
-
-        fn entry_info(&self) -> EntryInfo {
-            panic!("not implemented!");
-        }
-    }
-
     #[async_trait]
     impl vfs::node::Node for FakeDir {
         async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
@@ -1365,6 +1346,18 @@ mod tests {
 
     #[async_trait]
     impl Directory for FakeDir {
+        fn open(
+            self: Arc<Self>,
+            scope: ExecutionScope,
+            flags: fio::OpenFlags,
+            _path: Path,
+            server_end: ServerEnd<fio::NodeMarker>,
+        ) {
+            flags.to_object_request(server_end).handle(|object_request| {
+                object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
+            });
+        }
+
         async fn read_dirents<'a>(
             &'a self,
             _pos: &'a TraversalPosition,
@@ -1386,6 +1379,8 @@ mod tests {
             panic!("not implemented!");
         }
     }
+
+    impl vfs::node::IsDirectory for FakeDir {}
 
     #[fuchsia::test]
     async fn test_get_storage_utilization() {

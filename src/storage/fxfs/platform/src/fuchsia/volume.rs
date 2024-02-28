@@ -46,7 +46,10 @@ use {
         sync::{Arc, Mutex, Weak},
         time::Duration,
     },
-    vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope},
+    vfs::{
+        directory::{entry::DirectoryEntry, entry_container::Directory as VfsDirectory},
+        execution_scope::ExecutionScope,
+    },
 };
 
 // LINT.IfChange
@@ -450,6 +453,8 @@ impl FsInspectVolume for FxVolume {
 pub trait RootDir: FxNode + DirectoryEntry {
     fn as_directory_entry(self: Arc<Self>) -> Arc<dyn DirectoryEntry>;
 
+    fn as_directory(self: Arc<Self>) -> Arc<dyn VfsDirectory>;
+
     fn as_node(self: Arc<Self>) -> Arc<dyn FxNode>;
 
     /// An optional callback invoked when the volume is opened.
@@ -683,7 +688,7 @@ mod tests {
             time::Duration,
         },
         storage_device::{fake_device::FakeDevice, DeviceHolder},
-        vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
+        vfs::{directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path},
     };
 
     #[fuchsia::test(threads = 10)]

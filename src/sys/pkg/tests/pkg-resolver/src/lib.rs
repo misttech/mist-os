@@ -49,7 +49,7 @@ use {
         time::Duration,
     },
     tempfile::TempDir,
-    vfs::directory::{entry::DirectoryEntry as _, helper::DirectlyMutable as _},
+    vfs::directory::{entry_container::Directory as _, helper::DirectlyMutable as _},
 };
 
 // If the body of an https response is not large enough, hyper will download the body

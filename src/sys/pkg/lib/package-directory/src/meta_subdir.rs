@@ -11,8 +11,7 @@ use {
     vfs::{
         common::send_on_open_with_error,
         directory::{
-            entry::EntryInfo, immutable::connection::ImmutableConnection,
-            traversal_position::TraversalPosition,
+            immutable::connection::ImmutableConnection, traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
         immutable_attributes,
@@ -37,150 +36,7 @@ impl<S: crate::NonMetaStorage> MetaSubdir<S> {
     }
 }
 
-impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaSubdir<S> {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: VfsPath,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        let flags = flags & !(fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE);
-        let describe = flags.contains(fio::OpenFlags::DESCRIBE);
-
-        if path.is_empty() {
-            flags.to_object_request(server_end).handle(|object_request| {
-                if flags.intersects(
-                    fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::RIGHT_EXECUTABLE
-                        | fio::OpenFlags::CREATE
-                        | fio::OpenFlags::CREATE_IF_ABSENT
-                        | fio::OpenFlags::TRUNCATE
-                        | fio::OpenFlags::APPEND,
-                ) {
-                    return Err(zx::Status::NOT_SUPPORTED);
-                }
-
-                object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
-            });
-            return;
-        }
-
-        // <path as vfs::path::Path>::as_str() is an object relative path expression [1], except
-        // that it may:
-        //   1. have a trailing "/"
-        //   2. be exactly "."
-        //   3. be longer than 4,095 bytes
-        // The .is_empty() check above rules out "." and the following line removes the possible
-        // trailing "/".
-        // [1] https://fuchsia.dev/fuchsia-src/concepts/process/namespaces?hl=en#object_relative_path_expressions
-        let file_path = format!(
-            "{}{}",
-            self.path,
-            path.as_ref().strip_suffix('/').unwrap_or_else(|| path.as_ref())
-        );
-
-        if let Some(location) = self.root_dir.meta_files.get(&file_path).copied() {
-            let () = MetaFile::new(self.root_dir.clone(), location).open(
-                scope,
-                flags,
-                VfsPath::dot(),
-                server_end,
-            );
-            return;
-        }
-
-        let directory_path = file_path + "/";
-        for k in self.root_dir.meta_files.keys() {
-            if k.starts_with(&directory_path) {
-                let () = MetaSubdir::new(self.root_dir.clone(), directory_path).open(
-                    scope,
-                    flags,
-                    VfsPath::dot(),
-                    server_end,
-                );
-                return;
-            }
-        }
-
-        let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
-    }
-
-    #[cfg(feature = "supports_open2")]
-    fn open2(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        path: VfsPath,
-        protocols: fio::ConnectionProtocols,
-        object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), zx::Status> {
-        if path.is_empty() {
-            match protocols.open_mode() {
-                fio::OpenMode::OpenExisting => {}
-                fio::OpenMode::AlwaysCreate | fio::OpenMode::MaybeCreate => {
-                    return Err(zx::Status::NOT_SUPPORTED);
-                }
-            }
-
-            if let Some(rights) = protocols.rights() {
-                if rights.intersects(fio::Operations::WRITE_BYTES)
-                    | rights.intersects(fio::Operations::EXECUTE)
-                {
-                    return Err(zx::Status::NOT_SUPPORTED);
-                }
-            }
-            // Note that `ImmutableConnection::create` will check that protocols contain
-            // directory-only protocols.
-            return object_request.spawn_connection(
-                scope,
-                self,
-                protocols,
-                ImmutableConnection::create,
-            );
-        }
-
-        // <path as vfs::path::Path>::as_str() is an object relative path expression [1], except
-        // that it may:
-        //   1. have a trailing "/"
-        //   2. be exactly "."
-        //   3. be longer than 4,095 bytes
-        // The .is_empty() check above rules out "." and the following line removes the possible
-        // trailing "/".
-        // [1] https://fuchsia.dev/fuchsia-src/concepts/process/namespaces?hl=en#object_relative_path_expressions
-        let file_path = format!(
-            "{}{}",
-            self.path,
-            path.as_ref().strip_suffix('/').unwrap_or_else(|| path.as_ref())
-        );
-
-        if let Some(location) = self.root_dir.meta_files.get(&file_path).copied() {
-            return MetaFile::new(self.root_dir.clone(), location).open2(
-                scope,
-                VfsPath::dot(),
-                protocols,
-                object_request,
-            );
-        }
-
-        let directory_path = file_path + "/";
-        for k in self.root_dir.meta_files.keys() {
-            if k.starts_with(&directory_path) {
-                return MetaSubdir::new(self.root_dir.clone(), directory_path).open2(
-                    scope,
-                    VfsPath::dot(),
-                    protocols,
-                    object_request,
-                );
-            }
-        }
-
-        Err(zx::Status::NOT_FOUND)
-    }
-
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-    }
-}
+impl<S: crate::NonMetaStorage> vfs::node::IsDirectory for MetaSubdir<S> {}
 
 #[async_trait]
 impl<S: crate::NonMetaStorage> vfs::node::Node for MetaSubdir<S> {
@@ -225,6 +81,149 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for MetaSubdir<S> {
 
 #[async_trait]
 impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for MetaSubdir<S> {
+    fn open(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        flags: fio::OpenFlags,
+        path: VfsPath,
+        server_end: ServerEnd<fio::NodeMarker>,
+    ) {
+        let flags = flags & !(fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE);
+        let describe = flags.contains(fio::OpenFlags::DESCRIBE);
+
+        if flags.intersects(fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT) {
+            let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_SUPPORTED);
+            return;
+        }
+
+        if path.is_empty() {
+            flags.to_object_request(server_end).handle(|object_request| {
+                if flags.intersects(
+                    fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::RIGHT_EXECUTABLE
+                        | fio::OpenFlags::TRUNCATE
+                        | fio::OpenFlags::APPEND,
+                ) {
+                    return Err(zx::Status::NOT_SUPPORTED);
+                }
+
+                object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
+            });
+            return;
+        }
+
+        // <path as vfs::path::Path>::as_str() is an object relative path expression [1], except
+        // that it may:
+        //   1. have a trailing "/"
+        //   2. be exactly "."
+        //   3. be longer than 4,095 bytes
+        // The .is_empty() check above rules out "." and the following line removes the possible
+        // trailing "/".
+        // [1] https://fuchsia.dev/fuchsia-src/concepts/process/namespaces?hl=en#object_relative_path_expressions
+        let file_path = format!(
+            "{}{}",
+            self.path,
+            path.as_ref().strip_suffix('/').unwrap_or_else(|| path.as_ref())
+        );
+
+        if let Some(location) = self.root_dir.meta_files.get(&file_path).copied() {
+            flags.to_object_request(server_end).handle(|object_request| {
+                vfs::file::serve(
+                    MetaFile::new(self.root_dir.clone(), location),
+                    scope,
+                    &flags,
+                    object_request,
+                )
+            });
+            return;
+        }
+
+        let directory_path = file_path + "/";
+        for k in self.root_dir.meta_files.keys() {
+            if k.starts_with(&directory_path) {
+                let () = MetaSubdir::new(self.root_dir.clone(), directory_path).open(
+                    scope,
+                    flags,
+                    VfsPath::dot(),
+                    server_end,
+                );
+                return;
+            }
+        }
+
+        let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
+    }
+
+    #[cfg(feature = "supports_open2")]
+    fn open2(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: VfsPath,
+        protocols: fio::ConnectionProtocols,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        match protocols.open_mode() {
+            fio::OpenMode::OpenExisting => {}
+            fio::OpenMode::AlwaysCreate | fio::OpenMode::MaybeCreate => {
+                return Err(zx::Status::NOT_SUPPORTED);
+            }
+        }
+
+        if path.is_empty() {
+            if let Some(rights) = protocols.rights() {
+                if rights.intersects(fio::Operations::WRITE_BYTES)
+                    | rights.intersects(fio::Operations::EXECUTE)
+                {
+                    return Err(zx::Status::NOT_SUPPORTED);
+                }
+            }
+            // Note that `ImmutableConnection::create` will check that protocols contain
+            // directory-only protocols.
+            return object_request.spawn_connection(
+                scope,
+                self,
+                protocols,
+                ImmutableConnection::create,
+            );
+        }
+
+        // <path as vfs::path::Path>::as_str() is an object relative path expression [1], except
+        // that it may:
+        //   1. have a trailing "/"
+        //   2. be exactly "."
+        //   3. be longer than 4,095 bytes
+        // The .is_empty() check above rules out "." and the following line removes the possible
+        // trailing "/".
+        // [1] https://fuchsia.dev/fuchsia-src/concepts/process/namespaces?hl=en#object_relative_path_expressions
+        let file_path = format!(
+            "{}{}",
+            self.path,
+            path.as_ref().strip_suffix('/').unwrap_or_else(|| path.as_ref())
+        );
+
+        if let Some(location) = self.root_dir.meta_files.get(&file_path).copied() {
+            return vfs::file::serve(
+                MetaFile::new(self.root_dir.clone(), location),
+                scope,
+                &protocols,
+                object_request,
+            );
+        }
+        let directory_path = file_path + "/";
+        for k in self.root_dir.meta_files.keys() {
+            if k.starts_with(&directory_path) {
+                return MetaSubdir::new(self.root_dir.clone(), directory_path).open2(
+                    scope,
+                    VfsPath::dot(),
+                    protocols,
+                    object_request,
+                );
+            }
+        }
+
+        Err(zx::Status::NOT_FOUND)
+    }
+
     async fn read_dirents<'a>(
         &'a self,
         pos: &'a TraversalPosition,
@@ -266,7 +265,7 @@ mod tests {
         futures::prelude::*,
         std::convert::TryInto as _,
         vfs::{
-            directory::{entry::DirectoryEntry, entry_container::Directory},
+            directory::{entry::EntryInfo, entry_container::Directory},
             node::Node,
         },
     };
@@ -319,8 +318,7 @@ mod tests {
         ] {
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            DirectoryEntry::open(
-                sub_dir.clone(),
+            sub_dir.clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::DESCRIBE | forbidden_flag,
                 VfsPath::dot(),
@@ -340,8 +338,7 @@ mod tests {
         let (_env, sub_dir) = TestEnv::new().await;
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
-        DirectoryEntry::open(
-            sub_dir,
+        sub_dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE,
             VfsPath::dot(),
@@ -363,8 +360,7 @@ mod tests {
 
         for path in ["dir/file", "dir/file/"] {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-            DirectoryEntry::open(
-                sub_dir.clone(),
+            sub_dir.clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -382,8 +378,7 @@ mod tests {
         for path in ["dir", "dir/"] {
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            DirectoryEntry::open(
-                sub_dir.clone(),
+            sub_dir.clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -398,16 +393,6 @@ mod tests {
                 }]
             );
         }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_entry_info() {
-        let (_env, sub_dir) = TestEnv::new().await;
-
-        assert_eq!(
-            DirectoryEntry::entry_info(sub_dir.as_ref()),
-            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-        );
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -501,7 +486,7 @@ mod tests {
         });
         protocols
             .to_object_request(server_end)
-            .handle(|req| DirectoryEntry::open2(sub_dir, scope, VfsPath::dot(), protocols, req));
+            .handle(|req| sub_dir.open2(scope, VfsPath::dot(), protocols, req));
 
         assert_eq!(
             fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
@@ -527,7 +512,7 @@ mod tests {
             let path = VfsPath::validate_and_split(path).unwrap();
             protocols
                 .to_object_request(server_end)
-                .handle(|req| DirectoryEntry::open2(sub_dir.clone(), scope, path, protocols, req));
+                .handle(|req| sub_dir.clone().open2(scope, path, protocols, req));
 
             assert_eq!(fuchsia_fs::file::read(&proxy).await.unwrap(), b"contents".to_vec());
         }
@@ -549,7 +534,7 @@ mod tests {
             let path = VfsPath::validate_and_split(path).unwrap();
             protocols
                 .to_object_request(server_end)
-                .handle(|req| DirectoryEntry::open2(sub_dir.clone(), scope, path, protocols, req));
+                .handle(|req| sub_dir.clone().open2(scope, path, protocols, req));
 
             assert_eq!(
                 fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
@@ -575,9 +560,9 @@ mod tests {
                 rights: Some(fio::Operations::READ_BYTES),
                 ..Default::default()
             });
-            protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(sub_dir.clone(), scope, VfsPath::dot(), protocols, req)
-            });
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| sub_dir.clone().open2(scope, VfsPath::dot(), protocols, req));
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
                 Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
@@ -598,9 +583,9 @@ mod tests {
                 rights: Some(forbidden_rights),
                 ..Default::default()
             });
-            protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(sub_dir.clone(), scope, VfsPath::dot(), protocols, req)
-            });
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| sub_dir.clone().open2(scope, VfsPath::dot(), protocols, req));
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
                 Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
@@ -625,9 +610,9 @@ mod tests {
                 rights: Some(fio::Operations::READ_BYTES),
                 ..Default::default()
             });
-            protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(sub_dir.clone(), scope, VfsPath::dot(), protocols, req)
-            });
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| sub_dir.clone().open2(scope, VfsPath::dot(), protocols, req));
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
                 Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FILE, .. })

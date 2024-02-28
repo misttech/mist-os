@@ -11,7 +11,7 @@ use {
     tracing::error,
     vfs::{
         common::send_on_open_with_error,
-        directory::entry::{DirectoryEntry, EntryInfo},
+        directory::{entry::EntryInfo, entry_container::Directory},
     },
 };
 
@@ -272,13 +272,13 @@ fn get_dir_children<'a>(
 
 #[cfg(test)]
 async fn verify_open_adjusts_flags(
-    entry: std::sync::Arc<impl DirectoryEntry>,
+    entry: std::sync::Arc<impl Directory>,
     in_flags: fio::OpenFlags,
     expected_flags: fio::OpenFlags,
 ) {
     let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
 
-    DirectoryEntry::open(entry, ExecutionScope::new(), in_flags, VfsPath::dot(), server_end);
+    entry.open(ExecutionScope::new(), in_flags, VfsPath::dot(), server_end);
 
     let (status, flags) = proxy.get_flags().await.unwrap();
     let () = zx::Status::ok(status).unwrap();

@@ -444,12 +444,12 @@ mod tests {
         std::path::PathBuf,
         std::sync::{Arc, Weak},
         vfs::{
-            self, directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::read_only, pseudo_directory, remote::remote_dir,
+            self, directory::entry_container::Directory, execution_scope::ExecutionScope,
+            file::vmo::read_only, pseudo_directory,
         },
     };
 
-    fn serve_vfs_dir(root: Arc<impl DirectoryEntry>) -> (Task<()>, fio::DirectoryProxy) {
+    fn serve_vfs_dir(root: Arc<impl Directory>) -> (Task<()>, fio::DirectoryProxy) {
         let fs_scope = ExecutionScope::new();
         let (client, server) = create_proxy::<fio::DirectoryMarker>().unwrap();
         root.open(
@@ -466,14 +466,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn hello_world_test() -> Result<(), Error> {
-        let root = remote_dir(
-            open_in_namespace(
-                "/pkg",
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            )
-            .unwrap(),
-        );
-        let (_task, bootfs) = serve_vfs_dir(root);
+        let bootfs = open_in_namespace(
+            "/pkg",
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        )
+        .unwrap();
         let resolver = FuchsiaBootResolver::new_from_directory(bootfs).await.unwrap();
 
         let url = "fuchsia-boot:///#meta/hello-world-rust.cm";
@@ -551,14 +548,11 @@ mod tests {
     #[fuchsia::test]
     async fn capability_provider_test() {
         // Create a CapabilityProvider to serve fuchsia boot resolver requests.
-        let root = remote_dir(
-            open_in_namespace(
-                "/pkg",
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            )
-            .unwrap(),
-        );
-        let (_task, bootfs) = serve_vfs_dir(root);
+        let bootfs = open_in_namespace(
+            "/pkg",
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        )
+        .unwrap();
         let resolver = FuchsiaBootResolver::new_from_directory(bootfs).await.unwrap();
         let resolver_provider =
             Box::new(ComponentResolverCapabilityProvider::new(resolver.clone()));

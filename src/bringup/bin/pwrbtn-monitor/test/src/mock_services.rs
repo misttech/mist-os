@@ -15,8 +15,8 @@ use {
     futures::{channel::mpsc, StreamExt, TryFutureExt, TryStreamExt},
     tracing::{info, warn},
     vfs::{
-        directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path as pfsPath,
-        pseudo_directory, service,
+        directory::entry_container::Directory, execution_scope::ExecutionScope,
+        path::Path as pfsPath, pseudo_directory, service,
     },
 };
 

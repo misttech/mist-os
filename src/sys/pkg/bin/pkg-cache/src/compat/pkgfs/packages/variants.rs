@@ -18,7 +18,7 @@ use {
     vfs::{
         directory::{
             dirents_sink,
-            entry::{DirectoryEntry, EntryInfo},
+            entry::EntryInfo,
             entry_container::{Directory, DirectoryWatcher},
             immutable::connection::ImmutableConnection,
             traversal_position::TraversalPosition,
@@ -56,7 +56,44 @@ impl PkgfsPackagesVariants {
     }
 }
 
-impl DirectoryEntry for PkgfsPackagesVariants {
+impl vfs::node::IsDirectory for PkgfsPackagesVariants {}
+
+#[async_trait]
+impl vfs::node::Node for PkgfsPackagesVariants {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_DIRECTORY,
+            id: 1,
+            content_size: 0,
+            storage_size: 0,
+            link_count: 1,
+            creation_time: 0,
+            modification_time: 0,
+        })
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        Ok(immutable_attributes!(
+            requested_attributes,
+            Immutable {
+                protocols: fio::NodeProtocolKinds::DIRECTORY,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::ENUMERATE
+                    | fio::Operations::TRAVERSE,
+                content_size: 0,
+                storage_size: 0,
+                link_count: 1,
+                id: 1,
+            }
+        ))
+    }
+}
+
+#[async_trait]
+impl Directory for PkgfsPackagesVariants {
     fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
@@ -155,47 +192,6 @@ impl DirectoryEntry for PkgfsPackagesVariants {
         }
     }
 
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-    }
-}
-
-#[async_trait]
-impl vfs::node::Node for PkgfsPackagesVariants {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY,
-            id: 1,
-            content_size: 0,
-            storage_size: 0,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
-    async fn get_attributes(
-        &self,
-        requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, zx::Status> {
-        Ok(immutable_attributes!(
-            requested_attributes,
-            Immutable {
-                protocols: fio::NodeProtocolKinds::DIRECTORY,
-                abilities: fio::Operations::GET_ATTRIBUTES
-                    | fio::Operations::ENUMERATE
-                    | fio::Operations::TRAVERSE,
-                content_size: 0,
-                storage_size: 0,
-                link_count: 1,
-                id: 1,
-            }
-        ))
-    }
-}
-
-#[async_trait]
-impl Directory for PkgfsPackagesVariants {
     async fn read_dirents<'a>(
         &'a self,
         pos: &'a TraversalPosition,
@@ -275,6 +271,7 @@ mod tests {
         fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
         maplit::{btreeset, convert_args, hashmap},
         std::str::FromStr,
+        vfs::directory::entry_container::Directory,
     };
 
     impl PkgfsPackagesVariants {
@@ -288,8 +285,7 @@ mod tests {
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
-            vfs::directory::entry::DirectoryEntry::open(
-                Arc::clone(self),
+            Arc::clone(self).open(
                 ExecutionScope::new(),
                 flags,
                 Path::dot(),
@@ -306,13 +302,7 @@ mod tests {
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
             protocols.to_object_request(server_end).handle(|req| {
-                vfs::directory::entry::DirectoryEntry::open2(
-                    Arc::clone(self),
-                    ExecutionScope::new(),
-                    Path::dot(),
-                    protocols,
-                    req,
-                )
+                Arc::clone(self).open2(ExecutionScope::new(), Path::dot(), protocols, req)
             });
 
             proxy

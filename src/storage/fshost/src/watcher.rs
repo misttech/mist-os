@@ -251,7 +251,7 @@ mod tests {
         futures::StreamExt,
         std::sync::Arc,
         vfs::{
-            directory::{entry::DirectoryEntry, helper::DirectlyMutable},
+            directory::{entry_container::Directory, helper::DirectlyMutable},
             execution_scope::ExecutionScope,
             path::Path,
             service,

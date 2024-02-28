@@ -37,7 +37,7 @@ use {
         },
     },
     tracing::{error, warn},
-    vfs::directory::entry::DirectoryEntry as _,
+    vfs::directory::entry_container::Directory,
 };
 
 mod missing_blobs;

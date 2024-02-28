@@ -4,28 +4,20 @@
 
 //! Implementations of a service endpoint.
 
-mod common;
-
 #[cfg(test)]
 mod tests;
 
 use crate::{
-    common::send_on_open_with_error,
-    directory::entry::{DirectoryEntry, EntryInfo},
+    directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
     execution_scope::ExecutionScope,
-    node::{self, Node},
-    object_request::ObjectRequestSend,
-    path::Path,
-    service::common::new_connection_validate_flags,
-    ProtocolsExt, ToObjectRequest,
+    node::Node,
+    object_request::{ObjectRequestRef, ObjectRequestSend},
+    ProtocolsExt,
 };
 
 use {
     async_trait::async_trait,
-    fidl::{
-        self,
-        endpoints::{RequestStream, ServerEnd},
-    },
+    fidl::{self, endpoints::RequestStream},
     fidl_fuchsia_io as fio,
     fuchsia_async::Channel,
     fuchsia_zircon_status::Status,
@@ -36,6 +28,19 @@ use {
 // Redefine these constants as a u32 as in macos they are u16
 const S_IRUSR: u32 = libc::S_IRUSR as u32;
 const S_IWUSR: u32 = libc::S_IWUSR as u32;
+
+/// Objects that behave like services should implement this trait.
+pub trait ServiceLike: Node {
+    /// Used to establish a new connection.
+    fn connect(
+        &self,
+        scope: ExecutionScope,
+        options: ServiceOptions,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status>;
+}
+
+pub struct ServiceOptions;
 
 /// Constructs a node in your file system that will host a service that implements a statically
 /// specified FIDL protocol.  `ServerRequestStream` specifies the type of the server side of this
@@ -88,54 +93,36 @@ pub struct Service {
     open: Box<dyn Fn(ExecutionScope, Channel) + Send + Sync>,
 }
 
-#[async_trait]
-impl DirectoryEntry for Service {
-    fn open(
-        self: Arc<Self>,
+impl ServiceLike for Service {
+    fn connect(
+        &self,
         scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        let flags = match new_connection_validate_flags(flags) {
-            Ok(flags) => flags,
-            Err(status) => {
-                send_on_open_with_error(
-                    flags.contains(fio::OpenFlags::DESCRIBE),
-                    server_end,
-                    status,
-                );
-                return;
+        _options: ServiceOptions,
+        object_request: ObjectRequestRef,
+    ) -> Result<(), Status> {
+        if object_request.what_to_send() == ObjectRequestSend::OnOpen {
+            if let Ok(channel) = object_request
+                .take()
+                .into_channel_after_sending_on_open(fio::NodeInfoDeprecated::Service(fio::Service))
+                .map(Channel::from_channel)
+            {
+                (self.open)(scope, channel);
             }
-        };
-        flags.to_object_request(server_end).handle(|object_request| {
-            if !path.is_empty() {
-                return Err(Status::NOT_DIR);
-            }
-            if flags.is_node() {
-                scope.spawn(node::Connection::create(scope.clone(), self, flags, object_request)?);
-            } else {
-                if object_request.what_to_send() == ObjectRequestSend::OnOpen {
-                    if let Ok(channel) = object_request
-                        .take()
-                        .into_channel_after_sending_on_open(fio::NodeInfoDeprecated::Service(
-                            fio::Service,
-                        ))
-                        .map(Channel::from_channel)
-                    {
-                        (self.open)(scope, channel);
-                    }
-                } else {
-                    let channel = Channel::from_channel(object_request.take().into_channel());
-                    (self.open)(scope, channel);
-                }
-            }
-            Ok(())
-        });
+        } else {
+            let channel = Channel::from_channel(object_request.take().into_channel());
+            (self.open)(scope, channel);
+        }
+        Ok(())
     }
+}
 
+impl DirectoryEntry for Service {
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Service)
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+        request.open_service(self)
     }
 }
 
@@ -169,5 +156,20 @@ impl Node for Service {
                 id: fio::INO_UNKNOWN,
             }
         ))
+    }
+}
+
+/// Helper to open a service or node as required.
+pub fn serve(
+    service: Arc<impl ServiceLike + ?Sized>,
+    scope: ExecutionScope,
+    protocols: &impl ProtocolsExt,
+    object_request: ObjectRequestRef<'_>,
+) -> Result<(), Status> {
+    if protocols.is_node() {
+        let options = protocols.to_node_options(service.is_directory())?;
+        service.open_as_node(scope, options, object_request)
+    } else {
+        service.connect(scope, protocols.to_service_options()?, object_request)
     }
 }

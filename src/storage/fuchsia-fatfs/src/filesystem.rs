@@ -195,7 +195,7 @@ mod tests {
         },
         fidl::endpoints::Proxy,
         scopeguard::defer,
-        vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
+        vfs::{directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path},
     };
 
     const TEST_DISK_SIZE: u64 = 2048 << 10; // 2048K

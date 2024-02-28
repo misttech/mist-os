@@ -34,8 +34,8 @@ use {
     thiserror::Error,
     tracing::{error, info, warn},
     vfs::{
-        directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo::read_only,
-        tree_builder::TreeBuilder,
+        directory::entry_container::Directory, execution_scope::ExecutionScope,
+        file::vmo::read_only, tree_builder::TreeBuilder,
     },
     zx::{HandleBased, Task},
 };

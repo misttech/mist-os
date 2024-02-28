@@ -90,7 +90,7 @@ mod tests {
         std::sync::Arc,
         tracing::info,
         vfs::{
-            directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path,
+            directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path,
             pseudo_directory,
         },
         wlan_common::test_utils::ExpectWithin,
@@ -145,7 +145,7 @@ mod tests {
         }
     }
 
-    fn serve_and_bind_vfs(vfs_dir: Arc<dyn DirectoryEntry>, path: &'static str) {
+    fn serve_and_bind_vfs(vfs_dir: Arc<dyn Directory>, path: &'static str) {
         let (client, server) = fidl::endpoints::create_endpoints();
         let scope = ExecutionScope::new();
         vfs_dir.open(

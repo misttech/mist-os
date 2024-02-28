@@ -203,7 +203,8 @@ mod tests {
         futures::StreamExt,
         std::{collections::HashSet, str::FromStr, sync::Arc},
         vfs::{
-            directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo::read_only,
+            directory::entry_container::Directory, execution_scope::ExecutionScope,
+            file::vmo::read_only,
         },
     };
 

@@ -121,7 +121,7 @@ impl TestFixture {
         };
         let (root, server_end) =
             create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
-        volume.root().clone().open(
+        volume.root().clone().as_directory().open(
             volume.volume().scope().clone(),
             fio::OpenFlags::DIRECTORY
                 | fio::OpenFlags::RIGHT_READABLE

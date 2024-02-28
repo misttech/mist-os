@@ -21,7 +21,7 @@ use {
     std::sync::Arc,
     tracing::{error, info, warn},
     vfs::{
-        directory::{entry::DirectoryEntry, helper::DirectlyMutable},
+        directory::{entry_container::Directory, helper::DirectlyMutable},
         execution_scope::ExecutionScope,
         node::Node as _,
         path::Path,

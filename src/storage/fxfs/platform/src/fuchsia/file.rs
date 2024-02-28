@@ -16,7 +16,6 @@ use {
     },
     anyhow::Error,
     async_trait::async_trait,
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, HandleBased, Status},
     futures::future::BoxFuture,
@@ -40,15 +39,11 @@ use {
     vfs::{
         attributes,
         common::rights_to_posix_mode_bits,
-        directory::{
-            entry::{DirectoryEntry, EntryInfo},
-            entry_container::MutableDirectory,
-        },
+        directory::entry_container::MutableDirectory,
         execution_scope::ExecutionScope,
         file::{File, FileOptions, GetVmo, StreamIoConnection, SyncMode},
         name::Name,
-        path::Path,
-        ObjectRequestRef, ProtocolsExt, ToObjectRequest,
+        ObjectRequestRef, ProtocolsExt,
     },
 };
 
@@ -275,26 +270,9 @@ impl FxNode for FxFile {
     }
 }
 
-impl DirectoryEntry for FxFile {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        flags.to_object_request(server_end).spawn(&scope.clone(), move |object_request| {
-            Box::pin(async move {
-                if !path.is_empty() {
-                    return Err(Status::NOT_FILE);
-                }
-                Self::create_connection_async(OpenedNode::new(self), scope, flags, object_request)
-            })
-        });
-    }
-
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(self.object_id(), fio::DirentType::File)
+impl vfs::node::IsDirectory for FxFile {
+    fn is_directory(&self) -> bool {
+        false
     }
 }
 
@@ -350,6 +328,10 @@ impl vfs::node::Node for FxFile {
                 verity_enabled: self.verified_file(),
             }
         ))
+    }
+
+    fn will_clone(&self) {
+        self.open_count_add_one();
     }
 
     fn close(self: Arc<Self>) {

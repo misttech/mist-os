@@ -13,7 +13,6 @@ use {
     fuchsia_zircon as zx,
     std::sync::Arc,
     tracing::error,
-    vfs::directory::entry::DirectoryEntry,
 };
 
 pub enum FsSourceType {
@@ -27,7 +26,9 @@ pub enum ConstructFsError {
     ParsingError(structs::ParsingError),
 }
 
-pub fn construct_fs(source: FsSourceType) -> Result<Arc<dyn DirectoryEntry>, ConstructFsError> {
+pub fn construct_fs(
+    source: FsSourceType,
+) -> Result<Arc<vfs::directory::immutable::Simple>, ConstructFsError> {
     let reader: Box<dyn Reader> = match source {
         FsSourceType::BlockDevice(block_device) => {
             Box::new(BlockDeviceReader::from_client_end(block_device).map_err(|e| {

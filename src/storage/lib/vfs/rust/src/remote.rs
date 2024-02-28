@@ -9,7 +9,7 @@ mod tests;
 
 use crate::{
     common::send_on_open_with_error,
-    directory::entry::{DirectoryEntry, EntryInfo},
+    directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
     execution_scope::ExecutionScope,
     path::Path,
 };
@@ -21,6 +21,16 @@ use {
     std::sync::Arc,
 };
 
+pub trait RemoteLike {
+    fn open(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        flags: fio::OpenFlags,
+        path: Path,
+        server_end: ServerEnd<fio::NodeMarker>,
+    );
+}
+
 /// The type for the callback function used to create new connections to the remote object. The
 /// arguments mirror DirectoryEntry::open.
 pub type RoutingFn =
@@ -29,8 +39,8 @@ pub type RoutingFn =
 /// Create a new [`Remote`] node that forwards requests to the provided [`RoutingFn`]. This routing
 /// function is called once per open request. The dirent type is set to the provided
 /// `dirent_type`, which should be one of the `DIRENT_TYPE_*` values defined in fuchsia.io.
-pub fn remote_boxed_with_type(open: RoutingFn, dirent_type: fio::DirentType) -> Arc<Remote> {
-    Arc::new(Remote { open, dirent_type })
+pub fn remote_boxed_with_type(open_fn: RoutingFn, dirent_type: fio::DirentType) -> Arc<Remote> {
+    Arc::new(Remote { open_fn, dirent_type })
 }
 
 /// Create a new [`Remote`] node that forwards open requests to the provided [`RoutingFn`]. This
@@ -82,11 +92,11 @@ pub fn remote_node(node: fio::NodeProxy) -> Arc<Remote> {
 /// done by calling a routing function of type [`RoutingFn`] provided at the time of construction.
 /// The remote node itself doesn't do any flag validation when forwarding the open call.
 pub struct Remote {
-    open: RoutingFn,
+    open_fn: RoutingFn,
     dirent_type: fio::DirentType,
 }
 
-impl DirectoryEntry for Remote {
+impl RemoteLike for Remote {
     fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
@@ -94,12 +104,16 @@ impl DirectoryEntry for Remote {
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        // There is no flag validation to do here. All flags are either handled by the initial
-        // connection that forwarded this open request (if it exists) or the remote node.
-        (self.open)(scope, flags, path, server_end);
+        (self.open_fn)(scope, flags, path, server_end);
     }
+}
 
+impl DirectoryEntry for Remote {
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, self.dirent_type)
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+        request.open_remote(self)
     }
 }

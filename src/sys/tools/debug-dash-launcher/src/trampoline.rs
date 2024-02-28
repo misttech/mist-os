@@ -15,7 +15,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-use vfs::directory::entry::DirectoryEntry;
+use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::mutable::connection::MutableConnection;
 use vfs::directory::simple::Simple;
@@ -226,7 +226,7 @@ async fn create_vmex_resource() -> Result<zx::Resource, LauncherError> {
 fn make_executable_vmo_file(
     resource: &zx::Resource,
     contents: &str,
-) -> Result<Arc<dyn DirectoryEntry>, LauncherError> {
+) -> Result<Arc<vmo::VmoFile>, LauncherError> {
     let vmo = zx::Vmo::create(contents.len() as u64).map_err(|_| LauncherError::Internal)?;
     vmo.write(contents.as_bytes(), 0).map_err(|_| LauncherError::Internal)?;
 
@@ -321,7 +321,6 @@ mod tests {
     use vfs::directory::immutable::connection::ImmutableConnection;
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
-    use vfs::path::Path;
 
     #[fuchsia::test]
     async fn parse_url_test() {
@@ -414,18 +413,17 @@ mod tests {
         }
     }
 
-    async fn open_directory(server: Arc<dyn DirectoryEntry>) -> fio::DirectoryProxy {
-        let (proxy, server_end) =
-            create_proxy::<fio::DirectoryMarker>().expect("Failed to create connection endpoints");
-        let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
-        server.open(ExecutionScope::new(), flags, Path::dot(), server_end.into_channel().into());
-        proxy
-    }
-
     async fn make_pkg(url: &str, name: &str, root: &Arc<Simple<ImmutableConnection>>) -> PkgDir {
         let (pkg_url, resource) = parse_url(&url.to_string()).unwrap();
-        let dir =
-            open_directory(root.get_entry(name).expect("error obtaining directory entry")).await;
+        let (dir, server_end) =
+            create_proxy::<fio::DirectoryMarker>().expect("Failed to create connection endpoints");
+        let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
+        root.clone().open(
+            ExecutionScope::new(),
+            flags,
+            name.try_into().unwrap(),
+            server_end.into_channel().into(),
+        );
         PkgDir { pkg_url, dir, resource }
     }
 

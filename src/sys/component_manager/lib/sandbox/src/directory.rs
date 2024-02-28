@@ -137,14 +137,14 @@ mod tests {
     use std::sync::Mutex;
     use test_util::Counter;
     use vfs::{
-        directory::entry::DirectoryEntry,
+        directory::entry_container::Directory as VfsDirectory,
         execution_scope::ExecutionScope,
         path::Path,
         pseudo_directory,
         remote::{remote_boxed_with_type, RoutingFn},
     };
 
-    fn serve_vfs_dir(root: Arc<impl DirectoryEntry>) -> ClientEnd<fio::DirectoryMarker> {
+    fn serve_vfs_dir(root: Arc<impl VfsDirectory>) -> ClientEnd<fio::DirectoryMarker> {
         let scope = ExecutionScope::new();
         let (client, server) = create_endpoints::<fio::DirectoryMarker>();
         root.open(

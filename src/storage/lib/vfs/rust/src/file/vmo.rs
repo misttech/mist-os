@@ -10,18 +10,18 @@ mod tests;
 
 use crate::{
     common::rights_to_posix_mode_bits,
-    directory::entry::{DirectoryEntry, EntryInfo},
+    directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
     execution_scope::ExecutionScope,
-    file::{common::vmo_flags_to_rights, FidlIoConnection, File, FileIo, FileOptions, SyncMode},
+    file::{
+        common::vmo_flags_to_rights, FidlIoConnection, File, FileIo, FileLike, FileOptions,
+        SyncMode,
+    },
     node::Node,
-    path::Path,
-    protocols::ProtocolsExt,
-    ObjectRequestRef, ToObjectRequest,
+    ObjectRequestRef,
 };
 
 use {
     async_trait::async_trait,
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _, Status},
     once_cell::sync::OnceCell,
@@ -201,61 +201,30 @@ impl VmoFile {
     }
 }
 
-impl DirectoryEntry for VmoFile {
+impl FileLike for VmoFile {
     fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        flags.to_object_request(server_end).handle(|object_request| {
-            if !path.is_empty() {
-                return Err(Status::NOT_DIR);
-            }
-
-            if flags.intersects(fio::OpenFlags::APPEND) {
-                return Err(Status::NOT_SUPPORTED);
-            }
-
-            object_request.take().spawn(&scope.clone(), move |object_request| {
-                Box::pin(async move {
-                    self.vmo()?;
-                    object_request.create_connection(scope, self, flags, FidlIoConnection::create)
-                })
-            });
-            Ok(())
-        });
-    }
-
-    fn open2(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        path: Path,
-        protocols: fio::ConnectionProtocols,
+        options: FileOptions,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
-        if !path.is_empty() {
-            return Err(Status::NOT_DIR);
-        }
-
-        // VmoFile doesn't support the option to append.
-        let options = protocols.to_file_options()?;
         if options.is_append {
             return Err(Status::NOT_SUPPORTED);
         }
 
-        object_request.take().spawn(&scope.clone(), move |object_request| {
-            Box::pin(async move {
-                self.vmo()?;
-                object_request.create_connection(scope, self, protocols, FidlIoConnection::create)
-            })
-        });
-        Ok(())
-    }
+        self.vmo()?;
 
+        FidlIoConnection::spawn(scope, self, options, object_request)
+    }
+}
+
+impl DirectoryEntry for VmoFile {
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(self.inode, fio::DirentType::File)
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+        request.open_file(self)
     }
 }
 
@@ -303,6 +272,11 @@ impl Node for VmoFile {
                 id: self.inode,
             }
         ))
+    }
+
+    fn will_open_as_node(&self) -> Result<(), Status> {
+        self.vmo()?;
+        Ok(())
     }
 }
 
