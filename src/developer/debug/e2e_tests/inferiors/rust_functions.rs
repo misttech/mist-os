@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use std::f32::consts::PI;
+use std::vec::Vec;
 
 static mut SOME_GLOBAL: i32 = 0;
 
