@@ -83,6 +83,7 @@ fuchsia_driver_component("vim3-devicetree") {
   ]
   info = "vim3-devicetree-info.json"
   manifest = "meta/vim3-devicetree.cml"
+  is_v1_driver = false
 }
 
 fuchsia_driver_package("package") {
