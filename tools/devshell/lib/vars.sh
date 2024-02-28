@@ -199,7 +199,13 @@ function fx-gen-internal {
   # the gen from the $FUCHSIA_DIR.
   (
     cd "${FUCHSIA_DIR}" && \
-    fx-gn "${subcommand}" --fail-on-unused-args --check=system --export-rust-project --ninja-executable="${PREBUILT_NINJA}" "${FUCHSIA_BUILD_DIR}" "$@"
+    fx-gn "${subcommand}" \
+        --fail-on-unused-args \
+        --check=system \
+        --export-rust-project \
+        --ninja-executable="${PREBUILT_NINJA}" \
+        --ninja-outputs-file="ninja_outputs.json" \
+        "${FUCHSIA_BUILD_DIR}" "$@"
   ) || return $?
   _link_gen_artifacts
 }
