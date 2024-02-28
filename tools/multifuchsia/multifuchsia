@@ -110,18 +110,7 @@ function cmd_checkout() {
 function cmd_mount() {
   local -r branch="$1"
 
-  if findmnt --raw --noheadings --output 'SOURCE' --mountpoint "$MOUNTPOINT" >/dev/null; then
-    echo "Trying to unmount $MOUNTPOINT" >&2
-    if ! sudo umount "$MOUNTPOINT" ; then
-      #echo "Stopping goma" >&2
-      #(cd ~/src/fuchsia && ./scripts/fx goma_ctl ensure_stop)
-      echo "Stopping ffx daemon" >&2
-      (cd "$MOUNTPOINT" && ./scripts/fx ffx emu stop --all)
-      (cd "$MOUNTPOINT" && ./scripts/fx ffx daemon stop)
-      echo "Unmounting $MOUNTPOINT" >&2
-      sudo umount "$MOUNTPOINT"
-    fi
-  fi
+  unmount_repo
 
   cd "$WORKDIR"
 
@@ -135,6 +124,27 @@ function cmd_mount() {
 
   echo "Bind mounting $destdir as fuchsia" >&2
   sudo mount --bind "$destdir" "$MOUNTPOINT"
+}
+
+function cmd_umount() {
+  unmount_repo
+}
+
+function unmount_repo() {
+  if findmnt --raw --noheadings --output 'SOURCE' --mountpoint "$MOUNTPOINT" >/dev/null; then
+    echo "Trying to unmount $MOUNTPOINT" >&2
+    if ! sudo umount "$MOUNTPOINT" ; then
+      echo "Stopping goma" >&2
+      (cd ~/src/fuchsia && ./scripts/fx goma_ctl ensure_stop)
+      echo "Stopping ffx daemon" >&2
+      (cd "$MOUNTPOINT" && ./scripts/fx ffx emu stop --all)
+      (cd "$MOUNTPOINT" && ./scripts/fx ffx daemon stop)
+      echo "Stopping bazel" >&2
+      (cd "$MOUNTPOINT" && ./scripts/fx bazel shutdown)
+      echo "Unmounting $MOUNTPOINT" >&2
+      sudo umount "$MOUNTPOINT"
+    fi
+  fi
 }
 
 ## rebase
@@ -621,6 +631,9 @@ function main() {
       ;;
     mount)
       cmd_mount "$@"
+      ;;
+    umount)
+      cmd_umount "$@"
       ;;
     update)
       cmd_update "$@"
