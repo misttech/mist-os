@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use addr::TargetAddr;
+use analytics::add_custom_event;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use chrono::Duration;
@@ -21,6 +22,7 @@ use fidl_fuchsia_developer_ffx::{
     FastbootInterface as FidlFastbootInterface, TargetInfo, TargetProxy, TargetRebootState,
 };
 use fuchsia_async::{Time, Timer};
+use std::collections::BTreeMap;
 use std::io::Write;
 use std::net::SocketAddr;
 use std::sync::Once;
@@ -51,7 +53,16 @@ impl FfxMain for FlashTool {
         // Massage FlashCommand
         let cmd = preprocess_flash_cmd(self.cmd).await?;
 
-        flash_plugin_impl(self.target_proxy.await?, cmd, &mut writer).await
+        match flash_plugin_impl(self.target_proxy.await?, cmd, &mut writer).await {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                tracing::error!("Flashing hit an error. Reporting a metric");
+                let custom_dimensions = BTreeMap::from([("error_message", e.to_string().into())]);
+                let _ =
+                    add_custom_event(Some("ffx_flash_error"), None, None, custom_dimensions).await;
+                Err(e)
+            }
+        }
     }
 }
 
