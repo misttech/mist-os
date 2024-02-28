@@ -26,6 +26,8 @@ group("tests") {
     ":fshost-metrics-tests",
     ":legacy-metrics-tests",
     ":log_settings_min_severity",
+    ":netstack-feedback-inspect-tests",
+    ":netstack-inspect-tests",
   ]
 
   if (!fxfs_blob) {
@@ -216,6 +218,25 @@ fuchsia_unittest_package("diagnostics-persistence-inspect-tests") {
           device_type = "Astro"
         }
       },
+    ]
+  }
+}
+
+fuchsia_unittest_package("netstack-inspect-tests") {
+  manifest = "meta/netstack_tests.cml"
+
+  test_specs = {
+    environments = all_fuchsia_envs
+  }
+}
+
+fuchsia_unittest_package("netstack-feedback-inspect-tests") {
+  manifest = "meta/netstack_feedback_tests.cml"
+
+  test_specs = {
+    environments = [
+      emu_env,
+      astro_env,
     ]
   }
 }
