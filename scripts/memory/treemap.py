@@ -10,8 +10,8 @@ For usage, see
 https://fuchsia.dev/fuchsia-src/development/memory/memory#visualize_memory_usage
 """
 
-import cgi
 import collections
+import html
 import json
 import sys
 import os.path
@@ -42,11 +42,13 @@ class Node(object):
             tag = (
                 '<span class="treemap-node-type '
                 'treemap-node-type-{}">{}</span> '
-            ).format(cgi.escape(self.type[0]), cgi.escape(self.type[0].upper()))
+            ).format(
+                html.escape(self.type[0]), html.escape(self.type[0].upper())
+            )
         if self.name in ("", UNNAMED_NAME):
             name = "<i>UNNAMED</i> [koid {}]".format(self.koid)
         else:
-            name = cgi.escape(self.name)
+            name = html.escape(self.name)
         return tag + name
 
 
