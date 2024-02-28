@@ -35,11 +35,13 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_log_manager_simple() {
+        #[allow(clippy::large_futures)]
         TestHarness::default().manager_test(false).await;
     }
 
     #[fuchsia::test]
     async fn test_log_manager_dump() {
+        #[allow(clippy::large_futures)]
         TestHarness::default().manager_test(true).await;
     }
 

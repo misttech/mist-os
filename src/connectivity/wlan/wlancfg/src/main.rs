@@ -471,6 +471,8 @@ async fn main() {
     fuchsia_trace_provider::trace_provider_create_with_fdio();
     ftrace_provider::trace_provider_create_with_fdio();
     wtrace::instant_wlancfg_start();
+
+    #[allow(clippy::large_futures)]
     if let Err(e) = run_all_futures().await {
         error!("{:?}", e);
     }

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![allow(clippy::large_futures)]
+
 use fidl::prelude::*;
 use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net_tun as fnet_tun;

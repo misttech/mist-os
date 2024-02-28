@@ -70,6 +70,7 @@ impl StreamRunner {
                 let Some(event) = events.try_next().await? else {
                     break true;
                 };
+                #[allow(clippy::large_futures)]
                 let control_flow = stream.handle_event(event).await?;
                 match control_flow {
                     StreamControlFlow::Continue => {}

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![allow(clippy::large_futures)]
+
 use audio_encoder_test_lib::pcm_audio::*;
 use fidl_fuchsia_media::*;
 use std::rc::Rc;

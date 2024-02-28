@@ -340,6 +340,7 @@ async fn run_ascendd(
 
     tracing::debug!("ascendd listening to socket {}", sockpath.display());
 
+    #[allow(clippy::large_futures)]
     futures::future::try_join3(
         futures::stream::iter(link.into_iter().map(Ok)).try_for_each_concurrent(None, |path| {
             let node = Arc::clone(&node);
@@ -363,6 +364,7 @@ async fn run_ascendd(
             let node = Arc::clone(&node);
             async move {
                 if usb {
+                    #[allow(clippy::large_futures)]
                     listen_for_usb_devices(Arc::downgrade(&node)).await
                 } else {
                     Ok(())

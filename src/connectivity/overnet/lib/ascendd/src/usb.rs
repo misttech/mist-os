@@ -58,6 +58,8 @@ pub async fn listen_for_usb_devices(router: Weak<Router>) -> Result<(), Error> {
         };
 
         router.upgrade().ok_or_else(|| format_err!("Router gone"))?;
+
+        #[allow(clippy::large_futures)]
         if let Err(e) = run_usb_link(device.debug_name(), interface, router.clone()).await {
             tracing::warn!("USB link terminated with error: {:?}", e)
         } else {
@@ -240,5 +242,6 @@ async fn run_usb_link(
         }
     };
 
+    #[allow(clippy::large_futures)]
     try_join(tx_rx, conn).await.map(std::mem::drop)
 }

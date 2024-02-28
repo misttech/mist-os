@@ -24,6 +24,7 @@ pub async fn explore_cmd(
 
     explore_over_socket(moniker, server, tools_urls, command, ns_layout, &dash_launcher).await?;
 
+    #[allow(clippy::large_futures)]
     socket_to_stdio::connect_socket_to_stdio(client, stdout).await?;
 
     let exit_code = wait_for_shell_exit(&dash_launcher).await?;

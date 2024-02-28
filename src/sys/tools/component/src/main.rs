@@ -52,6 +52,7 @@ pub async fn exec() -> Result<()> {
             // TODO(https://fxbug.dev/42077838): Use Stdout::raw instead, when a command is not provided
             let stdout = Stdout::buffered();
 
+            #[allow(clippy::large_futures)]
             explore_cmd(
                 args.query,
                 args.ns_layout,
@@ -152,6 +153,7 @@ pub async fn exec() -> Result<()> {
 
 #[fuchsia::main(logging = false)]
 async fn main() {
+    #[allow(clippy::large_futures)]
     if let Err(e) = exec().await {
         eprintln!("{}", e);
         std::process::exit(1);

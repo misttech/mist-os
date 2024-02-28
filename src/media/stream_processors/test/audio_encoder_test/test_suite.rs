@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![allow(clippy::large_futures)]
+
 use crate::pcm_audio::*;
 use crate::timestamp_validator::*;
 use fidl_fuchsia_media::*;

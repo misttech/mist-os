@@ -96,7 +96,9 @@ impl fho::FfxMain for TargetPackageTool {
     type Writer = fho::SimpleWriter;
     async fn main(self, _: Self::Writer) -> fho::Result<()> {
         match self.cmd.subcommand {
-            TargetPackageSubCommand::Explore(command) => {
+            TargetPackageSubCommand::Explore(command) =>
+            {
+                #[allow(clippy::large_futures)]
                 explore(command, self.dash_launcher_proxy.await?).await?
             }
         }
@@ -125,7 +127,10 @@ async fn explore(command: ExploreCommand, dash_launcher: fdash::LauncherProxy) -
             )),
             e => fho::Error::Unexpected(anyhow!("Unexpected error launching dash: {:?}", e)),
         })?;
+
+    #[allow(clippy::large_futures)]
     let () = socket_to_stdio::connect_socket_to_stdio(client, stdout).await?;
+
     let exit_code = wait_for_shell_exit(&dash_launcher).await?;
     std::process::exit(exit_code);
 }

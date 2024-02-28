@@ -33,6 +33,7 @@ impl FfxMain for ExploreTool {
         let stdout = if self.cmd.command.is_some() { Stdout::buffered() } else { Stdout::raw()? };
 
         // All errors from component_debug library are user-visible.
+        #[allow(clippy::large_futures)]
         explore_cmd(
             self.cmd.query,
             self.cmd.ns_layout,

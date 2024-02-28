@@ -100,6 +100,7 @@ template("clippy") {
     args += [
       "-Wclippy::expect_fun_call",
       "-Wclippy::large_enum_variant",
+      "-Wclippy::large_futures",
       "-Wclippy::unnecessary_mut_passed",
     ]
     args += invoker.rustflags

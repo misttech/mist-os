@@ -64,6 +64,7 @@ pub async fn connect_socket_to_stdio(
     socket: fidl::Socket,
     stdout: Stdout<'_>,
 ) -> anyhow::Result<()> {
+    #[allow(clippy::large_futures)]
     connect_socket_to_stdio_impl(socket, || std::io::stdin().lock(), stdout)?.await
 }
 
@@ -167,6 +168,7 @@ mod tests {
         let mut stdout = vec![];
         let (unblocker, block_until) = std::sync::mpsc::channel();
 
+        #[allow(clippy::large_futures)]
         let () = connect_socket_to_stdio_impl(
             socket_remote,
             move || {

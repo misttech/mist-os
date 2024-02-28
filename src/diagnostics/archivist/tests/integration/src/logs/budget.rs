@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![allow(clippy::large_futures)]
+
 use crate::{constants::*, test_topology};
 use anyhow::Error;
 use diagnostics_data::{Data, Logs};

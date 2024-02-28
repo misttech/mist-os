@@ -869,6 +869,7 @@ impl Controller {
                 timeout,
                 responder,
             } => {
+                #[allow(clippy::large_futures)]
                 let result = self
                     .ping(target, payload_length, interface_name, zx::Duration::from_nanos(timeout))
                     .await;
@@ -1285,7 +1286,9 @@ impl Controller {
         let fnet_ext::IpAddress(target) = target.into();
         const UNSPECIFIED_PORT: u16 = 0;
         match target {
-            std::net::IpAddr::V4(addr) => {
+            std::net::IpAddr::V4(addr) =>
+            {
+                #[allow(clippy::large_futures)]
                 ping_once::<ping::Ipv4>(
                     std::net::SocketAddrV4::new(addr, UNSPECIFIED_PORT),
                     payload_length.into(),
@@ -1300,6 +1303,7 @@ impl Controller {
                 let scope_id =
                     get_interface_scope_id(&interface_name, &addr, hermetic_network_connector)
                         .await?;
+                #[allow(clippy::large_futures)]
                 ping_once::<ping::Ipv6>(
                     std::net::SocketAddrV6::new(
                         addr,
@@ -1468,6 +1472,7 @@ async fn main() -> Result<(), Error> {
         match event {
             Event::ControllerRequest(controller_request) => {
                 let controller_request = controller_request.expect("stopped serving requests");
+                #[allow(clippy::large_futures)]
                 match futures::future::ready(controller_request)
                     .and_then(|req| controller.handle_request(req))
                     .await
