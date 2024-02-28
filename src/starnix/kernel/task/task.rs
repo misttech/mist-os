@@ -742,8 +742,7 @@ impl Task {
 
     /// When the task exits, if there is a notification that needs to propagate
     /// to a ptracer, make sure it will propagate.
-    pub fn set_ptrace_zombie(&self) {
-        let pids = self.thread_group.kernel.pids.write();
+    pub fn set_ptrace_zombie(&self, pids: &crate::task::PidTable) {
         let pgid = self.thread_group.read().process_group.leader;
         let mut state = self.write();
         state.set_stopped(StopState::ForceAwake, None, None, None);

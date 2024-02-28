@@ -534,7 +534,6 @@ impl ZombiePtraces {
         &mut self,
         selector: ProcessSelector,
         options: &WaitingOptions,
-        _pids: &mut PidTable, // TODO: Remember to delete me if unnecessary
     ) -> Option<(ZombieProcess, Option<(Arc<ThreadGroup>, OwnedRef<ZombieProcess>)>)> {
         // The zombies whose pid matches the pid selector queried.
         let zombie_matches_pid_selector = |zombie: &ZombieProcess| match selector {

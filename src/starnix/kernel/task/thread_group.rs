@@ -495,6 +495,9 @@ impl ThreadGroup {
         L: LockBefore<ProcessGroupState>,
     {
         let mut pids = self.kernel.pids.write();
+
+        task.set_ptrace_zombie(&pids);
+
         let mut state = self.write();
 
         let persistent_info: TaskPersistentInfo =
@@ -1130,8 +1133,7 @@ impl ThreadGroup {
         pids: &mut PidTable,
     ) -> Option<WaitResult> {
         // This checks to see if the target is a zombie ptracee.
-        let waitable_entry =
-            self.write().zombie_ptracees.get_waitable_entry(selector, options, pids);
+        let waitable_entry = self.write().zombie_ptracees.get_waitable_entry(selector, options);
         match waitable_entry {
             None => (),
             Some((zombie, None)) => return Some(zombie.to_wait_result()),
