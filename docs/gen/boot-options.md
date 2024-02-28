@@ -1057,12 +1057,12 @@ This enables use of the MMU and caches during the kernel's early boot phase.
 
 This enables use of ASIDs. True by default if the underlying hardware supports 16-bit ASIDs.
 
-### kernel.arm64.alternate-vbar=\[none | arch3 | arch1 | psci\]
+### kernel.arm64.alternate-vbar=\[none | arch3 | arch1 | psci | smccc10\]
 
 **Default:** `none`
 
 This selects the alternate exception vector implementation used to work around
-CPU-specific issues on entry to EL0.  Values can be:
+CPU-specific issues on entry to EL1 from EL0.  Values can be:
  * `none` (default) - No mitigations performed in early EL0 exception paths.
  * `arch3` - Always use SMCCC_ARCH_WORKAROUND_3 on every CPU.  **This may have
    unpredictable effects if the firmware does not support SMCCC 1.1 or does not
@@ -1070,8 +1070,12 @@ CPU-specific issues on entry to EL0.  Values can be:
  * `arch1` - Always use SMCCC_ARCH_WORKAROUND_1 on every CPU.  **This may have
    unpredictable effects if the firmware does not support SMCCC 1.1 or does not
    support SMCCC_ARCH_WORKAROUND_1.**
- * `psci` - Always Use PSCI_VERSION on every CPU.  **This may have
-   unpredictable effects if the firmware does not support SMCCC 1.1.**
+ * `psci` - Always use PSCI_VERSION with SMCCC 1.1 calling conventions, on
+   every CPU.  **This may have unpredictable effects if the firmware does
+   not support SMCCC 1.1.**
+ * `smccc10` - Always use PSCI_VERSION with SMCCC 1.0 calling conventions,
+   on every CPU.  This is safe on all systems, though has it more overhead
+   than SMCCC 1.1 options and may not be necessary on all CPUs.
 As on SoCs with heterogeneous cores, a different selection should be made for
 each individual CPU, values other than `none` should only be used in testing.
 

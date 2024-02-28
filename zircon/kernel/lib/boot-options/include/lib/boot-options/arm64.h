@@ -24,6 +24,7 @@ enum class Arm64AlternateVbar {
   kArchWorkaround3,
   kArchWorkaround1,
   kPsciVersion,
+  kSmccc10,
 };
 
 #define ARM64_OPTION_TYPES(OPTION_TYPE) \

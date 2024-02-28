@@ -51,20 +51,24 @@ bool ArchPatchCode(code_patching::Patcher& patcher, const ArchPatchInfo& info,
       ZX_ASSERT(insns.size_bytes() == sizeof(uint32_t));
       uint32_t& insn = *reinterpret_cast<uint32_t*>(insns.data());
       ktl::string_view choice = "unused";
-      switch (info.smccc_arch_workaround) {
-        case arch::ArmSmcccFunction::kSmcccArchWorkaround3:
+      switch (info.alternate_vbar) {
+        case Arm64AlternateVbar::kArchWorkaround3:
           choice = "SMCCC_ARCH_WORKAROUND_3"sv;
           insn = kMovW0SmcccArchWorkaround3;
           break;
-        case arch::ArmSmcccFunction::kSmcccArchWorkaround1:
+        case Arm64AlternateVbar::kArchWorkaround1:
           choice = "SMCCC_ARCH_WORKAROUND_1"sv;
           insn = kMovW0SmcccArchWorkaround1;
           break;
-        case arch::ArmSmcccFunction::kPsciPsciVersion:
-          choice = "PSCI_VERSION"sv;
+        case Arm64AlternateVbar::kPsciVersion:
+          choice = "SMCCC 1.1 PSCI_VERSION"sv;
           insn = kMovW0PsciVersion;
           break;
-        default:
+        case Arm64AlternateVbar::kSmccc10:
+          choice = "SMCCC 1.0 PSCI_VERSION"sv;
+          insn = kMovW0PsciVersion;
+          break;
+        case Arm64AlternateVbar::kNone:
           // The code won't actually be used.  To ensure that, the unpatched
           // instruction is a fatal trap.
           break;

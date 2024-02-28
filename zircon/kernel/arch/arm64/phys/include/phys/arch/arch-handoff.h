@@ -8,13 +8,14 @@
 #define ZIRCON_KERNEL_ARCH_ARM64_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_
 
 #include <lib/arch/arm64/smccc.h>
+#include <lib/boot-options/arm64.h>
 #include <lib/zbi-format/driver-config.h>
 
 #include <ktl/optional.h>
 #include <ktl/variant.h>
 
 struct ArchPatchInfo {
-  arch::ArmSmcccFunction smccc_arch_workaround{};
+  Arm64AlternateVbar alternate_vbar = Arm64AlternateVbar::kNone;
 };
 
 struct ZbiAmlogicRng {
@@ -54,7 +55,7 @@ struct ArchPhysHandoff {
   bool motmot_power_driver = false;
 
   // See ArchPatchInfo, above.
-  arch::ArmSmcccFunction smccc_arch_workaround{};
+  Arm64AlternateVbar alternate_vbar = Arm64AlternateVbar::kNone;
 };
 
 // This must match what the kernel's page-table bootstrapping actually uses as

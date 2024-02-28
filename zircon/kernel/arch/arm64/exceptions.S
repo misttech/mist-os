@@ -52,9 +52,10 @@
   .cfi_same_value \reg2
 .endm
 
-// Invoke one of those for each x<n> pair, optionally skipping x0, x1
-// and optionally replacing x20 with another register (i.e. xzr).
-.macro iframe.foreach.x op, x0=x0, x20=x20
+// Invoke one of those for each x<n> pair, optionally skipping x0, x1 and
+// optionally replacing x20 with another register (i.e. xzr), and optionally
+// stopping at the (odd number) x<last> rather than all the way up to x29.
+.macro iframe.foreach.x op, x0=x0, x20=x20, last=29
   .ifc "x0","\x0"
     \op x0, x1, ARM64_IFRAME_OFFSET_R
   .else
@@ -62,20 +63,30 @@
       .error "iframe.foreach.x optional x0= argument must be skip not x0=\x0"
     .endif
   .endif
-  \op x2, x3, ARM64_IFRAME_OFFSET_R + (2 * 8)
-  \op x4, x5, ARM64_IFRAME_OFFSET_R + (4 * 8)
-  \op x6, x7, ARM64_IFRAME_OFFSET_R + (6 * 8)
-  \op x8, x9, ARM64_IFRAME_OFFSET_R + (8 * 8)
-  \op x10, x11, ARM64_IFRAME_OFFSET_R + (10 * 8)
-  \op x12, x13, ARM64_IFRAME_OFFSET_R + (12 * 8)
-  \op x14, x15, ARM64_IFRAME_OFFSET_R + (14 * 8)
-  \op x16, x17, ARM64_IFRAME_OFFSET_R + (16 * 8)
-  \op x18, x19, ARM64_IFRAME_OFFSET_R + (18 * 8)
-  \op \x20, x21, ARM64_IFRAME_OFFSET_R + (20 * 8)
-  \op x22, x23, ARM64_IFRAME_OFFSET_R + (22 * 8)
-  \op x24, x25, ARM64_IFRAME_OFFSET_R + (24 * 8)
-  \op x26, x27, ARM64_IFRAME_OFFSET_R + (26 * 8)
-  \op x28, x29, ARM64_IFRAME_OFFSET_R + (28 * 8)
+  .if (\last < 3) || (\last > 29) || (\last % 2 == 0)
+    .error "iframe.foreach.x optional last=\last argument must be odd [3,29]"
+  .endif
+  iframe.x.step 3, \last, \op, x2, x3, ARM64_IFRAME_OFFSET_R + (2 * 8)
+  iframe.x.step 5, \last, \op, x4, x5, ARM64_IFRAME_OFFSET_R + (4 * 8)
+  iframe.x.step 7, \last, \op, x6, x7, ARM64_IFRAME_OFFSET_R + (6 * 8)
+  iframe.x.step 9, \last, \op, x8, x9, ARM64_IFRAME_OFFSET_R + (8 * 8)
+  iframe.x.step 11, \last, \op, x10, x11, ARM64_IFRAME_OFFSET_R + (10 * 8)
+  iframe.x.step 13, \last, \op, x12, x13, ARM64_IFRAME_OFFSET_R + (12 * 8)
+  iframe.x.step 15, \last, \op, x14, x15, ARM64_IFRAME_OFFSET_R + (14 * 8)
+  iframe.x.step 17, \last, \op, x16, x17, ARM64_IFRAME_OFFSET_R + (16 * 8)
+  iframe.x.step 19, \last, \op, x18, x19, ARM64_IFRAME_OFFSET_R + (18 * 8)
+  iframe.x.step 21, \last, \op, \x20, x21, ARM64_IFRAME_OFFSET_R + (20 * 8)
+  iframe.x.step 23, \last, \op, x22, x23, ARM64_IFRAME_OFFSET_R + (22 * 8)
+  iframe.x.step 25, \last, \op, x24, x25, ARM64_IFRAME_OFFSET_R + (24 * 8)
+  iframe.x.step 27, \last, \op, x26, x27, ARM64_IFRAME_OFFSET_R + (26 * 8)
+  iframe.x.step 29, \last, \op, x28, x29, ARM64_IFRAME_OFFSET_R + (28 * 8)
+.endm
+
+// Helper for iframe.foreach.x, see above.
+.macro iframe.x.step n, last, op, reg1, reg2, offset
+  .if (\n <= \last)
+    \op \reg1, \reg2, \offset
+  .endif
 .endm
 
 // Push the iframe on the stack and save the x0 and x1 registers.
@@ -464,15 +475,15 @@ iframe.async_exception.el0 arm64_el1_exception_serror_lower_a64, \
 .endm
 
 
-// The smccc_workaround table has non-default vectors for EL0 entry vectors.
-.macro iframe.smccc_workaround.el0 name:req, reload_args:req
-  .vbar_function arm64_el1_exception_smccc_workaround_\name
-    .label .L.arm64_el1_exception_smccc_workaround_\name\().start
+// The smccc11_workaround table has non-default vectors for EL0 entry vectors.
+.macro iframe.smccc11_workaround.el0 name:req, reload_args:req
+  .vbar_function arm64_el1_exception_smccc11_workaround_\name
+    .label .L.arm64_el1_exception_smccc11_workaround_\name\().start
     iframe.exc.start
     .cfi.iframe.exc.start.el0
-    iframe.stp x2, x3, ARM64_IFRAME_OFFSET_R + (2 * 8)
+    iframe.foreach.x iframe.stp, x0=skip, last=3
 
-    .label .L.arm64_el1_exception_smccc_workaround_\name\().workaround
+    .label .L.arm64_el1_exception_smccc11_workaround_\name\().workaround
     smccc_workaround_function_w0
     smccc_conduit
 
@@ -480,23 +491,60 @@ iframe.async_exception.el0 arm64_el1_exception_serror_lower_a64, \
       // Reload the registers that SMCCC may have clobbered, x0..x3.
       // These registers are needed by the syscall path.
       // TODO(mcgrathr): make syscall wrappers get args from iframe instead
-      iframe.ldp x0, x1, ARM64_IFRAME_OFFSET_R + (0 * 8)
-      iframe.ldp x2, x3, ARM64_IFRAME_OFFSET_R + (2 * 8)
+      iframe.foreach.x iframe.ldp, last=3
     .endif
 
     // Now pick up in the corresponding main vector code just after the
     // prefix that was repeated above.
     b arm64_el1_exception_\name + \
-      (.L.arm64_el1_exception_smccc_workaround_\name\().workaround - \
-       .L.arm64_el1_exception_smccc_workaround_\name\().start)
+      (.L.arm64_el1_exception_smccc11_workaround_\name\().workaround - \
+       .L.arm64_el1_exception_smccc11_workaround_\name\().start)
   .end_vbar_function
 .endm
 
-.vbar_table arm64_el1_exception_smccc_workaround, global, \
+.vbar_table arm64_el1_exception_smccc11_workaround, global, \
             iframe.alternate.stub
-iframe.smccc_workaround.el0 sync_lower_a64, 1
-iframe.smccc_workaround.el0 irq_lower_a64, 0
-iframe.smccc_workaround.el0 serror_lower_a64, 0
+iframe.smccc11_workaround.el0 sync_lower_a64, 1
+iframe.smccc11_workaround.el0 irq_lower_a64, 0
+iframe.smccc11_workaround.el0 serror_lower_a64, 0
+.end_vbar_table
+
+
+// The smccc10_workaround table has non-default vectors for EL0 entry vectors.
+// It differs from the smccc11_workaround table in needing to save registers up
+// through x17 before the SMCCC (1.0) call, and reload all argument registers
+// (up through x7 rather than only up through x3) afterwards.
+.macro iframe.smccc10_workaround.el0 name:req, reload_args:req
+  .vbar_function arm64_el1_exception_smccc10_workaround_\name
+    .label .L.arm64_el1_exception_smccc10_workaround_\name\().start
+    iframe.exc.start
+    .cfi.iframe.exc.start.el0
+    iframe.foreach.x iframe.stp, x0=skip, last=17
+
+    .label .L.arm64_el1_exception_smccc10_workaround_\name\().workaround
+    smccc_workaround_function_w0
+    smccc_conduit
+
+    .if \reload_args
+      // Reload the argument registers that SMCCC may have clobbered, x0..x7.
+      // These registers are needed by the syscall path.
+      // TODO(mcgrathr): make syscall wrappers get args from iframe instead
+      iframe.foreach.x iframe.ldp, last=7
+    .endif
+
+    // Now pick up in the corresponding main vector code just after the
+    // prefix that was repeated above.
+    b arm64_el1_exception_\name + \
+      (.L.arm64_el1_exception_smccc10_workaround_\name\().workaround - \
+       .L.arm64_el1_exception_smccc10_workaround_\name\().start)
+  .end_vbar_function
+.endm
+
+.vbar_table arm64_el1_exception_smccc10_workaround, global, \
+            iframe.alternate.stub
+iframe.smccc10_workaround.el0 sync_lower_a64, 1
+iframe.smccc10_workaround.el0 irq_lower_a64, 0
+iframe.smccc10_workaround.el0 serror_lower_a64, 0
 .end_vbar_table
 
 

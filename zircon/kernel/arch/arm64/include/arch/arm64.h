@@ -100,7 +100,8 @@ void arm64_uspace_entry(iframe_t* iframe, vaddr_t kstack) __NO_RETURN;
 // These are not actually functions, but special code addresses.
 using VbarFunction = void();
 VbarFunction arm64_el1_exception;
-VbarFunction arm64_el1_exception_smccc_workaround;
+VbarFunction arm64_el1_exception_smccc11_workaround;
+VbarFunction arm64_el1_exception_smccc10_workaround;
 
 void arm64_sync_exception(iframe_t* iframe, uint exception_flags, uint32_t esr);
 

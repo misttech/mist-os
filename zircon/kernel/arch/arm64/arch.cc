@@ -143,19 +143,38 @@ zx_status_t arm64_free_secondary_stack(cpu_num_t cpu_num) {
   return _init_thread[cpu_num - 1].stack().Teardown();
 }
 
+static VbarFunction* arm64_select_vbar_via_smccc(arch::ArmSmcccFunction function) {
+  // TODO(https://fxbug.dev/322202704): Auto-selection logic based on
+  // SMCCC_ARCH_FEATURES query.  In auto-selection mode, we should only get
+  // here if the physboot-time auto-selection detected that the given SMCCC
+  // function is supported by the firmware.  That means that on each individual
+  // CPU, the query will report whether the call is needed or not on that CPU.
+  // So that query will be done here to decide for this CPU.
+  dprintf(INFO,
+          "CPU %u using SMCCC_ARCH_WORKAROUND function %#" PRIx32 " by boot option override\n",
+          arch_curr_cpu_num(), static_cast<uint32_t>(function));
+  return arm64_el1_exception_smccc11_workaround;
+}
+
 // Select the exception vector to use for the current CPU.
 static VbarFunction* arm64_select_vbar() {
-  ZX_ASSERT(gPhysHandoff);
-  switch (gPhysHandoff->arch_handoff.smccc_arch_workaround) {
+  switch (gPhysHandoff->arch_handoff.alternate_vbar) {
     // TODO(https://fxbug.dev/322202704): per-CPU auto-selection logic
-    case arch::ArmSmcccFunction::kSmcccArchWorkaround3:
-    case arch::ArmSmcccFunction::kSmcccArchWorkaround1:
-    case arch::ArmSmcccFunction::kPsciPsciVersion:
-      dprintf(INFO, "CPU %u using SMCCC_ARCH_WORKAROUND function %#" PRIx32 "\n",
-              arch_curr_cpu_num(),
-              static_cast<uint32_t>(gPhysHandoff->arch_handoff.smccc_arch_workaround));
-      return arm64_el1_exception_smccc_workaround;
-    default:
+    case Arm64AlternateVbar::kArchWorkaround3:
+      return arm64_select_vbar_via_smccc(arch::ArmSmcccFunction::kSmcccArchWorkaround3);
+    case Arm64AlternateVbar::kArchWorkaround1:
+      return arm64_select_vbar_via_smccc(arch::ArmSmcccFunction::kSmcccArchWorkaround1);
+    case Arm64AlternateVbar::kPsciVersion:
+      // TODO(https://fxbug.dev/322202704): Auto-select based on core IDs?
+      dprintf(INFO, "CPU %u using SMCCC 1.1 PSCI_VERSION in lieu of SMCCC_ARCH_WORKAROUND\n",
+              arch_curr_cpu_num());
+      return arm64_el1_exception_smccc11_workaround;
+    case Arm64AlternateVbar::kSmccc10:
+      // TODO(https://fxbug.dev/322202704): Auto-select based on core IDs?
+      dprintf(INFO, "CPU %u using SMCCC 1.0 PSCI_VERSION in lieu of SMCCC 1.1 support\n",
+              arch_curr_cpu_num());
+      return arm64_el1_exception_smccc10_workaround;
+    case Arm64AlternateVbar::kNone:
       // TODO(https://fxbug.dev/322202704): fall back to branch loop?
       // Just panic on known cores with issues when firmware is lacking?
       dprintf(INFO, "CPU %u has no SMCCC workaround function configured\n", arch_curr_cpu_num());

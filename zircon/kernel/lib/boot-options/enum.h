@@ -126,7 +126,8 @@ inline constexpr auto Enum<Arm64AlternateVbar> = [](auto&& Switch) {
       .Case("none", Arm64AlternateVbar::kNone)
       .Case("arch3", Arm64AlternateVbar::kArchWorkaround3)
       .Case("arch1", Arm64AlternateVbar::kArchWorkaround1)
-      .Case("psci", Arm64AlternateVbar::kPsciVersion);
+      .Case("psci", Arm64AlternateVbar::kPsciVersion)
+      .Case("smccc10", Arm64AlternateVbar::kSmccc10);
 };
 
 #endif  // BOOT_OPTIONS_GENERATOR || defined(__x86_64__)

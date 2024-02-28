@@ -299,6 +299,10 @@ if (current_cpu == "arm64") {
               option = "psci"
               device_types = _smccc11_device_types
             },
+            {
+              option = "smccc10"
+              device_types = kernel_test_device_types
+            },
           ]) {
     core_tests("core-tests-workaround-${alternate.option}") {
       args = [ "kernel.arm64.alternate-vbar=${alternate.option}" ]

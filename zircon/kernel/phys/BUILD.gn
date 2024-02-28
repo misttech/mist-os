@@ -783,6 +783,9 @@ if (is_kernel) {
       # arch-handoff.h has #include <lib/zbi-format/driver-config.h>
       "//sdk/lib/zbi-format",
 
+      # arm64's arch-handoff.h has #include <lib/boot-options/arm64.h>
+      "//zircon/kernel/lib/boot-options",
+
       # handoff.h has #include <lib/arch/ticks.h>.
       "//zircon/kernel/lib/arch",
 

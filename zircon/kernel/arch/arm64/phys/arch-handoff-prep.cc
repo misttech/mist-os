@@ -26,31 +26,26 @@
 
 namespace {
 
-arch::ArmSmcccFunction GetAlternateVbar() {
-  switch (gBootOptions->arm64_alternate_vbar) {
-    case Arm64AlternateVbar::kNone:
-      break;
-    case Arm64AlternateVbar::kArchWorkaround3:
-      return arch::ArmSmcccFunction::kSmcccArchWorkaround3;
-    case Arm64AlternateVbar::kArchWorkaround1:
-      return arch::ArmSmcccFunction::kSmcccArchWorkaround1;
-    case Arm64AlternateVbar::kPsciVersion:
-      return arch::ArmSmcccFunction::kPsciPsciVersion;
-  }
-  return {};
+Arm64AlternateVbar GetAlternateVbar() {
+  // TODO(https://fxbug.dev/322202704): auto-detection logic for what firmware
+  // features are supported: SMCCC_ARCH_FEATURES on the boot CPU (or any CPU)
+  // can tell us which functions the firmware knows about such that per-CPU
+  // SMCCC_ARCH_FEATURES queries indicate whether that CPU needs to use it.
+  // Here in physboot we need to determine how to patch the firmware-using
+  // alternate vector implementations, and direct the kernel proper's arch.cc
+  // code to then decide which implementation to use for each CPU.
+  return gBootOptions->arm64_alternate_vbar;
 }
 
 }  // namespace
 
-ArchPatchInfo ArchPreparePatchInfo() {
-  return ArchPatchInfo{.smccc_arch_workaround = GetAlternateVbar()};
-}
+ArchPatchInfo ArchPreparePatchInfo() { return ArchPatchInfo{.alternate_vbar = GetAlternateVbar()}; }
 
 void HandoffPrep::ArchHandoff(const ArchPatchInfo& patch_info) {
   ZX_DEBUG_ASSERT(handoff_);
   ArchPhysHandoff& arch_handoff = handoff_->arch_handoff;
 
-  arch_handoff.smccc_arch_workaround = patch_info.smccc_arch_workaround;
+  arch_handoff.alternate_vbar = patch_info.alternate_vbar;
 }
 
 void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
