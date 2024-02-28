@@ -240,7 +240,7 @@ fn process_flag_template_inner(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffx_emulator_config::{AudioModel, DataUnits};
+    use ffx_emulator_config::AudioModel;
     use serde::Serialize;
 
     #[derive(Serialize)]

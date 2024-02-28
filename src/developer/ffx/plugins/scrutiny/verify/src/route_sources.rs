@@ -7,10 +7,8 @@ use ffx_scrutiny_verify_args::route_sources::Command;
 use scrutiny_config::{ConfigBuilder, ModelConfig};
 use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
 use scrutiny_plugins::verify::{RouteSourceError, VerifyRouteSourcesResults};
-use serde_json;
 use std::{
     collections::{HashMap, HashSet},
-    convert::TryFrom,
     path::PathBuf,
 };
 

@@ -402,7 +402,6 @@ mod test {
     use fuchsia_repo::test_utils;
     use sdk_metadata::VirtualDeviceV1;
     use std::io::Write;
-    use tempfile::TempDir;
 
     const VIRTUAL_DEVICE_VALID: &str =
         include_str!("../../../../../../../build/sdk/meta/test_data/virtual_device.json");

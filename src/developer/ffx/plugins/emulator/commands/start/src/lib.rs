@@ -435,7 +435,6 @@ mod tests {
     use camino::Utf8PathBuf;
     use emulator_instance::{LogLevel, RuntimeConfig};
     use ffx_config::ConfigLevel;
-    use ffx_emulator_config::EmulatorEngine;
     use pbms::ProductBundle;
     use sdk_metadata::ProductBundleV2;
     use std::{fs, path::Path, process::Command};

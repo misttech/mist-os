@@ -79,7 +79,6 @@ pub fn populate_runtime(
 #[cfg(test)]
 mod test {
     use super::*;
-    use anyhow::Result;
     use std::io::Write;
     use tempfile::NamedTempFile;
 

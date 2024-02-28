@@ -925,13 +925,10 @@ mod test {
     use assert_matches::assert_matches;
     use chrono::Utc;
     use ffx_daemon_target::target::{TargetAddrEntry, TargetAddrStatus};
-    use fidl_fuchsia_developer_ffx::{DaemonMarker, DaemonProxy};
-    use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
-    use fuchsia_async::Task;
+    use fidl_fuchsia_developer_ffx::DaemonProxy;
     use std::{
         cell::RefCell,
         collections::BTreeSet,
-        iter::FromIterator,
         str::FromStr,
         time::{Instant, SystemTime},
     };

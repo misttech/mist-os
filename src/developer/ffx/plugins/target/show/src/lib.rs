@@ -447,13 +447,12 @@ async fn gather_last_reboot_info_show(
 mod tests {
     use super::*;
     use fidl_fuchsia_buildinfo::{BuildInfo, ProviderRequest};
-    use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetInfo, TargetIp, TargetRequest};
+    use fidl_fuchsia_developer_ffx::{TargetInfo, TargetIp, TargetRequest};
     use fidl_fuchsia_feedback::{
         DeviceIdProviderRequest, LastReboot, LastRebootInfoProviderRequest, RebootReason,
     };
     use fidl_fuchsia_hwinfo::{
-        Architecture, BoardInfo, BoardRequest, DeviceInfo, DeviceRequest, ProductInfo,
-        ProductRequest,
+        BoardInfo, BoardRequest, DeviceInfo, DeviceRequest, ProductInfo, ProductRequest,
     };
     use fidl_fuchsia_net::{IpAddress, Ipv4Address};
     use fidl_fuchsia_update_channelcontrol::ChannelControlRequest;

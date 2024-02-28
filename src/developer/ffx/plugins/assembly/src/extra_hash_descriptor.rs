@@ -5,7 +5,6 @@
 use anyhow::Result;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
-use std::convert::TryFrom;
 use vbmeta::{HashDescriptor, RawHashDescriptorBuilder, Salt};
 
 /// Used to deserialize a JSON representation of a HashDescriptor.

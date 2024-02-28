@@ -13,7 +13,6 @@ use fidl_fuchsia_feedback::{
 use fidl_fuchsia_io as fio;
 use futures::stream::{FuturesOrdered, StreamExt};
 use std::{
-    convert::{TryFrom, TryInto},
     fs,
     io::Write,
     path::{Path, PathBuf},

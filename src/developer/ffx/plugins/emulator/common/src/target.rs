@@ -64,7 +64,6 @@ pub async fn is_active(
 #[cfg(test)]
 mod test {
     use super::*;
-    use ffx::TargetInfo;
     use fidl::endpoints::ServerEnd;
     use futures::TryStreamExt;
 

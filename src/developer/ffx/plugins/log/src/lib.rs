@@ -296,7 +296,7 @@ mod tests {
     use futures::{future::poll_fn, Future, StreamExt};
     use log_command::{
         log_formatter::{LogData, TIMESTAMP_FORMAT},
-        parse_seconds_string_as_duration, parse_time, DumpCommand, InstanceGetter, TimeFormat,
+        parse_seconds_string_as_duration, parse_time, DumpCommand, TimeFormat,
     };
     use log_symbolizer::{FakeSymbolizerForTest, NoOpSymbolizer};
     use moniker::Moniker;

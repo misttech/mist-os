@@ -100,7 +100,7 @@ mod tests {
     use {
         super::*,
         assert_matches::assert_matches,
-        fidl_fuchsia_power_metrics::{self as fmetrics, GpuUsage, Metric},
+        fidl_fuchsia_power_metrics::{self as fmetrics},
         futures::channel::mpsc,
         std::time::Duration,
     };

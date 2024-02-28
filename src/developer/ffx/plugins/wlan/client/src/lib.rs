@@ -5,7 +5,7 @@
 use {
     anyhow::Error,
     async_trait::async_trait,
-    donut_lib, ffx_wlan_client_args as arg_types, ffx_wlan_common,
+    ffx_wlan_client_args as arg_types,
     fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_wlan_policy as wlan_policy,
 };

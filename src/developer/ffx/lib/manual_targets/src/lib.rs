@@ -5,7 +5,7 @@
 use anyhow::{anyhow, Context as _, Result};
 use async_lock::Mutex;
 use async_trait::async_trait;
-use ffx_config::{self, api::ConfigError, ConfigLevel};
+use ffx_config::{api::ConfigError, ConfigLevel};
 use serde_json::{json, Map, Value};
 use std::sync::atomic::{AtomicUsize, Ordering};
 

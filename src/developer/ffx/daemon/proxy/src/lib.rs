@@ -404,19 +404,16 @@ async fn init_daemon_proxy(
 #[cfg(test)]
 mod test {
     use super::*;
-    use ascendd;
     use async_lock::Mutex;
     use async_net::unix::UnixListener;
     use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream, ServerEnd};
     use fidl_fuchsia_developer_ffx::{
         DaemonMarker, DaemonRequest, DaemonRequestStream, TargetCollectionMarker,
         TargetCollectionRequest, TargetCollectionRequestStream, TargetMarker, TargetRequest,
-        VersionInfo,
     };
     use fuchsia_async::Task;
-    use futures::{AsyncReadExt, Future, FutureExt, StreamExt, TryStreamExt};
-    use std::time::Duration;
-    use std::{path::PathBuf, sync::Arc};
+    use futures::{AsyncReadExt, StreamExt, TryStreamExt};
+    use std::path::PathBuf;
 
     /// Retry a future until it succeeds or retries run out.
     async fn retry_with_backoff<E, F>(

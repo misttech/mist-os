@@ -61,7 +61,7 @@ async fn command(
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_settings::{SetupRequest, SetupSettings};
+    use fidl_fuchsia_settings::SetupRequest;
     use test_case::test_case;
 
     #[fuchsia_async::run_singlethreaded(test)]

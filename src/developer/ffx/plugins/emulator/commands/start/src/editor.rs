@@ -5,7 +5,6 @@
 use anyhow::{bail, Context, Result};
 use emulator_instance::EmulatorConfiguration;
 use ffx_emulator_engines::process_flags_from_str;
-use serde_json;
 use std::{
     env::{temp_dir, var},
     fs::File,

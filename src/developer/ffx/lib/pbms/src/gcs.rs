@@ -13,7 +13,6 @@ use gcs::{
     gs_url::split_gs_url,
 };
 use std::path::Path;
-use structured_ui;
 
 /// Download from a given `gcs_url`.
 ///

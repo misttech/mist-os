@@ -13,7 +13,6 @@ use async_fs::File;
 use futures::{AsyncWriteExt as _, TryStreamExt as _};
 use hyper::{header::CONTENT_LENGTH, StatusCode};
 use std::path::{Path, PathBuf};
-use structured_ui;
 
 pub(crate) const CONFIG_STORAGE_PATH: &str = "pbms.storage.path";
 pub(crate) const GS_SCHEME: &str = "gs";

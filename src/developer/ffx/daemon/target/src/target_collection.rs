@@ -1206,8 +1206,8 @@ impl<'a> TargetUpdateFilter<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::target::{TargetAddrEntry, TargetProtocol, TargetTransport, TargetUpdateBuilder};
-    use chrono::{TimeZone, Utc};
+    use crate::target::{TargetProtocol, TargetTransport, TargetUpdateBuilder};
+    use chrono::TimeZone;
     use ffx_daemon_events::TargetConnectionState;
     use fuchsia_async::Task;
     use futures::prelude::*;

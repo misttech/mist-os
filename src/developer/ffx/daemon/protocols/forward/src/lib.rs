@@ -13,7 +13,7 @@ use fidl_fuchsia_net_ext::SocketAddress as SocketAddressExt;
 use futures::{future::join, AsyncReadExt as _, AsyncWriteExt as _, StreamExt as _};
 use protocols::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json::{self, Value};
+use serde_json::Value;
 use std::sync::Arc;
 
 const REVERSE_BACKLOG: u16 = 128;

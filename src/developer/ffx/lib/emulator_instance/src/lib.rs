@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use nix;
 pub use sdk_metadata::{AudioDevice, DataAmount, DataUnits, PointingDevice, Screen};
 use serde::{Deserialize, Serialize};
 use std::{

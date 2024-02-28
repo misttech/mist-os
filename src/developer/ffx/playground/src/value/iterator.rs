@@ -141,7 +141,6 @@ impl ReplayableIteratorCursor for MappedReplayableIteratorCursor {
 #[cfg(test)]
 mod test {
     use super::*;
-    use futures::FutureExt;
 
     /// Test an iterator. The iterator should yield 5, 6, 7, and 8 in order. If
     /// `check_end` is true it must not yield anything after that.

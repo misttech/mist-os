@@ -191,11 +191,7 @@ mod test {
         fidl_fuchsia_pkg_rewrite_ext::Rule,
         fuchsia_repo::repository::HttpRepository,
         futures::{channel::mpsc, SinkExt, StreamExt as _, TryStreamExt},
-        std::{
-            collections::BTreeSet,
-            sync::{Arc, Mutex},
-            time,
-        },
+        std::{collections::BTreeSet, sync::Mutex, time},
         url::Url,
     };
 

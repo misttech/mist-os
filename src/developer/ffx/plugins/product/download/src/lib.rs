@@ -18,7 +18,6 @@ use std::{
     io::{stderr, stdin, stdout},
     path::Path,
 };
-use structured_ui;
 
 /// `ffx product download` sub-command.
 #[ffx_plugin()]
@@ -138,7 +137,6 @@ mod test {
     };
     use std::io::Write;
     use temp_test_env::TempTestEnv;
-    use tempfile;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_gcs_pb_download_impl() {

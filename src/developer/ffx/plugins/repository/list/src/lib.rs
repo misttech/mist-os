@@ -7,11 +7,10 @@ use {
     ffx_core::ffx_plugin,
     ffx_repository_list_args::ListCommand,
     ffx_writer::Writer,
-    fidl,
     fidl_fuchsia_developer_ffx::{RepositoryIteratorMarker, RepositoryRegistryProxy},
     fidl_fuchsia_developer_ffx_ext::{RepositoryConfig, RepositorySpec},
     prettytable::{cell, format::TableFormat, row, table, Cell, Table},
-    std::{collections::BTreeSet, convert::TryInto},
+    std::collections::BTreeSet,
 };
 
 #[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
@@ -141,8 +140,7 @@ mod test {
         super::*,
         fidl_fuchsia_developer_ffx::{
             FileSystemRepositorySpec, PmRepositorySpec, RepositoryConfig,
-            RepositoryIteratorRequest, RepositoryRegistryProxy, RepositoryRegistryRequest,
-            RepositorySpec,
+            RepositoryIteratorRequest, RepositoryRegistryRequest, RepositorySpec,
         },
         fuchsia_async as fasync,
         futures::StreamExt,

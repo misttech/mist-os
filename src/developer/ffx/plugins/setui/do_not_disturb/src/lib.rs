@@ -56,7 +56,7 @@ async fn command(proxy: DoNotDisturbProxy, do_not_disturb: DoNotDisturb) -> Watc
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_settings::{DoNotDisturbRequest, DoNotDisturbSettings};
+    use fidl_fuchsia_settings::DoNotDisturbRequest;
     use test_case::test_case;
 
     #[fuchsia_async::run_singlethreaded(test)]

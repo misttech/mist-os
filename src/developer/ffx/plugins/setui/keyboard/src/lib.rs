@@ -59,7 +59,7 @@ async fn command(proxy: KeyboardProxy, keyboard: Keyboard) -> WatchOrSetResult {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_settings::{KeyboardRequest, KeyboardSettings};
+    use fidl_fuchsia_settings::KeyboardRequest;
     use test_case::test_case;
 
     #[fuchsia_async::run_singlethreaded(test)]

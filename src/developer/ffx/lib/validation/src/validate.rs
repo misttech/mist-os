@@ -420,7 +420,7 @@ impl<'a> Walker<'a> for Never {
 mod tests {
     use serde_json::json;
 
-    use crate::{field, schema::json};
+    use crate::field;
 
     use super::*;
 

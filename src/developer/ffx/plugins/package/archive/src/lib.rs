@@ -146,7 +146,6 @@ pub fn read_file_entries(reader: &mut dyn FarListReader) -> Result<Vec<ArchiveEn
 
 pub mod test_utils {
     use super::*;
-    use fuchsia_hash::Hash;
     use std::str::FromStr;
 
     pub static BLOB1: &str = "1f487b576253664f9de1a940ad3a350ca47316b5cdb65254fbf267367fd77c62";

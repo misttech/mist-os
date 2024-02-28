@@ -8,7 +8,6 @@ use ffx_scrutiny_verify_args::routes::{default_capability_types, Command};
 use scrutiny_config::{ConfigBuilder, ModelConfig};
 use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
 use scrutiny_plugins::verify::{CapabilityRouteResults, ResultsForCapabilityType};
-use serde_json;
 use std::{collections::HashSet, path::PathBuf};
 
 struct Query {

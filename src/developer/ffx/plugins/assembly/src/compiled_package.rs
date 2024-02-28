@@ -249,7 +249,7 @@ mod tests {
     use assembly_config_schema::assembly_config::AdditionalPackageContents;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::ToolProvider;
-    use assembly_util::{CompiledPackageDestination, FileEntry};
+    use assembly_util::CompiledPackageDestination;
     use fuchsia_archive::Utf8Reader;
     use fuchsia_pkg::PackageManifest;
     use std::fs::File;

@@ -10,11 +10,9 @@ use {
     ffx_core::ffx_plugin,
     ffx_preflight_args::PreflightCommand,
     regex::Regex,
-    serde_json,
     std::fmt,
     std::io::{stdout, Write},
     termion::color,
-    textwrap,
 };
 
 mod analytics;

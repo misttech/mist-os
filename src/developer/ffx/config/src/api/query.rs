@@ -9,7 +9,6 @@ use crate::{
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
 use std::{
-    convert::From,
     default::Default,
     path::{Path, PathBuf},
 };

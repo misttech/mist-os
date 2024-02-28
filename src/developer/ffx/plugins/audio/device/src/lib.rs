@@ -21,7 +21,6 @@ use {
     futures::AsyncWrite,
     futures::FutureExt,
     std::io::Read,
-    std::marker::Send,
 };
 
 #[derive(FfxTool)]
@@ -370,13 +369,9 @@ async fn device_set_gain_state(request: DeviceGainStateRequest) -> fho::Result<(
 mod tests {
     use super::*;
     use ffx_audio_common::tests::SINE_WAV;
-    use ffx_audio_device_args::{
-        DeviceCommand, DeviceDirection, DevicePlayCommand, DeviceRecordCommand, InfoCommand,
-    };
+    use ffx_audio_device_args::{DevicePlayCommand, DeviceRecordCommand, InfoCommand};
     use ffx_core::macro_deps::futures::AsyncWriteExt;
     use ffx_writer::{SimpleWriter, TestBuffer, TestBuffers};
-    use fho::FfxContext;
-    use fidl::HandleBased;
     use format_utils::Format;
     use std::fs;
     use std::io::Write;

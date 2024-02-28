@@ -281,10 +281,7 @@ pub(crate) async fn get_virtual_devices(product_bundle: &ProductBundle) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
-    use emulator_instance::{
-        AccelerationMode, ConsoleType, CpuArchitecture, EmulatorConfiguration, GpuType, LogLevel,
-        NetworkingMode, PortMapping,
-    };
+    use emulator_instance::{CpuArchitecture, PortMapping};
     use ffx_config::ConfigLevel;
     use ffx_emulator_common::config::{
         EMU_DEFAULT_DEVICE, EMU_DEFAULT_ENGINE, EMU_DEFAULT_GPU, EMU_INSTANCE_ROOT_DIR,

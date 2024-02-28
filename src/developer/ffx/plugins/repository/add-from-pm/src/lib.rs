@@ -9,7 +9,6 @@ use ffx_repository_add_from_pm_args::AddFromPmCommand;
 use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
 use fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositorySpec};
 use fuchsia_url::RepositoryUrl;
-use std::convert::TryInto;
 
 #[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
 pub async fn add_from_pm(cmd: AddFromPmCommand, repos: RepositoryRegistryProxy) -> Result<()> {

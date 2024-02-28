@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
     cmp::max,
-    convert::TryFrom,
     fmt::{self, Display, Write},
 };
 
@@ -575,7 +574,7 @@ impl TryFrom<Vec<ffx::TargetInfo>> for TabularTargetFormatter {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address};
+    use fidl_fuchsia_net::{Ipv4Address, Ipv6Address};
     use lazy_static::lazy_static;
     use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 

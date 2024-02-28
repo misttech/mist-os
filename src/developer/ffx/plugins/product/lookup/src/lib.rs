@@ -84,7 +84,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use {super::*, ffx_writer::Format, std::io::Write, temp_test_env::TempTestEnv};
+    use {super::*, ffx_writer::Format, temp_test_env::TempTestEnv};
 
     const PB_MANIFEST_NAME: &'static str = "product_bundles.json";
 

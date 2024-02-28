@@ -1297,7 +1297,6 @@ async fn doctor_summary<W: Write>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use async_lock::Mutex;
     use async_trait::async_trait;
     use ffx_config::{ConfigLevel, TestEnv};
     use ffx_doctor_test_utils::MockWriter;
@@ -1309,19 +1308,16 @@ mod test {
     };
     use fidl_fuchsia_developer_ffx::{
         DaemonProxy, DaemonRequest, OpenTargetError, RemoteControlState, TargetCollectionRequest,
-        TargetCollectionRequestStream, TargetConnectionError, TargetInfo, TargetRequest,
-        TargetState,
+        TargetCollectionRequestStream, TargetConnectionError, TargetRequest,
     };
-    use fidl_fuchsia_developer_remotecontrol::{
-        IdentifyHostResponse, RemoteControlMarker, RemoteControlRequest,
-    };
+    use fidl_fuchsia_developer_remotecontrol::{IdentifyHostResponse, RemoteControlRequest};
     use fuchsia_async as fasync;
     use futures::{
         channel::oneshot::{self, Receiver},
         future::Shared,
-        Future, FutureExt, TryFutureExt, TryStreamExt,
+        Future, FutureExt, TryFutureExt,
     };
-    use std::{cell::Cell, collections::HashSet, fmt, sync::Arc};
+    use std::{cell::Cell, fmt};
     use tempfile::tempdir;
 
     const NODENAME: &str = "fake-nodename";

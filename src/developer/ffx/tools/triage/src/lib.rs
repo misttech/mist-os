@@ -135,12 +135,10 @@ fn flatten_error(e: anyhow::Error) -> anyhow::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::Result;
     use ffx_writer::{Format, TestBuffers};
-    use fidl_fuchsia_feedback::{DataProviderProxy, DataProviderRequest, Snapshot};
+    use fidl_fuchsia_feedback::{DataProviderRequest, Snapshot};
     use lazy_static::lazy_static;
     use std::{collections::HashMap, fs, path::Path};
-    use tempfile::tempdir;
 
     macro_rules! test_file {
         (config $filename:expr) => {

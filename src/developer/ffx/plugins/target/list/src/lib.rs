@@ -13,7 +13,6 @@ use fidl_fuchsia_developer_ffx::{
     TargetCollectionProxy, TargetCollectionReaderMarker, TargetCollectionReaderRequest, TargetQuery,
 };
 use futures::TryStreamExt;
-use std::convert::TryFrom;
 
 mod target_formatter;
 

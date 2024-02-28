@@ -9,8 +9,7 @@ use futures::future::{ready, BoxFuture};
 use futures::FutureExt;
 use num::bigint::BigInt;
 use std::collections::HashMap;
-use std::convert::TryInto;
-use std::iter::{repeat_with, Iterator};
+use std::iter::repeat_with;
 use std::sync::{Arc, Mutex};
 
 use crate::error::{Error, Result};

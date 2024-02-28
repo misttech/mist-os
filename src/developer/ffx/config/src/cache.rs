@@ -90,7 +90,6 @@ async fn load_config_with_instant<T>(
 mod test {
     use super::*;
     use futures::future::join_all;
-    use std::time::Duration;
 
     async fn load(now: Instant, key: Option<&Path>, cache: &Cache<usize>) {
         let tests = 25;

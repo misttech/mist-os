@@ -7,7 +7,6 @@ use ffx_scrutiny_verify_args::kernel_cmdline::Command;
 use scrutiny_config::{ConfigBuilder, ModelConfig};
 use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
 use scrutiny_utils::golden::{CompareResult, GoldenFile};
-use serde_json;
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},

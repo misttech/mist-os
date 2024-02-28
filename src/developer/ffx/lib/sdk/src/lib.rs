@@ -441,7 +441,6 @@ impl FfxToolFiles {
 mod test {
     use super::*;
     use regex::Regex;
-    use sdk_metadata::ElementType;
     use std::io::Write;
     use tempfile::TempDir;
 

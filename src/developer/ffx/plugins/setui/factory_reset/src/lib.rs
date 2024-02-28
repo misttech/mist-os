@@ -64,7 +64,7 @@ async fn command(
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_settings::{FactoryResetRequest, FactoryResetSettings};
+    use fidl_fuchsia_settings::FactoryResetRequest;
     use test_case::test_case;
 
     #[fuchsia_async::run_singlethreaded(test)]

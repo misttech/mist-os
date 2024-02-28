@@ -112,7 +112,7 @@ mod tests {
     use super::*;
     use ffx_writer::{Format, TestBuffers};
     use fidl_fuchsia_audio_controller::{
-        DeviceControlListDevicesResponse, DeviceControlProxy, DeviceControlRequest, DeviceSelector,
+        DeviceControlListDevicesResponse, DeviceControlRequest, DeviceSelector,
     };
     use fidl_fuchsia_hardware_audio::DeviceType;
 

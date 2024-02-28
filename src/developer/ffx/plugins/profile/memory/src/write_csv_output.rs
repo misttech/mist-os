@@ -108,7 +108,6 @@ pub fn write_csv_output<'a, W: Write>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plugin_output::ProcessesMemoryUsage;
     use crate::processed::Kernel;
     use crate::processed::RetainedMemory;
     use crate::ProfileMemoryOutput::CompleteDigest;

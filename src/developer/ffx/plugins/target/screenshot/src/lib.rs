@@ -15,7 +15,6 @@ use {
     futures::stream::{FuturesOrdered, StreamExt},
     png::HasParameters,
     serde::{Deserialize, Serialize},
-    std::convert::{TryFrom, TryInto},
     std::fmt::{Display, Formatter, Result as FmtResult},
     std::fs,
     std::io::BufWriter,
@@ -241,7 +240,7 @@ fn bgra_to_rgba(img_data: &mut Vec<u8>) {
 mod test {
     use {
         super::*,
-        ffx_writer::{Format as WriterFormat, MachineWriter, TestBuffers},
+        ffx_writer::{Format as WriterFormat, TestBuffers},
         fidl::endpoints::ServerEnd,
         fidl_fuchsia_ui_composition::{ScreenshotRequest, ScreenshotTakeFileResponse},
         futures::TryStreamExt,

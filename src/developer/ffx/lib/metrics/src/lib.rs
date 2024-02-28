@@ -10,7 +10,6 @@ use std::{
     collections::BTreeMap,
     time::{Duration, Instant},
 };
-use tracing;
 
 pub const GA4_PROPERTY_ID: &str = "G-L10R82HSYT";
 pub const GA4_KEY: &str = "mHeVJ5GxQTCvAVCmVHn_dw";

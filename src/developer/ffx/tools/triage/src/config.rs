@@ -86,10 +86,7 @@ pub async fn get_or_default_config_files(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{
-        fs,
-        path::{Path, PathBuf},
-    };
+    use std::{fs, path::Path};
     use tempfile::{tempdir, NamedTempFile};
 
     fn create_empty_file(root: &Path, filename: &'static str) -> PathBuf {

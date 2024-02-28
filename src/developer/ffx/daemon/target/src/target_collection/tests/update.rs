@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::*;
 use assert_matches::assert_matches;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
 use fidl_fuchsia_overnet_protocol::NodeId;
 use rcs::RcsConnection;
-
-use crate::target::{TargetProtocol, TargetTransport, TargetUpdateBuilder};
-
-use super::*;
 
 const NODENAME: &str = "nodename";
 const SERIAL: &str = "serial";

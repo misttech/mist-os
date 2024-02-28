@@ -15,7 +15,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use serde::{Deserialize, Serialize};
-use std::{convert::From, io::Write};
+use std::io::Write;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FlashManifest {

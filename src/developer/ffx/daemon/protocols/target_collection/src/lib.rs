@@ -23,7 +23,6 @@ use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
 #[cfg(test)]
 use futures::channel::oneshot::Sender;
 use futures::TryStreamExt;
-use manual_targets;
 use protocols::prelude::*;
 use std::{
     net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6},
@@ -680,8 +679,6 @@ fn handle_discovered_target(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use addr::TargetAddr;
-    use anyhow::Result;
     use assert_matches::assert_matches;
     use async_channel::{Receiver, Sender};
     use ffx_config::{query, ConfigLevel};

@@ -18,7 +18,7 @@ use {
     std::cell::RefCell,
     std::fs,
     std::sync::{Arc, Mutex},
-    termion::{self, clear, cursor},
+    termion::{clear, cursor},
     url::Url,
 };
 

@@ -227,7 +227,6 @@ pub mod processed {
     use serde::Serialize;
 
     use std::collections::{HashMap, HashSet};
-    use std::iter::FromIterator;
 
     /// Per process memory attribution.
     #[derive(Serialize, PartialEq, Debug, Default)]

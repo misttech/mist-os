@@ -19,11 +19,9 @@ use maplit::hashmap;
 use pbms::AuthFlowChoice;
 use pbms::{list_from_gcs, string_from_url};
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::collections::HashMap;
 use std::io::{stderr, stdin, stdout, Write};
 use std::str::FromStr;
-use structured_ui;
 use version::Version;
 
 const PB_MANIFEST_NAME: &'static str = "product_bundles.json";
@@ -235,7 +233,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use {super::*, ffx_writer::Format, std::io::Write, temp_test_env::TempTestEnv};
+    use {super::*, ffx_writer::Format, temp_test_env::TempTestEnv};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_pb_list_impl() {

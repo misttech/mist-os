@@ -86,10 +86,8 @@ mod tests {
 
     use fuchsia_archive::Utf8Reader;
     use serde_json::json;
-    use std::fs::File;
     use std::io::Write;
     use tempfile::tempdir;
-    use utf8_path::path_relative_from_current_dir;
 
     #[test]
     fn construct() {

@@ -17,7 +17,6 @@
 //!     alternation operator, usually denoted `|`, will likely not appear in
 //!     this grammar.
 
-use nom;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take, take_while1};
 use nom::character::complete::{
@@ -34,7 +33,6 @@ use nom::sequence::{delimited, pair, preceded, separated_pair, terminated, tuple
 use nom_locate::LocatedSpan;
 use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::convert::From;
 use std::rc::Rc;
 
 /// Value indicating whether a variable is mutable or constant

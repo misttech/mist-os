@@ -571,7 +571,7 @@ impl<'bump> Editor<'bump> for DesugarEnum {
 mod test {
     use ffx_validation_proc_macro::schema;
 
-    use crate::schema::{json, json::Any, Field, Nothing, Schema, StructExtras, ValueType};
+    use crate::schema::{json, json::Any, Nothing, Schema};
 
     use super::*;
 

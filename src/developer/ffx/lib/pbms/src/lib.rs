@@ -298,7 +298,6 @@ where
 mod tests {
     use super::*;
     use ffx_config::{environment::test_init_in_tree, ConfigLevel};
-    use serde_json;
     use std::fs::File;
     use tempfile::TempDir;
 

@@ -721,11 +721,7 @@ impl Parse for ProxyMap {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::default::Default;
-    use syn::{
-        parse::{Parse, ParseStream},
-        parse2, parse_quote, Attribute, ItemType, ReturnType,
-    };
+    use syn::{parse2, parse_quote, Attribute, ItemType, ReturnType};
 
     struct WrappedCommand {
         original: ItemStruct,

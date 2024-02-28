@@ -21,7 +21,6 @@ use {
         format,
         path::{Component, Path, PathBuf},
     },
-    structured_ui,
     transfer_manifest::{TransferManifest, TransferManifestV1},
 };
 

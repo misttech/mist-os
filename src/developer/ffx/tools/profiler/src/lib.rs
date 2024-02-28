@@ -9,7 +9,7 @@ use async_fs::File;
 use errors::{ffx_bail, ffx_error};
 use fho::{deferred, moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_cpu_profiler as profiler;
-use std::{default::Default, io::stdin, io::BufRead, time::Duration};
+use std::{io::stdin, io::BufRead, time::Duration};
 
 type Writer = MachineWriter<()>;
 #[derive(FfxTool)]

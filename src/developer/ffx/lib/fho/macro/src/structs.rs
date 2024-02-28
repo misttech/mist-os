@@ -8,7 +8,7 @@ use crate::{
 };
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
-use syn::{self, spanned::Spanned, ExprCall};
+use syn::{spanned::Spanned, ExprCall};
 
 /// Creates the top-level struct declaration before any brackets are used.
 ///

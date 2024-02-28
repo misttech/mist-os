@@ -190,9 +190,7 @@ mod tests {
 
     use super::*;
     use crate::plugin_output::ProcessesMemoryUsage;
-    use crate::processed::RetainedMemory;
     use crate::ProfileMemoryOutput::ProcessDigest;
-    use std::collections::HashMap;
     use std::collections::HashSet;
 
     #[test]

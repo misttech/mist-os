@@ -4,7 +4,6 @@
 
 use anyhow::{anyhow, bail, Context as _, Result};
 use itertools::Itertools;
-use libc;
 use nix::{
     ifaddrs::{getifaddrs, InterfaceAddress},
     net::if_::InterfaceFlags,
@@ -309,7 +308,6 @@ pub fn get_mcast_interfaces() -> Result<Vec<McastInterface>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nix::sys::socket::SockaddrStorage;
     use std::str::FromStr;
 
     fn sockaddr(s: &str) -> SockaddrStorage {

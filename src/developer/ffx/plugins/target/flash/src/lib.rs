@@ -261,7 +261,7 @@ Using address {} as node name",
 mod test {
     use super::*;
     use pretty_assertions::assert_eq;
-    use std::{default::Default, path::PathBuf};
+    use std::path::PathBuf;
     use tempfile::NamedTempFile;
 
     #[fuchsia_async::run_singlethreaded(test)]

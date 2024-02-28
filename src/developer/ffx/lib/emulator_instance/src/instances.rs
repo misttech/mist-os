@@ -145,13 +145,9 @@ pub fn write_to_disk(data: &EmulatorInstanceData, instance_directory: &PathBuf) 
 mod tests {
     use super::*;
     use crate::{EmulatorInstanceInfo, EngineType};
-    use anyhow::Result;
     use ffx_config::ConfigLevel;
     use serde_json::json;
-    use std::{
-        fs::{create_dir_all, remove_file, File},
-        io::Write,
-    };
+    use std::{fs::remove_file, io::Write};
     use tempfile::tempdir;
 
     #[fuchsia_async::run_singlethreaded(test)]

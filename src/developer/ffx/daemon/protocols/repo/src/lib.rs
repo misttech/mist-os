@@ -676,10 +676,11 @@ impl<T: EventHandlerProvider<R>, R: Registrar> Repo<T, R> {
         // Make sure the repository is up to date.
         update_repository(repository_name, &repo).await?;
 
-        let entries = repo.read().await.show_package(&package_name, false).await.map_err(|err| {
-            tracing::error!("Unable to list package contents {:?}: {:#}", package_name, err);
-            ffx::RepositoryError::IoError
-        })?;
+        let entries =
+            repo.read().await.show_package(&package_name, false).await.map_err(|err| {
+                tracing::error!("Unable to list package contents {:?}: {:#}", package_name, err);
+                ffx::RepositoryError::IoError
+            })?;
 
         let Some(entries) = entries else {
             return Err(ffx::RepositoryError::NoMatchingPackage);
@@ -1299,7 +1300,7 @@ mod tests {
         addr::TargetAddr,
         assert_matches::assert_matches,
         ffx_config::ConfigLevel,
-        fidl::{self, endpoints::Request},
+        fidl::endpoints::Request,
         fidl_fuchsia_developer_ffx as ffx,
         fidl_fuchsia_developer_ffx_ext::RepositoryStorageType,
         fidl_fuchsia_developer_remotecontrol as rcs,
@@ -1319,13 +1320,11 @@ mod tests {
         std::{
             cell::RefCell,
             collections::BTreeSet,
-            convert::TryInto,
             fs,
             future::Future,
-            net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-            rc::Rc,
+            net::{IpAddr, Ipv4Addr, Ipv6Addr},
             str::FromStr,
-            sync::{Arc, Mutex},
+            sync::Mutex,
         },
     };
 

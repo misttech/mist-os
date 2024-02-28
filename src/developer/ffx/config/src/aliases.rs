@@ -105,7 +105,6 @@ pub(crate) fn add_isolation_default(cm: &mut ConfigMap) {
 mod test {
     use super::*;
     use crate::{self as ffx_config, ConfigLevel};
-    use serde_json::Value;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_ffx_isolated() {

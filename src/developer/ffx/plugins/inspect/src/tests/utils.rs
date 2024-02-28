@@ -22,7 +22,6 @@ use fidl_fuchsia_diagnostics_host::{
 };
 use fidl_fuchsia_sys2 as fsys;
 use futures::{AsyncWriteExt, StreamExt, TryStreamExt};
-use iquery_test_support;
 use std::sync::{Arc, Mutex};
 
 #[derive(Default)]

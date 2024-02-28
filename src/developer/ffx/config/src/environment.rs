@@ -351,7 +351,6 @@ impl fmt::Display for Environment {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_init;
     use std::fs;
 
     const ENVIRONMENT: &'static str = r#"

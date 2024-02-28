@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use analytics::add_custom_event;
-use fuchsia_async::{self, TimeoutExt as _};
+use fuchsia_async::TimeoutExt as _;
 use fuchsia_repo::repository::RepositorySpec;
 use std::{collections::BTreeMap, time::Duration};
 

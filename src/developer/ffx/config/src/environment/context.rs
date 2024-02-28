@@ -580,7 +580,6 @@ mod test {
     use super::*;
 
     use assert_matches::assert_matches;
-    use camino::Utf8Path;
     use tempfile::tempdir;
 
     const DOMAINS_TEST_DATA_PATH: &str = env!("DOMAINS_TEST_DATA_PATH");

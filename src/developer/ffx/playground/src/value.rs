@@ -6,7 +6,7 @@ use anyhow::anyhow;
 use fidl_codec::{library as lib, Value as FidlValue};
 use futures::future::BoxFuture;
 use num::{bigint::BigInt, bigint::TryFromBigIntError, traits::ToPrimitive as _};
-use std::cmp::{Ordering, PartialOrd};
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -726,7 +726,6 @@ impl std::fmt::Display for PlaygroundValue {
 mod test {
     use super::*;
     use futures::FutureExt;
-    use std::collections::HashMap;
 
     #[test]
     fn compare() {

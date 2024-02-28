@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow, fidl_fuchsia_wlan_policy as wlan_policy};
+use fidl_fuchsia_wlan_policy as wlan_policy;
 
 #[derive(Debug, PartialEq)]
 pub enum SecurityType {

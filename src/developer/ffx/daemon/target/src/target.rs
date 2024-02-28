@@ -1572,11 +1572,9 @@ impl Drop for KeepAliveHandle {
 #[cfg(test)]
 mod test {
     use super::*;
-    use anyhow::Context;
     use assert_matches::assert_matches;
     use chrono::TimeZone;
     use ffx::TargetIp;
-    use fidl;
     use fidl_fuchsia_developer_remotecontrol as rcs;
     use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
     use fidl_fuchsia_net::Subnet;

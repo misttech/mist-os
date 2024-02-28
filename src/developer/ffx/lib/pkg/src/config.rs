@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Result};
-use ffx_config::{self, ConfigLevel};
+use ffx_config::ConfigLevel;
 use fidl_fuchsia_developer_ffx_ext::RepositoryTarget;
 use fuchsia_repo::repository::RepositorySpec;
 use percent_encoding::{percent_decode_str, percent_encode, AsciiSet, CONTROLS};

@@ -5,9 +5,7 @@
 //! This module contains utility functions for process control.
 
 use anyhow::{bail, Result};
-use nix;
 use shared_child::SharedChild;
-use std::convert::TryInto;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{thread, time};

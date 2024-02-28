@@ -9,7 +9,7 @@ use crate::api::{
 };
 use analytics::{is_opted_in, set_opt_in_status};
 use anyhow::{anyhow, Context, Result};
-use std::{convert::From, io::Write, path::PathBuf, sync::Mutex};
+use std::{io::Write, path::PathBuf, sync::Mutex};
 
 pub mod api;
 pub mod environment;
@@ -241,10 +241,9 @@ mod test {
     use super::*;
     // This is to get the FfxConfigBacked derive to compile, as it
     // creates a token stream referencing `ffx_config` on the inside.
-    use crate::ConfigLevel;
     use crate::{self as ffx_config};
     use serde_json::{json, Value};
-    use std::{collections::HashSet, fs, path::PathBuf};
+    use std::{collections::HashSet, fs};
 
     #[test]
     fn test_config_levels_make_sense_from_first() {

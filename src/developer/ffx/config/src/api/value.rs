@@ -12,10 +12,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use serde_json::{Map, Value};
-use std::{
-    convert::{From, TryFrom, TryInto},
-    path::PathBuf,
-};
+use std::path::PathBuf;
 
 const ADDITIVE_RETURN_ERR: &str =
     "Additive mode can only be used with an array or Value return type.";

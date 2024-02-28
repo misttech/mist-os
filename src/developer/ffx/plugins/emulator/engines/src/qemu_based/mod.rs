@@ -852,8 +852,7 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use emulator_instance::{
-        DataAmount, DataUnits, DiskImage, EmulatorInstanceData, EmulatorInstanceInfo, EngineType,
-        PortMapping,
+        DataAmount, DataUnits, EmulatorInstanceData, EmulatorInstanceInfo, EngineType, PortMapping,
     };
     use ffx_config::{ConfigLevel, EnvironmentContext};
     use serde::{Deserialize, Serialize};

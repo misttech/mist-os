@@ -101,7 +101,6 @@ mod tests {
     use assembly_images_config::VBMeta;
     use assembly_manifest::AssemblyManifest;
     use camino::Utf8Path;
-    use std::convert::TryFrom;
     use tempfile::tempdir;
     use utf8_path::path_relative_from_current_dir;
     use vbmeta::{Key, Salt};

@@ -197,11 +197,7 @@ fn create_gerrit_report(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::Result;
-    use assembly_manifest::{
-        AssemblyManifest, BlobfsContents, Image, PackageMetadata, PackageSetMetadata,
-        PackagesMetadata,
-    };
+    use assembly_manifest::{PackageMetadata, PackageSetMetadata, PackagesMetadata};
     use serde_json::json;
 
     #[test]

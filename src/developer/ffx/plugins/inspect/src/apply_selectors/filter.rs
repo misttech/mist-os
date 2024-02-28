@@ -5,16 +5,12 @@
 use crate::apply_selectors::screen::Line;
 use anyhow::Result;
 use diagnostics_data::InspectData;
-use diagnostics_hierarchy::{self, hierarchy, HierarchyMatcher};
-use difference::{
-    self,
-    Difference::{Add, Rem, Same},
-};
+use diagnostics_hierarchy::{hierarchy, HierarchyMatcher};
+use difference::Difference::{Add, Rem, Same};
 use fidl_fuchsia_diagnostics::Selector;
-use selectors::{self, VerboseError};
+use selectors::VerboseError;
 use std::{
     collections::HashSet,
-    convert::TryInto,
     path::{Path, PathBuf},
 };
 
@@ -154,9 +150,7 @@ pub fn filter_data_to_lines(
 mod tests {
     use super::*;
     use crate::tests::utils::{get_empty_value_json, get_v1_json_dump, get_v1_single_value_json};
-    use fuchsia;
     use std::io::Write;
-    use tempfile;
 
     fn setup_and_run_selector_filtering(
         selector_string: &str,

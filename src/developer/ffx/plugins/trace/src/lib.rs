@@ -815,9 +815,7 @@ mod tests {
     use fidl_fuchsia_tracing_controller as tracing_controller;
     use futures::TryStreamExt;
     use pretty_assertions::assert_eq;
-    use regex::Regex;
     use serde_json::json;
-    use std::io::Write;
     use std::matches;
     use tempfile::NamedTempFile;
 

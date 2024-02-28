@@ -7,11 +7,7 @@ use {
     fidl_fuchsia_developer_ffx as fidl,
     fidl_fuchsia_net_ext::SocketAddress,
     serde::{Deserialize, Serialize},
-    std::{
-        collections::BTreeSet,
-        convert::{TryFrom, TryInto},
-        net::SocketAddr,
-    },
+    std::{collections::BTreeSet, net::SocketAddr},
     thiserror::Error,
 };
 

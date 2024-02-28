@@ -86,9 +86,7 @@ fn format_table(entries: &[FarEntry], display_lengths: bool) -> Table {
 mod tests {
     use super::*;
     use ffx_writer::Format;
-    use fuchsia_archive;
     use std::collections::BTreeMap;
-    use std::fs::File;
     use std::io::Read;
     use std::path::PathBuf;
     use tempfile::TempDir;

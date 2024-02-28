@@ -6,7 +6,6 @@
 
 use anyhow::{Context, Result};
 use serde_json::{map::Entry, Map, Value};
-use std::iter::FromIterator;
 
 /// A trait that adds a recursive mapping function to a nested json value tree.
 ///

@@ -529,7 +529,6 @@ impl FidlProtocol for TracingProtocol {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_lock::Mutex;
     use protocols::testing::FakeDaemonBuilder;
     use std::cell::RefCell;
 

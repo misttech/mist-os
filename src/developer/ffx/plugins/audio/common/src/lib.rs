@@ -159,7 +159,7 @@ pub async fn cancel_on_keypress(
 pub mod tests {
     use fidl_fuchsia_audio_controller::{
         CompositeDeviceInfo, DeviceControlGetDeviceInfoResponse, DeviceControlProxy,
-        DeviceControlRequest, DeviceInfo, RecorderProxy, RecorderRequest, StreamConfigDeviceInfo,
+        DeviceControlRequest, DeviceInfo, RecorderRequest, StreamConfigDeviceInfo,
     };
     use fidl_fuchsia_hardware_audio::{
         CompositeProperties, DeviceType, StreamProperties, SupportedFormats,

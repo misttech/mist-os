@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Result};
-use errors;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol::{

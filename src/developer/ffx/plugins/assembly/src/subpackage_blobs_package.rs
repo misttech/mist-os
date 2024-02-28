@@ -79,9 +79,7 @@ mod tests {
     use fuchsia_pkg::PackageBuilder;
     use pretty_assertions::assert_eq;
     use std::collections::{BTreeSet, HashMap};
-    use std::fs::File;
     use tempfile::tempdir;
-    use utf8_path::path_relative_from_current_dir;
 
     fn create_package(
         root: &Utf8Path,

@@ -61,7 +61,7 @@ async fn command(proxy: PrivacyProxy, user_data_sharing_consent: Option<bool>) -
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_settings::{PrivacyRequest, PrivacySettings};
+    use fidl_fuchsia_settings::PrivacyRequest;
     use test_case::test_case;
 
     #[fuchsia_async::run_singlethreaded(test)]

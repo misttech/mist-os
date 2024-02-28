@@ -49,7 +49,6 @@ pub async fn stop(_cmd: StopCommand, repos: RepositoryRegistryProxy) -> Result<(
 mod tests {
     use super::*;
     use fidl_fuchsia_developer_ffx::{RepositoryRegistryMarker, RepositoryRegistryRequest};
-    use fuchsia_async;
     use futures::channel::oneshot::channel;
     use std::{
         future::Future,

@@ -329,8 +329,8 @@ mod tests {
     pub(crate) use super::*;
     use crate::EngineState;
     use notify::{
-        event::{CreateKind, EventAttributes, ModifyKind, RemoveKind},
-        EventHandler, EventKind,
+        event::{EventAttributes, ModifyKind},
+        EventHandler,
     };
     use std::process;
     use tempfile::tempdir;

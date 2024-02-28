@@ -5,7 +5,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_bail;
-use fatfs;
 use ffx_efi_args::{EfiCommand, EfiSubCommand};
 use std::{
     cmp::max,
@@ -139,7 +138,7 @@ pub async fn command(cmd: EfiCommand) -> Result<()> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use ffx_efi_args::{CreateCommand, EfiCommand, EfiSubCommand};
+    use ffx_efi_args::CreateCommand;
     use std::fs::metadata;
     use tempfile::tempdir;
 

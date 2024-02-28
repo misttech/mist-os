@@ -19,7 +19,7 @@ use futures::{prelude::*, try_join};
 use pbms::is_local_product_bundle;
 use sdk::SdkVersion;
 use sparse::build_sparse_files;
-use std::{convert::Into, io::Write, path::PathBuf};
+use std::{io::Write, path::PathBuf};
 use termion::{color, style};
 use tokio::sync::{
     mpsc,

@@ -931,23 +931,18 @@ fn remove_package_from_sets<'a, 'b: 'a, const N: usize>(
 mod tests {
     use super::*;
     use assembly_config_schema::assembly_config::{
-        AdditionalPackageContents, MainPackageDefinition, ShellCommands,
+        AdditionalPackageContents, MainPackageDefinition,
     };
     use assembly_config_schema::image_assembly_config::PartialKernelConfig;
     use assembly_driver_manifest::DriverManifest;
     use assembly_file_relative_path::FileRelativePathBuf;
     use assembly_named_file_map::SourceMerklePair;
-    use assembly_package_utils::PackageManifestPathBuf;
     use assembly_platform_configuration::ComponentConfigs;
     use assembly_test_util::generate_test_manifest;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::ToolCommandLog;
     use assembly_util::CompiledPackageDestination;
-    use camino::{Utf8Path, Utf8PathBuf};
-    use fuchsia_archive;
-    use fuchsia_pkg::{
-        BlobInfo, MetaPackage, PackageBuilder, PackageManifest, PackageManifestBuilder,
-    };
+    use fuchsia_pkg::{BlobInfo, MetaPackage, PackageBuilder, PackageManifestBuilder};
     use serde_json::json;
     use std::fs::File;
     use std::io::BufReader;

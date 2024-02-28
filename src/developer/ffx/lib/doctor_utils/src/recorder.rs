@@ -106,11 +106,7 @@ impl Recorder for DoctorRecorder {
 mod test {
     use super::*;
     use fuchsia_async as fasync;
-    use std::{
-        collections::HashSet,
-        fs::File,
-        io::{Read, Write},
-    };
+    use std::{collections::HashSet, io::Read};
     use tempfile::tempdir;
     use zip::read::ZipArchive;
 

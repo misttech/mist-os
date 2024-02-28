@@ -11,7 +11,6 @@ use pin_project::pin_project;
 use std::{
     cmp::Eq,
     fmt::Debug,
-    future::Future,
     hash::Hash,
     pin::Pin,
     rc::{Rc, Weak},

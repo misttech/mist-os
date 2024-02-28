@@ -4,7 +4,6 @@
 
 use anyhow::{anyhow, Context as _, Result};
 use ffx_config::{global_env_context, EnvironmentContext, SdkRoot};
-use fuchsia_async;
 use sdk::FfxSdkConfig;
 use serde::Serialize;
 use serde_json::Value;

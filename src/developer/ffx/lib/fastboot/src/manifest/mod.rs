@@ -562,7 +562,6 @@ mod test {
     use camino::Utf8PathBuf;
     use maplit::btreemap;
     use serde_json::from_str;
-    use std::io::BufReader;
 
     const UNKNOWN_VERSION: &'static str = r#"{
         "version": 99999,

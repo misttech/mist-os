@@ -16,7 +16,6 @@ use {
     fidl::HandleBased,
     fidl_fuchsia_audio_controller::{PlayerPlayRequest, PlayerProxy},
     std::io::Read,
-    std::marker::Send,
 };
 
 #[derive(FfxTool)]
@@ -111,7 +110,6 @@ mod tests {
     use ffx_audio_play_args::AudioRenderUsageExtended;
     use ffx_core::macro_deps::futures::AsyncWriteExt;
     use ffx_writer::TestBuffers;
-    use fidl::HandleBased;
     use fidl_fuchsia_media::AudioRenderUsage;
     use std::fs;
     use std::io::Write;

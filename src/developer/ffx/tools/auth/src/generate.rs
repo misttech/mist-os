@@ -8,7 +8,6 @@ use fho::{Result, SimpleWriter};
 use std::fs::File;
 use std::io::{stderr, stdin, stdout, Write};
 use std::os::unix::fs::PermissionsExt;
-use structured_ui;
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(

@@ -1024,7 +1024,7 @@ mod test {
     use serde_json::json;
     use std::fs;
     use std::os::unix::prelude::PermissionsExt;
-    use std::{net::Ipv4Addr, rc::Rc, str::FromStr};
+    use std::{net::Ipv4Addr, str::FromStr};
     use tokio::process::Command;
 
     const ERR_CTX: &'static str = "running fake host-pipe command for test";

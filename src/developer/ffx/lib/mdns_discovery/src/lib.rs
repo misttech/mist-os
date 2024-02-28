@@ -21,7 +21,6 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::Write,
     hash::{Hash, Hasher},
-    marker::Copy,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     rc::{Rc, Weak},
     time::Duration,

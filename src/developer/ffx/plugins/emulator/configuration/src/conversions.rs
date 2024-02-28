@@ -172,7 +172,7 @@ mod tests {
     use sdk_metadata::{
         virtual_device::{Cpu, Hardware},
         AudioDevice, AudioModel, CpuArchitecture, DataAmount, DataUnits, ElementType, InputDevice,
-        PointingDevice, Screen, ScreenUnits, VirtualDeviceV1,
+        PointingDevice, Screen, ScreenUnits,
     };
     use std::{collections::HashMap, fs::File, io::Write};
 

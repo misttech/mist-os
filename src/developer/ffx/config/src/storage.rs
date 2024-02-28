@@ -425,7 +425,6 @@ mod test {
     use crate::nested::RecursiveMap;
     use regex::Regex;
     use serde_json::json;
-    use std::io::{BufReader, BufWriter};
 
     const ERROR: &'static [u8] = b"0";
 

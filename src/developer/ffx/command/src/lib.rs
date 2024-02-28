@@ -228,7 +228,6 @@ fn find_machine_and_help(cmd: &FfxCommandLine) -> Option<ffx_writer::Format> {
 mod test {
     use super::*;
     use std::io::BufWriter;
-    use tempfile;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_stamp_file_creation() {

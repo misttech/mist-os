@@ -121,8 +121,6 @@ mod tests {
     use ffx_audio_common::tests::SINE_WAV;
     use ffx_writer::TestBuffers;
     use fho::macro_deps::ffx_writer::TestBuffer;
-    use fho::SimpleWriter;
-    use futures::FutureExt;
 
     #[fuchsia::test]
     pub async fn test_record_no_cancel() -> Result<(), fho::Error> {

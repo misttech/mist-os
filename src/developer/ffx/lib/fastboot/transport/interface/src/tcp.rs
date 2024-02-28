@@ -10,7 +10,7 @@ use futures::{
 };
 use std::fmt;
 use std::time::Duration;
-use std::{convert::TryInto, io::ErrorKind, net::SocketAddr, pin::Pin};
+use std::{io::ErrorKind, net::SocketAddr, pin::Pin};
 use timeout::timeout;
 
 const FB_HANDSHAKE: [u8; 4] = *b"FB01";

@@ -8,7 +8,6 @@ use anyhow::{anyhow, Result};
 use byteorder::{ByteOrder, LittleEndian};
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use std::{
-    convert::TryInto,
     fs::{metadata, File},
     io::{BufRead, BufReader, BufWriter, Read, Write},
     path::PathBuf,
