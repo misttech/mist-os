@@ -42,7 +42,7 @@ lhs = 8
 rhs = 7
 
 # Initialize some more local variables.
-[zxdb] until 94
+[zxdb] until 93
 🛑 rust_functions::main() • rust_functions.rs:??
 
 [zxdb] locals
