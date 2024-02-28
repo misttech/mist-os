@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{self, format_err, Context, Error},
+    anyhow::{format_err, Context, Error},
     emergency_lib::{
         bss_cache::{Bss, BssCache, BssId, RealBssCache, UpdateError},
         bss_resolver::{BssResolver, RealBssResolver, ResolverError},
@@ -38,10 +38,7 @@ use {
     fuchsia_cobalt_builders::MetricEventExt,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
     futures::{lock::Mutex, prelude::*},
-    std::{
-        convert::TryFrom,
-        time::{Duration, Instant},
-    },
+    std::time::{Duration, Instant},
     tracing::info,
 };
 
@@ -433,7 +430,7 @@ mod tests {
             super::*,
             assert_matches::assert_matches,
             emergency_lib::bss_resolver::ResolverError,
-            fidl_fuchsia_location_position::{EmergencyProviderMarker, Position, PositionExtras},
+            fidl_fuchsia_location_position::{EmergencyProviderMarker, PositionExtras},
             fidl_fuchsia_metrics::MetricEventPayload,
             test_case::test_case,
         };
@@ -743,10 +740,7 @@ mod tests {
 #[cfg(test)]
 mod test_doubles {
     use {
-        super::*,
-        async_trait::async_trait,
-        emergency_lib::{bss_cache::UpdateError, bss_resolver::ResolverError},
-        fidl_fuchsia_location_position::Position,
+        super::*, async_trait::async_trait,
         fidl_fuchsia_wlan_policy::ScanResultIteratorProxyInterface,
     };
 

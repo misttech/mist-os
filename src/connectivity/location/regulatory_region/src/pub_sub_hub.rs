@@ -181,17 +181,8 @@ impl PubSubHubInner {
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
-        futures_test::task::new_count_waker,
-        std::{
-            future::Future,
-            io::Write,
-            pin::Pin,
-            task::{Context, Poll},
-        },
-        tempfile::TempDir,
+        super::*, assert_matches::assert_matches, fuchsia_async as fasync,
+        futures_test::task::new_count_waker, std::io::Write, tempfile::TempDir,
     };
 
     #[fasync::run_until_stalled(test)]

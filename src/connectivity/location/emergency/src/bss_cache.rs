@@ -235,7 +235,6 @@ mod tests {
                 Compatibility::Supported, NetworkIdentifier, SecurityType::Wpa2,
             },
             fuchsia_async as fasync,
-            std::convert::TryFrom,
             test_doubles::FakeScanResultIterator,
         };
 
@@ -821,7 +820,6 @@ mod tests {
             super::super::*,
             fidl_fuchsia_wlan_policy::{NetworkIdentifier, SecurityType::Wpa2},
             fuchsia_async as fasync,
-            std::convert::TryFrom,
             test_doubles::{RawStubScanResultIterator, StubScanResultIterator},
         };
 
