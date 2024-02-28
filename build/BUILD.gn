@@ -75,6 +75,9 @@ group("non_hermetic_deps") {
     "//bundles/assembly/*",
   ]
 
+  # TODO(b/314016615): tar_to_pkg() template is not hermetic
+  visibility += [ "//src/starnix/containers/alpine/*" ]
+
   # //build/images/assemble_system.gni needs `hermetic_deps = false`, and that
   # will not be resolved except by moving to Bazel.
   visibility += [

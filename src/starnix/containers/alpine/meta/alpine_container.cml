@@ -1,0 +1,24 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "//src/starnix/containers/container.shard.cml" ],
+    program: {
+        runner: "starnix",
+        features: [],
+        init: [],
+        init_user: "root:x:0:0",
+        kernel_cmdline: "",
+        mounts: [
+            "/:remote_bundle:data/system",
+            "/dev:devtmpfs",
+            "/dev/pts:devpts",
+            "/dev/shm:tmpfs",
+            "/proc:proc",
+            "/sys:sysfs",
+            "/tmp:tmpfs",
+        ],
+        name: "alpine",
+        startup_file_path: "",
+    },
+}
