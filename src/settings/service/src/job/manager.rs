@@ -25,7 +25,6 @@ use fuchsia_trace as ftrace;
 use futures::stream::{FuturesUnordered, StreamFuture};
 use futures::{FutureExt, StreamExt};
 use std::collections::HashMap;
-use std::convert::TryFrom;
 
 type JobStreamItem = (source::Id, Option<Result<Job, Error>>);
 
@@ -287,9 +286,7 @@ impl Manager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event;
     use crate::event::source::CompleteError;
-    use crate::job::Payload;
     use crate::message::base::Audience;
     use crate::service::{build_event_listener, test, MessageHub};
     use crate::tests::scaffold::workload::Workload;
@@ -299,7 +296,6 @@ mod tests {
     use futures::channel::mpsc;
     use futures::channel::oneshot::{self, Receiver, Sender};
     use futures::lock::Mutex;
-    use futures::StreamExt;
     use std::sync::Arc;
 
     // Validates that multiple messages can be handled from a single source

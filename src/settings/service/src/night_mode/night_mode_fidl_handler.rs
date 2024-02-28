@@ -13,7 +13,6 @@ use fidl_fuchsia_settings::{
     NightModeRequest, NightModeSetResponder, NightModeSetResult, NightModeSettings,
     NightModeWatchResponder,
 };
-use std::convert::TryFrom;
 
 impl ErrorResponder for NightModeSetResponder {
     fn id(&self) -> &'static str {

@@ -14,7 +14,6 @@ use fidl_fuchsia_settings::{
     AccessibilityWatchResponder,
 };
 use fuchsia_zircon as zx;
-use std::convert::TryFrom;
 
 impl ErrorResponder for AccessibilitySetResponder {
     fn id(&self) -> &'static str {

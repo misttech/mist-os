@@ -13,7 +13,6 @@ use fidl_fuchsia_settings::{
     SetupRequestStream,
 };
 use fuchsia_component::server::{ServiceFsDir, ServiceObj};
-use fuchsia_zircon;
 use serde::Deserialize;
 
 impl From<Error> for fuchsia_zircon::Status {

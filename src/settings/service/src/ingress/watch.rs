@@ -281,9 +281,9 @@ impl<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::base::{SettingInfo, UnknownInfo};
+    use crate::base::UnknownInfo;
     use crate::message::base::MessengerType;
-    use crate::service::{Address, MessageHub};
+    use crate::service::MessageHub;
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;
     use futures::channel::oneshot::Sender;

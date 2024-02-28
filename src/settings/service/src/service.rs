@@ -138,8 +138,6 @@ macro_rules! payload_convert {
             use $crate::service;
             use $crate::service::TryFromWithClient;
 
-            use std::convert::TryFrom;
-
             impl From<$payload_type> for service::Payload {
                 fn from(payload: $payload_type) -> service::Payload {
                     paste::paste! {

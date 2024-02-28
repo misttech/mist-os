@@ -16,7 +16,6 @@ use futures::channel::mpsc::{Receiver, Sender};
 use futures::StreamExt;
 use std::collections::HashMap;
 use std::sync::Arc;
-use utils;
 
 pub(crate) const DEFAULT_VOLUME_LEVEL: f32 = 0.5;
 pub(crate) const DEFAULT_VOLUME_MUTED: bool = false;

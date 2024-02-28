@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
 
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct KeyboardInfo {
@@ -89,7 +88,6 @@ impl From<Autorepeat> for fidl_fuchsia_settings::Autorepeat {
 #[cfg(test)]
 mod tests {
     use crate::keyboard::types::KeymapId;
-    use std::convert::TryFrom;
 
     #[fuchsia::test]
     fn test_try_from_keymapid() {

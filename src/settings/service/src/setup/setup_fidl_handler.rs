@@ -14,7 +14,6 @@ use fidl::prelude::*;
 use fidl_fuchsia_settings::{
     SetupRequest, SetupSetResponder, SetupSetResult, SetupSettings, SetupWatchResponder,
 };
-use std::convert::TryFrom;
 
 impl ErrorResponder for SetupSetResponder {
     fn id(&self) -> &'static str {

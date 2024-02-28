@@ -11,7 +11,6 @@ use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
 use futures::channel::mpsc::Sender;
-use utils;
 
 const COMPONENT_URL: &str = "#meta/setui_service.cm";
 

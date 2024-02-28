@@ -14,8 +14,6 @@ use fidl_fuchsia_settings::{
     ThemeType as FidlThemeType,
 };
 
-use std::convert::TryFrom;
-
 impl From<FidlThemeMode> for ThemeMode {
     fn from(fidl: FidlThemeMode) -> Self {
         ThemeMode::from_bits(FidlThemeMode::bits(&fidl))

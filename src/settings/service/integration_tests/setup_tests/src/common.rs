@@ -12,7 +12,6 @@ use fuchsia_component_test::{
 };
 use futures::lock::Mutex;
 use std::sync::Arc;
-use utils;
 
 const COMPONENT_URL: &str = "#meta/setui_service.cm";
 

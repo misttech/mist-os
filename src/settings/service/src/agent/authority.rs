@@ -125,7 +125,6 @@ fn process_payload(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agent::AgentCreator;
     use crate::message::message_hub::MessageHub;
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;

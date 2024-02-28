@@ -13,7 +13,6 @@ use fidl_fuchsia_settings::{
     InputRequest, InputSetResponder, InputSetResult, InputSettings, InputState as FidlInputState,
     InputWatchResponder,
 };
-use std::convert::TryFrom;
 
 impl ErrorResponder for InputSetResponder {
     fn id(&self) -> &'static str {

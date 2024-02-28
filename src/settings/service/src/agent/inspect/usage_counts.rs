@@ -158,7 +158,6 @@ mod tests {
     use super::*;
     use crate::display::types::SetDisplayInfo;
     use crate::intl::types::{IntlInfo, LocaleId, TemperatureUnit};
-    use crate::service;
 
     use diagnostics_assertions::assert_data_tree;
     use std::collections::HashSet;

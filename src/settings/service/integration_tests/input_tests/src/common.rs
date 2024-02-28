@@ -11,7 +11,6 @@ use fuchsia_component_test::{
 };
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use utils;
 
 const COMPONENT_URL: &str = "#meta/setui_service_with_camera.cm";
 

@@ -30,7 +30,6 @@ use crate::setup::types::SetupInfo;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashSet;
-use std::convert::TryFrom;
 
 /// The setting types supported by the service.
 #[derive(PartialEq, Debug, Eq, Hash, Clone, Copy, Serialize)]

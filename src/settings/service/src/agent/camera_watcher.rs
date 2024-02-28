@@ -143,7 +143,6 @@ mod tests {
     use crate::event;
     use crate::message::base::{MessageEvent, MessengerType};
     use crate::message::receptor::Receptor;
-    use crate::service_context::ServiceContext;
     use crate::tests::fakes::service_registry::ServiceRegistry;
     use crate::tests::helpers::{
         create_messenger_and_publisher, create_messenger_and_publisher_from_hub,

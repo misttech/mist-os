@@ -22,7 +22,6 @@ use settings_storage::fidl_storage::{FidlStorage, FidlStorageConvertible};
 use settings_storage::storage_factory::StorageAccess;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::convert::TryInto;
 use std::sync::Arc;
 
 /// Used as the argument field in a ControllerError::InvalidArgument to signal the FIDL handler to

@@ -25,7 +25,6 @@ use futures::future::BoxFuture;
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::sync::Arc;
-use thiserror;
 
 pub type ControllerGenerateResult = Result<(), anyhow::Error>;
 

@@ -132,7 +132,6 @@ pub(crate) mod testing {
     use super::*;
 
     use crate::clock;
-    use crate::inspect::config_logger::InspectConfigLoggerHandle;
     use crate::tests::helpers::move_executor_forward_and_get;
 
     use assert_matches::assert_matches;

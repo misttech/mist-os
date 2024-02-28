@@ -28,7 +28,7 @@ use futures::lock::Mutex;
 use futures::Stream;
 use futures::StreamExt;
 use std::collections::{HashMap, VecDeque};
-use std::convert::{Infallible, TryFrom};
+use std::convert::Infallible;
 use std::sync::Arc;
 use thiserror::Error as ThisError;
 
@@ -313,7 +313,6 @@ impl Handler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::job::execution;
     use crate::service::{test, MessageHub};
     use crate::tests::scaffold::workload::{Sequential, StubWorkload, Workload};
     use rand::Rng;

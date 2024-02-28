@@ -18,7 +18,6 @@ use fuchsia_trace as ftrace;
 use futures::StreamExt;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-use std::iter::FromIterator;
 use std::sync::Arc;
 
 /// Type definition for exit message sender.

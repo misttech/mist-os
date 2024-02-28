@@ -139,11 +139,8 @@ mod tests {
     use super::*;
     use crate::event;
     use crate::input::common::MediaButtonsEventBuilder;
-    use crate::input::MediaButtons;
     use crate::message::base::MessageEvent;
     use crate::message::receptor::Receptor;
-    use crate::service;
-    use crate::service_context::ServiceContext;
     use crate::tests::fakes::service_registry::ServiceRegistry;
     use crate::tests::helpers::{
         create_messenger_and_publisher, create_messenger_and_publisher_from_hub,

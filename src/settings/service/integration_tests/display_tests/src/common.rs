@@ -16,7 +16,6 @@ use futures::lock::Mutex;
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
-use utils;
 
 const COMPONENT_URL: &str = "#meta/setui_service.cm";
 

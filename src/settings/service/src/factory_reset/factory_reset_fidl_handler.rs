@@ -13,7 +13,6 @@ use fidl_fuchsia_settings::{
     Error, FactoryResetRequest, FactoryResetSetResponder, FactoryResetSetResult,
     FactoryResetSettings, FactoryResetWatchResponder,
 };
-use std::convert::TryFrom;
 
 use crate::job::source::Error as JobError;
 

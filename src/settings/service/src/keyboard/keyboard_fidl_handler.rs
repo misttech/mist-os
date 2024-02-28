@@ -14,7 +14,6 @@ use fidl_fuchsia_settings::{
     KeyboardWatchResponder,
 };
 use fuchsia_zircon as zx;
-use std::convert::TryFrom;
 
 impl ErrorResponder for KeyboardSetResponder {
     fn id(&self) -> &'static str {

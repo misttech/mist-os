@@ -12,7 +12,6 @@ use fidl_fuchsia_settings::{
     PrivacyRequest, PrivacySetResponder, PrivacySetResult, PrivacySettings, PrivacyWatchResponder,
 };
 use fuchsia_zircon as zx;
-use std::convert::TryFrom;
 
 impl ErrorResponder for PrivacySetResponder {
     fn id(&self) -> &'static str {

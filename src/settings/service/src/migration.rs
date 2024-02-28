@@ -430,9 +430,8 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, ServerEnd};
     use fidl::Vmo;
-    use fidl_fuchsia_io::{DirectoryMarker, DirectoryProxy};
+    use fidl_fuchsia_io::DirectoryMarker;
     use fuchsia_async as fasync;
-    use fuchsia_fs::OpenFlags;
     use futures::future::BoxFuture;
     use futures::lock::Mutex;
     use futures::FutureExt;

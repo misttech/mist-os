@@ -13,7 +13,6 @@ use futures::lock::Mutex;
 use futures::{StreamExt, TryStreamExt};
 use std::sync::Arc;
 use test_case::test_case;
-use tracing;
 
 mod common;
 

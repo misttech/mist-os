@@ -6,8 +6,6 @@ use anyhow::Error;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_settings::*;
 use fuchsia_component_test::{ChildOptions, RealmBuilder, RealmInstance};
-use tracing;
-use utils;
 
 const COMPONENT_URL: &str = "#meta/setui_service.cm";
 

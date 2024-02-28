@@ -10,7 +10,7 @@ use crate::event::{Event, Publisher};
 use crate::handler::setting_handler::ControllerError;
 use crate::service_context::{ExternalServiceEvent, ExternalServiceProxy};
 use crate::{call, trace, trace_guard};
-use fidl::{self, endpoints::create_proxy};
+use fidl::endpoints::create_proxy;
 use fidl_fuchsia_media::{AudioRenderUsage, Usage};
 use fidl_fuchsia_media_audio::VolumeControlProxy;
 use fuchsia_async as fasync;

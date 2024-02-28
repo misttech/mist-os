@@ -137,8 +137,6 @@ mod tests {
     use crate::handler::setting_handler::{
         BoxedController, ClientImpl, ControllerError, ControllerStateResult, SettingHandlerResult,
     };
-    use crate::service;
-    use crate::service_context::ServiceContext;
     use fuchsia_async as fasync;
     use futures::future::FutureExt;
     use futures::select;

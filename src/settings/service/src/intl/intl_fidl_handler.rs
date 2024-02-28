@@ -13,7 +13,6 @@ use fidl::endpoints::{ControlHandle, Responder};
 use fidl_fuchsia_settings::{
     IntlRequest, IntlSetResponder, IntlSetResult, IntlSettings, IntlWatchResponder,
 };
-use std::convert::TryFrom;
 
 impl From<SettingInfo> for IntlSettings {
     fn from(response: SettingInfo) -> Self {

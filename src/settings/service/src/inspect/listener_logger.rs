@@ -70,7 +70,6 @@ impl ListenerInspectLogger {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ListenerInspectLogger;
     use diagnostics_assertions::assert_data_tree;
 
     #[fuchsia::test]

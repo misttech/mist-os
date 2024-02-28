@@ -4,10 +4,8 @@
 
 use anyhow::Error;
 use fidl_fuchsia_settings::*;
-use fidl_fuchsia_settings::{DoNotDisturbProxy, DoNotDisturbSettings};
 use fuchsia_component_test::{ChildOptions, RealmBuilder, RealmInstance};
 use test_case::test_case;
-use utils;
 
 struct DoNotDisturbTest;
 

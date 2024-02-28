@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use std::collections::hash_map::DefaultHasher;
-use std::convert::TryFrom;
 use std::hash::Hash;
 use std::hash::Hasher;
 
@@ -155,7 +154,6 @@ mod tests {
 
     use assert_matches::assert_matches;
 
-    use crate::base::SettingInfo;
     use crate::job::{execution, work, Signature};
     use crate::light::types::{LightGroup, LightInfo, LightState, LightType, LightValue};
 

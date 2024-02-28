@@ -23,7 +23,6 @@ use futures::lock::Mutex;
 use futures::StreamExt;
 use std::collections::HashMap;
 use std::sync::Arc;
-use utils;
 
 pub use crate::mock_discovery::SessionId;
 

@@ -224,7 +224,7 @@ mod tests {
     use fuchsia_zircon::Time;
 
     use crate::agent::Invocation;
-    use crate::base::{SettingInfo, SettingType, UnknownInfo};
+    use crate::base::UnknownInfo;
     use crate::message::base::Status;
     use crate::service::MessageHub;
     use crate::service_context::ServiceContext;

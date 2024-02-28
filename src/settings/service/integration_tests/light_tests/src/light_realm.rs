@@ -24,7 +24,6 @@ use futures::lock::Mutex;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
-use utils;
 use vfs::{
     directory::{spawn_directory_with_options, DirectoryOptions},
     pseudo_directory, service,

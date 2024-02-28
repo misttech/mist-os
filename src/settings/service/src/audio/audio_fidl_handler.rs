@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use std::collections::hash_map::DefaultHasher;
-use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
 
 use fidl::prelude::*;

@@ -16,7 +16,6 @@ use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use settings_storage::storage_factory::StorageFactory as StorageFactoryTrait;
 use std::borrow::Cow;
-use std::convert::TryInto;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use thiserror::Error;
@@ -343,8 +342,7 @@ impl IntoHandlerResult for SettingInfo {
 pub mod persist {
     use super::ClientImpl as BaseProxy;
     use super::*;
-    use crate::base::SettingInfo;
-    use crate::message::base::{Audience, MessageEvent};
+    use crate::message::base::MessageEvent;
     use crate::service;
     use crate::storage;
     use crate::trace;
@@ -357,7 +355,6 @@ pub mod persist {
     impl<T: DeviceStorageConvertible + Into<SettingInfo> + Send + Sync> Storage for T {}
 
     pub(crate) mod controller {
-        use super::ClientProxy;
         use super::*;
 
         #[async_trait]

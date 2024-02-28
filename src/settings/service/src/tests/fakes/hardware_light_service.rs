@@ -13,7 +13,6 @@ use fuchsia_zircon::Channel;
 use futures::lock::Mutex;
 use futures::TryStreamExt;
 use std::collections::HashMap;
-use std::convert::TryInto;
 use std::sync::Arc;
 
 /// An implementation of fuchsia.hardware.light for testing use.

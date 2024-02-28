@@ -467,7 +467,6 @@ mod tests {
     use fuchsia_async::TestExecutor;
     use futures::prelude::*;
     use serde::{Deserialize, Serialize};
-    use std::marker::Unpin;
     use std::task::Poll;
 
     const VALUE0: i32 = 3;

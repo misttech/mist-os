@@ -457,9 +457,7 @@ bitflags_serde_legacy::impl_traits!(DeviceState);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::input::input_device_configuration::{
-        InputConfiguration, InputDeviceConfiguration, SourceState,
-    };
+    use crate::input::input_device_configuration::{InputDeviceConfiguration, SourceState};
 
     const DEFAULT_MIC_NAME: &str = "microphone";
     const DEFAULT_CAMERA_NAME: &str = "camera";

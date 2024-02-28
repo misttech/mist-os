@@ -13,7 +13,6 @@ use fidl_fuchsia_settings::{
     DoNotDisturbRequest, DoNotDisturbSetResponder, DoNotDisturbSetResult, DoNotDisturbSettings,
     DoNotDisturbWatchResponder,
 };
-use std::convert::TryFrom;
 
 impl From<SettingInfo> for DoNotDisturbSettings {
     fn from(response: SettingInfo) -> Self {

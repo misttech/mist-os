@@ -5,7 +5,6 @@
 use crate::light::light_hardware_configuration::DisableConditions;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::convert::TryFrom;
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct LightInfo {
@@ -237,7 +236,6 @@ impl TryFrom<ColorRgb> for fidl_fuchsia_hardware_light::Rgb {
 #[cfg(test)]
 mod tests {
     use crate::light::types::ColorRgb;
-    use std::convert::TryFrom;
 
     #[fuchsia::test]
     fn test_try_from_rgb() {
