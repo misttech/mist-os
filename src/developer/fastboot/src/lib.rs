@@ -15,9 +15,7 @@ use {
         AsyncReadExt, AsyncWriteExt,
     },
     lazy_static::lazy_static,
-    std::convert::TryFrom,
     std::io::Read,
-    std::marker::Sync,
     thiserror::Error,
 };
 

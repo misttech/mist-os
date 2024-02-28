@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::anyhow, std::convert::TryFrom};
+use anyhow::anyhow;
 
 #[derive(PartialEq, Debug)]
 pub enum ClientVariable {

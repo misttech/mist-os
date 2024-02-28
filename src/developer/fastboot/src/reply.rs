@@ -2,11 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::anyhow,
-    std::convert::{From, TryFrom},
-    std::fmt,
-};
+use {anyhow::anyhow, std::fmt};
 
 // Client response with a single packet no greater than 64 bytes. The first four bytes of the
 // response are “OKAY”, “FAIL”, “DATA”, or “INFO”. Additional bytes may contain an (ascii)
