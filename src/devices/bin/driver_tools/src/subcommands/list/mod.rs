@@ -9,12 +9,11 @@ use {
     args::ListCommand,
     bind::debugger::debug_dump::dump_bind_rules,
     fidl_fuchsia_driver_development as fdd,
-    fuchsia_driver_dev::{self, Device},
+    fuchsia_driver_dev::Device,
     futures::join,
     std::{
         collections::{HashMap, HashSet},
         io::Write,
-        iter::FromIterator,
     },
 };
 

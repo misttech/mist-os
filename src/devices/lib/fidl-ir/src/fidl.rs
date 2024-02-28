@@ -12,7 +12,6 @@ use {
     serde::{Deserialize, Deserializer, Serialize},
     std::collections::{BTreeMap, HashSet},
     std::ops::Add,
-    std::string::ToString,
 };
 
 lazy_static! {

@@ -423,7 +423,6 @@ mod test {
     use super::*;
     use fuchsia_async as fasync;
     use futures::prelude::*;
-    use futures::FutureExt;
 
     async fn run_usb_server(
         stream: fidl_fuchsia_hardware_usb_device::DeviceRequestStream,

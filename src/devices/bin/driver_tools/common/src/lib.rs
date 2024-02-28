@@ -4,7 +4,7 @@
 
 use {
     anyhow::{anyhow, format_err, Context, Result},
-    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf, futures,
+    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf,
 };
 
 #[derive(Debug)]

@@ -14,7 +14,6 @@ use {
     fuchsia_component_test::RealmBuilder,
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
     futures::StreamExt,
-    std::convert::TryFrom,
 };
 
 // This will only return once all `events` are seen in `event_stream`.

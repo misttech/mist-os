@@ -43,7 +43,6 @@ pub async fn i2c(
 mod tests {
     use {
         super::*,
-        anyhow::{Context, Result},
         argh::FromArgs,
         fidl_fuchsia_hardware_i2c as fi2c, fuchsia_async as fasync,
         fuchsia_component::server::{FidlService, ServiceFs},

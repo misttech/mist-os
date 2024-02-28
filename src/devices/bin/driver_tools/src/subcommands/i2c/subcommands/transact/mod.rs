@@ -102,7 +102,7 @@ pub async fn transact(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, anyhow::Result, fidl_fuchsia_hardware_i2c as fi2c};
+    use {super::*, fidl_fuchsia_hardware_i2c as fi2c};
 
     fn i2c_read(length: u32) -> fi2c::Transaction {
         fi2c::Transaction {

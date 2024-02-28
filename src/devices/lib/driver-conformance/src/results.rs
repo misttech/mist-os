@@ -7,11 +7,9 @@ use {
     flate2::write::GzEncoder,
     flate2::Compression,
     serde::{Deserialize, Serialize},
-    serde_json,
     std::fs,
     std::path::{Path, PathBuf},
     std::str::FromStr,
-    tar,
     test_output_directory::{ArtifactSubDirectory, MaybeUnknown, Outcome, TestRunResult},
     walkdir::WalkDir,
 };

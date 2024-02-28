@@ -7,7 +7,7 @@ pub mod args;
 use {
     anyhow::Result,
     args::ListHostsCommand,
-    fidl_fuchsia_driver_development as fdd, fuchsia_driver_dev,
+    fidl_fuchsia_driver_development as fdd,
     std::collections::{BTreeMap, BTreeSet},
 };
 

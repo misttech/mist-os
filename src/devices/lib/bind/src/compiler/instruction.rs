@@ -5,7 +5,6 @@
 //! Bind rules instructions
 
 use crate::compiler::Symbol;
-use fidl_fuchsia_driver_legacy;
 use num_derive::FromPrimitive;
 use std::fmt;
 

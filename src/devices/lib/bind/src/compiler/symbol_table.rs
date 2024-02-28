@@ -8,7 +8,6 @@ use crate::make_identifier;
 use crate::parser::common::{CompoundIdentifier, Include};
 use crate::parser::{self, bind_library};
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use std::fmt;
 use std::ops::Deref;
 

@@ -14,7 +14,6 @@ use nom::{
     sequence::{delimited, separated_pair, terminated, tuple},
     IResult,
 };
-use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
 pub struct Ast {

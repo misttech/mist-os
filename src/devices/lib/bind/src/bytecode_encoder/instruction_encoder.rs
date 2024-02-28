@@ -11,7 +11,6 @@ use crate::compiler::Symbol;
 use crate::compiler::SymbolicInstructionInfo;
 use crate::parser::bind_library::ValueType;
 use std::collections::HashMap;
-use std::convert::TryFrom;
 
 // Info on a jump instruction's offset. |index| represents the jump offset's
 // location in the bytecode vector. |inst_offset| represents number of bytes

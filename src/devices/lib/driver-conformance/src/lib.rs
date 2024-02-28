@@ -11,13 +11,12 @@ use {
     args::{ConformanceCommand, ConformanceSubCommand, TestCommand},
     driver_connector::DriverConnector,
     errors::ffx_bail,
-    ffx_config, fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_test_manager as ftm,
+    fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_test_manager as ftm,
     fuchsia_driver_dev::{
         get_devices_by_driver, get_driver_by_device, get_driver_by_filter, Device,
     },
     futures::FutureExt,
     parser::{FilterTests, ValidateAgainstMetadata},
-    serde_json,
     signal_hook::{
         consts::signal::{SIGINT, SIGTERM},
         iterator::Signals,

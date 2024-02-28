@@ -10,7 +10,7 @@ use {
     args::ListDevicesCommand,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_driver_development as fdd,
     fidl_fuchsia_driver_legacy as fdl, fidl_fuchsia_driver_legacy,
-    fuchsia_driver_dev::{self, DFv1Device, DFv2Node, Device},
+    fuchsia_driver_dev::{DFv1Device, DFv2Node, Device},
 };
 
 trait DevicePrinter {

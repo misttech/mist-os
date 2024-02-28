@@ -16,7 +16,6 @@ use nom::{
     IResult,
 };
 use std::collections::HashSet;
-use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
 pub struct Node<'a> {

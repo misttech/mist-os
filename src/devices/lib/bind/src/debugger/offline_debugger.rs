@@ -523,8 +523,6 @@ mod test {
     use super::*;
     use crate::make_identifier;
     use crate::parser::bind_library;
-    use crate::parser::bind_rules::{Condition, ConditionOp, Statement};
-    use crate::parser::common::{CompoundIdentifier, Span};
 
     #[test]
     fn duplicate_key() {

@@ -4,9 +4,8 @@
 
 use {
     super::{util::*, *},
-    anyhow::Error,
     fidl_ir_lib::fidl::*,
-    std::{io, iter},
+    std::iter,
 };
 
 pub struct CppMockBackend<'a, W: io::Write> {

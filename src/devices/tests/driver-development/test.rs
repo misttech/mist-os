@@ -6,8 +6,8 @@ mod test_utils;
 
 use {
     anyhow::{Context, Result},
-    bind_fuchsia_platform, fidl_fuchsia_driver_development as fdd,
-    fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_test as fdt,
+    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf,
+    fidl_fuchsia_driver_test as fdt,
     fuchsia_async::{self as fasync},
     fuchsia_component_test::{RealmBuilder, RealmInstance},
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},

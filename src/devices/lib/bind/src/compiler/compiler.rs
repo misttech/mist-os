@@ -15,7 +15,6 @@ use crate::parser::bind_rules::{self, Condition, ConditionOp, Statement};
 use crate::parser::common::{CompoundIdentifier, Value};
 use crate::parser::{self, bind_composite};
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use std::fmt;
 use thiserror::Error;
 

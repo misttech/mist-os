@@ -8,7 +8,7 @@ use {
     anyhow::{format_err, Result},
     args::DumpCommand,
     fidl_fuchsia_driver_development as fdd,
-    fuchsia_driver_dev::{self, DFv1Device, DFv2Node, Device},
+    fuchsia_driver_dev::{DFv1Device, DFv2Node, Device},
     std::collections::{BTreeMap, VecDeque},
     std::io::Write,
 };

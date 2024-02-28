@@ -466,7 +466,7 @@ mod tests {
     use super::*;
     use {
         crate::composite_node_spec_manager::strip_parents_from_spec,
-        crate::resolved_driver::{DriverPackageType, ResolvedDriver},
+        crate::resolved_driver::DriverPackageType,
         bind::{
             compiler::{
                 CompiledBindRules, CompositeBindRules, CompositeNode, Symbol, SymbolicInstruction,
@@ -479,7 +479,6 @@ mod tests {
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
         fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi,
         fidl_fuchsia_mem as fmem,
-        std::collections::HashMap,
     };
 
     fn create_driver_info(

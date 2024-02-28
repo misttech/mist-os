@@ -4,9 +4,7 @@
 
 use {
     super::{util::*, *},
-    anyhow::Error,
     fidl_ir_lib::fidl::*,
-    std::io,
 };
 
 pub struct CppInternalBackend<'a, W: io::Write> {

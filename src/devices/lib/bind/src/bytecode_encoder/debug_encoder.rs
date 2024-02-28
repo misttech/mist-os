@@ -129,7 +129,7 @@ mod test {
     use crate::compiler::CompositeBindRules;
     use crate::compiler::CompositeNode;
     use crate::compiler::{BindRules, CompiledBindRules};
-    use crate::compiler::{Symbol, SymbolicInstruction, SymbolicInstructionInfo};
+    use crate::compiler::{SymbolicInstruction, SymbolicInstructionInfo};
     use crate::make_identifier;
     use crate::parser::bind_library::ValueType;
     use crate::parser::bind_rules::ConditionOp;

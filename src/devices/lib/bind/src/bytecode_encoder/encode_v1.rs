@@ -9,7 +9,6 @@ use crate::compiler::{BindRules, BindRulesDecodeError, Symbol, SymbolicInstructi
 use bitfield::bitfield;
 use byteorder::ByteOrder;
 use num_derive::FromPrimitive;
-use std::convert::TryFrom;
 use std::fmt;
 
 /// Functions for encoding the old bytecode format. These functions need to be
@@ -184,8 +183,7 @@ pub fn encode_to_string_v1<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bytecode_encoder::encode_v1::RawInstruction;
-    use crate::compiler::{SymbolicInstruction, SymbolicInstructionInfo};
+    use crate::compiler::SymbolicInstruction;
     use std::collections::HashMap;
 
     #[test]

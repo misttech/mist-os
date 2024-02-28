@@ -567,10 +567,9 @@ mod tests {
     use super::*;
     use crate::resolved_driver::DriverPackageType;
     use bind::compiler::{
-        CompiledBindRules, CompositeBindRules, CompositeNode, Symbol, SymbolicInstruction,
+        CompiledBindRules, CompositeBindRules, CompositeNode, SymbolicInstruction,
         SymbolicInstructionInfo,
     };
-    use bind::interpreter::decode_bind_rules::DecodedRules;
     use bind::parser::bind_library::ValueType;
     use fuchsia_async as fasync;
 

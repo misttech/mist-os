@@ -12,7 +12,6 @@ use {
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
     fuchsia_zircon as zx,
     futures::{channel::mpsc, StreamExt, TryStreamExt},
-    reloadtest_tools,
     std::collections::HashMap,
 };
 

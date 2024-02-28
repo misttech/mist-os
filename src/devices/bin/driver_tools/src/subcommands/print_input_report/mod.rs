@@ -44,14 +44,12 @@ pub async fn print_input_report(
 mod tests {
     use {
         super::*,
-        anyhow::{Context, Result},
         argh::FromArgs,
         fidl::endpoints::ServerEnd,
         fidl_fuchsia_input as finput, fidl_fuchsia_input_report as fir, fidl_fuchsia_io as fio,
         fuchsia_async::{self as fasync, Task},
         fuchsia_component::server::{FidlService, ServiceFs},
-        futures::{lock::Mutex, Future, FutureExt, StreamExt, TryStreamExt},
-        std::sync::Arc,
+        futures::{Future, FutureExt, StreamExt, TryStreamExt},
     };
 
     enum InputDeviceRequestStream {

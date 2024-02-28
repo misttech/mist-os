@@ -5,7 +5,6 @@ use {
     crate::util::is_set,
     bitfield::bitfield,
     fidl_fuchsia_hardware_pci::Capability as FidlCapability,
-    std::convert::From,
     std::fmt,
     zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref},
 };

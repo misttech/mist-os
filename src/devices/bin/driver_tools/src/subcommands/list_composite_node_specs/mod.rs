@@ -10,7 +10,7 @@ use {
     },
     anyhow::{Context, Result},
     args::ListCompositeNodeSpecsCommand,
-    fidl_fuchsia_driver_development as fdd, fuchsia_driver_dev,
+    fidl_fuchsia_driver_development as fdd,
     std::io::Write,
 };
 
