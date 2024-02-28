@@ -23,7 +23,7 @@
 namespace fidlc {
 
 Compiler::Compiler(Libraries* all_libraries, const VersionSelection* version_selection,
-                   MethodHasher method_hasher, ExperimentalFlags experimental_flags)
+                   MethodHasher method_hasher, ExperimentalFlagSet experimental_flags)
     : reporter_(all_libraries->reporter()),
       library_(std::make_unique<Library>()),
       all_libraries_(all_libraries),

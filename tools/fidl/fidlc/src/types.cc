@@ -49,7 +49,7 @@ bool ArrayType::ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
     return false;
   }
 
-  if (c.utf8 && !resolver->experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kZxCTypes)) {
+  if (c.utf8 && !resolver->experimental_flags().IsEnabled(ExperimentalFlag::kZxCTypes)) {
     return reporter->Fail(ErrExperimentalZxCTypesDisallowed, layout.span(),
                           layout.resolved().name());
   }
@@ -296,7 +296,7 @@ bool PrimitiveType::ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
 
   if ((subtype == PrimitiveSubtype::kZxUsize64 || subtype == PrimitiveSubtype::kZxUintptr64 ||
        subtype == PrimitiveSubtype::kZxUchar) &&
-      !resolver->experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kZxCTypes)) {
+      !resolver->experimental_flags().IsEnabled(ExperimentalFlag::kZxCTypes)) {
     return reporter->Fail(ErrExperimentalZxCTypesDisallowed, layout.span(),
                           layout.resolved().name());
   }
@@ -325,7 +325,7 @@ bool ZxExperimentalPointerType::ApplyConstraints(TypeResolver* resolver, Reporte
                                   nullptr, constraints.items, nullptr)) {
     return false;
   }
-  if (!resolver->experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kZxCTypes)) {
+  if (!resolver->experimental_flags().IsEnabled(ExperimentalFlag::kZxCTypes)) {
     return reporter->Fail(ErrExperimentalZxCTypesDisallowed, layout.span(),
                           layout.resolved().name());
   }

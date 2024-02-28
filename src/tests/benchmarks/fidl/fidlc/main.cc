@@ -26,7 +26,7 @@ bool RunBenchmark(perftest::RepeatState* state, const char* fidl) {
   while (state->KeepRunning()) {
     fidlc::SourceFile source_file("example.test.fidl", fidl);
     fidlc::Reporter reporter;
-    fidlc::ExperimentalFlags experimental_flags;
+    fidlc::ExperimentalFlagSet experimental_flags;
     fidlc::Lexer lexer(source_file, &reporter);
     fidlc::Parser parser(&lexer, &reporter, experimental_flags);
     fidlc::VirtualSourceFile virtual_file("generated");

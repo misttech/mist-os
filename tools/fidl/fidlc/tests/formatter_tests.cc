@@ -21,7 +21,7 @@ std::string Format(const std::string& source, bool reformat_and_compare = true) 
   // and write.
   Reporter reporter;
   auto formatter = Formatter(40, &reporter);
-  ExperimentalFlags experimental_flags;
+  ExperimentalFlagSet experimental_flags;
   auto result = formatter.Format(source_file, experimental_flags);
 
   // If we're still going to reformat, then this is the first pass.  Otherwise, we're on the second

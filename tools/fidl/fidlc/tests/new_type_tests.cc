@@ -29,7 +29,7 @@ type Bar = enum {
 type OpaqueBar = Bar;
 )FIDL");
 
-  library.EnableFlag(ExperimentalFlags::Flag::kAllowNewTypes);
+  library.EnableFlag(ExperimentalFlag::kAllowNewTypes);
   ASSERT_COMPILED(library);
 }
 
@@ -42,7 +42,7 @@ type B = A;
 type C = resource struct { b B; };
 )FIDL");
 
-  library.EnableFlag(ExperimentalFlags::Flag::kAllowNewTypes);
+  library.EnableFlag(ExperimentalFlag::kAllowNewTypes);
   ASSERT_COMPILED(library);
 }
 
@@ -55,7 +55,7 @@ type B = A;
 type C = struct { b B; };
 )FIDL");
 
-  library.EnableFlag(ExperimentalFlags::Flag::kAllowNewTypes);
+  library.EnableFlag(ExperimentalFlag::kAllowNewTypes);
   library.ExpectFail(ErrTypeMustBeResource, "C", "b", "struct");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -83,7 +83,7 @@ type NewUnion = Union;
 type NewAlias = Alias;
 )FIDL");
 
-  library.EnableFlag(ExperimentalFlags::Flag::kAllowNewTypes);
+  library.EnableFlag(ExperimentalFlag::kAllowNewTypes);
   ASSERT_COMPILED(library);
 }
 
@@ -106,7 +106,7 @@ type NewClientEnd = client_end:Protocol;
 type NewServerEnd = server_end:Protocol;
 )FIDL");
 
-  library.EnableFlag(ExperimentalFlags::Flag::kAllowNewTypes);
+  library.EnableFlag(ExperimentalFlag::kAllowNewTypes);
   library.UseLibraryZx();
   ASSERT_COMPILED(library);
 }
@@ -120,7 +120,7 @@ type NewStruct = Struct;
 type DoubleNewStruct = NewStruct;
 )FIDL");
 
-  library.EnableFlag(ExperimentalFlags::Flag::kAllowNewTypes);
+  library.EnableFlag(ExperimentalFlag::kAllowNewTypes);
   ASSERT_COMPILED(library);
 }
 
@@ -132,14 +132,14 @@ type ConstrainedVec = vector<int32>:<5, optional>;
 type ConstrainedString = string:108;
 )FIDL");
 
-  library.EnableFlag(ExperimentalFlags::Flag::kAllowNewTypes);
+  library.EnableFlag(ExperimentalFlag::kAllowNewTypes);
   ASSERT_COMPILED(library);
 }
 
 TEST(NewTypeTests, BadNewTypesConstraints) {
   TestLibrary library;
   library.AddFile("bad/fi-0179.test.fidl");
-  library.EnableFlag(ExperimentalFlags::Flag::kAllowNewTypes);
+  library.EnableFlag(ExperimentalFlag::kAllowNewTypes);
   library.ExpectFail(ErrNewTypeCannotHaveConstraint, "Name");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }

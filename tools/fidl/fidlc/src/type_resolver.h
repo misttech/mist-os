@@ -18,9 +18,7 @@ class TypeResolver {
   explicit TypeResolver(CompileStep* compile_step) : compile_step_(compile_step) {}
 
   Reporter* reporter() { return compile_step_->reporter(); }
-  const ExperimentalFlags& experimental_flags() const {
-    return compile_step_->experimental_flags();
-  }
+  ExperimentalFlagSet experimental_flags() const { return compile_step_->experimental_flags(); }
 
   // Top level methods for resolving layout parameters. These are used by
   // TypeTemplates.

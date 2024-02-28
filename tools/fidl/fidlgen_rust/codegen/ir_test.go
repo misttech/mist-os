@@ -5,8 +5,6 @@
 package codegen
 
 import (
-	"fmt"
-	"strings"
 	"testing"
 
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgentest"
@@ -60,58 +58,6 @@ func TestDerivesCalculation(t *testing.T) {
 		actual := root.Structs[0].Derives.String()
 		if ex.expected != actual {
 			t.Errorf("%s: expected %s, found %s", ex.fidl, ex.expected, actual)
-		}
-	}
-}
-
-func TestExperiments(t *testing.T) {
-	default_experiments := []string{}
-
-	cases := []struct {
-		desc        string
-		experiments []string
-	}{
-		{
-			desc:        "no experiments",
-			experiments: []string{},
-		},
-		{
-			desc:        "single experiment",
-			experiments: []string{"allow_new_types"},
-		},
-		{
-			desc:        "multiple experiments",
-			experiments: []string{"allow_new_types", "unknown_interactions_new_defaults"},
-		},
-	}
-	for _, test := range cases {
-		gen := NewGenerator("", "")
-		e2e := fidlgentest.EndToEndTest{T: t}
-		for _, ex := range test.experiments {
-			e2e = e2e.WithExperiment(ex)
-		}
-
-		root := Compile(e2e.Single("library foo.bar;"))
-		bytes, err := gen.ExecuteTemplate("GenerateSourceFile", root)
-		if err != nil {
-			t.Fatalf("case (%s): could not apply template: %s", test.desc, err)
-		}
-
-		rust := string(bytes)
-		all := root.Experiments
-		total_experiments := len(test.experiments) + len(default_experiments)
-		if len(all) != total_experiments {
-			t.Errorf("case (%s): got %d experiment markers, want %d", test.desc, len(all), total_experiments)
-		}
-		for _, ex := range test.experiments {
-			if !strings.Contains(rust, fmt.Sprintf("\n// fidl_experiment = %s", ex)) {
-				t.Errorf("case (%s): could not find '// fidl_experiment = %s' in output", test.desc, ex)
-			}
-		}
-		for _, ex := range default_experiments {
-			if !strings.Contains(rust, fmt.Sprintf("\n// fidl_experiment = %s", ex)) {
-				t.Errorf("case (%s): could not find '// fidl_experiment = %s' in output", test.desc, ex)
-			}
 		}
 	}
 }

@@ -641,7 +641,7 @@ protocol MyProtocol {
 
 constexpr ErrorDef<123> TestErrIncorrectNumberOfMembers("incorrect number of members");
 
-bool MustHaveThreeMembers(Reporter* reporter, const ExperimentalFlags flags,
+bool MustHaveThreeMembers(Reporter* reporter, const ExperimentalFlagSet flags,
                           const Attribute* attribute, const Element* element) {
   switch (element->kind) {
     case Element::Kind::kStruct: {
@@ -1456,7 +1456,7 @@ type MyStruct = struct {};
       .AddArg("float64", AttributeArgSchema(ConstantValue::Kind::kFloat64));
 
   // For the use of usize64, uintptr64, and uchar.
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   ASSERT_COMPILED(library);
 

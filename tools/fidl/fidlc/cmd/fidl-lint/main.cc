@@ -61,7 +61,7 @@ void Lint(const fidlc::SourceFile& source_file, fidlc::Findings* findings,
           std::set<std::string>* excluded_checks_not_found) {
   fidlc::Reporter reporter;
   fidlc::Lexer lexer(source_file, &reporter);
-  fidlc::ExperimentalFlags experimental_flags;
+  fidlc::ExperimentalFlagSet experimental_flags;
   fidlc::Parser parser(&lexer, &reporter, experimental_flags);
   std::unique_ptr<fidlc::File> ast = parser.Parse();
   for (auto* diag : reporter.Diagnostics()) {

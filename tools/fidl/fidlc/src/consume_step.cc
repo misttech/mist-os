@@ -851,7 +851,7 @@ void ConsumeStep::ConsumeTypeDeclaration(std::unique_ptr<RawTypeDeclaration> typ
   auto& layout_ref = type_decl->type_ctor->layout_ref;
 
   if (layout_ref->kind == RawLayoutReference::Kind::kNamed) {
-    if (experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kAllowNewTypes)) {
+    if (experimental_flags().IsEnabled(ExperimentalFlag::kAllowNewTypes)) {
       ConsumeNewType(std::move(type_decl));
       return;
     }
@@ -867,7 +867,7 @@ void ConsumeStep::ConsumeTypeDeclaration(std::unique_ptr<RawTypeDeclaration> typ
 
 void ConsumeStep::ConsumeNewType(std::unique_ptr<RawTypeDeclaration> type_decl) {
   ZX_ASSERT(type_decl->type_ctor->layout_ref->kind == RawLayoutReference::Kind::kNamed);
-  ZX_ASSERT(experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kAllowNewTypes));
+  ZX_ASSERT(experimental_flags().IsEnabled(ExperimentalFlag::kAllowNewTypes));
 
   std::unique_ptr<AttributeList> attributes;
   ConsumeAttributeList(std::move(type_decl->attributes), &attributes);

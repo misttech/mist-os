@@ -12,7 +12,7 @@
 namespace fidlc {
 
 std::optional<std::string> Formatter::Format(const SourceFile& source_file,
-                                             const ExperimentalFlags& experimental_flags) const {
+                                             ExperimentalFlagSet experimental_flags) const {
   Lexer lexer(source_file, reporter_);
   Parser parser(&lexer, reporter_, experimental_flags);
   std::unique_ptr<File> ast = parser.Parse();

@@ -153,7 +153,7 @@ func TestNaturalArgumentRenderingSendPath(t *testing.T) {
 	}
 	for _, ex := range cases {
 		t.Run(ex.desc, func(t *testing.T) {
-			root := Compile(fidlgentest.EndToEndTest{T: t}.WithExperiment("unknown_interactions").Single("library example; " + ex.fidl))
+			root := Compile(fidlgentest.EndToEndTest{T: t}.Single("library example; " + ex.fidl))
 			var protocols []*Protocol
 			for _, decl := range root.Decls {
 				if p, ok := decl.(*Protocol); ok {

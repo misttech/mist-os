@@ -150,7 +150,7 @@ type UnionOfThings = strict union {
 };
 type NewUnionOfThings = UnionOfThings;
 )FIDL");
-  library.EnableFlag(ExperimentalFlags::Flag::kAllowNewTypes);
+  library.EnableFlag(ExperimentalFlag::kAllowNewTypes);
   ASSERT_COMPILED(library);
 
   auto new_bool_and_u32_struct = library.LookupNewType("NewBoolAndU32");
@@ -893,7 +893,7 @@ type BoolOverlayAndUint8Struct = struct {
     x uint8;
 };
 )FIDL");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   ASSERT_COMPILED(library);
   auto bool_or_string_or_u64 = library.LookupOverlay("BoolOrStringOrU64");
@@ -1221,7 +1221,7 @@ type StringArray = struct {
     s string_array<5>;
 };
 )FIDL");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   ASSERT_COMPILED(library);
 

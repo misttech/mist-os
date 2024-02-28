@@ -27,7 +27,7 @@ class Libraries;
 class Compiler final {
  public:
   Compiler(Libraries* all_libraries, const VersionSelection* version_selection,
-           MethodHasher method_hasher, ExperimentalFlags experimental_flags);
+           MethodHasher method_hasher, ExperimentalFlagSet experimental_flags);
   Compiler(const Compiler&) = delete;
 
   // Consumes a parsed file. Must be called once for each file in the library.
@@ -58,7 +58,7 @@ class Compiler final {
     VirtualSourceFile* generated_source_file();
     const VersionSelection* version_selection() { return compiler_->version_selection; }
     const MethodHasher& method_hasher() { return compiler_->method_hasher_; }
-    const ExperimentalFlags& experimental_flags() { return compiler_->experimental_flags_; }
+    ExperimentalFlagSet experimental_flags() { return compiler_->experimental_flags_; }
 
     // Returns types that were created in the typespace while compiling this library.
     cpp20::span<const std::unique_ptr<Type>> created_types();
@@ -77,7 +77,7 @@ class Compiler final {
   Libraries* all_libraries_;
   const VersionSelection* version_selection;
   MethodHasher method_hasher_;
-  const ExperimentalFlags experimental_flags_;
+  ExperimentalFlagSet experimental_flags_;
   size_t typespace_start_index_;
 };
 

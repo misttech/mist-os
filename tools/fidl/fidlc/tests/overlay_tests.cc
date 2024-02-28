@@ -30,7 +30,7 @@ type Union = strict union {
     1: o Overlay;
 };
 )FIDL");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   ASSERT_COMPILED(library);
 }
@@ -59,7 +59,7 @@ type Overlay = strict overlay {
 };
 
 )FIDL");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   ASSERT_COMPILED(library);
 }
@@ -82,7 +82,7 @@ type Outer = strict overlay {
 };
 
 )FIDL");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   ASSERT_COMPILED(library);
 }
@@ -103,7 +103,7 @@ type Foo = strict overlay {
     5: reserved bool;
 };
 )FIDL");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   ASSERT_COMPILED(library);
   auto type_decl = library.LookupOverlay("Foo");
@@ -120,7 +120,7 @@ type Foo = flexible overlay {
     2: floppity bool;
 };
 )FIDL");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   library.ExpectFail(ErrOverlayMustBeStrict);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -135,7 +135,7 @@ type Foo = strict resource overlay {
     2: floppity bool;
 };
 )FIDL");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   library.ExpectFail(ErrCannotSpecifyModifier, Token::KindAndSubkind(Token::Subkind::kResource),
                      Token::KindAndSubkind(Token::Subkind::kOverlay));
@@ -152,7 +152,7 @@ type Foo = strict overlay {
     2: floppity client_end:Bar;
 };
 )FIDL");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   library.ExpectFail(ErrOverlayMemberMustBeValue);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -168,7 +168,7 @@ type Foo = strict overlay {
     3: reserved;
 };
 )FIDL");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   library.ExpectFail(ErrOverlayMustNotContainReserved);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -200,7 +200,7 @@ type Baff = struct {
     baz Biff:optional;
 };
 )FIDL");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   library.ExpectFail(ErrCannotBeOptional, "Biff");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -222,7 +222,7 @@ type Bar = strict overlay {
     3: i int32;
 };
 )FIDL");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   ASSERT_COMPILED(library);
 }
@@ -236,7 +236,7 @@ type Value = strict overlay {
     2: recurse Value;
 };
 )FIDL");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   library.ExpectFail(ErrIncludeCycle, "overlay 'Value' -> overlay 'Value'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -260,7 +260,7 @@ type Sum = strict overlay {
     4: product Product;
 };
 )FIDL");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   library.ExpectFail(ErrIncludeCycle, "struct 'Product' -> overlay 'Sum' -> struct 'Product'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -274,7 +274,7 @@ type Foo = strict overlay {
   @selector("v2") 1: v string;
 };
 )FIDL");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   library.ExpectFail(ErrInvalidAttributePlacement, "selector");
   ASSERT_COMPILER_DIAGNOSTICS(library);

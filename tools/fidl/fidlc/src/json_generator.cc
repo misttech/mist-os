@@ -1001,12 +1001,10 @@ std::ostringstream JSONGenerator::Produce() {
     }
 
     std::vector<std::string_view> active_experiments;
-    experimental_flags_.ForEach(
-        [&](const std::string_view name, ExperimentalFlags::Flag flag, bool enabled) {
-          if (enabled) {
-            active_experiments.push_back(name);
-          }
-        });
+    for (auto& [name, flag] : kAllExperimentalFlags) {
+      if (experimental_flags_.IsEnabled(flag))
+        active_experiments.push_back(name);
+    }
     GenerateObjectMember("experiments", active_experiments);
 
     if (compilation_->version_selection_) {
@@ -1038,7 +1036,7 @@ std::ostringstream JSONGenerator::Produce() {
     GenerateObjectMember("external_struct_declarations", compilation_->external_structs);
     GenerateObjectMember("table_declarations", compilation_->declarations.tables);
     GenerateObjectMember("union_declarations", compilation_->declarations.unions);
-    if (experimental_flags_.IsFlagEnabled(ExperimentalFlags::Flag::kZxCTypes)) {
+    if (experimental_flags_.IsEnabled(ExperimentalFlag::kZxCTypes)) {
       GenerateObjectMember("overlay_declarations", compilation_->declarations.overlays);
     }
     GenerateObjectMember("alias_declarations", compilation_->declarations.aliases);

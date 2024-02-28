@@ -46,7 +46,7 @@ void add(std::vector<std::unique_ptr<T>>* elements, Fn producer_fn) {
 
 }  // namespace
 
-Parser::Parser(Lexer* lexer, Reporter* reporter, ExperimentalFlags experimental_flags)
+Parser::Parser(Lexer* lexer, Reporter* reporter, ExperimentalFlagSet experimental_flags)
     : lexer_(lexer),
       reporter_(reporter),
       checkpoint_(reporter->Checkpoint()),
@@ -1219,7 +1219,7 @@ std::unique_ptr<RawLayout> Parser::ParseLayout(
       ValidateModifiers<Strictness, Resourceness>(modifiers, identifier->start_token);
     layout_kind = RawLayout::Kind::kUnion;
     member_kind = RawLayoutMember::Kind::kOrdinaled;
-  } else if (experimental_flags_.IsFlagEnabled(ExperimentalFlags::Flag::kZxCTypes) &&
+  } else if (experimental_flags_.IsEnabled(ExperimentalFlag::kZxCTypes) &&
              identifier->span().data() == "overlay") {
     if (modifiers != nullptr)
       ValidateModifiers<Strictness>(modifiers, identifier->start_token);

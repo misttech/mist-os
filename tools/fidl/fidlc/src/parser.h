@@ -25,7 +25,7 @@ namespace fidlc {
 // for additional context
 class Parser {
  public:
-  Parser(Lexer* lexer, Reporter* reporter, ExperimentalFlags experimental_flags);
+  Parser(Lexer* lexer, Reporter* reporter, ExperimentalFlagSet experimental_flags);
 
   // Returns the parsed raw AST, or null if there were unrecoverable errors.
   std::unique_ptr<File> Parse() { return ParseFile(); }
@@ -350,7 +350,7 @@ class Parser {
   Lexer* lexer_;
   Reporter* reporter_;
   const Reporter::Counts checkpoint_;
-  const ExperimentalFlags experimental_flags_;
+  const ExperimentalFlagSet experimental_flags_;
 
   // The stack of information interesting to the currently active ASTScope objects.
   std::vector<SourceElement> active_ast_scopes_;

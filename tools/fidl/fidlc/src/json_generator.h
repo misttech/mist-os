@@ -54,7 +54,7 @@ class JSONGenerator : public JsonWriter<JSONGenerator> {
   using JsonWriter<JSONGenerator>::Generate;
   using JsonWriter<JSONGenerator>::GenerateArray;
 
-  JSONGenerator(const Compilation* compilation, ExperimentalFlags experimental_flags)
+  JSONGenerator(const Compilation* compilation, ExperimentalFlagSet experimental_flags)
       : JsonWriter(json_file_),
         compilation_(compilation),
         experimental_flags_(experimental_flags) {}
@@ -151,7 +151,7 @@ class JSONGenerator : public JsonWriter<JSONGenerator> {
                                           Position position = Position::kSubsequent);
 
   const Compilation* compilation_;
-  const ExperimentalFlags experimental_flags_;
+  ExperimentalFlagSet experimental_flags_;
   std::ostringstream json_file_;
 };
 

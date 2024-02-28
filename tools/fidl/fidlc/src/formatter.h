@@ -16,7 +16,7 @@ class Formatter final {
   Formatter(size_t cols, Reporter* reporter) : cols_(cols), reporter_(reporter) {}
 
   std::optional<std::string> Format(const SourceFile& source_file,
-                                    const ExperimentalFlags& experimental_flags) const;
+                                    ExperimentalFlagSet experimental_flags) const;
 
  private:
   std::string Print(std::unique_ptr<File> ast, size_t original_file_size) const;

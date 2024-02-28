@@ -251,7 +251,7 @@ enum struct Behavior {
 };
 
 bool Parse(const fidlc::SourceFile& source_file, fidlc::Reporter* reporter,
-           fidlc::Compiler* compiler, const fidlc::ExperimentalFlags& experimental_flags) {
+           fidlc::Compiler* compiler, fidlc::ExperimentalFlagSet experimental_flags) {
   fidlc::Lexer lexer(source_file, reporter);
   fidlc::Parser parser(&lexer, reporter, experimental_flags);
   auto ast = parser.Parse();
@@ -297,7 +297,7 @@ int compile(fidlc::Reporter* reporter, const std::string& library_name,
             const std::vector<fidlc::SourceManager>& source_managers,
             fidlc::VirtualSourceFile* virtual_file,
             const fidlc::VersionSelection* version_selection,
-            fidlc::ExperimentalFlags experimental_flags) {
+            fidlc::ExperimentalFlagSet experimental_flags) {
   fidlc::Libraries all_libraries(reporter, virtual_file);
   for (const auto& source_manager : source_managers) {
     if (source_manager.sources().empty()) {
@@ -411,7 +411,7 @@ int main(int argc, char* argv[]) {
   std::string format = "text";
   std::vector<std::pair<Behavior, std::string>> outputs;
   fidlc::VersionSelection version_selection;
-  fidlc::ExperimentalFlags experimental_flags;
+  fidlc::ExperimentalFlagSet experimental_flags;
   while (args->Remaining()) {
     // Try to parse an output type.
     std::string behavior_argument = args->Claim();
@@ -457,10 +457,12 @@ int main(int argc, char* argv[]) {
     } else if (behavior_argument == "--name") {
       library_name = args->Claim();
     } else if (behavior_argument == "--experimental") {
-      std::string flag = args->Claim();
-      if (!experimental_flags.EnableFlagByName(flag)) {
-        FailWithUsage("Unknown experimental flag %s\n", flag.c_str());
+      std::string string = args->Claim();
+      auto it = fidlc::kAllExperimentalFlags.find(string);
+      if (it == fidlc::kAllExperimentalFlags.end()) {
+        FailWithUsage("Unknown experimental flag %s\n", string.c_str());
       }
+      experimental_flags.Enable(it->second);
     } else if (behavior_argument == "--depfile") {
       dep_file_path = args->Claim();
     } else if (behavior_argument == "--files") {
@@ -489,7 +491,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Ready. Set. Go.
-  if (experimental_flags.IsFlagEnabled(fidlc::ExperimentalFlags::Flag::kOutputIndexJson)) {
+  if (experimental_flags.IsEnabled(fidlc::ExperimentalFlag::kOutputIndexJson)) {
     auto path = std::filesystem::path(json_path).replace_extension("index.json");
     outputs.emplace_back(Behavior::kIndex, path);
   }

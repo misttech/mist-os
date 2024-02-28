@@ -1211,7 +1211,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
       "test.transitional.TransitionalEvent.Event",
       "test.transitional.TransitionMethods.UnimplementedMethod",
   };
-  if (experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kTransitionalAllowList)) {
+  if (experimental_flags().IsEnabled(ExperimentalFlag::kTransitionalAllowList)) {
     for (auto& method : protocol_declaration->methods) {
       auto attribute = method.attributes->Get("transitional");
       if (attribute == nullptr) {
@@ -1232,7 +1232,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
 }
 
 void CompileStep::ValidateDomainErrorType(const Union* result_union) {
-  if (experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kAllowArbitraryErrorTypes)) {
+  if (experimental_flags().IsEnabled(ExperimentalFlag::kAllowArbitraryErrorTypes)) {
     return;
   }
   auto& error_member = result_union->members[1];

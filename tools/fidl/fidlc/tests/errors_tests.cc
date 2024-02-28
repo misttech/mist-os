@@ -218,7 +218,7 @@ protocol Example {
     Method() -> () error table {};
 };
 )FIDL");
-  library.EnableFlag(ExperimentalFlags::Flag::kAllowArbitraryErrorTypes);
+  library.EnableFlag(ExperimentalFlag::kAllowArbitraryErrorTypes);
   ASSERT_COMPILED(library);
 
   auto result_id = static_cast<const IdentifierType*>(
@@ -232,7 +232,7 @@ protocol Example {
 TEST(ErrorsTests, TransitionalAllowList) {
   TestLibrary library;
   library.AddFile("bad/fi-0202.test.fidl");
-  library.EnableFlag(ExperimentalFlags::Flag::kTransitionalAllowList);
+  library.EnableFlag(ExperimentalFlag::kTransitionalAllowList);
   library.ExpectFail(ErrTransitionalNotAllowed, "NewMethod");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }

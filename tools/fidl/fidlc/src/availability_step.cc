@@ -366,8 +366,8 @@ struct CmpAvailability {
 // * For each @available(removed=N) there IS NOT a corresponding @available(added=N)
 class Validator {
  public:
-  Validator(Reporter* reporter, const Platform& platform, ExperimentalFlags flags)
-      : reporter_(reporter), platform_(platform), flags_(flags) {}
+  Validator(Reporter* reporter, const Platform& platform)
+      : reporter_(reporter), platform_(platform) {}
   Validator(const Validator&) = delete;
 
   void Insert(const Element* element) {
@@ -458,7 +458,6 @@ class Validator {
 
   Reporter* reporter_;
   const Platform& platform_;
-  ExperimentalFlags flags_;
   std::map<std::string, std::set<const Element*, CmpAvailability>> by_canonical_name_;
   std::map<std::string_view, std::map<Version, const Element*>> by_added_by_name_;
 };
@@ -471,10 +470,10 @@ void AvailabilityStep::ValidateAvailabilities() {
     // We failed to compile the library declaration's @available attribute.
     return;
   }
-  Validator decl_validator(reporter(), *platform, experimental_flags());
+  Validator decl_validator(reporter(), *platform);
   for (auto& [name, decl] : library()->declarations.all) {
     decl_validator.Insert(decl);
-    Validator member_validator(reporter(), *platform, experimental_flags());
+    Validator member_validator(reporter(), *platform);
     decl->ForEachMember([&](const Element* member) { member_validator.Insert(member); });
   }
 }

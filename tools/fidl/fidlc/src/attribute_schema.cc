@@ -105,7 +105,7 @@ AttributeSchema& AttributeSchema::Deprecate() {
 // static
 const AttributeSchema AttributeSchema::kUserDefined(Kind::kUserDefined);
 
-void AttributeSchema::Validate(Reporter* reporter, const ExperimentalFlags flags,
+void AttributeSchema::Validate(Reporter* reporter, ExperimentalFlagSet flags,
                                const Attribute* attribute, const Element* element) const {
   switch (kind_) {
     case Kind::kValidateOnly:
@@ -386,7 +386,7 @@ void AttributeSchema::ResolveArgsWithoutSchema(CompileStep* step, Attribute* att
   }
 }
 
-static bool DiscoverableConstraint(Reporter* reporter, const ExperimentalFlags flags,
+static bool DiscoverableConstraint(Reporter* reporter, ExperimentalFlagSet flags,
                                    const Attribute* attr, const Element* element) {
   auto arg = attr->GetArg(AttributeArg::kDefaultAnonymousName);
   if (!arg) {
@@ -400,7 +400,7 @@ static bool DiscoverableConstraint(Reporter* reporter, const ExperimentalFlags f
   return true;
 }
 
-static bool TransportConstraint(Reporter* reporter, const ExperimentalFlags flags,
+static bool TransportConstraint(Reporter* reporter, ExperimentalFlagSet flags,
                                 const Attribute* attribute, const Element* element) {
   ZX_ASSERT(element);
   ZX_ASSERT(element->kind == Element::Kind::kProtocol);

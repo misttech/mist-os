@@ -65,7 +65,7 @@ class SharedInterface {
   virtual Reporter* reporter() = 0;
   virtual Libraries* all_libraries() = 0;
   virtual VersionSelection* version_selection() = 0;
-  virtual ExperimentalFlags& experimental_flags() = 0;
+  virtual ExperimentalFlagSet& experimental_flags() = 0;
 
   const std::vector<std::unique_ptr<Diagnostic>>& errors() { return reporter()->errors(); }
   const std::vector<std::unique_ptr<Diagnostic>>& warnings() { return reporter()->warnings(); }
@@ -75,7 +75,7 @@ class SharedInterface {
   void SelectVersion(const std::string& platform, std::string_view version) {
     version_selection()->Insert(Platform::Parse(platform).value(), Version::Parse(version).value());
   }
-  void EnableFlag(ExperimentalFlags::Flag flag) { experimental_flags().EnableFlag(flag); }
+  void EnableFlag(ExperimentalFlag flag) { experimental_flags().Enable(flag); }
 };
 
 // Stores data structures that are shared amongst all libraries being compiled
@@ -97,7 +97,7 @@ class SharedAmongstLibraries final : public SharedInterface {
   Reporter* reporter() override { return &reporter_; }
   Libraries* all_libraries() override { return &all_libraries_; }
   VersionSelection* version_selection() override { return &version_selection_; }
-  ExperimentalFlags& experimental_flags() override { return experimental_flags_; }
+  ExperimentalFlagSet& experimental_flags() override { return experimental_flags_; }
 
   std::vector<std::unique_ptr<SourceFile>>& all_sources_of_all_libraries() {
     return all_sources_of_all_libraries_;
@@ -109,7 +109,7 @@ class SharedAmongstLibraries final : public SharedInterface {
   Libraries all_libraries_;
   std::vector<std::unique_ptr<SourceFile>> all_sources_of_all_libraries_;
   VersionSelection version_selection_;
-  ExperimentalFlags experimental_flags_;
+  ExperimentalFlagSet experimental_flags_;
 };
 
 // Helper template to allow passing either a string literal or `const Arg&`.
@@ -168,7 +168,7 @@ class TestLibrary final : public SharedInterface {
   Reporter* reporter() override { return shared_->reporter(); }
   Libraries* all_libraries() override { return shared_->all_libraries(); }
   VersionSelection* version_selection() override { return shared_->version_selection(); }
-  ExperimentalFlags& experimental_flags() override { return shared_->experimental_flags(); }
+  ExperimentalFlagSet& experimental_flags() override { return shared_->experimental_flags(); }
 
   void AddSource(const std::string& filename, const std::string& raw_source_code);
 
@@ -200,8 +200,8 @@ class TestLibrary final : public SharedInterface {
   // any were found.
   bool CheckDiagnostics();
 
-  // TODO(https://fxbug.dev/42069446): remove (or rename this class to be more general), as this does
-  // not use a library.
+  // TODO(https://fxbug.dev/42069446): remove (or rename this class to be more general), as this
+  // does not use a library.
   bool Parse(std::unique_ptr<File>* out_ast_ptr);
 
   // Compiles the library. Must have compiled all dependencies first, using the

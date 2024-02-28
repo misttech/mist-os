@@ -1236,7 +1236,7 @@ type Bar = struct {};
 TEST(ErrcatGoodTests, Good0179) {
   TestLibrary library;
   library.AddFile("good/fi-0179.test.fidl");
-  library.EnableFlag(ExperimentalFlags::Flag::kAllowNewTypes);
+  library.EnableFlag(ExperimentalFlag::kAllowNewTypes);
   ASSERT_COMPILED(library);
 }
 
@@ -1350,7 +1350,7 @@ TEST(ErrcatGoodTests, Good0201) {
 TEST(ErrcatGoodTests, Good0202) {
   TestLibrary library;
   library.AddFile("good/fi-0202.test.fidl");
-  library.EnableFlag(ExperimentalFlags::Flag::kTransitionalAllowList);
+  library.EnableFlag(ExperimentalFlag::kTransitionalAllowList);
   library.SelectVersion("test", "10");
   ASSERT_COMPILED(library);
 }

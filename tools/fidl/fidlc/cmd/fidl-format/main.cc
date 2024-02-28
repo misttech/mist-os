@@ -51,11 +51,11 @@ void Usage(std::string_view argv0) {
 
 bool Format(const fidlc::SourceFile& source_file, fidlc::Reporter* reporter, std::string& output) {
   fidlc::Lexer lexer(source_file, reporter);
-  fidlc::ExperimentalFlags experimental_flags;
+  fidlc::ExperimentalFlagSet experimental_flags;
   // The formatter is run directly by fx format-code, not as part of the build,
   // so we can't rely on having accurate experimental flags. Instead, we just
   // set all the flags which could block parsing if disabled.
-  experimental_flags.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
+  experimental_flags.Enable(fidlc::ExperimentalFlag::kZxCTypes);
 
   auto formatter = fidlc::Formatter(100, reporter);
   auto result = formatter.Format(source_file, experimental_flags);

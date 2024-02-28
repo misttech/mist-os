@@ -43,7 +43,7 @@ const f64 float64 = 0;
 )FIDL");
 
   // For the use of usize64, uintptr64, and uchar.
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   ASSERT_COMPILED(library);
 
@@ -84,7 +84,7 @@ const float64 fidl.float64 = 0;
 )FIDL");
 
   // For the use of usize64, uintptr64, and uchar.
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
 
   ASSERT_COMPILED(library);
 
@@ -729,25 +729,25 @@ TEST(TypesTests, BadExperimentalPointerWithoutFlag) {
 
 TEST(TypesTests, GoodUsize64WithFlag) {
   TestLibrary library("library example; alias T = usize64;");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
   ASSERT_COMPILED(library);
 }
 
 TEST(TypesTests, GoodUintptr64WithFlag) {
   TestLibrary library("library example; alias T = uintptr64;");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
   ASSERT_COMPILED(library);
 }
 
 TEST(TypesTests, GoodUcharWithFlag) {
   TestLibrary library("library example; alias T = uchar;");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
   ASSERT_COMPILED(library);
 }
 
 TEST(TypesTests, GoodExperimentalPointerWithFlag) {
   TestLibrary library("library example; alias T = experimental_pointer<uint32>;");
-  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlag::kZxCTypes);
   ASSERT_COMPILED(library);
 }
 

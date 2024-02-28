@@ -64,7 +64,7 @@ class AttributeSchema {
  public:
   // Note: Constraints get access to the fully compiled Element.
   // This is one reason why VerifyAttributesStep is a separate step.
-  using Constraint = fit::function<bool(Reporter* reporter, ExperimentalFlags flags,
+  using Constraint = fit::function<bool(Reporter* reporter, ExperimentalFlagSet flags,
                                         const Attribute* attribute, const Element* element)>;
 
   // Constructs a new schema that allows any placement, takes no arguments, and
@@ -97,7 +97,7 @@ class AttributeSchema {
 
   // Validates the attribute's placement and constraints. Must call
   // `ResolveArgs` first.
-  void Validate(Reporter* reporter, ExperimentalFlags flags, const Attribute* attribute,
+  void Validate(Reporter* reporter, ExperimentalFlagSet flags, const Attribute* attribute,
                 const Element* element) const;
 
   // Returns attribute schemas for FIDL's officially recognized attributes.
