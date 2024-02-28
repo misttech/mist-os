@@ -12,6 +12,7 @@ use {
         memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
         node::{FxNode, GetResult, NodeCache},
         pager::Pager,
+        profile::ProfileState,
         symlink::FxSymlink,
         volumes_directory::VolumesDirectory,
     },
@@ -35,15 +36,16 @@ use {
         filesystem::{self, SyncOptions},
         log::*,
         object_store::{
-            directory::Directory, transaction::Options, HandleOptions, HandleOwner,
-            ObjectDescriptor, ObjectStore,
+            directory::Directory,
+            transaction::{lock_keys, LockKey, Options},
+            HandleOptions, HandleOwner, ObjectDescriptor, ObjectStore,
         },
     },
     std::{
         boxed::Box,
         future::Future,
         marker::Unpin,
-        sync::{Arc, Mutex, Weak},
+        sync::{Arc, Mutex, MutexGuard, Weak},
         time::Duration,
     },
     vfs::{
@@ -56,6 +58,8 @@ use {
 // TODO:(b/299919008) Fix this number to something reasonable, or maybe just for fxblob.
 const DIRENT_CACHE_LIMIT: usize = 8000;
 // LINT.ThenChange(src/storage/stressor/src/aggressive.rs)
+
+const PROFILE_DIRECTORY: &str = "profiles";
 
 #[derive(Clone)]
 pub struct MemoryPressureLevelConfig {
@@ -128,6 +132,8 @@ pub struct FxVolume {
     scope: ExecutionScope,
 
     dirent_cache: DirentCache,
+
+    profile_state: Mutex<ProfileState>,
 }
 
 #[fxfs_trace::trace]
@@ -148,6 +154,7 @@ impl FxVolume {
             fs_id,
             scope,
             dirent_cache: DirentCache::new(DIRENT_CACHE_LIMIT),
+            profile_state: Mutex::new(ProfileState::new()),
         })
     }
 
@@ -175,7 +182,88 @@ impl FxVolume {
         &self.scope
     }
 
+    pub fn profile_state_mut(&self) -> MutexGuard<'_, ProfileState> {
+        self.profile_state.lock().unwrap()
+    }
+
+    pub fn stop_profiler(&self) {
+        self.pager.set_recorder(None);
+        self.profile_state_mut().stop_profiler();
+    }
+
+    pub async fn record_or_replay_profile(self: &Arc<Self>, name: &str) -> Result<(), Error> {
+        let internal_dir = self
+            .get_or_create_internal_dir()
+            .await
+            .map_err(|e| e.context("Opening internal directory"))?;
+        // Have to do separate calls to create the profile dir if necessary.
+        let mut transaction = self
+            .store()
+            .filesystem()
+            .new_transaction(
+                lock_keys![LockKey::object(
+                    self.store().store_object_id(),
+                    internal_dir.object_id(),
+                )],
+                Options::default(),
+            )
+            .await?;
+        let profile_dir = match internal_dir.directory().lookup(PROFILE_DIRECTORY).await? {
+            Some((object_id, _)) => Directory::open_unchecked(self.clone(), object_id),
+            None => {
+                let new_dir = internal_dir
+                    .directory()
+                    .create_child_dir(&mut transaction, PROFILE_DIRECTORY, None)
+                    .await?;
+                transaction.commit().await?;
+                new_dir
+            }
+        };
+
+        // We don't meddle in FxDirectory or FxFile here because we don't want a paged object.
+        // Normally we ensure that there's only one copy by using the Node cache on the volume, but
+        // that would create FxFile, so in this case we just assume that only one profile operation
+        // should be ongoing at a time, as that is ensured in `VolumesDirectory`.
+        transaction = self
+            .store()
+            .filesystem()
+            .new_transaction(
+                lock_keys![LockKey::object(
+                    self.store().store_object_id(),
+                    profile_dir.object_id(),
+                )],
+                Options::default(),
+            )
+            .await?;
+        match profile_dir.lookup(name).await? {
+            Some((id, descriptor)) => {
+                ensure!(matches!(descriptor, ObjectDescriptor::File), FxfsError::Inconsistent);
+                let handle =
+                    ObjectStore::open_object(self, id, HandleOptions::default(), None).await?;
+                self.profile_state_mut().replay_profile(handle, self.clone());
+            }
+            None => {
+                let handle = profile_dir.create_child_file(&mut transaction, name, None).await?;
+                transaction.commit().await?;
+                self.pager.set_recorder(Some(self.profile_state_mut().record_new(handle)));
+            }
+        }
+        Ok(())
+    }
+
+    async fn get_or_create_internal_dir(self: &Arc<Self>) -> Result<Arc<FxDirectory>, Error> {
+        let internal_data_id = self.store().get_or_create_internal_directory_id().await?;
+        let internal_dir = self
+            .get_or_load_node(internal_data_id, ObjectDescriptor::Directory, None)
+            .await?
+            .into_any()
+            .downcast::<FxDirectory>()
+            .unwrap();
+        Ok(internal_dir)
+    }
+
     pub async fn terminate(&self) {
+        self.stop_profiler();
         self.dirent_cache.clear();
 
         // `NodeCache::terminate` will break any strong reference cycles contained within nodes
@@ -658,7 +746,12 @@ mod tests {
         crate::fuchsia::{
             directory::FxDirectory,
             file::FxFile,
+            fxblob::{
+                testing::{self as blob_testing, BlobFixture},
+                BlobDirectory,
+            },
             memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
+            pager::PagerBacked,
             testing::{
                 close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
                 open_file_checked, write_at, TestFixture,
@@ -666,6 +759,7 @@ mod tests {
             volume::{FxVolumeAndRoot, MemoryPressureConfig, MemoryPressureLevelConfig},
             volumes_directory::VolumesDirectory,
         },
+        delivery_blob::CompressionMode,
         fidl::endpoints::ServerEnd,
         fidl_fuchsia_fxfs::{BytesAndNodes, ProjectIdMarker, VolumeMarker},
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -2081,6 +2175,70 @@ mod tests {
         fsck(filesystem.clone()).await.expect("Fsck");
         fsck_volume(filesystem.as_ref(), volume_store_id, None).await.expect("Fsck volume");
         filesystem.close().await.expect("close filesystem failed");
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_profile() {
+        let mut hashes = Vec::new();
+        let device = {
+            let fixture = blob_testing::new_blob_fixture().await;
+
+            // Page in the zero offsets only to avoid readahead strangeness.
+            for i in 0..3u64 {
+                let hash =
+                    fixture.write_blob(i.to_le_bytes().as_slice(), CompressionMode::Never).await;
+                hashes.push(hash);
+            }
+            fixture.close().await
+        };
+        device.ensure_unique();
+
+        device.reopen(false);
+        let device = {
+            let fixture = blob_testing::open_blob_fixture(device).await;
+            fixture.volume().volume().record_or_replay_profile("foo").await.expect("Recording");
+
+            // Page in the zero offsets only to avoid readahead strangeness.
+            let mut writable = [0u8];
+            for hash in &hashes {
+                let vmo = fixture.get_blob_vmo(*hash).await;
+                vmo.read(&mut writable, 0).expect("Vmo read");
+            }
+            fixture.volume().volume().stop_profiler();
+            fixture.close().await
+        };
+        device.ensure_unique();
+
+        device.reopen(false);
+        let fixture = blob_testing::open_blob_fixture(device).await;
+        {
+            // Need to get the root vmo to check committed bytes.
+            let dir = fixture
+                .volume()
+                .root()
+                .clone()
+                .into_any()
+                .downcast::<BlobDirectory>()
+                .expect("Root should be BlobDirectory");
+
+            // Ensure that nothing is paged in right now.
+            for hash in &hashes {
+                let blob = dir.open_blob(*hash).await.expect("Opening blob");
+                assert_eq!(blob.vmo().info().unwrap().committed_bytes, 0);
+            }
+
+            fixture.volume().volume().record_or_replay_profile("foo").await.expect("Replaying");
+
+            // Await all data being played back by checking that things have paged in.
+            for hash in &hashes {
+                let blob = dir.open_blob(*hash).await.expect("Opening blob");
+                while blob.vmo().info().unwrap().committed_bytes == 0 {
+                    fasync::Timer::new(Duration::from_millis(25)).await;
+                }
+            }
+            fixture.volume().volume().stop_profiler();
+        }
+        fixture.close().await;
     }
 
     #[fuchsia::test(threads = 10)]

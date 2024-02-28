@@ -6,6 +6,9 @@ use {
     crate::fuchsia::{
         epochs::{Epochs, RefGuard},
         errors::map_to_status,
+        fxblob::blob::FxBlob,
+        node::FxNode,
+        profile::Recorder,
     },
     anyhow::Error,
     bitflags::bitflags,
@@ -153,6 +156,7 @@ pub struct Pager {
     // need to wait for page requests for the specific file being flushed, but we should see if we
     // need to for performance reasons first.
     epochs: Arc<Epochs>,
+    recorder: Mutex<Option<Recorder>>,
 }
 
 // FileHolder is used to retain either a strong or a weak reference to a file.  If there are any
@@ -174,6 +178,7 @@ impl Pager {
             scope,
             executor: fasync::EHandle::local(),
             epochs: Epochs::new(),
+            recorder: Mutex::new(None),
         })
     }
 
@@ -184,6 +189,23 @@ impl Pager {
             task.await;
             std::mem::drop(guard);
         });
+    }
+
+    pub fn set_recorder(&self, recorder: Option<Recorder>) {
+        // Drop the old one outside of the lock.
+        let _ = std::mem::replace(&mut (*self.recorder.lock().unwrap()), recorder);
+    }
+
+    pub fn record_page_in<P: PagerBacked>(&self, node: Arc<P>, range: Range<u64>) {
+        if let Ok(blob) = node.into_any().downcast::<FxBlob>() {
+            let mut recorder_holder = self.recorder.lock().unwrap();
+            if let Some(recorder) = &mut (*recorder_holder) {
+                // If the message fails to send, so will all the rest.
+                if let Err(_) = recorder.record(blob.root(), range.start) {
+                    *recorder_holder = None;
+                }
+            }
+        }
     }
 
     /// Creates a new VMO to be used with the pager. `Pager::register_file` must be called before
@@ -368,7 +390,7 @@ impl Pager {
 }
 
 /// This is a trait for objects (files/blobs) that expose a pager backed VMO.
-pub trait PagerBacked: Sync + Send + Sized + 'static {
+pub trait PagerBacked: FxNode + Sync + Send + Sized + 'static {
     /// The pager backing this VMO.
     fn pager(&self) -> &Pager;
 
@@ -471,7 +493,9 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, pager_range: PageInRange<P>
             );
         let read_range = read_range.expand(expanded_range_for_readahead);
         for range in read_range.chunks(readahead_alignment) {
+            let recorded_range = range.range.clone();
             this.pager().spawn(page_in_chunk(this.clone(), range, ref_guard.clone()));
+            this.pager().record_page_in(this.clone(), recorded_range);
         }
     }
 }
@@ -787,7 +811,8 @@ impl<T: PagerBacked, U: PagerRequestType> Drop for PagerRangeChunksIter<T, U> {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, futures::channel::mpsc, futures::StreamExt, vfs::execution_scope::ExecutionScope,
+        super::*, crate::fuchsia::node::FxNode, futures::channel::mpsc, futures::StreamExt,
+        vfs::execution_scope::ExecutionScope,
     };
 
     struct MockFile {
@@ -800,6 +825,32 @@ mod tests {
         fn new(pager: Arc<Pager>) -> Self {
             let (vmo, pager_packet_receiver_registration) = pager.create_vmo(page_size()).unwrap();
             Self { pager, vmo, pager_packet_receiver_registration }
+        }
+    }
+
+    impl FxNode for MockFile {
+        fn object_id(&self) -> u64 {
+            unimplemented!();
+        }
+
+        fn parent(&self) -> Option<Arc<crate::directory::FxDirectory>> {
+            unimplemented!();
+        }
+
+        fn set_parent(&self, _parent: Arc<crate::directory::FxDirectory>) {
+            unimplemented!();
+        }
+
+        fn open_count_add_one(&self) {
+            unimplemented!();
+        }
+
+        fn open_count_sub_one(self: Arc<Self>) {
+            unimplemented!();
+        }
+
+        fn object_descriptor(&self) -> fxfs::object_store::ObjectDescriptor {
+            unimplemented!();
         }
     }
 
@@ -852,6 +903,32 @@ mod tests {
         fn new(pager: Arc<Pager>, sender: mpsc::UnboundedSender<()>) -> Self {
             let (vmo, pager_packet_receiver_registration) = pager.create_vmo(page_size()).unwrap();
             Self { pager, vmo, pager_packet_receiver_registration, sender: Mutex::new(sender) }
+        }
+    }
+
+    impl FxNode for OnZeroChildrenFile {
+        fn object_id(&self) -> u64 {
+            unimplemented!();
+        }
+
+        fn parent(&self) -> Option<Arc<crate::directory::FxDirectory>> {
+            unimplemented!();
+        }
+
+        fn set_parent(&self, _parent: Arc<crate::directory::FxDirectory>) {
+            unimplemented!();
+        }
+
+        fn open_count_add_one(&self) {
+            unimplemented!();
+        }
+
+        fn open_count_sub_one(self: Arc<Self>) {
+            unimplemented!();
+        }
+
+        fn object_descriptor(&self) -> fxfs::object_store::ObjectDescriptor {
+            unimplemented!();
         }
     }
 
@@ -956,6 +1033,32 @@ mod tests {
             pager: Arc<Pager>,
             status_code: Mutex<zx::Status>,
             pager_packet_receiver_registration: PagerPacketReceiverRegistration<Self>,
+        }
+
+        impl FxNode for StatusCodeFile {
+            fn object_id(&self) -> u64 {
+                unimplemented!();
+            }
+
+            fn parent(&self) -> Option<Arc<crate::directory::FxDirectory>> {
+                unimplemented!();
+            }
+
+            fn set_parent(&self, _parent: Arc<crate::directory::FxDirectory>) {
+                unimplemented!();
+            }
+
+            fn open_count_add_one(&self) {
+                unimplemented!();
+            }
+
+            fn open_count_sub_one(self: Arc<Self>) {
+                unimplemented!();
+            }
+
+            fn object_descriptor(&self) -> fxfs::object_store::ObjectDescriptor {
+                unimplemented!();
+            }
         }
 
         impl PagerBacked for StatusCodeFile {
@@ -1176,6 +1279,32 @@ mod tests {
             });
             this.pager.register_file(&this);
             this
+        }
+    }
+
+    impl FxNode for PagerRangeTestFile {
+        fn object_id(&self) -> u64 {
+            1
+        }
+
+        fn parent(&self) -> Option<Arc<crate::directory::FxDirectory>> {
+            unimplemented!()
+        }
+
+        fn set_parent(&self, _parent: Arc<crate::directory::FxDirectory>) {
+            unimplemented!()
+        }
+
+        fn open_count_add_one(&self) {
+            unimplemented!()
+        }
+
+        fn open_count_sub_one(self: Arc<Self>) {
+            unimplemented!()
+        }
+
+        fn object_descriptor(&self) -> fxfs::object_store::ObjectDescriptor {
+            unimplemented!()
         }
     }
 

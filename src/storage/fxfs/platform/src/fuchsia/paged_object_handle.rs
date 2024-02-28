@@ -1094,6 +1094,7 @@ mod tests {
         super::*,
         crate::fuchsia::{
             directory::FxDirectory,
+            node::FxNode,
             pager::PagerPacketReceiverRegistration,
             pager::{default_page_in, PageInRange, PagerBacked},
             testing::{close_dir_checked, close_file_checked, open_file_checked, TestFixture},
@@ -2194,6 +2195,32 @@ mod tests {
             fn unblock(&self, request: u64) {
                 self.unblocked_requests.lock().unwrap().insert(request);
                 self.cvar.notify_all();
+            }
+        }
+
+        impl FxNode for File {
+            fn object_id(&self) -> u64 {
+                self.handle.handle.object_id()
+            }
+
+            fn parent(&self) -> Option<Arc<crate::directory::FxDirectory>> {
+                unimplemented!();
+            }
+
+            fn set_parent(&self, _parent: Arc<crate::directory::FxDirectory>) {
+                unimplemented!();
+            }
+
+            fn open_count_add_one(&self) {
+                unimplemented!();
+            }
+
+            fn open_count_sub_one(self: Arc<Self>) {
+                unimplemented!();
+            }
+
+            fn object_descriptor(&self) -> fxfs::object_store::ObjectDescriptor {
+                unimplemented!();
             }
         }
 
