@@ -81,8 +81,6 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
         ),
         # API levels whose contents should not change anymore.
         "frozen_api_levels": supported_api_levels,
-        # DEPRECATED. Remove once petals no longer reference this.
-        "supported_fuchsia_api_levels": supported_api_levels,
     }
 
 
