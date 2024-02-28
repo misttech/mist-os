@@ -137,9 +137,7 @@ mod test {
         fidl_fuchsia_developer_remotecontrol::{
             IdentifyHostResponse, RemoteControlMarker, RemoteControlProxy, RemoteControlRequest,
         },
-        fidl_fuchsia_developer_remotecontrol_connector::{
-            ConnectorMarker, ConnectorProxy, ConnectorRequest,
-        },
+        fidl_fuchsia_developer_remotecontrol_connector::{ConnectorProxy, ConnectorRequest},
         fuchsia_async as fasync,
         std::cell::RefCell,
         std::rc::Rc,

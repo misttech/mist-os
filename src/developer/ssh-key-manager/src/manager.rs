@@ -340,7 +340,7 @@ mod tests {
         fidl_fuchsia_ssh::{
             AuthorizedKeysMarker, AuthorizedKeysProxy, KeyWatcherMarker, KeyWatcherProxy,
         },
-        std::{io::Cursor, sync::Arc},
+        std::io::Cursor,
     };
 
     struct MockEventSender {

@@ -39,7 +39,6 @@ use std::{
 };
 
 use criterion::Criterion;
-use csv;
 use tempfile::TempDir;
 use walkdir::WalkDir;
 
