@@ -35,6 +35,9 @@ impl Inner {
     /// files returned but shuffling the remainder.
     pub fn next_file_num(&mut self) -> u64 {
         let mut rng = rand::thread_rng();
+        if self.file_counter == 0 {
+            tracing::info!("File counter looped.");
+        }
         self.file_map.swap(
             self.file_counter,
             (self.file_counter + rng.gen_range(0..(NUM_FILES - DIRENT_CACHE_LIMIT))) % NUM_FILES,
