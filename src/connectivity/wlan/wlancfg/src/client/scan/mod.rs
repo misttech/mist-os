@@ -26,9 +26,8 @@ use {
         stream::{FuturesUnordered, StreamExt},
     },
     itertools::Itertools,
-    std::{collections::HashMap, convert::TryFrom, sync::Arc},
+    std::{collections::HashMap, sync::Arc},
     tracing::{debug, error, info, warn},
-    wlan_common,
 };
 
 mod fidl_conversion;
@@ -459,26 +458,16 @@ mod tests {
         super::*,
         crate::{
             access_point::state_machine as ap_fsm,
-            mode_management::{
-                iface_manager_api::{ConnectAttemptRequest, SmeForScan},
-                Defect, IfaceFailure,
-            },
+            mode_management::{iface_manager_api::ConnectAttemptRequest, Defect, IfaceFailure},
             util::testing::{
                 fakes::FakeSavedNetworksManager, generate_channel, generate_random_sme_scan_result,
             },
         },
-        anyhow::Error,
         fidl::endpoints::{create_proxy, ControlHandle, Responder},
         fidl_fuchsia_wlan_common_security as fidl_security, fuchsia_async as fasync,
         fuchsia_zircon as zx,
-        futures::{
-            channel::{mpsc, oneshot},
-            future,
-            lock::Mutex,
-            task::Poll,
-        },
+        futures::{future, task::Poll},
         pin_utils::pin_mut,
-        std::{convert::TryInto, sync::Arc},
         test_case::test_case,
         wlan_common::{
             assert_variant, fake_bss_description,

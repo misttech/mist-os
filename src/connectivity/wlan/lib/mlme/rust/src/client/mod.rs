@@ -20,7 +20,7 @@ use {
         disconnect::LocallyInitiated,
         error::Error,
     },
-    anyhow::{self, format_err},
+    anyhow::format_err,
     banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     channel_switch::ChannelState,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
@@ -29,7 +29,6 @@ use {
     ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid},
     scanner::Scanner,
     state::States,
-    std::convert::TryInto,
     tracing::{error, warn},
     wlan_common::{
         appendable::Appendable,
@@ -49,7 +48,7 @@ use {
     wlan_frame_writer::{
         write_frame, write_frame_with_dynamic_buffer, write_frame_with_fixed_buffer,
     },
-    wlan_sme, wlan_trace as wtrace,
+    wlan_trace as wtrace,
     zerocopy::ByteSlice,
 };
 
@@ -1315,14 +1314,13 @@ mod tests {
         fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync,
         fuchsia_sync::Mutex,
         futures::task::Poll,
-        ieee80211::MacAddrBytes,
         lazy_static::lazy_static,
-        std::{convert::TryFrom, sync::Arc},
+        std::sync::Arc,
         wlan_common::{
             assert_variant,
             capabilities::StaCapabilities,
             channel::Cbw,
-            fake_bss_description, fake_fidl_bss_description, ie,
+            fake_bss_description, fake_fidl_bss_description,
             stats::SignalStrengthAverage,
             test_utils::{fake_capabilities::fake_client_capabilities, fake_frames::*},
             timer::{self, create_timer},

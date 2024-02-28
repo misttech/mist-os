@@ -6,7 +6,6 @@ use crate::key::exchange::{self, handshake::group_key::supplicant::Supplicant};
 use crate::rsna::{Dot11VerifiedKeyFrame, NegotiatedProtection, Role, UpdateSink};
 use crate::{rsn_ensure, Error};
 use bytes::Bytes;
-use eapol;
 use zerocopy::ByteSlice;
 
 mod supplicant;
@@ -169,7 +168,7 @@ fn is_zero(slice: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rsna::{test_util, NegotiatedProtection};
+    use crate::rsna::test_util;
     use wlan_common::ie::rsn::fake_wpa2_s_rsne;
 
     fn verify_group_key_frame(key_frame: eapol::KeyFrameBuf, role: Role) {

@@ -9,7 +9,6 @@ use crate::keywrap::{self, keywrap_algorithm};
 use crate::ProtectionInfo;
 use crate::{rsn_ensure, Error};
 use anyhow::{anyhow, ensure};
-use eapol;
 use fidl_fuchsia_wlan_mlme::SaeFrame;
 use wlan_common::ie::rsn::{
     akm::Akm,
@@ -538,14 +537,12 @@ pub type UpdateSink = Vec<SecAssocUpdate>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rsna::{test_util, NegotiatedProtection, Role};
     use wlan_common::{
         assert_variant,
         ie::rsn::{
             akm::{self, AKM_PSK},
             cipher::{self, CIPHER_CCMP_128, CIPHER_GCMP_256},
             fake_wpa2_s_rsne,
-            rsne::Rsne,
         },
     };
 

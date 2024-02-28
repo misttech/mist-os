@@ -25,7 +25,6 @@ use {
         timer::{EventId, Timer},
         TimeUnit,
     },
-    wlan_sme::{self},
     wlan_trace as wtrace,
     zerocopy::ByteSlice,
 };
@@ -486,7 +485,7 @@ mod tests {
         futures::task::Poll,
         ieee80211::MacAddrBytes,
         lazy_static::lazy_static,
-        std::{convert::TryFrom, sync::Arc},
+        std::sync::Arc,
         wlan_common::{
             assert_variant, big_endian::BigEndianU16, test_utils::fake_frames::fake_wpa2_rsne,
             timer,

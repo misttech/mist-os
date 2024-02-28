@@ -20,7 +20,6 @@ use {
     std::{
         fmt::Display,
         future::Future,
-        marker::Unpin,
         pin::Pin,
         sync::Arc,
         task::{Context, Poll},

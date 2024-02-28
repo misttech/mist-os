@@ -8,7 +8,6 @@ use {
     fuchsia_zircon::DurationNum,
     ieee80211::Bssid,
     lazy_static::lazy_static,
-    netdevice_client,
     pin_utils::pin_mut,
     wlan_common::{
         bss::Protection,

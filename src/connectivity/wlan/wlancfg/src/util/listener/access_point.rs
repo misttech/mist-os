@@ -109,12 +109,7 @@ pub type ApListenerMessageSender = mpsc::UnboundedSender<ApMessage>;
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{super::generic::CurrentStateCache, *},
-        crate::client::types::Ssid,
-        fidl_fuchsia_wlan_policy as fidl_policy,
-        std::convert::TryFrom,
-    };
+    use {super::*, crate::client::types::Ssid, fidl_fuchsia_wlan_policy as fidl_policy};
 
     fn create_network_id() -> types::NetworkIdentifier {
         types::NetworkIdentifier {

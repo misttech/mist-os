@@ -858,7 +858,6 @@ pub mod test_utils {
         crate::{
             buffer::{CBufferProvider, FakeCBufferProvider},
             ddk_converter,
-            error::Error,
         },
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
         fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
@@ -866,8 +865,7 @@ pub mod test_utils {
         fuchsia_sync::Mutex,
         fuchsia_zircon::HandleBased,
         paste::paste,
-        std::{collections::VecDeque, sync::Arc},
-        wlan_sme,
+        std::collections::VecDeque,
     };
 
     pub trait FromMlmeEvent {
@@ -1547,7 +1545,6 @@ mod tests {
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
         fuchsia_async as fasync,
         ieee80211::Ssid,
-        std::convert::TryFrom,
         wlan_common::assert_variant,
     };
 

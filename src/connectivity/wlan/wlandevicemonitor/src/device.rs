@@ -129,7 +129,7 @@ async fn serve_phy(
 mod tests {
     use {
         super::*,
-        crate::{inspect, watchable_map},
+        crate::watchable_map,
         fidl::endpoints::create_proxy,
         fuchsia_async as fasync,
         fuchsia_inspect::{Inspector, InspectorConfig},

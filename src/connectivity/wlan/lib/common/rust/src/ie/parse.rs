@@ -237,7 +237,6 @@ mod tests {
     use {
         super::*,
         crate::assert_variant,
-        std::convert::TryInto,
         zerocopy::{AsBytes, FromBytes, FromZeros, NoCell},
     };
 

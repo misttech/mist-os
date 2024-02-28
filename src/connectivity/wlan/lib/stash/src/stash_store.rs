@@ -255,9 +255,8 @@ mod tests {
     use {
         super::*,
         crate::tests::{network_id, new_stash_id},
-        fidl::endpoints::create_proxy,
         fuchsia_component::client::connect_to_protocol,
-        wlan_stash_constants::{Credential, SecurityType, POLICY_STASH_PREFIX},
+        wlan_stash_constants::{Credential, SecurityType},
     };
 
     fn new_stash_store(id: &str) -> fidl_stash::StoreAccessorProxy {

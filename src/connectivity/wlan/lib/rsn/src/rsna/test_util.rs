@@ -14,24 +14,18 @@ use crate::key::{
 use crate::key_data::kde;
 use crate::nonce::NonceReader;
 use crate::psk;
-use crate::rsna::{Dot11VerifiedKeyFrame, NegotiatedProtection, SecAssocUpdate};
-use crate::ProtectionInfo;
 use crate::{Authenticator, Supplicant};
 use eapol::KeyFrameTx;
-use fidl_fuchsia_wlan_mlme::SaeFrame;
 use hex::FromHex;
 use ieee80211::{MacAddr, Ssid};
 use lazy_static::lazy_static;
-use std::{
-    convert::TryFrom,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 use wlan_common::{
     ie::{
         fake_wpa_ie,
         rsn::{
             akm,
-            cipher::{self, Cipher},
+            cipher::{self},
             fake_wpa2_a_rsne, fake_wpa2_s_rsne, fake_wpa3_a_rsne, fake_wpa3_s_rsne,
             suite_filter::DEFAULT_GROUP_MGMT_CIPHER,
             suite_selector::OUI,
@@ -40,7 +34,6 @@ use wlan_common::{
     },
     organization::Oui,
 };
-use zerocopy::ByteSlice;
 
 lazy_static! {
     static ref S_ADDR: MacAddr = MacAddr::from([0x81, 0x76, 0x61, 0x14, 0xDF, 0xC9]);

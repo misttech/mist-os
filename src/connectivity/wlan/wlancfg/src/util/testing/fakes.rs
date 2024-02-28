@@ -26,7 +26,6 @@ use {
     rand::Rng,
     std::{
         collections::{HashMap, VecDeque},
-        convert::TryInto,
         sync::Arc,
     },
     tracing::{info, warn},

@@ -90,7 +90,7 @@ mod tests {
         super::*,
         crate::tests::{network_id, new_stash_id},
         assert_matches::assert_matches,
-        wlan_stash_constants::{Credential, PersistentData, SecurityType},
+        wlan_stash_constants::{Credential, SecurityType},
     };
 
     #[fuchsia::test]

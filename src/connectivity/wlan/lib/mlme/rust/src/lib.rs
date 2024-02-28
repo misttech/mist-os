@@ -41,7 +41,7 @@ use {
     std::{cmp, fmt, sync::Arc, time::Duration},
     tracing::info,
     wlan_fidl_ext::{ResponderExt, SendResultExt},
-    wlan_sme, wlan_trace as wtrace,
+    wlan_trace as wtrace,
 };
 pub use {ddk_converter::*, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, wlan_common as common};
 
@@ -512,7 +512,6 @@ mod tests {
     use {
         super::{buffer::FakeCBufferProvider, device::FakeDevice, test_utils::FakeMlme, *},
         fuchsia_async::TestExecutor,
-        futures::channel::{mpsc, oneshot},
         std::task::Poll,
         wlan_common::assert_variant,
     };

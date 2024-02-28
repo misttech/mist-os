@@ -4,7 +4,6 @@
 
 use {
     crate::ie::*,
-    paste,
     std::{
         cmp::{max, min},
         collections::HashSet,

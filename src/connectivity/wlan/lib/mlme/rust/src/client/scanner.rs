@@ -545,7 +545,7 @@ mod tests {
         fuchsia_sync::Mutex,
         ieee80211::{MacAddrBytes, Ssid},
         lazy_static::lazy_static,
-        std::{convert::TryFrom, sync::Arc},
+        std::sync::Arc,
         test_case::test_case,
         wlan_common::{
             assert_variant,

@@ -10,7 +10,6 @@ use {
     ieee80211::{Bssid, Ssid},
     std::{
         collections::{hash_map, HashMap, HashSet},
-        convert::TryInto,
         mem,
         sync::Arc,
     },
@@ -363,7 +362,7 @@ mod tests {
     use ieee80211::MacAddr;
     use lazy_static::lazy_static;
     use regex::bytes::Regex;
-    use std::{convert::TryFrom, fmt::Write};
+    use std::fmt::Write;
     use test_case::test_case;
     use wlan_common::{
         assert_variant, fake_bss_description, fake_fidl_bss_description,

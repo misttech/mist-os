@@ -15,7 +15,6 @@ use {
     async_trait::async_trait,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_device_service as fidl_service,
     fuchsia_inspect::{self as inspect, NumericProperty},
-    fuchsia_zircon,
     ieee80211::{MacAddr, MacAddrBytes, NULL_ADDR},
     std::collections::{HashMap, HashSet},
     thiserror::Error,

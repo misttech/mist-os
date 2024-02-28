@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
     wlan_common::{
-        self, bss::BssDescription, channel::Channel, security::SecurityAuthenticator,
+        bss::BssDescription, channel::Channel, security::SecurityAuthenticator,
         sequestered::Sequestered,
     },
     wlan_metrics_registry::{

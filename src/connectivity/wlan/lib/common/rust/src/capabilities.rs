@@ -237,8 +237,7 @@ mod tests {
     use {
         super::*,
         crate::{
-            assert_variant, ie, mac,
-            test_utils::fake_capabilities::fake_5ghz_band_capability_ht_cbw,
+            assert_variant, mac, test_utils::fake_capabilities::fake_5ghz_band_capability_ht_cbw,
         },
     };
 

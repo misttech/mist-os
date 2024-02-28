@@ -619,7 +619,7 @@ mod tests {
     use {
         super::*,
         crate::{
-            ap::remote_client::{ClientEvent, ClientRejection},
+            ap::remote_client::ClientEvent,
             buffer::FakeCBufferProvider,
             device::{FakeDevice, FakeDeviceConfig, FakeDeviceState},
         },
@@ -627,12 +627,12 @@ mod tests {
         fuchsia_sync::Mutex,
         ieee80211::Bssid,
         lazy_static::lazy_static,
-        std::{convert::TryFrom, sync::Arc},
+        std::sync::Arc,
         test_case::test_case,
         wlan_common::{
             assert_variant,
             big_endian::BigEndianU16,
-            mac::{AsBytesExt as _, CapabilityInfo},
+            mac::AsBytesExt as _,
             test_utils::fake_frames::fake_wpa2_rsne,
             timer::{self, create_timer},
         },

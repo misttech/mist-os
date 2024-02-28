@@ -4,12 +4,9 @@
 
 use {
     crate::{bss::BssDescription, security::SecurityDescriptor},
-    anyhow::{self, format_err},
+    anyhow::format_err,
     fidl_fuchsia_wlan_sme as fidl_sme,
-    std::{
-        collections::HashSet,
-        convert::{TryFrom, TryInto},
-    },
+    std::collections::HashSet,
 };
 
 #[cfg(target_os = "fuchsia")]

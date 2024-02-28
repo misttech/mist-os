@@ -20,7 +20,6 @@ use {
     fuchsia_trace_provider as ftrace_provider,
     fuchsia_zircon::prelude::*,
     futures::{
-        self,
         channel::{mpsc, oneshot},
         future::OptionFuture,
         lock::Mutex,
@@ -30,7 +29,7 @@ use {
     pin_utils::pin_mut,
     std::{convert::Infallible, sync::Arc},
     tracing::{error, info, warn},
-    wlan_trace as wtrace, wlancfg_config,
+    wlan_trace as wtrace,
     wlancfg_lib::{
         access_point::AccessPoint,
         client::{

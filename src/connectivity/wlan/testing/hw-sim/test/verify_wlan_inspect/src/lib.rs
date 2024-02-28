@@ -5,7 +5,7 @@
 use {
     anyhow::{format_err, Error},
     diagnostics_assertions::{assert_data_tree, AnyProperty},
-    diagnostics_hierarchy::{self, DiagnosticsHierarchy},
+    diagnostics_hierarchy::DiagnosticsHierarchy,
     diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect},
     fidl_fuchsia_diagnostics::ArchiveAccessorMarker,
     fidl_fuchsia_wlan_policy as fidl_policy,

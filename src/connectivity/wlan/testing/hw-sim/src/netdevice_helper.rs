@@ -6,7 +6,6 @@ use {
     fidl::endpoints::{create_proxy, Proxy},
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     futures::{FutureExt as _, StreamExt as _, TryStreamExt as _},
-    netdevice_client,
     wlan_common::{appendable::Appendable, big_endian::BigEndianU16, mac},
 };
 

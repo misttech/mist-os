@@ -16,7 +16,6 @@ use crate::rsna::{
 };
 use crate::{format_rsn_err, Error};
 use bytes::Bytes;
-use eapol;
 use eapol::KeyFrameBuf;
 use zerocopy::ByteSlice;
 
@@ -177,7 +176,7 @@ mod tests {
     use super::*;
     use crate::key::exchange::handshake::group_key::GroupKey;
     use crate::key_data::kde;
-    use crate::rsna::{test_util, Dot11VerifiedKeyFrame, NegotiatedProtection, Role};
+    use crate::rsna::{test_util, NegotiatedProtection, Role};
     use lazy_static::lazy_static;
     use wlan_common::big_endian::BigEndianU64;
     use wlan_common::ie::rsn::cipher::{Cipher, CIPHER_BIP_CMAC_128, CIPHER_CCMP_128, TKIP};

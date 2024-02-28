@@ -23,7 +23,7 @@ use {
         select,
         stream::FuturesUnordered,
     },
-    std::{convert::TryFrom, sync::Arc},
+    std::sync::Arc,
     tracing::{error, info, warn},
 };
 
@@ -507,9 +507,8 @@ mod tests {
         super::*,
         crate::{
             access_point::state_machine as ap_fsm,
-            config_management::{Credential, NetworkConfig, SecurityType, WPA_PSK_BYTE_LEN},
+            config_management::{NetworkConfig, SecurityType, WPA_PSK_BYTE_LEN},
             mode_management::iface_manager_api::SmeForScan,
-            telemetry::{TelemetryEvent, TelemetrySender},
             util::testing::{
                 fakes::{FakeSavedNetworksManager, FakeScanRequester},
                 generate_random_fidl_network_config, generate_random_fidl_network_config_with_ssid,
@@ -521,11 +520,9 @@ mod tests {
         fuchsia_async as fasync,
         futures::{
             channel::{mpsc, oneshot},
-            lock::Mutex,
             task::Poll,
         },
         pin_utils::pin_mut,
-        std::convert::TryFrom,
         test_case::test_case,
         wlan_common::assert_variant,
     };

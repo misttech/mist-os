@@ -43,11 +43,7 @@ use {
     hex,
     lazy_static::lazy_static,
     pin_utils::pin_mut,
-    std::{
-        convert::{Infallible, TryFrom},
-        pin::Pin,
-        sync::Arc,
-    },
+    std::{convert::Infallible, pin::Pin, sync::Arc},
     test_case::test_case,
     tracing::{debug, info, trace},
     wlan_common::{

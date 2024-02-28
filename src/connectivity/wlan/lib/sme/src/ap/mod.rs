@@ -34,7 +34,7 @@ use {
         timer::{self, EventId, Timer},
         RadioConfig,
     },
-    wlan_rsn::{self, psk},
+    wlan_rsn::psk,
 };
 
 const DEFAULT_BEACON_PERIOD: u16 = 100;
@@ -880,9 +880,7 @@ mod tests {
         super::*,
         crate::{test_utils::*, MlmeStream, Station},
         fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_async as fasync,
-        ieee80211::MacAddr,
         lazy_static::lazy_static,
-        std::convert::TryFrom,
         test_case::test_case,
         wlan_common::{
             assert_variant,
@@ -895,7 +893,6 @@ mod tests {
                 },
                 fake_features::fake_mac_sublayer_support,
             },
-            RadioConfig,
         },
     };
 

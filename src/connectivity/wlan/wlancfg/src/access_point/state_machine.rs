@@ -568,8 +568,7 @@ mod tests {
         fidl_fuchsia_wlan_common as fidl_common,
         futures::{stream::StreamFuture, task::Poll, Future},
         pin_utils::pin_mut,
-        std::convert::TryFrom,
-        wlan_common::{assert_variant, channel::Cbw},
+        wlan_common::assert_variant,
     };
 
     struct TestValues {

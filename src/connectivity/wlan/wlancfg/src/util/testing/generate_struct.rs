@@ -16,7 +16,6 @@ use {
     fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddrBytes, Ssid},
     rand::{Rng as _, RngCore},
-    std::convert::TryFrom,
     wlan_common::{
         channel::{Cbw, Channel},
         random_fidl_bss_description,

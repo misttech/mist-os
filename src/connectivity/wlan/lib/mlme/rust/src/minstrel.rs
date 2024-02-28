@@ -707,7 +707,6 @@ mod tests {
     use {
         super::*,
         fidl_fuchsia_wlan_common as fidl_common,
-        ieee80211::{MacAddr, MacAddrBytes},
         lazy_static::lazy_static,
         std::sync::{Arc, Mutex},
         wlan_common::{

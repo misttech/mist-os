@@ -5,7 +5,7 @@
 use {
     crate::client::ScanError,
     fuchsia_zircon as zx,
-    thiserror::{self, Error},
+    thiserror::Error,
     wlan_common::{
         appendable::BufferTooSmall,
         error::{FrameParseError, FrameWriteError},

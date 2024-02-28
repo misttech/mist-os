@@ -514,7 +514,6 @@ mod tests {
         crate::client::test_utils,
         diagnostics_assertions::{assert_data_tree, AnyProperty},
         fuchsia_inspect::Inspector,
-        std::convert::TryFrom,
     };
 
     #[test]

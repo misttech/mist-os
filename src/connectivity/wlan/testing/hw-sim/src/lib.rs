@@ -20,7 +20,7 @@ use {
     lazy_static::lazy_static,
     pin_utils::pin_mut,
     realm_proxy_client::RealmProxyClient,
-    std::{convert::TryFrom, future::Future, marker::Unpin},
+    std::future::Future,
     wlan_common::{
         bss::Protection,
         channel::{Cbw, Channel},
@@ -36,7 +36,7 @@ use {
         mac, mgmt_writer, TimeUnit,
     },
     wlan_frame_writer::write_frame_with_dynamic_buffer,
-    wlan_rsn::{self, rsna::UpdateSink},
+    wlan_rsn::rsna::UpdateSink,
 };
 
 pub mod event;

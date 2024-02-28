@@ -4,7 +4,6 @@
 
 use num_traits::SaturatingAdd;
 use std::collections::VecDeque;
-use std::default::Default;
 use tracing::error;
 
 pub struct WindowedStats<T> {

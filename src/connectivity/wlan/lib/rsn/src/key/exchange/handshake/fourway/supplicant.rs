@@ -18,7 +18,6 @@ use crate::rsna::{
 use crate::Error;
 use crate::ProtectionInfo;
 use anyhow::{ensure, format_err};
-use eapol;
 use eapol::KeyFrameBuf;
 use tracing::error;
 use zerocopy::ByteSlice;

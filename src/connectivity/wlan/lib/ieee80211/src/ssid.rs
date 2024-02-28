@@ -7,7 +7,6 @@ use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     std::{
         borrow::Cow,
-        convert::{TryFrom, TryInto},
         fmt,
         ops::{Deref, Index},
         slice::SliceIndex,

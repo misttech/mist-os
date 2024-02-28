@@ -17,7 +17,6 @@ use {
     std::{
         cmp::Reverse,
         collections::{HashMap, HashSet},
-        convert::TryFrom,
         fmt::{self, Debug},
     },
     wlan_common::security::{
@@ -803,7 +802,7 @@ mod tests {
     use {
         super::*,
         crate::util::testing::random_connection_data,
-        std::{collections::VecDeque, iter::FromIterator},
+        std::collections::VecDeque,
         test_case::test_case,
         wlan_common::assert_variant,
         wlan_common::security::{

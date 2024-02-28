@@ -89,7 +89,7 @@ mod tests {
         crate::assert_variant,
         fuchsia_async as fasync,
         fuchsia_zircon::{self as zx, DurationNum},
-        futures::channel::mpsc::{self, UnboundedSender},
+        futures::channel::mpsc::UnboundedSender,
         pin_utils::pin_mut,
         std::task::Poll,
     };

@@ -5,7 +5,6 @@
 //! Generic state machine implementation with compile time checked state transitions.
 
 use std::{
-    convert::{AsMut, AsRef},
     fmt::Debug,
     marker::PhantomData,
     ops::{Deref, DerefMut},

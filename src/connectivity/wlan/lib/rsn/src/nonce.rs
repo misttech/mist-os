@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::prf;
-use anyhow;
 use bytes::{BufMut, BytesMut};
 use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;

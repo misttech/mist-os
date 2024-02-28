@@ -3,15 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{self, bail},
-    banjo_fuchsia_wlan_common as banjo_wlan_common,
+    anyhow::bail, banjo_fuchsia_wlan_common as banjo_wlan_common,
     banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac,
     banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
     banjo_fuchsia_wlan_internal as banjo_wlan_internal, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    static_assertions::assert_eq_size_val,
-    std::cmp::min,
-    tracing::warn,
+    static_assertions::assert_eq_size_val, std::cmp::min, tracing::warn,
 };
 
 /// Generic wrapper for a banjo return type, with a lifetime parameter. The

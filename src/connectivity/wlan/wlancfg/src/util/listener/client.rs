@@ -102,12 +102,7 @@ pub type ClientListenerMessageSender = mpsc::UnboundedSender<ClientListenerMessa
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{super::generic::CurrentStateCache, *},
-        crate::client::types::Ssid,
-        fidl_fuchsia_wlan_policy as fidl_policy,
-        std::convert::TryFrom,
-    };
+    use {super::*, crate::client::types::Ssid, fidl_fuchsia_wlan_policy as fidl_policy};
 
     #[fuchsia::test]
     fn merge_update_none_to_one_active() {

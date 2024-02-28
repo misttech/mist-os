@@ -4,9 +4,8 @@
 
 use {
     crate::client::EstablishRsnaFailureReason,
-    eapol,
     fidl_fuchsia_wlan_mlme::{EapolResultCode, SaeFrame},
-    wlan_rsn::{self, auth, rsna::UpdateSink, Error, NegotiatedProtection},
+    wlan_rsn::{auth, rsna::UpdateSink, Error, NegotiatedProtection},
 };
 
 #[derive(Debug)]

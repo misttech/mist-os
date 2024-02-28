@@ -417,7 +417,7 @@ fn read_delba_hdr<B: ByteSlice>(body: B) -> Result<Ref<B, mac::DelbaHdr>, Error>
 #[cfg(test)]
 mod tests {
     use {
-        super::*, crate::error::Error, fuchsia_zircon as zx, wlan_common::assert_variant,
+        super::*, fuchsia_zircon as zx, wlan_common::assert_variant,
         wlan_statemachine as statemachine,
     };
 

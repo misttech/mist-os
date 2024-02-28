@@ -5,8 +5,7 @@
 use {
     super::*,
     crate::error::{FrameParseError, FrameParseResult},
-    anyhow::{self, format_err, Context},
-    std::convert::TryInto,
+    anyhow::{format_err, Context},
     zerocopy::ByteSlice,
 };
 

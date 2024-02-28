@@ -108,8 +108,8 @@ mod tests {
     use super::*;
     use hex::FromHex;
     use wlan_common::ie::rsn::{
-        akm::{Akm, PSK},
-        cipher::{Cipher, CCMP_128, TKIP},
+        akm::PSK,
+        cipher::{CCMP_128, TKIP},
     };
 
     struct TestData {

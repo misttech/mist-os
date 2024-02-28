@@ -89,7 +89,7 @@ mod tests {
     use futures::task::Poll;
     use ieee80211::Ssid;
     use pin_utils::pin_mut;
-    use std::convert::TryFrom;
+
     use wlan_common::assert_variant;
 
     #[test]

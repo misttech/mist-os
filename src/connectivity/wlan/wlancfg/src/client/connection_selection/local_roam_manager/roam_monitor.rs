@@ -130,10 +130,7 @@ mod test {
         crate::{
             client::connection_selection::{EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR},
             config_management::network_config::PastConnectionList,
-            util::{
-                pseudo_energy::SignalData,
-                testing::{generate_connect_selection, generate_random_channel},
-            },
+            util::testing::{generate_connect_selection, generate_random_channel},
         },
         fidl_fuchsia_wlan_internal as fidl_internal,
         fuchsia_async::TestExecutor,

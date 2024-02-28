@@ -15,7 +15,6 @@ use crate::nonce::NonceReader;
 use crate::rsna::{Dot11VerifiedKeyFrame, NegotiatedProtection, Role, UpdateSink};
 use crate::ProtectionInfo;
 use crate::{rsn_ensure, Error};
-use eapol;
 use ieee80211::MacAddr;
 use std::{
     ops::Deref,
@@ -628,14 +627,13 @@ fn is_zero(slice: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::Fourway;
     use super::*;
     use crate::{
-        rsna::{test_util, SecAssocUpdate, UpdateSink},
+        rsna::{test_util, SecAssocUpdate},
         rsne::RsnCapabilities,
     };
     use wlan_common::ie::{
-        rsn::cipher::{Cipher, CIPHER_BIP_CMAC_128, CIPHER_BIP_CMAC_256},
+        rsn::cipher::{CIPHER_BIP_CMAC_128, CIPHER_BIP_CMAC_256},
         wpa::fake_wpa_ies::fake_deprecated_wpa1_vendor_ie,
     };
 

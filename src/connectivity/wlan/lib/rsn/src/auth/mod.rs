@@ -10,7 +10,6 @@ use {
         rsna::{AuthRejectedReason, AuthStatus, Dot11VerifiedKeyFrame, SecAssocUpdate, UpdateSink},
         Error,
     },
-    anyhow,
     fidl_fuchsia_wlan_mlme::SaeFrame,
     ieee80211::{MacAddr, MacAddrBytes, Ssid},
     tracing::warn,
@@ -264,7 +263,6 @@ fn process_sae_updates(
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_wlan_ieee80211;
     use std::sync::{Arc, Mutex};
     use wlan_common::assert_variant;
 

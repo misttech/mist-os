@@ -8,7 +8,6 @@ use {
     fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
     structopt::StructOpt,
-    wlan_dev,
 };
 
 fn main() -> Result<(), Error> {

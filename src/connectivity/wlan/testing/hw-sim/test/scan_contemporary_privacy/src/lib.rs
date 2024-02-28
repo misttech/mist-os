@@ -8,7 +8,6 @@ use {
     ieee80211::{Bssid, MacAddrBytes, Ssid},
     lazy_static::lazy_static,
     pin_utils::pin_mut,
-    std::convert::TryFrom,
     wlan_common::{
         bss::Protection,
         channel::{Cbw, Channel},

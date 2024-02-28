@@ -18,14 +18,7 @@ use {
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
     ieee80211::{Bssid, MacAddrBytes, Ssid},
     static_assertions::assert_eq_size,
-    std::{
-        cmp::Ordering,
-        collections::HashMap,
-        convert::{TryFrom, TryInto},
-        fmt,
-        hash::Hash,
-        ops::Range,
-    },
+    std::{cmp::Ordering, collections::HashMap, fmt, hash::Hash, ops::Range},
     zerocopy::{AsBytes, Ref},
 };
 

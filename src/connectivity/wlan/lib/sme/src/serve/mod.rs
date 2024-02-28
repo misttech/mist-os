@@ -16,7 +16,6 @@ use {
     futures::{channel::mpsc, future::FutureObj, prelude::*, select, stream::FuturesUnordered},
     std::{
         convert::Infallible,
-        marker::Unpin,
         pin::Pin,
         sync::{Arc, Mutex},
     },
@@ -324,7 +323,6 @@ mod tests {
         fuchsia_inspect::Inspector,
         futures::task::Poll,
         pin_utils::pin_mut,
-        std::pin::Pin,
         test_case::test_case,
         wlan_common::{
             assert_variant,

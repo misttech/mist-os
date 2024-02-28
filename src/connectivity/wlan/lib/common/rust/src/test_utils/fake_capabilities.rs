@@ -10,7 +10,6 @@ use {
     },
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_mlme as fidl_mlme,
-    std::convert::TryInto,
     zerocopy::AsBytes,
 };
 

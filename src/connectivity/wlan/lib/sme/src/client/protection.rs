@@ -7,7 +7,6 @@ use {
     anyhow::{format_err, Error},
     fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_mlme::DeviceInfo,
-    std::convert::{TryFrom, TryInto},
     wlan_common::{
         bss::BssDescription,
         ie::{
@@ -21,7 +20,6 @@ use {
         },
     },
     wlan_rsn::{
-        self,
         auth::{self, psk::ToPsk},
         nonce::NonceReader,
         NegotiatedProtection, ProtectionInfo,
@@ -367,7 +365,7 @@ pub(crate) fn build_protection_ie(protection: &Protection) -> Result<Option<Prot
 mod tests {
     use {
         super::*,
-        crate::client::{self, rsn::Rsna},
+        crate::client::{self},
         wlan_common::{
             assert_variant, fake_bss_description,
             ie::{
@@ -380,7 +378,6 @@ mod tests {
             },
             test_utils::fake_features::{fake_security_support, fake_security_support_empty},
         },
-        wlan_rsn::{rsna::NegotiatedProtection, ProtectionInfo},
     };
 
     #[test]

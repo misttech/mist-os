@@ -9,12 +9,9 @@ use {
     futures::channel::mpsc,
     ieee80211::{Bssid, MacAddrBytes, Ssid},
     lazy_static::lazy_static,
-    std::{
-        convert::TryFrom,
-        sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc, Mutex,
-        },
+    std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
     },
     wlan_common::{
         assert_variant,

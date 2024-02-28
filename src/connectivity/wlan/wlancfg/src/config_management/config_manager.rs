@@ -22,7 +22,6 @@ use {
     futures::lock::Mutex,
     rand::Rng,
     std::{
-        clone::Clone,
         collections::{hash_map::Entry, HashMap, HashSet},
         fs,
         path::Path,
@@ -732,7 +731,7 @@ mod tests {
             distributions::{Alphanumeric, DistString as _},
             thread_rng,
         },
-        std::{convert::TryFrom, io::Write},
+        std::io::Write,
         tempfile::TempDir,
         test_case::test_case,
         wlan_common::assert_variant,

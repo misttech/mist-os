@@ -21,7 +21,6 @@ use {
     },
     std::sync::Arc,
     tracing::{error, info},
-    wlandevicemonitor_config,
 };
 
 const PHY_PATH: &'static str = "/dev/class/wlanphy";

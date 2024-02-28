@@ -6,7 +6,7 @@
 
 use {
     core::mem,
-    thiserror::{self, Error},
+    thiserror::Error,
     tracing::warn,
     wlan_bitfield::bitfield,
     wlan_common::{

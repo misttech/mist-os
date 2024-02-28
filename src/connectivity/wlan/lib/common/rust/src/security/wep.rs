@@ -14,8 +14,7 @@
 //                        implement an insecure security protocol.
 
 use fidl_fuchsia_wlan_common_security as fidl_security;
-use hex;
-use std::convert::{TryFrom, TryInto};
+
 use thiserror::Error;
 
 use crate::security::SecurityError;

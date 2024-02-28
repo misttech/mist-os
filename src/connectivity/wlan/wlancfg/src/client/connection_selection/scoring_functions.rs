@@ -177,12 +177,9 @@ mod test {
         crate::{
             client::connection_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
             config_management::{ConnectFailure, FailureReason, PastConnectionData},
-            util::{
-                pseudo_energy::SignalData,
-                testing::{
-                    generate_channel, generate_random_bss, generate_random_saved_network_data,
-                    generate_random_scanned_candidate, random_connection_data,
-                },
+            util::testing::{
+                generate_channel, generate_random_bss, generate_random_saved_network_data,
+                generate_random_scanned_candidate, random_connection_data,
             },
         },
         fuchsia_async as fasync, fuchsia_zircon as zx,

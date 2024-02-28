@@ -56,7 +56,7 @@ pub fn poll_sme_req(
 }
 
 mod tests {
-    use {super::*, fuchsia_async as fasync, futures::future};
+    use {super::*, fuchsia_async as fasync};
 
     #[fuchsia::test]
     fn test_run_while() {

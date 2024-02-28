@@ -244,9 +244,7 @@ fn convert_connect_result(result: &ConnectResult, is_reconnect: bool) -> fidl_sm
 mod tests {
     use {
         super::*,
-        crate::client::{
-            ConnectFailure, ConnectResult, EstablishRsnaFailure, EstablishRsnaFailureReason,
-        },
+        crate::client::{ConnectFailure, EstablishRsnaFailure, EstablishRsnaFailureReason},
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_wlan_internal as fidl_internal,
         fidl_fuchsia_wlan_mlme::ScanResultCode,

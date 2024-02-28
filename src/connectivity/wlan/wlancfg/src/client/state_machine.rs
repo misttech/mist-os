@@ -40,10 +40,7 @@ use {
         select,
         stream::{self, StreamExt, TryStreamExt},
     },
-    std::{
-        convert::{Infallible, TryFrom},
-        sync::Arc,
-    },
+    std::{convert::Infallible, sync::Arc},
     tracing::{debug, error, info, warn},
     wlan_common::{
         bss::BssDescription, energy::DecibelMilliWatt, sequestered::Sequestered,
@@ -867,8 +864,7 @@ mod tests {
         futures::{task::Poll, Future},
         lazy_static::lazy_static,
         pin_utils::pin_mut,
-        std::convert::TryFrom,
-        wlan_common::{assert_variant, sequestered::Sequestered},
+        wlan_common::assert_variant,
         wlan_metrics_registry::PolicyDisconnectionMigratedMetricDimensionReason,
     };
 

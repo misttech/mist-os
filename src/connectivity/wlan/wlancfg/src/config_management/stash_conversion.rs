@@ -83,7 +83,6 @@ pub fn network_config_vec_to_persistent_data(
 mod tests {
     use {
         super::{super::*, *},
-        std::convert::TryFrom,
         wlan_stash::policy as pstash,
     };
 

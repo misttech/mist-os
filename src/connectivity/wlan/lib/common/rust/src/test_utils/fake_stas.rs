@@ -23,7 +23,6 @@ use {
         distributions::{Distribution, Standard},
         Rng,
     },
-    std::convert::{TryFrom, TryInto},
 };
 
 #[rustfmt::skip]
@@ -526,7 +525,6 @@ mod tests {
             bss::{BssDescription, Protection},
             test_utils::fake_frames::{fake_wmm_param_body, fake_wmm_param_header},
         },
-        ie::IeType,
     };
 
     #[test]

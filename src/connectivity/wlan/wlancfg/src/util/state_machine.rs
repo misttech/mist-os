@@ -8,7 +8,7 @@ use {
         ready,
         task::{Context, Poll},
     },
-    std::{convert::Infallible, marker::Unpin, pin::Pin},
+    std::{convert::Infallible, pin::Pin},
 };
 
 #[derive(Debug)]

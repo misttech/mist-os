@@ -13,7 +13,7 @@ use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_device as fidl_dev,
     fidl_fuchsia_wlan_device_service::{self as fidl_svc, DeviceMonitorRequest},
     fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_inspect::{self, Inspector},
+    fuchsia_inspect::Inspector,
     fuchsia_zircon as zx,
     futures::{
         channel::mpsc, select, stream::FuturesUnordered, FutureExt, StreamExt, TryStreamExt,
@@ -556,7 +556,7 @@ mod tests {
         crate::device::PhyOwnership,
         fidl::endpoints::{create_proxy, create_proxy_and_stream, ControlHandle},
         fidl_fuchsia_wlan_common as fidl_wlan_common, fuchsia_async as fasync,
-        futures::{future::BoxFuture, pin_mut, task::Poll, StreamExt},
+        futures::{future::BoxFuture, pin_mut, task::Poll},
         ieee80211::{MacAddrBytes, NULL_ADDR},
         std::convert::Infallible,
         test_case::test_case,

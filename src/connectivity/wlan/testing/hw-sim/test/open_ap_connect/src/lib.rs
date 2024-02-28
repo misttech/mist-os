@@ -7,7 +7,6 @@ use {
     fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::DurationNum,
     futures::channel::oneshot,
-    hex,
     std::panic,
     wlan_hw_sim::{
         event::{

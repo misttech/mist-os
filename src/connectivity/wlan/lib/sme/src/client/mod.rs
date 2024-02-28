@@ -29,13 +29,9 @@ use {
     fuchsia_zircon as zx,
     futures::channel::{mpsc, oneshot},
     ieee80211::{Bssid, MacAddrBytes, Ssid},
-    std::{
-        convert::{TryFrom, TryInto},
-        sync::Arc,
-    },
+    std::sync::Arc,
     tracing::{error, info, warn},
     wlan_common::{
-        self,
         bss::{BssDescription, Protection as BssProtection},
         capabilities::derive_join_capabilities,
         channel::Channel,
@@ -806,14 +802,13 @@ mod tests {
     use fuchsia_inspect as finspect;
     use ieee80211::MacAddr;
     use lazy_static::lazy_static;
-    use std::convert::TryFrom;
     use test_case::test_case;
     use wlan_common::{
         assert_variant,
         channel::Cbw,
         fake_bss_description, fake_fidl_bss_description,
         ie::{fake_ht_cap_bytes, fake_vht_cap_bytes, /*rsn::akm,*/ IeType},
-        security::{wep::WEP40_KEY_BYTES, wpa::credential::PSK_SIZE_BYTES, SecurityAuthenticator},
+        security::{wep::WEP40_KEY_BYTES, wpa::credential::PSK_SIZE_BYTES},
         test_utils::{
             fake_features::{
                 fake_mac_sublayer_support, fake_security_support, fake_security_support_empty,

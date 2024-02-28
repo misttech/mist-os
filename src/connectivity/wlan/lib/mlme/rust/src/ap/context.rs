@@ -525,9 +525,8 @@ mod test {
         crate::{ap::ClientEvent, buffer::FakeCBufferProvider, device::FakeDevice},
         fuchsia_async as fasync,
         lazy_static::lazy_static,
-        std::convert::TryFrom,
         wlan_common::{
-            assert_variant, mac,
+            assert_variant,
             timer::{self, create_timer},
         },
     };

@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        appendable::BufferTooSmall,
-        ie::{
-            rsn::{akm, cipher, rsne::Rsne},
-            wpa::WpaIe,
-            write_wpa1_ie,
-            wsc::{ProbeRespWsc, WpsState},
-            *,
-        },
-        organization::Oui,
+use crate::{
+    appendable::BufferTooSmall,
+    ie::{
+        rsn::{akm, cipher, rsne::Rsne},
+        wpa::WpaIe,
+        wsc::{ProbeRespWsc, WpsState},
+        *,
     },
-    std::convert::TryInto,
+    organization::Oui,
 };
 
 pub fn fake_ht_cap_chanwidth(chanwidth: ChanWidthSet) -> HtCapabilities {

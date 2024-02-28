@@ -8,7 +8,7 @@ use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_sme as fidl_sme,
     fidl_fuchsia_wlan_softmac as fidl_softmac,
     fuchsia_async::{Duration, Task},
-    fuchsia_inspect::{self, Inspector, Node as InspectNode},
+    fuchsia_inspect::{Inspector, Node as InspectNode},
     fuchsia_inspect_contrib::auto_persist,
     fuchsia_trace as ftrace,
     fuchsia_zircon::{self as zx, HandleBased},
@@ -30,7 +30,7 @@ use {
         },
         DriverEvent, DriverEventSink,
     },
-    wlan_sme::{self, serve::create_sme},
+    wlan_sme::serve::create_sme,
     wlan_trace as wtrace,
 };
 
@@ -597,18 +597,14 @@ mod tests {
         super::*,
         anyhow::format_err,
         diagnostics_assertions::assert_data_tree,
-        fidl::endpoints::Proxy,
         fuchsia_async::TestExecutor,
         fuchsia_inspect::InspectorConfig,
-        futures::{channel::oneshot, stream::FuturesUnordered, task::Poll},
+        futures::{stream::FuturesUnordered, task::Poll},
         pin_utils::pin_mut,
         std::sync::Arc,
         test_case::test_case,
         wlan_common::assert_variant,
-        wlan_mlme::{
-            self,
-            device::test_utils::{FakeDevice, FakeDeviceConfig},
-        },
+        wlan_mlme::device::test_utils::{FakeDevice, FakeDeviceConfig},
         zx::Vmo,
     };
 

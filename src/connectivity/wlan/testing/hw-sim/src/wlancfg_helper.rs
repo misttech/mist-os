@@ -11,7 +11,6 @@ use {
     futures::{StreamExt, TryStreamExt},
     ieee80211::Ssid,
     realm_proxy_client::RealmProxyClient,
-    std::convert::TryInto,
     tracing::info,
 };
 

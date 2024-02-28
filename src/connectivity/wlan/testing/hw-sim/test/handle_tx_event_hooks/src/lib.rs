@@ -22,7 +22,7 @@ use {
         },
         *,
     },
-    wlan_rsn::{self, rsna::UpdateSink},
+    wlan_rsn::rsna::UpdateSink,
 };
 
 fn scan_and_connect<'h>(

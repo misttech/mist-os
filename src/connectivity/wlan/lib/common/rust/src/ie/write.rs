@@ -196,7 +196,6 @@ mod tests {
         super::*,
         crate::buffer_writer::BufferWriter,
         crate::ie::rsn::{akm, cipher},
-        crate::organization::Oui,
     };
 
     #[test]

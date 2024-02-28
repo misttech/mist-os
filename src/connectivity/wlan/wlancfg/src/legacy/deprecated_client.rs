@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 use {
     crate::legacy::IfaceRef,
-    fidl, fidl_fuchsia_wlan_product_deprecatedclient as deprecated,
-    fidl_fuchsia_wlan_sme as fidl_sme,
+    fidl_fuchsia_wlan_product_deprecatedclient as deprecated, fidl_fuchsia_wlan_sme as fidl_sme,
     futures::prelude::*,
     tracing::{debug, error},
 };

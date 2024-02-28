@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use hex;
-use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
 use std::str;
 use thiserror::Error;
@@ -204,7 +202,6 @@ impl TryFrom<Vec<u8>> for Passphrase {
 
 #[cfg(test)]
 mod tests {
-    use std::convert::TryFrom;
 
     use crate::security::wpa::credential::{
         Passphrase, PassphraseError, Psk, PskError, PSK_SIZE_BYTES,

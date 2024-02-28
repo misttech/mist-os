@@ -4,7 +4,7 @@
 
 use {
     crate::{ResponderExt, SendResultExt, WithName},
-    fidl, fuchsia_zircon as zx,
+    fuchsia_zircon as zx,
     test_case::test_case,
 };
 

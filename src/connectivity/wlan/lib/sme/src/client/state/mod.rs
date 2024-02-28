@@ -1345,9 +1345,8 @@ mod tests {
         fuchsia_async::DurationExt,
         fuchsia_inspect::Inspector,
         futures::{channel::mpsc, Stream, StreamExt},
-        ieee80211::Ssid,
         link_state::{EstablishingRsna, LinkUp},
-        std::{convert::TryFrom, sync::Arc, task::Poll},
+        std::{sync::Arc, task::Poll},
         wlan_common::{
             assert_variant,
             bss::Protection as BssProtection,
@@ -1366,11 +1365,7 @@ mod tests {
             },
             timer,
         },
-        wlan_rsn::{
-            key::exchange::Key,
-            rsna::{SecAssocStatus, SecAssocUpdate, UpdateSink},
-            NegotiatedProtection,
-        },
+        wlan_rsn::{key::exchange::Key, rsna::SecAssocStatus, NegotiatedProtection},
         zx::DurationNum,
     };
 

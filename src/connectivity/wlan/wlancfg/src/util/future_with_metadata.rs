@@ -39,13 +39,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_async as fasync,
-        futures::{future, task::Poll},
-        pin_utils::pin_mut,
-        wlan_common::assert_variant,
-    };
+    use {super::*, fuchsia_async as fasync, pin_utils::pin_mut, wlan_common::assert_variant};
 
     #[fuchsia::test]
     fn assign_and_read_metadata_in_future_output() {

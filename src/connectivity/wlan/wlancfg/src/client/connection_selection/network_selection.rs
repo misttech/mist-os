@@ -24,7 +24,7 @@ pub fn select_networks(
 #[cfg(test)]
 mod test {
 
-    use {super::*, crate::client::types, std::collections::HashSet};
+    use super::*;
     #[fuchsia::test]
     fn select_networks_selects_specified_network() {
         let ssid = "foo";

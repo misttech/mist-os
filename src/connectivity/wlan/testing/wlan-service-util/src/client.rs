@@ -14,7 +14,6 @@ use fidl_fuchsia_wlan_sme as fidl_sme;
 use fuchsia_zircon as zx;
 use futures::stream::TryStreamExt;
 use ieee80211::Ssid;
-use std::convert::TryFrom;
 use wlan_common::{
     bss::{BssDescription, Protection},
     security::{

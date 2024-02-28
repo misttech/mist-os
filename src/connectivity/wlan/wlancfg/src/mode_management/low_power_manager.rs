@@ -85,7 +85,7 @@ mod tests {
         },
         anyhow::format_err,
         async_trait::async_trait,
-        fuchsia_async, fuchsia_zircon as zx,
+        fuchsia_zircon as zx,
         futures::{channel::mpsc, task::Poll, StreamExt},
         ieee80211::MacAddr,
         pin_utils::pin_mut,

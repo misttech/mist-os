@@ -1107,11 +1107,10 @@ impl RemoteClient {
 mod tests {
     use {
         super::*,
-        crate::{ap::TimedEvent, buffer::FakeCBufferProvider, device::FakeDevice},
+        crate::{buffer::FakeCBufferProvider, device::FakeDevice},
         fuchsia_async as fasync,
         ieee80211::Bssid,
         lazy_static::lazy_static,
-        std::convert::TryFrom,
         test_case::test_case,
         wlan_common::{
             assert_variant,

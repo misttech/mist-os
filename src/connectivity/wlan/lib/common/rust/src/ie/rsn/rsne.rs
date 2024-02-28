@@ -605,7 +605,7 @@ named_attr!(
 mod tests {
     use super::{
         akm::{AKM_EAP, AKM_FT_PSK},
-        cipher::{CIPHER_BIP_CMAC_256, CIPHER_CCMP_128, CIPHER_GCMP_256, CIPHER_TKIP},
+        cipher::{CIPHER_BIP_CMAC_256, CIPHER_GCMP_256, CIPHER_TKIP},
         *,
     };
     use crate::test_utils::fake_features::fake_security_support_empty;

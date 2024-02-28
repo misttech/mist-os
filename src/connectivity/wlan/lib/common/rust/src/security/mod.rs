@@ -48,7 +48,6 @@ pub mod wep;
 pub mod wpa;
 
 use fidl_fuchsia_wlan_common_security as fidl_security;
-use std::convert::TryFrom;
 use thiserror::Error;
 
 use crate::security::{
@@ -536,7 +535,7 @@ impl TryFrom<fidl_security::Authentication> for SecurityAuthenticator {
 #[cfg(test)]
 mod tests {
     use fidl_fuchsia_wlan_common_security as fidl_security;
-    use std::convert::{TryFrom, TryInto};
+
     use test_case::test_case;
 
     use crate::security::{

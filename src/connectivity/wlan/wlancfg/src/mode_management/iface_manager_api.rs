@@ -288,7 +288,6 @@ mod tests {
         futures::{future::BoxFuture, task::Poll, StreamExt},
         pin_utils::pin_mut,
         rand::Rng,
-        std::convert::TryFrom,
         test_case::test_case,
         wlan_common::{assert_variant, channel::Cbw, RadioConfig},
     };

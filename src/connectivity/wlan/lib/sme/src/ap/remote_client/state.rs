@@ -19,7 +19,6 @@ use {
         timer::EventId,
     },
     wlan_rsn::{
-        self,
         gtk::GtkProvider,
         nonce::NonceReader,
         rsna::{SecAssocStatus, SecAssocUpdate, UpdateSink},
@@ -833,13 +832,12 @@ mod tests {
     use {
         super::*,
         crate::{
-            ap::{aid, create_rsn_cfg, test_utils::MockAuthenticator},
+            ap::{create_rsn_cfg, test_utils::MockAuthenticator},
             test_utils, MlmeRequest, MlmeSink, MlmeStream,
         },
         futures::channel::mpsc,
-        ieee80211::{MacAddr, MacAddrBytes, Ssid},
+        ieee80211::{MacAddrBytes, Ssid},
         lazy_static::lazy_static,
-        std::convert::TryFrom,
         wlan_common::{
             assert_variant,
             ie::rsn::{

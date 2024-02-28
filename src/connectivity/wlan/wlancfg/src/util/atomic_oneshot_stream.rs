@@ -94,10 +94,7 @@ mod tests {
     use {
         super::*,
         fuchsia_async as fasync,
-        futures::{
-            channel::mpsc, future, select, stream::FuturesUnordered, task::Poll, FutureExt,
-            StreamExt,
-        },
+        futures::{channel::mpsc, future, select, stream::FuturesUnordered, task::Poll, FutureExt},
         pin_utils::pin_mut,
         wlan_common::assert_variant,
     };

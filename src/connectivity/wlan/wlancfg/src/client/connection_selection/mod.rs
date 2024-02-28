@@ -28,7 +28,7 @@ use {
     std::collections::HashMap,
     std::{collections::HashSet, sync::Arc},
     tracing::{debug, error, info, warn},
-    wlan_common::{self, security::SecurityAuthenticator, sequestered::Sequestered},
+    wlan_common::{security::SecurityAuthenticator, sequestered::Sequestered},
     wlan_inspect::wrappers::InspectWlanChan,
 };
 
@@ -659,7 +659,6 @@ mod tests {
         lazy_static::lazy_static,
         pin_utils::pin_mut,
         rand::Rng,
-        std::{convert::TryFrom, sync::Arc},
         test_case::test_case,
         wlan_common::{
             assert_variant, random_fidl_bss_description, scan::Compatibility,

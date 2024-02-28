@@ -20,7 +20,6 @@ use {
         },
         Error,
     },
-    eapol,
     fidl_fuchsia_wlan_mlme::EapolResultCode,
     std::collections::HashSet,
     tracing::{error, info},

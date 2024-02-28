@@ -4,7 +4,6 @@
 
 use {
     anyhow::{format_err, Error},
-    std::convert::TryFrom,
     tracing::error,
 };
 

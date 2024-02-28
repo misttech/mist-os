@@ -6,7 +6,6 @@ use {
     crate::error::Error,
     anyhow::format_err,
     std::{
-        convert::TryFrom,
         ffi::c_void,
         mem::{self, ManuallyDrop},
         ops::{Deref, DerefMut},

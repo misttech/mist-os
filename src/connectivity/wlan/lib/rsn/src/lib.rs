@@ -8,7 +8,7 @@
 // This crate doesn't comply with all 2018 idioms
 #![allow(elided_lifetimes_in_paths)]
 
-use thiserror::{self, Error};
+use thiserror::Error;
 
 // TODO(hahnr): Limit exports and rearrange modules.
 
@@ -31,7 +31,6 @@ use {
         },
         rsna::{esssa::EssSa, Role, UpdateSink},
     },
-    eapol,
     fidl_fuchsia_wlan_mlme::{EapolResultCode, SaeFrame},
     ieee80211::{MacAddr, Ssid},
     std::sync::{Arc, Mutex},

@@ -5,7 +5,7 @@
 use {
     super::{Header, Id, IeType},
     crate::buffer_reader::BufferReader,
-    std::{convert::TryInto, mem::size_of, ops::Range},
+    std::{mem::size_of, ops::Range},
     zerocopy::ByteSlice,
 };
 

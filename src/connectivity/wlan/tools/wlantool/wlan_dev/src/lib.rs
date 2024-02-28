@@ -18,7 +18,6 @@ use {
     futures::prelude::*,
     ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid, NULL_ADDR},
     itertools::Itertools,
-    std::convert::TryFrom,
     std::fmt,
     wlan_common::{
         bss::{BssDescription, Protection},
