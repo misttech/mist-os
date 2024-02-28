@@ -135,10 +135,7 @@ impl<const TW: usize, const TH: usize> Rasterizer<TW, TH> {
 mod tests {
     use super::*;
 
-    use crate::{
-        rasterizer::pixel_segment::PixelSegmentUnpacked, GeomId, Layer, LinesBuilder, Order, Point,
-        TILE_HEIGHT, TILE_WIDTH,
-    };
+    use crate::{GeomId, Layer, LinesBuilder, Order, Point, TILE_HEIGHT, TILE_WIDTH};
 
     fn segments(p0: Point, p1: Point) -> Vec<PixelSegment<TILE_WIDTH, TILE_HEIGHT>> {
         let mut builder = LinesBuilder::new();

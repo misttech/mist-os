@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{convert::TryInto, str};
+use std::str;
 
 use crate::core::property::Writable;
 

@@ -319,9 +319,9 @@ mod tests {
     use std::borrow::Cow;
 
     use crate::{
-        painter::{layer_workbench::passes, style::Color, BlendMode, Fill, Props, RGBA},
+        painter::{BlendMode, Fill, RGBA},
         simd::{i8x16, Simd},
-        PIXEL_WIDTH, TILE_HEIGHT,
+        PIXEL_WIDTH,
     };
 
     const WHITEF: Color = Color { r: 1.0, g: 1.0, b: 1.0, a: 1.0 };

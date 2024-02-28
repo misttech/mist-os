@@ -6,7 +6,7 @@ use {
     anyhow::Error,
     argh::FromArgs,
     display_utils::{Coordinator, DisplayId, PixelFormat},
-    fuchsia_async as fasync, fuchsia_trace_provider,
+    fuchsia_async as fasync,
     futures::{
         future::{FutureExt, TryFutureExt},
         select,

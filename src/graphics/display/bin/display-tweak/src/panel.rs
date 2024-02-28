@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::utils::{self, on_off_to_bool};
 use anyhow::{bail, Context as _, Error};
 use argh::FromArgs;
-use fdio;
-use fidl;
 use fidl_fuchsia_hardware_display as display;
 use futures::prelude::*;
-use tracing;
-
-use crate::utils::{self, on_off_to_bool};
 
 /// Obtains a handle to the display entry point at the default hard-coded path.
 fn open_display_provider() -> Result<display::ProviderProxy, Error> {

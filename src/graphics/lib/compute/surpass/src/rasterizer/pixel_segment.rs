@@ -233,7 +233,7 @@ impl<const TW: usize, const TH: usize> From<PixelSegment<TW, TH>> for PixelSegme
 mod tests {
     use super::*;
 
-    use crate::{LAYER_LIMIT, PIXEL_DOUBLE_WIDTH, PIXEL_WIDTH, TILE_HEIGHT, TILE_WIDTH};
+    use crate::{LAYER_LIMIT, PIXEL_DOUBLE_WIDTH, TILE_HEIGHT, TILE_WIDTH};
 
     #[test]
     fn pixel_segment() {

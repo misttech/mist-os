@@ -10,7 +10,7 @@ use {
     },
     fuchsia_zircon as zx,
     mapped_vmo::Mapping,
-    std::{cmp::min, convert::TryInto},
+    std::cmp::min,
 };
 
 // TODO(armansito): Extend this to support different patterns and tiled image formats.

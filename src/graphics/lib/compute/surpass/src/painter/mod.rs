@@ -6,7 +6,6 @@ use std::{
     borrow::Cow,
     cell::{Cell, RefCell, RefMut},
     collections::BTreeMap,
-    convert::TryInto,
     mem,
     ops::ControlFlow,
     ops::Range,
@@ -774,8 +773,8 @@ mod tests {
     use std::{collections::HashMap, iter};
 
     use crate::{
-        layout::LinearLayout, painter::style::Color, point::Point, rasterizer::Rasterizer, GeomId,
-        Layer, LinesBuilder, Order, TILE_HEIGHT, TILE_WIDTH,
+        layout::LinearLayout, point::Point, rasterizer::Rasterizer, GeomId, Layer, LinesBuilder,
+        Order,
     };
 
     const RED: Color = Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 };

@@ -968,7 +968,7 @@ pub struct Style {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, convert::TryInto};
+    use std::collections::HashSet;
 
     use super::*;
 

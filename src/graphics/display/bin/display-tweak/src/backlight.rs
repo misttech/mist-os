@@ -4,10 +4,7 @@
 
 use anyhow::{Context as _, Error};
 use argh::FromArgs;
-use fdio;
-use fidl;
 use fidl_fuchsia_hardware_backlight as backlight;
-use tracing;
 
 use crate::utils::{self, on_off_to_bool};
 

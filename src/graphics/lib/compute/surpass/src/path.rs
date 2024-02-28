@@ -878,8 +878,6 @@ impl PathBuilder {
 mod tests {
     use super::*;
 
-    use crate::Point;
-
     fn dist(p0: Point, p1: Point, p2: Point) -> f32 {
         let d10 = p1 - p0;
         let d21 = p2 - p1;

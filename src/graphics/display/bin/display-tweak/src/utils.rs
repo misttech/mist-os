@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
-use fidl;
 use fuchsia_zircon as zx;
 
 /// Unwraps the result of a FIDL call that errors out with a zx::result into a

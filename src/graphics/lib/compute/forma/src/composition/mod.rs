@@ -153,8 +153,6 @@ impl Composition {
 mod tests {
     use super::*;
 
-    use std::convert::TryFrom;
-
     use surpass::{
         painter::{Color, RGBA},
         Path, TILE_HEIGHT, TILE_WIDTH,
