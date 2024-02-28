@@ -7,7 +7,7 @@ use {
     anyhow::Error,
     fidl::endpoints::DiscoverableProtocolMarker,
     serde::Deserialize,
-    serde_json::{self, value::Value},
+    serde_json::value::Value,
     std::{collections::HashMap, default::Default, io},
 };
 

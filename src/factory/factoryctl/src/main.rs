@@ -196,7 +196,7 @@ mod tests {
             Route,
         },
         fuchsia_zircon as zx,
-        futures::{StreamExt, TryStreamExt},
+        futures::StreamExt,
         vfs::{
             directory::entry_container::Directory, execution_scope::ExecutionScope,
             file::vmo::read_only, tree_builder::TreeBuilder,

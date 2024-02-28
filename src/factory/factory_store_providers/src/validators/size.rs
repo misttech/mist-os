@@ -150,7 +150,7 @@ impl Validator for SizeValidator {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::config::ValidatorFileArgsMap, serde_json::json};
+    use {super::*, serde_json::json};
 
     const TO_VALIDATE1: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
     const TO_VALIDATE2: &str = "Здравствуйте";

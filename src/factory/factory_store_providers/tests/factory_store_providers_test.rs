@@ -10,11 +10,10 @@ use {
         MiscFactoryStoreProviderMarker, PlayReadyFactoryStoreProviderMarker,
         WeaveFactoryStoreProviderMarker, WidevineFactoryStoreProviderMarker,
     },
-    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_fs,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_fs::file::{AsyncFile, AsyncGetSizeExt},
     std::fs,
     std::path::Path,
-    std::vec::Vec,
 };
 
 static DATA_FILE_PATH: &'static str = "/pkg/data";

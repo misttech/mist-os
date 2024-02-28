@@ -6,7 +6,6 @@ use {
     anyhow::Error,
     fuchsia_zircon as zx,
     serde::{Deserialize, Serialize},
-    serde_json,
     std::collections::HashMap,
 };
 

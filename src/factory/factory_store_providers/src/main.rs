@@ -26,7 +26,7 @@ use {
     fidl_fuchsia_storage_ext4::{MountVmoResult, Server_Marker},
     fuchsia_bootfs::BootfsParser,
     fuchsia_component::server::ServiceFs,
-    fuchsia_fs, fuchsia_zircon as zx,
+    fuchsia_zircon as zx,
     futures::{lock::Mutex, StreamExt as _, TryFutureExt as _, TryStreamExt as _},
     remote_block_device::BlockClient as _,
     std::{io, sync::Arc},
@@ -428,10 +428,7 @@ async fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        fidl::endpoints::create_endpoints,
-        fuchsia_async as fasync,
-        vfs::{file::vmo::read_only, pseudo_directory},
+        super::*, fidl::endpoints::create_endpoints, fuchsia_async as fasync, vfs::pseudo_directory,
     };
 
     #[fasync::run_singlethreaded(test)]
