@@ -121,5 +121,5 @@ fuchsia_test_package("starnix_magma_tests") {
 # child once every test includes this package.
 fuchsia_package("netstack_package") {
   package_name = "netstack"
-  deps = [ "//src/connectivity/network:netstack-for-tests" ]
+  deps = [ "//src/connectivity/network/netstack3:component-dropin" ]
 }

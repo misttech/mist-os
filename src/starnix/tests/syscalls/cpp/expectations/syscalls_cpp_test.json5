@@ -35,6 +35,9 @@
                 "TmpfsFaultTest/FaultFileTest.ReadV/0",
                 "SocketFault/SocketFault.ReadV/2",
                 "SocketFault/SocketFault.WriteV/2",
+
+                // TODO(https://fxbug.dev/307595538)
+                "SndRcvBufSockOpt/SndRcvBufSockOpt.DoubledOnGet/[01]",
             ],
         },
     ],

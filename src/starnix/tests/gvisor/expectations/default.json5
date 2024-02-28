@@ -10,6 +10,142 @@
             ],
         },
         {
+            include: "//third_party/gvisor_syscall_tests/expects/netstack3/all.json5",
+        },
+        {
+            type: "expect_pass",
+            matchers: [
+                // Tests that pass with starnix but fail when run against
+                // fdio/netstack3 without starnix
+                "AllTCPSockets/AllSocketPairTest.BasicSendmmsg/0",
+                "AllTCPSockets/AllSocketPairTest.BasicSendmmsg/1",
+                "AllTCPSockets/AllSocketPairTest.BasicSendmmsg/2",
+                "AllTCPSockets/AllSocketPairTest.BasicSendmmsg/3",
+                "AllTCPSockets/AllSocketPairTest.BasicSendmmsg/4",
+                "AllTCPSockets/AllSocketPairTest.BasicSendmmsg/5",
+                "AllTCPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/0",
+                "AllTCPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/1",
+                "AllTCPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/2",
+                "AllTCPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/3",
+                "AllTCPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/4",
+                "AllTCPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/5",
+                "AllTCPSockets/AllSocketPairTest.BasicRecvmmsg/0",
+                "AllTCPSockets/AllSocketPairTest.BasicRecvmmsg/1",
+                "AllTCPSockets/AllSocketPairTest.BasicRecvmmsg/2",
+                "AllTCPSockets/AllSocketPairTest.BasicRecvmmsg/3",
+                "AllTCPSockets/AllSocketPairTest.BasicRecvmmsg/4",
+                "AllTCPSockets/AllSocketPairTest.BasicRecvmmsg/5",
+                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg10KB/0",
+                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg10KB/1",
+                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg10KB/2",
+                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg10KB/3",
+                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg10KB/4",
+                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg10KB/5",
+                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg16KB/0",
+                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg16KB/1",
+                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg16KB/2",
+                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg16KB/3",
+                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg16KB/4",
+                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg16KB/5",
+                "AllTCPSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/0",
+                "AllTCPSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/1",
+                "AllTCPSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/2",
+                "AllTCPSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/3",
+                "AllTCPSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/4",
+                "AllTCPSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/5",
+                "AllTCPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/0",
+                "AllTCPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/1",
+                "AllTCPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/2",
+                "AllTCPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/3",
+                "AllTCPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/4",
+                "AllTCPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/5",
+                "AllTCPSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/0",
+                "AllTCPSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/1",
+                "AllTCPSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/2",
+                "AllTCPSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/3",
+                "AllTCPSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/4",
+                "AllTCPSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/5",
+                "AllTCPSockets/AllSocketPairTest.RecvmmsgTimeoutBeforeRecv/0",
+                "AllTCPSockets/AllSocketPairTest.RecvmmsgTimeoutBeforeRecv/1",
+                "AllTCPSockets/AllSocketPairTest.RecvmmsgTimeoutBeforeRecv/2",
+                "AllTCPSockets/AllSocketPairTest.RecvmmsgTimeoutBeforeRecv/3",
+                "AllTCPSockets/AllSocketPairTest.RecvmmsgTimeoutBeforeRecv/4",
+                "AllTCPSockets/AllSocketPairTest.RecvmmsgTimeoutBeforeRecv/5",
+                "AllTCPSockets/AllSocketPairTest.RecvWaitAll/0",
+                "AllTCPSockets/AllSocketPairTest.RecvWaitAll/1",
+                "AllTCPSockets/AllSocketPairTest.RecvWaitAll/2",
+                "AllTCPSockets/AllSocketPairTest.RecvWaitAll/3",
+                "AllTCPSockets/AllSocketPairTest.RecvWaitAll/4",
+                "AllTCPSockets/AllSocketPairTest.RecvWaitAll/5",
+                "AllTCPSockets/AllSocketPairTest.RecvWaitAllDontWait/0",
+                "AllTCPSockets/AllSocketPairTest.RecvWaitAllDontWait/1",
+                "AllTCPSockets/AllSocketPairTest.RecvWaitAllDontWait/2",
+                "AllTCPSockets/AllSocketPairTest.RecvWaitAllDontWait/3",
+                "AllTCPSockets/AllSocketPairTest.RecvWaitAllDontWait/4",
+                "AllTCPSockets/AllSocketPairTest.RecvWaitAllDontWait/5",
+                "AllTCPSockets/AllSocketPairTest.RecvTimeoutWaitAll/0",
+                "AllTCPSockets/AllSocketPairTest.RecvTimeoutWaitAll/1",
+                "AllTCPSockets/AllSocketPairTest.RecvTimeoutWaitAll/2",
+                "AllTCPSockets/AllSocketPairTest.RecvTimeoutWaitAll/3",
+                "AllTCPSockets/AllSocketPairTest.RecvTimeoutWaitAll/4",
+                "AllTCPSockets/AllSocketPairTest.RecvTimeoutWaitAll/5",
+                "AllUDPSockets/AllSocketPairTest.BasicSendmmsg/0",
+                "AllUDPSockets/AllSocketPairTest.BasicSendmmsg/1",
+                "AllUDPSockets/AllSocketPairTest.BasicSendmmsg/2",
+                "AllUDPSockets/AllSocketPairTest.BasicSendmmsg/3",
+                "AllUDPSockets/AllSocketPairTest.BasicSendmmsg/4",
+                "AllUDPSockets/AllSocketPairTest.BasicSendmmsg/5",
+                "AllUDPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/0",
+                "AllUDPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/1",
+                "AllUDPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/2",
+                "AllUDPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/3",
+                "AllUDPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/4",
+                "AllUDPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/5",
+                "AllUDPSockets/AllSocketPairTest.BasicRecvmmsg/0",
+                "AllUDPSockets/AllSocketPairTest.BasicRecvmmsg/1",
+                "AllUDPSockets/AllSocketPairTest.BasicRecvmmsg/2",
+                "AllUDPSockets/AllSocketPairTest.BasicRecvmmsg/3",
+                "AllUDPSockets/AllSocketPairTest.BasicRecvmmsg/4",
+                "AllUDPSockets/AllSocketPairTest.BasicRecvmmsg/5",
+                "AllUDPSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/0",
+                "AllUDPSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/1",
+                "AllUDPSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/2",
+                "AllUDPSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/3",
+                "AllUDPSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/4",
+                "AllUDPSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/5",
+                "AllUDPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/0",
+                "AllUDPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/1",
+                "AllUDPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/2",
+                "AllUDPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/3",
+                "AllUDPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/4",
+                "AllUDPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/5",
+                "AllUDPSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/0",
+                "AllUDPSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/1",
+                "AllUDPSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/2",
+                "AllUDPSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/3",
+                "AllUDPSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/4",
+                "AllUDPSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/5",
+                "AllUDPSockets/AllSocketPairTest.RecvmmsgTimeoutBeforeRecv/0",
+                "AllUDPSockets/AllSocketPairTest.RecvmmsgTimeoutBeforeRecv/1",
+                "AllUDPSockets/AllSocketPairTest.RecvmmsgTimeoutBeforeRecv/2",
+                "AllUDPSockets/AllSocketPairTest.RecvmmsgTimeoutBeforeRecv/3",
+                "AllUDPSockets/AllSocketPairTest.RecvmmsgTimeoutBeforeRecv/4",
+                "AllUDPSockets/AllSocketPairTest.RecvmmsgTimeoutBeforeRecv/5",
+                "IPUnboundSockets/IPUnboundSocketTest.NullTOS/2",
+                "IPUnboundSockets/IPUnboundSocketTest.NullTOS/3",
+                "SocketTest.UnixSocketPairProtocol",
+                "SocketTest.ProtocolUnix",
+                "SocketTest.UnixSocketStat",
+                "SocketTest.UnixSocketStatFS",
+                "SocketTest.UnixSCMRightsOnlyPassedOnce",
+                "SocketTest.Permission",
+                "OpenModes/SocketOpenTest.Unix/0",
+                "OpenModes/SocketOpenTest.Unix/1",
+                "AllInetTests/SimpleTcpSocketTest.NonBlockingConnect_PollWrNorm/0",
+                "AllInetTests/SimpleTcpSocketTest.NonBlockingConnect_PollWrNorm/1",
+            ],
+        },
+        {
             type: "expect_failure",
             matchers: [
                 // affinity_test
@@ -415,14 +551,21 @@
                 "AllInetTests/CookedPacketTest.BindDrop/*",
                 "AllInetTests/CookedPacketTest.ReceiveOutbound/*",
 
-                // packet_socket_raw_test
-                "AllInetTests/RawPacketTest.SetSocketDetachFilterNoInstalledFilter/*",
-
                 // packet_socket_test
                 "AllPacketSocketTests/PacketSocketTest.GetSockName/*",
 
                 // ping_socket_test
                 "PingSocket.ReceiveIPPacketInfo",
+                "PingSocket.ReceiveTOS",
+                "PingSocket.ReceiveTClass",
+                "PingSocket.ReceiveTTL",
+                "PingSocket.ReceiveHopLimit",
+                "PingSockets/Fixture.Bind/ICMP_socket_V4Multicast",
+                "PingSockets/Fixture.Bind/ICMP_socket_V4MulticastAllHosts",
+                "PingSockets/Fixture.Bind/ICMPv6_socket_V6Multicast",
+                "PingSockets/Fixture.Bind/ICMPv6_socket_V6MulticastInterfaceLocalAllNodes",
+                "PingSockets/Fixture.Bind/ICMPv6_socket_V6MulticastLinkLocalAllNodes",
+                "PingSockets/Fixture.Bind/ICMPv6_socket_V6MulticastLinkLocalAllRouters",
 
                 // pivot_root_test
                 "PivotRootTest.WithoutCapability",
@@ -562,14 +705,6 @@
                 "PtyTest.CanonInputWordErase",
                 "JobControlTest.ControllingProcessPersistsAfterChildExists",
 
-                // raw_socket_icmp
-                "RawSocketICMPTest.IPv6ChecksumNotSupported",
-                "RawSocketICMPTest.ICMPv6FilterNotSupported",
-
-                // raw_socket_test
-                "RawSocketTest.ReceiveIPPacketInfo",
-                "AllInetTests/RawSocketTest.SetSocketDetachFilterNoInstalledFilter/*",
-
                 // rlimits_test
                 "RlimitTest.RlimitNProc",
 
@@ -637,37 +772,14 @@
                 "AllUnixDomainSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
                 "AllUnixDomainSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
                 "AllUnixDomainSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",
-                "AllTCPSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",
-                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
-                "AllTCPSockets/AllSocketPairTest.SetAndGetBooleanSocketOptions/*",
-                "AllTCPSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
 
                 // socket_ip_udp_loopback_test
                 "AllUDPSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
-                "AllUDPSockets/AllSocketPairTest.SetAndGetBooleanSocketOptions/*",
-                "AllUDPSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",
                 "AllUDPSockets/NonStreamSocketPairTest.RecvmsgMsghdrFlagMsgTrunc/*",
-                "AllUDPSockets/UDPSocketPairTest.ReceiveOrigDstAddrDefault/*",
                 "AllUDPSockets/UDPSocketPairTest.PayloadTooBig/*",
-                "AllUDPSockets/UDPSocketPairTest.SetAndGetReceiveOrigDstAddr/*",
-
-                // socket_ipv4_datagram_based_socket_unbound_loopback_test
-                "IPv4Sockets/IPv4DatagramBasedUnboundSocketTest.IpMulticastIfSetShort/*",
-                "IPv4Sockets/IPv4DatagramBasedUnboundSocketTest.IpMulticastIfSetNicGetReqn/*",
-                "IPv4Sockets/IPv4DatagramBasedUnboundSocketTest.IpMulticastIfSetNic/*",
-                "IPv4Sockets/IPv4DatagramBasedUnboundSocketTest.TestMultipleJoinsOnSingleSocket/*",
 
                 // socket_ipv4_udp_unbound_loopback_test
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPPKTINFO/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastIPPacketInfo/*",
-
-                // socket_ipv4_udp_unbound_loopback_nogotsan_test
-                "IPv4UDPSockets/IPv4UDPUnboundSocketNogotsanTest.UDPConnectPortExhaustion/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketNogotsanTest.UDPBindPortExhaustion/*",
-
-                // socket_ipv6_udp_unbound_loopback_test
-                "IPv6UDPSockets/IPv6UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
 
                 // socket_netdevice_test
                 "NetdeviceTest.InterfaceName",
@@ -750,15 +862,39 @@
 
                 // tcp_socket_test
                 "AllInetTests/SimpleTcpSocketTest.SetSocketAttachDetachFilter/*",
-                "AllInetTests/TcpSocketTest.MsgTrunc/*",
-                "AllInetTests/TcpSocketTest.MsgTruncLargeSize/*",
-                "AllInetTests/TcpSocketTest.MsgTruncPeek/*",
-                "AllInetTests/TcpSocketTest.MsgTruncWithCtrunc/*",
-                "AllInetTests/TcpSocketTest.MsgTruncWithCtruncOnly/*",
-                "AllInetTests/TcpSocketTest.TcpInq/*",
-                "AllInetTests/TcpSocketTest.TcpInqSetSockOpt/*",
-                "AllInetTests/TcpSocketTest.TcpSCMPriority/*",
                 "AllInetTests/TcpSocketTest.Tiocinq/*",
+
+                // socket_ip_tcp_loopback_test
+                "AllTCPSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/0",
+                "AllTCPSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/1",
+                "AllTCPSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/2",
+                "AllTCPSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/3",
+                "AllTCPSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/4",
+                "AllTCPSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/5",
+
+                // socket_ip_unbound_netlink_test
+                "IPUnboundSockets/IPv6UnboundSocketTest.ConnectToBadLocalAddress/1",
+                "IPUnboundSockets/IPv4UnboundSocketTest.ConnectToBadLocalAddress/0",
+
+                // socket_ipv4_udp_unbound_loopback_test
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.ReuseAddrReusePortDistribution/0",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrReusePortConvertibleToReusePort/0",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketRecvBufAboveMax/0",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketRecvBufBelowMin/0",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrThenReusePort/0",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindDoubleReuseAddrReusePortThenReusePort/0",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.ReuseAddrReusePortDistribution/1",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReusePortThenReuseAddr/0",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindDoubleReuseAddrReusePortThenReusePort/1",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrThenReusePort/1",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketRecvBufBelowMin/1",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReusePortThenReuseAddr/1",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketRecvBufAboveMax/1",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrReusePortConvertibleToReusePort/1",
+
+                // socket_ipv6_unbound_test
+                "IPv6UnboundSockets/IPv6UnboundSocketTest.ZeroHopLimit/0",
+                "IPv6UnboundSockets/IPv6UnboundSocketTest.ZeroHopLimit/1",
 
                 // timerfd_test - https://fxbug.dev/42159666
                 "AllTimerTypes/TimerfdTest.BlockingPoll_SetTimeResetsExpirations/CLOCK_MONOTONIC",
@@ -771,27 +907,19 @@
                 "TimerTest.ProcessPingedRepeatedlyAfterCPUSoftLimit",
 
                 // udp_socket_test
-                "AllInetTests/UdpSocketControlMessagesTest.SetAndReceivePktInfo/0",
-                "AllInetTests/UdpSocketControlMessagesTest.SetAndReceivePktInfo/2",
                 "AllInetTests/UdpSocketTest.Disconnect/*",
                 "AllInetTests/UdpSocketTest.DisconnectAfterBind/*",
                 "AllInetTests/UdpSocketTest.DisconnectAfterBindToAny/*",
-                "AllInetTests/UdpSocketTest.DisconnectAfterBindToUnspecAndConnect/*",
                 "AllInetTests/UdpSocketTest.DisconnectAfterConnectAnyWithPort/*",
                 "AllInetTests/UdpSocketTest.DisconnectAfterConnectWithoutBind/*",
-                "AllInetTests/UdpSocketTest.Fionread/*",
-                "AllInetTests/UdpSocketTest.FIONREADShutdown/*",
-                "AllInetTests/UdpSocketTest.FIONREADWriteShutdown/*",
-                "AllInetTests/UdpSocketTest.FIONREADZeroLengthPacket/*",
-                "AllInetTests/UdpSocketTest.FIONREADZeroLengthWriteShutdown/*",
                 "AllInetTests/UdpSocketTest.ReceiveAfterDisconnect/*",
                 "AllInetTests/UdpSocketTest.RecvErrorConnRefused/*",
                 "AllInetTests/UdpSocketTest.RecvErrorConnRefusedOtherAFSockOpt/*",
                 "AllInetTests/UdpSocketTest.SetSocketDetachFilter/*",
-                "AllInetTests/UdpSocketTest.SoTimestamp/*",
-                "AllInetTests/UdpSocketTest.TimestampIoctl/*",
-                "AllInetTests/UdpSocketTest.TimestampIoctlNothingRead/*",
-                "AllInetTests/UdpSocketTest.TimestampIoctlPersistence/*",
+
+                // packet_socket_raw_test
+                "AllInetTests/RawPacketTest.SetSocketRecvBuf/0",
+                "AllInetTests/RawPacketTest.SetSocketRecvBuf/1",
 
                 // utimes_test
                 "FutimesatTest.OnNullPathWithOPath",
@@ -903,7 +1031,6 @@
                 "AddressFamily/SendFileTest.Shutdown/*",
                 "BindToDeviceTest/BindToDeviceDistributionTest.Tcp/*",
                 "BindToDeviceTest/BindToDeviceDistributionTest.Udp/*",
-                "BlockingTCPSockets/BlockingStreamSocketPairTest.SendMsgTooLarge/*",
                 "AllConnectedSockets/DataTransferStressTest.BigDataTransfer/*",
                 "AllUnixDomainSockets/UnboundDgramUnixSocketPairTest.ZeroWriteAllowed/*",
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.ZeroLengthMessageFDDiscarded/*",
@@ -913,8 +1040,6 @@
                 "TimerTest.ProcessKilledOnCPUHardLimit",
                 "TimerTest.ProcessKilledOnCPUSoftLimit",
                 "TimerTest.ProcessPingedRepeatedlyAfterCPUSoftLimit",
-                "AllInetTests/SimpleTcpSocketTest.SynRcvdOnListenerShutdown/*",
-                "AllInetTests/SimpleTcpSocketTest.CloseNonConnectedLingerOption/*",
                 "FlockTest.TestSharedLockFailExclusiveHolderBlocking",
                 "FlockTest.TestExclusiveLockFailExclusiveHolderBlocking",
 
@@ -928,13 +1053,6 @@
                 "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutUsecTooLarge/*",
 
                 // These tests are flaky.
-                "AllInetTests/RawSocketTest.MultipleSocketReceive/*",
-                "AllInetTests/RawSocketTest.RecvBufLimitsEmptyRecvBuffer/*",
-                "AllInetTests/RawSocketTest.SendAndReceive/*",
-                "AllInetTests/RawSocketTest.SendAndReceiveViaConnect/*",
-                "AllInetTests/SimpleTcpSocketTest.SelfConnect*/*",
-                "AllInetTests/SimpleTcpSocketTest.Shutdown*ConnectingSocket/*",
-                "AllInetTests/UdpSocketTest.RecvBufLimits/*",
                 "ExceptionTest.IOAccessFault",
                 "FcntlTest.SetFdO_ASYNC",
                 "MountTest.BindToSelf",
@@ -942,25 +1060,11 @@
                 "PselectTest.SignalMaskBlocksSignal",
                 "UnameTest.Sanity",
 
-                // https://fxbug.dev/42063905
-                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4EphemeralPortReservedReuseAddr/*",
-                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/*",
-
                 // TODO: These tests have different outcomes in socket_domain_test and
                 // socket_ip_tcp_loopback_test.
                 "AllUnixDomainSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
                 "AllUnixDomainSockets/AllSocketPairTest.SetAndGetBooleanSocketOptions/*",
                 "AllUnixDomainSockets/AllSocketPairTest.GetSocketOutOfBandInlineOption/*",
-
-                // socket_inet_loopback_isolated_test: these tests time out since each runs for
-                // more than 7s.
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/*",
-                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/*",
-
-                // socket_inet_loopback_isolated_test - flaky TODO(https://fxbug.dev/42079114)
-                "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/*",
-                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/*",
-                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitTest/*",
 
                 // socket_udp_test - hanging tests.
                 "AllInetTests/UdpSocketTest.ReadShutdown/*",
@@ -1005,9 +1109,6 @@
 
                 // uidgid_test - https://fxbug.dev/42159674
                 "UidGidRootTest.SetgidNotFromThreadGroupLeader",
-
-                // socket_ipv4_udp_unbound_external_networking_test
-                "IPv4UDPUnboundSockets/IPv4UDPUnboundExternalNetworkingSocketTest*",
 
                 // socket_bind_to_device_test
                 "BindToDeviceTest*",
