@@ -692,23 +692,27 @@ mod tests {
         ))
     }
 
-    fn pkg_dir_namespace_entry() -> fcrunner::ComponentNamespaceEntry {
+    fn namespace_entry(path: &str, flags: fio::OpenFlags) -> fcrunner::ComponentNamespaceEntry {
         // Get a handle to /pkg
-        let pkg_path = "/pkg".to_string();
-        let pkg_dir = fuchsia_fs::directory::open_in_namespace(
-            "/pkg",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )
-        .unwrap();
+        let ns_path = path.to_string();
+        let ns_dir = fuchsia_fs::directory::open_in_namespace(path, flags).unwrap();
         // TODO(https://fxbug.dev/42060182): Use Proxy::into_client_end when available.
-        let pkg_client_end = ClientEnd::new(
-            pkg_dir.into_channel().expect("could not convert proxy to channel").into_zx_channel(),
+        let client_end = ClientEnd::new(
+            ns_dir.into_channel().expect("could not convert proxy to channel").into_zx_channel(),
         );
         fcrunner::ComponentNamespaceEntry {
-            path: Some(pkg_path),
-            directory: Some(pkg_client_end),
+            path: Some(ns_path),
+            directory: Some(client_end),
             ..Default::default()
         }
+    }
+
+    fn pkg_dir_namespace_entry() -> fcrunner::ComponentNamespaceEntry {
+        namespace_entry("/pkg", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE)
+    }
+
+    fn svc_dir_namespace_entry() -> fcrunner::ComponentNamespaceEntry {
+        namespace_entry("/svc", fio::OpenFlags::RIGHT_READABLE)
     }
 
     fn hello_world_startinfo(
@@ -1607,5 +1611,87 @@ mod tests {
             }
         })
         .await;
+    }
+
+    /// Creates start info for a component which runs immediately escrows its
+    /// outgoing directory and then exits.
+    pub fn immediate_escrow_startinfo(
+        outgoing_dir: ServerEnd<fio::DirectoryMarker>,
+        runtime_dir: ServerEnd<fio::DirectoryMarker>,
+    ) -> fcrunner::ComponentStartInfo {
+        let ns = vec![
+            pkg_dir_namespace_entry(),
+            // Give the test component LogSink.
+            svc_dir_namespace_entry(),
+        ];
+
+        fcrunner::ComponentStartInfo {
+            resolved_url: Some("#meta/immediate_escrow_component.cm".to_string()),
+            program: Some(fdata::Dictionary {
+                entries: Some(vec![
+                    fdata::DictionaryEntry {
+                        key: "binary".to_string(),
+                        value: Some(Box::new(fdata::DictionaryValue::Str(
+                            "bin/immediate_escrow".to_string(),
+                        ))),
+                    },
+                    fdata::DictionaryEntry {
+                        key: "lifecycle.stop_event".to_string(),
+                        value: Some(Box::new(fdata::DictionaryValue::Str("notify".to_string()))),
+                    },
+                ]),
+                ..Default::default()
+            }),
+            ns: Some(ns),
+            outgoing_dir: Some(outgoing_dir),
+            runtime_dir: Some(runtime_dir),
+            ..Default::default()
+        }
+    }
+
+    /// Test that an ELF component can send an `OnEscrow` event on its lifecycle
+    /// channel and this event is forwarded to the `ComponentController`.
+    #[fuchsia::test]
+    async fn test_lifecycle_on_escrow() {
+        let (outgoing_dir_client, outgoing_dir_server) =
+            fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
+        let (_, runtime_dir_server) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
+        let start_info = immediate_escrow_startinfo(outgoing_dir_server, runtime_dir_server);
+
+        let runner = new_elf_runner_for_test();
+        let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
+            Arc::new(SecurityPolicy::default()),
+            Moniker::root(),
+        ));
+        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
+            .expect("could not create component controller endpoints");
+
+        runner.start(start_info, server_controller).await;
+
+        let mut event_stream = controller.take_event_stream();
+
+        match event_stream.try_next().await {
+            Ok(Some(fcrunner::ComponentControllerEvent::OnPublishDiagnostics { .. })) => {}
+            other => panic!("unexpected event result: {:?}", other),
+        }
+
+        match event_stream.try_next().await {
+            Ok(Some(fcrunner::ComponentControllerEvent::OnEscrow {
+                payload: fcrunner::ComponentControllerOnEscrowRequest { outgoing_dir, .. },
+            })) => {
+                let outgoing_dir_server = outgoing_dir.unwrap();
+
+                assert_eq!(
+                    outgoing_dir_client.basic_info().unwrap().koid,
+                    outgoing_dir_server.basic_info().unwrap().related_koid
+                );
+            }
+            other => panic!("unexpected event result: {:?}", other),
+        }
+
+        match event_stream.try_next().await {
+            Err(fidl::Error::ClientChannelClosed { .. }) => {}
+            other => panic!("unexpected event result: {:?}", other),
+        }
     }
 }

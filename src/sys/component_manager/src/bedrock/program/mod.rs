@@ -4,8 +4,9 @@
 
 use crate::{model::token::InstanceToken, runner::RemoteRunner};
 use fidl::endpoints;
-use fidl::endpoints::ServerEnd;
+use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl_fuchsia_component_runner as fcrunner;
+use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_data as fdata;
 use fidl_fuchsia_diagnostics_types as fdiagnostics;
 use fidl_fuchsia_io as fio;
@@ -42,8 +43,8 @@ pub struct Program {
     /// blocking any consumers indefinitely.
     runtime_dir: fio::DirectoryProxy,
 
-    /// The scope in which the namespace is run. component_manager will use this to gracefully shutdown
-    /// the namespace when the component is stopped.
+    /// The scope in which the namespace is run. component_manager will use this to
+    /// gracefully shutdown the namespace when the component is stopped.
     namespace_scope: ExecutionScope,
 }
 
@@ -183,6 +184,13 @@ impl Program {
                 component_exit_status: self.on_terminate().await,
             }),
         }
+    }
+
+    /// Drops the program and returns state that the program has escrowed, if any.
+    pub fn finalize(self) -> Option<EscrowRequest> {
+        let escrowed_state = self.controller.escrow().lock().take();
+        drop(self);
+        escrowed_state
     }
 
     /// Gets a [`Koid`] that will uniquely identify this program.
@@ -349,20 +357,41 @@ impl StartInfo {
     }
 }
 
+/// Information and capabilities that the framework holds on behalf of a component,
+/// to be delivered on the next execution.
+#[derive(Debug)]
+pub struct EscrowRequest {
+    // Escrow the outgoing directory server endpoint. Whenever the
+    // component is started, the framework will return this channel via
+    // `ComponentStartInfo.outgoing_dir`.
+    pub outgoing_dir: Option<ServerEnd<fio::DirectoryMarker>>,
+
+    /// Escrow some user defined state. Whenever the component is started,
+    /// the framework will return these handles via
+    /// `ComponentStartInfo.escrowed_dictionary`.
+    pub escrowed_dictionary: Option<ClientEnd<fsandbox::DictionaryMarker>>,
+}
+
+impl From<fcrunner::ComponentControllerOnEscrowRequest> for EscrowRequest {
+    fn from(value: fcrunner::ComponentControllerOnEscrowRequest) -> Self {
+        Self { outgoing_dir: value.outgoing_dir, escrowed_dictionary: value.escrowed_dictionary }
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use {
         super::*,
-        crate::model::testing::{
-            mocks,
-            mocks::{ControlMessage, ControllerActionResponse, MockController},
+        crate::model::testing::mocks::{
+            self, ControlMessage, ControllerActionResponse, MockController,
         },
         assert_matches::assert_matches,
+        fidl::endpoints::ControlHandle,
         fuchsia_async as fasync,
         fuchsia_zircon::{self as zx, Koid},
         futures::lock::Mutex,
-        std::panic,
-        std::{boxed::Box, collections::HashMap, sync::Arc, task::Poll},
+        std::{boxed::Box, collections::HashMap, panic, sync::Arc, task::Poll},
+        zx::AsHandleRef,
     };
 
     #[fuchsia::test]
@@ -581,6 +610,7 @@ pub mod tests {
             assert_eq!(msg_list, &vec![ControlMessage::Stop]);
         });
         assert!(exec.run_until_stalled(&mut check_msgs).is_ready());
+        drop(check_msgs);
 
         // Roll time passed the stop timeout.
         let mut new_time =
@@ -607,8 +637,8 @@ pub mod tests {
                 msg_map.get(&program.koid()).expect("No messages received on the channel");
             assert_eq!(msg_list, &vec![ControlMessage::Stop, ControlMessage::Kill]);
         });
-
         assert!(exec.run_until_stalled(&mut check_msgs).is_ready());
+        drop(check_msgs);
 
         // Roll time beyond the kill timeout period
         new_time = fasync::Time::from_nanos(exec.now().into_nanos() + kill_timeout.into_nanos());
@@ -623,6 +653,9 @@ pub mod tests {
                 component_exit_status: zx::Status::TIMED_OUT,
             }))
         );
+
+        drop(stop_fut);
+        assert!(program.finalize().is_none());
     }
 
     #[fuchsia::test]
@@ -691,6 +724,9 @@ pub mod tests {
                 component_exit_status: zx::Status::OK
             }))
         );
+
+        drop(stop_fut);
+        assert!(program.finalize().is_none());
     }
 
     #[fuchsia::test]
@@ -764,6 +800,7 @@ pub mod tests {
         // Expect the message check future to complete because the controller
         // should close the channel.
         assert!(exec.run_until_stalled(&mut check_msgs).is_ready());
+        drop(check_msgs);
 
         // At this point stop_component() should now poll to completion because
         // the control channel is closed, but stop_component will perceive this
@@ -774,6 +811,36 @@ pub mod tests {
                 request: StopRequestSuccess::Killed,
                 component_exit_status: zx::Status::OK
             }))
+        );
+
+        drop(stop_fut);
+        assert!(program.finalize().is_none());
+    }
+
+    /// Test that `Program::finalize` will reap the `OnEscrow` event received from the
+    /// `ComponentController`.
+    #[fuchsia::test]
+    async fn finalize_program() {
+        let (program, server) = mocks::mock_program();
+        let (stream, control) = server.into_stream_and_control_handle().unwrap();
+        let (outgoing_dir_client, outgoing_dir_server) = fidl::endpoints::create_endpoints();
+
+        control
+            .send_on_escrow(fcrunner::ComponentControllerOnEscrowRequest {
+                outgoing_dir: Some(outgoing_dir_server),
+                ..Default::default()
+            })
+            .unwrap();
+        control.shutdown();
+        drop(control);
+        drop(stream);
+        program.on_terminate().await;
+
+        let escrow = program.finalize();
+        let received_outgoing_dir_server = escrow.unwrap().outgoing_dir.unwrap();
+        assert_eq!(
+            outgoing_dir_client.basic_info().unwrap().koid,
+            received_outgoing_dir_server.basic_info().unwrap().related_koid
         );
     }
 }

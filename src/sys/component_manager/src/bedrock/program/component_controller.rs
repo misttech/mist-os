@@ -3,14 +3,17 @@
 // found in the LICENSE file.
 
 use {
+    super::EscrowRequest,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_diagnostics_types as fdiagnostics,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync,
+    fuchsia_sync::Mutex,
+    fuchsia_zircon as zx,
     futures::{
         channel::oneshot,
         future::{BoxFuture, Shared},
         FutureExt, StreamExt,
     },
-    std::ops::Deref,
+    std::{ops::Deref, sync::Arc},
 };
 
 /// Wrapper around the `ComponentControllerProxy` with utilities for handling events.
@@ -20,6 +23,9 @@ pub struct ComponentController {
 
     /// Receiver for epitaphs coming from the connection.
     epitaph_value_recv: Shared<oneshot::Receiver<zx::Status>>,
+
+    /// The last value seen in an `ComponentController.OnEscrow` event.
+    escrow: Arc<Mutex<Option<EscrowRequest>>>,
 
     /// The task listening for events.
     _event_listener_task: fasync::Task<()>,
@@ -42,16 +48,28 @@ impl<'a> ComponentController {
         diagnostics_sender: Option<oneshot::Sender<fdiagnostics::ComponentDiagnostics>>,
     ) -> Self {
         let (epitaph_sender, epitaph_value_recv) = oneshot::channel();
+        let escrow = Arc::new(Mutex::new(None));
 
         let event_stream = proxy.take_event_stream();
-        let events_fut = Self::listen_for_events(event_stream, epitaph_sender, diagnostics_sender);
+        let events_fut = Self::listen_for_events(
+            event_stream,
+            epitaph_sender,
+            escrow.clone(),
+            diagnostics_sender,
+        );
         let event_listener_task = fasync::Task::spawn(events_fut);
 
         Self {
             inner: proxy,
             epitaph_value_recv: epitaph_value_recv.shared(),
+            escrow,
             _event_listener_task: event_listener_task,
         }
+    }
+
+    /// The last value seen in a `ComponentController.OnEscrow` event.
+    pub fn escrow(&self) -> Arc<Mutex<Option<EscrowRequest>>> {
+        self.escrow.clone()
     }
 
     /// Obtain a future for the epitaph value.
@@ -69,6 +87,7 @@ impl<'a> ComponentController {
     async fn listen_for_events(
         mut event_stream: fcrunner::ComponentControllerEventStream,
         epitaph_sender: oneshot::Sender<zx::Status>,
+        escrow: Arc<Mutex<Option<EscrowRequest>>>,
         mut diagnostics_sender: Option<oneshot::Sender<fdiagnostics::ComponentDiagnostics>>,
     ) {
         let mut epitaph_sender = Some(epitaph_sender);
@@ -88,9 +107,8 @@ impl<'a> ComponentController {
                     } => {
                         diagnostics_sender.take().and_then(|sender| sender.send(payload).ok());
                     }
-                    fcrunner::ComponentControllerEvent::OnEscrow { .. } => {
-                        // TODO(https://fxbug.dev/319754472): Implement.
-                        tracing::warn!("Unimplemented OnStopped (https://fxbug.dev/319754472)");
+                    fcrunner::ComponentControllerEvent::OnEscrow { payload } => {
+                        *escrow.lock() = Some(payload.into());
                     }
                 },
             }

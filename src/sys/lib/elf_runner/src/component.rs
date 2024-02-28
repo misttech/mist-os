@@ -6,10 +6,15 @@ use {
     crate::{runtime_dir::RuntimeDirectory, Job},
     async_trait::async_trait,
     fidl::endpoints::Proxy,
-    fidl_fuchsia_process_lifecycle::LifecycleProxy,
+    fidl_fuchsia_component_runner::ComponentControllerOnEscrowRequest,
+    fidl_fuchsia_process_lifecycle::{LifecycleEvent, LifecycleProxy},
     fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Process, Task},
-    futures::future::{join_all, BoxFuture, FutureExt},
+    futures::{
+        future::{join_all, BoxFuture, FutureExt},
+        stream::BoxStream,
+        StreamExt,
+    },
     moniker::Moniker,
     runner::component::Controllable,
     std::{
@@ -234,6 +239,34 @@ impl Controllable for ElfComponent {
             join_all(tasks).await;
         }
         .boxed()
+    }
+
+    fn on_escrow<'a>(&self) -> BoxStream<'a, ComponentControllerOnEscrowRequest> {
+        let Some(lifecycle) = &self.lifecycle_channel else {
+            return futures::stream::empty().boxed();
+        };
+        lifecycle
+            .take_event_stream()
+            .filter_map(|result| async {
+                match result {
+                    Ok(LifecycleEvent::OnEscrow { payload }) => {
+                        Some(ComponentControllerOnEscrowRequest {
+                            outgoing_dir: payload.outgoing_dir,
+                            escrowed_dictionary: payload.escrowed_dictionary,
+                            ..Default::default()
+                        })
+                    }
+                    Err(fidl::Error::ClientChannelClosed { .. }) => {
+                        // The ELF program is expected to close the server endpoint.
+                        None
+                    }
+                    Err(error) => {
+                        warn!(%error, "error handling lifecycle channel events");
+                        None
+                    }
+                }
+            })
+            .boxed()
     }
 }
 

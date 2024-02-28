@@ -240,8 +240,7 @@ closed protocol ComponentController {
     /// execution of the component has finished, then start the component again
     /// when the `ZX_CHANNEL_READABLE` signal is observed on `outgoing_dir`.
     ///
-    /// It is an error to send this event multiple times. Subsequent calls will
-    /// be discarded and an error will be logged in the component's log sink.
+    /// Repeated calls will replace the old escrowed value. This is discouraged.
     ///
     /// Handles escrowed via `OnEscrow` are always delivered to the next
     /// execution of the component.

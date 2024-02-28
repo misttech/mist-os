@@ -2449,7 +2449,9 @@ impl ProgramRuntime {
         // even after cancellation future may still run for a short period of time
         // before getting dropped. If that happens there is a chance of scheduling a
         // duplicate Stop action.
-        drop(self.program);
+        //
+        // TODO(https://fxbug.dev/326626515): Start using `_escrow_request`.
+        let _escrow_request = self.program.finalize();
         self.exit_listener.await;
         stop_result
     }

@@ -12,13 +12,16 @@ use {
     futures::{
         future::{self, BoxFuture, Either},
         prelude::*,
+        stream::{BoxStream, Stream},
         Future,
     },
     lazy_static::lazy_static,
     library_loader,
     namespace::{Namespace, Path},
-    std::convert::{TryFrom, TryInto},
-    std::path::PathBuf,
+    std::{
+        convert::{TryFrom, TryInto},
+        path::PathBuf,
+    },
     thiserror::Error,
     tracing::*,
 };
@@ -44,6 +47,11 @@ pub trait Controllable {
     fn teardown<'a>(&mut self) -> BoxFuture<'a, ()> {
         async {}.boxed()
     }
+
+    /// Monitor any escrow requests from the component.
+    fn on_escrow<'a>(&self) -> BoxStream<'a, fcrunner::ComponentControllerOnEscrowRequest> {
+        futures::stream::empty().boxed()
+    }
 }
 
 /// Holds information about the component that allows the controller to
@@ -56,6 +64,9 @@ pub struct Controller<C: Controllable> {
     /// Controllable object which controls the underlying component.
     /// This would be None once the object is killed.
     controllable: Option<C>,
+
+    /// Task that forwards the `on_escrow` event.
+    on_escrow_monitor: fasync::Task<()>,
 }
 
 pub struct ChannelEpitaph(u32);
@@ -92,13 +103,16 @@ impl From<fcomp::Error> for ChannelEpitaph {
     }
 }
 
-impl<C: Controllable> Controller<C> {
+impl<C: Controllable + 'static> Controller<C> {
     /// Creates new instance
     pub fn new(
         controllable: C,
         requests: fcrunner::ComponentControllerRequestStream,
     ) -> Controller<C> {
-        Controller { controllable: Some(controllable), request_stream: requests }
+        let on_escrow = controllable.on_escrow();
+        let on_escrow_monitor =
+            fasync::Task::spawn(Self::monitor_events(on_escrow, requests.control_handle()));
+        Controller { controllable: Some(controllable), request_stream: requests, on_escrow_monitor }
     }
 
     async fn serve_controller(&mut self) -> Result<(), ()> {
@@ -119,6 +133,17 @@ impl<C: Controllable> Controller<C> {
         }
         // The channel closed
         Err(())
+    }
+
+    async fn monitor_events(
+        mut on_escrow: impl Stream<Item = fcrunner::ComponentControllerOnEscrowRequest> + Unpin + Send,
+        control_handle: fcrunner::ComponentControllerControlHandle,
+    ) {
+        while let Some(event) = on_escrow.next().await {
+            control_handle
+                .send_on_escrow(event)
+                .unwrap_or_else(|err| error!(%err, "failed to send OnEscrow event"));
+        }
     }
 
     /// Serve the request stream held by this Controller. `exit_fut` should
@@ -157,6 +182,10 @@ impl<C: Controllable> Controller<C> {
             controllable.teardown().await;
         }
 
+        // Drain any escrow events.
+        // TODO(https://fxbug.dev/326626515): Drain the escrow requests until no long readable
+        // instead of waiting for an unbounded amount of time if `on_escrow` never completes.
+        self.on_escrow_monitor.await;
         self.request_stream.control_handle().shutdown_with_epitaph(result_code.into());
     }
 

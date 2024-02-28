@@ -100,6 +100,7 @@ fuchsia_test_package("elf_runner_tests") {
   test_components = [ ":elf_runner_tests_cmp" ]
   deps = [
     ":elf_runner_tests_cmp",
+    "tests/lifecycle:immediate_escrow_component",
     "tests/lifecycle:run-indefinitely",
     "//examples/hello_world/rust:hello-world-rust-component",
     "//src/sys/component_manager/testing/lifecycle",
