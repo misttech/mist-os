@@ -9,6 +9,7 @@
 #include <lib/counters.h>
 #include <lib/fit/defer.h>
 #include <lib/user_copy/user_ptr.h>
+#include <zircon/compiler.h>
 
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
@@ -65,18 +66,15 @@ zx_status_t MBufChain::ReadHelper(T* chain, user_out_ptr<char> dst, size_t len, 
     }
   });
 
-  while (pos < len && iter != chain->buffers_.end()) {
+  zx_status_t status = ZX_OK;
+  while (pos < len && iter != chain->buffers_.end() && status == ZX_OK) {
     const char* src = iter->data_ + read_off;
     size_t copy_len = ktl::min(static_cast<size_t>(iter->len_ - read_off), len - pos);
-    zx_status_t status = dst.byte_offset(pos).copy_array_to_user(src, copy_len);
-    if (status != ZX_OK) {
-      // Record the fact that some data might have been read, even if the overall operation is
-      // considered a failure.
-      *actual = pos;
-      return status;
+    status = dst.byte_offset(pos).copy_array_to_user(src, copy_len);
+    bool copy_succeeded = status == ZX_OK;
+    if (likely(copy_succeeded)) {
+      pos += copy_len;
     }
-
-    pos += copy_len;
 
     if constexpr (ktl::is_const<T>::value) {
       read_off = 0;
@@ -87,8 +85,10 @@ zx_status_t MBufChain::ReadHelper(T* chain, user_out_ptr<char> dst, size_t len, 
       // faults) data will be "dropped".  Consider changing this function to only advance (and
       // free) once all data has been successfully copied.
 
-      read_off += static_cast<uint32_t>(copy_len);
-      chain->size_ -= copy_len;
+      if (likely(copy_succeeded)) {
+        read_off += static_cast<uint32_t>(copy_len);
+        chain->size_ -= copy_len;
+      }
 
       if (read_off == iter->len_ || datagram) {
         if (datagram) {
@@ -105,7 +105,8 @@ zx_status_t MBufChain::ReadHelper(T* chain, user_out_ptr<char> dst, size_t len, 
     }
   }
 
-  // Drain any leftover mbufs in the datagram packet if we're consuming data.
+  // Drain any leftover mbufs in the datagram packet if we're consuming data, even
+  // if we fail to read bytes.
   if constexpr (!ktl::is_const<T>::value) {
     if (datagram) {
       while (!chain->buffers_.is_empty() && chain->buffers_.front().pkt_len_ == 0) {
@@ -121,8 +122,10 @@ zx_status_t MBufChain::ReadHelper(T* chain, user_out_ptr<char> dst, size_t len, 
     }
   }
 
+  // Record the fact that some data might have been read, even if the overall operation is
+  // considered a failure.
   *actual = pos;
-  return ZX_OK;
+  return status;
 }
 
 zx_status_t MBufChain::WriteDatagram(user_in_ptr<const char> src, size_t len, size_t* written) {

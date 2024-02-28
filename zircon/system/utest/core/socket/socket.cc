@@ -822,7 +822,7 @@ TEST(SocketTest, ReadIntoNullBuffer) {
   ASSERT_STATUS(b.read(0, nullptr, 1, &actual), ZX_ERR_INVALID_ARGS);
 }
 
-TEST(SocketTest, ReadIntoBadBuffer) {
+TEST(SocketTest, StreamReadIntoBadBuffer) {
   zx::socket a, b;
   ASSERT_OK(zx::socket::create(0, &a, &b));
 
@@ -925,7 +925,7 @@ TEST(SocketTest, WriteFromPartialBadBuffer) {
   EXPECT_EQ(has_read_signal, could_read);
 }
 
-TEST(SocketTest, ReadToPartialBadBuffer) {
+TEST(SocketTest, StreamReadToPartialBadBuffer) {
   zx::socket a, b;
   ASSERT_OK(zx::socket::create(0, &a, &b));
 
@@ -1015,5 +1015,124 @@ TEST(SocketTest, ReuseDatagramBuffer) {
   // At this point the socket should be empty.
   EXPECT_FALSE(GetSignals(b) & ZX_SOCKET_READABLE);
 }
+
+enum class ReadBufferFaultsAt {
+  kBeginning,
+  kMiddle,
+};
+
+enum class ReadBehaviour {
+  kConsume,
+  kPeek,
+};
+
+class DatagramSocketBadBufferTest
+    : public zxtest::TestWithParam<std::tuple<ReadBufferFaultsAt, ReadBehaviour>> {};
+
+TEST_P(DatagramSocketBadBufferTest, Read) {
+  const auto [read_buffer_faults_at, read_behaviour] = GetParam();
+
+  zx::socket local, remote;
+  ASSERT_OK(zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &remote));
+
+  // A packet size that is large enough to span multiple |Mbuf|s.
+  constexpr size_t kNumPages = 2;
+  const size_t page_size = zx_system_get_page_size();
+  const size_t packet_size = page_size * kNumPages;
+
+  // Enqueue two packets to the socket so that we can see what packet(s)
+  // remain when reading into a bad buffer.
+  constexpr char kFirstPacketByte = 'A';
+  constexpr char kSecondPacketByte = 'B';
+  std::vector<char> buf(packet_size, kFirstPacketByte);
+  {
+    size_t count;
+    ASSERT_OK(local.write(0u, buf.data(), buf.size(), &count));
+    ASSERT_EQ(count, buf.size());
+    std::fill(buf.begin(), buf.end(), kSecondPacketByte);
+    ASSERT_OK(local.write(0u, buf.data(), buf.size(), &count));
+    ASSERT_EQ(count, buf.size());
+  }
+
+  constexpr int kValidPermFlags = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE;
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(packet_size, 0, &vmo));
+  zx_vaddr_t addr;
+  ASSERT_OK(zx::vmar::root_self()->map(kValidPermFlags, 0, vmo, 0, packet_size, &addr));
+  auto unmap = fit::defer([&]() {
+    // Cleanup the mapping we created.
+    zx::vmar::root_self()->unmap(addr, packet_size);
+    addr = 0;
+  });
+  ASSERT_NE(0, addr);
+
+  // Performing a read where the buffer triggers a fault. Where the fault occurs
+  // and whether the datagram is dropped depends on this test's parameter.
+  {
+    zx_vaddr_t protect_addr;
+    switch (read_buffer_faults_at) {
+      case ReadBufferFaultsAt::kBeginning:
+        protect_addr = addr;
+        break;
+      case ReadBufferFaultsAt::kMiddle:
+        protect_addr = addr + page_size;
+        break;
+    }
+    ASSERT_OK(zx::vmar::root_self()->protect(0, protect_addr, page_size));
+
+    size_t count;
+    uint32_t read_flags = 0;
+    switch (read_behaviour) {
+      case ReadBehaviour::kConsume:
+        break;
+      case ReadBehaviour::kPeek:
+        read_flags |= ZX_SOCKET_PEEK;
+        break;
+    }
+    ASSERT_STATUS(remote.read(read_flags, reinterpret_cast<char*>(addr), packet_size, &count),
+                  ZX_ERR_INVALID_ARGS);
+  }
+
+  // Perform a read where the whole buffer is valid; the buffer does not fault
+  // anywhere.
+  {
+    ASSERT_OK(zx::vmar::root_self()->protect(kValidPermFlags, addr, packet_size));
+
+    std::vector<char> packets_remaining;
+    switch (read_behaviour) {
+      case ReadBehaviour::kConsume:
+        // The first packet should have been dropped by the first (faulting)
+        // consuming read above.
+        break;
+      case ReadBehaviour::kPeek:
+        // Expect to read the first packet; the first packet shouldn't have been
+        // dropped by the first (faulting) peek.
+        packets_remaining.push_back(kFirstPacketByte);
+        break;
+    }
+    // The second packet should always be available.
+    packets_remaining.push_back(kSecondPacketByte);
+
+    for (auto it = packets_remaining.begin(); it != packets_remaining.end(); ++it) {
+      size_t count;
+      ASSERT_OK(remote.read(0u, reinterpret_cast<char*>(addr), packet_size, &count));
+      ASSERT_EQ(count, packet_size);
+      std::fill(buf.begin(), buf.end(), *it);
+      EXPECT_BYTES_EQ(reinterpret_cast<char*>(addr), buf.data(), packet_size);
+    }
+  }
+
+  // The socket(s) should now be empty.
+  {
+    uint32_t data;
+    ASSERT_STATUS(local.read(0u, &data, sizeof(data), nullptr), ZX_ERR_SHOULD_WAIT);
+    ASSERT_STATUS(remote.read(0u, &data, sizeof(data), nullptr), ZX_ERR_SHOULD_WAIT);
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    SocketTest, DatagramSocketBadBufferTest,
+    zxtest::Combine(zxtest::Values(ReadBufferFaultsAt::kBeginning, ReadBufferFaultsAt::kMiddle),
+                    zxtest::Values(ReadBehaviour::kConsume, ReadBehaviour::kPeek)));
 
 }  // namespace

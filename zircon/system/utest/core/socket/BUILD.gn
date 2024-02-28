@@ -6,6 +6,7 @@ source_set("socket") {
   testonly = true
   sources = [ "socket.cc" ]
   deps = [
+    "//sdk/lib/fit",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",

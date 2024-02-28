@@ -44,16 +44,20 @@ class MBufChain {
   // When |datagram| is false, the data in the chain is treated as a stream (no boundaries).
   //
   // When |datagram| is true, the data in the chain is treated as a sequence of datagrams and the
-  // call will read at most one datagram.  If |len| is too small to read a complete datagram, a
+  // call will read at most one datagram. If |len| is too small to read a complete datagram, a
   // partial datagram is returned and its remaining bytes are discarded.
   //
   // The actual number of bytes read is returned in |actual|, and this can be non-zero even if the
   // read itself is an error.
   //
-  // Returns an error on failure.
+  // Returns an error on failure. If an error occurs while copying a datagram to |dst|, the
+  // datagram is dropped.
   zx_status_t Read(user_out_ptr<char> dst, size_t len, bool datagram, size_t* actual);
 
-  // Same as Read() but leaves the bytes in the chain instead of consuming them.
+  // Same as Read() but leaves the bytes in the chain instead of consuming them, even if
+  // an error occurs.
+  //
+  // Returns an error on failure.
   zx_status_t Peek(user_out_ptr<char> dst, size_t len, bool datagram, size_t* actual) const;
 
   bool is_full() const { return size_ >= kSizeMax; }
