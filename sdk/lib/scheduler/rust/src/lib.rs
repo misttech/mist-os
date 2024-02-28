@@ -9,7 +9,6 @@ use {
         RoleTarget,
     },
     fuchsia_component::client::connect_to_protocol_sync,
-    fuchsia_runtime,
     fuchsia_sync::RwLock,
     fuchsia_zircon::{HandleBased, Rights, Status, Thread, Time},
     std::sync::Arc,

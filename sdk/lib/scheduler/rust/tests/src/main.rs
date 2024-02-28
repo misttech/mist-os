@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use fuchsia_runtime;
-use fuchsia_scheduler;
 use fuchsia_zircon::Status;
 use std::thread;
 

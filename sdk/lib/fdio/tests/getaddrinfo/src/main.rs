@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    fidl, fidl_fuchsia_net_name as fnet_name,
+    fidl_fuchsia_net_name as fnet_name,
     fuchsia_component::server::{ServiceFs, ServiceFsDir},
     futures::{StreamExt as _, TryStreamExt as _},
 };
