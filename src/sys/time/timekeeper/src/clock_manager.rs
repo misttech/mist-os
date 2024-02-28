@@ -346,7 +346,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
             // This should be an uncommon setting, so log it.
             info!("delaying first time source sample by: {:?}", first_delay);
             _ = fasync::Timer::new(fasync::Time::after(first_delay)).await;
-            info!("delay done");
+            debug!("delay done");
         }
 
         let details = self.clock.get_details().expect("failed to get UTC clock details");
@@ -582,7 +582,7 @@ mod tests {
         crate::{
             diagnostics::{FakeDiagnostics, ANY_DURATION},
             enums::{FrequencyDiscardReason, Role, WriteRtcOutcome},
-            make_test_config,
+            make_test_config, make_test_config_with_delay,
             rtc::FakeRtc,
             time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample},
         },
@@ -912,6 +912,43 @@ mod tests {
             Event::StartClock { track: *TEST_TRACK, source: *START_CLOCK_SOURCE },
             Event::WriteRtc { outcome: WriteRtcOutcome::Succeeded },
         ]);
+    }
+
+    #[fuchsia::test]
+    fn fail_when_no_initial_delay() {
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
+
+        let clock = create_clock();
+        let rtc = FakeRtc::valid(BACKSTOP_TIME);
+        let diagnostics = Arc::new(FakeDiagnostics::new());
+        let config = make_test_config_with_delay(1);
+
+        // Create a clock manager.
+        let monotonic_ref = zx::Time::get_monotonic();
+        let clock_manager = create_clock_manager(
+            Arc::clone(&clock),
+            vec![Sample::new(monotonic_ref + OFFSET, monotonic_ref, STD_DEV)],
+            None,
+            Some(rtc.clone()),
+            Arc::clone(&diagnostics),
+            config,
+            None,
+        );
+
+        let (_, r) = mpsc::channel(1);
+        let start_time = executor.now();
+        let mut fut = clock_manager.maintain_clock(r).boxed();
+
+        let _ = executor.run_until_stalled(&mut fut);
+
+        // Half a second in, nothing to wake.
+        executor.set_fake_time(start_time + fasync::Duration::from_millis(550));
+        let _ = executor.run_until_stalled(&mut fut);
+        assert_eq!(false, executor.wake_expired_timers());
+
+        // One second in, there is something to wake.
+        executor.set_fake_time(start_time + fasync::Duration::from_millis(1050));
+        assert_eq!(true, executor.wake_expired_timers());
     }
 
     #[fuchsia::test]

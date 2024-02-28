@@ -446,7 +446,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
 
 // Reexport test config creation to be used in other tests.
 #[cfg(test)]
-use tests::make_test_config;
+use tests::{make_test_config, make_test_config_with_delay};
 
 #[cfg(test)]
 mod tests {
@@ -666,6 +666,55 @@ mod tests {
             Event::WriteRtc { outcome: WriteRtcOutcome::Succeeded },
         ]);
     }
+
+    #[fuchsia::test]
+    fn fail_when_no_delays() {
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
+        let (primary_clock, primary_ticks) = create_clock();
+        let rtc = FakeRtc::valid(INVALID_RTC_TIME);
+        let diagnostics = Arc::new(FakeDiagnostics::new());
+        let config = make_test_config_with_delay(1);
+
+        let monotonic_ref = zx::Time::get_monotonic();
+
+        // Maintain UTC until no more work remains
+        let mut fut = maintain_utc(
+            PrimaryTrack {
+                clock: Arc::clone(&primary_clock),
+                time_source: FakePushTimeSource::events(vec![
+                    TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
+                    TimeSourceEvent::from(Sample::new(
+                        monotonic_ref + OFFSET,
+                        monotonic_ref,
+                        STD_DEV,
+                    )),
+                ])
+                .into(),
+            },
+            None,
+            Some(rtc),
+            Arc::clone(&diagnostics),
+            Arc::clone(&config),
+        )
+        .boxed();
+
+        let start_time = executor.now();
+        let _ = executor.run_until_stalled(&mut fut);
+
+        // Half a second in, nothing to wake.
+        executor.set_fake_time(start_time + fasync::Duration::from_millis(550));
+        let _ = executor.run_until_stalled(&mut fut);
+        assert_eq!(false, executor.wake_expired_timers());
+
+        // One second in, there is something to wake.
+        executor.set_fake_time(start_time + fasync::Duration::from_millis(1050));
+        assert_eq!(true, executor.wake_expired_timers());
+        let _ = executor.run_until_stalled(&mut fut);
+
+        // And our clock was updated, too!
+        assert!(primary_clock.get_details().unwrap().last_value_update_ticks > primary_ticks);
+    }
+
     #[fuchsia::test]
     fn no_update_invalid_rtc() {
         let mut executor = fasync::TestExecutor::new();
