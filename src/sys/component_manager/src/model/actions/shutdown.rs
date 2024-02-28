@@ -603,13 +603,15 @@ fn get_dependency_from_offer(
         )),
 
         OfferDecl::Protocol(OfferProtocolDecl {
-            dependency_type: DependencyType::Weak, ..
+            dependency_type: DependencyType::Weak | DependencyType::WeakForMigration,
+            ..
         })
         | OfferDecl::Directory(OfferDirectoryDecl {
-            dependency_type: DependencyType::Weak, ..
+            dependency_type: DependencyType::Weak | DependencyType::WeakForMigration,
+            ..
         })
         | OfferDecl::Dictionary(OfferDictionaryDecl {
-            dependency_type: DependencyType::Weak,
+            dependency_type: DependencyType::Weak | DependencyType::WeakForMigration,
             ..
         }) => {
             // weak dependencies are ignored by this algorithm, because weak

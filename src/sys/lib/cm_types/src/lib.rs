@@ -909,9 +909,10 @@ impl Default for AllowedOffers {
 pub enum DependencyType {
     Strong,
     Weak,
+    WeakForMigration,
 }
 
-symmetrical_enums!(DependencyType, fdecl::DependencyType, Strong, Weak);
+symmetrical_enums!(DependencyType, fdecl::DependencyType, Strong, Weak, WeakForMigration);
 
 impl Default for DependencyType {
     fn default() -> Self {
