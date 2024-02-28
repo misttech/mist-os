@@ -5,7 +5,7 @@
 // [START import_statement_rust]
 use {
     // [START_EXCLUDE]
-    anyhow::{self, Context, Error},
+    anyhow::{Context, Error},
     fidl_fidl_examples_routing_echo as fecho,
     fuchsia_component::server as fserver,
     // [END_EXCLUDE]

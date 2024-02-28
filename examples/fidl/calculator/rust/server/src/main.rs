@@ -14,12 +14,11 @@
 //! 4. FIDL interaction
 //! 5. Error handling
 
-use anyhow::{self, Context};
+use anyhow::Context;
 use fidl_fuchsia_examples_calculator::{CalculatorRequest, CalculatorRequestStream};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{component, health::Reporter};
 use futures::prelude::*;
-use tracing;
 
 /// Wraps all hosted protocols into a single type that can be matched against
 /// and dispatched.

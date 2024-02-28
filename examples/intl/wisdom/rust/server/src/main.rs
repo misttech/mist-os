@@ -9,7 +9,6 @@ use {
     fidl_fuchsia_examples_intl_wisdom as fwisdom, fuchsia_async as fasync,
     fuchsia_component::server,
     futures::{StreamExt, TryStreamExt},
-    icu_data,
 };
 
 fn main() -> Result<(), Error> {

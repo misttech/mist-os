@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    assert_matches::assert_matches, fidl, fidl_fidl_examples_routing_echo as fecho,
+    assert_matches::assert_matches, fidl_fidl_examples_routing_echo as fecho,
     fuchsia_component::client, fuchsia_zircon as zx, tracing::info,
 };
 

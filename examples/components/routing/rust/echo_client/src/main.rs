@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 // [START imports]
-use anyhow;
 use fidl_fidl_examples_routing_echo::EchoMarker;
 use fuchsia_component::client::connect_to_protocol;
-use tracing;
 // [END imports]
 
 // [START main_body]

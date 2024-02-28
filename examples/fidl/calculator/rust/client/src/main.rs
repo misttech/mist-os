@@ -15,12 +15,9 @@
 
 mod parse;
 
-use anyhow;
-use fidl;
 use fidl_fuchsia_examples_calculator::{CalculatorMarker, CalculatorProxy};
 use fuchsia_component::client::connect_to_protocol;
 use std::fs;
-use tracing;
 
 /// Entry-point into the client.
 #[fuchsia::main]

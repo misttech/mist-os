@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 // [START imports]
-use anyhow::{self, Context};
+use anyhow::Context;
 use fidl_fidl_examples_routing_echo::{EchoRequest, EchoRequestStream};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{component, health::Reporter};

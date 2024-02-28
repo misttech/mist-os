@@ -4,7 +4,7 @@
 
 use regex::Regex;
 use {
-    anyhow::{self, Error},
+    anyhow::Error,
     diagnostics_reader::{ArchiveReader, Logs},
     fidl_fuchsia_data as fdata,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},

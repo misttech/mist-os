@@ -5,7 +5,7 @@
 use {
     fidl_fuchsia_intl as fintl, rust_icu_common as ucommon, rust_icu_sys as usys,
     rust_icu_ucal as ucal, rust_icu_udat as udat, rust_icu_uloc as uloc,
-    rust_icu_ustring as ustring, std::convert::TryFrom, thiserror::Error,
+    rust_icu_ustring as ustring, thiserror::Error,
 };
 
 /// All error classes produced in this module.
@@ -113,7 +113,6 @@ pub fn ask_for_wisdom(intl_profile: &fintl::Profile, timestamp_ms: i64) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
-    use icu_data;
     use regex::Regex;
 
     #[test]

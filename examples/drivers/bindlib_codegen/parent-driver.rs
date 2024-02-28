@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 // [START code]
-use bind_fuchsia_example_library;
 use bind_fuchsia_example_library::bind_fuchsia_pci;
 
 fn main() {

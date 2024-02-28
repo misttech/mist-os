@@ -6,7 +6,7 @@
 use {
     anyhow::Error, fidl_fuchsia_examples_intl_wisdom as fwisdom, fidl_fuchsia_intl as fintl,
     rust_icu_sys as usys, rust_icu_ucal as ucal, rust_icu_udat as udat, rust_icu_uloc as uloc,
-    rust_icu_ustring as ustring, std::convert::TryFrom,
+    rust_icu_ustring as ustring,
 };
 // [END imports]
 

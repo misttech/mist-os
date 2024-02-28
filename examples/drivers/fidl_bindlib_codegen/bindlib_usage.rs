@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 // [START code]
-use bind_fuchsia_gizmo_protocol;
 
 fn main() {
     let _test_protocol_key: &str = bind_fuchsia_gizmo_protocol::TESTINGPROTOCOL;
