@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{self, Context};
+use anyhow::Context;
 use std::{
-    convert::TryInto,
     io::{Read, Write},
     net::{Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener},
 };
