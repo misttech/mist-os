@@ -35,7 +35,6 @@
 use {
     crate::{addr, port},
     anyhow::{format_err, Context as _},
-    crossbeam,
     fidl::endpoints,
     fidl_fuchsia_hardware_vsock::{
         CallbacksMarker, CallbacksRequest, CallbacksRequestStream, DeviceProxy,
