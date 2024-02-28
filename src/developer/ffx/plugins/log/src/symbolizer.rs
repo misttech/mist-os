@@ -27,12 +27,8 @@ impl<T> Symbolize for SymbolizerChannel<T>
 where
     T: Symbolizer,
 {
-    async fn symbolize(&self, entry: LogEntry) -> LogEntry {
-        self.symbolize_message(entry).await
-    }
-
-    fn supports_transactions(&self) -> bool {
-        false
+    async fn symbolize(&self, entry: LogEntry) -> Option<LogEntry> {
+        Some(self.symbolize_message(entry).await)
     }
 }
 
@@ -199,11 +195,14 @@ mod tests {
     async fn symbolizer_replaces_markers_with_symbolized_logs() {
         let symbolizer =
             SymbolizerChannel::new(FakeSymbolizerForTest::new(LOG_PREFIX, vec![])).await.unwrap();
-        let log = symbolizer.symbolize(make_log_entry("{{{reset}}}\n".to_string())).await;
+        let log = symbolizer.symbolize(make_log_entry("{{{reset}}}\n".to_string())).await.unwrap();
         let (_, out) = log.data.as_symbolized_log().unwrap();
         assert_eq!(out, "cool-logger{{{reset}}}\n");
 
-        let log = symbolizer.symbolize(make_log_entry("{{{mmap:something}}\n".to_string())).await;
+        let log = symbolizer
+            .symbolize(make_log_entry("{{{mmap:something}}\n".to_string()))
+            .await
+            .unwrap();
         let (_, out) = log.data.as_symbolized_log().unwrap();
 
         assert_eq!(out, "cool-logger{{{mmap:something}}\n");
@@ -211,6 +210,7 @@ mod tests {
         let out = symbolizer
             .symbolize(make_log_entry("not_real\n".to_string()))
             .await
+            .unwrap()
             .data
             .as_target_log()
             .unwrap()
@@ -233,6 +233,7 @@ mod tests {
         let out = symbolizer
             .symbolize(make_log_entry("{{{reset}}}\n".to_string()))
             .await
+            .unwrap()
             .data
             .as_target_log()
             .unwrap()
@@ -244,6 +245,7 @@ mod tests {
         let out = symbolizer
             .symbolize(make_log_entry("{{{mmap:something}}\n".to_string()))
             .await
+            .unwrap()
             .data
             .as_target_log()
             .unwrap()
@@ -256,6 +258,7 @@ mod tests {
         let out = symbolizer
             .symbolize(make_log_entry("not_real\n".to_string()))
             .await
+            .unwrap()
             .data
             .as_target_log()
             .unwrap()
@@ -273,6 +276,7 @@ mod tests {
         let out = symbolizer
             .symbolize(make_log_entry("{{{reset}}}\n".to_string()))
             .await
+            .unwrap()
             .data
             .as_target_log()
             .unwrap()
@@ -284,6 +288,7 @@ mod tests {
         let out = symbolizer
             .symbolize(make_log_entry("{{{mmap:something}}\n".to_string()))
             .await
+            .unwrap()
             .data
             .as_target_log()
             .unwrap()
@@ -296,6 +301,7 @@ mod tests {
         let out = symbolizer
             .symbolize(make_log_entry("not_real\n".to_string()))
             .await
+            .unwrap()
             .data
             .as_target_log()
             .unwrap()

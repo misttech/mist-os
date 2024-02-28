@@ -46,12 +46,8 @@ struct NoOpSymoblizer;
 
 #[async_trait(?Send)]
 impl Symbolize for NoOpSymoblizer {
-    async fn symbolize(&self, entry: LogEntry) -> LogEntry {
-        entry
-    }
-
-    fn supports_transactions(&self) -> bool {
-        true
+    async fn symbolize(&self, entry: LogEntry) -> Option<LogEntry> {
+        Some(entry)
     }
 }
 

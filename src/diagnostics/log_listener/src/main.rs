@@ -41,12 +41,8 @@ impl Symbolizer {
 
 #[async_trait(?Send)]
 impl Symbolize for Symbolizer {
-    async fn symbolize(&self, entry: LogEntry) -> LogEntry {
-        entry
-    }
-
-    fn supports_transactions(&self) -> bool {
-        return true;
+    async fn symbolize(&self, entry: LogEntry) -> Option<LogEntry> {
+        Some(entry)
     }
 }
 

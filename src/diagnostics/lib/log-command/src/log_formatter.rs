@@ -98,17 +98,10 @@ impl Display for LogEntry {
 /// A trait for symbolizing log entries
 #[async_trait(?Send)]
 pub trait Symbolize {
-    async fn symbolize(&self, entry: LogEntry) -> LogEntry;
-
-    /// Returns true if this symbolizer supports transactions, false otherwise.
-    /// If this is false, it is invalid to attempt transactions on this symbolizer.
-    /// A symbolizer supports transactions if it can handle multiple calls to symbolize
-    /// in parallel. Transactional symbolizers must guarantee in-order delivery
-    /// of completions to callers. Futures are guaranteed to complete in the order
-    /// in which they were queued. Callers are expected to poll all returned futures
-    /// in order to make further progress on symbolization, even if prior ones
-    /// haven't yet completed.
-    fn supports_transactions(&self) -> bool;
+    /// Symbolizes a LogEntry and optionally produces a result.
+    /// The symbolizer may choose to discard the result.
+    /// This method may be called multiple times concurrently.
+    async fn symbolize(&self, entry: LogEntry) -> Option<LogEntry>;
 }
 
 async fn handle_value<F, S>(
@@ -129,7 +122,10 @@ where
         },
         data: one.into(),
     };
-    formatter.push_log(symbolizer.symbolize(entry).await).await?;
+    let Some(symbolized) = symbolizer.symbolize(entry).await else {
+        return Ok(());
+    };
+    formatter.push_log(symbolized).await?;
     Ok(())
 }
 
@@ -477,12 +473,8 @@ pub struct NoOpSymbolizer;
 
 #[async_trait(?Send)]
 impl Symbolize for NoOpSymbolizer {
-    async fn symbolize(&self, entry: LogEntry) -> LogEntry {
-        entry
-    }
-
-    fn supports_transactions(&self) -> bool {
-        true
+    async fn symbolize(&self, entry: LogEntry) -> Option<LogEntry> {
+        Some(entry)
     }
 }
 
@@ -536,18 +528,14 @@ mod test {
 
     #[async_trait(?Send)]
     impl Symbolize for FakeFuchsiaSymbolizer {
-        async fn symbolize(&self, entry: LogEntry) -> LogEntry {
-            LogEntry {
+        async fn symbolize(&self, entry: LogEntry) -> Option<LogEntry> {
+            Some(LogEntry {
                 data: LogData::SymbolizedTargetLog(
                     entry.data.as_target_log().unwrap().clone(),
                     "Fuchsia".to_string(),
                 ),
                 timestamp: entry.timestamp,
-            }
-        }
-
-        fn supports_transactions(&self) -> bool {
-            return true;
+            })
         }
     }
 
