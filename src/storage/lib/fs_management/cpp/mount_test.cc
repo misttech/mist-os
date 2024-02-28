@@ -79,18 +79,14 @@ class RamdiskTestFixture : public testing::Test {
   zx::result<MountResult> MountMinfs(bool read_only) {
     MountOptions options{.readonly = read_only};
 
-    zx_handle_t handle = ramdisk_get_block_interface(ramdisk_client());
-    if (handle == ZX_HANDLE_INVALID) {
-      return zx::error(ZX_ERR_INTERNAL);
-    }
-    fidl::UnownedClientEnd<fuchsia_hardware_block::Block> unowned(handle);
-    zx::result device = component::Clone(unowned, component::AssumeProtocolComposesNode);
-    if (device.is_error()) {
-      return device.take_error();
+    zx::result<fidl::ClientEnd<fuchsia_hardware_block::Block>> block_client =
+        component::Connect<fuchsia_hardware_block::Block>(ramdisk_path());
+    if (block_client.is_error()) {
+      return block_client.take_error();
     }
 
     auto component = FsComponent::FromDiskFormat(kDiskFormatMinfs);
-    auto mounted_filesystem = Mount(std::move(device.value()), component, options);
+    auto mounted_filesystem = Mount(std::move(block_client.value()), component, options);
     if (mounted_filesystem.is_error())
       return mounted_filesystem.take_error();
     auto data_root = mounted_filesystem->DataRoot();
