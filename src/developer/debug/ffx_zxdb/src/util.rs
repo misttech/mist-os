@@ -4,7 +4,6 @@
 
 use anyhow::Result;
 use fidl_fuchsia_debugger as fdebugger;
-use std::vec::Vec;
 
 /// A representation of a DebugAgent instance.
 pub struct Agent {
