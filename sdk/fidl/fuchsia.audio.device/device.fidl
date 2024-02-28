@@ -3,3 +3,114 @@
 // found in the LICENSE file.
 @available(added=HEAD)
 library fuchsia.audio.device;
+
+using fuchsia.hardware.audio;
+using fuchsia.audio;
+
+/// Common aliases, consts and types used by more than one of the fuchsia.audio.device protocols.
+///
+alias ClockDomain = fuchsia.hardware.audio.ClockDomain;
+alias TokenId = uint64;
+
+/// Maximum number of audio devices in the system at any time.
+const MAX_COUNT_DEVICES uint32 = 256;
+
+/// Maximum number of `PcmFormatSet`s that a device can report as supported.
+const MAX_COUNT_FORMATS uint32 = fuchsia.hardware.audio.MAX_COUNT_FORMATS;
+const MAX_COUNT_DAI_FORMATS uint32 = fuchsia.hardware.audio.MAX_COUNT_DAI_FORMATS;
+
+/// Maximum number of `ChannelSet`s that a device can report in a single PcmFormatSet.
+const MAX_COUNT_CHANNEL_SETS uint32 = fuchsia.hardware.audio.MAX_COUNT_CHANNEL_SETS;
+
+/// Maximum number of distinct sample formats that a single PcmFormatSet can contain.
+const MAX_COUNT_SAMPLE_TYPES uint32 = 32;
+
+/// Maximum number of frame rates that a device can report in a PcmFormatSet.
+const MAX_COUNT_RATES uint32 = fuchsia.hardware.audio.MAX_COUNT_SUPPORTED_RATES;
+
+/// Maximum number of channels that a device can report as supported.
+const MAX_COUNT_CHANNELS uint32 = fuchsia.hardware.audio.MAX_COUNT_CHANNELS_IN_RING_BUFFER;
+
+/// Maximum length of the strings for device, manufacturer and product names.
+const MAX_STRING_SIZE uint32 = fuchsia.hardware.audio.MAX_UI_STRING_SIZE;
+
+/// The device's type (e.g. directionality).
+type DeviceType = flexible enum {
+    /// The device is a source of audio streams.
+    INPUT = 1;
+
+    /// The device is a destination for audio streams.
+    OUTPUT = 2;
+};
+
+/// This table contains vectors representing three dimensions of device
+/// configuration (channelization, sample format, frame rate). The device should
+/// support all combinations of the items in these vectors.
+type PcmFormatSet = table {
+    /// The number of channel sets that the device supports. This must contain
+    /// at least one `ChannelSet` entry.
+    ///
+    /// Required.
+    1: channel_sets vector<ChannelSet>:MAX_COUNT_CHANNEL_SETS;
+
+    /// The number of sample formats that the device supports. This must
+    /// contain least one `AudioSampleFormat` entry.
+    ///
+    /// Required.
+    2: sample_types vector<fuchsia.audio.SampleType>:MAX_COUNT_SAMPLE_TYPES;
+
+    /// The number of frame rates that the device supports. This must contain at
+    /// least one frame rate entry.
+    ///
+    /// Required.
+    3: frame_rates vector<uint32>:MAX_COUNT_RATES;
+};
+
+/// One possible channel configuration for the device.
+type ChannelSet = table {
+    /// Each item in this vector describes the attributes (e.g. frequency range)
+    /// of that channel. The length of this vector defines the number of
+    /// channels supported by this ChannelSet. Must contain at least one entry.
+    ///
+    /// Required.
+    1: attributes vector<ChannelAttributes>:MAX_COUNT_CHANNELS;
+
+    // TODO(https://fxbug.dev/105130): Incorporate this, once it lands.
+    //   2: config AudioChannelConfig;
+};
+
+/// The attributes (e.g. frequency range) of a single channel.
+type ChannelAttributes = table {
+    /// Minimum frequency that this channel guarantees to emit/capture, in Hz.
+    /// If absent, this channel extends to the bottom of the device range.
+    ///
+    /// Optional.
+    1: min_frequency uint32;
+
+    /// Maximum frequency that this channel guarantees to emit/capture, in Hz.
+    /// If absent, this channel extends to the top of the device range.
+    ///
+    /// Optional.
+    2: max_frequency uint32;
+};
+
+/// The device's current state of gain.
+//
+// TODO(https://fxbug.dev/102027): Remove legacy gain aspects once driver API does.
+// Going forward, gain will be handled by `SignalProcessing`.
+type GainState = table {
+    /// Device-wide gain, in decibels.
+    ///
+    /// Required.
+    1: gain_db float32;
+
+    /// Mute state for all channels. If absent, all channels are unmuted.
+    ///
+    /// Optional.
+    2: muted bool;
+
+    /// Automatic Gain Control. If absent, disabled.
+    ///
+    /// Optional.
+    3: agc_enabled bool;
+};
