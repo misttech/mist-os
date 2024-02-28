@@ -19,7 +19,6 @@ use {
     },
     std::{
         collections::{HashSet, VecDeque},
-        convert::{TryFrom, TryInto},
         mem,
         pin::Pin,
         sync::Arc,
@@ -736,9 +735,8 @@ mod tests {
     use byteorder::{ByteOrder, NativeEndian};
     use fixture::fixture;
     use fuchsia_async as fasync;
-    use futures::{io::AsyncWriteExt, Future, FutureExt};
+    use futures::{io::AsyncWriteExt, FutureExt};
     use futures_test::task::new_count_waker;
-    use hex;
     use sha2::{Digest as _, Sha256};
     use std::fs::File;
     use std::io::{Read, Write};

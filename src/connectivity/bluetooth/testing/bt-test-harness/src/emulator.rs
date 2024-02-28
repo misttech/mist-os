@@ -94,10 +94,7 @@ use {
         Future,
     },
     hci_emulator_client::types::{ControllerParameters, LegacyAdvertisingState},
-    std::{
-        collections::HashMap,
-        convert::{AsMut, AsRef},
-    },
+    std::{collections::HashMap, convert::AsRef},
 };
 
 /// The URL of the platform bus driver. The bt-hci-emulator driver is a legacy driver, which binds
@@ -257,10 +254,8 @@ where
 /// Utilities used for setting up expectation predicates on the HCI emulator state transitions.
 pub mod expectation {
     use {
-        super::*,
-        fidl_fuchsia_bluetooth::DeviceClass,
-        fidl_fuchsia_bluetooth_test::{ConnectionState, LegacyAdvertisingType},
-        fuchsia_bluetooth::{expectation::Predicate, types::Address},
+        super::*, fidl_fuchsia_bluetooth_test::LegacyAdvertisingType,
+        fuchsia_bluetooth::expectation::Predicate,
     };
 
     pub fn local_name_is<S>(name: &'static str) -> Predicate<S>

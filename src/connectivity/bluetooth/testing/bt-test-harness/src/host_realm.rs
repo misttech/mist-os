@@ -5,7 +5,6 @@
 use {
     crate::{emulator::EMULATOR_ROOT_DRIVER_URL, host_realm::mpsc::Receiver},
     anyhow::{format_err, Error},
-    cm_types,
     fidl::endpoints::ClientEnd,
     fidl_fuchsia_bluetooth_host::{HostMarker, ReceiverMarker, ReceiverRequestStream},
     fidl_fuchsia_component::{CreateChildArgs, RealmMarker},

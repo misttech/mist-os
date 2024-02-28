@@ -637,10 +637,8 @@ mod tests {
     };
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::types::{example_host, Address, HostId};
-    use fuchsia_inspect::NumericProperty;
     use fuchsia_inspect_derive::WithInspect;
-    use futures::{pin_mut, FutureExt, SinkExt};
-    use std::convert::{TryFrom, TryInto};
+    use futures::{pin_mut, SinkExt};
 
     use crate::fidl_client::tests::MockUpstreamClient;
     use crate::gatt_service::tests::setup_gatt_service;

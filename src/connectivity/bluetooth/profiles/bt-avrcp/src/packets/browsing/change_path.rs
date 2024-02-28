@@ -4,7 +4,6 @@
 
 use {
     packet_encoding::{Decodable, Encodable},
-    std::convert::{TryFrom, TryInto},
     std::num::NonZeroU64,
 };
 

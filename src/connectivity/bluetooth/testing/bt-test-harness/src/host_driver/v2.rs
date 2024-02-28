@@ -22,7 +22,6 @@ use {
     hci_emulator_client::Emulator,
     std::{
         collections::HashMap,
-        convert::{AsMut, AsRef, TryInto},
         ops::{Deref, DerefMut},
         sync::Arc,
     },

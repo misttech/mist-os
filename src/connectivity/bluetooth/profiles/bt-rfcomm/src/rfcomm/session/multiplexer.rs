@@ -298,7 +298,6 @@ impl SessionMultiplexer {
 mod tests {
     use super::*;
     use diagnostics_assertions::assert_data_tree;
-    use std::convert::TryFrom;
 
     use crate::rfcomm::inspect::CREDIT_FLOW_CONTROL;
 

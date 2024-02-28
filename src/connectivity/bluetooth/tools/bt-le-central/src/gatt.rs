@@ -4,7 +4,6 @@
 
 use anyhow::{format_err, Context, Error};
 use fidl::endpoints;
-use fidl_fuchsia_bluetooth;
 use fidl_fuchsia_bluetooth_gatt2::{
     Characteristic as FidlCharacteristic, CharacteristicNotifierMarker,
     CharacteristicNotifierRequest, ClientProxy, Handle, LongReadOptions, ReadByTypeResult,
@@ -782,7 +781,6 @@ mod tests {
     use fidl_fuchsia_bluetooth_gatt2::{ClientMarker, ServiceHandle};
     use fuchsia_zircon::DurationNum;
     use futures::{future::FutureExt, join, pin_mut, select};
-    use std::vec::Vec;
 
     #[fuchsia::test]
     async fn test_read_by_type() {

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use chrono::naive::NaiveDateTime;
-use hex;
 use objects::{Builder, ObexObjectError as Error, Parser};
 use std::collections::HashSet;
 use std::fmt;
@@ -652,7 +651,7 @@ impl Message {
 impl TryFrom<(XmlEvent, MessagesListingVersion)> for Message {
     type Error = Error;
     fn try_from(src: (XmlEvent, MessagesListingVersion)) -> Result<Self, Error> {
-        let XmlEvent::StartElement{ref name, ref attributes, ..} = src.0 else {
+        let XmlEvent::StartElement { ref name, ref attributes, .. } = src.0 else {
             return Err(Error::InvalidData(format!("{:?}", src)));
         };
         if name.local_name.as_str() != MESSAGE_ELEM {
@@ -702,7 +701,7 @@ impl MessagesListing {
     fn validate_messages_listing_element(
         element: XmlEvent,
     ) -> Result<MessagesListingVersion, Error> {
-        let XmlEvent::StartElement{ref name, ref attributes, ..} = element else {
+        let XmlEvent::StartElement { ref name, ref attributes, .. } = element else {
             return Err(Error::InvalidData(format!("{:?}", element)));
         };
 
@@ -771,7 +770,9 @@ impl Parser for MessagesListing {
                     match name.local_name.as_str() {
                         MESSAGES_LISTING_ELEM => {
                             let ParsedXmlEvent::MessagesListingElement = parsed_elem else {
-                                return Err(Error::MissingData(format!("closing {MESSAGES_LISTING_ELEM}")));
+                                return Err(Error::MissingData(format!(
+                                    "closing {MESSAGES_LISTING_ELEM}"
+                                )));
                             };
                             finished_messages_listing = true;
                         }

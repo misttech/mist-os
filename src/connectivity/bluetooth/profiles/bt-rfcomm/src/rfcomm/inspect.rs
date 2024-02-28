@@ -162,7 +162,6 @@ mod tests {
     use fuchsia_async::DurationExt;
     use fuchsia_inspect_derive::WithInspect;
     use fuchsia_zircon::DurationNum;
-    use std::convert::TryFrom;
 
     use crate::rfcomm::session::channel::Credits;
 

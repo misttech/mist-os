@@ -55,7 +55,6 @@ mod tests {
     use crate::peer::gain_control::Gain;
     use assert_matches::assert_matches;
     use at_commands as at;
-    use std::convert::TryFrom;
 
     #[test]
     fn correct_marker() {

@@ -6,7 +6,6 @@ use bt_hfp::call::list::Idx as CallIdx;
 use fidl_fuchsia_bluetooth_hfp::CallState;
 use std::collections::hash_map::{Entry, HashMap};
 use std::collections::VecDeque;
-use std::iter::FromIterator;
 
 /// A Transaction represents a group of requested call state changes that should all complete before
 /// the HF is notified that any of the changes in the group have completed.

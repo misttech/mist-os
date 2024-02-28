@@ -166,7 +166,6 @@ mod tests {
     use fidl_fuchsia_bluetooth_bredr::{DataElement, ProfileMarker};
     use fuchsia_bluetooth::types::Address;
     use futures::FutureExt;
-    use std::convert::TryFrom;
 
     async fn expect_data(remote: &mut Channel, expected_data: Vec<u8>) {
         let mut vec = Vec::new();

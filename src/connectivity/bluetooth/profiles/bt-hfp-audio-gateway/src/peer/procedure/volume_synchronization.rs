@@ -4,7 +4,7 @@
 
 use super::{Procedure, ProcedureError, ProcedureMarker, ProcedureRequest};
 
-use {at_commands as at, core::convert::TryInto};
+use at_commands as at;
 
 use crate::peer::{service_level_connection::SlcState, slc_request::SlcRequest, update::AgUpdate};
 
@@ -110,7 +110,6 @@ impl Procedure for VolumeSynchronizationProcedure {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use std::convert::TryInto;
 
     #[test]
     fn correct_marker() {

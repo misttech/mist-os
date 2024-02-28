@@ -4,7 +4,6 @@
 
 use {
     anyhow::Error,
-    fdio,
     fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy},
     fidl_fuchsia_device::{NameProviderMarker, NameProviderRequestStream},
     fidl_fuchsia_stash::SecureStoreMarker,

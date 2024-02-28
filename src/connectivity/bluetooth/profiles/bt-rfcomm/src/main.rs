@@ -8,7 +8,7 @@ use anyhow::{Context as _, Error};
 use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect_derive::Inspect;
-use futures::{self, channel::mpsc, future, pin_mut};
+use futures::{channel::mpsc, future, pin_mut};
 use tracing::{debug, warn};
 
 mod fidl_service;

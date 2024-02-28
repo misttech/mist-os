@@ -15,7 +15,7 @@ use notification_stream::NotificationStream;
 use packet_encoding::{Decodable, Encodable};
 use rand::Rng;
 use std::collections::HashSet;
-use std::{convert::TryInto, sync::Arc};
+use std::sync::Arc;
 use tracing::{error, info, trace, warn};
 
 mod notification_stream;

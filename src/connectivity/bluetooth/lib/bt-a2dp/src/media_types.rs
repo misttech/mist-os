@@ -5,7 +5,6 @@
 use bitfield::bitfield;
 use bitflags::bitflags;
 use bt_avdtp as avdtp;
-use std::convert::TryFrom;
 
 bitflags! {
     /// Sampling Frequency field for SBC (Octet 0; b4-7).

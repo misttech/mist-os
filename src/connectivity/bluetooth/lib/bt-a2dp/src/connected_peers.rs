@@ -25,7 +25,6 @@ use futures::{
 };
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
-    convert::TryInto,
     pin::Pin,
     sync::Arc,
 };
@@ -462,11 +461,7 @@ mod tests {
     use fidl_fuchsia_bluetooth_bredr::{
         ProfileMarker, ProfileRequestStream, ServiceClassProfileIdentifier,
     };
-    use futures::{self, pin_mut, task::Poll, StreamExt};
-    use std::{
-        convert::{TryFrom, TryInto},
-        iter::FromIterator,
-    };
+    use futures::pin_mut;
 
     use crate::{media_task::tests::TestMediaTaskBuilder, media_types::*, stream::Stream};
 

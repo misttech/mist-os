@@ -4,7 +4,6 @@
 
 use bt_avctp::{AvcCommandResponse, AvcCommandType, AvcPeer, AvcResponseType, AvctpPeer};
 use derivative::Derivative;
-use fidl_fuchsia_bluetooth;
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::{profile::Psm, types::Channel, types::PeerId};
@@ -16,7 +15,6 @@ use futures::{channel::mpsc, stream::StreamExt, Future};
 use packet_encoding::{Decodable, Encodable};
 use std::{
     collections::{HashMap, HashSet},
-    convert::TryFrom,
     mem::{discriminant, Discriminant},
     num::NonZeroU16,
     sync::Arc,
@@ -935,10 +933,8 @@ pub(crate) mod tests {
             ConnectParameters, L2capParameters, ProfileMarker, ProfileRequest, ProfileRequestStream,
         },
         fuchsia_async::{self as fasync, DurationExt},
-        fuchsia_bluetooth::types::Channel,
         fuchsia_inspect_derive::WithInspect,
         fuchsia_zircon::DurationNum,
-        std::convert::TryInto,
     };
 
     fn setup_remote_peer(

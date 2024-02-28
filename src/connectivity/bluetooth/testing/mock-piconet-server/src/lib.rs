@@ -880,9 +880,8 @@ mod tests {
         super::*,
         assert_matches::assert_matches,
         cm_rust::{
-            Availability, DependencyType, ExposeDecl, ExposeProtocolDecl, ExposeSource,
-            ExposeTarget, OfferDecl, OfferProtocolDecl, OfferSource, OfferTarget, UseDecl,
-            UseProtocolDecl, UseSource,
+            Availability, DependencyType, OfferDecl, OfferProtocolDecl, OfferSource, OfferTarget,
+            UseDecl, UseProtocolDecl, UseSource,
         },
         cm_types::Name,
         fidl_fuchsia_component_test as fctest,

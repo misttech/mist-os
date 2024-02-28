@@ -12,7 +12,6 @@ use fuchsia_bluetooth::types::{Address, BondingData, HostData, HostId, HostInfo,
 use fuchsia_sync::RwLock;
 use futures::{future::try_join_all, Future, FutureExt, StreamExt, TryFutureExt};
 use pin_utils::pin_mut;
-use std::convert::TryInto;
 use std::sync::{Arc, Weak};
 use tracing::{error, info, trace, warn};
 

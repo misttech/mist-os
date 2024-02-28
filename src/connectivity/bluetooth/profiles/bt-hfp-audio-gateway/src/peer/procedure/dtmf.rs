@@ -6,11 +6,7 @@ use super::{Procedure, ProcedureError, ProcedureMarker, ProcedureRequest};
 
 use crate::peer::{service_level_connection::SlcState, slc_request::SlcRequest, update::AgUpdate};
 
-use {
-    at_commands as at,
-    core::convert::{TryFrom, TryInto},
-    fidl_fuchsia_bluetooth_hfp as fidl,
-};
+use {at_commands as at, fidl_fuchsia_bluetooth_hfp as fidl};
 
 /// Represents a single Dual-tone multi-frequency signaling code.
 /// This is a native representation of the FIDL enum `fuchsia.bluetooth.hfp.DtmfCode`.

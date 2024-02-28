@@ -4,7 +4,7 @@
 
 use {
     packet_encoding::{Decodable, Encodable},
-    std::{convert::TryFrom, u32},
+    std::u32,
 };
 
 use crate::packets::{

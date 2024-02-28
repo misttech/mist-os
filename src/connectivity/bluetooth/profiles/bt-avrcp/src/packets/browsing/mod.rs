@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    packet_encoding::{decodable_enum, Decodable, Encodable},
-    std::convert::TryInto,
-};
+use packet_encoding::{decodable_enum, Decodable, Encodable};
 
 mod change_path;
 mod get_folder_items;

@@ -5,7 +5,6 @@
 use anyhow::format_err;
 use bitflags::bitflags;
 use fidl_fuchsia_media as media;
-use std::string::ToString;
 
 use crate::audio::AudioError;
 use crate::config::AudioGatewayFeatureSupport;

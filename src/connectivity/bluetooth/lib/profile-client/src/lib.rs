@@ -34,7 +34,6 @@ use fuchsia_bluetooth::types::{Channel, PeerId};
 use futures::stream::{FusedStream, Stream, StreamExt};
 use futures::task::{Context, Poll, Waker};
 use futures::FutureExt;
-use std::convert::{TryFrom, TryInto};
 use std::pin::Pin;
 use tracing::trace;
 

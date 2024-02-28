@@ -6,7 +6,6 @@ use bitfield::bitfield;
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_bluetooth_deviceid as di;
 use fuchsia_bluetooth::types::Uuid;
-use std::convert::TryFrom;
 
 use crate::error::Error;
 
@@ -238,7 +237,6 @@ pub(crate) mod tests {
 
     use assert_matches::assert_matches;
     use fidl_fuchsia_bluetooth_deviceid::DeviceIdentificationRecord;
-    use std::convert::TryInto;
 
     /// Returns a device version of 2.0.6.
     fn valid_device_release_number() -> di::DeviceReleaseNumber {

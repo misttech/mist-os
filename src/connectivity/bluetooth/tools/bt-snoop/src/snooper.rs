@@ -11,7 +11,6 @@ use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, Channel, DurationNum, MessageBuf};
 use futures::Stream;
 use std::{
-    marker::Unpin,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
@@ -188,9 +187,7 @@ mod tests {
     use super::*;
 
     use fuchsia_async as fasync;
-    use fuchsia_zircon::Channel;
     use futures::StreamExt;
-    use std::task::Poll;
 
     #[test]
     fn test_from_channel() {

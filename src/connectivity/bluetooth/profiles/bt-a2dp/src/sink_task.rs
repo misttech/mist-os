@@ -365,7 +365,7 @@ mod tests {
         fuchsia_inspect_derive::WithInspect,
         fuchsia_sync::Mutex,
         fuchsia_zircon::DurationNum,
-        futures::{channel::mpsc, io::AsyncWriteExt, pin_mut, task::Poll, StreamExt},
+        futures::{channel::mpsc, io::AsyncWriteExt, pin_mut, task::Poll},
         std::sync::{Arc, RwLock},
     };
 

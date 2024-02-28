@@ -17,7 +17,7 @@ use futures::lock::Mutex;
 use futures::{select, FutureExt, SinkExt, StreamExt};
 use packet_encoding::Encodable;
 use std::collections::{hash_map::Entry, HashMap};
-use std::{convert::TryInto, sync::Arc};
+use std::sync::Arc;
 use tracing::{error, info, trace, warn};
 
 /// RFCOMM channels used to communicate with profile clients.
@@ -1078,7 +1078,6 @@ mod tests {
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_async as fasync;
     use futures::{pin_mut, task::Poll, Future};
-    use std::convert::TryFrom;
 
     use crate::{rfcomm::session::multiplexer::ParameterNegotiationState, rfcomm::test_util::*};
 

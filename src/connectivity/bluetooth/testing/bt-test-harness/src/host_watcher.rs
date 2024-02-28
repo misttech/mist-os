@@ -18,7 +18,6 @@ use {
     hci_emulator_client::Emulator,
     std::{
         collections::HashMap,
-        convert::TryFrom,
         ops::{Deref, DerefMut},
         sync::Arc,
     },
@@ -204,10 +203,6 @@ impl Drop for ActivatedFakeHost {
 
 pub mod expectation {
     use super::*;
-    use fuchsia_bluetooth::{
-        expectation::Predicate,
-        types::{HostId, HostInfo},
-    };
 
     pub(crate) fn host_not_present(id: HostId) -> Predicate<HostWatcherState> {
         let msg = format!("Host not present: {}", id);

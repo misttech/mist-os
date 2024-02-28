@@ -9,9 +9,7 @@
 use fidl_fuchsia_bluetooth as fidl;
 use fidl_fuchsia_bluetooth_bredr as fidlbredr;
 use serde::{Deserialize, Serialize};
-use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
-use uuid;
 
 use crate::error::Error;
 use crate::inspect::ToProperty;

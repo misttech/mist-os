@@ -127,12 +127,11 @@ mod tests {
     use super::*;
 
     use async_utils::PollExt;
-    use fidl_fuchsia_hardware_audio::StreamConfigProxy;
     use fidl_fuchsia_hardware_audio::*;
     use fixture::fixture;
     use fuchsia_async as fasync;
     use fuchsia_zircon as zx;
-    use futures::{task::Poll, StreamExt};
+    use futures::StreamExt;
 
     use crate::driver::tests::with_audio_frame_stream;
 

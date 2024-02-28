@@ -6,7 +6,6 @@ use anyhow::{Error, Result};
 use at_commands as at;
 use std::fmt;
 use std::fmt::Debug;
-use std::marker::Unpin;
 
 use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 

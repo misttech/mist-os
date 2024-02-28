@@ -468,7 +468,7 @@ pub(crate) mod tests {
     use crate::tests::generate_empty_watch_notification;
 
     use assert_matches::assert_matches;
-    use fidl::endpoints::{create_proxy, create_proxy_and_stream};
+    use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_bluetooth_avrcp::{NotificationEvent, TargetHandlerMarker};
     use fidl_fuchsia_media_sessions2 as fidl_media;
     use futures::{future::join_all, task::Poll, FutureExt};

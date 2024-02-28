@@ -8,7 +8,6 @@ use {
     fuchsia_zircon::Duration,
     futures::{future, future::Ready, stream::FilterMap, Stream, StreamExt},
     packet_encoding::{Decodable, Encodable},
-    std::convert::TryFrom,
     tracing::{info, trace},
 };
 

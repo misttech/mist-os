@@ -15,7 +15,6 @@ use {
     futures::future::{self, BoxFuture, FutureExt},
     std::{
         collections::HashMap,
-        convert::TryInto,
         ops::{Deref, DerefMut},
         sync::Arc,
     },

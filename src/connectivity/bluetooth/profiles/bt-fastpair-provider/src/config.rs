@@ -9,7 +9,6 @@ use base64::engine::{
 };
 use fastpair_provider_config::Config as StructuredConfig;
 use p256::SecretKey;
-use std::convert::TryFrom;
 
 use crate::types::keys::private_key_from_bytes;
 use crate::types::{Error, ModelId};

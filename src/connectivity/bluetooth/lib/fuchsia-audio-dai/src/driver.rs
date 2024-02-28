@@ -158,7 +158,6 @@ mod tests {
     use super::*;
 
     use async_utils::PollExt;
-    use fuchsia;
     use fuchsia_async as fasync;
     use futures::{pin_mut, task::Poll, StreamExt};
 

@@ -124,7 +124,6 @@ mod tests {
         super::*,
         fuchsia_async as fasync,
         futures::{pin_mut, StreamExt},
-        std::task::Poll,
     };
 
     macro_rules! unwrap_ready {

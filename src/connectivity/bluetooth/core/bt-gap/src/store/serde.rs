@@ -35,7 +35,6 @@ use {
         Address, BondingData, BredrBondData, HostData, LeBondData, OneOrBoth, PeerId, Uuid,
     },
     serde::{Deserialize, Serialize},
-    std::convert::{From, TryInto},
 };
 
 #[derive(Serialize)]

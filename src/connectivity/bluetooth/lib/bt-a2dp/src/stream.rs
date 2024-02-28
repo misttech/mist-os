@@ -12,7 +12,7 @@ use {
     fuchsia_inspect::{self as inspect, Property},
     fuchsia_inspect_derive::{AttachError, Inspect},
     futures::{future::BoxFuture, FutureExt, TryFutureExt},
-    std::{collections::HashMap, convert::TryFrom, fmt, sync::Arc, time::Duration},
+    std::{collections::HashMap, fmt, sync::Arc, time::Duration},
     tracing::{info, warn},
 };
 
@@ -328,7 +328,6 @@ pub(crate) mod tests {
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::types::Channel;
     use futures::pin_mut;
-    use std::convert::TryInto;
     use std::task::Poll;
 
     use crate::media_task::tests::TestMediaTaskBuilder;

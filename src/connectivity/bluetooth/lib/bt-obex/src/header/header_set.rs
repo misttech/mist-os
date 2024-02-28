@@ -252,7 +252,6 @@ pub fn expect_end_of_body(headers: &HeaderSet, expected: Vec<u8>) {
 mod tests {
     use super::*;
 
-    use crate::header::{ConnectionIdentifier, SingleResponseMode};
     use assert_matches::assert_matches;
 
     #[fuchsia::test]

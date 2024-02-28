@@ -33,7 +33,7 @@ if let Some(payload) = audio_mux_element.get_payload(0) {
 
 */
 
-use anyhow::{self, format_err};
+use anyhow::format_err;
 use nom::{
     bits::{
         bits,

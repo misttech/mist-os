@@ -8,7 +8,6 @@ use {
     fidl_fuchsia_bluetooth_avrcp_test::*,
     fuchsia_async as fasync,
     futures::{
-        self,
         future::{FutureExt, TryFutureExt},
         stream::TryStreamExt,
     },

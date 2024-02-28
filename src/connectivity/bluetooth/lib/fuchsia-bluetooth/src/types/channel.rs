@@ -9,7 +9,6 @@ use fuchsia_zircon as zx;
 use futures::io;
 use futures::stream::{FusedStream, Stream};
 use futures::{Future, TryFutureExt};
-use std::convert::TryFrom;
 use std::fmt;
 use std::ops::Deref;
 use std::pin::Pin;

@@ -6,7 +6,6 @@ use {
     fidl_fuchsia_bluetooth_avrcp as fidl_avrcp,
     packet_encoding::{Decodable, Encodable},
     std::collections::HashSet,
-    std::convert::{TryFrom, TryInto},
 };
 
 use crate::packets::{

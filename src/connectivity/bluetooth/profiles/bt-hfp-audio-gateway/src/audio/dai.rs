@@ -7,7 +7,7 @@ use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_hardware_audio::{self as audio, DaiFormat, PcmFormat};
 use fidl_fuchsia_media as media;
 use fuchsia_audio_dai::{self as dai, DaiAudioDevice, DigitalAudioInterface};
-use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId, Uuid};
+use fuchsia_bluetooth::types::{peer_audio_stream_id, Uuid};
 use media::AudioDeviceEnumeratorProxy;
 use tracing::{info, warn};
 
@@ -168,7 +168,6 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::{channel::mpsc, SinkExt, StreamExt};
 
-    use crate::features::CodecId;
     use crate::sco_connector::tests::connection_for_codec;
 
     #[fuchsia::test]

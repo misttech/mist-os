@@ -24,7 +24,6 @@ use fuchsia_zircon as zx;
 use futures::stream::{FusedStream, FuturesUnordered, Stream, StreamExt};
 use futures::{future::BoxFuture, Future, FutureExt};
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use tracing::{debug, info, trace, warn};
 
 use crate::types::packets::KeyBasedPairingAction;

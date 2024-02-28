@@ -11,7 +11,7 @@ use fuchsia_sync::RwLock;
 use futures::stream::StreamExt;
 use futures::Future;
 use std::collections::{HashMap, HashSet};
-use std::{convert::TryInto, sync::Arc};
+use std::sync::Arc;
 use tracing::{info, warn};
 
 mod search;
@@ -240,7 +240,6 @@ mod tests {
         fuchsia_async as fasync,
         fuchsia_bluetooth::profile::ProtocolDescriptor,
         futures::{pin_mut, task::Poll},
-        std::convert::TryFrom,
     };
 
     use crate::{

@@ -185,7 +185,6 @@ pub(crate) mod tests {
     use assert_matches::assert_matches;
     use async_test_helpers::run_while;
     use async_utils::PollExt;
-    use fidl::client::QueryResponseFut;
     use fidl_fuchsia_bluetooth::ErrorCode;
     use fuchsia_async as fasync;
     use futures::{pin_mut, SinkExt};

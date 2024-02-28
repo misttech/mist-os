@@ -15,16 +15,13 @@ use fuchsia_bluetooth::types::{addresses_to_custom_string, HostId, HostInfo, Pee
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::Mutex;
 use futures::{channel::mpsc, select, FutureExt, Sink, SinkExt, Stream, StreamExt, TryFutureExt};
-use pairing_delegate;
 use pin_utils::pin_mut;
 use prettytable::{cell, format, row, Row, Table};
 use regex::Regex;
 use rustyline::{error::ReadlineError, CompletionType, Config, EditMode, Editor};
 use std::sync::Arc;
 use std::thread;
-use std::{
-    cmp::Ordering, collections::HashMap, convert::TryFrom, iter::FromIterator, str::FromStr,
-};
+use std::{cmp::Ordering, collections::HashMap, str::FromStr};
 
 use crate::{
     commands::{Cmd, CmdHelper, ReplControl},
@@ -779,8 +776,7 @@ mod tests {
         fidl::endpoints::Proxy,
         fidl_fuchsia_bluetooth as fbt, fidl_fuchsia_bluetooth_sys as fsys,
         fidl_fuchsia_bluetooth_sys::{InputCapability, OutputCapability},
-        fuchsia_bluetooth::types::{Address, PeerId},
-        fuchsia_sync::Mutex,
+        fuchsia_bluetooth::types::Address,
         fuchsia_zircon::{Duration, DurationNum},
         futures::join,
         std::task::Poll,

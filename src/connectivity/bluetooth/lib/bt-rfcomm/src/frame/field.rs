@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use bitfield::bitfield;
-use std::convert::TryFrom;
 
 use crate::frame::{error::FrameParseError, FrameTypeMarker};
 use crate::DLCI;

@@ -8,7 +8,6 @@ use {
     fuchsia_inspect_contrib::nodes::NodeExt,
     fuchsia_inspect_derive::Inspect,
     fuchsia_zircon as zx,
-    std::convert::TryInto,
     std::fmt,
 };
 

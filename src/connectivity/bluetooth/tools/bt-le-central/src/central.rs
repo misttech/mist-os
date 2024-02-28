@@ -14,7 +14,7 @@ use fidl_fuchsia_bluetooth_le::{
 use fuchsia_bluetooth::types::{le::Peer, PeerId, Uuid};
 use fuchsia_sync::RwLock;
 use futures::{future::FutureExt, pin_mut, select};
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 
 use crate::gatt::repl::start_gatt_loop;
 

@@ -12,7 +12,6 @@ use fuchsia_inspect_derive::{AttachError, IValue, Inspect};
 use futures::channel::{mpsc, oneshot};
 use futures::future::{BoxFuture, Shared};
 use futures::{select, FutureExt, SinkExt, StreamExt};
-use std::convert::TryInto;
 use tracing::{error, info, trace};
 
 use crate::rfcomm::inspect::{DuplexDataStreamInspect, SessionChannelInspect, FLOW_CONTROLLER};
@@ -517,8 +516,7 @@ mod tests {
     use fuchsia_async::DurationExt;
     use fuchsia_inspect_derive::WithInspect;
     use fuchsia_zircon::DurationNum;
-    use futures::{channel::mpsc, pin_mut, task::Poll};
-    use std::convert::TryFrom;
+    use futures::{pin_mut, task::Poll};
 
     use crate::rfcomm::test_util::{expect_frame, expect_user_data_frame, poll_stream};
 

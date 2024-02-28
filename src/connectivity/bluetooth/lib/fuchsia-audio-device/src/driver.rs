@@ -6,7 +6,6 @@ use anyhow::format_err;
 use async_helpers::maybe_stream::MaybeStream;
 use fidl::{endpoints::ClientEnd, prelude::*};
 use fidl_fuchsia_hardware_audio::*;
-use fidl_fuchsia_media;
 use fuchsia_async as fasync;
 use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::{IValue, Inspect};

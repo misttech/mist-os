@@ -40,7 +40,6 @@ impl FusedFuture for Dropped {
 #[cfg(test)]
 mod tests {
     use async_utils::PollExt;
-    use futures::task::Context;
     use futures_test::task::new_count_waker;
 
     use super::*;

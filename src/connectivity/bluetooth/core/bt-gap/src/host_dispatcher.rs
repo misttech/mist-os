@@ -33,8 +33,6 @@ use futures::future::{BoxFuture, Future};
 use futures::FutureExt;
 use slab::Slab;
 use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::marker::Unpin;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, Waker};
 use tracing::{error, info, trace, warn};

@@ -344,12 +344,11 @@ mod tests {
     use fuchsia_zircon as zx;
     use futures::{pin_mut, SinkExt, TryStreamExt};
     use std::collections::HashSet;
-    use std::convert::TryFrom;
     use test_battery_manager::TestBatteryManager;
 
     use crate::audio::TestAudioControl;
     use crate::{
-        peer::{fake::PeerFake, ConnectionBehavior, PeerRequest},
+        peer::{fake::PeerFake, PeerRequest},
         profile::test_server::{setup_profile_and_test_server, LocalProfileTestServer},
     };
 

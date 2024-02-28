@@ -16,7 +16,6 @@ use futures::{select, FutureExt, StreamExt};
 use profile_client::{ProfileClient, ProfileEvent};
 use std::collections::HashMap;
 use std::future::Future;
-use std::marker::Unpin;
 use tracing::{debug, info, warn};
 
 use crate::config::HandsFreeFeatureSupport;

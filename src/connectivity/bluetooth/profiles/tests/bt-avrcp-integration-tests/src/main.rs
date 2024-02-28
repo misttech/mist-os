@@ -20,7 +20,6 @@ use {
     fuchsia_zircon as zx,
     futures::{join, stream::StreamExt, TryFutureExt},
     mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember},
-    std::convert::TryInto,
 };
 
 /// AVRCP component URL.

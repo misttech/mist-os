@@ -5,7 +5,6 @@
 use anyhow::{format_err, Context as _, Error};
 use async_trait::async_trait;
 use bt_init_config::Config;
-use fdio;
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
 use fidl_fuchsia_bluetooth_snoop::SnoopMarker;

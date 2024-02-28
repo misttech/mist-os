@@ -403,7 +403,6 @@ mod tests {
     use futures::pin_mut;
 
     use crate::header::header_set::{expect_body, expect_end_of_body};
-    use crate::header::{Header, HeaderIdentifier, HeaderSet};
     use crate::server::handler::test_utils::TestApplicationProfile;
     use crate::transport::test_utils::{expect_response, send_packet};
 

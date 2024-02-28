@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::format_err;
-use std::convert::TryFrom;
 
 use crate::frame::FrameParseError;
 use crate::{RfcommError, Role};

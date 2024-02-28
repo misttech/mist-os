@@ -34,8 +34,6 @@ async fn find_devices_internal(
 #[cfg(test)]
 mod tests {
     use {
-        anyhow::Error,
-        fuchsia,
         fuchsia_component_test::{
             Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Route,
         },

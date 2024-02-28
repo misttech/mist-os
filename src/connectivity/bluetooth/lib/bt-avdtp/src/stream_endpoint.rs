@@ -9,7 +9,6 @@ use {
     fuchsia_zircon::{Duration, DurationNum, Status},
     futures::{io, stream::Stream, FutureExt},
     std::{
-        convert::TryFrom,
         fmt,
         pin::Pin,
         sync::Arc,
@@ -547,7 +546,6 @@ mod tests {
     use super::*;
     use crate::{
         tests::{expect_remote_recv, recv_remote, setup_peer},
-        types::MediaCodecType,
         Request,
     };
 
@@ -1081,10 +1079,7 @@ mod tests {
         assert!(s.get_configuration().is_none());
     }
 
-    use std::sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    };
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     /// Create a callback that tracks how many times it has been called
     fn call_count_callback() -> (Option<StreamEndpointUpdateCallback>, Arc<AtomicUsize>) {

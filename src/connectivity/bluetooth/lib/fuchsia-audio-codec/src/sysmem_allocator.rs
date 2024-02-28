@@ -12,7 +12,7 @@ use {
         AllocatorProxy, BufferCollectionConstraints, BufferCollectionInfo2, BufferCollectionMarker,
         BufferCollectionProxy, BufferCollectionTokenMarker, BufferMemorySettings,
     },
-    fuchsia_runtime, fuchsia_zircon as zx,
+    fuchsia_zircon as zx,
     fuchsia_zircon::AsHandleRef,
     futures::{
         future::{FusedFuture, Future},
@@ -20,7 +20,6 @@ use {
         task::{Context, Poll},
         FutureExt,
     },
-    std::convert::TryInto,
     std::pin::Pin,
     tracing::error,
 };

@@ -15,7 +15,6 @@ use {
         types::Address,
     },
     futures::TryFutureExt,
-    test_harness,
 };
 
 mod expect {

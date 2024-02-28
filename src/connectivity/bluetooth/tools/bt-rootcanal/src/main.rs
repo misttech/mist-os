@@ -10,7 +10,7 @@ use {
     fuchsia_fs::OpenFlags,
     fuchsia_zircon::{self as zx},
     futures::{
-        self, future::Either, io::ReadHalf, io::WriteHalf, AsyncRead, AsyncReadExt, AsyncWrite,
+        future::Either, io::ReadHalf, io::WriteHalf, AsyncRead, AsyncReadExt, AsyncWrite,
         AsyncWriteExt, FutureExt,
     },
     std::net::{IpAddr, SocketAddr},

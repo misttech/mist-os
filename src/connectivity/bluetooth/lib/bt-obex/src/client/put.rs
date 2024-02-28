@@ -179,7 +179,7 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::pin_mut;
 
-    use crate::header::{ConnectionIdentifier, Header, HeaderIdentifier};
+    use crate::header::ConnectionIdentifier;
     use crate::operation::ResponsePacket;
     use crate::transport::test_utils::{
         expect_code, expect_request, expect_request_and_reply, new_manager,

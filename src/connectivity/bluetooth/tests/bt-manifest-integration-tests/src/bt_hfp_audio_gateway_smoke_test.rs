@@ -17,7 +17,7 @@ use {
     },
     futures::{channel::mpsc, pending, SinkExt, StreamExt},
     realmbuilder_mock_helpers::{add_fidl_service_handler, mock_component, mock_dev},
-    std::{collections::HashSet, iter::FromIterator},
+    std::collections::HashSet,
     tracing::info,
 };
 

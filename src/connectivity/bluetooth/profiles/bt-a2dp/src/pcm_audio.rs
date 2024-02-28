@@ -53,7 +53,6 @@ mod tests {
     use super::*;
 
     use fidl_fuchsia_media::{AudioChannelId, AudioPcmMode};
-    use hex;
     use sha2::{Digest as _, Sha256};
 
     #[test]

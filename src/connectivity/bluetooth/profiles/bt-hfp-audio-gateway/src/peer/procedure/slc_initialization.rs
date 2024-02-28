@@ -14,7 +14,7 @@ use crate::{
     },
 };
 
-use {at_commands as at, num_traits::FromPrimitive, std::convert::TryFrom};
+use {at_commands as at, num_traits::FromPrimitive};
 
 /// A singular state within the SLC Initialization Procedure.
 pub trait SlcProcedureState: core::fmt::Debug {
@@ -472,7 +472,7 @@ impl SlcProcedureState for SlcErrorState {
 mod tests {
     use super::*;
 
-    use crate::features::{CodecId, HfFeatures};
+    use crate::features::CodecId;
     use assert_matches::assert_matches;
 
     #[test]

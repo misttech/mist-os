@@ -14,7 +14,6 @@ use {
     futures::{pin_mut, stream::StreamExt},
     mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember},
     profile_client::{ProfileClient, ProfileEvent},
-    std::convert::TryInto,
 };
 
 /// RFCOMM component URL.

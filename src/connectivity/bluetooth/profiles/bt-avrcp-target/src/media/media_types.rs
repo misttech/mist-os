@@ -8,7 +8,6 @@ use {
     fidl_fuchsia_media_sessions2 as fidl_media,
     fidl_table_validation::ValidFidlTable,
     fuchsia_async as fasync, fuchsia_zircon as zx,
-    std::convert::TryInto,
     tracing::{debug, trace, warn},
 };
 

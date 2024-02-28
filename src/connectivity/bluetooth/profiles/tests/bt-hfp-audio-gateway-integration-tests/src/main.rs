@@ -22,7 +22,6 @@ use {
     futures::{channel::mpsc, stream::StreamExt, TryFutureExt},
     mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember},
     realmbuilder_mock_helpers::{mock_component, mock_dev},
-    std::convert::TryInto,
     test_call_manager::TestCallManager,
 };
 

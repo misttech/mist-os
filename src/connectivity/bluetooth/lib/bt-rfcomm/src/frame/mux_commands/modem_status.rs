@@ -4,7 +4,6 @@
 
 use bitfield::bitfield;
 use packet_encoding::{Decodable, Encodable};
-use std::convert::TryFrom;
 
 use crate::frame::FrameParseError;
 use crate::DLCI;

@@ -10,7 +10,6 @@ use {
         expectation::{self, asynchronous::ExpectableExt},
         types::{Address, BondingData, LeBondData, OneOrBoth, PeerId},
     },
-    test_harness,
 };
 
 // TODO(https://fxbug.dev/42072596): Add tests for BR/EDR and dual mode bond data.

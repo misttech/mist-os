@@ -4,8 +4,7 @@
 
 use fidl_fuchsia_bluetooth_sys::{self as sys, BrEdrSecurityMode, LeSecurityMode};
 use serde::{Deserialize, Serialize};
-use serde_json;
-use std::{cmp::PartialEq, convert::Into, fs::OpenOptions, path::Path};
+use std::{cmp::PartialEq, fs::OpenOptions, path::Path};
 
 static OVERRIDE_CONFIG_FILE_PATH: &'static str = "/config/data/build-config.json";
 static DEFAULT_CONFIG_FILE_PATH: &'static str = "/pkg/data/bt-gap-default.json";

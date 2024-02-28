@@ -4,7 +4,6 @@
 
 use {
     fuchsia_async as fasync,
-    fuchsia_bluetooth::types::Channel,
     fuchsia_zircon::{self as zx, Status},
     futures::executor::block_on,
     std::result,

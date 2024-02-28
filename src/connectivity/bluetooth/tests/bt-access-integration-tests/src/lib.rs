@@ -8,7 +8,6 @@ use {
         core_realm::DEFAULT_TEST_DEVICE_NAME,
         host_watcher::{activate_fake_host, HostWatcherHarness},
     },
-    fidl,
     fidl_fuchsia_bluetooth_sys::ProcedureTokenProxy,
     fidl_fuchsia_bluetooth_test::{AdvertisingData, LowEnergyPeerParameters, PeerProxy},
     fuchsia_bluetooth::{
@@ -17,7 +16,6 @@ use {
         types::Address,
     },
     hci_emulator_client::Emulator,
-    test_harness,
 };
 
 async fn create_le_peer(hci: &Emulator, address: Address) -> Result<PeerProxy, Error> {

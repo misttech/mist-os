@@ -13,7 +13,6 @@ use {
     futures::future::BoxFuture,
     futures::{FutureExt, TryStreamExt},
     std::{
-        convert::TryInto,
         ops::{Deref, DerefMut},
         sync::Arc,
     },

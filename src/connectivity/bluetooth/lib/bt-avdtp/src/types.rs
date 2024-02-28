@@ -6,7 +6,6 @@ use {
     fuchsia_zircon as zx,
     packet_encoding::{decodable_enum, Decodable, Encodable},
     std::{
-        convert::TryFrom,
         fmt,
         io::{Cursor, Write},
         result,

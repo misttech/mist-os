@@ -20,7 +20,7 @@
 
 use fidl_fuchsia_bluetooth::Appearance;
 use fidl_fuchsia_bluetooth_le as fidl;
-use std::{convert::TryFrom, fmt, str::FromStr};
+use std::{fmt, str::FromStr};
 
 use crate::error::Error;
 use crate::types::{id::PeerId, uuid::Uuid};

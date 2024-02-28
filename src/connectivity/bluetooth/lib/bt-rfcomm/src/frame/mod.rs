@@ -476,7 +476,6 @@ mod tests {
 
     use assert_matches::assert_matches;
     use mux_commands::{MuxCommandParams, RemotePortNegotiationParams};
-    use std::convert::TryFrom;
 
     #[test]
     fn test_is_mux_startup_frame() {

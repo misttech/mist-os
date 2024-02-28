@@ -5,7 +5,6 @@
 use bitfield::bitfield;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
-use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
 pub enum MessageHeaderParseErrorType {

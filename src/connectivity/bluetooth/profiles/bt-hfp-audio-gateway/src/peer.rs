@@ -336,7 +336,7 @@ mod tests {
     use futures::StreamExt;
     use std::collections::HashSet;
 
-    use crate::{audio::TestAudioControl, AudioGatewayFeatureSupport};
+    use crate::audio::TestAudioControl;
 
     fn new_audio_control() -> Arc<Mutex<Box<dyn AudioControl>>> {
         Arc::new(Mutex::new(Box::new(TestAudioControl::default())))

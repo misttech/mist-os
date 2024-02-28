@@ -4,7 +4,7 @@
 
 use {
     packet_encoding::{Decodable, Encodable},
-    std::{convert::TryFrom, u8},
+    std::u8,
 };
 
 use crate::packets::player_application_settings::{
@@ -253,7 +253,6 @@ impl TryFrom<GetCurrentPlayerApplicationSettingValueResponse> for PlayerApplicat
 mod tests {
     use super::*;
     use crate::packets::VendorDependentRawPdu;
-    use std::convert::TryInto;
 
     #[test]
     // Test GetCurrentPlayerApplicationSettingValue command encoding success.

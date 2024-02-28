@@ -12,7 +12,6 @@ use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::{AttachError, Inspect, Unit};
 use std::cmp::min;
 use std::collections::HashSet;
-use std::convert::{TryFrom, TryInto};
 
 use crate::assigned_numbers::{constants::SERVICE_CLASS_UUIDS, AssignedNumber};
 use crate::error::Error;

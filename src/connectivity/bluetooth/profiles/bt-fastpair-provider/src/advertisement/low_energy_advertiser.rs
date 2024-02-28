@@ -20,7 +20,6 @@ use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::stream::{FusedStream, Stream, StreamExt};
 use futures::{ready, Future, FutureExt};
-use std::convert::TryFrom;
 use tracing::{debug, info, trace, warn};
 
 use crate::gatt_service::FAST_PAIR_SERVICE_UUID;
@@ -349,7 +348,7 @@ mod tests {
         PeripheralRequestStream,
     };
     use fuchsia_async as fasync;
-    use futures::{pin_mut, stream::StreamExt};
+    use futures::pin_mut;
 
     use crate::types::AccountKey;
 

@@ -6,7 +6,7 @@ use {
     bt_avctp::AvcCommandType,
     fidl_fuchsia_bluetooth_avrcp as fidl_avrcp,
     packet_encoding::{decodable_enum, Decodable, Encodable},
-    std::{convert::TryFrom, result},
+    std::result,
     thiserror::Error,
     tracing::{debug, info, warn},
 };

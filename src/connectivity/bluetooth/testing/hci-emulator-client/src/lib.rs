@@ -269,7 +269,7 @@ impl TestDevice {
 mod tests {
     use {
         super::*,
-        fidl_fuchsia_driver_test as fdt, fuchsia,
+        fidl_fuchsia_driver_test as fdt,
         fuchsia_component_test::RealmBuilder,
         fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
     };

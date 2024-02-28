@@ -272,7 +272,7 @@ impl MediaTask for RunningSourceTask {
 mod tests {
     use super::*;
 
-    use bt_a2dp::{codec::MediaCodecConfig, media_types::*};
+    use bt_a2dp::media_types::*;
     use bt_avdtp::MediaCodecType;
     use fuchsia_bluetooth::types::Channel;
     use fuchsia_inspect as inspect;

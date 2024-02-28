@@ -120,13 +120,12 @@ mod tests {
     use super::*;
 
     use async_utils::PollExt;
-    use fidl_fuchsia_hardware_audio::StreamConfigProxy;
     use fidl_fuchsia_hardware_audio::*;
     use fidl_fuchsia_media::{AudioChannelId, AudioPcmMode, PcmFormat};
     use fixture::fixture;
     use fuchsia_async as fasync;
     use fuchsia_zircon as zx;
-    use futures::{task::Poll, AsyncWriteExt};
+    use futures::AsyncWriteExt;
 
     const TEST_UNIQUE_ID: &[u8; 16] = &[5; 16];
     const TEST_CLOCK_DOMAIN: u32 = 0x00010203;

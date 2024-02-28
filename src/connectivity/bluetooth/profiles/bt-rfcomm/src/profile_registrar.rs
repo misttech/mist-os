@@ -15,11 +15,9 @@ use fuchsia_bluetooth::profile::{
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect_derive::Inspect;
 use futures::{
-    self, channel::mpsc, future::BoxFuture, select, sink::SinkExt, stream::StreamExt, Future,
-    FutureExt,
+    channel::mpsc, future::BoxFuture, select, sink::SinkExt, stream::StreamExt, Future, FutureExt,
 };
 use std::collections::HashSet;
-use std::convert::{TryFrom, TryInto};
 use tracing::{info, trace, warn};
 
 use crate::fidl_service::Service;

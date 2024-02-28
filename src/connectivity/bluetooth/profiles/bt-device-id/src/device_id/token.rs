@@ -113,7 +113,7 @@ mod tests {
         ChannelParameters, ConnectionReceiverMarker, ConnectionReceiverProxy, ProfileMarker,
     };
     use fuchsia_async as fasync;
-    use futures::{future::MaybeDone, pin_mut, StreamExt};
+    use futures::{future::MaybeDone, pin_mut};
 
     use crate::device_id::service_record::tests::minimal_record;
 

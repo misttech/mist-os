@@ -114,7 +114,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {super::*, std::time::Duration};
+    use super::*;
 
     // Dummy struct that implements the SizeOf and CreatedAt traits required for elements of
     // a `BoundedQueue`

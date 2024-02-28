@@ -8,7 +8,7 @@ use {
     fuchsia_bluetooth::types::{Channel, PeerId},
     fuchsia_inspect_derive::{AttachError, Inspect},
     fuchsia_sync::RwLock,
-    futures::{self, channel::oneshot},
+    futures::channel::oneshot,
     std::{collections::HashMap, sync::Arc},
 };
 

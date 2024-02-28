@@ -42,7 +42,6 @@ use futures::future::{BoxFuture, FutureExt};
 use futures::select;
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
-use std::convert::TryFrom;
 use tracing::{info, warn};
 
 use crate::services::pairing::pairing_requests::PairingRequests;
@@ -311,13 +310,12 @@ impl PairingDispatcherHandle {
 mod test {
     use super::*;
     use {
-        anyhow::Error,
         assert_matches::assert_matches,
         fidl_fuchsia_bluetooth::Appearance,
         fidl_fuchsia_bluetooth_sys as sys,
         fuchsia_bluetooth::types::Address,
         futures::{
-            future::{self, BoxFuture, Future, FutureExt},
+            future::{self, Future},
             stream::TryStreamExt,
         },
     };

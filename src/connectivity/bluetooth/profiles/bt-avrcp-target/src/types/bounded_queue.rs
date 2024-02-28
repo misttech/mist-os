@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{collections::vec_deque, iter::FromIterator};
+use std::collections::vec_deque;
 
 use crate::types::MAX_NOTIFICATION_EVENT_QUEUE_SIZE;
 

@@ -10,11 +10,9 @@ use fidl_fuchsia_stash::{
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::inspect::Inspectable;
 use fuchsia_bluetooth::types::{Address, BondingData, HostData, PeerId};
-use fuchsia_inspect;
 use futures::channel::{mpsc, oneshot};
 use futures::future::{Future, FutureExt};
 use futures::stream::StreamExt;
-use serde_json;
 use std::collections::HashMap;
 use tracing::{error, info, warn};
 

@@ -4,7 +4,6 @@
 
 use bitfield::bitfield;
 use packet_encoding::{decodable_enum, Decodable, Encodable};
-use std::convert::TryFrom;
 
 /// The DLC PN frame definition.
 mod dlc_parameter_negotiation;
@@ -348,7 +347,6 @@ mod tests {
     use super::*;
 
     use assert_matches::assert_matches;
-    use dlc_parameter_negotiation::CreditBasedFlowHandshake;
     use modem_status::ModemStatusSignals;
 
     #[test]

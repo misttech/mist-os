@@ -22,7 +22,7 @@ use {
         select, FutureExt, Sink, SinkExt, Stream, StreamExt, TryStreamExt,
     },
     rustyline::{error::ReadlineError, CompletionType, Config, Editor},
-    std::{convert::TryFrom, sync::Arc, thread},
+    std::{sync::Arc, thread},
     test_rfcomm_client::RfcommManager,
 };
 

@@ -4,7 +4,7 @@
 
 use fidl_fuchsia_bluetooth_sys as fsys;
 use fuchsia_inspect::{self as inspect, Property};
-use std::{convert::TryFrom, fmt};
+use std::fmt;
 
 use crate::error::Error;
 use crate::inspect::{DebugExt, InspectData, Inspectable, IsInspectable, ToProperty};

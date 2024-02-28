@@ -15,7 +15,7 @@ use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::{lock::Mutex, FutureExt};
 use std::collections::{HashMap, HashSet};
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 use tracing::{info, trace, warn};
 
 use crate::rfcomm::session::Session;
@@ -294,7 +294,6 @@ mod tests {
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fidl_fuchsia_bluetooth_bredr::ConnectionReceiverMarker;
     use fuchsia_async as fasync;
-    use fuchsia_bluetooth::types::Channel;
     use fuchsia_inspect_derive::WithInspect;
     use futures::{pin_mut, task::Poll, AsyncWriteExt, StreamExt};
 

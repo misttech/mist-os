@@ -29,7 +29,7 @@ use {
         Future, FutureExt, StreamExt, TryFutureExt,
     },
     std::collections::HashSet,
-    std::{convert::TryInto, io, pin::Pin},
+    std::{io, pin::Pin},
     tracing::{info, warn},
 };
 
@@ -497,7 +497,7 @@ pub(crate) mod tests {
             StreamSinkRequest, StreamSinkRequestStream,
         },
         fuchsia_async as fasync,
-        futures::{pin_mut, task::Poll, FutureExt},
+        futures::pin_mut,
         futures_test::task::new_count_waker,
     };
 

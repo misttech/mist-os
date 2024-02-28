@@ -193,7 +193,6 @@ pub(crate) mod tests {
     use fuchsia_bluetooth::profile::{DataElement, ProtocolDescriptor};
     use fuchsia_bluetooth::types::{PeerId, Uuid};
     use futures::{stream::StreamExt, task::Poll};
-    use std::convert::TryFrom;
 
     /// Defines a Protocol requesting RFCOMM with the provided server `channel`.
     pub fn rfcomm_protocol_descriptor_list(

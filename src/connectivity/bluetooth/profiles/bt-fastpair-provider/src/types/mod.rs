@@ -11,7 +11,6 @@ use fuchsia_inspect_derive::{AttachError, Inspect};
 use lru_cache::LruCache;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::convert::{TryFrom, TryInto};
 use std::{fs, io, path};
 use tracing::{debug, warn};
 

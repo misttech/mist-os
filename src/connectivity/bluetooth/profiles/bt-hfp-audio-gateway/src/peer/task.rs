@@ -25,7 +25,7 @@ use {
         FutureExt, SinkExt, StreamExt,
     },
     profile_client::ProfileEvent,
-    std::{convert::TryInto, fmt, sync::Arc},
+    std::{fmt, sync::Arc},
     tracing::{error, info, warn},
     vigil::{DropWatch, Vigil},
 };
@@ -903,11 +903,9 @@ mod tests {
             future::ready,
             pin_mut,
             stream::{FusedStream, Stream},
-            SinkExt,
         },
         proptest::prelude::*,
         std::collections::HashSet,
-        std::convert::TryFrom,
     };
 
     use crate::{

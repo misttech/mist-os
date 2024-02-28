@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use sha2::{Digest, Sha256};
-use std::convert::TryInto;
 use tracing::debug;
 
 use crate::types::{AccountKey, Error};

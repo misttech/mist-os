@@ -454,12 +454,12 @@ mod tests {
     use async_test_helpers::run_while;
     use async_utils::PollExt;
     use diagnostics_assertions::assert_data_tree;
-    use fidl::endpoints::{self, RequestStream};
+    use fidl::endpoints::RequestStream;
     use fidl_fuchsia_power_battery as fpower;
     use fuchsia_async::pin_mut;
     use fuchsia_inspect_derive::WithInspect;
     use futures::{task::Poll, Future};
-    use std::{convert::TryInto, pin::Pin};
+    use std::pin::Pin;
     use test_battery_manager::TestBatteryManager;
 
     fn setup_media_relay() -> (sessions2::PlayerProxy, avrcp::PeerManagerRequestStream, impl Future)

@@ -6,7 +6,7 @@ use async_utils::hanging_get::server::{HangingGet, Publisher, Subscriber};
 use fidl_fuchsia_bluetooth_power::{Identifier, Information, WatcherWatchResponder};
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_sync::Mutex;
-use std::{collections::HashMap, convert::TryFrom};
+use std::collections::HashMap;
 use tracing::warn;
 
 use crate::error::Error;

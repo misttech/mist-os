@@ -5,7 +5,6 @@
 use {
     anyhow::{format_err, Error},
     packet_encoding::decodable_enum,
-    std::convert::{TryFrom, TryInto},
     std::ops::Range,
     std::u16,
     thiserror::Error,

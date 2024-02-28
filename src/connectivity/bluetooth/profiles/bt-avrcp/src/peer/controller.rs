@@ -7,7 +7,6 @@ use futures::channel::mpsc;
 use futures::Future;
 use packet_encoding::{Decodable, Encodable};
 use std::collections::HashSet;
-use std::convert::{TryFrom, TryInto};
 use tracing::trace;
 
 use crate::packets::{Error as PacketError, *};
@@ -472,7 +471,6 @@ impl Controller {
 pub mod tests {
     use super::*;
 
-    use crate::peer::decode_avc_vendor_command;
     use crate::peer::tests::*;
     use crate::peer_manager::TargetDelegate;
     use crate::profile::{AvrcpProtocolVersion, AvrcpService, AvrcpTargetFeatures};

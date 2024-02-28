@@ -24,7 +24,7 @@ mod test {
             super::*,
             anyhow::format_err,
             assert_matches::assert_matches,
-            fuchsia, fuchsia_async as fasync,
+            fuchsia_async as fasync,
             fuchsia_sync::Mutex,
             futures::{
                 channel::oneshot,

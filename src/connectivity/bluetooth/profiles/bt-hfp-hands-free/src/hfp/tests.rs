@@ -16,7 +16,6 @@ use fuchsia_bluetooth::types::{Channel, PeerId};
 use futures::channel::mpsc;
 use futures::{pin_mut, StreamExt};
 use profile_client::ProfileClient;
-use std::boxed::Box;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::Poll;

@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_bluetooth_sys::{self as sys, BootstrapRequest, BootstrapRequestStream},
     fuchsia_bluetooth::types::{BondingData, Identity, PeerId},
     futures::prelude::*,
-    std::{convert::TryFrom, iter, mem},
+    std::{iter, mem},
 };
 
 use crate::host_dispatcher::*;

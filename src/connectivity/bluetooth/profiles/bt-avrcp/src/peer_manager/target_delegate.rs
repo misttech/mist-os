@@ -274,10 +274,6 @@ mod tests {
 
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
-    use fidl_fuchsia_bluetooth_avrcp::{
-        Equalizer, PlayerApplicationSettings, ShuffleMode, TargetHandlerMarker,
-        TargetHandlerRequest,
-    };
     use fuchsia_async as fasync;
     use futures::StreamExt;
     use std::task::Poll;

@@ -13,7 +13,6 @@ use {
     },
     packet_encoding::{Decodable, Encodable},
     std::{
-        convert::TryFrom,
         pin::Pin,
         sync::Arc,
         task::{Context, Poll},

@@ -775,9 +775,7 @@ pub(crate) mod tests {
         },
         assert_matches::assert_matches,
         fuchsia_async as fasync,
-        fuchsia_bluetooth::types::Channel,
-        futures::io::AsyncWriteExt,
-        std::{convert::TryFrom, mem::Discriminant},
+        std::mem::Discriminant,
     };
 
     /// Builds and returns a connected service level connection. Returns the SLC and

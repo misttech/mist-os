@@ -63,7 +63,6 @@ mod tests {
     use super::*;
     use fidl_fuchsia_bluetooth_bredr as bredr;
     use fuchsia_bluetooth::profile::ProtocolDescriptor;
-    use std::convert::TryFrom;
 
     use crate::types::tests::rfcomm_protocol_descriptor_list;
 

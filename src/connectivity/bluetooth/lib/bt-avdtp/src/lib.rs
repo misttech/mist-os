@@ -16,14 +16,7 @@ use {
     },
     packet_encoding::{Decodable, Encodable},
     slab::Slab,
-    std::{
-        collections::VecDeque,
-        convert::TryFrom,
-        marker::{PhantomData, Unpin},
-        mem,
-        pin::Pin,
-        sync::Arc,
-    },
+    std::{collections::VecDeque, marker::PhantomData, mem, pin::Pin, sync::Arc},
     tracing::{info, trace, warn},
 };
 

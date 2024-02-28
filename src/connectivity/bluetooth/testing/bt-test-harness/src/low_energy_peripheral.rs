@@ -15,7 +15,6 @@ use {
     futures::future::{self, BoxFuture},
     futures::{FutureExt, TryFutureExt, TryStreamExt},
     std::{
-        convert::TryInto,
         ops::{Deref, DerefMut},
         sync::Arc,
     },

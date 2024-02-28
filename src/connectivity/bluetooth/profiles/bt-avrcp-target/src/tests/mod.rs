@@ -9,10 +9,7 @@ use {
     fidl_fuchsia_bluetooth_avrcp::*,
     fidl_fuchsia_media_sessions2::*,
     fuchsia_async as fasync,
-    futures::{
-        StreamExt, TryStreamExt,
-        {pin_mut, task::Poll},
-    },
+    futures::{pin_mut, task::Poll, TryStreamExt},
 };
 
 use crate::avrcp_handler::handle_target_requests;

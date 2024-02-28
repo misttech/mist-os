@@ -15,7 +15,7 @@ use {
     fuchsia_zircon::DurationNum,
     futures::{channel::mpsc, SinkExt, StreamExt},
     realmbuilder_mock_helpers::mock_component,
-    std::{collections::HashSet, iter::FromIterator},
+    std::collections::HashSet,
     tracing::info,
 };
 

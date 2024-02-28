@@ -323,9 +323,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use async_utils::PollExt;
-    use fidl::endpoints;
     use fuchsia_zircon::DurationNum;
-    use futures::{channel::oneshot::Sender, Future};
     use std::pin::Pin;
 
     const INITIAL_MEDIA_VOLUME: f32 = 0.8;

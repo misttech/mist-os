@@ -8,7 +8,7 @@ use fidl_fuchsia_media as media;
 use fuchsia_async as fasync;
 use fuchsia_audio_codec::{StreamProcessor, StreamProcessorOutputStream};
 use fuchsia_audio_device::{driver::SoftPcm, AudioFrameSink, AudioFrameStream};
-use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId, Uuid};
+use fuchsia_bluetooth::types::{peer_audio_stream_id, Uuid};
 use fuchsia_zircon as zx;
 use futures::{pin_mut, task::Context, AsyncWriteExt, FutureExt, StreamExt};
 use media::AudioDeviceEnumeratorProxy;
@@ -331,7 +331,6 @@ mod tests {
     use super::*;
 
     use fidl_fuchsia_bluetooth_bredr::ScoConnectionRequestStream;
-    use futures::StreamExt;
 
     use crate::sco_connector::tests::connection_for_codec;
 

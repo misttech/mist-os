@@ -261,7 +261,6 @@ impl<I: ProcedureInputT<O>, O: ProcedureOutputT> FusedStream for ProcedureManage
 mod test {
     use super::*;
 
-    use crate::config::HandsFreeFeatureSupport;
     use crate::peer::procedure::test;
 
     use fuchsia_async as fasync;

@@ -4,9 +4,9 @@
 
 use {
     bt_avctp::{self as avctp, AvctpCommand},
-    futures::{self, Future},
+    futures::Future,
     packet_encoding::{Decodable, Encodable},
-    std::{convert::TryFrom, sync::Arc},
+    std::sync::Arc,
     tracing::{info, trace, warn},
 };
 

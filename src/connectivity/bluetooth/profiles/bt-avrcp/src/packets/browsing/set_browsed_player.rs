@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use packet_encoding::{Decodable, Encodable};
-use std::convert::{TryFrom, TryInto};
 use tracing::{info, warn};
 
 use crate::packets::{

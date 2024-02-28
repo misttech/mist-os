@@ -12,7 +12,7 @@ use fuchsia_bluetooth::types::{Channel, PeerId, Uuid};
 use fuchsia_sync::Mutex;
 use futures::{channel::mpsc, select, StreamExt};
 use profile_client::{ProfileClient, ProfileEvent};
-use std::{cell::Cell, collections::HashMap, convert::TryFrom, sync::Arc};
+use std::{cell::Cell, collections::HashMap, sync::Arc};
 use tracing::{info, warn};
 
 /// The default buffer size for the mpsc channels used to relay user data packets to be sent to the
@@ -396,7 +396,6 @@ mod tests {
     use fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileRequestStream};
     use fidl_fuchsia_bluetooth_rfcomm_test::{RfcommTestMarker, RfcommTestRequestStream};
     use fixture::fixture;
-    use std::convert::TryInto;
 
     type TestFixture = (RfcommManager, ProfileRequestStream, RfcommTestRequestStream);
 

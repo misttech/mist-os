@@ -8,7 +8,6 @@ use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::Channel;
 use futures::{channel::mpsc, stream::Stream, task::Poll, StreamExt};
 use packet_encoding::Encodable;
-use std::marker::Unpin;
 
 /// Simulates the peer sending an RFCOMM frame over the L2CAP `remote` socket.
 #[track_caller]

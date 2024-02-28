@@ -236,7 +236,7 @@ mod tests {
     use async_utils::PollExt;
     use fidl_fuchsia_bluetooth_le::CentralRequest;
     use fuchsia_async as fasync;
-    use futures::{pin_mut, StreamExt};
+    use futures::pin_mut;
 
     #[fuchsia::test]
     fn watch_scan_results_lifetime() {

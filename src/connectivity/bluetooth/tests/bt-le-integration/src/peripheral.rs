@@ -21,8 +21,7 @@ use {
         types::Address,
     },
     futures::TryFutureExt,
-    std::{iter::repeat, mem::drop, ops::Deref},
-    test_harness,
+    std::{iter::repeat, ops::Deref},
 };
 
 mod expectation {

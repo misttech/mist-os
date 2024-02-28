@@ -11,7 +11,6 @@ use {
     std::{
         convert::TryFrom as _,
         fmt,
-        marker::Unpin,
         pin::Pin,
         task::{Context, Poll},
     },
@@ -197,10 +196,7 @@ pub fn open_default_device() -> Result<CommandChannel, Error> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fuchsia_async as fasync, fuchsia_zircon::Channel, futures::StreamExt,
-        std::task::Poll,
-    };
+    use {super::*, fuchsia_async as fasync, futures::StreamExt};
 
     #[test]
     fn test_from_channel() {

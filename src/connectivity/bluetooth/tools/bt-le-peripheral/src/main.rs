@@ -24,7 +24,6 @@ use {
     },
     fuchsia_component::client::connect_to_protocol,
     futures::{select, StreamExt},
-    std::convert::TryFrom,
     structopt::StructOpt,
 };
 

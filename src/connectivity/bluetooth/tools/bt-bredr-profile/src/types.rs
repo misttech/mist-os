@@ -10,7 +10,6 @@ use {
         cmp::PartialEq,
         collections::{hash_map::Iter, HashMap},
         fmt::Debug,
-        iter::IntoIterator,
     },
     test_rfcomm_client::RfcommManager,
 };

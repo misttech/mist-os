@@ -14,7 +14,6 @@ use futures::{
     ready,
     stream::{FusedStream, Stream, StreamExt},
 };
-use std::convert::TryFrom;
 use tracing::trace;
 
 /// Item type returned by `<HostWatcher as Stream>::poll_next`.
@@ -195,7 +194,6 @@ pub(crate) mod tests {
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::types::{example_host, HostId};
     use futures::pin_mut;
-    use std::convert::TryInto;
 
     #[track_caller]
     fn expect_watch_request(

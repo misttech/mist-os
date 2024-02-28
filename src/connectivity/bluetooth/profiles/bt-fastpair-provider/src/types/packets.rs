@@ -9,7 +9,6 @@ use packet_encoding::decodable_enum;
 use packet_encoding::Encodable as PacketEncodable;
 use rand::Rng;
 use sha2::Sha256;
-use std::convert::{TryFrom, TryInto};
 use tracing::debug;
 
 use crate::types::keys::public_key_from_bytes;

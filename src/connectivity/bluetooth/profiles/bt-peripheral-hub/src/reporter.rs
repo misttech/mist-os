@@ -6,7 +6,7 @@ use fidl_fuchsia_bluetooth_power::{Information, ReporterRequest, ReporterRequest
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_zircon as zx;
 use futures::{Future, TryStreamExt};
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 use tracing::debug;
 
 use crate::error::Error;
@@ -68,7 +68,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use fidl_fuchsia_bluetooth_power::{Identifier, ReporterMarker, ReporterProxy};
-    use futures::{pin_mut, select, Future, FutureExt};
+    use futures::{pin_mut, select, FutureExt};
 
     fn make_reporter_task(
     ) -> (impl Future<Output = Result<(), Error>>, ReporterProxy, Arc<PeripheralState>) {

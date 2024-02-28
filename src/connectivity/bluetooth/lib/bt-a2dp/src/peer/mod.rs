@@ -30,7 +30,6 @@ use futures::{
 };
 use std::{
     collections::{HashMap, HashSet},
-    convert::TryInto,
     pin::Pin,
     sync::{Arc, Weak},
 };
@@ -1080,8 +1079,6 @@ mod tests {
     };
     use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
     use futures::{future::Either, pin_mut};
-    use std::convert::TryInto;
-    use std::task::Poll;
 
     use crate::media_task::tests::{TestMediaTask, TestMediaTaskBuilder};
     use crate::media_types::*;

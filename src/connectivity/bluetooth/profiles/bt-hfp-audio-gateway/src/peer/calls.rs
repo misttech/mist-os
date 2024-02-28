@@ -25,7 +25,6 @@ use {
     fuchsia_inspect_derive::{AttachError, Inspect},
     futures::stream::{FusedStream, Stream, StreamExt},
     std::{
-        convert::{TryFrom, TryInto},
         pin::Pin,
         task::{Context, Poll},
     },

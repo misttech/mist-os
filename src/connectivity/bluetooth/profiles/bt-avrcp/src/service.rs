@@ -12,7 +12,6 @@ use {
     fuchsia_component::server::{ServiceFs, ServiceObj},
     fuchsia_zircon as zx,
     futures::{
-        self,
         channel::mpsc,
         future::{FutureExt, TryFutureExt},
         stream::{StreamExt, TryStreamExt},

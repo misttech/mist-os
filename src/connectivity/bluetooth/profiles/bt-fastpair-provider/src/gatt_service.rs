@@ -441,8 +441,7 @@ pub(crate) mod tests {
     use async_utils::PollExt;
     use fidl_fuchsia_bluetooth_gatt2::LocalServiceProxy;
     use fuchsia_async as fasync;
-    use fuchsia_bluetooth::types::PeerId;
-    use futures::{future::Either, pin_mut, stream::StreamExt};
+    use futures::{future::Either, pin_mut};
 
     #[fuchsia::test]
     fn gatt_service_is_received_by_upstream_server() {

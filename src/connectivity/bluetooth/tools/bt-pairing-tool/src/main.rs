@@ -10,7 +10,6 @@ use {
     fuchsia_bluetooth::types::io_capabilities::{InputCapability, OutputCapability},
     fuchsia_component::client::connect_to_protocol,
     futures::channel::mpsc::channel,
-    pairing_delegate,
 };
 
 // Defines all the command line arguments accepted by the tool.

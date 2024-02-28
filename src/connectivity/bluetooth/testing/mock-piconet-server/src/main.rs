@@ -16,7 +16,7 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
 use futures::stream::{SelectAll, StreamExt};
-use futures::{self, channel::mpsc, future::FutureExt, select, sink::SinkExt};
+use futures::{channel::mpsc, future::FutureExt, select, sink::SinkExt};
 use std::collections::{hash_map::Entry, HashMap, HashSet};
 use std::sync::Arc;
 use tracing::{error, info, warn};

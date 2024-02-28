@@ -6,13 +6,7 @@ use super::{Procedure, ProcedureError, ProcedureMarker, ProcedureRequest};
 
 use crate::peer::{service_level_connection::SlcState, slc_request::SlcRequest, update::AgUpdate};
 
-use {
-    at_commands as at,
-    bt_hfp::call::list::Idx as CallIdx,
-    core::convert::{TryFrom, TryInto},
-    std::fmt,
-    std::slice::Iter,
-};
+use {at_commands as at, bt_hfp::call::list::Idx as CallIdx, std::fmt, std::slice::Iter};
 
 // TODO(https://fxbug.dev/42176336): Add support for multi-party calls and enhanced call control
 

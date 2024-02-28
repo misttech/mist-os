@@ -6,7 +6,7 @@ use fidl_fuchsia_bluetooth::{Appearance, DeviceClass};
 use fidl_fuchsia_bluetooth_sys as fsys;
 use fuchsia_inspect::Node;
 use fuchsia_inspect_contrib::log::WriteInspect;
-use std::{convert::TryFrom, fmt};
+use std::fmt;
 
 use crate::assigned_numbers::find_service_uuid;
 use crate::error::Error;

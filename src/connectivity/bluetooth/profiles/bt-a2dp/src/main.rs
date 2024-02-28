@@ -33,7 +33,7 @@ use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
 use futures::{Stream, StreamExt};
 use profile_client::{ProfileClient, ProfileEvent};
-use std::{collections::HashSet, convert::TryFrom, sync::Arc};
+use std::{collections::HashSet, sync::Arc};
 use tracing::{debug, error, info, trace, warn};
 
 mod avrcp_relay;
@@ -642,8 +642,7 @@ mod tests {
     use fidl_fuchsia_bluetooth_a2dp as a2dp;
     use fidl_fuchsia_bluetooth_bredr::{ProfileRequest, ProfileRequestStream};
     use fuchsia_bluetooth::types::Channel;
-    use futures::{task::Poll, StreamExt};
-    use std::{convert::TryInto, iter::FromIterator};
+    use futures::task::Poll;
 
     fn run_to_stalled(exec: &mut fasync::TestExecutor) {
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());

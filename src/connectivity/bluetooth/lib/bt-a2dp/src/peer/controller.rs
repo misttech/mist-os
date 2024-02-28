@@ -13,7 +13,7 @@ use fuchsia_async as fasync;
 use fuchsia_bluetooth::{detachable_map::DetachableWeak, types::PeerId};
 use fuchsia_sync::Mutex;
 use futures::{TryFutureExt, TryStreamExt};
-use std::{collections::HashMap, convert::TryInto, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use tracing::{error, info, warn};
 
 use crate::peer::Peer;
@@ -397,8 +397,7 @@ mod tests {
     use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::{detachable_map::DetachableMap, types::Channel};
-    use futures::{self, StreamExt};
-    use std::convert::TryFrom;
+    use futures::StreamExt;
 
     use crate::media_task::tests::TestMediaTaskBuilder;
     use crate::stream::{tests::make_sbc_endpoint, Stream, Streams};

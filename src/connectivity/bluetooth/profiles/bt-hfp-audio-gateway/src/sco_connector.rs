@@ -8,7 +8,6 @@ use fuchsia_bluetooth::{profile::ValidScoConnectionParameters, types::PeerId};
 use fuchsia_inspect_derive::Unit;
 use futures::{Future, FutureExt, StreamExt};
 use std::collections::HashSet;
-use std::convert::TryInto;
 use tracing::{debug, info};
 
 use crate::error::ScoConnectError;

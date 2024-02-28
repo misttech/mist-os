@@ -7,11 +7,7 @@ use {
     bt_rfcomm::profile::{is_rfcomm_protocol, server_channel_from_protocol},
     fidl_fuchsia_bluetooth_bredr as bredr,
     fuchsia_bluetooth::profile::*,
-    std::{
-        collections::HashSet,
-        convert::{TryFrom, TryInto},
-        iter::FromIterator,
-    },
+    std::collections::HashSet,
 };
 
 use crate::types::ServiceRecord;

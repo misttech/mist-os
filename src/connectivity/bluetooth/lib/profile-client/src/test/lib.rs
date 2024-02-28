@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl;
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_bluetooth::types::{self as bt, PeerId};
 use futures::{Stream, StreamExt};

@@ -204,7 +204,6 @@ async fn process_audio_requests(
 mod tests {
     use fidl_fuchsia_media::{AudioDeviceEnumeratorMarker, AudioDeviceEnumeratorRequest};
     use fixture::fixture;
-    use fuchsia;
     use futures::{task::Context, Future};
     use std::pin::Pin;
 

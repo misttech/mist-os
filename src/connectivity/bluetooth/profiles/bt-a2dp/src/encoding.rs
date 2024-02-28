@@ -387,8 +387,7 @@ mod encoder_tests {
     use super::*;
 
     use bt_avdtp as avdtp;
-    use fidl_fuchsia_media::{AudioChannelId, AudioPcmMode, PcmFormat};
-    use std::convert::TryFrom;
+    use fidl_fuchsia_media::{AudioChannelId, AudioPcmMode};
 
     pub async fn test_encoding_capability(
         capability: &avdtp::ServiceCapability,

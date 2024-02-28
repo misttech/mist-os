@@ -4,7 +4,6 @@
 
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_bluetooth::profile::{DataElement, ProtocolDescriptor};
-use std::convert::TryFrom;
 
 use crate::dlci::ServerChannel;
 
