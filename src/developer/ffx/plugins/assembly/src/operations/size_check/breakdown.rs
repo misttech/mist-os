@@ -24,6 +24,7 @@ const RESOURCES: &'static [&'static str] = &[
     "lib/libc++abi.so.1",
     "lib/libunwind.so.1",
     "lib/libre2.so",
+    "lib/libvfs_internal.so",
 ];
 
 #[derive(Clone)]
