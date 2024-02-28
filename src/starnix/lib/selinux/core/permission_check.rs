@@ -176,11 +176,8 @@ impl<'a> Query for PermissionCheckImpl<'a> {
 mod tests {
     use super::{super::access_vector_cache::DenyAll, *};
 
-    use selinux_common::{AbstractObjectClass, ProcessPermission};
-    use selinux_policy::{
-        testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010},
-        AccessVector, AccessVectorComputer,
-    };
+    use selinux_common::ProcessPermission;
+    use selinux_policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
     use std::any::Any;
 
     fn access_vector_from_permission<P: ClassPermission + Into<Permission> + 'static>(

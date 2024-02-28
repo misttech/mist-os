@@ -11,7 +11,7 @@ use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx};
 use starnix_sync::{Locked, Unlocked};
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
     arch::execution::{new_syscall, restore_cfi_directives},

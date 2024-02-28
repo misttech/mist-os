@@ -30,7 +30,6 @@ use starnix_uapi::{
 };
 use std::{
     collections::{btree_map::Entry, BTreeMap},
-    iter::Iterator,
     ops::{Bound, Deref, DerefMut, Range, RangeBounds},
     pin::Pin,
 };

@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_runtime;
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use std::{
     marker::PhantomData,

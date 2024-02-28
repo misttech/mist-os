@@ -211,7 +211,7 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
     use fuchsia_async::TestExecutor;
-    use futures::{pin_mut, StreamExt};
+    use futures::pin_mut;
     use std::task::Poll;
 
     #[test]

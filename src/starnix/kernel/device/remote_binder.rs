@@ -1059,7 +1059,7 @@ mod tests {
     use once_cell::sync::Lazy;
     use rand::distributions::{Alphanumeric, DistString};
     use starnix_uapi::{file_mode::mode, mount_flags::MountFlags};
-    use std::{collections::BTreeMap, ffi::CString, future::Future};
+    use std::{collections::BTreeMap, ffi::CString};
 
     static REMOTE_CONTROLLER_CLIENT: Lazy<
         Mutex<BTreeMap<String, ClientEnd<fbinder::RemoteControllerMarker>>>,

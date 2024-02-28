@@ -884,7 +884,7 @@ mod tests {
     };
     use starnix_sync::Unlocked;
     use starnix_uapi::{
-        auth::{Credentials, FsCred},
+        auth::Credentials,
         file_mode::FileMode,
         signals::{SIGCHLD, SIGTTOU},
     };

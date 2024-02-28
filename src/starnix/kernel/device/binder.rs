@@ -4555,9 +4555,9 @@ impl BinderFs {
 pub mod tests {
     use super::*;
     use crate::{
-        mm::{MemoryAccessor, PAGE_SIZE},
+        mm::PAGE_SIZE,
         testing::*,
-        vfs::{anon_fs, Anon, FdFlags},
+        vfs::{anon_fs, Anon},
     };
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, RequestStream, ServerEnd};
@@ -4565,14 +4565,14 @@ pub mod tests {
     use fuchsia_async::LocalExecutor;
     use futures::TryStreamExt;
     use memoffset::offset_of;
-    use starnix_sync::{Locked, Unlocked};
+    use starnix_sync::Unlocked;
     use starnix_uapi::{
         binder_transaction_data__bindgen_ty_1, binder_transaction_data__bindgen_ty_2,
         errors::{EBADF, EINVAL},
         file_mode::FileMode,
         BINDER_TYPE_WEAK_HANDLE,
     };
-    use std::{ops::Deref, sync::Weak};
+    use std::sync::Weak;
     use zerocopy::FromZeros;
 
     const BASE_ADDR: UserAddress = UserAddress::const_from(0x0000000000000100);

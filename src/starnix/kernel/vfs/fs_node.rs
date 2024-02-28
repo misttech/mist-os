@@ -1978,7 +1978,6 @@ impl Releasable for FsNode {
 mod tests {
     use super::*;
     use crate::{testing::*, vfs::buffers::VecOutputBuffer};
-    use starnix_uapi::auth::Credentials;
 
     #[::fuchsia::test]
     async fn open_device_file() {

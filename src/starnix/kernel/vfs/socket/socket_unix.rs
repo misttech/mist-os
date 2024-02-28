@@ -961,7 +961,6 @@ pub fn resolve_unix_socket_address(
 mod tests {
     use super::*;
     use crate::{mm::MemoryAccessor, testing::*};
-    use std::convert::TryInto;
 
     #[::fuchsia::test]
     async fn test_socket_send_capacity() {

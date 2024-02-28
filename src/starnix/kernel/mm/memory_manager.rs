@@ -38,9 +38,7 @@ use starnix_uapi::{
     PROT_READ, PROT_WRITE, SI_KERNEL, UIO_MAXIOV,
 };
 use static_assertions::const_assert_eq;
-use std::{
-    collections::HashMap, convert::TryInto, ffi::CStr, mem::MaybeUninit, ops::Range, sync::Arc,
-};
+use std::{collections::HashMap, ffi::CStr, mem::MaybeUninit, ops::Range, sync::Arc};
 use syncio::zxio::zxio_default_maybe_faultable_copy;
 use usercopy::slice_to_maybe_uninit_mut;
 use zerocopy::{AsBytes, FromBytes, NoCell};

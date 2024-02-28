@@ -283,7 +283,7 @@ mod test {
         pin::Pin,
         sync::{
             atomic::{AtomicUsize, Ordering},
-            Arc, Barrier,
+            Barrier,
         },
     };
 

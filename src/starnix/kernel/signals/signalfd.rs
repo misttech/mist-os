@@ -15,7 +15,6 @@ use starnix_uapi::{
     errno, error, errors::Errno, open_flags::OpenFlags, signalfd_siginfo, signals::SigSet,
     vfs::FdEvents, SFD_NONBLOCK,
 };
-use std::convert::TryInto;
 use zerocopy::AsBytes;
 
 pub struct SignalFd {

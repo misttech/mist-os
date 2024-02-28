@@ -16,7 +16,6 @@ use crate::{
     magma::read_magma_command_and_type,
     magma::StarnixPollItem,
 };
-use fidl_fuchsia_logger;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::HandleBased;
 use magma::{

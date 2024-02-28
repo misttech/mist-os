@@ -13,7 +13,6 @@ use fuchsia_component::{
 use fuchsia_zircon as zx;
 use futures::{StreamExt, TryStreamExt};
 use kernel_manager::StarnixKernel;
-use starnix_runner_config;
 use tracing::{info, warn};
 
 /// The component URL of the Starnix kernel.

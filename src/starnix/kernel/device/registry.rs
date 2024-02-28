@@ -28,7 +28,6 @@ use starnix_uapi::{
 use starnix_sync::{MappedMutexGuard, Mutex, MutexGuard, RwLock};
 use std::{
     collections::btree_map::{BTreeMap, Entry},
-    marker::{Send, Sync},
     sync::Arc,
 };
 

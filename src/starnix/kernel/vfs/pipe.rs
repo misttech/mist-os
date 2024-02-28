@@ -31,7 +31,7 @@ use starnix_uapi::{
     vfs::{default_statfs, FdEvents},
     FIONREAD, F_GETPIPE_SZ, F_SETPIPE_SZ, PIPEFS_MAGIC,
 };
-use std::{cmp::Ordering, convert::TryInto, sync::Arc};
+use std::{cmp::Ordering, sync::Arc};
 
 const ATOMIC_IO_BYTES: u16 = 4096;
 

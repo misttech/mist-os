@@ -22,9 +22,7 @@ use fuchsia_zircon::{
 use macro_rules_attribute::apply;
 use once_cell::sync::OnceCell;
 use selinux::SecurityId;
-use starnix_logging::{
-    log_debug, log_warn, set_zx_name, {self},
-};
+use starnix_logging::{log_debug, log_warn, set_zx_name};
 use starnix_sync::{LockBefore, Locked, MmDumpable, Mutex, RwLock, TaskRelease};
 use starnix_uapi::{
     auth::{
@@ -44,7 +42,6 @@ use starnix_uapi::{
 };
 use std::{
     cmp,
-    convert::TryFrom,
     ffi::CString,
     fmt,
     mem::MaybeUninit,

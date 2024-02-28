@@ -36,7 +36,7 @@ use starnix_uapi::{
     WEXITED, WNOHANG, WNOWAIT, WSTOPPED, WUNTRACED, __WALL, __WCLONE,
 };
 use static_assertions::const_assert_eq;
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 use zerocopy::FromBytes;
 
 // Rust will let us do this cast in a const assignment but not in a const generic constraint.
@@ -892,7 +892,6 @@ mod tests {
         },
         uaddr, uid_t, SI_QUEUE,
     };
-    use std::convert::TryInto;
     use zerocopy::AsBytes;
 
     #[cfg(target_arch = "x86_64")]

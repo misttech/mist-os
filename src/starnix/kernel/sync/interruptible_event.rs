@@ -178,7 +178,6 @@ impl InterruptibleEvent {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::sync::Arc;
 
     #[test]
     fn test_wait_block_and_notify() {

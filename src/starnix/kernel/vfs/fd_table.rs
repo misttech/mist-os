@@ -404,7 +404,6 @@ impl Clone for FdTable {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::sync::Arc;
 
     use crate::{fs::fuchsia::SyslogFile, task::*, testing::*};
 

@@ -462,7 +462,6 @@ impl<S> GenericNetlinkClientHandle<S> {
 #[cfg(test)]
 mod test_utils {
     use super::*;
-    use netlink::multicast_groups::ModernGroup;
     use netlink_packet_core::NetlinkSerializable;
 
     #[derive(Clone)]
@@ -483,9 +482,8 @@ mod tests {
     use assert_matches::assert_matches;
     use fuchsia_async::TestExecutor;
     use futures::pin_mut;
-    use netlink_packet_core::NetlinkPayload;
     use netlink_packet_generic::GenlHeader;
-    use std::{sync::Arc, task::Poll};
+    use std::task::Poll;
 
     const TEST_FAMILY: &str = "test_family";
     const MCAST_GROUP_1: &str = "m1";

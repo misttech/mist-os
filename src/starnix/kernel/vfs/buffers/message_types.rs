@@ -19,7 +19,6 @@ use starnix_uapi::{
     SCM_CREDENTIALS, SCM_RIGHTS, SCM_SECURITY, SOL_IP, SOL_IPV6, SOL_SOCKET, SO_TIMESTAMP,
     SO_TIMESTAMPNS,
 };
-use syncio;
 
 /// A `Message` represents a typed segment of bytes within a `MessageQueue`.
 #[derive(Clone, Debug)]

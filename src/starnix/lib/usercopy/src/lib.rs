@@ -4,9 +4,7 @@
 
 use std::{mem::MaybeUninit, ops::Range};
 
-use fdio;
 use fidl_fuchsia_io as fio;
-use fuchsia_runtime;
 use fuchsia_zircon as zx;
 use zerocopy::FromBytes;
 use zx::{AsHandleRef, HandleBased, Task};

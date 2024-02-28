@@ -258,9 +258,7 @@ mod tests {
     use starnix_uapi::{
         __NR_rt_sigreturn,
         errors::{EINTR, ERESTARTSYS},
-        sigaction,
         signals::{SIGUSR1, SIGUSR2},
-        user_address::UserAddress,
         SA_RESTART, SA_RESTORER, SA_SIGINFO, SI_USER,
     };
 

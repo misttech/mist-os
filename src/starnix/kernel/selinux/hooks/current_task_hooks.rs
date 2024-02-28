@@ -183,7 +183,7 @@ mod tests {
         create_kernel_task_and_unlocked, create_kernel_task_and_unlocked_with_selinux, create_task,
         AutoReleasableTask,
     };
-    use selinux::security_server::{Mode, SecurityServer};
+    use selinux::security_server::Mode;
     use starnix_uapi::signals::SIGTERM;
     use tests::thread_group_hooks::SeLinuxThreadGroupState;
 

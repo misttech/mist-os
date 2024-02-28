@@ -69,8 +69,7 @@ use starnix_uapi::{
     XATTR_NAME_MAX, XATTR_REPLACE,
 };
 use std::{
-    cmp::Ordering, collections::VecDeque, convert::TryInto, marker::PhantomData, mem::MaybeUninit,
-    sync::Arc, usize,
+    cmp::Ordering, collections::VecDeque, marker::PhantomData, mem::MaybeUninit, sync::Arc, usize,
 };
 
 // Constants from bionic/libc/include/sys/stat.h
@@ -2759,9 +2758,8 @@ pub fn sys_io_destroy(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{mm::PAGE_SIZE, testing::*};
+    use crate::testing::*;
     use starnix_uapi::{vfs::default_statfs, O_RDONLY, SEEK_CUR, SEEK_END, SEEK_SET};
-    use std::sync::Arc;
     use zerocopy::AsBytes;
 
     #[::fuchsia::test]

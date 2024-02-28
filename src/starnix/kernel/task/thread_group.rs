@@ -1664,7 +1664,6 @@ impl TaskContainer {
 mod test {
     use super::*;
     use crate::testing::*;
-    use itertools::Itertools;
 
     #[::fuchsia::test]
     async fn test_setsid() {

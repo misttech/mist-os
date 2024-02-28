@@ -45,10 +45,7 @@ use fidl_fuchsia_ui_pointer::{
 use fidl_fuchsia_ui_policy as fuipolicy;
 use fidl_fuchsia_ui_views as fuiviews;
 use fuchsia_async as fasync;
-use fuchsia_inspect::{
-    health::Reporter,
-    NumericProperty, {self},
-};
+use fuchsia_inspect::{health::Reporter, NumericProperty};
 use fuchsia_zircon as zx;
 use futures::{
     future::{

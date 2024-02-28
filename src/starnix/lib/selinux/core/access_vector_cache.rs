@@ -470,10 +470,7 @@ mod tests {
     use selinux_policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
     use std::{
         collections::{HashMap, HashSet},
-        sync::{
-            atomic::{AtomicU32, AtomicUsize, Ordering},
-            Arc,
-        },
+        sync::atomic::{AtomicU32, AtomicUsize},
         thread::spawn,
     };
 

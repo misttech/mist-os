@@ -1038,7 +1038,7 @@ mod tests {
             eventfd::{new_eventfd, EventFdType},
         },
     };
-    use starnix_uapi::{open_flags::OpenFlags, vfs::FdEvents};
+    use starnix_uapi::open_flags::OpenFlags;
 
     const KEY: ReadyItemKey = ReadyItemKey::Usize(1234);
 

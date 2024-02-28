@@ -9,7 +9,6 @@ use crate::{
 use linux_uapi as uapi;
 use static_assertions::assert_eq_size;
 use std::{
-    convert::{From, TryFrom},
     fmt,
     ops::{BitAnd, BitOr, Not},
 };

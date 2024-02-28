@@ -1266,7 +1266,7 @@ mod tests {
         task::syscalls::sys_prctl,
         testing::{create_kernel_task_and_unlocked, create_task},
     };
-    use starnix_uapi::{user_address::UserAddress, PR_SET_PTRACER};
+    use starnix_uapi::PR_SET_PTRACER;
 
     #[::fuchsia::test]
     async fn test_set_ptracer() {

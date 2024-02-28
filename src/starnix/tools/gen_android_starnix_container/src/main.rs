@@ -243,7 +243,6 @@ fn generate(cmd: Command) -> Result<()> {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use camino::Utf8Path;
     use ext4_metadata::{Metadata, NodeInfo, ROOT_INODE_NUM};
     use std::str::FromStr;
     use tempfile::TempDir;

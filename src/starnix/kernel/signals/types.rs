@@ -17,7 +17,7 @@ use starnix_uapi::{
     SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SIG_DFL, SIG_IGN, SI_KERNEL,
     SI_MAX_SIZE,
 };
-use std::{collections::VecDeque, convert::TryFrom, sync::Arc};
+use std::{collections::VecDeque, sync::Arc};
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 /// `SignalActions` contains a `sigaction` for each valid signal.
@@ -495,7 +495,6 @@ mod test {
         signals::{SIGCHLD, SIGPWR},
         CLD_EXITED,
     };
-    use std::convert::TryFrom;
 
     #[::fuchsia::test]
     fn test_signal() {

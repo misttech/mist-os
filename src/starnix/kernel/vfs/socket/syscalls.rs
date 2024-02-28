@@ -33,7 +33,7 @@ use starnix_uapi::{
     MSG_CTRUNC, MSG_DONTWAIT, MSG_TRUNC, MSG_WAITFORONE, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_CLOEXEC,
     SOCK_NONBLOCK, UIO_MAXIOV,
 };
-use std::{convert::TryInto, mem::size_of};
+use std::mem::size_of;
 
 pub fn sys_socket(
     _locked: &mut Locked<'_, Unlocked>,
