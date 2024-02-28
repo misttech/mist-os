@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//tools/cmc/build/expect_includes.gni")
@@ -172,18 +171,4 @@ fuchsia_package("package") {
     ":driver_test_realm",
     "//src/devices/misc/drivers/test-parent",
   ]
-}
-
-fuchsia_package("realm_builder_version-package") {
-  package_name = "driver_test_realm_realm_builder_version"
-  deps = [
-    ":realm_builder_version",
-    "//src/devices/misc/drivers/test-parent",
-  ]
-}
-
-# Define Bazel input resource so it can be used
-export_fuchsia_package_to_bazel("realm-builder-version-package-bazel") {
-  package = ":realm_builder_version-package"
-  package_name = "driver_test_realm"
 }

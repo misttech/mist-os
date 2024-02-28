@@ -7,9 +7,7 @@ import("//build/cpp/sdk_source_set.gni")
 sdk_source_set("board-test-helper") {
   sdk_name = "board-test-helper"
   category = "internal"
-  include_base = "//sdk"
-
-  deps = [
+  non_sdk_local_deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/lib/device-watcher/cpp",
@@ -21,10 +19,10 @@ sdk_source_set("board-test-helper") {
     "//zircon/system/ulib/sync:sync-cpp",
   ]
 
-  non_sdk_public_deps = [ "//src/devices/bus/drivers/platform" ]
-  public_deps = [
-    "//sdk/lib/sys/component/cpp/testing:cpp_library",
+  non_sdk_public_deps = [
+    "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/zbi-format",
+    "//src/devices/bus/drivers/platform",
     "//zircon/system/ulib/zx",
   ]
 
@@ -39,11 +37,4 @@ source_set("visitor-test-helper") {
   deps = []
   public_deps = [ "//sdk/lib/driver/devicetree/manager:manager-test-helper" ]
   testonly = true
-}
-
-group("devicetree-test-bazel-inputs") {
-  deps = [
-    "//sdk/lib/driver_test_realm:realm-builder-version-package-bazel",
-    "//src/devices/bus/drivers/platform:platform-bus-package-bazel",
-  ]
 }

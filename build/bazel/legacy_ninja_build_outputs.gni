@@ -45,8 +45,6 @@ gn_labels_for_bazel_inputs = [
                                "//build/images/updates/tests:fx_publish_test.gn_assembly.bazel_legacy_aib",
                                "//src/fonts/asset_providers:bazel_inputs",
                                "//sdk:core",
-                               "//sdk/lib/driver/devicetree/examples/example-board:test-dtb",
-                               "//sdk/lib/driver/devicetree/testing:devicetree-test-bazel-inputs",
                              ] + eng_platform_aib_labels
 
 # If a board_configuration_label is defined, then add it's bazel input target.

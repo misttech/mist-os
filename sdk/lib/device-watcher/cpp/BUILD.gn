@@ -7,11 +7,13 @@ import("//build/cpp/sdk_source_set.gni")
 import("//build/test.gni")
 
 sdk_source_set("cpp") {
-  category = "internal"
+  category = "experimental"
   sdk_name = "device-watcher"
   include_base = "//sdk"
-  sources = [ "device-watcher.cc" ]
-  public = [ "device-watcher.h" ]
+  sources = [
+    "device-watcher.cc",
+    "device-watcher.h",
+  ]
   public_deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/fit",
