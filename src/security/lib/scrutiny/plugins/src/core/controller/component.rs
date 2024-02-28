@@ -13,7 +13,7 @@ use {
         model::model::DataModel,
     },
     scrutiny_utils::usage::UsageBuilder,
-    serde_json::{self, value::Value},
+    serde_json::value::Value,
     std::io::{self, ErrorKind},
     std::sync::Arc,
 };

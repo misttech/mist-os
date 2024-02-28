@@ -15,7 +15,7 @@ use {
         usage::UsageBuilder,
     },
     serde::{Deserialize, Serialize},
-    serde_json::{self, value::Value},
+    serde_json::value::Value,
     std::{path::Path, path::PathBuf, sync::Arc},
 };
 

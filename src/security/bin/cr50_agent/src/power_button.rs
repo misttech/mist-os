@@ -89,7 +89,7 @@ impl Drop for PowerButtonInhibitor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl_fuchsia_power_button::{Action, MonitorRequest};
+    use fidl_fuchsia_power_button::MonitorRequest;
     use futures::TryStreamExt;
 
     struct FakePowerButtonManager {

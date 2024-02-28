@@ -8,7 +8,7 @@ use {
     fuchsia_url::AbsolutePackageUrl,
     scrutiny::{model::controller::DataController, model::model::DataModel},
     scrutiny_utils::{url::from_pkg_url_parts, usage::UsageBuilder},
-    serde_json::{self, value::Value},
+    serde_json::value::Value,
     std::sync::Arc,
 };
 

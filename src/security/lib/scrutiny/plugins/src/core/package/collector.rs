@@ -23,7 +23,6 @@ use {
     anyhow::{anyhow, Context, Result},
     base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
     cm_fidl_analyzer::{match_absolute_pkg_urls, PkgUrlMatch},
-    cm_fidl_validator,
     fidl::unpersist,
     fidl_fuchsia_component_decl as fdecl,
     fuchsia_merkle::Hash,

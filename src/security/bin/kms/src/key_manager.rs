@@ -716,7 +716,6 @@ mod tests {
     use super::*;
     use crate::common::{self as common, ASYMMETRIC_KEY_ALGORITHMS};
     use crate::crypto_provider::{mock_provider::MockProvider, CryptoProviderError};
-    use fidl_fuchsia_kms::KeyOrigin;
     use tempfile::tempdir;
     static TEST_KEY_NAME: &str = "TestKey";
 

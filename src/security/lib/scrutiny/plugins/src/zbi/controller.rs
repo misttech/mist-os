@@ -8,7 +8,7 @@ use {
     scrutiny::{model::controller::DataController, model::model::DataModel},
     scrutiny_utils::bootfs::BootfsPackageIndex,
     scrutiny_utils::usage::UsageBuilder,
-    serde_json::{self, value::Value},
+    serde_json::value::Value,
     std::sync::Arc,
 };
 

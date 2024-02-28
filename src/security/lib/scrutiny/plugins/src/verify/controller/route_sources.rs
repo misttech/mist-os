@@ -18,8 +18,7 @@ use {
     routing::{component_instance::ComponentInstanceInterface, mapper::RouteSegment},
     scrutiny::model::{controller::DataController, model::DataModel},
     serde::{Deserialize, Serialize},
-    serde_json::{self, json, value::Value},
-    serde_json5,
+    serde_json::{json, value::Value},
     std::{
         collections::{HashMap, HashSet},
         fmt,

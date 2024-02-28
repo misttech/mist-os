@@ -5,7 +5,6 @@
 use {
     anyhow::{Context, Error},
     serde_derive::Deserialize,
-    serde_json,
     std::{fs::File, io::BufReader},
     uuid::Uuid,
 };

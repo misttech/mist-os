@@ -25,7 +25,7 @@ use {
         manager::{PluginManager, PluginState},
         plugin::PluginDescriptor,
     },
-    serde_json::{self, json, Value},
+    serde_json::{json, Value},
     std::{
         borrow::Cow::{self, Borrowed},
         collections::{HashMap, VecDeque},
@@ -33,7 +33,7 @@ use {
         process,
         sync::{Arc, Mutex, RwLock},
     },
-    termion::{self, clear, color, cursor, style},
+    termion::{clear, color, cursor, style},
     tracing::{error, info, warn},
 };
 

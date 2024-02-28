@@ -12,7 +12,6 @@ use {
     serde::{Deserialize, Serialize},
     std::fmt,
     std::{
-        boxed::Box,
         collections::{HashMap, HashSet},
         sync::{Arc, Mutex, RwLock},
     },

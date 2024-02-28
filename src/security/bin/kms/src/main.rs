@@ -17,7 +17,6 @@ use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::fs;
 use std::sync::Arc;
 use tracing::{error, info};

@@ -10,7 +10,6 @@ use {
     serde::ser::SerializeSeq,
     serde::{Deserialize, Deserializer, Serialize, Serializer},
     std::collections::HashMap,
-    std::convert::{TryFrom, TryInto},
     std::fmt,
     std::io::{Cursor, Read, Seek, SeekFrom},
     thiserror::Error,

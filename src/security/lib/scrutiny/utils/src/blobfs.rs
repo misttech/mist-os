@@ -10,10 +10,8 @@ use {
     },
     anyhow::{anyhow, Context, Error, Result},
     byteorder::{LittleEndian, ReadBytesExt},
-    hex,
     serde::Serialize,
     std::cmp,
-    std::convert::{TryFrom, TryInto},
     std::{
         collections::HashMap,
         fs::File,

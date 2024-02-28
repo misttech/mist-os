@@ -7,7 +7,6 @@ use {
     byteorder::{LittleEndian, ReadBytesExt},
     serde::{Deserialize, Serialize},
     std::collections::HashMap,
-    std::convert::{TryFrom, TryInto},
     std::fmt,
     std::io::{Cursor, Read, Seek, SeekFrom},
     std::str,

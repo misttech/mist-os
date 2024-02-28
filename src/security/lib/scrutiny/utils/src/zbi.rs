@@ -7,7 +7,6 @@ use {
     anyhow::{Error, Result},
     byteorder::{LittleEndian, ReadBytesExt},
     serde::{Deserialize, Serialize},
-    std::convert::{TryFrom, TryInto},
     std::io::{Cursor, Read, Seek, SeekFrom},
     thiserror::Error,
     tracing::info,

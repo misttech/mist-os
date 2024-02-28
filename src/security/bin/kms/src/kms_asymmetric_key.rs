@@ -217,7 +217,7 @@ impl KmsAsymmetricKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::common::{self as common, ASYMMETRIC_KEY_ALGORITHMS};
+    use crate::common::ASYMMETRIC_KEY_ALGORITHMS;
     use crate::crypto_provider::mock_provider::MockProvider;
     static TEST_KEY_NAME: &str = "TestKey";
 

@@ -10,8 +10,7 @@ use std::ptr;
 use tracing::error;
 
 use self::tee_client_api::{
-    teec_operation_impl, TEEC_TempMemoryReference as TeecTempMemoryReference,
-    TEEC_Value as TeecValue,
+    TEEC_TempMemoryReference as TeecTempMemoryReference, TEEC_Value as TeecValue,
 };
 
 pub use self::tee_client_api::{

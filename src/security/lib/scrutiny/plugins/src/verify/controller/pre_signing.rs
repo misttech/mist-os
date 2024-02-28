@@ -14,7 +14,6 @@ use {
     },
     serde::{Deserialize, Serialize},
     serde_json::{json, value::Value},
-    serde_json5,
     std::{collections::HashMap, fs::read_to_string, path::PathBuf, sync::Arc},
 };
 

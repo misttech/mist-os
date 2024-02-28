@@ -158,7 +158,6 @@ impl Deserializable for CcdOpenResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::convert::TryInto;
 
     #[fuchsia::test]
     fn test_ccd_request_serialize() {

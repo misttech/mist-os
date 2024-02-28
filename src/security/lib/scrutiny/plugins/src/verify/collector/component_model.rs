@@ -26,7 +26,7 @@ use {
     scrutiny::model::{collector::DataCollector, model::DataModel},
     serde::{Deserialize, Serialize},
     serde_json5::from_reader,
-    std::{collections::HashMap, convert::TryFrom, fs::File, path::PathBuf, sync::Arc},
+    std::{collections::HashMap, fs::File, path::PathBuf, sync::Arc},
     tracing::{error, info, warn},
     url::Url,
 };

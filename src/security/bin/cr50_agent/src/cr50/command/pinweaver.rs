@@ -10,7 +10,7 @@ use fidl_fuchsia_tpm_cr50::{
 use fuchsia_zircon as zx;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
-use std::{convert::TryInto, marker::PhantomData};
+use std::marker::PhantomData;
 use tracing::warn;
 
 use crate::{

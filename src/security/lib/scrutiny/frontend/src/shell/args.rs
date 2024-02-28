@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    serde_json::{self, json, Value},
+    serde_json::{json, Value},
     std::collections::HashMap,
     std::collections::VecDeque,
 };

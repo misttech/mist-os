@@ -27,7 +27,7 @@ use {
     fuchsia_zircon::{AsHandleRef, Rights, Status},
     futures::{channel::oneshot::channel, join, TryStreamExt},
     security_pkg_test_util::{config::load_config, storage::mount_image_as_ramdisk},
-    std::{convert::TryInto, fs::File},
+    std::fs::File,
     tracing::info,
 };
 

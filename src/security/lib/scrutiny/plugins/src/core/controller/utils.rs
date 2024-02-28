@@ -7,7 +7,7 @@ use {
     anyhow::{Context, Error, Result},
     scrutiny::model::model::DataModel,
     serde::{Deserialize, Serialize},
-    serde_json::{self, value::Value},
+    serde_json::value::Value,
     std::io::{self, ErrorKind},
     std::sync::Arc,
     url::Url,
