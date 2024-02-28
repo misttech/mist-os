@@ -83,7 +83,6 @@ mod tests {
     use super::*;
     use std::fs;
     use std::io::Write;
-    use tempfile;
 
     // This test is only used to confirm that a program call generates some
     // output that looks meaningful.  Refer to the unit tests in the library
