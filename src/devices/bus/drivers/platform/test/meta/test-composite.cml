@@ -17,5 +17,6 @@
     },
     use: [
         { service: "fuchsia.hardware.gpio.Service" },
+        { service: "fuchsia.hardware.spi.Service" },
     ],
 }

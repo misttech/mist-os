@@ -186,8 +186,8 @@ fuchsia_driver("test-spi-driver") {
   deps = [
     ":test-spi-bind",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.spi:fuchsia.hardware.spi_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_cpp",
+    "//sdk/lib/driver/outgoing/cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
@@ -245,9 +245,9 @@ fuchsia_driver("test-composite-driver") {
   deps = [
     ":test-composite-bind",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.spi:fuchsia.hardware.spi_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.test:fuchsia.hardware.test_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+    "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
     "//src/devices/lib/driver",
     "//src/lib/ddk",

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.spiimpl/cpp/driver/fidl.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
-#include <fuchsia/hardware/spiimpl/cpp/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
@@ -13,6 +13,8 @@
 
 #include <ddktl/device.h>
 
+#include "sdk/lib/driver/outgoing/cpp/outgoing_directory.h"
+
 #define DRIVER_NAME "test-spi"
 
 namespace spi {
@@ -20,8 +22,7 @@ namespace spi {
 class TestSpiDevice;
 using DeviceType = ddk::Device<TestSpiDevice>;
 
-class TestSpiDevice : public DeviceType,
-                      public ddk::SpiImplProtocol<TestSpiDevice, ddk::base_protocol> {
+class TestSpiDevice : public DeviceType, public fdf::WireServer<fuchsia_hardware_spiimpl::SpiImpl> {
  public:
   static zx_status_t Create(zx_device_t* parent) {
     auto dev = std::make_unique<TestSpiDevice>(parent, 0);
@@ -36,8 +37,37 @@ class TestSpiDevice : public DeviceType,
       return status;
     }
 
-    status = dev->DdkAdd(
-        ddk::DeviceAddArgs("test-spi").forward_metadata(parent, DEVICE_METADATA_SPI_CHANNELS));
+    {
+      fuchsia_hardware_spiimpl::Service::InstanceHandler handler({
+          .device = dev->bindings_.CreateHandler(dev.get(), fdf::Dispatcher::GetCurrent()->get(),
+                                                 fidl::kIgnoreBindingClosure),
+      });
+      auto result =
+          dev->outgoing_.AddService<fuchsia_hardware_spiimpl::Service>(std::move(handler));
+      if (result.is_error()) {
+        zxlogf(ERROR, "AddService failed: %s", result.status_string());
+        return result.error_value();
+      }
+    }
+
+    auto directory_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    if (directory_endpoints.is_error()) {
+      return directory_endpoints.status_value();
+    }
+
+    {
+      auto result = dev->outgoing_.Serve(std::move(directory_endpoints->server));
+      if (result.is_error()) {
+        zxlogf(ERROR, "Failed to serve the outgoing directory: %s", result.status_string());
+        return result.error_value();
+      }
+    }
+
+    std::array<const char*, 1> service_offers{fuchsia_hardware_spiimpl::Service::Name};
+    status = dev->DdkAdd(ddk::DeviceAddArgs("test-spi")
+                             .forward_metadata(parent, DEVICE_METADATA_SPI_CHANNELS)
+                             .set_runtime_service_offers(service_offers)
+                             .set_outgoing_dir(directory_endpoints->client.TakeChannel()));
     if (status != ZX_OK) {
       zxlogf(ERROR, "%s: DdkAdd failed: %d", __func__, status);
       return status;
@@ -59,68 +89,76 @@ class TestSpiDevice : public DeviceType,
   explicit TestSpiDevice(zx_device_t* parent, uint32_t bus_id)
       : DeviceType(parent), bus_id_(bus_id) {}
 
-  uint32_t SpiImplGetChipSelectCount() { return 1; }
-  zx_status_t SpiImplExchange(uint32_t cs, const uint8_t* txdata_list, size_t txdata_count,
-                              uint8_t* out_rxdata_list, size_t rxdata_count,
-                              size_t* out_rxdata_actual) {
+  void GetChipSelectCount(fdf::Arena& arena, GetChipSelectCountCompleter::Sync& completer) {
+    completer.buffer(arena).Reply(1);
+  }
+
+  void TransmitVector(fuchsia_hardware_spiimpl::wire::SpiImplTransmitVectorRequest* request,
+                      fdf::Arena& arena, TransmitVectorCompleter::Sync& completer) {
     // TX only, ignore
-    if (!out_rxdata_list) {
-      return ZX_OK;
-    }
+    completer.buffer(arena).ReplySuccess();
+  }
 
+  void ReceiveVector(fuchsia_hardware_spiimpl::wire::SpiImplReceiveVectorRequest* request,
+                     fdf::Arena& arena, ReceiveVectorCompleter::Sync& completer) {
+    fidl::VectorView<uint8_t> rxdata(arena, request->size);
     // RX only, fill with pattern
-    else if (!txdata_list) {
-      for (size_t i = 0; i < rxdata_count; i++) {
-        out_rxdata_list[i] = i & 0xff;
-      }
-      *out_rxdata_actual = rxdata_count;
-      return ZX_OK;
+    for (size_t i = 0; i < rxdata.count(); i++) {
+      rxdata[i] = i & 0xff;
     }
+    completer.buffer(arena).ReplySuccess(rxdata);
+  }
 
+  void ExchangeVector(fuchsia_hardware_spiimpl::wire::SpiImplExchangeVectorRequest* request,
+                      fdf::Arena& arena, ExchangeVectorCompleter::Sync& completer) {
+    fidl::VectorView<uint8_t> rxdata(arena, request->txdata.count());
     // Both TX and RX; copy
-    else {
-      if (txdata_count != rxdata_count) {
-        return ZX_ERR_INVALID_ARGS;
-      }
-      memcpy(out_rxdata_list, txdata_list, txdata_count);
-      *out_rxdata_actual = txdata_count;
-      return ZX_OK;
-    }
+    memcpy(rxdata.data(), request->txdata.data(), request->txdata.count());
+    completer.buffer(arena).ReplySuccess(rxdata);
   }
 
-  zx_status_t SpiImplRegisterVmo(uint32_t chip_select, uint32_t vmo_id, zx::vmo vmo,
-                                 uint64_t offset, uint64_t size, uint32_t rights) {
-    return ZX_ERR_NOT_SUPPORTED;
+  void LockBus(fuchsia_hardware_spiimpl::wire::SpiImplLockBusRequest* request, fdf::Arena& arena,
+               LockBusCompleter::Sync& completer) {
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  zx_status_t SpiImplUnregisterVmo(uint32_t chip_select, uint32_t vmo_id, zx::vmo* out_vmo) {
-    return ZX_ERR_NOT_SUPPORTED;
+  void UnlockBus(fuchsia_hardware_spiimpl::wire::SpiImplUnlockBusRequest* request,
+                 fdf::Arena& arena, UnlockBusCompleter::Sync& completer) {
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  void SpiImplReleaseRegisteredVmos(uint32_t chip_select) {}
+  void RegisterVmo(fuchsia_hardware_spiimpl::wire::SpiImplRegisterVmoRequest* request,
+                   fdf::Arena& arena, RegisterVmoCompleter::Sync& completer) {}
 
-  zx_status_t SpiImplTransmitVmo(uint32_t chip_select, uint32_t vmo_id, uint64_t offset,
-                                 uint64_t size) {
-    return ZX_ERR_NOT_SUPPORTED;
+  void UnregisterVmo(fuchsia_hardware_spiimpl::wire::SpiImplUnregisterVmoRequest* request,
+                     fdf::Arena& arena, UnregisterVmoCompleter::Sync& completer) {}
+
+  void ReleaseRegisteredVmos(
+      fuchsia_hardware_spiimpl::wire::SpiImplReleaseRegisteredVmosRequest* request,
+      fdf::Arena& arena, ReleaseRegisteredVmosCompleter::Sync& completer) {}
+
+  void TransmitVmo(fuchsia_hardware_spiimpl::wire::SpiImplTransmitVmoRequest* request,
+                   fdf::Arena& arena, TransmitVmoCompleter::Sync& completer) {
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  zx_status_t SpiImplReceiveVmo(uint32_t chip_select, uint32_t vmo_id, uint64_t offset,
-                                uint64_t size) {
-    return ZX_ERR_NOT_SUPPORTED;
+  void ReceiveVmo(fuchsia_hardware_spiimpl::wire::SpiImplReceiveVmoRequest* request,
+                  fdf::Arena& arena, ReceiveVmoCompleter::Sync& completer) {
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  zx_status_t SpiImplExchangeVmo(uint32_t chip_select, uint32_t tx_vmo_id, uint64_t tx_offset,
-                                 uint32_t rx_vmo_id, uint64_t rx_offset, uint64_t size) {
-    return ZX_ERR_NOT_SUPPORTED;
+  void ExchangeVmo(fuchsia_hardware_spiimpl::wire::SpiImplExchangeVmoRequest* request,
+                   fdf::Arena& arena, ExchangeVmoCompleter::Sync& completer) {
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  zx_status_t SpiImplLockBus(uint32_t chip_select) { return ZX_ERR_NOT_SUPPORTED; }
-  zx_status_t SpiImplUnlockBus(uint32_t chip_select) { return ZX_ERR_NOT_SUPPORTED; }
   // Methods required by the ddk mixins
   void DdkRelease() { delete this; }
 
  private:
   uint32_t bus_id_;
+  fdf::OutgoingDirectory outgoing_;
+  fdf::ServerBindingGroup<fuchsia_hardware_spiimpl::SpiImpl> bindings_;
 };
 
 zx_status_t test_spi_bind(void* ctx, zx_device_t* parent) { return TestSpiDevice::Create(parent); }

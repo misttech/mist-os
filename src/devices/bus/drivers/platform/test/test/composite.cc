@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.gpio/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.spi/cpp/fidl.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
-#include <fuchsia/hardware/spi/c/banjo.h>
 #include <fuchsia/hardware/test/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
@@ -88,65 +88,63 @@ static zx_status_t test_gpio(fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio_c
   return ZX_OK;
 }
 
-static zx_status_t test_spi(spi_protocol_t* spi) {
+static zx_status_t test_spi(fidl::ClientEnd<fuchsia_hardware_spi::Device> spi_client) {
+  fidl::WireSyncClient<fuchsia_hardware_spi::Device> spi(std::move(spi_client));
+
   uint8_t txbuf[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-  uint8_t rxbuf[sizeof txbuf];
+  auto txbuf_view = fidl::VectorView<uint8_t>::FromExternal(txbuf, sizeof txbuf);
 
   // tx should just succeed
-  zx_status_t status = spi_transmit(spi, txbuf, sizeof txbuf);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: spi_transmit failed %d", DRIVER_NAME, status);
-    return status;
+  if (auto result = spi->TransmitVector(txbuf_view); !result.ok()) {
+    zxlogf(ERROR, "Call to TransmitVector failed: %s", result.FormatDescription().c_str());
+    return result.status();
+  } else if (result->status != ZX_OK) {
+    zxlogf(ERROR, "TransmitVector failed: %s", zx_status_get_string(result->status));
+    return result->status;
   }
 
   // rx should return pattern
-  size_t actual;
-  memset(rxbuf, 0, sizeof rxbuf);
-  status = spi_receive(spi, sizeof rxbuf, rxbuf, sizeof rxbuf, &actual);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: spi_receive failed %d (", DRIVER_NAME, status);
-    return status;
-  }
-
-  if (actual != sizeof rxbuf) {
-    zxlogf(ERROR, "%s: spi_receive returned incomplete %zu/%zu (", DRIVER_NAME, actual,
-           sizeof rxbuf);
+  if (auto result = spi->ReceiveVector(sizeof txbuf); !result.ok()) {
+    zxlogf(ERROR, "Call to ReceiveVector failed: %s", result.FormatDescription().c_str());
+    return result.status();
+  } else if (result->status != ZX_OK) {
+    zxlogf(ERROR, "ReceiveVector failed: %s", zx_status_get_string(result->status));
+    return result->status;
+  } else if (result->data.count() != sizeof txbuf) {
+    zxlogf(ERROR, "ReceiveVector returned incomplete %zu/%zu (", result->data.count(),
+           sizeof txbuf);
     return ZX_ERR_INTERNAL;
-  }
-
-  for (size_t i = 0; i < actual; i++) {
-    if (rxbuf[i] != (i & 0xff)) {
-      zxlogf(ERROR, "%s: spi_receive returned bad pattern rxbuf[%zu] = 0x%02x, should be 0x%02x(",
-             DRIVER_NAME, i, rxbuf[i], (uint8_t)(i & 0xff));
-      return ZX_ERR_INTERNAL;
+  } else {
+    for (size_t i = 0; i < result->data.count(); i++) {
+      if (result->data[i] != (i & 0xff)) {
+        zxlogf(ERROR, "ReceiveVector returned bad pattern rxbuf[%zu] = 0x%02x, should be 0x%02x(",
+               i, result->data[i], (uint8_t)(i & 0xff));
+        return ZX_ERR_INTERNAL;
+      }
     }
   }
 
   // exchange copies input
-  memset(rxbuf, 0, sizeof rxbuf);
-  status = spi_exchange(spi, txbuf, sizeof txbuf, rxbuf, sizeof rxbuf, &actual);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: spi_exchange failed %d (", DRIVER_NAME, status);
-    return status;
-  }
-
-  if (actual != sizeof rxbuf) {
-    zxlogf(ERROR, "%s: spi_exchange returned incomplete %zu/%zu (", DRIVER_NAME, actual,
-           sizeof rxbuf);
+  if (auto result = spi->ExchangeVector(txbuf_view); !result.ok()) {
+    zxlogf(ERROR, "Call to ExchangeVector failed: %s", result.FormatDescription().c_str());
+    return result.status();
+  } else if (result->status != ZX_OK) {
+    zxlogf(ERROR, "ExchangeVector failed: %s", zx_status_get_string(result->status));
+    return result->status;
+  } else if (result->rxdata.count() != sizeof txbuf) {
+    zxlogf(ERROR, "ExchangeVector returned incomplete %zu/%zu (", result->rxdata.count(),
+           sizeof txbuf);
     return ZX_ERR_INTERNAL;
-  }
-
-  for (size_t i = 0; i < actual; i++) {
-    if (rxbuf[i] != txbuf[i]) {
-      zxlogf(ERROR, "%s: spi_exchange returned bad result rxbuf[%zu] = 0x%02x, should be 0x%02x(",
-             DRIVER_NAME, i, rxbuf[i], txbuf[i]);
-      return ZX_ERR_INTERNAL;
+  } else {
+    for (size_t i = 0; i < result->rxdata.count(); i++) {
+      if (result->rxdata[i] != txbuf[i]) {
+        zxlogf(ERROR, "ExchangeVector returned bad result rxbuf[%zu] = 0x%02x, should be 0x%02x(",
+               i, result->rxdata[i], txbuf[i]);
+        return ZX_ERR_INTERNAL;
+      }
     }
   }
 
-  // SPI FIDL communication should work, but there is no way to synchronize this with the
-  // enumeration test that also attempts to open the device. FIDL communication is the
-  // responsibility of the SPI core driver, so checking Banjo only is good enough here.
   return ZX_OK;
 }
 
@@ -187,13 +185,13 @@ zx_status_t TestCompositeDevice::Bind(void* ctx, zx_device_t* parent) {
       return status;
     }
   } else if (metadata.composite_device_id == PDEV_DID_TEST_COMPOSITE_2) {
-    spi_protocol_t spi;
-    status = device_get_fragment_protocol(parent, "spi", ZX_PROTOCOL_SPI, &spi);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_SPI", DRIVER_NAME);
-      return status;
+    auto result =
+        DdkConnectFragmentFidlProtocol<fuchsia_hardware_spi::Service::Device>(parent, "spi");
+    if (result.is_error()) {
+      zxlogf(ERROR, "%s: failed to connect to SPI: %s", DRIVER_NAME, result.status_string());
+      return result.status_value();
     }
-    if ((status = test_spi(&spi)) != ZX_OK) {
+    if ((status = test_spi(*std::move(result))) != ZX_OK) {
       zxlogf(ERROR, "%s: test_spi failed: %d", DRIVER_NAME, status);
       return status;
     }
