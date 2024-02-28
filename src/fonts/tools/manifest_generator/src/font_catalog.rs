@@ -252,7 +252,7 @@ pub struct Typeface {
 mod tests {
     use {
         super::*,
-        fidl_fuchsia_fonts::{GenericFontFamily, Slant, Style2 as FidlStyle, Width, WEIGHT_NORMAL},
+        fidl_fuchsia_fonts::{Slant, Style2 as FidlStyle, Width, WEIGHT_NORMAL},
         maplit::btreemap,
         pretty_assertions::assert_eq,
         std::iter,

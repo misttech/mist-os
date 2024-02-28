@@ -17,7 +17,6 @@ use {
     manifest::{v2, FontManifestWrapper, FontsManifest},
     std::{
         collections::BTreeMap,
-        convert::TryFrom,
         fmt::{self, Display},
         path::{Path, PathBuf},
         sync::Arc,
@@ -472,11 +471,9 @@ mod tests {
         },
         char_set::CharSet,
         fidl_fuchsia_fonts::{GenericFontFamily, Slant, Width, WEIGHT_BOLD, WEIGHT_NORMAL},
-        manifest::{serde_ext::StyleOptions, v2},
+        manifest::serde_ext::StyleOptions,
         maplit::{btreemap, btreeset},
         pretty_assertions::assert_eq,
-        std::sync::Arc,
-        unicase::UniCase,
     };
 
     #[fuchsia_async::run_singlethreaded(test)]

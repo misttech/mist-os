@@ -16,7 +16,7 @@ use {
         TT_MS_ID_SYMBOL_CS, TT_MS_ID_UNICODE_CS, TT_MS_LANGID_ENGLISH_UNITED_STATES,
         TT_NAME_ID_FULL_NAME, TT_PLATFORM_MICROSOFT,
     },
-    std::{convert::TryInto, ffi::CStr, io::Cursor, ops::Range, ptr},
+    std::{ffi::CStr, io::Cursor, ops::Range, ptr},
 };
 
 pub use crate::sources::FTOpenArgs;
@@ -165,7 +165,7 @@ impl FTFace {
             // According to the FT docs, this is supposed to be an ASCII string, so it should
             // trivially convert to UTF-8.
             //
-            // Note: Must use c_char, not i8 or u8, because c_char's definition depends on the 
+            // Note: Must use c_char, not i8 or u8, because c_char's definition depends on the
             // architecture.
             let postscript_name =
                 FT_Get_Postscript_Name(self.ft_face) as *const std::os::raw::c_char;

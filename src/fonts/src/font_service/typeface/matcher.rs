@@ -182,9 +182,8 @@ mod tests {
         super::super::{test_util::*, Typeface},
         super::*,
         fidl_fuchsia_fonts::{
-            GenericFontFamily, Slant, TypefaceRequestFlags, Width, WEIGHT_BOLD, WEIGHT_EXTRA_BOLD,
-            WEIGHT_EXTRA_LIGHT, WEIGHT_LIGHT, WEIGHT_MEDIUM, WEIGHT_NORMAL, WEIGHT_SEMI_BOLD,
-            WEIGHT_THIN,
+            GenericFontFamily, TypefaceRequestFlags, WEIGHT_BOLD, WEIGHT_EXTRA_BOLD,
+            WEIGHT_EXTRA_LIGHT, WEIGHT_LIGHT, WEIGHT_SEMI_BOLD, WEIGHT_THIN,
         },
     };
 

@@ -285,11 +285,8 @@ impl TypefaceInspectData {
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        char_collection::char_collect,
-        diagnostics_assertions::assert_data_tree,
-        fidl_fuchsia_fonts::{Slant, Width, WEIGHT_NORMAL},
-        maplit::btreeset,
+        super::*, char_collection::char_collect, diagnostics_assertions::assert_data_tree,
+        fidl_fuchsia_fonts::WEIGHT_NORMAL, maplit::btreeset,
     };
 
     #[fuchsia::test]

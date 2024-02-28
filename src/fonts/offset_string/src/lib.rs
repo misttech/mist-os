@@ -5,7 +5,7 @@
 use {
     anyhow::{format_err, Error},
     serde::{Deserialize, Serialize},
-    std::{iter::Iterator, ops::RangeInclusive},
+    std::ops::RangeInclusive,
 };
 
 mod conversions;

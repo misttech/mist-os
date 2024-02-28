@@ -143,7 +143,7 @@ pub struct Settings {
 mod tests {
 
     use {
-        super::*, anyhow::Error, pretty_assertions::assert_eq, serde_json::json, std::io::Write,
+        super::*, pretty_assertions::assert_eq, serde_json::json, std::io::Write,
         tempfile::NamedTempFile,
     };
 

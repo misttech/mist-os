@@ -200,7 +200,6 @@ mod tests {
         manifest::v2,
         maplit::btreemap,
         std::path::Path,
-        unicase::UniCase,
     };
 
     #[fuchsia::test]

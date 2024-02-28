@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_fonts::{self as fonts},
     fidl_fuchsia_fonts_experimental as fonts_exp,
     fuchsia_component::server::ServiceFs,
-    futures::{future, prelude::*, stream::TryStreamExt},
+    futures::{prelude::*, stream::TryStreamExt},
 };
 
 enum ProviderRequestStream {

@@ -20,7 +20,7 @@ use {
         typeface::{Collection as TypefaceCollection, Typeface, TypefaceInfoAndCharSet},
     },
     anyhow::{format_err, Context as _, Error},
-    fidl::{self, endpoints::ServerEnd},
+    fidl::endpoints::ServerEnd,
     fidl_fuchsia_fonts::{self as fonts, CacheMissPolicy},
     fidl_fuchsia_fonts_experimental as fonts_exp,
     fidl_fuchsia_fonts_ext::{

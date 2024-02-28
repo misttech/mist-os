@@ -24,7 +24,6 @@ use {
     font_info::{FontAssetSource, FontInfo, FontInfoLoader, FontInfoLoaderImpl},
     manifest::{v2::FontsManifest, FontManifestWrapper},
     std::{
-        convert::TryInto,
         env, fs,
         io::{self, Write},
         path::PathBuf,

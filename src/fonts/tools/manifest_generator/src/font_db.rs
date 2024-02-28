@@ -558,10 +558,9 @@ mod tests {
         crate::{
             constants,
             fake_font_info_loader::FakeFontInfoLoaderImpl,
-            font_catalog::{Asset, Family, Typeface, TypefaceInAssetIndex},
-            font_pkgs::{FontPackageEntry, FontPackageListing},
-            font_sets::{FontSet, FontSets},
-            product_config::{FallbackChainEntry, ProductConfig, Settings},
+            font_catalog::{Asset, Family, Typeface},
+            font_pkgs::FontPackageEntry,
+            product_config::Settings,
         },
         assert_matches::assert_matches,
         fidl_fuchsia_fonts::{GenericFontFamily, Slant, Width},

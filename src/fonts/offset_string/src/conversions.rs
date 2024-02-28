@@ -7,7 +7,6 @@ use {
     anyhow::{format_err, Error},
     char_collection::{CharCollection, MultiCharRange},
     char_set::CharSet,
-    std::{convert::TryFrom, iter::Iterator},
     unic_char_range::{chars, CharRange},
 };
 

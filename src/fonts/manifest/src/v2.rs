@@ -17,7 +17,7 @@ use {
         ser::Serializer,
     },
     serde::{Deserialize, Serialize},
-    std::{convert::TryFrom, iter, ops::Deref, path::PathBuf},
+    std::{iter, ops::Deref, path::PathBuf},
     unicase::UniCase,
 };
 

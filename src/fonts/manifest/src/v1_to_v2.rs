@@ -8,10 +8,7 @@ use {
     crate::{v2, Family as FamilyV1, Font as FontV1, FontsManifest as FontsManifestV1},
     anyhow::{format_err, Error},
     itertools::Itertools,
-    std::{
-        convert::{From, TryFrom},
-        path::{Path, PathBuf},
-    },
+    std::path::{Path, PathBuf},
 };
 
 impl TryFrom<FontsManifestV1> for v2::FontsManifest {

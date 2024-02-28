@@ -22,9 +22,7 @@ use {
         ser::Serializer,
     },
     serde::{Deserialize, Serialize},
-    serde_json,
     std::{
-        convert::TryFrom,
         fmt,
         fs::{self, File},
         io::BufReader,
@@ -304,7 +302,7 @@ pub enum ManifestLoadError {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, anyhow::Error, assert_matches::assert_matches};
+    use {super::*, assert_matches::assert_matches};
 
     #[test]
     fn test_deserialize_manifest_version_v1_implicit() -> Result<(), Error> {

@@ -6,7 +6,6 @@
 
 use {
     serde::de::DeserializeOwned,
-    serde_json5,
     std::{
         fs,
         path::{Path, PathBuf},

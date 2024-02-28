@@ -15,7 +15,7 @@ use {
         Width,
     },
     fidl_fuchsia_intl::LocaleId,
-    manifest::{self, v2},
+    manifest::v2,
 };
 
 /// Creates a typeface with the given properties (with an `AssetId` of `0` and font index of `0`).

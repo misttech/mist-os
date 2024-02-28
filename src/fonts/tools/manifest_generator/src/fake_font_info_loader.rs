@@ -6,7 +6,7 @@ use {
     anyhow::{format_err, Error},
     char_set::CharSet,
     font_info::{FontAssetSource, FontInfo, FontInfoLoader},
-    std::{collections::BTreeSet, convert::TryInto, path::PathBuf},
+    std::{collections::BTreeSet, path::PathBuf},
 };
 
 /// An implementation of [`FakeFontInfoLoader`] that doesn't read the font file, but instead claims

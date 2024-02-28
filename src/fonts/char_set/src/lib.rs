@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    char_collection::CharCollection,
-    std::{cmp::Ordering, convert::TryFrom, iter::Iterator},
-};
+use {char_collection::CharCollection, std::cmp::Ordering};
 
 type BitmapElement = u64;
 const BITMAP_ELEMENT_SIZE: usize = 64;

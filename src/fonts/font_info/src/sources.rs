@@ -5,7 +5,7 @@
 use {
     anyhow::Error,
     freetype_ffi::{FT_Open_Args, FT_Stream, FT_OPEN_PATHNAME, FT_OPEN_STREAM},
-    std::{convert::TryFrom, ffi::CString, fmt, ptr},
+    std::{ffi::CString, fmt, ptr},
 };
 
 /// Describes the source of a font asset to be parsed.
