@@ -7,7 +7,6 @@ use {
     chrono::NaiveDateTime,
     fidl::endpoints::create_proxy,
     fidl_fuchsia_factory::MiscFactoryStoreProviderProxy,
-    fidl_fuchsia_hwinfo,
     fidl_fuchsia_intl::{LocaleId, RegulatoryDomain},
     fidl_fuchsia_io as fio,
     serde::{Deserialize, Serialize},

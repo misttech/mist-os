@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{self, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use fidl_fuchsia_hwinfo::{
     BoardInfo, BoardRequest, BoardRequestStream, DeviceInfo, DeviceRequest, DeviceRequestStream,
     ProductInfo, ProductRequest, ProductRequestStream,
@@ -14,7 +14,6 @@ use fuchsia_inspect::{component, health::Reporter};
 use futures::prelude::*;
 use lazy_static::lazy_static;
 use std::sync::{Arc, Mutex};
-use tracing;
 
 enum IncomingRequest {
     Product(ProductRequestStream),
