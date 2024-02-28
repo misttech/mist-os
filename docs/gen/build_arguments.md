@@ -374,7 +374,7 @@ to stdout/stderr during the Ninja build.
 
 **Current value (from the default):** `false`
 
-From //build/bazel/bazel_action.gni:18
+From //build/bazel/bazel_action.gni:17
 
 ### bazel_upload_build_events
 
@@ -1423,7 +1423,7 @@ Controls whether to promote warnings to errors.
 
 **Current value (from the default):** `true`
 
-From //build/config/BUILD.gn:36
+From //build/config/BUILD.gn:35
 
 ### dev_bootfs_labels
 
@@ -2743,7 +2743,7 @@ remove this option when the issues are addressed.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILD.gn:32
+From //build/config/BUILD.gn:31
 
 ### enable_grpc_ares
 
@@ -3145,7 +3145,7 @@ vendor/acme/proprietary:build_installer with Ninja:
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:123
+From //build/bazel/legacy_ninja_build_outputs.gni:121
 
 ### extra_package_labels
 
