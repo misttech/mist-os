@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::anyhow, std::fmt};
+use std::fmt;
+use std::num::ParseIntError;
+use thiserror::Error;
 
 // Client response with a single packet no greater than 64 bytes. The first four bytes of the
 // response are “OKAY”, “FAIL”, “DATA”, or “INFO”. Additional bytes may contain an (ascii)
@@ -27,18 +29,37 @@ const MIN_REPLY_LENGTH: usize = 4;
 const MAX_REPLY_LENGTH: usize = 64;
 const DATA_SIZE_LENGTH: usize = 8;
 
+#[derive(Debug, Error)]
+pub enum ParseReplyError {
+    #[error("Fastboot reply must have {} bytes at least! Got: {}", MIN_REPLY_LENGTH, reply_len)]
+    ReplyTooShort { reply_len: usize },
+
+    #[error(
+        "Fastboot reply must not have more than {} bytes. Got: {}",
+        MAX_REPLY_LENGTH,
+        reply_len
+    )]
+    ReplyTooLong { reply_len: usize },
+
+    #[error("DATA response packet size is {} expected {}", reply_len, DATA_SIZE_LENGTH)]
+    MismatchedDataPacketSize { reply_len: usize },
+
+    #[error("Error parsing DATA reply size")]
+    InvalidDataPacketSize(#[source] ParseIntError),
+
+    #[error("Unknown reply type: {}", reply_type)]
+    UnknownReply { reply_type: String },
+}
+
 impl TryFrom<&[u8]> for Reply {
-    type Error = anyhow::Error;
+    type Error = ParseReplyError;
 
     fn try_from(byte_vec: &[u8]) -> Result<Self, Self::Error> {
         if byte_vec.len() < MIN_REPLY_LENGTH {
-            return Err(anyhow!("Fastboot reply must have {} bytes at least!", MIN_REPLY_LENGTH));
+            return Err(ParseReplyError::ReplyTooShort { reply_len: byte_vec.len() });
         }
         if byte_vec.len() > MAX_REPLY_LENGTH {
-            return Err(anyhow!(
-                "Fastboot reply must not have more than {} bytes",
-                MAX_REPLY_LENGTH
-            ));
+            return Err(ParseReplyError::ReplyTooLong { reply_len: byte_vec.len() });
         }
 
         let (reply_type, reply_data) = byte_vec.split_at(MIN_REPLY_LENGTH);
@@ -50,18 +71,16 @@ impl TryFrom<&[u8]> for Reply {
             "OKAY" => Ok(Reply::Okay(reply_data_str)),
             "DATA" => {
                 if reply_data_str.len() != DATA_SIZE_LENGTH {
-                    return Err(anyhow!(
-                        "DATA response packet size is {} expected {}",
-                        reply_data_str.len(),
-                        DATA_SIZE_LENGTH
-                    ));
+                    return Err(ParseReplyError::MismatchedDataPacketSize {
+                        reply_len: reply_data_str.len(),
+                    });
                 }
                 match u32::from_str_radix(&reply_data_str, 16) {
                     Ok(ds) => Ok(Reply::Data(ds)),
-                    Err(e) => Err(anyhow!("Error parsing DATA reply size: {}", e)),
+                    Err(e) => Err(ParseReplyError::InvalidDataPacketSize(e)),
                 }
             }
-            _ => Err(anyhow!("Unknown reply type: {}", String::from_utf8_lossy(reply_type))),
+            _ => Err(ParseReplyError::UnknownReply { reply_type: reply_type_str }),
         }
     }
 }

@@ -15,7 +15,7 @@ use fastboot::{
     command::{ClientVariable, Command},
     download,
     reply::Reply,
-    send, send_with_listener, send_with_timeout, upload, SendError,
+    send, send_with_listener, send_with_timeout, upload, SendError, UploadError,
 };
 use ffx_config::get;
 use futures::io::{AsyncRead, AsyncWrite};
@@ -97,7 +97,7 @@ impl fastboot::UploadProgressListener for ProgressListener {
         Ok(())
     }
     #[tracing::instrument]
-    async fn on_error(&self, error: &str) -> Result<()> {
+    async fn on_error(&self, error: &UploadError) -> Result<()> {
         self.0.send(UploadProgress::OnError { error: anyhow!(error.to_string()) }).await?;
         Ok(())
     }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::anyhow;
+use thiserror::Error;
 
 #[derive(PartialEq, Debug)]
 pub enum ClientVariable {
@@ -88,8 +88,22 @@ pub enum Command {
 
 const MAX_COMMAND_LENGTH: usize = 64;
 
+#[derive(Debug, Error)]
+#[error("Client Variable name is too long: {}", client_variable)]
+pub struct ClientVariableTooLongError {
+    client_variable: String,
+}
+
+#[derive(Debug, Error)]
+pub enum SerializeCommandError {
+    #[error("Message name is too long for command.")]
+    MessageNameTooLong {},
+    #[error("GetVar command malformed.")]
+    InvalidGetVarCommand(#[from] ClientVariableTooLongError),
+}
+
 impl TryFrom<&ClientVariable> for Vec<u8> {
-    type Error = anyhow::Error;
+    type Error = ClientVariableTooLongError;
 
     fn try_from(var: &ClientVariable) -> Result<Self, Self::Error> {
         match var {
@@ -105,7 +119,7 @@ impl TryFrom<&ClientVariable> for Vec<u8> {
                 let bytes = s.as_bytes();
                 // Need to make sure it won't break the "getvar:" command
                 if bytes.len() > (MAX_COMMAND_LENGTH - 7) {
-                    Err(anyhow!("Client Variable name is too long"))
+                    Err(ClientVariableTooLongError { client_variable: s.to_string() })
                 } else {
                     Ok(bytes.to_vec())
                 }
@@ -114,16 +128,17 @@ impl TryFrom<&ClientVariable> for Vec<u8> {
     }
 }
 
-fn concat_message(cmd: &[u8], s: &str) -> Result<Vec<u8>, anyhow::Error> {
+fn concat_message(cmd: &[u8], s: &str) -> Result<Vec<u8>, SerializeCommandError> {
     let bytes = s.as_bytes();
     if MAX_COMMAND_LENGTH - cmd.len() < bytes.len() {
-        return Err(anyhow!("Message name is too long for command."));
+        Err(SerializeCommandError::MessageNameTooLong {})
+    } else {
+        Ok([cmd, &bytes[..]].concat())
     }
-    Ok([cmd, &bytes[..]].concat())
 }
 
 impl TryFrom<&Command> for Vec<u8> {
-    type Error = anyhow::Error;
+    type Error = SerializeCommandError;
 
     fn try_from(command: &Command) -> Result<Self, Self::Error> {
         match command {

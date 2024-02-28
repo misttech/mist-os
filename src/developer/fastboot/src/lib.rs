@@ -4,7 +4,7 @@
 
 use {
     crate::reply::Reply,
-    anyhow::{anyhow, bail, Result},
+    anyhow::{anyhow, bail, Error, Result},
     async_trait::async_trait,
     chrono::Duration,
     command::Command,
@@ -37,6 +37,30 @@ pub enum SendError {
     Timeout,
 }
 
+#[derive(Debug, Error)]
+pub enum DownloadError {
+    #[error("Did not get expected Data reply: {:?}", reply)]
+    UnexpectedReply { reply: Reply },
+    #[error("Could not verify download")]
+    CouldNotVerifyDownload(#[source] Error),
+    #[error("Could not read to interface")]
+    CouldNotReadToInterface(#[source] std::io::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum UploadError {
+    #[error("Target responded with wrong data size - received:{} expected:{}", received, expected)]
+    WrongSizeResponse { received: u32, expected: u32 },
+    #[error("Could not read bytes to upload")]
+    CouldNotReadBytesToUpload { source: std::io::Error },
+    #[error("Could not write to interface")]
+    CouldNotWriteToInterface(#[source] std::io::Error),
+    #[error("Could not verify upload")]
+    CouldNotVerifyUpload(#[source] Error),
+    #[error("Did not get expected Data reply: {:?}", reply)]
+    UnexpectedReply { reply: Reply },
+}
+
 #[async_trait]
 pub trait InfoListener {
     async fn on_info(&self, info: String) -> Result<()> {
@@ -52,7 +76,7 @@ impl InfoListener for LogInfoListener {}
 pub trait UploadProgressListener {
     async fn on_started(&self, size: usize) -> Result<()>;
     async fn on_progress(&self, bytes_written: u64) -> Result<()>;
-    async fn on_error(&self, error: &str) -> Result<()>;
+    async fn on_error(&self, error: &UploadError) -> Result<()>;
     async fn on_finished(&self) -> Result<()>;
 }
 
@@ -195,10 +219,7 @@ pub async fn upload<T: AsyncRead + AsyncWrite + Unpin, R: Read>(
     match reply {
         Reply::Data(s) => {
             if s != size {
-                let err = format!(
-                    "Target responded with wrong data size - received:{} expected:{}",
-                    s, size
-                );
+                let err = UploadError::WrongSizeResponse { received: s, expected: size };
                 tracing::error!(%err);
                 listener.on_error(&err).await?;
                 bail!(err);
@@ -215,7 +236,7 @@ pub async fn upload<T: AsyncRead + AsyncWrite + Unpin, R: Read>(
                         }
                         match interface.write(&bytes[..n]).await {
                             Err(e) => {
-                                let err = format!("Could not write to interface: {:?}", e);
+                                let err = UploadError::CouldNotWriteToInterface(e);
                                 tracing::error!(%err);
                                 listener.on_error(&err).await?;
                                 bail!(err);
@@ -227,7 +248,7 @@ pub async fn upload<T: AsyncRead + AsyncWrite + Unpin, R: Read>(
                         }
                     }
                     Err(e) => {
-                        let err = format!("Could not read bytes to upload: {:?}", e);
+                        let err = UploadError::CouldNotReadBytesToUpload { source: e };
                         tracing::error!(%err);
                         listener.on_error(&err).await?;
                         bail!(err);
@@ -241,14 +262,14 @@ pub async fn upload<T: AsyncRead + AsyncWrite + Unpin, R: Read>(
                     Ok(reply)
                 }
                 Err(e) => {
-                    let err = format!("Could not verify upload: {:?}", e);
+                    let err = UploadError::CouldNotVerifyUpload(e);
                     tracing::error!(%err);
                     listener.on_error(&err).await?;
                     bail!(err);
                 }
             }
         }
-        _ => bail!("Did not get expected Data reply: {:?}", reply),
+        rep @ _ => bail!(UploadError::UnexpectedReply { reply: rep }),
     }
 }
 
@@ -274,7 +295,7 @@ pub async fn download<T: AsyncRead + AsyncWrite + Unpin>(
                 .await?;
             while bytes_read != size {
                 match interface.read(&mut buffer[..]).await {
-                    Err(e) => bail!("Could not read to interface: {:?}", e),
+                    Err(e) => bail!(DownloadError::CouldNotReadToInterface(e)),
                     Ok(len) => {
                         tracing::debug!("fastboot: upload got {bytes_read}/{size} bytes");
                         bytes_read += len;
@@ -283,11 +304,11 @@ pub async fn download<T: AsyncRead + AsyncWrite + Unpin>(
                 }
             }
             file.flush().await?;
-            read_and_log_info(interface)
+            Ok(read_and_log_info(interface)
                 .await
-                .map_err(|e| anyhow!("Could not verify download: {:?}", e))
+                .map_err(|e| DownloadError::CouldNotVerifyDownload(e))?)
         }
-        _ => bail!("Did not get expected Data reply: {:?}", reply),
+        rep @ _ => bail!(DownloadError::UnexpectedReply { reply: rep }),
     }
 }
 
@@ -326,7 +347,7 @@ mod test {
             queue.push(UploadEvent::OnProgress(bytes_written));
             Ok(())
         }
-        async fn on_error(&self, error: &str) -> Result<()> {
+        async fn on_error(&self, error: &UploadError) -> Result<()> {
             let mut queue = self.event_queue.lock().await;
             queue.push(UploadEvent::OnError(error.to_string()));
             Ok(())
