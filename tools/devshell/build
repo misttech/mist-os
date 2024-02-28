@@ -6,11 +6,27 @@
 #### CATEGORY=Build
 ### Run Ninja to build Fuchsia
 
-## usage: fx build [options] [TARGET...] [-- NINJA_OPTIONS...]
+## usage: fx build [options] [LABELS_OR_TARGETS]... [-- NINJA_OPTIONS...]
 ##
-## Builds a set of targets after performing a few correctness checks for the Fuchsia build.
-## Ninja-specific options must be provided after a -- specifier.
-## Each TARGET value must be a Ninja target path.
+## Builds a set of GN or Ninja targets after performing a few correctness checks for
+## the Fuchsia build. Ninja-specific options must be provided after a -- specifier.
+##
+## If `FX_BUILD_WITH_LABELS=1` is set in the environment, LABELS_OR_TARGETS is a
+## list of Ninja target path, GN labels (beginning with //) or `--toolchain=NAME`
+## options or related aliases (see below). For example, the following lines
+## are equivalent ways to ask for the host `zbi` tool to be built:
+##
+##    fx build --host //zircon/tools/zbi
+##    fx build --host //zircon/tools/zbi:zbi
+##    fx build --toolchain=//build/toolchain:host_x64 //zircon/tools/zbi
+##    fx build '//zircon/tools/zbi(//build/toolchain:host_x64)'
+##    fx build host_x64/zbi
+##
+## The first line above is favored. Using the last line will print a warning
+## instructing the user which (optional) toolchain option + label to use instead.
+##
+## If `FX_BUILD_WITH_LABELS=1` is *not* set, then LABELS_OR_TARGETS must be
+## a list of Ninja target paths only.
 ##
 ## optional arguments:
 ##   -h, --help               Print this message. Use '-- --help' to print
@@ -22,6 +38,16 @@
 ##                            builder. This is useful for reproducing the exact
 ##                            set of targets built by the infrastructure.
 ##
+##   --toolchain=TOOLCHAIN    Specify the current GN toolchain suffix to use for
+##                            GN labels that appear after this option.
+##
+##   --host                   Alias for --toolchain=host
+##   --default                Alias for --toolchain=default
+##   --fuchsia                Alias for --toolchain=fuchsia
+##   --fidl                   Alias for --toolchain=fidl
+##
+##   --help-toolchains        Print list of valid TOOLCHAIN values.
+##
 ## Run `fx build -h` to see Ninja argument details.
 
 # Note: Do not use $(dirname "${BASH_SOURCE[0]}") to locate the script's
@@ -32,6 +58,22 @@ _script_dir="${BASH_SOURCE[0]%/*}"; if [[ "${_script_dir}" == "${BASH_SOURCE[0]}
 # shellcheck source=/dev/null
 source "${_script_dir}/lib/vars.sh" || exit 1
 fx-config-read
+
+shopt -s extglob
+
+function print-toolchain-help {
+  cat <<EOF
+Possible --toolchain aliases
+
+  host     Host toolchain    (//build/toolchain:host_$HOST_CPU)
+  default  Default toolchain (//build/toolchain/fuchsia:\$TARGET_CPU)
+  fuchsia  Default toolchain as well.
+  fidl     FIDL toolchain    (//build/fidl:fidling)
+
+Apart from that, the --toolchain value must be a valid GN toolchain
+label, such as '//some/toolchain:target'.
+EOF
+}
 
 function main {
   local switches=() fuchsia_targets=() ninja_switches=()
@@ -104,6 +146,17 @@ function main {
         exit 1
         ;;
 
+      --help-toolchains)
+        print-toolchain-help
+        exit 1
+        ;;
+
+      # The following options are used to specify GN toolchain for future
+      # labels that appear on the command line.
+      --host|--fidl|--default|--fuchsia|--toolchain=*)
+         fuchsia_targets+=("$1")
+         ;;
+
       # Anything that follows the Ninja tool name is passed to the tool itself
       # and not processed by Ninja itself, so stop the loop right here. If
       # there were fuchsia targets specificied before that, they will be
@@ -147,11 +200,11 @@ function main {
     fx-warn "This warning will soon become an error."
   fi
 
-  if [ -n "${fint_params_path}" ]; then
-    if [ ${#ninja_switches[@]} -gt 0 ]; then
+  if [[ -n "${fint_params_path}" ]]; then
+    if [[ ${#ninja_switches[@]} -gt 0 ]]; then
       fx-error "It's invalid to specify extra Ninja flags along with --fint-params-path."
       exit 1
-    elif [ ${#fuchsia_targets[@]} -gt 0 ]; then
+    elif [[ ${#fuchsia_targets[@]} -gt 0 ]]; then
       fx-error "It's invalid to specify targets along with --fint-params-path."
       exit 1
     fi
@@ -251,8 +304,25 @@ checkout_dir: \"${FUCHSIA_DIR}\"
 build_dir: \"${FUCHSIA_BUILD_DIR}\"
 ")
   else
+    # If FX_BUILD_WITH_LABELS is set to 1, support GN labels directly.
+    if [[ "${FX_BUILD_WITH_LABELS:-0}" == 1 && "${#fuchsia_targets[@]}" -gt 0 ]]; then
+      # Parse GN labels into a set of fully qualified GN labels
+      build_api_client="${FUCHSIA_DIR}/build/api/client"
+      gn_labels_raw="$("${build_api_client}" fx_build_args_to_labels --args "${fuchsia_targets[@]}")" || exit 1
+      readarray -t gn_labels <<< "${gn_labels_raw}"
+
+      # Convert GN labels to Ninja targets now.
+      ninja_targets_raw="$("${build_api_client}" gn_label_to_ninja_paths "${gn_labels[@]}")" || exit 1
+      readarray -t ninja_targets <<< "${ninja_targets_raw}"
+
+      echo "Building Ninja target(s): ${ninja_targets[*]}"
+    else
+      ninja_targets=("${fuchsia_targets[@]}")
+    fi
+
+
     (fx-run-ninja "${is_logging}" "$PREBUILT_NINJA" -C "${FUCHSIA_BUILD_DIR}" \
-      "${ninja_switches[@]}" "${fuchsia_targets[@]}")
+      "${ninja_switches[@]}" "${ninja_targets[@]}")
   fi
 
   status=$?
