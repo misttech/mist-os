@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Result};
-use fidl_fuchsia_input::{self, Key, KeymapId};
+use fidl_fuchsia_input::{Key, KeymapId};
 use fidl_fuchsia_ui_input3::{KeyEventType, KeyMeaning, LockState, Modifiers, NonPrintableKey};
 use lazy_static::lazy_static;
 use std::collections::{self, HashMap};

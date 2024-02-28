@@ -5,8 +5,7 @@
 use {
     anyhow::{format_err, Error},
     assert_matches::assert_matches,
-    cm_rust::{self, FidlIntoNative},
-    cm_types,
+    cm_rust::FidlIntoNative,
     fidl_fidl_examples_routing_echo::{self as fecho, EchoMarker as EchoClientStatsMarker},
     fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component::EventStreamMarker,
@@ -18,7 +17,6 @@ use {
         error::Error as RealmBuilderError, Capability, ChildOptions, DirectoryContents,
         LocalComponentHandles, RealmBuilder, RealmBuilderParams, Ref, Route,
     },
-    fuchsia_fs,
     fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
     futures::{
         channel::mpsc, future::pending, lock::Mutex, FutureExt, SinkExt, StreamExt, TryStreamExt,

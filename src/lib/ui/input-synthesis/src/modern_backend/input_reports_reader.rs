@@ -91,7 +91,6 @@ mod tests {
         use {
             super::*,
             futures::{pin_mut, task::Poll},
-            std::convert::TryFrom,
         };
 
         #[fasync::run_until_stalled(test)]
@@ -295,7 +294,6 @@ mod tests {
             super::*,
             assert_matches::assert_matches,
             futures::{pin_mut, task::Poll},
-            std::convert::TryFrom,
         };
 
         #[test]

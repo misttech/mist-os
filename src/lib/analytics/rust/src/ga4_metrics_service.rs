@@ -220,9 +220,6 @@ impl Default for GA4MetricsService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::metrics_state::write_app_status;
-    use crate::metrics_state::write_opt_in_status;
-    use crate::metrics_state::UNKNOWN_PROPERTY_ID;
     use std::path::PathBuf;
     use tempfile::tempdir;
 

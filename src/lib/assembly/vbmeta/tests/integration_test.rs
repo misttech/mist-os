@@ -4,7 +4,7 @@
 
 use include_bytes_from_working_dir::include_bytes_from_working_dir_env;
 use include_str_from_working_dir::include_str_from_working_dir_env;
-use std::convert::TryFrom;
+
 use vbmeta::Key;
 use vbmeta::VBMeta;
 use vbmeta::{HashDescriptor, Salt};

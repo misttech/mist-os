@@ -270,7 +270,6 @@ fn write_uuid_file(dir: &PathBuf, uuid: &str) -> Result<(), Error> {
 mod tests {
     use super::*;
     use std::fs::metadata;
-    use std::path::PathBuf;
     use tempfile::tempdir;
 
     const APP_NAME: &str = "ffx";

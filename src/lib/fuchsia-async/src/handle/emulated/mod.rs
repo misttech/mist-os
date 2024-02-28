@@ -2170,7 +2170,6 @@ mod test {
     use fuchsia_zircon_status as zx_status;
     use futures::FutureExt;
     use std::mem::ManuallyDrop;
-    use zx_status::Status;
 
     /// Returns a "handle" which mimics a closed handle.
     ///

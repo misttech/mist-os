@@ -16,7 +16,6 @@ use pin_utils::pin_mut;
 use std::{
     fmt,
     future::{poll_fn, Future},
-    marker::Unpin,
     sync::{
         atomic::{AtomicBool, AtomicI64, Ordering},
         Arc,
@@ -380,12 +379,11 @@ mod tests {
     use crate::{handle::on_signals::OnSignals, Interval, Timer};
     use assert_matches::assert_matches;
     use fuchsia_zircon::{self as zx, AsHandleRef, DurationNum};
-    use futures::{future, task::LocalFutureObj, StreamExt};
+    use futures::StreamExt;
     use pin_utils::pin_mut;
     use std::{
         cell::{Cell, RefCell},
-        sync::atomic::{AtomicBool, Ordering},
-        task::{Context, Poll, Waker},
+        task::Waker,
     };
 
     fn spawn(future: impl Future<Output = ()> + Send + 'static) {

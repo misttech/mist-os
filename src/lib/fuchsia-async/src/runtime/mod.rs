@@ -204,9 +204,7 @@ where
 mod task_tests {
 
     use super::*;
-    use crate::runtime::SendExecutor;
     use futures::channel::oneshot;
-    use std::future::Future;
 
     fn run(f: impl Send + 'static + Future<Output = ()>) {
         const TEST_THREADS: usize = 2;

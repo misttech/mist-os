@@ -90,8 +90,7 @@ impl<'a, Item> Future for TrySendFut<'a, Item> {
 #[cfg(test)]
 mod tests {
     use {
-        super::{TrySend, *},
-        core::task::Poll,
+        super::*,
         fuchsia_async as fasync,
         futures::{future::join, StreamExt},
     };

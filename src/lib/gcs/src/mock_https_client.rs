@@ -78,10 +78,7 @@ pub fn new_https_client() -> HttpsClient {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        hyper::{Body, Method, Request},
-    };
+    use {super::*, hyper::Method};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_mock() {

@@ -11,7 +11,6 @@ use {
     fuchsia_runtime::{HandleInfo, HandleType},
     fuchsia_zircon::{self as zx, AsHandleRef, DurationNum, HandleBased},
     futures::prelude::*,
-    std::convert::TryFrom,
     std::ffi::{CStr, CString},
     std::iter,
     std::mem,
@@ -956,7 +955,6 @@ mod tests {
         fidl_test_processbuilder::{UtilMarker, UtilProxy},
         fuchsia_async as fasync,
         lazy_static::lazy_static,
-        std::mem,
         vfs::{
             directory::entry_container::Directory, execution_scope::ExecutionScope,
             file::vmo::read_only, pseudo_directory,

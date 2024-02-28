@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{self, Context},
+    anyhow::Context,
     cm_rust::{FidlIntoNative, NativeIntoFidl, OfferDeclCommon},
     fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fcdecl,
@@ -27,7 +27,7 @@ use {
             Arc,
         },
     },
-    thiserror::{self, Error},
+    thiserror::Error,
     tracing::*,
     url::Url,
     vfs::execution_scope::ExecutionScope,
@@ -2016,9 +2016,8 @@ mod tests {
             create_endpoints, create_proxy, create_proxy_and_stream, create_request_stream,
             ClientEnd,
         },
-        fidl_fuchsia_io as fio,
-        fidl_fuchsia_logger::LogSinkMarker,
-        fidl_fuchsia_mem as fmem, fuchsia_async as fasync, fuchsia_zircon as zx,
+        fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
+        fuchsia_zircon as zx,
         std::time::Duration,
         test_case::test_case,
     };

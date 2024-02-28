@@ -17,14 +17,11 @@ use {
     base64::engine::{general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD, Engine as _},
     hyper::{Body, Method, Request},
     serde::{Deserialize, Serialize},
-    serde_json,
     sha2::{Digest, Sha256},
     std::{
         io::{Read, Write},
         net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream},
-        string::String,
     },
-    structured_ui,
     url::form_urlencoded,
 };
 

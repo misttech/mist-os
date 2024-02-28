@@ -172,12 +172,7 @@ pub fn render<W: io::Write>(fidl: Model, output: &mut W) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::parser,
-        super::*,
-        anyhow::{Error, Result},
-        xml::reader::EventReader,
-    };
+    use {super::*, anyhow::Error, xml::reader::EventReader};
 
     #[test]
     fn render_template() -> Result<()> {

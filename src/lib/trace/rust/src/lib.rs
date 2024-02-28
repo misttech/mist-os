@@ -5,9 +5,7 @@
 use {
     fuchsia_zircon as zx,
     pin_project::pin_project,
-    std::{
-        ffi::CStr, future::Future, marker::PhantomData, mem, pin::Pin, ptr, task::Poll, vec::Vec,
-    },
+    std::{ffi::CStr, future::Future, marker::PhantomData, mem, pin::Pin, ptr, task::Poll},
 };
 
 pub use sys::{TRACE_BLOB_TYPE_DATA, TRACE_BLOB_TYPE_LAST_BRANCH, TRACE_BLOB_TYPE_PERFETTO};

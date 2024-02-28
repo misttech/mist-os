@@ -7,7 +7,6 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
-use std::iter::FromIterator;
 
 use futures::stream::{FusedStream, FuturesUnordered, Stream};
 use pin_project::pin_project;
@@ -172,7 +171,6 @@ impl<F> FromIterator<F> for OneOrMany<F> {
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
-    use std::task::Context;
 
     use crate::event::Event;
     use assert_matches::assert_matches;

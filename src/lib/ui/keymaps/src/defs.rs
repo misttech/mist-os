@@ -11,7 +11,6 @@
 use crate::{LockStateChecker, ModifierChecker};
 use fidl_fuchsia_ui_input3::{LockState, Modifiers};
 use lazy_static::lazy_static;
-use std::convert::Into;
 
 lazy_static! {
     /// Standard [qwerty] keymap.

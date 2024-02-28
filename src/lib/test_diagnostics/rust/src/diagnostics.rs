@@ -137,7 +137,6 @@ mod tests {
                 BatchIteratorMarker, BatchIteratorRequest, FormattedContent, ReaderError,
             },
             fidl_fuchsia_mem as fmem, fuchsia_zircon as zx,
-            futures::StreamExt,
             futures::TryStreamExt,
         };
 

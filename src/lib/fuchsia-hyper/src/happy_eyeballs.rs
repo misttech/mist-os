@@ -335,20 +335,17 @@ impl<C: SocketConnector> Future for Inner<C> {
 mod test {
     use {
         super::*,
-        crate::happy_eyeballs::{happy_eyeballs, SocketConnector},
         assert_matches::assert_matches,
         fuchsia_async::{self as fasync},
         fuchsia_sync::Mutex,
         fuchsia_zircon::{self as zx, DurationNum},
-        futures::FutureExt,
         std::{
             collections::HashMap,
             fmt::Debug,
-            io::{self, Error, ErrorKind},
+            io::{Error, ErrorKind},
             iter::once,
-            net::{Ipv4Addr, Ipv6Addr, SocketAddr},
+            net::{Ipv4Addr, Ipv6Addr},
             sync::Arc,
-            task::Poll,
         },
         test_case::test_case,
     };

@@ -20,7 +20,7 @@ use anyhow::Error;
 use euclid::{default::Transform2D, size2, vec2};
 use fuchsia_trace::duration;
 use rive_rs::{self as rive};
-use std::{any::Any, collections::BTreeMap, convert::TryFrom, path::PathBuf};
+use std::{any::Any, collections::BTreeMap, path::PathBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// Identifier for a Facet

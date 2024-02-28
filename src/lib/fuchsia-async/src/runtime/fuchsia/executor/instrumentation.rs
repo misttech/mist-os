@@ -201,7 +201,7 @@ mod tests {
     use pin_utils::pin_mut;
 
     use super::*;
-    use crate::runtime::fuchsia::executor::{instrumentation::Snapshot, Time};
+    use crate::runtime::fuchsia::executor::Time;
     use crate::{handle::channel::Channel, LocalExecutor, SendExecutor, TestExecutor, Timer};
 
     const MICROSECOND: std::time::Duration = std::time::Duration::from_micros(1);

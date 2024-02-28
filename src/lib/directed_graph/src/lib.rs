@@ -5,7 +5,6 @@
 use std::{
     cmp::min,
     collections::{HashMap, HashSet},
-    default::Default,
     fmt::{Debug, Display},
     hash::Hash,
 };

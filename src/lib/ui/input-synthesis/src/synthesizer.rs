@@ -8,10 +8,10 @@ use {
     async_trait::async_trait,
     fidl_fuchsia_input as input,
     fidl_fuchsia_input_report::MouseInputReport,
-    fidl_fuchsia_ui_input::{self, KeyboardReport, Touch},
-    fidl_fuchsia_ui_input3 as input3, fuchsia_async as fasync, fuchsia_zircon as zx, keymaps,
+    fidl_fuchsia_ui_input::{KeyboardReport, Touch},
+    fidl_fuchsia_ui_input3 as input3, fuchsia_async as fasync, fuchsia_zircon as zx,
     serde::{Deserialize, Deserializer},
-    std::{convert::TryFrom, thread, time::Duration},
+    std::{thread, time::Duration},
     tracing::debug,
 };
 
@@ -675,15 +675,14 @@ mod tests {
         use {
             super::*,
             fidl::endpoints,
-            fidl_fuchsia_input_report::MouseInputReport,
             fidl_fuchsia_input_report::MOUSE_MAX_NUM_BUTTONS,
             fidl_fuchsia_ui_input::{
                 InputDeviceMarker, InputDeviceProxy as FidlInputDeviceProxy, InputDeviceRequest,
-                InputDeviceRequestStream, InputReport, KeyboardReport, MediaButtonsReport,
-                MouseReport, TouchscreenReport,
+                InputDeviceRequestStream, InputReport, MediaButtonsReport, MouseReport,
+                TouchscreenReport,
             },
             futures::stream::StreamExt,
-            std::{collections::HashSet, iter::FromIterator},
+            std::collections::HashSet,
         };
 
         // Like `InputReport`, but with the `Box`-ed items inlined.

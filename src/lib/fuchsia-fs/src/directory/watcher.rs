@@ -12,7 +12,6 @@ use {
     futures::stream::{FusedStream, Stream},
     std::{
         ffi::OsStr,
-        marker::Unpin,
         os::unix::ffi::OsStrExt,
         path::PathBuf,
         pin::Pin,

@@ -684,7 +684,7 @@ fn ensure_capacity<T>(vec: &mut Vec<T>, size: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DurationNum, HandleOp, Port, Rights, Signals, Vmo};
+    use crate::{DurationNum, Port, Signals, Vmo};
     use std::thread;
 
     #[test]

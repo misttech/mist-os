@@ -148,10 +148,8 @@ pub enum PortData {
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        fidl_fuchsia_kernel as fkernel,
-        fuchsia_component::client::connect_to_protocol,
-        fuchsia_zircon::{HandleBased, Status},
+        super::*, fidl_fuchsia_kernel as fkernel, fuchsia_component::client::connect_to_protocol,
+        fuchsia_zircon::HandleBased,
     };
 
     async fn get_hypervisor() -> Resource {

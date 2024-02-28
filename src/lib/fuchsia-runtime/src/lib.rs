@@ -29,7 +29,6 @@ use {
     },
     num_derive::FromPrimitive,
     num_traits::cast::FromPrimitive,
-    std::convert::TryFrom,
     thiserror::Error,
 };
 

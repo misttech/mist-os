@@ -18,7 +18,7 @@ use crate::{
 use euclid::{point2, size2, vec2};
 use fidl_fuchsia_input_report as hid_input_report;
 use keymaps::Keymap;
-use std::{collections::HashSet, iter::FromIterator};
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct TouchScale {

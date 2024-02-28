@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::TimeoutExt;
-use futures::{lock::Mutex, prelude::*, stream};
+use futures::{lock::Mutex, prelude::*};
 use std::pin::Pin;
 use std::sync::Arc;
 #[cfg(target_os = "fuchsia")]

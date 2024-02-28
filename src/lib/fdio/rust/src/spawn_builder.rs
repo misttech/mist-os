@@ -131,12 +131,7 @@ pub enum Error {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::AsHandleRef as _,
-        fuchsia_async as fasync,
-        std::{fs::File, io::Write as _},
-    };
+    use {super::*, fidl::AsHandleRef as _, fuchsia_async as fasync, std::io::Write as _};
 
     async fn process_exit_success(proc: zx::Process) {
         assert_eq!(

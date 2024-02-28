@@ -20,7 +20,6 @@ use {
         ViewKey,
     },
     fuchsia_trace::{duration, duration_begin, duration_end},
-    fuchsia_trace_provider,
     fuchsia_zircon::{Event, Time},
     rive_rs::{self as rive},
     std::path::Path,

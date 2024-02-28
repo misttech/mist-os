@@ -850,7 +850,7 @@ impl<'a, K: EntryKey, T> Entry<'a, K, T> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{collections::HashMap, vec, vec::Vec};
+    use alloc::{collections::HashMap, vec};
 
     use rand::seq::SliceRandom as _;
 

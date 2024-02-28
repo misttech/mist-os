@@ -7,7 +7,6 @@
 use assert_matches::assert_matches;
 use fidl_table_validation::*;
 use fidl_test_tablevalidation::{Example, VecOfExample, WrapExample};
-use std::convert::TryFrom;
 use test_case::test_case;
 
 #[test]

@@ -72,7 +72,7 @@ impl Iommu {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Handle, ObjectType, Resource};
+    use crate::ObjectType;
     use fidl_fuchsia_boot as fboot;
     use fuchsia_component::client::connect_channel_to_protocol;
 

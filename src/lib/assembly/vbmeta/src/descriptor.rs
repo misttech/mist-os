@@ -5,7 +5,7 @@
 use mundane::hash::{Digest, Hasher, Sha256};
 use ring::{rand, rand::SecureRandom};
 use serde::Deserialize;
-use std::convert::{TryFrom, TryInto};
+
 use thiserror::Error;
 use zerocopy::{
     byteorder::big_endian::{U32 as BigEndianU32, U64 as BigEndianU64},
@@ -241,7 +241,6 @@ mod tests {
     use super::*;
     use crate::descriptor::builder::RawHashDescriptorBuilder;
     use assert_matches::assert_matches;
-    use std::convert::TryFrom;
 
     /// Holds the set of inputs for a test.
     struct TestInputs {

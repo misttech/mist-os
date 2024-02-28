@@ -946,8 +946,8 @@ impl HostImageCycler {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, fidl::endpoints::create_proxy_and_stream, fidl_fuchsia_ui_gfx,
-        fidl_fuchsia_ui_scenic, fuchsia_async as fasync, futures::prelude::*,
+        super::*, fidl::endpoints::create_proxy_and_stream, fuchsia_async as fasync,
+        futures::prelude::*,
     };
 
     /// Returns `true` if the received session command matches the test expectation.

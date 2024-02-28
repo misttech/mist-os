@@ -4,7 +4,7 @@
 
 #![cfg(test)]
 
-use fdio::{self, SpawnOptions};
+use fdio::SpawnOptions;
 use fuchsia_runtime as runtime;
 use fuchsia_zircon::{self as zx, AsHandleRef, Task};
 use std::ffi::{CStr, CString};

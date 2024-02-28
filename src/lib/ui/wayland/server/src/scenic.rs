@@ -4,7 +4,7 @@
 
 use {
     fidl_fuchsia_ui_composition::{ContentId, FlatlandProxy, PresentArgs, TransformId},
-    fuchsia_scenic, fuchsia_trace as ftrace, fuchsia_zircon as zx,
+    fuchsia_trace as ftrace, fuchsia_zircon as zx,
     std::sync::atomic::{AtomicUsize, Ordering},
     std::{cell::RefCell, rc::Rc},
 };

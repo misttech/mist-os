@@ -9,7 +9,6 @@ use argh::FromArgs;
 use fdio::SpawnOptions;
 use fuchsia_runtime as runtime;
 use fuchsia_zircon as zx;
-use scoped_task;
 use std::any::Any;
 use std::env;
 use std::ffi::{CStr, CString};

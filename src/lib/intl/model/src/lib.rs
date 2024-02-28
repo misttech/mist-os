@@ -13,7 +13,6 @@
 use {
     anyhow::Result,
     serde::{Deserialize, Serialize},
-    serde_json,
     std::collections::BTreeMap,
     std::io,
 };

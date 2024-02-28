@@ -7,7 +7,6 @@
 use {
     fuchsia_runtime::HandleInfo,
     fuchsia_zircon as zx,
-    std::convert::TryFrom,
     std::ffi::CString,
     std::fmt,
     std::mem,

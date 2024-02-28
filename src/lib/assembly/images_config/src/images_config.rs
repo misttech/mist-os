@@ -9,7 +9,7 @@ use bfc::{PostProcessingScript, VBMetaDescriptor, ZbiCompression};
 use camino::Utf8PathBuf;
 use pfc::BlobfsLayout;
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
+
 use std::fmt;
 use std::io::Read;
 use std::str::FromStr;

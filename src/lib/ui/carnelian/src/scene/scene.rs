@@ -28,7 +28,6 @@ use fuchsia_zircon::{AsHandleRef, Event, Signals};
 use std::{
     any::Any,
     collections::{BTreeMap, HashMap},
-    convert::TryFrom,
     fmt::{self, Debug},
 };
 

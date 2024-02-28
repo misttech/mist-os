@@ -11,9 +11,8 @@ use {
     fuchsia_backoff::retry_or_last_error,
     fuchsia_hyper::HttpsClient,
     http::{request, StatusCode},
-    hyper::{self, Body, Method, Request, Response},
-    serde_json,
-    std::{fmt, string::String},
+    hyper::{Body, Method, Request, Response},
+    std::fmt,
     url::Url,
 };
 
@@ -306,7 +305,7 @@ impl fmt::Debug for TokenStore {
 
 #[cfg(test)]
 mod test {
-    use {super::*, fuchsia_hyper::new_https_client, hyper::StatusCode};
+    use {super::*, fuchsia_hyper::new_https_client};
 
     #[should_panic(expected = "Connection refused")]
     #[fuchsia_async::run_singlethreaded(test)]

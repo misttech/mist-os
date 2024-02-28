@@ -30,7 +30,6 @@ use futures::{
 use once_cell::sync::OnceCell;
 use serde::Deserialize;
 use std::{any::Any, collections::BTreeMap, fmt::Debug, fs, path::PathBuf, pin::Pin};
-use toml;
 
 pub(crate) mod strategies;
 

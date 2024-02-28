@@ -11,7 +11,6 @@ use {
     fuchsia_zircon::{self as zx, DurationNum},
     std::{
         collections::VecDeque,
-        default::Default,
         fmt::{self, Debug},
     },
 };

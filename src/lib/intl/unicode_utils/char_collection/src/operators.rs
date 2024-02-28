@@ -8,7 +8,6 @@
 //! precedence.
 
 use crate::{CharCollection, MultiCharRange};
-use std::convert::Into;
 use std::ops;
 
 impl<V: MultiCharRange> ops::BitOr<V> for CharCollection {

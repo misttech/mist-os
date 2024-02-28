@@ -10,9 +10,7 @@ use {
     anyhow::{bail, Context, Result},
     hyper::{Body, Method, Request},
     serde::{Deserialize, Serialize},
-    serde_json,
     std::time::{Duration, Instant},
-    structured_ui,
 };
 
 use cfg_if::cfg_if;

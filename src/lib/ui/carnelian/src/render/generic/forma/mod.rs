@@ -75,7 +75,7 @@ mod tests {
 
     use euclid::size2;
 
-    use crate::{drawing::DisplayRotation, render::generic};
+    use crate::render::generic;
 
     #[test]
     fn forma_init() {

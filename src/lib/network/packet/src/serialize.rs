@@ -1748,7 +1748,7 @@ impl<I: Serializer, O: PacketBuilder> Serializer for Nested<I, O> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Buffer, BufferMut};
+    use crate::BufferMut;
     use std::fmt::Debug;
     use test_case::test_case;
 

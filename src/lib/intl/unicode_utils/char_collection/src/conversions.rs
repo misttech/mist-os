@@ -4,8 +4,6 @@
 
 //! Conversion (`From`) implementations for [CharCollection], via [MultiCharRange].
 
-use std::boxed::Box;
-use std::convert::TryFrom;
 use std::iter;
 use std::ops::RangeInclusive;
 use unic_char_range::CharRange;
@@ -100,7 +98,6 @@ impl<T: MultiCharRange> From<&T> for CharCollection {
 #[cfg(test)]
 mod multi_char_range_tests {
     use crate::MultiCharRange;
-    use paste;
     use unic_char_range::{chars, CharRange};
 
     #[test]

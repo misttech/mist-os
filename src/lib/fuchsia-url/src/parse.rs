@@ -5,7 +5,7 @@
 use {
     crate::errors::{PackagePathSegmentError, ResourcePathError},
     serde::{Deserialize, Serialize},
-    std::convert::{TryFrom, TryInto as _},
+    std::convert::TryInto as _,
 };
 
 pub const MAX_PACKAGE_PATH_SEGMENT_BYTES: usize = 255;

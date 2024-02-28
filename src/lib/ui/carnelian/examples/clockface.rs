@@ -21,9 +21,8 @@ use {
     },
     chrono::{Local, Timelike},
     euclid::{point2, size2, vec2, Angle, Transform2D},
-    fuchsia_trace_provider,
     fuchsia_zircon::Event,
-    std::{convert::TryFrom, f32},
+    std::f32,
 };
 
 const BACKGROUND_COLOR: Color = Color { r: 235, g: 213, b: 179, a: 255 };

@@ -5,7 +5,6 @@
 use {
     crate::ConfigOverridePolicy,
     anyhow::{Context, Error},
-    cm_fidl_validator,
     cm_rust::NativeIntoFidl,
     fidl::endpoints::{create_endpoints, ServerEnd},
     fidl::Vmo,

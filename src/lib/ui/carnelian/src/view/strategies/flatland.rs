@@ -32,7 +32,7 @@ use fuchsia_async::{self as fasync, OnSignals};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId};
 use fuchsia_scenic::BufferCollectionTokenPair;
-use fuchsia_trace::{self, duration, instant};
+use fuchsia_trace::{duration, instant};
 use fuchsia_zircon::{self as zx, Event, HandleBased, Signals, Time};
 use futures::{channel::mpsc::UnboundedSender, prelude::*, StreamExt, TryStreamExt};
 use std::collections::{BTreeMap, BTreeSet, HashMap};

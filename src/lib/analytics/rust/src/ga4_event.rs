@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tracing;
 
 const POST_EVENT_COUNT_MAX: usize = 25;
 const EVENT_PARAM_COUNT_MAX: usize = 25;
@@ -413,7 +412,7 @@ fn get_systime() -> u128 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::{BTreeMap, HashMap};
+    use std::collections::BTreeMap;
 
     #[test]
     fn test_param_serde_flattening() {

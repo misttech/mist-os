@@ -600,7 +600,7 @@ mod tests {
         super::*,
         anyhow::Error,
         carnelian::{
-            drawing::{DisplayRotation, FontFace, TextGrid},
+            drawing::{DisplayRotation, FontFace},
             render::{generic, ContextInner},
         },
         euclid::size2,

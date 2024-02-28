@@ -18,9 +18,7 @@ use {
         ViewAssistantPtr, ViewKey,
     },
     euclid::{size2, vec2, Transform2D},
-    fuchsia_trace_provider,
     fuchsia_zircon::Event,
-    std::convert::TryFrom,
 };
 
 const BLACK_COLOR: Color = Color { r: 0, g: 0, b: 0, a: 255 };

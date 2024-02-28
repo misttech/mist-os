@@ -20,13 +20,11 @@ use {
         ViewKey,
     },
     fuchsia_trace::duration,
-    fuchsia_trace_provider,
     fuchsia_zircon::Event,
     rustc_hash::FxHashMap,
     std::{
         any::Any,
         collections::hash_map::Entry,
-        convert::TryFrom,
         f32,
         fs::File,
         io::{prelude::*, BufReader},

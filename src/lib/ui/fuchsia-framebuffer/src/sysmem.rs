@@ -11,7 +11,6 @@ use fidl_fuchsia_sysmem::{
     PixelFormatType,
 };
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_runtime;
 use fuchsia_zircon::{self as zx, AsHandleRef, Status};
 use std::cmp;
 

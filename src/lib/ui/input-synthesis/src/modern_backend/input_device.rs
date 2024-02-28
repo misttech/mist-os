@@ -23,7 +23,7 @@ use {
     fidl_fuchsia_ui_input::{KeyboardReport, Touch},
     fuchsia_async as fasync,
     futures::{future, pin_mut, StreamExt, TryFutureExt},
-    std::convert::{Into, TryFrom as _},
+    std::convert::TryFrom as _,
 };
 
 /// Implements the `synthesizer::InputDevice` trait, and the server side of the
@@ -408,7 +408,6 @@ mod tests {
                 *,
             },
             assert_matches::assert_matches,
-            fidl_fuchsia_input_report::InputReportsReaderMarker,
             futures::task::Poll,
         };
 
@@ -1234,7 +1233,6 @@ mod tests {
         use {
             super::{utils::make_input_device_proxy_and_struct, *},
             assert_matches::assert_matches,
-            fidl_fuchsia_input_report::InputReportsReaderMarker,
         };
 
         #[fasync::run_until_stalled(test)]
@@ -1264,10 +1262,7 @@ mod tests {
     mod utils {
         use {
             super::*,
-            fidl_fuchsia_input_report::{
-                InputDeviceMarker, InputDeviceProxy, InputReportsReaderMarker,
-                InputReportsReaderProxy,
-            },
+            fidl_fuchsia_input_report::{InputDeviceProxy, InputReportsReaderProxy},
             fuchsia_zircon as zx,
         };
 

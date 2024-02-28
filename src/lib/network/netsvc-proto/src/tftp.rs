@@ -26,7 +26,7 @@ use packet::{
     BufferView, FragmentedBytesMut, InnerPacketBuilder, PacketBuilder, PacketConstraints,
     ParsablePacket, ParseMetadata, SerializeTarget,
 };
-use std::{convert::TryFrom, io::Write as _, num::NonZeroU16, str::FromStr};
+use std::{io::Write as _, num::NonZeroU16, str::FromStr};
 use thiserror::Error;
 use witness::NonEmptyValidStr;
 use zerocopy::{

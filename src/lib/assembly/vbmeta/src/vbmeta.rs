@@ -140,7 +140,7 @@ mod tests {
     use crate::descriptor::builder::RawHashDescriptorBuilder;
     use crate::descriptor::Salt;
     use crate::test;
-    use std::convert::TryFrom;
+
     use zerocopy::Ref;
 
     #[test]

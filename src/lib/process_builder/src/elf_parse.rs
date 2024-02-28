@@ -531,7 +531,7 @@ impl Elf64DynSection {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, anyhow::Error, assert_matches::assert_matches, fdio, std::fs::File};
+    use {super::*, anyhow::Error, assert_matches::assert_matches, std::fs::File};
 
     // These are specially crafted files that just contain a valid ELF64 file header but
     // nothing else.

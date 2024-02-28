@@ -438,7 +438,7 @@ unsafe_handle_properties!(object: Vmo,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Handle, Iommu, IommuDescDummy, ObjectType, Rights};
+    use crate::{Iommu, IommuDescDummy, ObjectType};
     use fidl_fuchsia_boot as fboot;
     use fidl_fuchsia_kernel as fkernel;
     use fuchsia_component::client::connect_channel_to_protocol;

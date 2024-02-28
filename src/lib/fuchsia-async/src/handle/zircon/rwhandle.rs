@@ -295,7 +295,6 @@ mod tests {
     use super::*;
     use crate::TestExecutor;
     use fuchsia_zircon as zx;
-    use std::task::Context;
 
     #[test]
     fn is_closed_immediately_after_close() {

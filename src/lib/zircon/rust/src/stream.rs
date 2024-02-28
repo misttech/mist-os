@@ -11,7 +11,7 @@ use {
     },
     bitflags::bitflags,
     fuchsia_zircon_sys as sys,
-    std::{convert::TryInto, io::SeekFrom},
+    std::io::SeekFrom,
 };
 
 /// An object representing a Zircon [stream](https://fuchsia.dev/fuchsia-src/concepts/objects/stream.md).

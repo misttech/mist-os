@@ -39,11 +39,11 @@ use {
     fuchsia_trace as ftrace, fuchsia_wayland_core as wl,
     fuchsia_wayland_core::Enum,
     futures::prelude::*,
+    std::collections::BTreeSet,
     std::sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
-    std::{collections::BTreeSet, convert::TryInto},
     xdg_shell_server_protocol::{
         self as xdg_shell,
         xdg_positioner::{Anchor, Gravity},

@@ -7,7 +7,7 @@
 use heck::CamelCase;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use std::convert::TryFrom;
+
 use syn::spanned::Spanned;
 use syn::{punctuated::*, token::*, *};
 

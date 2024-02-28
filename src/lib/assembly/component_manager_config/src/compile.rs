@@ -13,10 +13,8 @@ use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal,
     itertools::Itertools,
     serde::Deserialize,
-    serde_json5,
     std::{
         collections::HashSet,
-        convert::{TryFrom, TryInto},
         fs::{self, File},
         io::Write,
         path::PathBuf,

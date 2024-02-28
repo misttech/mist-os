@@ -620,7 +620,6 @@ mod test {
     use crate::USB_ENDPOINT_DIR_MASK;
     use std::collections::HashMap;
     use std::sync::mpsc::{channel, Receiver, Sender};
-    use std::sync::Mutex;
 
     #[derive(Clone)]
     enum EndpointBuffer {

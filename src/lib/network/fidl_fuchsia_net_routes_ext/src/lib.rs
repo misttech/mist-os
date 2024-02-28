@@ -952,7 +952,7 @@ pub async fn wait_for_routes<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testutil::{self, internal as internal_testutil};
+    use crate::testutil::internal as internal_testutil;
     use assert_matches::assert_matches;
     use fidl_fuchsia_net as _;
     use fuchsia_zircon_status as zx_status;

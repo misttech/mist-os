@@ -558,7 +558,7 @@ mod tests {
     // fuchsia_zircon::Vmar that we need to use.
     use fuchsia_zircon::{
         AsHandleRef, Channel, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp,
-        ObjectType, Rights, Status, Vmo,
+        ObjectType, Rights, Vmo,
     };
     use fuchsia_zircon_sys as sys;
 

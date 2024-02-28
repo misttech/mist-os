@@ -14,11 +14,9 @@ use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::io::{self, AsyncRead, AsyncWrite};
 use futures::ready;
 use futures::task::{AtomicWaker, Context};
-use libc;
 
 use std::fmt;
 use std::io::{Read, Write};
-use std::marker::Unpin;
 use std::mem;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::pin::Pin;

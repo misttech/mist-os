@@ -18,7 +18,6 @@ use std::{
     cmp,
     collections::BinaryHeap,
     future::Future,
-    marker::Unpin,
     pin::Pin,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -238,7 +237,7 @@ impl Eq for TimeWaker {}
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{LocalExecutor, SendExecutor, TestExecutor, Timer};
+    use crate::{LocalExecutor, SendExecutor, TestExecutor};
     use assert_matches::assert_matches;
     use fuchsia_zircon::prelude::*;
     use fuchsia_zircon::Duration;

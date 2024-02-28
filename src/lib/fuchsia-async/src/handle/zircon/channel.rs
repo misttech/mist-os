@@ -198,7 +198,7 @@ impl<'a> Future for RecvEtcMsg<'a> {
 mod tests {
     use super::*;
     use crate::TestExecutor;
-    use fuchsia_zircon::{self as zx, MessageBuf};
+    use fuchsia_zircon::{self as zx};
     use pin_utils::pin_mut;
     use std::mem;
 

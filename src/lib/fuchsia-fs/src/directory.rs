@@ -755,7 +755,7 @@ mod tests {
         crate::file::write,
         assert_matches::assert_matches,
         fuchsia_async as fasync,
-        futures::{channel::oneshot, stream::StreamExt},
+        futures::channel::oneshot,
         proptest::prelude::*,
         tempfile::TempDir,
         vfs::{

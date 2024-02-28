@@ -12,7 +12,6 @@ use crate::{
     Vmar,
 };
 use bitflags::bitflags;
-use std::convert::Into;
 
 use fuchsia_zircon_sys as sys;
 

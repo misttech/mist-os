@@ -16,7 +16,6 @@ use {
         ViewAssistantPtr, ViewKey,
     },
     euclid::{default::Point2D, size2},
-    fuchsia_trace_provider,
     fuchsia_zircon::Event,
     std::{collections::BTreeMap, path::PathBuf},
 };

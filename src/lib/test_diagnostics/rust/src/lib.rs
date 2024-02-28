@@ -9,7 +9,6 @@ use {
     fuchsia_sync::Mutex,
     futures::{
         channel::mpsc,
-        io::AsyncRead,
         prelude::*,
         ready,
         task::{Context, Poll},

@@ -39,7 +39,7 @@ impl Bti {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Handle, IommuDescDummy, ObjectType, Resource, Vmo};
+    use crate::{IommuDescDummy, ObjectType, Resource, Vmo};
     use fidl_fuchsia_boot as fboot;
     use fuchsia_component::client::connect_channel_to_protocol;
 

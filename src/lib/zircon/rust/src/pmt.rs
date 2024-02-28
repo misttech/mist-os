@@ -38,7 +38,7 @@ impl Pmt {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Handle, Vmo};
+    use crate::Vmo;
 
     #[test]
     fn pmt_unpin_invalid_handle() {

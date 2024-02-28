@@ -20,7 +20,6 @@ use {
         default::{Point2D, Rect},
         point2, size2,
     },
-    fuchsia_trace_provider,
     fuchsia_zircon::{AsHandleRef, Event, Signals},
     std::{collections::BTreeMap, fs::File},
 };

@@ -18,7 +18,6 @@ use futures::{
 use tracing::{debug, error, trace, warn};
 
 use std::collections::{hash_map, BinaryHeap, HashMap, HashSet};
-use std::convert::TryFrom;
 use std::sync::{Arc, Mutex};
 
 const DEFAULT_INCREMENTS_MS: i64 = 10;

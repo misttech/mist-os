@@ -132,7 +132,7 @@ fn build_directory(
 mod tests {
     use {
         super::*, fidl::endpoints::create_proxy, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
-        fuchsia_fs, futures::TryStreamExt, maplit::hashset, std::collections::HashSet,
+        futures::TryStreamExt, maplit::hashset, std::collections::HashSet,
     };
 
     #[fuchsia::test]

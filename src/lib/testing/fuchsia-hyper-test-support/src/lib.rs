@@ -19,7 +19,6 @@ use {
     anyhow::Error,
     chrono::Utc,
     fuchsia_async::{self as fasync, Task},
-    fuchsia_hyper,
     futures::{future::BoxFuture, prelude::*},
     hyper::{
         server::{accept::from_stream, Server},

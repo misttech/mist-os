@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{convert::TryFrom, error, fmt, fmt::Debug, hash::Hash, io::Read, ops::Add, u32};
+use std::{error, fmt, fmt::Debug, hash::Hash, io::Read, ops::Add, u32};
 
 use anyhow::Error;
 use display_utils::PixelFormat;
@@ -368,8 +368,6 @@ pub(crate) mod tests {
     use super::*;
 
     use fuchsia_async as fasync;
-
-    use crate::drawing::DisplayRotation;
 
     #[test]
     fn generic_compile_test() {

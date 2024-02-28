@@ -6,7 +6,6 @@
 //! creation.
 
 use std::collections::HashSet;
-use std::convert::{From, TryFrom, TryInto};
 use std::fmt::{Debug, Display, Formatter};
 use std::mem;
 use std::net::IpAddr;
@@ -957,7 +956,7 @@ impl EmbeddedPacketBuilder for DomainBuilder {
 mod tests {
     use super::*;
 
-    use packet::{InnerPacketBuilder, ParseBuffer, Serializer};
+    use packet::{ParseBuffer, Serializer};
     use std::fmt::Write;
 
     trait EmbeddedPacketBuilderTestExt: EmbeddedPacketBuilder {

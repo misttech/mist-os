@@ -191,7 +191,6 @@ fn normalize_path_impl<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::iter::FromIterator;
 
     #[test]
     fn resolve_path_from_file_simple() {

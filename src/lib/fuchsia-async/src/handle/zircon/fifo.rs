@@ -9,7 +9,7 @@ use {
     std::{
         fmt,
         future::Future,
-        marker::{PhantomData, Unpin},
+        marker::PhantomData,
         mem::MaybeUninit,
         pin::Pin,
         task::{Context, Poll},

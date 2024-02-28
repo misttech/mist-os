@@ -18,7 +18,6 @@ use {
     rustc_hash::{FxHashMap, FxHashSet},
     std::{
         collections::{hash_map::Entry, BTreeSet},
-        convert::TryFrom,
         mem,
     },
     term_model::{
@@ -463,7 +462,7 @@ mod tests {
         super::*,
         anyhow::Error,
         carnelian::{
-            drawing::{DisplayRotation, FontFace},
+            drawing::DisplayRotation,
             render::{generic, Context as RenderContext, ContextInner},
         },
         euclid::size2,

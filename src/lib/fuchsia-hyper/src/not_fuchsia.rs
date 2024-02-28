@@ -133,16 +133,15 @@ mod test {
     use {
         crate::*,
         anyhow::{Error, Result},
-        async_net::{Ipv6Addr, SocketAddr, TcpListener},
+        async_net::TcpListener,
         futures::{
-            future::BoxFuture, stream::FuturesUnordered, FutureExt, StreamExt, TryFutureExt,
-            TryStreamExt,
+            future::BoxFuture, stream::FuturesUnordered, StreamExt, TryFutureExt, TryStreamExt,
         },
         hyper::{
             body::HttpBody,
             server::{accept::from_stream, Server},
             service::{make_service_fn, service_fn},
-            Body, Response, StatusCode,
+            Response, StatusCode,
         },
         std::{convert::Infallible, io::Write},
     };

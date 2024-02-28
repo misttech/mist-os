@@ -8,9 +8,7 @@ use {
         clone::Clone,
         cmp::Ordering,
         hash::{Hash, Hasher},
-        iter::Iterator,
         ops::Range,
-        vec::Vec,
     },
     unic_char_range::{chars, CharIter, CharRange},
 };

@@ -15,7 +15,6 @@ use {
     },
     std::{
         io::{self, Write},
-        marker::Unpin,
         net::{self, Shutdown, SocketAddr},
         ops::Deref,
         os::unix::io::FromRawFd as _,

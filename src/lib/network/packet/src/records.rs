@@ -1330,7 +1330,6 @@ mod tests {
 ///
 /// [type-length-value]: https://en.wikipedia.org/wiki/Type-length-value
 pub mod options {
-    use core::convert::TryFrom;
     use core::mem;
     use core::num::{NonZeroUsize, TryFromIntError};
 

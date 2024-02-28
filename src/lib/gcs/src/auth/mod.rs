@@ -25,7 +25,6 @@ use {
     hyper::{Body, Method, Request},
     info::{CLIENT_ID, CLIENT_SECRET, OAUTH_REFRESH_TOKEN_ENDPOINT},
     serde::{Deserialize, Serialize},
-    serde_json,
     std::fmt,
 };
 

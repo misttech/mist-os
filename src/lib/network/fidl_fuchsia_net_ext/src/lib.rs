@@ -9,7 +9,6 @@ use std::fmt::Display;
 
 use fidl_fuchsia_net as fidl;
 
-use anyhow;
 use net_types::{ethernet, ip, Witness as _};
 use paste::paste;
 

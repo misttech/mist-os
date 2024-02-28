@@ -6,7 +6,7 @@ use {
     crate::synthesizer::*,
     anyhow::{format_err, Error},
     fidl_fuchsia_io as fio,
-    fidl_fuchsia_ui_input::{self, KeyboardReport, Touch},
+    fidl_fuchsia_ui_input::{KeyboardReport, Touch},
     fuchsia_component::client::{new_protocol_connector, new_protocol_connector_in_dir},
     keymaps::{
         inverse_keymap::{InverseKeymap, Shift},

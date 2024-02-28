@@ -14,7 +14,6 @@ use {
         KeyboardDescriptor, KeyboardInputDescriptor, MouseDescriptor, MouseInputDescriptor, Range,
         TouchDescriptor, TouchInputDescriptor, TouchType, Unit, UnitType, TOUCH_MAX_CONTACTS,
     },
-    std::convert::TryFrom,
 };
 
 // Use this to place required DeviceInfo into DeviceDescriptor.

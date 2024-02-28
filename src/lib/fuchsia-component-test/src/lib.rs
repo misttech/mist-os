@@ -5,7 +5,7 @@
 use {
     crate::{error::Error, local_component_runner::LocalComponentRunnerBuilder},
     anyhow::{format_err, Context as _},
-    cm_rust::{self, FidlIntoNative, NativeIntoFidl},
+    cm_rust::{FidlIntoNative, NativeIntoFidl},
     component_events::{events::Started, matcher::EventMatcher},
     fidl::endpoints::{
         self, create_proxy, ClientEnd, DiscoverableProtocolMarker, Proxy, ServerEnd, ServiceMarker,
@@ -1883,7 +1883,7 @@ mod tests {
         assert_matches::assert_matches,
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_component as fcomponent,
-        futures::{channel::mpsc, future::pending, FutureExt, SinkExt, StreamExt, TryStreamExt},
+        futures::{channel::mpsc, future::pending, SinkExt, StreamExt},
     };
 
     // To ensure that the expected value of any new member is explicitly

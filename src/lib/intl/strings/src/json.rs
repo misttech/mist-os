@@ -72,8 +72,7 @@ pub fn model_from_dictionaries(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::{Context, Result};
-    use intl_model::Model;
+    use anyhow::Context;
 
     #[test]
     fn build_from_dictionary() -> Result<()> {

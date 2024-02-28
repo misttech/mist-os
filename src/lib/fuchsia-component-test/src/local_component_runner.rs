@@ -12,7 +12,7 @@ use {
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
     fuchsia_component::DEFAULT_SERVICE_INSTANCE,
-    fuchsia_fs, fuchsia_zircon as zx,
+    fuchsia_zircon as zx,
     futures::{channel::oneshot, future::BoxFuture, lock::Mutex, select, FutureExt, TryStreamExt},
     runner::get_value as get_dictionary_value,
     std::{collections::HashMap, sync::Arc},
@@ -398,7 +398,7 @@ mod tests {
         assert_matches::assert_matches,
         fidl::endpoints::{create_proxy, Proxy as _},
         fuchsia_zircon::AsHandleRef,
-        futures::{channel::oneshot, future::pending, lock::Mutex},
+        futures::future::pending,
     };
 
     #[fuchsia::test]

@@ -21,11 +21,9 @@ use {
     },
     core::cell::RefCell,
     euclid::{point2, size2},
-    fuchsia_trace_provider,
     fuchsia_zircon::Event,
     std::collections::HashSet,
     std::collections::VecDeque,
-    std::convert::TryFrom,
     std::f32,
     std::rc::Rc,
 };

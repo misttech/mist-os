@@ -1495,7 +1495,6 @@ impl Controller {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
 
     use assert_matches::assert_matches;
     use const_unwrap::const_unwrap_option;

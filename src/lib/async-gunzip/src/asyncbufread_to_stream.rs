@@ -9,7 +9,6 @@
 
 use crate::asyncbufread_to_stream::flags::Flags;
 use crate::{ChunkStats, DecodeError, Error};
-use async_generator;
 use async_generator::Yield;
 use bytes::Bytes;
 use futures::pin_mut;

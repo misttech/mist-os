@@ -4,11 +4,8 @@
 
 use {
     anyhow::{Context, Result},
-    intl_model as model, libc, rust_icu_common as ucommon, rust_icu_sys as usys,
-    rust_icu_uloc as uloc,
+    intl_model as model, rust_icu_common as ucommon, rust_icu_sys as usys, rust_icu_uloc as uloc,
     std::collections::BTreeMap,
-    std::convert::From,
-    std::convert::TryFrom,
     std::ffi,
     std::fs,
     std::io,

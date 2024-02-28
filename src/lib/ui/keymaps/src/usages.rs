@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_input;
-
 /// Standard [USB HID] usages.
 ///
 /// [USB HID]: https://www.usb.org/sites/default/files/documents/hut1_12v2.pdf

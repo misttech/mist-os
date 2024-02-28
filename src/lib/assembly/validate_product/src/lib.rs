@@ -10,7 +10,7 @@ use camino::Utf8PathBuf;
 use fuchsia_pkg::PackageManifest;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use std::{collections::BTreeMap, fmt, fs::File, path::PathBuf};
-use version_history::{self, AbiRevision};
+use version_history::AbiRevision;
 
 /// Validate a product config.
 pub fn validate_product(

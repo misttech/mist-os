@@ -4,7 +4,6 @@
 
 use euclid::default::{Transform2D, Vector2D};
 use forma::{Color as FormaColor, GeomPresTransform, Order as FormaOrder};
-use std::convert::TryFrom;
 
 use crate::{
     color::Color,

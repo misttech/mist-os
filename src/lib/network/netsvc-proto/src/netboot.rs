@@ -15,10 +15,7 @@ use packet::{
     BufferView, FragmentedBytesMut, PacketBuilder, PacketConstraints, ParsablePacket,
     ParseMetadata, SerializeTarget,
 };
-use std::{
-    convert::{TryFrom, TryInto},
-    num::NonZeroU16,
-};
+use std::num::NonZeroU16;
 use zerocopy::{
     byteorder::little_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
 };
