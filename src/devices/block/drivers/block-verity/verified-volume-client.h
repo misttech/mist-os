@@ -7,6 +7,8 @@
 
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.verified/cpp/wire.h>
+#include <fidl/fuchsia.hardware.block/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/zx/channel.h>
 
 #include <fbl/unique_fd.h>
@@ -43,9 +45,9 @@ class VerifiedVolumeClient {
       Disposition disposition, const zx::duration& timeout);
 
   // Requests that the volume be opened for authoring.  If successful,
-  // `mutable_block_fd_out` will contain an open handle to the mutable block
-  // device.
-  zx_status_t OpenForAuthoring(const zx::duration& timeout, fbl::unique_fd& mutable_block_fd_out);
+  // a client connection to the mutable block device will be returned.
+  zx::result<fidl::ClientEnd<fuchsia_hardware_block::Block>> OpenForAuthoring(
+      const zx::duration& timeout);
 
   // Requests that any child device (mutable or verified) created by
   // `OpenForAuthoring` or `OpenForVerifiedRead` be unbound.
@@ -63,8 +65,8 @@ class VerifiedVolumeClient {
   // Requests that the volume be opened for verified reads, with the expectation
   // that the volume superblock matches the seal provided.  If successful,
   // `verified_block_fd_out` will contain a handle to the verified block device.
-  zx_status_t OpenForVerifiedRead(const digest::Digest& expected_seal, const zx::duration& timeout,
-                                  fbl::unique_fd& verified_block_fd_out);
+  zx::result<fidl::ClientEnd<fuchsia_hardware_block::Block>> OpenForVerifiedRead(
+      const digest::Digest& expected_seal, const zx::duration& timeout);
 
  private:
   fidl::ClientEnd<fuchsia_hardware_block_verified::DeviceManager> verity_chan_;

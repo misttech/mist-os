@@ -84,8 +84,8 @@ class BlockVerityTest : public zxtest::Test {
     vvc_ = std::move(verity).value();
   }
 
-  void OpenForAuthoring(fbl::unique_fd& mutable_block_fd) {
-    ASSERT_OK(vvc_->OpenForAuthoring(zx::duration::infinite(), mutable_block_fd));
+  zx::result<fidl::ClientEnd<fuchsia_hardware_block::Block>> OpenForAuthoring() {
+    return vvc_->OpenForAuthoring(zx::duration::infinite());
   }
 
   void CloseAndGenerateSeal(
@@ -93,12 +93,12 @@ class BlockVerityTest : public zxtest::Test {
     ASSERT_OK(vvc_->CloseAndGenerateSeal(seal_arena_, out));
   }
 
-  zx_status_t OpenForVerifiedRead(const fuchsia_hardware_block_verified::wire::Seal& expected_seal,
-                                  fbl::unique_fd& verified_block_fd) {
+  zx::result<fidl::ClientEnd<fuchsia_hardware_block::Block>> OpenForVerifiedRead(
+      const fuchsia_hardware_block_verified::wire::Seal& expected_seal) {
     uint8_t buf[block_verity::kHashOutputSize];
     memcpy(buf, expected_seal.sha256().superblock_hash.begin(), block_verity::kHashOutputSize);
     digest::Digest digest(buf);
-    return vvc_->OpenForVerifiedRead(digest, zx::duration::infinite(), verified_block_fd);
+    return vvc_->OpenForVerifiedRead(digest, zx::duration::infinite());
   }
 
   void Close() { ASSERT_OK(vvc_->Close()); }
@@ -140,17 +140,15 @@ TEST_F(BlockVerityTest, BasicWrites) {
   BindAndOpenVerityDeviceManager();
 
   // Open for authoring
-  fbl::unique_fd mutable_block_fd;
-  OpenForAuthoring(mutable_block_fd);
-  fdio_cpp::UnownedFdioCaller caller(mutable_block_fd);
+  zx::result<fidl::ClientEnd<fuchsia_hardware_block::Block>> mutable_block = OpenForAuthoring();
+  ASSERT_OK(mutable_block);
 
   // Zero out the underlying ramdisk.
   ZeroUnderlyingRamdisk();
 
   // Examine the size of the child device.  Expect it to be 8126 blocks, because
   // we've reserved 1 superblock and 65 integrity blocks of our 8192-block device.
-  const fidl::WireResult result =
-      fidl::WireCall(caller.borrow_as<fuchsia_hardware_block::Block>())->GetInfo();
+  const fidl::WireResult result = fidl::WireCall(mutable_block.value())->GetInfo();
   ASSERT_OK(result.status());
   const fit::result response = result.value();
   ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
@@ -167,8 +165,7 @@ TEST_F(BlockVerityTest, BasicWrites) {
     // Seek to start of block
     off_t offset = block * kBlockSize;
     // Verify read succeed
-    ASSERT_OK(BRead(caller.borrow_as<fuchsia_hardware_block::Block>(), read_buf.get(),
-                    read_buf.size(), offset));
+    ASSERT_OK(BRead(mutable_block.value(), read_buf.get(), read_buf.size(), offset));
     // Expect to read all zeroes.
     ASSERT_EQ(memcmp(zero_buf.get(), read_buf.get(), zero_buf.size()), 0);
   }
@@ -180,12 +177,10 @@ TEST_F(BlockVerityTest, BasicWrites) {
   }
 
   // Write the first block on the mutable device with that pattern.
-  ASSERT_OK(BWrite(caller.borrow_as<fuchsia_hardware_block::Block>(), write_buf.get(),
-                   write_buf.size(), 0));
+  ASSERT_OK(BWrite(mutable_block.value(), write_buf.get(), write_buf.size(), 0));
 
   // Read it back.
-  ASSERT_OK(
-      BRead(caller.borrow_as<fuchsia_hardware_block::Block>(), read_buf.get(), read_buf.size(), 0));
+  ASSERT_OK(BRead(mutable_block.value(), read_buf.get(), read_buf.size(), 0));
   ASSERT_EQ(memcmp(write_buf.get(), read_buf.get(), read_buf.size()), 0);
 
   // Find a block that matches from the underlying device.
@@ -221,8 +216,8 @@ TEST_F(BlockVerityTest, BasicSeal) {
   BindAndOpenVerityDeviceManager();
 
   // Open for authoring
-  fbl::unique_fd mutable_block_fd;
-  OpenForAuthoring(mutable_block_fd);
+  zx::result<fidl::ClientEnd<fuchsia_hardware_block::Block>> mutable_block = OpenForAuthoring();
+  ASSERT_OK(mutable_block);
 
   // Close and generate a seal over the all-zeroes data section.
   fuchsia_hardware_block_verified::wire::DeviceManagerCloseAndGenerateSealResponse result;
@@ -375,22 +370,18 @@ TEST_F(BlockVerityTest, SealAndVerifiedRead) {
   BindAndOpenVerityDeviceManager();
 
   // Open for authoring
-  fbl::unique_fd mutable_block_fd;
-  OpenForAuthoring(mutable_block_fd);
+  zx::result<fidl::ClientEnd<fuchsia_hardware_block::Block>> mutable_block = OpenForAuthoring();
+  ASSERT_OK(mutable_block);
 
   // Close and generate a seal over the all-zeroes data section.
   fuchsia_hardware_block_verified::wire::DeviceManagerCloseAndGenerateSealResponse seal_result;
   CloseAndGenerateSeal(&seal_result);
 
   const fuchsia_hardware_block_verified::wire::Seal& seal = seal_result.seal;
-  fbl::unique_fd verified_block_fd;
-  auto verified_block_channel = [&verified_block_fd]() {
-    fdio_cpp::UnownedFdioCaller verified_block_caller(verified_block_fd);
-    return verified_block_caller.borrow_as<fuchsia_hardware_block::Block>();
-  };
 
   // Prepare to read every block.
-  ASSERT_OK(OpenForVerifiedRead(seal, verified_block_fd));
+  zx::result verified_block = OpenForVerifiedRead(seal);
+  ASSERT_OK(verified_block);
 
   // Zero block that matches what we expect to read
   fbl::Array<uint8_t> zero_block(new uint8_t[kBlockSize], kBlockSize);
@@ -400,7 +391,7 @@ TEST_F(BlockVerityTest, SealAndVerifiedRead) {
 
   // Examine the size of the child device.  Expect it to be 8126 blocks, because
   // we've reserved 1 superblock and 65 integrity blocks of our 8192-block device.
-  const fidl::WireResult result = fidl::WireCall(verified_block_channel())->GetInfo();
+  const fidl::WireResult result = fidl::WireCall(verified_block.value())->GetInfo();
   ASSERT_OK(result.status());
   const fit::result response = result.value();
   ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
@@ -411,20 +402,20 @@ TEST_F(BlockVerityTest, SealAndVerifiedRead) {
   // Read all the blocks, and verify they're all zeroes.  Mark the buffer with
   // all 0xcc before each read to show that the reads are, in fact, doing work each
   // iteration.
-  for (uint64_t verified_block = 0; verified_block < info.block_count; verified_block++) {
+  for (uint64_t verified_block_ind = 0; verified_block_ind < info.block_count;
+       verified_block_ind++) {
     memset(read_buf.get(), 0xcc, kBlockSize);
-    off_t offset = verified_block * kBlockSize;
-    ASSERT_OK(BRead(verified_block_channel(), read_buf.get(), read_buf.size(), offset),
-              "read failed on block %lu", verified_block);
+    off_t offset = verified_block_ind * kBlockSize;
+    ASSERT_OK(BRead(verified_block.value(), read_buf.get(), read_buf.size(), offset),
+              "read failed on block %lu", verified_block_ind);
     EXPECT_EQ(0, memcmp(zero_block.get(), read_buf.get(), kBlockSize),
-              "verified data block %lu did not contain expected contents", verified_block);
+              "verified data block %lu did not contain expected contents", verified_block_ind);
   }
 
   // Writes should fail.  This is a readonly device.
-  ASSERT_NE(BWrite(verified_block_channel(), read_buf.get(), read_buf.size(), 0), ZX_OK);
+  ASSERT_NE(BWrite(verified_block.value(), read_buf.get(), read_buf.size(), 0), ZX_OK);
 
   Close();
-  verified_block_fd.release();
 
   fdio_cpp::UnownedFdioCaller caller(ramdisk_->devfs_root_fd());
   zx::result channel =
@@ -437,34 +428,34 @@ TEST_F(BlockVerityTest, SealAndVerifiedRead) {
   memset(one_block.get(), 0xff, kBlockSize);
   off_t data_start = kDataStartBlock * kBlockSize;
   ASSERT_OK(BWrite(channel.value(), one_block.get(), one_block.size(), data_start));
-  ASSERT_OK(OpenForVerifiedRead(seal, verified_block_fd));
+  verified_block = OpenForVerifiedRead(seal);
+  ASSERT_OK(verified_block);
 
   // Verify that attempting to read that block returns failure
-  ASSERT_NE(BRead(verified_block_channel(), read_buf.get(), read_buf.size(), 0), ZX_OK);
+  ASSERT_NE(BRead(verified_block.value(), read_buf.get(), read_buf.size(), 0), ZX_OK);
 
   // Verify that reading a different (uncorrupted) block still works.
-  ASSERT_OK(BRead(verified_block_channel(), read_buf.get(), read_buf.size(), kBlockSize));
+  ASSERT_OK(BRead(verified_block.value(), read_buf.get(), read_buf.size(), kBlockSize));
   Close();
-  verified_block_fd.release();
 
   // Corrupt an integrity block, and attempt to perform reads guarded by it.
   off_t integrity_start = kIntegrityStartBlock * kBlockSize;
   ASSERT_OK(BWrite(channel.value(), one_block.get(), one_block.size(), integrity_start));
-  ASSERT_OK(OpenForVerifiedRead(seal, verified_block_fd));
+  verified_block = OpenForVerifiedRead(seal);
+  ASSERT_OK(verified_block);
 
   // Verify that read of each block under that integrity block returns failure.
   for (uint64_t data_block = 0; data_block < kBlockSize / 32; data_block++) {
     off_t offset = data_block * kBlockSize;
-    ASSERT_NE(BRead(verified_block_channel(), read_buf.get(), read_buf.size(), offset), ZX_OK);
+    ASSERT_NE(BRead(verified_block.value(), read_buf.get(), read_buf.size(), offset), ZX_OK);
   }
 
   // Other block reads should succeed.  Try one.
   off_t first_uncorrupted_data_block = (kBlockSize / 32) * kBlockSize;
-  ASSERT_OK(BRead(verified_block_channel(), read_buf.get(), read_buf.size(),
-                  first_uncorrupted_data_block));
+  ASSERT_OK(
+      BRead(verified_block.value(), read_buf.get(), read_buf.size(), first_uncorrupted_data_block));
 
   Close();
-  verified_block_fd.release();
 
   // Attempt to open the superblock with a different seal.  Expect failure,
   // because the superblock hash doesn't match.
@@ -473,7 +464,8 @@ TEST_F(BlockVerityTest, SealAndVerifiedRead) {
   auto mangled_seal = fuchsia_hardware_block_verified::wire::Seal::WithSha256(
       fidl::ObjectView<fuchsia_hardware_block_verified::wire::Sha256Seal>::FromExternal(
           &mangled_sha256_seal));
-  ASSERT_EQ(ZX_ERR_IO_DATA_INTEGRITY, OpenForVerifiedRead(mangled_seal, verified_block_fd));
+  verified_block = OpenForVerifiedRead(mangled_seal);
+  ASSERT_EQ(verified_block.error_value(), ZX_ERR_IO_DATA_INTEGRITY);
 
   // Corrupt the superblock, then attempt to open the superblock with the last working seal.
   // Expect OpenForVerifiedRead to fail.
@@ -483,7 +475,8 @@ TEST_F(BlockVerityTest, SealAndVerifiedRead) {
   // Corrupt the root integrity hash.
   memset(superblock_buf.data() + 32, 0, 32);
   ASSERT_OK(BWrite(channel.value(), superblock_buf.get(), superblock_buf.size(), 0));
-  ASSERT_EQ(OpenForVerifiedRead(seal, verified_block_fd), ZX_ERR_IO_DATA_INTEGRITY);
+  verified_block = OpenForVerifiedRead(seal);
+  ASSERT_EQ(verified_block.error_value(), ZX_ERR_IO_DATA_INTEGRITY);
 }
 
 }  // namespace

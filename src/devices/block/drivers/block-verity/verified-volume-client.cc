@@ -107,8 +107,8 @@ zx::result<std::unique_ptr<VerifiedVolumeClient>> VerifiedVolumeClient::CreateFr
       std::move(devfs_root_fd)));
 }
 
-zx_status_t VerifiedVolumeClient::OpenForAuthoring(const zx::duration& timeout,
-                                                   fbl::unique_fd& mutable_block_fd_out) {
+zx::result<fidl::ClientEnd<fuchsia_hardware_block::Block>> VerifiedVolumeClient::OpenForAuthoring(
+    const zx::duration& timeout) {
   // make FIDL call to open in authoring mode
   fidl::Arena allocator;
 
@@ -121,10 +121,10 @@ zx_status_t VerifiedVolumeClient::OpenForAuthoring(const zx::duration& timeout,
                   .block_size(fuchsia_hardware_block_verified::wire::BlockSize::kSize4096)
                   .Build());
   if (open_resp.status() != ZX_OK) {
-    return open_resp.status();
+    return zx::error(open_resp.status());
   }
   if (open_resp->is_error()) {
-    return open_resp->error_value();
+    return open_resp->take_error();
   }
 
   // Compute path of expected `mutable` child device via relative topological path
@@ -132,7 +132,7 @@ zx_status_t VerifiedVolumeClient::OpenForAuthoring(const zx::duration& timeout,
   if (verity_path.is_error()) {
     printf("VerifiedVolumeClient: could not compute relative path: %s\n",
            verity_path.status_string());
-    return verity_path.error_value();
+    return verity_path.take_error();
   }
   fbl::String mutable_path = fbl::String::Concat({verity_path.value(), "/mutable"});
 
@@ -141,7 +141,7 @@ zx_status_t VerifiedVolumeClient::OpenForAuthoring(const zx::duration& timeout,
           device_watcher::RecursiveWaitForFile(devfs_root_fd_.get(), mutable_path.c_str(), timeout);
       channel.is_error()) {
     printf("VerifiedVolumeClient: mutable device failed to appear: %s\n", channel.status_string());
-    return channel.error_value();
+    return channel.take_error();
   }
 
   // Then wait for the `block` child of that mutable device
@@ -151,18 +151,13 @@ zx_status_t VerifiedVolumeClient::OpenForAuthoring(const zx::duration& timeout,
   if (channel.is_error()) {
     printf("VerifiedVolumeClient: mutable block device failed to appear: %s\n",
            channel.status_string());
-    return channel.error_value();
+    return channel.take_error();
   }
 
   // Open child device and return
-  if (zx_status_t status =
-          fdio_fd_create(channel.value().release(), mutable_block_fd_out.reset_and_get_address());
-      status != ZX_OK) {
-    printf("VerifiedVolumeClient: failed to open %s: %s\n", mutable_block_path.c_str(),
-           zx_status_get_string(status));
-    return status;
-  }
-  return ZX_OK;
+  fdio_cpp::UnownedFdioCaller caller(devfs_root_fd_.get());
+  return component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(),
+                                                             mutable_block_path);
 }
 
 zx_status_t VerifiedVolumeClient::Close() {
@@ -197,9 +192,9 @@ zx_status_t VerifiedVolumeClient::CloseAndGenerateSeal(
   return ZX_OK;
 }
 
-zx_status_t VerifiedVolumeClient::OpenForVerifiedRead(const digest::Digest& expected_seal,
-                                                      const zx::duration& timeout,
-                                                      fbl::unique_fd& verified_block_fd_out) {
+zx::result<fidl::ClientEnd<fuchsia_hardware_block::Block>>
+VerifiedVolumeClient::OpenForVerifiedRead(const digest::Digest& expected_seal,
+                                          const zx::duration& timeout) {
   // make FIDL call to open in authoring mode
   fidl::Arena allocator;
 
@@ -219,10 +214,10 @@ zx_status_t VerifiedVolumeClient::OpenForVerifiedRead(const digest::Digest& expe
                   fidl::ObjectView<fuchsia_hardware_block_verified::wire::Sha256Seal>::FromExternal(
                       &sha256_seal)));
   if (open_resp.status() != ZX_OK) {
-    return open_resp.status();
+    return zx::error(open_resp.status());
   }
   if (open_resp->is_error()) {
-    return open_resp->error_value();
+    return open_resp->take_error();
   }
 
   // Compute path of expected `verified` child device via relative topological path
@@ -230,7 +225,7 @@ zx_status_t VerifiedVolumeClient::OpenForVerifiedRead(const digest::Digest& expe
   if (verity_path.is_error()) {
     printf("VerifiedVolumeClient: could not compute relative path: %s\n",
            verity_path.status_string());
-    return verity_path.error_value();
+    return verity_path.take_error();
   }
   fbl::String verified_path = fbl::String::Concat({verity_path.value(), "/verified"});
 
@@ -239,7 +234,7 @@ zx_status_t VerifiedVolumeClient::OpenForVerifiedRead(const digest::Digest& expe
                                                                 verified_path.c_str(), timeout);
       channel.is_error()) {
     printf("VerifiedVolumeClient: verified device failed to appear: %s\n", channel.status_string());
-    return channel.error_value();
+    return channel.take_error();
   }
 
   // Then wait for the `block` child of that verified device
@@ -249,17 +244,12 @@ zx_status_t VerifiedVolumeClient::OpenForVerifiedRead(const digest::Digest& expe
   if (channel.is_error()) {
     printf("VerifiedVolumeClient: verified block device failed to appear: %s\n",
            channel.status_string());
-    return channel.error_value();
+    return channel.take_error();
   }
 
-  if (zx_status_t status =
-          fdio_fd_create(channel.value().release(), verified_block_fd_out.reset_and_get_address());
-      status != ZX_OK) {
-    printf("VerifiedVolumeClient: failed to open %s: %s\n", verified_block_path.c_str(),
-           zx_status_get_string(status));
-    return status;
-  }
-  return ZX_OK;
+  fdio_cpp::UnownedFdioCaller caller(devfs_root_fd_.get());
+  return component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(),
+                                                             verified_block_path);
 }
 
 }  // namespace block_verity
