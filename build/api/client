@@ -51,4 +51,4 @@ readonly fuchsia_dir="${script_dir}/../.."
 host_tag="$(fuchsia_host_tag)"
 readonly host_tag
 readonly python_prebuilt_dir="${fuchsia_dir}/prebuilt/third_party/python3/${host_tag}"
-exec "${python_prebuilt_dir}/bin/python3" -S "${script_dir}/client.py" "$@"
+exec "${python_prebuilt_dir}/bin/python3" -S "${script_dir}/client.py" "--host-tag=${host_tag}" "$@"

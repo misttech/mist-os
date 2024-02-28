@@ -5,6 +5,9 @@
 
 """A tool providing information about the Fuchsia build graph(s).
 
+This is not intended to be called directly by developers, but by
+specialized tools and scripts like `fx`, `ffx` and others.
+
 See https://fxbug.dev/42084664 for context.
 """
 
@@ -20,6 +23,55 @@ from typing import List, Sequence
 _SCRIPT_FILE = Path(__file__)
 _SCRIPT_DIR = _SCRIPT_FILE.parent
 _FUCHSIA_DIR = (_SCRIPT_DIR / ".." / "..").resolve()
+sys.path.insert(0, _SCRIPT_DIR)
+
+
+def _get_host_platform() -> str:
+    """Return host platform name, following Fuchsia conventions."""
+    if sys.platform == "linux":
+        return "linux"
+    elif sys.platform == "darwin":
+        return "mac"
+    else:
+        return os.uname().sysname
+
+
+def _get_host_arch() -> str:
+    """Return host CPU architecture, following Fuchsia conventions."""
+    host_arch = os.uname().machine
+    if host_arch == "x86_64":
+        return "x64"
+    elif host_arch.startswith(("armv8", "aarch64")):
+        return "arm64"
+    else:
+        return host_arch
+
+
+def _get_host_tag() -> str:
+    """Return host tag, following Fuchsia conventions."""
+    return "%s-%s" % (get_host_platform(), get_host_arch())
+
+
+def _warning(msg: str):
+    """Print a warning message to stderr."""
+    if sys.stderr.isatty():
+        print(f"\033[1;33mWARNING:\033[0m {msg}", file=sys.stderr)
+    else:
+        print(f"WARNING: {msg}", file=sys.stderr)
+
+
+def _error(msg: str):
+    """Print an error message to stderr."""
+    if sys.stderr.isatty():
+        print(f"\033[1;31mERROR:\033[0m {msg}", file=sys.stderr)
+    else:
+        print(f"ERROR: {msg}", file=sys.stderr)
+
+
+def _printerr(msg) -> int:
+    """Like _error() but returns 1."""
+    _error(msg)
+    return 1
 
 
 # NOTE: Do not use dataclasses because its import adds 20ms of startup time
@@ -43,6 +95,8 @@ class BuildApiModule:
 
 
 class BuildApiModuleList(object):
+    """Models the list of all build API module files."""
+
     def __init__(self, build_dir: Path):
         self._modules: List[BuildApiModule] = []
         self.list_path = build_dir / "build_api_client_info"
@@ -74,13 +128,64 @@ class BuildApiModuleList(object):
         return [m.name for m in self._modules]
 
 
-def printerr(msg, **kwargs) -> int:
-    """Like print() but sends output to sys.stderr by default, then return 1."""
-    if "file" in kwargs:
-        print("ERROR: " + msg, **kwargs)
-    else:
-        print("ERROR: " + msg, file=sys.stderr, **kwargs)
-    return 1
+class OutputsDatabase(object):
+    """Manage a lazily-created / updated NinjaOutputsTabular database.
+
+    Usage is:
+        1) Create instance.
+        2) Call load() to load the database from the Ninja build directory.
+        3) Call gn_label_to_paths() or path_to_gn_label() as many times
+           as needed.
+    """
+
+    def __init__(self):
+        self._database = None
+
+    def load(self, build_dir: Path) -> bool:
+        """Load the database from the given build directory.
+
+        This takes care of converting the ninja_outputs.json file generated
+        by GN into the more efficient tabular format, whenever this is needed.
+
+        Args:
+          build_dir: Ninja build directory.
+
+        Returns:
+          On success return True, on failure, print an error message to stderr
+          then return False.
+        """
+        json_file = build_dir / "ninja_outputs.json"
+        tab_file = build_dir / "ninja_outputs.tabular"
+        if not json_file.exists():
+            if tab_file.exists():
+                tab_file.unlink()
+            print(
+                f"ERROR: Missing Ninja outputs file: {json_file}",
+                file=sys.stderr,
+            )
+            return False
+
+        from gn_ninja_outputs import NinjaOutputsTabular as OutputsDatabase
+
+        self._database = OutputsDatabase()
+
+        if (
+            not tab_file.exists()
+            or tab_file.stat().st_mtime < json_file.stat().st_mtime
+        ):
+            # Re-generate database file when needed
+            self._database.load_from_json(json_file)
+            self._database.save_to_file(tab_file)
+        else:
+            # Load previously generated database.
+            self._database.load_from_file(tab_file)
+        return True
+
+    def gn_label_to_paths(self, label: str) -> List[str]:
+        return self._database.gn_label_to_paths(label)
+
+    def path_to_gn_label(self, path: str) -> str:
+        return self._database.path_to_gn_label(path)
 
 
 def get_build_dir(fuchsia_dir: Path) -> Path:
@@ -102,13 +207,13 @@ def cmd_print(args: argparse.Namespace) -> int:
     """Implement the `print` command."""
     module = args.modules.find(args.api_name)
     if not module:
-        return printerr(
+        return _printerr(
             f"Unknown build API module name {args.api_name}, must be one of:\n\n %s\n"
             % "\n ".join(args.modules.names())
         )
 
     if not module.path.exists():
-        return printerr(
+        return _printerr(
             f"Missing input file, please use `fx set` or `fx gen` command: {module.path}"
         )
 
@@ -136,8 +241,112 @@ def cmd_print_all(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ninja_path_to_gn_label(args: argparse.Namespace) -> int:
+    """Implement the `ninja_path_to_gn_label` command."""
+    outputs = OutputsDatabase()
+    if not outputs.load(args.build_dir):
+        return 1
+
+    failure = False
+    labels = set()
+    for path in args.paths:
+        label = outputs.path_to_gn_label(path)
+        if not label:
+            print(
+                f"ERROR: Unknown Ninja target path: {path}",
+                file=sys.stderr,
+            )
+            failure = True
+            continue
+
+        labels.add(label)
+
+    if failure:
+        return 1
+
+    print("\n".join(sorted(labels)))
+    return 0
+
+
+def _get_target_cpu(build_dir: Path) -> str:
+    args_json_path = build_dir / "args.json"
+    if not args_json_path.exists():
+        return "unknown_cpu"
+    import json
+
+    args_json = json.load(args_json_path.open())
+    if not isinstance(args_json, dict):
+        return "unknown_cpu"
+    return args_json.get("target_cpu", "unknown_cpu")
+
+
+def cmd_gn_label_to_ninja_paths(args: argparse.Namespace) -> int:
+    """Implement the `gn_label_to_ninja_paths` command."""
+    outputs = OutputsDatabase()
+    if not outputs.load(args.build_dir):
+        return 1
+
+    failure = False
+    all_paths = []
+    for label in args.labels:
+        paths = outputs.gn_label_to_paths(label)
+        if not paths:
+            _error(f"Unknown GN label: {label}")
+            failure = True
+            continue
+        all_paths.extend(paths)
+
+    if failure:
+        return 1
+
+    for path in sorted(all_paths):
+        print(path)
+    return 0
+
+
+def cmd_fx_build_args_to_labels(args: argparse.Namespace) -> int:
+    outputs = OutputsDatabase()
+    if not outputs.load(args.build_dir):
+        return 1
+
+    from gn_labels import GnLabelQualifier
+
+    host_cpu = args.host_tag.split("-")[1]
+    target_cpu = _get_target_cpu(args.build_dir)
+    qualifier = GnLabelQualifier(host_cpu, target_cpu)
+
+    failure = False
+
+    def ninja_path_to_gn_label(path: str) -> str:
+        label = outputs.path_to_gn_label(path)
+        if label:
+            label_args = qualifier.label_to_build_args(label)
+            _warning(
+                f"Use '{' '.join(label_args)}' instead of Ninja path '{path}'"
+            )
+            return label
+
+        _error(f"Unknown Ninja path: {path}")
+        nonlocal failure
+        failure = True
+        return ""
+
+    qualifier.set_ninja_path_to_gn_label(ninja_path_to_gn_label)
+
+    labels = qualifier.build_args_to_labels(args.args)
+    if failure:
+        return 1
+
+    for label in labels:
+        print(label)
+
+    return 0
+
+
 def main(main_args: Sequence[str]) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawTextHelpFormatter
+    )
     parser.add_argument(
         "--fuchsia-dir",
         default=_FUCHSIA_DIR,
@@ -149,17 +358,25 @@ def main(main_args: Sequence[str]) -> int:
         type=Path,
         help="Specify Ninja build directory.",
     )
-
-    subparsers = parser.add_subparsers(required=True, help="sub-command help")
-    print_parser = subparsers.add_parser(
-        "print", help="Print build API module content"
+    parser.add_argument(
+        "--host-tag",
+        help="Host platform tag, using Fuchsia conventions (auto-detected).",
+        # NOTE: Do not set a default with _get_host_tag() here for fastser startup,
+        # since the //build/api/client wrapper script will always set this option.
     )
-    print_parser.add_argument("api_name", help="Name of build API module")
+    subparsers = parser.add_subparsers(required=True, help="sub-command help.")
+    print_parser = subparsers.add_parser(
+        "print",
+        help="Print build API module content.",
+        description="Print the content of a given build API module, given its name. "
+        "Use the 'list' command to print the list of all available names.",
+    )
+    print_parser.add_argument("api_name", help="Name of build API module.")
     print_parser.set_defaults(func=cmd_print)
 
     print_all_parser = subparsers.add_parser(
         "print_all",
-        help="Print single JSON containing the content of all build API modules",
+        help="Print single JSON containing the content of all build API modules.",
     )
     print_all_parser.add_argument(
         "--pretty", action="store_true", help="Pretty print the JSON output."
@@ -167,9 +384,50 @@ def main(main_args: Sequence[str]) -> int:
     print_all_parser.set_defaults(func=cmd_print_all)
 
     list_parser = subparsers.add_parser(
-        "list", help="Print list of all build API modules"
+        "list",
+        help="Print list of all build API module names.",
+        description="Print list of all build API module names.",
     )
     list_parser.set_defaults(func=cmd_list)
+
+    ninja_path_to_gn_label_parser = subparsers.add_parser(
+        "ninja_path_to_gn_label",
+        help="Print the GN label of a given Ninja output path.",
+    )
+    ninja_path_to_gn_label_parser.add_argument(
+        "paths",
+        metavar="NINJA_PATH",
+        nargs="+",
+        help="Ninja output path, relative to the build directory.",
+    )
+    ninja_path_to_gn_label_parser.set_defaults(func=cmd_ninja_path_to_gn_label)
+
+    gn_label_to_ninja_paths_parser = subparsers.add_parser(
+        "gn_label_to_ninja_paths",
+        help="Print the Ninja output paths of one or more GN labels.",
+        description="Print the Ninja output paths of one or more GN labels.",
+    )
+    gn_label_to_ninja_paths_parser.add_argument(
+        "labels",
+        metavar="GN_LABEL",
+        nargs="+",
+        help="A qualified GN label (begins with //, may include full toolchain suffix).",
+    )
+    gn_label_to_ninja_paths_parser.set_defaults(
+        func=cmd_gn_label_to_ninja_paths
+    )
+
+    fx_build_args_to_labels_parser = subparsers.add_parser(
+        "fx_build_args_to_labels",
+        help="Parse fx build arguments into qualified GN labels.",
+        description="Convert a series of `fx build` arguments into a list of fully qualified GN labels.",
+    )
+    fx_build_args_to_labels_parser.add_argument(
+        "--args", required=True, nargs=argparse.REMAINDER
+    )
+    fx_build_args_to_labels_parser.set_defaults(
+        func=cmd_fx_build_args_to_labels
+    )
 
     args = parser.parse_args(main_args)
 
@@ -177,13 +435,16 @@ def main(main_args: Sequence[str]) -> int:
         args.build_dir = get_build_dir(args.fuchsia_dir)
 
     if not args.build_dir.exists():
-        return printerr(
-            "Could not locate build directory, please use `fx set` command or use --build-dir=DIR",
+        return _printerr(
+            "Could not locate build directory, please use `fx set` command or use --build-dir=DIR.",
         )
+
+    if not args.host_tag:
+        args.host_tag = get_host_tag()
 
     args.modules = BuildApiModuleList(args.build_dir)
     if args.modules.empty():
-        return printerr(
+        return _printerr(
             f"Missing input file, did you run `fx gen` or `fx set`?: {args.modules.list_path}"
         )
 

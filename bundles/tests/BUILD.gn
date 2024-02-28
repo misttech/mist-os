@@ -6,6 +6,7 @@ group("tests") {
   testonly = true
   public_deps = [
     "//build:tests",
+    "//build/api:tests",
     "//bundles/fidl:tests",
     "//bundles/packages/tests:all",
     "//examples:tests",

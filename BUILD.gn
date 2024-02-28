@@ -1819,6 +1819,9 @@ group("host") {
     # build configuration.
     "//bundles/tools/shac:shac_tools",
 
+    # Host tests for //build/api/client
+    "//build/api:tests",
+
     # Tools & tests added by the developer
     ":developer_host_tools",
   ]
