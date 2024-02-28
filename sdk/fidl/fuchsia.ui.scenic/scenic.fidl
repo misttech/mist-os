@@ -75,7 +75,6 @@ closed protocol Scenic {
     ///
     /// The response acknowledges the request to create a Session, but actual
     /// creation may happen later.
-    @transitional
     strict CreateSessionT(resource struct {
         endpoints SessionEndpoints;
     }) -> ();
@@ -104,7 +103,6 @@ closed protocol Scenic {
     /// Returns whether the clients should use [`fuchsia.ui.composition/Flatland`] protocol to
     /// interact with Scenic instead.
     // TODO(https://fxbug.dev/42142792): Remove after Flatland migration is completed.
-    @transitional
     strict UsesFlatland() -> (struct {
         flatland_enabled bool;
     });

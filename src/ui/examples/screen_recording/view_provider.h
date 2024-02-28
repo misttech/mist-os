@@ -27,13 +27,18 @@ using BouncingSquare = struct {
   fuchsia::math::SizeU size;
 };
 
-class ViewProviderImpl : fuchsia::ui::app::ViewProvider {
+class ViewProviderImpl final : fuchsia::ui::app::ViewProvider {
  public:
-  ViewProviderImpl(sys::ComponentContext* component_context);
+  explicit ViewProviderImpl(sys::ComponentContext* component_context);
   ~ViewProviderImpl() override;
 
   // |fuchsia::ui::app::ViewProvider|
   void CreateView2(fuchsia::ui::app::CreateView2Args args) override;
+  void CreateViewWithViewRef(zx::eventpair token,
+                             fuchsia::ui::views::ViewRefControl view_ref_control,
+                             fuchsia::ui::views::ViewRef view_ref) override {
+    ZX_PANIC("Not Implemented");
+  }
 
  private:
   void DrawSquare();

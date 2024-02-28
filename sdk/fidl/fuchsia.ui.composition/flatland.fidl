@@ -530,7 +530,6 @@ closed protocol Flatland {
 
     /// Identical to [`CreateView`], except it allows association of View identity (ViewRef) and
     /// view-bound protocols.
-    @transitional
     strict CreateView2(resource struct {
         /// A typed wrapper for a channel, representing the child endpoint of the connection
         /// between two Flatland instances.
@@ -751,7 +750,6 @@ closed protocol Flatland {
     /// Calling this function replaces any previous values set on this Transform. To reset a
     /// Transform to "no hit testing": send an empty vector with [`SetHitRegions`].
     @available(added=10)
-    @transitional
     strict SetInfiniteHitRegion(struct {
         transform_id TransformId;
         hit_test HitTestInteraction;

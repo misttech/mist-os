@@ -30,7 +30,6 @@ closed protocol ViewProvider {
     ///
     /// `view_ref_control` must not have the ZX_RIGHT_DUPLICATE set, or view creation
     /// will fail.
-    @transitional
     @available(deprecated=13)
     strict CreateViewWithViewRef(resource struct {
         token zx.Handle:EVENTPAIR;
@@ -43,7 +42,6 @@ closed protocol ViewProvider {
     /// The args are provided as a table, for forward compatibility.  See documentation on the
     /// individual table fields.
     // TODO(https://fxbug.dev/42162471): Rename this to `CreateView()`.
-    @transitional
     strict CreateView2(resource struct {
         args CreateView2Args;
     });

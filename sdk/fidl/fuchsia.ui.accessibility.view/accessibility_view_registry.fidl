@@ -69,7 +69,6 @@ closed protocol Registry {
     ///
     /// - ZX_ERR_PEER_CLOSED, if Scenic fails creating the accessibility `Viewport`.
     ///
-    @transitional
     strict CreateAccessibilityViewport(resource struct {
         viewport_creation_token fuchsia.ui.views.ViewportCreationToken;
     }) -> (resource struct {

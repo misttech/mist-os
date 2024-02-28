@@ -37,7 +37,7 @@ namespace fui = fuchsia::ui::input;
 namespace fup = fuchsia::ui::policy;
 namespace futc = fuchsia::ui::test::conformance;
 
-class ButtonsListener : public fup::MediaButtonsListener {
+class ButtonsListener final : public fup::MediaButtonsListener {
  public:
   ButtonsListener() : binding_(this) {}
 
@@ -45,6 +45,9 @@ class ButtonsListener : public fup::MediaButtonsListener {
   void OnEvent(fui::MediaButtonsEvent event, OnEventCallback callback) override {
     events_received_.push_back(std::move(event));
     callback();
+  }
+  void OnMediaButtonsEvent(fuchsia::ui::input::MediaButtonsEvent event) override {
+    ZX_PANIC("Not Implemented");
   }
   // Returns a client end bound to this object.
   fidl::InterfaceHandle<fup::MediaButtonsListener> NewBinding() { return binding_.NewBinding(); }

@@ -26,7 +26,7 @@
 namespace touch_flatland_client {
 
 // Implementation of a simple scenic client using the Flatland API.
-class TouchFlatlandClient : public fuchsia::ui::app::ViewProvider {
+class TouchFlatlandClient final : public fuchsia::ui::app::ViewProvider {
  public:
   TouchFlatlandClient(async::Loop* loop) : loop_(loop), view_provider_binding_(this) {
     FX_CHECK(loop_);
@@ -85,6 +85,12 @@ class TouchFlatlandClient : public fuchsia::ui::app::ViewProvider {
 
     // Listen for pointer events.
     touch_source_->Watch({}, fit::bind_member(this, &TouchFlatlandClient::Watch));
+  }
+
+  void CreateViewWithViewRef(zx::eventpair token,
+                             fuchsia::ui::views::ViewRefControl view_ref_control,
+                             fuchsia::ui::views::ViewRef view_ref) override {
+    ZX_PANIC("Not Implemented");
   }
 
  private:

@@ -46,8 +46,8 @@ closed protocol Keyboard {
 /// and wait for the client under test to report back that it received the injected
 /// text via fuchsia.ui.test.input.KeyboardInputListener.
 ///
-/// NOTE: This protocol is implemented by OOT code. When adding new methods here
-/// the methods MUST be annotated with `@transitional` at introduction time.
+/// NOTE: This protocol is implemented by OOT code. Use versioning to make changes
+/// to this protocol.
 @discoverable
 closed protocol KeyboardInputListener {
     /// Notify that the client is ready to receive text input. Clients that need

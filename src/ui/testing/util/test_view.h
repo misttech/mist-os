@@ -46,8 +46,8 @@ class TestViewAccess {
   fxl::WeakPtr<TestView> test_view_{};
 };
 
-class TestView : public fuchsia::ui::app::ViewProvider,
-                 public component_testing::LocalComponentImpl {
+class TestView final : public fuchsia::ui::app::ViewProvider,
+                       public component_testing::LocalComponentImpl {
  public:
   enum class ContentType {
     // Draws a green rect in the view.
@@ -87,6 +87,11 @@ class TestView : public fuchsia::ui::app::ViewProvider,
 
   // |fuchsia.ui.app.ViewProvider|
   void CreateView2(fuchsia::ui::app::CreateView2Args args) override;
+  void CreateViewWithViewRef(zx::eventpair token,
+                             fuchsia::ui::views::ViewRefControl view_ref_control,
+                             fuchsia::ui::views::ViewRef view_ref) override {
+    ZX_PANIC("Not Implemented");
+  }
 
   // Add a child view!
   // The viewport will have side length of 1/4 our side length and will be centered in our view.

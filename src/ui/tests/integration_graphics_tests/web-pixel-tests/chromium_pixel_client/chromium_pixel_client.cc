@@ -71,7 +71,7 @@ class NavListener : public fuchsia::web::NavigationEventListener {
 };
 
 // Implements a simple web app.
-class WebApp : public fuchsia::ui::app::ViewProvider {
+class WebApp final : public fuchsia::ui::app::ViewProvider {
  public:
   WebApp()
       : loop_(&kAsyncLoopConfigAttachToCurrentThread),
@@ -194,7 +194,8 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
                             [](auto result) { FX_CHECK(!result.is_err()); });
   }
 
-  // TODO(https://fxbug.dev/42055424): Remove this function when async::Loop provides support for RunLoopUntil().
+  // TODO(https://fxbug.dev/42055424): Remove this function when async::Loop provides support for
+  // RunLoopUntil().
   template <typename PredicateT>
   void RunLoopUntil(PredicateT predicate) {
     while (!predicate()) {
@@ -249,6 +250,11 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
     web_frame_->CreateView2(std::move(args2));
   }
 
+  void CreateViewWithViewRef(zx::eventpair token,
+                             fuchsia::ui::views::ViewRefControl view_ref_control,
+                             fuchsia::ui::views::ViewRef view_ref) override {
+    ZX_PANIC("Not Implemented");
+  }
   async::Loop loop_;
   std::unique_ptr<sys::ComponentContext> context_;
   fidl::Binding<fuchsia::ui::app::ViewProvider> view_provider_binding_;

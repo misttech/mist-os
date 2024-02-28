@@ -91,7 +91,6 @@ closed protocol InputMethodEditor {
 
     // TODO(https://fxbug.dev/42152248)
     @available(deprecated=8, note="Instead, use `fuchsia.ui.input3.KeyEventInjector`")
-    @transitional
     strict DispatchKey3(struct {
         event fuchsia.ui.input3.KeyEvent;
     }) -> (struct {
