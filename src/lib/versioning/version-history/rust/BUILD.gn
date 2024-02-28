@@ -14,7 +14,6 @@ rustc_library("version-history") {
     "proc-macro/shared:version-history-shared",
     "//third_party/rust_crates:itertools",
   ]
-  test_deps = [ "//third_party/rust_crates:proptest" ]
 
   sources = [ "src/lib.rs" ]
 

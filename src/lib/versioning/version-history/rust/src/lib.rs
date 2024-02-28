@@ -8,28 +8,6 @@ use itertools::Itertools;
 
 pub use version_history_shared::Status;
 
-/// VERSION_HISTORY is an array of all the known SDK versions.  It is guaranteed
-/// (at compile-time) by the proc_macro to be non-empty.
-///
-/// Deprecated. Use [HISTORY] instead.
-///
-/// TODO: https://fxbug.dev/326104955 - Delete this.
-pub const VERSION_HISTORY: &[Version] = &version_history_macro::declare_version_history!();
-
-/// LATEST_VERSION is the latest known SDK version.
-///
-/// Deprecated. Use [HISTORY] instead.
-///
-/// TODO: https://fxbug.dev/326104955 - Delete this.
-pub const LATEST_VERSION: &Version = &version_history_macro::latest_sdk_version!();
-
-/// SUPPORTED_API_LEVELS are the supported API levels.
-///
-/// Deprecated. Use [HISTORY] instead.
-///
-/// TODO: https://fxbug.dev/326104955 - Delete this.
-pub const SUPPORTED_API_LEVELS: &[Version] = &version_history_macro::get_supported_versions!();
-
 /// Global [VersionHistory] instance generated at build-time from the contents
 /// of `//sdk/version_history.json`.
 pub const HISTORY: VersionHistory =
@@ -175,76 +153,11 @@ pub struct Version {
 impl Version {
     /// Returns true if this version is supported - that is, whether components
     /// targeting this version will be able to run on this device.
-    ///
-    /// TODO: https://fxbug.dev/326104955 - Make this private.
-    pub fn is_supported(&self) -> bool {
+    fn is_supported(&self) -> bool {
         match self.status {
             Status::InDevelopment | Status::Supported => true,
             Status::Unsupported => false,
         }
-    }
-}
-
-/// TODO: https://fxbug.dev/326104955 - Delete this.
-pub fn version_from_abi_revision(abi_revision: AbiRevision) -> Option<Version> {
-    // TODO(https://fxbug.dev/42068452): Store APIs and ABIs in a map instead of a list.
-    VERSION_HISTORY.iter().find(|v| v.abi_revision == abi_revision).cloned()
-}
-
-/// Returns true if the given abi_revision is listed in the VERSION_HISTORY of
-/// known SDK versions.
-///
-/// TODO: https://fxbug.dev/326104955 - Delete this.
-pub fn is_valid_abi_revision(abi_revision: AbiRevision) -> bool {
-    version_from_abi_revision(abi_revision).is_some()
-}
-
-/// Returns true if the given abi_revision is listed in SUPPORTED_API_LEVELS.
-///
-/// TODO: https://fxbug.dev/326104955 - Delete this.
-pub fn is_supported_abi_revision(abi_revision: AbiRevision) -> bool {
-    if let Some(version) = version_from_abi_revision(abi_revision) {
-        version.is_supported()
-    } else {
-        false
-    }
-}
-
-/// Returns a vector of the ABI revisions in SUPPORTED_API_LEVELS.
-///
-/// TODO: https://fxbug.dev/326104955 - Delete this.
-pub fn get_supported_abi_revisions() -> Vec<AbiRevision> {
-    let mut abi_revisions: Vec<AbiRevision> = Vec::new();
-    for version in SUPPORTED_API_LEVELS {
-        abi_revisions.push(version.abi_revision);
-    }
-
-    return abi_revisions;
-}
-
-/// TODO: https://fxbug.dev/326104955 - Delete this.
-pub fn get_latest_abi_revision() -> AbiRevision {
-    return LATEST_VERSION.abi_revision;
-}
-
-/// TODO: https://fxbug.dev/326104955 - Delete this.
-pub fn check_abi_revision(abi_revision: Option<AbiRevision>) -> Result<(), AbiRevisionError> {
-    let abi_revision = abi_revision.ok_or(AbiRevisionError::Absent)?;
-
-    if let Some(version) = version_from_abi_revision(abi_revision) {
-        if version.is_supported() {
-            Ok(())
-        } else {
-            Err(AbiRevisionError::Unsupported {
-                version,
-                supported_versions: SUPPORTED_API_LEVELS.to_vec(),
-            })
-        }
-    } else {
-        Err(AbiRevisionError::Unknown {
-            abi_revision,
-            supported_versions: SUPPORTED_API_LEVELS.to_vec(),
-        })
     }
 }
 
@@ -465,61 +378,6 @@ The following API levels are supported: {}",
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proptest::prelude::*;
-
-    // Helper to convert from the shared crate's Version struct to this crate's
-    // struct.
-    fn version_history_from_shared() -> Vec<Version> {
-        version_history_shared::version_history()
-            .unwrap()
-            .into_iter()
-            .map(|v| Version {
-                api_level: ApiLevel::from_u64(v.api_level),
-                abi_revision: AbiRevision::from_u64(v.abi_revision.value),
-                status: v.status,
-            })
-            .collect::<Vec<_>>()
-    }
-
-    #[test]
-    fn test_proc_macro_worked() {
-        let expected = version_history_from_shared();
-        assert_eq!(expected, VERSION_HISTORY);
-    }
-
-    #[test]
-    fn test_latest_version_proc_macro() {
-        let shared_versions = version_history_from_shared();
-        let expected = shared_versions.last().expect("version_history_shared was empty");
-        assert_eq!(expected, &version_history_macro::latest_sdk_version!());
-    }
-
-    #[test]
-    fn test_valid_abi_revision() {
-        for version in VERSION_HISTORY {
-            assert!(is_valid_abi_revision(version.abi_revision));
-        }
-    }
-
-    #[test]
-    fn test_is_supported_abi_revision() {
-        for version in SUPPORTED_API_LEVELS {
-            assert!(is_supported_abi_revision(version.abi_revision));
-        }
-    }
-
-    // To ensure this test doesn't flake, proptest is used to generate u64
-    // values which are not in the current VERSION_HISTORY list.
-    proptest! {
-        #[test]
-        fn test_invalid_abi_revision(u in any::<u64>().prop_filter("using u64 that isn't in VERSION_HISTORY", |u|
-            // The randomly chosen 'abi_revision' must not equal any of the
-            // abi_revisions in the VERSION_HISTORY list.
-            VERSION_HISTORY.iter().all(|v| v.abi_revision != AbiRevision::from_u64(*u))
-        )) {
-            assert!(!is_valid_abi_revision(AbiRevision::from_u64(u)))
-        }
-    }
 
     pub const FAKE_VERSION_HISTORY: VersionHistory = VersionHistory {
         versions: &[
@@ -546,8 +404,22 @@ mod tests {
         ],
     };
 
+    // Helper to convert from the shared crate's Version struct to this crate's
+    // struct.
+    fn version_history_from_shared() -> Vec<Version> {
+        version_history_shared::version_history()
+            .unwrap()
+            .into_iter()
+            .map(|v| Version {
+                api_level: ApiLevel::from_u64(v.api_level),
+                abi_revision: AbiRevision::from_u64(v.abi_revision.value),
+                status: v.status,
+            })
+            .collect::<Vec<_>>()
+    }
+
     #[test]
-    fn test_proc_macro_worked2() {
+    fn test_proc_macro_worked() {
         let expected = version_history_from_shared();
         assert_eq!(expected, HISTORY.versions);
     }
