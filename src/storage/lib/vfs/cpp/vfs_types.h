@@ -296,9 +296,21 @@ class VnodeAttributesUpdate {
 
 #ifdef __Fuchsia__
 
-// Converts an io2 Representation to an io1 NodeInfoDeprecated.
-fuchsia_io::wire::NodeInfoDeprecated ConvertToIoV1NodeInfo(
-    fidl::AnyArena& arena, fuchsia_io::Representation representation);
+// Represents an fuchsia.io/OnRepresentation response. Used instead of |fuchsia_io::Representation|
+// directly to prevent extra heap allocations when making wire calls.
+using VnodeRepresentation =
+#if __Fuchsia_API_level__ < 18
+    std::variant<fuchsia_io::ConnectorInfo, fuchsia_io::DirectoryInfo, fuchsia_io::FileInfo>;
+#else
+    std::variant<fuchsia_io::ConnectorInfo, fuchsia_io::DirectoryInfo, fuchsia_io::FileInfo,
+                 fuchsia_io::SymlinkInfo>;
+#endif
+
+// Consume an io2 |representation|, and convert to equivalent |fuchsia_io::wire::NodeInfoDeprecated|
+// to be handled with |handler|. A callback is used to avoid lifetime issues, which would require
+// use of an arena if the value were to be returned.
+void HandleAsNodeInfoDeprecated(VnodeRepresentation representation,
+                                fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated)> handler);
 
 #endif  // __Fuchsia__
 

@@ -380,28 +380,21 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
   // Send an |fuchsia.io/OnOpen| event if requested. At this point we know the connection is either
   // a Node connection, or a File/Directory that composes the node protocol.
   if (options->flags.describe) {
-    fidl::Arena arena;
-    zx::result<fio::wire::NodeInfoDeprecated> info;
-    {
-      zx::result<fuchsia_io::Representation> result = connection->NodeGetRepresentation();
-      if (result.is_ok()) {
-        info = zx::ok(ConvertToIoV1NodeInfo(arena, std::move(*result)));
-      } else {
-        info = result.take_error();
-      }
-    }
-    if (info.is_error()) {
+    zx::result representation = connection->NodeGetRepresentation();
+    if (representation.is_error()) {
       // Ignore errors since there is nothing we can do if this fails.
       [[maybe_unused]] fidl::Status status =
-          fidl::WireSendEvent(node)->OnOpen(info.status_value(), fio::wire::NodeInfoDeprecated());
-      return info.status_value();
+          fidl::WireSendEvent(node)->OnOpen(representation.status_value(), {});
+      return representation.status_value();
     }
-    // We ignore the error and continue here in case the far end has queued open requests and
-    // immediately closed the connection.  If the caller is doing that, they shouldn't have used
-    // the describe flag, but there have been cases where this happened in the past and so we
-    // preserve that behaviour for now.
-    [[maybe_unused]] fidl::Status status =
-        fidl::WireSendEvent(node)->OnOpen(ZX_OK, std::move(*info));
+
+    fs::HandleAsNodeInfoDeprecated(*std::move(representation), [&node](auto info) {
+      // We ignore any errors sending the OnOpen event. Even if there are errors below, it's
+      // possible that a client may have already sent messages into the channel and closed their end
+      // without processing the response.
+      [[maybe_unused]] fidl::Status status =
+          fidl::WireSendEvent(node)->OnOpen(ZX_OK, std::move(info));
+    });
   }
 
   return RegisterConnection(std::move(connection), node.TakeChannel());

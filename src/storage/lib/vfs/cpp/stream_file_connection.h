@@ -26,7 +26,7 @@ class StreamFileConnection final : public FileConnection {
 
   ~StreamFileConnection() final = default;
 
-  zx::result<fuchsia_io::Representation> NodeGetRepresentation() const final;
+  zx::result<fs::VnodeRepresentation> NodeGetRepresentation() const final;
 
  private:
   //

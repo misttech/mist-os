@@ -4,7 +4,7 @@
 
 #include "src/storage/lib/vfs/cpp/file_connection.h"
 
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/zx/handle.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -59,7 +59,7 @@ void FileConnection::Query(QueryCompleter::Sync& completer) {
   completer.Reply(Connection::NodeQuery());
 }
 
-zx::result<fuchsia_io::Representation> FileConnection::NodeGetRepresentation() const {
+zx::result<fs::VnodeRepresentation> FileConnection::NodeGetRepresentation() const {
   fuchsia_io::FileInfo info;
   zx::result<zx::event> observer = vnode()->GetObserver();
   if (observer.is_ok()) {
@@ -67,7 +67,7 @@ zx::result<fuchsia_io::Representation> FileConnection::NodeGetRepresentation() c
   } else if (observer.error_value() != ZX_ERR_NOT_SUPPORTED) {
     return observer.take_error();
   }
-  return zx::ok(fuchsia_io::Representation::WithFile(std::move(info)));
+  return zx::ok(std::move(info));
 }
 
 void FileConnection::Describe(DescribeCompleter::Sync& completer) {
@@ -76,15 +76,10 @@ void FileConnection::Describe(DescribeCompleter::Sync& completer) {
     completer.Close(representation.status_value());
     return;
   }
+  fuchsia_io::FileInfo* info = std::get_if<fuchsia_io::FileInfo>(&*representation);
+  ZX_DEBUG_ASSERT(info);
   fidl::Arena arena;
-  auto builder = fio::wire::FileInfo::Builder(arena);
-  if (representation->file()->observer().has_value()) {
-    builder.observer(std::move(*representation->file()->observer()));
-  }
-  if (representation->file()->stream().has_value()) {
-    builder.stream(std::move(*representation->file()->stream()));
-  }
-  completer.Reply(builder.Build());
+  completer.Reply(fidl::ToWire(arena, std::move(*info)));
 }
 
 void FileConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {

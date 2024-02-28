@@ -76,7 +76,7 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   void StartDispatching(zx::channel channel, OnUnbound on_unbound);
 
   // Get the representation of this connection.
-  virtual zx::result<fuchsia_io::Representation> NodeGetRepresentation() const = 0;
+  virtual zx::result<fs::VnodeRepresentation> NodeGetRepresentation() const = 0;
 
   fbl::RefPtr<fs::Vnode>& vnode() { return vnode_; }
   const fbl::RefPtr<fs::Vnode>& vnode() const { return vnode_; }

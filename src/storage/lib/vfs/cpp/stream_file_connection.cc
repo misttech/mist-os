@@ -228,18 +228,19 @@ zx::result<> StreamFileConnection::SetFlagsInternal(fuchsia_io::wire::OpenFlags 
   return status;
 }
 
-zx::result<fuchsia_io::Representation> StreamFileConnection::NodeGetRepresentation() const {
-  zx::result<fuchsia_io::Representation> representation = FileConnection::NodeGetRepresentation();
+zx::result<fs::VnodeRepresentation> StreamFileConnection::NodeGetRepresentation() const {
+  zx::result representation = FileConnection::NodeGetRepresentation();
   if (representation.is_error()) {
     return representation.take_error();
   }
-  ZX_ASSERT(representation->Which() == fuchsia_io::Representation::Tag::kFile);
+  fuchsia_io::FileInfo* info = std::get_if<fuchsia_io::FileInfo>(&*representation);
+  ZX_DEBUG_ASSERT(info);
   if (vnode()->SupportsClientSideStreams()) {
-    zx::stream stream;
-    if (zx_status_t status = stream_.duplicate(ZX_RIGHT_SAME_RIGHTS, &stream); status != ZX_OK) {
+    info->stream() = zx::stream{};
+    if (zx_status_t status = stream_.duplicate(ZX_RIGHT_SAME_RIGHTS, &*info->stream());
+        status != ZX_OK) {
       return zx::error(status);
     }
-    representation->file()->stream() = std::move(stream);
   }
   return representation;
 }

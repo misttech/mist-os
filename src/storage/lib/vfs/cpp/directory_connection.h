@@ -25,8 +25,8 @@ class DirectoryConnection final : public Connection,
 
   ~DirectoryConnection() final;
 
-  zx::result<fuchsia_io::Representation> NodeGetRepresentation() const final {
-    return zx::ok(fuchsia_io::Representation::WithDirectory({}));
+  zx::result<fs::VnodeRepresentation> NodeGetRepresentation() const final {
+    return zx::ok(fuchsia_io::DirectoryInfo{});
   }
 
  private:
