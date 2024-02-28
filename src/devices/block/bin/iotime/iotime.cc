@@ -79,8 +79,9 @@ static zx::duration iotime_posix(int is_read, fbl::unique_fd fd, size_t total_io
   return t1 - t0;
 }
 
-static zx::duration iotime_block(int is_read, fbl::unique_fd fd, size_t total_io_size,
-                                 size_t buffer_size) {
+static zx::duration iotime_block(int is_read,
+                                 fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block_client,
+                                 size_t total_io_size, size_t buffer_size) {
   if ((total_io_size % 4096) || (buffer_size % 4096)) {
     fprintf(stderr, "error: total_io_size and buffer_size must be multiples of 4K\n");
     return zx::duration::infinite();
@@ -92,23 +93,20 @@ static zx::duration iotime_block(int is_read, fbl::unique_fd fd, size_t total_io
     return zx::duration::infinite();
   }
 
-  fdio_cpp::UnownedFdioCaller disk_connection(fd);
-  fidl::UnownedClientEnd channel = disk_connection.borrow_as<fuchsia_hardware_block::Block>();
-
   size_t bytes_remaining = total_io_size;
   const zx::time t0 = zx::clock::get_monotonic();
   while (bytes_remaining > 0) {
     size_t transfer_size = std::min(buffer_size, bytes_remaining);
 
     if (is_read) {
-      zx_status_t status = block_client::SingleReadBytes(channel, buffer.get(), transfer_size,
+      zx_status_t status = block_client::SingleReadBytes(block_client, buffer.get(), transfer_size,
                                                          total_io_size - bytes_remaining);
       if (status != ZX_OK) {
         fprintf(stderr, "error: failed SingleReadBytes() call: %s\n", zx_status_get_string(status));
         return zx::duration::infinite();
       }
     } else {
-      zx_status_t status = block_client::SingleWriteBytes(channel, buffer.get(), transfer_size,
+      zx_status_t status = block_client::SingleWriteBytes(block_client, buffer.get(), transfer_size,
                                                           total_io_size - bytes_remaining);
       if (status != ZX_OK) {
         fprintf(stderr, "error: failed SingleWriteBytes() call: %s\n",
@@ -213,6 +211,7 @@ int main(int argc, char** argv) {
 
   storage::RamDisk ramdisk;
   fbl::unique_fd fd;
+  zx::duration io_duration;
   if (device == "--ramdisk") {
     if (mode != "block") {
       fprintf(stderr, "ramdisk only supported for block\n");
@@ -228,36 +227,25 @@ int main(int argc, char** argv) {
     ramdisk = std::move(result.value());
     zx_handle_t handle = ramdisk_get_block_interface(ramdisk.client());
     fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block(handle);
-    // TODO(https://fxbug.dev/42063787): this relies on multiplexing.
-    zx::result cloned = component::Clone(block, component::AssumeProtocolComposesNode);
-    if (cloned.is_error()) {
-      fprintf(stderr, "error: cannot create ramdisk fd: %s\n", cloned.status_string());
-      return EXIT_FAILURE;
-    }
-    if (zx_status_t status =
-            fdio_fd_create(cloned.value().TakeChannel().release(), fd.reset_and_get_address());
-        status != ZX_OK) {
-      fprintf(stderr, "error: cannot create ramdisk fd: %s\n", zx_status_get_string(status));
-      return EXIT_FAILURE;
-    }
+    io_duration = iotime_block(is_read, block, total_io_size, buffer_size);
   } else {
     fd.reset(open(device.c_str(), is_read ? O_RDONLY : O_WRONLY));
     if (fd.get() < 0) {
       fprintf(stderr, "error: cannot open '%s': %s\n", device.c_str(), strerror(errno));
       return EXIT_FAILURE;
     }
-  }
-
-  zx::duration io_duration;
-  if (mode == "posix") {
-    io_duration = iotime_posix(is_read, std::move(fd), total_io_size, buffer_size);
-  } else if (mode == "block") {
-    io_duration = iotime_block(is_read, std::move(fd), total_io_size, buffer_size);
-  } else if (mode == "fifo") {
-    io_duration = iotime_fifo(device.c_str(), is_read, std::move(fd), total_io_size, buffer_size);
-  } else {
-    fprintf(stderr, "error: unsupported mode '%s'\n", mode.c_str());
-    return EXIT_FAILURE;
+    if (mode == "posix") {
+      io_duration = iotime_posix(is_read, std::move(fd), total_io_size, buffer_size);
+    } else if (mode == "block") {
+      fdio_cpp::UnownedFdioCaller disk_connection(fd);
+      fidl::UnownedClientEnd channel = disk_connection.borrow_as<fuchsia_hardware_block::Block>();
+      io_duration = iotime_block(is_read, channel, total_io_size, buffer_size);
+    } else if (mode == "fifo") {
+      io_duration = iotime_fifo(device.c_str(), is_read, std::move(fd), total_io_size, buffer_size);
+    } else {
+      fprintf(stderr, "error: unsupported mode '%s'\n", mode.c_str());
+      return EXIT_FAILURE;
+    }
   }
 
   if (io_duration == zx::duration::infinite()) {
