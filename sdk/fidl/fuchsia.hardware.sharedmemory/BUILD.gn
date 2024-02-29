@@ -10,4 +10,5 @@ fidl("fuchsia.hardware.sharedmemory") {
     "//sdk/fidl/fuchsia.mem",
     "//zircon/vdso/zx",
   ]
+  sdk_category = "internal"
 }

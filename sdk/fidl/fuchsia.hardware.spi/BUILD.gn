@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.spi") {
   sources = [ "spi.fidl" ]
+  sdk_category = "internal"
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.sharedmemory",
