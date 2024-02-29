@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use once_cell::sync::Lazy;
 use starnix_logging::track_stub;
 use ubpf::{BpfHelper, FunctionSignature, Type};
 
@@ -40,37 +41,39 @@ extern "C" fn bpf_map_delete_elem(
     -1
 }
 
-pub static BPF_HELPERS: &'static [BpfHelper] = &[
-    BpfHelper {
-        index: MAP_LOOKUP_ELEM_INDEX,
-        name: MAP_LOOKUP_ELEM_NAME,
-        function_pointer: bpf_map_lookup_elem as *mut std::os::raw::c_void,
-        signature: FunctionSignature {
-            args: &[Type::ConstPtrToMap, Type::ConstMapKey { map_ptr_index: 0 }],
-            return_value: Type::NullOr(&Type::ConstMapValue { map_ptr_index: 0 }),
+pub static BPF_HELPERS: Lazy<Vec<BpfHelper>> = Lazy::new(|| {
+    vec![
+        BpfHelper {
+            index: MAP_LOOKUP_ELEM_INDEX,
+            name: MAP_LOOKUP_ELEM_NAME,
+            function_pointer: bpf_map_lookup_elem as *mut std::os::raw::c_void,
+            signature: FunctionSignature {
+                args: &[Type::ConstPtrToMapParameter, Type::MapKeyParameter { map_ptr_index: 0 }],
+                return_value: Type::NullOr(Box::new(Type::MapValueParameter { map_ptr_index: 0 })),
+            },
         },
-    },
-    BpfHelper {
-        index: MAP_UPDATE_ELEM_INDEX,
-        name: MAP_UPDATE_ELEM_NAME,
-        function_pointer: bpf_map_update_elem as *mut std::os::raw::c_void,
-        signature: FunctionSignature {
-            args: &[
-                Type::ConstPtrToMap,
-                Type::ConstMapKey { map_ptr_index: 0 },
-                Type::ConstMapValue { map_ptr_index: 0 },
-                Type::ScalarValue,
-            ],
-            return_value: Type::ScalarValue,
+        BpfHelper {
+            index: MAP_UPDATE_ELEM_INDEX,
+            name: MAP_UPDATE_ELEM_NAME,
+            function_pointer: bpf_map_update_elem as *mut std::os::raw::c_void,
+            signature: FunctionSignature {
+                args: &[
+                    Type::ConstPtrToMapParameter,
+                    Type::MapKeyParameter { map_ptr_index: 0 },
+                    Type::MapValueParameter { map_ptr_index: 0 },
+                    Type::ScalarValueParameter,
+                ],
+                return_value: Type::unknown_written_scalar_value(),
+            },
         },
-    },
-    BpfHelper {
-        index: MAP_DELETE_ELEM_INDEX,
-        name: MAP_DELETE_ELEM_NAME,
-        function_pointer: bpf_map_delete_elem as *mut std::os::raw::c_void,
-        signature: FunctionSignature {
-            args: &[Type::ConstPtrToMap, Type::ConstMapKey { map_ptr_index: 0 }],
-            return_value: Type::ScalarValue,
+        BpfHelper {
+            index: MAP_DELETE_ELEM_INDEX,
+            name: MAP_DELETE_ELEM_NAME,
+            function_pointer: bpf_map_delete_elem as *mut std::os::raw::c_void,
+            signature: FunctionSignature {
+                args: &[Type::ConstPtrToMapParameter, Type::MapKeyParameter { map_ptr_index: 0 }],
+                return_value: Type::unknown_written_scalar_value(),
+            },
         },
-    },
-];
+    ]
+});

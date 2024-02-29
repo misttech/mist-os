@@ -83,7 +83,7 @@ impl Program {
         let vm = (|| {
             // TODO(https://fxbug.dev/323503929): Only register helper function associated with the
             // type of the bpf program.
-            for helper in BPF_HELPERS {
+            for helper in BPF_HELPERS.iter() {
                 builder.register(helper)?;
             }
             let mut logger = BufferVeriferLogger::new(logger);
@@ -166,16 +166,22 @@ impl BufferVeriferLogger<'_> {
 impl VerifierLogger for BufferVeriferLogger<'_> {
     fn log(&mut self, line: &[u8]) {
         debug_assert!(line.is_ascii());
-        debug_assert!(line[line.len() - 1] == b'\n');
 
         if self.full {
             return;
         }
-        if line.len() > self.buffer.available() {
+        if line.len() + 1 > self.buffer.available() {
             self.full = true;
             return;
         }
         match self.buffer.write(line) {
+            Err(e) => {
+                log_warn!("Unable to write verifier log: {e:?}");
+                self.full = true;
+            }
+            _ => {}
+        }
+        match self.buffer.write(b"\n") {
             Err(e) => {
                 log_warn!("Unable to write verifier log: {e:?}");
                 self.full = true;

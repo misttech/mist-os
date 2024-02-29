@@ -27,8 +27,11 @@ rustc_library("ubpf") {
 
   deps = [
     "//src/starnix/lib/linux_uapi",
+    "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:libc",
+    "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:zerocopy",
     "//third_party/ubpf",
   ]
 

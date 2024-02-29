@@ -27,6 +27,7 @@ PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
   --explicit-padding \
   --allowlist-function "ubpf_.*" \
   --allowlist-item "EBPF_.*" \
+  --allowlist-item "UBPF_.*" \
   --raw-line "${RAW_LINES}" \
   -o src/starnix/lib/ubpf/src/ubpf.rs \
   src/starnix/lib/ubpf/wrapper.h \

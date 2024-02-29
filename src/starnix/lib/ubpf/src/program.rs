@@ -5,7 +5,9 @@
 use crate::{
     converter::cbpf_to_ebpf,
     ubpf::{ubpf_create, ubpf_destroy, ubpf_exec, ubpf_load, ubpf_register, ubpf_vm},
-    verifier::{verify, CallingContext, FunctionSignature, NullVerifierLogger, VerifierLogger},
+    verifier::{
+        verify, CallingContext, FunctionSignature, NullVerifierLogger, Type, VerifierLogger,
+    },
     MapSchema, UbpfError,
     UbpfError::*,
 };
@@ -52,6 +54,10 @@ impl UbpfVmBuilder {
 
     pub fn register_map_reference(&mut self, pc: usize, schema: MapSchema) {
         self.calling_context.register_map_reference(pc, schema);
+    }
+
+    pub fn set_args(&mut self, args: &[Type]) {
+        self.calling_context.set_args(args);
     }
 
     // This function signature will need more parameters eventually. The client needs to be able to
@@ -128,6 +134,11 @@ unsafe impl Send for UbpfVm {}
 unsafe impl Sync for UbpfVm {}
 
 impl UbpfVm {
+    /// Executes the current program on the provided data.  Warning: If
+    /// this program was a cbpf program, and it uses BPF_MEM, the
+    /// scratch memory must be provided by the caller to this
+    /// function.  The translated CBPF program will use the last 16
+    /// words of |data|.
     pub fn run<T>(&self, data: &mut T) -> Result<u64, i32> {
         let data_size: usize = std::mem::size_of::<T>();
         let mut bpf_return_value: u64 = 0;
@@ -148,10 +159,15 @@ impl UbpfVm {
     }
 
     /// This method instantiates an UbpfVm given a cbpf original.
-    pub fn from_cbpf(bpf_code: &[sock_filter]) -> Result<Self, UbpfError> {
-        // Convert the sock_filter to ebpf
+    pub fn from_cbpf<T>(bpf_code: &[sock_filter]) -> Result<Self, UbpfError> {
         let code = cbpf_to_ebpf(bpf_code)?;
-        let builder = UbpfVmBuilder::new()?;
+        let buffer_size = std::mem::size_of::<T>() as u64;
+        let mut builder = UbpfVmBuilder::new()?;
+        builder.set_args(&[
+            Type::default(),
+            Type::PtrToMemory { id: 0, offset: 0, buffer_size },
+            Type::from(buffer_size),
+        ]);
         builder.load(code, &mut NullVerifierLogger)
     }
 }
@@ -233,7 +249,7 @@ mod test {
             sock_filter { code: BPF_RET_K, jt: 0, jf: 0, k: SECCOMP_RET_ALLOW },
         ];
 
-        let prg = EbpfProgram::from_cbpf(&test_prg).expect("Error parsing program");
+        let prg = EbpfProgram::from_cbpf::<seccomp_data>(&test_prg).expect("Error parsing program");
 
         with_prg_assert_result(
             &prg,
@@ -307,7 +323,8 @@ mod test {
                 sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
             ];
 
-            let prg = EbpfProgram::from_cbpf(&test_prg).expect("Error parsing program");
+            let prg =
+                EbpfProgram::from_cbpf::<seccomp_data>(&test_prg).expect("Error parsing program");
 
             with_prg_assert_result(
                 &prg,
@@ -333,7 +350,8 @@ mod test {
                 sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
             ];
 
-            let prg = EbpfProgram::from_cbpf(&test_prg).expect("Error parsing program");
+            let prg =
+                EbpfProgram::from_cbpf::<seccomp_data>(&test_prg).expect("Error parsing program");
 
             with_prg_assert_result(
                 &prg,

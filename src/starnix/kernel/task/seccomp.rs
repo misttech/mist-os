@@ -113,7 +113,7 @@ impl SeccompFilter {
             }
         }
 
-        match EbpfProgram::from_cbpf(code) {
+        match EbpfProgram::from_cbpf::<seccomp_data>(code) {
             Ok(program) => Ok(SeccompFilter {
                 program,
                 unique_id: maybe_unique_id,
