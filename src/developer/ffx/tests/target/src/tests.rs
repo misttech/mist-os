@@ -68,7 +68,9 @@ async fn test_target_flash_gigaboot(ctx: TestContext) {
 #[fixture(emulator_fixture)]
 #[fuchsia::test]
 // TODO(https://fxbug.dev/42080558): test skipped when kernel won't fit for x86 UEFI
-#[cfg_attr(feature = "big_zircon_kernel", ignore)]
+// #[cfg_attr(feature = "big_zircon_kernel", ignore)]
+// Disabling due to infrequent timeout flakes.
+#[ignore]
 async fn test_target_flash_from_product(ctx: TestContext) {
     let isolate = ctx.isolate();
     isolate.start_daemon().await.unwrap();
