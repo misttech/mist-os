@@ -207,7 +207,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/common/x64-common.gni:73
+From //boards/common/x64-common.gni:70
 
 **Overridden from the default:** `""`
 
@@ -227,7 +227,7 @@ From //build/images/vbmeta.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/common/x64-common.gni:71
+From //boards/common/x64-common.gni:68
 
 **Overridden from the default:** `""`
 
@@ -421,7 +421,7 @@ From //build/images/filesystem_limits.gni:17
 
 **Current value for `target_cpu = "x64"`:** `10485760000`
 
-From //boards/common/x64-common.gni:75
+From //boards/common/x64-common.gni:72
 
 **Overridden from the default:** `false`
 
@@ -876,7 +876,7 @@ From //build/images/args.gni:30
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:79
+From //boards/common/x64-common.gni:76
 
 **Overridden from the default:** `false`
 
@@ -4496,7 +4496,7 @@ From //build/images/filesystem_limits.gni:12
 
 **Current value for `target_cpu = "x64"`:** `5216665600`
 
-From //boards/common/x64-common.gni:77
+From //boards/common/x64-common.gni:74
 
 **Overridden from the default:** `false`
 
@@ -5252,7 +5252,7 @@ From //build/board.gni:94
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/common/x64-common.gni:67
+From //boards/common/x64-common.gni:64
 
 **Overridden from the default:** `[]`
 
@@ -5273,7 +5273,7 @@ From //build/board.gni:93
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/common/x64-common.gni:66
+From //boards/common/x64-common.gni:63
 
 **Overridden from the default:** `false`
 
@@ -7294,7 +7294,7 @@ From //sdk/config.gni:13
 
 Identifier for the Core SDK.
 
-**Current value (from the default):** `"18.99991231.0.1"`
+**Current value (from the default):** `"19.99991231.0.1"`
 
 From //sdk/config.gni:7
 
@@ -8132,7 +8132,7 @@ From //build/images/args.gni:27
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:80
+From //boards/common/x64-common.gni:77
 
 **Overridden from the default:** `false`
 
@@ -8298,7 +8298,7 @@ From //build/images/vbmeta.gni:14
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:69
+From //boards/common/x64-common.gni:66
 
 **Overridden from the default:** `false`
 
