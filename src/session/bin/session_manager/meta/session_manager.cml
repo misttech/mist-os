@@ -67,10 +67,16 @@
         {
             config: "fuchsia.session.SessionUrl",
             config_key: "session_url",
+            type: "string",
+            max_size: 512,
         },
         {
+            // If `session_url` is non-empty and `autolaunch` is true,
+            // `session_manager` will automatically launch the given `session_url`
+            // on device startup.
             config: "fuchsia.session.AutoLaunch",
             config_key: "autolaunch",
+            type: "bool",
         },
     ],
     offer: [
@@ -541,15 +547,4 @@
             from: "self",
         },
     ],
-    config: {
-        session_url: {
-            type: "string",
-            max_size: 512,
-        },
-
-        // If `session_url` is non-empty and `autolaunch` is true,
-        // `session_manager` will automatically launch the given `session_url`
-        // on device startup.
-        autolaunch: { type: "bool" },
-    },
 }

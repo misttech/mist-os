@@ -586,6 +586,39 @@ This supports the following additional fields:
     [availability][/docs/concepts/components/v2/capabilities/availability.md] documentation.
 - `config_key`: (_optional `string`_) (`config` only) The configuration key in the component's `config` block that this capability
     will set.
+- `type`: (_optional `string`_) (`config` only) The type of configuration, one of:
+    - `bool`: Boolean type.
+    - `uint8`: Unsigned 8 bit type.
+    - `uint16`: Unsigned 16 bit type.
+    - `uint32`: Unsigned 32 bit type.
+    - `uint64`: Unsigned 64 bit type.
+    - `int8`: Signed 8 bit type.
+    - `int16`: Signed 16 bit type.
+    - `int32`: Signed 32 bit type.
+    - `int64`: Signed 64 bit type.
+    - `string`: ASCII string type.
+    - `vector`: Vector type. See `element` for the type of the element within the vector
+- `max_size`: (_optional `non-zero number`_) (`configuration` only) Only supported if this configuration `type` is 'string'.
+    This is the max size of the string.
+- `max_count`: (_optional `non-zero number`_) (`configuration` only) Only supported if this configuration `type` is 'vector'.
+    This is the max number of elements in the vector.
+- `element`: (_optional `object`_) (`configuration` only) Only supported if this configuration `type` is 'vector'.
+    This is the type of the elements in the configuration vector.
+
+    Example (simple type):
+
+    ```json5
+    { type: "uint8" }
+    ```
+
+    Example (string type):
+
+    ```json5
+    {
+      type: "string",
+      max_size: 100,
+    }
+    ```
 
 Example:
 

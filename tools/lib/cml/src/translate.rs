@@ -28,7 +28,7 @@ use {
 };
 
 /// Options for CML compilation. Uses the builder pattern.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct CompileOptions<'a> {
     file: Option<PathBuf>,
     config_package_path: Option<String>,
@@ -139,19 +139,7 @@ pub fn compile(
             .map(|env| translate_environments(&options, env, &all_capability_names))
             .transpose()?,
         facets: document.facets.clone().map(dictionary_from_nested_map).transpose()?,
-        config: document
-            .config
-            .as_ref()
-            .map(|c| {
-                if let Some(p) = options.config_package_path {
-                    Ok(translate_config(c, &p))
-                } else {
-                    Err(Error::invalid_args(
-                        "can't translate config: no package path for value file",
-                    ))
-                }
-            })
-            .transpose()?,
+        config: translate_config(&document.config, &document.r#use, &options.config_package_path)?,
         ..Default::default()
     };
 
@@ -1138,17 +1126,52 @@ fn translate_value_type(
     )
 }
 
-/// Translates a map of [`String`] -> [`ConfigValueType`] to a [`fuchsia.sys2.Config`]
+/// Create the `fdecl::ConfigSchema` from the fields of the `config` block and the config capability
+/// Use decls.
 fn translate_config(
-    fields: &BTreeMap<ConfigKey, ConfigValueType>,
-    package_path: &str,
-) -> fdecl::ConfigSchema {
+    fields: &Option<BTreeMap<ConfigKey, ConfigValueType>>,
+    uses: &Option<Vec<Use>>,
+    package_path: &Option<String>,
+) -> Result<Option<fdecl::ConfigSchema>, Error> {
+    let mut use_fields: BTreeMap<ConfigKey, ConfigValueType> = uses
+        .iter()
+        .flatten()
+        .map(|u| {
+            if u.config.is_none() {
+                return None;
+            }
+            let key = ConfigKey(u.config_key.clone().expect("key should be set").into());
+            let config_type =
+                validate::use_config_to_value_type(u).expect("config type should be valid");
+            Some((key, config_type))
+        })
+        .flatten()
+        .collect();
+    for (key, value) in fields.iter().flatten() {
+        if use_fields.contains_key(key) {
+            if use_fields.get(key) != Some(&value) {
+                return Err(Error::validate(format!(
+                    "Config error: `use` and `config` block contain key '{}' with different types",
+                    key
+                )));
+            }
+        }
+        use_fields.insert(key.clone(), value.clone());
+    }
+    let fields = use_fields;
+    if fields.is_empty() {
+        return Ok(None);
+    }
+    let Some(package_path) = package_path.as_ref() else {
+        return Err(Error::invalid_args("can't translate config: no package path for value file"));
+    };
+
     let mut fidl_fields = vec![];
 
     // Compute a SHA-256 hash from each field
     let mut hasher = Sha256::new();
 
-    for (key, value) in fields {
+    for (key, value) in &fields {
         let (type_, mutability) = translate_value_type(value);
 
         fidl_fields.push(fdecl::ConfigField {
@@ -1166,13 +1189,13 @@ fn translate_config(
     let hash = hasher.finalize();
     let checksum = fdecl::ConfigChecksum::Sha256(*hash.as_ref());
 
-    fdecl::ConfigSchema {
+    Ok(Some(fdecl::ConfigSchema {
         fields: Some(fidl_fields),
         checksum: Some(checksum),
         // for now we only support ELF components that look up config by package path
         value_source: Some(fdecl::ConfigValueSource::PackagePath(package_path.to_owned())),
         ..Default::default()
-    }
+    }))
 }
 
 fn translate_environments(
@@ -2882,7 +2905,6 @@ mod tests {
                         "path": "/event_stream/another",
                     },
                     { "runner": "usain", "from": "parent", },
-                    { "config": "fuchsia.config.Config",  "config_key" : "my_config", "from" : "self" }
                 ],
                 "capabilities": [
                     {
@@ -3051,13 +3073,6 @@ mod tests {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
                         ..Default::default()
                     }),
-                    fdecl::Use::Config(fdecl::UseConfiguration {
-                        source_name: Some("fuchsia.config.Config".to_string()),
-                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
-                        target_name: Some("my_config".to_string()),
-                        availability: Some(fdecl::Availability::Required),
-                        ..Default::default()
-                    })
                 ]),
                 collections:Some(vec![
                     fdecl::Collection{
@@ -3097,6 +3112,7 @@ mod tests {
                         ..Default::default()
                     },
                 ]),
+                config: None,
                 ..default_component_decl()
             },
         },
@@ -5554,6 +5570,70 @@ mod tests {
             compile(&input, CompileOptions::default()),
             Err(Error::Validate { err, .. })
             if &err == "Protocol(s) [\"fuchsia.logger.LogSink\"] offered to \"all\" multiple times"
+        );
+    }
+
+    #[test]
+    fn test_compile_use_config() {
+        let input = must_parse_cml!({
+            "use": [
+                    {
+                        "config": "fuchsia.config.Config",
+                        "config_key" : "my_config",
+                        "type": "bool",
+                    }
+            ],
+        });
+        let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
+        let options = CompileOptions::new().config_package_path("fake.cvf").features(&features);
+        let actual = compile(&input, options).unwrap();
+        assert_eq!(
+            actual.uses.unwrap(),
+            vec![fdecl::Use::Config(fdecl::UseConfiguration {
+                source_name: Some("fuchsia.config.Config".to_string()),
+                source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                target_name: Some("my_config".to_string()),
+                availability: Some(fdecl::Availability::Required),
+                ..Default::default()
+            })]
+        );
+        assert_eq!(
+            actual.config.unwrap().fields.unwrap(),
+            [fdecl::ConfigField {
+                key: Some("my_config".to_string()),
+                type_: Some(fdecl::ConfigType {
+                    layout: fdecl::ConfigTypeLayout::Bool,
+                    parameters: Some(vec![]),
+                    constraints: vec![],
+                }),
+                mutability: Some(fdecl::ConfigMutability::default()),
+                ..Default::default()
+            }]
+            .to_vec(),
+        );
+    }
+
+    #[test]
+    fn test_compile_use_config_optional_bad_type() {
+        let input = must_parse_cml!({
+            "use": [
+                    {
+                        "config": "fuchsia.config.Config",
+                        "config_key" : "my_config",
+                        "type": "bool",
+                        "availability": "optional",
+                    }
+            ],
+        "config": {
+            "my_config": { "type": "int8"},
+        }
+        });
+        let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
+        let options = CompileOptions::new().config_package_path("fake.cvf").features(&features);
+        assert_matches!(
+            compile(&input, options),
+            Err(Error::Validate { err, .. })
+            if &err == "Use and config block differ on type for key 'my_config'"
         );
     }
 }

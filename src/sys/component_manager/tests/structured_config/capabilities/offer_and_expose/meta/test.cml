@@ -14,9 +14,7 @@
             from: "parent",
             config: "fuchsia.config.MyConfig",
             config_key: "my_flag",
+            type: "bool",
         },
     ],
-    config: {
-        my_flag: { type: "bool" },
-    },
 }

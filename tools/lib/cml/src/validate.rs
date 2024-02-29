@@ -6,7 +6,7 @@ use {
     crate::{
         features::{Feature, FeatureSet},
         offer_to_all_would_duplicate, AnyRef, Availability, Capability, CapabilityClause,
-        CapabilityFromRef, CapabilityId, Child, Collection, ConfigKey, ConfigValueType,
+        CapabilityFromRef, CapabilityId, Child, Collection, ConfigKey, ConfigType, ConfigValueType,
         DependencyType, DictionaryRef, Disable, Document, Environment, EnvironmentExtends,
         EnvironmentRef, Error, EventScope, Expose, ExposeFromRef, ExposeToRef, FromClause, Name,
         Offer, OfferFromRef, OfferToRef, OneOrMany, Program, RegistrationRef, Rights,
@@ -243,9 +243,7 @@ impl<'a> ValidationContext<'a> {
         }
 
         // Validate "config"
-        if let Some(config) = &self.document.config {
-            self.validate_config(config)?;
-        }
+        self.validate_config(&self.document.config)?;
 
         // Check for dependency cycles
         match strong_dependencies.topological_sort() {
@@ -492,6 +490,13 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                     config
                 )));
             }
+            if use_.config_key == None {
+                return Err(Error::validate(format!(
+                    "Config '{}' missing field 'config_key'",
+                    config
+                )));
+            }
+            let _ = use_config_to_value_type(use_)?;
         }
 
         if let Some(source) = DependencyNode::use_from_ref(use_.from.as_ref()) {
@@ -1509,9 +1514,57 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         }
     }
 
-    fn validate_config(&self, fields: &BTreeMap<ConfigKey, ConfigValueType>) -> Result<(), Error> {
+    fn validate_config(
+        &self,
+        fields: &Option<BTreeMap<ConfigKey, ConfigValueType>>,
+    ) -> Result<(), Error> {
+        // If we `use` a config capability optionally then it has to exist in the `config` block.
+        // Collect the names of the keys here.
+        let optional_use_keys: BTreeMap<ConfigKey, ConfigValueType> = self
+            .document
+            .r#use
+            .iter()
+            .flatten()
+            .map(|u| {
+                if u.config == None {
+                    return None;
+                }
+                if u.availability != Some(Availability::Optional) {
+                    return None;
+                }
+                let key = ConfigKey(u.config_key.clone().expect("key should be set").into());
+                let value = use_config_to_value_type(u).expect("config type should be valid");
+                Some((key, value))
+            })
+            .flatten()
+            .collect();
+
+        let Some(fields) = fields else {
+            if !optional_use_keys.is_empty() {
+                return Err(Error::validate(
+                    "'config' section is empty but there are optional config uses",
+                ));
+            }
+            return Ok(());
+        };
+
         if fields.is_empty() {
             return Err(Error::validate("'config' section is empty"));
+        }
+
+        for (key, value) in optional_use_keys {
+            if !fields.contains_key(&key) {
+                return Err(Error::validate(format!(
+                    "'config' section must contain key for optional use '{}'",
+                    key
+                )));
+            }
+            if fields.get(&key) != Some(&value) {
+                return Err(Error::validate(format!(
+                    "Use and config block differ on type for key '{}'",
+                    key
+                )));
+            }
         }
 
         Ok(())
@@ -1622,6 +1675,57 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         }
         Ok(())
     }
+}
+
+// Construct the config type information out of a `use` for a configuration capability.
+// This will return validation errors if the `use` is missing fields.
+pub fn use_config_to_value_type(u: &Use) -> Result<ConfigValueType, Error> {
+    let config = u.config.clone().expect("Only call use_config_to_value_type on a Config");
+
+    let Some(config_type) = u.config_type.as_ref() else {
+        return Err(Error::validate(format!("Config '{}' is missing field 'type'", config)));
+    };
+
+    let config_type = match config_type {
+        ConfigType::Bool => ConfigValueType::Bool { mutability: None },
+        ConfigType::Uint8 => ConfigValueType::Uint8 { mutability: None },
+        ConfigType::Uint16 => ConfigValueType::Uint16 { mutability: None },
+        ConfigType::Uint32 => ConfigValueType::Uint32 { mutability: None },
+        ConfigType::Uint64 => ConfigValueType::Uint64 { mutability: None },
+        ConfigType::Int8 => ConfigValueType::Int8 { mutability: None },
+        ConfigType::Int16 => ConfigValueType::Int16 { mutability: None },
+        ConfigType::Int32 => ConfigValueType::Int32 { mutability: None },
+        ConfigType::Int64 => ConfigValueType::Int64 { mutability: None },
+        ConfigType::String => {
+            let Some(max_size) = u.config_max_size else {
+                return Err(Error::validate(format!(
+                    "Config '{}' is type String but is missing field 'max_size'",
+                    config
+                )));
+            };
+            ConfigValueType::String { max_size: max_size.into(), mutability: None }
+        }
+        ConfigType::Vector => {
+            let Some(ref element) = u.config_element_type else {
+                return Err(Error::validate(format!(
+                    "Config '{}' is type Vector but is missing field 'element'",
+                    config
+                )));
+            };
+            let Some(max_count) = u.config_max_count else {
+                return Err(Error::validate(format!(
+                    "Config '{}' is type Vector but is missing field 'max_count'",
+                    config
+                )));
+            };
+            ConfigValueType::Vector {
+                max_count: max_count.into(),
+                element: element.clone(),
+                mutability: None,
+            }
+        }
+    };
+    Ok(config_type)
 }
 
 /// Given an iterator with `(key, name)` tuples, ensure that `key` doesn't
@@ -2917,7 +3021,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "unknown field `resolver`, expected one of `service`, `protocol`, `directory`, `storage`, `event_stream`, `runner`, `config`, `from`, `path`, `rights`, `subdir`, `scope`, `filter`, `dependency`, `availability`, `config_key`"
+            Err(Error::Parse { err, .. }) if err.starts_with("unknown field `resolver`, expected one of")
         ),
 
         test_cml_use_disallows_nested_dirs_directory(
@@ -7185,5 +7289,100 @@ mod tests {
             });
 
         assert_matches!(compile(&input, CompileOptions::default()), Err(Error::Validate { .. }));
+    }
+
+    // Tests for config capabilities
+    test_validate_cml! {
+        a_test_cml_use_config(
+        json!({"use": [
+            {
+                "config": "fuchsia.config.MyConfig",
+                "config_key": "my_config",
+                "type": "bool",
+            },
+        ],}),
+        Ok(())
+        ),
+        test_cml_use_config_good_vector(
+        json!({"use": [
+            {
+                "config": "fuchsia.config.MyConfig",
+                "config_key": "my_config",
+                "type": "vector",
+                "element": { "type": "bool"},
+                "max_count": 1,
+            },
+        ],}),
+        Ok(())
+        ),
+        test_cml_use_config_bad_vector(
+        json!({"use": [
+            {
+                "config": "fuchsia.config.MyConfig",
+                "config_key": "my_config",
+                "type": "vector",
+                "element": { "type": "bool"},
+                // Missing max count.
+            },
+        ],}),
+        Err(Error::Validate {err,  .. })
+        if &err == "Config 'fuchsia.config.MyConfig' is type Vector but is missing field 'max_count'"
+        ),
+        test_cml_use_config_bad_string(
+        json!({"use": [
+            {
+                "config": "fuchsia.config.MyConfig",
+                "config_key": "my_config",
+                "type": "string",
+                // Missing max size.
+            },
+        ],}),
+        Err(Error::Validate { err, .. })
+        if &err == "Config 'fuchsia.config.MyConfig' is type String but is missing field 'max_size'"
+        ),
+
+        test_cml_optional_use_no_config(
+        json!({"use": [
+            {
+                "config": "fuchsia.config.MyConfig",
+                "config_key": "my_config",
+                "type": "bool",
+                "availability": "optional",
+            },
+        ],}),
+        Err(Error::Validate {err, ..})
+        if &err == "'config' section is empty but there are optional config uses"
+        ),
+        test_cml_optional_use_bad_type(
+        json!({"use": [
+            {
+                "config": "fuchsia.config.MyConfig",
+                "config_key": "my_config",
+                "type": "bool",
+                "availability": "optional",
+            },
+        ],
+        "config": {
+            "my_config": { "type": "uint8"}
+        }}),
+        Err(Error::Validate {err, ..})
+        if &err == "Use and config block differ on type for key 'my_config'"
+        ),
+
+        test_cml_optional_use_good(
+        json!({"use": [
+            {
+                "config": "fuchsia.config.MyConfig",
+                "config_key": "my_config",
+                "type": "bool",
+                "availability": "optional",
+            },
+        ],
+        "config": {
+            "my_config": { "type": "bool"},
+        }
+    }),
+    Ok(())
+        ),
     }
 }

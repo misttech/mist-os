@@ -2864,6 +2864,55 @@ pub struct Use {
     /// will set.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub config_key: Option<Name>,
+
+    /// (`config` only) The type of configuration, one of:
+    /// - `bool`: Boolean type.
+    /// - `uint8`: Unsigned 8 bit type.
+    /// - `uint16`: Unsigned 16 bit type.
+    /// - `uint32`: Unsigned 32 bit type.
+    /// - `uint64`: Unsigned 64 bit type.
+    /// - `int8`: Signed 8 bit type.
+    /// - `int16`: Signed 16 bit type.
+    /// - `int32`: Signed 32 bit type.
+    /// - `int64`: Signed 64 bit type.
+    /// - `string`: ASCII string type.
+    /// - `vector`: Vector type. See `element` for the type of the element within the vector
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    #[reference_doc(rename = "type")]
+    pub config_type: Option<ConfigType>,
+
+    /// (`configuration` only) Only supported if this configuration `type` is 'string'.
+    /// This is the max size of the string.
+    #[serde(rename = "max_size", skip_serializing_if = "Option::is_none")]
+    #[reference_doc(rename = "max_size")]
+    pub config_max_size: Option<NonZeroU32>,
+
+    /// (`configuration` only) Only supported if this configuration `type` is 'vector'.
+    /// This is the max number of elements in the vector.
+    #[serde(rename = "max_count", skip_serializing_if = "Option::is_none")]
+    #[reference_doc(rename = "max_count")]
+    pub config_max_count: Option<NonZeroU32>,
+
+    /// (`configuration` only) Only supported if this configuration `type` is 'vector'.
+    /// This is the type of the elements in the configuration vector.
+    ///
+    /// Example (simple type):
+    ///
+    /// ```json5
+    /// { type: "uint8" }
+    /// ```
+    ///
+    /// Example (string type):
+    ///
+    /// ```json5
+    /// {
+    ///   type: "string",
+    ///   max_size: 100,
+    /// }
+    /// ```
+    #[serde(rename = "element", skip_serializing_if = "Option::is_none")]
+    #[reference_doc(rename = "element", json_type = "object")]
+    pub config_element_type: Option<ConfigNestedValueType>,
 }
 
 /// Example:
@@ -4609,6 +4658,10 @@ mod tests {
             filter: None,
             dependency: None,
             availability: None,
+            config_element_type: None,
+            config_max_count: None,
+            config_max_size: None,
+            config_type: None,
         }
     }
 
