@@ -207,7 +207,16 @@ group("tests") {
       "tests:fuchsia_controller_isolate_directory_test",
       "tests:fuchsia_controller_socket_test",
     ]
+  }
+}
 
+group("e2e_tests") {
+  testonly = true
+  deps = []
+
+  # TODO(https://fxbug.dev/42078138): These tests fail on mac builders. This is most likely
+  # because of the infra machines running OSX 10.15
+  if (host_os != "mac") {
     # TODO(https://fxbug.dev/42080013): Re-enable when the corrupt profile header
     # issue is fixed.
     if (!is_coverage) {
