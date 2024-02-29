@@ -12,7 +12,7 @@ use {
     tracing::warn,
 };
 
-fn unsafe_slice_to_vec<T: Clone>(data: *const T, len: usize) -> Vec<T> {
+pub fn unsafe_slice_to_vec<T: Clone>(data: *const T, len: usize) -> Vec<T> {
     if data.is_null() || len == 0 {
         vec![]
     } else {

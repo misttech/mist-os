@@ -610,10 +610,7 @@ pub mod test_utils {
     use {
         super::*,
         banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
-        std::{
-            slice,
-            sync::{Arc, Mutex},
-        },
+        std::sync::{Arc, Mutex},
     };
 
     #[derive(Debug)]
@@ -796,8 +793,8 @@ pub mod test_utils {
         // Cannot mark fn unsafe because it has to match fn signature in FullDeviceInterface
         fn start_scan(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseStartScanRequest) {
             let channels =
-                unsafe { slice::from_raw_parts(req.channels_list, req.channels_count) }.to_vec();
-            let ssids = unsafe { slice::from_raw_parts(req.ssids_list, req.ssids_count) }.to_vec();
+                banjo_to_fidl::unsafe_slice_to_vec(req.channels_list, req.channels_count);
+            let ssids = banjo_to_fidl::unsafe_slice_to_vec(req.ssids_list, req.ssids_count);
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::StartScan {
                 req,
                 channels,
@@ -806,20 +803,16 @@ pub mod test_utils {
         }
 
         fn connect(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseConnectRequest) {
-            let selected_bss_ies = unsafe {
-                slice::from_raw_parts(req.selected_bss.ies_list, req.selected_bss.ies_count)
-            }
-            .to_vec();
+            let selected_bss_ies = banjo_to_fidl::unsafe_slice_to_vec(
+                req.selected_bss.ies_list,
+                req.selected_bss.ies_count,
+            );
             let sae_password =
-                unsafe { slice::from_raw_parts(req.sae_password_list, req.sae_password_count) }
-                    .to_vec();
+                banjo_to_fidl::unsafe_slice_to_vec(req.sae_password_list, req.sae_password_count);
             let wep_key =
-                unsafe { slice::from_raw_parts(req.wep_key.key_list, req.wep_key.key_count) }
-                    .to_vec();
+                banjo_to_fidl::unsafe_slice_to_vec(req.wep_key.key_list, req.wep_key.key_count);
             let security_ie =
-                unsafe { slice::from_raw_parts(req.security_ie_list, req.security_ie_count) }
-                    .to_vec();
-
+                banjo_to_fidl::unsafe_slice_to_vec(req.security_ie_list, req.security_ie_count);
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::ConnectReq {
                 req,
                 selected_bss_ies,
@@ -859,12 +852,10 @@ pub mod test_utils {
             let num_keys = req.num_keys;
             let mut keys = vec![];
             for i in 0..req.num_keys as usize {
-                keys.push(
-                    unsafe {
-                        slice::from_raw_parts(req.keylist[i].key_list, req.keylist[i].key_count)
-                    }
-                    .to_vec(),
-                );
+                keys.push(banjo_to_fidl::unsafe_slice_to_vec(
+                    req.keylist[i].key_list,
+                    req.keylist[i].key_count,
+                ));
             }
             self.mocks
                 .lock()
@@ -882,7 +873,7 @@ pub mod test_utils {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::DelKeysReq { req });
         }
         fn eapol_tx(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseEapolTxRequest) {
-            let data = unsafe { slice::from_raw_parts(req.data_list, req.data_count) }.to_vec();
+            let data = banjo_to_fidl::unsafe_slice_to_vec(req.data_list, req.data_count);
             self.mocks
                 .lock()
                 .unwrap()
@@ -916,8 +907,7 @@ pub mod test_utils {
         }
         fn sae_frame_tx(&mut self, frame: banjo_wlan_fullmac::WlanFullmacSaeFrame) {
             let sae_fields =
-                unsafe { slice::from_raw_parts(frame.sae_fields_list, frame.sae_fields_count) }
-                    .to_vec();
+                banjo_to_fidl::unsafe_slice_to_vec(frame.sae_fields_list, frame.sae_fields_count);
             self.mocks
                 .lock()
                 .unwrap()
