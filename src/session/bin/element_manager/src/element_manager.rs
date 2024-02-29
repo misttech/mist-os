@@ -14,7 +14,6 @@ use {
     },
     crate::element::Element,
     anyhow::{format_err, Error},
-    fidl,
     fidl::endpoints::{
         create_proxy, create_request_stream, ClientEnd, ControlHandle, Proxy, RequestStream,
         ServerEnd,
@@ -23,13 +22,12 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement, fidl_fuchsia_io as fio,
     fidl_fuchsia_ui_app as fuiapp,
     fuchsia_async::{self as fasync, DurationExt},
-    fuchsia_component, fuchsia_scenic as scenic, fuchsia_zircon as zx,
+    fuchsia_scenic as scenic, fuchsia_zircon as zx,
     futures::{lock::Mutex, select, FutureExt, StreamExt, TryStreamExt},
     rand::{
         distributions::{Alphanumeric, DistString},
         thread_rng,
     },
-    realm_management,
     std::{collections::HashMap, sync::Arc},
     tracing::{error, info},
 };

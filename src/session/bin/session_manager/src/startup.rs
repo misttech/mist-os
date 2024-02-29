@@ -6,8 +6,8 @@ use {
     crate::cobalt,
     fidl::endpoints::{create_proxy, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_session as fsession,
-    fuchsia_async as fasync, fuchsia_zircon as zx, realm_management,
-    thiserror::{self, Error},
+    fuchsia_async as fasync, fuchsia_zircon as zx,
+    thiserror::Error,
     tracing::info,
 };
 

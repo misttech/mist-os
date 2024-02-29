@@ -13,7 +13,6 @@ mod tests {
         fuchsia_component_test::{
             Capability, ChildOptions, ChildRef, DirectoryContents, RealmBuilder, Ref, Route,
         },
-        session_manager_lib,
     };
 
     const SESSION_URL: &'static str = "hello-world-session#meta/hello-world-session.cm";

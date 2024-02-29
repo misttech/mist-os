@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 // [START main]
-use anyhow::{self, Error};
-use tracing;
+use anyhow::Error;
 
 /// Creates a simple session that just prints "Hello World" to the syslog.
 #[fuchsia::main(logging = true)]
